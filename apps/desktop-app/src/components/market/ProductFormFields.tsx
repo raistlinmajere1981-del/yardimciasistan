@@ -11,6 +11,7 @@ import {
   productProviderLabel,
   type ProductFormState
 } from "../../app/product-model";
+import { MoneyInput } from "../ui/MoneyInput";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
 export interface ProductLookupSeed {
@@ -137,8 +138,8 @@ export function ProductFormFields({
       </label>
       <label className="market-field">Kategori<select disabled={disabled} value={form.categoryId} onChange={(event) => onChange({ ...form, categoryId: event.target.value })}><option value="">Kategorisiz</option>{categories.filter((category) => category.isActive).map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
       <label className="market-field">Birim<select disabled={disabled} value={form.unit} onChange={(event) => onChange({ ...form, unit: event.target.value as ProductFormState["unit"] })}>{Object.entries(PRODUCT_UNIT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-      <label className="market-field">Satış fiyatı<input disabled={disabled} type="number" min="0" step="0.01" value={form.salePrice} onChange={(event) => onChange({ ...form, salePrice: event.target.value })} /></label>
-      <label className="market-field">Alış fiyatı<input disabled={disabled} type="number" min="0" step="0.01" value={form.purchasePrice} onChange={(event) => onChange({ ...form, purchasePrice: event.target.value })} /></label>
+      <label className="market-field">Satış fiyatı<MoneyInput disabled={disabled} value={form.salePrice} onChange={(salePrice) => onChange({ ...form, salePrice })} /></label>
+      <label className="market-field">Alış fiyatı<MoneyInput disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>
       <label className="market-field">Para birimi<input disabled={disabled} value={form.currency} maxLength={3} onChange={(event) => onChange({ ...form, currency: event.target.value.toUpperCase() })} /></label>
       <label className="market-field">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value })} /></label>
       {inventoryEnabled && form.trackInventory && <label className="market-field">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>}

@@ -7,6 +7,7 @@ import type {
   CommerceUnit,
   ProductLookupCandidate
 } from "@yardimci-asistan/shared";
+import { parseMoneyToMajor } from "@yardimci-asistan/shared";
 import {
   createBarcodeSimulatorAdapter,
   createKeyboardBarcodeInputAdapter,
@@ -16,6 +17,7 @@ import type { DesktopCustomer } from "../../../electron/database";
 import type { DesktopCommerceBridge } from "../../../electron/commerce-ipc-contract";
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
+import { MoneyInput } from "../ui/MoneyInput";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
 import type { CartDraftQuickSaleRequest, MarketQuickSaleSession } from "../../app/use-market-quick-sale-session";
 import { useRequestGeneration } from "../workspace/use-request-generation";
@@ -202,7 +204,9 @@ export function MarketQuickSaleWorkspace({
     (sum, line) => sum + (line.product.salePrice * line.quantity),
     0
   ));
-  const discount = Math.max(0, Math.min(subtotal, roundMoney(Number(discountTotal) || 0)));
+  const discountMajor = discountTotal.trim() === "" ? 0 : parseMoneyToMajor(discountTotal);
+  const discountValid = discountMajor !== null && discountMajor >= 0;
+  const discount = discountValid ? Math.max(0, Math.min(subtotal, roundMoney(discountMajor))) : 0;
   const previewTotal = roundMoney(subtotal - discount);
   const currency = cartLines[0]?.product.currency ?? "TRY";
 
@@ -380,6 +384,10 @@ export function MarketQuickSaleWorkspace({
     }
     if (cartLines.length === 0) {
       onStateChange("error", "Satış için sepete en az bir ürün ekleyin.");
+      return;
+    }
+    if (!discountValid) {
+      onStateChange("error", "İndirim için geçerli bir tutar girin (örn. 125,50).");
       return;
     }
     if (isCredit && (!customerCreditEnabled || !selectedCustomer)) {
@@ -624,9 +632,10 @@ export function MarketQuickSaleWorkspace({
           </label>
           <label className="market-field">
             İndirim
-            <input type="number" min="0" step="0.01" value={discountTotal} onChange={(event) => setDiscountTotal(event.target.value)} disabled={disabled} />
+            <MoneyInput value={discountTotal} onChange={setDiscountTotal} disabled={disabled} />
           </label>
         </div>
+        {!discountValid && <p role="alert" className="market-muted">İndirim için geçerli bir tutar girin (örn. 125,50).</p>}
 
         {customerCreditEnabled && isCredit && (
           <CustomerPicker customers={customers} value={customerId} onChange={setCustomerId} disabled={disabled} />
@@ -638,7 +647,7 @@ export function MarketQuickSaleWorkspace({
           <span className="market-sale-grand-total"><small>{isCredit ? "Veresiye tutarı" : "Ödenecek"}</small><strong>{money(previewTotal, currency)}</strong></span>
         </div>
 
-        <button type="button" className="market-sale-complete" onClick={() => void completeSale()} disabled={disabled || cartLines.length === 0 || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))}>
+        <button type="button" className="market-sale-complete" onClick={() => void completeSale()} disabled={disabled || !discountValid || cartLines.length === 0 || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))}>
           <WalletCards size={18} aria-hidden="true" />
           {submitting ? "Satış işleniyor…" : isCredit ? "Satışı Veresiye Kaydet" : "Ödemeyi Al ve Satışı Tamamla"}
         </button>

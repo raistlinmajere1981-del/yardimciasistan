@@ -1,8 +1,9 @@
 import { PackagePlus, Plus, Save, Truck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { BUSINESS_CAPABILITIES, type CatalogProduct, type CommercePurchaseOrder, type CommerceSupplier } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, parseMoneyToMajor, type CatalogProduct, type CommercePurchaseOrder, type CommerceSupplier } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
+import { MoneyInput } from "../ui/MoneyInput";
 
 interface SupplierFormState {
   id: string;
@@ -32,7 +33,7 @@ function emptySupplierForm(): SupplierFormState {
 }
 
 function createPurchaseLine(index: number): PurchaseLineState {
-  return { key: `purchase-line-${Date.now()}-${index}`, productId: "", quantity: "1", unitCost: "0" };
+  return { key: `purchase-line-${Date.now()}-${index}`, productId: "", quantity: "1", unitCost: "" };
 }
 
 function money(value: number, currency = "TRY") {
@@ -119,13 +120,20 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
 
   async function receivePurchase() {
     if (!bridge) return;
-    const items = purchaseLines
-      .filter((line) => line.productId)
-      .map((line) => ({
+    const items: { productId: string; quantity: number; unitCost: number }[] = [];
+    for (const line of purchaseLines) {
+      if (!line.productId) continue;
+      const unitCost = parseMoneyToMajor(line.unitCost);
+      if (unitCost === null || unitCost < 0) {
+        onStateChange("error", "Birim maliyet için geçerli bir tutar girin (örn. 125,50).");
+        return;
+      }
+      items.push({
         productId: line.productId,
         quantity: Number(line.quantity),
-        unitCost: Number(line.unitCost)
-      }));
+        unitCost
+      });
+    }
     onStateChange("loading", "Alım stoğa işleniyor…");
     try {
       const result = await bridge.receivePurchase({
@@ -181,7 +189,7 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
               <div className="market-purchase-line" key={line.key}>
                 <label className="market-field">Ürün<select value={line.productId} onChange={(event) => updatePurchaseLine(line.key, { productId: event.target.value })}><option value="">Ürün seçin</option>{products.filter((product) => product.trackInventory && product.isActive).map((product) => <option value={product.id} key={product.id}>{product.name}</option>)}</select></label>
                 <label className="market-field">Miktar<input type="number" min="0" step="0.0001" value={line.quantity} onChange={(event) => updatePurchaseLine(line.key, { quantity: event.target.value })} /></label>
-                <label className="market-field">Birim maliyet<input type="number" min="0" step="0.01" value={line.unitCost} onChange={(event) => updatePurchaseLine(line.key, { unitCost: event.target.value })} /></label>
+                <label className="market-field">Birim maliyet<MoneyInput value={line.unitCost} onChange={(unitCost) => updatePurchaseLine(line.key, { unitCost })} /></label>
                 {purchaseLines.length > 1 && <button type="button" className="market-icon-button" aria-label={`${index + 1}. satırı kaldır`} onClick={() => setPurchaseLines((current) => current.filter((item) => item.key !== line.key))}>×</button>}
               </div>
             ))}

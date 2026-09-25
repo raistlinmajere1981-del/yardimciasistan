@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ROOM_PUBLIC_DETAIL_LIMITS,
+  formatMinorToInput as minorToInput,
   normalizeRoomPublicFeatures,
   normalizeTableCategoryInputs,
+  parseMoneyToMinor,
   type RoomPublicFeatureId
 } from "@yardimci-asistan/shared";
 import type {
@@ -202,7 +204,7 @@ export function useBusinessLayoutSettings(options: {
         if (!Number.isInteger(room.capacity) || room.capacity < 1 || room.capacity > 100) {
           return "Oda kapasitesi 1 ile 100 arasında olmalı.";
         }
-        if (parseMoneyToMinor(room.price) < 0) return "Oda fiyatlarını kontrol edin.";
+        if (parseMoneyToMinor(room.price) === null) return "Oda fiyatlarını kontrol edin.";
       }
     }
 
@@ -258,7 +260,9 @@ export function useBusinessLayoutSettings(options: {
               features: room.features,
               description: room.description,
               priceNote: room.priceNote,
-              nightlyPriceMinor: parseMoneyToMinor(room.price),
+              // validate() rejects blank/invalid prices before save, so the
+              // fallback below is unreachable in practice.
+              nightlyPriceMinor: parseMoneyToMinor(room.price) ?? 0,
               currency: room.currency
             }))
           : undefined,
@@ -393,18 +397,4 @@ function comparableDraft(value: BusinessLayoutDraft): string {
     })),
     capabilities: value.capabilities
   });
-}
-
-function minorToInput(value: number) {
-  return new Intl.NumberFormat("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(Math.max(0, value) / 100);
-}
-
-function parseMoneyToMinor(value: string) {
-  const normalized = value.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-  if (!normalized) return 0;
-  const amount = Number(normalized);
-  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : -1;
 }

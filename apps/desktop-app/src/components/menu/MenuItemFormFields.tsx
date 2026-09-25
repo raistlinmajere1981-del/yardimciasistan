@@ -6,6 +6,7 @@ import {
   type ItemFormState
 } from "./menu-model";
 import { ActionButton } from "../ui/ActionButton";
+import { MoneyInput } from "../ui/MoneyInput";
 
 const MAX_SOURCE_IMAGE_BYTES = 15 * 1024 * 1024;
 const TARGET_IMAGE_BYTES = 420 * 1024;
@@ -138,7 +139,7 @@ export function MenuItemFormFields({
           <div className="form-grid">
             <label className="form-field form-field--long form-field--span">Ürün adı<input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} placeholder="Serpme Kahvaltı" /></label>
             <label className="form-field form-field--medium">Kategori<select value={form.category_id} onChange={(event) => onChange({ ...form, category_id: event.target.value })}>{dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-            <label className="form-field form-field--short">Fiyat<input value={form.price} onChange={(event) => onChange({ ...form, price: event.target.value })} inputMode="decimal" /></label>
+            <label className="form-field form-field--short">Fiyat<MoneyInput value={form.price} onChange={(price) => onChange({ ...form, price })} /></label>
             <label className="form-field form-field--fluid form-field--span">Açıklama<textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ürün açıklaması" /></label>
             <div className="form-row form-field--span">
               <label className="form-check"><input checked={form.is_available} onChange={(event) => onChange({ ...form, is_available: event.target.checked })} type="checkbox" />Mevcut</label>

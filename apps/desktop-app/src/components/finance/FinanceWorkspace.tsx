@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Banknote, BedDouble, CreditCard, Landmark, Minus, Plus, Trash2, WalletCards } from "lucide-react";
+import { formatMinorCurrency } from "@yardimci-asistan/shared";
 import type { FinanceController } from "../../app/controller-types";
 import type {
   DesktopFinanceCategory,
@@ -12,6 +13,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FormDialog } from "../ui/FormDialog";
 import { DatePicker } from "../ui/DateTimePicker";
 import { MetricCard } from "../ui/MetricCard";
+import { MoneyInput } from "../ui/MoneyInput";
 import { Panel } from "../ui/Panel";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
@@ -160,10 +162,10 @@ export function FinanceWorkspace({
       </div>
 
       <div className="finance-summary-grid">
-        <MetricCard compact title="Bugün Gelen" value={minorMoney(data.todayIncomeMinor)} detail="Kasaya giren" tone="ok" icon={Banknote} />
-        <MetricCard compact title="Bugün Çıkan" value={minorMoney(data.todayExpenseMinor)} detail="Kaydedilen gider" tone="wait" icon={WalletCards} />
-        <MetricCard compact title="Bugünkü Fark" value={minorMoney(data.todayNetMinor)} detail="Gelen - çıkan" tone={data.todayNetMinor >= 0 ? "info" : "wait"} icon={CreditCard} />
-        {accommodationFolioEnabled && <MetricCard compact title="Bekleyen Alacak" value={minorMoney(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "wait" : "ok"} icon={Landmark} />}
+        <MetricCard compact title="Bugün Gelen" value={formatMinorCurrency(data.todayIncomeMinor)} detail="Kasaya giren" tone="ok" icon={Banknote} />
+        <MetricCard compact title="Bugün Çıkan" value={formatMinorCurrency(data.todayExpenseMinor)} detail="Kaydedilen gider" tone="wait" icon={WalletCards} />
+        <MetricCard compact title="Bugünkü Fark" value={formatMinorCurrency(data.todayNetMinor)} detail="Gelen - çıkan" tone={data.todayNetMinor >= 0 ? "info" : "wait"} icon={CreditCard} />
+        {accommodationFolioEnabled && <MetricCard compact title="Bekleyen Alacak" value={formatMinorCurrency(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "wait" : "ok"} icon={Landmark} />}
       </div>
 
       {topPanel && <div className="finance-top-panel">{topPanel}</div>}
@@ -192,7 +194,7 @@ export function FinanceWorkspace({
                       <span>{entrySourceLabel(entry, data.categories)} · {paymentMethodLabel(entry.paymentMethod)} · {formatDateTime(entry.occurredAt)}</span>
                     </div>
                     <b className={`finance-entry-item__amount ${entry.direction === "income" ? "is-income" : "is-expense"}`}>
-                      {entry.direction === "income" ? "+" : "−"}{minorMoney(entry.amountMinor)}
+                      {entry.direction === "income" ? "+" : "−"}{formatMinorCurrency(entry.amountMinor)}
                     </b>
                     {entry.sourceType === "manual" ? (
                       <ActionButton
@@ -222,7 +224,7 @@ export function FinanceWorkspace({
                 <h3>Bekleyen Alacaklar</h3>
                 <p>Oda hesapları</p>
               </div>
-              <strong>{minorMoney(data.outstandingPensionMinor)}</strong>
+              <strong>{formatMinorCurrency(data.outstandingPensionMinor)}</strong>
             </div>
             {outstandingRows.length === 0 ? (
               <p className="finance-compact-empty">Açık alacak yok.</p>
@@ -234,7 +236,7 @@ export function FinanceWorkspace({
                       <strong>{item.customerName}</strong>
                       <span>{item.context}{item.dateText ? ` · ${item.dateText}` : ""}</span>
                     </div>
-                    <b className="finance-outstanding-item__amount">{minorMoney(item.remainingMinor)}</b>
+                    <b className="finance-outstanding-item__amount">{formatMinorCurrency(item.remainingMinor)}</b>
                   </article>
                 ))}
               </div>
@@ -285,11 +287,9 @@ export function FinanceWorkspace({
               <div className="form-grid">
                 <label className="form-field form-field--short">
                   <span>Tutar</span>
-                  <input
-                    inputMode="decimal"
+                  <MoneyInput
                     value={draft.amount}
-                    onChange={(event) => updateDraft({ amount: event.target.value })}
-                    placeholder="0,00"
+                    onChange={(amount) => updateDraft({ amount })}
                     autoFocus
                     disabled={saving}
                   />
@@ -390,7 +390,7 @@ export function FinanceWorkspace({
 
       {pendingDelete && <ConfirmDialog tone="danger" eyebrow="Kasa kaydı" title="Bu hareket kaldırılsın mı?"
         description="Yalnız elle eklenen kasa kayıtları bu şekilde kaldırılabilir."
-        details={<><strong>{pendingDelete.description || categoryLabel(pendingDelete.category, data.categories)}</strong> · {minorMoney(pendingDelete.amountMinor)}</>}
+        details={<><strong>{pendingDelete.description || categoryLabel(pendingDelete.category, data.categories)}</strong> · {formatMinorCurrency(pendingDelete.amountMinor)}</>}
         busy={saving} confirmLabel={saving ? "Kaldırılıyor…" : "Kaydı Kaldır"}
         onConfirm={confirmDeleteEntry} onCancel={() => setPendingDelete(null)} />}
     </section>
@@ -429,10 +429,6 @@ function PaymentMethodSelect({
       <option value="other">Diğer</option>
     </select>
   );
-}
-
-function minorMoney(value: number): string {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(value / 100);
 }
 
 function formatDateTime(value: string): string {

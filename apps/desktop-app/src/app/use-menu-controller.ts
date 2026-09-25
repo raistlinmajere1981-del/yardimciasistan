@@ -13,6 +13,7 @@ import {
   nextSortOrder,
   toCategoryForm,
   toItemForm,
+  validateItemFormPrice,
   type CategoryFormState,
   type ItemFormState
 } from "../components/menu/menu-model";
@@ -182,6 +183,11 @@ export function useMenuController({
       return { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
     }
 
+    const priceError = validateItemFormPrice(form);
+    if (priceError) {
+      return { ok: false, message: priceError };
+    }
+
     const result = await bridge.saveMenuItem(itemFormToSaveInput(form));
     if (!result.ok) {
       return result;
@@ -200,6 +206,12 @@ export function useMenuController({
   async function saveItem(): Promise<DesktopMenuSaveResult> {
     setMenuEditState("loading");
     setMenuEditMessage("Ürün kaydediliyor...");
+    const priceError = validateItemFormPrice(itemForm);
+    if (priceError) {
+      setMenuEditState("error");
+      setMenuEditMessage(priceError);
+      return { ok: false, message: priceError };
+    }
     const result = await saveItemForm(itemForm);
     setMenuEditState(result.ok ? "success" : "error");
     setMenuEditMessage(result.message);

@@ -1,4 +1,10 @@
-import { moneyToMinor, type CustomerCreditEntryType, type CustomerCreditPaymentMethod } from "@yardimci-asistan/shared";
+import {
+  formatMinorCurrency,
+  moneyToMinor,
+  parseMoneyInput,
+  type CustomerCreditEntryType,
+  type CustomerCreditPaymentMethod
+} from "@yardimci-asistan/shared";
 
 export const customerCreditEntryLabels: Record<CustomerCreditEntryType, string> = {
   credit_sale: "Veresiye satış",
@@ -12,14 +18,14 @@ export const customerCreditPaymentLabels: Record<CustomerCreditPaymentMethod, st
 };
 
 export function formatCreditMoney(amountMinor: number, currency: string): string {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format(amountMinor / 100);
+  return formatMinorCurrency(amountMinor, currency);
 }
 
 export function parseCreditAmount(value: string): number | null {
-  const text = value.trim();
-  if (!/^\d+(?:[,.]\d{1,2})?$/.test(text)) return null;
+  const parsed = parseMoneyInput(value);
+  if (parsed.status !== "valid" || parsed.minor === null) return null;
   try {
-    const amount = moneyToMinor(Number(text.replace(",", ".")));
+    const amount = moneyToMinor(parsed.major ?? 0);
     return amount > 0 && amount <= 999_999_999_999 ? amount : null;
   } catch { return null; }
 }
