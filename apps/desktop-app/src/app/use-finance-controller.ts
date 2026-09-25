@@ -52,7 +52,7 @@ interface FinanceMutationLock {
 
 function todayDateInput(): string {
   const now = new Date();
-  return `${String(now.getDate()).padStart(2, "0")}.${String(now.getMonth() + 1).padStart(2, "0")}.${now.getFullYear()}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 function emptyDraft(): FinanceEntryDraft {
@@ -77,11 +77,11 @@ function parseMoneyToMinor(value: string): number {
 }
 
 function dateInputToTimestamp(value: string): string {
-  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value.trim());
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!match) return "";
-  const day = Number(match[1]);
+  const year = Number(match[1]);
   const month = Number(match[2]);
-  const year = Number(match[3]);
+  const day = Number(match[3]);
   const date = new Date(year, month - 1, day, 12, 0, 0, 0);
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return "";
   return date.toISOString();
@@ -297,7 +297,7 @@ export function useFinanceController({
     }
     const occurredAt = dateInputToTimestamp(draft.date);
     if (!occurredAt) {
-      setMessage("Tarihi GG.AA.YYYY biçiminde girin.");
+      setMessage("Geçerli bir işlem tarihi seçin.");
       return false;
     }
 
