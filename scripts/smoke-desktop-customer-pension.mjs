@@ -2,6 +2,7 @@ import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
+import { chooseDate } from './test-helpers/date-time-picker.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createSetupFixture, createReportFixture, createCompactUiFixture } from './lib/desktop-renderer-fixtures.mjs';
@@ -244,7 +245,7 @@ try {
     await capture('reservation-edit');
     await expect(page.getByRole('dialog').getByLabel('Giriş tarihi', { exact: true })).toBeDisabled();
     await closeDialog();
-    await page.getByLabel('Rezervasyon yönetimi', { exact: true }).getByLabel('Tarih', { exact: true }).fill('2030-01-01');
+    await chooseDate(page.getByLabel('Rezervasyon yönetimi', { exact: true }), 'Tarih', '2030-01-01');
     await capture('reservations-empty');
     await page.getByRole('button', { name: 'Filtreyi Temizle', exact: true }).click();
     await page.getByRole('button', { name: 'Günlük İşler', exact: true }).click();
@@ -293,8 +294,8 @@ try {
   await page.locator('.sidebar').getByRole('button', { name: 'Pansiyon', exact: true }).click();
   await page.getByRole('button', { name: 'Rezervasyonlar', exact: true }).click();
   await page.getByRole('button', { name: 'Yeni Rezervasyon', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('Giriş tarihi', { exact: true }).fill('2026-10-01');
-  await page.getByRole('dialog').getByLabel('Çıkış tarihi', { exact: true }).fill('2026-10-03');
+  await chooseDate(page.getByRole('dialog'), 'Giriş tarihi', '2026-10-01');
+  await chooseDate(page.getByRole('dialog'), 'Çıkış tarihi', '2026-10-03');
   await page.getByRole('dialog').getByLabel('Kişi sayısı', { exact: true }).fill('2');
   await page.getByRole('button', { name: 'Rezervasyonu Kaydet', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
