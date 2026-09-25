@@ -15,8 +15,6 @@ import { MetricCard } from "../ui/MetricCard";
 import { Panel } from "../ui/Panel";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
-const RECENT_ENTRY_PREVIEW_COUNT = 6;
-
 type OutstandingRow = {
   id: string;
   customerName: string;
@@ -28,10 +26,10 @@ type OutstandingRow = {
 
 export function FinanceWorkspace({
   controller,
-  aside
+  topPanel
 }: {
   controller: FinanceController;
-  aside?: ReactNode;
+  topPanel?: ReactNode;
 }) {
   const {
     data,
@@ -52,7 +50,6 @@ export function FinanceWorkspace({
     deleteManualEntry
   } = controller;
   const [pendingDelete, setPendingDelete] = useState<DesktopFinanceEntry | null>(null);
-  const [showAllEntries, setShowAllEntries] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const beginPresentationRequest = useRequestGeneration();
 
@@ -70,11 +67,6 @@ export function FinanceWorkspace({
   useEffect(() => {
     setNewCategoryName("");
   }, [draft.mode]);
-
-  const visibleRecentEntries = showAllEntries
-    ? data.recentEntries
-    : data.recentEntries.slice(0, RECENT_ENTRY_PREVIEW_COUNT);
-  const hasOlderEntries = data.recentEntries.length > RECENT_ENTRY_PREVIEW_COUNT;
 
   const outstandingRows = useMemo(() => {
     if (!accommodationFolioEnabled) return [];
@@ -131,8 +123,8 @@ export function FinanceWorkspace({
 
   async function submitEntry() {
     const isCurrent = beginPresentationRequest();
-    const saved = await saveEntry();
-    if (isCurrent() && saved) setShowAllEntries(false);
+    await saveEntry();
+    isCurrent();
   }
 
   async function addCategory() {
@@ -176,15 +168,14 @@ export function FinanceWorkspace({
         {accommodationFolioEnabled && <MetricCard compact title="Bekleyen Alacak" value={minorMoney(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "wait" : "ok"} icon={Landmark} />}
       </div>
 
-      <div className={`finance-main-grid ${!aside && !accommodationFolioEnabled ? "is-single-column" : ""}`}>
+      {topPanel && <div className="finance-top-panel">{topPanel}</div>}
+
+      <div className={`finance-main-grid ${!accommodationFolioEnabled ? "is-single-column" : ""}`}>
         <Panel className="finance-recent-panel">
           <div className="finance-section-heading page-toolbar">
             <div>
               <h3>Son Hareketler</h3>
-              <p>
-                Otomatik ve elle eklenen kasa kayıtları
-                {hasOlderEntries && !showAllEntries ? ` · son ${RECENT_ENTRY_PREVIEW_COUNT} kayıt` : ""}
-              </p>
+              <p>Otomatik ve elle eklenen kasa kayıtları</p>
             </div>
             {loading && <span className="loading-state" role="status">Yükleniyor…</span>}
           </div>
@@ -193,7 +184,7 @@ export function FinanceWorkspace({
           ) : (
             <>
               <div className="finance-entry-list">
-                {visibleRecentEntries.map((entry) => (
+                {data.recentEntries.map((entry) => (
                   <article key={entry.id} className="finance-entry-item">
                     <span className={`finance-direction-icon is-${entry.direction}`} aria-hidden="true">
                       {entry.direction === "income" ? "+" : "−"}
@@ -222,60 +213,43 @@ export function FinanceWorkspace({
                   </article>
                 ))}
               </div>
-              {hasOlderEntries && (
-                <ActionButton
-                  variant="secondary"
-                  size="sm"
-                  className="finance-history-toggle"
-                  onClick={() => setShowAllEntries((current) => !current)}
-                >
-                  {showAllEntries ? `Son ${RECENT_ENTRY_PREVIEW_COUNT} Kaydı Göster` : `Tüm Hareketleri Göster (${data.recentEntries.length})`}
-                </ActionButton>
-              )}
             </>
           )}
         </Panel>
 
-        {(aside || accommodationFolioEnabled) && (
-          <div className="finance-side-column">
-            {accommodationFolioEnabled && (
-              <Panel className="finance-outstanding-panel" padding="compact">
-                <div className="finance-section-heading page-toolbar">
-                  <div>
-                    <h3>Bekleyen Alacaklar</h3>
-                    <p>Oda hesapları</p>
-                  </div>
-                  <strong>{minorMoney(data.outstandingPensionMinor)}</strong>
-                </div>
-                {outstandingRows.length === 0 ? (
-                  <p className="finance-compact-empty">Açık alacak yok.</p>
-                ) : (
-                  <div className="finance-outstanding-list">
-                    {outstandingRows.slice(0, 5).map((item) => (
-                      <article key={item.id} className="finance-outstanding-item">
-                        <div className="finance-outstanding-item__main">
-                          <strong>{item.customerName}</strong>
-                          <span>{item.context}{item.dateText ? ` · ${item.dateText}` : ""}</span>
-                        </div>
-                        <b className="finance-outstanding-item__amount">{minorMoney(item.remainingMinor)}</b>
-                      </article>
-                    ))}
-                  </div>
-                )}
-                {outstandingRows.length > 0 && (
-                  <div className="finance-room-note">
-                    <BedDouble size={15} aria-hidden="true" />
-                    <span>Tahsilat Pansiyon → Oda Adisyonu içinden yapılır.</span>
-                  </div>
-                )}
-              </Panel>
+        {accommodationFolioEnabled && (
+          <Panel className="finance-outstanding-panel" padding="compact">
+            <div className="finance-section-heading page-toolbar">
+              <div>
+                <h3>Bekleyen Alacaklar</h3>
+                <p>Oda hesapları</p>
+              </div>
+              <strong>{minorMoney(data.outstandingPensionMinor)}</strong>
+            </div>
+            {outstandingRows.length === 0 ? (
+              <p className="finance-compact-empty">Açık alacak yok.</p>
+            ) : (
+              <div className="finance-outstanding-list">
+                {outstandingRows.map((item) => (
+                  <article key={item.id} className="finance-outstanding-item">
+                    <div className="finance-outstanding-item__main">
+                      <strong>{item.customerName}</strong>
+                      <span>{item.context}{item.dateText ? ` · ${item.dateText}` : ""}</span>
+                    </div>
+                    <b className="finance-outstanding-item__amount">{minorMoney(item.remainingMinor)}</b>
+                  </article>
+                ))}
+              </div>
             )}
-            {aside}
-          </div>
+            {outstandingRows.length > 0 && (
+              <div className="finance-room-note">
+                <BedDouble size={15} aria-hidden="true" />
+                <span>Tahsilat Pansiyon → Oda Adisyonu içinden yapılır.</span>
+              </div>
+            )}
+          </Panel>
         )}
       </div>
-
-      {message && !draft.mode && <p className="finance-feedback status-message" role="status">{message}</p>}
 
       {draft.mode && (
         <FormDialog
