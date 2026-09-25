@@ -81,6 +81,7 @@ import type {
   AddPensionPaymentInput,
   DesktopFinanceData,
   DesktopFinanceMutationResult,
+  SaveFinanceCategoryInput,
   SaveManualFinanceEntryInput,
   SetReservationAgreedTotalInput
 } from "./finance";
@@ -172,6 +173,8 @@ export interface DesktopBridge {
   getFinanceData: (limit?: number) => Promise<DesktopFinanceData>;
   saveManualFinanceEntry: (input: SaveManualFinanceEntryInput) => Promise<DesktopFinanceMutationResult>;
   deleteManualFinanceEntry: (entryId: string) => Promise<DesktopFinanceMutationResult>;
+  saveFinanceCategory: (input: SaveFinanceCategoryInput) => Promise<DesktopFinanceMutationResult>;
+  deleteFinanceCategory: (categoryId: string) => Promise<DesktopFinanceMutationResult>;
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => Promise<DesktopFinanceMutationResult>;
   addPensionPayment: (input: AddPensionPaymentInput) => Promise<DesktopFinanceMutationResult>;
   getRoomFolioData: () => Promise<DesktopRoomFolioData>;
@@ -306,6 +309,8 @@ const bridge: DesktopBridge = {
   getFinanceData: (limit?: number) => invokeWhenUnlocked<DesktopFinanceData>("finance:getData", limit),
   saveManualFinanceEntry: (input: SaveManualFinanceEntryInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:saveManualEntry", input),
   deleteManualFinanceEntry: (entryId: string) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:deleteManualEntry", entryId),
+  saveFinanceCategory: (input: SaveFinanceCategoryInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:saveCategory", input),
+  deleteFinanceCategory: (categoryId: string) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:deleteCategory", categoryId),
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:setReservationTotal", input),
   addPensionPayment: (input: AddPensionPaymentInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:addPensionPayment", input),
   getRoomFolioData: () => invokeWhenUnlocked<DesktopRoomFolioData>("roomFolio:getData"),
