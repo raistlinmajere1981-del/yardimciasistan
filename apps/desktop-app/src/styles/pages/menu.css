@@ -63,6 +63,51 @@
   align-items: center;
 }
 
+.menu-sortable-record {
+  position: relative;
+  cursor: grab;
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
+}
+
+.menu-sortable-record:active {
+  cursor: grabbing;
+}
+
+.menu-drag-handle {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.menu-sortable-record:hover .menu-drag-handle {
+  color: var(--color-accent);
+}
+
+.menu-sortable-record.is-dragging {
+  opacity: 0.48;
+}
+
+.menu-sortable-record.is-drop-before::before,
+.menu-sortable-record.is-drop-after::after {
+  position: absolute;
+  right: var(--space-2);
+  left: var(--space-2);
+  height: 2px;
+  content: "";
+  pointer-events: none;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+.menu-sortable-record.is-drop-before::before {
+  top: calc(var(--space-1) * -1);
+}
+
+.menu-sortable-record.is-drop-after::after {
+  bottom: calc(var(--space-1) * -1);
+}
+
 .menu-product-row__trailing {
   display: flex;
   flex-wrap: wrap;
