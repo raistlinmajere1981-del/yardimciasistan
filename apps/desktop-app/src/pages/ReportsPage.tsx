@@ -85,7 +85,7 @@ export function ReportsPage({
   const [reportAiMessage, setReportAiMessage] = useState("AI yalnız seçilen dönemin hazırlanmış rapor verisini kullanır.");
   const [cashAiMode, setCashAiMode] = useState<DesktopFinanceAiMode | "">("");
   const [cashAiContent, setCashAiContent] = useState("");
-  const [cashAiMessage, setCashAiMessage] = useState("AI yalnız bugünkü kasa ve mevcut alacak verisini kullanır.");
+  const [cashAiMessage, setCashAiMessage] = useState("");
   const [activeView, setActiveView] = useState<"cash" | "reports">("cash");
 
   useEffect(() => {
@@ -215,7 +215,7 @@ export function ReportsPage({
   useEffect(() => {
     setCashAiMode("");
     setCashAiContent("");
-    setCashAiMessage("AI yalnız bugünkü kasa ve mevcut alacak verisini kullanır.");
+    setCashAiMessage("");
   }, [financeController.data.generatedAt]);
 
   const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
@@ -247,7 +247,7 @@ export function ReportsPage({
           </button>
         ))}
       </div>
-      <p className="report-ai-status" role="status">{cashAiMessage}</p>
+      {cashAiMessage && <p className="report-ai-status" role="status">{cashAiMessage}</p>}
       {cashAiContent && <div className="report-ai-result finance-ai-result">{cashAiContent}</div>}
     </Panel>
   ) : null;
@@ -457,7 +457,7 @@ export function ReportsPage({
           </div>
         </div>
         <div className="report-operation-grid">
-          {reservationsEnabled && <section>
+          {reservationsEnabled && <section className="report-operation-section is-reservations">
             <h3>Etkin rezervasyon alanları</h3>
             <div className="report-compact-counters">
               <ReportCounter label="Gelen rezervasyon" value={report.pensionAndRequests.incomingReservations} />
@@ -467,7 +467,7 @@ export function ReportsPage({
               {accommodationReservationsEnabled && <ReportCounter label="Konaklama gecesi" value={report.pensionAndRequests.accommodationNights} />}
             </div>
           </section>}
-          {requestsEnabled && <section>
+          {requestsEnabled && <section className="report-operation-section is-requests">
             <h3>Müşteri talepleri</h3>
             <div className="report-compact-counters">
               <ReportCounter label="Yeni müşteri talebi" value={report.pensionAndRequests.newRequests} />
