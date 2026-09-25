@@ -134,12 +134,7 @@ try {
         }
         return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(businessLayout) };
       },
-      onSyncStatusChanged: (listener) => {
-        syncStatusListener = listener;
-        return () => {
-          if (syncStatusListener === listener) syncStatusListener = null;
-        };
-      },
+      onSyncStatusChanged: () => () => {},
       getReportData: async (range) => {
         window.__reportRanges.push(range);
         return {
@@ -1924,7 +1919,12 @@ try {
         phase: "idle",
         message: "Senkron hazır."
       }),
-      onSyncStatusChanged: () => () => {},
+      onSyncStatusChanged: (listener) => {
+        syncStatusListener = listener;
+        return () => {
+          if (syncStatusListener === listener) syncStatusListener = null;
+        };
+      },
       saveInitialSetup: async () => ({ ok: false, message: "smoke" }),
       createManualBackup: async () => ({ ok: false, message: "smoke" }),
       createManualRequest: async () => ({ ok: false, message: "smoke" }),
