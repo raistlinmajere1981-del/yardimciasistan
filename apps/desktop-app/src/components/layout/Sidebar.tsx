@@ -38,7 +38,6 @@ export function Sidebar({ items, activePage, businessName, collapsed = false, on
         <img className="brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
         <div className="brand-copy">
           <strong>Yardımcı Asistan</strong>
-          <small title={businessName}>{businessName || "İşletme Paneli"}</small>
         </div>
         {onToggleCollapsed && (
           <button
@@ -53,6 +52,7 @@ export function Sidebar({ items, activePage, businessName, collapsed = false, on
             {collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}
           </button>
         )}
+        <small className="brand-business-name" title={businessName}>{businessName || "İşletme Paneli"}</small>
       </div>
 
       <nav className="sidebar-primary-nav" aria-label="Masaüstü menü">
