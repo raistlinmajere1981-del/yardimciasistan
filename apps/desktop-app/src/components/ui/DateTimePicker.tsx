@@ -160,7 +160,7 @@ export function TimePicker({
   onChange,
   ariaLabel,
   disabled = false,
-  minuteStep = 15,
+  minuteStep = 1,
   clearable = true
 }: TimePickerProps) {
   const anchorRef = useRef<HTMLButtonElement>(null);
