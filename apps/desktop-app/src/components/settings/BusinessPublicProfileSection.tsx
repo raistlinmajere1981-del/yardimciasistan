@@ -299,9 +299,15 @@ export function BusinessPublicProfileSection({
   const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, feedback } = controller;
 
   return (
-    <section ref={sectionRef} id="settings-public-profile" tabIndex={-1} className="business-public-profile-section settings-business-subsection" aria-busy={loading || saving}>
+    <section ref={sectionRef} id="settings-public-profile" tabIndex={-1} className="business-public-profile-section settings-business-subsection settings-panel" aria-busy={loading || saving}>
+      <div className="settings-panel-header">
+        <div>
+          <h2>Müşteriye Açık Bilgiler</h2>
+          <p>Harita, açıklama ve müşteriye gösterilen işletme ayrıntıları.</p>
+        </div>
+      </div>
+      <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving || disabled}>
       {feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}
-      <fieldset className="settings-resource-fields" disabled={loading || saving || disabled}>
       {loading ? (
         <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
       ) : (
