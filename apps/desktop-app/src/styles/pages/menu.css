@@ -716,7 +716,9 @@
 }
 
 
-.menu-item-create-form {
+.menu-item-create-form,
+.menu-item-workspace-form {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
 }
