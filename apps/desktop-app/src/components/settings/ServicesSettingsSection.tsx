@@ -7,6 +7,7 @@ import { AndroidDevicesSection } from "./AndroidDevicesSection";
 type SyncState = "idle" | "loading" | "success" | "error";
 import { AiSettingsSection } from "./AiSettingsSection";
 import { WebSettingsSection } from "./WebSettingsSection";
+import { TimePicker } from "../ui/DateTimePicker";
 export interface ServicesSettingsProps {
   form: SetupFormState;
   enabledCapabilities: BusinessCapability[];
@@ -111,16 +112,16 @@ export function ServicesSettingsSection({
                   Otomatik
                 </label>
               </fieldset>
-              <label className="form-field form-field--short">
-                Gönderim saati
-                <input
-                  type="time"
-                  lang="tr-TR"
+              <div className="form-field form-field--short">
+                <span>Gönderim saati</span>
+                <TimePicker
+                  ariaLabel="Gönderim saati"
                   value={form.birthdaySettings.sendTime}
-                  onChange={(event) => updateBirthday("sendTime", event.target.value)}
+                  onChange={(value) => updateBirthday("sendTime", value)}
                   disabled={!form.birthdaySettings.enabled}
+                  clearable={false}
                 />
-              </label>
+              </div>
               <label className="form-field form-field--span form-field--fluid">
                 Mesaj
                 <textarea
