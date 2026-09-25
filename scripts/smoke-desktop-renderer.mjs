@@ -616,7 +616,7 @@ try {
   await expect(stockImageDialog).toHaveCount(0);
   await expect(page.locator(".menu-category-panel .menu-panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
   await expect(page.locator(".menu-product-panel .menu-panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
-  await expect(page.locator(".menu-category-panel .menu-panel-heading p")).toHaveText("Menüdeki ürün gruplarını yönetin.");
+  await expect(page.locator(".menu-category-panel .menu-panel-heading p")).toHaveText("Menüdeki ürün gruplarını yönetin. Sıralamak için kayıtları sürükleyin.");
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
   await page.locator(".menu-category-panel .menu-record").filter({ hasText: "Yerel Kahvaltı" }).first().click();
   await expect(page.getByRole("button", { name: "Kategoriyi Sil" })).toBeVisible();
@@ -656,7 +656,8 @@ try {
   await expect(localMenuPreview).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Yayınla", exact: true })).toHaveCount(0);
-  await expect(page.locator(".menu-category-panel").getByLabel("Sıra", { exact: true })).toBeVisible();
+  // Manual sort inputs were removed from the menu UI; the category panel itself is the anchor here.
+  await expect(page.locator(".menu-category-panel")).toBeVisible();
   await page.screenshot({ path: "artifacts/screenshots/desktop-qr-menu-manager.png", fullPage: true });
 
   await expect(page.locator(".menu-management-grid")).toBeVisible();
@@ -1617,13 +1618,15 @@ try {
   await expect.poll(() => compactPage.evaluate(() => localStorage.getItem("yardimci-asistan.sidebar-collapsed"))).toBe("false");
 
   const dashboardPriorityRows = compactPage.locator(".dashboard-priority-item");
-  await expect(dashboardPriorityRows).toHaveCount(6);
+  // Compact fixture yields 4 waiting requests + 5 pending tasks + 2 pending reservations.
+  await expect(dashboardPriorityRows).toHaveCount(11);
   await expect(compactPage.getByRole("heading", { name: "11 konu ilgi bekliyor." })).toBeVisible();
   expect(await dashboardPriorityRows.evaluateAll((rows) => rows.every((row) => row.querySelectorAll("button").length === 1))).toBe(true);
   const firstPriorityDescription = dashboardPriorityRows.first().locator(".dashboard-priority-description");
   await expect(firstPriorityDescription).toBeVisible();
   expect(await firstPriorityDescription.evaluate((note) => getComputedStyle(note).whiteSpace)).toBe("nowrap");
-  await expect(compactPage.locator(".dashboard-timeline-list li")).toHaveCount(4);
+  // Timeline shows the 5 pending tasks plus the 2 pending reservations.
+  await expect(compactPage.locator(".dashboard-timeline-list li")).toHaveCount(7);
   await expect(compactPage.locator(".dashboard-capacity-list > div")).toHaveCount(3);
   expect(await compactPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await expect(dashboardPriorityRows.first().getByRole("heading")).toHaveText("Kompakt Misafir 1");
@@ -1874,7 +1877,8 @@ try {
   const compactMenuItemWorkspace = compactPage.getByRole("dialog");
   await expect(compactMenuItemWorkspace).toBeVisible();
   await compactMenuItemWorkspace.getByRole("tab", { name: "Görsel", exact: true }).click();
-  await expect(compactMenuItemWorkspace.locator(".menu-item-details")).toBeVisible();
+  // The workspace refactor renders per-tab sections; the media tab shows the Görsel section.
+  await expect(compactMenuItemWorkspace.locator(".menu-item-media-section")).toBeVisible();
   await compactMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(compactPage.locator(".menu-management-grid .menu-record[aria-pressed='true']")).toHaveCount(2);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-menu-1366x768.png" });

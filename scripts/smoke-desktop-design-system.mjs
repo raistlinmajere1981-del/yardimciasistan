@@ -354,11 +354,15 @@ try {
   await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
 
   await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
-  await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('-1');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'Oda fiyatlarını kontrol edin.' })).toBeVisible();
+  const roomPriceInput = page.getByLabel('Oda 101 gecelik fiyatı', { exact: true });
+  const roomPriceBefore = await roomPriceInput.inputValue();
+  await roomPriceInput.fill('-1');
+  // MoneyInput rejects the sign at keystroke level: the last valid value stays,
+  // the draft remains clean, so save/discard stay disabled and nothing persists.
+  await expect(roomPriceInput).toHaveValue(roomPriceBefore);
+  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
-  await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
 
   await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
   await page.getByLabel('Mevcut şifre', { exact: true }).fill('design-test-password');
