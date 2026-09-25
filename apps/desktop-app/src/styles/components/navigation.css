@@ -1,6 +1,7 @@
 .brand {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   min-width: 0;
   padding: 0 var(--space-1) var(--space-3);
@@ -31,12 +32,18 @@
 }
 
 .brand small {
-  margin-top: var(--space-1);
   overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.brand-business-name {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+  padding-inline: var(--space-1);
 }
 
 .sidebar-toggle {
@@ -122,6 +129,7 @@
 }
 
 .sidebar.is-collapsed .brand-copy,
+.sidebar.is-collapsed .brand-business-name,
 .sidebar.is-collapsed .nav-item span {
   display: none;
 }
