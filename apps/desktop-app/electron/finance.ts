@@ -53,6 +53,16 @@ export interface DesktopFinanceData {
   categories: DesktopFinanceCategory[];
 }
 
+export type DesktopFinanceAiMode = "summary" | "flow" | "receivables" | "recommendations";
+
+export interface GenerateDesktopFinanceAiInput {
+  mode: DesktopFinanceAiMode;
+}
+
+export type GenerateDesktopFinanceAiResult =
+  | { ok: true; content: string }
+  | { ok: false; message: string };
+
 export interface SaveFinanceCategoryInput {
   id?: string;
   direction: FinanceDirection;
