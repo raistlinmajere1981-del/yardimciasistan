@@ -19,38 +19,73 @@
   gap: var(--space-4);
 }
 
+.settings-panel,
 .settings-service-card {
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
   background: var(--color-bg-panel);
 }
 
-.settings-service-card.is-enabled {
-  border-color: var(--color-accent-border);
+.settings-panel.setup-section {
+  padding: 0;
 }
 
+.settings-panel-header,
 .settings-service-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3) var(--space-4);
+  min-width: 0;
   padding: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
+.settings-panel-header > div,
 .settings-service-card-header > div {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
 }
 
+.settings-panel-header h2,
+.settings-panel-header h3,
+.settings-panel-header strong,
 .settings-service-card-header strong {
+  margin: 0;
   font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
 }
 
+.settings-panel-header p,
+.settings-panel-header small,
+.settings-panel-header > span,
 .settings-service-card-header span {
+  margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+}
+
+.settings-panel-body,
+.settings-service-card-body {
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.settings-panel-body > :first-child,
+.settings-service-card-body > :first-child {
+  margin-top: 0;
+}
+
+.settings-panel-body > :last-child,
+.settings-service-card-body > :last-child {
+  margin-bottom: 0;
+}
+
+.settings-service-card.is-enabled {
+  border-color: var(--color-accent-border);
 }
 
 .settings-service-toggle {
@@ -63,21 +98,11 @@
 
 .settings-service-card-body {
   margin: 0;
-  padding: var(--space-4);
   border: 0;
-  min-width: 0;
 }
 
 .settings-service-card.is-disabled .settings-service-card-body {
   opacity: 0.58;
-}
-
-.settings-service-card-body > :first-child {
-  margin-top: 0;
-}
-
-.settings-service-card-body > :last-child {
-  margin-bottom: 0;
 }
 
 .settings-service-empty,
@@ -395,18 +420,11 @@
 }
 
 .settings-business-subsection {
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-4);
 }
 
 .settings-subsection-heading {
-  margin-bottom: var(--space-4);
-}
-
-.settings-subsection-heading h3 {
   margin: 0;
-  font-size: var(--text-md);
 }
 
 .business-public-profile-body {
@@ -489,32 +507,11 @@
 
 .settings-application-workspace {
   display: grid;
-  gap: 0;
+  gap: var(--space-4);
 }
 
 .settings-application-subsection {
-  padding-block: var(--space-5);
-  border-top: 1px solid var(--color-border);
-}
-
-.settings-application-workspace > .settings-application-subsection:first-of-type {
-  padding-top: var(--space-3);
-  border-top: 0;
-}
-
-.settings-application-subsection .settings-subsection-heading {
-  margin-bottom: var(--space-4);
-}
-
-.settings-application-subsection .settings-subsection-heading h3 {
-  margin: 0;
-  font-size: var(--text-md);
-}
-
-.settings-application-subsection .settings-subsection-heading p {
-  margin: var(--space-1) 0 0;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  min-width: 0;
 }
 
 .appearance-field {
