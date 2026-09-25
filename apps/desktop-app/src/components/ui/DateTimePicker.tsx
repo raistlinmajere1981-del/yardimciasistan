@@ -61,7 +61,7 @@ export function DatePicker({
   const quickPresets = presets ?? DEFAULT_DATE_PRESETS();
 
   const choose = (next: string) => {
-    if (isDateDisabled(next, min, max)) return;
+    if (next && isDateDisabled(next, min, max)) return;
     onChange(next);
     setOpen(false);
     requestAnimationFrame(() => anchorRef.current?.focus());
@@ -404,6 +404,7 @@ function formatMonth(value: Date): string {
 }
 
 function isDateDisabled(value: string, min?: string, max?: string) {
+  if (!value) return false;
   return Boolean((min && value < min) || (max && value > max));
 }
 
