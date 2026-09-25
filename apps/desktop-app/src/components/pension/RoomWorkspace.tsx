@@ -3,6 +3,7 @@ import { projectRoomState } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../../electron/database";
 import { defaultRoomAssignmentForm, formatCustomerRoomStayStatus, formatStayDateRange } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
+import { DatePicker, addDays } from "../ui/DateTimePicker";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { WorkspaceTabs, WorkspaceTabList, WorkspaceTabPanel } from "../workspace/WorkspaceTabs";
@@ -174,8 +175,20 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
                   <option value="">Müşteri seçin</option>{data.customers.map(item => <option value={item.id} key={item.id}>{item.fullName}</option>)}
                 </select></label>
                 <div className="form-row">
-                  <label className="form-field form-field--short">Giriş tarihi<input lang="tr-TR" required type="date" value={draft.checkInDate} onChange={event => setDraft({ ...draft, checkInDate: event.target.value })} /></label>
-                  <label className="form-field form-field--short">Çıkış tarihi<input lang="tr-TR" type="date" min={draft.checkInDate} value={draft.checkOutDate} onChange={event => setDraft({ ...draft, checkOutDate: event.target.value })} /></label>
+                  <div className="form-field form-field--short">
+                    <span>Giriş tarihi</span>
+                    <DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate} onChange={value => setDraft({ ...draft, checkInDate: value })} />
+                  </div>
+                  <div className="form-field form-field--short">
+                    <span>Çıkış tarihi</span>
+                    <DatePicker
+                      ariaLabel="Çıkış tarihi"
+                      value={draft.checkOutDate}
+                      min={draft.checkInDate || undefined}
+                      presets={draft.checkInDate ? [1, 2, 7, 10].map(days => ({ label: `${days} gün`, value: addDays(draft.checkInDate, days) })) : []}
+                      onChange={value => setDraft({ ...draft, checkOutDate: value })}
+                    />
+                  </div>
                   <label className="form-field form-field--xs">Kişi sayısı<input required type="number" min={1} max={50} value={draft.guestCount} onChange={event => setDraft({ ...draft, guestCount: event.target.value })} /></label>
                 </div>
                 <label className="form-field form-field--fluid">Konaklama notu<textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label>
