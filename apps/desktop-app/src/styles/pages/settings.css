@@ -88,10 +88,6 @@
   margin-top: var(--space-4);
 }
 
-.settings-service-card.is-enabled {
-  border-color: var(--color-accent-border);
-}
-
 .settings-service-toggle {
   display: inline-flex;
   align-items: center;
