@@ -39,16 +39,33 @@ public final class AndroidDeviceCredentialSmoke {
   }
 
   @Test
-  public void embeddedDefaultsNeverOverwriteDeviceToken() {
+  public void embeddedDefaultsNeverOverwriteDeviceConnection() {
     InMemoryPreferences preferences = new InMemoryPreferences();
+    String provisionedUrl = "https://blacksea.example";
     preferences.edit()
-        .putString(ConnectionSettings.KEY_WEB_MODULE_URL, ConnectionDefaults.WEB_MODULE_URL)
+        .putString(ConnectionSettings.KEY_WEB_MODULE_URL, provisionedUrl)
         .putString(ConnectionSettings.KEY_SYNC_SECRET, CREDENTIAL)
         .commit();
 
     ConnectionSettings.ensureDefaults(preferences);
 
+    assertEquals(provisionedUrl, preferences.getString(ConnectionSettings.KEY_WEB_MODULE_URL, ""));
     assertEquals(CREDENTIAL, preferences.getString(ConnectionSettings.KEY_SYNC_SECRET, ""));
+  }
+
+  @Test
+  public void embeddedDefaultsPreservePendingDesktopProvisioning() {
+    assumeTrue(ConnectionSettings.isEmbeddedConnectionLocked());
+    InMemoryPreferences preferences = new InMemoryPreferences();
+    String provisionedUrl = "https://blacksea.example";
+    String ticket = "yab1.payload." + "a".repeat(64);
+
+    assertTrue(ConnectionSettings.storeBootstrapProvisioning(preferences, provisionedUrl, ticket));
+    ConnectionSettings.ensureDefaults(preferences);
+
+    assertEquals(provisionedUrl, preferences.getString(ConnectionSettings.KEY_WEB_MODULE_URL, ""));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_SYNC_SECRET, ""));
+    assertEquals(ticket, ConnectionSettings.bootstrapTicket(preferences));
   }
 
   @Test
