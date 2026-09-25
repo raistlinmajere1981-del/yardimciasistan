@@ -88,9 +88,8 @@
   font-weight: var(--weight-bold);
 }
 
-.operation-calendar-date-picker input {
-  min-height: var(--control-height-sm);
-  max-width: 145px;
+.operation-calendar-date-picker .date-time-picker {
+  width: min(145px, 100%);
 }
 
 .operation-calendar-summary {
@@ -283,8 +282,8 @@
     justify-content: space-between;
   }
 
-  .operation-calendar-date-picker input {
-    max-width: none;
+  .operation-calendar-date-picker .date-time-picker {
+    width: 100%;
     flex: 1;
   }
 
