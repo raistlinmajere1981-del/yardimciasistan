@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type {
+  DesktopFinanceCategory,
   DesktopFinanceData,
   DesktopFinanceEntry,
   FinanceDirection,
@@ -18,7 +19,8 @@ const EMPTY_FINANCE_DATA: DesktopFinanceData = {
   todayNetMinor: 0,
   outstandingPensionMinor: 0,
   recentEntries: [],
-  pensionBalances: []
+  pensionBalances: [],
+  categories: []
 };
 
 const EMPTY_FINANCE_ROOM_DATA: DesktopRoomFolioData = {
@@ -39,7 +41,7 @@ export interface FinanceEntryDraft {
   date: string;
 }
 
-type FinanceMutationType = "save" | "delete";
+type FinanceMutationType = "save" | "delete" | "category-save" | "category-delete";
 
 interface FinanceMutationLock {
   id: number;
@@ -85,11 +87,38 @@ function dateInputToTimestamp(value: string): string {
   return date.toISOString();
 }
 
-function incomeCategoryAllowed(category: string, accommodationEnabled: boolean, foodServiceEnabled: boolean) {
-  if (category === "other_income") return true;
-  if (category === "pension") return accommodationEnabled;
-  if (category === "restaurant") return foodServiceEnabled;
-  return false;
+function financeCategoryAvailable(
+  category: DesktopFinanceCategory,
+  accommodationEnabled: boolean,
+  foodServiceEnabled: boolean
+) {
+  if (!category.isActive) return false;
+  if (category.id === "pension") return accommodationEnabled;
+  if (category.id === "restaurant") return foodServiceEnabled;
+  return true;
+}
+
+function financeCategoriesForMode(
+  categories: DesktopFinanceCategory[],
+  mode: FinanceDirection,
+  accommodationEnabled: boolean,
+  foodServiceEnabled: boolean
+) {
+  return categories.filter((category) => (
+    category.direction === mode
+    && financeCategoryAvailable(category, accommodationEnabled, foodServiceEnabled)
+  ));
+}
+
+function defaultCategoryForMode(
+  categories: DesktopFinanceCategory[],
+  mode: FinanceDirection,
+  accommodationEnabled: boolean,
+  foodServiceEnabled: boolean
+) {
+  const options = financeCategoriesForMode(categories, mode, accommodationEnabled, foodServiceEnabled);
+  const preferredId = mode === "income" ? "other_income" : "other_expense";
+  return options.find((category) => category.id === preferredId)?.id ?? options[0]?.id ?? "";
 }
 
 export function useFinanceController({
@@ -215,7 +244,7 @@ export function useFinanceController({
     setLoading(false);
     setMutationType(type);
     return lock;
-  }, []);
+  }, [accommodationEnabled, data.categories, foodServiceEnabled]);
 
   const releaseMutation = useCallback((lock: FinanceMutationLock) => {
     if (mutationInFlight.current?.id !== lock.id) return;
@@ -238,7 +267,7 @@ export function useFinanceController({
     setDraft({
       mode,
       amount: "",
-      category: mode === "income" ? "other_income" : "other_expense",
+      category: defaultCategoryForMode(data.categories, mode, accommodationEnabled, foodServiceEnabled),
       paymentMethod: "cash",
       description: "",
       date: todayDateInput()
@@ -321,6 +350,121 @@ export function useFinanceController({
     }
   }, [acquireMutation, bridge, draft, refreshRoomData, releaseMutation]);
 
+  const saveCategory = useCallback(async (direction: FinanceDirection, name: string) => {
+    if (!bridge?.saveFinanceCategory) return false;
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      setMessage("Tür adı gerekli.");
+      return false;
+    }
+    const lock = acquireMutation("category-save");
+    if (!lock) return false;
+    try {
+      const result = await bridge.saveFinanceCategory({ direction, name: normalizedName });
+      const sameOperation = mutationInFlight.current?.id === lock.id;
+      if (!sameOperation) return result.ok;
+      const contextCurrent = (
+        lock.epoch === financeEpoch.current
+        && enabledRef.current
+        && financeEnabledRef.current
+      );
+      if (contextCurrent) setMessage(result.message);
+      if (result.ok) {
+        if (contextCurrent) {
+          financeLoadGeneration.current += 1;
+          setData(result.data);
+          const activeOptions = financeCategoriesForMode(
+            result.data.categories,
+            direction,
+            accommodationEnabled,
+            foodServiceEnabled
+          );
+          const created = activeOptions.find((category) => category.name.toLocaleLowerCase("tr-TR") === normalizedName.toLocaleLowerCase("tr-TR"));
+          if (created && draft.mode === direction) {
+            setDraft((current) => current.mode === direction ? { ...current, category: created.id } : current);
+          }
+        } else {
+          refreshAfterMutation.current = true;
+        }
+      }
+      return result.ok;
+    } catch {
+      if (
+        mutationInFlight.current?.id === lock.id
+        && lock.epoch === financeEpoch.current
+        && enabledRef.current
+        && financeEnabledRef.current
+      ) setMessage("Tür eklenemedi.");
+      return false;
+    } finally {
+      releaseMutation(lock);
+    }
+  }, [
+    accommodationEnabled,
+    acquireMutation,
+    bridge,
+    draft.mode,
+    foodServiceEnabled,
+    releaseMutation
+  ]);
+
+  const deleteCategory = useCallback(async (category: DesktopFinanceCategory) => {
+    if (category.isSystem || !bridge?.deleteFinanceCategory) return false;
+    const lock = acquireMutation("category-delete", category.id);
+    if (!lock) return false;
+    try {
+      const result = await bridge.deleteFinanceCategory(category.id);
+      const sameOperation = mutationInFlight.current?.id === lock.id;
+      if (!sameOperation) return result.ok;
+      const contextCurrent = (
+        lock.epoch === financeEpoch.current
+        && enabledRef.current
+        && financeEnabledRef.current
+      );
+      if (contextCurrent) setMessage(result.message);
+      if (result.ok) {
+        if (contextCurrent) {
+          financeLoadGeneration.current += 1;
+          setData(result.data);
+          if (draft.mode === category.direction && draft.category === category.id) {
+            const fallback = defaultCategoryForMode(
+              result.data.categories,
+              category.direction,
+              accommodationEnabled,
+              foodServiceEnabled
+            );
+            setDraft((current) => (
+              current.mode === category.direction && current.category === category.id
+                ? { ...current, category: fallback }
+                : current
+            ));
+          }
+        } else {
+          refreshAfterMutation.current = true;
+        }
+      }
+      return result.ok;
+    } catch {
+      if (
+        mutationInFlight.current?.id === lock.id
+        && lock.epoch === financeEpoch.current
+        && enabledRef.current
+        && financeEnabledRef.current
+      ) setMessage("Tür kaldırılamadı.");
+      return false;
+    } finally {
+      releaseMutation(lock);
+    }
+  }, [
+    accommodationEnabled,
+    acquireMutation,
+    bridge,
+    draft.category,
+    draft.mode,
+    foodServiceEnabled,
+    releaseMutation
+  ]);
+
   const deleteManualEntry = useCallback(async (entry: DesktopFinanceEntry) => {
     if (entry.sourceType !== "manual" || !bridge?.deleteManualFinanceEntry) return false;
     const lock = acquireMutation("delete", entry.id);
@@ -388,11 +532,29 @@ export function useFinanceController({
   }, [active, accommodationFolioEnabled, enabled, refreshRoomData]);
 
   useEffect(() => {
-    if (draft.mode !== "income") return;
-    if (incomeCategoryAllowed(draft.category, accommodationEnabled, foodServiceEnabled)) return;
-    if (mutationInFlight.current) return;
-    setDraft((current) => ({ ...current, category: "other_income" }));
-  }, [accommodationEnabled, draft.category, draft.mode, foodServiceEnabled, mutationType]);
+    if (!draft.mode || mutationInFlight.current) return;
+    const options = financeCategoriesForMode(
+      data.categories,
+      draft.mode,
+      accommodationEnabled,
+      foodServiceEnabled
+    );
+    if (options.some((category) => category.id === draft.category)) return;
+    const fallback = defaultCategoryForMode(
+      data.categories,
+      draft.mode,
+      accommodationEnabled,
+      foodServiceEnabled
+    );
+    setDraft((current) => current.mode ? { ...current, category: fallback } : current);
+  }, [
+    accommodationEnabled,
+    data.categories,
+    draft.category,
+    draft.mode,
+    foodServiceEnabled,
+    mutationType
+  ]);
 
   return {
     data,
@@ -413,6 +575,8 @@ export function useFinanceController({
     closeEntry,
     updateDraft,
     saveEntry,
+    saveCategory,
+    deleteCategory,
     deleteManualEntry,
     refreshFinanceData,
     refreshRoomData
