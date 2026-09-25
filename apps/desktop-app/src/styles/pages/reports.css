@@ -426,7 +426,7 @@
 
 .report-operation-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-3);
 }
 
@@ -442,7 +442,11 @@
   font-size: var(--text-sm);
 }
 
-.report-operation-grid .report-compact-counters {
+.report-operation-section.is-reservations .report-compact-counters {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.report-operation-section.is-requests .report-compact-counters {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -617,8 +621,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .report-sales-grid,
-  .report-operation-grid {
+  .report-sales-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -657,7 +660,9 @@
     grid-template-columns: 1fr;
   }
 
-  .report-restaurant-metrics {
+  .report-restaurant-metrics,
+  .report-operation-section.is-reservations .report-compact-counters,
+  .report-operation-section.is-requests .report-compact-counters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -674,5 +679,10 @@
 
   .finance-ai-panel .finance-ai-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-operation-section.is-reservations .report-compact-counters,
+  .report-operation-section.is-requests .report-compact-counters {
+    grid-template-columns: 1fr;
   }
 }
