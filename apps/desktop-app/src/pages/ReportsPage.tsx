@@ -220,7 +220,7 @@ export function ReportsPage({
     setCashAiMessage("AI yalnız bugünkü kasa ve mevcut alacak verisini kullanır.");
   }, [financeController.data.generatedAt]);
 
-    const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
+  const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
   const reservationsEnabled = accommodationReservationsEnabled || foodReservationsEnabled;
   const stockEnabled = foodMenuEnabled && inventoryEnabled;
   const financeAiPanel = aiEnabled && financeEnabled ? (
@@ -340,6 +340,33 @@ export function ReportsPage({
         )}
         {reportMessage && <p className="report-error" role="alert">{reportMessage}</p>}
       </Panel>
+
+      {aiEnabled && (
+        <Panel className="report-section-panel report-ai-panel period-report-ai-panel" padding="compact">
+          <div className="report-section-title">
+            <div>
+              <p>Seçilen dönem</p>
+              <h2>AI Rapor Yorumu</h2>
+            </div>
+            <span>{formatReportPeriod(report.period)}</span>
+          </div>
+          <div className="report-ai-actions" role="group" aria-label="AI rapor yorumu">
+            {REPORT_AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
+              <button
+                className={reportAiMode === action.mode ? "is-active" : ""}
+                type="button"
+                disabled={reportAiMode === action.mode && reportAiMessage.includes("hazırlanıyor")}
+                onClick={() => void generateReportAiComment(action.mode)}
+                key={action.mode}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+          <p className="report-ai-status" role="status">{reportAiMessage}</p>
+          {reportAiContent && <div className="report-ai-result">{reportAiContent}</div>}
+        </Panel>
+      )}
 
       <section aria-labelledby="report-summary-title">
         <div className="report-section-title">
