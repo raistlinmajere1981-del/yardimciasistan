@@ -1,12 +1,12 @@
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useMemo, useState } from "react";
-import { Banknote, BedDouble, CreditCard, Landmark, Minus, Plus, Trash2, WalletCards, X } from "lucide-react";
+import { Banknote, BedDouble, CreditCard, Landmark, Minus, Plus, Trash2, WalletCards } from "lucide-react";
 import type { FinanceController } from "../../app/controller-types";
 import type { DesktopFinanceEntry, FinancePaymentMethod } from "../../../electron/finance";
 import { ActionButton } from "../ui/ActionButton";
 import { MetricCard } from "../ui/MetricCard";
 import { Panel } from "../ui/Panel";
 import { StatusBadge } from "../ui/StatusBadge";
-import { useDialogFocus } from "../ui/useDialogFocus";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
 const RECENT_ENTRY_PREVIEW_COUNT = 12;
@@ -55,7 +55,6 @@ export function FinanceWorkspace({ controller }: { controller: FinanceController
   } = controller;
   const [pendingDelete, setPendingDelete] = useState<DesktopFinanceEntry | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
-  const deleteDialogRef = useDialogFocus(Boolean(pendingDelete));
   const beginPresentationRequest = useRequestGeneration();
 
   const incomeCategories = useMemo(() => {
@@ -329,47 +328,12 @@ export function FinanceWorkspace({ controller }: { controller: FinanceController
 
       {message && <p className="finance-feedback status-message" role="status">{message}</p>}
 
-      {pendingDelete && (
-        <div
-          className="finance-confirm-overlay overlay"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !saving) setPendingDelete(null);
-          }}
-        >
-          <section
-            ref={deleteDialogRef}
-            className="finance-confirm-dialog dialog dialog--compact"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="finance-delete-title"
-          >
-            <button
-              className="finance-confirm-close overlay-close"
-              type="button"
-              aria-label="Kapat"
-              disabled={saving}
-              onClick={() => setPendingDelete(null)}
-            >
-              <X size={18} />
-            </button>
-            <p className="panel-eyebrow">Kasa kaydı</p>
-            <h3 id="finance-delete-title">Bu hareket kaldırılsın mı?</h3>
-            <p className="finance-confirm-item">
-              <strong>{pendingDelete.description || categoryLabel(pendingDelete.category)}</strong> · {minorMoney(pendingDelete.amountMinor)}
-            </p>
-            <span className="finance-confirm-hint">Yalnız elle eklenen kasa kayıtları bu şekilde kaldırılabilir.</span>
-            <div className="finance-confirm-actions action-row">
-              <ActionButton variant="secondary" disabled={saving} onClick={() => setPendingDelete(null)}>
-                Vazgeç
-              </ActionButton>
-              <ActionButton variant="danger" disabled={saving} onClick={() => void confirmDeleteEntry()}>
-                {saving ? "Kaldırılıyor…" : "Kaydı Kaldır"}
-              </ActionButton>
-            </div>
-          </section>
-        </div>
-      )}
+      {pendingDelete && <ConfirmDialog tone="danger" eyebrow="Kasa kaydı" title="Bu hareket kaldırılsın mı?"
+        description="Yalnız elle eklenen kasa kayıtları bu şekilde kaldırılabilir."
+        details={<><strong>{pendingDelete.description || categoryLabel(pendingDelete.category)}</strong> · {minorMoney(pendingDelete.amountMinor)}</>}
+        busy={saving} confirmLabel={saving ? "Kaldırılıyor…" : "Kaydı Kaldır"}
+        onConfirm={confirmDeleteEntry} onCancel={() => setPendingDelete(null)} />}
+
     </section>
   );
 }

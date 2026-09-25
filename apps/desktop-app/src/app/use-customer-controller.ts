@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type {
@@ -27,6 +28,7 @@ export function useCustomerController({
   selectedWhatsAppRequestId,
   setSelectedWhatsAppRequestId
 }: UseCustomerControllerOptions) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [manualRequestForm, setManualRequestForm] = useState<ManualRequestFormState>(initialManualRequestForm);
   const [manualRequestState, setManualRequestState] = useState<SyncState>("idle");
   const [manualRequestMessage, setManualRequestMessage] = useState("Telefonla veya yüz yüze gelen talebi kaydedin.");
@@ -133,7 +135,7 @@ export function useCustomerController({
   }
 
   async function handleDeleteRequest(request: SyncedCustomerRequest) {
-    if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} adına kayıtlı talep ve bağlı hazır mesaj silinsin mi?`)) {
+    if (!window.yardimciDesktop || !(await confirm({ title: "Silme onayı", description: `${request.customer_name} adına kayıtlı talep ve bağlı hazır mesaj silinsin mi?`, tone: "danger", confirmLabel: "Sil" }))) {
       return;
     }
 
@@ -159,7 +161,7 @@ export function useCustomerController({
   }
 
   async function handleDeleteCustomer(customer: DesktopDashboardData["customers"][number]) {
-    if (!window.yardimciDesktop || !window.confirm(`${customer.fullName} müşteri kaydı silinsin mi?`)) {
+    if (!window.yardimciDesktop || !(await confirm({ title: "Silme onayı", description: `${customer.fullName} müşteri kaydı silinsin mi?`, tone: "danger", confirmLabel: "Sil" }))) {
       return;
     }
 
@@ -227,6 +229,7 @@ export function useCustomerController({
   }
 
   return {
+    confirmDialog,
     manualRequestForm,
     setManualRequestForm,
     manualRequestState,

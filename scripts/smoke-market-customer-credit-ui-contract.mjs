@@ -117,7 +117,6 @@ try {
   page.setDefaultTimeout(10000);
   const pageErrors = [];
   page.on("pageerror", (error) => { pageErrors.push(error.message); console.error(error.message); });
-  page.on("dialog", (dialog) => void dialog.accept());
   await page.exposeFunction("__m82Call", async (method, args) => {
     calls.push({ method, args });
     if (method === "toggleCredit") return setBusinessCapability(path, { capability: "commerce.customer_credit", enabled: args[0] });
@@ -251,7 +250,20 @@ try {
   await customerWorkspace.getByRole("tab", { name: "Hesap", exact: true }).click();
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");
   await customerWorkspace.getByRole("tab", { name: "Özet", exact: true }).click();
+  const deleteCallsBeforeCancel = calls.filter(call => call.method === "deleteCustomer").length;
   await customerWorkspace.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
+  const deleteConfirmation = page.getByRole("dialog", { name: "Silme onayı", exact: true });
+  await expect(deleteConfirmation).toContainText("Ahmet Veresiye müşteri kaydı silinsin mi?");
+  await expect(deleteConfirmation.locator(".action-button-danger")).toHaveText("Sil");
+  assert.equal(calls.filter(call => call.method === "deleteCustomer").length, deleteCallsBeforeCancel, "Opening confirmation must not delete the customer.");
+  await deleteConfirmation.getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await expect(deleteConfirmation).toHaveCount(0);
+  assert.equal(calls.filter(call => call.method === "deleteCustomer").length, deleteCallsBeforeCancel, "Cancelling must not call deleteCustomer.");
+  await customerWorkspace.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
+  await deleteConfirmation.getByRole("button", { name: "Sil", exact: true }).click();
+  await expect(deleteConfirmation).toHaveCount(0);
+  await expect.poll(() => calls.filter(call => call.method === "deleteCustomer").length).toBe(deleteCallsBeforeCancel + 1);
+
   await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu var.");
   await expect(page.getByRole("alert").filter({ hasText: "Bu müşterinin açık veresiye borcu var." })).toHaveCount(0);
   await customerWorkspace.getByRole("tab", { name: "Hesap", exact: true }).click();
@@ -388,6 +400,9 @@ try {
   await page.getByRole("navigation", { name: "Çalışma alanı" }).getByRole("button", { name: "Müşteriler" }).click();
   customerWorkspace = await openCustomerWorkspace(/Ahmet Veresiye/);
   await customerWorkspace.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
+  await expect(deleteConfirmation).toContainText("Ahmet Veresiye müşteri kaydı silinsin mi?");
+  await deleteConfirmation.getByRole("button", { name: "Sil", exact: true }).click();
+  await expect(deleteConfirmation).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Ahmet Veresiye/ })).toHaveCount(0);
   assert.ok(runtime.getCustomerCreditAccount(path, customerId).customer.deletedAt);
   // Full balance is independent of the first 200 displayed movements.

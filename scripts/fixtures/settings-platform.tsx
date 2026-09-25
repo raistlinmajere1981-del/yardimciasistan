@@ -12,6 +12,7 @@ import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell"
 import { readUiPreferences, applyUiPreferences, saveUiPreferences } from "../../apps/desktop-app/src/ui-preferences";
 import "../../apps/desktop-app/src/styles/index.css";
 
+let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
 let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"] };
 let layout = {
@@ -124,7 +125,14 @@ window.yardimciDesktop = {
   onUpdateStatusChanged: () => () => {},
   saveUpdatePreferences: async input => { window.settingsCalls.push({ kind: "update-preferences", input }); if (window.failUpdate) return { ok: false, message: "Güncelleme tercih hatası", status: updateStatus }; updateStatus = { ...updateStatus, ...input }; return { ok: true, message: "Güncelleme tercihleri kaydedildi", status: updateStatus }; },
   checkForUpdates: async () => { window.settingsCalls.push({ kind: "update-check" }); return updateStatus; },
-  updateAppPassword: async input => { window.settingsCalls.push({ kind: "password", input }); return { ok: true, message: "Şifre kaydedildi", status: { passwordConfigured: true } }; },
+  updateAppPassword: async input => { window.settingsCalls.push({ kind: "password", input }); return { ok: true, message: "Şifre kaydedildi", status: { passwordConfigured: Boolean(input.newPassword) } }; },
+  onDataMaintenanceConfirmation: listener => { maintenanceConfirmation = listener; return () => { maintenanceConfirmation = null; }; },
+  resetLocalData: async () => {
+    const approved = await maintenanceConfirmation?.({ title: "Yerel Verileri Sıfırla", description: "Bu bilgisayardaki Yardımcı Asistan verileri sıfırlanacak.", details: "İşlemden önce otomatik güvenlik yedeği alınır.", confirmLabel: "Verileri Sıfırla" });
+    if (!approved) return { ok: false, cancelled: true, message: "Veri sıfırlama iptal edildi." };
+    window.settingsCalls.push({ kind: "reset" });
+    return { ok: true, message: "Sıfırlama hazırlandı." };
+  },
   listLocalBackups: async () => ({ ok: true, backups: [] })
 };
 function Fixture() {

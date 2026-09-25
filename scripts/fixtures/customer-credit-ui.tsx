@@ -43,6 +43,7 @@ function Harness() {
   return <BusinessCapabilityRuntimeProvider value={{ snapshot, state: "success", message: "",
     setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <main className="smoke-shell">
+      {customers.confirmDialog}
       <nav aria-label="Çalışma alanı">
         <button type="button" onClick={() => setPage("market")}>Market</button>
         <button type="button" onClick={() => setPage("customers")}>Müşteriler</button>

@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useState } from "react";
 import { Save, Trash2 } from "lucide-react";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
@@ -127,19 +128,9 @@ export function MenuItemWorkspace({
         returnFocusRef={navigation.returnFocusRef}
         dismissOnBackdrop
         footer={deleteConfirm ? (
-          <div className="menu-workspace-delete-confirm">
-            <div>
-              <strong>“{item.name}” menüden silinecek.</strong>
-              <span>Bu işlem geri alınamaz.</span>
-            </div>
-            <div className="action-row">
-              <ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={() => setDeleteConfirm(false)}>Vazgeç</ActionButton>
-              <ActionButton variant="danger" type="button" disabled={saveState === "loading"} onClick={() => void remove()}>
-                <Trash2 size={16} aria-hidden="true" />
-                Ürünü sil
-              </ActionButton>
-            </div>
-          </div>
+          <ConfirmDialog embedded tone="danger" title={`“${item.name}” menüden silinecek.`}
+            description="Bu işlem geri alınamaz." confirmLabel="Ürünü sil" busy={saveState === "loading"}
+            onCancel={() => setDeleteConfirm(false)} onConfirm={remove} />
         ) : (
           <>
             <p className={"form-status sync-" + saveState} role="status" aria-live="polite">{saveMessage}</p>

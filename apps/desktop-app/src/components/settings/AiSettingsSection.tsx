@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { aiServicePresets, createDefaultAiServiceDraft, isAiServiceProfileStored, normalizeAiService, toAiServiceFormDraft, type SetupFormState } from "../../app/setup-model";
@@ -9,6 +10,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
     onFormChange({ ...form, [key]: value });
   };
 
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [showAiApiKey, setShowAiApiKey] = useState(false);
   const [showGoogleCurl, setShowGoogleCurl] = useState(false);
   const [revealedAiApiKey, setRevealedAiApiKey] = useState("");
@@ -139,6 +141,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
 
   return (
         <section id="settings-ai" tabIndex={-1} className={`settings-service-card setup-ai-section${form.aiEnabled ? " is-enabled" : " is-disabled"}`}>
+          {confirmDialog}
           <div className="settings-service-card-header">
             <div>
               <strong>AI Yardımcı</strong>
@@ -169,11 +172,13 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                   className="setup-ai-delete-key"
                   type="button"
                   disabled={form.clearAiApiKey}
-                  onClick={() => onFormChange({
-                    ...form,
-                    clearAiApiKey: true,
-                    aiEnabled: false
-                  })}
+                  onClick={async () => {
+                    if (await confirm({ title: "Kayıtlı anahtarı sil", tone: "danger", confirmLabel: "Anahtarı Sil",
+                      description: "Bu sağlayıcının kayıtlı AI anahtarı silinsin mi?",
+                      details: "Anahtar, bu ayar alanı kaydedildiğinde silinecek ve AI Yardımcı kapatılacak." })) {
+                      onFormChange({ ...form, clearAiApiKey: true, aiEnabled: false });
+                    }
+                  }}
                 >
                   <Trash2 size={15} aria-hidden="true" />
                   {form.clearAiApiKey ? "Anahtar silinecek" : "Kayıtlı Anahtarı Sil"}

@@ -320,6 +320,33 @@ try {
   await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await page.getByLabel('Enlem', { exact: true }).fill('91');
+  await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
+  const sharedConfirm = page.getByRole('dialog', { name: /değişiklikleri bekliyor/ });
+  const previousScheme = await page.evaluate(() => document.documentElement.dataset.colorScheme);
+  const previousViewport = page.viewportSize();
+  for (const scheme of ['dark', 'light']) {
+    await page.evaluate(scheme => { document.documentElement.dataset.colorScheme = scheme; }, scheme);
+    for (const width of [1366, 1024, 760, 360]) {
+      await page.setViewportSize({ width, height: 768 });
+      await expect(sharedConfirm).toBeVisible();
+      const geometry = await sharedConfirm.evaluate(dialog => {
+        const rect = dialog.getBoundingClientRect();
+        const buttons = [...dialog.querySelectorAll('button')].map(button => button.getBoundingClientRect());
+        const styles = getComputedStyle(dialog);
+        return { fits: rect.left >= 0 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1 && dialog.scrollWidth <= dialog.clientWidth + 1,
+          rows: new Set(buttons.map(rect => Math.round(rect.top))).size,
+          border: parseFloat(styles.borderTopWidth) > 0, shadow: styles.boxShadow !== 'none' };
+      });
+      expect(geometry.fits, `${scheme}/${width}`).toBe(true);
+      expect(geometry.border && geometry.shadow).toBe(true);
+      if (width >= 760) expect(geometry.rows, `${scheme}/${width} actions`).toBe(1);
+      await sharedConfirm.screenshot({ path: `${output}/confirm-${scheme}-${width}.png` });
+    }
+  }
+  await page.evaluate(scheme => { document.documentElement.dataset.colorScheme = scheme; }, previousScheme);
+  await page.setViewportSize(previousViewport);
+  await sharedConfirm.getByRole('button', { name: 'Burada kal' }).click();
+
   await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect(page.locator('#settings-public-profile').getByRole('alert').first()).toBeVisible();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);

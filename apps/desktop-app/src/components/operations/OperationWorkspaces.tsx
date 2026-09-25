@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useMemo, useState } from "react";
 import {
   BedDouble,
@@ -100,6 +101,7 @@ interface DailyTasksWorkspaceProps {
 }
 
 export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateStatus }: DailyTasksWorkspaceProps) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const pension = usePensionPage();
   const [localStatus, setLocalStatus] = useState("pending");
   const statusFilter = pension?.filters.taskStatus ?? localStatus;
@@ -204,8 +206,8 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
                               variant="danger"
                               size="sm"
                               type="button"
-                              onClick={() => {
-                                if (window.confirm(`“${task.title}” günlük işi silinsin mi?`)) {
+                              onClick={async () => {
+                                if (await confirm({ title: "Günlük işi sil", description: `“${task.title}” günlük işi silinsin mi?`, tone: "danger", confirmLabel: "Sil" })) {
                                   void onDelete(task.id);
                                 }
                               }}
@@ -226,6 +228,7 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
           ))
         )}
       </section>
+      {confirmDialog}
       <DailyTaskEditor
         open={editorOpen}
         scope={scope}

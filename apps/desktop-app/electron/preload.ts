@@ -1,3 +1,4 @@
+import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type {
   BusinessCapability,
@@ -252,6 +253,7 @@ export interface DesktopBridge {
   deleteLocalBackup: (backupId: string) => Promise<DesktopBackupActionResult>;
   restoreLocalBackup: (backupId: string) => Promise<DesktopDataMaintenanceResult>;
   resetLocalData: () => Promise<DesktopDataMaintenanceResult>;
+  onDataMaintenanceConfirmation: (listener: (request: DataMaintenanceConfirmation) => Promise<boolean>) => () => void;
   createOwnerReplySuggestion: (requestId: string) => Promise<RequestAiSuggestionResult>;
   generateAiWorkspace: (input: GenerateAiWorkspaceInput) => Promise<GenerateAiWorkspaceResult>;
   getAiWorkspaceHistory: (limit?: number) => Promise<AiWorkspaceHistoryEntry[]>;
@@ -426,6 +428,19 @@ const bridge: DesktopBridge = {
   openLocalBackupItemDirectory: (backupId: string) => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:openBackupItemDirectory", backupId),
   deleteLocalBackup: (backupId: string) => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:deleteBackup", backupId),
   restoreLocalBackup: (backupId: string) => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:restoreBackup", backupId),
+  onDataMaintenanceConfirmation: (listener) => {
+    const handler = async (_event: Electron.IpcRendererEvent, requestId: string, request: DataMaintenanceConfirmation) => {
+      let approved = false;
+      try {
+        approved = await listener(request);
+        const status: AppLockStatus = await ipcRenderer.invoke("appLock:getStatus");
+        approved = approved && !status.locked;
+      } catch { approved = false; }
+      ipcRenderer.send("dataMaintenance:confirmationResponse", requestId, approved);
+    };
+    ipcRenderer.on("dataMaintenance:confirmationRequested", handler);
+    return () => ipcRenderer.removeListener("dataMaintenance:confirmationRequested", handler);
+  },
   resetLocalData: () => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:resetLocalData"),
   createOwnerReplySuggestion: (requestId: string) => ipcRenderer.invoke("ai:createOwnerReplySuggestion", requestId),
   generateAiWorkspace: (input: GenerateAiWorkspaceInput) => ipcRenderer.invoke("ai:generateWorkspace", input),

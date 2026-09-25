@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { CheckCircle2, Copy, ExternalLink, MessageCircle, Phone, Save, Send, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import {
@@ -316,6 +317,7 @@ function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
 }
 
 export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const registeredGuestIdRef = useRef<number | null>(null);
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
@@ -505,7 +507,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
         return;
       }
 
-      const approved = window.confirm(
+      const approved = await confirm({ title: "WhatsApp mesajını gönder", tone: "warning", confirmLabel: "Gönder", description:
         [
           "WhatsApp Web üzerinden mesaj gönderilecek.",
           "",
@@ -517,7 +519,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           "",
           "Bu mesajı göndermeyi onaylıyor musunuz?"
         ].join("\n")
-      );
+      });
 
       if (!approved) {
         setSendState("idle");
@@ -550,6 +552,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
 
   return (
     <section className={`whatsapp-workspace whatsapp-view-${view}`} aria-label={view === "safe" ? "Güvenli mesaj alanı" : "WhatsApp Web alanı"}>
+      {confirmDialog}
       <aside className="panel whatsapp-request-panel">
         {preparedMessage && <div className="panel-heading compact"><div><strong>{recipientName}</strong><p>{preparedMessageLabel} · mesaj hazırlandı</p><small>Gönderim WhatsApp içinde sizin kontrolünüzde.</small></div></div>}
         <div className="panel-heading compact">

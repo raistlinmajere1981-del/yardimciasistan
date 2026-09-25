@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
@@ -62,20 +63,22 @@ export function AndroidDevicesSection({
   const permissionGroupOptions = ANDROID_PERMISSION_GROUP_OPTIONS
     .filter((group) => availableGroupIds.has(group.id))
     .map((group) => capabilityAwareAndroidGroupCopy(group, enabledCapabilities));
+  const { confirm, confirmDialog } = useConfirmDialog();
   const availableDevices = devices.filter((device) => !device.revokedAt);
   const removedDevices = devices.filter((device) => Boolean(device.revokedAt));
-  const restoreDevice = (device: DesktopAndroidDevice) => {
+  const restoreDevice = async (device: DesktopAndroidDevice) => {
     if (!onSetActive) return;
     const shortId = compactAndroidDeviceId(device.deviceId);
     const deviceName = device.deviceName || "Android Telefon";
     const roleLabel = device.role === "admin" ? "Yönetici" : "Personel";
-    if (!window.confirm(`${deviceName} (${shortId}) ${roleLabel} rolü ve kayıtlı görev alanlarıyla geri yüklensin mi?`)) {
+    if (!(await confirm({ title: "Telefonu geri yükle", description: `${deviceName} (${shortId}) ${roleLabel} rolü ve kayıtlı görev alanlarıyla geri yüklensin mi?`, tone: "warning", confirmLabel: "Geri Yükle" }))) {
       return;
     }
     onSetActive(device.deviceId, true);
   };
   return (
     <section id="settings-devices" tabIndex={-1} className="settings-android-devices-section">
+      {confirmDialog}
       <div className="android-devices-heading">
         <div>
           <h3>Telefon Kurulumu</h3>

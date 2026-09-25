@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   buildOwnerReplyWhatsAppMessage,
@@ -40,6 +41,7 @@ export function useMessagingController({
   customerCreditEnabled = false,
   onOpenMessages
 }: UseMessagingControllerOptions) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestIdState] = useState(dashboardData.requests[0]?.id ?? "");
   const [preparedWhatsAppMessage, setPreparedWhatsAppMessage] = useState<PreparedWhatsAppMessage | null>(null);
   const [birthdayPreparingId, setBirthdayPreparingId] = useState("");
@@ -542,7 +544,7 @@ export function useMessagingController({
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
       return;
     }
-    if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} için hazırlanmış mesaj silinsin mi? Talep kaydı korunur.`)) {
+    if (!window.yardimciDesktop || !(await confirm({ title: "Silme onayı", description: `${request.customer_name} için hazırlanmış mesaj silinsin mi? Talep kaydı korunur.`, tone: "danger", confirmLabel: "Sil" }))) {
       return;
     }
 
@@ -948,6 +950,7 @@ export function useMessagingController({
   }
 
   return {
+    confirmDialog,
     preparedWhatsAppMessage: surfacePreparedWhatsAppMessage,
     openPreparedCreditWhatsApp,
     prepareBirthdayWhatsApp,

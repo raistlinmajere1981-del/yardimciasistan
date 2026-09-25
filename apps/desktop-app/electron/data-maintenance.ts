@@ -1,7 +1,8 @@
+import { requestDataMaintenanceConfirmation, type DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { app, dialog, ipcMain, session, shell } from "electron";
+import { app, ipcMain, session, shell } from "electron";
 import { desktopLog } from "./desktop-logger";
 import {
   DESKTOP_DATABASE_FILE_NAME,
@@ -523,7 +524,7 @@ async function openBackupItemDirectory(userDataPath: string, backupId: string): 
   }
 }
 
-async function deleteBackup(userDataPath: string, backupId: string): Promise<DesktopBackupActionResult> {
+async function deleteBackup(userDataPath: string, backupId: string, confirm: (request: DataMaintenanceConfirmation) => Promise<boolean>): Promise<DesktopBackupActionResult> {
   const paths = resolvePaths(userDataPath);
   const id = safeBackupId(backupId);
   if (!id) return { ok: false, message: "Yedek kaydı geçersiz." };
@@ -533,17 +534,13 @@ async function deleteBackup(userDataPath: string, backupId: string): Promise<Des
     const item = readBackupItem(folderPath);
     if (!item) return { ok: false, message: "Silinecek yedek bulunamadı.", backups: listBackupItems(paths) };
 
-    const confirmation = await dialog.showMessageBox({
-      type: "warning",
+    const confirmation = await confirm({
       title: "Yedeği Sil",
-      message: "Bu yedek kalıcı olarak silinsin mi?",
-      detail: `${formatBackupDate(item.createdAt)} tarihli yedek klasörü, QR menü görselleri ve kalıcı asset dosyaları silinecek.`,
-      buttons: ["Vazgeç", "Yedeği Sil"],
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true
+      description: "Bu yedek kalıcı olarak silinsin mi?",
+      details: `${formatBackupDate(item.createdAt)} tarihli yedek klasörü, QR menü görselleri ve kalıcı asset dosyaları silinecek.`,
+      confirmLabel: "Yedeği Sil"
     });
-    if (confirmation.response !== 1) {
+    if (!confirmation) {
       return { ok: false, cancelled: true, message: "Yedek silme iptal edildi.", backups: listBackupItems(paths) };
     }
 
@@ -670,7 +667,7 @@ function formatBackupDate(value: string) {
   }).format(date);
 }
 
-async function prepareRestore(userDataPath: string, backupId: string): Promise<DesktopDataMaintenanceResult> {
+async function prepareRestore(userDataPath: string, backupId: string, confirm: (request: DataMaintenanceConfirmation) => Promise<boolean>): Promise<DesktopDataMaintenanceResult> {
   const paths = resolvePaths(userDataPath);
   const id = safeBackupId(backupId);
   if (!id) return { ok: false, message: "Geri yüklenecek yedek kaydı geçersiz." };
@@ -682,17 +679,13 @@ async function prepareRestore(userDataPath: string, backupId: string): Promise<D
     const sourcePath = path.join(backupFolderPath, backup.databaseFileName || BACKUP_DATABASE_FILE);
     validateYardimciDatabase(sourcePath);
 
-    const confirmation = await dialog.showMessageBox({
-      type: "warning",
+    const confirmation = await confirm({
       title: "Yedekten Geri Yükle",
-      message: `${formatBackupDate(backup.createdAt)} tarihli yedeğe dönülsün mü?`,
-      detail: "Mevcut verilerin önce otomatik güvenlik yedeği alınır. Seçilen yedek daha sonra yerel verilerin yerini alır ve uygulama yeniden başlatılır.",
-      buttons: ["Vazgeç", "Geri Yükle"],
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true
+      description: `${formatBackupDate(backup.createdAt)} tarihli yedeğe dönülsün mü?`,
+      details: "Mevcut verilerin önce otomatik güvenlik yedeği alınır. Seçilen yedek daha sonra yerel verilerin yerini alır ve uygulama yeniden başlatılır.",
+      confirmLabel: "Geri Yükle"
     });
-    if (confirmation.response !== 1) {
+    if (!confirmation) {
       return { ok: false, cancelled: true, message: "Geri yükleme iptal edildi." };
     }
 
@@ -732,19 +725,15 @@ async function prepareRestore(userDataPath: string, backupId: string): Promise<D
   }
 }
 
-async function prepareReset(userDataPath: string): Promise<DesktopDataMaintenanceResult> {
+async function prepareReset(userDataPath: string, confirm: (request: DataMaintenanceConfirmation) => Promise<boolean>): Promise<DesktopDataMaintenanceResult> {
   const paths = resolvePaths(userDataPath);
-  const confirmation = await dialog.showMessageBox({
-    type: "warning",
+  const confirmation = await confirm({
     title: "Yerel Verileri Sıfırla",
-    message: "Bu bilgisayardaki Yardımcı Asistan verileri sıfırlanacak.",
-    detail: "İşletme kayıtları, ayarlar ve uygulama şifresi kaldırılır. Projedeki backup klasörü korunur ve işlemden önce otomatik güvenlik yedeği alınır. Uygulama yeniden başladığında başlangıç verileri yeniden oluşturulur.",
-    buttons: ["Vazgeç", "Verileri Sıfırla"],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true
+    description: "Bu bilgisayardaki Yardımcı Asistan verileri sıfırlanacak.",
+    details: "İşletme kayıtları, ayarlar ve uygulama şifresi kaldırılır. Projedeki backup klasörü korunur ve işlemden önce otomatik güvenlik yedeği alınır. Uygulama yeniden başladığında başlangıç verileri yeniden oluşturulur.",
+    confirmLabel: "Verileri Sıfırla"
   });
-  if (confirmation.response !== 1) {
+  if (!confirmation) {
     return { ok: false, cancelled: true, message: "Veri sıfırlama iptal edildi." };
   }
 
@@ -793,7 +782,7 @@ export function registerDataMaintenanceIpcHandlers(userDataPath: () => string) {
   ipcMain.handle("dataMaintenance:listBackups", () => getBackups(userDataPath()));
   ipcMain.handle("dataMaintenance:openBackupDirectory", () => openBackupDirectory(userDataPath()));
   ipcMain.handle("dataMaintenance:openBackupItemDirectory", (_event, backupId: string) => openBackupItemDirectory(userDataPath(), backupId));
-  ipcMain.handle("dataMaintenance:deleteBackup", (_event, backupId: string) => deleteBackup(userDataPath(), backupId));
-  ipcMain.handle("dataMaintenance:restoreBackup", (_event, backupId: string) => prepareRestore(userDataPath(), backupId));
-  ipcMain.handle("dataMaintenance:resetLocalData", () => prepareReset(userDataPath()));
+  ipcMain.handle("dataMaintenance:deleteBackup", (event, backupId: string) => deleteBackup(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request)));
+  ipcMain.handle("dataMaintenance:restoreBackup", (event, backupId: string) => prepareRestore(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request)));
+  ipcMain.handle("dataMaintenance:resetLocalData", (event) => prepareReset(userDataPath(), (request) => requestDataMaintenanceConfirmation(event.sender, request)));
 }

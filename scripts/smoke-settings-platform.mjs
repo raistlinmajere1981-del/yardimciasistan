@@ -76,6 +76,29 @@ try {
 
   await select('Servisler');
   await expect(guard()).toBeVisible();
+  for (const width of [1366, 1024, 760]) {
+    await page.setViewportSize({ width, height: 900 });
+    const geometry = await guard().evaluate(dialog => {
+      const buttons = [...dialog.querySelectorAll('button')].map(el => el.getBoundingClientRect());
+      const rect = dialog.getBoundingClientRect();
+      return { rows: new Set(buttons.map(rect => Math.round(rect.top))).size, fits: rect.left >= 0 && rect.right <= innerWidth && dialog.scrollWidth <= dialog.clientWidth };
+    });
+    expect(geometry, `confirm geometry ${width}`).toEqual({ rows: 1, fits: true });
+  }
+  const stay = guard().getByRole('button', { name: 'Burada kal', exact: true });
+  await stay.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(guard().getByRole('button', { name: 'Kaydet ve geç', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(stay).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(guard()).toHaveCount(0);
+  await expect(tab('Servisler')).toBeFocused();
+  await select('Servisler');
+  await page.mouse.click(2, 2);
+  await expect(guard()).toHaveCount(0);
+  await select('Servisler');
+
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
   await guard().getByRole('button', { name: 'Burada kal', exact: true }).click();
   await expect(guard()).toHaveCount(0);
@@ -97,9 +120,17 @@ try {
   // Failed guarded save never completes the transition and keeps the draft.
   await select('İşletme');
   await page.getByLabel('Firma adı', { exact: true }).fill('Hata Taslağı');
-  await page.evaluate(() => { window.failSetup = true; });
+  await page.evaluate(() => { window.failSetup = true; window.delaySetup = true; });
   await select('Servisler');
   await guard().getByRole('button', { name: 'Kaydet ve geç', exact: true }).click();
+  await expect(guard().getByRole('button', { name: 'Kaydediliyor…' })).toBeDisabled();
+  await expect(guard().getByRole('button', { name: 'Burada kal' })).toBeDisabled();
+  await expect(guard().getByRole('button', { name: 'Değişiklikleri geri al ve geç' })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await page.mouse.click(2, 2);
+  await expect(guard()).toBeVisible();
+  await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+  await page.evaluate(() => { window.delaySetup = false; window.finishSetup(); });
   await expect(guard()).toBeVisible();
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('Test kayıt hatası', { exact: true })).toBeVisible();
@@ -251,6 +282,39 @@ try {
   await page.getByRole('button', { name: 'Şifreyi Kaydet', exact: true }).click();
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'password').length)).toBe(1);
   await expect(tab('Uygulama')).not.toContainText('Değişiklik var');
+
+  await page.getByLabel('Mevcut şifre', { exact: true }).fill('abcdefg');
+  await page.getByRole('button', { name: 'Şifreyi Kaldır', exact: true }).click();
+  const passwordConfirm = page.getByRole('dialog', { name: 'Uygulama şifresini kaldır' });
+  await expect(passwordConfirm.locator('.action-button-danger')).toHaveText('Şifreyi Kaldır');
+  await passwordConfirm.getByRole('button', { name: 'Vazgeç' }).click();
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'password').length)).toBe(1);
+  await page.getByRole('button', { name: 'Şifreyi Kaldır', exact: true }).click();
+  await passwordConfirm.getByRole('button', { name: 'Şifreyi Kaldır' }).click();
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'password').at(-1).input)).toEqual({ currentPassword: 'abcdefg', newPassword: '' });
+  await page.getByRole('button', { name: 'Verileri Sıfırla', exact: true }).click();
+  const resetConfirm = page.getByRole('dialog', { name: 'Yerel Verileri Sıfırla' });
+  await expect(resetConfirm.locator('.action-button-danger')).toHaveText('Verileri Sıfırla');
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'reset').length)).toBe(0);
+  await page.getByRole('button', { name: 'Verileri Sıfırla', exact: true }).click();
+  await resetConfirm.getByRole('button', { name: 'Verileri Sıfırla' }).click();
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'reset').length)).toBe(1);
+
+  await page.evaluate(() => window.refreshSettings({ aiApiKeyConfigured: true, aiEnabled: true }));
+  await select('Servisler');
+  await page.getByRole('button', { name: 'Kayıtlı Anahtarı Sil', exact: true }).click();
+  const keyConfirm = page.getByRole('dialog', { name: 'Kayıtlı anahtarı sil' });
+  await expect(keyConfirm.locator('.action-button-danger')).toHaveText('Anahtarı Sil');
+  await page.keyboard.press('Escape');
+  await expect(tab('Servisler')).not.toContainText('Değişiklik var');
+  const callsBeforeKeyDelete = (await setupCalls()).length;
+  await page.getByRole('button', { name: 'Kayıtlı Anahtarı Sil', exact: true }).click();
+  await keyConfirm.getByRole('button', { name: 'Anahtarı Sil' }).click();
+  await expect(page.getByRole('button', { name: 'Anahtar silinecek' })).toBeDisabled();
+  expect((await setupCalls()).length).toBe(callsBeforeKeyDelete);
+  await save();
+  expect((await setupCalls()).at(-1).input.clearAiApiKey).toBe(true);
 
   // Responsive body remains bounded after the new footer/dialog architecture.
   for (const width of [1440, 1024, 900, 760, 600]) {

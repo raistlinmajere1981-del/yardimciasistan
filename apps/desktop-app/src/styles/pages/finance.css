@@ -270,24 +270,6 @@
   margin-top: var(--space-2);
 }
 
-.finance-confirm-item {
-  margin: 0 0 var(--space-1);
-  color: var(--color-text);
-}
-
-.finance-confirm-hint {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.finance-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
 @media (max-width: 1100px) {
   .finance-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

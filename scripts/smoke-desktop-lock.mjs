@@ -232,8 +232,8 @@ try {
 
   await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
   await page.getByLabel("Mevcut şifre").fill("değişen-şifre-84");
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Şifreyi Kaldır" }).click();
+  await page.getByRole("dialog", { name: "Uygulama şifresini kaldır" }).getByRole("button", { name: "Şifreyi Kaldır" }).click();
   await expect(page.getByText("Uygulama açılış şifresi kaldırıldı.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Uygulamayı kilitle" }).click();
   await expect(lockDialog.getByLabel("Uygulama şifresi")).toHaveCount(0);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Save, Star, Trash2, X } from "lucide-react";
+import { Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult } from "../../../electron/database";
 import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
@@ -17,7 +17,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton } from "../ui/DataList";
 import { FormDialog } from "../ui/FormDialog";
 import { StatusBadge } from "../ui/StatusBadge";
-import { useDialogFocus } from "../ui/useDialogFocus";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FeatureWorkspacePage } from "../workspace/FeatureWorkspacePage";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
@@ -89,7 +89,6 @@ export function MenuManager({
   const relatedProductCount = categoryForm.id
     ? dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length
     : 0;
-  const deleteDialogRef = useDialogFocus(pendingCategoryDelete);
 
   useEffect(() => {
     if (itemCreateOpen || !pendingItemId) return;
@@ -324,61 +323,12 @@ export function MenuManager({
         </FormDialog>
       )}
 
-      {pendingCategoryDelete && (
-        <div className="overlay" role="presentation">
-          <section
-            ref={deleteDialogRef}
-            className="dialog dialog--compact menu-delete-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="menu-delete-title"
-            aria-describedby="menu-delete-description"
-          >
-            <div className="menu-delete-dialog__header">
-              <div className="overlay-heading">
-                <h2 id="menu-delete-title">Kategoriyi sil</h2>
-                <p id="menu-delete-description">“{categoryForm.name}” kategorisi ve bağlı {relatedProductCount} ürün silinecek.</p>
-              </div>
-              <button
-                className="overlay-close"
-                type="button"
-                data-dialog-close
-                onClick={() => setPendingCategoryDelete(false)}
-                disabled={menuEditState === "loading"}
-                aria-label="Silme onayını kapat"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-            <div className="menu-delete-dialog__notice">
-              <StatusBadge tone="danger">Bu işlem geri alınamaz.</StatusBadge>
-            </div>
-            <div className="form-actions">
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                data-dialog-close
-                onClick={() => setPendingCategoryDelete(false)}
-                disabled={menuEditState === "loading"}
-              >
-                Vazgeç
-              </ActionButton>
-              <ActionButton
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  setPendingCategoryDelete(false);
-                  onDeleteCategory(true);
-                }}
-                disabled={menuEditState === "loading"}
-              >
-                <Trash2 size={16} aria-hidden="true" />
-                Kategoriyi sil
-              </ActionButton>
-            </div>
-          </section>
-        </div>
-      )}
+      {pendingCategoryDelete && <ConfirmDialog tone="danger" title="Kategoriyi sil"
+        description={`“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinecek.`}
+        details="Bu işlem geri alınamaz." confirmLabel="Kategoriyi sil" busy={menuEditState === "loading"}
+        onCancel={() => setPendingCategoryDelete(false)}
+        onConfirm={() => { setPendingCategoryDelete(false); onDeleteCategory(true); }} />}
+
     </>
   );
 }

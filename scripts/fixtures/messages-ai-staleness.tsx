@@ -44,6 +44,7 @@ function Harness() {
 
   return (
     <main>
+      {controller.confirmDialog}
       <p data-testid="sync-state">{syncState}</p>
       <p data-testid="status-message">{statusMessage}</p>
       <p data-testid="selected-whatsapp">{controller.selectedWhatsAppRequestId}</p>

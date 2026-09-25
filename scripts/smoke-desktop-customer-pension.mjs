@@ -63,6 +63,7 @@ try {
     window.yardimciDesktop = {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
       commerce: { listProducts: async () => [], listCategories: async () => [], getCustomerCreditAccount: async id => ({ customer: { ...dashboard.customers.find(customer => customer.id === id), businessId: 'fixture', deletedAt: '' }, balances: [{ currency: 'TRY', amountMinor: 45000 }], entries: [] }) },
+      deleteCustomer: async id => { window.__designCalls.push({ kind: "delete-customer", input: id }); return { ok: false, message: "Aktif konaklaması olan müşteri silinemez." }; },
       saveCustomer: async input => {
         window.__designCalls.push({ kind: 'customer', input });
         const savedId = input.id || 'stage2-customer';
@@ -189,6 +190,19 @@ try {
     const customerWorkspace = page.getByRole('dialog');
     await expect(customerWorkspace).toBeVisible();
     await capture('customer-workspace');
+    const deleteCount = await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length);
+    await customerWorkspace.getByRole('button', { name: 'Müşteriyi Sil' }).click();
+    const deleteConfirm = page.getByRole('dialog', { name: 'Silme onayı' });
+    await expect(deleteConfirm.locator('.action-button-danger')).toHaveText('Sil');
+    await expect(deleteConfirm).toContainText('müşteri kaydı silinsin mi?');
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length)).toBe(deleteCount);
+    await customerWorkspace.getByRole('button', { name: 'Müşteriyi Sil' }).click();
+    await deleteConfirm.getByRole('button', { name: 'Sil', exact: true }).click();
+    await expect(customerWorkspace.getByRole('alert')).toHaveText('Müşteri silinemedi. Yeniden deneyin.');
+    await expect(page.getByText('Aktif konaklaması olan müşteri silinemez.', { exact: true })).toHaveCount(1);
+    expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length)).toBe(deleteCount + 1);
+
     await customerWorkspace.getByRole('tab', { name: 'Bilgiler', exact: true }).click();
     await capture('customer-editor');
     const nameBounds = await customerWorkspace.getByLabel('Ad soyad', { exact: true }).boundingBox();

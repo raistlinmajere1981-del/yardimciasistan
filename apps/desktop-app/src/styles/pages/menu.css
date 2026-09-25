@@ -266,25 +266,6 @@
   justify-content: end;
 }
 
-.menu-delete-dialog {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.menu-delete-dialog__header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.menu-delete-dialog__notice {
-  padding: var(--space-3);
-  border: 1px solid var(--color-danger-border);
-  border-radius: var(--radius-control);
-  background: var(--color-danger-soft);
-}
-
 .stock-image-dialog {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -683,29 +664,4 @@
 .menu-item-create-form {
   display: grid;
   gap: var(--space-4);
-}
-
-.menu-workspace-delete-confirm {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.menu-workspace-delete-confirm > div:first-child {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.menu-workspace-delete-confirm span {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-@media (max-width: 760px) {
-  .menu-workspace-delete-confirm {
-    align-items: stretch;
-    flex-direction: column;
-  }
 }

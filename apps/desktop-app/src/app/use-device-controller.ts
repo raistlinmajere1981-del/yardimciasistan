@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import type { DesktopAndroidDevice, DesktopDashboardData } from "../../electron/database";
@@ -10,6 +11,7 @@ interface UseDeviceControllerOptions {
 }
 
 export function useDeviceController({ setDashboardData, androidEnabled }: UseDeviceControllerOptions) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [backupState, setBackupState] = useState<SyncState>("idle");
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
@@ -143,10 +145,10 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     );
   }
 
-  function handleRevokeAndroidDevice(device: DesktopAndroidDevice) {
+  async function handleRevokeAndroidDevice(device: DesktopAndroidDevice) {
     const shortId = compactAndroidDeviceId(device.deviceId);
     const deviceLabel = `${device.deviceName || "Bu telefon"}${shortId ? ` (${shortId})` : ""}`;
-    if (!window.yardimciDesktop || !window.confirm(`${deviceLabel} kaldırılsın ve erişimi kapatılsın mı?`)) {
+    if (!window.yardimciDesktop || !(await confirm({ title: "Silme onayı", description: `${deviceLabel} kaldırılsın ve erişimi kapatılsın mı?`, tone: "danger", confirmLabel: "Sil" }))) {
       return;
     }
     void runAndroidDeviceMutation(
@@ -177,6 +179,7 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
   }
 
   return {
+    confirmDialog,
     backupState,
     backupMessage,
     androidDeviceState,

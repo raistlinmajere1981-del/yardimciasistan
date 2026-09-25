@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { FolderOpen, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DesktopBackupListItem } from "../../../electron/data-maintenance";
@@ -6,6 +7,10 @@ type MaintenanceState = "idle" | "loading" | "success" | "error";
 type MaintenanceAction = "load" | "backup" | "open-root" | "open-item" | "restore" | "delete" | "reset" | null;
 
 export function DataMaintenanceSettings() {
+  const { confirm, confirmDialog } = useConfirmDialog();
+  useEffect(() => window.yardimciDesktop?.onDataMaintenanceConfirmation?.(
+    (request) => confirm({ ...request, tone: "danger" })
+  ), [confirm]);
   const [state, setState] = useState<MaintenanceState>("idle");
   const [action, setAction] = useState<MaintenanceAction>("load");
   const [activeBackupId, setActiveBackupId] = useState("");
@@ -204,6 +209,7 @@ export function DataMaintenanceSettings() {
 
   return (
     <div className="settings-application-subsection settings-data-maintenance-section backup-manager settings-panel">
+      {confirmDialog}
       <div className="settings-panel-header backup-manager-title">
         <div>
           <h3>Veri ve Yedekleme</h3>

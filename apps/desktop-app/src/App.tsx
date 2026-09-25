@@ -112,6 +112,10 @@ function App() {
         clearOverride: desktopSyncController.clearRuntimeBusinessCapabilityOverride
       }}
     >
+      {customerController.confirmDialog}
+      {deviceController.confirmDialog}
+      {menuController.confirmDialog}
+      {messagingController.confirmDialog}
       <DesktopAppView
         activePage={activePage}
         requestPageChange={requestPageChange}

@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../electron/database";
@@ -30,6 +31,7 @@ export function useMenuController({
   setDashboardData,
   loadDashboardData
 }: UseMenuControllerOptions) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
   const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
@@ -211,7 +213,7 @@ export function useMenuController({
     }
     if (!confirmed) {
       const relatedProductCount = dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length;
-      if (!window.confirm(`“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`)) {
+      if (!(await confirm({ title: "Silme onayı", description: `“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`, tone: "danger", confirmLabel: "Sil" }))) {
         return;
       }
     }
@@ -267,6 +269,7 @@ export function useMenuController({
   }
 
   return {
+    confirmDialog,
     menuPublishState,
     menuStatusMessage,
     menuEditState,

@@ -1,3 +1,4 @@
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useCallback, useRef, useState, type FormEvent } from "react";
 import { KeyRound, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import type { SettingsOperationResult } from "../../app/settings-save";
@@ -8,6 +9,7 @@ interface PasswordSettingsProps {
 }
 
 export function usePasswordSettings({ configured, onConfiguredChange }: PasswordSettingsProps) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -106,7 +108,7 @@ export function usePasswordSettings({ configured, onConfiguredChange }: Password
       showError("Şifreyi kaldırmak için mevcut şifrenizi girin.");
       return;
     }
-    if (!window.confirm("Uygulama açılış şifresi kaldırılsın mı? Uygulama açılırken artık şifre sorulmayacak.")) {
+    if (!(await confirm({ title: "Uygulama şifresini kaldır", description: "Uygulama açılış şifresi kaldırılsın mı? Uygulama açılırken artık şifre sorulmayacak.", tone: "danger", confirmLabel: "Şifreyi Kaldır" }))) {
       return;
     }
     if (!window.yardimciDesktop?.updateAppPassword) {
@@ -174,13 +176,14 @@ export function usePasswordSettings({ configured, onConfiguredChange }: Password
     }
   }
 
-  return { configured, currentPassword, setCurrentPassword, newPassword, setNewPassword, passwordConfirmation, setPasswordConfirmation, webSecurityKey, setWebSecurityKey, recoveryOpen, setRecoveryOpen, busyAction, message, messageTone, sectionRef, currentPasswordRef, newPasswordRef, hasPasswordDraft, savePasswordDraft, removePassword, resetPassword };
+  return { confirmDialog, configured, currentPassword, setCurrentPassword, newPassword, setNewPassword, passwordConfirmation, setPasswordConfirmation, webSecurityKey, setWebSecurityKey, recoveryOpen, setRecoveryOpen, busyAction, message, messageTone, sectionRef, currentPasswordRef, newPasswordRef, hasPasswordDraft, savePasswordDraft, removePassword, resetPassword };
 }
 
 export function PasswordSettings({ controller }: { controller: ReturnType<typeof usePasswordSettings> }) {
   const { configured, currentPassword, setCurrentPassword, newPassword, setNewPassword, passwordConfirmation, setPasswordConfirmation, webSecurityKey, setWebSecurityKey, recoveryOpen, setRecoveryOpen, busyAction, message, messageTone, sectionRef, currentPasswordRef, newPasswordRef, hasPasswordDraft, savePasswordDraft, removePassword, resetPassword } = controller;
   return (
     <>
+      {controller.confirmDialog}
       <div ref={sectionRef} id="settings-password" tabIndex={-1} className="settings-application-subsection settings-password-section settings-panel">
         <div className="settings-panel-header settings-password-title">
           <div>
