@@ -195,8 +195,6 @@
 
 .menu-item-image-label {
   width: 100%;
-  max-width: 240px;
-  margin-left: auto;
   color: var(--color-text);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -290,8 +288,8 @@
 
 .menu-item-image-editor .menu-media-preview-tools.is-compact {
   width: 100%;
-  max-width: 240px;
-  margin-left: auto;
+  max-width: none;
+  margin-left: 0;
 }
 
 .menu-media-preview-tools.is-compact .menu-media-file-name {
