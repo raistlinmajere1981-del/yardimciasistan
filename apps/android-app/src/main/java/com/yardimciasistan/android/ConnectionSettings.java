@@ -23,14 +23,25 @@ final class ConnectionSettings {
     if (isEmbeddedConnectionLocked() && !isDebugConnectionOverrideActive(preferences)) {
       String storedUrl = storedValue(preferences, KEY_WEB_MODULE_URL);
       String storedCredential = storedValue(preferences, KEY_SYNC_SECRET);
+
+      // A desktop provisioning ticket deliberately moves this installation to
+      // another business endpoint. Keep that target until the phone exchanges
+      // the ticket for its per-device credential.
+      if (hasPendingBootstrap(preferences)) {
+        return;
+      }
+
+      // After desktop approval URL + device credential form one connection
+      // identity. Embedded build defaults must never split that pair.
+      if (isDeviceCredential(storedCredential)) {
+        return;
+      }
+
       SharedPreferences.Editor editor = null;
       if (!ConnectionDefaults.WEB_MODULE_URL.equals(storedUrl)) {
         editor = preferences.edit().putString(KEY_WEB_MODULE_URL, ConnectionDefaults.WEB_MODULE_URL);
       }
-      // After desktop approval the phone replaces the shared bootstrap secret
-      // with its own device token. Embedded defaults must never overwrite it.
-      if (!isDeviceCredential(storedCredential)
-          && !ConnectionDefaults.SYNC_SECRET.equals(storedCredential)) {
+      if (!ConnectionDefaults.SYNC_SECRET.equals(storedCredential)) {
         editor = editor == null ? preferences.edit() : editor;
         editor.putString(KEY_SYNC_SECRET, ConnectionDefaults.SYNC_SECRET);
       }
