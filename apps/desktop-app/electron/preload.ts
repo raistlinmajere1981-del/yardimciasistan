@@ -26,6 +26,7 @@ import type {
   SaveInitialSetupInput,
   SaveMenuCategoryInput,
   SaveMenuItemInput,
+  ReorderMenuRecordsInput,
   DesktopMenuSaveResult,
   CreateManualRequestInput,
   CreateManualRequestResult,
@@ -274,6 +275,7 @@ export interface DesktopBridge {
   pushAiSettings: () => Promise<PushAiSettingsResult>;
   saveMenuCategory: (input: SaveMenuCategoryInput) => Promise<DesktopMenuSaveResult>;
   saveMenuItem: (input: SaveMenuItemInput) => Promise<DesktopMenuSaveResult>;
+  reorderMenuRecords: (input: ReorderMenuRecordsInput) => Promise<DesktopStatusUpdateResult>;
   deleteMenuCategory: (categoryId: string) => Promise<DesktopStatusUpdateResult>;
   deleteMenuItem: (itemId: string) => Promise<DesktopStatusUpdateResult>;
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => Promise<DesktopStockImageAnalyzeResult>;
@@ -466,6 +468,7 @@ const bridge: DesktopBridge = {
   pushAiSettings: () => ipcRenderer.invoke("sync:pushAiSettings"),
   saveMenuCategory: (input: SaveMenuCategoryInput) => ipcRenderer.invoke("menu:saveCategory", input),
   saveMenuItem: (input: SaveMenuItemInput) => ipcRenderer.invoke("menu:saveItem", input),
+  reorderMenuRecords: (input: ReorderMenuRecordsInput) => ipcRenderer.invoke("menu:reorder", input),
   deleteMenuCategory: (categoryId: string) => ipcRenderer.invoke("menu:deleteCategory", categoryId),
   deleteMenuItem: (itemId: string) => ipcRenderer.invoke("menu:deleteItem", itemId),
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => ipcRenderer.invoke("stockImage:analyze", input),
