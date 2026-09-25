@@ -421,7 +421,6 @@ export function DesktopWorkspaceRouter({
           data={surfaceData}
           setupData={setupData}
           automaticSyncStatus={automaticSyncStatus}
-          syncBusy={syncState === "loading" || automaticSyncStatus.phase === "syncing"}
           features={runtimeFeatures}
           aiEnabled={aiEnabled}
           customersEnabled={customersEnabled}
@@ -436,7 +435,6 @@ export function DesktopWorkspaceRouter({
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
           onOpenDailyAi={() => openAiTools("daily")}
           onPrepareBirthday={prepareBirthdayWhatsApp}
-          onSyncNow={pullRequests}
           birthdayPreparingId={birthdayPreparingId}
           formatRequestType={formatRequestType}
           formatRequestStatus={formatRequestStatus}
