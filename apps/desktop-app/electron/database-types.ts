@@ -219,6 +219,7 @@ export interface DesktopDashboardData {
   androidActionFailures: DesktopAndroidActionFailure[];
   menu: PublishedQrMenu;
   summary: DashboardSummary;
+  attention: DesktopOperationalAttention;
   birthdayOverview: DesktopBirthdayOverview;
 }
 
@@ -286,6 +287,18 @@ export interface DesktopReportAttentionItem {
   detail: string;
 }
 
+export interface DesktopOperationalAttention {
+  pendingRequests: number;
+  pendingReservations: number;
+  paymentWaitingTables: number;
+  overdueTasks: number;
+  incompleteTasks: number;
+  outOfStockItems: number;
+  lowStockItems: number;
+  totalCount: number;
+  items: DesktopReportAttentionItem[];
+}
+
 export interface DesktopReportData {
   period: DesktopReportPeriod;
   generatedAt: string;
@@ -328,17 +341,7 @@ export interface DesktopReportData {
     imageMovements: DesktopReportStockMovement[];
     recentMovements: DesktopReportStockMovement[];
   };
-  attention: {
-    pendingRequests: number;
-    pendingReservations: number;
-    paymentWaitingTables: number;
-    overdueTasks: number;
-    incompleteTasks: number;
-    outOfStockItems: number;
-    lowStockItems: number;
-    totalCount: number;
-    items: DesktopReportAttentionItem[];
-  };
+  attention: DesktopOperationalAttention;
 }
 
 export type DesktopReportQueryResult =
