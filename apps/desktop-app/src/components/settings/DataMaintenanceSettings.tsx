@@ -203,11 +203,15 @@ export function DataMaintenanceSettings() {
   }
 
   return (
-    <div className="settings-application-subsection settings-data-maintenance-section backup-manager">
-      <div className="settings-subsection-heading backup-manager-title">
-        <div><h3>Veri ve Yedekleme</h3></div>
+    <div className="settings-application-subsection settings-data-maintenance-section backup-manager settings-panel">
+      <div className="settings-panel-header backup-manager-title">
+        <div>
+          <h3>Veri ve Yedekleme</h3>
+          <p>Yerel verileri yedekleyin, geri yükleyin veya sıfırlayın.</p>
+        </div>
         {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
       </div>
+      <div className="settings-panel-body">
       <div className="form-actions backup-manager-toolbar">
         <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void createBackup()} disabled={busy}>
           <Save size={16} aria-hidden="true" />
@@ -270,6 +274,7 @@ export function DataMaintenanceSettings() {
           {message}
         </p>
       )}
+      </div>
     </div>
   );
 }
