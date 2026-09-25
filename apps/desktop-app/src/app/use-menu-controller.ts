@@ -206,6 +206,54 @@ export function useMenuController({
     return result;
   }
 
+  async function reorderCategories(orderedIds: string[]): Promise<DesktopStatusUpdateResult> {
+    const bridge = window.yardimciDesktop;
+    if (!bridge) {
+      return { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
+    }
+
+    const result = await bridge.reorderMenuRecords({ kind: "categories", orderedIds });
+    if (!result.ok) {
+      setMenuEditState("error");
+      setMenuEditMessage(result.message);
+      return result;
+    }
+
+    setDashboardData(result.dashboardData);
+    const selectedCategory = result.dashboardData.menu.categories.find((category) => category.id === selectedCategoryId);
+    if (selectedCategory) {
+      setCategoryForm(toCategoryForm(selectedCategory));
+    }
+    setMenuEditState("success");
+    setMenuEditMessage(result.message);
+    markMenuDirty();
+    return result;
+  }
+
+  async function reorderItems(categoryId: string, orderedIds: string[]): Promise<DesktopStatusUpdateResult> {
+    const bridge = window.yardimciDesktop;
+    if (!bridge) {
+      return { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
+    }
+
+    const result = await bridge.reorderMenuRecords({ kind: "items", categoryId, orderedIds });
+    if (!result.ok) {
+      setMenuEditState("error");
+      setMenuEditMessage(result.message);
+      return result;
+    }
+
+    setDashboardData(result.dashboardData);
+    const selectedItem = result.dashboardData.menu.items.find((item) => item.id === selectedItemId);
+    if (selectedItem) {
+      setItemForm(toItemForm(selectedItem, result.dashboardData.menu.categories[0]?.id ?? ""));
+    }
+    setMenuEditState("success");
+    setMenuEditMessage(result.message);
+    markMenuDirty();
+    return result;
+  }
+
   async function deleteCategory(confirmed = false) {
     const bridge = window.yardimciDesktop;
     if (!categoryForm.id || !bridge) {
@@ -292,6 +340,8 @@ export function useMenuController({
     saveCategory,
     saveItem,
     saveItemForm,
+    reorderCategories,
+    reorderItems,
     deleteCategory,
     deleteItemById
   };
