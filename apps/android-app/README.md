@@ -296,7 +296,12 @@ açık ve bilgisayar yetkilendirilmişse:
 - desktop paketindekinden eski sürüm varsa **Güncelle**,
 - aynı sürüm varsa **Güncel**
 
-durumu gösterilir.
+durumu gösterilir. Uygulama zaten kuruluysa **İşletmeye Bağla** işlemi APK'yı veya
+telefon verisini silmeden mevcut desktop web bağlantısı için yeni tek kullanımlık
+bootstrap bileti gönderir. Böylece telefon daha önce başka bir firma/hosting adresine
+bağlanmış olsa bile aynı cihaz kimliği korunarak yeni işletmeye geçirilebilir. Normal
+APK güncellemesi de başarılı kurulumdan sonra mevcut desktop işletme bağlantısını yeniden
+provision eder.
 
 İlk kurulumda desktop ortak `sync_secret` değerini telefona göndermez. Bunun yerine
 kısa ömürlü, tek kullanımlık `yab1...` kurulum bileti oluşturur ve ADB intent extras
