@@ -17,6 +17,7 @@ import type {
   DesktopReportRangeInput,
   DesktopReportStockMovement
 } from "../../electron/database";
+import type { DesktopFinanceAiMode } from "../../electron/finance";
 import { FinanceWorkspace } from "../components/finance/FinanceWorkspace";
 import type { FinanceController } from "../app/controller-types";
 import { MetricCard } from "../components/ui/MetricCard";
@@ -40,11 +41,17 @@ interface ReportsPageProps {
   inventoryEnabled: boolean;
 }
 
-const AI_ACTIONS: Array<{ mode: DesktopReportAiMode; label: string }> = [
+const REPORT_AI_ACTIONS: Array<{ mode: DesktopReportAiMode; label: string }> = [
   { mode: "summary", label: "Dönemi Özetle" },
-  { mode: "attention", label: "Dikkat Edilecekleri Bul" },
   { mode: "sales", label: "Satışları Yorumla" },
   { mode: "recommendations", label: "İşletme İçin Öneri Ver" }
+];
+
+const CASH_AI_ACTIONS: Array<{ mode: DesktopFinanceAiMode; label: string }> = [
+  { mode: "summary", label: "Bugünü Özetle" },
+  { mode: "flow", label: "Hareketleri Yorumla" },
+  { mode: "receivables", label: "Alacakları Yorumla" },
+  { mode: "recommendations", label: "Kasa İçin Öneri Ver" }
 ];
 
 const REPORT_PRESETS: Array<{ preset: Exclude<DesktopReportPreset, "custom">; label: string }> = [
@@ -75,16 +82,19 @@ export function ReportsPage({
   const [report, setReport] = useState<DesktopReportData>(() => emptyReport(initialRange));
   const [loading, setLoading] = useState(false);
   const [reportMessage, setReportMessage] = useState("");
-  const [aiMode, setAiMode] = useState<DesktopReportAiMode | "">("");
-  const [aiContent, setAiContent] = useState("");
-  const [aiMessage, setAiMessage] = useState("Bir yorum türü seçtiğinizde AI yalnız hazırlanmış rapor sonucunu kullanır.");
+  const [reportAiMode, setReportAiMode] = useState<DesktopReportAiMode | "">("");
+  const [reportAiContent, setReportAiContent] = useState("");
+  const [reportAiMessage, setReportAiMessage] = useState("AI yalnız seçilen dönemin hazırlanmış rapor verisini kullanır.");
+  const [cashAiMode, setCashAiMode] = useState<DesktopFinanceAiMode | "">("");
+  const [cashAiContent, setCashAiContent] = useState("");
+  const [cashAiMessage, setCashAiMessage] = useState("AI yalnız bugünkü kasa ve mevcut alacak verisini kullanır.");
   const [activeView, setActiveView] = useState<"cash" | "reports">("cash");
 
   useEffect(() => {
     let active = true;
-    setAiMode("");
-    setAiContent("");
-    setAiMessage("Bir yorum türü seçtiğinizde AI yalnız hazırlanmış rapor sonucunu kullanır.");
+    setReportAiMode("");
+    setReportAiContent("");
+    setReportAiMessage("AI yalnız seçilen dönemin hazırlanmış rapor verisini kullanır.");
     if (!reportsEnabled) {
       setReport(emptyReport(range));
       setLoading(false);
@@ -162,83 +172,85 @@ export function ReportsPage({
     });
   }
 
-  async function generateAiComment(mode: DesktopReportAiMode) {
-    setAiMode(mode);
-    setAiContent("");
-    setAiMessage("AI işletme yorumu hazırlanıyor...");
+  async function generateReportAiComment(mode: DesktopReportAiMode) {
+    setReportAiMode(mode);
+    setReportAiContent("");
+    setReportAiMessage("AI dönem yorumu hazırlanıyor...");
     if (!aiEnabled || !window.yardimciDesktop) {
-      setAiMessage("Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.");
+      setReportAiMessage("Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.");
       return;
     }
     try {
       const result = await window.yardimciDesktop.generateReportAiComment({ mode, range });
       if (result.ok) {
-        setAiContent(result.content);
-        setAiMessage("AI yorumu hazır.");
+        setReportAiContent(result.content);
+        setReportAiMessage("AI dönem yorumu hazır.");
       } else {
-        setAiMessage(result.message);
+        setReportAiMessage(result.message);
       }
     } catch {
-      setAiMessage("Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.");
+      setReportAiMessage("Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.");
     }
   }
 
-  const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
+  async function generateCashAiComment(mode: DesktopFinanceAiMode) {
+    setCashAiMode(mode);
+    setCashAiContent("");
+    setCashAiMessage("AI kasa yorumu hazırlanıyor...");
+    if (!aiEnabled || !window.yardimciDesktop?.generateFinanceAiComment) {
+      setCashAiMessage("Kasa verileri hazır ancak AI yorumu şu anda oluşturulamadı.");
+      return;
+    }
+    try {
+      const result = await window.yardimciDesktop.generateFinanceAiComment({ mode });
+      if (result.ok) {
+        setCashAiContent(result.content);
+        setCashAiMessage("AI kasa yorumu hazır.");
+      } else {
+        setCashAiMessage(result.message);
+      }
+    } catch {
+      setCashAiMessage("Kasa verileri hazır ancak AI yorumu şu anda oluşturulamadı.");
+    }
+  }
+
+  useEffect(() => {
+    setCashAiMode("");
+    setCashAiContent("");
+    setCashAiMessage("AI yalnız bugünkü kasa ve mevcut alacak verisini kullanır.");
+  }, [financeController.data.generatedAt]);
+
+    const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
   const reservationsEnabled = accommodationReservationsEnabled || foodReservationsEnabled;
   const stockEnabled = foodMenuEnabled && inventoryEnabled;
-  const financeAiPanel = aiEnabled && reportsEnabled ? (
+  const financeAiPanel = aiEnabled && financeEnabled ? (
     <Panel className="finance-ai-panel report-ai-panel" padding="compact">
       <div className="report-section-title">
         <div>
-          <p>İsteğe bağlı</p>
+          <p>Bugünkü kasa</p>
           <h2>AI Kasa Yorumu</h2>
         </div>
         <Sparkles size={19} aria-hidden="true" />
       </div>
       <div className="finance-ai-period">
-        <span>{formatReportPeriod(report.period)}</span>
-        <div className="report-date-presets finance-ai-presets" role="group" aria-label="AI yorum dönemi">
-          {[
-            { preset: "today" as const, label: "Bugün" },
-            { preset: "last7" as const, label: "7 Gün" },
-            { preset: "last30" as const, label: "30 Gün" }
-          ].map((option) => (
-            <button
-              className={range.preset === option.preset ? "is-active" : ""}
-              type="button"
-              aria-pressed={range.preset === option.preset}
-              onClick={() => selectPreset(option.preset)}
-              key={option.preset}
-            >
-              {option.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              selectCustom();
-              setActiveView("reports");
-            }}
-          >
-            Tarih Aralığı
-          </button>
-        </div>
+        <span>{longDate(localDateKey(new Date()))}</span>
+        <small>Bugünkü para hareketleri ve mevcut bekleyen alacaklar</small>
       </div>
       <div className="report-ai-actions finance-ai-actions">
-        {AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
+        {CASH_AI_ACTIONS.map((action) => (
           <button
-            className={aiMode === action.mode ? "is-active" : ""}
+            className={cashAiMode === action.mode ? "is-active" : ""}
             type="button"
-            disabled={aiMode === action.mode && aiMessage.includes("hazırlanıyor")}
-            onClick={() => void generateAiComment(action.mode)}
+            disabled={cashAiMode === action.mode && cashAiMessage.includes("hazırlanıyor")}
+            onClick={() => void generateCashAiComment(action.mode)}
             key={action.mode}
           >
             {action.label}
           </button>
         ))}
       </div>
-      <p className="report-ai-status" role="status">{aiMessage}</p>
-      {aiContent && <div className="report-ai-result finance-ai-result">{aiContent}</div>}
+      <p className="report-ai-status" role="status">{cashAiMessage}</p>
+      {cashAiContent && <div className="report-ai-result finance-ai-result">{cashAiContent}</div>}
     </Panel>
   ) : null;
 
