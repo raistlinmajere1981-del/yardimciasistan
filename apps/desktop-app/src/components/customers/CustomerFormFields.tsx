@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import type { DesktopIdentityImageAnalyzeResult } from "../../../electron/database";
 import type { CustomerFormState } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
+import { DatePicker } from "../ui/DateTimePicker";
 
 type AnalysisState = "idle" | "loading" | "success" | "error";
 
@@ -124,12 +125,12 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           </select></label>
           <label className="form-field form-field--medium">Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
           <label className="form-field form-field--medium">Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
-          <label className="form-field form-field--short">Doğum tarihi<input lang="tr-TR" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
+          <div className="form-field form-field--short"><span>Doğum tarihi</span><DatePicker ariaLabel="Doğum tarihi" value={form.birthDate} presets={[]} onChange={(value) => update("birthDate", value)} /></div>
           <label className="form-field form-field--medium">Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
             <option value="">Seçilmedi</option><option value="female">Kadın</option><option value="male">Erkek</option><option value="unspecified">Belirtilmemiş</option>
           </select></label>
           <label className="form-field form-field--medium">Seri / belge no<input value={form.documentSerialNumber} onChange={(event) => update("documentSerialNumber", event.target.value)} /></label>
-          <label className="form-field form-field--short">Son geçerlilik<input lang="tr-TR" type="date" value={form.documentExpiryDate} onChange={(event) => update("documentExpiryDate", event.target.value)} /></label>
+          <div className="form-field form-field--short"><span>Son geçerlilik</span><DatePicker ariaLabel="Son geçerlilik" value={form.documentExpiryDate} presets={[]} onChange={(value) => update("documentExpiryDate", value)} /></div>
           <label className="form-field form-field--medium">Doğum yeri<input value={form.birthPlace} onChange={(event) => update("birthPlace", event.target.value)} /></label>
           <label className="form-field form-field--medium">Anne adı<input value={form.motherName} onChange={(event) => update("motherName", event.target.value)} /></label>
           <label className="form-field form-field--medium">Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
