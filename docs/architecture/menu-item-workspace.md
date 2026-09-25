@@ -23,7 +23,7 @@ Stock tracking is an explicit form state rather than an implicit “quantity is 
 
 The media section keeps the current preview at the top-right of the panel with adjacent file-select and clear actions. Image preparation and persistence still use the existing canonical menu image field.
 
-Menu order is owned by the menu lists, not by numeric form fields. Categories are drag-reordered globally. Products are drag-reordered within the selected category; the “Tüm kategoriler” view is an overview and asks the user to select a category before changing product order. Reorder persistence renumbers the affected records atomically in 10-step positions and marks them pending for the existing menu sync path.
+Menu order is owned by the menu lists, not by numeric form fields. Categories are drag-reordered globally. Products are drag-reordered within their own category; the “Tüm kategoriler” view groups products by category and still allows same-category drag ordering without permitting accidental cross-category moves. Reorder persistence renumbers the affected records atomically in 10-step positions and marks them pending for the existing menu sync path.
 
 ## Operations
 
