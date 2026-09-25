@@ -420,26 +420,26 @@ export function BusinessPublicProfileSection({
             <div className="form-row business-public-profile-times">
               {accommodationDetailsEnabled && (
                 <>
-                  <label className="form-field form-field--short">
-                    Giriş saati
-                    <input lang="tr-TR" type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
-                  </label>
-                  <label className="form-field form-field--short">
-                    Çıkış saati
-                    <input lang="tr-TR" type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
-                  </label>
+                  <div className="form-field form-field--short">
+                    <span>Giriş saati</span>
+                    <TimePicker ariaLabel="Giriş saati" value={draft.checkInTime} onChange={(value) => update("checkInTime", value)} />
+                  </div>
+                  <div className="form-field form-field--short">
+                    <span>Çıkış saati</span>
+                    <TimePicker ariaLabel="Çıkış saati" value={draft.checkOutTime} onChange={(value) => update("checkOutTime", value)} />
+                  </div>
                 </>
               )}
               {showBreakfastTimes && (
                 <>
-                  <label className="form-field form-field--short">
-                    Kahvaltı başlangıcı
-                    <input lang="tr-TR" type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
-                  </label>
-                  <label className="form-field form-field--short">
-                    Kahvaltı bitişi
-                    <input lang="tr-TR" type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
-                  </label>
+                  <div className="form-field form-field--short">
+                    <span>Kahvaltı başlangıcı</span>
+                    <TimePicker ariaLabel="Kahvaltı başlangıcı" value={draft.breakfastStartTime} onChange={(value) => update("breakfastStartTime", value)} />
+                  </div>
+                  <div className="form-field form-field--short">
+                    <span>Kahvaltı bitişi</span>
+                    <TimePicker ariaLabel="Kahvaltı bitişi" value={draft.breakfastEndTime} onChange={(value) => update("breakfastEndTime", value)} />
+                  </div>
                 </>
               )}
             </div>
