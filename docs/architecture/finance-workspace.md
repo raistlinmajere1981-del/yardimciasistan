@@ -6,10 +6,13 @@ Status: closed and verified on `refactor/finance-workspace-v2`.
 
 - Finance remains the canonical operational workspace for daily cash tracking.
 - No separate FinanceEntry entity workspace was introduced.
-- Manual income and expense entry remain bounded subflows inside Finance Workspace.
+- Manual income and expense entry are bounded FormDialog subflows launched from Finance Workspace.
 - Room Folio, pension payment and restaurant transaction ownership remain in their existing domain services.
 - Automatic finance entries remain read-only projections in Finance Workspace; they must be corrected through their source transaction.
 - The existing `reports` route remains the host surface and is presented as `Kasa` when Finance is enabled.
+- Kasa and Detaylı Raporlar are sibling tabs; detailed reporting is no longer a hidden/collapsible panel below the daily cash workspace.
+- AI report actions live in the daily Kasa side rail so they remain reachable without scrolling through detailed reports.
+- Finance categories are persisted in `finance_categories`. System source categories are protected; user categories can be added or deactivated directly inside the income/expense dialogs.
 
 ## Persistent controller lifetime
 
@@ -32,6 +35,7 @@ This keeps operation lifetime independent from `FinanceWorkspace` mount/unmount.
 
 - delete confirmation presentation
 - recent-entry expansion
+- entry-dialog category text input
 
 ## Manual mutation contract
 
@@ -100,7 +104,7 @@ Stage 8D does not change:
 - `apps/desktop-app/electron/room-folio.ts`
 - `apps/desktop-app/electron/room-folio-ipc.ts`
 - preload Finance contracts
-- SQLite schema, migrations or triggers
+- Room Folio and restaurant schemas/triggers
 - Room Folio transaction ownership
 - restaurant transaction ownership
 
@@ -129,6 +133,10 @@ npm run check:linux
 ```
 
 Final Astra review: `STAGE8D_FINAL=pass`.
+
+## Current category lifecycle
+
+The clean schema contains `finance_categories`. The Finance service also ensures the table exists for the single-working-copy development database and seeds only missing defaults. Removing a user category marks it inactive, so historical `finance_entries.category` values keep resolving to their original label. System categories such as Pansiyon and Restoran cannot be removed.
 
 ## Deferred, non-blocking follow-ups
 
