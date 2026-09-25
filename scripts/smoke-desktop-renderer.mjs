@@ -2203,7 +2203,8 @@ try {
   await expect(setupPage.getByText("2 görsel ve metin modeli bu sağlayıcı altında kayıtlı.")).toBeVisible();
   const storedGeminiKeyInput = setupPage.getByLabel("Google AI Studio API anahtarı veya cURL");
   await expect(storedGeminiKeyInput).toHaveValue("********************");
-  await expect(setupPage.getByText("Kayıtlı anahtar maskelenir; Göster ile görüntüleyebilir veya yeni anahtar yapıştırabilirsiniz.")).toBeVisible();
+  await expect(setupPage.getByText("Kayıtlı anahtar maskelenir; Göster ile görüntüleyebilir veya yeni anahtar yapıştırabilirsiniz.")).toHaveCount(0);
+  await expect(setupPage.getByRole("button", { name: "Kayıtlı Anahtarı Sil", exact: true })).toBeVisible();
   await setupPage.getByRole("button", { name: "Göster" }).click();
   await expect(storedGeminiKeyInput).toHaveValue("AQ.smoke-key");
   await setupPage.getByRole("button", { name: "Gizle" }).click();
