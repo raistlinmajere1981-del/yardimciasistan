@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, X } from "lucide-react";
 
-export interface DatePickerPreset {
+interface DatePickerPreset {
   label: string;
   value: string;
 }
