@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   BedDouble,
   Cake,
   CalendarCheck2,
@@ -9,6 +10,8 @@ import {
   Clock3,
   MessageCircle,
   MessageSquareText,
+  PackageMinus,
+  ReceiptText,
   Sparkles,
   UtensilsCrossed
 } from "lucide-react";
@@ -94,7 +97,17 @@ export function DashboardPage({
   const birthdayAttentionCount = customersEnabled && birthdayOverview.enabled
     ? birthdayOverview.dueCount + birthdayOverview.invalidPhoneCount + birthdayOverview.waitingCount + birthdayOverview.failedCount
     : 0;
-  const attentionCount = waitingRequestCount + openTaskCount + pendingReservationCount + birthdayAttentionCount;
+  const paymentWaitingCount = data.attention.paymentWaitingTables;
+  const stockAttentionCount = data.attention.outOfStockItems + data.attention.lowStockItems;
+  const operationalAttentionItems = data.attention.items.filter((item) =>
+    item.kind === "payment_waiting" || item.kind === "out_of_stock" || item.kind === "low_stock"
+  );
+  const attentionCount = waitingRequestCount
+    + openTaskCount
+    + pendingReservationCount
+    + birthdayAttentionCount
+    + paymentWaitingCount
+    + stockAttentionCount;
   const visiblePriorityItems = dashboard.priorityItems.slice(0, 6);
   const hiddenPriorityCount = Math.max(0, attentionCount - visiblePriorityItems.length);
   const visibleScheduleItems = dashboard.scheduleItems.slice(0, 4);
@@ -175,6 +188,12 @@ export function DashboardPage({
           {customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0 && (
             <AttentionCard tone="info" icon={Cake} value={birthdayOverview.candidates.length} label="müşterinin doğum günü var" />
           )}
+          {paymentWaitingCount > 0 && (
+            <AttentionCard tone="wait" icon={ReceiptText} value={paymentWaitingCount} label="masa hesap bekliyor" />
+          )}
+          {stockAttentionCount > 0 && (
+            <AttentionCard tone={data.attention.outOfStockItems > 0 ? "danger" : "wait"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
+          )}
         </div>
       </section>
 
@@ -217,7 +236,32 @@ export function DashboardPage({
           )}
         </Panel>
 
-        {(calendarEnabled || capacityVisible || (customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0)) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
+        {(operationalAttentionItems.length > 0 || calendarEnabled || capacityVisible || (customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0)) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
+          {operationalAttentionItems.length > 0 && (
+            <Panel className="dashboard-operational-attention-panel" padding="compact">
+              <div className="dashboard-section-heading page-toolbar compact">
+                <div>
+                  <p>Dikkat gerektirenler</p>
+                  <h2>Anlık durum</h2>
+                </div>
+                <AlertTriangle size={19} aria-hidden="true" />
+              </div>
+              <div className="dashboard-operational-attention-list">
+                {operationalAttentionItems.map((item, index) => (
+                  <article key={`${item.kind}:${item.title}:${index}`} className={`is-${item.kind}`}>
+                    <span className="dashboard-operational-attention-icon" aria-hidden="true">
+                      {item.kind === "payment_waiting" ? <ReceiptText size={16} /> : <PackageMinus size={16} />}
+                    </span>
+                    <div>
+                      <strong>{item.title}</strong>
+                      {item.detail && <span>{item.detail}</span>}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </Panel>
+          )}
+
           {calendarEnabled && <Panel className="dashboard-timeline-panel" padding="compact">
             <div className="dashboard-section-heading page-toolbar compact">
               <div>
