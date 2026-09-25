@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export type CalendarViewMode = "day" | "week";
+export type CalendarViewMode = "day" | "week" | "month";
 
 /** Calendar page context survives ordinary page navigation because the controller lives in DesktopWorkspaceRouter. */
 export function useCalendarPageController() {
