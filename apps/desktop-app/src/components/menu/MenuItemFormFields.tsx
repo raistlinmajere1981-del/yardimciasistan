@@ -128,26 +128,67 @@ export function MenuItemFormFields({
   return (
     <div className="form-stack menu-item-form">
       {showDetails && (
-        <section className="panel form-stack menu-item-details-section">
-          <div className={showInlineMedia ? "page-toolbar menu-item-details-toolbar has-media" : "page-toolbar menu-item-details-toolbar"}>
+        <section className="panel menu-item-details-section">
+          <div className="page-toolbar menu-item-section-heading">
             <div className="page-toolbar__copy">
               <strong>Ürün bilgileri</strong>
               <small>Menüde görünen temel bilgiler ve sınıflandırma.</small>
             </div>
-            {showInlineMedia && renderImageControls(true)}
           </div>
-          <div className="form-grid">
-            <label className="form-field form-field--long form-field--span">Ürün adı<input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} placeholder="Serpme Kahvaltı" /></label>
-            <label className="form-field form-field--medium">Kategori<select value={form.category_id} onChange={(event) => onChange({ ...form, category_id: event.target.value })}>{dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-            <label className="form-field form-field--short">Fiyat<MoneyInput value={form.price} onChange={(price) => onChange({ ...form, price })} /></label>
-            <label className="form-field form-field--fluid form-field--span">Açıklama<textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ürün açıklaması" /></label>
-            <div className="form-row form-field--span">
+
+          <div className={showInlineMedia ? "menu-item-editor-grid has-media" : "menu-item-editor-grid"}>
+            <label className="form-field menu-item-field-name">
+              Ürün adı
+              <input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} placeholder="Serpme Kahvaltı" />
+            </label>
+
+            <label className="form-field menu-item-field-category">
+              Kategori
+              <select value={form.category_id} onChange={(event) => onChange({ ...form, category_id: event.target.value })}>
+                {dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </label>
+
+            <label className="form-field menu-item-field-price">
+              Fiyat
+              <MoneyInput value={form.price} onChange={(price) => onChange({ ...form, price })} />
+            </label>
+
+            <label className="form-field menu-item-field-currency">
+              Para birimi
+              <select value={form.currency} onChange={(event) => onChange({ ...form, currency: event.target.value })}>
+                <option value="TRY">TRY</option>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </select>
+            </label>
+
+            <label className="form-field menu-item-field-description">
+              Açıklama
+              <textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ürün açıklaması" />
+            </label>
+
+            {showInlineMedia && (
+              <div className="menu-item-image-editor">
+                <span className="menu-item-image-label">Ürün görseli</span>
+                {renderImageControls(true)}
+              </div>
+            )}
+
+            <div className="menu-item-field-status">
               <label className="form-check"><input checked={form.is_available} onChange={(event) => onChange({ ...form, is_available: event.target.checked })} type="checkbox" />Mevcut</label>
               <label className="form-check"><input checked={form.is_featured} onChange={(event) => onChange({ ...form, is_featured: event.target.checked })} type="checkbox" />Öne çıkar</label>
             </div>
-            <label className="form-field form-field--short">Para birimi<select value={form.currency} onChange={(event) => onChange({ ...form, currency: event.target.value })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label>
-            <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => onChange({ ...form, tags: event.target.value })} placeholder="popüler, kahvaltı" /></label>
-            <label className="form-field form-field--medium">Alerjenler<input value={form.allergens} onChange={(event) => onChange({ ...form, allergens: event.target.value })} placeholder="gluten, süt" /></label>
+
+            <label className="form-field menu-item-field-tags">
+              Etiketler
+              <input value={form.tags} onChange={(event) => onChange({ ...form, tags: event.target.value })} placeholder="popüler, kahvaltı" />
+            </label>
+
+            <label className="form-field menu-item-field-allergens">
+              Alerjenler
+              <input value={form.allergens} onChange={(event) => onChange({ ...form, allergens: event.target.value })} placeholder="gluten, süt" />
+            </label>
           </div>
         </section>
       )}
@@ -170,17 +211,40 @@ export function MenuItemFormFields({
           </div>
 
           {form.stock_tracking_enabled && (
-            <div className="menu-stock-fields form-stack">
-              <div className="form-row">
-                <label className="form-field form-field--short">Stok miktarı<input value={form.stock_quantity} onChange={(event) => onChange({ ...form, stock_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="0" /></label>
-                <label className="form-field form-field--medium">Stok birimi<select value={form.stock_unit} onChange={(event) => onChange({ ...form, stock_unit: event.target.value === "gram" ? "gram" : "piece" })}><option value="piece">Adet</option><option value="gram">Gram</option></select></label>
+            <div className="menu-stock-fields">
+              <div className="menu-stock-metrics">
+                <label className="form-field">
+                  Stok miktarı
+                  <input value={form.stock_quantity} onChange={(event) => onChange({ ...form, stock_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Örn. 10" />
+                </label>
+                <label className="form-field">
+                  Stok birimi
+                  <select value={form.stock_unit} onChange={(event) => onChange({ ...form, stock_unit: event.target.value === "gram" ? "gram" : "piece" })}>
+                    <option value="piece">Adet</option>
+                    <option value="gram">Gram</option>
+                  </select>
+                </label>
+                <label className="form-field">
+                  Minimum stok uyarısı ({stockUnitShortLabel(form.stock_unit)})
+                  <input value={form.stock_min_quantity} onChange={(event) => onChange({ ...form, stock_min_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Örn. 5" />
+                </label>
+                <label className="form-field">
+                  Bir satışta düşülecek ({stockUnitShortLabel(form.stock_unit)})
+                  <input value={form.stock_consumption_quantity} onChange={(event) => onChange({ ...form, stock_consumption_quantity: event.target.value })} inputMode="decimal" type="number" min="0.001" step="any" placeholder="Örn. 1" />
+                </label>
               </div>
-              <div className="form-row">
-                <label className="form-field form-field--short">Minimum stok uyarısı ({stockUnitShortLabel(form.stock_unit)})<input value={form.stock_min_quantity} onChange={(event) => onChange({ ...form, stock_min_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Örn. 5" /></label>
-                <label className="form-field form-field--short">Bir satışta düşülecek ({stockUnitShortLabel(form.stock_unit)})<input value={form.stock_consumption_quantity} onChange={(event) => onChange({ ...form, stock_consumption_quantity: event.target.value })} inputMode="decimal" type="number" min="0.001" step="any" placeholder="Örn. 1" /></label>
-              </div>
-              {qrMenuEnabled && <label className="form-check"><input checked={form.hide_when_out_of_stock} onChange={(event) => onChange({ ...form, hide_when_out_of_stock: event.target.checked })} type="checkbox" />Stok bitince QR menüden gizle</label>}
-              <label className="form-field form-field--fluid">Stok notu<textarea value={form.stock_note} onChange={(event) => onChange({ ...form, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" /></label>
+
+              {qrMenuEnabled && (
+                <label className="form-check menu-stock-qr-toggle">
+                  <input checked={form.hide_when_out_of_stock} onChange={(event) => onChange({ ...form, hide_when_out_of_stock: event.target.checked })} type="checkbox" />
+                  Stok bitince QR menüden gizle
+                </label>
+              )}
+
+              <label className="form-field menu-stock-note">
+                Stok notu
+                <textarea value={form.stock_note} onChange={(event) => onChange({ ...form, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" />
+              </label>
             </div>
           )}
         </section>
