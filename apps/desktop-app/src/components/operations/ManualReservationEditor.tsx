@@ -250,9 +250,6 @@ export function ManualReservationEditor({
               Web talebinden oluşan rezervasyonda tarih ve kişi bilgisi talep kaydıyla bağlıdır; burada oda ve not değiştirilebilir.
             </p>
           )}
-          {customers.length === 0 && !isEditing && (
-            <p className="form-status">Müşteri listeniz boş. Yeni Müşteri Ekle ile ilk kaydı oluşturabilirsiniz.</p>
-          )}
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
 
