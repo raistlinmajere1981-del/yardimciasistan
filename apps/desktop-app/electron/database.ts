@@ -342,6 +342,7 @@ export class DesktopDatabase {
 
   getDashboardData(): DesktopDashboardData {
     const settings = this.db.prepare("SELECT web_module_url FROM settings LIMIT 1").get() as { web_module_url?: string } | undefined;
+    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
 
     return {
       databasePath: this.databasePath,
@@ -357,6 +358,7 @@ export class DesktopDatabase {
       androidDevices: this.getAndroidDevices(),
       paymentWaitingTableOrders: listPaymentWaitingTableOrders(this.db),
       androidActionFailures: this.getAndroidActionFailures(),
+      attention: getOperationalAttention(this.db, enabledCapabilities),
       birthdayOverview: readBirthdayOverview(this.db),
       summary: {
         newRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status = 'new' AND deleted_at = ''"),
@@ -2163,6 +2165,8 @@ import {
   getReportData as getStoredReportData,
   getAndroidReportPresets as getStoredAndroidReportPresets,
 } from "./database/report-store.js";
+
+import { getOperationalAttention } from "./database/operational-attention.js";
 
 import {
   getAndroidDevices as getStoredAndroidDevices,
