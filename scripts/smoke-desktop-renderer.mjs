@@ -134,7 +134,12 @@ try {
         }
         return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(businessLayout) };
       },
-      onSyncStatusChanged: () => () => {},
+      onSyncStatusChanged: (listener) => {
+        syncStatusListener = listener;
+        return () => {
+          if (syncStatusListener === listener) syncStatusListener = null;
+        };
+      },
       getReportData: async (range) => {
         window.__reportRanges.push(range);
         return {
@@ -1886,6 +1891,8 @@ try {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     let currentDashboardData = dashboardData;
+    let syncStatusListener = null;
+    window.__emitAutomaticSyncStatus = (status) => syncStatusListener?.(status);
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
@@ -1978,6 +1985,70 @@ try {
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(pullPage.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(pullPage.locator(".dashboard-attention-card").first().locator("strong")).toHaveText("0");
+  const shellSync = pullPage.locator(".page-header-tools .sync-pill");
+  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
+  await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
+    enabled: true,
+    clientId: "renderer-smoke",
+    requestCursor: 0,
+    acknowledgedCursor: 0,
+    lastAttemptAt: "2026-07-18T12:35:15+03:00",
+    lastSuccessAt: "2026-07-18T12:00:00+03:00",
+    lastError: "",
+    consecutiveFailures: 0,
+    pendingJobs: 0,
+    nextRetryAt: "",
+    phase: "syncing",
+    message: "Web, masaüstü ve Android verileri eşitleniyor..."
+  }));
+  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
+  await expect(shellSync.getByRole("button", { name: "Şimdi Eşitle", exact: true })).toBeEnabled();
+  await expect(shellSync.getByText("Eşitleniyor", { exact: true })).toHaveCount(0);
+  await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
+    enabled: true,
+    clientId: "renderer-smoke",
+    requestCursor: 0,
+    acknowledgedCursor: 0,
+    lastAttemptAt: "2026-07-18T12:35:15+03:00",
+    lastSuccessAt: "2026-07-18T12:35:16+03:00",
+    lastError: "",
+    consecutiveFailures: 0,
+    pendingJobs: 0,
+    nextRetryAt: "",
+    phase: "success",
+    message: "0 talep, 0 telefon işlemi ve 1 yayın eşitlendi."
+  }));
+  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
+  await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
+    enabled: true,
+    clientId: "renderer-smoke",
+    requestCursor: 0,
+    acknowledgedCursor: 0,
+    lastAttemptAt: "2026-07-18T12:35:30+03:00",
+    lastSuccessAt: "2026-07-18T12:35:16+03:00",
+    lastError: "Web modülüne ulaşılamadı.",
+    consecutiveFailures: 1,
+    pendingJobs: 1,
+    nextRetryAt: "2026-07-18T12:35:35+03:00",
+    phase: "error",
+    message: "Web modülüne ulaşılamadı."
+  }));
+  await expect(shellSync.getByText("Web modülüne ulaşılamadı. · 1 eşitleme bekliyor", { exact: true })).toBeVisible();
+  await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
+    enabled: true,
+    clientId: "renderer-smoke",
+    requestCursor: 0,
+    acknowledgedCursor: 0,
+    lastAttemptAt: "2026-07-18T12:35:45+03:00",
+    lastSuccessAt: "2026-07-18T12:35:46+03:00",
+    lastError: "",
+    consecutiveFailures: 0,
+    pendingJobs: 0,
+    nextRetryAt: "",
+    phase: "success",
+    message: "Tüm veriler güncel."
+  }));
+  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
   await pullPage.getByRole("button", { name: "Şimdi Eşitle", exact: true }).click();
   await expect(pullPage.getByText("1 talep alındı.")).toBeVisible();
   await expect(pullPage.getByRole("heading", { name: "Web Sync Smoke" })).toBeVisible();
