@@ -12,7 +12,6 @@ import {
 import type {
   DesktopReportAiMode,
   DesktopReportData,
-  DesktopReportPeriod,
   DesktopReportPreset,
   DesktopReportRangeInput,
   DesktopReportStockMovement
@@ -69,7 +68,6 @@ export function ReportsPage({
   requestsEnabled,
   tasksEnabled,
   accommodationReservationsEnabled,
-  accommodationFolioEnabled,
   foodReservationsEnabled,
   foodOrdersEnabled,
   foodMenuEnabled,
@@ -289,7 +287,7 @@ export function ReportsPage({
         <div className="report-filter-heading">
           <div>
             <p className="panel-eyebrow">Rapor dönemi</p>
-            <h2>{formatReportPeriod(report.period)}</h2>
+            <h2>{formatPeriodLabel(range.startDate, range.endDate)}</h2>
           </div>
           {loading && <span className="report-loading loading-state" role="status">Rapor hazırlanıyor…</span>}
         </div>
@@ -348,14 +346,14 @@ export function ReportsPage({
               <p>Seçilen dönem</p>
               <h2>AI Rapor Yorumu</h2>
             </div>
-            <span>{formatReportPeriod(report.period)}</span>
+            <span>{formatPeriodLabel(range.startDate, range.endDate)}</span>
           </div>
           <div className="report-ai-actions" role="group" aria-label="AI rapor yorumu">
             {REPORT_AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
               <button
                 className={reportAiMode === action.mode ? "is-active" : ""}
                 type="button"
-                disabled={reportAiMode === action.mode && reportAiMessage.includes("hazırlanıyor")}
+                disabled={loading || (reportAiMode === action.mode && reportAiMessage.includes("hazırlanıyor"))}
                 onClick={() => void generateReportAiComment(action.mode)}
                 key={action.mode}
               >
@@ -671,12 +669,6 @@ function shiftDate(value: string, days: number): string {
 
 function isIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00`));
-}
-
-function formatReportPeriod(period: DesktopReportPeriod): string {
-  return period.startDate === period.endDate
-    ? longDate(period.startDate)
-    : formatPeriodLabel(period.startDate, period.endDate);
 }
 
 function formatPeriodLabel(startDate: string, endDate: string): string {
