@@ -1176,12 +1176,13 @@ try {
   await manualRequestDrawer.getByLabel("Tarih notu").fill("Bu akşam");
   await manualRequestDrawer.getByLabel("Kişi sayısı").fill("3");
   await manualRequestDrawer.getByLabel("Not", { exact: true }).fill("Telefonla alınan bahçe masası talebi.");
-  await manualRequestDrawer.getByText("Detaylı bilgi", { exact: true }).click();
+  await expect(manualRequestDrawer.locator("details")).toHaveCount(0);
+  await expect(manualRequestDrawer.getByText("Telefonla veya yüz yüze gelen talebi kaydedin.", { exact: true })).toHaveCount(0);
   await chooseDate(manualRequestDrawer, "Giriş tarihi", "2026-07-18");
   await chooseTime(manualRequestDrawer, "Saat", "21:00");
   await manualRequestDrawer.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
   await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Manuel talep kaydedildi.")).toBeVisible();
-  await manualRequestDrawer.getByRole("button", { name: "Elle talep formunu kapat" }).click();
+  await manualRequestDrawer.getByRole("button", { name: "Formu kapat" }).click();
   await expect(manualRequestDrawer).toHaveCount(0);
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
   await conversionPage.locator(".request-detail-panel").getByText("Diğer işlemler", { exact: true }).click();
