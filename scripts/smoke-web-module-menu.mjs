@@ -93,6 +93,7 @@ try {
 
   const emptyReviews = await page.request.get(`${baseUrl}/api/google-reviews.php`);
   expect(emptyReviews.status()).toBe(200);
+  expect(emptyReviews.headers()["cache-control"]).toContain("no-store");
   expect(await emptyReviews.json()).toMatchObject({ available: false, reason: "not_configured" });
 
   const invalidGoogleTest = await page.request.post(`${baseUrl}/api/sync.php`, {
@@ -124,6 +125,10 @@ try {
   expect(googlePublishBody).not.toContain(googleSecret);
   expect(readFileSync(join(webModuleRoot, "data", "google-reviews.local.php"), "utf8")).toContain(googleSecret);
 
+  const businessWithReviews = await page.request.get(`${baseUrl}/api/business.php`);
+  expect(businessWithReviews.status()).toBe(200);
+  expect(await businessWithReviews.json()).toMatchObject({ business: { google_reviews_enabled: true } });
+
   const googleDisable = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
@@ -138,6 +143,11 @@ try {
   });
   expect(googleDisable.status()).toBe(200);
   expect(await googleDisable.json()).toMatchObject({ ok: true, enabled: false, has_api_key: false });
+
+  const businessWithoutReviews = await page.request.get(`${baseUrl}/api/business.php`);
+  expect(businessWithoutReviews.status()).toBe(200);
+  expect(await businessWithoutReviews.json()).toMatchObject({ business: { google_reviews_enabled: false } });
+
   const disabledReviews = await page.request.get(`${baseUrl}/api/google-reviews.php`);
   expect(disabledReviews.status()).toBe(200);
   expect(await disabledReviews.json()).toMatchObject({ available: false, reason: "not_configured" });
