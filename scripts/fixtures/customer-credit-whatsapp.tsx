@@ -46,14 +46,12 @@ function Harness() {
     setStatusMessage(message);
   }), []);
 
-  const selectedRequestForCall = messaging.selectedWhatsAppRequest;
   const workspace = (view: "safe" | "web", onReturnToSafe?: () => void) => <WhatsAppWorkspace view={view}
     preparedMessage={messaging.preparedWhatsAppMessage} requests={messaging.readyWhatsAppRequests}
     selectedRequest={messaging.selectedWhatsAppRequest} selectedMessage={messaging.selectedWhatsAppMessage}
     selectedUrl={messaging.selectedWhatsAppUrl}
     getRequestStatusTone={() => "neutral"} onSelectRequest={messaging.setSelectedWhatsAppRequestId}
     onOpenExternal={messaging.openSelectedWhatsAppExternal} onReturnToSafe={onReturnToSafe}
-    onCall={selectedRequestForCall ? () => messaging.callCustomer(selectedRequestForCall) : undefined}
     onMessageSent={messaging.handleWhatsAppMessageSent}
     onDeleteMessage={messaging.handleDeleteWhatsAppMessage} />;
 
@@ -80,7 +78,6 @@ function Harness() {
           staysEnabled: false,
           customerCreditEnabled,
           onPreparedCreditWhatsApp: messaging.openPreparedCreditWhatsApp,
-          onCall: messaging.callCustomerRecord,
           onWhatsApp: messaging.openCustomerWhatsApp,
           onSave: customers.handleSaveCustomer,
           onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
