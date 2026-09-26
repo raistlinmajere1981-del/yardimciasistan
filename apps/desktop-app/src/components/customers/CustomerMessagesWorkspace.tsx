@@ -109,7 +109,7 @@ export function CustomerMessagesWorkspace({
   const webReady = active && mode === "web" && webTakeoverState === "ready";
 
   return (
-    <section className={`combined-page messages-page customer-messages-workspace${mode === "web" ? " messages-page--web" : ""}`} aria-label="Hazır Mesajlar">
+    <section className={`combined-page customer-messages-workspace${mode === "web" ? " customer-messages-workspace--web" : ""}`} aria-label="Hazır Mesajlar">
       {whatsappEnabled && (
         <div className="page-toolbar message-toolbar">
           <div className="page-toolbar__start">
