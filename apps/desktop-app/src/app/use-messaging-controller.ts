@@ -1,6 +1,7 @@
 import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
+  buildOwnerReplyWhatsAppMessage,
   createWhatsAppUrl,
   createWhatsAppWebUrl,
   type WhatsAppAction
@@ -384,8 +385,22 @@ export function useMessagingController({
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
       return;
     }
-    setSelectedWhatsAppRequestId(request.id);
-    onOpenCustomerMessages();
+
+    const hasPreparedMessage = (dashboardData.preparedWhatsAppMessages ?? [])
+      .some((message) => message.requestId === request.id);
+    if (hasPreparedMessage) {
+      setSelectedWhatsAppRequestId(request.id);
+      onOpenCustomerMessages();
+      return;
+    }
+
+    if (!request.customer_phone) {
+      setStatusMessage("WhatsApp bağlantısı için müşteri telefonu gerekiyor.");
+      return;
+    }
+
+    const fallbackMessage = buildOwnerReplyWhatsAppMessage(request.whatsapp_message);
+    void window.yardimciDesktop?.openExternal(createWhatsAppUrl(request.customer_phone, fallbackMessage));
   }
 
   function callCustomer(request: SyncedCustomerRequest) {
