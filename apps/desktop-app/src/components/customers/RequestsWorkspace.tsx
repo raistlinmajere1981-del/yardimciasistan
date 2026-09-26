@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   CheckCircle2,
   ClipboardList,
+  Copy,
   MessageCircle,
   Phone,
   Plus,
@@ -90,6 +91,8 @@ interface RequestsWorkspaceProps {
   enabledCapabilities: BusinessCapability[];
   convertingRequestId: string;
   suggestingRequestId: string;
+  aiState: SyncState;
+  aiMessage: string;
   manualRequestForm: ManualRequestFormState;
   manualRequestState: SyncState;
   manualRequestMessage: string;
@@ -113,6 +116,8 @@ export function RequestsWorkspace({
   enabledCapabilities,
   convertingRequestId,
   suggestingRequestId,
+  aiState,
+  aiMessage,
   manualRequestForm,
   manualRequestState,
   manualRequestMessage,
@@ -129,6 +134,7 @@ export function RequestsWorkspace({
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
   const [requestFilter, setRequestFilter] = useState<RequestFilter>("all");
+  const [aiCopyMessage, setAiCopyMessage] = useState("");
   const waitingRequests = requests.filter((request) => isRequestWaitingForReply(request.status));
   const visibleRequests = requestFilter === "waiting" ? waitingRequests : requests;
   const selectedRequest = visibleRequests.find((request) => request.id === externallySelectedRequest?.id)
@@ -139,6 +145,10 @@ export function RequestsWorkspace({
       onSelectRequest(selectedRequest.id);
     }
   }, [externallySelectedRequest?.id, onSelectRequest, selectedRequest?.id]);
+
+  useEffect(() => {
+    setAiCopyMessage("");
+  }, [selectedRequest?.id, selectedRequest?.ai_suggested_reply]);
 
   const selectedActionMode = selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
   const selectedRequestSupportsReservation = selectedRequest
@@ -253,6 +263,53 @@ export function RequestsWorkspace({
               <div className="record-note">
                 <span>AI özeti</span>
                 <p className="record-note__body">{selectedRequest.ai_summary || "Bu talep için henüz AI özeti hazırlanmadı."}</p>
+              </div>
+            )}
+            {aiEnabled && selectedRequest.ai_suggested_reply && (
+              <div className="request-ai-reply">
+                <div className="request-ai-reply__heading">
+                  <span>AI cevap taslağı</span>
+                  <small>{aiCopyMessage || (aiState !== "idle" ? aiMessage : "Göndermeden önce kontrol edin.")}</small>
+                </div>
+                <textarea
+                  className="request-ai-reply__content"
+                  readOnly
+                  value={selectedRequest.ai_suggested_reply}
+                  aria-label="AI cevap taslağı"
+                />
+                <div className="action-row request-ai-reply__actions">
+                  <ActionButton
+                    variant="secondary"
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(selectedRequest.ai_suggested_reply)
+                        .then(() => setAiCopyMessage("Cevap taslağı kopyalandı."))
+                        .catch(() => setAiCopyMessage("Cevap taslağı panoya kopyalanamadı."));
+                    }}
+                  >
+                    <Copy size={16} aria-hidden="true" />
+                    Kopyala
+                  </ActionButton>
+                  {whatsappEnabled && (
+                    <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
+                      <MessageCircle size={16} aria-hidden="true" />
+                      WhatsApp'a Hazırla
+                    </ActionButton>
+                  )}
+                  {selectedActionMode === "open" && (
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      onClick={() => onSuggest(selectedRequest)}
+                      disabled={suggestingRequestId === selectedRequest.id}
+                    >
+                      <Sparkles size={16} aria-hidden="true" />
+                      {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "Yeniden hazırla"}
+                    </ActionButton>
+                  )}
+                </div>
               </div>
             )}
             <div className="action-row request-primary-actions">
