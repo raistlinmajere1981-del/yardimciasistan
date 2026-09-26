@@ -34,6 +34,7 @@ const requiredFiles = [
   "api/android-stock-image-analysis.php",
   "api/android-identity-image-analysis.php",
   "lib/storage.php",
+  "lib/google-reviews.php",
   "lib/public-request-guard.php",
   "lib/public-room-availability.php",
   "lib/public-room-availability-intent.php",
@@ -178,7 +179,9 @@ function validateSource() {
   assert.ok(syncEndpoint.includes("publish_google_reviews_settings"), "api/sync.php Google yorumları özel ayar yayın aksiyonunu içermeli.");
   const googleReviewsEndpoint = readFileSync(join(sourceRoot, "api", "google-reviews.php"), "utf8");
   assert.ok(googleReviewsEndpoint.includes("X-Goog-Api-Key"), "api/google-reviews.php Places API anahtarını yalnız sunucu tarafında kullanmalı.");
-  assert.ok(googleReviewsEndpoint.includes("reviews,googleMapsUri"), "api/google-reviews.php yorum ve Google Maps alanlarını istemeli.");
+  assert.ok(googleReviewsEndpoint.includes("ya_google_reviews_fetch_place"), "api/google-reviews.php ortak Google Places yardımcısını kullanmalı.");
+  const googleReviewsLib = readFileSync(join(sourceRoot, "lib", "google-reviews.php"), "utf8");
+  assert.ok(googleReviewsLib.includes("reviews,googleMapsUri"), "lib/google-reviews.php yorum ve Google Maps alanlarını istemeli.");
   assert.ok(
     readFileSync(join(sourceRoot, "api", "chat.php"), "utf8").includes("Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz."),
     "api/chat.php katalog eşleşmesi yokluğunu satış yokluğu olarak yorumlamamalı."
