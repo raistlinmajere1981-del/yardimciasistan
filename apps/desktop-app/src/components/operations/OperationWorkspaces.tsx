@@ -2,7 +2,6 @@ import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { DatePicker } from "../ui/DateTimePicker";
 import { useMemo, useState } from "react";
 import {
-  BedDouble,
   CalendarCheck,
   CheckCircle2,
   ClipboardList,
@@ -181,48 +180,51 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
               description={task.description || "Açıklama yok."}
               actions={(
                 <>
-                  <ActionButton size="sm" type="button" onClick={() => onUpdateStatus(task.id, "done")} disabled={task.status === "done"}>
-                    <CheckCircle2 size={15} aria-hidden="true" />
-                    Tamamla
-                  </ActionButton>
-                  <details className="record-disclosure">
-                    <summary>Diğer işlemler</summary>
-                    <div className="record-disclosure__body action-row">
-                      <div className="action-row">
-                        {task.taskType.startsWith("manual_") && (
-                          <>
-                            <ActionButton
-                              variant="secondary"
-                              size="sm"
-                              type="button"
-                              onClick={() => {
-                                setEditingTask(task);
-                                setEditorOpen(true);
-                              }}
-                            >
-                              <Pencil size={14} aria-hidden="true" />
-                              Düzenle
-                            </ActionButton>
-                            <ActionButton
-                              variant="danger"
-                              size="sm"
-                              type="button"
-                              onClick={async () => {
-                                if (await confirm({ title: "Günlük işi sil", description: `“${task.title}” günlük işi silinsin mi?`, tone: "danger", confirmLabel: "Sil" })) {
-                                  void onDelete(task.id);
-                                }
-                              }}
-                            >
-                              <Trash2 size={14} aria-hidden="true" />
-                              Sil
-                            </ActionButton>
-                          </>
-                        )}
-                        <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "cancelled")} disabled={task.status === "cancelled"}>İptal Et</ActionButton>
-                        <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "pending")} disabled={task.status === "pending"}>Yeniden Aç</ActionButton>
-                      </div>
-                    </div>
-                  </details>
+                  {task.status === "pending" && (
+                    <ActionButton size="sm" type="button" onClick={() => onUpdateStatus(task.id, "done")}>
+                      <CheckCircle2 size={15} aria-hidden="true" />
+                      Tamamla
+                    </ActionButton>
+                  )}
+                  {task.taskType.startsWith("manual_") && (
+                    <ActionButton
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        setEditingTask(task);
+                        setEditorOpen(true);
+                      }}
+                    >
+                      <Pencil size={14} aria-hidden="true" />
+                      Düzenle
+                    </ActionButton>
+                  )}
+                  {task.status === "pending" && (
+                    <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "cancelled")}>
+                      İptal Et
+                    </ActionButton>
+                  )}
+                  {["done", "cancelled", "archived"].includes(task.status) && (
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "pending")}>
+                      Yeniden Aç
+                    </ActionButton>
+                  )}
+                  {task.taskType.startsWith("manual_") && (
+                    <ActionButton
+                      variant="danger"
+                      size="sm"
+                      type="button"
+                      onClick={async () => {
+                        if (await confirm({ title: "Günlük işi sil", description: `“${task.title}” günlük işi silinsin mi?`, tone: "danger", confirmLabel: "Sil" })) {
+                          void onDelete(task.id);
+                        }
+                      }}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                      Sil
+                    </ActionButton>
+                  )}
                 </>
               )}
             />
@@ -366,47 +368,61 @@ export function ReservationsWorkspace({
               description={reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}
               actions={(
                 <>
-                  <ActionButton size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "approved")} disabled={reservation.status === "approved"}>
-                    <CheckCircle2 size={15} aria-hidden="true" />
-                    Onayla
-                  </ActionButton>
-                  {reservation.roomIds.length === 1 && rooms.some(room => room.id === reservation.roomIds[0]) && <ActionButton variant="secondary" size="sm" onClick={() => navigation.openWorkspace({
-                    entityType: "room", entityId: reservation.roomIds[0], mode: "stay", returnContext: { page: "pension", view: "reservations", entityId: reservation.id }
-                  }, { onReturn: context => { if (context.page === "pension" && context.view) pension?.setMode(context.view); } })}>Odayı Aç</ActionButton>}
-                  {reservation.reservationType === "room" && ["pending", "approved"].includes(reservation.status) && reservation.roomIds.length <= 1 &&
-                    <ActionButton variant="secondary" size="sm" onClick={() => setAssignment(reservation)}>Oda Ata / Düzenle</ActionButton>}
+                  {reservation.status === "pending" && (
+                    <ActionButton size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "approved")}>
+                      <CheckCircle2 size={15} aria-hidden="true" />
+                      Onayla
+                    </ActionButton>
+                  )}
+                  {reservation.roomIds.length === 1 && rooms.some(room => room.id === reservation.roomIds[0]) && (
+                    <ActionButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => navigation.openWorkspace({
+                        entityType: "room",
+                        entityId: reservation.roomIds[0],
+                        mode: "stay",
+                        returnContext: { page: "pension", view: "reservations", entityId: reservation.id }
+                      })}
+                    >
+                      Odayı Aç
+                    </ActionButton>
+                  )}
+                  {reservation.reservationType === "room" && ["pending", "approved"].includes(reservation.status) && reservation.roomIds.length <= 1 && (
+                    <ActionButton variant="secondary" size="sm" onClick={() => setAssignment(reservation)}>
+                      Oda Ata / Düzenle
+                    </ActionButton>
+                  )}
                   {whatsappEnabled && (
                     <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
                       <MessageCircle size={15} aria-hidden="true" />
-                      WhatsApp
+                      WhatsApp'a Hazırla
                     </ActionButton>
                   )}
-                  <details className="record-disclosure">
-                    <summary>Detay</summary>
-                    <div className="record-disclosure__body action-row">
-                      <p>{reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}</p>
-                      <div className="action-row">
-                        {reservation.reservationType === "room"
-                          && ["pending", "approved"].includes(reservation.status)
-                          && reservation.roomIds.length <= 1 && (
-                            <ActionButton
-                              variant="secondary"
-                              size="sm"
-                              type="button"
-                              onClick={() => {
-                                setEditingReservation(reservation);
-                                setManualEditorOpen(true);
-                              }}
-                            >
-                              <Pencil size={14} aria-hidden="true" />
-                              Düzenle
-                            </ActionButton>
-                          )}
-                        <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>Reddet</ActionButton>
-                        <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>İptal Et</ActionButton>
-                      </div>
-                    </div>
-                  </details>
+                  {reservation.reservationType === "room" && ["pending", "approved"].includes(reservation.status) && reservation.roomIds.length <= 1 && (
+                    <ActionButton
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        setEditingReservation(reservation);
+                        setManualEditorOpen(true);
+                      }}
+                    >
+                      <Pencil size={14} aria-hidden="true" />
+                      Düzenle
+                    </ActionButton>
+                  )}
+                  {["pending", "approved"].includes(reservation.status) && (
+                    <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>
+                      Reddet
+                    </ActionButton>
+                  )}
+                  {["pending", "approved"].includes(reservation.status) && (
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>
+                      İptal Et
+                    </ActionButton>
+                  )}
                 </>
               )}
             />
@@ -440,7 +456,6 @@ interface RoomsWorkspaceProps {
 
 export function RoomsWorkspace({ rooms, reservations, stays, reservationsEnabled, staysEnabled }: RoomsWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
-  const page = usePensionPage();
   return <section className="room-grid" aria-label="Oda yönetimi">
     {rooms.length === 0 && <p>Oda kaydı yok. Odaları Ayarlar bölümünden ekleyebilirsiniz.</p>}
     {rooms.map(room => {
@@ -449,8 +464,11 @@ export function RoomsWorkspace({ rooms, reservations, stays, reservationsEnabled
         ?? stays.find(stay => state.planning.plannedStayIds.includes(stay.id));
       return <button type="button" className="card room-card" key={room.id} data-status={state.operationalCondition}
         aria-label={`${room.name} odasını aç`}
-        onClick={() => navigation.openWorkspace({ entityType: "room", entityId: room.id,
-          returnContext: { page: "pension", view: page?.mode ?? "rooms", entityId: room.id } }, { onReturn: context => { if (context.page === "pension" && context.view) page?.setMode(context.view); } })}>
+        onClick={() => navigation.openWorkspace({
+          entityType: "room",
+          entityId: room.id,
+          returnContext: { page: "pension", view: "rooms", entityId: room.id }
+        })}>
         <strong>{room.number ? `Oda ${room.number} · ${room.name}` : room.name}</strong>
         <span>{roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
         <span>{state.occupancy.status === "occupied" ? "Misafir içeride" : "Oda boş"}</span>
