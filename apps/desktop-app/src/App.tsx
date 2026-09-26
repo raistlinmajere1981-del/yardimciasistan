@@ -93,6 +93,23 @@ function App() {
     setSyncState,
     setStatusMessage
   });
+
+  useEffect(() => {
+    if (activePage !== "messages") return;
+    const customersEnabled = runtimeHasCapability(
+      desktopSyncController.businessCapabilities,
+      BUSINESS_CAPABILITIES.CUSTOMERS
+    );
+    const whatsappEnabled = runtimeHasCapability(
+      desktopSyncController.businessCapabilities,
+      BUSINESS_CAPABILITIES.WHATSAPP
+    );
+    if (!customersEnabled || !whatsappEnabled) {
+      pageLeaveGuardRef.current = null;
+      setActivePage("dashboard");
+    }
+  }, [activePage, desktopSyncController.businessCapabilities]);
+
   const deviceController = useDeviceController({
     setDashboardData: desktopSyncController.setDashboardData,
     androidEnabled: runtimeHasCapability(
