@@ -7,6 +7,7 @@ import {
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { runtimeHasCapability } from "../../app/capabilities";
+import { useDashboardAi } from "../../app/use-dashboard-ai";
 import { projectDesktopDashboardData } from "../../app/capability-projection";
 import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
@@ -32,7 +33,7 @@ import type {
 import type { UiPreferences } from "../../ui-preferences";
 import { CustomersWorkspace } from "../customers/CustomersWorkspace";
 import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
-import { AiWorkspace, WhatsAppWorkspace } from "../messages/MessageWorkspaces";
+import { WhatsAppWorkspace } from "../messages/MessageWorkspaces";
 import { MenuManager } from "../menu/MenuManager";
 import { RestaurantReservationsWorkspace } from "../operations/RestaurantReservationsWorkspace";
 import {
@@ -136,17 +137,6 @@ export function DesktopWorkspaceRouter({
     suggestingRequestId,
     aiState,
     aiMessage,
-    aiWorkspaceMode,
-    aiWorkspaceRequestId,
-    aiWorkspaceInstructions,
-    setAiWorkspaceInstructions,
-    aiWorkspaceEntry,
-    aiWorkspaceContent,
-    setAiWorkspaceContent,
-    aiWorkspaceHistory,
-    aiWorkspaceState,
-    aiWorkspaceMessage,
-    messagesAiOpen,
     openWhatsApp,
     callCustomer,
     openReservationWhatsApp,
@@ -156,15 +146,7 @@ export function DesktopWorkspaceRouter({
     handleWhatsAppMessageSent,
     handleDeleteWhatsAppMessage,
     handleCreateOwnerReplySuggestion,
-    handleGenerateAiWorkspace,
-    handleSaveAiWorkspace,
-    handleCopyAiWorkspace,
-    handlePrepareAiWorkspaceWhatsApp,
-    openAiTools,
     handleRewriteWhatsAppMessage,
-    selectAiWorkspaceHistoryEntry,
-    changeAiWorkspaceMode,
-    changeAiWorkspaceRequest
   } = messagingController;
   const {
     manualRequestForm,
@@ -215,6 +197,7 @@ export function DesktopWorkspaceRouter({
   const tasksEnabled = runtimeHasCapability(businessCapabilities, C.TASKS);
   const aiEnabled = runtimeHasCapability(businessCapabilities, C.AI);
   const whatsappEnabled = runtimeHasCapability(businessCapabilities, C.WHATSAPP);
+  const dashboardAi = useDashboardAi(aiEnabled);
   const roomsEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_ROOMS);
   const accommodationReservationsEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_RESERVATIONS);
   const accommodationStaysEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_STAYS);
@@ -256,10 +239,6 @@ export function DesktopWorkspaceRouter({
   function openDashboardReply(request: SyncedCustomerRequest) {
     if (whatsappEnabled) {
       openWhatsApp(request);
-      return;
-    }
-    if (aiEnabled) {
-      openAiTools("reply", request.id);
       return;
     }
     openDashboardCustomerWork(request);
@@ -343,10 +322,8 @@ export function DesktopWorkspaceRouter({
 
   const persistentMessagesPage = (
     <MessagesPage
-      aiEnabled={aiEnabled}
       whatsappEnabled={customerMessagingEnabled}
       automaticWebviewRequired={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
-      aiOpen={messagesAiOpen}
       active={activePage === "messages"}
       safeMode={(
         <WhatsAppWorkspace
@@ -389,31 +366,6 @@ export function DesktopWorkspaceRouter({
           onDeleteMessage={handleDeleteWhatsAppMessage}
         />
       )}
-      aiTools={(
-        <AiWorkspace
-          dashboardData={surfaceData}
-          aiEnabled={aiEnabled}
-          customersEnabled={customersEnabled}
-          whatsappEnabled={customerMessagingEnabled}
-          mode={aiWorkspaceMode}
-          selectedRequestId={aiWorkspaceRequestId}
-          instructions={aiWorkspaceInstructions}
-          entry={aiWorkspaceEntry}
-          content={aiWorkspaceContent}
-          history={aiWorkspaceHistory}
-          state={aiWorkspaceState}
-          message={aiWorkspaceMessage}
-          onModeChange={changeAiWorkspaceMode}
-          onRequestChange={changeAiWorkspaceRequest}
-          onInstructionsChange={setAiWorkspaceInstructions}
-          onContentChange={setAiWorkspaceContent}
-          onGenerate={handleGenerateAiWorkspace}
-          onSave={handleSaveAiWorkspace}
-          onCopy={handleCopyAiWorkspace}
-          onWhatsApp={handlePrepareAiWorkspaceWhatsApp}
-          onSelectHistory={selectAiWorkspaceHistoryEntry}
-        />
-      )}
     />
   );
 
@@ -436,7 +388,11 @@ export function DesktopWorkspaceRouter({
           onOpenCustomerWork={openDashboardCustomerWork}
           onOpenReservation={openDashboardReservation}
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
-          onOpenDailyAi={() => openAiTools("daily")}
+          dailyAiState={dashboardAi.state}
+          dailyAiMessage={dashboardAi.message}
+          dailyAiContent={dashboardAi.content}
+          dailyAiFallback={dashboardAi.fallback}
+          onGenerateDailyAi={() => void dashboardAi.generateDailyEvaluation()}
           onPrepareBirthday={prepareBirthdayWhatsApp}
           birthdayPreparingId={birthdayPreparingId}
           formatRequestType={formatRequestType}
