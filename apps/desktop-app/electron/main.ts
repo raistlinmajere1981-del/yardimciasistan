@@ -76,7 +76,7 @@ import { createBusinessAiCatalog } from "./business-ai-catalog-service";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
-import { registerAiWorkspaceIpcHandlers } from "./ipc/ai-workspace-ipc";
+import { registerBusinessAiIpcHandlers } from "./ipc/business-ai-ipc";
 import { registerReportIpcHandlers } from "./ipc/report-ipc";
 import { getWebSyncConfig } from "./sync-config";
 import { registerSyncIpcHandlers } from "./ipc/sync-ipc";
@@ -700,7 +700,7 @@ function registerIpcHandlers() {
     finalizeOperationMutation: finalizeDesktopOperationMutation
   });
 
-  registerAiWorkspaceIpcHandlers({
+  registerBusinessAiIpcHandlers({
     getDatabase,
     assertCapability: assertDesktopCapability
   });
