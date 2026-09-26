@@ -134,7 +134,7 @@ export function RestaurantReservationsWorkspace({
                       disabled={!reservation.customerPhone}
                     >
                       <MessageCircle size={15} aria-hidden="true" />
-                      WhatsApp
+                      WhatsApp'a Hazırla
                     </ActionButton>
                   )}
                   {["pending", "approved"].includes(reservation.status) && (
