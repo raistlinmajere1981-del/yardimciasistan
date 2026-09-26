@@ -64,6 +64,7 @@ import { registerMenuIpcHandlers } from "./ipc/menu-ipc";
 import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
 import { AndroidInstallationService } from "./android-installation-service";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
+import { registerRoomMediaIpcHandlers } from "./room-media-ipc";
 import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 import { registerImageAnalysisIpcHandlers } from "./ipc/image-analysis-ipc";
 import {
@@ -352,7 +353,8 @@ if (!hasSingleInstanceLock) {
       createAiCatalog: () => createBusinessAiCatalog(getDatabase()),
       createRoomCatalog: () => createPublicRoomCatalog(
         getDatabase().databasePath,
-        getDatabase().getEnabledBusinessCapabilities()
+        getDatabase().getEnabledBusinessCapabilities(),
+        getDatabase().userDataPath
       ),
       onDashboardChanged: () => {
         markLocalCompanionSnapshotDirty();
@@ -685,6 +687,13 @@ function registerIpcHandlers() {
   registerRoomTableIpcHandlers({
     getDatabase,
     assertCapability: assertDesktopCapability
+  });
+
+  registerRoomMediaIpcHandlers({
+    userDataPath: () => getDatabase().userDataPath,
+    assertUnlocked: assertAppSessionUnlocked,
+    assertCapability: assertDesktopCapability,
+    onMutation: () => getSyncCoordinator().scheduleSoon()
   });
 
   registerTableOrderIpcHandlers({

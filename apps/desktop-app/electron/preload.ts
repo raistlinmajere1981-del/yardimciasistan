@@ -16,7 +16,12 @@ import type {
   MarketBarcodeScanEvent,
   MarketCartDraftLoadResult,
   ProductLookupResponse,
-  SaveBusinessPublicProfileInput
+  SaveBusinessPublicProfileInput,
+  AddRoomMediaInput,
+  DeleteRoomMediaInput,
+  RoomMediaAsset,
+  RoomMediaMutationResult,
+  UpdateRoomMediaInput
 } from "@yardimci-asistan/shared";
 import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
@@ -198,6 +203,10 @@ export interface DesktopBridge {
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
   getBusinessLayout: () => Promise<BusinessLayoutSnapshot>;
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => Promise<BusinessLayoutSaveResult>;
+  listRoomMedia: (roomId: string) => Promise<RoomMediaAsset[]>;
+  addRoomMedia: (input: AddRoomMediaInput) => Promise<RoomMediaMutationResult>;
+  updateRoomMedia: (input: UpdateRoomMediaInput) => Promise<RoomMediaMutationResult>;
+  deleteRoomMedia: (input: DeleteRoomMediaInput) => Promise<RoomMediaMutationResult>;
   getBusinessPublicProfile: () => Promise<BusinessPublicProfile>;
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => Promise<BusinessPublicProfileSaveResult>;
   geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
@@ -343,6 +352,10 @@ const bridge: DesktopBridge = {
   saveInitialSetup: (input: SaveInitialSetupInput) => invokeWhenUnlocked<DesktopSetupSaveResult>("setup:saveInitial", input),
   getBusinessLayout: () => invokeWhenUnlocked<BusinessLayoutSnapshot>("businessLayout:get"),
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => invokeWhenUnlocked<BusinessLayoutSaveResult>("businessLayout:save", input),
+  listRoomMedia: (roomId: string) => invokeWhenUnlocked<RoomMediaAsset[]>("roomMedia:list", roomId),
+  addRoomMedia: (input: AddRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:add", input),
+  updateRoomMedia: (input: UpdateRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:update", input),
+  deleteRoomMedia: (input: DeleteRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:delete", input),
   getBusinessPublicProfile: () => invokeWhenUnlocked<BusinessPublicProfile>("businessPublicProfile:get"),
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => invokeWhenUnlocked<BusinessPublicProfileSaveResult>("businessPublicProfile:save", input),
   geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),

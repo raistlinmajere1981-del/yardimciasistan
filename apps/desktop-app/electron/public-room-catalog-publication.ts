@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { getRoomPublishedMedia } from "./room-media-service";
 import {
   BUSINESS_CAPABILITIES,
   hasBusinessCapability,
@@ -9,7 +10,8 @@ import {
 
 export function createPublicRoomCatalog(
   databasePath: string,
-  capabilities: Iterable<BusinessCapability>
+  capabilities: Iterable<BusinessCapability>,
+  userDataPath = ""
 ): RoomPublicCatalog {
   const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   if (!hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS)) {
@@ -40,7 +42,7 @@ export function createPublicRoomCatalog(
       nightlyPriceMinor: Math.max(0, Math.trunc(Number(row.nightly_price_minor ?? 0) || 0)),
       currency: normalizeCurrency(row.price_currency),
       sortOrder: Math.max(0, Math.trunc(Number(row.sort_order ?? 0) || 0)),
-      media: [],
+      media: userDataPath ? getRoomPublishedMedia(userDataPath, text(row.id)) : [],
       updatedAt: text(row.updated_at)
     })).filter((room) => room.id && room.name);
 
