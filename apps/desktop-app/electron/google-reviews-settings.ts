@@ -131,6 +131,8 @@ export async function publishGoogleReviewsSettings(
     return { ok: false, message: "Google yorumları açık ancak Place ID veya API anahtarı okunamıyor." };
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
     const response = await fetch(`${baseUrl}/api/sync.php?action=publish_google_reviews_settings`, {
       method: "POST",
@@ -146,7 +148,8 @@ export async function publishGoogleReviewsSettings(
           enabled: stored.enabled,
           place_id: stored.placeId,
           api_key: apiKey
-        }
+        },
+        signal: controller.signal
       })
     });
     const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string; published_at?: string } | null;
@@ -165,8 +168,15 @@ export async function publishGoogleReviewsSettings(
       message: String(payload.message || "Google yorumları ayarları web modülüne uygulandı."),
       publishedAt
     };
-  } catch {
-    return { ok: false, message: "Google yorumları ayarları gönderilirken web modülüne ulaşılamadı." };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error && error.name === "AbortError"
+        ? "Google yorumları web yayını zaman aşımına uğradı."
+        : "Google yorumları ayarları gönderilirken web modülüne ulaşılamadı."
+    };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -245,6 +255,8 @@ async function testGoogleReviewsViaWebModule(
     return { ok: false, message: "Google bağlantısını denemek için web modül bağlantısı hazır olmalı." };
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
     const response = await fetch(`${baseUrl}/api/sync.php?action=test_google_reviews_settings`, {
       method: "POST",
@@ -259,7 +271,8 @@ async function testGoogleReviewsViaWebModule(
         google_reviews: {
           place_id: placeId,
           api_key: apiKey
-        }
+        },
+        signal: controller.signal
       })
     });
     const payload = await response.json().catch(() => null) as {
@@ -286,8 +299,15 @@ async function testGoogleReviewsViaWebModule(
         ? Math.max(0, Math.trunc(Number(payload.user_rating_count)))
         : 0
     };
-  } catch {
-    return { ok: false, message: "Google Places bağlantısı denenirken web modülüne ulaşılamadı." };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error && error.name === "AbortError"
+        ? "Google Places bağlantı testi zaman aşımına uğradı."
+        : "Google Places bağlantısı denenirken web modülüne ulaşılamadı."
+    };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
