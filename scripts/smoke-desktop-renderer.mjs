@@ -668,6 +668,7 @@ try {
   await expect(customerWorkViews.getByRole("button", { name: "Talepler" })).toBeVisible();
   await expect(customerWorkViews.getByRole("button", { name: "Müşteriler" })).toBeVisible();
   await expect(customerWorkViews.getByRole("button", { name: "Hazır Mesajlar" })).toBeVisible();
+  await expect(customerWorkViews.getByRole("button")).toHaveText(["Müşteriler", "Talepler", "Hazır Mesajlar"]);
   await customerWorkViews.getByRole("button", { name: "Hazır Mesajlar" }).click();
   await expect(page.getByText("İletişim", { exact: true })).toHaveCount(0);
   await expect(page.locator(".whatsapp-request-panel .panel-heading")).toContainText("Hazır Mesajlar");
@@ -1206,6 +1207,9 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "AI Cevap Hazırla" })).toBeVisible();
+  await expect(conversionPage.locator(".request-detail-panel").getByRole("button", { name: "WhatsApp'tan Yaz" })).toHaveCount(1);
+  await expect(conversionPage.locator(".request-detail-panel").getByRole("button", { name: "WhatsApp'a Hazırla" })).toHaveCount(0);
+  await expect(conversionPage.locator(".request-detail-panel").getByRole("button", { name: "Müşteriyi Ara" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "AI Cevap Hazırla" }).click();
   await expect(conversionPage.getByLabel("AI cevap taslağı")).toHaveValue(/Merhaba Smoke Misafir, talebinizi aldık/);
   await conversionPage.getByRole("button", { name: "Yeniden hazırla" }).click();
@@ -1247,14 +1251,14 @@ try {
   await manualRequestDrawer.getByRole("button", { name: "Formu kapat" }).click();
   await expect(manualRequestDrawer).toHaveCount(0);
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
-  await conversionPage.locator(".request-detail-panel").getByText("Diğer işlemler", { exact: true }).click();
   await conversionPage.getByRole("button", { name: "Reddet", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
   await expect(conversionPage.getByRole("button", { name: "Talebi Sil" })).toBeVisible();
-  await expect(conversionPage.locator(".request-primary-actions .action-button")).toHaveCount(4);
+  await expect(conversionPage.locator(".request-more-actions")).toHaveCount(0);
+  await expect(conversionPage.locator(".request-detail-header-actions")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Yeniden Aç" }).click();
   await conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" }).click();
   await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
@@ -1712,10 +1716,10 @@ try {
   await compactPage.getByRole("button", { name: /Kompakt Misafir 4/ }).click();
   const customerRequestRows = compactPage.locator(".requests-workspace .list-row--button");
   await expect(customerRequestRows).toHaveCount(8);
-  await compactPage.locator(".request-detail-panel").getByText("Diğer işlemler", { exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
   await expect(compactPage.getByRole("button", { name: "Talebi Sil" })).toBeVisible();
-  await expect(compactPage.locator(".request-primary-actions .action-button")).toHaveCount(4);
+  await expect(compactPage.locator(".request-more-actions")).toHaveCount(0);
+  await expect(compactPage.locator(".request-detail-header-actions")).toBeVisible();
   await expect(compactPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
 
