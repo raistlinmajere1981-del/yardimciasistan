@@ -542,6 +542,10 @@ try {
         languages: ["Türkçe", "İngilizce"],
         features: ["Wi-Fi"],
         feature_ids: ["wifi"],
+        social_links: [
+          { platform: "facebook", url: "https://facebook.com/nehirtekel" },
+          { platform: "instagram", url: "https://instagram.com/nehirtekel" }
+        ],
         check_in_time: "",
         check_out_time: "",
         breakfast_start_time: "",
@@ -712,7 +716,11 @@ try {
       payment_note: "Nakit ve kredi/banka kartı kabul edilir.",
       languages: ["Türkçe", "İngilizce"],
       features: ["Wi-Fi"],
-      feature_ids: ["wifi"]
+      feature_ids: ["wifi"],
+      social_links: [
+        { platform: "facebook", url: "https://facebook.com/nehirtekel" },
+        { platform: "instagram", url: "https://instagram.com/nehirtekel" }
+      ]
     }
   });
 

@@ -9,7 +9,9 @@ const {
   isBusinessPublicClockTime,
   isBusinessPublicFeatureId,
   normalizeBusinessPublicFeatures,
-  normalizeBusinessPublicLanguages
+  normalizeBusinessPublicLanguages,
+  normalizeBusinessSocialLinks,
+  normalizeBusinessSocialLinkUrl
 } = require("../dist/index.js");
 
 test("business public feature catalog keeps stable unique ids", () => {
@@ -76,4 +78,25 @@ test("business public features are capability-aware", () => {
   ]).map((feature) => feature.id);
   assert.ok(accommodationFeatures.includes("luggage_storage"));
   assert.ok(accommodationFeatures.includes("airport_transfer"));
+});
+
+
+test("business social links are allow-listed, normalized and deduplicated", () => {
+  assert.equal(
+    normalizeBusinessSocialLinkUrl("instagram", "instagram.com/blacksea"),
+    "https://instagram.com/blacksea"
+  );
+  assert.equal(normalizeBusinessSocialLinkUrl("instagram", "https://example.com/blacksea"), "");
+  assert.deepEqual(
+    normalizeBusinessSocialLinks([
+      { platform: "facebook", url: "facebook.com/blacksea" },
+      { platform: "instagram", url: "https://www.instagram.com/blacksea/" },
+      { platform: "facebook", url: "https://facebook.com/other" },
+      { platform: "unsupported", url: "https://example.com" }
+    ]),
+    [
+      { platform: "facebook", url: "https://facebook.com/blacksea" },
+      { platform: "instagram", url: "https://www.instagram.com/blacksea/" }
+    ]
+  );
 });

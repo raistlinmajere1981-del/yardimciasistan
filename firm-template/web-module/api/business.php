@@ -74,6 +74,7 @@ ya_business_response(200, [
         'languages' => is_array($publicContext['languages'] ?? null) ? array_values($publicContext['languages']) : [],
         'features' => is_array($publicContext['features'] ?? null) ? array_values($publicContext['features']) : [],
         'feature_ids' => is_array($publicContext['feature_ids'] ?? null) ? array_values($publicContext['feature_ids']) : [],
+        'social_links' => is_array($publicContext['social_links'] ?? null) ? array_values($publicContext['social_links']) : [],
         'map_url' => ya_business_string($config['map_url'] ?? ''),
         'primary_color' => ya_business_color($config['primary_color'] ?? '', '#2f6f5e'),
         'accent_color' => ya_business_color($config['accent_color'] ?? '', '#e47863')

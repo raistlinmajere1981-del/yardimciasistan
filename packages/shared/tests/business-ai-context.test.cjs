@@ -17,7 +17,10 @@ const publicProfile = {
   features: ["wifi", "parking"],
   policyNote: "İade koşulları fiş üzerinde belirtilir.",
   paymentNote: "Nakit ve kart kabul edilir.",
-  languages: ["Türkçe", "English"]
+  languages: ["Türkçe", "English"],
+  socialLinks: [
+    { platform: "instagram", url: "https://instagram.com/testpansiyon" }
+  ]
 };
 
 test("market AI context keeps general business facts and drops hospitality-only details", () => {
@@ -47,6 +50,9 @@ test("market AI context keeps general business facts and drops hospitality-only 
   assert.deepEqual(context.featureIds, []);
   assert.equal(context.latitude, null);
   assert.equal(context.longitude, null);
+  assert.deepEqual(context.socialLinks, [
+    { platform: "instagram", url: "https://instagram.com/testpansiyon" }
+  ]);
   assert.equal(context.checkInTime, "");
   assert.equal(context.checkOutTime, "");
   assert.equal(context.breakfastStartTime, "");

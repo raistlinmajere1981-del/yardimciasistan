@@ -1124,6 +1124,7 @@ function ya_sync_publish_business_context(array $payload): void
         static fn (string $value): string => mb_substr($value, 0, 80),
         ya_sync_string_array($candidate['feature_ids'] ?? [])
     ), 0, 20);
+    $socialLinks = ya_sync_social_links($candidate['social_links'] ?? []);
     $latitude = is_numeric($candidate['latitude'] ?? null) ? (float) $candidate['latitude'] : null;
     $longitude = is_numeric($candidate['longitude'] ?? null) ? (float) $candidate['longitude'] : null;
     if ($latitude !== null && ($latitude < -90 || $latitude > 90)) $latitude = null;
@@ -1152,6 +1153,7 @@ function ya_sync_publish_business_context(array $payload): void
         'languages' => $languages,
         'features' => $features,
         'feature_ids' => $featureIds,
+        'social_links' => $socialLinks,
         'check_in_time' => mb_substr(ya_sync_string($candidate['check_in_time'] ?? ''), 0, 5),
         'check_out_time' => mb_substr(ya_sync_string($candidate['check_out_time'] ?? ''), 0, 5),
         'breakfast_start_time' => mb_substr(ya_sync_string($candidate['breakfast_start_time'] ?? ''), 0, 5),
@@ -1177,6 +1179,37 @@ function ya_sync_publish_business_context(array $payload): void
         'server_revision' => $publication['server_revision'],
         'deduplicated' => $publication['deduplicated']
     ]);
+}
+
+function ya_sync_social_links(mixed $value): array
+{
+    if (!is_array($value)) return [];
+
+    $allowedPlatforms = ['facebook', 'instagram', 'youtube', 'tiktok', 'x'];
+    $seen = [];
+    $links = [];
+
+    foreach ($value as $candidate) {
+        if (!is_array($candidate)) continue;
+        $platform = strtolower(ya_sync_string($candidate['platform'] ?? ''));
+        $url = ya_sync_string($candidate['url'] ?? '');
+        if (!in_array($platform, $allowedPlatforms, true) || isset($seen[$platform])) continue;
+        if (strlen($url) > 1000 || filter_var($url, FILTER_VALIDATE_URL) === false) continue;
+        $parts = parse_url($url);
+        if (!is_array($parts)) continue;
+        $scheme = strtolower(ya_sync_string($parts['scheme'] ?? ''));
+        $host = ya_sync_string($parts['host'] ?? '');
+        if (!in_array($scheme, ['http', 'https'], true) || $host === '' || isset($parts['user']) || isset($parts['pass'])) continue;
+
+        $seen[$platform] = true;
+        $links[] = [
+            'platform' => $platform,
+            'url' => $url
+        ];
+        if (count($links) >= 5) break;
+    }
+
+    return $links;
 }
 
 function ya_sync_publish_ai_settings(array $payload): void

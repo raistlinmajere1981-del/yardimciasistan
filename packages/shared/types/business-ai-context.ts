@@ -9,7 +9,9 @@ import {
   getBusinessPublicFeatureLabel,
   normalizeBusinessPublicFeatures,
   normalizeBusinessPublicLanguages,
-  type BusinessPublicProfile
+  normalizeBusinessSocialLinks,
+  type BusinessPublicProfile,
+  type BusinessSocialLink
 } from "./business-public-profile";
 import type { BusinessType } from "./business";
 
@@ -34,6 +36,7 @@ export interface BusinessAiContext {
   languages: string[];
   features: string[];
   featureIds: string[];
+  socialLinks: BusinessSocialLink[];
   checkInTime: string;
   checkOutTime: string;
   breakfastStartTime: string;
@@ -87,6 +90,7 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
     languages: normalizeBusinessPublicLanguages(source.publicProfile.languages),
     features: normalizedFeatureIds.map(getBusinessPublicFeatureLabel),
     featureIds: normalizedFeatureIds,
+    socialLinks: normalizeBusinessSocialLinks(source.publicProfile.socialLinks),
     checkInTime: hasAccommodation ? source.publicProfile.checkInTime : "",
     checkOutTime: hasAccommodation ? source.publicProfile.checkOutTime : "",
     breakfastStartTime: hasAccommodation ? source.publicProfile.breakfastStartTime : "",

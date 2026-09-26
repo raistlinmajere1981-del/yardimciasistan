@@ -1514,6 +1514,10 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
       languages: options.context.languages,
       features: options.context.features,
       feature_ids: options.context.featureIds,
+      social_links: options.context.socialLinks.map((link) => ({
+        platform: link.platform,
+        url: link.url
+      })),
       check_in_time: options.context.checkInTime,
       check_out_time: options.context.checkOutTime,
       breakfast_start_time: options.context.breakfastStartTime,

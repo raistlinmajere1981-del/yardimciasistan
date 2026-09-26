@@ -5,6 +5,7 @@ import {
   isBusinessPublicClockTime,
   normalizeBusinessPublicFeatures,
   normalizeBusinessPublicLanguages,
+  normalizeBusinessSocialLinks,
   type BusinessPublicProfile,
   type SaveBusinessPublicProfileInput
 } from "@yardimci-asistan/shared";
@@ -21,7 +22,8 @@ const EMPTY_BUSINESS_PUBLIC_PROFILE: BusinessPublicProfile = {
   features: [],
   policyNote: "",
   paymentNote: "",
-  languages: []
+  languages: [],
+  socialLinks: []
 };
 
 export type BusinessPublicProfileSaveResult =
@@ -46,6 +48,7 @@ interface BusinessPublicProfileRow {
 export function getBusinessPublicProfile(databasePath: string): BusinessPublicProfile {
   const db = new DatabaseSync(databasePath);
   try {
+    ensureBusinessPublicSocialLinksTable(db);
     const businessId = getActiveBusinessId(db);
     if (!businessId) return { ...EMPTY_BUSINESS_PUBLIC_PROFILE };
 
@@ -58,7 +61,17 @@ export function getBusinessPublicProfile(databasePath: string): BusinessPublicPr
       LIMIT 1
     `).get(businessId) as BusinessPublicProfileRow | undefined;
 
-    return row ? mapProfileRow(row) : { ...EMPTY_BUSINESS_PUBLIC_PROFILE };
+    const profile = row ? mapProfileRow(row) : { ...EMPTY_BUSINESS_PUBLIC_PROFILE };
+    const socialRow = db.prepare(`
+      SELECT links_json
+      FROM business_public_social_links
+      WHERE business_id = ?
+      LIMIT 1
+    `).get(businessId) as { links_json?: unknown } | undefined;
+    return {
+      ...profile,
+      socialLinks: normalizeBusinessSocialLinks(parseJsonArray(socialRow?.links_json))
+    };
   } finally {
     db.close();
   }
@@ -73,6 +86,7 @@ export function saveBusinessPublicProfile(
 
   const db = new DatabaseSync(databasePath);
   try {
+    ensureBusinessPublicSocialLinksTable(db);
     const businessId = getActiveBusinessId(db);
     if (!businessId) {
       return { ok: false, message: "İşletme profili henüz oluşturulmamış." };
@@ -116,6 +130,21 @@ export function saveBusinessPublicProfile(
       profile.policyNote,
       profile.paymentNote,
       JSON.stringify(profile.languages),
+      now,
+      now
+    );
+
+    db.prepare(`
+      INSERT INTO business_public_social_links (
+        business_id, links_json, created_at, updated_at, sync_status
+      ) VALUES (?, ?, ?, ?, 'local_only')
+      ON CONFLICT(business_id) DO UPDATE SET
+        links_json = excluded.links_json,
+        updated_at = excluded.updated_at,
+        sync_status = 'local_only'
+    `).run(
+      businessId,
+      JSON.stringify(profile.socialLinks),
       now,
       now
     );
@@ -164,7 +193,8 @@ function normalizeProfileInput(
       features: normalizeBusinessPublicFeatures(input?.features ?? []),
       policyNote: cleanText(input?.policyNote, BUSINESS_PUBLIC_PROFILE_LIMITS.policyNote),
       paymentNote: cleanText(input?.paymentNote, BUSINESS_PUBLIC_PROFILE_LIMITS.paymentNote),
-      languages: normalizeBusinessPublicLanguages(input?.languages ?? [])
+      languages: normalizeBusinessPublicLanguages(input?.languages ?? []),
+      socialLinks: normalizeBusinessSocialLinks(input?.socialLinks ?? [])
     }
   };
 }
@@ -185,7 +215,8 @@ function mapProfileRow(row: BusinessPublicProfileRow): BusinessPublicProfile {
     features: normalizeBusinessPublicFeatures(parseJsonArray(row.features_json)),
     policyNote: String(row.policy_note ?? ""),
     paymentNote: String(row.payment_note ?? ""),
-    languages: normalizeBusinessPublicLanguages(parseJsonArray(row.languages_json))
+    languages: normalizeBusinessPublicLanguages(parseJsonArray(row.languages_json)),
+    socialLinks: []
   };
 }
 
@@ -218,4 +249,18 @@ function parseJsonArray(value: unknown): unknown[] {
   } catch {
     return [];
   }
+}
+
+
+function ensureBusinessPublicSocialLinksTable(db: DatabaseSync): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS business_public_social_links (
+      business_id TEXT PRIMARY KEY,
+      links_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      sync_status TEXT NOT NULL DEFAULT 'local_only',
+      FOREIGN KEY (business_id) REFERENCES business(id) ON DELETE CASCADE
+    )
+  `);
 }

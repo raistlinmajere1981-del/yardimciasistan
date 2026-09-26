@@ -1,3 +1,22 @@
+export const BUSINESS_SOCIAL_PLATFORM_CATALOG = [
+  { id: "facebook", label: "Facebook", hosts: ["facebook.com", "fb.com"] },
+  { id: "instagram", label: "Instagram", hosts: ["instagram.com"] },
+  { id: "youtube", label: "YouTube", hosts: ["youtube.com", "youtu.be"] },
+  { id: "tiktok", label: "TikTok", hosts: ["tiktok.com"] },
+  { id: "x", label: "X", hosts: ["x.com", "twitter.com"] }
+] as const;
+
+export type BusinessSocialPlatformId = (typeof BUSINESS_SOCIAL_PLATFORM_CATALOG)[number]["id"];
+
+export interface BusinessSocialLink {
+  platform: BusinessSocialPlatformId;
+  url: string;
+}
+
+const BUSINESS_SOCIAL_PLATFORM_IDS = new Set<string>(
+  BUSINESS_SOCIAL_PLATFORM_CATALOG.map((platform) => platform.id)
+);
+
 export const BUSINESS_PUBLIC_FEATURE_CATALOG = [
   { id: "wifi", label: "Wi-Fi", group: "connectivity" },
   { id: "parking", label: "Otopark", group: "transport" },
@@ -26,7 +45,9 @@ export const BUSINESS_PUBLIC_PROFILE_LIMITS = {
   paymentNote: 800,
   language: 40,
   languages: 12,
-  features: BUSINESS_PUBLIC_FEATURE_CATALOG.length
+  features: BUSINESS_PUBLIC_FEATURE_CATALOG.length,
+  socialLinks: BUSINESS_SOCIAL_PLATFORM_CATALOG.length,
+  socialUrl: 1000
 } as const;
 
 /**
@@ -48,6 +69,7 @@ export interface BusinessPublicProfile {
   policyNote: string;
   paymentNote: string;
   languages: string[];
+  socialLinks: BusinessSocialLink[];
 }
 
 export type SaveBusinessPublicProfileInput = BusinessPublicProfile;
@@ -139,4 +161,59 @@ export function hasCompleteBusinessPublicMapPoint(latitude: unknown, longitude: 
     && Number.isFinite(longitude)
     && longitude >= -180
     && longitude <= 180;
+}
+
+
+export function isBusinessSocialPlatformId(value: unknown): value is BusinessSocialPlatformId {
+  return typeof value === "string" && BUSINESS_SOCIAL_PLATFORM_IDS.has(value);
+}
+
+export function normalizeBusinessSocialLinkUrl(
+  platform: BusinessSocialPlatformId,
+  value: unknown
+): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    return "";
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
+    return "";
+  }
+
+  const definition = BUSINESS_SOCIAL_PLATFORM_CATALOG.find((candidate) => candidate.id === platform);
+  if (!definition) return "";
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  const matchesPlatform = definition.hosts.some((host) =>
+    hostname === host || hostname.endsWith(`.${host}`)
+  );
+  if (!matchesPlatform) return "";
+
+  parsed.protocol = "https:";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+export function normalizeBusinessSocialLinks(values: readonly unknown[]): BusinessSocialLink[] {
+  const normalized: BusinessSocialLink[] = [];
+  const seen = new Set<BusinessSocialPlatformId>();
+
+  for (const value of values) {
+    if (!value || typeof value !== "object") continue;
+    const candidate = value as { platform?: unknown; url?: unknown };
+    if (!isBusinessSocialPlatformId(candidate.platform) || seen.has(candidate.platform)) continue;
+    const url = normalizeBusinessSocialLinkUrl(candidate.platform, candidate.url);
+    if (!url) continue;
+    seen.add(candidate.platform);
+    normalized.push({ platform: candidate.platform, url });
+    if (normalized.length >= BUSINESS_PUBLIC_PROFILE_LIMITS.socialLinks) break;
+  }
+
+  return normalized;
 }

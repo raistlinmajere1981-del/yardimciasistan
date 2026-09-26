@@ -24,7 +24,8 @@ const expectedEmptyProfile = {
   features: [],
   policyNote: "",
   paymentNote: "",
-  languages: []
+  languages: [],
+  socialLinks: []
 };
 
 const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-business-public-profile-"));
@@ -86,12 +87,20 @@ try {
     features: ["wifi", "parking", "internal_only", "wifi"],
     policyNote: "  Sessizlik saatleri 23:00 sonrasıdır.  ",
     paymentNote: "  Nakit ve kart kabul edilir.  ",
-    languages: ["Türkçe", "English", "türkçe", "  Deutsch  "]
+    languages: ["Türkçe", "English", "türkçe", "  Deutsch  "],
+    socialLinks: [
+      { platform: "facebook", url: "facebook.com/profiltest" },
+      { platform: "instagram", url: "https://instagram.com/profiltest" }
+    ]
   });
   assert.equal(saved.ok, true, saved.ok ? "" : saved.message);
   assert.deepEqual(saved.profile.features, ["wifi", "parking"]);
   assert.deepEqual(saved.profile.languages, ["Türkçe", "English", "Deutsch"]);
   assert.equal(saved.profile.description, "Sahile yakın, sakin aile işletmesi.");
+  assert.deepEqual(saved.profile.socialLinks, [
+    { platform: "facebook", url: "https://facebook.com/profiltest" },
+    { platform: "instagram", url: "https://instagram.com/profiltest" }
+  ]);
 
   const persisted = getBusinessPublicProfile(database.databasePath);
   assert.deepEqual(persisted, saved.profile);
@@ -121,6 +130,9 @@ try {
     assert.deepEqual(JSON.parse(String(row.features_json)), ["wifi", "parking"]);
     assert.deepEqual(JSON.parse(String(row.languages_json)), ["Türkçe", "English", "Deutsch"]);
     assert.equal(row.sync_status, "local_only");
+    const socialRow = raw.prepare("SELECT links_json, sync_status FROM business_public_social_links").get();
+    assert.deepEqual(JSON.parse(String(socialRow.links_json)), saved.profile.socialLinks);
+    assert.equal(socialRow.sync_status, "local_only");
     assert.equal(String(raw.prepare("PRAGMA integrity_check").get().integrity_check), "ok");
     assert.deepEqual(raw.prepare("PRAGMA foreign_key_check").all(), []);
   } finally {

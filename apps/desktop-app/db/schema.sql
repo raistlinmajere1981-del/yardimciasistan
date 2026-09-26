@@ -88,6 +88,15 @@ CREATE TABLE business_public_profile (
   FOREIGN KEY (business_id) REFERENCES business(id) ON DELETE CASCADE
 );
 
+CREATE TABLE business_public_social_links (
+  business_id TEXT PRIMARY KEY,
+  links_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'local_only',
+  FOREIGN KEY (business_id) REFERENCES business(id) ON DELETE CASCADE
+);
+
 CREATE TABLE business_capabilities (
   business_id TEXT NOT NULL,
   capability_id TEXT NOT NULL,
