@@ -929,6 +929,7 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
       languages: ["Türkçe"],
       features: [],
       featureIds: [],
+      socialLinks: [],
       checkInTime: "",
       checkOutTime: "",
       breakfastStartTime: "",
@@ -944,6 +945,7 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
   assert.equal(calls[0].body.business_context.directions_note, "Ana caddeden ikinci sokak.");
   assert.deepEqual(calls[0].body.business_context.features, []);
   assert.deepEqual(calls[0].body.business_context.feature_ids, []);
+  assert.deepEqual(calls[0].body.business_context.social_links, []);
   assert.equal(calls[0].body.business_context.latitude, 41.1);
   assert.equal(calls[0].body.business_context.longitude, 33.2);
   assert.equal("sync_secret" in calls[0].body, false);

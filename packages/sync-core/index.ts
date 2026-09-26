@@ -1514,7 +1514,7 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
       languages: options.context.languages,
       features: options.context.features,
       feature_ids: options.context.featureIds,
-      social_links: options.context.socialLinks.map((link) => ({
+      social_links: (options.context.socialLinks ?? []).map((link) => ({
         platform: link.platform,
         url: link.url
       })),
