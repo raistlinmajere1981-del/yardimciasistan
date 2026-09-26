@@ -86,9 +86,6 @@ import type {
   CreateManualRequestResult,
   SaveRequestAiSuggestionInput,
   RequestAiSuggestionResult,
-  AiWorkspaceHistoryEntry,
-  SaveAiWorkspaceResultInput,
-  SaveAiWorkspaceResult,
   DesktopStatusUpdateResult,
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
@@ -163,12 +160,6 @@ export type {
   CreateManualRequestResult,
   SaveRequestAiSuggestionInput,
   RequestAiSuggestionResult,
-  AiWorkspaceMode,
-  AiWorkspaceHistoryEntry,
-  GenerateAiWorkspaceInput,
-  GenerateAiWorkspaceResult,
-  SaveAiWorkspaceResultInput,
-  SaveAiWorkspaceResult,
   DesktopStatusUpdateResult,
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
@@ -1610,63 +1601,6 @@ export class DesktopDatabase {
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
-  saveAiWorkspaceHistory(input: Omit<AiWorkspaceHistoryEntry, "id" | "createdAt">): AiWorkspaceHistoryEntry {
-    return saveStoredAiWorkspaceHistory(this.db, input);
-  }
-
-  getAiWorkspaceHistory(limit = 12): AiWorkspaceHistoryEntry[] {
-    return getStoredAiWorkspaceHistory(this.db, limit);
-  }
-
-  saveAiWorkspaceResult(input: SaveAiWorkspaceResultInput): SaveAiWorkspaceResult {
-    const requestId = input.requestId.trim();
-    const content = input.content.trim();
-    const summary = input.summary.trim();
-    if (input.mode === "daily") {
-      return { ok: false, message: "Günlük değerlendirme belirli bir talebe kaydedilemez." };
-    }
-    if (!requestId) {
-      return { ok: false, message: "Sonucu kaydetmek için talep seçin." };
-    }
-    if (!content) {
-      return { ok: false, message: "Kaydedilecek AI sonucu boş olamaz." };
-    }
-
-    if (input.mode === "reply") {
-      const result = this.saveRequestAiSuggestion({
-        requestId,
-        summary,
-        suggestedReply: content,
-        missingFields: input.missingFields
-      });
-      return result.ok
-        ? { ok: true, message: "AI cevap taslağı talebe kaydedildi.", requestId, dashboardData: result.dashboardData }
-        : result;
-    }
-
-    const request = this.db.prepare("SELECT id FROM requests WHERE id = ? AND deleted_at = ''").get(requestId);
-    if (!request) {
-      return { ok: false, message: "Talep bulunamadı." };
-    }
-    const now = new Date().toISOString();
-    this.db
-      .prepare("UPDATE requests SET ai_summary = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(content.slice(0, 1600), now, requestId);
-    insertDatabaseEvent(this.db, {
-      type: "ai.request_summarized",
-      entityType: "request",
-      entityId: requestId,
-      payload: { summary: content.slice(0, 1600) },
-      now
-    });
-    return {
-      ok: true,
-      message: "AI özeti talebe kaydedildi.",
-      requestId,
-      dashboardData: this.getDashboardData()
-    };
-  }
-
   convertRequestToReservation(requestId: string): RequestReservationConversionResult {
     const result = convertStoredRequestToReservation(this.db, requestId, this.getEnabledBusinessCapabilities());
     if (!result.ok) {
@@ -2284,11 +2218,6 @@ import {
   markAiSettingsPublished as markStoredAiSettingsPublished,
   upsertAiServiceProfileInTransaction as upsertStoredAiServiceProfileInTransaction,
 } from "./database/ai-profile-store.js";
-
-import {
-  saveAiWorkspaceHistory as saveStoredAiWorkspaceHistory,
-  getAiWorkspaceHistory as getStoredAiWorkspaceHistory,
-} from "./database/ai-workspace-store.js";
 
 import {
   getRooms as getStoredRooms,
