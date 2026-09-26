@@ -8,6 +8,7 @@ const YA_GOOGLE_REVIEWS_SETTINGS_FILE = YA_BASE_DIR . '/data/google-reviews.loca
 
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
+require_once YA_BASE_DIR . '/lib/google-reviews.php';
 
 $businessConfig = ya_sync_load_json(YA_CONFIG_FILE, []);
 ya_sync_apply_cors($businessConfig);
@@ -20,7 +21,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings'], true)
+if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -89,6 +90,10 @@ try {
 
     if ($action === 'publish_ai_settings') {
         ya_sync_publish_ai_settings($payload);
+    }
+
+    if ($action === 'test_google_reviews_settings') {
+        ya_sync_test_google_reviews_settings($payload);
     }
 
     if ($action === 'publish_google_reviews_settings') {
@@ -1215,6 +1220,52 @@ function ya_sync_social_links(mixed $value): array
     }
 
     return $links;
+}
+
+function ya_sync_test_google_reviews_settings(array $payload): void
+{
+    $candidate = $payload['google_reviews'] ?? null;
+    if (!is_array($candidate)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Denenilecek Google yorumları ayarları bulunamadı.'
+        ]);
+    }
+
+    $placeId = trim(ya_sync_string($candidate['place_id'] ?? ''));
+    $apiKey = trim(ya_sync_string($candidate['api_key'] ?? ''));
+    if ($placeId === '' || $apiKey === ''
+        || strlen($placeId) > 255 || strlen($apiKey) > 8192
+        || preg_match('/[\x00-\x20\x7F]/', $placeId) === 1
+        || preg_match('/[\x00-\x1F\x7F]/', $apiKey) === 1) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Bağlantıyı denemek için geçerli Place ID ve Places API anahtarı gerekli.'
+        ]);
+    }
+
+    ya_sync_require_client_id($payload);
+    $google = ya_google_reviews_fetch_place(
+        $apiKey,
+        $placeId,
+        'displayName,rating,userRatingCount'
+    );
+    if (($google['ok'] ?? false) !== true || !is_array($google['place'] ?? null)) {
+        $googleStatus = (int)($google['status'] ?? 0);
+        ya_sync_response(in_array($googleStatus, [400, 401, 403, 404], true) ? 422 : 503, [
+            'ok' => false,
+            'message' => (string)($google['message'] ?? 'Google Places bağlantısı doğrulanamadı.')
+        ]);
+    }
+
+    $place = $google['place'];
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Google Places bağlantısı web sunucusundan doğrulandı.',
+        'name' => mb_substr(ya_sync_string($place['displayName']['text'] ?? ''), 0, 240),
+        'rating' => is_numeric($place['rating'] ?? null) ? (float)$place['rating'] : null,
+        'user_rating_count' => max(0, (int)($place['userRatingCount'] ?? 0))
+    ]);
 }
 
 function ya_sync_publish_google_reviews_settings(array $payload): void
