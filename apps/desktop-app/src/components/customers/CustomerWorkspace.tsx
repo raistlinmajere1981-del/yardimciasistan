@@ -28,14 +28,13 @@ export interface CustomerWorkspaceProps {
   onPreparedCreditWhatsApp?: (message: PreparedWhatsAppMessage) => void;
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
-  onSummarize: (requestId: string) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => Promise<DesktopStatusUpdateResult | undefined>;
 }
 
 export function CustomerWorkspace(props: CustomerWorkspaceProps) {
-  const { intent, data, aiEnabled, whatsappEnabled, reservationsEnabled, staysEnabled, customerCreditEnabled, onPreparedCreditWhatsApp, onCall, onWhatsApp, onSummarize, onSave, onAnalyzeIdentity, onDelete } = props;
+  const { intent, data, aiEnabled, whatsappEnabled, reservationsEnabled, staysEnabled, customerCreditEnabled, onPreparedCreditWhatsApp, onCall, onWhatsApp, onSave, onAnalyzeIdentity, onDelete } = props;
   const navigation = useWorkspaceNavigation();
   const customer = data.customers.find((item) => item.id === intent.entityId) ?? null;
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
@@ -137,7 +136,6 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           <div className="action-row customer-detail-actions">
             <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(customer)} disabled={!customer.phone}><Phone size={16} aria-hidden="true" />Müşteriyi Ara</ActionButton>
             {whatsappEnabled && <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => leaveFor(() => onWhatsApp(customer))} disabled={!customer.phone}><MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz</ActionButton>}
-            {aiEnabled && <ActionButton variant="ghost" size="sm" type="button" onClick={() => leaveFor(() => onSummarize(selectedRequests[0]?.id ?? ""))} disabled={selectedRequests.length === 0}><Sparkles size={16} aria-hidden="true" />Geçmişi Özetle</ActionButton>}
           </div>
 
           {staysEnabled && <div className="action-row customer-stay-actions">
