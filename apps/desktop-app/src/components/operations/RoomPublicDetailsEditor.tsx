@@ -1,27 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImagePlus, Save, Trash2 } from "lucide-react";
+import { Save } from "lucide-react";
 import {
   ROOM_PUBLIC_DETAIL_LIMITS,
   ROOM_PUBLIC_FEATURE_CATALOG,
   normalizeRoomPublicFeatures,
-  type RoomMediaAsset,
   type RoomPublicFeatureId,
-  type RoomPublicMediaKind,
   type SaveRoomPublicDetailsInput
 } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
 
 type EditorState = "idle" | "loading" | "error";
-type MediaState = "idle" | "loading" | "error";
-
-const ROOM_MEDIA_KIND_OPTIONS: Array<{ id: RoomPublicMediaKind; label: string }> = [
-  { id: "cover", label: "Kapak görseli" },
-  { id: "photo", label: "Fotoğraf" },
-  { id: "panorama_360", label: "360° panorama" },
-  { id: "panorama_180", label: "180° panorama" },
-  { id: "video", label: "Video" }
-];
 
 interface RoomPublicDetailsEditorRoom {
   id: string;
@@ -43,7 +32,6 @@ interface RoomPublicDetailsSaveResult {
 interface RoomPublicDetailsEditorProps {
   open: boolean;
   room: RoomPublicDetailsEditorRoom | null;
-  mediaRoomId?: string;
   onClose: () => void;
   onSave: (input: SaveRoomPublicDetailsInput) => Promise<RoomPublicDetailsSaveResult>;
 }
@@ -78,123 +66,31 @@ function toggleFeature(features: RoomPublicFeatureId[], featureId: RoomPublicFea
     : [...features, featureId];
 }
 
-function mediaKindLabel(kind: RoomPublicMediaKind) {
-  return ROOM_MEDIA_KIND_OPTIONS.find((option) => option.id === kind)?.label ?? kind;
-}
-
-function formatMediaSize(bytes: number) {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
-export function RoomPublicDetailsEditor({ open, room, mediaRoomId = "", onClose, onSave }: RoomPublicDetailsEditorProps) {
+export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPublicDetailsEditorProps) {
   const [form, setForm] = useState<RoomPublicDetailsFormState>(() => toForm(room));
   const [state, setState] = useState<EditorState>("idle");
-  const [media, setMedia] = useState<RoomMediaAsset[]>([]);
-  const [mediaKind, setMediaKind] = useState<RoomPublicMediaKind>("photo");
-  const [mediaState, setMediaState] = useState<MediaState>("idle");
-  const [mediaMessage, setMediaMessage] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setForm(toForm(room));
     setState("idle");
-    setMedia([]);
-    setMediaKind("photo");
-    setMediaState("idle");
-    setMediaMessage("");
-
-    if (!mediaRoomId || !window.yardimciDesktop) return;
-    let cancelled = false;
-    setMediaState("loading");
-    void window.yardimciDesktop.listRoomMedia(mediaRoomId)
-      .then((items) => {
-        if (cancelled) return;
-        setMedia(items);
-        setMediaState("idle");
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setMediaState("error");
-        setMediaMessage(error instanceof Error ? error.message : "Oda medyaları okunamadı.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, room, mediaRoomId]);
+  }, [open, room]);
 
   const capacity = useMemo(() => Number.parseInt(form.capacity, 10), [form.capacity]);
   const validCapacity = Number.isInteger(capacity) && capacity > 0 && capacity <= 100;
   const canSave = Boolean(room && form.name.trim() && validCapacity && state !== "loading");
-  const mediaBusy = mediaState === "loading";
-  const mediaEnabled = Boolean(mediaRoomId);
 
   if (!open || !room) {
     return null;
   }
 
-  const addMedia = async () => {
-    const bridge = window.yardimciDesktop;
-    if (!bridge) return;
-    setMediaState("loading");
-    setMediaMessage("");
-    try {
-      const result = await bridge.addRoomMedia({ roomId: mediaRoomId, kind: mediaKind });
-      setMedia(result.media);
-      setMediaState(result.ok ? "idle" : "error");
-      setMediaMessage(result.message);
-    } catch (error) {
-      setMediaState("error");
-      setMediaMessage(error instanceof Error ? error.message : "Medya eklenemedi.");
-    }
-  };
-
-  const updateMedia = async (item: RoomMediaAsset, changes: Partial<Pick<RoomMediaAsset, "kind" | "title">>) => {
-    const bridge = window.yardimciDesktop;
-    if (!bridge) return;
-    const next = { ...item, ...changes };
-    setMedia((current) => current.map((candidate) => candidate.id === item.id ? next : candidate));
-    setMediaState("loading");
-    setMediaMessage("");
-    try {
-      const result = await bridge.updateRoomMedia({
-        roomId: mediaRoomId,
-        mediaId: item.id,
-        kind: next.kind,
-        title: next.title
-      });
-      setMedia(result.media);
-      setMediaState(result.ok ? "idle" : "error");
-      setMediaMessage(result.message);
-    } catch (error) {
-      setMediaState("error");
-      setMediaMessage(error instanceof Error ? error.message : "Medya güncellenemedi.");
-    }
-  };
-
-  const deleteMedia = async (item: RoomMediaAsset) => {
-    const bridge = window.yardimciDesktop;
-    if (!bridge) return;
-    setMediaState("loading");
-    setMediaMessage("");
-    try {
-      const result = await bridge.deleteRoomMedia({ roomId: mediaRoomId, mediaId: item.id });
-      setMedia(result.media);
-      setMediaState(result.ok ? "idle" : "error");
-      setMediaMessage(result.message);
-    } catch (error) {
-      setMediaState("error");
-      setMediaMessage(error instanceof Error ? error.message : "Medya kaldırılamadı.");
-    }
-  };
-
   return (
     <FormDialog
       title="Oda bilgilerini düzenle"
       onClose={() => {
-        if (state !== "loading" && !mediaBusy) onClose();
+        if (state !== "loading") onClose();
       }}
-      closeBlocked={state === "loading" || mediaBusy}
+      closeBlocked={state === "loading"}
       dismissOnBackdrop
       onSubmit={async (event) => {
         event.preventDefault();
@@ -228,10 +124,10 @@ export function RoomPublicDetailsEditor({ open, room, mediaRoomId = "", onClose,
             </p>
           )}
           <div className="action-row room-public-details-actions">
-            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading" || mediaBusy}>
+            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
               Vazgeç
             </ActionButton>
-            <ActionButton type="submit" disabled={!canSave || mediaBusy}>
+            <ActionButton type="submit" disabled={!canSave}>
               <Save size={16} aria-hidden="true" />
               {state === "loading" ? "Kaydediliyor" : "Kaydet"}
             </ActionButton>
@@ -350,111 +246,6 @@ export function RoomPublicDetailsEditor({ open, room, mediaRoomId = "", onClose,
               />
             </label>
           </div>
-        </section>
-
-        <section className="panel form-stack room-media-editor">
-          <div className="page-toolbar">
-            <div className="page-toolbar__copy">
-              <strong>Web medyaları</strong>
-              <small>Fotoğraf, panorama ve videolar siteye otomatik yayınlanır</small>
-            </div>
-          </div>
-
-          {!mediaEnabled && (
-            <p className="room-media-help">
-              Yeni oda için medya eklemeden önce Ayarları Kaydet ile oda kaydını oluşturun.
-            </p>
-          )}
-
-          <div className="room-media-add-row">
-            <label className="form-field form-field--medium">
-              Eklenecek medya türü
-              <select
-                value={mediaKind}
-                disabled={mediaBusy || !mediaEnabled}
-                onChange={(event) => setMediaKind(event.target.value as RoomPublicMediaKind)}
-              >
-                {ROOM_MEDIA_KIND_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            <ActionButton type="button" onClick={() => void addMedia()} disabled={mediaBusy || !mediaEnabled}>
-              <ImagePlus size={16} aria-hidden="true" />
-              {mediaBusy ? "İşleniyor" : "Dosya ekle"}
-            </ActionButton>
-          </div>
-
-          <p className="room-media-help">
-            360° ve 180° için panoramik JPG/PNG/WebP; video için MP4/WebM kullanın. Kapak, panorama ve video türlerinde son eklenen dosya aktif kayıt olur.
-          </p>
-
-          {mediaMessage && (
-            <p className={mediaState === "error" ? "form-status sync-error" : "form-status"}>
-              {mediaMessage}
-            </p>
-          )}
-
-          {media.length === 0 ? (
-            <div className="room-media-empty">Bu oda için henüz medya eklenmedi.</div>
-          ) : (
-            <div className="room-media-list">
-              {media.map((item) => (
-                <div className="room-media-row" key={item.id}>
-                  <div className="room-media-file">
-                    <strong>{item.originalName}</strong>
-                    <small>{formatMediaSize(item.sizeBytes)} · {item.remoteUrl ? "Web'e hazır" : "Yayın bekliyor"}</small>
-                  </div>
-
-                  <label className="form-field room-media-kind">
-                    Tür
-                    <select
-                      value={item.kind}
-                      disabled={mediaBusy || !mediaEnabled}
-                      onChange={(event) => void updateMedia(item, {
-                        kind: event.target.value as RoomPublicMediaKind
-                      })}
-                    >
-                      {ROOM_MEDIA_KIND_OPTIONS.map((option) => (
-                        <option key={option.id} value={option.id}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="form-field room-media-title">
-                    Başlık
-                    <input
-                      value={item.title}
-                      maxLength={240}
-                      disabled={mediaBusy || !mediaEnabled}
-                      placeholder={mediaKindLabel(item.kind)}
-                      onChange={(event) => {
-                        const title = event.target.value;
-                        setMedia((current) => current.map((candidate) =>
-                          candidate.id === item.id ? { ...candidate, title } : candidate
-                        ));
-                      }}
-                      onBlur={(event) => void updateMedia(
-                        { ...item, title: event.currentTarget.value },
-                        { title: event.currentTarget.value }
-                      )}
-                    />
-                  </label>
-
-                  <ActionButton
-                    variant="secondary"
-                    type="button"
-                    disabled={mediaBusy || !mediaEnabled}
-                    onClick={() => void deleteMedia(item)}
-                    title="Medyayı kaldır"
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                    Kaldır
-                  </ActionButton>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
       </div>
     </FormDialog>
