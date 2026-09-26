@@ -27,6 +27,10 @@ import {
   BusinessSocialLinksSection,
   useBusinessPublicProfileSettings
 } from "./BusinessPublicProfileSection";
+import {
+  GoogleReviewsSettingsSection,
+  useGoogleReviewsSettings
+} from "./GoogleReviewsSettingsSection";
 import { RoomManagementSection } from "./RoomManagementSection";
 import { LayoutSettingsSection } from "./LayoutSettingsSection";
 import { PasswordSettings, usePasswordSettings } from "../security/PasswordSettings";
@@ -80,6 +84,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     enabledCapabilities: capabilities,
     enabled: initialized
   });
+  const googleReviews = useGoogleReviewsSettings(initialized);
   const layout = useBusinessLayoutSettings({
     enabled: initialized,
     onDashboardRefresh: props.onDashboardRefresh
@@ -106,7 +111,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       : hasSetupSection;
 
   const dirty: Record<SettingsCategoryId, boolean> = {
-    business: drafts.dirty.business || profile.dirty,
+    business: drafts.dirty.business || profile.dirty || googleReviews.dirty,
     operations: layout.dirty,
     services: drafts.dirty.services,
     application: updates.dirty
@@ -117,14 +122,14 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     ? layout.loading || layout.saving
     : active === "application"
       ? updates.busy
-      : drafts.busy || (active === "business" && profile.saving);
+      : drafts.busy || (active === "business" && (profile.saving || googleReviews.saving || googleReviews.testing));
 
   const categorySaving = active === "operations"
     ? layout.saving
     : active === "application"
       ? updates.action === "save"
       : setupCategory
-        ? drafts.feedback[setupCategory]?.state === "loading" || (active === "business" && profile.saving)
+        ? drafts.feedback[setupCategory]?.state === "loading" || (active === "business" && (profile.saving || googleReviews.saving))
         : false;
 
   const feedback = active === "operations"
@@ -149,6 +154,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         if (!profileResult.ok) return profileResult;
         changed ||= profileResult.changed;
       }
+      if (googleReviews.dirty) {
+        const googleReviewsResult = await googleReviews.save();
+        if (!googleReviewsResult.ok) return googleReviewsResult;
+        changed ||= googleReviewsResult.changed;
+      }
       return { ok: true, changed };
     }
 
@@ -167,6 +177,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     if (categoryId === "business") {
       drafts.discard("business");
       profile.discard();
+      googleReviews.discard();
       return;
     }
     if (categoryId === "operations") {
@@ -352,6 +363,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                     controller={profile}
                     disabled={drafts.busy || guardBusy}
                   />
+                  {capabilities.includes("accommodation.rooms") && (
+                    <GoogleReviewsSettingsSection
+                      controller={googleReviews}
+                      disabled={drafts.busy || guardBusy}
+                    />
+                  )}
                 </>
               )}
             </>
