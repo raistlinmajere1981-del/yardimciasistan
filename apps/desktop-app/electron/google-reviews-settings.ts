@@ -95,7 +95,9 @@ export function saveGoogleReviewsSettings(
 
 export async function testGoogleReviewsConnection(
   databasePath: string,
-  input: Pick<SaveGoogleReviewsSettingsInput, "placeId" | "apiKey" | "clearApiKey">
+  input: Pick<SaveGoogleReviewsSettingsInput, "placeId" | "apiKey" | "clearApiKey">,
+  syncConfig: { baseUrl: string; syncSecret: string },
+  clientId: string
 ): Promise<GoogleReviewsConnectionTestResult> {
   const placeId = normalizePlaceId(input.placeId);
   if (!placeId) {
@@ -109,7 +111,7 @@ export async function testGoogleReviewsConnection(
     return { ok: false, message: "Bağlantıyı denemek için Places API anahtarı gerekli." };
   }
 
-  return fetchGooglePlaceSummary(apiKey, placeId);
+  return testGoogleReviewsViaWebModule(apiKey, placeId, syncConfig, clientId);
 }
 
 export async function publishGoogleReviewsSettings(
@@ -231,54 +233,61 @@ function normalizePlaceId(value: unknown): string {
   return placeId;
 }
 
-async function fetchGooglePlaceSummary(apiKey: string, placeId: string): Promise<GoogleReviewsConnectionTestResult> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+async function testGoogleReviewsViaWebModule(
+  apiKey: string,
+  placeId: string,
+  syncConfig: { baseUrl: string; syncSecret: string },
+  clientId: string
+): Promise<GoogleReviewsConnectionTestResult> {
+  const baseUrl = syncConfig.baseUrl.trim().replace(/\/+$/, "");
+  const syncSecret = syncConfig.syncSecret.trim();
+  if (!baseUrl || !syncSecret || !clientId.trim()) {
+    return { ok: false, message: "Google bağlantısını denemek için web modül bağlantısı hazır olmalı." };
+  }
+
   try {
-    const response = await fetch(
-      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=tr`,
-      {
-        headers: {
-          "Accept": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "displayName,rating,userRatingCount"
-        },
-        signal: controller.signal
-      }
-    );
-    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
-    if (!response.ok) {
-      if (response.status === 403) {
-        return { ok: false, message: "Google bağlantısı reddedildi. API anahtarı, Places API (New), faturalandırma ve anahtar kısıtlamalarını kontrol edin." };
-      }
-      if (response.status === 400 || response.status === 404) {
-        return { ok: false, message: "Google Place ID doğrulanamadı. İşletmenin Place ID değerini kontrol edin." };
-      }
-      return { ok: false, message: `Google Places bağlantısı doğrulanamadı (HTTP ${response.status}).` };
+    const response = await fetch(`${baseUrl}/api/sync.php?action=test_google_reviews_settings`, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-YA-Sync-Secret": syncSecret
+      },
+      body: JSON.stringify({
+        action: "test_google_reviews_settings",
+        client_id: clientId,
+        google_reviews: {
+          place_id: placeId,
+          api_key: apiKey
+        }
+      })
+    });
+    const payload = await response.json().catch(() => null) as {
+      ok?: boolean;
+      message?: string;
+      name?: string;
+      rating?: number | null;
+      user_rating_count?: number;
+    } | null;
+
+    if (!response.ok || payload?.ok !== true) {
+      return {
+        ok: false,
+        message: String(payload?.message || `Google Places bağlantısı web sunucusundan doğrulanamadı (HTTP ${response.status}).`)
+      };
     }
 
-    const displayName = payload?.displayName;
-    const name = displayName && typeof displayName === "object"
-      ? String((displayName as Record<string, unknown>).text ?? "").trim()
-      : "";
-    const ratingValue = Number(payload?.rating);
-    const countValue = Number(payload?.userRatingCount);
     return {
       ok: true,
-      message: "Google Places bağlantısı doğrulandı.",
-      name: name || "Google işletmesi",
-      rating: Number.isFinite(ratingValue) ? ratingValue : null,
-      userRatingCount: Number.isFinite(countValue) ? Math.max(0, Math.trunc(countValue)) : 0
+      message: String(payload.message || "Google Places bağlantısı web sunucusundan doğrulandı."),
+      name: String(payload.name || "Google işletmesi"),
+      rating: typeof payload.rating === "number" && Number.isFinite(payload.rating) ? payload.rating : null,
+      userRatingCount: Number.isFinite(Number(payload.user_rating_count))
+        ? Math.max(0, Math.trunc(Number(payload.user_rating_count)))
+        : 0
     };
-  } catch (error) {
-    return {
-      ok: false,
-      message: error instanceof Error && error.name === "AbortError"
-        ? "Google Places bağlantısı zaman aşımına uğradı."
-        : "Google Places servisine ulaşılamadı."
-    };
-  } finally {
-    clearTimeout(timeout);
+  } catch {
+    return { ok: false, message: "Google Places bağlantısı denenirken web modülüne ulaşılamadı." };
   }
 }
 
