@@ -25,14 +25,14 @@ try {
     return page;
   }
   const page = await open(), dialog = page.getByRole('dialog');
-  const viewNavigation = page.getByRole('navigation', { name: 'Restoran görünümü' });
-  await expect(viewNavigation.getByRole('button', { name: 'Masalar', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(viewNavigation.getByRole('tab')).toHaveCount(0);
   const button = name => page.getByRole('button', { name, exact: true });
   const tab = name => dialog.getByRole('tab', { name, exact: true });
   const state = () => page.evaluate(() => window.fixtureState());
-  const floor = page.getByRole('region', { name: 'Floor', exact: true });
-  expect(await floor.evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
+  const board = page.getByRole('region', { name: 'Restoran operasyonları', exact: true });
+  await expect(board.locator('.operations-board__pane')).toHaveCount(2);
+  await expect(page.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Masa yönetimi', exact: true })).toBeVisible();
+  expect(await page.locator('.operations-board__pane--center .operations-board__pane-body').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   await page.getByLabel('Masa grubu').selectOption('Bahçe');
   await button('Bahçe 1 masasını aç').focus(); await page.keyboard.press('Enter');
@@ -79,7 +79,7 @@ try {
   await expect(dialog.getByRole('tabpanel', { name: 'Geçmiş' })).toContainText('Ödendi');
   await button("Floor'a dön").click();
 
-  await button('Rezervasyonlar').click(); await button('Yeni Rezervasyon').click();
+  await button('Yeni Rezervasyon').click();
   await expect(dialog).toHaveClass(/form-dialog/); await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
   await dialog.getByLabel('Masa', { exact: true }).selectOption('table-a');
   await dialog.getByLabel('Not', { exact: true }).fill('Korunan rezervasyon notu');
