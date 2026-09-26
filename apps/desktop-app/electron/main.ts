@@ -75,6 +75,7 @@ import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { publishBusinessAiContext } from "./business-ai-context-service";
 import { createBusinessAiCatalog } from "./business-ai-catalog-service";
 import { createPublicRoomCatalog } from "./public-room-catalog-publication";
+import { publishPendingRoomMedia } from "./room-media-publication";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
@@ -355,6 +356,11 @@ if (!hasSingleInstanceLock) {
         getDatabase().databasePath,
         getDatabase().getEnabledBusinessCapabilities(),
         getDatabase().userDataPath
+      ),
+      prepareRoomCatalog: (config, clientId) => publishPendingRoomMedia(
+        getDatabase().userDataPath,
+        config,
+        clientId
       ),
       onDashboardChanged: () => {
         markLocalCompanionSnapshotDirty();

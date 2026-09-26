@@ -19,6 +19,8 @@ const requiredFiles = [
   "api/request.php",
   "api/sync.php",
   "api/menu.php",
+  "api/rooms.php",
+  "api/room-media.php",
   "api/chat.php",
   "api/availability.php",
   "api/availability-sync.php",
@@ -44,6 +46,7 @@ const requiredFiles = [
   "config/business.json",
   "data/.htaccess",
   "data/ai-conversations.json",
+  "media/.htaccess",
   "knowledge/.htaccess",
   "knowledge/firma.md",
   "knowledge/odalar.md",
@@ -161,6 +164,11 @@ function validateSource() {
   const availabilitySyncEndpoint = readFileSync(join(sourceRoot, "api", "availability-sync.php"), "utf8");
   assert.ok(availabilitySyncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "Availability heartbeat sync_secret header doğrulaması uygulamalı.");
   assert.ok(availabilitySyncEndpoint.includes("ya_public_room_availability_store_publication"), "Availability heartbeat global operasyon revision'ını artırmayan ayrı publication yazımını kullanmalı.");
+
+  const roomMediaEndpoint = readFileSync(join(sourceRoot, "api", "room-media.php"), "utf8");
+  assert.ok(roomMediaEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "Oda medya endpoint'i güvenlik anahtarı doğrulamalı.");
+  assert.ok(roomMediaEndpoint.includes("finfo(FILEINFO_MIME_TYPE)"), "Oda medya endpoint'i gerçek MIME türünü doğrulamalı.");
+  assert.ok(roomMediaEndpoint.includes("YA_ROOM_MEDIA_VIDEO_MAX_BYTES"), "Oda medya endpoint'i yükleme boyutu sınırı uygulamalı.");
 
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");

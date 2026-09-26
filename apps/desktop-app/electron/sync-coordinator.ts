@@ -66,6 +66,10 @@ export interface SyncCoordinatorOptions {
   createAndroidSnapshot: () => AndroidOperationsSnapshot;
   createAiCatalog?: () => BusinessAiCatalog;
   createRoomCatalog?: () => RoomPublicCatalog;
+  prepareRoomCatalog?: (
+    config: { baseUrl: string; syncSecret: string },
+    clientId: string
+  ) => Promise<{ ok: boolean; message: string; uploaded?: number; status?: number }>;
   onDashboardChanged: () => void;
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
@@ -553,6 +557,15 @@ export class SyncCoordinator {
     clientId: string
   ): Promise<string> {
     if (this.roomCatalogSupported === false) return "";
+
+    const preparation = await this.options.prepareRoomCatalog?.(config, clientId);
+    if (preparation && !preparation.ok) {
+      if ([400, 404, 405].includes(preparation.status ?? 0)) {
+        this.roomCatalogSupported = false;
+        return "";
+      }
+      return preparation.message;
+    }
 
     const catalog = this.options.createRoomCatalog?.() ?? { version: 1, updatedAt: "", rooms: [] };
     const payload = JSON.stringify(catalog);
