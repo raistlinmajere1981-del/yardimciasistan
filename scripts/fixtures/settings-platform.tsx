@@ -138,6 +138,10 @@ window.yardimciDesktop = {
       })
     };
   },
+  listRoomMedia: async () => [],
+  addRoomMedia: async () => ({ ok: true, message: "Medya eklendi.", media: [] }),
+  updateRoomMedia: async () => ({ ok: true, message: "Medya güncellendi.", media: [] }),
+  deleteRoomMedia: async () => ({ ok: true, message: "Medya kaldırıldı.", media: [] }),
   getUpdateStatus: async () => updateStatus,
   onUpdateStatusChanged: () => () => {},
   saveUpdatePreferences: async input => { window.settingsCalls.push({ kind: "update-preferences", input }); if (window.failUpdate) return { ok: false, message: "Güncelleme tercih hatası", status: updateStatus }; updateStatus = { ...updateStatus, ...input }; return { ok: true, message: "Güncelleme tercihleri kaydedildi", status: updateStatus }; },

@@ -127,6 +127,23 @@ try {
         publicProfile = input;
         return { ok: true, message: "Bilgiler kaydedildi.", profile: publicProfile };
       },
+      getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
+      saveGoogleReviewsSettings: async (input) => ({
+        ok: true,
+        message: "Google yorumları ayarları kaydedildi.",
+        settings: { enabled: input.enabled, placeId: input.placeId, apiKeyConfigured: Boolean(input.apiKey), lastPublishedAt: "", publicationPending: false }
+      }),
+      testGoogleReviewsConnection: async () => ({ ok: true, message: "Google Places bağlantısı doğrulandı.", name: "Smoke İşletme", rating: 4.8, userRatingCount: 12 }),
+      getBusinessLayout: async () => ({ capabilities: { rooms: false, tables: false }, rooms: [], tableCategories: [] }),
+      saveBusinessLayout: async (input) => ({ ok: true, message: "İşletme düzeni kaydedildi.", layout: { capabilities: { rooms: false, tables: false }, rooms: [], tableCategories: [] } }),
+      listRoomMedia: async () => [],
+      addRoomMedia: async () => ({ ok: true, message: "Medya eklendi.", media: [] }),
+      updateRoomMedia: async () => ({ ok: true, message: "Medya güncellendi.", media: [] }),
+      deleteRoomMedia: async () => ({ ok: true, message: "Medya kaldırıldı.", media: [] }),
+      getUpdateStatus: async () => ({ phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false }),
+      saveUpdatePreferences: async (input) => ({ ok: true, message: "Kaydedildi", status: { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: input.customBaseUrl ?? "", autoCheckEnabled: input.autoCheckEnabled ?? true, notes: [], installSupported: false } }),
+      onUpdateStatusChanged: () => () => {},
+      checkForUpdates: async () => ({ phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false }),
       getSyncStatus: async () => ({
         enabled: true,
         clientId: "lock-smoke",

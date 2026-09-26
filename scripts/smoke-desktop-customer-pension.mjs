@@ -99,6 +99,25 @@ try {
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
+      getGoogleReviewsSettings: async () => ({ enabled: false, placeId: '', apiKeyConfigured: false, lastPublishedAt: '', publicationPending: false }),
+      saveGoogleReviewsSettings: async input => ({
+        ok: true,
+        message: 'Google yorumları ayarları kaydedildi.',
+        settings: {
+          enabled: input.enabled,
+          placeId: input.placeId,
+          apiKeyConfigured: Boolean(input.apiKey),
+          lastPublishedAt: '',
+          publicationPending: false
+        }
+      }),
+      testGoogleReviewsConnection: async () => ({
+        ok: true,
+        message: 'Google Places bağlantısı doğrulandı.',
+        name: 'Smoke İşletmesi',
+        rating: 4.8,
+        userRatingCount: 12
+      }),
       getBusinessLayout: async () => structuredClone(businessLayout),
       listRoomMedia: async () => [],
       addRoomMedia: async () => ({ ok: true, message: 'Medya eklendi.', media: [] }),
