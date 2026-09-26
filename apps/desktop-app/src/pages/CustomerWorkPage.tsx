@@ -33,8 +33,8 @@ export function CustomerWorkPage({
   }, [activeTab, onTabChange, requestsEnabled, whatsappEnabled]);
 
   const views: readonly { id: CustomerWorkTab; label: string }[] = [
-    ...(requestsEnabled ? [{ id: "requests" as const, label: "Talepler" }] : []),
     { id: "customers" as const, label: "Müşteriler" },
+    ...(requestsEnabled ? [{ id: "requests" as const, label: "Talepler" }] : []),
     ...(whatsappEnabled ? [{ id: "prepared" as const, label: "Hazır Mesajlar" }] : [])
   ];
 
