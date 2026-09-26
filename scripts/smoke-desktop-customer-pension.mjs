@@ -232,8 +232,7 @@ try {
     await page.locator('.sidebar').getByRole('button', { name: 'Pansiyon', exact: true }).click();
     await page.locator('.content').evaluate(el => el.scrollTop = 0);
     await capture('pension');
-    await page.getByRole('button', { name: 'Rezervasyonlar', exact: true }).click();
-    await page.getByRole('button', { name: 'Rezervasyonlar', exact: true }).click();
+      await page.getByRole('button', { name: 'Rezervasyonlar', exact: true }).click();
   await page.getByRole('button', { name: 'Yeni Rezervasyon', exact: true }).click();
     await capture('reservation-editor');
     await page.getByRole('dialog').getByRole('button', { name: 'Yeni Müşteri Ekle', exact: true }).click();
@@ -304,10 +303,8 @@ try {
   await page.evaluate(() => localStorage.setItem('stage2a.empty-tasks', 'true'));
   await page.reload();
   for (const name of ['Pansiyon', 'Restoran']) {
-    const viewLabel = name === 'Pansiyon' ? 'Pansiyon görünümü' : 'Restoran görünümü';
     await page.locator('.sidebar').getByRole('button', { name, exact: true }).click();
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
-    await page.getByRole('navigation', { name: viewLabel }).getByRole('button', { name: 'Günlük İşler', exact: true }).click();
     const tasks = page.getByLabel('Günlük işler', { exact: true });
     await expect(tasks.getByText('Günlük iş yok.', { exact: true })).toBeVisible();
     await expect(tasks.getByRole('button', { name: 'Yeni İş', exact: true })).toBeEnabled();
