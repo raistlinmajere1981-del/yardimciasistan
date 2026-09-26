@@ -66,7 +66,6 @@ function Harness() {
             reservationsEnabled: false,
             staysEnabled: false,
             customerCreditEnabled: snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT),
-            onCall: () => undefined,
             onWhatsApp: () => undefined,
             onSave: customers.handleSaveCustomer,
             onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
