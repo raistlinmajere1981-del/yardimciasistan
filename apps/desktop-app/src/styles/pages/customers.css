@@ -1,19 +1,5 @@
 /* Customer workflow composition; shared controls live in components/. */
 
-.customer-work-page {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.customer-work-content {
-  min-width: 0;
-}
-
-.customer-work-tabs {
-  justify-self: start;
-  max-width: 100%;
-}
-
 .customer-history-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-sm)), 1fr));

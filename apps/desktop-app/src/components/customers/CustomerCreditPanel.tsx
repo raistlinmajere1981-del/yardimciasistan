@@ -6,12 +6,12 @@ import { CustomerCreditBalances } from "./CustomerCreditBalances";
 import { CustomerCreditForm } from "./CustomerCreditForm";
 import { CustomerCreditHistory, CustomerCreditMovement } from "./CustomerCreditHistory";
 import { CustomerCreditWhatsAppShare } from "./CustomerCreditWhatsAppShare";
-import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
+import type { EphemeralWhatsAppHandoff } from "../../app/whatsapp-handoff";
 
 export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPreparedWhatsApp }: {
   customerId: string;
   whatsappEnabled?: boolean;
-  onPreparedWhatsApp?: (message: PreparedWhatsAppMessage) => void;
+  onPreparedWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
 }) {
   const { account, loading, error, reload } = useCustomerCreditAccount(customerId);
   const [expanded, setExpanded] = useState(false);

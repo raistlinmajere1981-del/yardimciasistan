@@ -36,7 +36,11 @@ function Harness() {
       onOpenCustomerWork={(request) => record("customer-work", request?.id)}
       onOpenReservation={(reservation) => record("reservation", reservation.id)}
       onCompleteTask={(taskId) => record("task-complete", taskId)}
-      onOpenDailyAi={() => record("daily-ai")}
+      onGenerateDailyAi={() => record("daily-ai")}
+      dailyAiState="idle"
+      dailyAiMessage=""
+      dailyAiContent=""
+      dailyAiFallback={false}
       onPrepareBirthday={(customerId) => record("birthday", customerId)}
       formatRequestType={(value) => value}
       formatRequestStatus={(value) => value}

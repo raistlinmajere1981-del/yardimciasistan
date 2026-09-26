@@ -26,7 +26,8 @@ const secondRequest = {
 const dashboard = {
   ...baseDashboard,
   requests: [firstRequest, secondRequest],
-  summary: { ...baseDashboard.summary, newRequests: 2, waitingRequests: 2 }
+  preparedWhatsAppMessages: [],
+  summary: { ...baseDashboard.summary, newRequests: 2, waitingRequests: 2, preparedWhatsAppMessages: 0 }
 };
 
 const server = await createServer({
@@ -56,51 +57,16 @@ try {
     const clone = (value) => JSON.parse(JSON.stringify(value));
     window.__m8eInitial = { dashboard };
     window.__m8eStats = {
-      generateCalls: 0,
-      saveCalls: 0,
       suggestionCalls: 0,
-      historyCalls: 0,
+      rewriteCalls: 0,
       birthdayPrepareCalls: 0
     };
-    window.__m8ePendingGenerate = [];
     window.__m8ePendingSuggestion = [];
+    window.__m8ePendingRewrite = [];
     window.__m8ePendingBirthday = [];
 
-    const createEntry = (input, index) => ({
-      id: `ai-entry-${index}`,
-      mode: input.mode,
-      requestId: input.requestId || "",
-      requestLabel: input.requestId || "Günlük",
-      instructions: input.instructions || "",
-      content: `AI content ${input.requestId || input.mode} #${index}`,
-      summary: "AI summary",
-      missingFields: [],
-      provider: "test",
-      model: "test-model",
-      fallback: false,
-      createdAt: `2026-09-24T09:00:${String(index).padStart(2, "0")}.000Z`
-    });
-
-    window.__m8eResolveGenerate = (index, override = {}) => {
-      const pending = window.__m8ePendingGenerate[index];
-      if (!pending) throw new Error(`Missing generate call ${index}`);
-      pending.resolve({
-        ok: true,
-        message: "AI sonucu hazır.",
-        entry: { ...createEntry(pending.input, index), ...override }
-      });
-    };
-
-    window.__m8eResolveBirthday = (index, result = { ok: false, message: "stale birthday result" }) => {
-      const pending = window.__m8ePendingBirthday[index];
-      if (!pending) throw new Error(`Missing birthday preparation ${index}`);
-      pending.resolve(result);
-    };
-
-    window.__m8eResolveSuggestion = (index, label) => {
-      const pending = window.__m8ePendingSuggestion[index];
-      if (!pending) throw new Error(`Missing suggestion call ${index}`);
-      const nextDashboard = clone(dashboard);
+    const resolveWithDashboard = (pending, label) => {
+      const nextDashboard = clone(window.__m8eDashboard || dashboard);
       nextDashboard.requests = nextDashboard.requests.map((request) => request.id === pending.requestId
         ? { ...request, ai_suggested_reply: label, whatsapp_message: label }
         : request);
@@ -115,25 +81,35 @@ try {
       });
     };
 
+    window.__m8eResolveSuggestion = (index, label) => {
+      const pending = window.__m8ePendingSuggestion[index];
+      if (!pending) throw new Error(`Missing suggestion call ${index}`);
+      resolveWithDashboard(pending, label);
+    };
+
+    window.__m8eResolveRewrite = (index, label) => {
+      const pending = window.__m8ePendingRewrite[index];
+      if (!pending) throw new Error(`Missing rewrite call ${index}`);
+      resolveWithDashboard(pending, label);
+    };
+
+    window.__m8eResolveBirthday = (index, result = { ok: false, message: "stale birthday result" }) => {
+      const pending = window.__m8ePendingBirthday[index];
+      if (!pending) throw new Error(`Missing birthday preparation ${index}`);
+      pending.resolve(result);
+    };
+
     window.yardimciDesktop = {
-      getAiWorkspaceHistory: async () => {
-        window.__m8eStats.historyCalls += 1;
-        return [];
-      },
-      generateAiWorkspace: async (input) => {
-        const index = window.__m8eStats.generateCalls++;
-        return new Promise((resolveGenerate) => {
-          window.__m8ePendingGenerate[index] = { input: clone(input), resolve: resolveGenerate };
-        });
-      },
-      saveAiWorkspaceResult: async (input) => {
-        window.__m8eStats.saveCalls += 1;
-        return { ok: true, message: "AI sonucu kaydedildi.", dashboardData: clone(window.__m8eDashboard || dashboard), input };
-      },
       createOwnerReplySuggestion: async (requestId) => {
         const index = window.__m8eStats.suggestionCalls++;
         return new Promise((resolveSuggestion) => {
           window.__m8ePendingSuggestion[index] = { requestId, resolve: resolveSuggestion };
+        });
+      },
+      rewriteOwnerReplySuggestion: async (input) => {
+        const index = window.__m8eStats.rewriteCalls++;
+        return new Promise((resolveRewrite) => {
+          window.__m8ePendingRewrite[index] = { requestId: input.requestId, resolve: resolveRewrite };
         });
       },
       prepareBirthdayWhatsApp: async (customerId) => {
@@ -152,57 +128,13 @@ try {
   await page.goto(`${baseUrl}messages-ai-staleness-test`);
   await expect.poll(() => page.evaluate(() => Boolean(window.__m8eController))).toBe(true);
 
-  // A -> B while A is pending: A may persist in backend history, but must not enter the active editor.
-  await page.evaluate(() => {
-    window.__m8eController.changeAiWorkspaceRequest("req-a");
-  });
-  await expect(page.getByTestId("workspace-request")).toHaveText("req-a");
-  await page.evaluate(() => { void window.__m8eController.handleGenerateAiWorkspace(); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(1);
-  await page.evaluate(() => window.__m8eController.changeAiWorkspaceRequest("req-b"));
-  await expect(page.getByTestId("workspace-request")).toHaveText("req-b");
-  await page.evaluate(() => window.__m8eResolveGenerate(0));
-  await page.waitForTimeout(30);
-  await expect(page.getByTestId("workspace-content")).toHaveText("");
-
-  // A -> B -> A must still invalidate the old A operation; matching target identity alone is insufficient.
-  await page.evaluate(() => window.__m8eController.changeAiWorkspaceRequest("req-a"));
-  await page.evaluate(() => { void window.__m8eController.handleGenerateAiWorkspace(); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(2);
-  await page.evaluate(() => window.__m8eController.changeAiWorkspaceRequest("req-b"));
-  await page.evaluate(() => window.__m8eController.changeAiWorkspaceRequest("req-a"));
-  await page.evaluate(() => window.__m8eResolveGenerate(1));
-  await page.waitForTimeout(30);
-  await expect(page.getByTestId("workspace-content")).toHaveText("");
-
-  // Same-turn duplicate generation is synchronously locked before the first await.
-  await page.evaluate(() => {
-    void window.__m8eController.handleGenerateAiWorkspace();
-    void window.__m8eController.handleGenerateAiWorkspace();
-  });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(3);
-  await page.evaluate(() => window.__m8eResolveGenerate(2));
-  await expect(page.getByTestId("workspace-content")).toContainText("req-a #2");
-
-  // Rewrite A becomes stale as soon as the WhatsApp selection moves to B; stale generate must not reach save.
-  await page.evaluate(() => window.__m8eController.setSelectedWhatsAppRequestId("req-a"));
-  await expect(page.getByTestId("selected-whatsapp")).toHaveText("req-a");
-  const savesBeforeRewrite = await page.evaluate(() => window.__m8eStats.saveCalls);
-  await page.evaluate(() => { void window.__m8eController.handleRewriteWhatsAppMessage("Daha kısa yaz."); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(4);
-  await page.evaluate(() => window.__m8eController.setSelectedWhatsAppRequestId("req-b"));
-  await page.evaluate(() => window.__m8eResolveGenerate(3));
-  await page.waitForTimeout(30);
-  expect(await page.evaluate(() => window.__m8eStats.saveCalls)).toBe(savesBeforeRewrite);
-  await expect(page.getByTestId("selected-whatsapp")).toHaveText("req-b");
-  await expect(page.getByTestId("reply-state")).toHaveText("idle");
-
-  // Two owner suggestions on different requests: only the newest renderer snapshot/selection may win.
+  // Two owner suggestions on different requests: only the newest generation may win.
   await page.evaluate(() => {
     void window.__m8eController.handleCreateOwnerReplySuggestion(window.__m8eDashboard.requests.find((request) => request.id === "req-a"));
     void window.__m8eController.handleCreateOwnerReplySuggestion(window.__m8eDashboard.requests.find((request) => request.id === "req-b"));
   });
   await expect.poll(() => page.evaluate(() => window.__m8eStats.suggestionCalls)).toBe(2);
+  await expect(page.getByTestId("suggesting-request")).toHaveText("req-b");
   await page.evaluate(() => window.__m8eResolveSuggestion(1, "B latest"));
   await expect.poll(() => page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-b")?.ai_suggested_reply)).toBe("B latest");
   await page.evaluate(() => window.__m8eResolveSuggestion(0, "A stale"));
@@ -211,75 +143,83 @@ try {
   expect(await page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-a")?.ai_suggested_reply || "")).toBe("");
   expect(await page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-b")?.ai_suggested_reply)).toBe("B latest");
 
-  // AI capability off invalidates a pending generation and clears request-based AI state.
+  // Same-request concurrent suggestion is blocked by request-scoped ownership.
   await page.evaluate(() => {
-    window.__m8eController.changeAiWorkspaceRequest("req-a");
-    void window.__m8eController.handleGenerateAiWorkspace();
+    void window.__m8eController.handleCreateOwnerReplySuggestion(window.__m8eDashboard.requests.find((request) => request.id === "req-a"));
   });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(5);
-  await page.evaluate(() => window.__m8eSetFlags({ aiEnabled: false }));
-  await expect(page.getByTestId("workspace-content")).toHaveText("");
-  await page.evaluate(() => window.__m8eResolveGenerate(4));
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.suggestionCalls)).toBe(3);
+  await page.evaluate(() => {
+    void window.__m8eController.handleCreateOwnerReplySuggestion(window.__m8eDashboard.requests.find((request) => request.id === "req-a"));
+  });
   await page.waitForTimeout(30);
-  await expect(page.getByTestId("workspace-content")).toHaveText("");
+  expect(await page.evaluate(() => window.__m8eStats.suggestionCalls)).toBe(3);
+  await expect(page.getByTestId("reply-state")).toHaveText("error");
+  await expect(page.getByTestId("reply-message")).toContainText("başka bir AI işlemi");
+  await page.evaluate(() => window.__m8eResolveSuggestion(2, "A single"));
+  await expect.poll(() => page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-a")?.ai_suggested_reply)).toBe("A single");
+
+  // Rewrite and suggestion share request ownership: a pending rewrite blocks a suggestion.
+  await page.evaluate(() => {
+    void window.__m8eController.handleRewriteRequestReply(window.__m8eDashboard.requests.find((request) => request.id === "req-b"), "Daha kısa yaz.");
+  });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.rewriteCalls)).toBe(1);
+  await page.evaluate(() => {
+    void window.__m8eController.handleCreateOwnerReplySuggestion(window.__m8eDashboard.requests.find((request) => request.id === "req-b"));
+  });
+  await page.waitForTimeout(30);
+  expect(await page.evaluate(() => window.__m8eStats.suggestionCalls)).toBe(3);
+  await expect(page.getByTestId("reply-state")).toHaveText("error");
+  await page.evaluate(() => window.__m8eResolveRewrite(0, "B rewritten"));
+  await expect.poll(() => page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-b")?.ai_suggested_reply)).toBe("B rewritten");
+
+  // A pending rewrite becomes stale as soon as the WhatsApp selection moves.
+  await page.evaluate(() => window.__m8eController.setSelectedWhatsAppRequestId("req-a"));
+  await expect(page.getByTestId("selected-whatsapp")).toHaveText("req-a");
+  await page.evaluate(() => {
+    void window.__m8eController.handleRewriteRequestReply(window.__m8eDashboard.requests.find((request) => request.id === "req-a"), "Daha kısa yaz.");
+  });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.rewriteCalls)).toBe(2);
+  await page.evaluate(() => window.__m8eController.setSelectedWhatsAppRequestId("req-b"));
+  await page.evaluate(() => window.__m8eResolveRewrite(1, "A stale rewrite"));
+  await page.waitForTimeout(30);
+  expect(await page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-a")?.ai_suggested_reply)).toBe("A single");
+  await expect(page.getByTestId("selected-whatsapp")).toHaveText("req-b");
+  await expect(page.getByTestId("reply-state")).toHaveText("idle");
+
+  // WhatsApp capability off must NOT cancel a pending request AI suggestion.
+  await page.evaluate(() => {
+    void window.__m8eController.handleCreateOwnerReplySuggestion(window.__m8eDashboard.requests.find((request) => request.id === "req-a"));
+  });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.suggestionCalls)).toBe(4);
+  await page.evaluate(() => window.__m8eSetFlags({ whatsappEnabled: false }));
+  await expect.poll(() => page.evaluate(() => window.__m8eFlags.whatsappEnabled)).toBe(false);
+  await page.evaluate(() => window.__m8eResolveSuggestion(3, "A survives"));
+  await expect.poll(() => page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-a")?.ai_suggested_reply)).toBe("A survives");
+  await expect(page.getByTestId("reply-state")).toHaveText("success");
+  await page.evaluate(() => window.__m8eSetFlags({ whatsappEnabled: true }));
+
+  // AI capability off invalidates a pending suggestion and clears request AI feedback.
+  await page.evaluate(() => {
+    void window.__m8eController.handleCreateOwnerReplySuggestion(window.__m8eDashboard.requests.find((request) => request.id === "req-b"));
+  });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.suggestionCalls)).toBe(5);
+  await page.evaluate(() => window.__m8eSetFlags({ aiEnabled: false }));
+  await expect(page.getByTestId("suggesting-request")).toHaveText("");
+  await expect(page.getByTestId("reply-message")).toContainText("AI bu işletmede etkin değil");
+  await page.evaluate(() => window.__m8eResolveSuggestion(4, "B stale ai-off"));
+  await page.waitForTimeout(30);
+  expect(await page.evaluate(() => window.__m8eDashboard.requests.find((request) => request.id === "req-b")?.ai_suggested_reply)).toBe("B rewritten");
   await page.evaluate(() => window.__m8eSetFlags({ aiEnabled: true }));
 
-  // CUSTOMERS off normalizes real workspace state to daily and drops request-scoped material.
+  // CUSTOMERS off clears selection, pending AI ownership and prepared handoff state.
   await expect.poll(() => page.evaluate(() => window.__m8eFlags.aiEnabled)).toBe(true);
-  await page.evaluate(() => window.__m8eController.changeAiWorkspaceRequest("req-a"));
-  await page.evaluate(() => { void window.__m8eController.handleGenerateAiWorkspace(); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(6);
-  await page.evaluate(() => window.__m8eResolveGenerate(5));
-  await expect(page.getByTestId("workspace-content")).toContainText("req-a #5");
+  await page.evaluate(() => window.__m8eController.setSelectedWhatsAppRequestId("req-a"));
+  await expect(page.getByTestId("selected-whatsapp")).toHaveText("req-a");
   await page.evaluate(() => window.__m8eSetFlags({ customersEnabled: false }));
-  await expect(page.getByTestId("workspace-mode")).toHaveText("daily");
-  await expect(page.getByTestId("workspace-request")).toHaveText("");
-  await expect(page.getByTestId("workspace-content")).toHaveText("");
-  expect(await page.evaluate(() => window.__m8eController.aiWorkspaceHistory.every((entry) => !entry.requestId))).toBe(true);
-
-  // A pending rewrite must not overwrite a newer independent Workspace generation.
-  await page.evaluate(() => window.__m8eSetFlags({ customersEnabled: true, whatsappEnabled: true, aiEnabled: true }));
-  await expect.poll(() => page.evaluate(() => window.__m8eFlags.customersEnabled && window.__m8eFlags.whatsappEnabled && window.__m8eFlags.aiEnabled)).toBe(true);
-  await page.evaluate(() => {
-    window.__m8eController.setSelectedWhatsAppRequestId("req-a");
-    window.__m8eController.changeAiWorkspaceMode("reply");
-    window.__m8eController.changeAiWorkspaceRequest("req-b");
-  });
-  await page.evaluate(() => { void window.__m8eController.handleRewriteWhatsAppMessage("A rewrite"); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(7);
-  await page.evaluate(() => { void window.__m8eController.handleGenerateAiWorkspace(); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(8);
-  await page.evaluate(() => window.__m8eResolveGenerate(7));
-  await expect(page.getByTestId("workspace-request")).toHaveText("req-b");
-  await expect(page.getByTestId("workspace-content")).toContainText("req-b #7");
-  const savesBeforeLateRewrite = await page.evaluate(() => window.__m8eStats.saveCalls);
-  await page.evaluate(() => window.__m8eResolveGenerate(6));
-  await expect.poll(() => page.evaluate((before) => window.__m8eStats.saveCalls > before, savesBeforeLateRewrite)).toBe(true);
-  await page.waitForTimeout(30);
-  await expect(page.getByTestId("workspace-request")).toHaveText("req-b");
-  await expect(page.getByTestId("workspace-content")).toContainText("req-b #7");
-
-  // If Workspace generate starts first and a later rewrite wins the Workspace surface,
-  // the stale generate must not leave Workspace stuck in loading.
-  await page.evaluate(() => {
-    window.__m8eController.changeAiWorkspaceMode("reply");
-    window.__m8eController.changeAiWorkspaceRequest("req-b");
-    window.__m8eController.setSelectedWhatsAppRequestId("req-a");
-  });
-  await page.evaluate(() => { void window.__m8eController.handleGenerateAiWorkspace(); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(9);
-  await expect(page.getByTestId("workspace-state")).toHaveText("loading");
-  await page.evaluate(() => { void window.__m8eController.handleRewriteWhatsAppMessage("A later rewrite"); });
-  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(10);
-  await page.evaluate(() => window.__m8eResolveGenerate(9));
-  await expect(page.getByTestId("workspace-request")).toHaveText("req-a");
-  await expect(page.getByTestId("workspace-content")).toContainText("req-a #9");
-  await expect(page.getByTestId("workspace-state")).toHaveText("success");
-  await page.evaluate(() => window.__m8eResolveGenerate(8));
-  await page.waitForTimeout(30);
-  await expect(page.getByTestId("workspace-request")).toHaveText("req-a");
-  await expect(page.getByTestId("workspace-content")).toContainText("req-a #9");
-  await expect(page.getByTestId("workspace-state")).toHaveText("success");
+  await expect(page.getByTestId("selected-whatsapp")).toHaveText("");
+  await expect(page.getByTestId("suggesting-request")).toHaveText("");
+  await expect(page.getByTestId("reply-state")).toHaveText("idle");
+  await page.evaluate(() => window.__m8eSetFlags({ customersEnabled: true }));
 
   // WHATSAPP off/on must release a pending birthday preparation owner and loading UI.
   await page.evaluate(() => { void window.__m8eController.prepareBirthdayWhatsApp("customer-a"); });

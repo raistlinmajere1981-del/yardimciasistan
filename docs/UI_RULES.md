@@ -109,8 +109,10 @@ Launcher canonical workspace/page/operation'a yönlendirir.
 WhatsApp Web kullanıcı kontrolündedir. Uygulama mesaj içeriğini hazırlayabilir; otomatik
 gönderim yapmaz.
 
-Persistent WhatsApp guest/webview lifecycle korunur. Mesajlar sayfasındaki görünüm
-değişimi webview oturumunu gereksiz yere yok etmez.
+WhatsApp login oturumu `persist:yardimci-whatsapp` partition tarafından korunur.
+Hazır Mesajlar, Müşteri İşleri içinde embedded bir yüzeydir; Müşteri İşleri dışına
+çıkıldığında renderer surface unmount olabilir. Otomatik doğum günü gönderimi
+renderer sekmesinden bağımsız Electron otomasyon lifecycle'ına aittir.
 
 AI sonucu kullanıcı tarafından gözden geçirilebilir ve düzenlenebilir olmalıdır. AI kesin
 rezervasyon/müsaitlik/fiyat yetkilisi gibi davranmaz.

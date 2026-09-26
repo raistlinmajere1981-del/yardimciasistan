@@ -11,8 +11,8 @@ import { useCustomerController } from "../../apps/desktop-app/src/app/use-custom
 import { useMessagingController } from "../../apps/desktop-app/src/app/use-messaging-controller";
 import { useMarketController } from "../../apps/desktop-app/src/app/use-market-controller";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
+import { CustomerMessagesWorkspace } from "../../apps/desktop-app/src/components/customers/CustomerMessagesWorkspace";
 import { WhatsAppWorkspace } from "../../apps/desktop-app/src/components/messages/MessageWorkspaces";
-import { MessagesPage } from "../../apps/desktop-app/src/pages/MessagesPage";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
 import "../../apps/desktop-app/src/styles/index.css";
 
@@ -30,9 +30,9 @@ function Harness() {
   const [statusMessage, setStatusMessage] = useState("");
   const whatsappEnabled = snapshot.enabledCapabilities.includes(C.WHATSAPP);
   const customerCreditEnabled = snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT);
-  const messaging = useMessagingController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
-    messagesActive: page === "messages", aiEnabled: false, customersEnabled: true, whatsappEnabled, customerCreditEnabled,
-    onOpenMessages: () => setPage("messages") });
+  const messaging = useMessagingController({ surfaceData: dashboardData, setDashboardData, setSyncState, setStatusMessage,
+    aiEnabled: false, customersEnabled: true, whatsappEnabled, customerCreditEnabled,
+    onOpenPreparedMessages: () => setPage("prepared") });
   const customers = useCustomerController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
     selectedWhatsAppRequestId: messaging.selectedWhatsAppRequestId, setSelectedWhatsAppRequestId: messaging.setSelectedWhatsAppRequestId });
   const marketController = useMarketController({
@@ -46,20 +46,22 @@ function Harness() {
     setStatusMessage(message);
   }), []);
 
+  const selectedRequestForCall = messaging.selectedWhatsAppRequest;
   const workspace = (view: "safe" | "web", onReturnToSafe?: () => void) => <WhatsAppWorkspace view={view}
-    preparedMessage={messaging.preparedWhatsAppMessage} requests={dashboardData.requests}
+    preparedMessage={messaging.preparedWhatsAppMessage} requests={messaging.readyWhatsAppRequests}
     selectedRequest={messaging.selectedWhatsAppRequest} selectedMessage={messaging.selectedWhatsAppMessage}
-    selectedUrl={messaging.selectedWhatsAppUrl} aiEnabled={false} aiState="idle" aiMessage=""
+    selectedUrl={messaging.selectedWhatsAppUrl}
     getRequestStatusTone={() => "neutral"} onSelectRequest={messaging.setSelectedWhatsAppRequestId}
     onOpenExternal={messaging.openSelectedWhatsAppExternal} onReturnToSafe={onReturnToSafe}
-    onRewrite={messaging.handleRewriteWhatsAppMessage} onMessageSent={messaging.handleWhatsAppMessageSent}
+    onCall={selectedRequestForCall ? () => messaging.callCustomer(selectedRequestForCall) : undefined}
+    onMessageSent={messaging.handleWhatsAppMessageSent}
     onDeleteMessage={messaging.handleDeleteWhatsAppMessage} />;
 
   return <BusinessCapabilityRuntimeProvider value={{ snapshot, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <main className="smoke-shell">
       {customers.confirmDialog}
       {messaging.confirmDialog}
-      <nav aria-label="Çalışma alanı">{["customers", "market", "messages"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Mesajlar"}</button>)}</nav>
+      <nav aria-label="Çalışma alanı">{["customers", "market", "prepared"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Hazır Mesajlar"}</button>)}</nav>
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
         <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
@@ -80,15 +82,14 @@ function Harness() {
           onPreparedCreditWhatsApp: messaging.openPreparedCreditWhatsApp,
           onCall: messaging.callCustomerRecord,
           onWhatsApp: messaging.openCustomerWhatsApp,
-          onSummarize: () => undefined,
           onSave: customers.handleSaveCustomer,
           onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
           onDelete: customers.handleDeleteCustomer
         }} />
         </WorkspaceNavigationProvider>
       </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} />
-        : <MessagesPage safeMode={workspace("safe")} webMode={(onReturn) => workspace("web", onReturn)} aiTools={null}
-          aiEnabled={false} whatsappEnabled={whatsappEnabled} aiOpen={false} active />}
+        : <CustomerMessagesWorkspace safeMode={workspace("safe")} webMode={(onReturn) => workspace("web", onReturn)}
+          whatsappEnabled={whatsappEnabled} prewarmWebview={false} active={page === "prepared"} />}
     </main>
   </BusinessCapabilityRuntimeProvider>;
 }

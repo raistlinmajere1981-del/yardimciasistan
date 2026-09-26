@@ -153,6 +153,7 @@ function createDashboardFixture() {
     backupPath: "/tmp/yardimci-asistan/backups",
     webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     requests: [],
+    preparedWhatsAppMessages: [],
     rooms: [
       {
         id: "room_smoke_101",
@@ -407,6 +408,17 @@ function createDashboardConversionFixture() {
         updated_at: "2026-07-11T10:15:00+03:00"
       }
     ],
+    preparedWhatsAppMessages: [
+      {
+        id: "whatsapp_smoke_001",
+        requestId: "request_smoke_001",
+        customerName: "Smoke Misafir",
+        customerPhone: "+905321234567",
+        message: "Merhaba, müsaitliği kontrol edip dönüş yapacağız.",
+        status: "prepared",
+        updatedAt: "2026-07-11T10:15:00+03:00"
+      }
+    ],
     menu: {
       categories: [
         {
@@ -502,6 +514,7 @@ function createDashboardConversionFixture() {
       ...createDashboardFixture().summary,
       newRequests: 1,
       waitingRequests: 1,
+      preparedWhatsAppMessages: 1,
       activeMenuCategories: 1,
       availableMenuItems: 2
     }
@@ -615,6 +628,17 @@ function createCompactUiFixture() {
     tables,
     reservations,
     dailyTasks,
+    preparedWhatsAppMessages: requests
+      .filter((request) => !["answered", "rejected", "cancelled", "archived", "converted_to_reservation"].includes(request.status))
+      .map((request) => ({
+        id: `whatsapp_${request.id}`,
+        requestId: request.id,
+        customerName: request.customer_name,
+        customerPhone: request.customer_phone,
+        message: request.ai_suggested_reply || request.whatsapp_message,
+        status: "prepared",
+        updatedAt: request.updated_at
+      })),
     customers: requests.map((request, index) => ({
       id: request.customer_id,
       fullName: request.customer_name,
@@ -639,7 +663,7 @@ function createCompactUiFixture() {
       totalRooms: rooms.length,
       availableTables: tables.filter((table) => table.status === "available").length,
       pendingReservations: reservations.filter((reservation) => reservation.status === "pending").length,
-      preparedWhatsAppMessages: requests.length,
+      preparedWhatsAppMessages: requests.filter((request) => !["answered", "rejected", "cancelled", "archived", "converted_to_reservation"].includes(request.status)).length,
       activeMenuCategories: categories.filter((category) => category.is_active).length,
       availableMenuItems: items.filter((item) => item.is_available).length
     }

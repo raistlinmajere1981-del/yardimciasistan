@@ -55,8 +55,10 @@ try {
   for (const capability of ["commerce.customer_credit", "retail.barcode", "service.whatsapp"]) setBusinessCapability(path, { capability, enabled: true });
   setBusinessCapability(path, { capability: "service.android", enabled: false });
   raw = new DatabaseSync(path);
-  // A preexisting, unrelated request exercises the original source after credit handoff.
-  assert.equal(database.createManualRequest({ requestType: "general_info", customerName: "Talep Müşterisi", customerPhone: "05329876543", dateText: "", startDate: "", endDate: "", time: "", guestCount: 1, adultCount: 1, childCount: 0, message: "Bilgi almak istiyorum.", priority: "normal" }).ok, true);
+  // A preexisting, unrelated prepared request exercises the outbox source after credit handoff.
+  const unrelatedRequest = database.createManualRequest({ requestType: "general_info", customerName: "Talep Müşterisi", customerPhone: "05329876543", dateText: "", startDate: "", endDate: "", time: "", guestCount: 1, adultCount: 1, childCount: 0, message: "Bilgi almak istiyorum.", priority: "normal" });
+  assert.equal(unrelatedRequest.ok, true);
+  assert.equal(database.saveRequestAiSuggestion({ requestId: unrelatedRequest.savedId, summary: "Bilgi talebi.", suggestedReply: "Merhaba Talep Müşterisi, bilgi talebinizi aldık.", missingFields: [] }).ok, true);
   const customerId = database.saveCustomer({ fullName: "Ahmet Paylaşım", phone: "05321234567" }).savedId;
   const product = runtime.saveRuntimeCatalogProduct(path, { name: "Paylaşım Test Ürünü", salePrice: 10, trackInventory: false });
   const addDebt = (amountMinor, currency = "TRY") => runtime.addCustomerCreditAdjustment(path, { customerId, currency, amountMinor, entryType: "adjustment_debit", note: "Önceki borç", source: "smoke" });
@@ -231,8 +233,8 @@ try {
   assert.equal(target.searchParams.get("text"), edited);
   assert.equal(financialState(), beforeShare);
 
-  // Existing request source remains selectable; request send control stays available.
-  await page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-list .message-request-row").first().click();
+  // Existing prepared request source remains selectable; request send control stays available.
+  await page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-list button.message-request-row").first().click();
   await expect(page.getByRole("button", { name: "Onayla ve Gönder", exact: true })).toHaveCount(1);
   await navigate("Müşteriler"); await openAccount();
   await share(); await editor.fill("Kullanıcı düzenledi.");

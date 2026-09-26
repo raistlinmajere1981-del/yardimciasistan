@@ -261,13 +261,9 @@
   padding-bottom: var(--space-1);
 }
 
-.operation-calendar-month-weekdays,
-.operation-calendar-grid.is-month {
+.operation-calendar-month-weekdays {
   min-width: 980px;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.operation-calendar-month-weekdays {
   display: grid;
   gap: 10px;
   margin-bottom: 8px;
@@ -282,6 +278,8 @@
 }
 
 .operation-calendar-grid.is-month {
+  min-width: 980px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: stretch;
 }
 
@@ -359,7 +357,7 @@
 .operation-calendar-month-item-dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--color-text-muted);
 }
 

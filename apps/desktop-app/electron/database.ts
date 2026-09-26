@@ -341,7 +341,7 @@ export class DesktopDatabase {
     const settings = this.db.prepare("SELECT web_module_url FROM settings LIMIT 1").get() as { web_module_url?: string } | undefined;
     const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
     const requests = getRequests(this.db);
-    const preparedWhatsAppMessages = getStoredAndroidPreparedMessages(this.db, requests);
+    const preparedWhatsAppMessages = getStoredPreparedWhatsAppMessages(this.db, requests);
 
     return {
       databasePath: this.databasePath,
@@ -368,18 +368,7 @@ export class DesktopDatabase {
         totalRooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE is_active = 1 AND deleted_at = ''"),
         availableTables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE status = 'available' AND is_active = 1 AND deleted_at = ''"),
         pendingReservations: this.getScalarCount("SELECT COUNT(*) as count FROM reservations WHERE status = 'pending' AND deleted_at = ''"),
-        preparedWhatsAppMessages: this.getScalarCount(`
-          SELECT COUNT(*) as count
-          FROM whatsapp_messages
-          LEFT JOIN requests ON requests.id = whatsapp_messages.request_id AND requests.deleted_at = ''
-          WHERE whatsapp_messages.direction = 'outgoing'
-            AND whatsapp_messages.status = 'prepared'
-            AND whatsapp_messages.deleted_at = ''
-            AND (
-              requests.id IS NULL
-              OR requests.status NOT IN ('answered', 'rejected', 'cancelled', 'archived', 'converted_to_reservation')
-            )
-        `),
+        preparedWhatsAppMessages: preparedWhatsAppMessages.length,
         activeMenuCategories: this.getScalarCount("SELECT COUNT(*) as count FROM menu_categories WHERE is_active = 1 AND deleted_at = ''"),
         availableMenuItems: this.getScalarCount(`
           SELECT COUNT(*) as count
@@ -499,8 +488,8 @@ export class DesktopDatabase {
   revokeAndroidDevice(deviceIdInput: string): DesktopAndroidDeviceMutationResult {
     return revokeStoredAndroidDevice(this.db, deviceIdInput, new Set(this.getEnabledBusinessCapabilities()));
   }
-  getAndroidPreparedMessages(): DesktopPreparedMessage[] {
-    return getStoredAndroidPreparedMessages(this.db, getRequests(this.db));
+  getPreparedWhatsAppMessages(): DesktopPreparedMessage[] {
+    return getStoredPreparedWhatsAppMessages(this.db, getRequests(this.db));
   }
 
   applyAndroidAction(action: AndroidSyncAction): ApplyAndroidActionResult {
@@ -2188,7 +2177,7 @@ import {
 
 import {
   markWhatsAppMessageSent as markStoredWhatsAppMessageSent,
-  getAndroidPreparedMessages as getStoredAndroidPreparedMessages,
+  getPreparedWhatsAppMessages as getStoredPreparedWhatsAppMessages,
   deleteMessageInTransaction as deleteStoredMessageInTransaction,
 } from "./database/prepared-message-store.js";
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { MessagesPage } from "../../apps/desktop-app/src/pages/MessagesPage";
+import { CustomerMessagesWorkspace } from "../../apps/desktop-app/src/components/customers/CustomerMessagesWorkspace";
 import "../../apps/desktop-app/src/styles/index.css";
 
 const control = window as typeof window & {
@@ -12,14 +12,11 @@ function Harness() {
   control.__m8eTakeoverSetActive = setActive;
 
   return (
-    <MessagesPage
+    <CustomerMessagesWorkspace
       safeMode={<div data-testid="safe-surface">safe</div>}
       webMode={() => <div data-testid="web-surface">web</div>}
-      aiTools={null}
-      aiEnabled={false}
       whatsappEnabled
-      automaticWebviewRequired={false}
-      aiOpen={false}
+      prewarmWebview={false}
       active={active}
     />
   );

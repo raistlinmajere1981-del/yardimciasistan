@@ -25,16 +25,15 @@ function Harness() {
   });
 
   const controller = useMessagingController({
-    dashboardData,
+    surfaceData: dashboardData,
     setDashboardData,
     setSyncState,
     setStatusMessage,
-    messagesActive: true,
     aiEnabled: flags.aiEnabled,
     customersEnabled: flags.customersEnabled,
     whatsappEnabled: flags.whatsappEnabled,
     customerCreditEnabled: flags.customerCreditEnabled,
-    onOpenMessages: () => undefined
+    onOpenPreparedMessages: () => undefined
   });
 
   control.__m8eController = controller;
@@ -48,11 +47,9 @@ function Harness() {
       <p data-testid="sync-state">{syncState}</p>
       <p data-testid="status-message">{statusMessage}</p>
       <p data-testid="selected-whatsapp">{controller.selectedWhatsAppRequestId}</p>
-      <p data-testid="workspace-request">{controller.aiWorkspaceRequestId}</p>
-      <p data-testid="workspace-mode">{controller.aiWorkspaceMode}</p>
-      <p data-testid="workspace-content">{controller.aiWorkspaceContent}</p>
-      <p data-testid="workspace-state">{controller.aiWorkspaceState}</p>
+      <p data-testid="suggesting-request">{controller.suggestingRequestId}</p>
       <p data-testid="reply-state">{controller.aiState}</p>
+      <p data-testid="reply-message">{controller.aiMessage}</p>
       <p data-testid="birthday-preparing">{controller.birthdayPreparingId}</p>
     </main>
   );

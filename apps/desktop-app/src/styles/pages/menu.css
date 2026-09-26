@@ -88,7 +88,18 @@
   opacity: 0.48;
 }
 
-.menu-sortable-record.is-drop-before::before,
+.menu-sortable-record.is-drop-before::before {
+  position: absolute;
+  right: var(--space-2);
+  left: var(--space-2);
+  height: 2px;
+  content: "";
+  pointer-events: none;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+  top: calc(var(--space-1) * -1);
+}
+
 .menu-sortable-record.is-drop-after::after {
   position: absolute;
   right: var(--space-2);
@@ -98,13 +109,6 @@
   pointer-events: none;
   background: var(--color-accent);
   border-radius: var(--radius-pill);
-}
-
-.menu-sortable-record.is-drop-before::before {
-  top: calc(var(--space-1) * -1);
-}
-
-.menu-sortable-record.is-drop-after::after {
   bottom: calc(var(--space-1) * -1);
 }
 

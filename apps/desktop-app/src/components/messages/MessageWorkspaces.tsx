@@ -14,7 +14,7 @@ import { formatRequestStatus, formatRequestType } from "../../app/record-formatt
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton, DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
-import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
+import type { EphemeralWhatsAppHandoff } from "../../app/whatsapp-handoff";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
@@ -26,7 +26,7 @@ function getStatusTone(state: SyncState): StatusTone {
 }
 
 interface WhatsAppWorkspaceProps {
-  preparedMessage?: PreparedWhatsAppMessage | null;
+  preparedMessage?: EphemeralWhatsAppHandoff | null;
   view: "safe" | "web";
   requests: SyncedCustomerRequest[];
   selectedRequest: SyncedCustomerRequest | undefined;

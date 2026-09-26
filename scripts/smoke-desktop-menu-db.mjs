@@ -415,7 +415,7 @@ try {
   assert.equal(aiSuggestionResult.ok, true);
   assert.ok(aiSuggestionResult.dashboardData.requests.some((request) => request.id === "request_smoke_001" && request.ai_suggested_reply.includes("smoke AI")));
   assert.ok(aiSuggestionResult.dashboardData.summary.preparedWhatsAppMessages >= 1);
-  assert.ok(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_001" && message.message.includes("smoke AI")));
+  assert.ok(database.getPreparedWhatsAppMessages().some((message) => message.requestId === "request_smoke_001" && message.message.includes("smoke AI")));
 
   const rejectedWhatsAppSentResult = database.markWhatsAppMessageSent({
     requestId: "request_smoke_001",
@@ -430,36 +430,11 @@ try {
   });
   assert.equal(whatsappSentResult.ok, true);
   assert.equal(whatsappSentResult.dashboardData.summary.preparedWhatsAppMessages, preparedBeforeSend - 1);
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_001"), false);
+  assert.equal(database.getPreparedWhatsAppMessages().some((message) => message.requestId === "request_smoke_001"), false);
   assert.ok(database.countEventsByType("whatsapp.message_sent") >= 1);
 
-  const workspaceEntry = database.saveAiWorkspaceHistory({
-    mode: "summary",
-    requestId: "request_smoke_001",
-    requestLabel: "Smoke Misafir • Pansiyon rezervasyonu",
-    instructions: "Eksik bilgileri öne çıkar.",
-    content: "Smoke Misafir balkonlu oda için bilgi istiyor.",
-    summary: "AI çalışma alanı smoke özeti",
-    missingFields: ["giriş saati"],
-    provider: "openai_compatible",
-    model: "smoke-model-v1",
-    fallback: false
-  });
-  assert.ok(workspaceEntry.id.startsWith("ai_conv_"));
-  const workspaceHistory = database.getAiWorkspaceHistory();
-  assert.equal(workspaceHistory[0].id, workspaceEntry.id);
-  assert.equal(workspaceHistory[0].mode, "summary");
-  assert.deepEqual(workspaceHistory[0].missingFields, ["giriş saati"]);
-
-  const workspaceSaveResult = database.saveAiWorkspaceResult({
-    mode: "summary",
-    requestId: "request_smoke_001",
-    content: "Düzenlenen çalışma alanı özeti.",
-    summary: workspaceEntry.summary,
-    missingFields: workspaceEntry.missingFields
-  });
-  assert.equal(workspaceSaveResult.ok, true);
-  assert.ok(workspaceSaveResult.dashboardData.requests.some((request) => request.id === "request_smoke_001" && request.ai_summary === "Düzenlenen çalışma alanı özeti."));
+  // Request-scoped AI summary is owned by the request record (no separate AI workspace).
+  assert.ok(aiSuggestionResult.dashboardData.requests.some((request) => request.id === "request_smoke_001" && request.ai_summary === "Smoke AI özet"));
 
   const conversionResult = database.convertRequestToReservation("request_smoke_001");
   assert.equal(conversionResult.ok, true);
@@ -789,7 +764,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   });
   assert.equal(preparedMessageResult.ok, true);
   const preparedMessageCount = preparedMessageResult.dashboardData.summary.preparedWhatsAppMessages;
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_customer_001"), true);
+  assert.equal(database.getPreparedWhatsAppMessages().some((message) => message.requestId === "request_smoke_customer_001"), true);
   const requestBeforeAnswer = preparedMessageResult.dashboardData.requests.find((request) => request.id === "request_smoke_customer_001");
   assert.ok(requestBeforeAnswer);
 
@@ -953,7 +928,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   }));
   assert.equal(answeredRequestResult.ok, true);
   assert.equal(database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001")?.status, "answered");
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_customer_001"), false);
+  assert.equal(database.getPreparedWhatsAppMessages().some((message) => message.requestId === "request_smoke_customer_001"), false);
   assert.equal(database.getDashboardData().summary.preparedWhatsAppMessages, preparedMessageCount - 1);
 
   const reopenedRequestResult = database.applyAndroidAction(androidAction("android_action_request_reopen_001", "customer_request_reopen", {

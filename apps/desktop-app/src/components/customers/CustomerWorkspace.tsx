@@ -5,7 +5,7 @@ import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdenti
 import { customerFormToInput, formatCustomerGender, formatCustomerLastContactDate, formatCustomerRoomStayStatus, formatCustomerSource, formatIdentityType, formatStayDateRange, hasCustomerIdentityDetails, toCustomerForm, type CustomerFormState } from "../../app/customer-model";
 import { formatDateForDisplay, formatRequestStatus, formatRequestType, formatReservationDate, formatReservationStatus } from "../../app/record-formatters";
 import { customerCreditError } from "../../app/customer-credit-ui";
-import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
+import type { EphemeralWhatsAppHandoff } from "../../app/whatsapp-handoff";
 import type { CustomerWorkspaceIntent, CustomerWorkspaceMode } from "../workspace/workspace-intent";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { WorkspaceTabList, WorkspaceTabPanel, WorkspaceTabs } from "../workspace/WorkspaceTabs";
@@ -25,7 +25,7 @@ export interface CustomerWorkspaceProps {
   reservationsEnabled: boolean;
   staysEnabled: boolean;
   customerCreditEnabled: boolean;
-  onPreparedCreditWhatsApp?: (message: PreparedWhatsAppMessage) => void;
+  onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;

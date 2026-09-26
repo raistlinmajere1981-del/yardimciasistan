@@ -48,7 +48,7 @@ try {
   await expect.poll(() => page.evaluate(() => window.__m8eTakeoverCalls)).toBe(1);
 
   // Leave while the failed takeover is sleeping before retry. A stale loop must not call main again.
-  await page.getByRole("tab", { name: "Mesaj Hazırla", exact: true }).click();
+  await page.getByRole("tab", { name: "Hazır Mesaj", exact: true }).click();
   await page.waitForTimeout(180);
   expect(await page.evaluate(() => window.__m8eTakeoverCalls)).toBe(1);
   expect(await page.evaluate(() => window.__m8eActivity.at(-1))).toBe(false);

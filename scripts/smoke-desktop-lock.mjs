@@ -305,6 +305,7 @@ function createDashboardData() {
     backupPath: "/tmp/yardimci-asistan-lock-smoke/backups",
     webModuleUrl: "https://example.test/yardimci-asistan",
     requests: [],
+    preparedWhatsAppMessages: [],
     rooms: [],
     tables: [],
     reservations: [],

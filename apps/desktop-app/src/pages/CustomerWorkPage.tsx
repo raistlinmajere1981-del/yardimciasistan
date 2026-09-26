@@ -1,8 +1,7 @@
 import { useEffect, type ReactNode } from "react";
+import type { CustomerWorkTab } from "../app/navigation";
 import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
 import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
-
-export type CustomerWorkTab = "requests" | "customers" | "messages";
 
 interface CustomerWorkPageProps {
   requestsEnabled: boolean;
@@ -28,7 +27,7 @@ export function CustomerWorkPage({
       onTabChange("customers");
       return;
     }
-    if (activeTab === "messages" && !whatsappEnabled) {
+    if (activeTab === "prepared" && !whatsappEnabled) {
       onTabChange(requestsEnabled ? "requests" : "customers");
     }
   }, [activeTab, onTabChange, requestsEnabled, whatsappEnabled]);
@@ -36,24 +35,24 @@ export function CustomerWorkPage({
   const views: readonly { id: CustomerWorkTab; label: string }[] = [
     ...(requestsEnabled ? [{ id: "requests" as const, label: "Talepler" }] : []),
     { id: "customers" as const, label: "Müşteriler" },
-    ...(whatsappEnabled ? [{ id: "messages" as const, label: "Hazır Mesajlar" }] : [])
+    ...(whatsappEnabled ? [{ id: "prepared" as const, label: "Hazır Mesajlar" }] : [])
   ];
 
   const normalizedTab: CustomerWorkTab = activeTab === "requests" && !requestsEnabled
     ? "customers"
-    : activeTab === "messages" && !whatsappEnabled
+    : activeTab === "prepared" && !whatsappEnabled
       ? (requestsEnabled ? "requests" : "customers")
       : activeTab;
 
   const content = normalizedTab === "requests"
     ? requests
-    : normalizedTab === "messages"
+    : normalizedTab === "prepared"
       ? messages
       : customers;
 
   const bodyLabel = normalizedTab === "requests"
     ? "Talep yönetimi görünümü"
-    : normalizedTab === "messages"
+    : normalizedTab === "prepared"
       ? "Hazır mesajlar görünümü"
       : "Müşteri yönetimi görünümü";
 
