@@ -1,17 +1,15 @@
 import { ipcMain } from "electron";
-import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import type {
-  AiWorkspaceHistoryEntry,
+  DailyBusinessEvaluationResult,
   DesktopDatabase,
-  GenerateAiWorkspaceInput,
-  GenerateAiWorkspaceResult,
   RequestAiSuggestionResult,
-  SaveAiWorkspaceResult,
-  SaveAiWorkspaceResultInput
+  RewriteRequestAiSuggestionInput
 } from "../database";
 import {
   createOwnerReplySuggestionForRequest,
-  generateAiWorkspaceEntry
+  generateDailyBusinessEvaluation,
+  rewriteOwnerReplySuggestionForRequest
 } from "../ai-workspace-service";
 
 export function registerAiWorkspaceIpcHandlers(options: {
@@ -21,30 +19,21 @@ export function registerAiWorkspaceIpcHandlers(options: {
   const { getDatabase, assertCapability } = options;
 
   ipcMain.handle("ai:createOwnerReplySuggestion", async (_event, requestId: string): Promise<RequestAiSuggestionResult> => {
-    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri kayıtları bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI bu işletmede etkin değil.");
     return createOwnerReplySuggestionForRequest(getDatabase(), requestId);
   });
 
-  ipcMain.handle("ai:generateWorkspace", async (_event, input: GenerateAiWorkspaceInput): Promise<GenerateAiWorkspaceResult> => {
+  ipcMain.handle("ai:rewriteOwnerReplySuggestion", async (_event, input: RewriteRequestAiSuggestionInput): Promise<RequestAiSuggestionResult> => {
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri kayıtları bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI bu işletmede etkin değil.");
-    if (String(input?.requestId ?? "").trim()) {
-      assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
-    }
-    return generateAiWorkspaceEntry(getDatabase(), input);
+    return rewriteOwnerReplySuggestionForRequest(getDatabase(), input);
   });
 
-  ipcMain.handle("ai:getWorkspaceHistory", (_event, limit?: number): AiWorkspaceHistoryEntry[] => {
+  ipcMain.handle("ai:generateDailyBusinessEvaluation", async (): Promise<DailyBusinessEvaluationResult> => {
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI bu işletmede etkin değil.");
-    const history = getDatabase().getAiWorkspaceHistory(limit);
-    return hasBusinessCapability(getDatabase().getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.CUSTOMERS)
-      ? history
-      : history.filter((entry) => !entry.requestId);
-  });
-
-  ipcMain.handle("ai:saveWorkspaceResult", (_event, input: SaveAiWorkspaceResultInput): SaveAiWorkspaceResult => {
-    assertCapability(BUSINESS_CAPABILITIES.AI, "AI bu işletmede etkin değil.");
-    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
-    return getDatabase().saveAiWorkspaceResult(input);
+    return generateDailyBusinessEvaluation(getDatabase());
   });
 }
