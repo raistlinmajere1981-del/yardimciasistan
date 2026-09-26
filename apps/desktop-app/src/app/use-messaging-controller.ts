@@ -319,7 +319,6 @@ export function useMessagingController({
     if (whatsappEnabled) return;
     const birthdayWasActive = birthdayOperationOwnerRef.current !== null;
     whatsappSelectionRevisionRef.current += 1;
-    rewriteGenerationRef.current += 1;
     birthdayOperationGenerationRef.current += 1;
     birthdayOperationOwnerRef.current = null;
     if (birthdayWasActive) {
@@ -327,13 +326,8 @@ export function useMessagingController({
       setSyncState("idle");
       setStatusMessage("WhatsApp kapatıldığı için doğum günü mesajı hazırlığı durduruldu.");
     }
-    for (const [requestId, owner] of requestAiOperationOwnersRef.current) {
-      if (owner.kind === "rewrite") requestAiOperationOwnersRef.current.delete(requestId);
-    }
     setSelectedWhatsAppRequestIdState("");
     setPreparedWhatsAppMessage(null);
-    setAiState("idle");
-    setAiMessage("WhatsApp bu işletmede etkin değil.");
   }, [whatsappEnabled]);
 
   const selectedWhatsAppRequest = useMemo(
