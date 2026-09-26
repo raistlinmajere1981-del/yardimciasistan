@@ -3,20 +3,6 @@
 
 -- TABLES
 
-CREATE TABLE ai_conversations (
-  id TEXT PRIMARY KEY,
-  source TEXT NOT NULL,
-  customer_id TEXT NOT NULL DEFAULT '',
-  request_id TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'open',
-  messages_json TEXT NOT NULL DEFAULT '[]',
-  summary TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  deleted_at TEXT NOT NULL DEFAULT '',
-  sync_status TEXT NOT NULL DEFAULT 'local_only'
-);
-
 CREATE TABLE ai_service_profiles (
   service TEXT PRIMARY KEY,
   project_name TEXT NOT NULL DEFAULT '',
