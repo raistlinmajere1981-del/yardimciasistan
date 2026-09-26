@@ -1,21 +1,21 @@
-.messages-page {
+.customer-messages-workspace {
   gap: var(--space-4);
 }
 
-.feature-workspace-page__body:has(.customer-messages-workspace.messages-page--web),
-.customer-messages-workspace.messages-page--web,
-.customer-messages-workspace.messages-page--web > .message-mode-content:not(.is-hidden) {
+.feature-workspace-page__body:has(.customer-messages-workspace--web),
+.customer-messages-workspace--web,
+.customer-messages-workspace--web > .message-mode-content:not(.is-hidden) {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
-.feature-workspace-page__body:has(.customer-messages-workspace.messages-page--web) {
+.feature-workspace-page__body:has(.customer-messages-workspace--web) {
   overflow: hidden;
 }
 
-.messages-page--web > .message-toolbar {
+.customer-messages-workspace--web > .message-toolbar {
   flex: none;
 }
 
@@ -28,12 +28,12 @@
   gap: var(--space-3) var(--space-4);
 }
 
-.messages-page .message-mode-switch {
+.customer-messages-workspace .message-mode-switch {
   flex: 0 0 auto;
   width: fit-content;
 }
 
-.messages-page .message-mode-switch > button {
+.customer-messages-workspace .message-mode-switch > button {
   min-height: var(--control-height-sm);
   padding-inline: var(--space-3);
 }
@@ -421,11 +421,11 @@
     flex-direction: column;
   }
 
-  .messages-page .message-mode-switch {
+  .customer-messages-workspace .message-mode-switch {
     width: 100%;
   }
 
-  .messages-page .message-mode-switch > button {
+  .customer-messages-workspace .message-mode-switch > button {
     flex: 1 1 0;
   }
 
