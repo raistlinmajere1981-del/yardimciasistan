@@ -1,3 +1,4 @@
+import { useDashboardSnapshot } from "./use-dashboard-snapshot";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
@@ -27,7 +28,7 @@ export function useDesktopSync({
   const appDataInitializedRef = useRef(false);
   const onBootstrapSetupRef = useRef(onBootstrapSetup);
   const onDashboardLoadedRef = useRef(onDashboardLoaded);
-  const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
+  const [dashboardData, setDashboardData] = useDashboardSnapshot(defaultDashboardData);
   const [businessCapabilities, setBusinessCapabilities] = useState<BusinessCapabilitySnapshot | null>(null);
   const [businessCapabilityState, setBusinessCapabilityState] = useState<SyncState>("idle");
   const [businessCapabilityMessage, setBusinessCapabilityMessage] = useState("İşletme yetenekleri profil varsayımlarını kullanıyor.");

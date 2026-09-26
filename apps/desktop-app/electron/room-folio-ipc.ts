@@ -60,8 +60,8 @@ export function registerRoomFolioIpcHandlers(options: {
     menuCategories: [],
     menuItems: []
   });
-  const folioData = (): DesktopRoomFolioData => {
-    const data = service().getData();
+  const folioData = (roomId?: string): DesktopRoomFolioData => {
+    const data = service().getData(roomId);
     return options.canUseMenu?.() === false
       ? { ...data, menuCategories: [], menuItems: [] }
       : data;
@@ -73,14 +73,14 @@ export function registerRoomFolioIpcHandlers(options: {
     return result;
   };
 
-  ipcMain.handle("roomFolio:getData", (): DesktopRoomFolioData => {
+  ipcMain.handle("roomFolio:getData", (_event, roomId?: unknown): DesktopRoomFolioData => {
     options.assertUnlocked();
     if (!hasFolioCapability()) {
       assertRoomAccess();
       return roomProfileData();
     }
     options.assertCapability?.();
-    return folioData();
+    return folioData(typeof roomId === "string" ? roomId : undefined);
   });
 
   ipcMain.handle("roomFolio:open", (_event, stayId: string): DesktopRoomFolioMutationResult => {

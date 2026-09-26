@@ -91,7 +91,7 @@ try {
   await launcher.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("heading", { level: 2 })).toHaveText("Oda 101 · Pilot 101");
+  await expect(dialog.getByRole("heading", { level: 2 })).toHaveText("Pilot 101");
   await expect(dialog.getByRole("tab", { name: "Özet", exact: true })).toHaveAttribute("aria-selected", "true");
   await dialog.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(launcher).toBeFocused();

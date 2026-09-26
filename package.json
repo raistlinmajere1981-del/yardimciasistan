@@ -107,7 +107,9 @@
     "smoke:sector-feature-contributions": "node scripts/smoke-sector-feature-contributions.mjs",
     "smoke:business-layout": "node scripts/smoke-business-layout.mjs",
     "smoke:table-categories-db": "node scripts/smoke-table-categories-db.mjs",
-    "smoke:setup-profile-contract": "node scripts/smoke-setup-profile-contract.mjs"
+    "smoke:setup-profile-contract": "node scripts/smoke-setup-profile-contract.mjs",
+    "smoke:operations-ui": "node scripts/smoke-operations-card-models.mjs && node scripts/smoke-operations-cards.mjs",
+    "smoke:operations-projections": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-operations-projections.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

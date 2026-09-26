@@ -5,7 +5,10 @@ export interface RoomWorkspaceIntent {
   entityType: "room";
   entityId: string;
   mode?: "summary" | "stay" | "account" | "history";
-  action?: "payment" | "assign-reservation" | "create-stay";
+  action?: "payment" | "assign-reservation" | "create-stay" | "check-in" | "checkout" | "linked-stay" | "room-status";
+  stayId?: string;
+  folioId?: string;
+  reservationId?: string;
   customerId?: string;
   returnContext?: WorkspaceReturnContext;
 }
@@ -14,7 +17,8 @@ export interface TableWorkspaceIntent {
   entityType: "table";
   entityId: string;
   mode?: "order" | "customer" | "account" | "history";
-  action?: "room-transfer";
+  action?: "room-transfer" | "add-item";
+  orderId?: string;
   returnContext?: WorkspaceReturnContext;
 }
 

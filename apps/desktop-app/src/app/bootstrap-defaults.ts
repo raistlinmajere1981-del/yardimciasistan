@@ -2,6 +2,9 @@ import { getBusinessProfile } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 
 export const defaultDashboardData: DesktopDashboardData = {
+  revision: 0,
+  roomOperations: null,
+  tableOperations: null,
   databasePath: "Tarayıcı önizleme modu",
   backupPath: "Tarayıcı önizleme modu",
   webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",

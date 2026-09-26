@@ -1,3 +1,4 @@
+import { RoomsWorkspace } from "../pension/RoomsWorkspace";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES,
@@ -39,7 +40,6 @@ import { RestaurantReservationsWorkspace } from "../operations/RestaurantReserva
 import {
   DailyTasksWorkspace,
   ReservationsWorkspace,
-  RoomsWorkspace,
   formatTaskDue
 } from "../operations/OperationWorkspaces";
 import { SettingsWorkspace } from "../settings/SettingsWorkspace";
@@ -461,9 +461,9 @@ export function DesktopWorkspaceRouter({
           ) : null}
           rooms={(
             <RoomsWorkspace
-              rooms={surfaceData.rooms}
-              reservations={pensionReservations}
-              stays={surfaceData.customerRoomStays}
+              data={surfaceData}
+              onDashboard={setDashboardData}
+              folioEnabled={accommodationFolioEnabled}
               reservationsEnabled={accommodationReservationsEnabled}
               staysEnabled={accommodationStaysEnabled}
             />

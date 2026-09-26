@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { DatabaseSync } from 'node:sqlite';
+import { resolve } from 'node:path';
+import { createTemporaryDesktopDatabase } from './test-helpers/desktop-database.mjs';
+import { createSmokeSetupInput } from './test-helpers/desktop-setup.mjs';
+import { seedSmokeBusinessLayout } from './test-helpers/business-layout.mjs';
+const require = createRequire(import.meta.url);
+const { DesktopDatabase } = require('../apps/desktop-app/dist-electron/database.js');
+const { DesktopRoomFolioService } = require('../apps/desktop-app/dist-electron/room-folio.js');
+const { database, cleanup } = createTemporaryDesktopDatabase('operations-projections-');
+let db, second;
+try {
+  database.initialize();
+  const setup = database.saveInitialSetup(createSmokeSetupInput({ businessName: 'Operations projections', phone: '+905550003002', whatsapp: '+905550003002', syncSecret: 'projection-smoke', servicePreferences: { whatsapp: false, android: true } }));
+  assert.equal(setup.ok, true, setup.message);
+  seedSmokeBusinessLayout(database.databasePath, { roomCount: 2, tableCategories: [{ name: 'Salon', tableCount: 2 }] });
+  db = new DatabaseSync(database.databasePath); db.exec('PRAGMA foreign_keys = ON');
+  const initial = database.getDashboardData();
+  const [room, otherRoom] = initial.rooms;
+  const [table] = initial.tables;
+  db.prepare("INSERT INTO customers (id, full_name, phone, created_at, updated_at) VALUES ('guest', 'Projection guest', '', '', '')").run();
+  const insertStay = db.prepare(`INSERT INTO customer_room_stays (id, customer_id, room_id, status, check_in_date, check_out_date, created_at, updated_at) VALUES (?, 'guest', ?, ?, ?, '2040-01-03', '', '')`);
+  insertStay.run('target-stay', room.id, 'planned', '2035-01-01');
+  insertStay.run('old-stay', room.id, 'checked_out', '2020-01-01');
+  const insertFolio = db.prepare(`INSERT INTO room_folios (id, stay_id, room_id, customer_id, check_in_date, lodging_total_minor, opened_at, created_at, updated_at) VALUES (?, ?, ?, 'guest', '2035-01-01', 25000, '', '', ?)`);
+  insertFolio.run('target-folio', 'target-stay', room.id, '2000-01-01');
+  insertFolio.run('old-folio', 'old-stay', room.id, '2000-01-02');
+  // More active stays and open accounts than bounded history supports.
+  for (let i = 0; i < 505; i++) {
+    insertStay.run(`filler-${i}`, otherRoom.id, 'planned', '2039-01-01');
+    if (i < 105) insertFolio.run(`filler-folio-${i}`, `filler-${i}`, otherRoom.id, '2039-01-01');
+  }
+  db.prepare(`INSERT INTO reservations (id, customer_id, reservation_type, status, title, start_date, end_date, room_ids_json, created_at, updated_at) VALUES ('target-booking', 'guest', 'room', 'approved', 'Upcoming', '2040-01-04', '2040-01-06', ?, '', '')`).run(JSON.stringify([room.id]));
+  for (let i = 0; i < 85; i++) db.prepare("INSERT INTO reservations (id, reservation_type, status, title, start_date, created_at, updated_at) VALUES (?, 'room', 'completed', 'History', '2020-01-01', '', '')").run(`history-${i}`);
+  const beforeChanges = db.prepare('PRAGMA data_version').get().data_version;
+  const snapshot = database.getDashboardData();
+  const target = snapshot.roomOperations.find(item => item.roomId === room.id);
+  assert.equal(snapshot.customerRoomStays.some(item => item.id === 'target-stay'), false);
+  assert.equal(snapshot.reservations.some(item => item.id === 'target-booking'), false);
+  assert.equal(target.stays[0].id, 'target-stay');
+  assert.equal(target.reservations[0].id, 'target-booking');
+  assert.equal(target.accounts.find(item => item.stayId === 'target-stay').folioId, 'target-folio');
+  assert.equal(target.accounts.find(item => item.folioId === 'old-folio').stayStatus, 'checked_out');
+  const folios = new DesktopRoomFolioService(database.databasePath);
+  assert.equal(folios.getData().folios.some(item => item.id === 'target-folio'), false);
+  assert.deepEqual(folios.getData(room.id).folios.map(item => item.id).sort(), ['old-folio', 'target-folio']);
+  assert.equal(db.prepare('PRAGMA data_version').get().data_version, beforeChanges);
+  assert.deepEqual(snapshot.rooms.map(item => item.id), initial.rooms.map(item => item.id));
+  const payment = folios.addPayment({ folioId: 'old-folio', amountMinor: 5000, paymentMethod: 'cash', note: '' });
+  assert.equal(payment.ok, true, payment.message);
+  assert.equal(database.getDashboardData().roomOperations.find(item => item.roomId === room.id).accounts.find(item => item.folioId === 'old-folio').remainingMinor, 20000);
+  const opened = database.openTableOrder(table.id);
+  assert.equal(opened.ok, true, opened.message);
+  assert.equal(database.getDashboardData().tableOperations.find(item => item.tableId === table.id).order.id, opened.order.id);
+  assert.equal(database.updateTableOrderStatus({ orderId: opened.order.id, status: 'preparing' }).ok, true);
+  assert.equal(database.getDashboardData().tableOperations.find(item => item.tableId === table.id).order.status, 'preparing');
+  const latest = database.getDashboardData();
+  second = new DesktopDatabase({ appPath: resolve('apps/desktop-app'), userDataPath: database.userDataPath });
+  assert.ok(second.getDashboardData().revision > latest.revision, 'Process-wide revision survives short-lived facade instances used by financial refresh');
+  db.exec("UPDATE business_capabilities SET is_enabled = 0 WHERE capability_id IN ('accommodation.folio', 'accommodation.stays', 'accommodation.reservations', 'food_service.orders', 'food_service.reservations')");
+  const denied = database.getDashboardData();
+  assert.ok(denied.roomOperations.every(item => !item.accounts.length && !item.stays.length && !item.reservations.length));
+  assert.ok(denied.tableOperations.every(item => !item.order && !item.reservations.length));
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+  console.log('operations-projections-ok: unlimited active projection, exact account identity, scoped folio read, mutations/refresh, shared revision, capability projection');
+} finally { second?.close(); db?.close(); cleanup(); }

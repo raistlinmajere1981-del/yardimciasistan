@@ -20,6 +20,7 @@
 @import "./components/badges.css" layer(components.primitives);
 @import "./components/buttons.css" layer(components.primitives);
 @import "./components/cards.css" layer(components.primitives);
+@import "./components/resource-card.css" layer(components.primitives);
 @import "./components/data-list.css" layer(components.primitives);
 @import "./components/dialogs.css" layer(components.primitives);
 @import "./components/workspace.css" layer(components.primitives);

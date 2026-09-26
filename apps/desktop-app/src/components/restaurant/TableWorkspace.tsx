@@ -6,6 +6,7 @@ import { WorkspaceTabs, WorkspaceTabList, WorkspaceTabPanel } from "../workspace
 import type { TableWorkspaceIntent } from "../workspace/workspace-intent";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
+import { getTableCardModel } from "./table-card-model";
 import { TableOrderEditor } from "./TableOrderEditor";
 import { TableRoomTransfer } from "./TableRoomTransfer";
 import { useTableOrderController } from "./use-table-order-controller";
@@ -13,17 +14,21 @@ import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getRes
 
 type Mode = NonNullable<TableWorkspaceIntent["mode"]>;
 type Flow = "cancel" | "room-transfer" | null;
-export function TableWorkspace({ intent, data, orders, ordersEnabled, menuEnabled, customersEnabled, reservationsEnabled,
-  roomFolioTransferEnabled, onOrderChanged, onDashboardDataChanged, onUpdateTableStatus }: {
+export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, customersEnabled, reservationsEnabled,
+  roomFolioTransferEnabled, onDashboardDataChanged, onUpdateTableStatus }: {
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
-  intent: TableWorkspaceIntent; data: DesktopDashboardData; orders: DesktopTableOrder[];
+  intent: TableWorkspaceIntent; data: DesktopDashboardData;
   ordersEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean;
-  roomFolioTransferEnabled: boolean; onOrderChanged: (order: DesktopTableOrder) => void;
+  roomFolioTransferEnabled: boolean;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }) {
   const navigation = useWorkspaceNavigation();
-  const controller = useTableOrderController(intent.entityId, ordersEnabled, onOrderChanged, onDashboardDataChanged);
+  const [orders, setOrders] = useState<DesktopTableOrder[]>([]);
+  const onOrderChanged = (next: DesktopTableOrder) => setOrders(current => [next, ...current.filter(item => item.id !== next.id)]);
+  const controller = useTableOrderController(intent.entityId, ordersEnabled, onOrderChanged, onDashboardDataChanged, data.revision, intent.orderId);
   const [mode, setMode] = useState<Mode>(intent.mode ?? "order");
+  const historyRead = useRef(0);
+  const [historyError, setHistoryError] = useState("");
   const [flow, setFlow] = useState<Flow>(null);
   const [returnRequested, setReturnRequested] = useState(false);
   const [transferCommitted, setTransferCommitted] = useState(false);
@@ -40,10 +45,24 @@ export function TableWorkspace({ intent, data, orders, ordersEnabled, menuEnable
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useEffect(() => { flowTitle.current?.focus(); }, [flow]);
   useEffect(() => {
+    if (intent.action === "add-item" && menuEnabled && order?.id) {
+      document.querySelector<HTMLInputElement>('dialog[open] input[aria-label="Sipariş için ürün ara"]')?.focus();
+    }
+  }, [intent.action, menuEnabled, order?.id]);
+  useEffect(() => {
     if (intent.action === "room-transfer" && roomFolioTransferEnabled && order?.status === "payment" && order.total > 0) setFlow("room-transfer");
     // An initial action is consumed once for the loaded order, not on every item refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent.action, order?.id, roomFolioTransferEnabled]);
+  useEffect(() => {
+    if (mode !== "history" || !ordersEnabled) return;
+    const request = ++historyRead.current;
+    setHistoryError("");
+    void window.yardimciDesktop!.listTableOrders().then(next => {
+      if (request === historyRead.current) setOrders(next);
+    }).catch(() => { if (request === historyRead.current) setHistoryError("Adisyon geçmişi okunamadı."); });
+    return () => { historyRead.current++; };
+  }, [mode, ordersEnabled, data.revision]);
   function finishFlow() {
     setFlow(null);
     requestAnimationFrame(() => document.querySelector<HTMLElement>('dialog[open] [role="tab"][aria-selected="true"]')?.focus());
@@ -86,6 +105,9 @@ export function TableWorkspace({ intent, data, orders, ordersEnabled, menuEnable
   }
   if (!table) return <WorkspaceFrame title="Masa kullanılamıyor" presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()}
     returnFocusRef={navigation.returnFocusRef}><p>Masa kaydı bulunamadı.</p></WorkspaceFrame>;
+  const cardModel = getTableCardModel(table, data.tableOperations?.find(item => item.tableId === table.id),
+    { ordersEnabled, menuEnabled, reservationsEnabled }, new Date().toLocaleDateString("sv-SE"));
+  const canStart = cardModel.action && "kind" in cardModel.action && cardModel.action.kind === "start";
   const tableStatus = getTableStatusAction(table.status) || table.status;
   const relatedReservations = reservationsEnabled ? data.reservations.filter(item => item.tableIds.includes(table.id)
     && !["rejected", "cancelled", "completed"].includes(item.status)) : [];
@@ -106,7 +128,7 @@ export function TableWorkspace({ intent, data, orders, ordersEnabled, menuEnable
         {order && <strong aria-label="Güncel toplam">{formatMoney(order.total, getOrderCurrency(order))}</strong>}
       </div>}
       actions={<>
-        {ordersEnabled && !order && <ActionButton disabled={disabled || !table.isActive} onClick={() => void controller.startTableOrder()}>Sipariş Başlat</ActionButton>}
+        {ordersEnabled && !order && <ActionButton disabled={disabled || !canStart} onClick={() => void controller.startTableOrder()}>Sipariş Başlat</ActionButton>}
         {order && <ActionButton disabled={disabled} onClick={() => { setMode("account"); setFlow(null); }}>Hesaba Geç</ActionButton>}
         <details className="table-workspace-overflow"><summary>Diğer</summary><div className="form-stack">
           {order && <ActionButton variant="danger" size="sm" disabled={disabled} onClick={() => setFlow("cancel")}>Adisyonu İptal Et</ActionButton>}
@@ -170,7 +192,7 @@ export function TableWorkspace({ intent, data, orders, ordersEnabled, menuEnable
           </div> : <p>Aktif adisyon yok.</p>}
         </WorkspaceTabPanel>}
         {ordersEnabled && <WorkspaceTabPanel value="history">
-          <h3>Kapanan adisyonlar</h3><p>Bu masanın kayıtlı adisyonları gösterilir; tam işlem günlüğü değildir.</p>
+          {historyError && <p role="alert">{historyError}</p>}<h3>Kapanan adisyonlar</h3><p>Bu masanın kayıtlı adisyonları gösterilir; tam işlem günlüğü değildir.</p>
           {orders.filter(item => item.tableId === table.id && ["paid", "cancelled"].includes(item.status)).map(item => <article className="table-history-record" key={item.id}>
             <StatusBadge tone={getOrderBadge(item.status).tone}>{getOrderBadge(item.status).label}</StatusBadge>{" "}
             <span>{new Date(item.closedAt).toLocaleString("tr-TR")} · {formatMoney(item.total, getOrderCurrency(item))}</span>

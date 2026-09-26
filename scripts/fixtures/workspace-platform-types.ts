@@ -5,12 +5,12 @@ import type { WorkspaceDefinition } from "../../apps/desktop-app/src/components/
 
 export function intentContracts(intent: WorkspaceIntent) {
   if (intent.entityType === "room") {
-    const action: "payment" | "assign-reservation" | "create-stay" | undefined = intent.action;
+    const action: "payment" | "assign-reservation" | "create-stay" | "check-in" | "checkout" | "linked-stay" | "room-status" | undefined = intent.action;
     const customer: string | undefined = intent.customerId;
     return { action, customer };
   }
   if (intent.entityType === "table") {
-    const action: "room-transfer" | undefined = intent.action;
+    const action: "room-transfer" | "add-item" | undefined = intent.action;
     // @ts-expect-error Table intent cannot acquire the Room-specific payload.
     const _customer = intent.customerId;
     return { action };

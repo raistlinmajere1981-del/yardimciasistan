@@ -29,14 +29,14 @@ try {
   const tab = name => dialog.getByRole('tab', { name, exact: true });
   const state = () => page.evaluate(() => window.fixtureState());
   const board = page.getByRole('region', { name: 'Restoran operasyonları', exact: true });
-  await expect(board.locator('.operations-board__pane')).toHaveCount(2);
+  await expect(board.locator('.operations-board__pane')).toHaveCount(3);
   await expect(page.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Masalar paneli', exact: true })).toBeVisible();
   expect(await page.locator('.operations-board__pane--center .operations-board__pane-body').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   await page.getByLabel('Masa grubu').selectOption('Bahçe');
   await button('Bahçe 1 masasını aç').focus(); await page.keyboard.press('Enter');
-  await expect(dialog).toHaveClass(/workspace-frame--full-canvas/);
+  await expect(dialog).toHaveClass(/workspace-frame--centered/);
   await expect(dialog.getByRole('heading', { level: 2 })).toBeFocused();
   await expect(dialog.getByRole('tablist', { name: 'Masa çalışma alanı' }).getByRole('tab')).toHaveText(['Sipariş', 'Müşteri', 'Hesap', 'Geçmiş']);
   await expect(button('Sipariş Başlat')).toBeEnabled();

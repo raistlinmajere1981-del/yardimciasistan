@@ -14,6 +14,8 @@ import { RoomAccount, RoomAccountOperation, accountFlowTitle, type AccountOperat
 import { useRoomFolioController } from "./use-room-folio-controller";
 import { minorMoney, formatDateRange } from "./folio-format";
 import { roomConditionLabel, roomToday } from "./room-presentation";
+import { roomIdentity } from "./room-card-model";
+import { setRoomOperationalStatus } from "./room-operations";
 
 type Tab = NonNullable<WorkspaceIntent["mode"]>;
 type StayFlow = { kind: "assignment" | "create-stay" | "linked-stay" | "room-status" }
@@ -33,21 +35,27 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   const [tab, setTab] = useState<Tab>(intent.mode === "account" && !folioEnabled ? "summary" : intent.mode ?? "summary");
   const [flow, setFlow] = useState<Flow>(() => intent.action === "create-stay" && staysEnabled ? { kind: "create-stay" }
     : intent.action === "assign-reservation" && reservationsEnabled ? { kind: "assignment" }
-      : intent.action === "payment" && folioEnabled ? { kind: "payment" } : null);
+      : intent.action === "payment" && folioEnabled ? { kind: "payment" }
+        : (intent.action === "check-in" || intent.action === "checkout") && intent.stayId && staysEnabled ? { kind: intent.action, stayId: intent.stayId }
+          : intent.action === "linked-stay" && staysEnabled && reservationsEnabled ? { kind: "linked-stay" }
+            : intent.action === "room-status" ? { kind: "room-status" } : null);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
-  const [reservationId, setReservationId] = useState("");
-  const [roomStatus, setRoomStatus] = useState("available");
+  const [reservationId, setReservationId] = useState(intent.reservationId ?? "");
+  const [roomStatus, setRoomStatus] = useState(data.rooms.find(room => room.id === intent.entityId)?.status ?? "available");
   const [draft, setDraft] = useState(() => defaultRoomAssignmentForm(intent.customerId ?? "", intent.entityId));
   const begin = useRequestGeneration();
   const mutationRunning = useRef(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const room = data.rooms.find(item => item.id === intent.entityId);
-  const roomStays = data.customerRoomStays.filter(stay => stay.roomId === intent.entityId);
-  const refreshKey = roomStays.map(stay => `${stay.id}:${stay.status}:${stay.updatedAt}`).join("|") + room?.updatedAt;
-  const account = useRoomFolioController(intent.entityId, folioEnabled, refreshKey);
+  const operations = data.roomOperations?.find(item => item.roomId === intent.entityId);
+  const roomStays = [...(operations?.stays ?? []), ...data.customerRoomStays.filter(stay => stay.roomId === intent.entityId && !operations?.stays.some(active => active.id === stay.id))];
+  const reservations = [...(operations?.reservations ?? []), ...data.reservations.filter(item => !operations?.reservations.some(active => active.id === item.id))];
+  const refreshKey = `${data.revision}|${roomStays.map(stay => `${stay.id}:${stay.status}:${stay.updatedAt}`).join("|")}|${room?.updatedAt}`;
+  const currentStay = roomStays.find(stay => stay.status === "checked_in") ?? roomStays.find(stay => stay.status === "planned");
+  const account = useRoomFolioController(intent.entityId, folioEnabled, refreshKey, { folioId: intent.folioId, stayId: intent.stayId ?? currentStay?.id });
   const blocked = useWorkspaceCloseGuard({ busy: busy || account.busy, dirty });
   const tabs: { id: Tab; label: string }[] = [{ id: "summary", label: "Özet" }, { id: "stay", label: "Konaklama" },
     ...(folioEnabled ? [{ id: "account" as const, label: "Hesap" }] : []), { id: "history", label: "Geçmiş" }];
@@ -84,29 +92,31 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   }
   if (!room) return <WorkspaceFrame title="Oda kullanılamıyor" presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()}
     returnFocusRef={navigation.returnFocusRef}><p>Oda kaydı bulunamadı veya bu yetenek kullanılamıyor.</p></WorkspaceFrame>;
-  const state = projectRoomState(room, roomStays, data.reservations, roomToday());
-  const currentStay = roomStays.find(stay => stay.status === "checked_in") ?? roomStays.find(stay => stay.status === "planned");
-  const plannedReservations = data.reservations.filter(item => state.planning.reservationIds.includes(item.id));
+  const state = projectRoomState(room, roomStays, reservations, roomToday());
+  const plannedReservations = reservations.filter(item => state.planning.reservationIds.includes(item.id));
   const selectedStay = roomStays.find(stay => stay.id === account.selected?.stayId);
-  const departed = selectedStay?.status === "checked_out";
+  const departed = (selectedStay?.status ?? operations?.accounts.find(item => item.folioId === account.selected?.id)?.stayStatus) === "checked_out";
   const roomPrice = account.data.rooms.find(item => item.id === room.id);
   const bridge = window.yardimciDesktop!;
-  const eligibleReservations = data.reservations.filter(item => item.reservationType === "room" && item.status === "approved" && item.roomIds.includes(room.id));
+  const eligibleReservations = reservations.filter(item => item.reservationType === "room" && item.status === "approved" && item.roomIds.includes(room.id));
   const task = data.dailyTasks.find(item => item.relatedType === "room" && item.relatedId === room.id && item.status === "pending");
   const stayForFlow = flow && "stayId" in flow ? roomStays.find(stay => stay.id === flow.stayId) : undefined;
   async function submitStayFlow() {
     if (!flow) return;
     if (flow.kind === "assignment") {
-      const reservation = data.reservations.find(item => item.id === reservationId);
+      const reservation = reservations.find(item => item.id === reservationId);
       if (reservation) await mutate(() => assignReservationRoom(reservation, room!.id));
     } else if (flow.kind === "linked-stay") {
       await mutate(() => bridge.createStayFromReservation({ reservationId, roomId: room!.id }));
     } else if (flow.kind === "create-stay") {
       await mutate(() => bridge.assignCustomerRoom({ ...draft, roomId: room!.id, guestCount: Number(draft.guestCount), status: "planned" }));
     } else if (flow.kind === "room-status") {
-      await mutate(() => bridge.updateRoomStatus({ roomId: room!.id, status: roomStatus }));
+      await mutate(() => setRoomOperationalStatus(room!.id, roomStatus));
     } else if (flow.kind === "check-in") {
       const stayId = flow.stayId;
+      if (stayForFlow?.status !== "planned" || state.operationalCondition !== "ready" || !room!.isActive) {
+        setError(true); setMessage("Oda veya konaklama durumu değişti. Giriş bilgilerini kontrol edin."); return;
+      }
       await mutate(() => bridge.checkInStay(stayId), async () => {
         if (!folioEnabled) return "Misafir girişi tamamlandı.";
         const financial = await account.mutate(() => bridge.openRoomFolio(stayId));
@@ -118,7 +128,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       await mutate(() => bridge.checkoutStay(stayId), async () => {
         if (!folioEnabled) return "Misafir çıkışı tamamlandı. Odanın fiziksel durumunu kontrol edip temizlik tamamlandığında Hazır olarak işaretleyin.";
         try {
-          const snapshot = await bridge.getRoomFolioData();
+          const snapshot = await bridge.getRoomFolioData(intent.entityId);
           account.applySnapshot(snapshot);
           const debt = snapshot.folios.find(item => item.stayId === stayId)?.remainingMinor ?? 0;
           return debt > 0 ? `Çıkış tamamlandı · ${minorMoney(debt)} açık hesap. Odanın temizlik durumunu kontrol edin.`
@@ -133,7 +143,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
     }
   }
   return <WorkspaceTabs value={tab}>
-    <WorkspaceFrame title={room.number ? `Oda ${room.number} · ${room.name}` : room.name}
+    <WorkspaceFrame title={roomIdentity(room)}
       context={<div className="room-workspace-context">
         <span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
         <span>Doluluk: {state.occupancy.status === "occupied" ? "Misafir içeride" : "Boş"}</span>
@@ -145,7 +155,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           : staysEnabled && currentStay?.status === "checked_in" ? <ActionButton disabled={busy || account.busy} onClick={() => start({ kind: "checkout", stayId: currentStay.id })}>Misafir Çıkışı</ActionButton>
             : staysEnabled && currentStay?.status === "planned" ? <ActionButton disabled={busy || account.busy} onClick={() => start({ kind: "check-in", stayId: currentStay.id })}>Giriş Yap</ActionButton> : null}
       </>}
-      presentation={navigation.current!.presentation} onPresentationChange={navigation.updateWorkspacePresentation}
+      presentation={navigation.current!.presentation}
       onClose={() => navigation.closeWorkspace()} closeBlocked={blocked} returnFocusRef={navigation.returnFocusRef}
       navigation={<WorkspaceTabList tabs={tabs} label="Oda çalışma alanı" onChange={value => {
         if (flow || busy || account.busy) { setMessage("Önce açık işlemi tamamlayın veya Vazgeç ile geri dönün."); return; }
@@ -163,7 +173,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           : <p>{account.loading ? "Hesap hazırlanıyor…" : "Bu oda için açık hesap bulunamadı."}</p>
           : <form className="form-stack" onSubmit={event => { event.preventDefault(); void submitStayFlow(); }}>
             <fieldset className="form-stack" disabled={busy || account.busy}>
-              {flow.kind === "assignment" && <ReservationRoomAssignment reservations={data.reservations} rooms={data.rooms} fixed="room"
+              {flow.kind === "assignment" && <ReservationRoomAssignment reservations={reservations} rooms={data.rooms} fixed="room"
                 reservationId={reservationId} roomId={room.id} onChange={value => setReservationId(value)} />}
               {flow.kind === "linked-stay" && <><p>Onaylı rezervasyondaki müşteri, tarihler ve rezervasyon bağlantısı korunur. Oda ataması değişmez.</p>
                 <label className="form-field form-field--long">Rezervasyon<select aria-label="Rezervasyon" required value={reservationId} onChange={event => setReservationId(event.target.value)}><option value="">Rezervasyon seçin</option>

@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { getHospitalityOperations } from "./database/hospitality-operations-store.js";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -251,6 +252,9 @@ function replaceStoredBusinessCapabilities(
   }
 }
 
+// Main and short-lived service facades publish into the same renderer stream.
+let dashboardRevision = 0;
+
 export class DesktopDatabase {
   private readonly db: DatabaseSync;
   readonly databasePath: string;
@@ -342,15 +346,19 @@ export class DesktopDatabase {
     const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
     const requests = getRequests(this.db);
     const preparedWhatsAppMessages = getStoredPreparedWhatsAppMessages(this.db, requests);
+    const rooms = getStoredRooms(this.db, getStoredActiveResourceReservationTitles(this.db, "room"));
+    const tables = getStoredTables(this.db, getStoredActiveResourceReservationTitles(this.db, "table"));
 
     return {
+      revision: ++dashboardRevision,
+      ...getHospitalityOperations(this.db, rooms, tables, enabledCapabilities),
       databasePath: this.databasePath,
       backupPath: this.backupPath,
       webModuleUrl: settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
       requests,
       preparedWhatsAppMessages,
-      rooms: getStoredRooms(this.db, getStoredActiveResourceReservationTitles(this.db, "room")),
-      tables: getStoredTables(this.db, getStoredActiveResourceReservationTitles(this.db, "table")),
+      rooms,
+      tables,
       reservations: getStoredReservations(this.db),
       dailyTasks: getStoredDailyTasks(this.db),
       customers: getStoredCustomers(this.db),

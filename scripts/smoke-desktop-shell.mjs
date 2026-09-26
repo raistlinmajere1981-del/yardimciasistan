@@ -126,7 +126,7 @@ try {
         await expect(dialog).toHaveCount(0);
       }
       if (name === 'Restoran') {
-        const card = page.locator('.restaurant-table-card').filter({ hasText: 'Bahçe Masası 1' });
+        const card = page.locator('.resource-card').filter({ hasText: 'Bahçe Masası 1' });
         await card.getByRole('button', { name: /masasını aç/ }).click();
         const dialog = page.getByRole('dialog', { name: 'Bahçe Masası 1' });
         await checkOverlay(dialog, 'table-workspace');

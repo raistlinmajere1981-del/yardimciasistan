@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { DesktopCustomerRoomStay } from "../database-types.js";
 
-export function getCustomerRoomStays(db: DatabaseSync): DesktopCustomerRoomStay[] {
+export function getCustomerRoomStays(db: DatabaseSync, scope: "recent" | "active" = "recent"): DesktopCustomerRoomStay[] {
   const rows = db
     .prepare(`
         SELECT
@@ -27,6 +27,7 @@ export function getCustomerRoomStays(db: DatabaseSync): DesktopCustomerRoomStay[
         JOIN customers ON customers.id = customer_room_stays.customer_id
         JOIN rooms ON rooms.id = customer_room_stays.room_id
         WHERE customer_room_stays.deleted_at = ''
+        ${scope === "active" ? "AND customer_room_stays.status IN ('planned', 'checked_in')" : ""}
         ORDER BY
           CASE customer_room_stays.status
             WHEN 'checked_in' THEN 0
@@ -36,7 +37,7 @@ export function getCustomerRoomStays(db: DatabaseSync): DesktopCustomerRoomStay[
           END,
           customer_room_stays.check_in_date DESC,
           customer_room_stays.created_at DESC
-        LIMIT 500
+        ${scope === "recent" ? "LIMIT 500" : ""}
       `)
     .all() as Array<Record<string, unknown>>;
 

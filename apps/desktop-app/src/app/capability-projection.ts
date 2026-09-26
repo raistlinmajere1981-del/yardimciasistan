@@ -129,6 +129,17 @@ export function projectDesktopDashboardData(
     ...source,
     rooms,
     tables,
+    roomOperations: enabled.has(C.ACCOMMODATION_ROOMS) ? source.roomOperations?.map(item => ({
+      ...item,
+      stays: enabled.has(C.ACCOMMODATION_STAYS) ? item.stays : [],
+      reservations: accommodationReservationsEnabled ? item.reservations : [],
+      accounts: enabled.has(C.ACCOMMODATION_FOLIO) ? item.accounts : []
+    })) ?? null : [],
+    tableOperations: enabled.has(C.FOOD_TABLES) ? source.tableOperations?.map(item => ({
+      ...item,
+      order: foodOrdersEnabled ? item.order : null,
+      reservations: foodReservationsEnabled ? item.reservations : []
+    })) ?? null : [],
     requests,
     preparedWhatsAppMessages,
     reservations,

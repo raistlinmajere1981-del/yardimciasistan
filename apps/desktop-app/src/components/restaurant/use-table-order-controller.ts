@@ -1,10 +1,11 @@
+import { startTableOrder, setTableOrderStatus } from "./table-order-operations";
 import { useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData, DesktopTableOrder, DesktopTableOrderResult } from "../../../electron/database";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
 /** Entity lifetime only. The page owns the order projection; SQLite owns persisted orders. */
 export function useTableOrderController(tableId: string, enabled: boolean,
-  onOrder: (order: DesktopTableOrder) => void, onDashboard: (data: DesktopDashboardData) => void) {
+  onOrder: (order: DesktopTableOrder) => void, onDashboard: (data: DesktopDashboardData) => void, revision: number, expectedOrderId?: string) {
   const [order, setOrder] = useState<DesktopTableOrder | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -42,7 +43,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
     return true;
   }
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || running.current || notePromise.current) return;
     const current = beginRead();
     setLoading(true); setLoaded(false);
     void (async () => {
@@ -51,6 +52,9 @@ export function useTableOrderController(tableId: string, enabled: boolean,
         if (!bridge) throw new Error("bridge unavailable");
         const next = await bridge.getActiveTableOrder(tableId);
         if (!current()) return;
+        if (expectedOrderId && next?.id !== expectedOrderId) {
+          feedback("Seçilen adisyon artık açık değil veya değişti. Masayı yeniden açın.", true); return;
+        }
         if (next && !apply(next)) throw new Error("table mismatch");
         if (!next) { orderRef.current = null; setOrder(null); }
         setLoaded(true);
@@ -61,7 +65,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
     return () => { beginRead(); };
     // Identity is keyed by WorkspaceHost; callbacks are kept fresh without restarting reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, enabled, beginRead]);
+  }, [tableId, enabled, beginRead, revision, expectedOrderId, busy]);
 
   function editNote(id: string, text: string) {
     drafts.current = { ...drafts.current, [id]: text };
@@ -123,11 +127,11 @@ export function useTableOrderController(tableId: string, enabled: boolean,
   };
   const active = order && ["open", "preparing", "served", "payment"].includes(order.status) ? order : null;
   return { order, active, notes, dirty, busy, loading, loaded, message, error, editNote, flushNotes, run, feedback,
-    startTableOrder: () => mutate(() => bridge().openTableOrder(tableId)),
+    startTableOrder: () => mutate(() => startTableOrder(tableId)),
     addItem: (id: string) => mutate(() => bridge().addTableOrderItem(orderRef.current!.id, id, 1, "")),
     quantity: (id: string, value: number) => mutate(() => bridge().updateTableOrderItemQuantity(id, value)),
     removeItem: (id: string) => mutate(() => bridge().removeTableOrderItem(id)),
-    status: (status: "preparing" | "served" | "payment") => mutate(() => bridge().updateTableOrderStatus(orderRef.current!.id, status)),
+    status: (status: "preparing" | "served" | "payment") => mutate(() => setTableOrderStatus(orderRef.current!.id, status)),
     closeTableOrder: (status: "paid" | "cancelled") => mutate(() => bridge().closeTableOrder(orderRef.current!.id, status))
   };
 }

@@ -255,9 +255,9 @@ try {
     await closeDialog();
     await capture('rooms');
     const unavailableRoom = page.getByRole('button', { name: 'Ek Oda 3 odasını aç', exact: true });
-    await expect(unavailableRoom).toContainText('Hizmet dışı');
+    await expect(page.getByRole('article').filter({ has: unavailableRoom })).toContainText('Hizmet dışı');
     await expect(page.getByLabel('Oda yönetimi', { exact: true }).getByRole('combobox')).toHaveCount(0);
-    await page.getByLabel('Oda yönetimi', { exact: true }).getByRole('button').first().click();
+    await page.getByLabel('Oda yönetimi', { exact: true }).getByRole('button', { name: /odasını aç$/ }).first().click();
     await capture('room-workspace');
     await page.getByRole('dialog').getByRole('tab', { name: 'Hesap', exact: true }).click();
     await capture('folio-account');

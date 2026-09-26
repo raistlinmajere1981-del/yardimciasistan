@@ -11,15 +11,15 @@
 }
 
 .operations-board--three {
-  grid-template-columns: minmax(230px, 0.8fr) minmax(420px, 1.7fr) minmax(230px, 0.8fr);
+  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 2fr) minmax(210px, 0.72fr);
 }
 
 .operations-board--left-center {
-  grid-template-columns: minmax(250px, 0.8fr) minmax(460px, 1.7fr);
+  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 2fr);
 }
 
 .operations-board--center-right {
-  grid-template-columns: minmax(460px, 1.7fr) minmax(250px, 0.8fr);
+  grid-template-columns: minmax(0, 2fr) minmax(210px, 0.72fr);
 }
 
 .operations-board--center {
@@ -142,11 +142,6 @@
   justify-content: flex-start;
 }
 
-.operations-board__pane--center .room-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-sm)), 1fr));
-  align-content: start;
-}
-
 .operations-board__pane--center .restaurant-table-area-list {
   align-content: start;
 }
@@ -165,13 +160,13 @@
 
 @media (max-width: 1100px) {
   .operations-board--three {
-    grid-template-columns: minmax(170px, 0.8fr) minmax(280px, 1.5fr) minmax(170px, 0.8fr);
+    grid-template-columns: minmax(160px, 0.7fr) minmax(0, 1.6fr) minmax(160px, 0.7fr);
     gap: var(--space-2);
   }
 
   .operations-board--left-center,
   .operations-board--center-right {
-    grid-template-columns: minmax(200px, 0.8fr) minmax(320px, 1.7fr);
+    grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.6fr);
     gap: var(--space-2);
   }
 
@@ -181,7 +176,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .feature-workspace-page__body:has(.operations-board) {
     overflow: auto;
   }

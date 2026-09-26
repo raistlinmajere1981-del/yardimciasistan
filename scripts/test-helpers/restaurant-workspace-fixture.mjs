@@ -15,6 +15,20 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
   const capabilities = { ordersEnabled: variant !== 'tables-only', menuEnabled: variant !== 'no-menu',
     reservationsEnabled: variant !== 'no-reservations', customersEnabled: variant !== 'no-customers',
     roomFolioTransferEnabled: !['no-transfer', 'tables-only'].includes(variant) };
+  const snapshot = () => {
+    dashboard.revision = (dashboard.revision ?? 0) + 1;
+    dashboard.tableOperations = dashboard.tables.map(table => ({ tableId: table.id,
+      order: capabilities.ordersEnabled ? orders.filter(item => item.tableId === table.id && !['paid', 'cancelled'].includes(item.status)).map(item => ({
+        id: item.id, status: item.status, itemCount: item.itemCount, total: item.total, openedAt: item.openedAt, updatedAt: item.updatedAt, currency: 'TRY'
+      }))[0] ?? null : null,
+      reservations: capabilities.reservationsEnabled ? dashboard.reservations.filter(item => item.tableIds.includes(table.id) && ['pending', 'approved'].includes(item.status)) : []
+    }));
+    window.fixtureDashboard = copy(dashboard);
+    return copy(dashboard);
+  };
+  snapshot();
+  window.fixturePatch = patch => { Object.assign(dashboard, copy(patch)); window.fixturePublishDashboard?.(snapshot()); };
+  window.fixtureSetOrders = next => { orders = copy(next); window.fixturePublishDashboard?.(snapshot()); };
   window.fixtureCapabilities = capabilities; window.fixtureDashboard = dashboard; window.fixtureCalls = calls;
   window.fixtureState = () => copy({ orders, dashboard, finance, transfers });
   const wait = kind => window[`fixtureDelay${kind}`] ? new Promise(resolve => { window[`fixtureResolve${kind}`] = resolve; }) : Promise.resolve();
@@ -27,10 +41,10 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     order.updatedAt = new Date().toISOString();
     const resource = dashboard.tables.find(table => table.id === order.tableId);
     resource.status = ['paid', 'cancelled'].includes(order.status) ? 'available' : order.status === 'payment' ? 'bill_waiting' : 'occupied';
-    return copy({ ok: true, message: 'İşlem kaydedildi.', order, dashboardData: dashboard });
+    return copy({ ok: true, message: 'İşlem kaydedildi.', order, dashboardData: snapshot() });
   };
   window.yardimciDesktop = {
-    getDashboardData: async () => copy(dashboard),
+    getDashboardData: async () => snapshot(),
     listTableOrders: async () => { calls.push({ kind: 'list' }); return copy(orders); },
     getActiveTableOrder: async id => {
       calls.push({ kind: 'inspect', id });
@@ -40,7 +54,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
       return snapshot;
     },
     openTableOrder: async id => {
-      calls.push({ kind: 'start', id });
+      calls.push({ kind: 'start', id }); await wait('Start'); if (window.fixtureFailStart) return { ok: false, message: 'Adisyon açılamadı.' };
       let order = orders.find(order => order.tableId === id && !['paid', 'cancelled'].includes(order.status));
       if (!order) { order = { id: `order-${orders.length}`, tableId: id, tableName: dashboard.tables.find(table => table.id === id).name,
         status: 'open', openedAt: now, closedAt: '', subtotal: 0, discountTotal: 0, total: 0, note: '', items: [], itemCount: 0, createdAt: now, updatedAt: now }; orders.unshift(order); }
@@ -76,7 +90,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
       order.status = status; order.closedAt = new Date().toISOString(); if (status === 'paid') finance++;
       return result(order);
     },
-    updateTableStatus: async ({ tableId, status }) => { calls.push({ kind: 'table-status' }); dashboard.tables.find(table => table.id === tableId).status = status; return copy({ ok: true, message: 'Masa durumu güncellendi.', dashboardData: dashboard }); },
+    updateTableStatus: async ({ tableId, status }) => { calls.push({ kind: 'table-status' }); dashboard.tables.find(table => table.id === tableId).status = status; return copy({ ok: true, message: 'Masa durumu güncellendi.', dashboardData: snapshot() }); },
     getRoomFolioData: async () => { calls.push({ kind: 'folios' }); await wait('Folio'); return { folios: [{ id: 'folio-a', status: 'open', roomNumber: '101', customerName: 'Pilot Misafir' }] }; },
     addRoomFolioManualItem: async input => {
       calls.push({ kind: 'transfer', input }); await wait('Transfer');
@@ -86,7 +100,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     },
     saveCustomer: async input => {
       const customer = { ...dashboard.customers[0], ...input, id: 'customer-new' }; dashboard.customers.push(customer);
-      return copy({ ok: true, message: 'Müşteri kaydedildi.', savedId: customer.id, dashboardData: dashboard });
+      return copy({ ok: true, message: 'Müşteri kaydedildi.', savedId: customer.id, dashboardData: snapshot() });
     },
     saveManualRestaurantReservation: async input => {
       calls.push({ kind: 'reservation', input });
@@ -94,7 +108,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
         customerName: dashboard.customers.find(customer => customer.id === input.customerId).fullName,
         title: 'Pilot rezervasyon', status: 'approved', startDate: input.date, endDate: input.date, time: input.time,
         guestCount: input.guestCount, notes: input.notes, tableIds: input.tableId ? [input.tableId] : [], roomIds: [] });
-      return copy({ ok: true, message: 'Rezervasyon kaydedildi.', dashboardData: dashboard });
+      return copy({ ok: true, message: 'Rezervasyon kaydedildi.', dashboardData: snapshot() });
     }
   };
 }

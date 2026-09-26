@@ -8,6 +8,6 @@ export const tableWorkspaceDefinition: WorkspaceDefinition<
   Omit<ComponentProps<typeof TableWorkspace>, "intent">
 > = {
   entityType: "table",
-  defaultPresentation: "full-canvas",
+  defaultPresentation: "centered",
   render: (intent, context) => <TableWorkspace {...context} intent={intent} />
 };

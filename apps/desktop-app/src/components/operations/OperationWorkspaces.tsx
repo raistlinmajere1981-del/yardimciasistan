@@ -19,17 +19,12 @@ import type {
   SaveManualReservationInput
 } from "../../../electron/database";
 import {
-  formatStayDateRange
-} from "../../app/customer-model";
-import {
   formatDateForDisplay,
   formatReservationDate,
   formatReservationStatus
 } from "../../app/record-formatters";
-import { projectRoomState } from "@yardimci-asistan/shared";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { usePensionPage } from "../pension/pension-page-state";
-import { roomConditionLabel, roomToday } from "../pension/room-presentation";
 import { ReservationAssignmentDialog } from "../pension/ReservationRoomAssignment";
 import { DailyTaskEditor, type DailyTaskScope } from "./DailyTaskEditor";
 import { ManualReservationEditor } from "./ManualReservationEditor";
@@ -68,13 +63,6 @@ function formatTaskRelation(task: DesktopDashboardData["dailyTasks"][number]) {
     request: "İlgili talep"
   };
   return labels[task.relatedType] ?? "İlgili kayıt";
-}
-
-function getResourceStatusTone(value: string): StatusTone {
-  if (value === "available") return "ok";
-  if (["reserved", "cleaning", "bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) return "wait";
-  if (["maintenance", "out_of_service"].includes(value)) return "danger";
-  return "info";
 }
 
 function matchesReservationDate(reservation: DesktopDashboardData["reservations"][number], date: string) {
@@ -444,38 +432,4 @@ export function ReservationsWorkspace({
       />
     </section>
   );
-}
-
-interface RoomsWorkspaceProps {
-  rooms: DesktopDashboardData["rooms"];
-  reservations: DesktopDashboardData["reservations"];
-  stays: DesktopDashboardData["customerRoomStays"];
-  reservationsEnabled: boolean;
-  staysEnabled: boolean;
-}
-
-export function RoomsWorkspace({ rooms, reservations, stays, reservationsEnabled, staysEnabled }: RoomsWorkspaceProps) {
-  const navigation = useWorkspaceNavigation();
-  return <section className="room-grid" aria-label="Oda yönetimi">
-    {rooms.length === 0 && <p>Oda kaydı yok. Odaları Ayarlar bölümünden ekleyebilirsiniz.</p>}
-    {rooms.map(room => {
-      const state = projectRoomState(room, stays, reservations, roomToday());
-      const activeStay = stays.find(stay => state.occupancy.stayIds.includes(stay.id))
-        ?? stays.find(stay => state.planning.plannedStayIds.includes(stay.id));
-      return <button type="button" className="card room-card" key={room.id} data-status={state.operationalCondition}
-        aria-label={`${room.name} odasını aç`}
-        onClick={() => navigation.openWorkspace({
-          entityType: "room",
-          entityId: room.id,
-          returnContext: { page: "pension", view: "rooms", entityId: room.id }
-        })}>
-        <strong>{room.number ? `Oda ${room.number} · ${room.name}` : room.name}</strong>
-        <span>{roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
-        <span>{state.occupancy.status === "occupied" ? "Misafir içeride" : "Oda boş"}</span>
-        {staysEnabled && activeStay && <span>{activeStay.customerName} · {formatStayDateRange(activeStay)}</span>}
-        {reservationsEnabled && <span>{state.planning.reservationIds.length} rezervasyon · {state.planning.plannedStayIds.length} planlı konaklama</span>}
-        <small>{room.capacity} kişi · {room.floor || "Kat belirtilmedi"}</small>
-      </button>;
-    })}
-  </section>;
 }
