@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   BUSINESS_CAPABILITIES,
   BUSINESS_PUBLIC_PROFILE_LIMITS,
+  BUSINESS_SOCIAL_PLATFORM_CATALOG,
   getBusinessPublicFeatureCatalogForCapabilities,
   hasBusinessCapability,
+  normalizeBusinessSocialLinkUrl,
   type BusinessCapability,
   type BusinessPublicFeatureId,
   type BusinessPublicProfile,
+  type BusinessSocialLink,
+  type BusinessSocialPlatformId,
   type SaveBusinessPublicProfileInput
 } from "@yardimci-asistan/shared";
 import type { BusinessLocationGeocodeCandidate } from "../../../electron/business-location-geocode";
 import type { SettingsOperationResult } from "../../app/settings-save";
 import { BusinessLocationMapPicker } from "./BusinessLocationMapPicker";
 import { TimePicker } from "../ui/DateTimePicker";
+import { ActionButton } from "../ui/ActionButton";
 
 interface BusinessPublicProfileDraft {
   description: string;
@@ -27,6 +33,7 @@ interface BusinessPublicProfileDraft {
   policyNote: string;
   paymentNote: string;
   languages: string;
+  socialLinks: BusinessSocialLink[];
 }
 
 interface BusinessPublicProfileSectionProps {
@@ -49,7 +56,8 @@ const EMPTY_DRAFT: BusinessPublicProfileDraft = {
   features: [],
   policyNote: "",
   paymentNote: "",
-  languages: ""
+  languages: "",
+  socialLinks: []
 };
 
 export function useBusinessPublicProfileSettings({ businessAddress, enabledCapabilities, enabled }: BusinessPublicProfileSectionProps) {
@@ -156,6 +164,29 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     );
   };
 
+  const addSocialLink = () => {
+    const used = new Set(draft.socialLinks.map((link) => link.platform));
+    const nextPlatform = BUSINESS_SOCIAL_PLATFORM_CATALOG.find((platform) => !used.has(platform.id));
+    if (!nextPlatform) return;
+    update("socialLinks", [...draft.socialLinks, { platform: nextPlatform.id, url: "" }]);
+  };
+
+  const setSocialLinkPlatform = (index: number, platform: BusinessSocialPlatformId) => {
+    update("socialLinks", draft.socialLinks.map((link, currentIndex) =>
+      currentIndex === index ? { platform, url: "" } : link
+    ));
+  };
+
+  const setSocialLinkUrl = (index: number, url: string) => {
+    update("socialLinks", draft.socialLinks.map((link, currentIndex) =>
+      currentIndex === index ? { ...link, url } : link
+    ));
+  };
+
+  const removeSocialLink = (index: number) => {
+    update("socialLinks", draft.socialLinks.filter((_, currentIndex) => currentIndex !== index));
+  };
+
   const lookupBusinessAddress = async () => {
     const bridge = window.yardimciDesktop;
     if (!bridge?.geocodeBusinessAddress) {
@@ -203,6 +234,21 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     const coordinates = parseCoordinates(draft.latitude, draft.longitude);
     if (!coordinates.ok) return coordinates;
 
+    const socialLinks: BusinessSocialLink[] = [];
+    for (const link of draft.socialLinks) {
+      const rawUrl = link.url.trim();
+      if (!rawUrl) continue;
+      const normalizedUrl = normalizeBusinessSocialLinkUrl(link.platform, rawUrl);
+      if (!normalizedUrl) {
+        const platform = BUSINESS_SOCIAL_PLATFORM_CATALOG.find((item) => item.id === link.platform);
+        return {
+          ok: false,
+          message: `${platform?.label ?? "Sosyal medya"} bağlantısı geçerli bir profil adresi olmalı.`
+        };
+      }
+      socialLinks.push({ platform: link.platform, url: normalizedUrl });
+    }
+
     return {
       ok: true,
       input: {
@@ -217,7 +263,8 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
         features: draft.features,
         policyNote: draft.policyNote,
         paymentNote: draft.paymentNote,
-        languages: splitLanguages(draft.languages)
+        languages: splitLanguages(draft.languages),
+        socialLinks
       }
     };
   }, [draft]);
@@ -287,7 +334,7 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     setCoordinateError("");
     setFeedback({ error: false, message: "Müşteriye açık bilgiler geri alındı." });
   }
-  return { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, save, feedback, dirty, discard };
+  return { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, addSocialLink, setSocialLinkPlatform, setSocialLinkUrl, removeSocialLink, lookupBusinessAddress, selectAddressCandidate, save, feedback, dirty, discard };
 }
 
 export function BusinessPublicProfileSection({
@@ -496,6 +543,114 @@ export function BusinessPublicProfileSection({
   );
 }
 
+export function BusinessSocialLinksSection({
+  controller,
+  disabled = false
+}: {
+  controller: ReturnType<typeof useBusinessPublicProfileSettings>;
+  disabled?: boolean;
+}) {
+  const {
+    draft,
+    loading,
+    saving,
+    addSocialLink,
+    setSocialLinkPlatform,
+    setSocialLinkUrl,
+    removeSocialLink
+  } = controller;
+  const usedPlatforms = new Set(draft.socialLinks.map((link) => link.platform));
+  const canAdd = draft.socialLinks.length < BUSINESS_PUBLIC_PROFILE_LIMITS.socialLinks;
+
+  return (
+    <section id="settings-social-links" tabIndex={-1} className="settings-panel business-social-links-section" aria-busy={loading || saving}>
+      <div className="settings-panel-header">
+        <div>
+          <h2>Sosyal Medya</h2>
+          <p>Web sitesinin üst ve alt alanında gösterilecek profil bağlantıları.</p>
+        </div>
+        <ActionButton
+          variant="secondary"
+          size="sm"
+          type="button"
+          disabled={loading || saving || disabled || !canAdd}
+          onClick={addSocialLink}
+        >
+          <Plus size={15} aria-hidden="true" />
+          Bağlantı ekle
+        </ActionButton>
+      </div>
+
+      <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving || disabled}>
+        {draft.socialLinks.length === 0 ? (
+          <div className="business-social-links-empty">
+            Henüz sosyal medya bağlantısı eklenmedi.
+          </div>
+        ) : (
+          <div className="business-social-links-list">
+            {draft.socialLinks.map((link, index) => {
+              const definition = BUSINESS_SOCIAL_PLATFORM_CATALOG.find((item) => item.id === link.platform);
+              return (
+                <div className="business-social-link-row" key={`${link.platform}-${index}`}>
+                  <label className="form-field business-social-link-platform">
+                    Platform
+                    <select
+                      value={link.platform}
+                      onChange={(event) => setSocialLinkPlatform(index, event.target.value as BusinessSocialPlatformId)}
+                    >
+                      {BUSINESS_SOCIAL_PLATFORM_CATALOG.map((platform) => (
+                        <option
+                          key={platform.id}
+                          value={platform.id}
+                          disabled={platform.id !== link.platform && usedPlatforms.has(platform.id)}
+                        >
+                          {platform.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="form-field business-social-link-url">
+                    Profil bağlantısı
+                    <input
+                      type="url"
+                      value={link.url}
+                      maxLength={BUSINESS_PUBLIC_PROFILE_LIMITS.socialUrl}
+                      onChange={(event) => setSocialLinkUrl(index, event.target.value)}
+                      placeholder={socialLinkPlaceholder(link.platform)}
+                      aria-label={`${definition?.label ?? "Sosyal medya"} profil bağlantısı`}
+                    />
+                  </label>
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    className="business-social-link-remove"
+                    onClick={() => removeSocialLink(index)}
+                    aria-label={`${definition?.label ?? "Sosyal medya"} bağlantısını kaldır`}
+                    title="Bağlantıyı kaldır"
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                  </ActionButton>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </fieldset>
+    </section>
+  );
+}
+
+function socialLinkPlaceholder(platform: BusinessSocialPlatformId): string {
+  return {
+    facebook: "https://facebook.com/isletme",
+    instagram: "https://instagram.com/isletme",
+    youtube: "https://youtube.com/@isletme",
+    tiktok: "https://tiktok.com/@isletme",
+    x: "https://x.com/isletme"
+  }[platform];
+}
+
 function toDraft(profile: BusinessPublicProfile): BusinessPublicProfileDraft {
   return {
     description: profile.description,
@@ -509,7 +664,8 @@ function toDraft(profile: BusinessPublicProfile): BusinessPublicProfileDraft {
     features: [...profile.features],
     policyNote: profile.policyNote,
     paymentNote: profile.paymentNote,
-    languages: profile.languages.join(", ")
+    languages: profile.languages.join(", "),
+    socialLinks: profile.socialLinks.map((link) => ({ ...link }))
   };
 }
 

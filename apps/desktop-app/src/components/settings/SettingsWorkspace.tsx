@@ -24,6 +24,7 @@ import { ServicesSettingsSection, type ServicesSettingsProps } from "./ServicesS
 import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
 import {
   BusinessPublicProfileSection,
+  BusinessSocialLinksSection,
   useBusinessPublicProfileSettings
 } from "./BusinessPublicProfileSection";
 import { RoomManagementSection } from "./RoomManagementSection";
@@ -342,10 +343,16 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 runtimeSnapshot={runtimeCapabilities}
               />
               {initialized && (
-                <BusinessPublicProfileSection
-                  controller={profile}
-                  disabled={drafts.busy || guardBusy}
-                />
+                <>
+                  <BusinessPublicProfileSection
+                    controller={profile}
+                    disabled={drafts.busy || guardBusy}
+                  />
+                  <BusinessSocialLinksSection
+                    controller={profile}
+                    disabled={drafts.busy || guardBusy}
+                  />
+                </>
               )}
             </>
           )}
