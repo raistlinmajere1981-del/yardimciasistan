@@ -182,14 +182,14 @@ Goal: prove the application grammar on the most cross-cutting existing feature.
 
 ## Page anatomy
 
+Current post-pilot presentation uses one bounded operations board:
+
 ```text
 Pansiyon
-  local toolbar
-  [Odalar] [Rezervasyonlar] [Günlük İşler]
-  one active viewport workspace body
+  Rezervasyonlar | Odalar | Günlük İşler
 ```
 
-Remove the current vertical composition of unrelated large operation panels.
+Rooms remain the primary center resource surface. Reservation and daily-work regions are compact side panes. All visible panes fill the available feature viewport and own their own scroll, so the page does not grow vertically with record count. Entity work still escalates into the canonical Room Workspace rather than becoming a second editor inside the board.
 
 ## Rooms mode
 
@@ -236,8 +236,8 @@ Preserve useful logic from Reservation list/filter, Daily Task list/filter, Room
 
 ## Exit criteria
 
-- Pension page itself does not grow vertically with all operation areas
-- active workspace body owns scroll
+- Pension page itself does not grow vertically with operation records
+- reservation, room and daily-work panes have deliberate independent scroll ownership
 - same Room Workspace opens from Room and relevant Customer context
 - same Reservation assignment operation opens from Reservation and Room context
 - Reservation assignment does not accidentally create Stay
@@ -256,14 +256,18 @@ Goal: validate the same architecture under a high-frequency POS workflow.
 
 ## Target
 
+Current post-pilot page presentation keeps the high-frequency floor centered inside the shared hospitality operations board:
+
 ```text
-Floor
-  → Table Workspace
-      → Order
-      → Payment/Close
-      → Transfer
-  → Floor
+Rezervasyonlar | Floor / Masalar | Günlük İşler
+                        ↓
+                 Table Workspace
+                   → Order
+                   → Payment/Close
+                   → Transfer
 ```
+
+The side panes are compact operational queues with independent scroll; Table Workspace remains the canonical table/order surface.
 
 Default Table Workspace is main-surface/full-canvas rather than centered modal.
 
