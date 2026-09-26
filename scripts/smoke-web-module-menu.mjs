@@ -562,7 +562,7 @@ try {
       room_id: "room_101",
       media_id: "room_media_smoke_cover",
       kind: "cover",
-      content_hash: "f202ea0b1206e6881862ac651c2093aebf69f68606de92d9fdc45ceef9068c34",
+      content_hash: "41c651b0bf0bf4f02c4cdd09779fb742cf34494ec72e07e7f3e0682a5676480a",
       file: {
         name: "cover.png",
         mimeType: "image/png",
