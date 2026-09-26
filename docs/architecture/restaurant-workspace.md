@@ -41,3 +41,16 @@ Customer mode shows existing table/reservation relationships. Creating a new dir
 TableOrder/customer association and table-to-table transfer require future domain
 operations and are intentionally absent. Reservation customer/table selection remains
 in the canonical bounded reservation form, with QuickCustomerCreator reuse.
+
+
+## Current Restaurant operations board
+
+`RestaurantPage` now uses the same `OperationsBoardLayout` geometry proven by Pension while keeping restaurant domain behavior local:
+
+- left: restaurant reservations when enabled,
+- center: floor/tables with group and status filters,
+- right: restaurant daily work when enabled.
+
+The old `Masalar / Rezervasyonlar / Günlük İşler` page selector is removed. All three operational regions stay visible and scroll independently inside the bounded page viewport. Table Workspace remains the canonical table/order surface and still opens from the center floor without silently creating a second table/order editor.
+
+Reservation and daily-work panels expose their applicable actions directly; hidden `Diğer işlemler` disclosure is not part of the board interaction model.
