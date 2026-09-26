@@ -148,9 +148,9 @@ export async function publishGoogleReviewsSettings(
           enabled: stored.enabled,
           place_id: stored.placeId,
           api_key: apiKey
-        },
-        signal: controller.signal
-      })
+        }
+      }),
+      signal: controller.signal
     });
     const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string; published_at?: string } | null;
     if (!response.ok || payload?.ok !== true) {
@@ -271,9 +271,9 @@ async function testGoogleReviewsViaWebModule(
         google_reviews: {
           place_id: placeId,
           api_key: apiKey
-        },
-        signal: controller.signal
-      })
+        }
+      }),
+      signal: controller.signal
     });
     const payload = await response.json().catch(() => null) as {
       ok?: boolean;
