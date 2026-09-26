@@ -230,6 +230,7 @@ function assertCurrentDatabase(database, options = {}) {
     "google_place_id",
     "google_places_api_key_encrypted",
     "google_reviews_last_published_at",
+    "google_reviews_publish_pending",
     "product_data_enabled",
     "product_data_provider",
     "product_data_auto_search",
