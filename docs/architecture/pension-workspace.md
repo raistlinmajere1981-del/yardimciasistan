@@ -2,13 +2,19 @@
 
 Stage 4 production consumer of the workspace platform for Pension/Rooms. Constitution and domain decisions remain authoritative; this file records only the implemented ownership and operation boundaries.
 
-## Pension page modes
+## Pension operations board
 
-`apps/desktop-app/src/pages/PensionPage.tsx` renders one active viewport body selected by a local toolbar: `Odalar`, `Rezervasyonlar`, `Günlük İşler`. Only the active body scrolls (`FeatureWorkspacePage` body); the page no longer stacks all operation panels vertically. `DesktopWorkspaceRouter.tsx` supplies `RoomsWorkspace`, `ReservationsWorkspace` and `DailyTasksWorkspace` from `components/operations/OperationWorkspaces.tsx`.
+`apps/desktop-app/src/pages/PensionPage.tsx` renders one viewport-filling operations board instead of page tabs. The shared `OperationsBoardLayout` owns only geometry and scroll boundaries:
+
+- left: Reservations when the capability is enabled,
+- center: Rooms,
+- right: Daily Work when the capability is enabled.
+
+Each pane owns its own vertical scroll. The center resource pane remains the primary operational surface; reservation/task lists use compact side-pane presentation. Capability-disabled panes are removed and the remaining columns expand.
 
 ## State ownership
 
-`components/pension/pension-page-state.tsx` owns `mode` and `filters` (`reservationStatus`, `reservationDate`, `taskStatus`). The controller is created once in `DesktopWorkspaceRouter` so it survives feature-page switches; `PensionPageContext` distributes it to the reservation/task workspaces. Room tiles use `projectRoomState` for display only. Workspace drafts, busy/dirty flags and tab/flow state live inside `RoomWorkspace`; presentation changes do not remount the workspace.
+`components/pension/pension-page-state.tsx` owns only reservation/task filters (`reservationStatus`, `reservationDate`, `taskStatus`). There is no hidden page-mode state. The controller is created once in `DesktopWorkspaceRouter` so filters survive entity workspace/page transitions; `PensionPageContext` distributes those filters to reservation/task workspaces. Room tiles use `projectRoomState` for display only. Workspace drafts, busy/dirty flags and tab/flow state live inside `RoomWorkspace`.
 
 ## Room Workspace tabs
 
@@ -28,7 +34,7 @@ Guest departure (`checkoutStay`) sets `checked_out`; with no other active Stay t
 
 ## Return context
 
-Intents carry `returnContext: { page, view, entityId? }` with views `rooms`, `reservations`, `daily-tasks` (`components/workspace/workspace-intent.ts`). Room entries from Rooms, Reservations (`Odayı Aç`) and Customers (`Odaya Ata`, stay `Odayı Aç`) pass `onReturn` to restore the originating pension view. Normal close does not switch pages, so filters survive. Exact scroll offsets are not preserved by design.
+Intents may still carry `returnContext: { page, view, entityId? }` with `rooms`, `reservations` or `daily-tasks` as the originating region. These values no longer switch a Pension page tab; the full board is already visible. Closing a Room Workspace returns to the Pension page and the mounted filter controller preserves reservation/task filters. Exact per-pane scroll offsets are not preserved by design.
 
 ## Capability behavior
 
