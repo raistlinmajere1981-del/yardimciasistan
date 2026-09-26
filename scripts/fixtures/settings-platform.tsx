@@ -53,6 +53,7 @@ window.requestSettingsPageLeave = () => {
 
 window.settingsCalls = [];
 window.failSetup = false;
+let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "" };
 window.yardimciDesktop = {
   getSetupData: async () => structuredClone(canonical),
   saveInitialSetup: async input => {
@@ -64,6 +65,21 @@ window.yardimciDesktop = {
   },
   getBusinessPublicProfile: async () => profile,
   saveBusinessPublicProfile: async input => { window.settingsCalls.push({ kind: "profile", input }); if (window.failProfile) return { ok: false, message: "Profil hatası" }; profile = input; return { ok: true, message: "Müşteri bilgileri kaydedildi", profile }; },
+  getGoogleReviewsSettings: async () => structuredClone(googleReviews),
+  saveGoogleReviewsSettings: async input => {
+    window.settingsCalls.push({ kind: "google-reviews", input });
+    googleReviews = {
+      enabled: input.enabled,
+      placeId: input.placeId,
+      apiKeyConfigured: input.clearApiKey ? false : Boolean(input.apiKey) || googleReviews.apiKeyConfigured,
+      lastPublishedAt: "2026-09-27T00:00:00.000Z"
+    };
+    return { ok: true, message: "Google yorumları ayarları kaydedildi.", settings: structuredClone(googleReviews) };
+  },
+  testGoogleReviewsConnection: async input => {
+    window.settingsCalls.push({ kind: "google-reviews-test", input });
+    return { ok: true, message: "Google Places bağlantısı doğrulandı.", name: "BlackSea Pansiyon", rating: 4.9, userRatingCount: 42 };
+  },
   getDashboardData: async () => defaultDashboardData,
   getBusinessLayout: async () => {
     const enabled = getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions);
