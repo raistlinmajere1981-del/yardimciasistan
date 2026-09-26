@@ -77,7 +77,6 @@ import { createBusinessAiCatalog } from "./business-ai-catalog-service";
 import { createPublicRoomCatalog } from "./public-room-catalog-publication";
 import { publishPendingRoomMedia } from "./room-media-publication";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
-import { registerBusinessLayoutIpcHandlers } from "./business-layout-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
 import { registerBusinessAiIpcHandlers } from "./ipc/business-ai-ipc";
@@ -568,14 +567,6 @@ function registerIpcHandlers() {
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability
-  });
-
-  registerBusinessLayoutIpcHandlers({
-    databasePath: () => getDatabase().databasePath,
-    assertUnlocked: assertAppSessionUnlocked,
-    onMutation: () => {
-      getSyncCoordinator().scheduleSoon();
-    }
   });
 
   registerBusinessPublicProfileIpcHandlers({
