@@ -2,7 +2,6 @@ import {
   CalendarDays,
   Home,
   Menu as MenuIcon,
-  MessageCircle,
   Settings,
   Store,
   Users,
@@ -16,7 +15,7 @@ import { restaurantNavigationContribution } from "../components/restaurant/resta
 import { runtimeHasCapability } from "./capabilities";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 
-export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "messages" | "reports" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "reports" | "settings";
 
 export interface NavigationItem {
   id: DesktopPage;
@@ -67,14 +66,19 @@ const customerWorkContribution = {
   order: 10,
   condition: { allOf: [C.CUSTOMERS] },
   contentScroll: "workspace",
-  presentation: (capabilities) => ({
-    label: "Müşteri İşleri",
-    eyebrow: "Müşteri operasyonu",
-    title: "Müşteri İşleri",
-    description: runtimeHasCapability(capabilities, C.REQUESTS)
-      ? "Talepleri ve müşteri kayıtlarını yönetin."
-      : "Müşteri kayıtlarını yönetin."
-  })
+  presentation: (capabilities) => {
+    const topics = [
+      runtimeHasCapability(capabilities, C.REQUESTS) ? "talepleri" : "",
+      "müşteri kayıtlarını",
+      runtimeHasCapability(capabilities, C.WHATSAPP) ? "hazır mesajları" : ""
+    ].filter(Boolean);
+    return {
+      label: "Müşteri İşleri",
+      eyebrow: "Müşteri operasyonu",
+      title: "Müşteri İşleri",
+      description: `${topics.join(", ")} tek çalışma alanında yönetin.`
+    };
+  }
 } satisfies NavigationContribution;
 
 const calendarContribution = {
@@ -142,20 +146,6 @@ const menuContribution = {
   })
 } satisfies NavigationContribution;
 
-const messagesContribution = {
-  pageId: "messages",
-  icon: MessageCircle,
-  order: 70,
-  condition: { allOf: [C.CUSTOMERS, C.WHATSAPP] },
-  contentScroll: "page",
-  presentation: {
-    label: "Mesajlar",
-    eyebrow: "Mesaj merkezi",
-    title: "Mesajlar",
-    description: "Hazır yanıtları ve WhatsApp görüşmelerini yönetin."
-  }
-} satisfies NavigationContribution;
-
 const reportsContribution = {
   pageId: "reports",
   icon: WalletCards,
@@ -204,7 +194,6 @@ const navigationContributions = [
   restaurantNavigationContribution,
   marketContribution,
   menuContribution,
-  messagesContribution,
   reportsContribution,
   settingsContribution
 ] as const satisfies readonly NavigationContribution[];
