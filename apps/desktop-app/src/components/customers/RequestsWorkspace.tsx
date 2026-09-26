@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Copy,
   MessageCircle,
-  Phone,
   Plus,
   RefreshCw,
   Save,
@@ -99,7 +98,6 @@ interface RequestsWorkspaceProps {
   onSelectRequest: (requestId: string) => void;
   onManualRequestFormChange: (form: ManualRequestFormState) => void;
   onCreateManualRequest: () => void;
-  onCall: (request: SyncedCustomerRequest) => void;
   onWhatsApp: (request: SyncedCustomerRequest) => void;
   onConvert: (request: SyncedCustomerRequest) => void;
   onSuggest: (request: SyncedCustomerRequest) => void;
@@ -125,7 +123,6 @@ export function RequestsWorkspace({
   onSelectRequest,
   onManualRequestFormChange,
   onCreateManualRequest,
-  onCall,
   onWhatsApp,
   onConvert,
   onSuggest,
@@ -230,16 +227,42 @@ export function RequestsWorkspace({
       <section className="panel record-workspace__detail request-detail-panel">
         {selectedRequest ? (
           <>
-            <div className="card__header">
+            <div className="card__header request-detail-header">
               <div className="page-toolbar__copy">
                 <span className="status-badge info">{formatRequestType(selectedRequest.request_type)}</span>
                 <h2>{selectedRequest.customer_name}</h2>
               </div>
-              <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>
-                {formatRequestStatus(selectedRequest.status)}
-              </StatusBadge>
+              <div className="request-detail-header-tools">
+                <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>
+                  {formatRequestStatus(selectedRequest.status)}
+                </StatusBadge>
+                <div className="action-row request-detail-header-actions">
+                  {selectedActionMode === "open" && (
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
+                      <CheckCircle2 size={16} aria-hidden="true" />
+                      Cevaplandı İşaretle
+                    </ActionButton>
+                  )}
+                  {selectedActionMode === "open" && (
+                    <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
+                      <ClipboardList size={16} aria-hidden="true" />
+                      Reddet
+                    </ActionButton>
+                  )}
+                  {["answered", "rejected", "closed"].includes(selectedActionMode) && (
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "new")}>
+                      <RefreshCw size={16} aria-hidden="true" />
+                      Yeniden Aç
+                    </ActionButton>
+                  )}
+                  <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedRequest)}>
+                    <Trash2 size={16} aria-hidden="true" />
+                    Talebi Sil
+                  </ActionButton>
+                </div>
+              </div>
             </div>
-            <dl className="data-list">
+            <dl className="data-list request-meta-grid">
               <div>
                 <dt>Telefon</dt>
                 <dd>{selectedRequest.customer_phone}</dd>
@@ -293,12 +316,6 @@ export function RequestsWorkspace({
                     <Copy size={16} aria-hidden="true" />
                     Kopyala
                   </ActionButton>
-                  {whatsappEnabled && (
-                    <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
-                      <MessageCircle size={16} aria-hidden="true" />
-                      WhatsApp'a Hazırla
-                    </ActionButton>
-                  )}
                 </div>
                 {selectedActionMode === "open" && (
                   <div className="request-ai-rewrite-actions">
@@ -317,10 +334,6 @@ export function RequestsWorkspace({
               </div>
             )}
             <div className="action-row request-primary-actions">
-              <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(selectedRequest)}>
-                <Phone size={16} aria-hidden="true" />
-                Müşteriyi Ara
-              </ActionButton>
               {whatsappEnabled && (
                 <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
                   <MessageCircle size={16} aria-hidden="true" />
@@ -345,33 +358,6 @@ export function RequestsWorkspace({
                   Rezervasyonu Aç
                 </ActionButton>
               )}
-              <details className="request-more-actions">
-                <summary>Diğer işlemler</summary>
-                <div className="request-more-actions-menu">
-                  {selectedActionMode === "open" && (
-                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
-                      <CheckCircle2 size={16} aria-hidden="true" />
-                      Cevaplandı İşaretle
-                    </ActionButton>
-                  )}
-                  {selectedActionMode === "open" && (
-                    <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
-                      <ClipboardList size={16} aria-hidden="true" />
-                      Reddet
-                    </ActionButton>
-                  )}
-                  {["answered", "rejected", "closed"].includes(selectedActionMode) && (
-                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "new")}>
-                      <RefreshCw size={16} aria-hidden="true" />
-                      Yeniden Aç
-                    </ActionButton>
-                  )}
-                  <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedRequest)}>
-                    <Trash2 size={16} aria-hidden="true" />
-                    Talebi Sil
-                  </ActionButton>
-                </div>
-              </details>
             </div>
           </>
         ) : (
