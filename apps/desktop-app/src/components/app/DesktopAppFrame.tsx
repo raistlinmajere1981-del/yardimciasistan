@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { Eye, LockKeyhole, RefreshCw, ScrollText, UploadCloud } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage } from "../../app/navigation";
+import type { CustomerWorkTab } from "../../pages/CustomerWorkPage";
 import type { RequestPageChange } from "../../app/page-navigation-guard";
 import { buildNavigation, getPageContentScroll, getPageMeta } from "../../app/navigation";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "../../app/notifications";
@@ -33,6 +34,7 @@ import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/Workspa
 interface DesktopAppFrameProps {
   activePage: DesktopPage;
   requestPageChange: RequestPageChange;
+  setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
   syncState: SyncState;
   statusMessage: string;
   setupController: SetupController;
@@ -56,6 +58,7 @@ export function DesktopAppFrame(props: DesktopAppFrameProps) {
 function DesktopAppFrameContent({
   activePage,
   requestPageChange,
+  setCustomerWorkTab,
   syncState,
   statusMessage,
   setupController,
@@ -149,6 +152,7 @@ function DesktopAppFrameContent({
   function openDesktopNotification(item: DesktopNotificationItem) {
     if (item.kind === "request" && item.relatedId) {
       setSelectedRequestId(item.relatedId);
+      setCustomerWorkTab("requests");
     }
     const destination = navigationItems.some((navigationItem) => navigationItem.id === item.destination)
       ? item.destination
