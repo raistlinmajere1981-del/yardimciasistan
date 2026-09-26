@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Page geometry only; the feature selects one active body and owns its state. */
+/** Page geometry only; the feature owns its operational body, optional toolbar and state. */
 export function FeatureWorkspacePage({ label, toolbar, bodyLabel, children }: {
   label: string;
   toolbar?: ReactNode;
