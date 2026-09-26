@@ -107,7 +107,7 @@ try {
   expect(invalidGoogleTest.status()).toBe(422);
   expect(await invalidGoogleTest.json()).toMatchObject({ ok: false });
 
-  const googleSecret = "AIzaSmokeGoogleReviewsSecret";
+  const googleSecret = "smoke-google-key-not-secret";
   const googlePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
