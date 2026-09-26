@@ -87,7 +87,6 @@ function DesktopAppFrameContent({
     openMenuPreview,
     closeMenuPreview
   } = menuController;
-  const { selectedWhatsAppRequest } = messagingController;
   const { setSelectedRequestId } = customerController;
   const navigationItems = useMemo(() => buildNavigation(businessCapabilities), [businessCapabilities]);
   const pageMeta = getPageMeta(activePage, businessCapabilities);
@@ -100,9 +99,7 @@ function DesktopAppFrameContent({
     [automaticSyncStatus, businessCapabilities, dashboardData]
   );
   const whatsappEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP);
-  const customersEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS);
   const aiEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.AI);
-  const customerMessagingEnabled = whatsappEnabled && customersEnabled;
   const menuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_MENU);
   const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
   const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
@@ -198,12 +195,6 @@ function DesktopAppFrameContent({
                     </button>
                   )}
                 </div>
-              ) : activePage === "messages" ? (
-                <div className="sync-pill sync-idle">
-                  <span>{customerMessagingEnabled
-                    ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin")
-                    : (aiEnabled ? "AI araçları kullanıma hazır." : "Mesaj araçları bu işletmede etkin değil.")}</span>
-                </div>
               ) : activePage === "settings" ? null : (
                 <div className={`sync-pill sync-${syncDisplayState}`}>
                   <span role="status" aria-live="polite">
@@ -260,7 +251,6 @@ function DesktopAppFrameContent({
             onPreparedCreditWhatsApp: messagingController.openPreparedCreditWhatsApp,
             onCall: messagingController.callCustomerRecord,
             onWhatsApp: messagingController.openCustomerWhatsApp,
-            onSummarize: (requestId) => messagingController.openAiTools("summary", requestId),
             onSave: customerController.handleSaveCustomer,
             onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
             onDelete: customerController.handleDeleteCustomer
