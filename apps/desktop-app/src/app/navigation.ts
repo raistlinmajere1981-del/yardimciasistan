@@ -146,22 +146,13 @@ const messagesContribution = {
   pageId: "messages",
   icon: MessageCircle,
   order: 70,
-  condition: { anyOf: [C.AI, { allOf: [C.CUSTOMERS, C.WHATSAPP] }] },
+  condition: { allOf: [C.CUSTOMERS, C.WHATSAPP] },
   contentScroll: "page",
-  presentation: (capabilities) => {
-    const customersEnabled = runtimeHasCapability(capabilities, C.CUSTOMERS);
-    const whatsappEnabled = customersEnabled && runtimeHasCapability(capabilities, C.WHATSAPP);
-    const aiEnabled = runtimeHasCapability(capabilities, C.AI);
-    return {
-      label: "Mesajlar",
-      eyebrow: "Mesaj merkezi",
-      title: "Mesajlar",
-      description: whatsappEnabled
-        ? "Hazır yanıtları ve WhatsApp görüşmelerini yönetin."
-        : aiEnabled && customersEnabled
-          ? "AI ile müşteri yanıtları ve günlük değerlendirmeler hazırlayın."
-          : "AI ile günlük işletme değerlendirmeleri hazırlayın."
-    };
+  presentation: {
+    label: "Mesajlar",
+    eyebrow: "Mesaj merkezi",
+    title: "Mesajlar",
+    description: "Hazır yanıtları ve WhatsApp görüşmelerini yönetin."
   }
 } satisfies NavigationContribution;
 
