@@ -561,7 +561,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-bg-panel);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
 }
 
 .room-media-card-top {
