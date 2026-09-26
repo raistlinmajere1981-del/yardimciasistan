@@ -60,6 +60,25 @@ talep, action ve yayın yazımları SQLite'a gider.
 
 AI anahtarı tarayıcıdan erişilebilir bir dosyada gösterilmemelidir. Masaüstünden yayınlanan anahtar `data/ai-settings.local.php` içinde `0600` izinle tutulur; bu dosya deploy paketine ve Git'e dahil edilmez. `data/.htaccess` doğrudan erişimi kapatır; Nginx kullanılan hostingde aynı engel panelden tanımlanmalıdır.
 
+## Google yorumları
+
+Google yorumları yapılandırması masaüstü uygulamasındaki `Ayarlar → İşletme → Google Yorumları`
+alanından yönetilir. Place ID ve Places API (New) anahtarı `sync_secret` ile korunan
+`api/sync.php` üzerinden web modülüne yayınlanır. API anahtarı public business bağlamına,
+HTML'e veya JavaScript'e eklenmez; hostingde `data/google-reviews.local.php` içinde tutulur.
+
+Public site yalnız normalize edilmiş yorumu aşağıdaki endpoint'ten okur:
+
+```text
+api/google-reviews.php
+```
+
+Ayar kapalı veya eksikse endpoint `available=false` döndürür. Google Places yorum içeriği
+kalıcı olarak önbelleklenmez; public endpoint her içerik isteğinde güncel veriyi Google Places'tan
+okur ve `Cache-Control: no-store` döndürür. Kalıcı tutulan yalnız işletmenin Place ID ayarı ve
+sunucu tarafında korunan API credential'ıdır. `data/google-reviews.local.php` deploy paketine
+dahil edilmez.
+
 ## AI Chat Endpoint
 
 Web AI sohbet endpointi:

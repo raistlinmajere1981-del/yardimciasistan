@@ -312,7 +312,17 @@ export class DesktopDatabase {
 
       const settingsColumns = this.db.prepare("PRAGMA table_info(settings)").all() as Array<{ name?: string }>;
       const settingsColumnNames = new Set(settingsColumns.map((column) => String(column.name ?? "")));
-      for (const columnName of ["local_network_enabled", "ai_service", "ai_last_published_at", "product_data_enabled"]) {
+      for (const columnName of [
+        "local_network_enabled",
+        "ai_service",
+        "ai_last_published_at",
+        "google_reviews_enabled",
+        "google_place_id",
+        "google_places_api_key_encrypted",
+        "google_reviews_last_published_at",
+        "google_reviews_publish_pending",
+        "product_data_enabled"
+      ]) {
         if (!settingsColumnNames.has(columnName)) {
           throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
         }

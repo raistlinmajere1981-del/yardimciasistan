@@ -14,7 +14,7 @@ import "../../apps/desktop-app/src/styles/index.css";
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
-let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"] };
+let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"], socialLinks: [] };
 let layout = {
   capabilities: { rooms: true, tables: true },
   rooms: [{
@@ -53,6 +53,7 @@ window.requestSettingsPageLeave = () => {
 
 window.settingsCalls = [];
 window.failSetup = false;
+let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false };
 window.yardimciDesktop = {
   getSetupData: async () => structuredClone(canonical),
   saveInitialSetup: async input => {
@@ -64,6 +65,22 @@ window.yardimciDesktop = {
   },
   getBusinessPublicProfile: async () => profile,
   saveBusinessPublicProfile: async input => { window.settingsCalls.push({ kind: "profile", input }); if (window.failProfile) return { ok: false, message: "Profil hatası" }; profile = input; return { ok: true, message: "Müşteri bilgileri kaydedildi", profile }; },
+  getGoogleReviewsSettings: async () => structuredClone(googleReviews),
+  saveGoogleReviewsSettings: async input => {
+    window.settingsCalls.push({ kind: "google-reviews", input });
+    googleReviews = {
+      enabled: input.enabled,
+      placeId: input.placeId,
+      apiKeyConfigured: input.clearApiKey ? false : Boolean(input.apiKey) || googleReviews.apiKeyConfigured,
+      lastPublishedAt: "2026-09-27T00:00:00.000Z",
+      publicationPending: false
+    };
+    return { ok: true, message: "Google yorumları ayarları kaydedildi.", settings: structuredClone(googleReviews) };
+  },
+  testGoogleReviewsConnection: async input => {
+    window.settingsCalls.push({ kind: "google-reviews-test", input });
+    return { ok: true, message: "Google Places bağlantısı doğrulandı.", name: "BlackSea Pansiyon", rating: 4.9, userRatingCount: 42 };
+  },
   getDashboardData: async () => defaultDashboardData,
   getBusinessLayout: async () => {
     const enabled = getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions);
@@ -121,6 +138,10 @@ window.yardimciDesktop = {
       })
     };
   },
+  listRoomMedia: async () => [],
+  addRoomMedia: async () => ({ ok: true, message: "Medya eklendi.", media: [] }),
+  updateRoomMedia: async () => ({ ok: true, message: "Medya güncellendi.", media: [] }),
+  deleteRoomMedia: async () => ({ ok: true, message: "Medya kaldırıldı.", media: [] }),
   getUpdateStatus: async () => updateStatus,
   onUpdateStatusChanged: () => () => {},
   saveUpdatePreferences: async input => { window.settingsCalls.push({ kind: "update-preferences", input }); if (window.failUpdate) return { ok: false, message: "Güncelleme tercih hatası", status: updateStatus }; updateStatus = { ...updateStatus, ...input }; return { ok: true, message: "Güncelleme tercihleri kaydedildi", status: updateStatus }; },

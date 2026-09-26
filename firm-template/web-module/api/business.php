@@ -30,6 +30,7 @@ $email = ya_business_string($publicContext['email'] ?? $config['email'] ?? '');
 $address = ya_business_string($publicContext['address'] ?? $config['address'] ?? '');
 $profileId = ya_business_string($publicContext['profile_id'] ?? $config['profile_id'] ?? '');
 $runtimeCapabilities = ya_business_public_capabilities();
+$googleReviewsEnabled = ya_business_google_reviews_enabled();
 $aiEnabled = $runtimeCapabilities === null || in_array('service.ai', $runtimeCapabilities, true);
 $whatsappEnabled = array_key_exists('whatsapp_enabled', $publicContext)
     ? ($publicContext['whatsapp_enabled'] === true)
@@ -60,6 +61,7 @@ ya_business_response(200, [
         'ai_enabled' => $aiEnabled,
         'whatsapp_enabled' => $whatsappEnabled,
         'requests_enabled' => $requestsEnabled,
+        'google_reviews_enabled' => $googleReviewsEnabled,
         'phone' => $phone,
         'whatsapp' => $whatsapp,
         'email' => $email,
@@ -115,6 +117,22 @@ function ya_business_public_context(): array
         return is_array($context) ? $context : [];
     } catch (Throwable) {
         return [];
+    }
+}
+
+function ya_business_google_reviews_enabled(): bool
+{
+    $path = YA_BASE_DIR . '/data/google-reviews.local.php';
+    if (!is_file($path)) return false;
+
+    try {
+        $settings = require $path;
+        return is_array($settings)
+            && ($settings['enabled'] ?? false) === true
+            && trim((string)($settings['place_id'] ?? '')) !== ''
+            && trim((string)($settings['api_key'] ?? '')) !== '';
+    } catch (Throwable) {
+        return false;
     }
 }
 

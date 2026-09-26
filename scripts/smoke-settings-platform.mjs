@@ -43,6 +43,11 @@ try {
   await expect(page.getByRole('tabpanel')).toHaveCount(1);
   await expect(page.locator('.settings-category-workspace')).toHaveCount(1);
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#settings-public-profile')).toHaveAttribute('aria-busy', 'false');
+  const googleReviewsSection = page.locator('#settings-google-reviews');
+  if (await googleReviewsSection.count()) {
+    await expect(googleReviewsSection).toHaveAttribute('aria-busy', 'false');
+  }
 
   // Clean keyboard navigation remains immediate and focus follows only accepted transitions.
   await tab('İşletme').focus();
@@ -275,6 +280,17 @@ try {
   await guard().getByRole('button', { name: 'Kaydet ve geç', exact: true }).click();
   await expect(tab('İşletme Düzeni')).toHaveAttribute('aria-selected', 'true');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.description)).toBe('Profil Taslağı');
+
+  // Google reviews stays inside Business settings, validates the live Google connection and saves with the category.
+  await select('İşletme');
+  await page.getByLabel('Google yorumlarını web sitesinde göster').check();
+  await page.getByLabel('Google Place ID').fill('ChIJBlackSeaFixture');
+  await page.getByLabel('Places API anahtarı').fill('smoke-google-key-not-secret');
+  await page.getByRole('button', { name: 'Google Bağlantısını Dene', exact: true }).click();
+  await expect(page.locator('#settings-google-reviews')).toContainText('BlackSea Pansiyon');
+  await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'google-reviews').length)).toBe(1);
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'google-reviews').at(-1).input.placeId)).toBe('ChIJBlackSeaFixture');
 
   // Action controls remain action-based and do not dirty Application.
   await select('Uygulama');

@@ -21,6 +21,7 @@ const requiredFiles = [
   "api/menu.php",
   "api/rooms.php",
   "api/room-media.php",
+  "api/google-reviews.php",
   "api/chat.php",
   "api/availability.php",
   "api/availability-sync.php",
@@ -33,6 +34,7 @@ const requiredFiles = [
   "api/android-stock-image-analysis.php",
   "api/android-identity-image-analysis.php",
   "lib/storage.php",
+  "lib/google-reviews.php",
   "lib/public-request-guard.php",
   "lib/public-room-availability.php",
   "lib/public-room-availability-intent.php",
@@ -174,6 +176,12 @@ function validateSource() {
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_business_context"), "api/sync.php güncel işletme AI bağlamı yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_ai_catalog"), "api/sync.php güncel AI ürün kaynağı yayın aksiyonunu içermeli.");
+  assert.ok(syncEndpoint.includes("publish_google_reviews_settings"), "api/sync.php Google yorumları özel ayar yayın aksiyonunu içermeli.");
+  const googleReviewsEndpoint = readFileSync(join(sourceRoot, "api", "google-reviews.php"), "utf8");
+  assert.ok(googleReviewsEndpoint.includes("ya_google_reviews_fetch_place"), "api/google-reviews.php ortak Google Places yardımcısını kullanmalı.");
+  const googleReviewsLib = readFileSync(join(sourceRoot, "lib", "google-reviews.php"), "utf8");
+  assert.ok(googleReviewsLib.includes("X-Goog-Api-Key"), "lib/google-reviews.php Places API anahtarını yalnız sunucu tarafında kullanmalı.");
+  assert.ok(googleReviewsLib.includes("reviews,googleMapsUri"), "lib/google-reviews.php yorum ve Google Maps alanlarını istemeli.");
   assert.ok(
     readFileSync(join(sourceRoot, "api", "chat.php"), "utf8").includes("Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz."),
     "api/chat.php katalog eşleşmesi yokluğunu satış yokluğu olarak yorumlamamalı."
@@ -269,7 +277,12 @@ function validatePackage(manifest, businessConfig) {
 
   assertPackageFreeOfDemoData(manifest, businessConfig);
 
-  for (const secretFile of ["config/ai.local.php", "data/ai-settings.local.php"]) {
+  for (const secretFile of [
+    "config/ai.local.php",
+    "data/ai-settings.local.php",
+    "data/google-reviews.local.php",
+    "data/google-reviews-cache.json"
+  ]) {
     assert.equal(manifestFiles.has(secretFile), false, `Paket gizli runtime ayarı içermemeli: ${secretFile}`);
   }
 
@@ -330,7 +343,10 @@ function shouldCopySourcePath(sourcePath) {
     return false;
   }
 
-  if (relativePath === "config/ai.local.php" || relativePath === "data/ai-settings.local.php") {
+  if (relativePath === "config/ai.local.php"
+      || relativePath === "data/ai-settings.local.php"
+      || relativePath === "data/google-reviews.local.php"
+      || relativePath === "data/google-reviews-cache.json") {
     return false;
   }
 

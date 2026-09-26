@@ -43,6 +43,25 @@ try {
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
+      getGoogleReviewsSettings: async () => ({ enabled: false, placeId: '', apiKeyConfigured: false, lastPublishedAt: '', publicationPending: false }),
+      saveGoogleReviewsSettings: async input => ({
+        ok: true,
+        message: 'Google yorumları ayarları kaydedildi.',
+        settings: {
+          enabled: input.enabled,
+          placeId: input.placeId,
+          apiKeyConfigured: Boolean(input.apiKey),
+          lastPublishedAt: '',
+          publicationPending: false
+        }
+      }),
+      testGoogleReviewsConnection: async () => ({
+        ok: true,
+        message: 'Google Places bağlantısı doğrulandı.',
+        name: 'Smoke İşletmesi',
+        rating: 4.8,
+        userRatingCount: 12
+      }),
       getBusinessLayout: async () => ({
         capabilities: { rooms: true, tables: true },
         rooms: dashboard.rooms.map((room, index) => ({
@@ -75,6 +94,10 @@ try {
         };
       },
       getRoomFolioData: async () => ({ rooms: [], activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
+      listRoomMedia: async () => [],
+      addRoomMedia: async () => ({ ok: true, message: 'Medya eklendi.', media: [] }),
+      updateRoomMedia: async () => ({ ok: true, message: 'Medya güncellendi.', media: [] }),
+      deleteRoomMedia: async () => ({ ok: true, message: 'Medya kaldırıldı.', media: [] }),
       listLocalBackups: async () => ({ ok: true, backups: [{ id: 'design-backup', createdAt: '2026-09-13T09:00:00Z', kind: 'manual', sizeBytes: 2048000, imageCount: 3 }] }),
       updateAppPassword: async input => { window.__designCalls.push({ kind: 'password', input }); return { ok: true, message: 'Şifre kaydedildi.', status: { passwordConfigured: true } }; },
       testWebConnection: async () => ({ ok: true, message: 'Bağlantı başarılı.' }),

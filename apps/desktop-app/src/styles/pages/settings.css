@@ -88,6 +88,50 @@
   margin-top: var(--space-4);
 }
 
+.setting-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: var(--control-height-lg);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+}
+
+.setting-switch-row > span {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.setting-switch-row strong {
+  font-size: var(--text-sm);
+}
+
+.setting-switch-row small {
+  color: var(--color-text-muted);
+}
+
+.setting-switch-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  inline-size: 1.2rem;
+  block-size: 1.2rem;
+}
+
+.settings-inline-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.settings-inline-actions small {
+  color: var(--color-text-muted);
+}
+
+
 .settings-service-toggle {
   display: inline-flex;
   align-items: center;
