@@ -471,7 +471,7 @@
 
 .room-media-row {
   display: grid;
-  grid-template-columns: minmax(10rem, 1.4fr) minmax(10rem, .8fr) minmax(12rem, 1fr) auto;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--space-3);
   padding: var(--space-3);
@@ -481,6 +481,7 @@
 }
 
 .room-media-file {
+  grid-column: 1 / -1;
   min-width: 0;
   align-self: center;
   display: grid;
@@ -506,14 +507,15 @@
   min-width: 0;
 }
 
-@media (max-width: 920px) {
+@media (max-width: 700px) {
   .room-media-row {
-    grid-template-columns: minmax(0, 1fr) minmax(10rem, .8fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .room-media-file,
+  .room-media-kind,
   .room-media-title {
-    grid-column: 1 / -1;
+    grid-column: 1;
   }
 }
 
