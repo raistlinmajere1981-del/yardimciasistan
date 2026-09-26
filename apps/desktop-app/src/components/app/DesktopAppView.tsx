@@ -103,6 +103,7 @@ export function DesktopAppView({
     <DesktopAppFrame
       activePage={activePage}
       requestPageChange={requestPageChange}
+      setCustomerWorkTab={setCustomerWorkTab}
       syncState={syncState}
       statusMessage={statusMessage}
       setupController={setupController}
