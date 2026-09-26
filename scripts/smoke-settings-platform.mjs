@@ -43,6 +43,11 @@ try {
   await expect(page.getByRole('tabpanel')).toHaveCount(1);
   await expect(page.locator('.settings-category-workspace')).toHaveCount(1);
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#settings-public-profile')).toHaveAttribute('aria-busy', 'false');
+  const googleReviewsSection = page.locator('#settings-google-reviews');
+  if (await googleReviewsSection.count()) {
+    await expect(googleReviewsSection).toHaveAttribute('aria-busy', 'false');
+  }
 
   // Clean keyboard navigation remains immediate and focus follows only accepted transitions.
   await tab('İşletme').focus();
