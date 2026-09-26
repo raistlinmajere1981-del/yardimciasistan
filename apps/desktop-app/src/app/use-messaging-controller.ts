@@ -1,7 +1,6 @@
 import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
-  buildOwnerReplyWhatsAppMessage,
   createWhatsAppUrl,
   createWhatsAppWebUrl,
   type WhatsAppAction
@@ -333,12 +332,12 @@ export function useMessagingController({
   const readyWhatsAppRequestIds = useMemo(
     () => new Set(
       customersEnabled && whatsappEnabled
-        ? dashboardData.preparedWhatsAppMessages
+        ? (dashboardData.preparedWhatsAppMessages ?? [])
           .map((message) => message.requestId)
           .filter(Boolean)
         : []
     ),
-    [customersEnabled, dashboardData.preparedWhatsAppMessages, whatsappEnabled]
+    [customersEnabled, (dashboardData.preparedWhatsAppMessages ?? []), whatsappEnabled]
   );
 
   const readyWhatsAppRequests = useMemo(
@@ -359,9 +358,9 @@ export function useMessagingController({
 
   const selectedPreparedWhatsAppRecord = useMemo(
     () => selectedWhatsAppRequest
-      ? dashboardData.preparedWhatsAppMessages.find((message) => message.requestId === selectedWhatsAppRequest.id)
+      ? (dashboardData.preparedWhatsAppMessages ?? []).find((message) => message.requestId === selectedWhatsAppRequest.id)
       : undefined,
-    [dashboardData.preparedWhatsAppMessages, selectedWhatsAppRequest]
+    [(dashboardData.preparedWhatsAppMessages ?? []), selectedWhatsAppRequest]
   );
 
   const selectedWhatsAppMessage = useMemo(
