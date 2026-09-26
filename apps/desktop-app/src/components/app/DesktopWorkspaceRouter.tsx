@@ -424,6 +424,8 @@ export function DesktopWorkspaceRouter({
               enabledCapabilities={enabledCapabilities}
               convertingRequestId={convertingRequestId}
               suggestingRequestId={suggestingRequestId}
+              aiState={aiState}
+              aiMessage={aiMessage}
               manualRequestForm={manualRequestForm}
               manualRequestState={manualRequestState}
               manualRequestMessage={manualRequestMessage}
