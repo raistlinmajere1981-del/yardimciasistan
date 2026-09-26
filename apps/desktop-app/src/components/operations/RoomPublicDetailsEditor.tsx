@@ -43,6 +43,7 @@ interface RoomPublicDetailsSaveResult {
 interface RoomPublicDetailsEditorProps {
   open: boolean;
   room: RoomPublicDetailsEditorRoom | null;
+  mediaRoomId?: string;
   onClose: () => void;
   onSave: (input: SaveRoomPublicDetailsInput) => Promise<RoomPublicDetailsSaveResult>;
 }
@@ -86,7 +87,7 @@ function formatMediaSize(bytes: number) {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPublicDetailsEditorProps) {
+export function RoomPublicDetailsEditor({ open, room, mediaRoomId = "", onClose, onSave }: RoomPublicDetailsEditorProps) {
   const [form, setForm] = useState<RoomPublicDetailsFormState>(() => toForm(room));
   const [state, setState] = useState<EditorState>("idle");
   const [media, setMedia] = useState<RoomMediaAsset[]>([]);
@@ -103,10 +104,10 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
     setMediaState("idle");
     setMediaMessage("");
 
-    if (!room?.id || !window.yardimciDesktop) return;
+    if (!mediaRoomId || !window.yardimciDesktop) return;
     let cancelled = false;
     setMediaState("loading");
-    void window.yardimciDesktop.listRoomMedia(room.id)
+    void window.yardimciDesktop.listRoomMedia(mediaRoomId)
       .then((items) => {
         if (cancelled) return;
         setMedia(items);
@@ -120,12 +121,13 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
     return () => {
       cancelled = true;
     };
-  }, [open, room]);
+  }, [open, room, mediaRoomId]);
 
   const capacity = useMemo(() => Number.parseInt(form.capacity, 10), [form.capacity]);
   const validCapacity = Number.isInteger(capacity) && capacity > 0 && capacity <= 100;
   const canSave = Boolean(room && form.name.trim() && validCapacity && state !== "loading");
   const mediaBusy = mediaState === "loading";
+  const mediaEnabled = Boolean(mediaRoomId);
 
   if (!open || !room) {
     return null;
@@ -137,7 +139,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
     setMediaState("loading");
     setMediaMessage("");
     try {
-      const result = await bridge.addRoomMedia({ roomId: room.id, kind: mediaKind });
+      const result = await bridge.addRoomMedia({ roomId: mediaRoomId, kind: mediaKind });
       setMedia(result.media);
       setMediaState(result.ok ? "idle" : "error");
       setMediaMessage(result.message);
@@ -156,7 +158,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
     setMediaMessage("");
     try {
       const result = await bridge.updateRoomMedia({
-        roomId: room.id,
+        roomId: mediaRoomId,
         mediaId: item.id,
         kind: next.kind,
         title: next.title
@@ -176,7 +178,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
     setMediaState("loading");
     setMediaMessage("");
     try {
-      const result = await bridge.deleteRoomMedia({ roomId: room.id, mediaId: item.id });
+      const result = await bridge.deleteRoomMedia({ roomId: mediaRoomId, mediaId: item.id });
       setMedia(result.media);
       setMediaState(result.ok ? "idle" : "error");
       setMediaMessage(result.message);
@@ -358,12 +360,18 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
             </div>
           </div>
 
+          {!mediaEnabled && (
+            <p className="room-media-help">
+              Yeni oda için medya eklemeden önce Ayarları Kaydet ile oda kaydını oluşturun.
+            </p>
+          )}
+
           <div className="room-media-add-row">
             <label className="form-field form-field--medium">
               Eklenecek medya türü
               <select
                 value={mediaKind}
-                disabled={mediaBusy}
+                disabled={mediaBusy || !mediaEnabled}
                 onChange={(event) => setMediaKind(event.target.value as RoomPublicMediaKind)}
               >
                 {ROOM_MEDIA_KIND_OPTIONS.map((option) => (
@@ -371,7 +379,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                 ))}
               </select>
             </label>
-            <ActionButton type="button" onClick={() => void addMedia()} disabled={mediaBusy}>
+            <ActionButton type="button" onClick={() => void addMedia()} disabled={mediaBusy || !mediaEnabled}>
               <ImagePlus size={16} aria-hidden="true" />
               {mediaBusy ? "İşleniyor" : "Dosya ekle"}
             </ActionButton>
@@ -402,7 +410,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                     Tür
                     <select
                       value={item.kind}
-                      disabled={mediaBusy}
+                      disabled={mediaBusy || !mediaEnabled}
                       onChange={(event) => void updateMedia(item, {
                         kind: event.target.value as RoomPublicMediaKind
                       })}
@@ -418,7 +426,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                     <input
                       value={item.title}
                       maxLength={240}
-                      disabled={mediaBusy}
+                      disabled={mediaBusy || !mediaEnabled}
                       placeholder={mediaKindLabel(item.kind)}
                       onChange={(event) => {
                         const title = event.target.value;
@@ -436,7 +444,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                   <ActionButton
                     variant="secondary"
                     type="button"
-                    disabled={mediaBusy}
+                    disabled={mediaBusy || !mediaEnabled}
                     onClick={() => void deleteMedia(item)}
                     title="Medyayı kaldır"
                   >

@@ -118,6 +118,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
           description: editingRoom.description,
           priceNote: editingRoom.priceNote
         } : null}
+        mediaRoomId={editingRoom?.id ?? ""}
         onClose={() => setEditingKey("")}
         onSave={async (input: SaveRoomPublicDetailsInput) => {
           const room = rooms.find((candidate) => candidate.key === input.roomId);
