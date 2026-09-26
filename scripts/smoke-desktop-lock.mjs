@@ -46,7 +46,8 @@ try {
       features: [],
       policyNote: "",
       paymentNote: "",
-      languages: ["Türkçe"]
+      languages: ["Türkçe"],
+      socialLinks: []
     };
     const status = () => ({
       locked,

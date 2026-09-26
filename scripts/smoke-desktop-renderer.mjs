@@ -57,7 +57,8 @@ try {
       features: [],
       policyNote: "",
       paymentNote: "",
-      languages: ["Türkçe"]
+      languages: ["Türkçe"],
+      socialLinks: []
     };
     let businessLayout = {
       capabilities: {
@@ -105,6 +106,10 @@ try {
         return { ok: true, message: "Müşteri bilgileri kaydedildi.", profile: structuredClone(businessProfile) };
       },
       getBusinessLayout: async () => structuredClone(businessLayout),
+      listRoomMedia: async () => [],
+      addRoomMedia: async () => ({ ok: true, message: "Medya eklendi.", media: [] }),
+      updateRoomMedia: async () => ({ ok: true, message: "Medya güncellendi.", media: [] }),
+      deleteRoomMedia: async () => ({ ok: true, message: "Medya kaldırıldı.", media: [] }),
       saveBusinessLayout: async (input) => {
         if (input.rooms) {
           businessLayout = {
@@ -1440,7 +1445,8 @@ try {
       features: [],
       policyNote: "",
       paymentNote: "",
-      languages: ["Türkçe"]
+      languages: ["Türkçe"],
+      socialLinks: []
     };
     let compactLayout = {
       capabilities: {
@@ -1488,6 +1494,10 @@ try {
         return { ok: true, message: "Müşteri bilgileri kaydedildi.", profile: structuredClone(compactProfile) };
       },
       getBusinessLayout: async () => structuredClone(compactLayout),
+      listRoomMedia: async () => [],
+      addRoomMedia: async () => ({ ok: true, message: "Medya eklendi.", media: [] }),
+      updateRoomMedia: async () => ({ ok: true, message: "Medya güncellendi.", media: [] }),
+      deleteRoomMedia: async () => ({ ok: true, message: "Medya kaldırıldı.", media: [] }),
       saveBusinessLayout: async (input) => {
         if (input.rooms) {
           compactLayout = {

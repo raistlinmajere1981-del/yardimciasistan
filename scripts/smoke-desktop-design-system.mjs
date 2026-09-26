@@ -24,7 +24,7 @@ try {
   await page.addInitScript(({ setup, dashboard }) => {
     localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ version: 2, scheme: 'light', density: 'comfortable', scale: 1, accent: 'coral', font: 'plex', motion: 'system' }));
     const enabledCapabilities = ['core.customers','core.requests','core.business_profile','accommodation.rooms','accommodation.reservations','food_service.tables','food_service.menu','food_service.orders','service.whatsapp','service.android','service.ai'];
-    let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'] };
+    let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'], socialLinks: [] };
     let rooms = [
       { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', capacity: 2, bedInfo: '1 çift kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 240000, currency: 'TRY', sortOrder: 1, canRemove: true, removeBlockReason: '' },
       { id: 'room_design_102', name: 'Smoke Aile Odası', number: '102', capacity: 4, bedInfo: '1 çift + 2 tek kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 320000, currency: 'TRY', sortOrder: 2, canRemove: true, removeBlockReason: '' }
@@ -63,6 +63,10 @@ try {
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
       getBusinessLayout: async () => structuredClone(businessLayout),
+      listRoomMedia: async () => [],
+      addRoomMedia: async () => ({ ok: true, message: 'Medya eklendi.', media: [] }),
+      updateRoomMedia: async () => ({ ok: true, message: 'Medya güncellendi.', media: [] }),
+      deleteRoomMedia: async () => ({ ok: true, message: 'Medya kaldırıldı.', media: [] }),
       saveBusinessLayout: async input => {
         if (input.rooms) {
           rooms = input.rooms.map((room, index) => ({
