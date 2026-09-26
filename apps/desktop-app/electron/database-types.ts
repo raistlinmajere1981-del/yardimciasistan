@@ -736,54 +736,17 @@ export type RequestAiSuggestionResult =
       message: string;
     };
 
-export type AiWorkspaceMode = "reply" | "summary" | "daily";
-
-export interface AiWorkspaceHistoryEntry {
-  id: string;
-  mode: AiWorkspaceMode;
-  requestId: string;
-  requestLabel: string;
-  instructions: string;
-  content: string;
-  summary: string;
-  missingFields: string[];
-  provider: string;
-  model: string;
-  fallback: boolean;
-  createdAt: string;
-}
-
-export interface GenerateAiWorkspaceInput {
-  mode: AiWorkspaceMode;
+export interface RewriteRequestAiSuggestionInput {
   requestId: string;
   instructions: string;
 }
 
-export type GenerateAiWorkspaceResult =
+export type DailyBusinessEvaluationResult =
   | {
       ok: true;
       message: string;
-      entry: AiWorkspaceHistoryEntry;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface SaveAiWorkspaceResultInput {
-  mode: AiWorkspaceMode;
-  requestId: string;
-  content: string;
-  summary: string;
-  missingFields: string[];
-}
-
-export type SaveAiWorkspaceResult =
-  | {
-      ok: true;
-      message: string;
-      requestId: string;
-      dashboardData: DesktopDashboardData;
+      content: string;
+      fallback: boolean;
     }
   | {
       ok: false;
