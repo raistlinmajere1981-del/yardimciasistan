@@ -1,6 +1,6 @@
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, ExternalLink, MessageCircle, Phone, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, MessageCircle, Send, ShieldCheck, Trash2 } from "lucide-react";
 import {
   createWhatsAppInspectionScript,
   createWhatsAppSendScript,
@@ -36,7 +36,6 @@ interface WhatsAppWorkspaceProps {
   onSelectRequest: (requestId: string) => void;
   onOpenExternal: () => void;
   onReturnToSafe?: () => void;
-  onCall?: () => void;
   onMessageSent: (requestId: string, message: string) => Promise<{ ok: boolean; message: string }>;
   onDeleteMessage: (request: SyncedCustomerRequest) => void;
 }
@@ -68,7 +67,7 @@ function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
   };
 }
 
-export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
+export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
   const { confirm, confirmDialog } = useConfirmDialog();
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const registeredGuestIdRef = useRef<number | null>(null);
@@ -474,10 +473,6 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           <ActionButton variant="whatsapp" size="sm" type="button" onClick={onOpenExternal} disabled={!selectedUrl}>
             <ExternalLink size={16} aria-hidden="true" />
             WhatsApp Linkini Aç
-          </ActionButton>
-          <ActionButton variant="secondary" size="sm" type="button" onClick={onCall} disabled={!onCall}>
-            <Phone size={16} aria-hidden="true" />
-            Müşteriyi Ara
           </ActionButton>
           {!preparedMessage && <ActionButton variant="danger" size="sm" type="button" onClick={() => selectedRequest && onDeleteMessage(selectedRequest)} disabled={!selectedRequest || !selectedMessage}>
             <Trash2 size={16} aria-hidden="true" />
