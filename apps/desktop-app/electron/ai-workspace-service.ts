@@ -9,11 +9,11 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import type {
+  DailyBusinessEvaluationResult,
   DesktopDatabase,
   DesktopDashboardData,
-  GenerateAiWorkspaceInput,
-  GenerateAiWorkspaceResult,
-  RequestAiSuggestionResult
+  RequestAiSuggestionResult,
+  RewriteRequestAiSuggestionInput
 } from "./database";
 import { createDesktopAiConfig } from "./ai-config";
 import { createCurrentBusinessAiContext } from "./business-ai-context-service";
@@ -21,7 +21,8 @@ import { createRelevantBusinessAiCatalogContext } from "./business-ai-catalog-se
 
 export async function createOwnerReplySuggestionForRequest(
   database: DesktopDatabase,
-  requestId: string
+  requestId: string,
+  instructions = ""
 ): Promise<RequestAiSuggestionResult> {
   const request = database.getRequestById(requestId);
   if (!request) {
@@ -43,6 +44,7 @@ export async function createOwnerReplySuggestionForRequest(
       guestCount: request.guest_count,
       message: request.message,
       tone: "warm",
+      instructions: String(instructions ?? "").trim().slice(0, 400),
       businessContext,
       catalogContext
     },
@@ -66,119 +68,65 @@ export async function createOwnerReplySuggestionForRequest(
   return saveResult;
 }
 
-export async function generateAiWorkspaceEntry(
+export async function rewriteOwnerReplySuggestionForRequest(
   database: DesktopDatabase,
-  input: GenerateAiWorkspaceInput
-): Promise<GenerateAiWorkspaceResult> {
-  const mode = input?.mode;
-  if (mode !== "reply" && mode !== "summary" && mode !== "daily") {
-    return { ok: false, message: "AI çalışma türü geçersiz." };
+  input: RewriteRequestAiSuggestionInput
+): Promise<RequestAiSuggestionResult> {
+  const requestId = String(input?.requestId ?? "").trim();
+  if (!requestId) {
+    return { ok: false, message: "AI cevabı için talep seçilmemiş." };
   }
+  const instructions = String(input?.instructions ?? "").trim().slice(0, 400);
+  return createOwnerReplySuggestionForRequest(database, requestId, instructions);
+}
 
+export async function generateDailyBusinessEvaluation(
+  database: DesktopDatabase
+): Promise<DailyBusinessEvaluationResult> {
   const setup = database.getSetupData();
+  const capabilities = database.getEnabledBusinessCapabilities();
+  const dashboard = projectDashboardForAi(database.getDashboardData(), capabilities);
   const businessContext = createCurrentBusinessAiContext(database);
-  const instructions = String(input?.instructions ?? "").trim().slice(0, 800);
-  const request = mode === "daily" ? null : database.getRequestById(String(input?.requestId ?? ""));
-  if (mode !== "daily" && !request) {
-    return { ok: false, message: "Bu çalışma için bir talep seçin." };
-  }
-
+  const fallback = buildLocalDailyEvaluation(dashboard, capabilities);
   const config = createDesktopAiConfig(database, setup);
-  let content = "";
-  let summary = "";
-  let missingFields: string[] = [];
-  let provider = String(config.provider);
-  let model = setup.aiModel;
-  let fallback = false;
-  let providerMessage = "";
-  const requestLabel = request ? `${request.customer_name} • ${formatWorkspaceRequestType(request.request_type)}` : "Günlük işletme özeti";
 
-  if (mode === "reply" && request) {
-    const suggestion = await generateOwnerReplySuggestion(
-      {
-        businessName: setup.businessName || "Yardımcı Asistan",
-        customerName: request.customer_name,
-        requestType: request.request_type,
-        dateText: request.date_text || request.start_date,
-        guestCount: request.guest_count,
-        message: request.message,
-        tone: "warm",
-        instructions,
-        businessContext,
-        catalogContext: createRelevantBusinessAiCatalogContext(database, request.message)
-      },
-      config
-    );
-    content = suggestion.suggestedReply;
-    summary = suggestion.summary;
-    missingFields = suggestion.missingFields;
-    provider = String(suggestion.provider ?? provider);
-    model = suggestion.model || model;
-    fallback = suggestion.fallback === true;
-    providerMessage = suggestion.providerMessage ?? "";
-  } else {
-    const capabilities = database.getEnabledBusinessCapabilities();
-    const dashboard = projectDashboardForAi(database.getDashboardData(), capabilities);
-    const localFallback = mode === "summary" && request
-      ? buildLocalRequestSummary(request)
-      : buildLocalDailyEvaluation(dashboard, capabilities);
-    if (!config.enabled || config.provider === "disabled") {
-      content = localFallback;
-      summary = mode === "summary" ? localFallback.slice(0, 1600) : "Günlük işletme değerlendirmesi";
-      provider = "disabled";
-      fallback = true;
-      providerMessage = "AI Yardımcı kapalı.";
-    } else {
-      const completion = await generateConfiguredChat({
-        ...config,
-        messages: buildAiWorkspaceMessages({
-          mode: mode as "summary" | "daily",
-          businessName: setup.businessName || "Yardımcı Asistan",
-          request,
-          dashboard,
-          businessContext,
-          instructions
-        })
-      });
-
-      if (completion.ok) {
-        content = completion.answer.trim().slice(0, 6000);
-        summary = mode === "summary" ? content.slice(0, 1600) : "Günlük işletme değerlendirmesi";
-        provider = completion.provider;
-        model = completion.model || model;
-      } else {
-        content = localFallback;
-        summary = mode === "summary" ? localFallback.slice(0, 1600) : "Günlük işletme değerlendirmesi";
-        provider = completion.provider;
-        fallback = true;
-        providerMessage = completion.message;
-      }
-    }
+  if (!config.enabled || config.provider === "disabled") {
+    return {
+      ok: true,
+      message: "AI Yardımcı kapalı; güvenli yerel değerlendirme hazırlandı.",
+      content: fallback,
+      fallback: true
+    };
   }
 
-  if (!content.trim()) {
+  const completion = await generateConfiguredChat({
+    ...config,
+    messages: buildDailyBusinessEvaluationMessages({
+      businessName: setup.businessName || "Yardımcı Asistan",
+      dashboard,
+      businessContext
+    })
+  });
+
+  if (!completion.ok) {
+    return {
+      ok: true,
+      message: `AI servisi kullanılamadı; güvenli yerel değerlendirme hazırlandı. ${completion.message}`.trim(),
+      content: fallback,
+      fallback: true
+    };
+  }
+
+  const content = completion.answer.trim().slice(0, 6000);
+  if (!content) {
     return { ok: false, message: "AI Yardımcı boş sonuç döndürdü." };
   }
 
-  const entry = database.saveAiWorkspaceHistory({
-    mode,
-    requestId: request?.id ?? "",
-    requestLabel,
-    instructions,
-    content,
-    summary,
-    missingFields,
-    provider,
-    model,
-    fallback
-  });
-
   return {
     ok: true,
-    message: fallback
-      ? `AI servisi kullanılamadı; güvenli yerel sonuç hazırlandı.${providerMessage ? ` ${providerMessage}` : ""}`
-      : "AI sonucu hazırlandı. Düzenleyip kullanabilirsiniz.",
-    entry
+    message: "Günlük işletme değerlendirmesi hazırlandı.",
+    content,
+    fallback: false
   };
 }
 
@@ -208,7 +156,8 @@ function projectDashboardForAi(
     );
   });
   const stays = enabled.has(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS) ? source.customerRoomStays : [];
-  const requests = enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS) ? source.requests : [];
+  const requestsEnabled = enabled.has(BUSINESS_CAPABILITIES.REQUESTS) && enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS);
+  const requests = requestsEnabled ? source.requests : [];
   const customers = enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS) ? source.customers : [];
   const menu = enabled.has(BUSINESS_CAPABILITIES.FOOD_MENU)
     ? source.menu
@@ -231,8 +180,8 @@ function projectDashboardForAi(
     menu,
     summary: {
       ...source.summary,
-      newRequests: enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS) ? source.summary.newRequests : 0,
-      waitingRequests: enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS) ? source.summary.waitingRequests : 0,
+      newRequests: requestsEnabled ? source.summary.newRequests : 0,
+      waitingRequests: requestsEnabled ? source.summary.waitingRequests : 0,
       pendingDailyTasks: dailyTasks.filter((task) => task.status === "pending").length,
       availableRooms: rooms.filter((room) => room.status === "available").length,
       totalRooms: rooms.length,
@@ -247,52 +196,24 @@ function projectDashboardForAi(
   };
 }
 
-function buildAiWorkspaceMessages(input: {
-  mode: "summary" | "daily";
+function buildDailyBusinessEvaluationMessages(input: {
   businessName: string;
-  request: ReturnType<DesktopDatabase["getRequestById"]>;
   dashboard: DesktopDashboardData;
   businessContext: ReturnType<typeof createCurrentBusinessAiContext>;
-  instructions: string;
 }) {
-  const commonRules = [
+  const rules = [
     `${input.businessName} için işletme sahibine yardımcı ol.`,
     "Türkçe, kısa, açık ve uygulanabilir yaz.",
+    "Günlük operasyonu Öncelikler, Riskler ve Önerilen Sıra başlıklarıyla değerlendir.",
     "Kesin rezervasyon, müsaitlik veya bağlayıcı fiyat onayı verme.",
     "Olmayan bilgi üretme.",
-    "Güncel işletme bağlamında yer almayan sektör, hizmet veya müşteri bilgilerini varsayma.",
-    "Katalog eşleşmesi yoksa bunun ürünün satılmadığını kanıtlamadığını kabul et; yalnız doğrulanamadığını söyle."
+    "Güncel işletme bağlamında yer almayan sektör, hizmet veya müşteri bilgilerini varsayma."
   ];
-  if (input.mode === "summary" && input.request) {
-    return [
-      {
-        role: "system" as const,
-        content: [...commonRules, "Talebi en fazla 5 kısa maddede özetle; eksik ve dikkat gerektiren bilgileri belirt."].join("\n")
-      },
-      {
-        role: "user" as const,
-        content: JSON.stringify({
-          businessContext: input.businessContext,
-          request: {
-            customer: input.request.customer_name,
-            type: input.request.request_type,
-            status: input.request.status,
-            date: input.request.date_text || input.request.start_date,
-            endDate: input.request.end_date,
-            time: input.request.time,
-            guestCount: input.request.guest_count,
-            message: input.request.message
-          },
-          additionalInstructions: input.instructions
-        })
-      }
-    ];
-  }
 
   return [
     {
       role: "system" as const,
-      content: [...commonRules, "Günlük operasyonu Öncelikler, Riskler ve Önerilen Sıra başlıklarıyla değerlendir."].join("\n")
+      content: rules.join("\n")
     },
     {
       role: "user" as const,
@@ -300,29 +221,19 @@ function buildAiWorkspaceMessages(input: {
         businessContext: input.businessContext,
         summary: input.dashboard.summary,
         pendingTasks: input.dashboard.dailyTasks.filter((task) => task.status !== "completed").slice(0, 20),
-        pendingReservations: input.dashboard.reservations.filter((reservation) => !["confirmed", "cancelled", "completed"].includes(reservation.status)).slice(0, 20),
+        pendingReservations: input.dashboard.reservations
+          .filter((reservation) => !["confirmed", "cancelled", "completed"].includes(reservation.status))
+          .slice(0, 20),
         recentRequests: input.dashboard.requests.slice(0, 15).map((request) => ({
           customer: request.customer_name,
           type: request.request_type,
           status: request.status,
           date: request.date_text || request.start_date,
           message: request.message
-        })),
-        additionalInstructions: input.instructions
+        }))
       })
     }
   ];
-}
-
-function buildLocalRequestSummary(request: NonNullable<ReturnType<DesktopDatabase["getRequestById"]>>) {
-  const fields = [
-    `Müşteri: ${request.customer_name || "Belirtilmedi"}`,
-    `Talep: ${formatWorkspaceRequestType(request.request_type)}`,
-    `Tarih: ${request.date_text || request.start_date || "Belirtilmedi"}`,
-    `Kişi: ${request.guest_count > 0 ? request.guest_count : "Belirtilmedi"}`,
-    `Not: ${request.message || "Belirtilmedi"}`
-  ];
-  return fields.map((field) => `• ${field}`).join("\n");
 }
 
 function buildLocalDailyEvaluation(
@@ -333,7 +244,8 @@ function buildLocalDailyEvaluation(
   const pendingTasks = dashboard.dailyTasks.filter((task) => task.status !== "completed");
   const priorities: string[] = [];
   const recommendedOrder: string[] = [];
-  if (enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS)) {
+
+  if (enabled.has(BUSINESS_CAPABILITIES.REQUESTS) && enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS)) {
     priorities.push(`• ${dashboard.summary.newRequests} yeni talebi kontrol edin.`);
     recommendedOrder.push("yeni talepleri");
   }
@@ -348,6 +260,7 @@ function buildLocalDailyEvaluation(
   if (priorities.length === 0) {
     priorities.push("• Etkin işletme alanlarındaki güncel durumu kontrol edin.");
   }
+
   const risks: string[] = [];
   if (enabled.has(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS)) {
     risks.push(`Boş oda: ${dashboard.summary.availableRooms}/${dashboard.summary.totalRooms}`);
@@ -355,6 +268,7 @@ function buildLocalDailyEvaluation(
   if (enabled.has(BUSINESS_CAPABILITIES.FOOD_TABLES)) {
     risks.push(`boş masa: ${dashboard.summary.availableTables}`);
   }
+
   return [
     "Öncelikler",
     ...priorities,
@@ -365,15 +279,4 @@ function buildLocalDailyEvaluation(
       ? `• Önce ${recommendedOrder.join(", ardından ")} sonuçlandırın.`
       : "• Önce güncel işletme durumunu gözden geçirin."
   ].join("\n");
-}
-
-function formatWorkspaceRequestType(value: string) {
-  const labels: Record<string, string> = {
-    pension_reservation: "Pansiyon rezervasyonu",
-    restaurant_reservation: "Masa rezervasyonu",
-    breakfast_request: "Kahvaltı talebi",
-    general_info: "Bilgi talebi",
-    price_question: "Fiyat sorusu"
-  };
-  return labels[value] ?? "Genel talep";
 }
