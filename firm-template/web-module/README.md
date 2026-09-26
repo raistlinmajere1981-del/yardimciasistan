@@ -73,10 +73,11 @@ Public site yalnız normalize edilmiş yorumu aşağıdaki endpoint'ten okur:
 api/google-reviews.php
 ```
 
-Ayar kapalı veya eksikse endpoint `available=false` döndürür. Başarılı Google Places yanıtları
-altı saat `data/google-reviews-cache.json` içinde önbelleklenir. Credential değiştiğinde cache
-fingerprint'i eşleşmediği için eski yapılandırmanın yorumu yeni yapılandırmada kullanılmaz.
-`data/google-reviews.local.php` ve cache dosyası deploy paketine dahil edilmez.
+Ayar kapalı veya eksikse endpoint `available=false` döndürür. Google Places yorum içeriği
+kalıcı olarak önbelleklenmez; public endpoint her içerik isteğinde güncel veriyi Google Places'tan
+okur ve `Cache-Control: no-store` döndürür. Kalıcı tutulan yalnız işletmenin Place ID ayarı ve
+sunucu tarafında korunan API credential'ıdır. `data/google-reviews.local.php` deploy paketine
+dahil edilmez.
 
 ## AI Chat Endpoint
 
