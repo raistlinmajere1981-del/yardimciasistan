@@ -23,6 +23,7 @@ export const defaultDashboardData: DesktopDashboardData = {
     updated_at: "2026-07-10T10:00:00+03:00"
   },
   requests: [],
+  preparedWhatsAppMessages: [],
   rooms: [],
   tables: [],
   reservations: [],
