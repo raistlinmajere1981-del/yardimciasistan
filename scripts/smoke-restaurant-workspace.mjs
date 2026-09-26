@@ -93,7 +93,7 @@ try {
   await button('Rezervasyonu Kaydet').click(); await expect(dialog).toHaveCount(0);
   expect((await state()).dashboard.reservations[0].tableIds).toEqual(['table-a']);
   expect((await state()).orders).toHaveLength(1);
-  await button('Masalar').click(); await button('Bahçe 1 masasını aç').click(); await tab('Müşteri').click();
+  await button('Bahçe 1 masasını aç').click(); await tab('Müşteri').click();
   await expect(dialog.getByRole('tabpanel', { name: 'Müşteri' })).toContainText('Pilot Misafir');
   await button('Sipariş Başlat').click(); await tab('Sipariş').click(); await button('Çay ürününü siparişe ekle').click();
   await button('Çay satırını sil').click(); expect((await state()).orders[0].items).toHaveLength(0);
@@ -122,7 +122,7 @@ try {
   await button("Floor'a dön").click();
   for (const variant of ['tables-only', 'no-menu', 'no-customers', 'no-reservations', 'no-transfer', 'no-catalog']) {
     const variantPage = await open(variant), surface = variantPage.getByRole('dialog');
-    if (variant === 'no-reservations') await expect(variantPage.getByRole('button', { name: 'Rezervasyonlar', exact: true })).toHaveCount(0);
+    if (variant === 'no-reservations') await expect(variantPage.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toHaveCount(0);
     await variantPage.getByRole('button', { name: 'Bahçe 1 masasını aç' }).click();
     if (variant === 'no-customers') await expect(surface.getByRole('tab', { name: 'Müşteri' })).toHaveCount(0);
     if (variant === 'tables-only') {

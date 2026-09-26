@@ -232,14 +232,13 @@ try {
     await page.locator('.sidebar').getByRole('button', { name: 'Pansiyon', exact: true }).click();
     await page.locator('.content').evaluate(el => el.scrollTop = 0);
     await capture('pension');
-      await page.getByRole('button', { name: 'Rezervasyonlar', exact: true }).click();
   await page.getByRole('button', { name: 'Yeni Rezervasyon', exact: true }).click();
     await capture('reservation-editor');
     await page.getByRole('dialog').getByRole('button', { name: 'Yeni Müşteri Ekle', exact: true }).click();
     await capture('quick-customer');
     await closeDialog();
     const reservationRow = page.getByLabel('Rezervasyon listesi', { exact: true }).getByRole('article').first();
-    await reservationRow.locator('summary').click();
+    await expect(reservationRow.locator('summary')).toHaveCount(0);
     await reservationRow.getByRole('button', { name: 'Düzenle', exact: true }).click();
     await capture('reservation-edit');
     await expect(page.getByRole('dialog').getByLabel('Giriş tarihi', { exact: true })).toBeDisabled();
@@ -247,11 +246,9 @@ try {
     await chooseDate(page.getByLabel('Rezervasyon yönetimi', { exact: true }), 'Tarih', '2030-01-01');
     await capture('reservations-empty');
     await page.getByRole('button', { name: 'Filtreyi Temizle', exact: true }).click();
-    await page.getByRole('button', { name: 'Günlük İşler', exact: true }).click();
     await page.getByRole('button', { name: 'Yeni İş', exact: true }).click();
     await capture('daily-task-editor');
     await closeDialog();
-    await page.getByRole('button', { name: 'Odalar', exact: true }).click();
     await capture('rooms');
     const unavailableRoom = page.getByRole('button', { name: 'Ek Oda 3 odasını aç', exact: true });
     await expect(unavailableRoom).toContainText('Hizmet dışı');
@@ -291,7 +288,6 @@ try {
   expect(customerCall.input.phone).toBe('05321234567');
   await createdCustomerWorkspace.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
   await page.locator('.sidebar').getByRole('button', { name: 'Pansiyon', exact: true }).click();
-  await page.getByRole('button', { name: 'Rezervasyonlar', exact: true }).click();
   await page.getByRole('button', { name: 'Yeni Rezervasyon', exact: true }).click();
   await chooseDate(page.getByRole('dialog'), 'Giriş tarihi', '2026-10-01');
   await chooseDate(page.getByRole('dialog'), 'Çıkış tarihi', '2026-10-03');

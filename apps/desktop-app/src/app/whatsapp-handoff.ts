@@ -1,4 +1,4 @@
-interface BaseEphemeralWhatsAppHandoff {
+export interface BaseEphemeralWhatsAppHandoff {
   customerId: string;
   customerName: string;
   phone: string;
