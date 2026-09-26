@@ -8,7 +8,8 @@ import {
   type BusinessCapability,
   type CustomerRequest,
   type ISODateTimeString,
-  type MenuStockUnit
+  type MenuStockUnit,
+  type RoomPublicCatalog
 } from "@yardimci-asistan/shared";
 
 export interface SyncCoreConfig {
@@ -66,6 +67,11 @@ export interface PushAiSettingsOptions extends SyncCoreConfig {
 export interface PushBusinessContextOptions extends SyncCoreConfig {
   clientId: string;
   context: BusinessAiContext;
+}
+
+export interface PushRoomCatalogOptions extends SyncCoreConfig {
+  clientId: string;
+  catalog: RoomPublicCatalog;
 }
 
 export interface PushAiCatalogOptions extends SyncCoreConfig {
@@ -1252,6 +1258,16 @@ export interface PushBusinessContextSuccess {
   deduplicated?: boolean;
 }
 
+export interface PushRoomCatalogSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  room_count: number;
+  source_revision?: number;
+  server_revision?: number;
+  deduplicated?: boolean;
+}
+
 export interface PushAiCatalogSuccess {
   ok: true;
   message: string;
@@ -1269,6 +1285,7 @@ export type PushMenuResult = PushMenuSuccess | SyncFailure;
 export type PushAndroidSnapshotResult = PushAndroidSnapshotSuccess | SyncFailure;
 export type PushAiSettingsResult = PushAiSettingsSuccess | SyncFailure;
 export type PushBusinessContextResult = PushBusinessContextSuccess | SyncFailure;
+export type PushRoomCatalogResult = PushRoomCatalogSuccess | SyncFailure;
 export type PushAiCatalogResult = PushAiCatalogSuccess | SyncFailure;
 export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
 export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
@@ -1441,6 +1458,39 @@ export async function pushAiCatalog(options: PushAiCatalogOptions): Promise<Push
   });
 }
 
+export async function pushRoomCatalog(options: PushRoomCatalogOptions): Promise<PushRoomCatalogResult> {
+  return syncRequest<PushRoomCatalogSuccess>(options, {
+    action: "publish_room_catalog",
+    client_id: options.clientId,
+    room_catalog: {
+      version: options.catalog.version,
+      updated_at: options.catalog.updatedAt,
+      rooms: options.catalog.rooms.map((room) => ({
+        id: room.id,
+        name: room.name,
+        number: room.number,
+        capacity: room.capacity,
+        bed_info: room.bedInfo,
+        floor: room.floor,
+        features: room.features,
+        description: room.description,
+        price_note: room.priceNote,
+        nightly_price_minor: room.nightlyPriceMinor,
+        currency: room.currency,
+        sort_order: room.sortOrder,
+        media: room.media.map((media) => ({
+          id: media.id,
+          kind: media.kind,
+          url: media.url,
+          mime_type: media.mimeType,
+          title: media.title,
+          sort_order: media.sortOrder
+        }))
+      }))
+    }
+  });
+}
+
 export async function pushBusinessContext(options: PushBusinessContextOptions): Promise<PushBusinessContextResult> {
   return syncRequest<PushBusinessContextSuccess>(options, {
     action: "publish_business_context",
@@ -1455,12 +1505,15 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
       whatsapp_enabled: options.context.whatsappEnabled,
       email: options.context.email,
       address: options.context.address,
+      latitude: options.context.latitude,
+      longitude: options.context.longitude,
       description: options.context.description,
       directions_note: options.context.directionsNote,
       policy_note: options.context.policyNote,
       payment_note: options.context.paymentNote,
       languages: options.context.languages,
       features: options.context.features,
+      feature_ids: options.context.featureIds,
       check_in_time: options.context.checkInTime,
       check_out_time: options.context.checkOutTime,
       breakfast_start_time: options.context.breakfastStartTime,

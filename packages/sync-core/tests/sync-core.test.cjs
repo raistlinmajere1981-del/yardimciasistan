@@ -22,6 +22,7 @@ const {
   pushAiCatalog,
   pushAiSettings,
   pushBusinessContext,
+  pushRoomCatalog,
   pushAndroidSnapshot,
   pushMenu,
   pullRequests,
@@ -919,12 +920,15 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
       whatsappEnabled: false,
       email: "info@example.test",
       address: "Örnek Mahallesi",
+      latitude: 41.1,
+      longitude: 33.2,
       description: "Mahalle marketi.",
       directionsNote: "Ana caddeden ikinci sokak.",
       policyNote: "İade koşulları fiş üzerinde belirtilir.",
       paymentNote: "Nakit ve kart kabul edilir.",
       languages: ["Türkçe"],
       features: [],
+      featureIds: [],
       checkInTime: "",
       checkOutTime: "",
       breakfastStartTime: "",
@@ -939,6 +943,9 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
   assert.equal(calls[0].body.business_context.profile_id, "market");
   assert.equal(calls[0].body.business_context.directions_note, "Ana caddeden ikinci sokak.");
   assert.deepEqual(calls[0].body.business_context.features, []);
+  assert.deepEqual(calls[0].body.business_context.feature_ids, []);
+  assert.equal(calls[0].body.business_context.latitude, 41.1);
+  assert.equal(calls[0].body.business_context.longitude, 33.2);
   assert.equal("sync_secret" in calls[0].body, false);
 });
 
@@ -980,4 +987,45 @@ test("pushAiCatalog publishes only compact public catalog fields", async () => {
   assert.equal(calls[0].ai_catalog.items[0].name, "Coca-Cola Zero");
   assert.equal("purchase_price" in calls[0].ai_catalog.items[0], false);
   assert.equal("current_quantity" in calls[0].ai_catalog.items[0], false);
+});
+
+test("pushRoomCatalog publishes only customer-facing room data", async () => {
+  const calls = [];
+  const result = await pushRoomCatalog({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "sync-secret",
+    clientId: "desktop-1",
+    catalog: {
+      version: 1,
+      updatedAt: "2026-09-26T12:00:00Z",
+      rooms: [{
+        id: "room_101",
+        name: "Oda 101",
+        number: "101",
+        capacity: 2,
+        bedInfo: "1 çift kişilik yatak",
+        floor: "1. kat",
+        features: ["wifi", "private_bathroom"],
+        description: "Deniz tarafında.",
+        priceNote: "Sezona göre değişebilir.",
+        nightlyPriceMinor: 250000,
+        currency: "TRY",
+        sortOrder: 1,
+        media: []
+      }]
+    },
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({
+        ok: true,
+        message: "Oda kataloğu yayınlandı.",
+        published_at: "2026-09-26T12:00:01Z",
+        room_count: 1
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+  });
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].action, "publish_room_catalog");
+  assert.equal(calls[0].room_catalog.rooms[0].name, "Oda 101");
+  assert.equal("status" in calls[0].room_catalog.rooms[0], false);
 });

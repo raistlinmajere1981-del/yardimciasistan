@@ -19,7 +19,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_ai_catalog'], true)
+if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_ai_catalog'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -92,6 +92,10 @@ try {
 
     if ($action === 'publish_business_context') {
         ya_sync_publish_business_context($payload);
+    }
+
+    if ($action === 'publish_room_catalog') {
+        ya_sync_publish_room_catalog($payload);
     }
 
     if ($action === 'publish_ai_catalog') {
@@ -968,6 +972,80 @@ function ya_sync_publish_ai_catalog(array $payload): void
     ]);
 }
 
+
+function ya_sync_publish_room_catalog(array $payload): void
+{
+    $candidate = $payload['room_catalog'] ?? null;
+    if (!is_array($candidate)) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Yayınlanacak oda kataloğu bulunamadı.']);
+    }
+
+    $rooms = [];
+    foreach (($candidate['rooms'] ?? []) as $rawRoom) {
+        if (!is_array($rawRoom)) continue;
+        $id = mb_substr(ya_sync_string($rawRoom['id'] ?? ''), 0, 180);
+        $name = mb_substr(ya_sync_string($rawRoom['name'] ?? ''), 0, 120);
+        if ($id === '' || $name === '') continue;
+
+        $media = [];
+        foreach (($rawRoom['media'] ?? []) as $rawMedia) {
+            if (!is_array($rawMedia)) continue;
+            $kind = ya_sync_string($rawMedia['kind'] ?? '');
+            if (!in_array($kind, ['cover', 'photo', 'panorama_360', 'panorama_180', 'video'], true)) continue;
+            $url = mb_substr(ya_sync_string($rawMedia['url'] ?? ''), 0, 2048);
+            if ($url === '') continue;
+            $media[] = [
+                'id' => mb_substr(ya_sync_string($rawMedia['id'] ?? ''), 0, 180),
+                'kind' => $kind,
+                'url' => $url,
+                'mime_type' => mb_substr(ya_sync_string($rawMedia['mime_type'] ?? ''), 0, 120),
+                'title' => mb_substr(ya_sync_string($rawMedia['title'] ?? ''), 0, 240),
+                'sort_order' => max(0, ya_sync_int($rawMedia['sort_order'] ?? 0, 0))
+            ];
+        }
+
+        $rooms[] = [
+            'id' => $id,
+            'name' => $name,
+            'number' => mb_substr(ya_sync_string($rawRoom['number'] ?? ''), 0, 40),
+            'capacity' => max(1, min(100, ya_sync_int($rawRoom['capacity'] ?? 1, 1))),
+            'bed_info' => mb_substr(ya_sync_string($rawRoom['bed_info'] ?? ''), 0, 160),
+            'floor' => mb_substr(ya_sync_string($rawRoom['floor'] ?? ''), 0, 80),
+            'features' => array_slice(ya_sync_string_array($rawRoom['features'] ?? []), 0, 32),
+            'description' => mb_substr(ya_sync_string($rawRoom['description'] ?? ''), 0, 1200),
+            'price_note' => mb_substr(ya_sync_string($rawRoom['price_note'] ?? ''), 0, 500),
+            'nightly_price_minor' => max(0, ya_sync_int($rawRoom['nightly_price_minor'] ?? 0, 0)),
+            'currency' => mb_substr(strtoupper(ya_sync_string($rawRoom['currency'] ?? 'TRY')), 0, 3),
+            'sort_order' => max(0, ya_sync_int($rawRoom['sort_order'] ?? 0, 0)),
+            'media' => $media
+        ];
+    }
+
+    usort($rooms, static fn (array $a, array $b): int =>
+        ((int) ($a['sort_order'] ?? 0) <=> (int) ($b['sort_order'] ?? 0))
+        ?: strcmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''))
+    );
+
+    $clientId = ya_sync_require_client_id($payload);
+    $now = date(DATE_ATOM);
+    $catalog = [
+        'version' => 1,
+        'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
+        'rooms' => $rooms
+    ];
+    $publication = ya_storage_publish('room_catalog', $catalog, $clientId, null, '', $now);
+
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Oda kataloğu yayınlandı.',
+        'published_at' => $now,
+        'room_count' => count($rooms),
+        'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'],
+        'deduplicated' => $publication['deduplicated']
+    ]);
+}
+
 function ya_sync_publish_business_context(array $payload): void
 {
     $candidate = $payload['business_context'] ?? null;
@@ -996,6 +1074,18 @@ function ya_sync_publish_business_context(array $payload): void
         static fn (string $value): string => mb_substr($value, 0, 120),
         ya_sync_string_array($candidate['features'] ?? [])
     ), 0, 20);
+    $featureIds = array_slice(array_map(
+        static fn (string $value): string => mb_substr($value, 0, 80),
+        ya_sync_string_array($candidate['feature_ids'] ?? [])
+    ), 0, 20);
+    $latitude = is_numeric($candidate['latitude'] ?? null) ? (float) $candidate['latitude'] : null;
+    $longitude = is_numeric($candidate['longitude'] ?? null) ? (float) $candidate['longitude'] : null;
+    if ($latitude !== null && ($latitude < -90 || $latitude > 90)) $latitude = null;
+    if ($longitude !== null && ($longitude < -180 || $longitude > 180)) $longitude = null;
+    if (($latitude === null) !== ($longitude === null)) {
+        $latitude = null;
+        $longitude = null;
+    }
 
     $publishedContext = [
         'version' => 1,
@@ -1007,12 +1097,15 @@ function ya_sync_publish_business_context(array $payload): void
         'whatsapp_enabled' => ya_sync_bool($candidate['whatsapp_enabled'] ?? false),
         'email' => mb_substr(ya_sync_string($candidate['email'] ?? ''), 0, 160),
         'address' => mb_substr(ya_sync_string($candidate['address'] ?? ''), 0, 500),
+        'latitude' => $latitude,
+        'longitude' => $longitude,
         'description' => mb_substr(ya_sync_string($candidate['description'] ?? ''), 0, 1600),
         'directions_note' => mb_substr(ya_sync_string($candidate['directions_note'] ?? ''), 0, 1200),
         'policy_note' => mb_substr(ya_sync_string($candidate['policy_note'] ?? ''), 0, 1200),
         'payment_note' => mb_substr(ya_sync_string($candidate['payment_note'] ?? ''), 0, 800),
         'languages' => $languages,
         'features' => $features,
+        'feature_ids' => $featureIds,
         'check_in_time' => mb_substr(ya_sync_string($candidate['check_in_time'] ?? ''), 0, 5),
         'check_out_time' => mb_substr(ya_sync_string($candidate['check_out_time'] ?? ''), 0, 5),
         'breakfast_start_time' => mb_substr(ya_sync_string($candidate['breakfast_start_time'] ?? ''), 0, 5),
