@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 /** Page geometry only; the feature selects one active body and owns its state. */
 export function FeatureWorkspacePage({ label, toolbar, bodyLabel, children }: {
   label: string;
-  toolbar: ReactNode;
+  toolbar?: ReactNode;
   bodyLabel: string;
   children: ReactNode;
 }) {
   return <section className="feature-workspace-page" aria-label={label}>
-    <div className="page-toolbar">{toolbar}</div>
+    {toolbar && <div className="page-toolbar">{toolbar}</div>}
     <section className="feature-workspace-page__body" aria-label={bodyLabel}>{children}</section>
   </section>;
 }
