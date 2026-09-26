@@ -38,19 +38,21 @@ Customer records, stays, identity and customer-specific operations remain in the
 
 This is an outbox/delivery surface, not a second request workspace.
 
-It lists request records only when they have prepared message content and can also host the current ephemeral customer-credit or birthday handoff.
+It lists request records only when they have prepared message content and can also host the current ephemeral customer-credit, birthday or reservation handoff.
 
 The safe view is limited to delivery concerns:
 
 - recipient,
 - prepared message,
 - copy,
-- WhatsApp link,
+- transition to the embedded WhatsApp Web surface,
 - delete prepared request message.
 
 AI rewrite controls do not live here; they belong to the request detail that owns the content.
 
 The WhatsApp view keeps the explicit user-controlled Web flow.
+
+Reservation buttons in Pension and Restaurant do not open the system browser. They build the reservation-specific message, create an ephemeral reservation handoff and navigate to Müşteri İşleri → Hazır Mesajlar. The safe surface can then switch directly to the embedded WhatsApp Web view; external opening remains only a secondary/fallback action inside the Web surface.
 
 ## Navigation capability
 
@@ -64,8 +66,8 @@ Only **Müşteri İşleri** contributes a sidebar item.
 
 Requests capability kapalıyken request-domain kayıtları renderer yüzeyine taşınmaz;
 bu nedenle request'e bağlı prepared mesajlar Hazır Mesajlar'da gösterilmez.
-Customer-domain ephemeral WhatsApp handoff'ları (doğum günü / veresiye) çalışmaya
-devam edebilir. Prepared listesi sırf dolu diye REQUESTS dışındaki request
+Customer-domain ephemeral WhatsApp handoff'ları (doğum günü / veresiye) ve
+rezervasyon kaynaklı geçici handoff'lar çalışmaya devam edebilir. Prepared listesi sırf dolu diye REQUESTS dışındaki request
 entity'leri projection sınırından sızdırılmaz.
 
 This removes the previous Requests/WhatsApp/AI combinations that had to decide whether a separate Messages page should appear.
