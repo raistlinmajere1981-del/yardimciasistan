@@ -66,8 +66,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
     return () => { active = false; };
   }, [enabled]);
 
-  const dirty = settings.publicationPending
-    || draft.enabled !== settings.enabled
+  const dirty = draft.enabled !== settings.enabled
     || draft.placeId.trim() !== settings.placeId
     || Boolean(draft.apiKey.trim())
     || draft.clearApiKey;
@@ -85,7 +84,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
   }), [draft]);
 
   const save = useCallback(async (): Promise<SettingsOperationResult> => {
-    if (!dirty) return { ok: true, changed: false };
+    if (!dirty && !settings.publicationPending) return { ok: true, changed: false };
     if (saveInFlight.current) return { ok: false, message: "Google yorumları ayarları kaydediliyor." };
     saveInFlight.current = true;
     setSaving(true);
@@ -108,7 +107,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
       saveInFlight.current = false;
       setSaving(false);
     }
-  }, [buildInput, dirty]);
+  }, [buildInput, dirty, settings.publicationPending]);
 
   const testConnection = useCallback(async (): Promise<GoogleReviewsConnectionTestResult> => {
     setTesting(true);
@@ -164,7 +163,7 @@ export function GoogleReviewsSettingsSection({
   controller: ReturnType<typeof useGoogleReviewsSettings>;
   disabled?: boolean;
 }) {
-  const { draft, settings, loading, saving, testing, feedback, update, testConnection } = controller;
+  const { draft, settings, loading, saving, testing, feedback, update, save, testConnection } = controller;
   const apiKeyConfigured = settings.apiKeyConfigured && !draft.clearApiKey;
 
   return (
@@ -252,7 +251,16 @@ export function GoogleReviewsSettingsSection({
             {testing ? "Bağlantı deneniyor…" : "Google Bağlantısını Dene"}
           </ActionButton>
           {settings.publicationPending ? (
-            <small>Web yayını bekliyor. Kaydet düğmesi bağlantı yeniden kullanılabildiğinde yayını tekrar dener.</small>
+            <>
+              <small>Web yayını bekliyor. Yerel ayar kaydedildi; web modülüne yeniden gönderebilirsiniz.</small>
+              <ActionButton
+                variant="secondary"
+                type="button"
+                onClick={() => { void save(); }}
+              >
+                {saving ? "Web'e gönderiliyor…" : "Web Yayınını Yeniden Dene"}
+              </ActionButton>
+            </>
           ) : settings.lastPublishedAt ? (
             <small>Son web yayını: {new Date(settings.lastPublishedAt).toLocaleString("tr-TR")}</small>
           ) : null}
