@@ -82,7 +82,11 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   const preparedMessageLabel = preparedMessage?.source === "birthday"
     ? "Doğum günü mesajı"
     : preparedMessage?.source === "reservation"
-      ? "Rezervasyon mesajı"
+      ? preparedMessage.reservationType === "table"
+        ? "Masa rezervasyonu"
+        : preparedMessage.reservationType === "room"
+          ? "Pansiyon rezervasyonu"
+          : "Rezervasyon mesajı"
       : "Veresiye hesabı";
   const webViewAction = useMemo(
     () => (recipientPhone ? prepareWhatsAppAction({ phone: recipientPhone, message: selectedMessage, preferredMode: "webview" }) : null),
