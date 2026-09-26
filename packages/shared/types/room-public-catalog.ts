@@ -34,3 +34,38 @@ export interface RoomPublicCatalog {
   updatedAt: string;
   rooms: RoomPublicCatalogRoom[];
 }
+
+
+export interface RoomMediaAsset {
+  id: string;
+  roomId: string;
+  kind: RoomPublicMediaKind;
+  originalName: string;
+  mimeType: string;
+  title: string;
+  sortOrder: number;
+  sizeBytes: number;
+  updatedAt: string;
+  remoteUrl: string;
+}
+
+export interface AddRoomMediaInput {
+  roomId: string;
+  kind: RoomPublicMediaKind;
+}
+
+export interface UpdateRoomMediaInput {
+  roomId: string;
+  mediaId: string;
+  kind: RoomPublicMediaKind;
+  title: string;
+}
+
+export interface DeleteRoomMediaInput {
+  roomId: string;
+  mediaId: string;
+}
+
+export type RoomMediaMutationResult =
+  | { ok: true; message: string; media: RoomMediaAsset[] }
+  | { ok: false; message: string; media: RoomMediaAsset[] };
