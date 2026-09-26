@@ -434,7 +434,6 @@ export function DesktopWorkspaceRouter({
                   onSelectRequest={setSelectedWhatsAppRequestId}
                   onOpenExternal={openSelectedWhatsAppExternal}
                   onReturnToSafe={onReturnToSafe}
-                  onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
                   onMessageSent={handleWhatsAppMessageSent}
                   onDeleteMessage={handleDeleteWhatsAppMessage}
                 />
