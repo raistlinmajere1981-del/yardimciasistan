@@ -533,12 +533,15 @@ try {
         whatsapp_enabled: false,
         email: "info@example.test",
         address: "Gebeş, Sahil Sokak No:45/1, Cide / Kastamonu",
+        latitude: 41.891571,
+        longitude: 33.003712,
         description: "Mahalle marketi ve tekel bayisi.",
         directions_note: "Cide sahil yolundan Gideros yönüne 5 km gidince solda.",
         policy_note: "Veresiye satışımız yoktur.",
         payment_note: "Nakit ve kredi/banka kartı kabul edilir.",
         languages: ["Türkçe", "İngilizce"],
-        features: [],
+        features: ["Wi-Fi"],
+        feature_ids: ["wifi"],
         check_in_time: "",
         check_out_time: "",
         breakfast_start_time: "",
@@ -550,6 +553,54 @@ try {
   expect(await businessContextPublish.json()).toMatchObject({
     ok: true,
     profile_id: "market"
+  });
+
+  const roomCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_room_catalog",
+      client_id: "desktop-web-room-catalog-smoke",
+      room_catalog: {
+        version: 1,
+        updated_at: "2026-09-26T12:00:00+03:00",
+        rooms: [
+          {
+            id: "room_101",
+            name: "Oda 101",
+            number: "101",
+            capacity: 2,
+            bed_info: "1 çift kişilik yatak",
+            floor: "1. kat",
+            features: ["wifi", "private_bathroom"],
+            description: "Deniz tarafında sakin oda.",
+            price_note: "Sezona göre değişebilir.",
+            nightly_price_minor: 250000,
+            currency: "TRY",
+            sort_order: 1,
+            media: []
+          }
+        ]
+      }
+    }
+  });
+  expect(roomCatalogPublish.ok()).toBe(true);
+  expect(await roomCatalogPublish.json()).toMatchObject({ ok: true, room_count: 1 });
+
+  const roomsResponse = await page.request.get(`${baseUrl}/api/rooms.php`);
+  expect(roomsResponse.ok()).toBe(true);
+  expect(await roomsResponse.json()).toMatchObject({
+    ok: true,
+    rooms: [{
+      id: "room_101",
+      name: "Oda 101",
+      number: "101",
+      capacity: 2,
+      bed_info: "1 çift kişilik yatak",
+      features: ["wifi", "private_bathroom"],
+      nightly_price_minor: 250000,
+      currency: "TRY",
+      media: []
+    }]
   });
 
   const aiCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
@@ -612,11 +663,14 @@ try {
       profile_id: "market",
       whatsapp_enabled: false,
       address: "Gebeş, Sahil Sokak No:45/1, Cide / Kastamonu",
+      latitude: 41.891571,
+      longitude: 33.003712,
       directions_note: "Cide sahil yolundan Gideros yönüne 5 km gidince solda.",
       policy_note: "Veresiye satışımız yoktur.",
       payment_note: "Nakit ve kredi/banka kartı kabul edilir.",
       languages: ["Türkçe", "İngilizce"],
-      features: []
+      features: ["Wi-Fi"],
+      feature_ids: ["wifi"]
     }
   });
 
