@@ -6,6 +6,7 @@ export interface GoogleReviewsSettings {
   placeId: string;
   apiKeyConfigured: boolean;
   lastPublishedAt: string;
+  publicationPending: boolean;
 }
 
 export interface SaveGoogleReviewsSettingsInput {
@@ -35,6 +36,7 @@ interface StoredGoogleReviewsSettings {
   placeId: string;
   encryptedApiKey: string;
   lastPublishedAt: string;
+  publicationPending: boolean;
 }
 
 const SAFE_STORAGE_PREFIX = "safe-storage:v1:";
@@ -45,7 +47,8 @@ export function getGoogleReviewsSettings(databasePath: string): GoogleReviewsSet
     enabled: stored.enabled,
     placeId: stored.placeId,
     apiKeyConfigured: Boolean(stored.encryptedApiKey),
-    lastPublishedAt: stored.lastPublishedAt
+    lastPublishedAt: stored.lastPublishedAt,
+    publicationPending: stored.publicationPending
   };
 }
 
@@ -75,6 +78,7 @@ export function saveGoogleReviewsSettings(
           google_place_id = ?,
           google_places_api_key_encrypted = ?,
           google_reviews_last_published_at = '',
+          google_reviews_publish_pending = 1,
           updated_at = ?
       WHERE deleted_at = ''
     `).run(input.enabled ? 1 : 0, placeId, keyUpdate.encryptedValue, now);
@@ -168,7 +172,8 @@ function readStoredSettings(databasePath: string): StoredGoogleReviewsSettings {
   const db = new DatabaseSync(databasePath);
   try {
     const row = db.prepare(`
-      SELECT google_reviews_enabled, google_place_id, google_places_api_key_encrypted, google_reviews_last_published_at
+      SELECT google_reviews_enabled, google_place_id, google_places_api_key_encrypted,
+             google_reviews_last_published_at, google_reviews_publish_pending
       FROM settings
       WHERE deleted_at = ''
       LIMIT 1
@@ -177,7 +182,8 @@ function readStoredSettings(databasePath: string): StoredGoogleReviewsSettings {
       enabled: Number(row?.google_reviews_enabled ?? 0) === 1,
       placeId: String(row?.google_place_id ?? "").trim(),
       encryptedApiKey: String(row?.google_places_api_key_encrypted ?? "").trim(),
-      lastPublishedAt: String(row?.google_reviews_last_published_at ?? "").trim()
+      lastPublishedAt: String(row?.google_reviews_last_published_at ?? "").trim(),
+      publicationPending: Number(row?.google_reviews_publish_pending ?? 0) === 1
     };
   } finally {
     db.close();
@@ -282,7 +288,7 @@ function markPublished(databasePath: string, publishedAt: string) {
   try {
     db.prepare(`
       UPDATE settings
-      SET google_reviews_last_published_at = ?, updated_at = ?
+      SET google_reviews_last_published_at = ?, google_reviews_publish_pending = 0, updated_at = ?
       WHERE deleted_at = ''
     `).run(publishedAt, new Date().toISOString());
   } finally {
