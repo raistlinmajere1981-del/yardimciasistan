@@ -330,33 +330,45 @@ export function useMessagingController({
     setPreparedWhatsAppMessage(null);
   }, [whatsappEnabled]);
 
+  const readyWhatsAppRequestIds = useMemo(
+    () => new Set(
+      customersEnabled && whatsappEnabled
+        ? dashboardData.preparedWhatsAppMessages
+          .map((message) => message.requestId)
+          .filter(Boolean)
+        : []
+    ),
+    [customersEnabled, dashboardData.preparedWhatsAppMessages, whatsappEnabled]
+  );
+
   const readyWhatsAppRequests = useMemo(
-    () => !customersEnabled || !whatsappEnabled
-      ? []
-      : dashboardData.requests.filter((request) => Boolean(
-          (aiEnabled ? request.ai_suggested_reply : "")?.trim()
-          || request.whatsapp_message?.trim()
-        )),
-    [aiEnabled, customersEnabled, dashboardData.requests, whatsappEnabled]
+    () => dashboardData.requests.filter((request) => readyWhatsAppRequestIds.has(request.id)),
+    [dashboardData.requests, readyWhatsAppRequestIds]
   );
 
   const selectedWhatsAppRequest = useMemo(
     () => {
       if (!customersEnabled || surfacePreparedWhatsAppMessage) return undefined;
-      return dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId)
-        ?? readyWhatsAppRequests[0];
+      const explicitlySelected = readyWhatsAppRequestIds.has(selectedWhatsAppRequestId)
+        ? dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId)
+        : undefined;
+      return explicitlySelected ?? readyWhatsAppRequests[0];
     },
-    [customersEnabled, dashboardData.requests, readyWhatsAppRequests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
+    [customersEnabled, dashboardData.requests, readyWhatsAppRequestIds, readyWhatsAppRequests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
+  );
+
+  const selectedPreparedWhatsAppRecord = useMemo(
+    () => selectedWhatsAppRequest
+      ? dashboardData.preparedWhatsAppMessages.find((message) => message.requestId === selectedWhatsAppRequest.id)
+      : undefined,
+    [dashboardData.preparedWhatsAppMessages, selectedWhatsAppRequest]
   );
 
   const selectedWhatsAppMessage = useMemo(
-    () => surfacePreparedWhatsAppMessage ? surfacePreparedWhatsAppMessage.message : customersEnabled && whatsappEnabled && selectedWhatsAppRequest
-      ? buildOwnerReplyWhatsAppMessage(
-          (aiEnabled ? selectedWhatsAppRequest.ai_suggested_reply : "")
-          || selectedWhatsAppRequest.whatsapp_message
-        )
-      : "",
-    [aiEnabled, customersEnabled, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
+    () => surfacePreparedWhatsAppMessage
+      ? surfacePreparedWhatsAppMessage.message
+      : selectedPreparedWhatsAppRecord?.message ?? "",
+    [selectedPreparedWhatsAppRecord, surfacePreparedWhatsAppMessage]
   );
 
   const selectedWhatsAppUrl = useMemo(
