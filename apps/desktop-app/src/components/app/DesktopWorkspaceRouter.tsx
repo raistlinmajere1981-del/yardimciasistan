@@ -144,7 +144,6 @@ export function DesktopWorkspaceRouter({
     aiState,
     aiMessage,
     openWhatsApp,
-    callCustomer,
     openReservationWhatsApp,
     prepareBirthdayWhatsApp,
     birthdayPreparingId,
@@ -385,7 +384,6 @@ export function DesktopWorkspaceRouter({
               onSelectRequest={setSelectedRequestId}
               onManualRequestFormChange={setManualRequestForm}
               onCreateManualRequest={handleCreateManualRequest}
-              onCall={callCustomer}
               onWhatsApp={openWhatsApp}
               onConvert={handleConvertRequestToReservation}
               onSuggest={handleCreateOwnerReplySuggestion}
@@ -420,7 +418,6 @@ export function DesktopWorkspaceRouter({
                   getRequestStatusTone={getRequestStatusTone}
                   onSelectRequest={setSelectedWhatsAppRequestId}
                   onOpenExternal={openSelectedWhatsAppExternal}
-                  onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
                   onMessageSent={handleWhatsAppMessageSent}
                   onDeleteMessage={handleDeleteWhatsAppMessage}
                 />
