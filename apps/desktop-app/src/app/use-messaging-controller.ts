@@ -7,11 +7,7 @@ import {
   type WhatsAppAction
 } from "@yardimci-asistan/whatsapp-bridge";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
-import type {
-  AiWorkspaceHistoryEntry,
-  AiWorkspaceMode,
-  DesktopDashboardData
-} from "../../electron/database";
+import type { DesktopDashboardData } from "../../electron/database";
 import { buildReservationWhatsAppMessage } from "./reservation-messaging";
 import type { SyncState } from "./runtime-state";
 import type { PreparedWhatsAppMessage } from "./whatsapp-handoff";
@@ -21,7 +17,6 @@ interface UseMessagingControllerOptions {
   setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
-  messagesActive: boolean;
   aiEnabled: boolean;
   customersEnabled: boolean;
   whatsappEnabled: boolean;
@@ -34,7 +29,6 @@ export function useMessagingController({
   setDashboardData,
   setSyncState,
   setStatusMessage,
-  messagesActive,
   aiEnabled,
   customersEnabled,
   whatsappEnabled,
@@ -225,15 +219,6 @@ export function useMessagingController({
   const [suggestingRequestId, setSuggestingRequestId] = useState("");
   const [aiState, setAiState] = useState<SyncState>("idle");
   const [aiMessage, setAiMessage] = useState("AI cevap taslağı hazır.");
-  const [aiWorkspaceMode, setAiWorkspaceMode] = useState<AiWorkspaceMode>("reply");
-  const [aiWorkspaceRequestId, setAiWorkspaceRequestId] = useState(dashboardData.requests[0]?.id ?? "");
-  const [aiWorkspaceInstructions, setAiWorkspaceInstructions] = useState("");
-  const [aiWorkspaceEntry, setAiWorkspaceEntry] = useState<AiWorkspaceHistoryEntry | null>(null);
-  const [aiWorkspaceContent, setAiWorkspaceContent] = useState("");
-  const [aiWorkspaceHistory, setAiWorkspaceHistory] = useState<AiWorkspaceHistoryEntry[]>([]);
-  const [aiWorkspaceState, setAiWorkspaceState] = useState<SyncState>("idle");
-  const [aiWorkspaceMessage, setAiWorkspaceMessage] = useState("Bir araç seçip AI sonucunu hazırlayın.");
-  const [messagesAiOpen, setMessagesAiOpen] = useState(false);
 
   const aiCapabilityValuesRef = useRef({ aiEnabled, customersEnabled });
   const aiCapabilityEpochRef = useRef(0);
@@ -264,10 +249,6 @@ export function useMessagingController({
   whatsappEnabledRef.current = whatsappEnabled;
   customerCreditEnabledRef.current = customerCreditEnabled;
 
-  const workspaceRevisionRef = useRef(0);
-  const workspaceGenerateSequenceRef = useRef(0);
-  const workspaceGenerateOwnerRef = useRef<number | null>(null);
-  const historyLoadGenerationRef = useRef(0);
   const whatsappSelectionRevisionRef = useRef(0);
   const suggestionGenerationRef = useRef(0);
   const rewriteGenerationRef = useRef(0);
@@ -278,17 +259,6 @@ export function useMessagingController({
   const requestAiOperationOwnersRef = useRef(new Map<string, { id: number; kind: "suggestion" | "rewrite" }>());
   const birthdayOperationGenerationRef = useRef(0);
   const birthdayOperationOwnerRef = useRef<number | null>(null);
-
-  const surfaceAiWorkspaceMode: AiWorkspaceMode = customersEnabled ? aiWorkspaceMode : "daily";
-
-  function invalidateWorkspaceGeneration() {
-    workspaceRevisionRef.current += 1;
-    if (workspaceGenerateOwnerRef.current !== null) {
-      workspaceGenerateOwnerRef.current = null;
-      setAiWorkspaceState("idle");
-      setAiWorkspaceMessage("Çalışma bağlamı değişti; önceki AI sonucu bu alana uygulanmayacak.");
-    }
-  }
 
   function invalidateWhatsAppSelection() {
     whatsappSelectionRevisionRef.current += 1;
@@ -311,40 +281,7 @@ export function useMessagingController({
   }
 
   useEffect(() => {
-    if (!messagesActive || !messagesAiOpen || !aiEnabled || !window.yardimciDesktop) return;
-    const generation = ++historyLoadGenerationRef.current;
-    const aiEpoch = aiCapabilityEpochRef.current;
-    void window.yardimciDesktop.getAiWorkspaceHistory(16).then((history) => {
-      if (
-        generation !== historyLoadGenerationRef.current
-        || aiEpoch !== aiCapabilityEpochRef.current
-        || !aiEnabledRef.current
-      ) return;
-      setAiWorkspaceHistory(
-        customersEnabledRef.current ? history : history.filter((entry) => !entry.requestId)
-      );
-    }).catch(() => {
-      if (
-        generation === historyLoadGenerationRef.current
-        && aiEpoch === aiCapabilityEpochRef.current
-        && aiEnabledRef.current
-      ) {
-        setAiWorkspaceMessage("AI geçmişi yüklenemedi.");
-      }
-    });
-  }, [aiEnabled, customersEnabled, messagesActive, messagesAiOpen]);
-
-  useEffect(() => {
-    if (messagesActive && aiEnabled && !whatsappEnabled) {
-      setMessagesAiOpen(true);
-    }
-  }, [aiEnabled, messagesActive, whatsappEnabled]);
-
-  useEffect(() => {
     if (aiEnabled) return;
-    workspaceRevisionRef.current += 1;
-    workspaceGenerateOwnerRef.current = null;
-    historyLoadGenerationRef.current += 1;
     suggestionGenerationRef.current += 1;
     rewriteGenerationRef.current += 1;
     dashboardAiApplyGenerationRef.current += 1;
@@ -353,15 +290,6 @@ export function useMessagingController({
     setSuggestingRequestId("");
     setAiState("idle");
     setAiMessage("AI bu işletmede etkin değil.");
-    setAiWorkspaceMode(customersEnabledRef.current ? "reply" : "daily");
-    setAiWorkspaceRequestId("");
-    setAiWorkspaceInstructions("");
-    setAiWorkspaceEntry(null);
-    setAiWorkspaceContent("");
-    setAiWorkspaceHistory([]);
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("AI bu işletmede etkin değil.");
-    setMessagesAiOpen(false);
   }, [aiEnabled]);
 
   useEffect(() => {
@@ -374,9 +302,6 @@ export function useMessagingController({
       setSyncState("idle");
       setStatusMessage("Müşteri yönetimi kapatıldığı için doğum günü mesajı hazırlığı durduruldu.");
     }
-    workspaceRevisionRef.current += 1;
-    workspaceGenerateOwnerRef.current = null;
-    historyLoadGenerationRef.current += 1;
     suggestionGenerationRef.current += 1;
     rewriteGenerationRef.current += 1;
     dashboardAiApplyGenerationRef.current += 1;
@@ -388,14 +313,6 @@ export function useMessagingController({
     setSuggestingRequestId("");
     setAiState("idle");
     setAiMessage("AI cevap taslağı hazır.");
-    setAiWorkspaceMode("daily");
-    setAiWorkspaceRequestId("");
-    setAiWorkspaceInstructions("");
-    setAiWorkspaceEntry((current) => current?.requestId ? null : current);
-    setAiWorkspaceContent("");
-    setAiWorkspaceHistory((current) => current.filter((entry) => !entry.requestId));
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("Günlük işletme değerlendirmesi hazır.");
   }, [customersEnabled]);
 
   useEffect(() => {
@@ -418,19 +335,6 @@ export function useMessagingController({
     setAiState("idle");
     setAiMessage("WhatsApp bu işletmede etkin değil.");
   }, [whatsappEnabled]);
-
-  useEffect(() => {
-    if (!customersEnabled) {
-      if (aiWorkspaceRequestId) setAiWorkspaceRequestId("");
-      return;
-    }
-    if (aiWorkspaceRequestId && dashboardData.requests.some((request) => request.id === aiWorkspaceRequestId)) {
-      return;
-    }
-    workspaceRevisionRef.current += 1;
-    workspaceGenerateOwnerRef.current = null;
-    setAiWorkspaceRequestId(dashboardData.requests[0]?.id ?? "");
-  }, [aiWorkspaceRequestId, customersEnabled, dashboardData.requests]);
 
   const selectedWhatsAppRequest = useMemo(
     () => !customersEnabled || surfacePreparedWhatsAppMessage
@@ -631,187 +535,15 @@ export function useMessagingController({
     }
   }
 
-  async function handleGenerateAiWorkspace() {
-    if (!aiEnabledRef.current) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("AI bu işletmede etkin değil.");
-      return;
-    }
-    const bridge = window.yardimciDesktop;
-    if (!bridge) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("AI araçları hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    if (workspaceGenerateOwnerRef.current !== null) return;
-
-    const generation = ++workspaceGenerateSequenceRef.current;
-    workspaceRevisionRef.current += 1;
-    const revision = workspaceRevisionRef.current;
-    const aiEpoch = aiCapabilityEpochRef.current;
-    const mode = customersEnabledRef.current ? aiWorkspaceMode : "daily";
-    const requestId = mode === "daily" ? "" : aiWorkspaceRequestId;
-    const instructions = aiWorkspaceInstructions;
-    workspaceGenerateOwnerRef.current = generation;
-    setAiWorkspaceState("loading");
-    setAiWorkspaceMessage("AI sonucu hazırlanıyor...");
-
-    try {
-      const result = await bridge.generateAiWorkspace({ mode, requestId, instructions });
-      const current = (
-        workspaceGenerateOwnerRef.current === generation
-        && revision === workspaceRevisionRef.current
-        && aiEpoch === aiCapabilityEpochRef.current
-        && aiEnabledRef.current
-        && (mode === "daily" || customersEnabledRef.current)
-      );
-      if (!current) return;
-
-      if (!result.ok) {
-        setAiWorkspaceState("error");
-        setAiWorkspaceMessage(result.message);
-        return;
-      }
-
-      workspaceRevisionRef.current += 1;
-      setAiWorkspaceEntry(result.entry);
-      setAiWorkspaceContent(result.entry.content);
-      setAiWorkspaceHistory((history) => [result.entry, ...history.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
-      setAiWorkspaceState("success");
-      setAiWorkspaceMessage(result.message);
-    } catch {
-      if (
-        workspaceGenerateOwnerRef.current === generation
-        && revision === workspaceRevisionRef.current
-        && aiEpoch === aiCapabilityEpochRef.current
-        && aiEnabledRef.current
-      ) {
-        setAiWorkspaceState("error");
-        setAiWorkspaceMessage("AI sonucu hazırlanamadı.");
-      }
-    } finally {
-      if (workspaceGenerateOwnerRef.current === generation) {
-        workspaceGenerateOwnerRef.current = null;
-      }
-    }
-  }
-
-  async function persistAiWorkspaceResult() {
-    if (!aiEnabledRef.current) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("AI bu işletmede etkin değil.");
-      return false;
-    }
-    const bridge = window.yardimciDesktop;
-    const entry = aiWorkspaceEntry;
-    if (!bridge || !entry) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("Önce bir AI sonucu hazırlayın.");
-      return false;
-    }
-
-    const revision = workspaceRevisionRef.current;
-    const aiEpoch = aiCapabilityEpochRef.current;
-    const content = aiWorkspaceContent;
-    const result = await bridge.saveAiWorkspaceResult({
-      mode: entry.mode,
-      requestId: entry.requestId,
-      content,
-      summary: entry.summary,
-      missingFields: entry.missingFields
-    });
-    const current = (
-      revision === workspaceRevisionRef.current
-      && aiEpoch === aiCapabilityEpochRef.current
-      && aiEnabledRef.current
-      && (!entry.requestId || customersEnabledRef.current)
-    );
-    if (!current) return false;
-
-    if (!result.ok) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage(result.message);
-      return false;
-    }
-    setDashboardData(result.dashboardData);
-    setAiWorkspaceState("success");
-    setAiWorkspaceMessage(result.message);
-    return true;
-  }
-
-  async function handleSaveAiWorkspace() {
-    await persistAiWorkspaceResult();
-  }
-
-  async function handleCopyAiWorkspace() {
-    if (!aiWorkspaceContent.trim()) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("Kopyalanacak bir AI sonucu yok.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(aiWorkspaceContent);
-      setAiWorkspaceState("success");
-      setAiWorkspaceMessage("AI sonucu panoya kopyalandı.");
-    } catch {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("Panoya kopyalama başarısız oldu.");
-    }
-  }
-
-  async function handlePrepareAiWorkspaceWhatsApp() {
-    if (!whatsappEnabledRef.current || !customersEnabledRef.current) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("WhatsApp bu işletmede etkin değil.");
-      return;
-    }
-    const entry = aiWorkspaceEntry;
-    if (!entry || entry.mode !== "reply") {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("WhatsApp için cevap taslağı türünde bir sonuç hazırlayın.");
-      return;
-    }
-    const revision = workspaceRevisionRef.current;
-    const whatsappEpoch = whatsappCapabilityEpochRef.current;
-    if (await persistAiWorkspaceResult()) {
-      if (
-        revision !== workspaceRevisionRef.current
-        || whatsappEpoch !== whatsappCapabilityEpochRef.current
-        || !whatsappEnabledRef.current
-        || !customersEnabledRef.current
-      ) return;
-      setSelectedWhatsAppRequestId(entry.requestId);
-      onOpenMessages();
-    }
-  }
-
-  function openAiTools(mode: AiWorkspaceMode, requestId = "", instructions = "") {
-    if (!aiEnabledRef.current) {
-      setStatusMessage("AI bu işletmede etkin değil.");
-      return;
-    }
-    invalidateWorkspaceGeneration();
-    const allowedMode = customersEnabledRef.current ? mode : "daily";
-    setAiWorkspaceMode(allowedMode);
-    setAiWorkspaceRequestId(customersEnabledRef.current ? requestId : "");
-    setAiWorkspaceInstructions(instructions);
-    setAiWorkspaceEntry(null);
-    setAiWorkspaceContent("");
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("AI sonucunu hazırlamak için düğmeye basın.");
-    setMessagesAiOpen(true);
-    onOpenMessages();
-  }
-
   async function handleRewriteWhatsAppMessage(instructions: string) {
-    if (!whatsappEnabledRef.current || !aiEnabledRef.current || !customersEnabledRef.current) {
+    if (!aiEnabledRef.current || !customersEnabledRef.current) {
       setAiState("error");
-      setAiMessage(!whatsappEnabledRef.current ? "WhatsApp bu işletmede etkin değil." : "AI bu işletmede etkin değil.");
+      setAiMessage("AI bu işletmede etkin değil.");
       return;
     }
     const target = selectedWhatsAppRequest;
     const bridge = window.yardimciDesktop;
-    if (!target || !bridge) {
+    if (!target || !bridge?.rewriteOwnerReplySuggestion) {
       setAiState("error");
       setAiMessage("Mesajı yenilemek için bir müşteri talebi seçin.");
       return;
@@ -823,31 +555,27 @@ export function useMessagingController({
       setAiMessage("Bu talep için başka bir AI işlemi devam ediyor.");
       return;
     }
+
     const generation = ++rewriteGenerationRef.current;
     const dashboardGeneration = ++dashboardAiApplyGenerationRef.current;
     const feedbackOwner = ++replyFeedbackSequenceRef.current;
     replyFeedbackOwnerRef.current = feedbackOwner;
     const selectionRevision = whatsappSelectionRevisionRef.current;
-    const workspaceRevision = workspaceRevisionRef.current;
     const aiEpoch = aiCapabilityEpochRef.current;
-    const whatsappEpoch = whatsappCapabilityEpochRef.current;
 
     const operationCurrent = () => (
       generation === rewriteGenerationRef.current
       && selectionRevision === whatsappSelectionRevisionRef.current
       && aiEpoch === aiCapabilityEpochRef.current
-      && whatsappEpoch === whatsappCapabilityEpochRef.current
       && aiEnabledRef.current
       && customersEnabledRef.current
-      && whatsappEnabledRef.current
     );
 
     setAiState("loading");
     setAiMessage("Mesaj yeniden hazırlanıyor...");
 
     try {
-      const result = await bridge.generateAiWorkspace({
-        mode: "reply",
+      const result = await bridge.rewriteOwnerReplySuggestion({
         requestId: target.id,
         instructions
       });
@@ -855,45 +583,19 @@ export function useMessagingController({
       if (!result.ok) {
         if (replyFeedbackOwnerRef.current === feedbackOwner) {
           setAiState("error");
-          setAiMessage("AI cevabı alınamadı. Biraz sonra tekrar deneyin.");
-        }
-        return;
-      }
-
-      const saveResult = await bridge.saveAiWorkspaceResult({
-        mode: result.entry.mode,
-        requestId: result.entry.requestId,
-        content: result.entry.content,
-        summary: result.entry.summary,
-        missingFields: result.entry.missingFields
-      });
-      if (!operationCurrent()) return;
-      if (!saveResult.ok) {
-        if (replyFeedbackOwnerRef.current === feedbackOwner) {
-          setAiState("error");
-          setAiMessage(saveResult.message);
+          setAiMessage(result.message);
         }
         return;
       }
 
       if (dashboardGeneration === dashboardAiApplyGenerationRef.current) {
-        setDashboardData(saveResult.dashboardData);
-      }
-      if (workspaceRevision === workspaceRevisionRef.current) {
-        workspaceRevisionRef.current += 1;
-        workspaceGenerateOwnerRef.current = null;
-        setAiWorkspaceMode("reply");
-        setAiWorkspaceRequestId(target.id);
-        setAiWorkspaceInstructions(instructions);
-        setAiWorkspaceEntry(result.entry);
-        setAiWorkspaceContent(result.entry.content);
-        setAiWorkspaceHistory((history) => [result.entry, ...history.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
-        setAiWorkspaceState("success");
-        setAiWorkspaceMessage("Hazır mesaj yenilendi. Göndermeden önce kontrol edin.");
+        setDashboardData(result.dashboardData);
       }
       if (replyFeedbackOwnerRef.current === feedbackOwner) {
         setAiState("success");
-        setAiMessage("Hazır mesaj yenilendi. Göndermeden önce kontrol edin.");
+        setAiMessage(result.missingFields.length > 0
+          ? `${result.message} Eksik: ${result.missingFields.join(", ")}.`
+          : "Hazır mesaj yenilendi. Göndermeden önce kontrol edin.");
       }
     } catch {
       if (operationCurrent() && replyFeedbackOwnerRef.current === feedbackOwner) {
@@ -903,50 +605,6 @@ export function useMessagingController({
     } finally {
       releaseRequestAiOperation(target.id, requestOwner);
     }
-  }
-
-  function selectAiWorkspaceHistoryEntry(entry: AiWorkspaceHistoryEntry) {
-    if (!customersEnabledRef.current && entry.mode !== "daily") {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("Müşteri odaklı AI çalışmaları bu işletmede etkin değil.");
-      return;
-    }
-    invalidateWorkspaceGeneration();
-    setAiWorkspaceMode(entry.mode);
-    setAiWorkspaceRequestId(entry.requestId);
-    setAiWorkspaceInstructions(entry.instructions);
-    setAiWorkspaceEntry(entry);
-    setAiWorkspaceContent(entry.content);
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("Geçmiş sonuç açıldı; düzenleyip yeniden kullanabilirsiniz.");
-  }
-
-  function changeAiWorkspaceMode(mode: AiWorkspaceMode) {
-    invalidateWorkspaceGeneration();
-    setAiWorkspaceMode(customersEnabledRef.current ? mode : "daily");
-    setAiWorkspaceEntry(null);
-    setAiWorkspaceContent("");
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("Yeni çalışma türü seçildi; sonucu hazırlayın.");
-  }
-
-  function changeAiWorkspaceRequest(requestId: string) {
-    invalidateWorkspaceGeneration();
-    setAiWorkspaceRequestId(customersEnabledRef.current ? requestId : "");
-    setAiWorkspaceEntry(null);
-    setAiWorkspaceContent("");
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("Talep seçildi; AI sonucunu hazırlayın.");
-  }
-
-  function changeAiWorkspaceInstructions(value: string) {
-    invalidateWorkspaceGeneration();
-    setAiWorkspaceInstructions(value);
-  }
-
-  function changeAiWorkspaceContent(value: string) {
-    invalidateWorkspaceGeneration();
-    setAiWorkspaceContent(value);
   }
 
   return {
@@ -963,17 +621,6 @@ export function useMessagingController({
     suggestingRequestId,
     aiState,
     aiMessage,
-    aiWorkspaceMode: surfaceAiWorkspaceMode,
-    aiWorkspaceRequestId,
-    aiWorkspaceInstructions,
-    setAiWorkspaceInstructions: changeAiWorkspaceInstructions,
-    aiWorkspaceEntry,
-    aiWorkspaceContent,
-    setAiWorkspaceContent: changeAiWorkspaceContent,
-    aiWorkspaceHistory,
-    aiWorkspaceState,
-    aiWorkspaceMessage,
-    messagesAiOpen,
     openWhatsApp,
     callCustomer,
     callCustomerRecord,
@@ -983,14 +630,6 @@ export function useMessagingController({
     handleWhatsAppMessageSent,
     handleDeleteWhatsAppMessage,
     handleCreateOwnerReplySuggestion,
-    handleGenerateAiWorkspace,
-    handleSaveAiWorkspace,
-    handleCopyAiWorkspace,
-    handlePrepareAiWorkspaceWhatsApp,
-    openAiTools,
     handleRewriteWhatsAppMessage,
-    selectAiWorkspaceHistoryEntry,
-    changeAiWorkspaceMode,
-    changeAiWorkspaceRequest
   };
 }
