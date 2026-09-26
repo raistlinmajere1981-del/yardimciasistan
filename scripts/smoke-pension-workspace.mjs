@@ -27,25 +27,26 @@ try {
     return page;
   }
   const page = await open();
-  const viewNavigation = page.getByRole('navigation', { name: 'Pansiyon görünümü' });
-  await expect(viewNavigation.getByRole('button', { name: 'Odalar', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(viewNavigation.getByRole('tab')).toHaveCount(0);
   const button = name => page.getByRole('button', { name, exact: true });
   const dialog = page.getByRole('dialog');
   const tab = name => dialog.getByRole('tab', { name, exact: true });
-  const body = page.getByRole('region', { name: 'Odalar', exact: true });
-  await expect(page.getByRole('navigation', { name: 'Pansiyon görünümü' }).getByRole('button')).toHaveCount(3);
-  const bounds = await body.boundingBox();
+  const board = page.getByRole('region', { name: 'Pansiyon operasyonları', exact: true });
+  await expect(board.locator('.operations-board__pane')).toHaveCount(3);
+  await expect(page.getByRole('region', { name: 'Pansiyon rezervasyonları', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Oda yönetimi', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Pansiyon günlük işleri', exact: true })).toBeVisible();
+  const bounds = await board.boundingBox();
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(769);
-  expect(await body.evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
+  expect(await page.locator('.operations-board__pane--center .operations-board__pane-body').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
+  expect(await page.getByLabel('Rezervasyon yönetimi').locator('.data-records').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
+  expect(await page.getByLabel('Günlük işler', { exact: true }).locator('.data-records').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   await expect(button('Pilot 101 odasını aç')).toContainText('Temizlik bekliyor');
   await expect(button('Pilot 101 odasını aç')).toContainText('1 rezervasyon');
   await expect(button('Pilot 103 odasını aç')).toContainText('Bakımda');
   await expect(button('Pilot 103 odasını aç')).toContainText('1 rezervasyon');
-  await button('Rezervasyonlar').click();
-  await expect(page.getByLabel('Oda yönetimi')).toHaveCount(0);
   await page.getByLabel('Rezervasyon yönetimi').getByLabel('Durum', { exact: true }).selectOption('approved');
+  await page.getByLabel('Günlük işler', { exact: true }).getByLabel('Durum', { exact: true }).selectOption('all');
   await button('Oda Ata / Düzenle').first().click();
   await dialog.getByLabel('Oda', { exact: true }).selectOption('room-102');
   await page.keyboard.press('Escape');
@@ -58,18 +59,8 @@ try {
   await page.evaluate(() => window.fixtureSetPage('customerWork'));
   await button('Çalışma alanını kapat').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pansiyon');
-  await expect(button('Rezervasyonlar')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('Rezervasyon yönetimi').getByLabel('Durum', { exact: true })).toHaveValue('approved');
-
-  await button('Günlük İşler').click();
-  await expect(page.getByLabel('Rezervasyon yönetimi')).toHaveCount(0);
-  await page.getByLabel('Günlük işler', { exact: true }).getByLabel('Durum', { exact: true }).selectOption('all');
-  await button('Odalar').click();
-  await button('Rezervasyonlar').click();
-  await expect(page.getByLabel('Rezervasyon yönetimi').getByLabel('Durum', { exact: true })).toHaveValue('approved');
-  await button('Günlük İşler').click();
   await expect(page.getByLabel('Günlük işler', { exact: true }).getByLabel('Durum', { exact: true })).toHaveValue('all');
-  await button('Odalar').click();
   await button('Pilot 102 odasını aç').click();
   await expect(dialog.getByRole('heading', { level: 2 })).toBeFocused();
   await expect(dialog.getByRole('tab')).toHaveText(['Özet', 'Konaklama', 'Hesap', 'Geçmiş']);
@@ -151,7 +142,6 @@ try {
   await expect(dialog.getByText('Fiziksel durum: Hazır', { exact: true })).toBeVisible();
   await tab('Geçmiş').click(); await expect(dialog.getByRole('tabpanel', { name: 'Geçmiş' })).toContainText('tam geçmiş değildir');
   await button('Çalışma alanını kapat').click(); await expect(button('Pilot 102 odasını aç')).toBeFocused();
-  await expect(button('Odalar')).toHaveAttribute('aria-pressed', 'true');
   await button('Müşteriler').click();
   const customerEntry = page.locator('.customer-record-row').first();
   await customerEntry.click();
@@ -228,5 +218,5 @@ try {
     await variantPage.close();
   }
   expect(errors).toEqual([]);
-  console.log('pension-workspace-smoke-ok: modes, scroll, projection, assignment/stays, lifecycle, account, stock, focus, guards, capabilities, stale results');
+  console.log('pension-workspace-smoke-ok: operations board, pane scroll, projection, assignment/stays, lifecycle, account, stock, focus, guards, capabilities, stale results');
 } finally { await browser?.close(); await server.close(); }
