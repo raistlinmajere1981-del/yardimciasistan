@@ -27,7 +27,13 @@ export function registerGoogleReviewsSettingsIpcHandlers(options: {
     "googleReviews:testConnection",
     async (_event, input: Pick<SaveGoogleReviewsSettingsInput, "placeId" | "apiKey" | "clearApiKey">): Promise<GoogleReviewsConnectionTestResult> => {
       assertUnlocked();
-      return testGoogleReviewsConnection(getDatabase().databasePath, input);
+      const database = getDatabase();
+      return testGoogleReviewsConnection(
+        database.databasePath,
+        input,
+        getWebSyncConfig(database.getSetupData()),
+        database.getSyncRuntimeStatus().clientId
+      );
     }
   );
 
