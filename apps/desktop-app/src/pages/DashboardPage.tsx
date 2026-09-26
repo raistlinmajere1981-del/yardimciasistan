@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
+import type { SyncState } from "../app/runtime-state";
 import {
   buildDashboardView,
   formatDashboardDate,
@@ -52,7 +53,11 @@ interface DashboardPageProps {
   onOpenCustomerWork: (request?: DashboardRequest) => void;
   onOpenReservation: (reservation: DesktopDashboardData["reservations"][number]) => void;
   onCompleteTask: (taskId: string) => void;
-  onOpenDailyAi: () => void;
+  dailyAiState: SyncState;
+  dailyAiMessage: string;
+  dailyAiContent: string;
+  dailyAiFallback: boolean;
+  onGenerateDailyAi: () => void;
   onPrepareBirthday: (customerId: string) => void;
   birthdayPreparingId?: string;
   formatRequestType: (value: string) => string;
@@ -79,7 +84,11 @@ export function DashboardPage({
   onOpenCustomerWork,
   onOpenReservation,
   onCompleteTask,
-  onOpenDailyAi,
+  dailyAiState,
+  dailyAiMessage,
+  dailyAiContent,
+  dailyAiFallback,
+  onGenerateDailyAi,
   onPrepareBirthday,
   birthdayPreparingId = "",
   formatRequestType,
@@ -290,10 +299,29 @@ export function DashboardPage({
               </div>
             )}
             {aiEnabled && (
-              <ActionButton className="dashboard-ai-command" variant="secondary" size="sm" onClick={onOpenDailyAi}>
-                <Sparkles size={15} aria-hidden="true" />
-                Günü değerlendir
-              </ActionButton>
+              <>
+                <ActionButton
+                  className="dashboard-ai-command"
+                  variant="secondary"
+                  size="sm"
+                  onClick={onGenerateDailyAi}
+                  disabled={dailyAiState === "loading"}
+                >
+                  <Sparkles size={15} aria-hidden="true" />
+                  {dailyAiState === "loading" ? "Değerlendiriliyor" : dailyAiContent ? "Yeniden değerlendir" : "Günü değerlendir"}
+                </ActionButton>
+                {(dailyAiMessage || dailyAiContent) && (
+                  <div className="dashboard-ai-evaluation" aria-live="polite">
+                    {dailyAiMessage && (
+                      <p className={`dashboard-ai-evaluation-status is-${dailyAiState}`}>
+                        {dailyAiFallback && dailyAiState === "success" ? "Yerel değerlendirme · " : ""}
+                        {dailyAiMessage}
+                      </p>
+                    )}
+                    {dailyAiContent && <div className="dashboard-ai-evaluation-content">{dailyAiContent}</div>}
+                  </div>
+                )}
+              </>
             )}
           </Panel>}
 
