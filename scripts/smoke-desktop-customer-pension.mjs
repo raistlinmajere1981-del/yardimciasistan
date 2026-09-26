@@ -100,6 +100,10 @@ try {
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
       getBusinessLayout: async () => structuredClone(businessLayout),
+      listRoomMedia: async () => [],
+      addRoomMedia: async () => ({ ok: true, message: 'Medya eklendi.', media: [] }),
+      updateRoomMedia: async () => ({ ok: true, message: 'Medya güncellendi.', media: [] }),
+      deleteRoomMedia: async () => ({ ok: true, message: 'Medya kaldırıldı.', media: [] }),
       saveBusinessLayout: async input => {
         if (input.rooms) {
           businessLayout = {
