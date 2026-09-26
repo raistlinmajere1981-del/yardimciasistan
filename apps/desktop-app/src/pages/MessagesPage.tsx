@@ -10,15 +10,12 @@ type WebTakeoverState = "idle" | "pending" | "ready" | "error";
 interface MessagesPageProps {
   safeMode: ReactNode;
   webMode: (onReturnToSafe: () => void) => ReactNode;
-  aiTools: ReactNode;
-  aiEnabled: boolean;
   whatsappEnabled: boolean;
   automaticWebviewRequired?: boolean;
-  aiOpen: boolean;
   active: boolean;
 }
 
-export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEnabled, automaticWebviewRequired = false, aiOpen, active }: MessagesPageProps) {
+export function MessagesPage({ safeMode, webMode, whatsappEnabled, automaticWebviewRequired = false, active }: MessagesPageProps) {
   const [mode, setMode] = useState<MessageMode>("safe");
   const [webModeActivated, setWebModeActivated] = useState(automaticWebviewRequired);
   const [webTakeoverState, setWebTakeoverState] = useState<WebTakeoverState>("idle");
@@ -29,12 +26,6 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
   useEffect(() => {
     if (automaticWebviewRequired) setWebModeActivated(true);
   }, [automaticWebviewRequired]);
-
-  useEffect(() => {
-    if (active && aiOpen) {
-      setMode("safe");
-    }
-  }, [active, aiOpen]);
 
   useEffect(() => {
     if (whatsappEnabled) return;
@@ -154,7 +145,6 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
           </div>
         </>
       )}
-      {aiEnabled && (aiOpen || !whatsappEnabled) && mode === "safe" && <div className="messages-ai-tools">{aiTools}</div>}
     </section>
   );
 }
