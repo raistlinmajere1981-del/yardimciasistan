@@ -73,6 +73,7 @@ import {
 import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { publishBusinessAiContext } from "./business-ai-context-service";
 import { createBusinessAiCatalog } from "./business-ai-catalog-service";
+import { createPublicRoomCatalog } from "./public-room-catalog-publication";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
@@ -349,6 +350,10 @@ if (!hasSingleInstanceLock) {
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
       createAndroidSnapshot: () => createAndroidOperationsSnapshot(getDatabase().getDashboardData()),
       createAiCatalog: () => createBusinessAiCatalog(getDatabase()),
+      createRoomCatalog: () => createPublicRoomCatalog(
+        getDatabase().databasePath,
+        getDatabase().getEnabledBusinessCapabilities()
+      ),
       onDashboardChanged: () => {
         markLocalCompanionSnapshotDirty();
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());

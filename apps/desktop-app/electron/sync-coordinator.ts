@@ -1,6 +1,7 @@
 import {
   PhpHostingSyncTransport,
   pushAiCatalog,
+  pushRoomCatalog,
   type AndroidOperationsSnapshot,
   type AndroidSyncAction,
   type SyncCapabilitiesSuccess,
@@ -11,7 +12,8 @@ import {
   BUSINESS_CAPABILITIES,
   hasBusinessCapability,
   type BusinessAiCatalog,
-  type BusinessCapability
+  type BusinessCapability,
+  type RoomPublicCatalog
 } from "@yardimci-asistan/shared";
 import {
   DesktopDatabase,
@@ -63,6 +65,7 @@ export interface SyncCoordinatorOptions {
   getSyncConfig: () => { baseUrl: string; syncSecret: string };
   createAndroidSnapshot: () => AndroidOperationsSnapshot;
   createAiCatalog?: () => BusinessAiCatalog;
+  createRoomCatalog?: () => RoomPublicCatalog;
   onDashboardChanged: () => void;
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
@@ -87,6 +90,8 @@ export class SyncCoordinator {
   private availabilityHeartbeatSupported: boolean | null = null;
   private aiCatalogSupported: boolean | null = null;
   private lastAiCatalogPayload = "";
+  private roomCatalogSupported: boolean | null = null;
+  private lastRoomCatalogPayload = "";
 
   constructor(private readonly options: SyncCoordinatorOptions) {}
 
@@ -94,6 +99,8 @@ export class SyncCoordinator {
     this.stop();
     this.aiCatalogSupported = null;
     this.lastAiCatalogPayload = "";
+    this.roomCatalogSupported = null;
+    this.lastRoomCatalogPayload = "";
     this.emitStatus();
     this.initialTimer = setTimeout(() => {
       this.initialTimer = null;
@@ -336,6 +343,11 @@ export class SyncCoordinator {
       errors.push(availabilityError);
     }
 
+    const roomCatalogError = await this.publishRoomCatalogIfChanged(config, clientId);
+    if (roomCatalogError) {
+      errors.push(roomCatalogError);
+    }
+
     const aiCatalogError = await this.publishAiCatalogIfChanged(config, clientId);
     if (aiCatalogError) {
       errors.push(aiCatalogError);
@@ -534,6 +546,53 @@ export class SyncCoordinator {
     } catch {
       return "Canlı müsaitlik yayını sırasında web modülüne ulaşılamadı.";
     }
+  }
+
+  private async publishRoomCatalogIfChanged(
+    config: { baseUrl: string; syncSecret: string },
+    clientId: string
+  ): Promise<string> {
+    if (this.roomCatalogSupported === false) return "";
+
+    const catalog = this.options.createRoomCatalog?.() ?? { version: 1, updatedAt: "", rooms: [] };
+    const payload = JSON.stringify(catalog);
+    if (payload === this.lastRoomCatalogPayload) return "";
+
+    const runtimeFetch = globalThis.fetch;
+    const result = await pushRoomCatalog({
+      ...config,
+      clientId,
+      catalog,
+      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
+    });
+
+    if (result.ok) {
+      this.roomCatalogSupported = true;
+      this.lastRoomCatalogPayload = payload;
+      this.options.database.recordSyncEvent({
+        direction: "push",
+        entityType: "room_catalog",
+        ok: true,
+        recordCount: result.room_count,
+        message: result.message
+      });
+      return "";
+    }
+
+    if ([400, 404, 405].includes(result.status ?? 0)) {
+      this.roomCatalogSupported = false;
+      return "";
+    }
+
+    this.options.database.recordSyncEvent({
+      direction: "push",
+      entityType: "room_catalog",
+      ok: false,
+      recordCount: 0,
+      message: result.message,
+      status: result.status
+    });
+    return result.message;
   }
 
   private async publishAiCatalogIfChanged(
