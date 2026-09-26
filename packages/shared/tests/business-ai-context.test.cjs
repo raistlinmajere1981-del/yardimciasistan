@@ -44,6 +44,9 @@ test("market AI context keeps general business facts and drops hospitality-only 
   assert.equal(context.paymentNote, "Nakit ve kart kabul edilir.");
   assert.deepEqual(context.languages, ["Türkçe", "English"]);
   assert.deepEqual(context.features, []);
+  assert.deepEqual(context.featureIds, []);
+  assert.equal(context.latitude, null);
+  assert.equal(context.longitude, null);
   assert.equal(context.checkInTime, "");
   assert.equal(context.checkOutTime, "");
   assert.equal(context.breakfastStartTime, "");
@@ -66,6 +69,9 @@ test("hospitality AI context keeps accommodation facts and hides disabled WhatsA
   });
 
   assert.deepEqual(context.features, ["Wi-Fi", "Otopark"]);
+  assert.deepEqual(context.featureIds, ["wifi", "parking"]);
+  assert.equal(context.latitude, null);
+  assert.equal(context.longitude, null);
   assert.equal(context.checkInTime, "14:00");
   assert.equal(context.breakfastStartTime, "08:00");
   assert.equal(context.whatsappEnabled, false);

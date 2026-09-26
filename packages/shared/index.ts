@@ -18,6 +18,7 @@ export * from "./types/reservation";
 export * from "./types/room";
 export * from "./types/room-state";
 export * from "./types/room-public-details";
+export * from "./types/room-public-catalog";
 export * from "./types/stock-image";
 export * from "./types/sync";
 export * from "./types/table";

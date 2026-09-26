@@ -25,12 +25,15 @@ export interface BusinessAiContext {
   whatsappEnabled: boolean;
   email: string;
   address: string;
+  latitude: number | null;
+  longitude: number | null;
   description: string;
   directionsNote: string;
   policyNote: string;
   paymentNote: string;
   languages: string[];
   features: string[];
+  featureIds: string[];
   checkInTime: string;
   checkOutTime: string;
   breakfastStartTime: string;
@@ -58,6 +61,11 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
     || hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_TABLES)
     || hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_ORDERS);
   const hospitalityDetailsRelevant = hasAccommodation || hasFoodService;
+  const normalizedFeatureIds = hospitalityDetailsRelevant
+    ? normalizeBusinessPublicFeatures(source.publicProfile.features)
+        .filter((featureId) => getBusinessPublicFeatureCatalogForCapabilities(enabled)
+          .some((feature) => feature.id === featureId))
+    : [];
   const whatsappEnabled = hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.WHATSAPP);
 
   return {
@@ -70,17 +78,15 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
     whatsappEnabled,
     email: cleanText(source.email, 160),
     address: cleanText(source.address, 500),
+    latitude: source.publicProfile.latitude,
+    longitude: source.publicProfile.longitude,
     description: cleanText(source.publicProfile.description, 1600),
     directionsNote: cleanText(source.publicProfile.directionsNote, 1200),
     policyNote: cleanText(source.publicProfile.policyNote, 1200),
     paymentNote: cleanText(source.publicProfile.paymentNote, 800),
     languages: normalizeBusinessPublicLanguages(source.publicProfile.languages),
-    features: hospitalityDetailsRelevant
-      ? normalizeBusinessPublicFeatures(source.publicProfile.features)
-          .filter((featureId) => getBusinessPublicFeatureCatalogForCapabilities(enabled)
-            .some((feature) => feature.id === featureId))
-          .map(getBusinessPublicFeatureLabel)
-      : [],
+    features: normalizedFeatureIds.map(getBusinessPublicFeatureLabel),
+    featureIds: normalizedFeatureIds,
     checkInTime: hasAccommodation ? source.publicProfile.checkInTime : "",
     checkOutTime: hasAccommodation ? source.publicProfile.checkOutTime : "",
     breakfastStartTime: hasAccommodation ? source.publicProfile.breakfastStartTime : "",
