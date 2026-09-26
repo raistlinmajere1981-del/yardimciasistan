@@ -1738,6 +1738,12 @@ try {
   await expect(reservationRows.first().locator("summary")).toHaveCount(0);
   await expect(reservationRows.first().getByRole("button", { name: "Reddet" })).toBeVisible();
   await expect(reservationRows.first().getByRole("button", { name: "İptal Et" })).toBeVisible();
+  await reservationRows.first().getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
+  await expect(compactPage.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
+  await expect(compactPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Hazır Mesajlar" })).toHaveAttribute("aria-pressed", "true");
+  await expect(compactPage.getByText("Pansiyon rezervasyonu", { exact: true }).first()).toBeVisible();
+  await expect(compactPage.getByRole("button", { name: "WhatsApp'a Geç", exact: true })).toBeVisible();
+  await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
   await expect(compactPage.locator(".task-record-row")).toHaveCount(2);
   await expect(compactPage.getByLabel("Oda yönetimi")).toBeVisible();
   await expect(compactPage.getByLabel("Rezervasyon yönetimi")).toBeVisible();
@@ -1754,6 +1760,13 @@ try {
   await expect(compactPage.getByLabel("Restoran günlük işleri", { exact: true })).toBeVisible();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
   await expect(compactPage.locator(".task-record-row").first().locator("summary")).toHaveCount(0);
+  const restaurantReservationRows = compactPage.locator(".restaurant-reservation-record");
+  await expect(restaurantReservationRows.first()).toBeVisible();
+  await restaurantReservationRows.first().getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
+  await expect(compactPage.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
+  await expect(compactPage.getByText("Masa rezervasyonu", { exact: true }).first()).toBeVisible();
+  await expect(compactPage.getByRole("button", { name: "WhatsApp'a Geç", exact: true })).toBeVisible();
+  await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
   expect(await compactPage.locator(".operations-board__pane--center .operations-board__pane-body").evaluate(element => getComputedStyle(element).overflowY)).toBe("auto");
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-restaurant-1366x768.png" });
 
