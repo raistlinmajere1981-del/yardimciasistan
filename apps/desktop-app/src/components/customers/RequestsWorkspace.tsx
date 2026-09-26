@@ -103,6 +103,7 @@ interface RequestsWorkspaceProps {
   onWhatsApp: (request: SyncedCustomerRequest) => void;
   onConvert: (request: SyncedCustomerRequest) => void;
   onSuggest: (request: SyncedCustomerRequest) => void;
+  onRewrite: (request: SyncedCustomerRequest, instructions: string) => void;
   onUpdateStatus: (request: SyncedCustomerRequest, status: string) => void;
   onOpenReservation: (request: SyncedCustomerRequest) => void;
   onDelete: (request: SyncedCustomerRequest) => void;
@@ -128,6 +129,7 @@ export function RequestsWorkspace({
   onWhatsApp,
   onConvert,
   onSuggest,
+  onRewrite,
   onUpdateStatus,
   onOpenReservation,
   onDelete
@@ -297,19 +299,21 @@ export function RequestsWorkspace({
                       WhatsApp'a Hazırla
                     </ActionButton>
                   )}
-                  {selectedActionMode === "open" && (
-                    <ActionButton
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      onClick={() => onSuggest(selectedRequest)}
-                      disabled={suggestingRequestId === selectedRequest.id}
-                    >
-                      <Sparkles size={16} aria-hidden="true" />
-                      {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "Yeniden hazırla"}
-                    </ActionButton>
-                  )}
                 </div>
+                {selectedActionMode === "open" && (
+                  <div className="request-ai-rewrite-actions">
+                    <span>AI ile düzenle</span>
+                    <div className="action-row">
+                      <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı daha kısa ve doğrudan yaz.")} disabled={aiState === "loading"}>Daha Kısa</ActionButton>
+                      <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı daha samimi ve sıcak yaz.")} disabled={aiState === "loading"}>Daha Samimi</ActionButton>
+                      <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı daha resmi ve ölçülü yaz.")} disabled={aiState === "loading"}>Daha Resmi</ActionButton>
+                      <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı mevcut talep bilgilerine göre yeniden hazırla.")} disabled={aiState === "loading"}>
+                        <Sparkles size={16} aria-hidden="true" />
+                        {aiState === "loading" ? "Hazırlanıyor" : "Yeniden hazırla"}
+                      </ActionButton>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <div className="action-row request-primary-actions">
