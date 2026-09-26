@@ -31,6 +31,7 @@ import type {
   SetupController
 } from "../../app/controller-types";
 import type { UiPreferences } from "../../ui-preferences";
+import { CustomerMessagesWorkspace } from "../customers/CustomerMessagesWorkspace";
 import { CustomersWorkspace } from "../customers/CustomersWorkspace";
 import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
 import { WhatsAppWorkspace } from "../messages/MessageWorkspaces";
@@ -43,10 +44,9 @@ import {
   formatTaskDue
 } from "../operations/OperationWorkspaces";
 import { SettingsWorkspace } from "../settings/SettingsWorkspace";
-import { CustomerWorkPage } from "../../pages/CustomerWorkPage";
+import { CustomerWorkPage, type CustomerWorkTab } from "../../pages/CustomerWorkPage";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
-import { MessagesPage } from "../../pages/MessagesPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
 import { useCalendarPageController } from "../calendar/calendar-page-state";
 import { usePensionPageController } from "../pension/pension-page-state";
@@ -57,6 +57,8 @@ import { RestaurantPage } from "../../pages/RestaurantPage";
 interface DesktopWorkspaceRouterProps {
   activePage: DesktopPage;
   requestPageChange: RequestPageChange;
+  customerWorkTab: CustomerWorkTab;
+  setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
   registerPageLeaveGuard: RegisterPageLeaveGuard;
   syncState: SyncState;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
@@ -79,6 +81,8 @@ interface DesktopWorkspaceRouterProps {
 export function DesktopWorkspaceRouter({
   activePage,
   requestPageChange,
+  customerWorkTab,
+  setCustomerWorkTab,
   registerPageLeaveGuard,
   syncState,
   setSyncState,
@@ -131,6 +135,7 @@ export function DesktopWorkspaceRouter({
   } = menuController;
   const {
     setSelectedWhatsAppRequestId,
+    readyWhatsAppRequests,
     selectedWhatsAppRequest,
     selectedWhatsAppMessage,
     selectedWhatsAppUrl,
@@ -146,7 +151,7 @@ export function DesktopWorkspaceRouter({
     handleWhatsAppMessageSent,
     handleDeleteWhatsAppMessage,
     handleCreateOwnerReplySuggestion,
-    handleRewriteWhatsAppMessage,
+    handleRewriteRequestReply,
   } = messagingController;
   const {
     manualRequestForm,
@@ -221,6 +226,8 @@ export function DesktopWorkspaceRouter({
   const surfaceSelectedWhatsAppRequest = surfaceData.requests.find(
     (request) => request.id === selectedWhatsAppRequest?.id
   );
+  const readyWhatsAppRequestIds = new Set(readyWhatsAppRequests.map((request) => request.id));
+  const surfaceReadyWhatsAppRequests = surfaceData.requests.filter((request) => readyWhatsAppRequestIds.has(request.id));
   const runtimeFeatures = {
     rooms: roomsEnabled,
     tables: tablesEnabled,
@@ -233,14 +240,11 @@ export function DesktopWorkspaceRouter({
     if (request) {
       setSelectedRequestId(request.id);
     }
+    setCustomerWorkTab(requestsEnabled ? "requests" : "customers");
     requestPageChange("customerWork");
   }
 
   function openDashboardReply(request: SyncedCustomerRequest) {
-    if (whatsappEnabled) {
-      openWhatsApp(request);
-      return;
-    }
     openDashboardCustomerWork(request);
   }
 
@@ -320,55 +324,6 @@ export function DesktopWorkspaceRouter({
     return result;
   }
 
-  const persistentMessagesPage = (
-    <MessagesPage
-      whatsappEnabled={customerMessagingEnabled}
-      automaticWebviewRequired={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
-      active={activePage === "messages"}
-      safeMode={(
-        <WhatsAppWorkspace
-          view="safe"
-          preparedMessage={messagingController.preparedWhatsAppMessage}
-          requests={surfaceData.requests}
-          selectedRequest={surfaceSelectedWhatsAppRequest}
-          selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-          selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
-          aiEnabled={aiEnabled}
-          aiState={aiState}
-          aiMessage={aiMessage}
-          getRequestStatusTone={getRequestStatusTone}
-          onSelectRequest={setSelectedWhatsAppRequestId}
-          onOpenExternal={openSelectedWhatsAppExternal}
-          onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
-          onRewrite={handleRewriteWhatsAppMessage}
-          onMessageSent={handleWhatsAppMessageSent}
-          onDeleteMessage={handleDeleteWhatsAppMessage}
-        />
-      )}
-      webMode={(onReturnToSafe) => (
-        <WhatsAppWorkspace
-          view="web"
-          preparedMessage={messagingController.preparedWhatsAppMessage}
-          requests={surfaceData.requests}
-          selectedRequest={surfaceSelectedWhatsAppRequest}
-          selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-          selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
-          aiEnabled={aiEnabled}
-          aiState={aiState}
-          aiMessage={aiMessage}
-          getRequestStatusTone={getRequestStatusTone}
-          onSelectRequest={setSelectedWhatsAppRequestId}
-          onOpenExternal={openSelectedWhatsAppExternal}
-          onReturnToSafe={onReturnToSafe}
-          onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
-          onRewrite={handleRewriteWhatsAppMessage}
-          onMessageSent={handleWhatsAppMessageSent}
-          onDeleteMessage={handleDeleteWhatsAppMessage}
-        />
-      )}
-    />
-  );
-
   return (
     <>
       {activePage === "dashboard" ? (
@@ -415,6 +370,9 @@ export function DesktopWorkspaceRouter({
       ) : activePage === "customerWork" ? (
         <CustomerWorkPage
           requestsEnabled={requestsEnabled}
+          whatsappEnabled={customerMessagingEnabled}
+          activeTab={customerWorkTab}
+          onTabChange={setCustomerWorkTab}
           requests={(
             <RequestsWorkspace
               requests={surfaceData.requests}
@@ -436,6 +394,7 @@ export function DesktopWorkspaceRouter({
               onWhatsApp={openWhatsApp}
               onConvert={handleConvertRequestToReservation}
               onSuggest={handleCreateOwnerReplySuggestion}
+              onRewrite={handleRewriteRequestReply}
               onUpdateStatus={handleUpdateRequestStatus}
               onOpenReservation={openRequestReservation}
               onDelete={handleDeleteRequest}
@@ -448,6 +407,46 @@ export function DesktopWorkspaceRouter({
               aiEnabled={aiEnabled}
               onSave={handleSaveCustomer}
               onAnalyzeIdentity={handleAnalyzeIdentityImage}
+            />
+          )}
+          messages={(
+            <CustomerMessagesWorkspace
+              whatsappEnabled={customerMessagingEnabled}
+              automaticWebviewRequired={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
+              active={activePage === "customerWork" && customerWorkTab === "messages"}
+              safeMode={(
+                <WhatsAppWorkspace
+                  view="safe"
+                  preparedMessage={messagingController.preparedWhatsAppMessage}
+                  requests={surfaceReadyWhatsAppRequests}
+                  selectedRequest={surfaceSelectedWhatsAppRequest}
+                  selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+                  selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
+                  getRequestStatusTone={getRequestStatusTone}
+                  onSelectRequest={setSelectedWhatsAppRequestId}
+                  onOpenExternal={openSelectedWhatsAppExternal}
+                  onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
+                  onMessageSent={handleWhatsAppMessageSent}
+                  onDeleteMessage={handleDeleteWhatsAppMessage}
+                />
+              )}
+              webMode={(onReturnToSafe) => (
+                <WhatsAppWorkspace
+                  view="web"
+                  preparedMessage={messagingController.preparedWhatsAppMessage}
+                  requests={surfaceReadyWhatsAppRequests}
+                  selectedRequest={surfaceSelectedWhatsAppRequest}
+                  selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+                  selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
+                  getRequestStatusTone={getRequestStatusTone}
+                  onSelectRequest={setSelectedWhatsAppRequestId}
+                  onOpenExternal={openSelectedWhatsAppExternal}
+                  onReturnToSafe={onReturnToSafe}
+                  onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
+                  onMessageSent={handleWhatsAppMessageSent}
+                  onDeleteMessage={handleDeleteWhatsAppMessage}
+                />
+              )}
             />
           )}
         />
@@ -566,7 +565,7 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "market" ? (
         <MarketPage customers={dashboardData.customers} controller={marketController} />
-      ) : activePage === "messages" ? null : (
+      ) : (
         <SettingsWorkspace
           setupData={setupData}
           dashboardData={surfaceData}
@@ -591,9 +590,6 @@ export function DesktopWorkspaceRouter({
           registerPageLeaveGuard={registerPageLeaveGuard}
         />
       )}
-      <div className={activePage === "messages" ? "persistent-messages-page" : "persistent-messages-page is-hidden"} aria-hidden={activePage !== "messages"}>
-        {persistentMessagesPage}
-      </div>
     </>
   );
 }
