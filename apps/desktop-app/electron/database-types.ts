@@ -208,6 +208,7 @@ export interface DesktopDashboardData {
   backupPath: string;
   webModuleUrl: string;
   requests: SyncedCustomerRequest[];
+  preparedWhatsAppMessages: DesktopPreparedMessage[];
   rooms: DesktopRoom[];
   tables: DesktopTable[];
   reservations: DesktopReservation[];
