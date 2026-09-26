@@ -8,17 +8,6 @@ export function normalizeBoolean(value: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
-export function parseAiWorkspacePayload(value: unknown): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
-}
-
 export function normalizeStringArray(value: string[]) {
   return value.map((item) => item.trim()).filter(Boolean);
 }
