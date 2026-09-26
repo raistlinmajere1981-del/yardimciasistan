@@ -175,7 +175,7 @@ export function RestaurantPage({
           } : null}
           center={{
             title: "Masalar",
-            ariaLabel: "Masa yönetimi",
+            ariaLabel: "Masalar paneli",
             toolbar: tableToolbar,
             content: tableFloor
           }}
