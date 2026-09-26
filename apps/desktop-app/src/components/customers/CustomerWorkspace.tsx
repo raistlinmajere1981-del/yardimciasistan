@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BedDouble, CreditCard, MessageCircle, Phone, Save, Sparkles, Trash2 } from "lucide-react";
+import { BedDouble, CreditCard, MessageCircle, Phone, Save, Trash2 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, DesktopStatusUpdateResult, SaveCustomerInput } from "../../../electron/database";
 import { customerFormToInput, formatCustomerGender, formatCustomerLastContactDate, formatCustomerRoomStayStatus, formatCustomerSource, formatIdentityType, formatStayDateRange, hasCustomerIdentityDetails, toCustomerForm, type CustomerFormState } from "../../app/customer-model";
