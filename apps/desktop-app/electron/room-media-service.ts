@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { dialog, type BrowserWindow } from "electron";
+import { dialog, type BrowserWindow, type OpenDialogOptions } from "electron";
 import type {
   AddRoomMediaInput,
   DeleteRoomMediaInput,
@@ -45,9 +45,9 @@ export async function addRoomMediaFromDialog(
   const filters = kind === "video"
     ? [{ name: "Video", extensions: ["mp4", "webm"] }]
     : [{ name: "Görsel", extensions: ["jpg", "jpeg", "png", "webp"] }];
-  const pickerOptions = {
+  const pickerOptions: OpenDialogOptions = {
     title: mediaPickerTitle(kind),
-    properties: kind === "photo" ? ["openFile", "multiSelections"] as const : ["openFile"] as const,
+    properties: kind === "photo" ? ["openFile", "multiSelections"] : ["openFile"],
     filters
   };
   const result = owner
