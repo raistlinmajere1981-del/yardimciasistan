@@ -33,7 +33,7 @@ try {
   const board = page.getByRole('region', { name: 'Pansiyon operasyonları', exact: true });
   await expect(board.locator('.operations-board__pane')).toHaveCount(3);
   await expect(page.getByRole('region', { name: 'Pansiyon rezervasyonları', exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Oda yönetimi', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Odalar paneli', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Pansiyon günlük işleri', exact: true })).toBeVisible();
   const bounds = await board.boundingBox();
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(769);
