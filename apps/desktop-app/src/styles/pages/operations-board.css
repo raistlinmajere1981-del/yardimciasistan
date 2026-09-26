@@ -142,7 +142,11 @@
   justify-content: flex-start;
 }
 
-.operations-board__pane--center .room-grid,
+.operations-board__pane--center .room-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-sm)), 1fr));
+  align-content: start;
+}
+
 .operations-board__pane--center .restaurant-table-area-list {
   align-content: start;
 }
