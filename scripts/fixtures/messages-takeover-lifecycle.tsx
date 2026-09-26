@@ -13,7 +13,7 @@ function Harness() {
 
   return (
     <CustomerMessagesWorkspace
-      safeMode={<div data-testid="safe-surface">safe</div>}
+      safeMode={() => <div data-testid="safe-surface">safe</div>}
       webMode={() => <div data-testid="web-surface">web</div>}
       whatsappEnabled
       prewarmWebview={false}
