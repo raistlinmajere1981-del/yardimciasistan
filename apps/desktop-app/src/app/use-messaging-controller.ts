@@ -21,7 +21,7 @@ interface UseMessagingControllerOptions {
   customersEnabled: boolean;
   whatsappEnabled: boolean;
   customerCreditEnabled?: boolean;
-  onOpenMessages: () => void;
+  onOpenCustomerMessages: () => void;
 }
 
 export function useMessagingController({
@@ -33,7 +33,7 @@ export function useMessagingController({
   customersEnabled,
   whatsappEnabled,
   customerCreditEnabled = false,
-  onOpenMessages
+  onOpenCustomerMessages
 }: UseMessagingControllerOptions) {
   const { confirm, confirmDialog } = useConfirmDialog();
   const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestIdState] = useState(dashboardData.requests[0]?.id ?? "");
@@ -63,7 +63,7 @@ export function useMessagingController({
     invalidateWhatsAppSelection();
     setPreparedWhatsAppMessage(message);
     setSelectedWhatsAppRequestIdState("");
-    onOpenMessages();
+    onOpenCustomerMessages();
   }
 
   function openPreparedCreditWhatsApp(message: PreparedWhatsAppMessage) {
@@ -330,11 +330,23 @@ export function useMessagingController({
     setPreparedWhatsAppMessage(null);
   }, [whatsappEnabled]);
 
+  const readyWhatsAppRequests = useMemo(
+    () => !customersEnabled || !whatsappEnabled
+      ? []
+      : dashboardData.requests.filter((request) => Boolean(
+          (aiEnabled ? request.ai_suggested_reply : "")?.trim()
+          || request.whatsapp_message?.trim()
+        )),
+    [aiEnabled, customersEnabled, dashboardData.requests, whatsappEnabled]
+  );
+
   const selectedWhatsAppRequest = useMemo(
-    () => !customersEnabled || surfacePreparedWhatsAppMessage
-      ? undefined
-      : dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId) ?? dashboardData.requests[0],
-    [customersEnabled, dashboardData.requests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
+    () => {
+      if (!customersEnabled || surfacePreparedWhatsAppMessage) return undefined;
+      return dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId)
+        ?? readyWhatsAppRequests[0];
+    },
+    [customersEnabled, dashboardData.requests, readyWhatsAppRequests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
   );
 
   const selectedWhatsAppMessage = useMemo(
@@ -360,7 +372,7 @@ export function useMessagingController({
       return;
     }
     setSelectedWhatsAppRequestId(request.id);
-    onOpenMessages();
+    onOpenCustomerMessages();
   }
 
   function callCustomer(request: SyncedCustomerRequest) {
@@ -529,21 +541,20 @@ export function useMessagingController({
     }
   }
 
-  async function handleRewriteWhatsAppMessage(instructions: string) {
+  async function handleRewriteRequestReply(request: SyncedCustomerRequest, instructions: string) {
     if (!aiEnabledRef.current || !customersEnabledRef.current) {
       setAiState("error");
       setAiMessage("AI bu işletmede etkin değil.");
       return;
     }
-    const target = selectedWhatsAppRequest;
     const bridge = window.yardimciDesktop;
-    if (!target || !bridge?.rewriteOwnerReplySuggestion) {
+    if (!bridge?.rewriteOwnerReplySuggestion) {
       setAiState("error");
-      setAiMessage("Mesajı yenilemek için bir müşteri talebi seçin.");
+      setAiMessage("Mesajı yenileme aracı hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
-    const requestOwner = acquireRequestAiOperation(target.id, "rewrite");
+    const requestOwner = acquireRequestAiOperation(request.id, "rewrite");
     if (requestOwner === null) {
       setAiState("error");
       setAiMessage("Bu talep için başka bir AI işlemi devam ediyor.");
@@ -554,12 +565,10 @@ export function useMessagingController({
     const dashboardGeneration = ++dashboardAiApplyGenerationRef.current;
     const feedbackOwner = ++replyFeedbackSequenceRef.current;
     replyFeedbackOwnerRef.current = feedbackOwner;
-    const selectionRevision = whatsappSelectionRevisionRef.current;
     const aiEpoch = aiCapabilityEpochRef.current;
 
     const operationCurrent = () => (
       generation === rewriteGenerationRef.current
-      && selectionRevision === whatsappSelectionRevisionRef.current
       && aiEpoch === aiCapabilityEpochRef.current
       && aiEnabledRef.current
       && customersEnabledRef.current
@@ -570,7 +579,7 @@ export function useMessagingController({
 
     try {
       const result = await bridge.rewriteOwnerReplySuggestion({
-        requestId: target.id,
+        requestId: request.id,
         instructions
       });
       if (!operationCurrent()) return;
@@ -589,7 +598,7 @@ export function useMessagingController({
         setAiState("success");
         setAiMessage(result.missingFields.length > 0
           ? `${result.message} Eksik: ${result.missingFields.join(", ")}.`
-          : "Hazır mesaj yenilendi. Göndermeden önce kontrol edin.");
+          : "Cevap taslağı yenilendi. Göndermeden önce kontrol edin.");
       }
     } catch {
       if (operationCurrent() && replyFeedbackOwnerRef.current === feedbackOwner) {
@@ -597,7 +606,7 @@ export function useMessagingController({
         setAiMessage("AI cevabı alınamadı. Biraz sonra tekrar deneyin.");
       }
     } finally {
-      releaseRequestAiOperation(target.id, requestOwner);
+      releaseRequestAiOperation(request.id, requestOwner);
     }
   }
 
@@ -609,6 +618,7 @@ export function useMessagingController({
     birthdayPreparingId,
     selectedWhatsAppRequestId,
     setSelectedWhatsAppRequestId,
+    readyWhatsAppRequests,
     selectedWhatsAppRequest,
     selectedWhatsAppMessage,
     selectedWhatsAppUrl,
@@ -624,6 +634,6 @@ export function useMessagingController({
     handleWhatsAppMessageSent,
     handleDeleteWhatsAppMessage,
     handleCreateOwnerReplySuggestion,
-    handleRewriteWhatsAppMessage,
+    handleRewriteRequestReply,
   };
 }
