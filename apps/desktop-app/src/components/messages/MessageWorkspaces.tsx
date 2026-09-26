@@ -18,20 +18,6 @@ import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
-function getAiStatusTone(state: SyncState, fallback = false): StatusTone {
-  if (state === "loading") return "info";
-  if (state === "error") return "danger";
-  if (state === "success") return fallback ? "warning" : "success";
-  return "neutral";
-}
-
-function getAiStatusMessageClass(state: SyncState) {
-  if (state === "loading") return "status-message status-message--info";
-  if (state === "error") return "status-message status-message--danger";
-  if (state === "success") return "status-message status-message--success";
-  return "status-message";
-}
-
 interface WhatsAppWorkspaceProps {
   preparedMessage?: PreparedWhatsAppMessage | null;
   view: "safe" | "web";
@@ -39,15 +25,11 @@ interface WhatsAppWorkspaceProps {
   selectedRequest: SyncedCustomerRequest | undefined;
   selectedMessage: string;
   selectedUrl: string;
-  aiEnabled: boolean;
-  aiState: SyncState;
-  aiMessage: string;
   getRequestStatusTone: (status: string) => StatusTone;
   onSelectRequest: (requestId: string) => void;
   onOpenExternal: () => void;
   onReturnToSafe?: () => void;
   onCall?: () => void;
-  onRewrite: (instructions: string) => void;
   onMessageSent: (requestId: string, message: string) => Promise<{ ok: boolean; message: string }>;
   onDeleteMessage: (request: SyncedCustomerRequest) => void;
 }
@@ -79,7 +61,7 @@ function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
   };
 }
 
-export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
+export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
   const { confirm, confirmDialog } = useConfirmDialog();
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const registeredGuestIdRef = useRef<number | null>(null);
@@ -319,16 +301,16 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
       <aside className="panel whatsapp-request-panel">
         {preparedMessage && <div className="panel-heading compact"><div><strong>{recipientName}</strong><p>{preparedMessageLabel} · mesaj hazırlandı</p><small>Gönderim WhatsApp içinde sizin kontrolünüzde.</small></div></div>}
         <div className="panel-heading compact">
-          <h2>Talepler</h2>
-          <StatusBadge tone="info">{requests.length} kayıt</StatusBadge>
+          <h2>Hazır Mesajlar</h2>
+          <StatusBadge tone="info">{requests.length + (preparedMessage ? 1 : 0)} kayıt</StatusBadge>
         </div>
 
         <DataList className="whatsapp-request-list">
           {requests.length === 0 ? (
             <div className="empty-state empty-state--compact">
               <MessageCircle size={24} aria-hidden="true" />
-              <strong>Hazır talep yok.</strong>
-              <p>Web talepleri çekildiğinde burada görünür.</p>
+              <strong>Hazır mesaj yok.</strong>
+              <p>Bir talep cevabı veya müşteri mesajı hazırlandığında burada görünür.</p>
             </div>
           ) : (
             requests.map((request) => (
@@ -482,18 +464,6 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
             Mesajı Sil
           </ActionButton>}
         </div>
-        {aiEnabled && !preparedMessage && (
-          <div className="message-ai-actions">
-            <strong>AI ile mesajı düzenle</strong>
-            <div>
-              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı daha kısa ve doğrudan yaz.")} disabled={aiState === "loading"}>Daha Kısa</ActionButton>
-              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı daha samimi ve sıcak yaz.")} disabled={aiState === "loading"}>Daha Samimi</ActionButton>
-              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı daha resmi ve ölçülü yaz.")} disabled={aiState === "loading"}>Daha Resmi</ActionButton>
-              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı mevcut talep bilgilerine göre yeniden hazırla.")} disabled={aiState === "loading"}>AI ile Yenile</ActionButton>
-            </div>
-            <p className={`${getAiStatusMessageClass(aiState)} ai-message-status`} role={aiState === "error" ? "alert" : "status"} aria-live="polite">{aiMessage}</p>
-          </div>
-        )}
       </aside>}
     </section>
   );
