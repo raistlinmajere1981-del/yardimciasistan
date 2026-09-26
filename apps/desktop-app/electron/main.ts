@@ -1034,7 +1034,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
   };
   const financeData = new DesktopFinanceService(getDatabase().databasePath).getData(20);
   const roomFolioData = new DesktopRoomFolioService(getDatabase().databasePath).getData();
-  const messages = getDatabase().getAndroidPreparedMessages().map((message) => ({
+  const messages = getDatabase().getPreparedWhatsAppMessages().map((message) => ({
     id: message.id,
     request_id: message.requestId,
     customer_name: message.customerName,

@@ -39,7 +39,7 @@ function assertDesktopMessageDeletion(database) {
     missingFields: []
   });
   assert.equal(suggestion.ok, true);
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === request.id), true);
+  assert.equal(database.getPreparedWhatsAppMessages().some((message) => message.requestId === request.id), true);
 
   const result = database.deleteWhatsAppMessage({ requestId: request.id });
   assert.equal(result.ok, true);
@@ -47,7 +47,7 @@ function assertDesktopMessageDeletion(database) {
   assert.ok(preservedRequest);
   assert.equal(preservedRequest.ai_suggested_reply, "");
   assert.equal(preservedRequest.whatsapp_message, "");
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === request.id), false);
+  assert.equal(database.getPreparedWhatsAppMessages().some((message) => message.requestId === request.id), false);
   assert.equal(database.countEventsByType("whatsapp.message_deleted"), 1);
 }
 
@@ -78,7 +78,7 @@ function assertDesktopRequestDeletion(database) {
   const result = database.deleteRequest(request.id);
   assert.equal(result.ok, true);
   assert.equal(result.dashboardData.requests.some((candidate) => candidate.id === request.id), false);
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === request.id), false);
+  assert.equal(database.getPreparedWhatsAppMessages().some((message) => message.requestId === request.id), false);
   assert.equal(database.getDeletedRequestIds().includes(request.id), true);
   assert.equal(database.countEventsByType("request.deleted"), 1);
 }
@@ -136,7 +136,7 @@ function assertAndroidAdminOnlyDeletion(database) {
     suggestedReply: "Android yöneticisinin sileceği mesaj.",
     missingFields: []
   }).ok, true);
-  const preparedMessage = database.getAndroidPreparedMessages().find((message) => message.requestId === staffRequest.id);
+  const preparedMessage = database.getPreparedWhatsAppMessages().find((message) => message.requestId === staffRequest.id);
   assert.ok(preparedMessage);
   const messageDeletion = database.applyAndroidAction(androidAction(
     "android_message_delete_001",
@@ -144,7 +144,7 @@ function assertAndroidAdminOnlyDeletion(database) {
     { message_id: preparedMessage.id, request_id: staffRequest.id, expected_updated_at: preparedMessage.updatedAt }
   ));
   assert.equal(messageDeletion.ok, true);
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === staffRequest.id), false);
+  assert.equal(database.getPreparedWhatsAppMessages().some((message) => message.requestId === staffRequest.id), false);
 
   const requestDeletion = database.applyAndroidAction(androidAction(
     "android_request_delete_001",

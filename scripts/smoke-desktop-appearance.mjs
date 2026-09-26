@@ -420,6 +420,7 @@ function createEmptyDashboardFixture() {
     backupPath: "/tmp/yardimci-asistan-appearance-smoke-backups",
     webModuleUrl: "https://example.test/yardimci-asistan",
     requests: [],
+    preparedWhatsAppMessages: [],
     rooms: [],
     tables: [],
     reservations: [],

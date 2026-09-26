@@ -178,7 +178,7 @@ try {
     await page.setViewportSize({ width, height });
     await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
     const customerViews = page.getByRole('navigation', { name: 'Müşteri işleri görünümü' });
-    await expect(customerViews.getByRole('button')).toHaveCount(2);
+    await expect(customerViews.getByRole('button')).toHaveCount(3);
     await customerViews.getByRole('button', { name: 'Talepler', exact: true }).click();
     await expect(page.locator('.request-filter-tabs').getByRole('tab')).toHaveCount(2);
     await capture('requests');

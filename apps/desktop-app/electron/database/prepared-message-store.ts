@@ -11,7 +11,7 @@ import { getAndroidVersionConflict, nextMutationTimestamp } from "./android-util
 import { insertDeletionEvent } from "./deletion-store.js";
 import type { DeletionAndroidEventSink } from "./deletion-store.js";
 
-export function getAndroidPreparedMessages(db: DatabaseSync, requests: SyncedCustomerRequest[]): DesktopPreparedMessage[] {
+export function getPreparedWhatsAppMessages(db: DatabaseSync, requests: SyncedCustomerRequest[]): DesktopPreparedMessage[] {
   const rows = db
     .prepare(`
         SELECT

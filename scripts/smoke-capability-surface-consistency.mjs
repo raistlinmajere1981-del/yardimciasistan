@@ -52,7 +52,7 @@ const dailyTaskIpcSource = source("apps/desktop-app/electron/ipc/daily-task-ipc.
 const financeWorkspaceSource = source("apps/desktop-app/src/components/finance/FinanceWorkspace.tsx");
 const restaurantReservationsSource = source("apps/desktop-app/src/components/operations/RestaurantReservationsWorkspace.tsx");
 const desktopProjectionSource = source("apps/desktop-app/src/app/capability-projection.ts");
-const aiWorkspaceSource = source("apps/desktop-app/src/components/messages/MessageWorkspaces.tsx");
+const messageWorkspaceSource = source("apps/desktop-app/src/components/messages/MessageWorkspaces.tsx");
 const messagingControllerSource = source("apps/desktop-app/src/app/use-messaging-controller.ts");
 const dashboardSource = source("apps/desktop-app/src/pages/DashboardPage.tsx");
 const systemHealthSource = source("apps/desktop-app/src/components/dashboard/SystemHealthPanel.tsx");
@@ -351,24 +351,37 @@ assert.match(
   /preparedWhatsAppMessages:\s*enabled\.has\(C\.CUSTOMERS\)\s*&&\s*enabled\.has\(C\.WHATSAPP\)/,
   "prepared WhatsApp counts require both customer and WhatsApp capabilities"
 );
-assert.match(aiWorkspaceSource, /const modes:[\s\S]{0,120}= customersEnabled[\s\S]{0,300}\["daily"/);
-const normalizedAiWorkspaceSource = aiWorkspaceSource.replace(/\s+/g, " ");
+assert.doesNotMatch(
+  messageWorkspaceSource,
+  /aiEnabled|aiState|onRewrite|ai_suggested_reply|rewrite/i,
+  "Hazır Mesajlar outbox must stay a delivery surface without AI controls"
+);
 assert.match(
-  normalizedAiWorkspaceSource,
-  /customersEnabled\s*&&\s*<label className="form-field form-field--fluid ai-field"/,
-  "AI customer controls must remain gated by the customer capability"
+  messageWorkspaceSource,
+  /Hazır yanıt/,
+  "outbox safe view must keep the prepared-response delivery label"
 );
 assert.match(
   messagingControllerSource,
-  /surfaceAiWorkspaceMode:\s*AiWorkspaceMode\s*=\s*customersEnabled\s*\?\s*aiWorkspaceMode\s*:\s*"daily"/,
-  "AI customer modes must collapse to the daily surface when core.customers is disabled"
+  /handleCreateOwnerReplySuggestion/,
+  "request AI suggestion ownership must live in the messaging controller"
+);
+assert.match(
+  messagingControllerSource,
+  /handleRewriteRequestReply/,
+  "request AI rewrite ownership must live in the messaging controller"
+);
+assert.match(
+  messagingControllerSource,
+  /acquireRequestAiOperation/,
+  "request AI mutations must stay request-scoped"
 );
 assert.match(desktopProjectionSource, /newRequests: requestsEnabled \? source\.summary\.newRequests : 0/);
 assert.match(desktopProjectionSource, /waitingRequests: requestsEnabled \? source\.summary\.waitingRequests : 0/);
 assert.match(
   routerSource,
-  /<WhatsAppWorkspace[\s\S]{0,180}requests=\{surfaceData\.requests\}/,
-  "persistent messaging surfaces must consume the capability-safe request projection"
+  /<WhatsAppWorkspace[\s\S]{0,180}requests=\{surfaceReadyWhatsAppRequests\}/,
+  "outbox surfaces must consume the prepared-message queue projection"
 );
 assert.match(
   dashboardSource,
@@ -378,8 +391,13 @@ assert.match(
 assert.doesNotMatch(systemHealthSource, /AI devre dışı olsa|Android modülü bu işletmede kullanılmıyor/);
 assert.match(
   navigationSource,
-  /aiEnabled && customersEnabled[\s\S]{0,180}AI ile günlük işletme değerlendirmeleri hazırlayın/,
-  "AI-only navigation copy must not promise customer messaging"
+  /runtimeHasCapability\(capabilities, C\.REQUESTS\) \? "yeni talepler" : ""/,
+  "dashboard copy must derive topics from enabled capabilities"
+);
+assert.match(
+  navigationSource,
+  /runtimeHasCapability\(capabilities, C\.WHATSAPP\) \? "hazır mesajları" : ""/,
+  "customer-work copy must gate prepared messages on the WhatsApp capability"
 );
 
 // E — a composed pension + retail set exposes both domains without inventing food service.

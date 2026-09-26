@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { installPensionWorkspaceFixture } from './test-helpers/pension-workspace-fixture.mjs';
+import { chooseDate } from './test-helpers/date-time-picker.mjs';
 import { createCompactUiFixture } from './lib/desktop-renderer-fixtures.mjs';
 
 const server = await createServer({ root: resolve('apps/desktop-app'), configFile: resolve('apps/desktop-app/vite.renderer.config.ts'), server: { port: 0 } });
@@ -158,8 +159,8 @@ try {
   await dialog.getByLabel('Konaklama odası').selectOption('room-102');
   await button('Odaya Ata').click();
   await expect(dialog.getByLabel('Müşteri', { exact: true })).toBeDisabled();
-  await dialog.getByLabel('Giriş tarihi').fill('2031-01-01');
-  await dialog.getByLabel('Çıkış tarihi').fill('2031-01-02');
+  await chooseDate(dialog, 'Giriş tarihi', '2031-01-01');
+  await chooseDate(dialog, 'Çıkış tarihi', '2031-01-02');
   await button('Kaydet').click();
   expect((await page.evaluate(() => window.fixtureState())).dashboard.customerRoomStays[1].reservationId).toBe('');
   await button('Çalışma alanını kapat').click(); await expect(customerEntry).toBeFocused();

@@ -30,7 +30,6 @@ function Fixture() {
           customerCreditEnabled: false,
           onCall: () => {},
           onWhatsApp: () => {},
-          onSummarize: () => {},
           onSave: async () => ({ ok: false, message: "fixture" }),
           onAnalyzeIdentity: async () => ({ ok: false, message: "fixture" }),
           onDelete: async () => undefined
@@ -43,7 +42,7 @@ function Fixture() {
         tasks={<DailyTasksWorkspace scope="pension" tasks={data.dailyTasks} onSave={async () => ({ ok: false, message: "fixture" })} onDelete={async () => ({ ok: false, message: "fixture" })} onUpdateStatus={() => {}} />} />
         : <CustomersWorkspace customers={data.customers} rooms={data.rooms} stays={data.customerRoomStays} reservations={data.reservations} requests={[]}
           aiEnabled={false} whatsappEnabled={false} reservationsEnabled={capabilities.reservationsEnabled} staysEnabled={capabilities.staysEnabled}
-          onCall={() => {}} onWhatsApp={() => {}} onSummarize={() => {}} onSave={async () => ({ ok: false, message: "fixture" })}
+          onCall={() => {}} onWhatsApp={() => {}} onSave={async () => ({ ok: false, message: "fixture" })}
           onAnalyzeIdentity={async () => ({ ok: false, message: "fixture" })} onDelete={async () => undefined} />}
     </AppShell>
   </WorkspaceNavigationProvider>;

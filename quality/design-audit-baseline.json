@@ -506,14 +506,6 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/pages/MessagesPage.tsx": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
     "apps/desktop-app/src/pages/OperationCalendarPage.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
