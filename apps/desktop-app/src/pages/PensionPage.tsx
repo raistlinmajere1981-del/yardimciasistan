@@ -31,7 +31,7 @@ export function PensionPage({
           } : null}
           center={{
             title: "Odalar",
-            ariaLabel: "Oda yönetimi",
+            ariaLabel: "Odalar paneli",
             content: rooms
           }}
           right={tasksEnabled ? {
