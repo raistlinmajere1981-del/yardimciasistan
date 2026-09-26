@@ -77,6 +77,8 @@ import { createBusinessAiCatalog } from "./business-ai-catalog-service";
 import { createPublicRoomCatalog } from "./public-room-catalog-publication";
 import { publishPendingRoomMedia } from "./room-media-publication";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
+import { registerGoogleReviewsSettingsIpcHandlers } from "./google-reviews-settings-ipc";
+import { publishGoogleReviewsSettings } from "./google-reviews-settings";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
 import { registerBusinessAiIpcHandlers } from "./ipc/business-ai-ipc";
@@ -443,6 +445,7 @@ if (!hasSingleInstanceLock) {
     birthdayScheduler.start();
     if (!desktopDatabase.getSetupData().setupRequired) {
       void publishBusinessAiContextFromMain();
+      void publishGoogleReviewsSettingsFromMain();
     }
     void localCompanionServer.start()
       .then(() => {
@@ -575,6 +578,11 @@ function registerIpcHandlers() {
     onMutation: () => {
       void publishBusinessAiContextFromMain();
     }
+  });
+
+  registerGoogleReviewsSettingsIpcHandlers({
+    getDatabase,
+    assertUnlocked: assertAppSessionUnlocked
   });
 
   ipcMain.handle("sync:setMarketBarcodeFastPull", (event, enabled: unknown) => {
@@ -1320,6 +1328,15 @@ async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {
   return publishSavedAiSettings(
     database,
     getWebSyncConfig(database.getSetupData())
+  );
+}
+
+async function publishGoogleReviewsSettingsFromMain() {
+  const database = getDatabase();
+  return publishGoogleReviewsSettings(
+    database.databasePath,
+    getWebSyncConfig(database.getSetupData()),
+    database.getSyncRuntimeStatus().clientId
   );
 }
 
