@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BedDouble, CreditCard, MessageCircle, Phone, Save, Trash2 } from "lucide-react";
+import { BedDouble, CreditCard, MessageCircle, Save, Trash2 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, DesktopStatusUpdateResult, SaveCustomerInput } from "../../../electron/database";
 import { customerFormToInput, formatCustomerGender, formatCustomerLastContactDate, formatCustomerRoomStayStatus, formatCustomerSource, formatIdentityType, formatStayDateRange, hasCustomerIdentityDetails, toCustomerForm, type CustomerFormState } from "../../app/customer-model";
@@ -26,7 +26,6 @@ export interface CustomerWorkspaceProps {
   staysEnabled: boolean;
   customerCreditEnabled: boolean;
   onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
-  onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
@@ -34,7 +33,7 @@ export interface CustomerWorkspaceProps {
 }
 
 export function CustomerWorkspace(props: CustomerWorkspaceProps) {
-  const { intent, data, aiEnabled, whatsappEnabled, reservationsEnabled, staysEnabled, customerCreditEnabled, onPreparedCreditWhatsApp, onCall, onWhatsApp, onSave, onAnalyzeIdentity, onDelete } = props;
+  const { intent, data, aiEnabled, whatsappEnabled, reservationsEnabled, staysEnabled, customerCreditEnabled, onPreparedCreditWhatsApp, onWhatsApp, onSave, onAnalyzeIdentity, onDelete } = props;
   const navigation = useWorkspaceNavigation();
   const customer = data.customers.find((item) => item.id === intent.entityId) ?? null;
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
@@ -133,10 +132,9 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           <div className="record-note customer-detail-note"><span>Not</span><p className="record-note__body">{customer.notes || "Müşteri notu yok."}</p></div>
           {customer.tags.length > 0 && <div className="page-toolbar__start">{customer.tags.map((tag) => <StatusBadge tone="neutral" key={tag}>{tag}</StatusBadge>)}</div>}
 
-          <div className="action-row customer-detail-actions">
-            <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(customer)} disabled={!customer.phone}><Phone size={16} aria-hidden="true" />Müşteriyi Ara</ActionButton>
-            {whatsappEnabled && <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => leaveFor(() => onWhatsApp(customer))} disabled={!customer.phone}><MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz</ActionButton>}
-          </div>
+          {whatsappEnabled && <div className="action-row customer-detail-actions">
+            <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => leaveFor(() => onWhatsApp(customer))} disabled={!customer.phone}><MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz</ActionButton>
+          </div>}
 
           {staysEnabled && <div className="action-row customer-stay-actions">
             <label className="form-field form-field--medium">Konaklama odası<select aria-label="Konaklama odası" value={entryRoomId} onChange={(event) => setEntryRoomId(event.target.value)}>{data.rooms.filter((room) => room.isActive).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select></label>
