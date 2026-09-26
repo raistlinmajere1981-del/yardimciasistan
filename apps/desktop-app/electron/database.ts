@@ -340,12 +340,15 @@ export class DesktopDatabase {
   getDashboardData(): DesktopDashboardData {
     const settings = this.db.prepare("SELECT web_module_url FROM settings LIMIT 1").get() as { web_module_url?: string } | undefined;
     const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
+    const requests = getRequests(this.db);
+    const preparedWhatsAppMessages = getStoredAndroidPreparedMessages(this.db, requests);
 
     return {
       databasePath: this.databasePath,
       backupPath: this.backupPath,
       webModuleUrl: settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
-      requests: getRequests(this.db),
+      requests,
+      preparedWhatsAppMessages,
       rooms: getStoredRooms(this.db, getStoredActiveResourceReservationTitles(this.db, "room")),
       tables: getStoredTables(this.db, getStoredActiveResourceReservationTitles(this.db, "table")),
       reservations: getStoredReservations(this.db),
