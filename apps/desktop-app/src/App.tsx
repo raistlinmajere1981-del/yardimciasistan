@@ -15,11 +15,13 @@ import { useMessagingController } from "./app/use-messaging-controller";
 import { useOperationController } from "./app/use-operation-controller";
 import { useSetupController } from "./app/use-setup-controller";
 import { DesktopAppView } from "./components/app/DesktopAppView";
+import type { CustomerWorkTab } from "./pages/CustomerWorkPage";
 
 function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
+  const [customerWorkTab, setCustomerWorkTab] = useState<CustomerWorkTab>("requests");
   const pageLeaveGuardRef = useRef<PageLeaveGuard | null>(null);
 
   const registerPageLeaveGuard = useCallback((guard: PageLeaveGuard) => {
@@ -78,7 +80,10 @@ function App() {
     customersEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
     whatsappEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP),
     customerCreditEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),
-    onOpenMessages: () => requestPageChange("messages")
+    onOpenCustomerMessages: () => {
+      setCustomerWorkTab("messages");
+      requestPageChange("customerWork");
+    }
   });
   const customerController = useCustomerController({
     dashboardData: desktopSyncController.dashboardData,
@@ -93,22 +98,6 @@ function App() {
     setSyncState,
     setStatusMessage
   });
-
-  useEffect(() => {
-    if (activePage !== "messages") return;
-    const customersEnabled = runtimeHasCapability(
-      desktopSyncController.businessCapabilities,
-      BUSINESS_CAPABILITIES.CUSTOMERS
-    );
-    const whatsappEnabled = runtimeHasCapability(
-      desktopSyncController.businessCapabilities,
-      BUSINESS_CAPABILITIES.WHATSAPP
-    );
-    if (!customersEnabled || !whatsappEnabled) {
-      pageLeaveGuardRef.current = null;
-      setActivePage("dashboard");
-    }
-  }, [activePage, desktopSyncController.businessCapabilities]);
 
   const deviceController = useDeviceController({
     setDashboardData: desktopSyncController.setDashboardData,
@@ -135,6 +124,8 @@ function App() {
       <DesktopAppView
         activePage={activePage}
         requestPageChange={requestPageChange}
+        customerWorkTab={customerWorkTab}
+        setCustomerWorkTab={setCustomerWorkTab}
         registerPageLeaveGuard={registerPageLeaveGuard}
         syncState={syncState}
         setSyncState={setSyncState}
