@@ -18,6 +18,13 @@ import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
+function getStatusTone(state: SyncState): StatusTone {
+  if (state === "loading") return "info";
+  if (state === "error") return "danger";
+  if (state === "success") return "success";
+  return "neutral";
+}
+
 interface WhatsAppWorkspaceProps {
   preparedMessage?: PreparedWhatsAppMessage | null;
   view: "safe" | "web";
@@ -375,7 +382,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
 
           <div className="whatsapp-web-feedback">
             <StatusBadge tone={copyMessage.includes("kopyalandı") ? "success" : "neutral"} role="status" aria-live="polite">{copyMessage}</StatusBadge>
-            {sendMessage && <StatusBadge className="whatsapp-send-status" tone={getAiStatusTone(sendState)} role="status" aria-live="polite">{sendMessage}</StatusBadge>}
+            {sendMessage && <StatusBadge className="whatsapp-send-status" tone={getStatusTone(sendState)} role="status" aria-live="polite">{sendMessage}</StatusBadge>}
           </div>
         </div>
 
