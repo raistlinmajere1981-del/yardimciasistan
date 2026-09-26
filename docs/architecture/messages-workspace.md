@@ -1,81 +1,108 @@
-# Messages / WhatsApp Workspace
+# Customer Messaging Workspace
 
 ## Current ownership
 
-Messages is a WhatsApp-specific operational surface.
+Customer communication is owned by **Müşteri İşleri**. There is no standalone Messages page or navigation item.
 
-The current ownership model is:
+Müşteri İşleri exposes capability-driven views:
 
-- `useMessagingController` owns prepared-message, request reply and WhatsApp handoff state.
-- `MessagesPage` owns Safe / WhatsApp presentation mode and the user-takeover barrier.
-- `WhatsAppWorkspace` owns presentation-local copy/send/webview UI state.
-- the Electron WhatsApp driver owns the single persistent WhatsApp guest used by both user and automatic birthday delivery flows.
-- request AI belongs to Müşteri İşleri, daily AI belongs to Ana Sayfa, finance AI belongs to Kasa/Raporlar.
+- **Talepler** when `feature.requests` is enabled.
+- **Müşteriler** whenever customer management is enabled.
+- **Hazır Mesajlar** when WhatsApp is enabled.
 
-There is no generic AI Workspace surface, AI prompt box or AI history browser.
+The renderer keeps one customer-work tab state. Any WhatsApp handoff switches that state to `Hazır Mesajlar` and navigates to Müşteri İşleri.
+
+## Responsibility split
+
+### Talepler
+
+The request is the owner of request-related communication.
+
+The request detail contains:
+
+- request metadata and note,
+- AI summary,
+- AI reply draft,
+- structured rewrite actions,
+- copy,
+- WhatsApp handoff,
+- reservation conversion and request lifecycle actions.
+
+AI does not own a separate workspace.
+
+### Müşteriler
+
+Customer records, stays, identity and customer-specific operations remain in the customer view.
+
+### Hazır Mesajlar
+
+This is an outbox/delivery surface, not a second request workspace.
+
+It lists request records only when they have prepared message content and can also host the current ephemeral customer-credit or birthday handoff.
+
+The safe view is limited to delivery concerns:
+
+- recipient,
+- prepared message,
+- copy,
+- call,
+- WhatsApp link,
+- delete prepared request message.
+
+AI rewrite controls do not live here; they belong to the request detail that owns the content.
+
+The WhatsApp view keeps the explicit user-controlled Web flow.
 
 ## Navigation capability
 
-The Messages navigation contribution exists only when both:
+Only **Müşteri İşleri** contributes a sidebar item.
 
-- `core.customers`
-- `service.whatsapp`
+- Customers enabled → Müşteri İşleri is visible.
+- Requests enabled → Talepler view is visible.
+- WhatsApp enabled → Hazır Mesajlar view is visible.
+- Disabling Requests does not remove customer records or prepared WhatsApp work.
+- Disabling WhatsApp removes Hazır Mesajlar without affecting request AI preparation.
 
-are enabled.
-
-Requests do not require Messages. When WhatsApp is disabled, request review and AI reply preparation remain in Müşteri İşleri and the Messages navigation item disappears immediately.
+This removes the previous Requests/WhatsApp/AI combinations that had to decide whether a separate Messages page should appear.
 
 ## Contextual AI
 
-AI is attached to the business surface that owns the work:
+AI remains attached to the business surface that owns the work:
 
 - Ana Sayfa → daily operational evaluation.
-- Müşteri İşleri → request summary + AI reply preparation.
-- Mesajlar → structured rewrite actions for an already prepared request reply.
+- Müşteri İşleri / Talepler → request summary, reply generation and structured rewrites.
 - Kasa → current cash interpretation.
 - Detaylı Raporlar → selected-period interpretation.
 
-The user is not expected to write prompts. Structured actions provide the required intent.
+The user is not expected to write prompts.
 
-Request AI generation writes the summary and suggested reply back to the request record. The request detail shows that reply directly and can copy it or hand it to WhatsApp.
+## WhatsApp guest takeover
 
-## Shared WhatsApp guest takeover
-
-Automatic birthday delivery and interactive WhatsApp mode share one real Electron guest.
+Interactive WhatsApp mode still uses the existing Electron WhatsApp guest and `persist:yardimci-whatsapp` partition.
 
 When the user enters WhatsApp mode:
 
 ```text
 renderer requests takeover
 → main marks userBusy=true
-→ active automatic owner is permanently invalidated
+→ active automatic owner is invalidated
 → active automatic run reaches a guarded settle point
 → guest is returned to the WhatsApp home URL
 → takeover Promise resolves
-→ only then is the interactive webview surface revealed
+→ the interactive webview is revealed
 ```
 
-An old automatic owner cannot become valid again when `userBusy` later returns to false.
+Renderer takeover retries retain their sequence/disposal guard.
 
-Renderer takeover retries use a sequence/disposal guard. Leaving Web mode, navigating away or losing the WhatsApp capability invalidates the retry loop before it can issue a stale takeover IPC.
-
-## Webview lifecycle
-
-The persistent Messages host remains mounted across normal navigation so the WhatsApp guest survives page changes.
-
-The guest uses the existing `persist:yardimci-whatsapp` partition.
-
-Webview registration is tied to the guest element lifecycle rather than URL state. URL changes therefore do not intentionally create a second guest or duplicate registration cycle.
+The embedded customer-work surface may unmount when leaving Müşteri İşleri; the persistent Electron partition preserves the WhatsApp login session. Automatic birthday delivery remains owned by the Electron-side automation lifecycle rather than the renderer tab.
 
 ## Request AI ownership
 
 Initial `AI Cevap Hazırla` and structured rewrite operations share request-scoped mutation ownership.
 
-Different requests may run independently. Two AI mutations for the same request cannot own the request concurrently.
+Different requests may run independently. Two AI mutations for the same request cannot own that request concurrently.
 
-Renderer generation/epoch guards prevent stale completions from overwriting a newer request result after capability or selection changes.
-
-AI reply generation is independent from WhatsApp capability. Disabling WhatsApp does not cancel an in-progress request AI operation.
+AI generation remains independent from WhatsApp capability. Turning WhatsApp off does not cancel request AI work.
 
 ## Capability normalization
 
@@ -85,7 +112,7 @@ Turning AI off invalidates pending request AI ownership and prevents stale compl
 
 ### Customers
 
-Turning Customers off invalidates customer/request messaging operations, clears prepared customer handoffs and stops pending birthday preparation.
+Turning Customers off invalidates customer/request communication operations and clears ephemeral handoffs.
 
 ### WhatsApp
 
@@ -93,8 +120,8 @@ Turning WhatsApp off:
 
 - clears selected/prepared WhatsApp presentation state,
 - invalidates pending birthday preparation,
-- hides the Messages navigation contribution,
-- does not clear or cancel request AI work owned by Müşteri İşleri.
+- removes the Hazır Mesajlar view,
+- does not clear or cancel request AI work.
 
 ### Customer Credit
 
@@ -102,6 +129,6 @@ Turning Customer Credit off clears only credit handoff state.
 
 ## User-send policy
 
-Prepared text is never treated as implicit permission to send.
+Prepared text is never treated as permission to send.
 
-Interactive WhatsApp Web send still requires the existing explicit user confirmation flow. Automatic birthday delivery keeps its separate configured automation lifecycle and ownership guards.
+Interactive WhatsApp Web send keeps the explicit user confirmation flow. Automatic birthday delivery keeps its separate configured automation lifecycle and ownership guards.
