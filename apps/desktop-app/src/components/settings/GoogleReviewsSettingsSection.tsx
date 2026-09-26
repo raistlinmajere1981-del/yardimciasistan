@@ -18,7 +18,8 @@ const EMPTY_SETTINGS: GoogleReviewsSettings = {
   enabled: false,
   placeId: "",
   apiKeyConfigured: false,
-  lastPublishedAt: ""
+  lastPublishedAt: "",
+  publicationPending: false
 };
 
 function toDraft(settings: GoogleReviewsSettings): GoogleReviewsDraft {
@@ -65,7 +66,8 @@ export function useGoogleReviewsSettings(enabled: boolean) {
     return () => { active = false; };
   }, [enabled]);
 
-  const dirty = draft.enabled !== settings.enabled
+  const dirty = settings.publicationPending
+    || draft.enabled !== settings.enabled
     || draft.placeId.trim() !== settings.placeId
     || Boolean(draft.apiKey.trim())
     || draft.clearApiKey;
@@ -249,9 +251,11 @@ export function GoogleReviewsSettingsSection({
           >
             {testing ? "Bağlantı deneniyor…" : "Google Bağlantısını Dene"}
           </ActionButton>
-          {settings.lastPublishedAt && (
+          {settings.publicationPending ? (
+            <small>Web yayını bekliyor. Kaydet düğmesi bağlantı yeniden kullanılabildiğinde yayını tekrar dener.</small>
+          ) : settings.lastPublishedAt ? (
             <small>Son web yayını: {new Date(settings.lastPublishedAt).toLocaleString("tr-TR")}</small>
-          )}
+          ) : null}
         </div>
       </fieldset>
     </section>
