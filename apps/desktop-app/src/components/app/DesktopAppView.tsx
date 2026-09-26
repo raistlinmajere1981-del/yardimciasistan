@@ -2,6 +2,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
 import type { SyncState } from "../../app/runtime-state";
+import type { CustomerWorkTab } from "../../pages/CustomerWorkPage";
 import { useMarketController } from "../../app/use-market-controller";
 import { useFinanceController } from "../../app/use-finance-controller";
 import type {
@@ -27,6 +28,8 @@ import { DesktopWorkspaceRouter } from "./DesktopWorkspaceRouter";
 interface DesktopAppViewProps {
   activePage: DesktopPage;
   requestPageChange: RequestPageChange;
+  customerWorkTab: CustomerWorkTab;
+  setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
   registerPageLeaveGuard: RegisterPageLeaveGuard;
   syncState: SyncState;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
@@ -45,6 +48,8 @@ interface DesktopAppViewProps {
 export function DesktopAppView({
   activePage,
   requestPageChange,
+  customerWorkTab,
+  setCustomerWorkTab,
   registerPageLeaveGuard,
   syncState,
   setSyncState,
@@ -111,6 +116,8 @@ export function DesktopAppView({
       <DesktopWorkspaceRouter
         activePage={activePage}
         requestPageChange={requestPageChange}
+        customerWorkTab={customerWorkTab}
+        setCustomerWorkTab={setCustomerWorkTab}
         registerPageLeaveGuard={registerPageLeaveGuard}
         syncState={syncState}
         setSyncState={setSyncState}
