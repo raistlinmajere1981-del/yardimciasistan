@@ -31,7 +31,7 @@ try {
   const board = page.getByRole('region', { name: 'Restoran operasyonları', exact: true });
   await expect(board.locator('.operations-board__pane')).toHaveCount(2);
   await expect(page.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Masa yönetimi', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Masalar paneli', exact: true })).toBeVisible();
   expect(await page.locator('.operations-board__pane--center .operations-board__pane-body').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   await page.getByLabel('Masa grubu').selectOption('Bahçe');
