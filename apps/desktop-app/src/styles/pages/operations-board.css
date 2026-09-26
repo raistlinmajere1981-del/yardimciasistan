@@ -68,9 +68,13 @@
 .operations-board__pane-body {
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  padding: var(--space-3);
+}
+
+.operations-board__pane--center .operations-board__pane-body {
   overflow: auto;
   overscroll-behavior: contain;
-  padding: var(--space-3);
 }
 
 .operations-board__pane--left .record-stack,
@@ -185,5 +189,10 @@
   .operations-board__pane {
     min-height: 320px;
     max-height: 62dvh;
+  }
+
+  .operations-board__pane-body {
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 }
