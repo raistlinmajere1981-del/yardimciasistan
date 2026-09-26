@@ -59,7 +59,8 @@ try {
     window.__m8eStats = {
       suggestionCalls: 0,
       rewriteCalls: 0,
-      birthdayPrepareCalls: 0
+      birthdayPrepareCalls: 0,
+      externalCalls: 0
     };
     window.__m8ePendingSuggestion = [];
     window.__m8ePendingRewrite = [];
@@ -121,7 +122,10 @@ try {
       getDashboardData: async () => clone(window.__m8eDashboard || dashboard),
       markWhatsAppMessageSent: async () => ({ ok: true, message: "ok", dashboardData: clone(window.__m8eDashboard || dashboard) }),
       deleteWhatsAppMessage: async () => ({ ok: true, message: "ok", dashboardData: clone(window.__m8eDashboard || dashboard) }),
-      openExternal: async () => true
+      openExternal: async () => {
+        window.__m8eStats.externalCalls++;
+        return true;
+      }
     };
   }, { dashboard });
 
@@ -221,6 +225,29 @@ try {
   await expect(page.getByTestId("reply-state")).toHaveText("idle");
   await page.evaluate(() => window.__m8eSetFlags({ customersEnabled: true }));
 
+  // Reservation WhatsApp uses the in-app ephemeral handoff and must not open the system browser.
+  await page.evaluate(() => {
+    const reservation = window.__m8eDashboard.reservations[0];
+    window.__m8eController.openReservationWhatsApp(reservation);
+  });
+  await expect.poll(() => page.evaluate(() => window.__m8eController.preparedWhatsAppMessage?.source)).toBe("reservation");
+  expect(await page.evaluate(() => window.__m8eController.preparedWhatsAppMessage?.reservationId)).toBe(baseDashboard.reservations[0].id);
+  expect(await page.evaluate(() => window.__m8eStats.externalCalls)).toBe(0);
+
+  await page.evaluate(() => {
+    const reservation = {
+      ...window.__m8eDashboard.reservations[0],
+      id: "table-reservation",
+      reservationType: "table",
+      roomIds: [],
+      tableIds: [],
+      customerPhone: "+905551110003"
+    };
+    window.__m8eController.openReservationWhatsApp(reservation);
+  });
+  await expect.poll(() => page.evaluate(() => window.__m8eController.preparedWhatsAppMessage?.reservationType)).toBe("table");
+  expect(await page.evaluate(() => window.__m8eStats.externalCalls)).toBe(0);
+
   // WHATSAPP off/on must release a pending birthday preparation owner and loading UI.
   await page.evaluate(() => { void window.__m8eController.prepareBirthdayWhatsApp("customer-a"); });
   await expect.poll(() => page.evaluate(() => window.__m8eStats.birthdayPrepareCalls)).toBe(1);
@@ -236,7 +263,7 @@ try {
   await expect(page.getByTestId("sync-state")).toHaveText("idle");
 
   expect(pageErrors).toEqual([]);
-  console.log("messages-ai-staleness-smoke-ok");
+  console.log("messages-ai-staleness-smoke-ok: request AI guards and in-app reservation WhatsApp handoff");
 } finally {
   await browser?.close();
   await server.close();
