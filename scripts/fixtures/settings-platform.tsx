@@ -53,7 +53,7 @@ window.requestSettingsPageLeave = () => {
 
 window.settingsCalls = [];
 window.failSetup = false;
-let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "" };
+let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false };
 window.yardimciDesktop = {
   getSetupData: async () => structuredClone(canonical),
   saveInitialSetup: async input => {
@@ -72,7 +72,8 @@ window.yardimciDesktop = {
       enabled: input.enabled,
       placeId: input.placeId,
       apiKeyConfigured: input.clearApiKey ? false : Boolean(input.apiKey) || googleReviews.apiKeyConfigured,
-      lastPublishedAt: "2026-09-27T00:00:00.000Z"
+      lastPublishedAt: "2026-09-27T00:00:00.000Z",
+      publicationPending: false
     };
     return { ok: true, message: "Google yorumları ayarları kaydedildi.", settings: structuredClone(googleReviews) };
   },
