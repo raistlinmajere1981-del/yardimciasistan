@@ -47,11 +47,12 @@ export interface RoomMediaAsset {
   sizeBytes: number;
   updatedAt: string;
   remoteUrl: string;
+  previewDataUrl?: string;
 }
 
 export interface AddRoomMediaInput {
   roomId: string;
-  kind: RoomPublicMediaKind;
+  kind?: RoomPublicMediaKind;
 }
 
 export interface UpdateRoomMediaInput {

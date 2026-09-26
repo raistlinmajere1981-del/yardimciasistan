@@ -13,12 +13,12 @@ import type {
 } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 
-const ROOM_MEDIA_KIND_OPTIONS: Array<{ id: RoomPublicMediaKind; label: string }> = [
-  { id: "cover", label: "Kapak görseli" },
-  { id: "photo", label: "Normal fotoğraf" },
-  { id: "panorama_360", label: "360° panorama" },
-  { id: "panorama_180", label: "180° panorama" },
-  { id: "video", label: "Video" }
+const ROOM_MEDIA_KIND_OPTIONS: Array<{ id: RoomPublicMediaKind; label: string; chip: string }> = [
+  { id: "cover", label: "Kapak görseli", chip: "Kapak" },
+  { id: "photo", label: "Normal fotoğraf", chip: "Fotoğraf" },
+  { id: "panorama_360", label: "360° panorama", chip: "360°" },
+  { id: "panorama_180", label: "180° panorama", chip: "180°" },
+  { id: "video", label: "Video", chip: "Video" }
 ];
 
 interface RoomMediaPanelRoom {
@@ -44,10 +44,6 @@ function formatMediaSize(bytes: number) {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-function mediaKindLabel(kind: RoomPublicMediaKind) {
-  return ROOM_MEDIA_KIND_OPTIONS.find((option) => option.id === kind)?.label ?? kind;
-}
-
 function mediaKindOptionsForAsset(item: RoomMediaAsset) {
   if (item.mimeType.startsWith("video/")) {
     return ROOM_MEDIA_KIND_OPTIONS.filter((option) => option.id === "video");
@@ -71,7 +67,6 @@ function MediaKindIcon({ kind }: { kind: RoomPublicMediaKind }) {
 
 export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: RoomMediaPanelProps) {
   const [media, setMedia] = useState<RoomMediaAsset[]>([]);
-  const [mediaKind, setMediaKind] = useState<RoomPublicMediaKind>("photo");
   const [state, setState] = useState<MediaState>("idle");
   const [message, setMessage] = useState("");
 
@@ -110,7 +105,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
     setState("loading");
     setMessage("");
     try {
-      const result = await bridge.addRoomMedia({ roomId: mediaRoomId, kind: mediaKind });
+      const result = await bridge.addRoomMedia({ roomId: mediaRoomId });
       setMedia(result.media);
       setState(result.ok ? "idle" : "error");
       setMessage(result.message.includes("iptal") ? "" : result.message);
@@ -187,29 +182,16 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
           </select>
         </label>
 
-        <div className="room-media-panel-add">
-          <label className="form-field">
-            Medya türü
-            <select
-              value={mediaKind}
-              disabled={!mediaEnabled || busy}
-              onChange={(event) => setMediaKind(event.target.value as RoomPublicMediaKind)}
-            >
-              {ROOM_MEDIA_KIND_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <ActionButton
-            type="button"
-            size="sm"
-            disabled={!mediaEnabled || busy}
-            onClick={() => void addMedia()}
-          >
-            <ImagePlus size={15} aria-hidden="true" />
-            Dosya ekle
-          </ActionButton>
-        </div>
+        <ActionButton
+          type="button"
+          size="sm"
+          className="room-media-add-button"
+          disabled={!mediaEnabled || busy}
+          onClick={() => void addMedia()}
+        >
+          <ImagePlus size={15} aria-hidden="true" />
+          Fotoğraf / video ekle
+        </ActionButton>
 
         {!mediaRoomId && room && (
           <p className="room-media-panel-note">
@@ -217,7 +199,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
           </p>
         )}
         <p className="room-media-panel-note">
-          Kapak, fotoğraf, 360°/180° panorama ve video türleri daha sonra önizleme ve düzenleme araçlarıyla genişletilebilir.
+          JPG, PNG, WebP, MP4 ve WebM dosyaları birlikte seçilebilir. Kullanım türünü dosya kartından belirleyebilirsiniz.
         </p>
         {message && (
           <p className={state === "error" ? "form-status sync-error" : "form-status"}>
@@ -240,9 +222,13 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
             {media.map((item) => (
               <article className="room-media-card" key={item.id}>
                 <div className="room-media-card-top">
-                  <span className="room-media-card-icon">
-                    <MediaKindIcon kind={item.kind} />
-                  </span>
+                  <div className="room-media-card-preview" aria-hidden="true">
+                    {item.previewDataUrl ? (
+                      <img src={item.previewDataUrl} alt="" />
+                    ) : (
+                      <MediaKindIcon kind={item.kind} />
+                    )}
+                  </div>
                   <div className="room-media-card-copy">
                     <strong title={item.originalName}>{item.originalName}</strong>
                     <span>
@@ -265,27 +251,20 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
                   </ActionButton>
                 </div>
 
-                <label className="form-field room-media-card-kind">
-                  Kullanım
-                  <select
-                    value={item.kind}
-                    disabled={!mediaEnabled || busy}
-                    onChange={(event) => void updateMediaKind(
-                      item,
-                      event.target.value as RoomPublicMediaKind
-                    )}
-                  >
-                    {mediaKindOptionsForAsset(item).map((option) => (
-                      <option key={option.id} value={option.id}>{option.label}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="room-media-card-footer">
-                  <span>{mediaKindLabel(item.kind)}</span>
-                  <span className={item.remoteUrl ? "is-ready" : "is-pending"}>
-                    {item.remoteUrl ? "Yayınlandı" : "Senkron bekliyor"}
-                  </span>
+                <div className="room-media-kind-chips" aria-label="Medya kullanım türü">
+                  {mediaKindOptionsForAsset(item).map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`room-media-kind-chip${item.kind === option.id ? " is-selected" : ""}`}
+                      disabled={!mediaEnabled || busy}
+                      aria-pressed={item.kind === option.id}
+                      title={option.label}
+                      onClick={() => void updateMediaKind(item, option.id)}
+                    >
+                      {option.chip}
+                    </button>
+                  ))}
                 </div>
               </article>
             ))}

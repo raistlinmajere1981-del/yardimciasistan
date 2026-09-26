@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { dialog, type BrowserWindow, type OpenDialogOptions } from "electron";
+import { dialog, nativeImage, type BrowserWindow, type OpenDialogOptions } from "electron";
 import type {
   AddRoomMediaInput,
   DeleteRoomMediaInput,
@@ -39,16 +39,16 @@ export async function addRoomMediaFromDialog(
   input: AddRoomMediaInput
 ): Promise<RoomMediaMutationResult> {
   const roomId = normalizeId(input?.roomId);
-  const kind = normalizeKind(input?.kind);
-  if (!roomId || !kind) return failure("Oda veya medya türü geçersiz.", []);
+  if (!roomId) return failure("Oda kimliği geçersiz.", []);
 
-  const filters = kind === "video"
-    ? [{ name: "Video", extensions: ["mp4", "webm"] }]
-    : [{ name: "Görsel", extensions: ["jpg", "jpeg", "png", "webp"] }];
+  const preferredKind = normalizeKind(input?.kind);
   const pickerOptions: OpenDialogOptions = {
-    title: mediaPickerTitle(kind),
-    properties: kind === "photo" ? ["openFile", "multiSelections"] : ["openFile"],
-    filters
+    title: "Oda medyası seç",
+    properties: ["openFile", "multiSelections"],
+    filters: [{
+      name: "Görsel ve video",
+      extensions: ["jpg", "jpeg", "png", "webp", "mp4", "webm"]
+    }]
   };
   const result = owner
     ? await dialog.showOpenDialog(owner, pickerOptions)
@@ -61,22 +61,35 @@ export async function addRoomMediaFromDialog(
   const now = new Date().toISOString();
   let roomMedia = manifest.media.filter((item) => item.roomId === roomId);
   const retained = manifest.media.filter((item) => item.roomId !== roomId);
-
-  if (SINGLETON_KINDS.has(kind)) {
-    const removed = roomMedia.filter((item) => item.kind === kind);
-    for (const item of removed) removeStoredFile(userDataPath, item);
-    roomMedia = roomMedia.filter((item) => item.kind !== kind);
-  }
-
   let nextOrder = roomMedia.reduce((max, item) => Math.max(max, item.sortOrder), 0) + 1;
+
   try {
     for (const sourcePath of result.filePaths) {
-      const stored = copySelectedFile(userDataPath, roomId, kind, sourcePath, nextOrder++, now);
-      roomMedia.push(stored);
-      if (SINGLETON_KINDS.has(kind)) break;
+      const detectedKind = defaultKindForPath(sourcePath, preferredKind);
+      if (!detectedKind) {
+        throw new Error("Yalnız JPG, PNG, WebP, MP4 veya WebM dosyaları eklenebilir.");
+      }
+
+      if (SINGLETON_KINDS.has(detectedKind)) {
+        const replaced = roomMedia.filter((item) => item.kind === detectedKind);
+        for (const item of replaced) removeStoredFile(userDataPath, item);
+        roomMedia = roomMedia.filter((item) => item.kind !== detectedKind);
+      }
+
+      roomMedia.push(copySelectedFile(
+        userDataPath,
+        roomId,
+        detectedKind,
+        sourcePath,
+        nextOrder++,
+        now
+      ));
     }
   } catch (error) {
-    return failure(error instanceof Error ? error.message : "Medya dosyası eklenemedi.", sortMedia(roomMedia));
+    return failure(
+      error instanceof Error ? error.message : "Medya dosyası eklenemedi.",
+      toPublicLocalAssets(userDataPath, roomMedia)
+    );
   }
 
   writeManifest(userDataPath, {
@@ -85,10 +98,10 @@ export async function addRoomMediaFromDialog(
   });
   return {
     ok: true,
-    message: kind === "photo" && result.filePaths.length > 1
-      ? "Oda fotoğrafları eklendi."
+    message: result.filePaths.length > 1
+      ? `${result.filePaths.length} medya dosyası eklendi.`
       : "Oda medyası eklendi.",
-    media: sortMedia(roomMedia)
+    media: listRoomMedia(userDataPath, roomId)
   };
 }
 
@@ -148,9 +161,10 @@ export function listRoomMedia(userDataPath: string, roomId: string): RoomMediaAs
   const normalized = normalizeId(roomId);
   if (!normalized) return [];
   return sortMedia(
-    readManifest(userDataPath).media
-      .filter((item) => item.roomId === normalized)
-      .map(toPublicLocalAsset)
+    toPublicLocalAssets(
+      userDataPath,
+      readManifest(userDataPath).media.filter((item) => item.roomId === normalized)
+    )
   );
 }
 
@@ -312,9 +326,37 @@ function normalizeStoredAsset(value: unknown): StoredRoomMediaAsset | null {
   };
 }
 
-function toPublicLocalAsset(item: StoredRoomMediaAsset): RoomMediaAsset {
+function toPublicLocalAssets(
+  userDataPath: string,
+  items: StoredRoomMediaAsset[]
+): RoomMediaAsset[] {
+  return items.map((item) => toPublicLocalAsset(userDataPath, item));
+}
+
+function toPublicLocalAsset(userDataPath: string, item: StoredRoomMediaAsset): RoomMediaAsset {
   const { storedPath: _storedPath, contentHash: _contentHash, ...asset } = item;
-  return asset;
+  return {
+    ...asset,
+    previewDataUrl: createPreviewDataUrl(userDataPath, item)
+  };
+}
+
+function createPreviewDataUrl(userDataPath: string, item: StoredRoomMediaAsset): string {
+  if (!item.mimeType.startsWith("image/")) return "";
+  const source = getRoomMediaUploadSource(userDataPath, item.id);
+  if (!source) return "";
+
+  try {
+    const image = nativeImage.createFromPath(source.absolutePath);
+    if (image.isEmpty()) return "";
+    return image.resize({
+      width: 160,
+      height: 110,
+      quality: "good"
+    }).toDataURL();
+  } catch {
+    return "";
+  }
 }
 
 function removeStoredFile(userDataPath: string, item: StoredRoomMediaAsset): void {
@@ -353,12 +395,15 @@ function cleanText(value: unknown, maxLength: number): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-function mediaPickerTitle(kind: RoomPublicMediaKind): string {
-  if (kind === "cover") return "Oda kapak görseli seç";
-  if (kind === "photo") return "Oda fotoğrafı seç";
-  if (kind === "panorama_360") return "360° panorama seç";
-  if (kind === "panorama_180") return "180° panorama seç";
-  return "Oda videosu seç";
+function defaultKindForPath(
+  sourcePath: string,
+  preferredKind: RoomPublicMediaKind | null
+): RoomPublicMediaKind | null {
+  const extension = path.extname(sourcePath).toLowerCase();
+  if (VIDEO_EXTENSIONS.has(extension)) return "video";
+  if (!IMAGE_EXTENSIONS.has(extension)) return null;
+  if (preferredKind && preferredKind !== "video") return preferredKind;
+  return "photo";
 }
 
 function mimeForExtension(extension: string): string {
