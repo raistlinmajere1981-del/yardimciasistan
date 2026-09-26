@@ -61,7 +61,7 @@ export function projectDesktopDashboardData(
       }))
     : [];
   const preparedWhatsAppMessages = enabled.has(C.CUSTOMERS) && enabled.has(C.WHATSAPP)
-    ? source.preparedWhatsAppMessages
+    ? source.preparedWhatsAppMessages ?? []
     : [];
   const customers = enabled.has(C.CUSTOMERS)
     ? source.customers.map((customer) => ({
