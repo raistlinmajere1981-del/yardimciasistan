@@ -166,8 +166,8 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
       </div>
 
       <div className="room-media-panel-controls">
-        <label className="form-field">
-          Oda
+        <label className="form-field room-media-room-picker">
+          <span>Oda</span>
           <select
             value={room?.key ?? ""}
             disabled={disabled || rooms.length === 0}
@@ -199,7 +199,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
           </p>
         )}
         <p className="room-media-panel-note">
-          JPG, PNG, WebP, MP4 ve WebM dosyaları birlikte seçilebilir. Kullanım türünü dosya kartından belirleyebilirsiniz.
+          JPG · PNG · WebP · MP4 · WebM
         </p>
         {message && (
           <p className={state === "error" ? "form-status sync-error" : "form-status"}>
