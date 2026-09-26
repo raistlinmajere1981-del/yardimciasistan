@@ -48,6 +48,13 @@ function mediaKindLabel(kind: RoomPublicMediaKind) {
   return ROOM_MEDIA_KIND_OPTIONS.find((option) => option.id === kind)?.label ?? kind;
 }
 
+function mediaKindOptionsForAsset(item: RoomMediaAsset) {
+  if (item.mimeType.startsWith("video/")) {
+    return ROOM_MEDIA_KIND_OPTIONS.filter((option) => option.id === "video");
+  }
+  return ROOM_MEDIA_KIND_OPTIONS.filter((option) => option.id !== "video");
+}
+
 function roomLabel(room: RoomMediaPanelRoom) {
   if (room.number) return `Oda ${room.number} · ${room.name}`;
   return room.name || "Yeni Oda";
@@ -268,7 +275,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
                       event.target.value as RoomPublicMediaKind
                     )}
                   >
-                    {ROOM_MEDIA_KIND_OPTIONS.map((option) => (
+                    {mediaKindOptionsForAsset(item).map((option) => (
                       <option key={option.id} value={option.id}>{option.label}</option>
                     ))}
                   </select>
