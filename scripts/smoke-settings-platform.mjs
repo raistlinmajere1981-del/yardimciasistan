@@ -280,7 +280,7 @@ try {
   await select('İşletme');
   await page.getByLabel('Google yorumlarını web sitesinde göster').check();
   await page.getByLabel('Google Place ID').fill('ChIJBlackSeaFixture');
-  await page.getByLabel('Places API anahtarı').fill('AIzaFixtureKeyForSmoke');
+  await page.getByLabel('Places API anahtarı').fill('smoke-google-key-not-secret');
   await page.getByRole('button', { name: 'Google Bağlantısını Dene', exact: true }).click();
   await expect(page.locator('#settings-google-reviews')).toContainText('BlackSea Pansiyon');
   await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
