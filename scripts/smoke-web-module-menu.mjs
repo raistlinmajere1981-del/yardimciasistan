@@ -127,7 +127,9 @@ try {
 
   const businessWithReviews = await page.request.get(`${baseUrl}/api/business.php`);
   expect(businessWithReviews.status()).toBe(200);
-  expect(await businessWithReviews.json()).toMatchObject({ business: { google_reviews_enabled: true } });
+  const businessWithReviewsBody = await businessWithReviews.text();
+  expect(businessWithReviewsBody).not.toContain(googleSecret);
+  expect(JSON.parse(businessWithReviewsBody)).toMatchObject({ business: { google_reviews_enabled: true } });
 
   const googleDisable = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
