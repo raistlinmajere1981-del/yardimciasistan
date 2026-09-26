@@ -74,7 +74,6 @@ function App() {
     setDashboardData: desktopSyncController.setDashboardData,
     setSyncState,
     setStatusMessage,
-    messagesActive: activePage === "messages",
     aiEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.AI),
     customersEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
     whatsappEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP),
