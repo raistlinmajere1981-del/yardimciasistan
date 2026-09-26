@@ -21,6 +21,7 @@ const requiredFiles = [
   "api/menu.php",
   "api/rooms.php",
   "api/room-media.php",
+  "api/google-reviews.php",
   "api/chat.php",
   "api/availability.php",
   "api/availability-sync.php",
@@ -174,6 +175,10 @@ function validateSource() {
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_business_context"), "api/sync.php güncel işletme AI bağlamı yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_ai_catalog"), "api/sync.php güncel AI ürün kaynağı yayın aksiyonunu içermeli.");
+  assert.ok(syncEndpoint.includes("publish_google_reviews_settings"), "api/sync.php Google yorumları özel ayar yayın aksiyonunu içermeli.");
+  const googleReviewsEndpoint = readFileSync(join(sourceRoot, "api", "google-reviews.php"), "utf8");
+  assert.ok(googleReviewsEndpoint.includes("X-Goog-Api-Key"), "api/google-reviews.php Places API anahtarını yalnız sunucu tarafında kullanmalı.");
+  assert.ok(googleReviewsEndpoint.includes("reviews,googleMapsUri"), "api/google-reviews.php yorum ve Google Maps alanlarını istemeli.");
   assert.ok(
     readFileSync(join(sourceRoot, "api", "chat.php"), "utf8").includes("Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz."),
     "api/chat.php katalog eşleşmesi yokluğunu satış yokluğu olarak yorumlamamalı."
@@ -330,7 +335,10 @@ function shouldCopySourcePath(sourcePath) {
     return false;
   }
 
-  if (relativePath === "config/ai.local.php" || relativePath === "data/ai-settings.local.php") {
+  if (relativePath === "config/ai.local.php"
+      || relativePath === "data/ai-settings.local.php"
+      || relativePath === "data/google-reviews.local.php"
+      || relativePath === "data/google-reviews-cache.json") {
     return false;
   }
 
