@@ -276,6 +276,17 @@ try {
   await expect(tab('İşletme Düzeni')).toHaveAttribute('aria-selected', 'true');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.description)).toBe('Profil Taslağı');
 
+  // Google reviews stays inside Business settings, validates the live Google connection and saves with the category.
+  await select('İşletme');
+  await page.getByLabel('Google yorumlarını web sitesinde göster').check();
+  await page.getByLabel('Google Place ID').fill('ChIJBlackSeaFixture');
+  await page.getByLabel('Places API anahtarı').fill('AIzaFixtureKeyForSmoke');
+  await page.getByRole('button', { name: 'Google Bağlantısını Dene', exact: true }).click();
+  await expect(page.locator('#settings-google-reviews')).toContainText('BlackSea Pansiyon');
+  await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'google-reviews').length)).toBe(1);
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'google-reviews').at(-1).input.placeId)).toBe('ChIJBlackSeaFixture');
+
   // Action controls remain action-based and do not dirty Application.
   await select('Uygulama');
   await page.getByRole('button', { name: 'Güncellemeleri Kontrol Et', exact: true }).click();
