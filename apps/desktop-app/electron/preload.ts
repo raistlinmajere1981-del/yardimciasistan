@@ -116,6 +116,12 @@ import type {
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
 import type { BusinessPublicProfileSaveResult } from "./business-public-profile";
 import type {
+  GoogleReviewsConnectionTestResult,
+  GoogleReviewsSettings,
+  GoogleReviewsSettingsSaveResult,
+  SaveGoogleReviewsSettingsInput
+} from "./google-reviews-settings";
+import type {
   BusinessLayoutSaveResult,
   BusinessLayoutSnapshot,
   SaveBusinessLayoutInput
@@ -209,6 +215,9 @@ export interface DesktopBridge {
   deleteRoomMedia: (input: DeleteRoomMediaInput) => Promise<RoomMediaMutationResult>;
   getBusinessPublicProfile: () => Promise<BusinessPublicProfile>;
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => Promise<BusinessPublicProfileSaveResult>;
+  getGoogleReviewsSettings: () => Promise<GoogleReviewsSettings>;
+  saveGoogleReviewsSettings: (input: SaveGoogleReviewsSettingsInput) => Promise<GoogleReviewsSettingsSaveResult>;
+  testGoogleReviewsConnection: (input: Pick<SaveGoogleReviewsSettingsInput, "placeId" | "apiKey" | "clearApiKey">) => Promise<GoogleReviewsConnectionTestResult>;
   geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
@@ -358,6 +367,9 @@ const bridge: DesktopBridge = {
   deleteRoomMedia: (input: DeleteRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:delete", input),
   getBusinessPublicProfile: () => invokeWhenUnlocked<BusinessPublicProfile>("businessPublicProfile:get"),
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => invokeWhenUnlocked<BusinessPublicProfileSaveResult>("businessPublicProfile:save", input),
+  getGoogleReviewsSettings: () => invokeWhenUnlocked<GoogleReviewsSettings>("googleReviews:getSettings"),
+  saveGoogleReviewsSettings: (input: SaveGoogleReviewsSettingsInput) => invokeWhenUnlocked<GoogleReviewsSettingsSaveResult>("googleReviews:saveSettings", input),
+  testGoogleReviewsConnection: (input) => invokeWhenUnlocked<GoogleReviewsConnectionTestResult>("googleReviews:testConnection", input),
   geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
