@@ -1,0 +1,189 @@
+.feature-workspace-page__body:has(.operations-board) {
+  overflow: hidden;
+}
+
+.operations-board {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  gap: var(--space-3);
+}
+
+.operations-board--three {
+  grid-template-columns: minmax(230px, 0.8fr) minmax(420px, 1.7fr) minmax(230px, 0.8fr);
+}
+
+.operations-board--left-center {
+  grid-template-columns: minmax(250px, 0.8fr) minmax(460px, 1.7fr);
+}
+
+.operations-board--center-right {
+  grid-template-columns: minmax(460px, 1.7fr) minmax(250px, 0.8fr);
+}
+
+.operations-board--center {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.operations-board__pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-bg-panel);
+}
+
+.operations-board__pane--center {
+  border-color: var(--color-border-strong);
+}
+
+.operations-board__pane-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.operations-board__pane-header h2 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.operations-board__pane-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.operations-board__pane-body {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+}
+
+.operations-board__pane--left .record-stack,
+.operations-board__pane--right .record-stack,
+.operations-board__pane--left .restaurant-reservations-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  height: 100%;
+  min-height: 0;
+  gap: var(--space-3);
+}
+
+.operations-board__pane--left .record-stack > .page-toolbar,
+.operations-board__pane--right .record-stack > .page-toolbar,
+.operations-board__pane--left .restaurant-reservations-workspace > .page-toolbar {
+  display: grid;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.operations-board__pane--left .page-toolbar__start,
+.operations-board__pane--right .page-toolbar__start,
+.operations-board__pane--left .restaurant-reservation-summary {
+  justify-content: flex-start;
+}
+
+.operations-board__pane--left .filter-row,
+.operations-board__pane--right .filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.operations-board__pane--left .form-field,
+.operations-board__pane--right .form-field {
+  width: 100%;
+  max-width: none;
+}
+
+.operations-board__pane--left .data-records,
+.operations-board__pane--right .data-records,
+.operations-board__pane--left .restaurant-reservation-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: var(--space-1);
+}
+
+.operations-board__pane--left .list-row,
+.operations-board__pane--right .list-row {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.operations-board__pane--left .list-row__main,
+.operations-board__pane--right .list-row__main {
+  flex-basis: auto;
+}
+
+.operations-board__pane--left .list-row__actions,
+.operations-board__pane--right .list-row__actions {
+  margin-inline-start: 0;
+  justify-content: flex-start;
+}
+
+.operations-board__pane--center .room-grid,
+.operations-board__pane--center .restaurant-table-area-list {
+  align-content: start;
+}
+
+.hospitality-resource-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.hospitality-resource-toolbar .form-field {
+  min-width: var(--field-width-xs);
+}
+
+@media (max-width: 1100px) {
+  .operations-board--three {
+    grid-template-columns: minmax(210px, 0.8fr) minmax(330px, 1.5fr) minmax(210px, 0.8fr);
+    gap: var(--space-2);
+  }
+
+  .operations-board__pane-header,
+  .operations-board__pane-body {
+    padding: var(--space-2);
+  }
+}
+
+@media (max-width: 760px) {
+  .feature-workspace-page__body:has(.operations-board) {
+    overflow: auto;
+  }
+
+  .operations-board,
+  .operations-board--three,
+  .operations-board--left-center,
+  .operations-board--center-right,
+  .operations-board--center {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    overflow: visible;
+  }
+
+  .operations-board__pane {
+    min-height: 320px;
+    max-height: 62dvh;
+  }
+}
