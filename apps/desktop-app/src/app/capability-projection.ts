@@ -60,6 +60,9 @@ export function projectDesktopDashboardData(
         whatsapp_message: enabled.has(C.WHATSAPP) ? request.whatsapp_message : ""
       }))
     : [];
+  const preparedWhatsAppMessages = enabled.has(C.CUSTOMERS) && enabled.has(C.WHATSAPP)
+    ? source.preparedWhatsAppMessages
+    : [];
   const customers = enabled.has(C.CUSTOMERS)
     ? source.customers.map((customer) => ({
         ...customer,
@@ -127,6 +130,7 @@ export function projectDesktopDashboardData(
     rooms,
     tables,
     requests,
+    preparedWhatsAppMessages,
     reservations,
     dailyTasks,
     customers,
