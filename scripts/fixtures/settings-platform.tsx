@@ -14,7 +14,7 @@ import "../../apps/desktop-app/src/styles/index.css";
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
-let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"] };
+let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"], socialLinks: [] };
 let layout = {
   capabilities: { rooms: true, tables: true },
   rooms: [{
