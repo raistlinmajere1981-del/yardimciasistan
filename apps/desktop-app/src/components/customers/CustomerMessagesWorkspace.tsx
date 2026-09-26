@@ -8,7 +8,7 @@ type MessageMode = "safe" | "web";
 type WebTakeoverState = "idle" | "pending" | "ready" | "error";
 
 interface CustomerMessagesWorkspaceProps {
-  safeMode: ReactNode;
+  safeMode: (onOpenWeb: () => void) => ReactNode;
   webMode: (onReturnToSafe: () => void) => ReactNode;
   whatsappEnabled: boolean;
   prewarmWebview?: boolean;
@@ -131,7 +131,11 @@ export function CustomerMessagesWorkspace({
         </div>
       )}
 
-      {whatsappEnabled && <div className={mode === "safe" ? "message-mode-content" : "message-mode-content is-hidden"}>{safeMode}</div>}
+      {whatsappEnabled && (
+        <div className={mode === "safe" ? "message-mode-content" : "message-mode-content is-hidden"}>
+          {safeMode(() => selectMode("web"))}
+        </div>
+      )}
       {whatsappEnabled && webModeActivated && (
         <>
           {mode === "web" && !webReady && (
