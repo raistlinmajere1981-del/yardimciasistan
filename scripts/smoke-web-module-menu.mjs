@@ -91,6 +91,46 @@ try {
   expect(emptyResponse.status()).toBe(200);
   expect(await emptyResponse.json()).toMatchObject({ ok: true, categories: [], items: [], source_revision: 0 });
 
+  const emptyReviews = await page.request.get(`${baseUrl}/api/google-reviews.php`);
+  expect(emptyReviews.status()).toBe(200);
+  expect(await emptyReviews.json()).toMatchObject({ available: false, reason: "not_configured" });
+
+  const googleSecret = "AIzaSmokeGoogleReviewsSecret";
+  const googlePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_google_reviews_settings",
+      client_id: "desktop-google-reviews-smoke",
+      google_reviews: {
+        enabled: true,
+        place_id: "ChIJSmokePlace",
+        api_key: googleSecret
+      }
+    }
+  });
+  expect(googlePublish.status()).toBe(200);
+  const googlePublishBody = await googlePublish.text();
+  expect(googlePublishBody).not.toContain(googleSecret);
+  expect(readFileSync(join(webModuleRoot, "data", "google-reviews.local.php"), "utf8")).toContain(googleSecret);
+
+  const googleDisable = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_google_reviews_settings",
+      client_id: "desktop-google-reviews-smoke",
+      google_reviews: {
+        enabled: false,
+        place_id: "ChIJSmokePlace",
+        api_key: ""
+      }
+    }
+  });
+  expect(googleDisable.status()).toBe(200);
+  expect(await googleDisable.json()).toMatchObject({ ok: true, enabled: false, has_api_key: false });
+  const disabledReviews = await page.request.get(`${baseUrl}/api/google-reviews.php`);
+  expect(disabledReviews.status()).toBe(200);
+  expect(await disabledReviews.json()).toMatchObject({ available: false, reason: "not_configured" });
+
   const fixturePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
