@@ -12,7 +12,7 @@ import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import { formatCustomerSource } from "../../app/customer-model";
 import { formatRequestStatus, formatRequestType } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
-import { DataList, DataListButton } from "../ui/DataList";
+import { DataList, DataListButton, DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 
@@ -313,31 +313,44 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
         </div>
 
         <DataList className="whatsapp-request-list">
-          {requests.length === 0 ? (
+          {preparedMessage && (
+            <DataListItem
+              className="message-request-row"
+              title={recipientName}
+              leading={<MessageCircle size={16} aria-hidden="true" />}
+              meta={(
+                <>
+                  <span>{preparedMessage.phone || "Telefon yok"}</span>
+                  <span>{preparedMessageLabel}</span>
+                </>
+              )}
+              selected
+            />
+          )}
+          {requests.map((request) => (
+            <DataListButton
+              className="message-request-row"
+              key={request.id}
+              title={request.customer_name}
+              leading={<span className={`status-dot tone-${getRequestStatusTone(request.status)}`} aria-hidden="true" />}
+              meta={(
+                <>
+                  <span>{request.customer_phone || "Telefon yok"}</span>
+                  <span>{formatRequestType(request.request_type)}</span>
+                </>
+              )}
+              selected={!preparedMessage && selectedRequest?.id === request.id}
+              aria-label={`${request.customer_name}, ${request.customer_phone || "telefon yok"}, ${formatRequestType(request.request_type)}, ${formatRequestStatus(request.status)}`}
+              aria-pressed={!preparedMessage && selectedRequest?.id === request.id}
+              onClick={() => onSelectRequest(request.id)}
+            />
+          ))}
+          {requests.length === 0 && !preparedMessage && (
             <div className="empty-state empty-state--compact">
               <MessageCircle size={24} aria-hidden="true" />
               <strong>Hazır mesaj yok.</strong>
               <p>Bir talep cevabı veya müşteri mesajı hazırlandığında burada görünür.</p>
             </div>
-          ) : (
-            requests.map((request) => (
-              <DataListButton
-                className="message-request-row"
-                key={request.id}
-                title={request.customer_name}
-                leading={<span className={`status-dot tone-${getRequestStatusTone(request.status)}`} aria-hidden="true" />}
-                meta={(
-                  <>
-                    <span>{request.customer_phone || "Telefon yok"}</span>
-                    <span>{formatRequestType(request.request_type)}</span>
-                  </>
-                )}
-                selected={selectedRequest?.id === request.id}
-                aria-label={`${request.customer_name}, ${request.customer_phone || "telefon yok"}, ${formatRequestType(request.request_type)}, ${formatRequestStatus(request.status)}`}
-                aria-pressed={selectedRequest?.id === request.id}
-                onClick={() => onSelectRequest(request.id)}
-              />
-            ))
           )}
         </DataList>
       </aside>
