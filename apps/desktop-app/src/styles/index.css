@@ -49,6 +49,7 @@
 @import "./pages/market.css" layer(pages);
 @import "./pages/menu.css" layer(pages);
 @import "./pages/messages.css" layer(pages);
+@import "./pages/operations-board.css" layer(pages);
 @import "./pages/pension.css" layer(pages);
 @import "./pages/reports.css" layer(pages);
 @import "./pages/restaurant.css" layer(pages);

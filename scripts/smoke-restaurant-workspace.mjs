@@ -25,14 +25,14 @@ try {
     return page;
   }
   const page = await open(), dialog = page.getByRole('dialog');
-  const viewNavigation = page.getByRole('navigation', { name: 'Restoran görünümü' });
-  await expect(viewNavigation.getByRole('button', { name: 'Masalar', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(viewNavigation.getByRole('tab')).toHaveCount(0);
   const button = name => page.getByRole('button', { name, exact: true });
   const tab = name => dialog.getByRole('tab', { name, exact: true });
   const state = () => page.evaluate(() => window.fixtureState());
-  const floor = page.getByRole('region', { name: 'Floor', exact: true });
-  expect(await floor.evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
+  const board = page.getByRole('region', { name: 'Restoran operasyonları', exact: true });
+  await expect(board.locator('.operations-board__pane')).toHaveCount(2);
+  await expect(page.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Masalar paneli', exact: true })).toBeVisible();
+  expect(await page.locator('.operations-board__pane--center .operations-board__pane-body').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   await page.getByLabel('Masa grubu').selectOption('Bahçe');
   await button('Bahçe 1 masasını aç').focus(); await page.keyboard.press('Enter');
@@ -79,7 +79,7 @@ try {
   await expect(dialog.getByRole('tabpanel', { name: 'Geçmiş' })).toContainText('Ödendi');
   await button("Floor'a dön").click();
 
-  await button('Rezervasyonlar').click(); await button('Yeni Rezervasyon').click();
+  await button('Yeni Rezervasyon').click();
   await expect(dialog).toHaveClass(/form-dialog/); await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
   await dialog.getByLabel('Masa', { exact: true }).selectOption('table-a');
   await dialog.getByLabel('Not', { exact: true }).fill('Korunan rezervasyon notu');
@@ -93,7 +93,7 @@ try {
   await button('Rezervasyonu Kaydet').click(); await expect(dialog).toHaveCount(0);
   expect((await state()).dashboard.reservations[0].tableIds).toEqual(['table-a']);
   expect((await state()).orders).toHaveLength(1);
-  await button('Masalar').click(); await button('Bahçe 1 masasını aç').click(); await tab('Müşteri').click();
+  await button('Bahçe 1 masasını aç').click(); await tab('Müşteri').click();
   await expect(dialog.getByRole('tabpanel', { name: 'Müşteri' })).toContainText('Pilot Misafir');
   await button('Sipariş Başlat').click(); await tab('Sipariş').click(); await button('Çay ürününü siparişe ekle').click();
   await button('Çay satırını sil').click(); expect((await state()).orders[0].items).toHaveLength(0);
@@ -122,7 +122,7 @@ try {
   await button("Floor'a dön").click();
   for (const variant of ['tables-only', 'no-menu', 'no-customers', 'no-reservations', 'no-transfer', 'no-catalog']) {
     const variantPage = await open(variant), surface = variantPage.getByRole('dialog');
-    if (variant === 'no-reservations') await expect(variantPage.getByRole('button', { name: 'Rezervasyonlar', exact: true })).toHaveCount(0);
+    if (variant === 'no-reservations') await expect(variantPage.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toHaveCount(0);
     await variantPage.getByRole('button', { name: 'Bahçe 1 masasını aç' }).click();
     if (variant === 'no-customers') await expect(surface.getByRole('tab', { name: 'Müşteri' })).toHaveCount(0);
     if (variant === 'tables-only') {

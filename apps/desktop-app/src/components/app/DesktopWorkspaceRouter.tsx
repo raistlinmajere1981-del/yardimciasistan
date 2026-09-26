@@ -407,7 +407,7 @@ export function DesktopWorkspaceRouter({
               whatsappEnabled={customerMessagingEnabled}
               prewarmWebview={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
               active={activePage === "customerWork" && customerWorkTab === "prepared"}
-              safeMode={(
+              safeMode={(onOpenWeb) => (
                 <WhatsAppWorkspace
                   view="safe"
                   preparedMessage={messagingController.preparedWhatsAppMessage}
@@ -418,6 +418,7 @@ export function DesktopWorkspaceRouter({
                   getRequestStatusTone={getRequestStatusTone}
                   onSelectRequest={setSelectedWhatsAppRequestId}
                   onOpenExternal={openSelectedWhatsAppExternal}
+                  onOpenWeb={onOpenWeb}
                   onMessageSent={handleWhatsAppMessageSent}
                   onDeleteMessage={handleDeleteWhatsAppMessage}
                 />
@@ -434,7 +435,6 @@ export function DesktopWorkspaceRouter({
                   onSelectRequest={setSelectedWhatsAppRequestId}
                   onOpenExternal={openSelectedWhatsAppExternal}
                   onReturnToSafe={onReturnToSafe}
-                  onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
                   onMessageSent={handleWhatsAppMessageSent}
                   onDeleteMessage={handleDeleteWhatsAppMessage}
                 />
@@ -452,7 +452,7 @@ export function DesktopWorkspaceRouter({
               reservations={pensionReservations}
               rooms={surfaceData.rooms}
               customers={surfaceData.customers}
-              whatsappEnabled={whatsappEnabled}
+              whatsappEnabled={customerMessagingEnabled}
               onSaveCustomer={handleSaveCustomer}
               onSaveManual={handleSaveManualReservation}
               onUpdateStatus={handleUpdateReservationStatus}
@@ -496,7 +496,7 @@ export function DesktopWorkspaceRouter({
               accommodationReservationsEnabled={accommodationReservationsEnabled}
               customers={surfaceData.customers}
               tables={surfaceData.tables}
-              whatsappEnabled={whatsappEnabled}
+              whatsappEnabled={customerMessagingEnabled}
               onSave={handleSaveManualRestaurantReservation}
               onSaveCustomer={handleSaveCustomer}
               onUpdateStatus={handleUpdateReservationStatus}

@@ -41,7 +41,12 @@ export function useMessagingController({
   const [birthdayPreparingId, setBirthdayPreparingId] = useState("");
   const surfaceEphemeralWhatsAppHandoff = customersEnabled
     && whatsappEnabled
-    && (preparedWhatsAppMessage?.source === "birthday" || customerCreditEnabled)
+    && preparedWhatsAppMessage
+    && (
+      preparedWhatsAppMessage.source === "birthday"
+      || preparedWhatsAppMessage.source === "reservation"
+      || (preparedWhatsAppMessage.source === "customer_credit" && customerCreditEnabled)
+    )
     ? preparedWhatsAppMessage
     : null;
   useEffect(() => {
@@ -423,12 +428,21 @@ export function useMessagingController({
       return;
     }
     if (!reservation.customerPhone) {
-      setStatusMessage("WhatsApp bağlantısı için rezervasyonda müşteri telefonu gerekiyor.");
+      setStatusMessage("WhatsApp hazırlığı için rezervasyonda müşteri telefonu gerekiyor.");
       return;
     }
 
     const message = buildReservationWhatsAppMessage(reservation, surfaceData.rooms, surfaceData.tables);
-    void window.yardimciDesktop?.openExternal(createWhatsAppUrl(reservation.customerPhone, message));
+    openPreparedWhatsApp({
+      source: "reservation",
+      reservationId: reservation.id,
+      reservationType: reservation.reservationType,
+      customerId: reservation.customerId,
+      customerName: reservation.customerName || "Misafir",
+      phone: reservation.customerPhone,
+      message
+    });
+    setStatusMessage("Rezervasyon mesajı hazırlandı; gönderim sizin kontrolünüzde.");
   }
 
   function openSelectedWhatsAppExternal() {
@@ -445,7 +459,7 @@ export function useMessagingController({
   }
 
   async function handleWhatsAppMessageSent(requestId: string, message: string) {
-    if (preparedWhatsAppMessage) return { ok: false as const, message: "Veresiye paylaşımı için gönderim kaydı tutulmaz." };
+    if (preparedWhatsAppMessage) return { ok: false as const, message: "Geçici hazırlanmış mesajlar için yerel gönderim kaydı tutulmaz." };
     if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       return { ok: false as const, message: "WhatsApp bu işletmede etkin değil." };
     }

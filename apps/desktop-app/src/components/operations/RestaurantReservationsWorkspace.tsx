@@ -80,7 +80,7 @@ export function RestaurantReservationsWorkspace({
   const visibleReservations = showAll ? restaurantReservations : activeReservations;
 
   return (
-    <section className="restaurant-reservations-workspace" aria-label="Restoran rezervasyonları">
+    <div className="restaurant-reservations-workspace">
       <div className="reservation-toolbar page-toolbar">
         <div className="restaurant-reservation-summary" aria-label="Restoran rezervasyon özeti">
           <StatusBadge tone="info">{activeReservations.length} aktif rezervasyon</StatusBadge>
@@ -134,7 +134,7 @@ export function RestaurantReservationsWorkspace({
                       disabled={!reservation.customerPhone}
                     >
                       <MessageCircle size={15} aria-hidden="true" />
-                      WhatsApp
+                      WhatsApp'a Hazırla
                     </ActionButton>
                   )}
                   {["pending", "approved"].includes(reservation.status) && (
@@ -157,6 +157,6 @@ export function RestaurantReservationsWorkspace({
         onSave={onSave}
         onSaveCustomer={onSaveCustomer}
       />
-    </section>
+    </div>
   );
 }

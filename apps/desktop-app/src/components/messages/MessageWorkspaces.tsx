@@ -35,6 +35,7 @@ interface WhatsAppWorkspaceProps {
   getRequestStatusTone: (status: string) => StatusTone;
   onSelectRequest: (requestId: string) => void;
   onOpenExternal: () => void;
+  onOpenWeb?: () => void;
   onReturnToSafe?: () => void;
   onMessageSent: (requestId: string, message: string) => Promise<{ ok: boolean; message: string }>;
   onDeleteMessage: (request: SyncedCustomerRequest) => void;
@@ -67,7 +68,7 @@ function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
   };
 }
 
-export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
+export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, getRequestStatusTone, onSelectRequest, onOpenExternal, onOpenWeb, onReturnToSafe, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
   const { confirm, confirmDialog } = useConfirmDialog();
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const registeredGuestIdRef = useRef<number | null>(null);
@@ -78,7 +79,15 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   const [webViewError, setWebViewError] = useState("");
   const recipientPhone = preparedMessage?.phone ?? selectedRequest?.customer_phone;
   const recipientName = preparedMessage?.customerName || selectedRequest?.customer_name || (preparedMessage ? "Müşteri" : "Talep seçin");
-  const preparedMessageLabel = preparedMessage?.source === "birthday" ? "Doğum günü mesajı" : "Veresiye hesabı";
+  const preparedMessageLabel = preparedMessage?.source === "birthday"
+    ? "Doğum günü mesajı"
+    : preparedMessage?.source === "reservation"
+      ? preparedMessage.reservationType === "table"
+        ? "Masa rezervasyonu"
+        : preparedMessage.reservationType === "room"
+          ? "Pansiyon rezervasyonu"
+          : "Rezervasyon mesajı"
+      : "Veresiye hesabı";
   const webViewAction = useMemo(
     () => (recipientPhone ? prepareWhatsAppAction({ phone: recipientPhone, message: selectedMessage, preferredMode: "webview" }) : null),
     [selectedMessage, recipientPhone]
@@ -455,7 +464,9 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           </div>
           <div>
             <dt>Kaynak</dt>
-            <dd>{preparedMessage ? "Müşteri kartı" : selectedRequest ? formatCustomerSource(selectedRequest.source) : "-"}</dd>
+            <dd>{preparedMessage
+              ? preparedMessage.source === "reservation" ? "Rezervasyon" : "Müşteri kartı"
+              : selectedRequest ? formatCustomerSource(selectedRequest.source) : "-"}</dd>
           </div>
         </dl>
 
@@ -470,9 +481,9 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
             <Copy size={16} aria-hidden="true" />
             Hazır Mesajı Kopyala
           </ActionButton>
-          <ActionButton variant="whatsapp" size="sm" type="button" onClick={onOpenExternal} disabled={!selectedUrl}>
-            <ExternalLink size={16} aria-hidden="true" />
-            WhatsApp Linkini Aç
+          <ActionButton variant="whatsapp" size="sm" type="button" onClick={onOpenWeb} disabled={!selectedUrl || !onOpenWeb}>
+            <MessageCircle size={16} aria-hidden="true" />
+            WhatsApp'a Geç
           </ActionButton>
           {!preparedMessage && <ActionButton variant="danger" size="sm" type="button" onClick={() => selectedRequest && onDeleteMessage(selectedRequest)} disabled={!selectedRequest || !selectedMessage}>
             <Trash2 size={16} aria-hidden="true" />

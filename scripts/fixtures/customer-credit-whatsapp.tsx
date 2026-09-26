@@ -46,12 +46,12 @@ function Harness() {
     setStatusMessage(message);
   }), []);
 
-  const workspace = (view: "safe" | "web", onReturnToSafe?: () => void) => <WhatsAppWorkspace view={view}
+  const workspace = (view: "safe" | "web", onReturnToSafe?: () => void, onOpenWeb?: () => void) => <WhatsAppWorkspace view={view}
     preparedMessage={messaging.preparedWhatsAppMessage} requests={messaging.readyWhatsAppRequests}
     selectedRequest={messaging.selectedWhatsAppRequest} selectedMessage={messaging.selectedWhatsAppMessage}
     selectedUrl={messaging.selectedWhatsAppUrl}
     getRequestStatusTone={() => "neutral"} onSelectRequest={messaging.setSelectedWhatsAppRequestId}
-    onOpenExternal={messaging.openSelectedWhatsAppExternal} onReturnToSafe={onReturnToSafe}
+    onOpenExternal={messaging.openSelectedWhatsAppExternal} onOpenWeb={onOpenWeb} onReturnToSafe={onReturnToSafe}
     onMessageSent={messaging.handleWhatsAppMessageSent}
     onDeleteMessage={messaging.handleDeleteWhatsAppMessage} />;
 
@@ -85,7 +85,7 @@ function Harness() {
         }} />
         </WorkspaceNavigationProvider>
       </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} />
-        : <CustomerMessagesWorkspace safeMode={workspace("safe")} webMode={(onReturn) => workspace("web", onReturn)}
+        : <CustomerMessagesWorkspace safeMode={(onOpenWeb) => workspace("safe", undefined, onOpenWeb)} webMode={(onReturn) => workspace("web", onReturn)}
           whatsappEnabled={whatsappEnabled} prewarmWebview={false} active={page === "prepared"} />}
     </main>
   </BusinessCapabilityRuntimeProvider>;
