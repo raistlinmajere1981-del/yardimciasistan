@@ -71,13 +71,6 @@
   font-size: var(--text-xs);
 }
 
-.request-more-actions-menu {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding-block: var(--space-2);
-}
-
 .request-ai-reply {
   display: grid;
   gap: var(--space-2);
@@ -128,16 +121,40 @@
   font-weight: var(--weight-semibold);
 }
 
-.request-more-actions {
-  flex-basis: 100%;
+.request-detail-header {
+  align-items: flex-start;
 }
 
-.request-more-actions > summary {
-  cursor: pointer;
-  width: fit-content;
-  padding: var(--space-2) 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+.request-detail-header-tools {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.request-detail-header-actions {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.request-meta-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.request-meta-grid > div {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.request-meta-grid dt {
+  font-weight: var(--weight-semibold);
+}
+
+.request-meta-grid dd {
+  font-weight: var(--weight-medium);
 }
 
 .reservation-quick-customer {
@@ -376,6 +393,24 @@
 .manual-request-dialog-actions {
   margin-left: auto;
 }
+@media (max-width: 1024px) {
+  .request-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
+  .request-detail-header-tools {
+    justify-items: stretch;
+  }
+
+  .request-detail-header-actions {
+    justify-content: flex-start;
+  }
+
+  .request-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .customer-workspace-savebar { align-items: stretch; flex-direction: column; }
 }
