@@ -329,15 +329,17 @@ export function useMessagingController({
     setPreparedWhatsAppMessage(null);
   }, [whatsappEnabled]);
 
+  const preparedWhatsAppRecords = dashboardData.preparedWhatsAppMessages ?? [];
+
   const readyWhatsAppRequestIds = useMemo(
     () => new Set(
       customersEnabled && whatsappEnabled
-        ? (dashboardData.preparedWhatsAppMessages ?? [])
+        ? preparedWhatsAppRecords
           .map((message) => message.requestId)
           .filter(Boolean)
         : []
     ),
-    [customersEnabled, (dashboardData.preparedWhatsAppMessages ?? []), whatsappEnabled]
+    [customersEnabled, preparedWhatsAppRecords, whatsappEnabled]
   );
 
   const readyWhatsAppRequests = useMemo(
@@ -358,9 +360,9 @@ export function useMessagingController({
 
   const selectedPreparedWhatsAppRecord = useMemo(
     () => selectedWhatsAppRequest
-      ? (dashboardData.preparedWhatsAppMessages ?? []).find((message) => message.requestId === selectedWhatsAppRequest.id)
+      ? preparedWhatsAppRecords.find((message) => message.requestId === selectedWhatsAppRequest.id)
       : undefined,
-    [(dashboardData.preparedWhatsAppMessages ?? []), selectedWhatsAppRequest]
+    [preparedWhatsAppRecords, selectedWhatsAppRequest]
   );
 
   const selectedWhatsAppMessage = useMemo(
