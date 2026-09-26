@@ -95,9 +95,6 @@
 .finance-ai-panel .finance-ai-actions {
   display: grid;
   gap: var(--space-1);
-}
-
-.finance-ai-panel .finance-ai-actions {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: center;
 }
@@ -109,14 +106,14 @@
   font-size: var(--text-xs);
 }
 
-.finance-ai-panel .report-ai-status,
-.finance-ai-panel .finance-ai-result {
-  grid-column: 1 / -1;
-}
-
 .finance-ai-panel .report-ai-status {
+  grid-column: 1 / -1;
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
+}
+
+.finance-ai-panel .finance-ai-result {
+  grid-column: 1 / -1;
 }
 
 .finance-ai-result {

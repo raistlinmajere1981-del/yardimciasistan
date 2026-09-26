@@ -3,7 +3,7 @@ import type { CustomerCreditAccountDetail } from "@yardimci-asistan/shared";
 import { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint, normalizeInternationalPhone } from "@yardimci-asistan/whatsapp-bridge";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 import { reportAppStatus } from "../../app/runtime-state";
-import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
+import type { EphemeralWhatsAppHandoff } from "../../app/whatsapp-handoff";
 import { ActionButton } from "../ui/ActionButton";
 
 interface CreditShareDraft { account: CustomerCreditAccountDetail; message: string }
@@ -17,7 +17,7 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
   account: CustomerCreditAccountDetail;
   disabled: boolean;
   readFresh: () => Promise<CustomerCreditAccountDetail | undefined>;
-  onPrepared?: (message: PreparedWhatsAppMessage) => void;
+  onPrepared?: (message: EphemeralWhatsAppHandoff) => void;
 }) {
   const [draft, setDraft] = useState<CreditShareDraft | null>(null);
   const [busy, setBusy] = useState(false);

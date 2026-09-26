@@ -63,6 +63,12 @@ Only **Müşteri İşleri** contributes a sidebar item.
 - Disabling Requests does not remove customer records or prepared WhatsApp work.
 - Disabling WhatsApp removes Hazır Mesajlar without affecting request AI preparation.
 
+Requests capability kapalıyken request-domain kayıtları renderer yüzeyine taşınmaz;
+bu nedenle request'e bağlı prepared mesajlar Hazır Mesajlar'da gösterilmez.
+Customer-domain ephemeral WhatsApp handoff'ları (doğum günü / veresiye) çalışmaya
+devam edebilir. Prepared listesi sırf dolu diye REQUESTS dışındaki request
+entity'leri projection sınırından sızdırılmaz.
+
 This removes the previous Requests/WhatsApp/AI combinations that had to decide whether a separate Messages page should appear.
 
 ## Contextual AI

@@ -280,13 +280,16 @@
   box-shadow: var(--shadow-sm);
 }
 
-.dashboard-timeline-panel,
 .dashboard-capacity-panel {
+  box-shadow: var(--shadow-sm);
+  flex: 0 0 auto;
+}
+
+.dashboard-operational-attention-panel {
+  flex: 0 0 auto;
   box-shadow: var(--shadow-sm);
 }
 
-.dashboard-capacity-panel,
-.dashboard-operational-attention-panel,
 .dashboard-birthday-panel {
   flex: 0 0 auto;
 }
@@ -297,6 +300,7 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .dashboard-section-heading {
@@ -498,10 +502,6 @@
 .dashboard-side .panel {
   padding-top: var(--space-3);
   padding-bottom: var(--space-3);
-}
-
-.dashboard-operational-attention-panel {
-  box-shadow: var(--shadow-sm);
 }
 
 .dashboard-operational-attention-list {

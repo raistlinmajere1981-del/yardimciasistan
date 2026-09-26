@@ -10,10 +10,10 @@ import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../electron/database";
 import { buildReservationWhatsAppMessage } from "./reservation-messaging";
 import type { SyncState } from "./runtime-state";
-import type { PreparedWhatsAppMessage } from "./whatsapp-handoff";
+import type { EphemeralWhatsAppHandoff } from "./whatsapp-handoff";
 
 interface UseMessagingControllerOptions {
-  dashboardData: DesktopDashboardData;
+  surfaceData: DesktopDashboardData;
   setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
@@ -21,11 +21,11 @@ interface UseMessagingControllerOptions {
   customersEnabled: boolean;
   whatsappEnabled: boolean;
   customerCreditEnabled?: boolean;
-  onOpenCustomerMessages: () => void;
+  onOpenPreparedMessages: () => void;
 }
 
 export function useMessagingController({
-  dashboardData,
+  surfaceData,
   setDashboardData,
   setSyncState,
   setStatusMessage,
@@ -33,40 +33,40 @@ export function useMessagingController({
   customersEnabled,
   whatsappEnabled,
   customerCreditEnabled = false,
-  onOpenCustomerMessages
+  onOpenPreparedMessages
 }: UseMessagingControllerOptions) {
   const { confirm, confirmDialog } = useConfirmDialog();
-  const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestIdState] = useState(dashboardData.requests[0]?.id ?? "");
-  const [preparedWhatsAppMessage, setPreparedWhatsAppMessage] = useState<PreparedWhatsAppMessage | null>(null);
+  const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestIdState] = useState(surfaceData.requests[0]?.id ?? "");
+  const [preparedWhatsAppMessage, setEphemeralWhatsAppHandoff] = useState<EphemeralWhatsAppHandoff | null>(null);
   const [birthdayPreparingId, setBirthdayPreparingId] = useState("");
-  const surfacePreparedWhatsAppMessage = customersEnabled
+  const surfaceEphemeralWhatsAppHandoff = customersEnabled
     && whatsappEnabled
     && (preparedWhatsAppMessage?.source === "birthday" || customerCreditEnabled)
     ? preparedWhatsAppMessage
     : null;
   useEffect(() => {
     if (!customersEnabled || !whatsappEnabled || (preparedWhatsAppMessage?.source === "customer_credit" && !customerCreditEnabled)) {
-      setPreparedWhatsAppMessage(null);
+      setEphemeralWhatsAppHandoff(null);
     }
   }, [customerCreditEnabled, customersEnabled, preparedWhatsAppMessage?.source, whatsappEnabled]);
 
   function setSelectedWhatsAppRequestId(value: SetStateAction<string>) {
     invalidateWhatsAppSelection();
-    setPreparedWhatsAppMessage(null);
+    setEphemeralWhatsAppHandoff(null);
     setSelectedWhatsAppRequestIdState(value);
   }
 
-  function openPreparedWhatsApp(message: PreparedWhatsAppMessage) {
+  function openPreparedWhatsApp(message: EphemeralWhatsAppHandoff) {
     if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       throw new Error("WhatsApp bu işletmede etkin değil.");
     }
     invalidateWhatsAppSelection();
-    setPreparedWhatsAppMessage(message);
+    setEphemeralWhatsAppHandoff(message);
     setSelectedWhatsAppRequestIdState("");
-    onOpenCustomerMessages();
+    onOpenPreparedMessages();
   }
 
-  function openPreparedCreditWhatsApp(message: PreparedWhatsAppMessage) {
+  function openPreparedCreditWhatsApp(message: EphemeralWhatsAppHandoff) {
     if (!customerCreditEnabledRef.current) throw new Error("Veresiye WhatsApp paylaşımı şu anda etkin değil.");
     openPreparedWhatsApp(message);
   }
@@ -309,7 +309,7 @@ export function useMessagingController({
     replyFeedbackOwnerRef.current = ++replyFeedbackSequenceRef.current;
     requestAiOperationOwnersRef.current.clear();
     setSelectedWhatsAppRequestIdState("");
-    setPreparedWhatsAppMessage(null);
+    setEphemeralWhatsAppHandoff(null);
     setSuggestingRequestId("");
     setAiState("idle");
     setAiMessage("AI cevap taslağı hazır.");
@@ -327,10 +327,10 @@ export function useMessagingController({
       setStatusMessage("WhatsApp kapatıldığı için doğum günü mesajı hazırlığı durduruldu.");
     }
     setSelectedWhatsAppRequestIdState("");
-    setPreparedWhatsAppMessage(null);
+    setEphemeralWhatsAppHandoff(null);
   }, [whatsappEnabled]);
 
-  const preparedWhatsAppRecords = dashboardData.preparedWhatsAppMessages ?? [];
+  const preparedWhatsAppRecords = surfaceData.preparedWhatsAppMessages ?? [];
 
   const readyWhatsAppRequestIds = useMemo(
     () => new Set(
@@ -344,19 +344,19 @@ export function useMessagingController({
   );
 
   const readyWhatsAppRequests = useMemo(
-    () => dashboardData.requests.filter((request) => readyWhatsAppRequestIds.has(request.id)),
-    [dashboardData.requests, readyWhatsAppRequestIds]
+    () => surfaceData.requests.filter((request) => readyWhatsAppRequestIds.has(request.id)),
+    [surfaceData.requests, readyWhatsAppRequestIds]
   );
 
   const selectedWhatsAppRequest = useMemo(
     () => {
-      if (!customersEnabled || surfacePreparedWhatsAppMessage) return undefined;
+      if (!customersEnabled || surfaceEphemeralWhatsAppHandoff) return undefined;
       const explicitlySelected = readyWhatsAppRequestIds.has(selectedWhatsAppRequestId)
-        ? dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId)
+        ? surfaceData.requests.find((request) => request.id === selectedWhatsAppRequestId)
         : undefined;
       return explicitlySelected ?? readyWhatsAppRequests[0];
     },
-    [customersEnabled, dashboardData.requests, readyWhatsAppRequestIds, readyWhatsAppRequests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
+    [customersEnabled, surfaceData.requests, readyWhatsAppRequestIds, readyWhatsAppRequests, selectedWhatsAppRequestId, surfaceEphemeralWhatsAppHandoff]
   );
 
   const selectedPreparedWhatsAppRecord = useMemo(
@@ -367,17 +367,17 @@ export function useMessagingController({
   );
 
   const selectedWhatsAppMessage = useMemo(
-    () => surfacePreparedWhatsAppMessage
-      ? surfacePreparedWhatsAppMessage.message
+    () => surfaceEphemeralWhatsAppHandoff
+      ? surfaceEphemeralWhatsAppHandoff.message
       : selectedPreparedWhatsAppRecord?.message ?? "",
-    [selectedPreparedWhatsAppRecord, surfacePreparedWhatsAppMessage]
+    [selectedPreparedWhatsAppRecord, surfaceEphemeralWhatsAppHandoff]
   );
 
   const selectedWhatsAppUrl = useMemo(
-    () => surfacePreparedWhatsAppMessage ? createWhatsAppWebUrl(surfacePreparedWhatsAppMessage.phone, surfacePreparedWhatsAppMessage.message) : customersEnabled && whatsappEnabled && selectedWhatsAppRequest
+    () => surfaceEphemeralWhatsAppHandoff ? createWhatsAppWebUrl(surfaceEphemeralWhatsAppHandoff.phone, surfaceEphemeralWhatsAppHandoff.message) : customersEnabled && whatsappEnabled && selectedWhatsAppRequest
       ? createWhatsAppWebUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage)
       : "",
-    [customersEnabled, selectedWhatsAppMessage, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
+    [customersEnabled, selectedWhatsAppMessage, selectedWhatsAppRequest, whatsappEnabled, surfaceEphemeralWhatsAppHandoff]
   );
 
   function openWhatsApp(request: SyncedCustomerRequest) {
@@ -386,11 +386,11 @@ export function useMessagingController({
       return;
     }
 
-    const hasPreparedMessage = (dashboardData.preparedWhatsAppMessages ?? [])
+    const hasPreparedMessage = (surfaceData.preparedWhatsAppMessages ?? [])
       .some((message) => message.requestId === request.id);
     if (hasPreparedMessage) {
       setSelectedWhatsAppRequestId(request.id);
-      onOpenCustomerMessages();
+      onOpenPreparedMessages();
       return;
     }
 
@@ -435,7 +435,7 @@ export function useMessagingController({
       return;
     }
 
-    const message = buildReservationWhatsAppMessage(reservation, dashboardData.rooms, dashboardData.tables);
+    const message = buildReservationWhatsAppMessage(reservation, surfaceData.rooms, surfaceData.tables);
     void window.yardimciDesktop?.openExternal(createWhatsAppUrl(reservation.customerPhone, message));
   }
 
@@ -556,7 +556,7 @@ export function useMessagingController({
         && whatsappEnabledRef.current
       ) {
         whatsappSelectionRevisionRef.current += 1;
-        setPreparedWhatsAppMessage(null);
+        setEphemeralWhatsAppHandoff(null);
         setSelectedWhatsAppRequestIdState(request.id);
       }
       if (replyFeedbackOwnerRef.current === feedbackOwner) {
@@ -640,7 +640,7 @@ export function useMessagingController({
 
   return {
     confirmDialog,
-    preparedWhatsAppMessage: surfacePreparedWhatsAppMessage,
+    preparedWhatsAppMessage: surfaceEphemeralWhatsAppHandoff,
     openPreparedCreditWhatsApp,
     prepareBirthdayWhatsApp,
     birthdayPreparingId,

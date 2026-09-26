@@ -1,8 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { DesktopPage } from "../../app/navigation";
+import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
 import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
 import type { SyncState } from "../../app/runtime-state";
-import type { CustomerWorkTab } from "../../pages/CustomerWorkPage";
 import { useMarketController } from "../../app/use-market-controller";
 import { useFinanceController } from "../../app/use-finance-controller";
 import type {
@@ -15,6 +14,7 @@ import type {
   OperationController,
   SetupController
 } from "../../app/controller-types";
+import type { DesktopDashboardData } from "../../../electron/database";
 import {
   applyUiPreferences,
   readUiPreferences,
@@ -31,6 +31,7 @@ interface DesktopAppViewProps {
   customerWorkTab: CustomerWorkTab;
   setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
   registerPageLeaveGuard: RegisterPageLeaveGuard;
+  surfaceData: DesktopDashboardData;
   syncState: SyncState;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   statusMessage: string;
@@ -51,6 +52,7 @@ export function DesktopAppView({
   customerWorkTab,
   setCustomerWorkTab,
   registerPageLeaveGuard,
+  surfaceData,
   syncState,
   setSyncState,
   statusMessage,
@@ -104,6 +106,7 @@ export function DesktopAppView({
       activePage={activePage}
       requestPageChange={requestPageChange}
       setCustomerWorkTab={setCustomerWorkTab}
+      surfaceData={surfaceData}
       syncState={syncState}
       statusMessage={statusMessage}
       setupController={setupController}
@@ -119,6 +122,7 @@ export function DesktopAppView({
         requestPageChange={requestPageChange}
         customerWorkTab={customerWorkTab}
         setCustomerWorkTab={setCustomerWorkTab}
+        surfaceData={surfaceData}
         registerPageLeaveGuard={registerPageLeaveGuard}
         syncState={syncState}
         setSyncState={setSyncState}

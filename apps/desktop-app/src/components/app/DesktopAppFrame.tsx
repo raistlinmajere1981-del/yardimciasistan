@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, ty
 import { Eye, LockKeyhole, RefreshCw, ScrollText, UploadCloud } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
-import type { DesktopPage } from "../../app/navigation";
-import type { CustomerWorkTab } from "../../pages/CustomerWorkPage";
+import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
 import type { RequestPageChange } from "../../app/page-navigation-guard";
 import { buildNavigation, getPageContentScroll, getPageMeta } from "../../app/navigation";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "../../app/notifications";
@@ -21,6 +20,7 @@ import type {
   MessagingController,
   SetupController
 } from "../../app/controller-types";
+import type { DesktopDashboardData } from "../../../electron/database";
 import { AppShell } from "../layout/AppShell";
 import { PageHeader } from "../layout/PageHeader";
 import { Sidebar } from "../layout/Sidebar";
@@ -28,13 +28,13 @@ import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
 import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
-import { projectDesktopDashboardData } from "../../app/capability-projection";
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
 
 interface DesktopAppFrameProps {
   activePage: DesktopPage;
   requestPageChange: RequestPageChange;
   setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
+  surfaceData: DesktopDashboardData;
   syncState: SyncState;
   statusMessage: string;
   setupController: SetupController;
@@ -59,6 +59,7 @@ function DesktopAppFrameContent({
   activePage,
   requestPageChange,
   setCustomerWorkTab,
+  surfaceData,
   syncState,
   statusMessage,
   setupController,
@@ -107,7 +108,6 @@ function DesktopAppFrameContent({
   const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
   const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
   const inventoryEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.INVENTORY);
-  const workspaceData = projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? []);
   const automaticSyncNeedsAttention = automaticSyncStatus.phase === "offline" || automaticSyncStatus.phase === "error";
   const automaticSyncDisplayMessage = automaticSyncStatus.phase === "offline"
     ? OFFLINE_SYNC_MESSAGE
@@ -246,7 +246,7 @@ function DesktopAppFrameContent({
       overlay={(
         <>
           <WorkspaceHost definition={customerWorkspaceDefinition} context={{
-            data: workspaceData,
+            data: surfaceData,
             aiEnabled,
             whatsappEnabled,
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS) || runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS),
@@ -260,7 +260,7 @@ function DesktopAppFrameContent({
             onDelete: customerController.handleDeleteCustomer
           }} />
           <WorkspaceHost definition={menuItemWorkspaceDefinition} context={{
-            data: workspaceData,
+            data: surfaceData,
             qrMenuEnabled,
             inventoryEnabled,
             onSave: menuController.saveItemForm,
@@ -277,7 +277,7 @@ function DesktopAppFrameContent({
             onStateChange: marketController.handleStateChange
           }} />
           <WorkspaceHost definition={roomWorkspaceDefinition} context={{
-            data: workspaceData,
+            data: surfaceData,
             onDashboard: desktopSyncController.setDashboardData,
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS),

@@ -30,9 +30,9 @@ function Harness() {
   const [statusMessage, setStatusMessage] = useState("");
   const whatsappEnabled = snapshot.enabledCapabilities.includes(C.WHATSAPP);
   const customerCreditEnabled = snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT);
-  const messaging = useMessagingController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
+  const messaging = useMessagingController({ surfaceData: dashboardData, setDashboardData, setSyncState, setStatusMessage,
     aiEnabled: false, customersEnabled: true, whatsappEnabled, customerCreditEnabled,
-    onOpenCustomerMessages: () => setPage("messages") });
+    onOpenPreparedMessages: () => setPage("prepared") });
   const customers = useCustomerController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
     selectedWhatsAppRequestId: messaging.selectedWhatsAppRequestId, setSelectedWhatsAppRequestId: messaging.setSelectedWhatsAppRequestId });
   const marketController = useMarketController({
@@ -61,7 +61,7 @@ function Harness() {
     <main className="smoke-shell">
       {customers.confirmDialog}
       {messaging.confirmDialog}
-      <nav aria-label="Çalışma alanı">{["customers", "market", "messages"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Hazır Mesajlar"}</button>)}</nav>
+      <nav aria-label="Çalışma alanı">{["customers", "market", "prepared"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Hazır Mesajlar"}</button>)}</nav>
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
         <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
@@ -89,7 +89,7 @@ function Harness() {
         </WorkspaceNavigationProvider>
       </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} />
         : <CustomerMessagesWorkspace safeMode={workspace("safe")} webMode={(onReturn) => workspace("web", onReturn)}
-          whatsappEnabled={whatsappEnabled} automaticWebviewRequired={false} active={page === "messages"} />}
+          whatsappEnabled={whatsappEnabled} prewarmWebview={false} active={page === "prepared"} />}
     </main>
   </BusinessCapabilityRuntimeProvider>;
 }

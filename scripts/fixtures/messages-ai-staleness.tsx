@@ -25,7 +25,7 @@ function Harness() {
   });
 
   const controller = useMessagingController({
-    dashboardData,
+    surfaceData: dashboardData,
     setDashboardData,
     setSyncState,
     setStatusMessage,
@@ -33,7 +33,7 @@ function Harness() {
     customersEnabled: flags.customersEnabled,
     whatsappEnabled: flags.whatsappEnabled,
     customerCreditEnabled: flags.customerCreditEnabled,
-    onOpenCustomerMessages: () => undefined
+    onOpenPreparedMessages: () => undefined
   });
 
   control.__m8eController = controller;

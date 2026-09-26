@@ -11,7 +11,7 @@ interface CustomerMessagesWorkspaceProps {
   safeMode: ReactNode;
   webMode: (onReturnToSafe: () => void) => ReactNode;
   whatsappEnabled: boolean;
-  automaticWebviewRequired?: boolean;
+  prewarmWebview?: boolean;
   active: boolean;
 }
 
@@ -19,19 +19,19 @@ export function CustomerMessagesWorkspace({
   safeMode,
   webMode,
   whatsappEnabled,
-  automaticWebviewRequired = false,
+  prewarmWebview = false,
   active
 }: CustomerMessagesWorkspaceProps) {
   const [mode, setMode] = useState<MessageMode>("safe");
-  const [webModeActivated, setWebModeActivated] = useState(automaticWebviewRequired);
+  const [webModeActivated, setWebModeActivated] = useState(prewarmWebview);
   const [webTakeoverState, setWebTakeoverState] = useState<WebTakeoverState>("idle");
   const [webTakeoverMessage, setWebTakeoverMessage] = useState("");
   const [webTakeoverAttempt, setWebTakeoverAttempt] = useState(0);
   const takeoverSequence = useRef(0);
 
   useEffect(() => {
-    if (automaticWebviewRequired) setWebModeActivated(true);
-  }, [automaticWebviewRequired]);
+    if (prewarmWebview) setWebModeActivated(true);
+  }, [prewarmWebview]);
 
   useEffect(() => {
     if (whatsappEnabled) return;

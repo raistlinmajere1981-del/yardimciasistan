@@ -380,8 +380,13 @@ assert.match(desktopProjectionSource, /newRequests: requestsEnabled \? source\.s
 assert.match(desktopProjectionSource, /waitingRequests: requestsEnabled \? source\.summary\.waitingRequests : 0/);
 assert.match(
   routerSource,
-  /<WhatsAppWorkspace[\s\S]{0,180}requests=\{surfaceReadyWhatsAppRequests\}/,
-  "outbox surfaces must consume the prepared-message queue projection"
+  /<WhatsAppWorkspace[\s\S]{0,180}requests=\{readyWhatsAppRequests\}/,
+  "outbox surfaces must consume the controller-owned prepared-message queue"
+);
+assert.doesNotMatch(
+  routerSource,
+  /surfaceReadyWhatsAppRequests|surfaceSelectedWhatsAppRequest/,
+  "router must not re-derive the prepared-message queue beside the controller"
 );
 assert.match(
   dashboardSource,

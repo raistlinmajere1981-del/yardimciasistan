@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { BusinessCapabilityRuntimeProvider } from "./app/business-capability-context";
 import { runtimeHasCapability } from "./app/capabilities";
+import { projectDesktopDashboardData } from "./app/capability-projection";
 import { buildDesktopNotifications } from "./app/notifications";
-import type { DesktopPage } from "./app/navigation";
+import type { DesktopPage, CustomerWorkTab } from "./app/navigation";
 import type { PageLeaveGuard } from "./app/page-navigation-guard";
 import { subscribeAppStatus, type SyncState } from "./app/runtime-state";
 import { useAppLock } from "./app/use-app-lock";
@@ -15,7 +16,6 @@ import { useMessagingController } from "./app/use-messaging-controller";
 import { useOperationController } from "./app/use-operation-controller";
 import { useSetupController } from "./app/use-setup-controller";
 import { DesktopAppView } from "./components/app/DesktopAppView";
-import type { CustomerWorkTab } from "./pages/CustomerWorkPage";
 
 function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
@@ -71,8 +71,15 @@ function App() {
     setDashboardData: desktopSyncController.setDashboardData,
     loadDashboardData: desktopSyncController.loadDashboardData
   });
+  const surfaceData = useMemo(
+    () => projectDesktopDashboardData(
+      desktopSyncController.dashboardData,
+      desktopSyncController.businessCapabilities?.enabledCapabilities ?? []
+    ),
+    [desktopSyncController.dashboardData, desktopSyncController.businessCapabilities]
+  );
   const messagingController = useMessagingController({
-    dashboardData: desktopSyncController.dashboardData,
+    surfaceData,
     setDashboardData: desktopSyncController.setDashboardData,
     setSyncState,
     setStatusMessage,
@@ -80,8 +87,8 @@ function App() {
     customersEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
     whatsappEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP),
     customerCreditEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),
-    onOpenCustomerMessages: () => {
-      setCustomerWorkTab("messages");
+    onOpenPreparedMessages: () => {
+      setCustomerWorkTab("prepared");
       requestPageChange("customerWork");
     }
   });
@@ -127,6 +134,7 @@ function App() {
         customerWorkTab={customerWorkTab}
         setCustomerWorkTab={setCustomerWorkTab}
         registerPageLeaveGuard={registerPageLeaveGuard}
+        surfaceData={surfaceData}
         syncState={syncState}
         setSyncState={setSyncState}
         statusMessage={statusMessage}

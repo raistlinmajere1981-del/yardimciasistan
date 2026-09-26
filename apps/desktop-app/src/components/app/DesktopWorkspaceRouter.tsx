@@ -8,8 +8,7 @@ import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useDashboardAi } from "../../app/use-dashboard-ai";
-import { projectDesktopDashboardData } from "../../app/capability-projection";
-import type { DesktopPage } from "../../app/navigation";
+import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
 import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "../../app/operations";
 import {
@@ -44,7 +43,7 @@ import {
   formatTaskDue
 } from "../operations/OperationWorkspaces";
 import { SettingsWorkspace } from "../settings/SettingsWorkspace";
-import { CustomerWorkPage, type CustomerWorkTab } from "../../pages/CustomerWorkPage";
+import { CustomerWorkPage } from "../../pages/CustomerWorkPage";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
@@ -75,6 +74,7 @@ interface DesktopWorkspaceRouterProps {
   deviceController: DeviceController;
   uiPreferences: UiPreferences;
   setUiPreferences: Dispatch<SetStateAction<UiPreferences>>;
+  surfaceData: DesktopDashboardData;
   onDashboardRefresh: () => Promise<unknown>;
 }
 
@@ -99,6 +99,7 @@ export function DesktopWorkspaceRouter({
   deviceController,
   uiPreferences,
   setUiPreferences,
+  surfaceData,
   onDashboardRefresh
 }: DesktopWorkspaceRouterProps) {
   const {
@@ -213,7 +214,6 @@ export function DesktopWorkspaceRouter({
   const foodMenuEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_MENU);
   const inventoryEnabled = runtimeHasCapability(businessCapabilities, C.INVENTORY);
   const customerMessagingEnabled = customersEnabled && whatsappEnabled;
-  const surfaceData = projectDesktopDashboardData(dashboardData, enabledCapabilities);
   const pensionReservations = surfaceData.reservations.filter((reservation) => {
     const domain = getReservationDomain(reservation.reservationType, {
       roomIds: reservation.roomIds,
@@ -223,11 +223,6 @@ export function DesktopWorkspaceRouter({
   });
   const surfaceSelectedRequest = surfaceData.requests.find((request) => request.id === selectedRequest?.id)
     ?? surfaceData.requests[0];
-  const surfaceSelectedWhatsAppRequest = surfaceData.requests.find(
-    (request) => request.id === selectedWhatsAppRequest?.id
-  );
-  const readyWhatsAppRequestIds = new Set(readyWhatsAppRequests.map((request) => request.id));
-  const surfaceReadyWhatsAppRequests = surfaceData.requests.filter((request) => readyWhatsAppRequestIds.has(request.id));
   const runtimeFeatures = {
     rooms: roomsEnabled,
     tables: tablesEnabled,
@@ -412,20 +407,20 @@ export function DesktopWorkspaceRouter({
           messages={(
             <CustomerMessagesWorkspace
               whatsappEnabled={customerMessagingEnabled}
-              automaticWebviewRequired={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
-              active={activePage === "customerWork" && customerWorkTab === "messages"}
+              prewarmWebview={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
+              active={activePage === "customerWork" && customerWorkTab === "prepared"}
               safeMode={(
                 <WhatsAppWorkspace
                   view="safe"
                   preparedMessage={messagingController.preparedWhatsAppMessage}
-                  requests={surfaceReadyWhatsAppRequests}
-                  selectedRequest={surfaceSelectedWhatsAppRequest}
-                  selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-                  selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
+                  requests={readyWhatsAppRequests}
+                  selectedRequest={selectedWhatsAppRequest}
+                  selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+                  selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
                   getRequestStatusTone={getRequestStatusTone}
                   onSelectRequest={setSelectedWhatsAppRequestId}
                   onOpenExternal={openSelectedWhatsAppExternal}
-                  onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
+                  onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
                   onMessageSent={handleWhatsAppMessageSent}
                   onDeleteMessage={handleDeleteWhatsAppMessage}
                 />
@@ -434,15 +429,15 @@ export function DesktopWorkspaceRouter({
                 <WhatsAppWorkspace
                   view="web"
                   preparedMessage={messagingController.preparedWhatsAppMessage}
-                  requests={surfaceReadyWhatsAppRequests}
-                  selectedRequest={surfaceSelectedWhatsAppRequest}
-                  selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-                  selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
+                  requests={readyWhatsAppRequests}
+                  selectedRequest={selectedWhatsAppRequest}
+                  selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+                  selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
                   getRequestStatusTone={getRequestStatusTone}
                   onSelectRequest={setSelectedWhatsAppRequestId}
                   onOpenExternal={openSelectedWhatsAppExternal}
                   onReturnToSafe={onReturnToSafe}
-                  onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
+                  onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
                   onMessageSent={handleWhatsAppMessageSent}
                   onDeleteMessage={handleDeleteWhatsAppMessage}
                 />
