@@ -32,11 +32,8 @@ import type {
   CreateManualRequestResult,
   RequestReservationConversionResult,
   RequestAiSuggestionResult,
-  GenerateAiWorkspaceInput,
-  GenerateAiWorkspaceResult,
-  SaveAiWorkspaceResultInput,
-  SaveAiWorkspaceResult,
-  AiWorkspaceHistoryEntry,
+  RewriteRequestAiSuggestionInput,
+  DailyBusinessEvaluationResult,
   DesktopAndroidDeviceMutationResult,
   DesktopStatusUpdateResult,
   UpdateRequestStatusInput,
@@ -263,9 +260,8 @@ export interface DesktopBridge {
   resetLocalData: () => Promise<DesktopDataMaintenanceResult>;
   onDataMaintenanceConfirmation: (listener: (request: DataMaintenanceConfirmation) => Promise<boolean>) => () => void;
   createOwnerReplySuggestion: (requestId: string) => Promise<RequestAiSuggestionResult>;
-  generateAiWorkspace: (input: GenerateAiWorkspaceInput) => Promise<GenerateAiWorkspaceResult>;
-  getAiWorkspaceHistory: (limit?: number) => Promise<AiWorkspaceHistoryEntry[]>;
-  saveAiWorkspaceResult: (input: SaveAiWorkspaceResultInput) => Promise<SaveAiWorkspaceResult>;
+  rewriteOwnerReplySuggestion: (input: RewriteRequestAiSuggestionInput) => Promise<RequestAiSuggestionResult>;
+  generateDailyBusinessEvaluation: () => Promise<DailyBusinessEvaluationResult>;
   testAiConnection: (input: AiConnectionTestInput) => Promise<AiConnectionTestResult>;
   revealAiApiKey: (service: string) => Promise<AiApiKeyRevealResult>;
   pullRequests: () => Promise<PullRequestsResult>;
@@ -456,9 +452,8 @@ const bridge: DesktopBridge = {
   },
   resetLocalData: () => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:resetLocalData"),
   createOwnerReplySuggestion: (requestId: string) => ipcRenderer.invoke("ai:createOwnerReplySuggestion", requestId),
-  generateAiWorkspace: (input: GenerateAiWorkspaceInput) => ipcRenderer.invoke("ai:generateWorkspace", input),
-  getAiWorkspaceHistory: (limit?: number) => ipcRenderer.invoke("ai:getWorkspaceHistory", limit),
-  saveAiWorkspaceResult: (input: SaveAiWorkspaceResultInput) => ipcRenderer.invoke("ai:saveWorkspaceResult", input),
+  rewriteOwnerReplySuggestion: (input: RewriteRequestAiSuggestionInput) => ipcRenderer.invoke("ai:rewriteOwnerReplySuggestion", input),
+  generateDailyBusinessEvaluation: () => ipcRenderer.invoke("ai:generateDailyBusinessEvaluation"),
   testAiConnection: (input: AiConnectionTestInput) => ipcRenderer.invoke("ai:testConnection", input),
   revealAiApiKey: (service: string) => ipcRenderer.invoke("ai:revealApiKey", service),
   pullRequests: () => ipcRenderer.invoke("sync:pullRequests"),
