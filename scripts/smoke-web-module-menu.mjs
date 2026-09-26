@@ -95,6 +95,17 @@ try {
   expect(emptyReviews.status()).toBe(200);
   expect(await emptyReviews.json()).toMatchObject({ available: false, reason: "not_configured" });
 
+  const invalidGoogleTest = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "test_google_reviews_settings",
+      client_id: "desktop-google-reviews-smoke",
+      google_reviews: { place_id: "", api_key: "" }
+    }
+  });
+  expect(invalidGoogleTest.status()).toBe(422);
+  expect(await invalidGoogleTest.json()).toMatchObject({ ok: false });
+
   const googleSecret = "AIzaSmokeGoogleReviewsSecret";
   const googlePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
