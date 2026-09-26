@@ -1034,6 +1034,7 @@ function ya_sync_publish_room_catalog(array $payload): void
         'rooms' => $rooms
     ];
     $publication = ya_storage_publish('room_catalog', $catalog, $clientId, null, '', $now);
+    ya_sync_prune_room_media($rooms);
 
     ya_sync_response(200, [
         'ok' => true,
@@ -1044,6 +1045,51 @@ function ya_sync_publish_room_catalog(array $payload): void
         'server_revision' => $publication['server_revision'],
         'deduplicated' => $publication['deduplicated']
     ]);
+}
+
+function ya_sync_prune_room_media(array $rooms): void
+{
+    $root = YA_BASE_DIR . '/media/rooms';
+    if (!is_dir($root)) {
+        return;
+    }
+
+    $keep = [];
+    foreach ($rooms as $room) {
+        if (!is_array($room)) continue;
+        foreach (($room['media'] ?? []) as $media) {
+            if (!is_array($media)) continue;
+            $url = ya_sync_string($media['url'] ?? '');
+            if ($url === '') continue;
+            $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+            $marker = '/media/rooms/';
+            $position = strpos($path, $marker);
+            if ($position === false) continue;
+            $relative = substr($path, $position + strlen($marker));
+            $segments = array_values(array_filter(array_map('rawurldecode', explode('/', $relative)), static fn (string $value): bool => $value !== ''));
+            if (count($segments) !== 2) continue;
+            [$roomId, $fileName] = $segments;
+            if (preg_match('/^[A-Za-z0-9._:-]{1,180}$/', $roomId) !== 1) continue;
+            if (preg_match('/^[A-Za-z0-9._-]{1,220}$/', $fileName) !== 1) continue;
+            $keep[$roomId . '/' . $fileName] = true;
+        }
+    }
+
+    foreach (glob($root . '/*', GLOB_ONLYDIR) ?: [] as $roomDirectory) {
+        $roomId = basename($roomDirectory);
+        if (preg_match('/^[A-Za-z0-9._:-]{1,180}$/', $roomId) !== 1) continue;
+        foreach (glob($roomDirectory . '/*') ?: [] as $file) {
+            if (!is_file($file)) continue;
+            $key = $roomId . '/' . basename($file);
+            if (!isset($keep[$key])) {
+                @unlink($file);
+            }
+        }
+        $remaining = glob($roomDirectory . '/*') ?: [];
+        if ($remaining === []) {
+            @rmdir($roomDirectory);
+        }
+    }
 }
 
 function ya_sync_publish_business_context(array $payload): void
