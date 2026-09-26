@@ -45,11 +45,14 @@ export async function addRoomMediaFromDialog(
   const filters = kind === "video"
     ? [{ name: "Video", extensions: ["mp4", "webm"] }]
     : [{ name: "Görsel", extensions: ["jpg", "jpeg", "png", "webp"] }];
-  const result = await dialog.showOpenDialog(owner ?? undefined, {
+  const pickerOptions = {
     title: mediaPickerTitle(kind),
-    properties: kind === "photo" ? ["openFile", "multiSelections"] : ["openFile"],
+    properties: kind === "photo" ? ["openFile", "multiSelections"] as const : ["openFile"] as const,
     filters
-  });
+  };
+  const result = owner
+    ? await dialog.showOpenDialog(owner, pickerOptions)
+    : await dialog.showOpenDialog(pickerOptions);
   if (result.canceled || result.filePaths.length === 0) {
     return { ok: true, message: "Dosya seçimi iptal edildi.", media: listRoomMedia(userDataPath, roomId) };
   }
@@ -113,14 +116,12 @@ export function updateRoomMedia(
     for (const item of manifest.media) {
       if (item.roomId !== roomId || item.id === mediaId || item.kind !== kind) continue;
       item.kind = "photo";
-      item.remoteUrl = "";
     }
   }
 
   target.kind = kind;
   target.title = cleanText(input.title, 240);
   target.updatedAt = new Date().toISOString();
-  target.remoteUrl = "";
   writeManifest(userDataPath, manifest);
   return { ok: true, message: "Medya bilgisi güncellendi.", media: listRoomMedia(userDataPath, roomId) };
 }
