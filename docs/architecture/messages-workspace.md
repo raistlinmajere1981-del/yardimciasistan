@@ -45,7 +45,6 @@ The safe view is limited to delivery concerns:
 - recipient,
 - prepared message,
 - copy,
-- call,
 - WhatsApp link,
 - delete prepared request message.
 
