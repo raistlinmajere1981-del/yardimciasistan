@@ -277,7 +277,12 @@ function validatePackage(manifest, businessConfig) {
 
   assertPackageFreeOfDemoData(manifest, businessConfig);
 
-  for (const secretFile of ["config/ai.local.php", "data/ai-settings.local.php"]) {
+  for (const secretFile of [
+    "config/ai.local.php",
+    "data/ai-settings.local.php",
+    "data/google-reviews.local.php",
+    "data/google-reviews-cache.json"
+  ]) {
     assert.equal(manifestFiles.has(secretFile), false, `Paket gizli runtime ayarı içermemeli: ${secretFile}`);
   }
 
