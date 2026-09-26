@@ -403,14 +403,6 @@ export function useMessagingController({
     void window.yardimciDesktop?.openExternal(createWhatsAppUrl(request.customer_phone, fallbackMessage));
   }
 
-  function callCustomer(request: SyncedCustomerRequest) {
-    void window.yardimciDesktop?.openExternal(`tel:${request.customer_phone}`);
-  }
-
-  function callCustomerRecord(customer: DesktopDashboardData["customers"][number]) {
-    void window.yardimciDesktop?.openExternal(`tel:${customer.phone}`);
-  }
-
   function openCustomerWhatsApp(customer: DesktopDashboardData["customers"][number]) {
     if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
@@ -654,8 +646,6 @@ export function useMessagingController({
     aiState,
     aiMessage,
     openWhatsApp,
-    callCustomer,
-    callCustomerRecord,
     openCustomerWhatsApp,
     openReservationWhatsApp,
     openSelectedWhatsAppExternal,
