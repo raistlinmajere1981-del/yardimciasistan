@@ -79,11 +79,17 @@ function ya_google_reviews_normalize_place(array $place, int $maxReviews = 5): a
         if (!is_array($review)) continue;
         $text = trim((string)($review['text']['text'] ?? ''));
         if ($text === '') continue;
+        $authorUri = (string)($review['authorAttribution']['uri'] ?? '');
+        $authorPhotoUri = (string)($review['authorAttribution']['photoUri'] ?? '');
+        $reviewMapsUri = (string)($review['googleMapsUri'] ?? '');
         $reviews[] = [
             'author' => trim((string)($review['authorAttribution']['displayName'] ?? 'Google kullanıcısı')),
+            'author_uri' => filter_var($authorUri, FILTER_VALIDATE_URL) ? $authorUri : '',
+            'author_photo_uri' => filter_var($authorPhotoUri, FILTER_VALIDATE_URL) ? $authorPhotoUri : '',
             'rating' => max(0, min(5, (int)($review['rating'] ?? 0))),
             'relative_time' => trim((string)($review['relativePublishTimeDescription'] ?? '')),
-            'text' => $text
+            'text' => $text,
+            'google_maps_uri' => filter_var($reviewMapsUri, FILTER_VALIDATE_URL) ? $reviewMapsUri : ''
         ];
     }
 
