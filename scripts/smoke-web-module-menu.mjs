@@ -555,6 +555,32 @@ try {
     profile_id: "market"
   });
 
+  const roomMediaUpload = await page.request.post(`${baseUrl}/api/room-media.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    multipart: {
+      client_id: "desktop-web-room-catalog-smoke",
+      room_id: "room_101",
+      media_id: "room_media_smoke_cover",
+      kind: "cover",
+      content_hash: "f202ea0b1206e6881862ac651c2093aebf69f68606de92d9fdc45ceef9068c34",
+      file: {
+        name: "cover.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQ8cAAAAASUVORK5CYII=",
+          "base64"
+        )
+      }
+    }
+  });
+  expect(roomMediaUpload.ok()).toBe(true);
+  const roomMediaUploadResult = await roomMediaUpload.json();
+  expect(roomMediaUploadResult).toMatchObject({
+    ok: true,
+    mime_type: "image/png"
+  });
+  expect(roomMediaUploadResult.url).toMatch(/\/media\/rooms\/room_101\/room_media_smoke_cover\.png$/);
+
   const roomCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
@@ -577,7 +603,14 @@ try {
             nightly_price_minor: 250000,
             currency: "TRY",
             sort_order: 1,
-            media: []
+            media: [{
+              id: "room_media_smoke_cover",
+              kind: "cover",
+              url: roomMediaUploadResult.url,
+              mime_type: "image/png",
+              title: "Oda 101 kapak",
+              sort_order: 1
+            }]
           }
         ]
       }
@@ -599,9 +632,18 @@ try {
       features: ["wifi", "private_bathroom"],
       nightly_price_minor: 250000,
       currency: "TRY",
-      media: []
+      media: [{
+        id: "room_media_smoke_cover",
+        kind: "cover",
+        url: roomMediaUploadResult.url,
+        mime_type: "image/png"
+      }]
     }]
   });
+
+  const publishedRoomMedia = await page.request.get(`${baseUrl}${roomMediaUploadResult.url}`);
+  expect(publishedRoomMedia.ok()).toBe(true);
+  expect(publishedRoomMedia.headers()["content-type"]).toContain("image/png");
 
   const aiCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
