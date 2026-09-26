@@ -1728,35 +1728,33 @@ try {
   await expect(compactCustomerRows).toHaveCount(8);
 
   await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
-  await expect(compactPage.getByRole("navigation", { name: "Pansiyon görünümü" }).getByRole("button")).toHaveCount(3);
+  const pensionBoard = compactPage.getByRole("region", { name: "Pansiyon operasyonları", exact: true });
+  await expect(pensionBoard.locator(".operations-board__pane")).toHaveCount(3);
   const compactRoomCards = compactPage.getByLabel("Oda yönetimi").getByRole("button");
   await expect(compactRoomCards.nth(3)).toContainText("Temizlik bekliyor");
   await expect(compactPage.getByLabel("Oda yönetimi").getByRole("combobox")).toHaveCount(0);
-  await compactPage.getByRole("button", { name: "Rezervasyonlar", exact: true }).click();
   const reservationRows = compactPage.locator(".reservation-record-row");
   await expect(reservationRows).toHaveCount(3);
-  await reservationRows.first().locator("summary").click();
+  await expect(reservationRows.first().locator("summary")).toHaveCount(0);
   await expect(reservationRows.first().getByRole("button", { name: "Reddet" })).toBeVisible();
   await expect(reservationRows.first().getByRole("button", { name: "İptal Et" })).toBeVisible();
-  await reservationRows.first().locator("summary").click();
-  await compactPage.getByRole("button", { name: "Günlük İşler", exact: true }).click();
   await expect(compactPage.locator(".task-record-row")).toHaveCount(2);
-  await expect(compactPage.getByLabel("Oda yönetimi")).toHaveCount(0);
-  await expect(compactPage.getByLabel("Rezervasyon yönetimi")).toHaveCount(0);
+  await expect(compactPage.getByLabel("Oda yönetimi")).toBeVisible();
+  await expect(compactPage.getByLabel("Rezervasyon yönetimi")).toBeVisible();
+  await expect(compactPage.getByLabel("Günlük işler", { exact: true })).toBeVisible();
+  await expect(compactPage.locator(".task-record-row").first().locator("summary")).toHaveCount(0);
   await compactPage.waitForTimeout(50);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-pension-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
-  await expect(compactPage.getByRole("region", { name: "Floor", exact: true })).toBeVisible();
+  const restaurantBoard = compactPage.getByRole("region", { name: "Restoran operasyonları", exact: true });
+  await expect(restaurantBoard.locator(".operations-board__pane")).toHaveCount(3);
   const compactTableCards = compactPage.locator(".restaurant-table-card");
   await expect(compactPage.locator(".table-area-heading h3")).toHaveText(["Bahçe", "Salon"]);
-  await expect(compactPage.getByRole("button", { name: "Günlük İşler", exact: true })).toBeVisible();
-  await compactPage.getByRole("button", { name: "Günlük İşler", exact: true }).click();
-  await expect(compactPage.locator(".task-record-row").first().locator(".list-row__actions > button")).toHaveCount(1);
-  await compactPage.locator(".task-record-row").first().locator("summary").click();
+  await expect(compactPage.getByLabel("Restoran günlük işleri", { exact: true })).toBeVisible();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
-  await compactPage.getByRole("button", { name: "Masalar", exact: true }).click();
-  expect(await compactPage.getByRole("region", { name: "Floor", exact: true }).evaluate(element => getComputedStyle(element).overflowY)).toBe("auto");
+  await expect(compactPage.locator(".task-record-row").first().locator("summary")).toHaveCount(0);
+  expect(await compactPage.locator(".operations-board__pane--center .operations-board__pane-body").evaluate(element => getComputedStyle(element).overflowY)).toBe("auto");
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-restaurant-1366x768.png" });
 
   const tableManagement = compactPage.locator(".restaurant-table-area-list");
