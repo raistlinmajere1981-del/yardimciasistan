@@ -114,7 +114,7 @@ The browser fixture verifies:
 
 The smoke is included in `smoke:desktop-renderer` and `pilot:check`.
 
-The existing static `smoke-operation-calendar` was also extended to guard the router-owned Calendar controller contract.
+The existing static `smoke-calendar-workspace` was also extended to guard the router-owned Calendar controller contract.
 
 ## Domain boundaries preserved
 
@@ -139,7 +139,7 @@ Stage closure passed locally:
 npm run typecheck
 npm run typecheck:electron
 npm run smoke:calendar-workspace
-node scripts/smoke-operation-calendar.mjs
+node scripts/smoke-calendar-workspace.mjs
 npm run smoke:desktop-renderer
 
 npm run lint:strict

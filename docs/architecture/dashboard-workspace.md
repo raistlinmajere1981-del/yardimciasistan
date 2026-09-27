@@ -179,7 +179,7 @@ npm run smoke:dashboard-workspace
 npm run smoke:desktop-renderer
 
 node scripts/smoke-stage2c-core-workspaces.mjs
-node scripts/smoke-operation-calendar.mjs
+node scripts/smoke-calendar-workspace.mjs
 
 npm run lint:strict
 npm run knip:strict
