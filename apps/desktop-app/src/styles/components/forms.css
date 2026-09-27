@@ -169,3 +169,54 @@ textarea {
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
 }
+
+
+.choice-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.choice-chips button {
+  min-height: var(--control-height-sm);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+
+.choice-chips button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.choice-chips button.is-active,
+.choice-chips button[aria-pressed="true"] {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+  font-weight: var(--weight-semibold);
+}
+
+.choice-chips button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.choice-chips button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.form-field > .choice-chips {
+  width: min(100%, var(--field-width));
+}
