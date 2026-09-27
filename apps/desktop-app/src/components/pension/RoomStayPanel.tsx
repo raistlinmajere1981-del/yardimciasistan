@@ -3,6 +3,7 @@ import type { DesktopDashboardData } from "../../../electron/database";
 import { defaultRoomAssignmentForm, formatCustomerRoomStayStatus, formatStayDateRange } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 import { DatePicker, addDays } from "../ui/DateTimePicker";
+import { SearchSelect } from "../ui/SearchSelect";
 import type { RoomWorkspaceIntent } from "../workspace/workspace-intent";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomStayOperations } from "./use-room-stay-operations";
@@ -47,13 +48,44 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     }}>
       <h4>Yeni konaklama</h4>
       <fieldset className="form-stack" disabled={disabled || !model.canCreate}>
-        {eligible.length > 0 && <label className="form-field">İlgili rezervasyon<select aria-label="İlgili rezervasyon" value={reservationId} onChange={event => setReservationId(event.target.value)}>
-          <option value="">Rezervasyonsuz konaklama</option>{eligible.map(item => <option key={item.id} value={item.id}>{item.title || item.customerName}</option>)}
-        </select></label>}
+        {eligible.length > 0 && <div className="form-field form-field--fluid">
+          <span>İlgili rezervasyon</span>
+          <SearchSelect
+            ariaLabel="İlgili rezervasyon"
+            value={reservationId}
+            disabled={disabled || !model.canCreate}
+            placeholder="Rezervasyonsuz konaklama"
+            searchPlaceholder="Rezervasyon veya misafir ara"
+            onChange={value => { setReservationId(value); onDirty(true); }}
+            options={eligible.map(item => ({
+              id: item.id,
+              label: item.title || item.customerName || "Rezervasyon",
+              description: `${item.customerName || "Misafir"} · ${item.startDate} – ${item.endDate} · ${item.guestCount} kişi`,
+              keywords: `${item.customerName} ${item.startDate} ${item.endDate}`
+            }))}
+          />
+        </div>}
         {selected ? <div><p>{selected.customerName} · {selected.guestCount} kişi</p><p>{selected.startDate} – {selected.endDate}</p><p>Rezervasyon bağlantısı korunur.</p></div> : <>
-          <div className="operation-fields"><label className="form-field">Müşteri<select aria-label="Müşteri" required value={draft.customerId} disabled={Boolean(intent.customerId)} onChange={event => setDraft({ ...draft, customerId: event.target.value })}>
-            <option value="">Müşteri seçin</option>{data.customers.map(item => <option value={item.id} key={item.id}>{item.fullName}</option>)}
-          </select></label><label className="form-field">Kişi sayısı<input required type="number" min={1} max={room.capacity > 0 ? Math.min(50, room.capacity) : 50} value={draft.guestCount} onChange={event => setDraft({ ...draft, guestCount: event.target.value })} /></label></div>
+          <div className="operation-fields">
+            <div className="form-field">
+              <span>Müşteri</span>
+              <SearchSelect
+                ariaLabel="Müşteri"
+                value={draft.customerId}
+                disabled={disabled || Boolean(intent.customerId)}
+                placeholder="Müşteri seçin"
+                searchPlaceholder="Müşteri adı veya telefon ara"
+                onChange={customerId => { setDraft({ ...draft, customerId }); onDirty(true); }}
+                options={data.customers.map(item => ({
+                  id: item.id,
+                  label: item.fullName,
+                  description: item.phone || item.email || undefined,
+                  keywords: `${item.phone || ""} ${item.email || ""}`
+                }))}
+              />
+            </div>
+            <label className="form-field">Kişi sayısı<input required type="number" min={1} max={room.capacity > 0 ? Math.min(50, room.capacity) : 50} value={draft.guestCount} onChange={event => setDraft({ ...draft, guestCount: event.target.value })} /></label>
+          </div>
           <div className="operation-fields">
             <div className="form-field"><span>Giriş tarihi</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate} onChange={value => { setDraft({ ...draft, checkInDate: value }); onDirty(true); }} /></div>
             <div className="form-field"><span>Çıkış tarihi</span><DatePicker ariaLabel="Çıkış tarihi" value={draft.checkOutDate} min={draft.checkInDate || undefined}
