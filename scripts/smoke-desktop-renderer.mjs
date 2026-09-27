@@ -79,6 +79,7 @@ try {
         nightlyPriceMinor: room.nightlyPriceMinor ?? 0,
         currency: room.currency ?? "TRY",
         sortOrder: index + 1,
+        outOfService: room.status === "out_of_service",
         canRemove: true,
         removeBlockReason: ""
       })),
@@ -135,6 +136,7 @@ try {
               nightlyPriceMinor: room.nightlyPriceMinor,
               currency: room.currency,
               sortOrder: index + 1,
+              outOfService: room.outOfService === true,
               canRemove: true,
               removeBlockReason: ""
             }))
@@ -1486,6 +1488,7 @@ try {
         nightlyPriceMinor: room.nightlyPriceMinor ?? 0,
         currency: room.currency ?? "TRY",
         sortOrder: index + 1,
+        outOfService: room.status === "out_of_service",
         canRemove: true,
         removeBlockReason: ""
       })),
@@ -1542,6 +1545,7 @@ try {
               nightlyPriceMinor: room.nightlyPriceMinor,
               currency: room.currency,
               sortOrder: index + 1,
+              outOfService: room.outOfService === true,
               canRemove: true,
               removeBlockReason: ""
             }))

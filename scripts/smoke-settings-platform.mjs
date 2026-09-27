@@ -217,9 +217,41 @@ try {
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 1);
   const savedLayout = (await layoutCalls()).at(-1).input;
   expect(savedLayout.rooms).toHaveLength(2);
-  expect(savedLayout.rooms[0]).toMatchObject({ id: 'room-1', name: 'Deniz Oda', number: 'A1', capacity: 3, nightlyPriceMinor: 175000 });
-  expect(savedLayout.rooms[1]).toMatchObject({ name: 'Bahçe Oda', nightlyPriceMinor: 0 });
+  expect(savedLayout.rooms[0]).toMatchObject({ id: 'room-1', name: 'Deniz Oda', number: 'A1', capacity: 3, nightlyPriceMinor: 175000, outOfService: false });
+  expect(savedLayout.rooms[1]).toMatchObject({ name: 'Bahçe Oda', nightlyPriceMinor: 0, outOfService: false });
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
+  // Out-of-service is a staged BusinessLayout field, not an instant mutation.
+  const outOfServiceBox = page.getByLabel('Oda A1 hizmet dışı', { exact: true });
+  await expect(outOfServiceBox).toBeVisible();
+  await expect(outOfServiceBox).not.toBeChecked();
+  const mediaSelectBefore = await page.locator('.room-media-room-picker select').inputValue().catch(() => '');
+  await outOfServiceBox.check();
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  expect((await layoutCalls()).length).toBe(beforeLayoutSave + 1);
+  const mediaSelectAfter = await page.locator('.room-media-room-picker select').inputValue().catch(() => '');
+  expect(mediaSelectAfter).toBe(mediaSelectBefore);
+  await save();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 2);
+  const outOfServiceSaved = (await layoutCalls()).at(-1).input;
+  expect(outOfServiceSaved.rooms[0]).toMatchObject({ id: 'room-1', outOfService: true });
+  expect(outOfServiceSaved.rooms[1]).toMatchObject({ outOfService: false });
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+  await expect(page.getByLabel('Oda A1 hizmet dışı', { exact: true })).toBeChecked();
+
+  // Uncheck stages a return to service; discard restores the saved out-of-service state.
+  await page.getByLabel('Oda A1 hizmet dışı', { exact: true }).uncheck();
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  await discard();
+  await expect(page.getByLabel('Oda A1 hizmet dışı', { exact: true })).toBeChecked();
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
+  // Return to service persists as outOfService=false through the same staged save.
+  await page.getByLabel('Oda A1 hizmet dışı', { exact: true }).uncheck();
+  await save();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 3);
+  expect((await layoutCalls()).at(-1).input.rooms[0]).toMatchObject({ id: 'room-1', outOfService: false });
+  await expect(page.getByLabel('Oda A1 hizmet dışı', { exact: true })).not.toBeChecked();
 
   // Add -> remove is net-zero dirty; removing an existing room is staged and discard restores it.
   await page.getByRole('button', { name: 'Oda Ekle', exact: true }).click();

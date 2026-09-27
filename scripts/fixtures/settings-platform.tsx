@@ -30,6 +30,7 @@ let layout = {
     floor: "",
     priceNote: "",
     sortOrder: 1,
+    outOfService: false,
     canRemove: true,
     removeBlockReason: ""
   }],
@@ -113,6 +114,7 @@ window.yardimciDesktop = {
           nightlyPriceMinor: room.nightlyPriceMinor,
           currency: room.currency,
           sortOrder: index + 1,
+          outOfService: room.outOfService === true,
           canRemove: true,
           removeBlockReason: ""
         }))

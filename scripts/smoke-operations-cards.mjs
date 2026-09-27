@@ -63,6 +63,10 @@ try {
 
   // Physical status chips mutate directly on the card and never open a confirmation/workspace.
   const roomStatus = card(101).getByRole('group', { name: 'Oda 101 fiziksel durumunu değiştir', exact: true });
+  await expect(roomStatus.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
+  await expect(roomStatus.getByRole('button', { name: 'Hazır', exact: true })).toBeVisible();
+  await expect(roomStatus.getByRole('button', { name: 'Temizlik', exact: true })).toBeVisible();
+  await expect(roomStatus.getByRole('button', { name: 'Bakımda', exact: true })).toBeVisible();
   await page.evaluate(() => { window.fixtureDelayRoom = true; window.fixtureFailRoom = true; });
   await roomStatus.getByRole('button', { name: 'Hazır', exact: true }).evaluate(el => { el.click(); el.click(); });
   await expect(page.locator('.confirm-dialog')).toHaveCount(0);
@@ -75,6 +79,23 @@ try {
   await roomStatus.getByRole('button', { name: 'Hazır', exact: true }).click();
   await expect(roomStatus.getByRole('button', { name: 'Hazır', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.locator('.resource-card h3').allTextContents()).toEqual(orderBefore);
+
+  // Out-of-service is structural, not a daily chip: the card shows a read-only indicator and cannot reactivate.
+  await page.evaluate(() => {
+    const state = window.fixtureState();
+    const rooms = state.dashboard.rooms.map(room => room.id === 'room-101' ? { ...room, status: 'out_of_service' } : room);
+    window.fixturePatch({ rooms });
+  });
+  await expect(card(101)).toContainText('Hizmet dışı');
+  await expect(card(101).getByRole('group', { name: 'Oda 101 fiziksel durumunu değiştir', exact: true })).toHaveCount(0);
+  await expect(card(101).getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
+  await expect(card(101).locator('.resource-card__out-of-service')).toContainText('Hizmet dışı');
+  await page.evaluate(() => {
+    const state = window.fixtureState();
+    const rooms = state.dashboard.rooms.map(room => room.id === 'room-101' ? { ...room, status: 'cleaning' } : room);
+    window.fixturePatch({ rooms });
+  });
+  await expect(card(101).getByRole('group', { name: 'Oda 101 fiziksel durumunu değiştir', exact: true })).toBeVisible();
 
   // Current guest checkout is a true card quick action: it must not open the workspace and settles the current folio.
   const paymentsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);

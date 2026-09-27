@@ -45,10 +45,14 @@ try {
   const pilot101 = page.getByRole('article', { name: 'Pilot 101', exact: true });
   await expect(pilot101.getByRole('group', { name: 'Pilot 101 fiziksel durumunu değiştir', exact: true })
     .getByRole('button', { name: 'Temizlik', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(pilot101.getByRole('group', { name: 'Pilot 101 fiziksel durumunu değiştir', exact: true })
+    .getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await expect(pilot101).toContainText('Yaklaşan rezervasyon');
   const pilot103 = page.getByRole('article', { name: 'Pilot 103', exact: true });
   await expect(pilot103.getByRole('group', { name: 'Pilot 103 fiziksel durumunu değiştir', exact: true })
     .getByRole('button', { name: 'Bakımda', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(pilot103.getByRole('group', { name: 'Pilot 103 fiziksel durumunu değiştir', exact: true })
+    .getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await expect(page.getByRole('article', { name: 'Pilot 103', exact: true })).toContainText('Yaklaşan rezervasyon');
   await page.getByLabel('Rezervasyon yönetimi').getByRole('group', { name: 'Durum', exact: true }).getByRole('button', { name: 'Onaylandı', exact: true }).click();
   await page.getByLabel('Günlük işler', { exact: true }).getByRole('group', { name: 'Durum', exact: true }).getByRole('button', { name: 'Tümü', exact: true }).click();
@@ -68,6 +72,7 @@ try {
   const account = dialog.getByRole('region', { name: 'Misafir Hesabı', exact: true });
   await expect(stayPanel.getByLabel('Müşteri', { exact: true })).toBeVisible();
   await expect(operations.getByLabel('Fiziksel oda durumu')).toBeVisible();
+  await expect(operations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toBeVisible();
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => !['read', 'assignment'].includes(call.kind)))).toEqual([]);
   await captureOperationWorkspace(page, 'room-empty');
@@ -128,6 +133,30 @@ try {
   await operations.getByRole('group', { name: 'Fiziksel oda durumu', exact: true }).getByRole('button', { name: 'Hazır', exact: true }).click();
   await expect(dialog.getByText('Fiziksel durum: Hazır', { exact: true })).toBeVisible();
   await button('Çalışma alanını kapat').click(); await expect(button('Pilot 102 odasını aç')).toBeFocused();
+
+  // Out-of-service rooms leave daily operations: no chips, read-only card and workspace guidance.
+  await page.evaluate(() => {
+    const state = window.fixtureState();
+    window.fixturePatch({ rooms: state.dashboard.rooms.map(room => room.id === 'room-102' ? { ...room, status: 'out_of_service' } : room) });
+  });
+  const outOfServiceCard = page.getByRole('article', { name: 'Pilot 102', exact: true });
+  await expect(outOfServiceCard).toContainText('Hizmet dışı');
+  await expect(outOfServiceCard.getByRole('group', { name: 'Pilot 102 fiziksel durumunu değiştir', exact: true })).toHaveCount(0);
+  await expect(outOfServiceCard.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
+  await expect(outOfServiceCard.locator('.resource-card__out-of-service')).toContainText('Hizmet dışı');
+  await button('Pilot 102 odasını aç').click();
+  const outOperations = dialog.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true });
+  await expect(outOperations).toContainText('Oda hizmet dışı. Ayarlar > İşletme Düzeni > Oda Yönetimi');
+  await expect(outOperations.getByLabel('Fiziksel oda durumu')).toHaveCount(0);
+  await expect(outOperations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
+  await button('Çalışma alanını kapat').click();
+  await page.evaluate(() => {
+    const state = window.fixtureState();
+    window.fixturePatch({ rooms: state.dashboard.rooms.map(room => room.id === 'room-102' ? { ...room, status: 'available' } : room) });
+  });
+  await expect(page.getByRole('article', { name: 'Pilot 102', exact: true })
+    .getByRole('group', { name: 'Pilot 102 fiziksel durumunu değiştir', exact: true })).toBeVisible();
+
   await button('Müşteriler').click();
   const customerEntry = page.locator('.customer-record-row').first(); await customerEntry.click();
   await dialog.getByLabel('Konaklama odası').selectOption('room-102'); await button('Odaya Ata').click();

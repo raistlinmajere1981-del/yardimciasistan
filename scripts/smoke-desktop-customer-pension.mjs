@@ -52,6 +52,7 @@ try {
         nightlyPriceMinor: 150000,
         currency: "TRY",
         sortOrder: index + 1,
+        outOfService: room.status === "out_of_service",
         canRemove: room.status !== "occupied" && room.status !== "reserved",
         removeBlockReason: room.status === "occupied" || room.status === "reserved" ? "Oda durumu aktif kullanım gösteriyor." : ""
       })),
@@ -140,6 +141,7 @@ try {
               nightlyPriceMinor: room.nightlyPriceMinor,
               currency: room.currency,
               sortOrder: index + 1,
+              outOfService: room.outOfService === true,
               canRemove: true,
               removeBlockReason: ""
             }))
