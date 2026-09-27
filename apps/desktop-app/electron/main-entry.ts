@@ -2,7 +2,7 @@ import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
-import { resetHostingRuntime } from "@yardimci-asistan/sync-core";
+import { getSyncCapabilities, resetHostingRuntime } from "@yardimci-asistan/sync-core";
 import { DesktopDatabase } from "./database";
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
 import {
@@ -279,6 +279,20 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanion
           const normalizedSecret = String(syncSecret ?? "").trim();
           if (!normalizedBaseUrl || !normalizedSecret || normalizedSecret === "change-this-secret") {
             return { ok: true, skipped: true, message: "Bağlı web modülü yapılandırılmamış." };
+          }
+
+          const capabilities = await getSyncCapabilities({
+            baseUrl: normalizedBaseUrl,
+            syncSecret: normalizedSecret
+          });
+          if (!capabilities.ok) {
+            return { ok: false, message: capabilities.message };
+          }
+          if (!capabilities.features.includes("runtime_reset")) {
+            return {
+              ok: false,
+              message: "Web modülü temiz başlangıç sıfırlamasını desteklemiyor. Web modülü paketini güncelleyip tekrar deneyin."
+            };
           }
 
           const result = await resetHostingRuntime({
