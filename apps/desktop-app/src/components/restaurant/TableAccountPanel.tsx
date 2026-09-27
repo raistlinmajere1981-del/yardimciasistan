@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { ChoiceChips } from "../ui/ChoiceChips";
+import { SearchSelect } from "../ui/SearchSelect";
 import { TableRoomTransfer } from "./TableRoomTransfer";
 import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, formatTableStatus, getTableStatusAction } from "./table-presentation";
@@ -34,10 +36,23 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
     </dl>
     {customersEnabled && <section className="operation-section form-stack" aria-label="Masa müşterisi">
       <h4>Müşteri</h4><p>{customer?.fullName || "Masaya bağlı müşteri yok."}</p>
-      <label className="form-field">Müşteri seç<select aria-label="Müşteri seç" value={selectedCustomerId} disabled={disabled} onChange={event => setCustomerDraft(event.target.value)}>
-        <option value="">Müşteri seçin</option>
-        {data.customers.map(item => <option key={item.id} value={item.id}>{item.fullName}</option>)}
-      </select></label>
+      <div className="form-field form-field--fluid">
+        <span>Müşteri seç</span>
+        <SearchSelect
+          ariaLabel="Müşteri seç"
+          value={selectedCustomerId}
+          disabled={disabled}
+          placeholder="Müşteri seçin"
+          searchPlaceholder="Müşteri adı veya telefon ara"
+          onChange={setCustomerDraft}
+          options={data.customers.map(item => ({
+            id: item.id,
+            label: item.fullName,
+            description: item.phone || item.email || undefined,
+            keywords: [item.phone, item.email, ...(item.tags ?? [])].filter(Boolean).join(" ")
+          }))}
+        />
+      </div>
       <ActionButton disabled={disabled || !selectedCustomerId || selectedCustomerId === table.currentCustomerId}
         onClick={() => void assignCustomer(selectedCustomerId)}>{table.currentCustomerId ? "Müşteriyi Değiştir" : "Müşteriyi Bağla"}</ActionButton>
       {table.currentCustomerId && <ActionButton variant="secondary" disabled={disabled} onClick={() => void assignCustomer("")}>Bağı Kaldır</ActionButton>}
@@ -66,11 +81,27 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
         controller.feedback(result.message, !result.ok); if (result.ok) setStatusDraft(""); return result.ok;
       });
     }}>
-      <h4>Masa hazırlığı</h4><label className="form-field">Masa durumu<select aria-label={`${table.name} durumunu değiştir`} value={statusDraft || tableStatus} disabled={disabled} onChange={event => setStatusDraft(event.target.value)}>
-        {!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus) && <option value={tableStatus}>{formatTableStatus(table.status)}</option>}
-        <option value="available">Boş</option><option value="occupied">Dolu</option>{reservationsEnabled && <option value="reserved">Rezerve</option>}
-        {ordersEnabled && <option value="bill_waiting">Hesap</option>}<option value="cleaning">Temizlik</option>
-      </select></label><ActionButton variant="secondary" type="submit" disabled={disabled || !statusDraft}>Masa Durumunu Kaydet</ActionButton>
+      <h4>Masa hazırlığı</h4>
+      <div className="form-field form-field--fluid">
+        <span>Masa durumu</span>
+        <ChoiceChips
+          ariaLabel={`${table.name} durumunu değiştir`}
+          value={statusDraft || tableStatus}
+          disabled={disabled}
+          onChange={setStatusDraft}
+          options={[
+            ...(!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
+              ? [{ id: tableStatus, label: formatTableStatus(table.status), disabled: true }]
+              : []),
+            { id: "available", label: "Boş" },
+            { id: "occupied", label: "Dolu" },
+            ...(reservationsEnabled ? [{ id: "reserved", label: "Rezerve" }] : []),
+            ...(ordersEnabled ? [{ id: "bill_waiting", label: "Hesap" }] : []),
+            { id: "cleaning", label: "Temizlik" }
+          ]}
+        />
+      </div>
+      <ActionButton variant="secondary" type="submit" disabled={disabled || !statusDraft}>Masa Durumunu Kaydet</ActionButton>
     </form>}
     <p role={controller.error ? "alert" : "status"}>{controller.busy ? "İşlem kaydediliyor..." : controller.loading ? "Adisyon yükleniyor..." : controller.message}</p>
   </>;
