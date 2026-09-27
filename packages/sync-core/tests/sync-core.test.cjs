@@ -26,6 +26,7 @@ const {
   pushAndroidSnapshot,
   pushMenu,
   pullRequests,
+  resetHostingRuntime,
   PhpHostingSyncTransport,
   resolveAndroidActionPermission
 } = require("../dist");
@@ -55,6 +56,33 @@ test("createSyncEndpointUrl creates the mini API sync endpoint", () => {
     createSyncEndpointUrl("https://firma.example/yardimci-asistan/"),
     "https://firma.example/yardimci-asistan/api/sync.php"
   );
+});
+
+test("resetHostingRuntime performs an authenticated destructive runtime reset", async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "Web modülü çalışma verileri temizlendi.",
+      reset_at: "2026-09-27T16:30:00Z",
+      deleted: { web_requests: 4, android_actions: 2, publications: 5 },
+      server_revision: 0
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const result = await resetHostingRuntime({
+    baseUrl: "https://firma.example/yardimci-asistan/",
+    syncSecret: "secret",
+    fetchImpl
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.server_revision, 0);
+  assert.equal(result.deleted.web_requests, 4);
+  assert.equal(calls[0].url, "https://firma.example/yardimci-asistan/api/sync.php");
+  assert.equal(calls[0].headers["X-YA-Sync-Secret"], "secret");
+  assert.deepEqual(calls[0].body, { action: "reset_runtime" });
 });
 
 test("pullRequests posts secret and returns request data", async () => {

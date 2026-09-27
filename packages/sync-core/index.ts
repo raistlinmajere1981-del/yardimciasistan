@@ -49,6 +49,7 @@ export interface PushAndroidSnapshotOptions extends SyncCoreConfig {
 }
 
 export interface SyncCapabilitiesOptions extends SyncCoreConfig {}
+export interface ResetHostingRuntimeOptions extends SyncCoreConfig {}
 
 export interface AiConnectionSettings {
   enabled: boolean;
@@ -1235,6 +1236,14 @@ export interface SyncCapabilitiesSuccess {
   server_revision: number;
 }
 
+export interface ResetHostingRuntimeSuccess {
+  ok: true;
+  message: string;
+  reset_at: ISODateTimeString;
+  deleted: Record<string, number>;
+  server_revision: number;
+}
+
 export interface PushAiSettingsSuccess {
   ok: true;
   message: string;
@@ -1290,6 +1299,7 @@ export type PushAiCatalogResult = PushAiCatalogSuccess | SyncFailure;
 export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
 export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
 export type SyncCapabilitiesResult = SyncCapabilitiesSuccess | SyncFailure;
+export type ResetHostingRuntimeResult = ResetHostingRuntimeSuccess | SyncFailure;
 
 export interface PullCursorInput {
   afterSeq: number;
@@ -1368,6 +1378,12 @@ export function createSyncEndpointUrl(baseUrl: string): string {
 export async function getSyncCapabilities(options: SyncCapabilitiesOptions): Promise<SyncCapabilitiesResult> {
   return syncRequest<SyncCapabilitiesSuccess>(options, {
     action: "capabilities"
+  });
+}
+
+export async function resetHostingRuntime(options: ResetHostingRuntimeOptions): Promise<ResetHostingRuntimeResult> {
+  return syncRequest<ResetHostingRuntimeSuccess>(options, {
+    action: "reset_runtime"
   });
 }
 
