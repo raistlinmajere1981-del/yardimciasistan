@@ -331,6 +331,13 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
       }),
       getDashboardData: async () => dashboardData,
       getSetupData: async () => setupData,
+      getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
+      saveGoogleReviewsSettings: async (input) => ({
+        ok: true,
+        message: "Google yorumları ayarları kaydedildi.",
+        settings: { enabled: input.enabled, placeId: input.placeId, apiKeyConfigured: Boolean(input.apiKey), lastPublishedAt: "", publicationPending: false }
+      }),
+      testGoogleReviewsConnection: async () => ({ ok: true, message: "Google Places bağlantısı doğrulandı.", name: "Smoke İşletme", rating: 4.8, userRatingCount: 12 }),
       getRoomFolioData: async () => ({
         generatedAt: "",
         rooms: [],
