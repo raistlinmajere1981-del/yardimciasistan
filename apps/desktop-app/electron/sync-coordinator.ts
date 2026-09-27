@@ -96,10 +96,12 @@ export class SyncCoordinator {
   private lastAiCatalogPayload = "";
   private roomCatalogSupported: boolean | null = null;
   private lastRoomCatalogPayload = "";
+  private suspendedForMaintenance = false;
 
   constructor(private readonly options: SyncCoordinatorOptions) {}
 
   start() {
+    this.suspendedForMaintenance = false;
     this.stop();
     this.aiCatalogSupported = null;
     this.lastAiCatalogPayload = "";
@@ -141,6 +143,21 @@ export class SyncCoordinator {
     this.marketBarcodeFastPullActive = false;
   }
 
+  async suspendAndDrain() {
+    this.suspendedForMaintenance = true;
+    this.stop();
+    const active = this.inFlight;
+    if (active) {
+      try {
+        await active;
+      } catch {
+        // run() already normalizes failures; maintenance only needs the cycle to finish.
+      }
+    }
+    // A mutation may have tried to schedule work while the previous cycle was draining.
+    this.stop();
+  }
+
   restart() {
     const restoreMarketBarcodeFastPull = this.marketBarcodeFastPullActive;
     this.capabilitiesTarget = "";
@@ -153,6 +170,7 @@ export class SyncCoordinator {
   }
 
   scheduleSoon(delayMs = DEBOUNCE_DELAY_MS) {
+    if (this.suspendedForMaintenance) return;
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
@@ -222,6 +240,16 @@ export class SyncCoordinator {
   }
 
   private run(force: boolean): Promise<AutomaticSyncCycleResult> {
+    if (this.suspendedForMaintenance) {
+      const message = "Senkron veri bakımı için duraklatıldı.";
+      return Promise.resolve(this.result(true, message, {
+        pulledRequests: 0,
+        pulledActions: 0,
+        appliedActions: 0,
+        failedActions: 0,
+        publishedJobs: 0
+      }));
+    }
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;

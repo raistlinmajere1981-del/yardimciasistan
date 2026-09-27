@@ -226,7 +226,13 @@ const mainProcessReady = import("./main");
 // hesabı, commerce, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı
 // testi IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı initialization adımından
 // sonra yapılır.
-void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanionSnapshotDirty, scheduleAutomaticSyncSoon }) => {
+void mainProcessReady.then(async ({
+  assertAppSessionUnlocked,
+  markLocalCompanionSnapshotDirty,
+  scheduleAutomaticSyncSoon,
+  suspendAutomaticSyncForMaintenance,
+  resumeAutomaticSyncAfterMaintenanceAbort
+}) => {
   await app.whenReady();
   setImmediate(() => {
     const databasePath = () => resolveDatabasePath(userDataPath());
@@ -295,13 +301,16 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanion
             };
           }
 
+          await suspendAutomaticSyncForMaintenance();
           const result = await resetHostingRuntime({
             baseUrl: normalizedBaseUrl,
             syncSecret: normalizedSecret
           });
-          return result.ok
-            ? { ok: true, message: result.message }
-            : { ok: false, message: result.message };
+          if (!result.ok) {
+            resumeAutomaticSyncAfterMaintenanceAbort();
+            return { ok: false, message: result.message };
+          }
+          return { ok: true, message: result.message };
         } finally {
           database.close();
         }

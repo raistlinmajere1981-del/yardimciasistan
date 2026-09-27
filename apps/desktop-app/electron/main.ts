@@ -95,6 +95,7 @@ const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
 let desktopDatabase: DesktopDatabase | null = null;
 let syncCoordinator: SyncCoordinator | null = null;
 let androidActionSyncInFlight: Promise<AndroidActionProcessSummary> | null = null;
+let maintenanceSyncSuspended = false;
 let androidSnapshotPublishPending = true;
 const marketBarcodeFastPullSenders = new Set<number>();
 let appLockService: DesktopAppLockService | null = null;
@@ -816,7 +817,30 @@ export function markLocalCompanionSnapshotDirty(): number {
 }
 
 export function scheduleAutomaticSyncSoon() {
-  syncCoordinator?.scheduleSoon();
+  if (!maintenanceSyncSuspended) {
+    syncCoordinator?.scheduleSoon();
+  }
+}
+
+export async function suspendAutomaticSyncForMaintenance() {
+  maintenanceSyncSuspended = true;
+  marketBarcodeFastPullSenders.clear();
+  await syncCoordinator?.suspendAndDrain();
+  const androidPull = androidActionSyncInFlight;
+  if (androidPull) {
+    try {
+      await androidPull;
+    } catch {
+      // The normal Android sync path records its own failure state.
+    }
+  }
+  // Draining the Android path can itself attempt to schedule a follow-up.
+  await syncCoordinator?.suspendAndDrain();
+}
+
+export function resumeAutomaticSyncAfterMaintenanceAbort() {
+  maintenanceSyncSuspended = false;
+  syncCoordinator?.restart();
 }
 
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
@@ -934,6 +958,9 @@ function canUseAndroidSync(setup: DesktopSetupData, allowPlaceholderSecret: bool
 }
 
 function processAndroidActionQueue(allowPlaceholderSecret: boolean): Promise<AndroidActionProcessSummary> {
+  if (maintenanceSyncSuspended) {
+    return Promise.resolve({ pulled: 0, applied: 0, failed: 0 });
+  }
   if (androidActionSyncInFlight) {
     return androidActionSyncInFlight;
   }
