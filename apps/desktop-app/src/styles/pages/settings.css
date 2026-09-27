@@ -412,7 +412,7 @@
 .room-management-list-head,
 .room-management-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.25fr) minmax(8rem, 0.75fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 2.25fr) minmax(8rem, 0.75fr) auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -431,6 +431,12 @@
 
 .room-management-row input {
   width: 100%;
+}
+
+.room-management-out-of-service {
+  width: auto;
+  justify-self: start;
+  accent-color: var(--color-accent);
 }
 
 .room-management-identity {

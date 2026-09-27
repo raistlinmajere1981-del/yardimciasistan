@@ -27,7 +27,8 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
   const checkoutMethod = useRef<RoomFolioPaymentMethod>("cash");
   const begin = useRequestGeneration();
   const { confirm, confirmDialog } = useConfirmDialog();
-  const canSetPhysicalStatus = Boolean(summary && room.isActive && !model.current.length && !model.planned.length);
+  const isOutOfService = model.physical === "out_of_service" || room.status === "out_of_service";
+  const canSetPhysicalStatus = Boolean(summary && room.isActive && !isOutOfService && !model.current.length && !model.planned.length);
   const physicalValue = model.physical === "ready" ? "available" : model.physical;
   const tone = !summary ? "neutral" : model.physical === "cleaning" ? "warning" : model.physical !== "ready" ? "danger"
     : model.current.length || room.status === "occupied" ? "info" : model.planned.length || model.upcoming ? "warning" : "success";
@@ -38,7 +39,7 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
   });
 
   async function updatePhysicalStatus(status: string) {
-    if (running.current || !canSetPhysicalStatus || status === physicalValue || status === "inactive") return;
+    if (running.current || !canSetPhysicalStatus || status === physicalValue || status === "inactive" || status === "out_of_service") return;
     running.current = true;
     setBusy(true);
     setFeedback("");
@@ -118,19 +119,22 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
       onOpen={open}
       openLabel={`${room.name} odasını aç`}
       status={<>
-        <ChoiceChips
-          ariaLabel={`${roomIdentity(room)} fiziksel durumunu değiştir`}
-          value={physicalValue}
-          disabled={busy || !canSetPhysicalStatus}
-          onChange={value => void updatePhysicalStatus(value)}
-          options={[
-            ...(model.physical === "inactive" ? [{ id: "inactive", label: "Etkin değil", disabled: true }] : []),
-            { id: "available", label: "Hazır" },
-            { id: "cleaning", label: "Temizlik" },
-            { id: "maintenance", label: "Bakımda" },
-            { id: "out_of_service", label: "Hizmet dışı" }
-          ]}
-        />
+        {isOutOfService ? (
+          <span className="resource-card__out-of-service">Hizmet dışı</span>
+        ) : (
+          <ChoiceChips
+            ariaLabel={`${roomIdentity(room)} fiziksel durumunu değiştir`}
+            value={physicalValue}
+            disabled={busy || !canSetPhysicalStatus}
+            onChange={value => void updatePhysicalStatus(value)}
+            options={[
+              ...(model.physical === "inactive" ? [{ id: "inactive", label: "Etkin değil", disabled: true }] : []),
+              { id: "available", label: "Hazır" },
+              { id: "cleaning", label: "Temizlik" },
+              { id: "maintenance", label: "Bakımda" }
+            ]}
+          />
+        )}
         {model.current.length > 0 && <span><UserRound size={16} />Misafir içeride</span>}
       </>}
       action={model.quickAction && <ActionButton disabled={busy} onClick={() => void quickAction()}>{model.quickAction.label}</ActionButton>}

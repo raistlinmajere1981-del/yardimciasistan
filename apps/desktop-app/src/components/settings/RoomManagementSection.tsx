@@ -66,6 +66,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
             ) : (
               <>
                 <div className="room-management-list-head">
+                  <span aria-hidden="true" />
                   <span>Oda</span>
                   <span>Oda adı</span>
                   <span>Gecelik fiyat</span>
@@ -80,6 +81,15 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
                       key={room.key}
                       onClick={() => setMediaRoomKey(room.key)}
                     >
+                      <input
+                        className="room-management-out-of-service"
+                        type="checkbox"
+                        checked={room.outOfService}
+                        aria-label={`${identity} hizmet dışı`}
+                        title="Hizmet dışı"
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => updateRoom(room.key, { outOfService: event.target.checked })}
+                      />
                       <div className="room-management-identity">
                         <strong>{identity}</strong>
                         <button

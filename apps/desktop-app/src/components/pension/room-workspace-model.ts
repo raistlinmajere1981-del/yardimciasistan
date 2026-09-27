@@ -20,7 +20,7 @@ export function getRoomWorkspaceModel(data: DesktopDashboardData, roomId: string
     && planned.some(stay => stay.id === stayId));
   return { room, operations, stays, reservations, active, currentStay, planned, upcoming, state, conflict, canCheckIn,
     canCreate: Boolean(room?.isActive && state?.operationalCondition === "ready" && !active.length && room.status !== "occupied"),
-    canSetCondition: Boolean(room?.isActive && !active.length),
+    canSetCondition: Boolean(room?.isActive && !active.length && room.status !== "out_of_service" && state?.operationalCondition !== "out_of_service"),
     refreshKey: `${data.revision}|${stays.map(stay => `${stay.id}:${stay.status}:${stay.updatedAt}`).join("|")}|${room?.updatedAt}` };
 }
 export type RoomWorkspaceModel = ReturnType<typeof getRoomWorkspaceModel>;

@@ -17,6 +17,7 @@ export function RoomDailyOperations({ model, operations, disabled }: {
   const { room, state, active } = model;
   if (!room || !state) return null;
   const currentRoom = room;
+  const isOutOfService = currentRoom.status === "out_of_service" || state.operationalCondition === "out_of_service";
 
   async function requestCheckout(stay: typeof active[number]) {
     checkoutMethod.current = "cash";
@@ -64,7 +65,11 @@ export function RoomDailyOperations({ model, operations, disabled }: {
       {stay.status === "checked_in" && <ActionButton disabled={disabled} onClick={() => void requestCheckout(stay)}>Misafir Çıkışı</ActionButton>}
       <ActionButton variant="danger" disabled={disabled} onClick={() => void requestCancel(stay)}>{stay.status === "planned" ? "Planı İptal Et" : "Konaklamayı İptal Et"}</ActionButton>
     </section>)}
-    {model.canSetCondition && <section className="operation-section form-stack">
+    {isOutOfService && <section className="operation-section form-stack">
+      <h4>Oda hazırlığı</h4>
+      <p>Oda hizmet dışı. Ayarlar &gt; İşletme Düzeni &gt; Oda Yönetimi&apos;nden yeniden kullanıma alınabilir.</p>
+    </section>}
+    {!isOutOfService && model.canSetCondition && <section className="operation-section form-stack">
       <h4>Oda hazırlığı</h4>
       <div className="form-field form-field--fluid">
         <span>Fiziksel oda durumu</span>
@@ -73,6 +78,7 @@ export function RoomDailyOperations({ model, operations, disabled }: {
           value={state.operationalCondition === "ready" ? "available" : state.operationalCondition}
           disabled={disabled || !model.canSetCondition}
           onChange={value => {
+            if (value === "out_of_service") return;
             const current = state.operationalCondition === "ready" ? "available" : state.operationalCondition;
             if (value === current) return;
             void operations.mutate("operations", () => setRoomOperationalStatus(room.id, value));
@@ -80,8 +86,7 @@ export function RoomDailyOperations({ model, operations, disabled }: {
           options={[
             { id: "available", label: "Hazır" },
             { id: "cleaning", label: "Temizlik bekliyor" },
-            { id: "maintenance", label: "Bakımda" },
-            { id: "out_of_service", label: "Hizmet dışı" }
+            { id: "maintenance", label: "Bakımda" }
           ]}
         />
       </div>
