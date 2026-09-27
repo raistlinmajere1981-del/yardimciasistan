@@ -283,11 +283,12 @@ try {
     await expect(page.getByRole('dialog').getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
     await capture('folio-payment');
     await page.getByRole('dialog').getByRole('button', { name: 'Misafir Çıkışı', exact: true }).first().click();
-    await expect(page.getByRole('region', { name: 'Konaklama onayı', exact: true })).toBeVisible();
+    const checkoutConfirmation = page.getByRole('alertdialog', { name: 'Misafir çıkışı', exact: true });
+    await expect(checkoutConfirmation).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(1);
-    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(checkoutConfirmation).toContainText('Çıkış tamamlanır');
     await capture('checkout-confirmation');
-    await page.getByRole('button', { name: 'Vazgeç', exact: true }).click();
+    await checkoutConfirmation.getByRole('button', { name: 'Vazgeç', exact: true }).click();
     await closeDialog();
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
     await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
