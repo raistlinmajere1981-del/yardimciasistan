@@ -89,7 +89,7 @@ try {
   browser = await launchChromiumForSmoke(chromium);
 
   const fixedLauncherPage = await browser.newPage({ viewport: { width: 1000, height: 700 } });
-  await fixedLauncherPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await fixedLauncherPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await injectWidget(fixedLauncherPage, baseUrl, { profileId: "pension", connectApi: false });
   await fixedLauncherPage.evaluate(() => {
     document.body.style.minHeight = "1800px";
@@ -107,7 +107,7 @@ try {
   await fixedLauncherPage.close();
 
   const pensionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await pensionPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await pensionPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await injectWidget(pensionPage, baseUrl, { profileId: "pension", connectApi: false });
   await pensionPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(pensionPage.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
@@ -144,7 +144,7 @@ try {
   await pensionPage.close();
 
   const contextPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await contextPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await contextPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await injectWidget(contextPage, baseUrl, { profileId: "pension", connectApi: false });
   await contextPage.evaluate(() => {
     const reserve = document.createElement("button");
@@ -182,7 +182,7 @@ try {
   await contextPage.close();
 
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await injectWidget(page, baseUrl);
 
   await expect(page.getByRole("button", { name: "Yardımcı Asistan'ı aç" })).toBeVisible();
@@ -336,7 +336,7 @@ try {
   expect(aiDisabledBusiness.business.requests_enabled).toBe(true);
 
   const aiDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await aiDisabledPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await aiDisabledPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await injectWidget(aiDisabledPage, baseUrl);
   await aiDisabledPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(aiDisabledPage.locator('[data-ya-view="info"]')).toHaveCount(0);
@@ -379,7 +379,7 @@ try {
   expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
 
   const requestsDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await requestsDisabledPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await requestsDisabledPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   await injectWidget(requestsDisabledPage, baseUrl);
   await requestsDisabledPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(requestsDisabledPage.locator('[data-ya-request-type="pension_reservation"]')).toHaveCount(0);
@@ -446,7 +446,6 @@ async function injectWidget(page, widgetBaseUrl, options = {}) {
     script.dataset.whatsappPhone = "+90 531 696 9334";
     if (connectApi) script.dataset.apiBaseUrl = url;
     script.dataset.profileId = profileId;
-    script.dataset.menuUrl = `${url}/menu.html`;
     script.dataset.logoUrl = `${url}/assets/yardimci-asistan-symbol.png`;
     script.dataset.primaryColor = "#2F6F5E";
     script.dataset.accentColor = "#E47863";
