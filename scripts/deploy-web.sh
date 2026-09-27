@@ -135,7 +135,6 @@ if [[ "$skip_pack" == false ]]; then
 fi
 
 required_package_files=(
-  menu.html
   widget.js
   api/business.php
   api/chat.php
@@ -397,7 +396,7 @@ done
 if command -v curl >/dev/null 2>&1; then
   printf 'Canlı web modülü sağlık kontrolü yapılıyor...\n'
   if ! curl --fail --silent --show-error --max-time 20 \
-      "${public_url%/}/menu.html" >/dev/null \
+      "${public_url%/}/widget.js" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
       "${public_url%/}/api/menu.php" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
