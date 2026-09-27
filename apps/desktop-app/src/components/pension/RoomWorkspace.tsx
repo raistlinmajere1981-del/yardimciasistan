@@ -77,7 +77,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
         {account.selected?.status === "open" && <RoomAccountDetails key={account.selected.id} folio={account.selected} controller={account} disabled={busy || account.loading} onDirty={value => setDirty("account-details", value)} />}
       </OperationPanel>
       <OperationPanel title="Günlük Oda İşlemleri" id="room-operations">
-        <RoomDailyOperations model={model} operations={operations} disabled={busy || accountDraftDirty} onDirty={setDirty} />
+        <RoomDailyOperations model={model} operations={operations} disabled={busy || accountDraftDirty} />
         {account.selected?.status === "open" && <RoomAccountAdjustments key={account.selected.id} folio={account.selected} controller={account} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />}
         {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId} onDirty={setDirty} />}
       </OperationPanel>

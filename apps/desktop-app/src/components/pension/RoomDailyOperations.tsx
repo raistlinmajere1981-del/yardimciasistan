@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
 import { ChoiceChips } from "../ui/ChoiceChips";
@@ -9,10 +9,9 @@ import { formatDateRange } from "./folio-format";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomStayOperations } from "./use-room-stay-operations";
 
-export function RoomDailyOperations({ model, operations, disabled, onDirty }: {
-  model: RoomWorkspaceModel; operations: RoomStayOperations; disabled: boolean; onDirty: (key: string, dirty: boolean) => void;
+export function RoomDailyOperations({ model, operations, disabled }: {
+  model: RoomWorkspaceModel; operations: RoomStayOperations; disabled: boolean;
 }) {
-  const [condition, setCondition] = useState("");
   const checkoutMethod = useRef<RoomFolioPaymentMethod>("cash");
   const { confirm, confirmDialog } = useConfirmDialog();
   const { room, state, active } = model;
@@ -65,34 +64,28 @@ export function RoomDailyOperations({ model, operations, disabled, onDirty }: {
       {stay.status === "checked_in" && <ActionButton disabled={disabled} onClick={() => void requestCheckout(stay)}>Misafir Çıkışı</ActionButton>}
       <ActionButton variant="danger" disabled={disabled} onClick={() => void requestCancel(stay)}>{stay.status === "planned" ? "Planı İptal Et" : "Konaklamayı İptal Et"}</ActionButton>
     </section>)}
-    {state.operationalCondition === "cleaning" && model.canSetCondition && <section className="operation-section form-stack">
-      <h4>Oda temizlik bekliyor</h4><p>Temizlik ve hazırlık tamamlandığında odayı hazır olarak işaretleyin.</p>
-      <ActionButton disabled={disabled} onClick={() => void operations.mutate("operations", () => setRoomOperationalStatus(room.id, "available"))}>Temizliği Tamamla</ActionButton>
-    </section>}
-    {model.canSetCondition && <form className="operation-section form-stack" onSubmit={event => { event.preventDefault();
-      if (!model.canSetCondition || !condition) return;
-      void operations.mutate("operations", () => setRoomOperationalStatus(room.id, condition)).then(ok => { if (ok) { setCondition(""); onDirty("condition", false); } });
-    }}>
+    {model.canSetCondition && <section className="operation-section form-stack">
       <h4>Oda hazırlığı</h4>
-      <fieldset className="form-stack" disabled={disabled || !model.canSetCondition}>
-        <div className="form-field form-field--fluid">
-          <span>Fiziksel oda durumu</span>
-          <ChoiceChips
-            ariaLabel="Fiziksel oda durumu"
-            value={condition || (state.operationalCondition === "ready" ? "available" : state.operationalCondition)}
-            disabled={disabled || !model.canSetCondition}
-            onChange={value => { setCondition(value); onDirty("condition", true); }}
-            options={[
-              { id: "available", label: "Hazır" },
-              { id: "cleaning", label: "Temizlik bekliyor" },
-              { id: "maintenance", label: "Bakımda" },
-              { id: "out_of_service", label: "Hizmet dışı" }
-            ]}
-          />
-        </div>
-        <ActionButton variant="secondary" type="submit" disabled={!condition}>Durumu Kaydet</ActionButton>
-      </fieldset>
-    </form>}
+      <div className="form-field form-field--fluid">
+        <span>Fiziksel oda durumu</span>
+        <ChoiceChips
+          ariaLabel="Fiziksel oda durumu"
+          value={state.operationalCondition === "ready" ? "available" : state.operationalCondition}
+          disabled={disabled || !model.canSetCondition}
+          onChange={value => {
+            const current = state.operationalCondition === "ready" ? "available" : state.operationalCondition;
+            if (value === current) return;
+            void operations.mutate("operations", () => setRoomOperationalStatus(room.id, value));
+          }}
+          options={[
+            { id: "available", label: "Hazır" },
+            { id: "cleaning", label: "Temizlik bekliyor" },
+            { id: "maintenance", label: "Bakımda" },
+            { id: "out_of_service", label: "Hizmet dışı" }
+          ]}
+        />
+      </div>
+    </section>}
     {operations.feedback?.panel === "operations" && <p role={operations.feedback.error ? "alert" : "status"}>{operations.feedback.message}</p>}
     {confirmDialog}
   </>;

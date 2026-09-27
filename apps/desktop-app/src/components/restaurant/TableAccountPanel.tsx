@@ -16,7 +16,6 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
 }) {
   const { confirm, confirmDialog } = useConfirmDialog();
-  const [statusDraft, setStatusDraft] = useState("");
   const [customerDraft, setCustomerDraft] = useState<string | null>(null);
   const order = controller.active;
   const relatedReservations = reservationsEnabled ? data.reservations.filter(item => item.tableIds.includes(table.id)
@@ -89,22 +88,23 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
       {roomFolioTransferEnabled && order.status === "payment" && order.total > 0 && <TableRoomTransfer key={order.id} order={order} busy={disabled} onTransfer={onTransfer} revision={data.revision} />}
       {roomFolioTransferEnabled && order.status !== "payment" && <p>Odaya yazdırmak için adisyonu Hesap Bekliyor durumuna alın.</p>}
       <ActionButton variant="danger" disabled={disabled} onClick={() => void requestOrderClose("cancelled")}>Adisyonu İptal Et</ActionButton>
-    </section> : <form className="operation-section form-stack" onSubmit={event => { event.preventDefault();
-      if (!statusDraft) return;
-      void controller.run(async isCurrent => {
-        const result = await onUpdateTableStatus(table.id, statusDraft);
-        if (!isCurrent()) return false;
-        controller.feedback(result.message, !result.ok); if (result.ok) setStatusDraft(""); return result.ok;
-      });
-    }}>
+    </section> : <section className="operation-section form-stack">
       <h4>Masa hazırlığı</h4>
       <div className="form-field form-field--fluid">
         <span>Masa durumu</span>
         <ChoiceChips
           ariaLabel={`${table.name} durumunu değiştir`}
-          value={statusDraft || tableStatus}
+          value={tableStatus}
           disabled={disabled}
-          onChange={setStatusDraft}
+          onChange={value => {
+            if (value === tableStatus) return;
+            void controller.run(async isCurrent => {
+              const result = await onUpdateTableStatus(table.id, value);
+              if (!isCurrent()) return false;
+              controller.feedback(result.message, !result.ok);
+              return result.ok;
+            });
+          }}
           options={[
             ...(!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
               ? [{ id: tableStatus, label: formatTableStatus(table.status), disabled: true }]
@@ -117,8 +117,7 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
           ]}
         />
       </div>
-      <ActionButton variant="secondary" type="submit" disabled={disabled || !statusDraft}>Masa Durumunu Kaydet</ActionButton>
-    </form>}
+    </section>}
     <p role={controller.error ? "alert" : "status"}>{controller.busy ? "İşlem kaydediliyor..." : controller.loading ? "Adisyon yükleniyor..." : controller.message}</p>
     {confirmDialog}
   </>;

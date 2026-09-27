@@ -2,7 +2,7 @@ import type { DesktopTable, DesktopTableOperations } from "../../../electron/dat
 
 export type TableQuickAction = {
   label: string;
-  kind: "start" | "clean" | "preparing" | "served" | "payment" | "paid";
+  kind: "start" | "paid";
 };
 
 export function getTableCardModel(table: DesktopTable, summary: DesktopTableOperations | undefined,
@@ -15,14 +15,9 @@ export function getTableCardModel(table: DesktopTable, summary: DesktopTableOper
     && item.startDate === other.startDate && item.time === other.time));
 
   let quickAction: TableQuickAction | undefined;
-  if (summary && table.status === "cleaning" && !order && table.isActive) {
-    quickAction = { label: "Temizliği tamamla", kind: "clean" };
-  } else if (summary && !blocked && order) {
-    if (order.status === "open") quickAction = { label: "Hazırlamaya al", kind: "preparing" };
-    else if (order.status === "preparing") quickAction = { label: "Servis edildi", kind: "served" };
-    else if (order.status === "served") quickAction = { label: "Hesap bekliyor", kind: "payment" };
-    else if (order.status === "payment") quickAction = { label: "Hesabı kapat", kind: "paid" };
-  } else if (summary && !blocked && !conflict && capabilities.ordersEnabled && !["bill_waiting", "payment"].includes(table.status)) {
+  if (summary && !blocked && order?.status === "payment") {
+    quickAction = { label: "Hesabı kapat", kind: "paid" };
+  } else if (summary && !blocked && !order && !conflict && capabilities.ordersEnabled && !["bill_waiting", "payment"].includes(table.status)) {
     quickAction = { label: "Sipariş aç", kind: "start" };
   }
 
