@@ -9,7 +9,7 @@ import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { getTableCardModel } from "./table-card-model";
 import { closeTableOrder, startTableOrder, setTableOrderStatus } from "./table-order-operations";
-import { formatMoney, formatTableStatus, getOrderBadge, getOrderCurrency } from "./table-presentation";
+import { formatMoney, formatTableStatus, getOrderBadge } from "./table-presentation";
 
 export function TableResourceCard({ table, summary, capabilities, onDashboard, onUpdateTableStatus }: {
   table: DesktopTable; summary?: DesktopTableOperations;
@@ -55,7 +55,7 @@ export function TableResourceCard({ table, summary, capabilities, onDashboard, o
       tone: action.kind === "paid" ? "warning" : "info",
       details: <dl className="operation-facts">
         <div><dt>Masa</dt><dd>{table.name} · {table.area || "Genel"}</dd></div>
-        {order && <div><dt>Adisyon</dt><dd>{order.itemCount} ürün · {formatMoney(order.total, getOrderCurrency(order))}</dd></div>}
+        {order && <div><dt>Adisyon</dt><dd>{order.itemCount} ürün · {formatMoney(order.total, order.currency)}</dd></div>}
         {upcoming && !order && <div><dt>Yaklaşan rezervasyon</dt><dd>{upcoming.customerName || upcoming.title} · {upcoming.time}</dd></div>}
         <div><dt>Yeni durum</dt><dd>{nextLabel[action.kind]}</dd></div>
       </dl>

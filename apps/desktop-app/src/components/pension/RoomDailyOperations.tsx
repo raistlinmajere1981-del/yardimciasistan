@@ -17,12 +17,13 @@ export function RoomDailyOperations({ model, operations, disabled, onDirty }: {
   const { confirm, confirmDialog } = useConfirmDialog();
   const { room, state, active } = model;
   if (!room || !state) return null;
+  const currentRoom = room;
 
   async function requestCheckout(stay: typeof active[number]) {
     checkoutMethod.current = "cash";
     const account = model.operations?.accounts.find(item => item.stayId === stay.id);
     const approved = await confirm({
-      eyebrow: room.name,
+      eyebrow: currentRoom.name,
       title: "Misafir çıkışı",
       description: account?.remainingMinor
         ? "Kalan tutar seçilen ödeme yöntemiyle tahsil edilir; çıkış ve hesap kapanışı birlikte tamamlanır."
@@ -30,7 +31,7 @@ export function RoomDailyOperations({ model, operations, disabled, onDirty }: {
       confirmLabel: "Çıkış ve Hesabı Kapat",
       tone: account?.remainingMinor ? "warning" : "info",
       details: <RoomCheckoutConfirmationDetails
-        roomLabel={room.number ? `Oda ${room.number}` : room.name}
+        roomLabel={currentRoom.number ? `Oda ${currentRoom.number}` : currentRoom.name}
         stay={stay}
         account={account}
         onPaymentMethodChange={method => { checkoutMethod.current = method; }}
@@ -42,7 +43,7 @@ export function RoomDailyOperations({ model, operations, disabled, onDirty }: {
   async function requestCancel(stay: typeof active[number]) {
     const planned = stay.status === "planned";
     const approved = await confirm({
-      eyebrow: room.name,
+      eyebrow: currentRoom.name,
       title: planned ? "Konaklama planını iptal et" : "Konaklamayı iptal et",
       description: "Rezervasyon kaydı değişmez. Fiziksel çıkış gereken bir konaklamada Misafir Çıkışı işlemini kullanın.",
       confirmLabel: planned ? "Planı İptal Et" : "Konaklamayı İptal Et",
