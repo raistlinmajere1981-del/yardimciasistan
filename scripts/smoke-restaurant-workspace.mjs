@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { installRestaurantWorkspaceFixture } from './test-helpers/restaurant-workspace-fixture.mjs';
 import { captureOperationWorkspace } from './test-helpers/operation-workspace-screenshots.mjs';
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import { createCompactUiFixture } from './lib/desktop-renderer-fixtures.mjs';
 
 const server = await createServer({ root: resolve('apps/desktop-app'), configFile: resolve('apps/desktop-app/vite.renderer.config.ts'), server: { port: 0 } });
@@ -49,7 +50,7 @@ try {
   const customerCalls = () => page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'customer'));
   expect(await customerCalls()).toEqual([]);
   await expect(customerSelect).toBeVisible();
-  await customerSelect.selectOption('customer-a');
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /Pilot Misafir/);
   expect(await customerCalls()).toEqual([]);
   await page.evaluate(() => { window.fixtureDelayCustomer = true; });
   await button('Müşteriyi Bağla').evaluate(element => { element.click(); element.click(); });
@@ -59,13 +60,13 @@ try {
   await page.evaluate(() => { window.fixtureDelayCustomer = false; window.fixtureResolveCustomer(); });
   await expect(customerPanel.locator('p')).toHaveText('Pilot Misafir');
   expect((await state()).orders).toEqual([]);
-  await customerSelect.selectOption('customer-b');
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /İkinci Misafir/);
   await button('Müşteriyi Değiştir').click();
   await expect(customerPanel.locator('p')).toHaveText('İkinci Misafir');
   await button('Bağı Kaldır').click();
   await expect(customerPanel.locator('p')).toHaveText('Masaya bağlı müşteri yok.');
   expect((await state()).dashboard.tables[0].currentCustomerId).toBe('');
-  await expect(customerSelect).toHaveValue('');
+  await expect(customerSelect).toContainText('Müşteri seçin');
   await captureOperationWorkspace(page, 'table-empty');
   await button('Sipariş Aç').click();
   await button('Çay ürününü siparişe ekle').click();
@@ -81,7 +82,7 @@ try {
   await expect.poll(async () => (await state()).orders[0].items[0].note).toBe('Son not');
   await button('Geçmiş').click(); await button('← Masaya dön').click(); await expect(note).toHaveValue('Son not');
   const unchangedOrder = structuredClone((await state()).orders[0]);
-  await customerSelect.selectOption('customer-a');
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /Pilot Misafir/);
   await button('Müşteriyi Bağla').click();
   await expect(customerPanel.locator('p')).toHaveText('Pilot Misafir');
   expect((await state()).orders[0]).toEqual(unchangedOrder);
@@ -114,14 +115,14 @@ try {
 
   await button('Yeni Rezervasyon').click();
   await expect(dialog).toHaveClass(/form-dialog/); await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
-  await dialog.getByLabel('Masa', { exact: true }).selectOption('table-a');
+  await chooseSearchSelect(dialog, 'Masa', /Bahçe 1/);
   await dialog.getByLabel('Not', { exact: true }).fill('Korunan rezervasyon notu');
   await button('Yeni Müşteri Ekle').click();
   await dialog.getByLabel('Ad soyad', { exact: true }).fill('Yeni Pilot Misafir');
   await dialog.getByLabel('Telefon', { exact: true }).fill('05551112233');
   await button('Kaydet ve Seç').click();
-  await expect(dialog.getByLabel('Masa', { exact: true })).toHaveValue('table-a');
-  await expect(dialog.getByLabel('Müşteri', { exact: true })).toHaveValue('customer-new');
+  await expect(dialog.getByLabel('Masa', { exact: true })).toContainText('Bahçe 1');
+  await expect(dialog.getByLabel('Müşteri', { exact: true })).toContainText('Yeni Pilot Misafir');
   await expect(dialog.getByLabel('Not', { exact: true })).toHaveValue('Korunan rezervasyon notu');
   await button('Rezervasyonu Kaydet').click(); await expect(dialog).toHaveCount(0);
   expect((await state()).dashboard.reservations[0].tableIds).toEqual(['table-a']);
@@ -133,12 +134,12 @@ try {
   const reservationsBeforeCustomer = structuredClone((await state()).dashboard.reservations);
   const callsBeforeReservationOpen = (await customerCalls()).length;
   await button('Bahçe 1 masasını aç').click();
-  await expect(customerSelect).toHaveValue('customer-new');
+  await expect(customerSelect).toContainText('Yeni Pilot Misafir');
   await expect(button('Müşteriyi Bağla')).toBeEnabled();
   expect((await customerCalls()).length).toBe(callsBeforeReservationOpen);
   await button('Müşteriyi Bağla').click();
   await expect(customerPanel.locator('p')).toHaveText('Yeni Pilot Misafir');
-  await customerSelect.selectOption('customer-b'); await button('Müşteriyi Değiştir').click();
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /İkinci Misafir/); await button('Müşteriyi Değiştir').click();
   await button('Bağı Kaldır').click();
   expect((await state()).dashboard.reservations).toEqual(reservationsBeforeCustomer);
   expect((await state()).dashboard.tables[0].currentReservationId).toBe('reservation-a');
@@ -146,10 +147,11 @@ try {
   await button('Sipariş Aç').click(); await button('Çay ürününü siparişe ekle').click();
   await button('Çay satırını sil').click(); expect((await state()).orders[0].items).toHaveLength(0);
   await button('Çay ürününü siparişe ekle').click(); await note.fill('Odaya aktarım notu');
-  await dialog.getByLabel('Sipariş durumu').selectOption('payment');
+  await dialog.getByRole('group', { name: 'Sipariş durumu', exact: true }).getByRole('button', { name: 'Hesap bekliyor', exact: true }).click();
   await expect(dialog.getByLabel('Oda hesabı', { exact: true })).toBeVisible();
   await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
-  await dialog.getByLabel('Oda hesabı', { exact: true }).selectOption('folio-a');
+  await dialog.getByLabel('Oda hesabı', { exact: true }).click();
+  await dialog.getByRole('dialog', { name: 'Oda hesabı seçici', exact: true }).getByRole('option').first().click();
   await page.evaluate(() => { window.fixtureFailTransfer = true; });
   await button('Odaya Yaz').click(); await expect(dialog.getByRole('alert')).toHaveText('Aktarım reddedildi.');
   const stock = (await state()).dashboard.menu.items[0].stock_quantity;
@@ -162,7 +164,7 @@ try {
 
   // A delayed customer reply (and repeated dashboard delivery) cannot roll back a newer projection.
   await button('Bahçe 1 masasını aç').click();
-  await customerSelect.selectOption('customer-a');
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /Pilot Misafir/);
   await page.evaluate(() => { window.fixtureDelayCustomer = true; });
   await button('Müşteriyi Bağla').click();
   await expect.poll(() => page.evaluate(() => typeof window.fixtureResolveCustomer)).toBe('function');
@@ -199,7 +201,7 @@ try {
     if (variant === 'tables-only') {
       await expect(surface.locator('.workspace-tabs')).toHaveCount(0);
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([]);
-      await surface.getByLabel('Müşteri seç', { exact: true }).selectOption('customer-a');
+      await chooseSearchSelect(surface, 'Müşteri seç', /Pilot Misafir/);
       await surface.getByRole('button', { name: 'Müşteriyi Bağla', exact: true }).click();
       await expect(surface.getByRole('region', { name: 'Masa müşterisi' }).locator('p')).toHaveText('Pilot Misafir');
       expect(await variantPage.evaluate(() => window.fixtureState().orders)).toEqual([]);
