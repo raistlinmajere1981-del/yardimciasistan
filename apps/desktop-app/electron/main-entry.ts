@@ -302,15 +302,20 @@ void mainProcessReady.then(async ({
           }
 
           await suspendAutomaticSyncForMaintenance();
-          const result = await resetHostingRuntime({
-            baseUrl: normalizedBaseUrl,
-            syncSecret: normalizedSecret
-          });
-          if (!result.ok) {
+          try {
+            const result = await resetHostingRuntime({
+              baseUrl: normalizedBaseUrl,
+              syncSecret: normalizedSecret
+            });
+            if (!result.ok) {
+              resumeAutomaticSyncAfterMaintenanceAbort();
+              return { ok: false, message: result.message };
+            }
+            return { ok: true, message: result.message };
+          } catch (error) {
             resumeAutomaticSyncAfterMaintenanceAbort();
-            return { ok: false, message: result.message };
+            throw error;
           }
-          return { ok: true, message: result.message };
         } finally {
           database.close();
         }
