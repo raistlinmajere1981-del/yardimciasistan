@@ -753,7 +753,6 @@ async function prepareReset(
 
   try {
     const safetyBackup = createSafetyBackup(paths);
-    writePendingOperation(paths, { kind: "reset", createdAt: new Date().toISOString() });
 
     let webResetApplied = false;
     if (options.resetConnectedWebRuntime) {
@@ -767,6 +766,8 @@ async function prepareReset(
       }
       webResetApplied = !remote.skipped;
     }
+
+    writePendingOperation(paths, { kind: "reset", createdAt: new Date().toISOString() });
 
     try {
       await session.defaultSession.clearStorageData({ storages: ["localstorage"] });
