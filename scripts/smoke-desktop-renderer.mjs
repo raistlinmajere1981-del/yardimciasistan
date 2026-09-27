@@ -1690,7 +1690,8 @@ try {
   await expect(compactReservationWorkspace.getByRole("heading", { name: "Oda 101 · Balkonlu Standart Oda", exact: true })).toBeVisible();
   await expect(compactReservationWorkspace.getByRole("region", { name: "Oda ve Konaklama", exact: true })).toBeFocused();
   await compactReservationWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
-  await expect(compactPage.getByRole("heading", { name: "Ana Ekran", exact: true })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "Bugün ne var?", exact: true })).toBeVisible();
+  await expect(compactPage.getByRole("button", { name: "Ana Ekran", exact: true })).toHaveAttribute("aria-current", "page");
 
   const aiOnlyPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   await aiOnlyPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
