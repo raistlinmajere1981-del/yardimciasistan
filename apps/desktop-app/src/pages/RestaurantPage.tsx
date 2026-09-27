@@ -6,6 +6,7 @@ import { getTableStatusAction } from "../components/restaurant/table-presentatio
 import { TableResourceCard } from "../components/restaurant/TableResourceCard";
 import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
 import { WorkspaceHost } from "../components/workspace/WorkspaceNavigation";
+import { ChoiceChips } from "../components/ui/ChoiceChips";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
@@ -48,16 +49,21 @@ export function RestaurantPage({
           {groups.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
       </label>
-      <label className="form-field">
-        Masa filtresi
-        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="all">Tüm masalar</option>
-          <option value="available">Boş</option>
-          <option value="occupied">Dolu</option>
-          {reservationsEnabled && <option value="reserved">Rezerve</option>}
-          {ordersEnabled && <option value="bill_waiting">Hesap</option>}
-        </select>
-      </label>
+      <div className="form-field">
+        <span>Masa filtresi</span>
+        <ChoiceChips
+          ariaLabel="Masa filtresi"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { id: "all", label: "Tümü" },
+            { id: "available", label: "Boş" },
+            { id: "occupied", label: "Dolu" },
+            ...(reservationsEnabled ? [{ id: "reserved", label: "Rezerve" }] : []),
+            ...(ordersEnabled ? [{ id: "bill_waiting", label: "Hesap" }] : [])
+          ]}
+        />
+      </div>
     </div>
   );
 
