@@ -191,7 +191,7 @@ export function ServicesSettingsSection({
             </div>
           </section>
 
-          {hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.CATALOG) && (
+          {hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.RETAIL_BARCODE) && (
           <section id="settings-product-data" tabIndex={-1} className={`settings-service-card${form.productDataEnabled ? " is-enabled" : " is-disabled"}`}>
             <div className="settings-service-card-header">
               <div>

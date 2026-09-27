@@ -57,6 +57,21 @@ try {
   await page.evaluate(() => window.refreshSettings({ setupRequired: false }));
   await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab')).toHaveCount(4);
 
+  // Product data belongs only to the retail/barcode profile, not generic catalog users such as restaurant.
+  await select('Servisler');
+  await expect(page.locator('#settings-product-data')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('ürün verisi');
+  await expect(page.getByRole('button', { name: 'Servisler · Ürün Verisi', exact: true })).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: [] }));
+  await expect(page.locator('#settings-product-data')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('ürün verisi');
+  await expect(page.getByRole('button', { name: 'Servisler · Ürün Verisi', exact: true })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [] }));
+  await expect(page.locator('#settings-product-data')).toHaveCount(0);
+  await select('İşletme');
+
   await expect(page.locator('#settings-public-profile')).toHaveAttribute('aria-busy', 'false');
   const googleReviewsSection = page.locator('#settings-google-reviews');
   if (await googleReviewsSection.count()) {
