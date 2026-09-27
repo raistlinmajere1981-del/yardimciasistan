@@ -1376,10 +1376,14 @@ try {
   await chooseDate(stayWorkspace, "Giriş tarihi", "2026-08-01");
   await chooseDate(stayWorkspace, "Çıkış tarihi", "2026-08-03");
   await stayWorkspace.getByLabel("Kişi sayısı").fill("2");
-  await stayWorkspace.getByLabel("Konaklama notu").fill("Manuel resepsiyon ataması.");
-  await stayWorkspace.getByRole("button", { name: "Konaklama Oluştur", exact: true }).click();
-  await expect(stayWorkspace.getByText("Manuel konaklama · Rezervasyondan bağımsız", { exact: true })).toBeVisible();
-  await stayWorkspace.getByRole("button", { name: "Giriş Yap", exact: true }).first().click();
+  await stayWorkspace.getByLabel("Giriş notu").fill("Manuel resepsiyon ataması.");
+  const directEntryForm = stayWorkspace.getByRole("form", { name: "Misafir girişi", exact: true });
+  await directEntryForm.getByRole("button", { name: "Giriş Yap", exact: true }).click();
+  const directEntryConfirm = conversionPage.getByRole("alertdialog", { name: "Misafir girişi", exact: true });
+  await expect(directEntryConfirm).toBeVisible();
+  await expect(directEntryConfirm.getByRole("button", { name: "Girişi Onayla", exact: true })).toBeVisible();
+  await directEntryConfirm.getByRole("button", { name: "Girişi Onayla", exact: true }).click();
+  await expect(stayWorkspace.getByText("Manuel giriş · Rezervasyondan bağımsız", { exact: true })).toBeVisible();
   await expect(stayWorkspace.getByText(/Misafir girişi tamamlandı/)).toBeVisible();
   await stayWorkspace.getByRole("button", { name: "Misafir Çıkışı", exact: true }).first().click();
   await conversionPage.getByRole("alertdialog", { name: "Misafir çıkışı", exact: true })
@@ -1692,7 +1696,7 @@ try {
   await compactPage.getByRole("button", { name: "Kompakt Misafir 1 rezervasyonunu incele" }).click();
   const compactReservationWorkspace = compactPage.getByRole("dialog");
   await expect(compactReservationWorkspace.getByRole("heading", { name: "Oda 101 · Balkonlu Standart Oda", exact: true })).toBeVisible();
-  await expect(compactReservationWorkspace.getByRole("region", { name: "Oda ve Konaklama", exact: true })).toBeFocused();
+  await expect(compactReservationWorkspace.getByRole("region", { name: "Oda ve Misafir", exact: true })).toBeFocused();
   await compactReservationWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(compactPage.getByRole("heading", { name: "Bugün ne var?", exact: true })).toBeVisible();
   await expect(compactPage.getByRole("button", { name: "Ana Ekran", exact: true })).toHaveAttribute("aria-current", "page");

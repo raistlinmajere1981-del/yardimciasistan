@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { DesktopCustomerRoomStay, DesktopDashboardData } from "../../../electron/database";
+import type { DesktopDashboardData } from "../../../electron/database";
+import type { DesktopCustomerRoomStay } from "../../../electron/database-types";
 import { defaultRoomAssignmentForm, formatCustomerRoomStayStatus, formatStayDateRange } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 import { DatePicker, addDays } from "../ui/DateTimePicker";
@@ -40,7 +41,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const canEnter = Boolean(model.canCreate && entryCustomerId && !entryAssignment);
 
   async function requestEntry() {
-    if (!canEnter) return;
+    if (!room || !canEnter) return;
     const customerName = selected?.customerName || entryCustomer?.fullName || "Misafir";
     const guestCount = selected?.guestCount || Number(draft.guestCount);
     const checkInDate = selected?.startDate || draft.checkInDate;

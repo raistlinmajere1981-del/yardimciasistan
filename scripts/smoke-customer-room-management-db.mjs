@@ -105,6 +105,22 @@ try {
   assert.equal(stay.status, "planned");
   assert.equal(assignment.dashboardData.rooms.find((candidate) => candidate.id === room.id)?.status, "reserved");
 
+  const otherRoomForSingleActive = database.getDashboardData().rooms.find(
+    (candidate) => candidate.id !== room.id && candidate.isActive && candidate.capacity > 0
+  );
+  assert.ok(otherRoomForSingleActive, "Single-active check requires a second room");
+  const secondActiveDesktopBlocked = database.assignCustomerToRoom({
+    customerId: first.savedId,
+    roomId: otherRoomForSingleActive.id,
+    checkInDate: "2035-05-10",
+    checkOutDate: "2035-05-12",
+    guestCount: 1,
+    notes: "",
+    status: "checked_in"
+  });
+  assert.equal(secondActiveDesktopBlocked.ok, false);
+  assert.match(secondActiveDesktopBlocked.message, /Oda .*için aktif/);
+
   const overlap = database.assignCustomerToRoom({
     customerId: second.savedId,
     roomId: room.id,
@@ -199,6 +215,37 @@ try {
   assert.ok(androidStay);
   assert.equal(androidStay.source, "android");
   assert.equal(androidStay.status, "checked_in");
+  assert.equal(database.getDashboardData().rooms.find((candidate) => candidate.id === androidRoom.id)?.status, "occupied");
+
+  // Aynı müşteri ikinci odada aktif olamaz: desktop ve Android reddi Oda bilgisiyle gelir.
+  assert.equal(database.updateRoomStatus({ roomId: room.id, status: "available" }).ok, true);
+  const androidSecondDesktopBlocked = database.assignCustomerToRoom({
+    customerId: androidCustomer.id,
+    roomId: room.id,
+    checkInDate: "2036-06-01",
+    checkOutDate: "2036-06-03",
+    guestCount: 1,
+    notes: "",
+    status: "checked_in"
+  });
+  assert.equal(androidSecondDesktopBlocked.ok, false);
+  assert.match(androidSecondDesktopBlocked.message, /Oda .*için aktif/);
+  const androidSecondAndroidBlocked = database.applyAndroidAction(androidAction(
+    "android_customer_room_assign_admin_blocked",
+    staffDeviceId,
+    "customer_room_assign",
+    {
+      customer_id: androidCustomer.id,
+      room_id: room.id,
+      check_in_date: "2036-06-01",
+      check_out_date: "2036-06-03",
+      guest_count: 1,
+      notes: "",
+      status: "checked_in"
+    }
+  ));
+  assert.equal(androidSecondAndroidBlocked.ok, false);
+  assert.match(androidSecondAndroidBlocked.message, /Oda .*için aktif/);
 
   const androidCheckout = database.applyAndroidAction(androidAction(
     "android_customer_room_checkout_admin_001",
@@ -215,6 +262,67 @@ try {
     database.getDashboardData().customerRoomStays.find((candidate) => candidate.id === androidStay.id)?.status,
     "checked_out"
   );
+
+  // Doğrudan giriş: boş odada müşteri seçimi standart confirmation sonrası checked_in olur; folio açıksa hesap açılır.
+  // Burada domain katmanında oda occupied + stay checked_in doğrulanır; folio açılışı hospitality-domain ve pension-workspace'te ayrı doğrulanır.
+  assert.equal(database.updateRoomStatus({ roomId: androidRoom.id, status: "available" }).ok, true);
+  const directDesktop = database.assignCustomerToRoom({
+    customerId: second.savedId,
+    roomId: androidRoom.id,
+    checkInDate: "2036-07-01",
+    checkOutDate: "2036-07-03",
+    guestCount: 1,
+    notes: "",
+    status: "checked_in"
+  });
+  assert.equal(directDesktop.ok, true, directDesktop.message);
+  const directStay = database.getDashboardData().customerRoomStays.find((candidate) => candidate.id === directDesktop.savedId);
+  assert.ok(directStay);
+  assert.equal(directStay.status, "checked_in");
+  assert.ok(directStay.checkedInAt);
+  assert.equal(database.getDashboardData().rooms.find((candidate) => candidate.id === androidRoom.id)?.status, "occupied");
+  assert.equal(database.updateCustomerRoomStayStatus({ stayId: directStay.id, status: "checked_out" }).ok, true);
+  assert.equal(database.updateRoomStatus({ roomId: androidRoom.id, status: "available" }).ok, true);
+
+  // İkinci aktif oda kaydı status geçişinde de reddedilir (desktop + Android).
+  const reactivatable = database.assignCustomerToRoom({
+    customerId: androidCustomer.id,
+    roomId: room.id,
+    checkInDate: "2036-08-10",
+    checkOutDate: "2036-08-12",
+    guestCount: 1,
+    notes: "",
+    status: "planned"
+  });
+  assert.equal(reactivatable.ok, true, reactivatable.message);
+  assert.equal(database.updateCustomerRoomStayStatus({ stayId: reactivatable.savedId, status: "cancelled" }).ok, true);
+  const statusBlocker = database.assignCustomerToRoom({
+    customerId: androidCustomer.id,
+    roomId: androidRoom.id,
+    checkInDate: "2036-08-10",
+    checkOutDate: "2036-08-12",
+    guestCount: 1,
+    notes: "",
+    status: "checked_in"
+  });
+  assert.equal(statusBlocker.ok, true, statusBlocker.message);
+  const blockedReactivate = database.updateCustomerRoomStayStatus({ stayId: reactivatable.savedId, status: "planned" });
+  assert.equal(blockedReactivate.ok, false);
+  assert.match(blockedReactivate.message, /Oda .*için aktif/);
+  const reactivatableRow = database.getDashboardData().customerRoomStays.find((candidate) => candidate.id === reactivatable.savedId);
+  const blockedAndroidReactivate = database.applyAndroidAction(androidAction(
+    "android_customer_room_status_blocked",
+    staffDeviceId,
+    "customer_room_stay_status",
+    { stay_id: reactivatable.savedId, status: "planned", expected_updated_at: reactivatableRow.updatedAt }
+  ));
+  assert.equal(blockedAndroidReactivate.ok, false);
+  assert.match(blockedAndroidReactivate.message, /Oda .*için aktif/);
+  assert.equal(database.updateCustomerRoomStayStatus({ stayId: statusBlocker.savedId, status: "checked_out" }).ok, true);
+  assert.equal(database.updateCustomerRoomStayStatus({ stayId: reactivatable.savedId, status: "planned" }).ok, true);
+  assert.equal(database.updateCustomerRoomStayStatus({ stayId: reactivatable.savedId, status: "cancelled" }).ok, true);
+  assert.equal(database.updateRoomStatus({ roomId: room.id, status: "available" }).ok, true);
+  assert.equal(database.updateRoomStatus({ roomId: androidRoom.id, status: "available" }).ok, true);
 
   const sqlite = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
