@@ -570,7 +570,7 @@ export function applyAndroidCustomerRoomAssignment(
     const assignedRoom = activeCustomerStay.roomNumber
       ? `Oda ${activeCustomerStay.roomNumber}`
       : activeCustomerStay.roomName || "başka bir oda";
-    return { ok: false, message: `Müşteri zaten ${assignedRoom} için aktif. Önce mevcut giriş veya planı kapatın.` };
+    return { ok: false, message: `Müşteri zaten ${assignedRoom} için aktif. Önce mevcut oda kaydını çıkış veya iptal ile kapatın.` };
   }
   if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
     return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
@@ -668,7 +668,7 @@ export function applyAndroidCustomerRoomStayStatus(
       const assignedRoom = activeCustomerStay.roomNumber
         ? `Oda ${activeCustomerStay.roomNumber}`
         : activeCustomerStay.roomName || "başka bir oda";
-      return { ok: false, message: `Müşteri zaten ${assignedRoom} için aktif. Önce mevcut giriş veya planı kapatın.` };
+      return { ok: false, message: `Müşteri zaten ${assignedRoom} için aktif. Önce mevcut oda kaydını çıkış veya iptal ile kapatın.` };
     }
   }
   if (

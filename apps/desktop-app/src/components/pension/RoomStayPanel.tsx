@@ -25,10 +25,11 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const { confirm, confirmDialog } = useConfirmDialog();
   if (!room || !state) return null;
 
+  const activeRoomStays = data.roomOperations
+    ? data.roomOperations.flatMap(item => item.stays)
+    : data.customerRoomStays.filter(stay => ["planned", "checked_in"].includes(stay.status));
   const activeByCustomer = new Map(
-    data.customerRoomStays
-      .filter(stay => ["planned", "checked_in"].includes(stay.status))
-      .map(stay => [stay.customerId, stay] as const)
+    activeRoomStays.map(stay => [stay.customerId, stay] as const)
   );
   const eligible = reservations.filter(item => item.reservationType === "room" && item.status === "approved" && item.roomIds.includes(room.id)
     && !model.stays.some(stay => stay.reservationId === item.id && stay.status !== "cancelled"));
