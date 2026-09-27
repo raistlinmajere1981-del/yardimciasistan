@@ -344,6 +344,15 @@ function validateRoomTargets(
         return { ok: false, message: `${label} hizmet dışına alınamaz: ${reason}` };
       }
     }
+    if (room.id && !room.outOfService && current.get(room.id) === "out_of_service") {
+      const reason = getRoomRemovalBlockReason(db, room.id, current.get(room.id) ?? "");
+      if (reason) {
+        const stored = db.prepare("SELECT name, number FROM rooms WHERE id = ? LIMIT 1")
+          .get(room.id) as { name?: string; number?: string } | undefined;
+        const label = text(stored?.number) ? `Oda ${text(stored?.number)}` : text(stored?.name) || room.name || "Oda";
+        return { ok: false, message: `${label} yeniden hizmete alınamaz: ${reason}` };
+      }
+    }
   }
 
   for (const [roomId, status] of current) {

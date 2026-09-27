@@ -315,6 +315,46 @@ try {
     closedReader.close();
   }
 
+  // Historical inconsistency: an out_of_service room with an unfinished task
+  // cannot be reactivated until the blocker is cleared; the normal path keeps working.
+  const inconsistentBase = getBusinessLayout(database.databasePath);
+  const inconsistentTarget = inconsistentBase.rooms.find((room) => room.name === "Varsayılan Oda");
+  assert.ok(inconsistentTarget);
+  assert.equal(inconsistentTarget.outOfService, false);
+  const inconsistentTakeOut = saveBusinessLayout(database.databasePath, {
+    rooms: inconsistentBase.rooms.map((room) => toRoomInput(room, room.id === inconsistentTarget.id ? { outOfService: true } : {}))
+  });
+  assert.equal(inconsistentTakeOut.ok, true, inconsistentTakeOut.ok ? "" : inconsistentTakeOut.message);
+  assert.equal(inconsistentTakeOut.layout.rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, true);
+  const blockerDb = new DatabaseSync(database.databasePath);
+  try {
+    blockerDb.prepare(
+      "INSERT INTO daily_tasks (id, title, status, related_type, related_id, created_at, updated_at) " +
+      "VALUES ('oos-blocker-task', 'Tarihsel oda görevi', 'pending', 'room', ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')"
+    ).run(inconsistentTarget.id);
+  } finally {
+    blockerDb.close();
+  }
+  const blockedReactivate = saveBusinessLayout(database.databasePath, {
+    rooms: getBusinessLayout(database.databasePath).rooms.map((room) => toRoomInput(room, room.id === inconsistentTarget.id ? { outOfService: false } : {}))
+  });
+  assert.equal(blockedReactivate.ok, false);
+  assert.match(blockedReactivate.message, /yeniden hizmete alınamaz/iu);
+  assert.equal(readStatus(inconsistentTarget.id).status, "out_of_service");
+  assert.equal(getBusinessLayout(database.databasePath).rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, true);
+  const unblockDb = new DatabaseSync(database.databasePath);
+  try {
+    unblockDb.prepare("DELETE FROM daily_tasks WHERE id = 'oos-blocker-task'").run();
+  } finally {
+    unblockDb.close();
+  }
+  const normalReactivate = saveBusinessLayout(database.databasePath, {
+    rooms: getBusinessLayout(database.databasePath).rooms.map((room) => toRoomInput(room, room.id === inconsistentTarget.id ? { outOfService: false } : {}))
+  });
+  assert.equal(normalReactivate.ok, true, normalReactivate.ok ? "" : normalReactivate.message);
+  assert.equal(normalReactivate.layout.rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, false);
+  assert.equal(readStatus(inconsistentTarget.id).status, "available");
+
   console.log("business-layout-smoke-ok: atomic room/table layout, archive, blocker and partial update verified");
 } finally {
   database.close();
