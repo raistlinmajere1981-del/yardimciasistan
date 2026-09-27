@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ActionButton } from "../ui/ActionButton";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import { setRoomOperationalStatus } from "./room-operations";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomStayOperations } from "./use-room-stay-operations";
@@ -38,9 +39,21 @@ export function RoomDailyOperations({ model, operations, disabled, onDirty }: {
     }}>
       <h4>Oda hazırlığı</h4>
       <fieldset className="form-stack" disabled={disabled || !model.canSetCondition}>
-        <label className="form-field">Fiziksel oda durumu<select aria-label="Fiziksel oda durumu" value={condition || (state.operationalCondition === "ready" ? "available" : state.operationalCondition)} onChange={event => { setCondition(event.target.value); onDirty("condition", true); }}>
-          <option value="available">Hazır</option><option value="cleaning">Temizlik bekliyor</option><option value="maintenance">Bakımda</option><option value="out_of_service">Hizmet dışı</option>
-        </select></label>
+        <div className="form-field form-field--fluid">
+          <span>Fiziksel oda durumu</span>
+          <ChoiceChips
+            ariaLabel="Fiziksel oda durumu"
+            value={condition || (state.operationalCondition === "ready" ? "available" : state.operationalCondition)}
+            disabled={disabled || !model.canSetCondition}
+            onChange={value => { setCondition(value); onDirty("condition", true); }}
+            options={[
+              { id: "available", label: "Hazır" },
+              { id: "cleaning", label: "Temizlik bekliyor" },
+              { id: "maintenance", label: "Bakımda" },
+              { id: "out_of_service", label: "Hizmet dışı" }
+            ]}
+          />
+        </div>
         <ActionButton variant="secondary" type="submit" disabled={!condition}>Durumu Kaydet</ActionButton>
       </fieldset>
     </form>}
