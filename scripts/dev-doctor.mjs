@@ -22,9 +22,7 @@ checkCommand("java", ["-version"], true);
 checkCommand("keytool", ["-help"], true);
 
 checkFile("README.md", true);
-checkFile("docs/PROJECT_BRIEF.md", true);
 checkFile("docs/WEB_MODULE_INSTALLATION.md", true);
-checkFile("docs/dev/DESKTOP_INSTALLER_PLAN.md", true);
 checkFile("apps/android-app/package.json", true);
 checkFile("packages/shared/package.json", true);
 checkFile("packages/whatsapp-bridge/package.json", true);
