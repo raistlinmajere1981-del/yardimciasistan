@@ -43,6 +43,20 @@ try {
   await expect(page.getByRole('tabpanel')).toHaveCount(1);
   await expect(page.locator('.settings-category-workspace')).toHaveCount(1);
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+
+  // First-run setup intentionally exposes only Business; the remaining categories appear after the first save.
+  await page.evaluate(() => window.refreshSettings({ setupRequired: true }));
+  await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab')).toHaveCount(1);
+  await expect(tab('İşletme')).toBeVisible();
+  await expect(tab('İşletme Düzeni')).toHaveCount(0);
+  await expect(tab('Servisler')).toHaveCount(0);
+  await expect(tab('Uygulama')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('görünüm');
+  await expect(page.getByRole('button', { name: 'Uygulama · Görünüm', exact: true })).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await page.evaluate(() => window.refreshSettings({ setupRequired: false }));
+  await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab')).toHaveCount(4);
+
   await expect(page.locator('#settings-public-profile')).toHaveAttribute('aria-busy', 'false');
   const googleReviewsSection = page.locator('#settings-google-reviews');
   if (await googleReviewsSection.count()) {

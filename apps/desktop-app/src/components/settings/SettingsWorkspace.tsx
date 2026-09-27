@@ -79,6 +79,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
   const capabilities = settingsCapabilities(drafts.canonical);
   const initialized = !props.setupData.setupRequired;
+  const visibleCategories = initialized
+    ? settingsCategories
+    : settingsCategories.filter((item) => item.id === "business");
   const profile = useBusinessPublicProfileSettings({
     businessAddress: drafts.canonical.address,
     enabledCapabilities: capabilities,
@@ -138,7 +141,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       ? drafts.feedback[setupCategory]
       : undefined;
 
-  const results = searchSettings(query, capabilities, initialized, runtimeCapabilities);
+  const results = searchSettings(query, capabilities, initialized, runtimeCapabilities)
+    .filter((result) => initialized || result.category === "business");
 
   async function saveCategory(categoryId: SettingsCategoryId): Promise<SettingsOperationResult> {
     if (categoryId === "business") {
@@ -206,6 +210,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   }
 
   function requestCategoryTransition(transition: Omit<PendingCategoryTransition, "kind">): boolean {
+    if (!initialized && transition.category !== "business") return false;
     const categoryTransition: PendingCategoryTransition = { kind: "category", ...transition };
     if (transition.category === active) {
       if (transition.clearQuery) setQuery("");
@@ -329,7 +334,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         )}
       </div>
 
-      <SettingsCategoryTabs active={active} dirty={dirty} onChange={requestTabChange} />
+      <SettingsCategoryTabs active={active} dirty={dirty} categories={visibleCategories} onChange={requestTabChange} />
 
       <section
         className="settings-category-workspace"
