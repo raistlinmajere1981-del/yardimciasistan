@@ -43,6 +43,7 @@ const menuManagerSource = source("apps/desktop-app/src/components/menu/MenuManag
 const menuItemFormFieldsSource = source("apps/desktop-app/src/components/menu/MenuItemFormFields.tsx");
 const menuPreviewSource = source("apps/desktop-app/src/components/menu/MenuPreview.tsx");
 const roomAccountSource = source("apps/desktop-app/src/components/pension/RoomAccount.tsx");
+const roomAccountAdjustmentsSource = source("apps/desktop-app/src/components/pension/RoomAccountAdjustments.tsx");
 const tableOrdersSource = source("apps/desktop-app/src/components/restaurant/TableOrderEditor.tsx");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
 const financeIpcSource = source("apps/desktop-app/electron/finance-ipc.ts");
@@ -118,7 +119,13 @@ assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
 const normalizedRoomAccountSource = roomAccountSource.replace(/\s+/g, " ");
 assert.match(
   normalizedRoomAccountSource,
-  /menuEnabled\s*&&[\s\S]{0,200}add-menu-item/,
+  /item\.kind === "menu" && menuEnabled/,
+  "Room account menu surface must remain gated by the food menu capability"
+);
+const normalizedRoomAccountAdjustmentsSource = roomAccountAdjustmentsSource.replace(/\s+/g, " ");
+assert.match(
+  normalizedRoomAccountAdjustmentsSource,
+  /menuEnabled\s*&&[\s\S]{0,1200}addRoomFolioMenuItem/,
   "Room account menu surface must remain gated by the food menu capability"
 );
 const normalizedTableOrdersSource = tableOrdersSource.replace(/\s+/g, " ");
