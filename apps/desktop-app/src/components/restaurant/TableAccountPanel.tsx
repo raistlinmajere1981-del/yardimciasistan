@@ -3,6 +3,7 @@ import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../../e
 import { ActionButton } from "../ui/ActionButton";
 import { ChoiceChips } from "../ui/ChoiceChips";
 import { SearchSelect } from "../ui/SearchSelect";
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { TableRoomTransfer } from "./TableRoomTransfer";
 import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, formatTableStatus, getTableStatusAction } from "./table-presentation";
@@ -14,7 +15,7 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
   onCloseOrder: (status: "paid" | "cancelled") => void; onTransfer: (folioId: string) => void;
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
 }) {
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [statusDraft, setStatusDraft] = useState("");
   const [customerDraft, setCustomerDraft] = useState<string | null>(null);
   const order = controller.active;
@@ -29,6 +30,25 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
     if (await controller.assignTableCustomer(customerId)) setCustomerDraft(customerId);
   }
   const tableStatus = getTableStatusAction(table.status) || table.status;
+  async function requestOrderClose(status: "paid" | "cancelled") {
+    if (!order) return;
+    const cancelling = status === "cancelled";
+    const approved = await confirm({
+      eyebrow: table.name,
+      title: cancelling ? "Adisyonu iptal et" : "Hesabı kapat",
+      description: cancelling
+        ? "Adisyon iptal edilir ve ürün stokları geri yüklenir."
+        : "Tahsilatın alındığını onayladığınızda adisyon ödendi olarak kapatılır.",
+      confirmLabel: cancelling ? "Adisyonu İptal Et" : "Ödendi / Kapat",
+      tone: cancelling ? "danger" : "warning",
+      details: <dl className="operation-facts">
+        <div><dt>Masa</dt><dd>{table.name} · {table.area || "Genel"}</dd></div>
+        <div><dt>Ürün</dt><dd>{order.itemCount} adet</dd></div>
+        <div><dt>Toplam</dt><dd>{formatMoney(order.total, getOrderCurrency(order))}</dd></div>
+      </dl>
+    });
+    if (approved) onCloseOrder(status);
+  }
   return <>
     <dl className="operation-facts"><div><dt>Masa</dt><dd>{table.name} · {table.area || "Genel"}</dd></div>
       <div><dt>Durum</dt><dd>{formatTableStatus(table.status)}</dd></div><div><dt>Kapasite</dt><dd>{table.capacity} kişi</dd></div>
@@ -65,14 +85,10 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
         <div className="operation-balance"><dt>Kalan / toplam</dt><dd>{formatMoney(order.total, getOrderCurrency(order))}</dd></div>
       </dl>
       <p>Tahsilatı aldıktan sonra adisyonu ödendi olarak kapatın.</p>
-      <ActionButton disabled={disabled} onClick={() => onCloseOrder("paid")}>Ödendi / Kapat</ActionButton>
+      <ActionButton disabled={disabled} onClick={() => void requestOrderClose("paid")}>Ödendi / Kapat</ActionButton>
       {roomFolioTransferEnabled && order.status === "payment" && order.total > 0 && <TableRoomTransfer key={order.id} order={order} busy={disabled} onTransfer={onTransfer} revision={data.revision} />}
       {roomFolioTransferEnabled && order.status !== "payment" && <p>Odaya yazdırmak için adisyonu Hesap Bekliyor durumuna alın.</p>}
-      <ActionButton variant="danger" disabled={disabled} onClick={() => setConfirmCancel(true)}>Adisyonu İptal Et</ActionButton>
-      {confirmCancel && <div className="operation-confirmation form-stack"><p>Adisyon iptal edilir ve ürün stokları geri yüklenir.</p>
-        <ActionButton variant="danger" disabled={disabled} onClick={() => onCloseOrder("cancelled")}>İptali Onayla</ActionButton>
-        <ActionButton variant="secondary" disabled={disabled} onClick={() => setConfirmCancel(false)}>Vazgeç</ActionButton>
-      </div>}
+      <ActionButton variant="danger" disabled={disabled} onClick={() => void requestOrderClose("cancelled")}>Adisyonu İptal Et</ActionButton>
     </section> : <form className="operation-section form-stack" onSubmit={event => { event.preventDefault();
       if (!statusDraft) return;
       void controller.run(async isCurrent => {
@@ -104,5 +120,6 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
       <ActionButton variant="secondary" type="submit" disabled={disabled || !statusDraft}>Masa Durumunu Kaydet</ActionButton>
     </form>}
     <p role={controller.error ? "alert" : "status"}>{controller.busy ? "İşlem kaydediliyor..." : controller.loading ? "Adisyon yükleniyor..." : controller.message}</p>
+    {confirmDialog}
   </>;
 }

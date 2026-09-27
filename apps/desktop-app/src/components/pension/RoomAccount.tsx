@@ -1,9 +1,9 @@
-import { useState } from "react";
 import type { DesktopRoomFolio } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
 import { minorMoney, paymentMethodLabel, formatDateTime, formatDateRange } from "./folio-format";
 import type { RoomFolioController } from "./use-room-folio-controller";
 import { RoomAccountPayment } from "./RoomAccountPayment";
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 
 export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous, disabled, onDirty }: {
   controller: RoomFolioController; menuEnabled: boolean; currentStayId?: string; ambiguous: boolean; disabled: boolean;
@@ -37,10 +37,37 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
   folio: DesktopRoomFolio; controller: RoomFolioController; menuEnabled: boolean; departed?: boolean;
   disabled: boolean; onDirty: (dirty: boolean) => void;
 }) {
-  const [confirmation, setConfirmation] = useState<{ paymentId: string } | "close" | null>(null);
-  const [error, setError] = useState("");
+  const { confirm, confirmDialog } = useConfirmDialog();
   const open = folio.status === "open";
-  return <article className="room-account-record form-stack" tabIndex={-1} data-folio-id={folio.id} data-stay-id={folio.stayId}>
+  async function requestVoid(payment: DesktopRoomFolio["payments"][number]) {
+    const approved = await confirm({
+      title: "Tahsilatı geri al",
+      description: "Seçilen tahsilat oda hesabından ve kasa kayıtlarından geri alınacak.",
+      confirmLabel: "Tahsilatı Geri Al",
+      tone: "danger",
+      details: <dl className="operation-facts">
+        <div><dt>Misafir</dt><dd>{folio.customerName}</dd></div>
+        <div><dt>Tahsilat</dt><dd>{minorMoney(payment.amountMinor)} · {paymentMethodLabel(payment.paymentMethod)}</dd></div>
+        <div><dt>Tarih</dt><dd>{formatDateTime(payment.paidAt)}</dd></div>
+      </dl>
+    });
+    if (approved) void controller.mutate(() => window.yardimciDesktop!.voidRoomFolioPayment(payment.id));
+  }
+  async function requestClose() {
+    const approved = await confirm({
+      title: "Oda hesabını kapat",
+      description: "Tahsilatı tamamlanmış bu hesap kapatılacak. Konaklama ve oda durumu değişmeyecek.",
+      confirmLabel: "Hesabı Kapat",
+      tone: "warning",
+      details: <dl className="operation-facts">
+        <div><dt>Misafir</dt><dd>{folio.customerName}</dd></div>
+        <div><dt>Toplam</dt><dd>{minorMoney(folio.chargeTotalMinor)}</dd></div>
+        <div><dt>Ödenen</dt><dd>{minorMoney(folio.paidTotalMinor)}</dd></div>
+      </dl>
+    });
+    if (approved) void controller.mutate(() => window.yardimciDesktop!.checkoutRoomFolio({ folioId: folio.id }));
+  }
+  return <><article className="room-account-record form-stack" tabIndex={-1} data-folio-id={folio.id} data-stay-id={folio.stayId}>
     <div><strong>{folio.customerName}</strong><p>{departed ? "Çıkışı yapılmış konaklama" : open ? "Açık hesap" : "Kapalı hesap"} · {formatDateRange(folio.checkInDate, folio.plannedCheckOutDate)}</p></div>
     <dl className="operation-facts">
       <div><dt>Konaklama · {folio.nights} gece</dt><dd>{minorMoney(folio.lodgingTotalMinor)}</dd></div>
@@ -69,19 +96,11 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
       {folio.payments.map(payment => <div key={payment.id}>
         <span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.origin === "reservation" && " · Kapora"}</span>
         <b>{minorMoney(payment.amountMinor)}</b>
-        {open && payment.origin === "direct" && <ActionButton variant="danger" disabled={disabled} onClick={() => { setError(""); setConfirmation({ paymentId: payment.id }); }}>Tahsilatı Geri Al</ActionButton>}
+        {open && payment.origin === "direct" && <ActionButton variant="danger" disabled={disabled} onClick={() => void requestVoid(payment)}>Tahsilatı Geri Al</ActionButton>}
       </div>)}
     </div>
-    {departed && open && <ActionButton variant="secondary" disabled={disabled} onClick={() => { setError(""); setConfirmation("close"); }}>Hesabı Kapat</ActionButton>}
-    {confirmation && <div className="operation-confirmation form-stack">
-      <p>{confirmation === "close" ? "Hesap kapatılacak. Misafirin çıkış tarihi ve odanın temizlik durumu değişmeyecek." : "Seçilen tahsilat oda hesabından ve kasa kayıtlarından geri alınacak."}</p>
-      <ActionButton variant="danger" disabled={disabled} onClick={() => {
-        if (confirmation === "close" && folio.remainingMinor > 0) { setError("Açık borç varken hesap kapatılamaz. Önce ödeme alın."); return; }
-        void controller.mutate(() => confirmation === "close" ? window.yardimciDesktop!.checkoutRoomFolio({ folioId: folio.id })
-          : window.yardimciDesktop!.voidRoomFolioPayment(confirmation.paymentId)).then(result => { if (result?.ok) setConfirmation(null); });
-      }}>{confirmation === "close" ? "Hesabı Kapatmayı Onayla" : "Tahsilatı Geri Almayı Onayla"}</ActionButton>
-      <ActionButton variant="secondary" disabled={disabled} onClick={() => { setConfirmation(null); setError(""); }}>Vazgeç</ActionButton>
-      {error && <p role="alert">{error}</p>}
-    </div>}
-  </article>;
+    {departed && open && folio.remainingMinor === 0 && <ActionButton variant="secondary" disabled={disabled} onClick={() => void requestClose()}>Hesabı Kapat</ActionButton>}
+  </article>
+  {confirmDialog}
+  </>;
 }

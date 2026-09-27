@@ -1,6 +1,7 @@
 import { BedDouble, CalendarDays, CircleCheck, CircleAlert, UserRound, Wallet, Wrench, Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
 import type { DesktopRoom, DesktopDashboardData } from "../../../electron/database";
+import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import type { DesktopRoomOperations } from "../../../electron/database-types";
 import { ResourceCard } from "../operations/ResourceCard";
 import { ActionButton } from "../ui/ActionButton";
@@ -11,6 +12,7 @@ import { getRoomCardModel, roomIdentity, type RoomCardCapabilities } from "./roo
 import { setRoomOperationalStatus } from "./room-operations";
 import { roomToday } from "./room-presentation";
 import { formatDateRange, minorMoney } from "./folio-format";
+import { RoomCheckoutConfirmationDetails } from "./RoomCheckoutConfirmation";
 
 export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
   room: DesktopRoom; summary?: DesktopRoomOperations; capabilities: RoomCardCapabilities;
@@ -21,6 +23,7 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const running = useRef(false);
+  const checkoutMethod = useRef<RoomFolioPaymentMethod>("cash");
   const begin = useRequestGeneration();
   const { confirm, confirmDialog } = useConfirmDialog();
   const physicalLabels: Record<string, string> = { ready: "Hazır", cleaning: "Temizlik bekliyor", maintenance: "Bakımda", out_of_service: "Hizmet dışı", inactive: "Etkin değil" };
@@ -36,21 +39,28 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
     const action = model.quickAction;
     if (running.current || !action || action.disabledReason) return;
     const stay = action.kind === "checkout" ? model.current.find(item => item.id === action.stayId) : undefined;
+    checkoutMethod.current = "cash";
     const approved = await confirm({
       eyebrow: roomIdentity(room),
-      title: action.kind === "clean" ? "Temizliği tamamla" : "Misafir çıkışını tamamla",
+      title: action.kind === "clean" ? "Temizliği tamamla" : "Misafir çıkışı",
       description: action.kind === "clean"
         ? "Oda Hazır durumuna alınacak."
-        : "Konaklama tamamlanacak ve oda Temizlik bekliyor durumuna geçecek. Açık hesap varsa kapanmaz.",
-      confirmLabel: action.kind === "clean" ? "Hazır Olarak İşaretle" : "Çıkışı Tamamla",
-      tone: action.kind === "checkout" ? "warning" : "info",
-      details: <dl className="operation-facts">
-        <div><dt>Oda</dt><dd>{roomIdentity(room)}</dd></div>
-        {stay && <div><dt>Misafir</dt><dd>{stay.customerName} · {stay.guestCount} kişi</dd></div>}
-        {stay && <div><dt>Konaklama</dt><dd>{formatDateRange(stay.checkInDate, stay.checkOutDate)}</dd></div>}
-        {action.kind === "checkout" && model.currentAccount && <div><dt>Açık hesap</dt><dd>{minorMoney(model.currentAccount.remainingMinor, model.currentAccount.currency)}</dd></div>}
-        <div><dt>Yeni durum</dt><dd>{action.kind === "clean" ? "Hazır" : "Temizlik bekliyor"}</dd></div>
-      </dl>
+        : model.currentAccount?.remainingMinor
+          ? "Kalan tutar seçilen ödeme yöntemiyle tahsil edilir; çıkış ve hesap kapanışı birlikte tamamlanır."
+          : "Misafir çıkışı tamamlanır; varsa oda hesabı kapatılır ve oda temizlik durumuna geçer.",
+      confirmLabel: action.kind === "clean" ? "Hazır Olarak İşaretle" : "Çıkış ve Hesabı Kapat",
+      tone: action.kind === "checkout" && model.currentAccount?.remainingMinor ? "warning" : "info",
+      details: action.kind === "checkout" && stay
+        ? <RoomCheckoutConfirmationDetails
+            roomLabel={roomIdentity(room)}
+            stay={stay}
+            account={model.currentAccount}
+            onPaymentMethodChange={method => { checkoutMethod.current = method; }}
+          />
+        : <dl className="operation-facts">
+            <div><dt>Oda</dt><dd>{roomIdentity(room)}</dd></div>
+            <div><dt>Yeni durum</dt><dd>Hazır</dd></div>
+          </dl>
     });
     if (!approved) return;
 
@@ -59,6 +69,15 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
     setFeedback("");
     const current = begin();
     try {
+      if (action.kind === "checkout" && model.currentAccount?.remainingMinor) {
+        const payment = await window.yardimciDesktop!.addRoomFolioPayment({
+          folioId: model.currentAccount.folioId,
+          amountMinor: model.currentAccount.remainingMinor,
+          paymentMethod: checkoutMethod.current
+        });
+        if (!current()) return;
+        if (!payment.ok) { setFeedback(payment.message); return; }
+      }
       const result = action.kind === "clean"
         ? await setRoomOperationalStatus(room.id, "available")
         : await window.yardimciDesktop!.checkoutStay(action.stayId);

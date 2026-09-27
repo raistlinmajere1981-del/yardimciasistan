@@ -51,9 +51,14 @@
   position: relative;
   z-index: 0;
 }
+.resource-card__footer {
+  z-index: 2;
+  pointer-events: none;
+}
 .resource-card__actions {
   position: relative;
   z-index: 2;
+  pointer-events: auto;
 }
 .resource-card__header { display: flex; align-items: center; gap: var(--space-3); }
 .resource-card__header > div { min-width: 0; }

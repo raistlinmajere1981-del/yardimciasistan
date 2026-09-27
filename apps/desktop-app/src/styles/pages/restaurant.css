@@ -126,15 +126,33 @@
   background: var(--color-bg-panel);
 }
 
-.restaurant-order-product > div:first-child {
+.restaurant-order-product__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.restaurant-order-product__copy {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.restaurant-order-product > div:first-child > span {
+.restaurant-order-product__copy > span {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+}
+
+.restaurant-order-product__image,
+.restaurant-order-line__image {
+  inline-size: var(--control-height-lg);
+  block-size: var(--control-height-lg);
+  flex: 0 0 var(--control-height-lg);
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-field);
 }
 
 .restaurant-order-product strong {
@@ -181,18 +199,25 @@
 }
 
 .restaurant-order-line__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.restaurant-order-line__copy {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.restaurant-order-line__main strong {
+.restaurant-order-line__copy strong {
   overflow-wrap: anywhere;
   color: var(--color-text);
   font-size: var(--text-sm);
 }
 
-.restaurant-order-line__main span {
+.restaurant-order-line__copy span {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }

@@ -117,7 +117,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       })}>Görünümü Yenile</ActionButton>}
     </div>}>
     <div ref={surface} className={`operation-surface operation-surface--table${!ordersEnabled || !menuEnabled ? " operation-surface--two" : ""}`} hidden={history}>
-      {ordersEnabled ? <TableOrderEditor menu={data.menu} menuEnabled={menuEnabled} controller={controller} readOnly={transferCommitted} startControl={startControl} />
+      {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} controller={controller} readOnly={transferCommitted} startControl={startControl} />
         : <OperationPanel title="Masa İşlemleri"><p>Sipariş yönetimi etkin değil. Masa hazırlığını sağdaki panelden yönetebilirsiniz.</p></OperationPanel>}
       <OperationPanel title="Masa, Müşteri ve Hesap" id="table-account">
         <TableAccountPanel table={table} data={data} controller={controller} disabled={disabled} customersEnabled={customersEnabled}

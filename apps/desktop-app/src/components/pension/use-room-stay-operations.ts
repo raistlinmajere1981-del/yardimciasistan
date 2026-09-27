@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../../electron/database";
+import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomFolioController } from "./use-room-folio-controller";
-import { minorMoney } from "./folio-format";
 
 export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFolioController, folioEnabled: boolean,
   onDashboard: (data: DesktopDashboardData) => void) {
@@ -39,14 +39,21 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
         : "Misafir girişi tamamlandı; hesap açılamadı. Misafir Hesabı panelinde Hesabı Aç ile yeniden deneyin.";
     });
   }
-  async function checkout(stayId: string) {
+  async function checkout(stayId: string, paymentMethod: RoomFolioPaymentMethod = "cash") {
     if (!model.active.some(stay => stay.id === stayId && stay.status === "checked_in")) return false;
-    return mutate("operations", () => window.yardimciDesktop!.checkoutStay(stayId), async dashboard => {
-      if (!folioEnabled) return "Misafir çıkışı tamamlandı. Temizlik tamamlandığında odayı Hazır olarak işaretleyin.";
-      const debt = dashboard.roomOperations?.find(item => item.roomId === model.room?.id)?.accounts.find(item => item.stayId === stayId)?.remainingMinor ?? 0;
-      return debt > 0 ? `Çıkış tamamlandı · ${minorMoney(debt)} açık hesap. Odanın temizlik durumunu kontrol edin.`
-        : "Misafir çıkışı tamamlandı. Temizlik tamamlandığında odayı Hazır olarak işaretleyin.";
-    });
+    const openAccount = folioEnabled ? model.operations?.accounts.find(item => item.stayId === stayId) : undefined;
+    if (openAccount && openAccount.remainingMinor > 0) {
+      const payment = await account.mutate(() => window.yardimciDesktop!.addRoomFolioPayment({
+        folioId: openAccount.folioId,
+        amountMinor: openAccount.remainingMinor,
+        paymentMethod
+      }));
+      if (!payment?.ok) return false;
+    }
+    return mutate("operations", () => window.yardimciDesktop!.checkoutStay(stayId), async () =>
+      folioEnabled && openAccount
+        ? "Misafir çıkışı ve hesap kapanışı tamamlandı. Oda temizlik bekliyor."
+        : "Misafir çıkışı tamamlandı. Oda temizlik bekliyor.");
   }
   return { busy, feedback, mutate, checkIn, checkout };
 }
