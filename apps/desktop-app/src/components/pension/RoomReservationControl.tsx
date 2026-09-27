@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ActionButton } from "../ui/ActionButton";
+import { SearchSelect } from "../ui/SearchSelect";
 import { assignReservationRoom } from "./ReservationRoomAssignment";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomStayOperations } from "./use-room-stay-operations";
@@ -22,9 +23,23 @@ export function RoomReservationControl({ model, operations, disabled, initialRes
     }}>
       <h4>Rezervasyon ataması</h4>
       <fieldset className="form-stack" disabled={disabled}>
-        <label className="form-field">Atanacak rezervasyon<select aria-label="Atanacak rezervasyon" required value={reservationId} onChange={event => { setReservationId(event.target.value); onDirty("assignment", true); }}>
-          <option value="">Rezervasyon seçin</option>{assignable.map(item => <option value={item.id} key={item.id}>{item.title || item.customerName} · {item.startDate}</option>)}
-        </select></label>
+        <div className="form-field form-field--fluid">
+          <span>Atanacak rezervasyon</span>
+          <SearchSelect
+            ariaLabel="Atanacak rezervasyon"
+            value={reservationId}
+            disabled={disabled}
+            onChange={value => { setReservationId(value); onDirty("assignment", true); }}
+            placeholder="Rezervasyon seçin"
+            searchPlaceholder="Rezervasyon, misafir veya tarih ara"
+            options={assignable.map(item => ({
+              id: item.id,
+              label: item.title || item.customerName || "Rezervasyon",
+              description: `${item.customerName || "Misafir"} · ${item.startDate} – ${item.endDate} · ${item.guestCount} kişi`,
+              keywords: `${item.customerName} ${item.startDate} ${item.endDate}`
+            }))}
+          />
+        </div>
         <ActionButton variant="secondary" type="submit" disabled={!assignable.some(item => item.id === reservationId)}>Rezervasyonu Ata</ActionButton>
       </fieldset><p>Yalnız oda ataması kaydedilir; konaklama oluşturulmaz.</p>
     </form>;
