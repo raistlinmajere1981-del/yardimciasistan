@@ -1301,7 +1301,8 @@ try {
   await expect(conversionPage.getByRole("region", { name: "Restoran günlük işleri", exact: true })).toBeVisible();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toHaveCount(0);
   await expect(conversionPage.getByText("Bahçe masası kontrolü")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Tamamla" }).first().click();
+  await conversionPage.getByRole("region", { name: "Restoran günlük işleri", exact: true })
+    .getByRole("button", { name: "Tamamla", exact: true }).click();
   await expect(conversionPage.getByText("Günlük iş durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Smoke Bahçe Masası masasını aç" }).click();
   const smokeTableWorkspace = conversionPage.getByRole("dialog", { name: "Smoke Bahçe Masası" });

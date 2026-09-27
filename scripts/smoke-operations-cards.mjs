@@ -79,7 +79,8 @@ try {
   await expect(confirm).toContainText('Ece Yılmaz');
   await expect(confirm).toContainText('Kalan hesap');
   await confirm.getByRole('button', { name: 'Çıkış ve Hesabı Kapat', exact: true }).click();
-  await expect(card(103)).toContainText('Temizlik bekliyor');
+  await expect(card(103).getByRole('group', { name: 'Oda 103 fiziksel durumunu değiştir', exact: true })
+    .getByRole('button', { name: 'Temizlik', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentsBeforeCheckout + 1);
   expect((await page.evaluate(() => window.fixtureState())).folios.find(item => item.stayId === 'stay-2').status).toBe('closed');
 

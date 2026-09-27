@@ -53,7 +53,7 @@
 }
 .resource-card__status {
   z-index: 2;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .resource-card__footer {
   z-index: 2;
@@ -86,4 +86,7 @@
 .resource-card__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .resource-card__actions .action-button { min-height: var(--control-height-lg); flex: 1 1 auto; white-space: normal; }
 .resource-card__actions .action-button:active { transform: translateY(1px); }
-.resource-card__status .choice-chips button { min-height: var(--control-height-lg); }
+.resource-card__status .choice-chips button {
+  min-height: var(--control-height-lg);
+  pointer-events: auto;
+}

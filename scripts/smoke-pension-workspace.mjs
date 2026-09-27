@@ -42,9 +42,13 @@ try {
   expect(await page.getByLabel('Rezervasyon yönetimi').locator('.data-records').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
   expect(await page.getByLabel('Günlük işler', { exact: true }).locator('.data-records').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
-  await expect(page.getByRole('article', { name: 'Pilot 101', exact: true })).toContainText('Temizlik bekliyor');
-  await expect(page.getByRole('article', { name: 'Pilot 101', exact: true })).toContainText('Yaklaşan rezervasyon');
-  await expect(page.getByRole('article', { name: 'Pilot 103', exact: true })).toContainText('Bakımda');
+  const pilot101 = page.getByRole('article', { name: 'Pilot 101', exact: true });
+  await expect(pilot101.getByRole('group', { name: 'Pilot 101 fiziksel durumunu değiştir', exact: true })
+    .getByRole('button', { name: 'Temizlik', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(pilot101).toContainText('Yaklaşan rezervasyon');
+  const pilot103 = page.getByRole('article', { name: 'Pilot 103', exact: true });
+  await expect(pilot103.getByRole('group', { name: 'Pilot 103 fiziksel durumunu değiştir', exact: true })
+    .getByRole('button', { name: 'Bakımda', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('article', { name: 'Pilot 103', exact: true })).toContainText('Yaklaşan rezervasyon');
   await page.getByLabel('Rezervasyon yönetimi').getByRole('group', { name: 'Durum', exact: true }).getByRole('button', { name: 'Onaylandı', exact: true }).click();
   await page.getByLabel('Günlük işler', { exact: true }).getByRole('group', { name: 'Durum', exact: true }).getByRole('button', { name: 'Tümü', exact: true }).click();
