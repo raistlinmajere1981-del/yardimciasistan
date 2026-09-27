@@ -3,7 +3,7 @@ import type { WorkspaceIntent, WorkspaceReturnContext, WorkspaceModeUpdate } fro
 import { productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition } from "../../apps/desktop-app/src/app/workspace-definitions";
 import type { WorkspaceDefinition } from "../../apps/desktop-app/src/components/workspace/workspace-definition";
 
-export function intentContracts(intent: WorkspaceIntent) {
+function intentContracts(intent: WorkspaceIntent) {
   if (intent.entityType === "room") {
     const action: "payment" | "assign-reservation" | "create-stay" | "check-in" | "checkout" | "linked-stay" | "room-status" | undefined = intent.action;
     const customer: string | undefined = intent.customerId;
@@ -62,3 +62,5 @@ export const missingPage: WorkspaceReturnContext = { view: "rooms" };
 export const wrongRenderer: WorkspaceDefinition<Extract<WorkspaceIntent, { entityType: "table" }>, Parameters<typeof roomWorkspaceDefinition.render>[1]> = { ...tableWorkspaceDefinition, render: roomWorkspaceDefinition.render };
 
 export const productDefinitionEntity: "product" = productWorkspaceDefinition.entityType;
+
+void intentContracts;

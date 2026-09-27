@@ -49,7 +49,7 @@ export interface PushAndroidSnapshotOptions extends SyncCoreConfig {
 }
 
 export interface SyncCapabilitiesOptions extends SyncCoreConfig {}
-export interface ResetHostingRuntimeOptions extends SyncCoreConfig {}
+interface ResetHostingRuntimeOptions extends SyncCoreConfig {}
 
 export interface AiConnectionSettings {
   enabled: boolean;
@@ -1236,7 +1236,7 @@ export interface SyncCapabilitiesSuccess {
   server_revision: number;
 }
 
-export interface ResetHostingRuntimeSuccess {
+interface ResetHostingRuntimeSuccess {
   ok: true;
   message: string;
   reset_at: ISODateTimeString;
@@ -1244,7 +1244,7 @@ export interface ResetHostingRuntimeSuccess {
   server_revision: number;
 }
 
-export interface PushAiSettingsSuccess {
+interface PushAiSettingsSuccess {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
@@ -1299,7 +1299,7 @@ export type PushAiCatalogResult = PushAiCatalogSuccess | SyncFailure;
 export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
 export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
 export type SyncCapabilitiesResult = SyncCapabilitiesSuccess | SyncFailure;
-export type ResetHostingRuntimeResult = ResetHostingRuntimeSuccess | SyncFailure;
+type ResetHostingRuntimeResult = ResetHostingRuntimeSuccess | SyncFailure;
 
 export interface PullCursorInput {
   afterSeq: number;
