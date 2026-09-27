@@ -2,6 +2,9 @@ import { useState } from "react";
 import type { DesktopRoomFolio } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
 import { MoneyInput } from "../ui/MoneyInput";
+import { ChoiceChips } from "../ui/ChoiceChips";
+import { DatePicker } from "../ui/DateTimePicker";
+import { SearchSelect } from "../ui/SearchSelect";
 import { minorMoney, minorToInput, parseMoneyToMinor } from "./folio-format";
 import type { RoomFolioController } from "./use-room-folio-controller";
 
@@ -26,9 +29,23 @@ export function RoomAccountAdjustments({ folio, controller, menuEnabled, disable
         : window.yardimciDesktop!.addRoomFolioMenuItem({ folioId: folio.id, menuItemId: item.id, quantity: 1 }), "adjustments");
     }}>
       <fieldset className="form-stack" disabled={disabled}>
-        <label className="form-field">Ürün / hizmet<select aria-label="Ürün / hizmet" value={itemId} onChange={event => setItemId(event.target.value)}>
-          <option value="">Ürün seçin</option>{controller.data.menuItems.map(item => <option key={item.id} value={item.id}>{item.name} · {minorMoney(item.priceMinor)}</option>)}
-        </select></label>
+        <div className="form-field form-field--fluid">
+          <span>Ürün / hizmet</span>
+          <SearchSelect
+            ariaLabel="Ürün / hizmet"
+            value={itemId}
+            onChange={setItemId}
+            placeholder="Ürün seçin"
+            searchPlaceholder="Ürün, kategori veya açıklama ara"
+            options={controller.data.menuItems.map(item => ({
+              id: item.id,
+              label: item.name,
+              description: `${item.categoryName || "Menü"} · ${minorMoney(item.priceMinor)}${item.stockQuantity === null ? "" : ` · Stok ${item.stockQuantity} ${item.stockUnit || ""}`}`,
+              keywords: `${item.categoryName} ${item.description}`,
+              disabled: item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity
+            }))}
+          />
+        </div>
         <ActionButton variant="secondary" type="submit" disabled={!item || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)}>Ürünü Ekle</ActionButton>
       </fieldset>
     </form>}
@@ -40,7 +57,15 @@ export function RoomAccountAdjustments({ folio, controller, menuEnabled, disable
     }}>
       <fieldset className="form-stack" disabled={disabled}>
         <div className="operation-fields">
-          <label className="form-field">Kalem türü<select value={kind} onChange={event => setKind(event.target.value as typeof kind)}><option value="manual_charge">Ek ücret</option><option value="discount">İndirim</option></select></label>
+          <div className="form-field">
+            <span>Kalem türü</span>
+            <ChoiceChips
+              ariaLabel="Kalem türü"
+              value={kind}
+              onChange={setKind}
+              options={[{ id: "manual_charge", label: "Ek ücret" }, { id: "discount", label: "İndirim" }]}
+            />
+          </div>
           <label className="form-field">Tutar<MoneyInput required value={amount} onChange={setAmount} /></label>
         </div>
         <label className="form-field">Açıklama<input required value={label} onChange={event => setLabel(event.target.value)} /></label>
@@ -71,8 +96,16 @@ export function RoomAccountDetails({ folio, controller, disabled, onDirty }: {
     {controller.feedbackScope === "details" && controller.message && <p role={controller.error ? "alert" : "status"}>{controller.message}</p>}
     <fieldset className="form-stack" disabled={disabled}>
       <div className="operation-fields">
-        <label className="form-field">Giriş tarihi<input lang="tr-TR" type="date" required value={draft.start} onChange={event => setDraft({ ...draft, start: event.target.value })} /></label>
-        <label className="form-field">Çıkış tarihi<input lang="tr-TR" type="date" min={draft.start} value={draft.end} onChange={event => setDraft({ ...draft, end: event.target.value })} /></label>
+        <div className="form-field">
+          <span>Giriş tarihi</span>
+          <DatePicker ariaLabel="Giriş tarihi" value={draft.start} disabled={disabled} clearable={false}
+            onChange={start => { setDraft({ ...draft, start }); onDirty(true); }} />
+        </div>
+        <div className="form-field">
+          <span>Çıkış tarihi</span>
+          <DatePicker ariaLabel="Çıkış tarihi" value={draft.end} min={draft.start || undefined} disabled={disabled}
+            onChange={end => { setDraft({ ...draft, end }); onDirty(true); }} />
+        </div>
         <label className="form-field">Kişi sayısı<input type="number" required min={1} max={50} value={draft.guestCount} onChange={event => setDraft({ ...draft, guestCount: Number(event.target.value) })} /></label>
         <label className="form-field">Gecelik fiyat<MoneyInput required value={draft.nightly} onChange={nightly => setDraft({ ...draft, nightly })} /></label>
       </div>
