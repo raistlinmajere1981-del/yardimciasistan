@@ -6,6 +6,7 @@ import { captureOperationWorkspace } from './test-helpers/operation-workspace-sc
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { installPensionWorkspaceFixture } from './test-helpers/pension-workspace-fixture.mjs';
 import { chooseDate } from './test-helpers/date-time-picker.mjs';
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import { createCompactUiFixture } from './lib/desktop-renderer-fixtures.mjs';
 
 const server = await createServer({ root: resolve('apps/desktop-app'), configFile: resolve('apps/desktop-app/vite.renderer.config.ts'), server: { port: 0 } });
@@ -45,10 +46,10 @@ try {
   await expect(page.getByRole('article', { name: 'Pilot 101', exact: true })).toContainText('Yaklaşan rezervasyon');
   await expect(page.getByRole('article', { name: 'Pilot 103', exact: true })).toContainText('Bakımda');
   await expect(page.getByRole('article', { name: 'Pilot 103', exact: true })).toContainText('Yaklaşan rezervasyon');
-  await page.getByLabel('Rezervasyon yönetimi').getByLabel('Durum', { exact: true }).selectOption('approved');
-  await page.getByLabel('Günlük işler', { exact: true }).getByLabel('Durum', { exact: true }).selectOption('all');
+  await page.getByLabel('Rezervasyon yönetimi').getByRole('group', { name: 'Durum', exact: true }).getByRole('button', { name: 'Onaylandı', exact: true }).click();
+  await page.getByLabel('Günlük işler', { exact: true }).getByRole('group', { name: 'Durum', exact: true }).getByRole('button', { name: 'Tümü', exact: true }).click();
   await button('Oda Ata / Düzenle').first().click();
-  await dialog.getByLabel('Oda', { exact: true }).selectOption('room-102');
+  await chooseSearchSelect(dialog, 'Oda', /Pilot 102/);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeVisible();
   await button('Atamayı Kaydet').click();
@@ -66,10 +67,10 @@ try {
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toBeVisible();
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => !['read', 'assignment'].includes(call.kind)))).toEqual([]);
   await captureOperationWorkspace(page, 'room-empty');
-  await operations.getByLabel('Atanacak rezervasyon').selectOption('booking-0');
+  await chooseSearchSelect(operations, 'Atanacak rezervasyon', /Pilot rezervasyon 0/);
   await button('Rezervasyonu Ata').click();
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays.length)).toBe(0);
-  await stayPanel.getByLabel('İlgili rezervasyon').selectOption('booking-0');
+  await chooseSearchSelect(stayPanel, 'İlgili rezervasyon', /Pilot rezervasyon 0/);
   await button('Rezervasyondan Konaklama Oluştur').click();
   await expect(stayPanel).toContainText('Rezervasyon: Pilot rezervasyon 0');
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].reservationId)).toBe('booking-0');
@@ -81,7 +82,7 @@ try {
   await expect(button('Misafir Çıkışı')).toBeVisible();
   await expect(account.getByLabel('Ödeme tutarı')).toBeVisible();
   await captureOperationWorkspace(page, 'room-occupied');
-  await operations.getByLabel('Ürün / hizmet').selectOption('tea');
+  await chooseSearchSelect(operations, 'Ürün / hizmet', /Çay/);
   await button('Ürünü Ekle').click();
   await expect(account).toContainText('Çay');
   expect(await page.evaluate(() => window.fixtureState().menu[0].stockQuantity)).toBe(9);
@@ -175,7 +176,8 @@ try {
     if (variant !== 'no-menu') expect(await variantPage.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'read').length)).toBe(0);
     if (variant === 'rooms-only') await expect(workspace.getByRole('button', { name: 'Konaklama Oluştur' })).toHaveCount(0);
     else {
-      await workspace.getByLabel('Müşteri', { exact: true }).selectOption({ index: 1 });
+      await workspace.getByLabel('Müşteri', { exact: true }).click();
+      await workspace.getByRole('dialog', { name: 'Müşteri seçici', exact: true }).getByRole('option').nth(1).click();
       await workspace.getByRole('button', { name: 'Konaklama Oluştur', exact: true }).click();
       if (variant === 'no-menu') await variantPage.evaluate(() => { window.fixtureFailOpening = true; });
       await workspace.getByRole('button', { name: 'Giriş Yap', exact: true }).click();
