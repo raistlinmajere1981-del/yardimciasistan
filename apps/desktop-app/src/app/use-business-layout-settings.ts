@@ -27,6 +27,7 @@ export interface BusinessLayoutRoomDraft {
   priceNote: string;
   price: string;
   currency: string;
+  outOfService: boolean;
   canRemove: boolean;
   removeBlockReason: string;
 }
@@ -147,6 +148,7 @@ export function useBusinessLayoutSettings(options: {
           priceNote: "",
           price: "0,00",
           currency: "TRY",
+          outOfService: false,
           canRemove: true,
           removeBlockReason: ""
         }
@@ -263,7 +265,8 @@ export function useBusinessLayoutSettings(options: {
               // validate() rejects blank/invalid prices before save, so the
               // fallback below is unreachable in practice.
               nightlyPriceMinor: parseMoneyToMinor(room.price) ?? 0,
-              currency: room.currency
+              currency: room.currency,
+              outOfService: room.outOfService
             }))
           : undefined,
         tableCategories: current.capabilities.tables
@@ -354,6 +357,7 @@ function toRoomDraft(room: BusinessLayoutRoom): BusinessLayoutRoomDraft {
     priceNote: room.priceNote,
     price: minorToInput(room.nightlyPriceMinor),
     currency: room.currency,
+    outOfService: room.outOfService === true,
     canRemove: room.canRemove,
     removeBlockReason: room.removeBlockReason
   };
@@ -388,7 +392,8 @@ function comparableDraft(value: BusinessLayoutDraft): string {
       description: room.description.trim(),
       priceNote: room.priceNote.trim(),
       priceMinor: parseMoneyToMinor(room.price),
-      currency: room.currency
+      currency: room.currency,
+      outOfService: room.outOfService === true
     })),
     tableCategories: value.tableCategories.map((category) => ({
       sourceName: category.sourceName,
