@@ -75,13 +75,17 @@ try {
   await expect(card(101)).toContainText('Hazır');
   expect(await page.locator('.resource-card h3').allTextContents()).toEqual(orderBefore);
 
-  // Current guest checkout is also a guarded card mutation and leaves an open folio untouched.
+  // Current guest checkout is a true card quick action: it must not open the workspace and settles the current folio.
+  const paymentsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);
   await card(103).getByRole('button', { name: 'Misafir çıkışı', exact: true }).click();
   confirm = page.locator('.confirm-dialog');
+  await expect(page.locator('.workspace-frame')).toHaveCount(0);
   await expect(confirm).toContainText('Ece Yılmaz');
-  await expect(confirm).toContainText('Açık hesap');
-  await confirm.getByRole('button', { name: 'Çıkışı Tamamla', exact: true }).click();
+  await expect(confirm).toContainText('Kalan hesap');
+  await confirm.getByRole('button', { name: 'Çıkış ve Hesabı Kapat', exact: true }).click();
   await expect(card(103)).toContainText('Temizlik bekliyor');
+  expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentsBeforeCheckout + 1);
+  expect((await page.evaluate(() => window.fixtureState())).folios.find(item => item.stayId === 'stay-2').status).toBe('closed');
 
   // Simulate the dashboard event channel, followed by an older in-flight request.
   await page.evaluate(() => {

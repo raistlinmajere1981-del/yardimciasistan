@@ -10,6 +10,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
   dashboard.reservations = [];
   dashboard.menu.categories = [{ id: 'category-a', name: 'İçecek', is_active: true, sort_order: 1 }];
   dashboard.menu.items = [{ id: 'menu-a', name: 'Çay', description: '', category_id: 'category-a', is_available: true,
+    image_url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23888"/%3E%3C/svg%3E',
     price: 25, currency: 'TRY', stock_quantity: 8, stock_unit: 'piece', stock_consumption_quantity: 1, sort_order: 1 },
     { id: 'menu-b', name: 'Tükenen', description: '', category_id: 'category-a', is_available: true,
       price: 10, currency: 'TRY', stock_quantity: 0, stock_unit: 'piece', stock_consumption_quantity: 1, sort_order: 2 }];
