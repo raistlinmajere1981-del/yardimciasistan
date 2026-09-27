@@ -91,7 +91,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
     returnFocusRef={navigation.returnFocusRef}><p>Masa kaydı bulunamadı.</p></WorkspaceFrame>;
   const cardModel = getTableCardModel(table, data.tableOperations?.find(item => item.tableId === table.id),
     { ordersEnabled, menuEnabled, reservationsEnabled }, new Date().toLocaleDateString("sv-SE"));
-  const canStart = cardModel.action && "kind" in cardModel.action && cardModel.action.kind === "start";
+  const canStart = cardModel.quickAction?.kind === "start";
   const duration = order ? Math.max(0, Math.floor((clock - new Date(order.openedAt).getTime()) / 60_000)) : 0;
   const disabled = controller.busy || controller.loading || !controller.loaded || transferCommitted;
   const startControl = <div className="restaurant-start form-stack">
