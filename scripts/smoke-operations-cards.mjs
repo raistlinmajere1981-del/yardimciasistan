@@ -47,6 +47,11 @@ try {
   await expect(card(103).getByRole('button', { name: 'Oda 103 odasını aç' })).toBeFocused();
   await expect(card(103).getByRole('button', { name: 'Ayrıntı', exact: true })).toHaveCount(0);
 
+  // Non-interactive card body is also a launcher; embedded controls keep their own click target.
+  await card(103).locator('.resource-card__facts').click();
+  await expect(dialog).toBeVisible();
+  await close();
+
   // A planned stay is completed inside the workspace instead of duplicating the workflow on the card.
   await card(102).getByRole('button', { name: 'Oda 102 odasını aç' }).click();
   await expect(dialog.getByRole('button', { name: 'Giriş Yap', exact: true })).toBeVisible();

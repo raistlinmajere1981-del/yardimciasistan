@@ -1333,7 +1333,8 @@ try {
   await chooseDate(reservationWorkspace, "Tarih", "2026-07-18");
   await expect(reservationWorkspace.getByRole("button", { name: "Tarih", exact: true })).toHaveAttribute("data-picker-value", "2026-07-18");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
-  await reservationWorkspace.getByLabel("Durum").selectOption("pending");
+  await reservationWorkspace.getByRole("group", { name: "Durum", exact: true })
+    .getByRole("button", { name: "Onay bekleyen", exact: true }).click();
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
   await conversionPage.getByRole("button", { name: "Onayla" }).first().click();
   await expect(conversionPage.getByText("Rezervasyon durumu güncellendi.")).toBeVisible();

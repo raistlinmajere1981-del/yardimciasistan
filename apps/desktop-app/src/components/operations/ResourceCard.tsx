@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, type MouseEvent, type ReactNode } from "react";
 
 /** Presentation only. Resource identity, facts and operations belong to the feature. */
 export function ResourceCard({ title, subtitle, icon, status, tone, children, action, onOpen, openLabel, busy, feedback, error }: {
@@ -8,9 +8,16 @@ export function ResourceCard({ title, subtitle, icon, status, tone, children, ac
   busy?: boolean; feedback?: string; error?: boolean;
 }) {
   const id = useId();
-  return <article className="resource-card" data-tone={tone} aria-labelledby={`${id}-title`} aria-busy={busy || undefined}>
-    <button className="resource-card__open-hit-area" type="button" aria-label={openLabel} disabled={busy} onClick={onOpen} />
+  const openFromCardSurface = (event: MouseEvent<HTMLElement>) => {
+    if (busy) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a, input, select, textarea, [role='button'], [role='option'], [role='combobox'], [role='group']")) return;
+    onOpen();
+  };
+  return <article className="resource-card" data-tone={tone} aria-labelledby={`${id}-title`} aria-busy={busy || undefined} onClick={openFromCardSurface}>
     <header className="resource-card__header">
+      <button className="resource-card__open-hit-area" type="button" aria-label={openLabel} disabled={busy}
+        onClick={(event) => { event.stopPropagation(); onOpen(); }} />
       <span className="resource-card__icon" aria-hidden="true">{icon}</span>
       <div><h3 id={`${id}-title`}>{title}</h3>{subtitle && <p>{subtitle}</p>}</div>
     </header>

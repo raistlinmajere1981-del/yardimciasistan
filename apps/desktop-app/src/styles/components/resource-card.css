@@ -64,7 +64,8 @@
   z-index: 2;
   pointer-events: auto;
 }
-.resource-card__header { display: flex; align-items: center; gap: var(--space-3); }
+.resource-card__header { position: relative; display: flex; align-items: center; gap: var(--space-3); }
+.resource-card__header > :not(.resource-card__open-hit-area) { pointer-events: none; }
 .resource-card__header > div { min-width: 0; }
 .resource-card__header h3 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-bold); line-height: var(--leading-tight); overflow-wrap: anywhere; }
 .resource-card__header p { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: var(--text-xs); }
