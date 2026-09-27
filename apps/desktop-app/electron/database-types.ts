@@ -251,7 +251,7 @@ export interface DesktopTableOperations {
   reservations: DesktopReservation[];
 }
 
-type DesktopReportPreset = "today" | "yesterday" | "last7" | "last30" | "custom";
+export type DesktopReportPreset = "today" | "yesterday" | "last7" | "last30" | "custom";
 
 export interface DesktopReportRangeInput {
   preset: DesktopReportPreset;
