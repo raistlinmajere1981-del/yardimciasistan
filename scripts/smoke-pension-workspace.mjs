@@ -161,8 +161,7 @@ try {
     if (variant !== 'no-menu') expect(await variantPage.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'read').length)).toBe(0);
     if (variant === 'rooms-only') await expect(workspace.getByRole('button', { name: 'Konaklama Oluştur' })).toHaveCount(0);
     else {
-      await workspace.getByLabel('Müşteri', { exact: true }).click();
-      await workspace.getByRole('dialog', { name: 'Müşteri seçici', exact: true }).getByRole('option').nth(1).click();
+      await chooseSearchSelect(workspace, 'Müşteri', /^Kompakt Misafir 1(?:\\s|$)/);
       await workspace.getByRole('button', { name: 'Konaklama Oluştur', exact: true }).click();
       if (variant === 'no-menu') await variantPage.evaluate(() => { window.fixtureFailOpening = true; });
       await workspace.getByRole('button', { name: 'Giriş Yap', exact: true }).click();
