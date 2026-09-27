@@ -1,6 +1,6 @@
 # Workspace platform — proven APIs (Stage 6)
 
-The Constitution remains authoritative. The [extraction audit](platform-extraction-audit.md)
+The Constitution remains authoritative. The extraction audit is archived in Git history and
 records A/B/C/D decisions from both completed pilots.
 
 ## Static definitions and composition
