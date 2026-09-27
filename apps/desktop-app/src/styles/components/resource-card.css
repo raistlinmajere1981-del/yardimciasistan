@@ -33,7 +33,7 @@
   z-index: 1;
   padding: 0;
   border: 0;
-  border-radius: inherit;
+  border-radius: var(--radius-panel);
   background: transparent;
   cursor: pointer;
 }
