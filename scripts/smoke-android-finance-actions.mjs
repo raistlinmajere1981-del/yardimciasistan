@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
@@ -17,6 +18,15 @@ const DEVICE_ID = "android-finance-smoke";
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup(createSmokeSetupInput({
+    businessName: "Android Finance Smoke",
+    phone: "+905550005050",
+    whatsapp: "+905550005050",
+    syncSecret: "android-finance-secret-123",
+    servicePreferences: { whatsapp: false, android: true }
+  }));
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
   database.upsertAndroidDeviceSightings([{
     device_id: DEVICE_ID,
     device_name: "Finance Smoke",
@@ -58,7 +68,8 @@ try {
     service_orders: true,
     cashier: true,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   });
   assert.equal(groupsUpdated.ok, true, groupsUpdated.message);
   device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);

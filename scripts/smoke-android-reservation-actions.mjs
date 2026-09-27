@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
+
+const require = createRequire(import.meta.url);
+const { saveBusinessLayout } = require("../apps/desktop-app/dist-electron/business-layout.js");
 
 const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-android-reservation-");
 
@@ -14,10 +18,42 @@ try {
     phone: "+905550003030",
     whatsapp: "+905550003030",
     syncSecret: "android-reservation-secret-123",
-    servicePreferences: { whatsapp: false, android: true },
-    initialCounts: { rooms: 2, tables: 2 }
+    servicePreferences: { whatsapp: false, android: true }
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
+  const layoutSeed = saveBusinessLayout(database.databasePath, {
+    rooms: [
+      {
+        clientKey: "android-reservation-room-1",
+        name: "Android Oda 101",
+        number: "101",
+        capacity: 2,
+        bedInfo: "1 çift kişilik yatak",
+        floor: "",
+        features: [],
+        description: "",
+        priceNote: "",
+        nightlyPriceMinor: 100000,
+        currency: "TRY"
+      },
+      {
+        clientKey: "android-reservation-room-2",
+        name: "Android Oda 102",
+        number: "102",
+        capacity: 2,
+        bedInfo: "1 çift kişilik yatak",
+        floor: "",
+        features: [],
+        description: "",
+        priceNote: "",
+        nightlyPriceMinor: 100000,
+        currency: "TRY"
+      }
+    ],
+    tableCategories: [{ name: "Android Salon", tableCount: 2 }]
+  });
+  assert.equal(layoutSeed.ok, true, layoutSeed.ok ? "" : layoutSeed.message);
 
   registerAdminDevice(database);
   const customerId = createCustomer(database);
