@@ -145,16 +145,18 @@ Important command nesting:
 - Local test/dev CLIs such as Vite must use repository-installed binaries directly; do not use `npx` paths that can implicitly download missing packages.
 - Do not additionally run `npm run quality:strict` when the unique strict gates below are run individually.
 
-Milestone unique gates:
+Milestone gate:
 
 ```bash
-npm run check:linux
-npm run lint:strict
-npm run knip:strict
-npm run design:audit:strict
-npm run architecture:audit
-npm run pilot:check
+npm run pre-main
 ```
+
+`pre-main` is the repository-level merge gate. It composes the Linux product checks,
+strict lint/Knip/design/architecture audits, the full pilot gate, current platform/domain
+regressions, Android action regressions, and `git diff --check`.
+
+Run individual gates while diagnosing a failure; do not manually maintain a second
+merge checklist beside `pre-main`.
 
 For Electron refactors, normally include:
 - `npm run typecheck:electron`
