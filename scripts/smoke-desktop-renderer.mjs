@@ -1680,9 +1680,11 @@ try {
   await compactPage.evaluate(() => document.documentElement.setAttribute("data-color-scheme", "dark"));
 
   await compactPage.getByRole("button", { name: "Kompakt Misafir 1 rezervasyonunu incele" }).click();
-  await expect(compactPage.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
-  await expect(compactPage.locator(".request-detail-panel").getByRole("heading", { name: "Kompakt Misafir 1" })).toBeVisible();
-  await compactPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  const reservationWorkspace = compactPage.getByRole("dialog");
+  await expect(reservationWorkspace.getByRole("heading", { name: "Oda 101 · Balkonlu Standart Oda", exact: true })).toBeVisible();
+  await expect(reservationWorkspace.getByRole("region", { name: "Oda ve Konaklama", exact: true })).toBeFocused();
+  await reservationWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  await expect(compactPage.getByRole("heading", { name: "Ana Ekran", exact: true })).toBeVisible();
 
   const aiOnlyPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   await aiOnlyPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
