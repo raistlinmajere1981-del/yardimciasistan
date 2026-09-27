@@ -656,6 +656,8 @@ export interface SaveCustomerInput {
 export interface CreateStayFromReservationInput {
   reservationId: string;
   roomId?: string;
+  /** Defaults to planned for legacy callers; direct room entry requests checked_in. */
+  status?: "planned" | "checked_in";
 }
 
 export interface AssignCustomerRoomInput {

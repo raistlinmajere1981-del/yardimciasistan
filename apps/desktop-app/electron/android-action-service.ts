@@ -19,7 +19,10 @@ import type {
 import { insertDatabaseEvent } from "./database/event-store.js";
 import { markPreparedWhatsAppMessagesSentInTransaction } from "./database/prepared-message-store.js";
 import { mutateMenuStockInTransaction as mutateStoredMenuStock } from "./database/menu-stock-store.js";
-import { hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay } from "./database/customer-room-stay-store.js";
+import {
+  findActiveCustomerRoomStay as findStoredActiveCustomerRoomStay,
+  hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay
+} from "./database/customer-room-stay-store.js";
 import { findConflictingRoomReservation as findStoredConflictingRoomReservation } from "./database/reservation-store.js";
 import { findActiveOrderForTables } from "./database/table-order-store.js";
 import {
@@ -562,6 +565,13 @@ export function applyAndroidCustomerRoomAssignment(
   if (!customer || !room || Number(room.is_active ?? 0) !== 1) {
     return { ok: false, message: "Müşteri veya aktif oda masaüstü kayıtlarında bulunamadı." };
   }
+  const activeCustomerStay = findStoredActiveCustomerRoomStay(db, customerId);
+  if (activeCustomerStay) {
+    const assignedRoom = activeCustomerStay.roomNumber
+      ? `Oda ${activeCustomerStay.roomNumber}`
+      : activeCustomerStay.roomName || "başka bir oda";
+    return { ok: false, message: `Müşteri zaten ${assignedRoom} için aktif. Önce mevcut giriş veya planı kapatın.` };
+  }
   if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
     return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
   }
@@ -651,6 +661,15 @@ export function applyAndroidCustomerRoomStayStatus(
   };
   if (!(allowedTransitions[previousStatus] ?? []).includes(status)) {
     return { ok: false, message: "Bu konaklama kaydı seçilen duruma geçirilemez." };
+  }
+  if (["planned", "checked_in"].includes(status)) {
+    const activeCustomerStay = findStoredActiveCustomerRoomStay(db, String(stay.customer_id ?? ""), stayId);
+    if (activeCustomerStay) {
+      const assignedRoom = activeCustomerStay.roomNumber
+        ? `Oda ${activeCustomerStay.roomNumber}`
+        : activeCustomerStay.roomName || "başka bir oda";
+      return { ok: false, message: `Müşteri zaten ${assignedRoom} için aktif. Önce mevcut giriş veya planı kapatın.` };
+    }
   }
   if (
     ["planned", "checked_in"].includes(status)

@@ -67,6 +67,47 @@ function mapCustomerRoomStayRow(row: Record<string, unknown>): DesktopCustomerRo
   };
 }
 
+export interface ActiveCustomerRoomStayReference {
+  id: string;
+  roomId: string;
+  roomName: string;
+  roomNumber: string;
+  status: string;
+}
+
+export function findActiveCustomerRoomStay(
+  db: DatabaseSync,
+  customerId: string,
+  excludedStayId = ""
+): ActiveCustomerRoomStayReference | null {
+  if (!customerId) return null;
+  const row = db.prepare(`
+      SELECT
+        customer_room_stays.id,
+        customer_room_stays.room_id,
+        customer_room_stays.status,
+        rooms.name AS room_name,
+        rooms.number AS room_number
+      FROM customer_room_stays
+      JOIN rooms ON rooms.id = customer_room_stays.room_id
+      WHERE customer_room_stays.customer_id = ?
+        AND customer_room_stays.id != ?
+        AND customer_room_stays.status IN ('planned', 'checked_in')
+        AND customer_room_stays.deleted_at = ''
+      ORDER BY CASE customer_room_stays.status WHEN 'checked_in' THEN 0 ELSE 1 END,
+        customer_room_stays.created_at DESC
+      LIMIT 1
+    `).get(customerId, excludedStayId) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return {
+    id: String(row.id ?? ""),
+    roomId: String(row.room_id ?? ""),
+    roomName: String(row.room_name ?? ""),
+    roomNumber: String(row.room_number ?? ""),
+    status: String(row.status ?? "")
+  };
+}
+
 export function hasOverlappingCustomerRoomStay(
   db: DatabaseSync,
   roomId: string,
