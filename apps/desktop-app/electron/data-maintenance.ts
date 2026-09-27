@@ -55,6 +55,16 @@ export type DesktopDataMaintenanceResult =
       cancelled?: boolean;
     };
 
+export interface DataMaintenanceRemoteResetResult {
+  ok: boolean;
+  message: string;
+  skipped?: boolean;
+}
+
+export interface DataMaintenanceIpcOptions {
+  resetConnectedWebRuntime?: () => Promise<DataMaintenanceRemoteResetResult>;
+}
+
 type PendingDataMaintenance =
   | { kind: "restore"; createdAt: string }
   | { kind: "reset"; createdAt: string };
@@ -725,13 +735,17 @@ async function prepareRestore(userDataPath: string, backupId: string, confirm: (
   }
 }
 
-async function prepareReset(userDataPath: string, confirm: (request: DataMaintenanceConfirmation) => Promise<boolean>): Promise<DesktopDataMaintenanceResult> {
+async function prepareReset(
+  userDataPath: string,
+  confirm: (request: DataMaintenanceConfirmation) => Promise<boolean>,
+  options: DataMaintenanceIpcOptions
+): Promise<DesktopDataMaintenanceResult> {
   const paths = resolvePaths(userDataPath);
   const confirmation = await confirm({
-    title: "Yerel Verileri Sıfırla",
-    description: "Bu bilgisayardaki Yardımcı Asistan verileri sıfırlanacak.",
-    details: "İşletme kayıtları, ayarlar ve uygulama şifresi kaldırılır. Projedeki backup klasörü korunur ve işlemden önce otomatik güvenlik yedeği alınır. Uygulama yeniden başladığında başlangıç verileri yeniden oluşturulur.",
-    confirmLabel: "Verileri Sıfırla"
+    title: "Tüm Verileri Sıfırla",
+    description: "Yardımcı Asistan temiz başlangıç durumuna döndürülecek.",
+    details: "Yerel işletme kayıtları, ayarlar, uygulama şifresi ve kalıcı görseller silinir. Bağlı web modülü varsa eski talepler, senkron kuyruğu, Android çalışma verileri ve yayınlanmış çalışma özeti de temizlenir; böylece aynı web anahtarı tekrar girildiğinde eski kayıtlar geri yüklenmez. Yerel veriler için önce otomatik güvenlik yedeği alınır; ancak henüz masaüstüne alınmamış web talepleri bu yedekte bulunmayabilir.",
+    confirmLabel: "Tüm Verileri Sıfırla"
   });
   if (!confirmation) {
     return { ok: false, cancelled: true, message: "Veri sıfırlama iptal edildi." };
@@ -740,6 +754,20 @@ async function prepareReset(userDataPath: string, confirm: (request: DataMainten
   try {
     const safetyBackup = createSafetyBackup(paths);
     writePendingOperation(paths, { kind: "reset", createdAt: new Date().toISOString() });
+
+    let webResetApplied = false;
+    if (options.resetConnectedWebRuntime) {
+      const remote = await options.resetConnectedWebRuntime();
+      if (!remote.ok) {
+        removeIfExists(paths.markerPath);
+        return {
+          ok: false,
+          message: `Temiz başlangıç başlatılmadı. Bağlı web modülü temizlenemedi: ${remote.message}`
+        };
+      }
+      webResetApplied = !remote.skipped;
+    }
+
     try {
       await session.defaultSession.clearStorageData({ storages: ["localstorage"] });
     } catch (error) {
@@ -757,8 +785,8 @@ async function prepareReset(userDataPath: string, confirm: (request: DataMainten
       restartScheduled: true,
       safetyBackupFolderName: safetyBackup?.folderName,
       message: safetyBackup
-        ? `Mevcut veriler ${safetyBackup.folderName} klasöründe güvenceye alındı; sıfırlama için uygulama yeniden başlatılıyor.`
-        : "Sıfırlama hazırlandı; uygulama yeniden başlatılıyor."
+        ? `Mevcut veriler ${safetyBackup.folderName} klasöründe güvenceye alındı; ${webResetApplied ? "bağlı web çalışma verileri de temizlendi ve " : ""}uygulama temiz başlangıç için yeniden başlatılıyor.`
+        : `${webResetApplied ? "Bağlı web çalışma verileri temizlendi; " : ""}uygulama temiz başlangıç için yeniden başlatılıyor.`
     };
   } catch (error) {
     removeIfExists(paths.markerPath);
@@ -766,7 +794,10 @@ async function prepareReset(userDataPath: string, confirm: (request: DataMainten
   }
 }
 
-export function registerDataMaintenanceIpcHandlers(userDataPath: () => string) {
+export function registerDataMaintenanceIpcHandlers(
+  userDataPath: () => string,
+  options: DataMaintenanceIpcOptions = {}
+) {
   const channels = [
     "dataMaintenance:createBackup",
     "dataMaintenance:listBackups",
@@ -784,5 +815,9 @@ export function registerDataMaintenanceIpcHandlers(userDataPath: () => string) {
   ipcMain.handle("dataMaintenance:openBackupItemDirectory", (_event, backupId: string) => openBackupItemDirectory(userDataPath(), backupId));
   ipcMain.handle("dataMaintenance:deleteBackup", (event, backupId: string) => deleteBackup(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request)));
   ipcMain.handle("dataMaintenance:restoreBackup", (event, backupId: string) => prepareRestore(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request)));
-  ipcMain.handle("dataMaintenance:resetLocalData", (event) => prepareReset(userDataPath(), (request) => requestDataMaintenanceConfirmation(event.sender, request)));
+  ipcMain.handle("dataMaintenance:resetLocalData", (event) => prepareReset(
+    userDataPath(),
+    (request) => requestDataMaintenanceConfirmation(event.sender, request),
+    options
+  ));
 }
