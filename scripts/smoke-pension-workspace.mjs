@@ -105,9 +105,9 @@ try {
   const remainingBeforeCheckout = await page.evaluate(() => window.fixtureState().folios[0].remainingMinor);
   const paymentCallsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);
   await button('Misafir Çıkışı').click();
-  const checkoutConfirm = page.locator('.confirm-dialog');
+  const checkoutConfirm = page.getByRole('alertdialog', { name: 'Misafir çıkışı', exact: true });
   await expect(checkoutConfirm).toContainText('Kalan hesap');
-  await expect(checkoutConfirm).toContainText('Çıkış ödeme yöntemi');
+  await expect(checkoutConfirm.getByRole('group', { name: 'Çıkış ödeme yöntemi', exact: true })).toBeVisible();
   await checkoutConfirm.getByRole('button', { name: 'Kart', exact: true }).click();
   await checkoutConfirm.getByRole('button', { name: 'Çıkış ve Hesabı Kapat', exact: true }).click();
   await expect(operations).toContainText('hesap kapanışı tamamlandı');

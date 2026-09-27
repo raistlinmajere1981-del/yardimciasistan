@@ -50,7 +50,7 @@ try {
   const customerCalls = () => page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'customer'));
   expect(await customerCalls()).toEqual([]);
   await expect(customerSelect).toBeVisible();
-  await chooseSearchSelect(customerPanel, 'Müşteri seç', /Pilot Misafir/);
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   expect(await customerCalls()).toEqual([]);
   await page.evaluate(() => { window.fixtureDelayCustomer = true; });
   await button('Müşteriyi Bağla').evaluate(element => { element.click(); element.click(); });
@@ -84,7 +84,7 @@ try {
   await expect.poll(async () => (await state()).orders[0].items[0].note).toBe('Son not');
   await button('Geçmiş').click(); await button('← Masaya dön').click(); await expect(note).toHaveValue('Son not');
   const unchangedOrder = structuredClone((await state()).orders[0]);
-  await chooseSearchSelect(customerPanel, 'Müşteri seç', /Pilot Misafir/);
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   await button('Müşteriyi Bağla').click();
   await expect(customerPanel.locator('p')).toHaveText('Pilot Misafir');
   expect((await state()).orders[0]).toEqual(unchangedOrder);
@@ -175,7 +175,7 @@ try {
 
   // A delayed customer reply (and repeated dashboard delivery) cannot roll back a newer projection.
   await button('Bahçe 1 masasını aç').click();
-  await chooseSearchSelect(customerPanel, 'Müşteri seç', /Pilot Misafir/);
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   await page.evaluate(() => { window.fixtureDelayCustomer = true; });
   await button('Müşteriyi Bağla').click();
   await expect.poll(() => page.evaluate(() => typeof window.fixtureResolveCustomer)).toBe('function');
@@ -212,7 +212,7 @@ try {
     if (variant === 'tables-only') {
       await expect(surface.locator('.workspace-tabs')).toHaveCount(0);
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([]);
-      await chooseSearchSelect(surface, 'Müşteri seç', /Pilot Misafir/);
+      await chooseSearchSelect(surface, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
       await surface.getByRole('button', { name: 'Müşteriyi Bağla', exact: true }).click();
       await expect(surface.getByRole('region', { name: 'Masa müşterisi' }).locator('p')).toHaveText('Pilot Misafir');
       expect(await variantPage.evaluate(() => window.fixtureState().orders)).toEqual([]);
