@@ -72,7 +72,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
     presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()} closeBlocked={blocked} returnFocusRef={navigation.returnFocusRef}
     footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}>
     <div ref={surface} className="operation-surface" hidden={history} key={draftEpoch}>
-      <OperationPanel title="Oda ve Konaklama" id="room-stay">
+      <OperationPanel title="Oda ve Misafir" id="room-stay">
         <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled} onDirty={value => setDirty("stay", value)} />
         {account.selected?.status === "open" && <RoomAccountDetails key={account.selected.id} folio={account.selected} controller={account} disabled={busy || account.loading} onDirty={value => setDirty("account-details", value)} />}
       </OperationPanel>

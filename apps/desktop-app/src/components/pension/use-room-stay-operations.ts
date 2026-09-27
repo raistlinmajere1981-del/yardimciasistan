@@ -1,5 +1,11 @@
 import { useRef, useState } from "react";
-import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../../electron/database";
+import type {
+  AssignCustomerRoomInput,
+  CreateStayFromReservationInput,
+  DesktopCustomerMutationResult,
+  DesktopDashboardData,
+  DesktopStatusUpdateResult
+} from "../../../electron/database";
 import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
@@ -11,6 +17,7 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
   const [feedback, setFeedback] = useState<{ panel: "stay" | "operations"; message: string; error: boolean } | null>(null);
   const running = useRef(false);
   const begin = useRequestGeneration();
+
   async function mutate(panel: "stay" | "operations", operation: () => Promise<DesktopStatusUpdateResult>, after?: (dashboard: DesktopDashboardData) => Promise<string | undefined>) {
     if (running.current || account.busy) return false;
     running.current = true;
@@ -30,6 +37,30 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
       return false;
     } finally { running.current = false; if (current()) setBusy(false); }
   }
+
+  async function finishNewCheckIn(create: () => Promise<DesktopCustomerMutationResult>) {
+    let stayId = "";
+    return mutate("stay", async () => {
+      const result = await create();
+      if (result.ok) stayId = result.savedId;
+      return result;
+    }, async () => {
+      if (!folioEnabled) return "Misafir girişi tamamlandı.";
+      if (!stayId) return "Misafir girişi tamamlandı.";
+      const financial = await account.mutate(() => window.yardimciDesktop!.openRoomFolio(stayId));
+      return financial?.ok ? "Misafir girişi tamamlandı · Oda hesabı açıldı."
+        : "Misafir girişi tamamlandı; hesap açılamadı. Misafir Hesabı panelinde Hesabı Aç ile yeniden deneyin.";
+    });
+  }
+
+  async function checkInCustomer(input: Omit<AssignCustomerRoomInput, "status">) {
+    return finishNewCheckIn(() => window.yardimciDesktop!.assignCustomerRoom({ ...input, status: "checked_in" }));
+  }
+
+  async function checkInReservation(input: CreateStayFromReservationInput) {
+    return finishNewCheckIn(() => window.yardimciDesktop!.createStayFromReservation({ ...input, status: "checked_in" }));
+  }
+
   async function checkIn(stayId: string) {
     if (!model.canCheckIn(stayId)) return false;
     return mutate("operations", () => window.yardimciDesktop!.checkInStay(stayId), async () => {
@@ -39,6 +70,7 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
         : "Misafir girişi tamamlandı; hesap açılamadı. Misafir Hesabı panelinde Hesabı Aç ile yeniden deneyin.";
     });
   }
+
   async function checkout(stayId: string, paymentMethod: RoomFolioPaymentMethod = "cash") {
     if (!model.active.some(stay => stay.id === stayId && stay.status === "checked_in")) return false;
     const openAccount = folioEnabled ? model.operations?.accounts.find(item => item.stayId === stayId) : undefined;
@@ -55,6 +87,7 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
         ? "Misafir çıkışı ve hesap kapanışı tamamlandı. Oda temizlik bekliyor."
         : "Misafir çıkışı tamamlandı. Oda temizlik bekliyor.");
   }
-  return { busy, feedback, mutate, checkIn, checkout };
+
+  return { busy, feedback, mutate, checkInCustomer, checkInReservation, checkIn, checkout };
 }
 export type RoomStayOperations = ReturnType<typeof useRoomStayOperations>;
