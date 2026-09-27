@@ -1336,8 +1336,8 @@ try {
   await reservationWorkspace.getByRole("group", { name: "Durum", exact: true })
     .getByRole("button", { name: "Onay bekleyen", exact: true }).click();
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Onayla" }).first().click();
-  await expect(conversionPage.getByText("Rezervasyon durumu güncellendi.")).toBeVisible();
+  await reservationWorkspace.getByRole("button", { name: "Onayla", exact: true }).click();
+  await expect(conversionPage.getByText("Rezervasyon durumu güncellendi.", { exact: true })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Filtreyi Temizle" }).click();
   await expect(conversionPage.getByRole("button", { name: "WhatsApp'a Hazırla", exact: true }).first()).toBeVisible();
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();

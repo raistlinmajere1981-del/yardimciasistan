@@ -229,7 +229,12 @@ try {
 
   for (const [width, height, scheme, density, scale] of [[1366, 768, 'light', 'compact', 1], [1024, 768, 'dark', 'comfortable', 1.1], [600, 800, 'light', 'comfortable', 1]]) {
     await page.setViewportSize({ width, height });
-    await page.evaluate(({ scheme, density, scale }) => { document.documentElement.dataset.colorScheme = scheme; document.documentElement.dataset.density = density; document.documentElement.style.setProperty('--ui-scale', String(scale)); document.documentElement.style.zoom = String(scale); }, { scheme, density, scale });
+    await page.evaluate(({ scheme, density, scale }) => {
+      document.documentElement.dataset.colorScheme = scheme;
+      document.documentElement.dataset.density = density;
+      document.documentElement.style.setProperty('--ui-scale', String(scale));
+      document.documentElement.style.zoom = "";
+    }, { scheme, density, scale });
     const bounds = await dialog.boundingBox(); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width + 2); expect(bounds.y + bounds.height).toBeLessThanOrEqual(height + 2);
     expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 
