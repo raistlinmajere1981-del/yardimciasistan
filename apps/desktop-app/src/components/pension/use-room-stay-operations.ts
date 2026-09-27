@@ -1,0 +1,53 @@
+import { useRef, useState } from "react";
+import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../../electron/database";
+import { useRequestGeneration } from "../workspace/use-request-generation";
+import type { RoomWorkspaceModel } from "./room-workspace-model";
+import type { RoomFolioController } from "./use-room-folio-controller";
+import { minorMoney } from "./folio-format";
+
+export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFolioController, folioEnabled: boolean,
+  onDashboard: (data: DesktopDashboardData) => void) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<{ panel: "stay" | "operations"; message: string; error: boolean } | null>(null);
+  const running = useRef(false);
+  const begin = useRequestGeneration();
+  async function mutate(panel: "stay" | "operations", operation: () => Promise<DesktopStatusUpdateResult>, after?: (dashboard: DesktopDashboardData) => Promise<string | undefined>) {
+    if (running.current || account.busy) return false;
+    running.current = true;
+    const current = begin();
+    setBusy(true); setFeedback(null);
+    try {
+      const result = await operation();
+      if (!current()) return false;
+      if (!result.ok) { setFeedback({ panel, error: true, message: result.message }); return false; }
+      onDashboard(result.dashboardData);
+      const detail = await after?.(result.dashboardData);
+      if (!current()) return false;
+      setFeedback({ panel, error: false, message: detail || result.message });
+      return true;
+    } catch {
+      if (current()) setFeedback({ panel, error: true, message: "İşlem sonucu doğrulanamadı. Yenilemeden yeniden göndermeyin." });
+      return false;
+    } finally { running.current = false; if (current()) setBusy(false); }
+  }
+  async function checkIn(stayId: string) {
+    if (!model.canCheckIn(stayId)) return false;
+    return mutate("operations", () => window.yardimciDesktop!.checkInStay(stayId), async () => {
+      if (!folioEnabled) return "Misafir girişi tamamlandı.";
+      const financial = await account.mutate(() => window.yardimciDesktop!.openRoomFolio(stayId));
+      return financial?.ok ? "Misafir girişi tamamlandı · Oda hesabı açıldı."
+        : "Misafir girişi tamamlandı; hesap açılamadı. Misafir Hesabı panelinde Hesabı Aç ile yeniden deneyin.";
+    });
+  }
+  async function checkout(stayId: string) {
+    if (!model.active.some(stay => stay.id === stayId && stay.status === "checked_in")) return false;
+    return mutate("operations", () => window.yardimciDesktop!.checkoutStay(stayId), async dashboard => {
+      if (!folioEnabled) return "Misafir çıkışı tamamlandı. Temizlik tamamlandığında odayı Hazır olarak işaretleyin.";
+      const debt = dashboard.roomOperations?.find(item => item.roomId === model.room?.id)?.accounts.find(item => item.stayId === stayId)?.remainingMinor ?? 0;
+      return debt > 0 ? `Çıkış tamamlandı · ${minorMoney(debt)} açık hesap. Odanın temizlik durumunu kontrol edin.`
+        : "Misafir çıkışı tamamlandı. Temizlik tamamlandığında odayı Hazır olarak işaretleyin.";
+    });
+  }
+  return { busy, feedback, mutate, checkIn, checkout };
+}
+export type RoomStayOperations = ReturnType<typeof useRoomStayOperations>;

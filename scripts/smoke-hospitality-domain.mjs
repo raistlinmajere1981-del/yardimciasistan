@@ -3,6 +3,7 @@ import Module, { createRequire } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
 import { createTemporaryDesktopDatabase } from './test-helpers/desktop-database.mjs';
 import { createSmokeSetupInput } from './test-helpers/desktop-setup.mjs';
+import { seedSmokeBusinessLayout } from './test-helpers/business-layout.mjs';
 const require = createRequire(import.meta.url);
 const { DesktopRoomFolioService } = require('../apps/desktop-app/dist-electron/room-folio.js');
 const { checkoutHospitalityStay } = require('../apps/desktop-app/dist-electron/hospitality-checkout.js');
@@ -11,8 +12,9 @@ const { database, cleanup } = createTemporaryDesktopDatabase('hospitality-domain
 let db;
 try {
   database.initialize();
-  const setup = database.saveInitialSetup(createSmokeSetupInput({ businessName: 'Hospitality smoke', phone: '+905550003001', whatsapp: '+905550003001', syncSecret: 'hospitality-smoke-secret', servicePreferences: { whatsapp: false, android: true }, initialCounts: { rooms: 12, tables: 0 } }));
+  const setup = database.saveInitialSetup(createSmokeSetupInput({ businessName: 'Hospitality smoke', phone: '+905550003001', whatsapp: '+905550003001', syncSecret: 'hospitality-smoke-secret', servicePreferences: { whatsapp: false, android: true } }));
   assert.equal(setup.ok, true, setup.message);
+  seedSmokeBusinessLayout(database.databasePath, { roomCount: 12 });
   db = new DatabaseSync(database.databasePath);
   db.exec('PRAGMA foreign_keys = ON');
   const rooms = database.getDashboardData().rooms;

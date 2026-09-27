@@ -1,156 +1,87 @@
-import { useMemo, useState } from "react";
-import type { DesktopRoomFolio, DesktopRoomFolioMutationResult, RoomFolioPaymentMethod } from "../../../electron/room-folio";
+import { useState } from "react";
+import type { DesktopRoomFolio } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
-import { MoneyInput } from "../ui/MoneyInput";
-import { minorMoney, minorToInput, parseMoneyToMinor, paymentMethodLabel, formatDateTime, formatDateRange } from "./folio-format";
+import { minorMoney, paymentMethodLabel, formatDateTime, formatDateRange } from "./folio-format";
 import type { RoomFolioController } from "./use-room-folio-controller";
+import { RoomAccountPayment } from "./RoomAccountPayment";
 
-export type AccountFlow = "add-charge" | "add-menu-item" | "payment" | "void-payment" | "account-details" | "close-account";
-export interface AccountOperation { kind: AccountFlow; paymentId?: string }
-
-export function RoomAccount({ controller, menuEnabled, departed, onAction }: {
-  controller: RoomFolioController; menuEnabled: boolean; departed: boolean; onAction: (operation: AccountOperation) => void;
+export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous, disabled, onDirty }: {
+  controller: RoomFolioController; menuEnabled: boolean; currentStayId?: string; ambiguous: boolean; disabled: boolean;
+  onDirty: (key: string, dirty: boolean) => void;
 }) {
-  const folio = controller.selected;
-  if (controller.loading) return <p role="status">Hesap hazırlanıyor…</p>;
-  if (!folio) return <p>Bu oda için kullanılabilir hesap yok. Giriş işlemi Konaklama sekmesinden yapılır.</p>;
+  const current = controller.selected;
+  const previous = controller.folios.filter(item => item.stayId !== currentStayId && item.status === "open"
+    && !controller.data.activeStays.some(stay => stay.id === item.stayId && ["planned", "checked_in"].includes(stay.status)));
+  return <>
+    {controller.loading && <p role="status">Hesap hazırlanıyor…</p>}
+    {previous.some(folio => folio.remainingMinor > 0) && <p className="operation-prior-debt">Önceki borç · {minorMoney(previous.reduce((total, folio) => total + Math.max(0, folio.remainingMinor), 0))} · Aşağıda ayrı hesaplarda</p>}
+    <section aria-label="Mevcut konaklama hesabı" className="form-stack">
+      <h4>Mevcut konaklama</h4>
+      {current ? <AccountRecord key={current.id} folio={current} controller={controller} menuEnabled={menuEnabled} disabled={disabled} onDirty={dirty => onDirty(current.id, dirty)} />
+        : <><p>{ambiguous ? "Birden fazla girişli konaklama var; mevcut hesap belirlenemedi. Konaklama kayıtlarını kontrol edin." : currentStayId ? "Bu konaklama için hesap henüz açılmadı." : "Aktif misafir hesabı yok. Giriş tamamlandığında konaklama hesabı burada görünür."}</p>
+          {currentStayId && <ActionButton disabled={disabled} onClick={() => void controller.mutate(() => window.yardimciDesktop!.openRoomFolio(currentStayId))}>Hesabı Aç</ActionButton>}</>}
+    </section>
+    {controller.feedbackScope === "account" && controller.message && <p role={controller.error ? "alert" : "status"}>{controller.message}</p>}
+    {controller.error && <ActionButton variant="secondary" disabled={controller.busy} onClick={() => void controller.refresh()}>Hesabı Yenile</ActionButton>}
+    <section className="operation-section form-stack" aria-label="Önceki hesaplar">
+      <h4>Önceki hesaplar</h4>
+      {previous.length === 0 ? <p>Önceki konaklamalardan açık hesap yok.</p> : <>
+        <p>Bu tutarlar mevcut konaklama hesabına dahil değildir.</p>
+        {previous.map(folio => <AccountRecord key={folio.id} folio={folio} controller={controller} menuEnabled={menuEnabled} departed disabled={disabled} onDirty={dirty => onDirty(folio.id, dirty)} />)}
+      </>}
+    </section>
+  </>;
+}
+
+function AccountRecord({ folio, controller, menuEnabled, departed = false, disabled, onDirty }: {
+  folio: DesktopRoomFolio; controller: RoomFolioController; menuEnabled: boolean; departed?: boolean;
+  disabled: boolean; onDirty: (dirty: boolean) => void;
+}) {
+  const [confirmation, setConfirmation] = useState<{ paymentId: string } | "close" | null>(null);
+  const [error, setError] = useState("");
   const open = folio.status === "open";
-  return <div className="form-stack">
-    <label className="form-field form-field--long">Oda hesabı<select aria-label="Oda hesabı" disabled={controller.busy} value={folio.id} onChange={event => controller.select(event.target.value)}>
-      {controller.folios.map(item => <option key={item.id} value={item.id}>{item.customerName} · {formatDateRange(item.checkInDate, item.plannedCheckOutDate)} · {item.status === "open" ? "Açık" : "Kapalı"}</option>)}
-    </select></label>
-    <p>{open ? "Açık hesap" : "Kapalı hesap"} · {folio.customerName} · {formatDateRange(folio.checkInDate, folio.plannedCheckOutDate)}</p>
-    <div className="room-folio-totals">
-      <span>Toplam <strong>{minorMoney(folio.chargeTotalMinor)}</strong></span>
-      <span>Tahsil edilen <strong>{minorMoney(folio.paidTotalMinor)}</strong></span>
-      <span className={folio.remainingMinor > 0 ? "is-waiting" : "is-paid"}>Kalan <strong>{minorMoney(folio.remainingMinor)}</strong></span>
-    </div>
-    {open && <div className="action-row">
-      {menuEnabled && <ActionButton variant="secondary" onClick={() => onAction({ kind: "add-menu-item" })}>Ürün/Hizmet Ekle</ActionButton>}
-      <ActionButton variant="secondary" onClick={() => onAction({ kind: "add-charge" })}>Ücret / İndirim Ekle</ActionButton>
-      <ActionButton disabled={folio.remainingMinor <= 0} onClick={() => onAction({ kind: "payment" })}>Ödeme Al</ActionButton>
-      {departed && <ActionButton variant="secondary" onClick={() => onAction({ kind: "close-account" })}>Hesabı Kapat</ActionButton>}
-    </div>}
-    <div className="room-folio-line-list">
-      <article><div><strong>Konaklama · {folio.nights} gece</strong><span>{minorMoney(folio.nightlyPriceMinor)} / gece · {folio.guestCount} kişi</span></div>
-        <b>{minorMoney(folio.lodgingTotalMinor)}</b>
-        {open && <ActionButton variant="secondary" onClick={() => onAction({ kind: "account-details" })}>Hesap Bilgilerini Düzenle</ActionButton>}
-      </article>
+  return <article className="room-account-record form-stack" tabIndex={-1} data-folio-id={folio.id} data-stay-id={folio.stayId}>
+    <div><strong>{folio.customerName}</strong><p>{departed ? "Çıkışı yapılmış konaklama" : open ? "Açık hesap" : "Kapalı hesap"} · {formatDateRange(folio.checkInDate, folio.plannedCheckOutDate)}</p></div>
+    <dl className="operation-facts">
+      <div><dt>Konaklama · {folio.nights} gece</dt><dd>{minorMoney(folio.lodgingTotalMinor)}</dd></div>
+      <div><dt>Ekstralar / indirimler</dt><dd>{minorMoney(folio.chargeTotalMinor - folio.lodgingTotalMinor)}</dd></div>
+      <div><dt>Toplam</dt><dd>{minorMoney(folio.chargeTotalMinor)}</dd></div>
+      <div><dt>Ödenen</dt><dd>{minorMoney(folio.paidTotalMinor)}</dd></div>
+      <div className="operation-balance"><dt>Kalan</dt><dd>{minorMoney(folio.remainingMinor)}</dd></div>
+    </dl>
+    {open && <RoomAccountPayment folio={folio} controller={controller} disabled={disabled} onDirty={onDirty} />}
+    {folio.items.length > 0 && <div className="room-folio-line-list">
       {folio.items.map(item => <article key={item.id}>
         <div><strong>{item.label}</strong><span>{item.kind === "menu" ? `${item.quantity} adet · ${minorMoney(item.unitPriceMinor)}` : item.kind === "discount" ? "İndirim" : "Ek ücret"}</span></div>
         <b>{minorMoney(item.lineTotalMinor)}</b>
         {open && <div className="action-row">
           {item.kind === "menu" && menuEnabled && <>
-            <ActionButton variant="secondary" disabled={controller.busy} aria-label={`${item.label} miktarını azalt`} onClick={() => void controller.mutate(() => item.quantity <= 1
-              ? window.yardimciDesktop!.removeRoomFolioItem(item.id)
-              : window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: item.id, quantity: item.quantity - 1 }))}>−</ActionButton>
-            <ActionButton variant="secondary" disabled={controller.busy} aria-label={`${item.label} miktarını artır`} onClick={() => void controller.mutate(() => window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: item.id, quantity: item.quantity + 1 }))}>+</ActionButton>
+            <ActionButton variant="secondary" disabled={disabled} aria-label={`${item.label} miktarını azalt`} onClick={() => void controller.mutate(() => item.quantity <= 1
+              ? window.yardimciDesktop!.removeRoomFolioItem(item.id) : window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: item.id, quantity: item.quantity - 1 }))}>−</ActionButton>
+            <ActionButton variant="secondary" disabled={disabled} aria-label={`${item.label} miktarını artır`} onClick={() => void controller.mutate(() => window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: item.id, quantity: item.quantity + 1 }))}>+</ActionButton>
           </>}
-          <ActionButton variant="danger" disabled={controller.busy} aria-label={`${item.label} kalemini çıkar`} onClick={() => void controller.mutate(() => window.yardimciDesktop!.removeRoomFolioItem(item.id))}>Çıkar</ActionButton>
+          <ActionButton variant="danger" disabled={disabled} aria-label={`${item.label} kalemini çıkar`} onClick={() => void controller.mutate(() => window.yardimciDesktop!.removeRoomFolioItem(item.id))}>Çıkar</ActionButton>
         </div>}
       </article>)}
-    </div>
-    <div className="room-folio-payment-history"><h3>Tahsilatlar</h3>
+    </div>}
+    <div className="room-folio-payment-history"><h4>Tahsilatlar</h4>
       {folio.payments.length === 0 && <p>Henüz tahsilat yok.</p>}
       {folio.payments.map(payment => <div key={payment.id}>
         <span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.origin === "reservation" && " · Kapora"}</span>
         <b>{minorMoney(payment.amountMinor)}</b>
-        {open && payment.origin === "direct" && <ActionButton variant="danger" onClick={() => onAction({ kind: "void-payment", paymentId: payment.id })}>Tahsilatı Geri Al</ActionButton>}
+        {open && payment.origin === "direct" && <ActionButton variant="danger" disabled={disabled} onClick={() => { setError(""); setConfirmation({ paymentId: payment.id }); }}>Tahsilatı Geri Al</ActionButton>}
       </div>)}
     </div>
-    {departed && <p>Misafir çıkışı tamamlandı. Tahsilat ve hesabı kapatma, odanın temizlik durumunu değiştirmez.</p>}
-  </div>;
-}
-
-export const accountFlowTitle: Record<AccountFlow, string> = {
-  "add-charge": "Ücret / İndirim Ekle", "add-menu-item": "Ürün/Hizmet Ekle", payment: "Ödeme Al",
-  "void-payment": "Tahsilatı Geri Al", "account-details": "Hesap Bilgilerini Düzenle", "close-account": "Hesabı Kapat"
-};
-
-// Bounded operation body. It is mounted inside the existing Room Workspace modal.
-export function RoomAccountOperation({ operation, folio, controller, onDone }: {
-  operation: AccountOperation; folio: DesktopRoomFolio; controller: RoomFolioController; onDone: () => void;
-}) {
-  const [amount, setAmount] = useState(operation.kind === "payment" ? minorToInput(folio.remainingMinor) : "");
-  const [method, setMethod] = useState<RoomFolioPaymentMethod>("cash");
-  const [kind, setKind] = useState<"manual_charge" | "discount">("manual_charge");
-  const [label, setLabel] = useState("");
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [guestCount, setGuestCount] = useState(folio.guestCount);
-  const [start, setStart] = useState(folio.checkInDate);
-  const [end, setEnd] = useState(folio.plannedCheckOutDate);
-  const [nightly, setNightly] = useState(minorToInput(folio.nightlyPriceMinor));
-  const [manual, setManual] = useState(folio.lodgingManualOverride);
-  const [total, setTotal] = useState(minorToInput(folio.lodgingTotalMinor));
-  const [error, setError] = useState("");
-  const filteredMenu = useMemo(() => controller.data.menuItems.filter(item =>
-    (category === "all" || item.categoryId === category) && `${item.name} ${item.description}`.toLocaleLowerCase("tr-TR").includes(search.trim().toLocaleLowerCase("tr-TR"))
-  ), [category, controller.data.menuItems, search]);
-  async function run(call: () => Promise<DesktopRoomFolioMutationResult>) {
-    const result = await controller.mutate(call);
-    if (result?.ok) onDone();
-  }
-  const bridge = window.yardimciDesktop!;
-  async function submit() {
-    setError("");
-    const value = parseMoneyToMinor(amount);
-    if (operation.kind === "payment" || operation.kind === "add-charge") {
-      if (value === null || value <= 0) { setError("Geçerli bir tutar girin."); return; }
-      if (operation.kind === "payment") await run(() => bridge.addRoomFolioPayment({ folioId: folio.id, amountMinor: value, paymentMethod: method }));
-      else await run(() => bridge.addRoomFolioManualItem({ folioId: folio.id, kind, label: label.trim(), amountMinor: value }));
-    } else if (operation.kind === "void-payment" && operation.paymentId) {
-      await run(() => bridge.voidRoomFolioPayment(operation.paymentId!));
-    } else if (operation.kind === "close-account") {
-      if (folio.remainingMinor > 0) { setError("Açık borç varken hesap kapatılamaz. Önce ödeme alın."); return; }
-      await run(() => bridge.checkoutRoomFolio({ folioId: folio.id }));
-    } else if (operation.kind === "account-details") {
-      const nightlyMinor = parseMoneyToMinor(nightly);
-      const totalMinor = parseMoneyToMinor(total);
-      if (nightlyMinor === null || nightlyMinor < 0 || (manual && totalMinor === null)) { setError("Konaklama tutarlarını kontrol edin."); return; }
-      await run(() => bridge.updateRoomFolioDetails({ folioId: folio.id, guestCount, checkInDate: start, plannedCheckOutDate: end,
-        nightlyPriceMinor: nightlyMinor, lodgingManualOverride: manual, lodgingTotalMinor: manual ? totalMinor ?? undefined : undefined }));
-    }
-  }
-  return <form className="form-stack" onSubmit={event => { event.preventDefault(); void submit(); }}>
-    <fieldset className="form-stack" disabled={controller.busy}>
-      {operation.kind === "add-menu-item" ? <>
-        <label className="form-field form-field--long">Ürün ara<input value={search} onChange={event => setSearch(event.target.value)} /></label>
-        <label className="form-field form-field--medium">Kategori<select aria-label="Kategori" value={category} onChange={event => setCategory(event.target.value)}><option value="all">Tümü</option>
-          {controller.data.menuCategories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select></label>
-        <div className="room-folio-menu-list">{filteredMenu.map(item => <article key={item.id}>
-          <div><strong>{item.name}</strong><span>{item.categoryName}</span></div><b>{minorMoney(item.priceMinor)}</b>
-          <ActionButton disabled={item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity} onClick={() => {
-            const existing = folio.items.find(line => line.kind === "menu" && line.menuItemId === item.id && !line.note.trim());
-            void run(() => existing ? bridge.updateRoomFolioItemQuantity({ itemId: existing.id, quantity: existing.quantity + 1 })
-              : bridge.addRoomFolioMenuItem({ folioId: folio.id, menuItemId: item.id, quantity: 1 }));
-          }}>Ekle</ActionButton>
-        </article>)}</div>
-      </> : operation.kind === "account-details" ? <>
-        <div className="form-row">
-          <label className="form-field form-field--xs">Kişi sayısı<input type="number" required min={1} max={50} value={guestCount} onChange={event => setGuestCount(Number(event.target.value))} /></label>
-          <label className="form-field form-field--short">Giriş tarihi<input lang="tr-TR" type="date" required value={start} onChange={event => setStart(event.target.value)} /></label>
-          <label className="form-field form-field--short">Çıkış tarihi<input lang="tr-TR" type="date" min={start} value={end} onChange={event => setEnd(event.target.value)} /></label>
-          <label className="form-field form-field--short">Gecelik fiyat<MoneyInput required value={nightly} onChange={setNightly} /></label>
-        </div>
-        <p>Bu hesaba ait fiyat değişir. Odanın varsayılan fiyatı Ayarlar → Oda Yönetimi bölümündedir.</p>
-        <label className="form-check"><input type="checkbox" checked={manual} onChange={event => setManual(event.target.checked)} />Konaklama toplamını elle belirle</label>
-        {manual && <label className="form-field form-field--short">Konaklama toplamı<MoneyInput value={total} onChange={setTotal} /></label>}
-      </> : operation.kind === "void-payment" ? <p>Seçilen tahsilat oda hesabından ve kasa kayıtlarından geri alınacak.</p>
-        : operation.kind === "close-account" ? <p>{folio.remainingMinor > 0 ? `${minorMoney(folio.remainingMinor)} açık borç var. Önce ödeme alın.` : "Hesap kapatılacak. Misafirin çıkış tarihi ve odanın temizlik durumu değişmeyecek."}</p>
-        : <>
-          {operation.kind === "add-charge" && <>
-            <label className="form-field form-field--medium">Kalem türü<select aria-label="Kalem türü" value={kind} onChange={event => setKind(event.target.value as typeof kind)}><option value="manual_charge">Ek ücret</option><option value="discount">İndirim</option></select></label>
-            <label className="form-field form-field--long">Açıklama<input required value={label} onChange={event => setLabel(event.target.value)} /></label>
-          </>}
-          <label className="form-field form-field--short">{operation.kind === "payment" ? "Ödeme tutarı" : "Tutar"}<MoneyInput required value={amount} onChange={setAmount} /></label>
-          {operation.kind === "payment" && <label className="form-field form-field--medium">Ödeme yöntemi<select aria-label="Ödeme yöntemi" value={method} onChange={event => setMethod(event.target.value as RoomFolioPaymentMethod)}>
-            <option value="cash">Nakit</option><option value="card">Kart</option><option value="bank">Banka</option><option value="other">Diğer</option>
-          </select></label>}
-        </>}
-      {operation.kind !== "add-menu-item" && <ActionButton type="submit">{operation.kind === "payment" ? "Ödemeyi Kaydet" : operation.kind === "close-account" ? "Hesabı Kapat" : operation.kind === "void-payment" ? "Tahsilatı Geri Al" : "Kaydet"}</ActionButton>}
-    </fieldset>
-    {error && <p role="alert">{error}</p>}
-  </form>;
+    {departed && open && <ActionButton variant="secondary" disabled={disabled} onClick={() => { setError(""); setConfirmation("close"); }}>Hesabı Kapat</ActionButton>}
+    {confirmation && <div className="operation-confirmation form-stack">
+      <p>{confirmation === "close" ? "Hesap kapatılacak. Misafirin çıkış tarihi ve odanın temizlik durumu değişmeyecek." : "Seçilen tahsilat oda hesabından ve kasa kayıtlarından geri alınacak."}</p>
+      <ActionButton variant="danger" disabled={disabled} onClick={() => {
+        if (confirmation === "close" && folio.remainingMinor > 0) { setError("Açık borç varken hesap kapatılamaz. Önce ödeme alın."); return; }
+        void controller.mutate(() => confirmation === "close" ? window.yardimciDesktop!.checkoutRoomFolio({ folioId: folio.id })
+          : window.yardimciDesktop!.voidRoomFolioPayment(confirmation.paymentId)).then(result => { if (result?.ok) setConfirmation(null); });
+      }}>{confirmation === "close" ? "Hesabı Kapatmayı Onayla" : "Tahsilatı Geri Almayı Onayla"}</ActionButton>
+      <ActionButton variant="secondary" disabled={disabled} onClick={() => { setConfirmation(null); setError(""); }}>Vazgeç</ActionButton>
+      {error && <p role="alert">{error}</p>}
+    </div>}
+  </article>;
 }

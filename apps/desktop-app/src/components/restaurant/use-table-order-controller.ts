@@ -5,7 +5,7 @@ import { useRequestGeneration } from "../workspace/use-request-generation";
 
 /** Entity lifetime only. The page owns the order projection; SQLite owns persisted orders. */
 export function useTableOrderController(tableId: string, enabled: boolean,
-  onOrder: (order: DesktopTableOrder) => void, onDashboard: (data: DesktopDashboardData) => void, revision: number, expectedOrderId?: string) {
+  onOrder: (order: DesktopTableOrder) => void, onDashboard: (data: DesktopDashboardData) => void, revision: number, expectedOrderId?: string, customersEnabled = false) {
   const [order, setOrder] = useState<DesktopTableOrder | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -21,6 +21,10 @@ export function useTableOrderController(tableId: string, enabled: boolean,
   const dirtyIds = useRef(new Set<string>());
   const notePromise = useRef<Promise<boolean> | null>(null);
   const beginRead = useRequestGeneration();
+  const latestRevision = useRef(revision);
+  latestRevision.current = revision;
+  const customerCapability = useRef(customersEnabled);
+  customerCapability.current = customersEnabled;
   const callbacks = useRef({ onOrder, onDashboard });
   callbacks.current = { onOrder, onDashboard };
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -110,6 +114,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
     finally { running.current = false; if (alive.current) setBusy(false); }
   }
   function mutate(operation: () => Promise<DesktopTableOrderResult>) {
+    if (!enabled) return Promise.resolve(false);
     return run(async () => {
       const result = await operation();
       if (!alive.current) return false;
@@ -127,6 +132,21 @@ export function useTableOrderController(tableId: string, enabled: boolean,
   };
   const active = order && ["open", "preparing", "served", "payment"].includes(order.status) ? order : null;
   return { order, active, notes, dirty, busy, loading, loaded, message, error, editNote, flushNotes, run, feedback,
+    assignTableCustomer: (customerId: string) => {
+      if (!customerCapability.current) return Promise.resolve(false);
+      return run(async isCurrent => {
+        if (!customerCapability.current) return false;
+        const result = await bridge().assignTableCustomer({ tableId, customerId });
+        if (!isCurrent() || !customerCapability.current) return false;
+        feedback(result.message, !result.ok);
+        if (!result.ok) return false;
+        if (result.dashboardData.revision > latestRevision.current) {
+          latestRevision.current = result.dashboardData.revision;
+          callbacks.current.onDashboard(result.dashboardData);
+        }
+        return true;
+      });
+    },
     startTableOrder: () => mutate(() => startTableOrder(tableId)),
     addItem: (id: string) => mutate(() => bridge().addTableOrderItem(orderRef.current!.id, id, 1, "")),
     quantity: (id: string, value: number) => mutate(() => bridge().updateTableOrderItemQuantity(id, value)),

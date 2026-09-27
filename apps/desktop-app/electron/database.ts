@@ -93,6 +93,7 @@ import type {
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
+  AssignTableCustomerInput,
   DesktopTableOrder,
   AddTableOrderItemInput,
   UpdateTableOrderItemQuantityInput,
@@ -169,6 +170,7 @@ export type {
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
+  AssignTableCustomerInput,
   TableOrderStatus,
   DesktopTableOrder,
   AddTableOrderItemInput,
@@ -808,6 +810,12 @@ export class DesktopDatabase {
     if (!result.ok) {
       return result;
     }
+    return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  assignTableCustomer(input: AssignTableCustomerInput): DesktopStatusUpdateResult {
+    const result = assignStoredTableCustomer(this.db, input);
+    if (!result.ok) return result;
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
@@ -2241,6 +2249,7 @@ import {
 import {
   getTables as getStoredTables,
   updateTableStatus as updateStoredTableStatus,
+  assignTableCustomer as assignStoredTableCustomer,
 } from "./database/table-store.js";
 
 import {

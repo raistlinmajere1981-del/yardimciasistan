@@ -1,0 +1,68 @@
+/* Room and Table share the shell, panel geometry and interaction targets. */
+.operations-workspace.workspace-frame--centered {
+  width: calc(100vw / var(--ui-scale) - var(--space-8));
+  height: calc(100dvh / var(--ui-scale) - var(--space-8));
+}
+.operations-workspace :is(button, input, select, summary, .form-check) {
+  min-height: var(--control-height-lg);
+}
+.operations-workspace :is(.icon-button, .restaurant-quantity-control button) { min-width: var(--control-height-lg); }
+.operation-surface {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.12fr);
+  min-height: 0;
+  overflow: hidden;
+}
+.operation-surface[hidden] { display: none; }
+.operation-surface--table { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.9fr); }
+.operation-surface--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.operation-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.operation-panel + .operation-panel, .operation-surface--table > .operation-panel { border-inline-start: 1px solid var(--color-border); }
+.operation-panel__heading { padding: var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-bg-surface); }
+.operation-panel__heading h3 { margin: 0; font-size: var(--text-md); }
+.operation-panel__body { padding: var(--space-4); overflow: auto; overscroll-behavior: contain; min-height: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.operation-panel :is(h4, p) { margin: 0; }
+.operation-panel h4 { font-size: var(--text-sm); }
+.operation-panel p { color: var(--color-text-muted); font-size: var(--text-sm); line-height: var(--leading-normal); }
+.operation-panel [role="alert"] { color: var(--color-danger); }
+.operation-panel :is(input, select, textarea, fieldset, .form-field) { min-width: 0; max-width: 100%; }
+.operation-panel .form-field { width: 100%; }
+.operation-panel .form-field :is(input, select, textarea) { width: 100%; max-width: 100%; }
+.operation-panel textarea { min-height: calc(var(--control-height-lg) + var(--space-4)); }
+.operation-panel fieldset { padding: 0; border: 0; margin: 0; }
+.operation-panel .form-stack { gap: var(--space-3); }
+.operation-panel .form-field { gap: var(--space-1); }
+.operation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.operation-facts { display: grid; gap: var(--space-2); margin: 0; font-size: var(--text-sm); }
+.operation-facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+.operation-facts dt { color: var(--color-text-muted); }
+.operation-facts dd { margin: 0; text-align: end; font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.operation-facts .operation-balance { padding: var(--space-3); background: var(--color-accent-soft); border-radius: var(--radius-control); }
+.operation-balance dd { font-size: var(--text-xl); color: var(--color-accent); }
+.operation-section { border-top: 1px solid var(--color-border); padding-top: var(--space-4); display: grid; gap: var(--space-2); }
+.operation-section:first-child { border-top: 0; padding-top: 0; }
+.operation-confirmation { padding: var(--space-3); border: 1px solid var(--color-warning-border); border-radius: var(--radius-control); background: var(--color-warning-soft); }
+.operation-panel .operation-prior-debt { padding: var(--space-2) var(--space-3); color: var(--color-warning); background: var(--color-warning-soft); border-radius: var(--radius-control); }
+.operation-empty { padding-block: var(--space-2); }
+.operation-history { min-height: 0; overflow: auto; padding: var(--space-4); }
+.room-account-record + .room-account-record { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
+.operations-workspace .restaurant-order-ticket-panel { display: flex; flex-direction: column; }
+.operations-workspace .restaurant-order-line-list { flex: 1; }
+.operations-workspace .restaurant-order-line { grid-template-columns: minmax(0, 1fr) auto; }
+.operations-workspace .restaurant-order-line__remove { grid-column: 2; grid-row: 2; }
+.operations-workspace .restaurant-quantity-control { grid-column: 1; grid-template-columns: var(--control-height-lg) minmax(var(--space-6), auto) var(--control-height-lg); justify-self: start; }
+.restaurant-ticket-total { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.restaurant-start { padding: var(--space-3); background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); }
+.restaurant-start :is(h4, p) { margin: 0; }
+@media (max-width: 1100px) {
+  .operation-surface { overflow: auto; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; }
+  .operation-panel { display: block; overflow: visible; }
+  .operation-panel__body { overflow: visible; }
+  .operation-panel + .operation-panel, .operation-surface--table > .operation-panel { border-inline-start: 0; border-top: 1px solid var(--color-border); }
+  .operations-workspace .restaurant-order-product-list { max-height: 36dvh; }
+  .operations-workspace .restaurant-order-line-list { overflow: visible; flex: none; }
+  .operations-workspace .restaurant-order-menu-panel { border-inline-end: 0; }
+}
+@media (max-width: 480px) {
+  .operation-fields { grid-template-columns: minmax(0, 1fr); }
+}

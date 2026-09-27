@@ -1,9 +1,10 @@
 import { chromium, expect } from '@playwright/test';
 import { createServer } from 'vite';
 import { resolve } from 'node:path';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { installRestaurantWorkspaceFixture } from './test-helpers/restaurant-workspace-fixture.mjs';
+import { captureOperationWorkspace } from './test-helpers/operation-workspace-screenshots.mjs';
 import { createCompactUiFixture } from './lib/desktop-renderer-fixtures.mjs';
 
 const server = await createServer({ root: resolve('apps/desktop-app'), configFile: resolve('apps/desktop-app/vite.renderer.config.ts'), server: { port: 0 } });
@@ -20,13 +21,12 @@ try {
       await route.fulfill({ contentType: 'text/html', body: html });
     });
     await page.addInitScript(installRestaurantWorkspaceFixture, { dashboard: createCompactUiFixture(), variant });
-    await page.goto(`${server.resolvedUrls.local[0]}restaurant-test`);
+    await page.goto(`${server.resolvedUrls.local[0]}restaurant-test`, { waitUntil: "domcontentloaded", timeout: 30000 });
     await expect(page.getByRole('button', { name: 'Bahçe 1 masasını aç' })).toBeVisible();
     return page;
   }
   const page = await open(), dialog = page.getByRole('dialog');
   const button = name => page.getByRole('button', { name, exact: true });
-  const tab = name => dialog.getByRole('tab', { name, exact: true });
   const state = () => page.evaluate(() => window.fixtureState());
   const board = page.getByRole('region', { name: 'Restoran operasyonları', exact: true });
   await expect(board.locator('.operations-board__pane')).toHaveCount(3);
@@ -38,10 +38,36 @@ try {
   await button('Bahçe 1 masasını aç').focus(); await page.keyboard.press('Enter');
   await expect(dialog).toHaveClass(/workspace-frame--centered/);
   await expect(dialog.getByRole('heading', { level: 2 })).toBeFocused();
-  await expect(dialog.getByRole('tablist', { name: 'Masa çalışma alanı' }).getByRole('tab')).toHaveText(['Sipariş', 'Müşteri', 'Hesap', 'Geçmiş']);
-  await expect(button('Sipariş Başlat')).toBeEnabled();
+  await expect(dialog.locator('.workspace-tabs')).toHaveCount(0);
+  await expect(dialog.getByRole('region', { name: 'Menü', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('region', { name: 'Masa, Müşteri ve Hesap', exact: true })).toBeVisible();
+  await expect(button('Sipariş Aç')).toBeEnabled();
   expect((await state()).orders).toHaveLength(0);
-  await button('Sipariş Başlat').click();
+  expect(await page.evaluate(() => window.fixtureCalls.some(call => call.kind === 'start'))).toBe(false);
+  const customerPanel = dialog.getByRole('region', { name: 'Masa müşterisi', exact: true });
+  const customerSelect = customerPanel.getByLabel('Müşteri seç', { exact: true });
+  const customerCalls = () => page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'customer'));
+  expect(await customerCalls()).toEqual([]);
+  await expect(customerSelect).toBeVisible();
+  await customerSelect.selectOption('customer-a');
+  expect(await customerCalls()).toEqual([]);
+  await page.evaluate(() => { window.fixtureDelayCustomer = true; });
+  await button('Müşteriyi Bağla').evaluate(element => { element.click(); element.click(); });
+  await expect.poll(async () => (await customerCalls()).length).toBe(1);
+  expect(await customerCalls()).toEqual([{ kind: 'customer', tableId: 'table-a', customerId: 'customer-a' }]);
+  await expect(button('Müşteriyi Bağla')).toBeDisabled();
+  await page.evaluate(() => { window.fixtureDelayCustomer = false; window.fixtureResolveCustomer(); });
+  await expect(customerPanel.locator('p')).toHaveText('Pilot Misafir');
+  expect((await state()).orders).toEqual([]);
+  await customerSelect.selectOption('customer-b');
+  await button('Müşteriyi Değiştir').click();
+  await expect(customerPanel.locator('p')).toHaveText('İkinci Misafir');
+  await button('Bağı Kaldır').click();
+  await expect(customerPanel.locator('p')).toHaveText('Masaya bağlı müşteri yok.');
+  expect((await state()).dashboard.tables[0].currentCustomerId).toBe('');
+  await expect(customerSelect).toHaveValue('');
+  await captureOperationWorkspace(page, 'table-empty');
+  await button('Sipariş Aç').click();
   await button('Çay ürününü siparişe ekle').click();
   await expect(button('Tükenen ürününü siparişe ekle')).toBeDisabled();
   await button('Çay adetini artır').click(); expect((await state()).orders[0].total).toBe(50);
@@ -53,7 +79,14 @@ try {
   await note.fill('Son not');
   await page.evaluate(() => { window.fixtureDelayNote = false; window.fixtureResolveNote(); });
   await expect.poll(async () => (await state()).orders[0].items[0].note).toBe('Son not');
-  await tab('Müşteri').click(); await tab('Sipariş').click(); await expect(note).toHaveValue('Son not');
+  await button('Geçmiş').click(); await button('← Masaya dön').click(); await expect(note).toHaveValue('Son not');
+  const unchangedOrder = structuredClone((await state()).orders[0]);
+  await customerSelect.selectOption('customer-a');
+  await button('Müşteriyi Bağla').click();
+  await expect(customerPanel.locator('p')).toHaveText('Pilot Misafir');
+  expect((await state()).orders[0]).toEqual(unchangedOrder);
+  await button('Bağı Kaldır').click();
+  await captureOperationWorkspace(page, 'table-active');
   await note.fill('Escape ile kaydet'); await note.press('Escape');
   await expect(dialog).toHaveCount(0); expect((await state()).orders[0].items[0].note).toBe('Escape ile kaydet');
   await expect(button('Bahçe 1 masasını aç')).toBeFocused();
@@ -64,7 +97,7 @@ try {
   await note.fill('Kaybolmamalı'); await note.press('Escape');
   await expect(dialog.getByRole('alert')).toHaveText('Not reddedildi.');
   expect(await page.evaluate(() => window.fixtureOpen('table-b'))).toBe(false);
-  await tab('Hesap').click(); await button('Ödendi / Kapat').click();
+  await button('Ödendi / Kapat').click();
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'close').length)).toBe(0);
   await page.evaluate(() => { window.fixtureFailNote = false; window.fixtureFailClose = true; });
   await button('Ödendi / Kapat').click(); await expect(dialog.getByRole('alert')).toHaveText('Kapatma reddedildi.');
@@ -75,8 +108,8 @@ try {
   expect((await state()).finance).toBe(0);
   await page.evaluate(() => { window.fixtureDelayClose = false; window.fixtureResolveClose(); });
   await expect(dialog).toHaveCount(0); expect((await state()).finance).toBe(1);
-  await button('Bahçe 1 masasını aç').click(); await tab('Geçmiş').click();
-  await expect(dialog.getByRole('tabpanel', { name: 'Geçmiş' })).toContainText('Ödendi');
+  await button('Bahçe 1 masasını aç').click(); await button('Geçmiş').click();
+  await expect(dialog.getByRole('region', { name: 'Masa geçmişi' })).toContainText('Ödendi');
   await button("Floor'a dön").click();
 
   await button('Yeni Rezervasyon').click();
@@ -93,23 +126,57 @@ try {
   await button('Rezervasyonu Kaydet').click(); await expect(dialog).toHaveCount(0);
   expect((await state()).dashboard.reservations[0].tableIds).toEqual(['table-a']);
   expect((await state()).orders).toHaveLength(1);
-  await button('Bahçe 1 masasını aç').click(); await tab('Müşteri').click();
-  await expect(dialog.getByRole('tabpanel', { name: 'Müşteri' })).toContainText('Pilot Misafir');
-  await button('Sipariş Başlat').click(); await tab('Sipariş').click(); await button('Çay ürününü siparişe ekle').click();
+  await page.evaluate(() => {
+    const tables = structuredClone(window.fixtureState().dashboard.tables);
+    tables[0].currentReservationId = 'reservation-a'; window.fixturePatch({ tables });
+  });
+  const reservationsBeforeCustomer = structuredClone((await state()).dashboard.reservations);
+  const callsBeforeReservationOpen = (await customerCalls()).length;
+  await button('Bahçe 1 masasını aç').click();
+  await expect(customerSelect).toHaveValue('customer-new');
+  await expect(button('Müşteriyi Bağla')).toBeEnabled();
+  expect((await customerCalls()).length).toBe(callsBeforeReservationOpen);
+  await button('Müşteriyi Bağla').click();
+  await expect(customerPanel.locator('p')).toHaveText('Yeni Pilot Misafir');
+  await customerSelect.selectOption('customer-b'); await button('Müşteriyi Değiştir').click();
+  await button('Bağı Kaldır').click();
+  expect((await state()).dashboard.reservations).toEqual(reservationsBeforeCustomer);
+  expect((await state()).dashboard.tables[0].currentReservationId).toBe('reservation-a');
+  await expect(dialog.getByRole('region', { name: 'Masa, Müşteri ve Hesap', exact: true })).toContainText('Rezervasyon ·');
+  await button('Sipariş Aç').click(); await button('Çay ürününü siparişe ekle').click();
   await button('Çay satırını sil').click(); expect((await state()).orders[0].items).toHaveLength(0);
   await button('Çay ürününü siparişe ekle').click(); await note.fill('Odaya aktarım notu');
-  await tab('Hesap').click(); await dialog.getByLabel('Sipariş durumu').selectOption('payment');
-  await button('Odaya Yaz').click(); await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
+  await dialog.getByLabel('Sipariş durumu').selectOption('payment');
+  await expect(dialog.getByLabel('Oda hesabı', { exact: true })).toBeVisible();
+  await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
   await dialog.getByLabel('Oda hesabı', { exact: true }).selectOption('folio-a');
   await page.evaluate(() => { window.fixtureFailTransfer = true; });
-  await button('Aktarımı Onayla').click(); await expect(dialog.getByRole('alert')).toHaveText('Aktarım reddedildi.');
+  await button('Odaya Yaz').click(); await expect(dialog.getByRole('alert')).toHaveText('Aktarım reddedildi.');
   const stock = (await state()).dashboard.menu.items[0].stock_quantity;
   await page.evaluate(() => { window.fixtureFailTransfer = false; window.fixtureDelayTransfer = true; });
-  await button('Aktarımı Onayla').click(); await expect(button("Floor'a dön")).toBeDisabled();
+  await button('Odaya Yaz').click(); await expect(button("Floor'a dön")).toBeDisabled();
   await page.evaluate(() => { window.fixtureDelayTransfer = false; window.fixtureResolveTransfer(); });
   await expect(dialog).toHaveCount(0);
   const transferred = await state(); expect(transferred.transfers).toBe(1); expect(transferred.finance).toBe(1);
   expect(transferred.orders[0].items[0].note).toBe('Odaya aktarım notu'); expect(transferred.dashboard.menu.items[0].stock_quantity).toBe(stock);
+
+  // A delayed customer reply (and repeated dashboard delivery) cannot roll back a newer projection.
+  await button('Bahçe 1 masasını aç').click();
+  await customerSelect.selectOption('customer-a');
+  await page.evaluate(() => { window.fixtureDelayCustomer = true; });
+  await button('Müşteriyi Bağla').click();
+  await expect.poll(() => page.evaluate(() => typeof window.fixtureResolveCustomer)).toBe('function');
+  await page.evaluate(() => {
+    const tables = structuredClone(window.fixtureState().dashboard.tables);
+    tables[0].currentCustomerId = 'customer-b'; window.fixturePatch({ tables });
+  });
+  await expect(customerPanel.locator('p')).toHaveText('İkinci Misafir');
+  await page.evaluate(() => { window.fixtureDelayCustomer = false; window.fixtureResolveCustomer(); });
+  await expect(button('Bağı Kaldır')).toBeEnabled();
+  await page.evaluate(() => window.fixturePublishDashboard(window.fixtureCustomerResponse));
+  await expect(customerPanel.locator('p')).toHaveText('İkinci Misafir');
+  await button('Bağı Kaldır').click();
+  await button("Floor'a dön").click();
 
   // Read completion from an earlier entity cannot overwrite the new workspace.
   await page.evaluate(() => { window.fixtureDelayRead = true; });
@@ -118,33 +185,41 @@ try {
   await page.evaluate(() => { window.fixtureDelayRead = false; window.fixtureOpen('table-b'); });
   await expect(dialog.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
   await page.evaluate(() => window.fixtureResolveRead());
-  await expect(button('Sipariş Başlat')).toBeEnabled(); await expect(dialog.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
+  await expect(button('Sipariş Aç')).toBeEnabled(); await expect(dialog.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
   await button("Floor'a dön").click();
   for (const variant of ['tables-only', 'no-menu', 'no-customers', 'no-reservations', 'no-transfer', 'no-catalog']) {
     const variantPage = await open(variant), surface = variantPage.getByRole('dialog');
     if (variant === 'no-reservations') await expect(variantPage.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toHaveCount(0);
     await variantPage.getByRole('button', { name: 'Bahçe 1 masasını aç' }).click();
-    if (variant === 'no-customers') await expect(surface.getByRole('tab', { name: 'Müşteri' })).toHaveCount(0);
+    if (variant === 'no-customers') {
+      await expect(surface.getByRole('region', { name: 'Masa müşterisi' })).toHaveCount(0);
+      await expect(surface.getByLabel('Müşteri seç', { exact: true })).toHaveCount(0);
+      expect(await variantPage.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'customer'))).toEqual([]);
+    }
     if (variant === 'tables-only') {
-      await expect(surface.getByRole('tab')).toHaveText(['Sipariş', 'Müşteri']);
+      await expect(surface.locator('.workspace-tabs')).toHaveCount(0);
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([]);
+      await surface.getByLabel('Müşteri seç', { exact: true }).selectOption('customer-a');
+      await surface.getByRole('button', { name: 'Müşteriyi Bağla', exact: true }).click();
+      await expect(surface.getByRole('region', { name: 'Masa müşterisi' }).locator('p')).toHaveText('Pilot Misafir');
+      expect(await variantPage.evaluate(() => window.fixtureState().orders)).toEqual([]);
+      expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([{ kind: 'customer', tableId: 'table-a', customerId: 'customer-a' }]);
     } else {
-      await surface.getByRole('button', { name: 'Sipariş Başlat' }).click();
+      await surface.getByRole('button', { name: 'Sipariş Aç' }).click();
       if (variant === 'no-menu') await expect(surface.getByLabel('Sipariş için ürün ara')).toHaveCount(0);
-      await surface.getByRole('tab', { name: 'Hesap', exact: true }).click();
       if (variant === 'no-transfer') await expect(surface.getByRole('button', { name: 'Odaya Yaz' })).toHaveCount(0);
     }
     await variantPage.close();
   }
   await page.getByLabel('Masa grubu').selectOption('all'); await button('Salon 1 masasını aç').click();
-  await button('Sipariş Başlat').click(); await button('Çay ürününü siparişe ekle').click();
-  mkdirSync('artifacts/screenshots/restaurant-workspace', { recursive: true });
+  await button('Sipariş Aç').click(); await button('Çay ürününü siparişe ekle').click();
+
   for (const [width, height, scheme, density, scale] of [[1366, 768, 'light', 'compact', 1], [1024, 768, 'dark', 'comfortable', 1.1], [600, 800, 'light', 'comfortable', 1]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(({ scheme, density, scale }) => { document.documentElement.dataset.colorScheme = scheme; document.documentElement.dataset.density = density; document.documentElement.style.setProperty('--ui-scale', String(scale)); document.documentElement.style.zoom = String(scale); }, { scheme, density, scale });
     const bounds = await dialog.boundingBox(); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width + 2); expect(bounds.y + bounds.height).toBeLessThanOrEqual(height + 2);
     expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
-    await page.screenshot({ path: `artifacts/screenshots/restaurant-workspace/${width}-${scheme}.png` });
+
   }
   // Security lock destroys the workspace: pending mutation results cannot update a new entity.
   await page.evaluate(() => { window.fixtureDelayNote = true; });
@@ -157,7 +232,7 @@ try {
   await page.evaluate(() => { window.fixtureDelayRead = true; });
   await button('Bahçe 1 masasını aç').click();
   await page.evaluate(() => { window.oldRead = window.fixtureResolveRead; window.fixtureDelayRead = false; window.fixtureOpen('table-b'); });
-  await expect(button('Hesaba Geç')).toBeEnabled();
+  await expect(button('Ödendi / Kapat')).toBeEnabled();
   await page.evaluate(() => { window.fixtureRejectRead = true; window.oldRead(); });
   await expect(dialog.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
   await expect(dialog.getByRole('alert')).toHaveCount(0);

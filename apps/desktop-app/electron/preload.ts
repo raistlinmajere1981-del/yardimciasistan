@@ -44,6 +44,7 @@ import type {
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
+  AssignTableCustomerInput,
   DesktopTableOrder,
   DesktopTableOrderResult,
   UpdateReservationStatusInput,
@@ -253,6 +254,7 @@ export interface DesktopBridge {
   deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => Promise<DesktopStatusUpdateResult>;
   updateRoomStatus: (input: UpdateRoomStatusInput) => Promise<DesktopStatusUpdateResult>;
   updateTableStatus: (input: UpdateTableStatusInput) => Promise<DesktopStatusUpdateResult>;
+  assignTableCustomer: (input: AssignTableCustomerInput) => Promise<DesktopStatusUpdateResult>;
   listTableOrders: () => Promise<DesktopTableOrder[]>;
   getActiveTableOrder: (tableId: string) => Promise<DesktopTableOrder | null>;
   openTableOrder: (tableId: string) => Promise<DesktopTableOrderResult>;
@@ -440,6 +442,7 @@ const bridge: DesktopBridge = {
   deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => ipcRenderer.invoke("whatsapp:deleteMessage", input),
   updateRoomStatus: (input: UpdateRoomStatusInput) => ipcRenderer.invoke("room:updateStatus", input),
   updateTableStatus: (input: UpdateTableStatusInput) => ipcRenderer.invoke("table:updateStatus", input),
+  assignTableCustomer: (input: AssignTableCustomerInput) => invokeWhenUnlocked<DesktopStatusUpdateResult>("table:assignCustomer", input),
   listTableOrders: () => ipcRenderer.invoke("tableOrder:list"),
   getActiveTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:getActive", tableId),
   openTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:open", tableId),

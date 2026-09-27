@@ -278,13 +278,12 @@ try {
     await expect(page.getByLabel('Oda yönetimi', { exact: true }).getByRole('combobox')).toHaveCount(0);
     await page.getByLabel('Oda yönetimi', { exact: true }).getByRole('button', { name: /odasını aç$/ }).first().click();
     await capture('room-workspace');
-    await page.getByRole('dialog').getByRole('tab', { name: 'Hesap', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('region', { name: 'Misafir Hesabı', exact: true })).toBeVisible();
     await capture('folio-account');
-    await page.getByRole('dialog').getByRole('button', { name: 'Ödeme Al', exact: true }).click();
+    await expect(page.getByRole('dialog').getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
     await capture('folio-payment');
-    await page.getByRole('dialog').getByRole('button', { name: 'Vazgeç', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Misafir Çıkışı', exact: true }).first().click();
-    await expect(page.getByRole('heading', { name: 'Misafir Çıkışı', exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Konaklama onayı', exact: true })).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(1);
     await expect(page.getByRole('alertdialog')).toHaveCount(0);
     await capture('checkout-confirmation');

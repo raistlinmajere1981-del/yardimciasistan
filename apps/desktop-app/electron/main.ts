@@ -702,6 +702,7 @@ function registerIpcHandlers() {
 
   registerRoomTableIpcHandlers({
     getDatabase,
+    assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability
   });
 

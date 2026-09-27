@@ -6,9 +6,9 @@ import { useRequestGeneration } from "../workspace/use-request-generation";
 import { formatMoney, getOrderCurrency } from "./table-presentation";
 
 /** Target selection inside Table Workspace. Execution belongs to its guarded operation. */
-export function TableRoomTransfer({ order, busy, onTransfer, onCancel }: {
+export function TableRoomTransfer({ order, busy, onTransfer, revision }: {
   order: DesktopTableOrder; busy: boolean;
-  onTransfer: (folioId: string) => void; onCancel: () => void;
+  onTransfer: (folioId: string) => void; revision: number;
 }) {
   const [data, setData] = useState<DesktopRoomFolioData | null>(null);
   const [folioId, setFolioId] = useState("");
@@ -21,9 +21,10 @@ export function TableRoomTransfer({ order, busy, onTransfer, onCancel }: {
       setData(result); setMessage("");
     }).catch(() => { if (current()) setMessage("Açık oda hesapları okunamadı."); });
     return () => { begin(); };
-  }, [begin]);
+  }, [begin, revision]);
   const folios = data?.folios.filter(folio => folio.status === "open") ?? [];
-  return <div className="form-stack">
+  return <div className="operation-section form-stack" aria-label="Odaya yazdırma">
+    <h4>Odaya yazdırma</h4>
     <p>Bu aktarım masa adisyonunu kapatır; tahsilat oda hesabı üzerinden yapılır.</p>
     <p>{order.tableName} · {formatMoney(order.total, getOrderCurrency(order))}</p>
     <label className="form-field">Oda hesabı
@@ -37,8 +38,8 @@ export function TableRoomTransfer({ order, busy, onTransfer, onCancel }: {
     {message && <p role="status">{message}</p>}
     {data && folios.length === 0 && <p>Açık oda hesabı yok. Önce Pansiyon üzerinden oda hesabını açın.</p>}
     <div className="page-toolbar">
-      <ActionButton onClick={() => onTransfer(folioId)} disabled={busy || !folios.some(folio => folio.id === folioId)}>Aktarımı Onayla</ActionButton>
-      <ActionButton variant="secondary" onClick={onCancel} disabled={busy}>Vazgeç</ActionButton>
+      <ActionButton onClick={() => onTransfer(folioId)} disabled={busy || !folios.some(folio => folio.id === folioId)}>Odaya Yaz</ActionButton>
+
     </div>
   </div>;
 }

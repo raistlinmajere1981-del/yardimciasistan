@@ -6,6 +6,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     currentCustomerId: '', currentReservationId: '', activeReservationTitle: '', notes: '', sortOrder: 0, updatedAt: now });
   dashboard.tables = [table('table-a', 'Bahçe 1', 'Bahçe'), table('table-b', 'Salon 1', 'Salon')];
   dashboard.customers = [{ ...dashboard.customers[0], id: 'customer-a', fullName: 'Pilot Misafir', phone: '05550000000' }];
+  dashboard.customers.push({ ...dashboard.customers[0], id: 'customer-b', fullName: 'İkinci Misafir' });
   dashboard.reservations = [];
   dashboard.menu.categories = [{ id: 'category-a', name: 'İçecek', is_active: true, sort_order: 1 }];
   dashboard.menu.items = [{ id: 'menu-a', name: 'Çay', description: '', category_id: 'category-a', is_available: true,
@@ -89,6 +90,16 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
       const order = orderFor(id); if (['paid', 'cancelled'].includes(order.status)) return { ok: false, message: 'Kapalı.' };
       order.status = status; order.closedAt = new Date().toISOString(); if (status === 'paid') finance++;
       return result(order);
+    },
+    assignTableCustomer: async input => {
+      calls.push({ kind: 'customer', ...input });
+      if (!capabilities.customersEnabled) throw new Error('Customers disabled');
+      if (window.fixtureFailCustomer) return { ok: false, message: 'Müşteri bağı kaydedilemedi.' };
+      dashboard.tables.find(table => table.id === input.tableId).currentCustomerId = input.customerId;
+      const response = copy({ ok: true, message: 'Masa müşterisi güncellendi.', dashboardData: snapshot() });
+      window.fixtureCustomerResponse = copy(response.dashboardData);
+      await wait('Customer');
+      return response;
     },
     updateTableStatus: async ({ tableId, status }) => { calls.push({ kind: 'table-status' }); dashboard.tables.find(table => table.id === tableId).status = status; return copy({ ok: true, message: 'Masa durumu güncellendi.', dashboardData: snapshot() }); },
     getRoomFolioData: async () => { calls.push({ kind: 'folios' }); await wait('Folio'); return { folios: [{ id: 'folio-a', status: 'open', roomNumber: '101', customerName: 'Pilot Misafir' }] }; },

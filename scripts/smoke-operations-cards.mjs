@@ -43,11 +43,11 @@ try {
   await close();
   await expect(card(103).getByRole('button', { name: 'Oda 103 odasını aç' })).toBeFocused();
   await card(103).getByRole('button', { name: 'Hesap', exact: true }).click();
-  await expect(dialog.getByRole('tabpanel', { name: 'Hesap' })).toContainText('Ece Yılmaz');
-  await expect(dialog.getByRole('tabpanel', { name: 'Hesap' })).toContainText('3.600');
+  await expect(dialog.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('Ece Yılmaz');
+  await expect(dialog.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('3.600');
   await close();
   await card(104).getByRole('button', { name: 'Önceki hesabı tahsil et' }).click();
-  await expect(dialog.getByRole('heading', { name: 'Ödeme Al', exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
   await dialog.getByLabel('Ödeme tutarı', { exact: true }).fill('50');
   await page.evaluate(() => { window.fixtureDelayReads = true; });
   await dialog.getByRole('button', { name: 'Ödemeyi Kaydet', exact: true }).click();
@@ -62,14 +62,14 @@ try {
   await page.evaluate(() => window.fixtureReads[0].resolve());
   await expect.poll(() => page.evaluate(() => window.fixtureReads.length)).toBe(2);
   await page.evaluate(() => { window.fixtureDelayReads = false; window.fixtureReads[1].resolve(); });
-  await expect(dialog.getByRole('tabpanel', { name: 'Hesap' })).toContainText('750');
+  await expect(dialog.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('750');
   expect(await page.evaluate(() => window.fixtureCalls.find(call => call.kind === 'payment').input.folioId)).toBe('folio-stay-3');
   await close();
   await expect(card(104)).toContainText('750');
   await card(102).getByRole('button', { name: 'Giriş yap', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: 'Girişi Tamamla', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Giriş Yap', exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'check-in').length)).toBe(0);
-  await dialog.getByRole('button', { name: 'Girişi Tamamla' }).click();
+  await dialog.getByRole('button', { name: 'Giriş Yap' }).click();
   expect(await page.evaluate(() => window.fixtureCalls.find(call => call.kind === 'check-in').input)).toBe('stay-1');
   await close();
   await expect(card(102)).toContainText('Misafir içeride');
@@ -102,7 +102,7 @@ try {
   const floor = () => rd.getByRole('button', { name: "Floor'a dön", exact: true }).click();
   expect(await restaurant.evaluate(() => window.fixtureCalls)).toEqual([]); // No per-card reads, history cache, or implicit writes.
   await table(1).getByRole('button', { name: 'Masa 1 masasını aç' }).tap();
-  await expect(rd.getByRole('button', { name: 'Sipariş Başlat', exact: true })).toBeEnabled();
+  await expect(rd.getByRole('button', { name: 'Sipariş Aç', exact: true })).toBeEnabled();
   expect(await restaurant.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'start'))).toEqual([]);
   await floor();
   await expect(table(1).getByRole('button', { name: 'Masa 1 masasını aç' })).toBeFocused();
@@ -120,7 +120,7 @@ try {
   await expect(table(2).getByRole('button', { name: 'Tahsilat', exact: true })).toBeVisible();
   expect(await restaurant.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'status').map(call => [call.id, call.status]))).toEqual([['order-1', 'served'], ['order-1', 'payment']]);
   await table(3).getByRole('button', { name: 'Tahsilat', exact: true }).click();
-  await expect(rd.getByRole('tab', { name: 'Hesap', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(rd.getByRole('region', { name: 'Masa hesabı', exact: true })).toBeVisible();
   await rd.getByRole('button', { name: 'Ödendi / Kapat', exact: true }).click();
   await expect(rd).toHaveCount(0);
   expect(await restaurant.evaluate(() => window.fixtureCalls.find(call => call.kind === 'close').id)).toBe('order-2');

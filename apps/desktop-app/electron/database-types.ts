@@ -802,6 +802,12 @@ export interface UpdateRoomStatusInput {
   status: string;
 }
 
+export interface AssignTableCustomerInput {
+  tableId: string;
+  /** Empty string removes the customer relation. */
+  customerId: string;
+}
+
 export interface UpdateTableStatusInput {
   tableId: string;
   status: string;

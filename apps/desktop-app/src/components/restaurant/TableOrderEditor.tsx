@@ -5,10 +5,10 @@ import { IconButton } from "../ui/IconButton";
 import { ActionButton } from "../ui/ActionButton";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import type { useTableOrderController } from "./use-table-order-controller";
-import { formatMoney } from "./table-presentation";
+import { formatMoney, getOrderCurrency } from "./table-presentation";
 
-export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = false }: {
-  menu: PublishedQrMenu; menuEnabled: boolean; readOnly?: boolean; controller: ReturnType<typeof useTableOrderController>;
+export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = false, startControl }: {
+  menu: PublishedQrMenu; menuEnabled: boolean; readOnly?: boolean; startControl?: import("react").ReactNode; controller: ReturnType<typeof useTableOrderController>;
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,11 +42,11 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
   }, [activeCategories, categoryNames, menu.items, menuEnabled, searchQuery, selectedCategoryId]);
 
   return (
-    <div className={`restaurant-order-workspace${menuEnabled ? "" : " is-ticket-only"}`}>
+    <>
               {menuEnabled && <section className="restaurant-order-menu-panel" aria-labelledby="table-order-menu-title">
                 <div className="restaurant-order-panel-heading">
                   <div>
-                    <h3 id="table-order-menu-title">Menüden Ekle</h3>
+                    <h3 id="table-order-menu-title">Menü</h3>
                     <span>{availableItems.length} aktif ürün</span>
                   </div>
                   <label className="form-field form-field--medium restaurant-order-search">
@@ -98,8 +98,11 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
                     <span>{selectedOrder?.itemCount ?? 0} ürün</span>
                   </div>
                 </div>
+                {selectedOrder && <label className="form-field">Sipariş durumu<select aria-label="Sipariş durumu" value={selectedOrder.status} disabled={Boolean(busyAction)}
+                  onChange={event => void controller.status(event.target.value as "preparing" | "served" | "payment")}><option value="open" disabled>Açık</option><option value="preparing">Hazırlanıyor</option><option value="served">Servis Edildi</option><option value="payment">Hesap Bekliyor</option></select></label>}
+                {!selectedOrder && startControl}
                 <div className="restaurant-order-line-list">
-                  {!selectedOrder && <p className="restaurant-order-empty">Aktif adisyon yok. Sipariş Başlat ile başlayın.</p>}
+                  {!selectedOrder && <p className="restaurant-order-empty">Aktif adisyon yok. Sipariş açtığınızda ürün ekleyebilirsiniz.</p>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
                     <p className="restaurant-order-empty">{menuEnabled
                       ? "Henüz ürün eklenmedi. Soldaki aktif menüden ürün seçin."
@@ -144,8 +147,9 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
                   ))}
                 </div>
 
+                {selectedOrder && <div className="restaurant-ticket-total"><span>Adisyon toplamı</span><strong>{formatMoney(selectedOrder.total, getOrderCurrency(selectedOrder))}</strong></div>}
               </section>
-            </div>
+            </>
 
   );
 }

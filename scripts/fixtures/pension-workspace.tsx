@@ -53,7 +53,7 @@ function Fixture() {
 }
 function Controls({ refresh }) {
   const navigation = useWorkspaceNavigation();
-  window.fixtureOpen = id => navigation.openWorkspace({ entityType: "room", entityId: id, returnContext: { page: "pension", view: "rooms" } });
+  window.fixtureOpen = (id, intent = {}) => navigation.openWorkspace({ entityType: "room", entityId: id, ...intent, returnContext: { page: "pension", view: "rooms" } });
   window.fixtureRefresh = refresh;
   return null;
 }
