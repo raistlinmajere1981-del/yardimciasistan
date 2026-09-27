@@ -1777,7 +1777,9 @@ try {
   const pensionBoard = compactPage.getByRole("region", { name: "Pansiyon operasyonları", exact: true });
   await expect(pensionBoard.locator(".operations-board__pane")).toHaveCount(3);
   const compactRoomCards = compactPage.getByLabel("Oda yönetimi").getByRole("article");
-  await expect(compactRoomCards.nth(3)).toContainText("Temizlik bekliyor");
+  const compactCleaningRoom = compactRoomCards.filter({ has: compactPage.getByRole("heading", { name: "Oda 104 · Aile Odası", exact: true }) });
+  await expect(compactCleaningRoom.getByRole("group", { name: "Oda 104 · Aile Odası fiziksel durumunu değiştir", exact: true })
+    .getByRole("button", { name: "Temizlik", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(compactPage.getByLabel("Oda yönetimi").getByRole("combobox")).toHaveCount(0);
   const reservationRows = compactPage.locator(".reservation-record-row");
   await expect(reservationRows).toHaveCount(3);
