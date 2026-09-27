@@ -226,19 +226,19 @@ npm run android:mirror
 
 ## Dokümanlar
 
-- [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md)
-- [Proje Özeti](docs/PROJECT_BRIEF.md)
-- [Sistem Mimarisi](docs/ARCHITECTURE.md)
-- [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md)
-- [Güncel Görev Planı](docs/TASKS.md)
+Güncel doküman indeksi: [docs/README.md](docs/README.md).
+
+Başlıca sözleşmeler:
+
+- [Application Architecture Constitution](docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md)
+- [Domain Decisions](docs/architecture/DOMAIN_DECISIONS_V1.md)
+- [Feature Development Guide](docs/FEATURE_DEVELOPMENT.md)
+- [Modüler İşletme Temeli](docs/MODULAR_BUSINESS_FOUNDATION.md)
+- [UI Kuralları](docs/UI_RULES.md)
 - [Veri Modeli](docs/DATA_MODEL.md)
 - [Otomatik Senkronizasyon](docs/AUTOMATIC_SYNC.md)
-- [Pilot Saha Testi](docs/PILOT_FIELD_TEST.md)
-- [UI Kuralları](docs/UI_RULES.md)
-- [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
-- [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
 - [Firma Web Modülü Kurulumu](docs/WEB_MODULE_INSTALLATION.md)
-- [Android Dağıtımı](docs/ANDROID_DISTRIBUTION.md)
+- [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
 
 ## Güncel Geliştirme Aşaması
 

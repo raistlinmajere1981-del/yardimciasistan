@@ -1,25 +1,69 @@
-# Dokümanlar
+# Yardımcı Asistan Dokümanları
 
-Bu klasör Yardımcı Asistan v1 için ürün, mimari, UI, veri modeli, event sistemi ve görev planı kararlarını içerir.
+Bu klasör yalnız **güncel ürün ve uygulama sözleşmelerini** tutar. Tarihsel stage raporları,
+tamamlanmış audit/roadmap belgeleri ve tek seferlik oturum notları Git geçmişinde kalır;
+aktif `docs/` ağacında tutulmaz.
 
-Kod yazmadan önce özellikle `CODEX_RULES.md` ve `TASKS.md` kontrol edilmelidir.
+## Önce okunacaklar
 
-## Application Platform v2
+Yeni masaüstü feature/UI/platform işi için:
 
-Yeni desktop feature/UI/platform çalışmaları için otorite:
+- `architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md` — uzun vadeli uygulama grameri ve ownership kuralları.
+- `architecture/DOMAIN_DECISIONS_V1.md` — domain ayrımları ve kalıcı kararlar.
+- `FEATURE_DEVELOPMENT.md` — yeni feature geliştirme akışı.
+- `UI_RULES.md` — güncel UI ilkeleri.
+- `design-system/README.md` — masaüstü tasarım sistemi.
+- `desktop-frontend-architecture.md` — renderer kompozisyonu ve frontend sınırları.
 
-- `architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md`:
-  uzun vadeli uygulama grameri ve ownership kuralları
-- `architecture/DOMAIN_DECISIONS_V1.md`:
-  özellikle benzer görünen fakat farklı domain operation'lar
-- `architecture/APPLICATION_PLATFORM_V2_ROADMAP.md`:
-  migration sırası ve stage exit kriterleri
+Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 
-## Kurulum Rehberleri
+## Sistem ve domain
 
-- `ANDROID_DISTRIBUTION.md`: Debug/release ayrımı, kalıcı package kimliği, sürümleme, güvenli signing, USB debugging gerektirmeyen pilot APK kurulumu, AAB ve Play Store checklist'i.
-- `SESSION_REPORT_2026-07-18_AUTOMATIC_SYNC.md`: Otomatik senkronizasyon geliştirme oturumunun uygulama, test ve canlı dağıtım raporu.
-- `AUTOMATIC_SYNC.md`: Web, masaüstü ve Android arasındaki otomatik senkron mimarisi, güvenilirlik modeli ve işletim notları.
-- `WEB_MODULE_INSTALLATION.md`: Mevcut web sitesine firma web modülünü ve widget'ı kurma adımları.
-- `DEMO_SITE_CUSTOMIZATION.md`: Web sitesi olmayan firmalar için demo siteyi özelleştirme adımları.
-- `dev/HOSTING_TEST_PLAN.md`: Demo site, web modülü, PC ve Android uygulamasını canlı hosting üzerinde birlikte test etme planı.
+- `MODULAR_BUSINESS_FOUNDATION.md` — capability-first işletme modeli.
+- `DATA_MODEL.md` — ana veri modeli.
+- `EVENTS.md` — event sözleşmeleri.
+- `FINANCE_MODEL.md` — Kasa / oda hesabı / ön muhasebe modeli.
+- `AUTOMATIC_SYNC.md` — hosting ↔ desktop ↔ Android senkron mimarisi.
+- `desktop-sync-identity.md` — desktop sync kimliği.
+- `architecture/hospitality-domain.md` — pansiyon domain sınırları.
+- `architecture/sector-feature-contribution-model.md` — capability tabanlı feature katkıları.
+
+## Workspace / platform
+
+`architecture/` altında yalnız güncel platform ve workspace sözleşmeleri tutulur:
+
+- `workspace-platform.md`
+- `settings-platform.md`
+- `dashboard-workspace.md`
+- `calendar-workspace.md`
+- `finance-workspace.md`
+- `market-workspace.md`
+- `menu-item-workspace.md`
+- `messages-workspace.md`
+- `pension-workspace.md`
+- `restaurant-workspace.md`
+
+## Kurulum, dağıtım ve saha testi
+
+- `DEVELOPMENT_SETUP.md`
+- `WEB_MODULE_INSTALLATION.md`
+- `ANDROID_DISTRIBUTION.md`
+- `PILOT_FIELD_TEST.md`
+- `WINDOWS_HOSTING_FIELD_TEST.md`
+- `dev/LOCAL_COMPANION_NETWORK.md`
+
+## Operasyonel geliştirme notları
+
+- `diagnostics/logging.md` — structured desktop logları ve inceleme akışı.
+- `knip-runtime-smokes.md` — compiled runtime smoke / Knip istisna sözleşmesi.
+
+## Doküman yaşam döngüsü
+
+Yeni belge eklemeden önce şu filtreyi kullanın:
+
+1. Bu bilgi yaşayan bir ürün/mimari sözleşmesi mi?
+2. Başka bir güncel belgeyle aynı gerçeği tekrar ediyor mu?
+3. Bir stage/audit/session tamamlandığında belgeye hâlâ günlük geliştirmede ihtiyaç var mı?
+
+Yanıt yalnız tarihsel kanıt ise yeni belge tutmayın; commit/PR/Git geçmişi arşivdir.
+Tamamlanan plan/audit belgelerini aktif docs ağacında bırakmayın.

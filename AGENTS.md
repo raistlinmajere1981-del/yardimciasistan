@@ -18,7 +18,7 @@ Authoritative target architecture for new desktop feature/UI/platform work:
 
 - `docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md`
 - `docs/architecture/DOMAIN_DECISIONS_V1.md`
-- `docs/architecture/APPLICATION_PLATFORM_V2_ROADMAP.md`
+- `docs/FEATURE_DEVELOPMENT.md`
 
 Rules:
 
@@ -33,7 +33,7 @@ Rules:
 - Appearance v2 is the only desktop appearance model: scheme + density + scale + accent + font + motion. Do not add legacy easy/pro, data-theme/data-mode or feature-specific theme branches.
 - New staged Settings fields must use the existing category ownership/contribution model. Immediate preferences and operational actions keep their explicit lifecycles; do not create a second Settings persistence path.
 
-See the three architecture documents for details.
+See the current architecture documents and feature guide for details.
 
 ## Architecture
 
