@@ -371,13 +371,13 @@ try {
   await page.getByRole('button', { name: 'Şifreyi Kaldır', exact: true }).click();
   await passwordConfirm.getByRole('button', { name: 'Şifreyi Kaldır' }).click();
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'password').at(-1).input)).toEqual({ currentPassword: 'abcdefg', newPassword: '' });
-  await page.getByRole('button', { name: 'Verileri Sıfırla', exact: true }).click();
-  const resetConfirm = page.getByRole('dialog', { name: 'Yerel Verileri Sıfırla' });
-  await expect(resetConfirm.locator('.action-button-danger')).toHaveText('Verileri Sıfırla');
+  await page.getByRole('button', { name: 'Tüm Verileri Sıfırla', exact: true }).click();
+  const resetConfirm = page.getByRole('dialog', { name: 'Tüm Verileri Sıfırla' });
+  await expect(resetConfirm.locator('.action-button-danger')).toHaveText('Tüm Verileri Sıfırla');
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'reset').length)).toBe(0);
-  await page.getByRole('button', { name: 'Verileri Sıfırla', exact: true }).click();
-  await resetConfirm.getByRole('button', { name: 'Verileri Sıfırla' }).click();
+  await page.getByRole('button', { name: 'Tüm Verileri Sıfırla', exact: true }).click();
+  await resetConfirm.getByRole('button', { name: 'Tüm Verileri Sıfırla' }).click();
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'reset').length)).toBe(1);
 
   await page.evaluate(() => window.refreshSettings({ aiApiKeyConfigured: true, aiEnabled: true }));
