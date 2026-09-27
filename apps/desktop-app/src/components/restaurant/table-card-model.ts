@@ -1,9 +1,10 @@
-import type { DesktopTable } from "../../../electron/database-types";
-import type { DesktopTableOperations } from "../../../electron/database-types";
-import type { TableWorkspaceIntent } from "../workspace/workspace-intent";
+import type { DesktopTable, DesktopTableOperations } from "../../../electron/database-types";
 
-type TableAction = { label: string; kind: "start" | "clean" | "served" | "payment" }
-  | { label: string; intent: Omit<TableWorkspaceIntent, "entityType" | "entityId"> };
+export type TableQuickAction = {
+  label: string;
+  kind: "start" | "clean" | "preparing" | "served" | "payment" | "paid";
+};
+
 export function getTableCardModel(table: DesktopTable, summary: DesktopTableOperations | undefined,
   capabilities: { ordersEnabled: boolean; reservationsEnabled: boolean; menuEnabled: boolean }, today: string) {
   const order = capabilities.ordersEnabled ? summary?.order : null;
@@ -12,15 +13,18 @@ export function getTableCardModel(table: DesktopTable, summary: DesktopTableOper
   const blocked = !table.isActive || ["cleaning", "maintenance", "out_of_service"].includes(table.status);
   const conflict = reservations.some((item, index) => reservations.some((other, otherIndex) => otherIndex > index
     && item.startDate === other.startDate && item.time === other.time));
-  let action: TableAction | undefined;
-  if (summary && table.status === "cleaning" && !order && table.isActive) action = { label: "Temizliği tamamla", kind: "clean" };
-  else if (summary && !blocked && order) {
-    if (order.status === "preparing") action = { label: "Servis edildi", kind: "served" };
-    else if (order.status === "served") action = { label: "Hesabı aç", kind: "payment" };
-    else if (order.status === "payment") action = { label: "Tahsilat", intent: { mode: "account", orderId: order.id } };
-    else action = { label: capabilities.menuEnabled ? "Ürün ekle" : "Adisyonu düzenle", intent: { mode: "order", action: capabilities.menuEnabled ? "add-item" : undefined, orderId: order.id } };
+
+  let quickAction: TableQuickAction | undefined;
+  if (summary && table.status === "cleaning" && !order && table.isActive) {
+    quickAction = { label: "Temizliği tamamla", kind: "clean" };
+  } else if (summary && !blocked && order) {
+    if (order.status === "open") quickAction = { label: "Hazırlamaya al", kind: "preparing" };
+    else if (order.status === "preparing") quickAction = { label: "Servis edildi", kind: "served" };
+    else if (order.status === "served") quickAction = { label: "Hesap bekliyor", kind: "payment" };
+    else if (order.status === "payment") quickAction = { label: "Hesabı kapat", kind: "paid" };
   } else if (summary && !blocked && !conflict && capabilities.ordersEnabled && !["bill_waiting", "payment"].includes(table.status)) {
-    action = { label: "Sipariş başlat", kind: "start" };
+    quickAction = { label: "Sipariş aç", kind: "start" };
   }
-  return { order, upcoming, blocked, conflict, action };
+
+  return { order, upcoming, blocked, conflict, quickAction };
 }
