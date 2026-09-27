@@ -1,10 +1,10 @@
 import type { DesktopRoom } from "../../../electron/database";
 import type { DesktopRoomOperations } from "../../../electron/database-types";
-import type { RoomWorkspaceIntent } from "../workspace/workspace-intent";
 
 export interface RoomCardCapabilities { staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean }
-type RoomAction = { label: string; intent: Omit<RoomWorkspaceIntent, "entityType" | "entityId">; disabledReason?: string }
-  | { label: string; clean: true; disabledReason?: string };
+export type RoomQuickAction =
+  | { label: string; kind: "clean"; disabledReason?: string }
+  | { label: string; kind: "checkout"; stayId: string; disabledReason?: string };
 
 export function roomIdentity(room: Pick<DesktopRoom, "name" | "number">) {
   const number = room.number.trim();
@@ -28,30 +28,17 @@ export function getRoomCardModel(room: DesktopRoom, summary: DesktopRoomOperatio
   const currentAccount = current.length === 1 ? accounts.find(item => item.stayId === current[0].id) : undefined;
   const previousAccounts = accounts.filter(item => !["planned", "checked_in"].includes(item.stayStatus) && item.remainingMinor > 0);
   const physical = !room.isActive ? "inactive" : ["cleaning", "maintenance", "out_of_service"].includes(room.status) ? room.status : "ready";
-  const overlaps = (start: string, end: string, excludedId = "") => stays.some(stay => stay.id !== excludedId
-    && stay.checkInDate < (end || "9999-12-31") && start < (stay.checkOutDate || "9999-12-31"));
-  let action: RoomAction | undefined;
-  // Physical constraint > occupied stay > due planned arrival > booking > old debt > manual plan.
-  if (summary && physical === "cleaning") action = { label: "Temizliği tamamla", clean: true,
-    ...(stays.length ? { disabledReason: "Aktif konaklama varken fiziksel durum değiştirilemez." } : {}) };
-  else if (physical !== "ready") action = { label: "Durumu düzenle", intent: { action: "room-status", mode: "stay" } };
-  else if (summary && current.length === 1) {
-    const stay = current[0];
-    action = currentAccount && (!stay.checkOutDate || stay.checkOutDate > today)
-      ? { label: "Hesap", intent: { mode: "account", stayId: stay.id, folioId: currentAccount.folioId } }
-      : { label: "Misafir çıkışı", intent: { mode: "stay", action: "checkout", stayId: stay.id } };
-  } else if (summary && current.length > 1) action = { label: "Konaklamaları kontrol et", intent: { mode: "stay" } };
-  else if (summary && planned[0]?.checkInDate <= today && !overlaps(planned[0].checkInDate, planned[0].checkOutDate, planned[0].id)) {
-    action = { label: "Giriş yap", intent: { mode: "stay", action: "check-in", stayId: planned[0].id } };
-  } else if (summary && upcoming?.status === "approved" && capabilities.staysEnabled && upcoming.guestCount <= room.capacity
-    && !overlaps(upcoming.startDate, upcoming.endDate) && !summary.reservations.some(other => other.id !== upcoming.id
-      && other.startDate < (upcoming.endDate || "9999-12-31") && upcoming.startDate < (other.endDate || "9999-12-31"))) {
-    action = { label: "Konaklama oluştur", intent: { mode: "stay", action: "linked-stay", reservationId: upcoming.id } };
-  } else if (summary && previousAccounts[0]) {
-    const account = previousAccounts[0];
-    action = { label: "Önceki hesabı tahsil et", intent: { mode: "account", action: "payment", stayId: account.stayId, folioId: account.folioId } };
-  } else if (summary && !stays.length && !upcoming && capabilities.staysEnabled && !["occupied", "reserved"].includes(room.status)) {
-    action = { label: "Konaklama oluştur", intent: { mode: "stay", action: "create-stay" } };
+
+  let quickAction: RoomQuickAction | undefined;
+  if (summary && physical === "cleaning") {
+    quickAction = {
+      label: "Temizliği tamamla",
+      kind: "clean",
+      ...(current.length ? { disabledReason: "Aktif konaklama varken fiziksel durum değiştirilemez." } : {})
+    };
+  } else if (summary && physical === "ready" && current.length === 1) {
+    quickAction = { label: "Misafir çıkışı", kind: "checkout", stayId: current[0].id };
   }
-  return { current, planned, upcoming, currentAccount, previousAccounts, physical, action };
+
+  return { current, planned, upcoming, currentAccount, previousAccounts, physical, quickAction };
 }
