@@ -90,6 +90,7 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBeNull();
+    await waitForBootstrap(page);
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
@@ -201,6 +202,8 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
     await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
 
     await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForBootstrap(page);
+    await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
@@ -232,6 +235,7 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
   try {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
+    await waitForBootstrap(page);
     await expect(page.getByRole("button", { name: "Ayarlar", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
@@ -263,7 +267,7 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
 
 async function verifyLegacyPreferenceRecordIsDiscarded(activeBrowser, rendererUrl) {
   const legacyPreferences = { theme: "dark", mode: "easy", scale: 1.1 };
-  const context = await createIsolatedContext(activeBrowser, legacyPreferences);
+  const context = await createIsolatedContext(activeBrowser, legacyPreferences, false);
   const page = await context.newPage();
   const pageErrors = trackPageErrors(page);
 
@@ -271,6 +275,8 @@ async function verifyLegacyPreferenceRecordIsDiscarded(activeBrowser, rendererUr
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(JSON.parse(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord))).toEqual(legacyPreferences);
+    await waitForBootstrap(page);
+    await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
@@ -298,7 +304,7 @@ async function verifyLegacyPreferenceRecordIsDiscarded(activeBrowser, rendererUr
 
 async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
   const malformedPreferences = "{not-valid-json";
-  const context = await createIsolatedContext(activeBrowser, malformedPreferences);
+  const context = await createIsolatedContext(activeBrowser, malformedPreferences, false);
   const page = await context.newPage();
   const pageErrors = trackPageErrors(page);
 
@@ -306,6 +312,8 @@ async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBe(malformedPreferences);
+    await waitForBootstrap(page);
+    await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
@@ -329,6 +337,14 @@ async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
   } finally {
     await context.close();
   }
+}
+
+async function waitForBootstrap(page) {
+  // Fixture bootstrap resolves async after first render; on settle the app
+  // redirects once (dashboard when setup is complete) and no further
+  // redirects occur, so sidebar navigation sticks afterwards. The fixture
+  // business name only renders after bootstrap (default is empty).
+  await expect(page.locator(".brand-business-name", { hasText: "Deniz Çiçeği Pansiyon & Kafe" })).toBeVisible();
 }
 
 async function createIsolatedContext(activeBrowser, initialPreferences, setupRequired = true) {
