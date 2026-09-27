@@ -1386,7 +1386,7 @@ try {
   await expect(stayWorkspace.getByRole("region", { name: "Oda geçmişi" })).toContainText("Çıkış yaptı");
   await stayWorkspace.getByRole("button", { name: "Çalışma alanını kapat" }).click();
   await expect(conversionPage.getByRole("article").filter({ has: assignableRoomCard })
-    .getByRole("group", { name: "Smoke Aile Odası fiziksel durumunu değiştir", exact: true })
+    .getByRole("group", { name: /fiziksel durumunu değiştir$/ })
     .getByRole("button", { name: "Temizlik", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   const compactPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
