@@ -1,10 +1,11 @@
-import { BedDouble, CalendarDays, CircleCheck, CircleAlert, UserRound, Wallet, Wrench, Sparkles } from "lucide-react";
+import { BedDouble, CalendarDays, CircleAlert, UserRound, Wallet } from "lucide-react";
 import { useRef, useState } from "react";
 import type { DesktopRoom, DesktopDashboardData } from "../../../electron/database";
 import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import type { DesktopRoomOperations } from "../../../electron/database-types";
 import { ResourceCard } from "../operations/ResourceCard";
 import { ActionButton } from "../ui/ActionButton";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
@@ -26,7 +27,8 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
   const checkoutMethod = useRef<RoomFolioPaymentMethod>("cash");
   const begin = useRequestGeneration();
   const { confirm, confirmDialog } = useConfirmDialog();
-  const physicalLabels: Record<string, string> = { ready: "Hazır", cleaning: "Temizlik bekliyor", maintenance: "Bakımda", out_of_service: "Hizmet dışı", inactive: "Etkin değil" };
+  const canSetPhysicalStatus = Boolean(summary && room.isActive && !model.current.length && !model.planned.length);
+  const physicalValue = model.physical === "ready" ? "available" : model.physical;
   const tone = !summary ? "neutral" : model.physical === "cleaning" ? "warning" : model.physical !== "ready" ? "danger"
     : model.current.length || room.status === "occupied" ? "info" : model.planned.length || model.upcoming ? "warning" : "success";
   const open = () => navigation.openWorkspace({
@@ -35,32 +37,46 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
     returnContext: { page: "pension", view: "rooms", entityId: room.id }
   });
 
+  async function updatePhysicalStatus(status: string) {
+    if (running.current || !canSetPhysicalStatus || status === physicalValue || status === "inactive") return;
+    running.current = true;
+    setBusy(true);
+    setFeedback("");
+    const current = begin();
+    try {
+      const result = await setRoomOperationalStatus(room.id, status);
+      if (!current()) return;
+      if (result.ok) onDashboard(result.dashboardData);
+      else setFeedback(result.message);
+    } catch {
+      if (current()) setFeedback("İşlem sonucu doğrulanamadı. Yenileyip kontrol edin.");
+    } finally {
+      running.current = false;
+      if (current()) setBusy(false);
+    }
+  }
+
   async function quickAction() {
     const action = model.quickAction;
-    if (running.current || !action || action.disabledReason) return;
-    const stay = action.kind === "checkout" ? model.current.find(item => item.id === action.stayId) : undefined;
+    if (running.current || !action) return;
+    const stay = model.current.find(item => item.id === action.stayId);
     checkoutMethod.current = "cash";
     const approved = await confirm({
       eyebrow: roomIdentity(room),
-      title: action.kind === "clean" ? "Temizliği tamamla" : "Misafir çıkışı",
-      description: action.kind === "clean"
-        ? "Oda Hazır durumuna alınacak."
-        : model.currentAccount?.remainingMinor
-          ? "Kalan tutar seçilen ödeme yöntemiyle tahsil edilir; çıkış ve hesap kapanışı birlikte tamamlanır."
-          : "Misafir çıkışı tamamlanır; varsa oda hesabı kapatılır ve oda temizlik durumuna geçer.",
-      confirmLabel: action.kind === "clean" ? "Hazır Olarak İşaretle" : "Çıkış ve Hesabı Kapat",
-      tone: action.kind === "checkout" && model.currentAccount?.remainingMinor ? "warning" : "info",
-      details: action.kind === "checkout" && stay
+      title: "Misafir çıkışı",
+      description: model.currentAccount?.remainingMinor
+        ? "Kalan tutar seçilen ödeme yöntemiyle tahsil edilir; çıkış ve hesap kapanışı birlikte tamamlanır."
+        : "Misafir çıkışı tamamlanır; varsa oda hesabı kapatılır ve oda temizlik durumuna geçer.",
+      confirmLabel: "Çıkış ve Hesabı Kapat",
+      tone: model.currentAccount?.remainingMinor ? "warning" : "info",
+      details: stay
         ? <RoomCheckoutConfirmationDetails
             roomLabel={roomIdentity(room)}
             stay={stay}
             account={model.currentAccount}
             onPaymentMethodChange={method => { checkoutMethod.current = method; }}
           />
-        : <dl className="operation-facts">
-            <div><dt>Oda</dt><dd>{roomIdentity(room)}</dd></div>
-            <div><dt>Yeni durum</dt><dd>Hazır</dd></div>
-          </dl>
+        : undefined
     });
     if (!approved) return;
 
@@ -78,9 +94,7 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
         if (!current()) return;
         if (!payment.ok) { setFeedback(payment.message); return; }
       }
-      const result = action.kind === "clean"
-        ? await setRoomOperationalStatus(room.id, "available")
-        : await window.yardimciDesktop!.checkoutStay(action.stayId);
+      const result = await window.yardimciDesktop!.checkoutStay(action.stayId);
       if (!current()) return;
       if (result.ok) onDashboard(result.dashboardData);
       else setFeedback(result.message);
@@ -100,14 +114,26 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
       tone={tone}
       busy={busy}
       error={Boolean(feedback)}
-      feedback={feedback || model.quickAction?.disabledReason}
+      feedback={feedback}
       onOpen={open}
       openLabel={`${room.name} odasını aç`}
       status={<>
-        <span>{model.physical === "cleaning" ? <Sparkles size={16} /> : model.physical !== "ready" ? <Wrench size={16} /> : <CircleCheck size={16} />}{physicalLabels[model.physical]}</span>
+        <ChoiceChips
+          ariaLabel={`${roomIdentity(room)} fiziksel durumunu değiştir`}
+          value={physicalValue}
+          disabled={busy || !canSetPhysicalStatus}
+          onChange={value => void updatePhysicalStatus(value)}
+          options={[
+            ...(model.physical === "inactive" ? [{ id: "inactive", label: "Etkin değil", disabled: true }] : []),
+            { id: "available", label: "Hazır" },
+            { id: "cleaning", label: "Temizlik" },
+            { id: "maintenance", label: "Bakımda" },
+            { id: "out_of_service", label: "Hizmet dışı" }
+          ]}
+        />
         {model.current.length > 0 && <span><UserRound size={16} />Misafir içeride</span>}
       </>}
-      action={model.quickAction && <ActionButton disabled={busy || Boolean(model.quickAction.disabledReason)} onClick={() => void quickAction()}>{model.quickAction.label}</ActionButton>}
+      action={model.quickAction && <ActionButton disabled={busy} onClick={() => void quickAction()}>{model.quickAction.label}</ActionButton>}
     >
       {!summary ? <p className="resource-card__notice"><CircleAlert size={16} />Güncel özet alınamadı.</p> : <>
         {model.current.map(stay => <div className="resource-card__fact" key={stay.id}><span>Mevcut misafir</span><strong>{stay.customerName}</strong><small>{formatDateRange(stay.checkInDate, stay.checkOutDate)}</small></div>)}
