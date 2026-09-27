@@ -31,6 +31,7 @@ import { ManualReservationEditor } from "./ManualReservationEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
+import { ChoiceChips } from "../ui/ChoiceChips";
 
 function getReservationStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) return "danger";
@@ -120,18 +121,20 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
           </ActionButton>
         </div>
         <div className="form-row filter-row">
-          <label className="form-field form-field--medium">
-            Durum
-            <select aria-label="Durum" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="pending">Bekleyen</option>
-              <option value="done">Tamamlanan</option>
-              <option value="cancelled">İptal</option>
-              <option value="all">Tümü</option>
-            </select>
-          </label>
-          <ActionButton variant="secondary" size="sm" type="button" onClick={() => setStatusFilter("all")}>
-            Tümünü Göster
-          </ActionButton>
+          <div className="form-field form-field--fluid">
+            <span>Durum</span>
+            <ChoiceChips
+              ariaLabel="Durum"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { id: "pending", label: "Bekleyen" },
+                { id: "done", label: "Tamamlanan" },
+                { id: "cancelled", label: "İptal" },
+                { id: "all", label: "Tümü" }
+              ]}
+            />
+          </div>
         </div>
       </div>
 
@@ -295,17 +298,22 @@ export function ReservationsWorkspace({
           </ActionButton>
         </div>
         <div className="form-row filter-row">
-          <label className="reservation-status-filter form-field form-field--short">
+          <div className="reservation-status-filter form-field form-field--fluid">
             <span className="reservation-control-label">Durum</span>
-            <select aria-label="Durum" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">Tümü</option>
-              <option value="pending">Onay bekleyen</option>
-              <option value="approved">Onaylandı</option>
-              <option value="rejected">Reddedildi</option>
-              <option value="cancelled">İptal edildi</option>
-              <option value="completed">Tamamlandı</option>
-            </select>
-          </label>
+            <ChoiceChips
+              ariaLabel="Durum"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { id: "all", label: "Tümü" },
+                { id: "pending", label: "Onay bekleyen" },
+                { id: "approved", label: "Onaylandı" },
+                { id: "rejected", label: "Reddedildi" },
+                { id: "cancelled", label: "İptal" },
+                { id: "completed", label: "Tamamlandı" }
+              ]}
+            />
+          </div>
           <div className="reservation-date-filter form-field form-field--short">
             <span className="reservation-filter-label">Tarih</span>
             <DatePicker
