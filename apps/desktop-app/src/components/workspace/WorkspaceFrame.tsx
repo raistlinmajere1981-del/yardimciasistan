@@ -5,7 +5,7 @@ import { ModalSurface, type ModalSurfaceProps } from "../ui/ModalSurface";
 import type { WorkspacePresentation } from "./workspace-intent";
 
 /** Shell content bounds; measured only while a frame is open. */
-export const WorkspaceCanvasContext = createContext<RefObject<HTMLElement | null> | null>(null);
+const WorkspaceCanvasContext = createContext<RefObject<HTMLElement | null> | null>(null);
 
 interface WorkspaceFrameProps extends Omit<ModalSurfaceProps, "labelledBy" | "children" | "className"> {
   className?: string;

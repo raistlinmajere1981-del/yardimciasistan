@@ -2,7 +2,7 @@ import type { DesktopRoom } from "../../../electron/database";
 import type { DesktopRoomOperations } from "../../../electron/database-types";
 
 export interface RoomCardCapabilities { staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean }
-export type RoomQuickAction = { label: string; kind: "checkout"; stayId: string };
+type RoomQuickAction = { label: string; kind: "checkout"; stayId: string };
 
 export function roomIdentity(room: Pick<DesktopRoom, "name" | "number">) {
   const number = room.number.trim();

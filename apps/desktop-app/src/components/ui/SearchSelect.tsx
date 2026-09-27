@@ -9,7 +9,7 @@ import {
   type RefObject
 } from "react";
 
-export interface SearchSelectOption {
+interface SearchSelectOption {
   id: string;
   label: string;
   description?: string;

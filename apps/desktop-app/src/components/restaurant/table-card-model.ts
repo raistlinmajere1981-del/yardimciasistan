@@ -1,6 +1,6 @@
 import type { DesktopTable, DesktopTableOperations } from "../../../electron/database-types";
 
-export type TableQuickAction = {
+type TableQuickAction = {
   label: string;
   kind: "start" | "paid";
 };

@@ -55,13 +55,13 @@ export type DesktopDataMaintenanceResult =
       cancelled?: boolean;
     };
 
-export interface DataMaintenanceRemoteResetResult {
+interface DataMaintenanceRemoteResetResult {
   ok: boolean;
   message: string;
   skipped?: boolean;
 }
 
-export interface DataMaintenanceIpcOptions {
+interface DataMaintenanceIpcOptions {
   resetConnectedWebRuntime?: () => Promise<DataMaintenanceRemoteResetResult>;
 }
 

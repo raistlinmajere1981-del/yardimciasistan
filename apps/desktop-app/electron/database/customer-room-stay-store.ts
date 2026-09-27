@@ -67,7 +67,7 @@ function mapCustomerRoomStayRow(row: Record<string, unknown>): DesktopCustomerRo
   };
 }
 
-export interface ActiveCustomerRoomStayReference {
+interface ActiveCustomerRoomStayReference {
   id: string;
   roomId: string;
   roomName: string;
