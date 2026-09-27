@@ -17,8 +17,7 @@ try {
   assert.equal(model().quickAction.kind, 'checkout');
   assert.equal(model().quickAction.stayId, stay.id);
   assert.deepEqual(model().previousAccounts, [old]);
-  assert.equal(model({ ...room, status: 'cleaning' }).quickAction.kind, 'clean');
-  assert.ok(model({ ...room, status: 'cleaning' }).quickAction.disabledReason);
+  assert.equal(model({ ...room, status: 'cleaning' }).quickAction, undefined);
   assert.equal(model({ ...room, status: 'maintenance' }).quickAction, undefined);
   assert.equal(model({ ...room, isActive: false }).quickAction, undefined);
   assert.equal(model(room, { ...summary, stays: [{ ...stay, checkOutDate: '2030-01-02' }] }).quickAction.kind, 'checkout');
@@ -37,9 +36,9 @@ try {
   assert.equal(tm().quickAction.kind, 'start');
   assert.equal(tableModel(table, undefined, caps, '2030-01-02').quickAction, undefined);
   for (const status of ['maintenance', 'out_of_service']) assert.equal(tm({ ...table, status }).quickAction, undefined);
-  assert.equal(tm({ ...table, status: 'cleaning' }).quickAction.kind, 'clean');
+  assert.equal(tm({ ...table, status: 'cleaning' }).quickAction, undefined);
   assert.equal(tm(table, tableSummary, { ...caps, ordersEnabled: false }).quickAction, undefined);
-  for (const [status, kind] of [['preparing', 'served'], ['served', 'payment']]) assert.equal(tm(table, { ...tableSummary, order: { id: 'order', status } }).quickAction.kind, kind);
+  for (const status of ['open', 'preparing', 'served']) assert.equal(tm(table, { ...tableSummary, order: { id: 'order', status } }).quickAction, undefined);
   const paymentModel = tm(table, { ...tableSummary, order: { id: 'order', status: 'payment' } });
   assert.equal(paymentModel.quickAction.kind, 'paid');
   assert.equal(paymentModel.order.id, 'order');

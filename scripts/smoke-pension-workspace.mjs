@@ -121,7 +121,7 @@ try {
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentCallsBeforeCheckout + 1);
   await expect(account.getByRole('region', { name: 'Mevcut konaklama hesabı' })).toContainText('Aktif misafir hesabı yok');
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toContainText('Önceki konaklamalardan açık hesap yok.');
-  await button('Temizliği Tamamla').click();
+  await operations.getByRole('group', { name: 'Fiziksel oda durumu', exact: true }).getByRole('button', { name: 'Hazır', exact: true }).click();
   await expect(dialog.getByText('Fiziksel durum: Hazır', { exact: true })).toBeVisible();
   await button('Çalışma alanını kapat').click(); await expect(button('Pilot 102 odasını aç')).toBeFocused();
   await button('Müşteriler').click();

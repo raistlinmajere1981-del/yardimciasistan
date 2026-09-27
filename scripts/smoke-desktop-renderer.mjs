@@ -1305,12 +1305,11 @@ try {
   await expect(conversionPage.getByText("Günlük iş durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Smoke Bahçe Masası masasını aç" }).click();
   const smokeTableWorkspace = conversionPage.getByRole("dialog", { name: "Smoke Bahçe Masası" });
-  const smokeTableStatus = smokeTableWorkspace.getByRole("combobox", { name: "Smoke Bahçe Masası durumunu değiştir" });
-  await expect(smokeTableStatus).toHaveValue("available");
-  await smokeTableStatus.selectOption("bill_waiting");
-  await smokeTableWorkspace.getByRole("button", { name: "Masa Durumunu Kaydet" }).click();
+  const smokeTableStatus = smokeTableWorkspace.getByRole("group", { name: "Smoke Bahçe Masası durumunu değiştir", exact: true });
+  await expect(smokeTableStatus.getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await smokeTableStatus.getByRole("button", { name: "Hesap", exact: true }).click();
   await expect(smokeTableWorkspace.getByText("Masa durumu güncellendi.")).toBeVisible();
-  await expect(smokeTableStatus).toHaveValue("bill_waiting");
+  await expect(smokeTableStatus.getByRole("button", { name: "Hesap", exact: true })).toHaveAttribute("aria-pressed", "true");
   await smokeTableWorkspace.getByRole("button", { name: "Floor'a dön" }).click();
   await conversionPage.getByRole("button", { name: "Pansiyon" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
@@ -1319,9 +1318,10 @@ try {
   await expect(roomCard.getByRole("combobox")).toHaveCount(0);
   await roomCard.click();
   const roomWorkspace = conversionPage.getByRole("dialog");
-  await roomWorkspace.getByLabel("Fiziksel oda durumu").selectOption("maintenance");
-  await roomWorkspace.getByRole("button", { name: "Durumu Kaydet", exact: true }).click();
+  const roomStatus = roomWorkspace.getByRole("group", { name: "Fiziksel oda durumu", exact: true });
+  await roomStatus.getByRole("button", { name: "Bakımda", exact: true }).click();
   await expect(roomWorkspace.getByText("Oda durumu güncellendi.", { exact: true })).toBeVisible();
+  await expect(roomStatus.getByRole("button", { name: "Bakımda", exact: true })).toHaveAttribute("aria-pressed", "true");
   await roomWorkspace.getByRole("button", { name: "Çalışma alanını kapat" }).click();
   await expect(conversionPage.getByRole("article").filter({ has: roomCard })).toContainText("Bakımda");
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toBeVisible();
@@ -1680,10 +1680,10 @@ try {
   await compactPage.evaluate(() => document.documentElement.setAttribute("data-color-scheme", "dark"));
 
   await compactPage.getByRole("button", { name: "Kompakt Misafir 1 rezervasyonunu incele" }).click();
-  const reservationWorkspace = compactPage.getByRole("dialog");
-  await expect(reservationWorkspace.getByRole("heading", { name: "Oda 101 · Balkonlu Standart Oda", exact: true })).toBeVisible();
-  await expect(reservationWorkspace.getByRole("region", { name: "Oda ve Konaklama", exact: true })).toBeFocused();
-  await reservationWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  const compactReservationWorkspace = compactPage.getByRole("dialog");
+  await expect(compactReservationWorkspace.getByRole("heading", { name: "Oda 101 · Balkonlu Standart Oda", exact: true })).toBeVisible();
+  await expect(compactReservationWorkspace.getByRole("region", { name: "Oda ve Konaklama", exact: true })).toBeFocused();
+  await compactReservationWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(compactPage.getByRole("heading", { name: "Ana Ekran", exact: true })).toBeVisible();
 
   const aiOnlyPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });

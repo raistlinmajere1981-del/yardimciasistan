@@ -56,29 +56,25 @@ try {
   await close();
   await expect(card(102)).toContainText('Misafir içeride');
 
-  // True quick mutations stay on the card, but always show an explicit summary and confirmation first.
+  // Physical status chips mutate directly on the card and never open a confirmation/workspace.
+  const roomStatus = card(101).getByRole('group', { name: 'Oda 101 fiziksel durumunu değiştir', exact: true });
   await page.evaluate(() => { window.fixtureDelayRoom = true; window.fixtureFailRoom = true; });
-  await card(101).getByRole('button', { name: 'Temizliği tamamla' }).click();
-  let confirm = page.locator('.confirm-dialog');
-  await expect(confirm).toContainText('Oda 101');
-  await expect(confirm).toContainText('Yeni durum');
-  await expect(confirm).toContainText('Hazır');
-  await confirm.getByRole('button', { name: 'Hazır Olarak İşaretle', exact: true }).evaluate(el => { el.click(); el.click(); });
+  await roomStatus.getByRole('button', { name: 'Hazır', exact: true }).evaluate(el => { el.click(); el.click(); });
+  await expect(page.locator('.confirm-dialog')).toHaveCount(0);
+  await expect(page.locator('.workspace-frame')).toHaveCount(0);
   await expect(card(101)).toContainText('İşlem sürüyor');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'room-status').length)).toBe(1);
   await page.evaluate(() => window.fixtureReleaseRoom());
   await expect(card(101).getByRole('alert')).toContainText('Oda durumu kaydedilemedi');
   await page.evaluate(() => { window.fixtureDelayRoom = false; window.fixtureFailRoom = false; });
-  await card(101).getByRole('button', { name: 'Temizliği tamamla' }).click();
-  confirm = page.locator('.confirm-dialog');
-  await confirm.getByRole('button', { name: 'Hazır Olarak İşaretle', exact: true }).click();
-  await expect(card(101)).toContainText('Hazır');
+  await roomStatus.getByRole('button', { name: 'Hazır', exact: true }).click();
+  await expect(roomStatus.getByRole('button', { name: 'Hazır', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.locator('.resource-card h3').allTextContents()).toEqual(orderBefore);
 
   // Current guest checkout is a true card quick action: it must not open the workspace and settles the current folio.
   const paymentsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);
   await card(103).getByRole('button', { name: 'Misafir çıkışı', exact: true }).click();
-  confirm = page.locator('.confirm-dialog');
+  const confirm = page.locator('.confirm-dialog');
   await expect(page.locator('.workspace-frame')).toHaveCount(0);
   await expect(confirm).toContainText('Ece Yılmaz');
   await expect(confirm).toContainText('Kalan hesap');
@@ -127,17 +123,18 @@ try {
   await expect(rd).toHaveCount(0);
   await expect(table(1)).toContainText('Sipariş alınıyor');
 
-  // Service lifecycle quick actions are explicit state transitions.
-  await table(2).getByRole('button', { name: 'Servis edildi', exact: true }).click();
-  tableConfirm = restaurant.locator('.confirm-dialog');
-  await expect(tableConfirm).toContainText('3 ürün');
-  await tableConfirm.getByRole('button', { name: 'Servis edildi', exact: true }).click();
-  await expect(table(2).getByRole('button', { name: 'Hesap bekliyor', exact: true })).toBeVisible();
-  await table(2).getByRole('button', { name: 'Hesap bekliyor', exact: true }).click();
-  tableConfirm = restaurant.locator('.confirm-dialog');
-  await tableConfirm.getByRole('button', { name: 'Hesap bekliyor', exact: true }).click();
+  // Service lifecycle and physical table statuses are direct chips; account close remains a guarded quick action.
+  const orderStatus = table(2).getByRole('group', { name: 'Masa 2 sipariş durumu', exact: true });
+  await orderStatus.getByRole('button', { name: 'Servis edildi', exact: true }).click();
+  await expect(restaurant.locator('.confirm-dialog')).toHaveCount(0);
+  await orderStatus.getByRole('button', { name: 'Hesap bekliyor', exact: true }).click();
   await expect(table(2).getByRole('button', { name: 'Hesabı kapat', exact: true })).toBeVisible();
   expect(await restaurant.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'status').map(call => [call.id, call.status]))).toEqual([['order-1', 'served'], ['order-1', 'payment']]);
+
+  const tableStatus = table(4).getByRole('group', { name: 'Masa 4 durumunu değiştir', exact: true });
+  await tableStatus.getByRole('button', { name: 'Boş', exact: true }).click();
+  await expect(restaurant.locator('.confirm-dialog')).toHaveCount(0);
+  await expect(tableStatus.getByRole('button', { name: 'Boş', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
   // Payment close can be completed from the card, with total visible in the confirmation.
   await table(3).getByRole('button', { name: 'Hesabı kapat', exact: true }).click();
@@ -151,7 +148,7 @@ try {
 
   for (const [kind, variant] of [['pension', 'rooms-only'], ['restaurant', 'tables-only']]) {
     const disabled = await open(kind, variant);
-    await expect(disabled.getByRole('button', { name: /Misafir çıkışı|Sipariş aç|Hesabı kapat|Servis edildi|Hesap bekliyor|Hazırlamaya al/ })).toHaveCount(0);
+    await expect(disabled.getByRole('button', { name: /Misafir çıkışı|Sipariş aç|Hesabı kapat/ })).toHaveCount(0);
     expect(await disabled.evaluate(() => window.fixtureCalls)).toEqual([]);
     await disabled.close();
   }
