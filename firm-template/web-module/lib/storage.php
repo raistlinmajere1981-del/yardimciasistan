@@ -67,9 +67,44 @@ function ya_storage_capabilities(): array
             'android_device_permissions',
             'versioned_publications',
             'idempotent_publications',
-            'server_revision'
+            'server_revision',
+            'runtime_reset'
         ]
     ];
+}
+
+function ya_storage_reset_runtime(): array
+{
+    $database = ya_storage_open();
+    $tables = [
+        'web_requests',
+        'android_actions',
+        'android_device_sightings',
+        'publications',
+        'publication_receipts',
+        'sync_clients',
+        'sync_meta'
+    ];
+    $deleted = [];
+
+    $database->beginTransaction();
+    try {
+        foreach ($tables as $table) {
+            $count = (int) $database->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
+            $database->exec('DELETE FROM ' . $table);
+            $deleted[$table] = $count;
+        }
+        // A clean runtime starts sequence-backed inbound queues from the beginning.
+        $database->exec("DELETE FROM sqlite_sequence WHERE name IN ('web_requests', 'android_actions')");
+        $database->commit();
+    } catch (Throwable $error) {
+        if ($database->inTransaction()) {
+            $database->rollBack();
+        }
+        throw $error;
+    }
+
+    return $deleted;
 }
 
 function ya_storage_insert_request(array $request): array

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { DesktopDashboardData, DesktopStatusUpdateResult, SaveManualReservationInput } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
+import { SearchSelect } from "../ui/SearchSelect";
 
 type Reservation = DesktopDashboardData["reservations"][number];
 // Both entry points preserve booking metadata and call the existing assignment mutation.
@@ -19,17 +20,42 @@ export function ReservationRoomAssignment({ reservations, rooms, reservationId, 
 }) {
   return <div className="form-stack">
     <p>Yalnız rezervasyonun oda ataması kaydedilir. Konaklama oluşturulmaz.</p>
-    <label className="form-field form-field--long">Rezervasyon<select aria-label="Rezervasyon" required disabled={fixed === "reservation"} value={reservationId}
-      onChange={event => onChange(event.target.value, roomId)}>
-      <option value="">Rezervasyon seçin</option>
-      {reservations.filter(item => item.reservationType === "room" && ["pending", "approved"].includes(item.status) && item.roomIds.length <= 1).map(item =>
-        <option value={item.id} key={item.id}>{item.title || item.customerName} · {item.startDate} – {item.endDate}</option>)}
-    </select></label>
-    <label className="form-field form-field--long">Oda<select aria-label="Oda" disabled={fixed === "room"} value={roomId}
-      onChange={event => onChange(reservationId, event.target.value)}>
-      <option value="">Odayı daha sonra ata</option>
-      {rooms.filter(room => room.isActive || room.id === roomId).map(room => <option key={room.id} value={room.id}>{room.name} · {room.capacity} kişi</option>)}
-    </select></label>
+    <div className="form-field form-field--long">
+      <span>Rezervasyon</span>
+      <SearchSelect
+        ariaLabel="Rezervasyon"
+        disabled={fixed === "reservation"}
+        value={reservationId}
+        onChange={value => onChange(value, roomId)}
+        placeholder="Rezervasyon seçin"
+        searchPlaceholder="Rezervasyon, misafir veya tarih ara"
+        options={reservations
+          .filter(item => item.reservationType === "room" && ["pending", "approved"].includes(item.status) && item.roomIds.length <= 1)
+          .map(item => ({
+            id: item.id,
+            label: item.title || item.customerName || "Rezervasyon",
+            description: `${item.customerName || "Misafir"} · ${item.startDate} – ${item.endDate} · ${item.guestCount} kişi`,
+            keywords: `${item.customerName} ${item.startDate} ${item.endDate}`
+          }))}
+      />
+    </div>
+    <div className="form-field form-field--long">
+      <span>Oda</span>
+      <SearchSelect
+        ariaLabel="Oda"
+        disabled={fixed === "room"}
+        value={roomId}
+        onChange={value => onChange(reservationId, value)}
+        placeholder="Odayı daha sonra ata"
+        searchPlaceholder="Oda adı veya numarası ara"
+        options={rooms.filter(room => room.isActive || room.id === roomId).map(room => ({
+          id: room.id,
+          label: room.name,
+          description: `${room.capacity} kişi${room.floor ? ` · ${room.floor}` : ""}`,
+          keywords: `${room.number || ""} ${room.floor || ""}`
+        }))}
+      />
+    </div>
   </div>;
 }
 

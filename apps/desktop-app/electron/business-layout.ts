@@ -29,6 +29,7 @@ export interface BusinessLayoutRoom {
   nightlyPriceMinor: number;
   currency: string;
   sortOrder: number;
+  outOfService: boolean;
   canRemove: boolean;
   removeBlockReason: string;
 }
@@ -60,6 +61,7 @@ interface BusinessLayoutRoomInput {
   priceNote: string;
   nightlyPriceMinor: number;
   currency: string;
+  outOfService?: boolean;
 }
 
 interface BusinessLayoutTableCategoryInput {
@@ -89,6 +91,7 @@ interface NormalizedRoomInput {
   priceNote: string;
   nightlyPriceMinor: number;
   currency: string;
+  outOfService: boolean;
 }
 
 export function getBusinessLayout(databasePath: string): BusinessLayoutSnapshot {
@@ -227,7 +230,8 @@ function listRooms(db: DatabaseSync): BusinessLayoutRoom[] {
 
   return rows.map((row) => {
     const id = text(row.id);
-    const removeBlockReason = getRoomRemovalBlockReason(db, id, text(row.status));
+    const status = text(row.status);
+    const removeBlockReason = getRoomRemovalBlockReason(db, id, status);
     return {
       id,
       name: text(row.name),
@@ -241,6 +245,7 @@ function listRooms(db: DatabaseSync): BusinessLayoutRoom[] {
       nightlyPriceMinor: Math.max(0, Number(row.nightly_price_minor ?? 0) || 0),
       currency: normalizeCurrency(row.price_currency),
       sortOrder: Math.max(0, Number(row.sort_order ?? 0) || 0),
+      outOfService: status === "out_of_service",
       canRemove: !removeBlockReason,
       removeBlockReason
     };
@@ -306,7 +311,8 @@ function normalizeRoomInputs(
       description,
       priceNote,
       nightlyPriceMinor,
-      currency
+      currency,
+      outOfService: candidate?.outOfService === true
     });
   }
 
@@ -329,6 +335,24 @@ function validateRoomTargets(
     if (room.id && !current.has(room.id)) {
       return { ok: false, message: "Düzenlenecek odalardan biri artık mevcut değil." };
     }
+    if (room.id && room.outOfService && current.get(room.id) !== "out_of_service") {
+      const reason = getRoomRemovalBlockReason(db, room.id, current.get(room.id) ?? "");
+      if (reason) {
+        const stored = db.prepare("SELECT name, number FROM rooms WHERE id = ? LIMIT 1")
+          .get(room.id) as { name?: string; number?: string } | undefined;
+        const label = text(stored?.number) ? `Oda ${text(stored?.number)}` : text(stored?.name) || room.name || "Oda";
+        return { ok: false, message: `${label} hizmet dışına alınamaz: ${reason}` };
+      }
+    }
+    if (room.id && !room.outOfService && current.get(room.id) === "out_of_service") {
+      const reason = getRoomRemovalBlockReason(db, room.id, current.get(room.id) ?? "");
+      if (reason) {
+        const stored = db.prepare("SELECT name, number FROM rooms WHERE id = ? LIMIT 1")
+          .get(room.id) as { name?: string; number?: string } | undefined;
+        const label = text(stored?.number) ? `Oda ${text(stored?.number)}` : text(stored?.name) || room.name || "Oda";
+        return { ok: false, message: `${label} yeniden hizmete alınamaz: ${reason}` };
+      }
+    }
   }
 
   for (const [roomId, status] of current) {
@@ -346,30 +370,38 @@ function validateRoomTargets(
 }
 
 function reconcileRooms(db: DatabaseSync, rooms: NormalizedRoomInput[], now: string) {
-  const currentIds = new Set(
-    (db.prepare("SELECT id FROM rooms WHERE deleted_at = '' AND is_active = 1").all() as Array<{ id?: string }>)
-      .map((row) => text(row.id))
-      .filter(Boolean)
+  const currentRows = db.prepare(
+    "SELECT id, status FROM rooms WHERE deleted_at = '' AND is_active = 1"
+  ).all() as Array<{ id?: string; status?: string }>;
+  const currentStatuses = new Map(
+    currentRows.map((row) => [text(row.id), text(row.status)] as const)
   );
+  const currentIds = new Set([...currentStatuses.keys()].filter(Boolean));
   const retainedIds = new Set<string>();
 
   const updateRoom = db.prepare(
     "UPDATE rooms SET name = ?, number = ?, capacity = ?, bed_info = ?, floor = ?, features_json = ?, " +
     "description = ?, price_note = ?, nightly_price_minor = ?, price_currency = ?, sort_order = ?, " +
-    "is_active = 1, updated_at = ?, deleted_at = '', sync_status = 'local_only' " +
+    "status = ?, is_active = 1, updated_at = ?, deleted_at = '', sync_status = 'local_only' " +
     "WHERE id = ? AND deleted_at = ''"
   );
   const insertRoom = db.prepare(
     "INSERT INTO rooms (" +
     "id, name, number, capacity, bed_info, floor, status, features_json, description, price_note, " +
     "is_active, sort_order, created_at, updated_at, deleted_at, sync_status, nightly_price_minor, price_currency" +
-    ") VALUES (?, ?, ?, ?, ?, ?, 'available', ?, ?, ?, 1, ?, ?, ?, '', 'local_only', ?, ?)"
+    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, '', 'local_only', ?, ?)"
   );
 
   rooms.forEach((room, index) => {
     const sortOrder = index + 1;
     if (room.id) {
       retainedIds.add(room.id);
+      const currentStatus = currentStatuses.get(room.id) ?? "available";
+      const nextStatus = room.outOfService
+        ? "out_of_service"
+        : currentStatus === "out_of_service"
+          ? "available"
+          : currentStatus;
       updateRoom.run(
         room.name,
         room.number,
@@ -382,6 +414,7 @@ function reconcileRooms(db: DatabaseSync, rooms: NormalizedRoomInput[], now: str
         room.nightlyPriceMinor,
         room.currency,
         sortOrder,
+        nextStatus,
         now,
         room.id
       );
@@ -397,6 +430,7 @@ function reconcileRooms(db: DatabaseSync, rooms: NormalizedRoomInput[], now: str
       room.capacity,
       room.bedInfo,
       room.floor,
+      room.outOfService ? "out_of_service" : "available",
       JSON.stringify(room.features),
       room.description,
       room.priceNote,

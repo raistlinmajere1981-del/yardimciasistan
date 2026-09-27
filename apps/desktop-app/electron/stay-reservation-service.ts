@@ -10,7 +10,10 @@ import type {
   UpdateReservationStatusInput
 } from "./database-types.js";
 import { insertDatabaseEvent } from "./database/event-store.js";
-import { hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay } from "./database/customer-room-stay-store.js";
+import {
+  findActiveCustomerRoomStay as findStoredActiveCustomerRoomStay,
+  hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay
+} from "./database/customer-room-stay-store.js";
 import {
   findConflictingRoomReservation as findStoredConflictingRoomReservation,
   getReservations as getStoredReservations
@@ -60,7 +63,8 @@ function createReservationStayInTransaction(db: DatabaseSync, input: CreateStayF
   return createCustomerStay(db, {
     customerId: String(reservation.customer_id), roomId,
     checkInDate: String(reservation.start_date), checkOutDate: String(reservation.end_date),
-    guestCount: Number(reservation.guest_count), notes: String(reservation.notes), status: "planned"
+    guestCount: Number(reservation.guest_count), notes: String(reservation.notes),
+    status: input?.status === "checked_in" ? "checked_in" : "planned"
   }, reservationId);
 }
 
@@ -93,6 +97,13 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   }
   if (!room || Number(room.is_active ?? 0) !== 1) {
     return { ok: false, message: "Atama yapılacak aktif oda bulunamadı." };
+  }
+  const activeCustomerStay = findStoredActiveCustomerRoomStay(db, customerId);
+  if (activeCustomerStay) {
+    const assignedRoom = activeCustomerStay.roomNumber
+      ? `Oda ${activeCustomerStay.roomNumber}`
+      : activeCustomerStay.roomName || "başka bir oda";
+    return { ok: false, message: `${String(customer.full_name ?? "Müşteri")} zaten ${assignedRoom} için aktif. Önce mevcut oda kaydını çıkış veya iptal ile kapatın.` };
   }
   if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
     return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
@@ -159,7 +170,9 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   const roomLabel = String(room.number ?? "").trim() || String(room.name ?? "").trim();
   return {
     ok: true,
-    message: `${String(customer.full_name ?? "Müşteri")} ${roomLabel ? `· ${roomLabel}` : ""} oda kaydına eklendi.`,
+    message: status === "checked_in"
+      ? `${String(customer.full_name ?? "Müşteri")} ${roomLabel ? `· ${roomLabel}` : ""} giriş yaptı.`
+      : `${String(customer.full_name ?? "Müşteri")} ${roomLabel ? `· ${roomLabel}` : ""} oda planına eklendi.`,
     savedId: id
   };
 }
@@ -202,6 +215,15 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
   };
   if (!(allowedTransitions[previousStatus] ?? []).includes(status)) {
     return { ok: false, message: "Bu konaklama kaydı seçilen duruma geçirilemez." };
+  }
+  if (["planned", "checked_in"].includes(status)) {
+    const activeCustomerStay = findStoredActiveCustomerRoomStay(db, String(stay.customer_id ?? ""), stayId);
+    if (activeCustomerStay) {
+      const assignedRoom = activeCustomerStay.roomNumber
+        ? `Oda ${activeCustomerStay.roomNumber}`
+        : activeCustomerStay.roomName || "başka bir oda";
+      return { ok: false, message: `Müşteri zaten ${assignedRoom} için aktif. Önce mevcut oda kaydını çıkış veya iptal ile kapatın.` };
+    }
   }
   if (
     ["planned", "checked_in"].includes(status)

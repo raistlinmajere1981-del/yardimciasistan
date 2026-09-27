@@ -10,6 +10,7 @@ import type {
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
 import { DatePicker, TimePicker } from "../ui/DateTimePicker";
+import { SearchSelect } from "../ui/SearchSelect";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
 
 type EditorState = "idle" | "loading" | "error";
@@ -109,26 +110,23 @@ export function ManualRestaurantReservationEditor({
           }}
         >
           <div className="form-grid restaurant-reservation-form-grid">
-            <label className="form-field form-field--long form-field--span">
-              Müşteri
-              <select
-                aria-label="Müşteri"
-                required
+            <div className="form-field form-field--long form-field--span">
+              <span>Müşteri</span>
+              <SearchSelect
+                ariaLabel="Müşteri"
                 value={form.customerId}
-                onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}
-              >
-                {customers.length === 0 ? (
-                  <option value="">Henüz müşteri kaydı yok</option>
-                ) : (
-                  customers.map((customer) => (
-                    <option value={customer.id} key={customer.id}>
-                      {customer.fullName}{customer.phone ? ` · ${customer.phone}` : ""}
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(customerId) => setForm((current) => ({ ...current, customerId }))}
+                placeholder={customers.length === 0 ? "Henüz müşteri kaydı yok" : "Müşteri seçin"}
+                searchPlaceholder="Müşteri adı veya telefon ara"
+                options={customers.map((customer) => ({
+                  id: customer.id,
+                  label: customer.fullName,
+                  description: customer.phone || customer.email || undefined,
+                  keywords: `${customer.phone || ""} ${customer.email || ""}`
+                }))}
+              />
               <small>{selectedCustomer ? "Kayıtlı müşteri seçildi." : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}</small>
-            </label>
+            </div>
 
             <div className="form-field--span">
               <QuickCustomerCreator
@@ -173,22 +171,23 @@ export function ManualRestaurantReservationEditor({
               />
             </label>
 
-            <label className="form-field form-field--medium form-field--span">
-              Masa
-              <select
-                aria-label="Masa"
+            <div className="form-field form-field--medium form-field--span">
+              <span>Masa</span>
+              <SearchSelect
+                ariaLabel="Masa"
                 value={form.tableId}
-                onChange={(event) => setForm((current) => ({ ...current, tableId: event.target.value }))}
-              >
-                <option value="">Masayı daha sonra ata</option>
-                {activeTables.map((table) => (
-                  <option value={table.id} key={table.id}>
-                    {table.name} · {table.capacity} kişi{table.area ? ` · ${table.area}` : ""}
-                  </option>
-                ))}
-              </select>
+                onChange={(tableId) => setForm((current) => ({ ...current, tableId }))}
+                placeholder="Masayı daha sonra ata"
+                searchPlaceholder="Masa adı veya bölüm ara"
+                options={activeTables.map((table) => ({
+                  id: table.id,
+                  label: table.name,
+                  description: `${table.capacity} kişi${table.area ? ` · ${table.area}` : ""}`,
+                  keywords: table.area
+                }))}
+              />
               <small>Masa seçilirse kapasite ile aynı tarih ve saatteki rezervasyon çakışması kontrol edilir.</small>
-            </label>
+            </div>
 
             <label className="form-field form-field--fluid form-field--span">
               Not

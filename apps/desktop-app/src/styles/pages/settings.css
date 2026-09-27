@@ -412,7 +412,7 @@
 .room-management-list-head,
 .room-management-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.25fr) minmax(8rem, 0.75fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 2.25fr) minmax(8rem, 0.75fr) auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -424,12 +424,19 @@
 }
 
 .room-management-row {
+  position: relative;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
 }
 
 .room-management-row input {
   width: 100%;
+}
+
+.room-management-out-of-service {
+  width: auto;
+  justify-self: start;
+  accent-color: var(--color-accent);
 }
 
 .room-management-identity {
@@ -505,7 +512,7 @@
 
 .room-management-row {
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  transition: border-color 120ms ease, background 120ms ease;
 }
 
 .room-management-row:hover {
@@ -515,7 +522,17 @@
 .room-management-row.is-media-selected {
   border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
-  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.room-management-row.is-media-selected::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--space-1);
+  border-start-start-radius: var(--radius-control);
+  border-end-start-radius: var(--radius-control);
+  background: var(--color-accent);
 }
 
 .room-media-panel {
@@ -532,7 +549,7 @@
   min-width: 1.8rem;
   height: 1.8rem;
   padding-inline: var(--space-2);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-size: var(--text-xs);
@@ -588,7 +605,7 @@
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   padding: var(--space-3);
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-surface);
 }
 
 .room-media-panel-empty {
@@ -638,7 +655,7 @@
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-surface);
   color: var(--color-accent);
 }
 
@@ -681,7 +698,7 @@
   min-height: 1.75rem;
   padding: 0 var(--space-2);
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bg-field);
   color: var(--color-text-muted);
   font: inherit;
@@ -1114,7 +1131,7 @@
   padding: var(--space-4);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-control);
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-surface);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }

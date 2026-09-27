@@ -41,7 +41,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },
   { id: "settings-devices", category: "services", title: "Telefon Kurulumu", keywords: "android usb cihaz eşleme rol izin görev kur kaldır", persistence: "action", visible: (caps, initialized) => initialized && caps.includes(C.ANDROID) },
-  { id: "settings-product-data", category: "services", title: "Ürün Verisi", keywords: "barkod open food facts sağlayıcı görseller otomatik ara", persistence: "staged", visible: caps => caps.includes(C.CATALOG) },
+  { id: "settings-product-data", category: "services", title: "Ürün Verisi", keywords: "barkod open food facts sağlayıcı görseller otomatik ara", persistence: "staged", visible: caps => caps.includes(C.RETAIL_BARCODE) },
   { id: "settings-web", category: "services", title: "Web Modülü", keywords: "eşitleme adres güvenlik anahtarı otomatik", persistence: "staged" },
   { id: "settings-web-test", category: "services", title: "Web Bağlantısını Dene", keywords: "bağlantı test", persistence: "action" },
   { id: "settings-ai", category: "services", title: "AI Yardımcı", keywords: "openai gemini google studio groq openrouter model api anahtarı zaman aşımı", persistence: "staged" },

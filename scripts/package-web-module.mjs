@@ -275,6 +275,15 @@ function validatePackage(manifest, businessConfig) {
     assert.ok(manifestFiles.has(file), `Paket manifestinde eksik dosya: ${file}`);
   }
 
+  const legacyDemoAssets = manifest.files
+    .map((file) => file.path)
+    .filter((path) => /^assets\/menu-.*\.(?:webp|png|jpe?g)$/i.test(path));
+  assert.deepEqual(
+    legacyDemoAssets,
+    [],
+    `Web modül paketi eski demo menü görsellerini içermemeli: ${legacyDemoAssets.join(", ")}`
+  );
+
   assertPackageFreeOfDemoData(manifest, businessConfig);
 
   for (const secretFile of [

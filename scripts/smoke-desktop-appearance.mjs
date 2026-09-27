@@ -40,7 +40,8 @@ async function runSmoke() {
     await waitForUrl(baseUrl);
     browser = await launchChromiumForSmoke(chromium);
 
-    await verifyFreshSetup(browser, baseUrl);
+    await verifyFirstSetupCategoryGate(browser, baseUrl);
+    await verifyFreshPreferences(browser, baseUrl);
     await verifyEmbeddedSettings(browser, baseUrl);
     await verifyLegacyPreferenceRecordIsDiscarded(browser, baseUrl);
     await verifyMalformedPreferenceRecord(browser, baseUrl);
@@ -57,7 +58,7 @@ async function runSmoke() {
   }
 }
 
-async function verifyFreshSetup(activeBrowser, rendererUrl) {
+async function verifyFirstSetupCategoryGate(activeBrowser, rendererUrl) {
   const context = await createIsolatedContext(activeBrowser);
   const page = await context.newPage();
   const pageErrors = trackPageErrors(page);
@@ -66,6 +67,30 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBeNull();
+    await expect(page.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab")).toHaveCount(1);
+    await expect(page.getByRole("tab", { name: "İşletme", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Uygulama", exact: true })).toHaveCount(0);
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
+    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+    expect(pageErrors).toEqual([]);
+  } catch (error) {
+    await reportScenarioFailure("first setup category gate", page, pageErrors);
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
+async function verifyFreshPreferences(activeBrowser, rendererUrl) {
+  const context = await createIsolatedContext(activeBrowser, undefined, false);
+  const page = await context.newPage();
+  const pageErrors = trackPageErrors(page);
+
+  try {
+    await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
+
+    expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBeNull();
+    await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
@@ -134,7 +159,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     });
     mkdirSync(screenshotDirectory, { recursive: true });
     await page.screenshot({
-      path: join(screenshotDirectory, "desktop-appearance-first-setup.png"),
+      path: join(screenshotDirectory, "desktop-appearance-fresh-preferences.png"),
       fullPage: true
     });
 
@@ -188,7 +213,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     expect(await readStoredPreferences(page)).toEqual({ version: 2, scheme: "dark", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" });
     expect(pageErrors).toEqual([]);
   } catch (error) {
-    await reportScenarioFailure("fresh setup", page, pageErrors);
+    await reportScenarioFailure("fresh preferences", page, pageErrors);
     throw error;
   } finally {
     await context.close();
@@ -331,6 +356,13 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
       }),
       getDashboardData: async () => dashboardData,
       getSetupData: async () => setupData,
+      getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
+      saveGoogleReviewsSettings: async (input) => ({
+        ok: true,
+        message: "Google yorumları ayarları kaydedildi.",
+        settings: { enabled: input.enabled, placeId: input.placeId, apiKeyConfigured: Boolean(input.apiKey), lastPublishedAt: "", publicationPending: false }
+      }),
+      testGoogleReviewsConnection: async () => ({ ok: true, message: "Google Places bağlantısı doğrulandı.", name: "Smoke İşletme", rating: 4.8, userRatingCount: 12 }),
       getRoomFolioData: async () => ({
         generatedAt: "",
         rooms: [],

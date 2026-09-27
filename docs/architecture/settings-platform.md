@@ -1,6 +1,6 @@
 # Settings Platform v2 — Stage 7
 
-Status: implemented; external verification pending. The [pre-change audit](settings-platform-audit.md)
+Status: implemented; external verification pending. The pre-change audit is archived in Git history and
 records actual source-of-truth, draft, validation, gates, APIs and feedback owners.
 Constitution and D-007/D-013/D-014/D-016 remain authoritative. Stage 6 Page / Entity
 Workspace / Operation contracts and static Room/Table composition are unchanged.

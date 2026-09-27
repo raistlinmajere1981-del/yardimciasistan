@@ -20,6 +20,7 @@
 @import "./components/badges.css" layer(components.primitives);
 @import "./components/buttons.css" layer(components.primitives);
 @import "./components/cards.css" layer(components.primitives);
+@import "./components/resource-card.css" layer(components.primitives);
 @import "./components/data-list.css" layer(components.primitives);
 @import "./components/dialogs.css" layer(components.primitives);
 @import "./components/workspace.css" layer(components.primitives);
@@ -54,6 +55,7 @@
 @import "./pages/reports.css" layer(pages);
 @import "./pages/restaurant.css" layer(pages);
 @import "./pages/room-folio.css" layer(pages);
+@import "./components/operation-surface.css" layer(pages);
 @import "./pages/settings.css" layer(pages);
 @import "../components/settings/business-location-map-picker.css" layer(pages);
 @import "./pages/menu-preview.css" layer(pages);

@@ -19,23 +19,19 @@ import type {
   SaveManualReservationInput
 } from "../../../electron/database";
 import {
-  formatStayDateRange
-} from "../../app/customer-model";
-import {
   formatDateForDisplay,
   formatReservationDate,
   formatReservationStatus
 } from "../../app/record-formatters";
-import { projectRoomState } from "@yardimci-asistan/shared";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { usePensionPage } from "../pension/pension-page-state";
-import { roomConditionLabel, roomToday } from "../pension/room-presentation";
 import { ReservationAssignmentDialog } from "../pension/ReservationRoomAssignment";
 import { DailyTaskEditor, type DailyTaskScope } from "./DailyTaskEditor";
 import { ManualReservationEditor } from "./ManualReservationEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
+import { ChoiceChips } from "../ui/ChoiceChips";
 
 function getReservationStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) return "danger";
@@ -68,13 +64,6 @@ function formatTaskRelation(task: DesktopDashboardData["dailyTasks"][number]) {
     request: "İlgili talep"
   };
   return labels[task.relatedType] ?? "İlgili kayıt";
-}
-
-function getResourceStatusTone(value: string): StatusTone {
-  if (value === "available") return "ok";
-  if (["reserved", "cleaning", "bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) return "wait";
-  if (["maintenance", "out_of_service"].includes(value)) return "danger";
-  return "info";
 }
 
 function matchesReservationDate(reservation: DesktopDashboardData["reservations"][number], date: string) {
@@ -132,18 +121,20 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
           </ActionButton>
         </div>
         <div className="form-row filter-row">
-          <label className="form-field form-field--medium">
-            Durum
-            <select aria-label="Durum" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="pending">Bekleyen</option>
-              <option value="done">Tamamlanan</option>
-              <option value="cancelled">İptal</option>
-              <option value="all">Tümü</option>
-            </select>
-          </label>
-          <ActionButton variant="secondary" size="sm" type="button" onClick={() => setStatusFilter("all")}>
-            Tümünü Göster
-          </ActionButton>
+          <div className="form-field form-field--fluid">
+            <span>Durum</span>
+            <ChoiceChips
+              ariaLabel="Durum"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { id: "pending", label: "Bekleyen" },
+                { id: "done", label: "Tamamlanan" },
+                { id: "cancelled", label: "İptal" },
+                { id: "all", label: "Tümü" }
+              ]}
+            />
+          </div>
         </div>
       </div>
 
@@ -307,17 +298,22 @@ export function ReservationsWorkspace({
           </ActionButton>
         </div>
         <div className="form-row filter-row">
-          <label className="reservation-status-filter form-field form-field--short">
+          <div className="reservation-status-filter form-field form-field--fluid">
             <span className="reservation-control-label">Durum</span>
-            <select aria-label="Durum" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="all">Tümü</option>
-              <option value="pending">Onay bekleyen</option>
-              <option value="approved">Onaylandı</option>
-              <option value="rejected">Reddedildi</option>
-              <option value="cancelled">İptal edildi</option>
-              <option value="completed">Tamamlandı</option>
-            </select>
-          </label>
+            <ChoiceChips
+              ariaLabel="Durum"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { id: "all", label: "Tümü" },
+                { id: "pending", label: "Onay bekleyen" },
+                { id: "approved", label: "Onaylandı" },
+                { id: "rejected", label: "Reddedildi" },
+                { id: "cancelled", label: "İptal" },
+                { id: "completed", label: "Tamamlandı" }
+              ]}
+            />
+          </div>
           <div className="reservation-date-filter form-field form-field--short">
             <span className="reservation-filter-label">Tarih</span>
             <DatePicker
@@ -444,38 +440,4 @@ export function ReservationsWorkspace({
       />
     </section>
   );
-}
-
-interface RoomsWorkspaceProps {
-  rooms: DesktopDashboardData["rooms"];
-  reservations: DesktopDashboardData["reservations"];
-  stays: DesktopDashboardData["customerRoomStays"];
-  reservationsEnabled: boolean;
-  staysEnabled: boolean;
-}
-
-export function RoomsWorkspace({ rooms, reservations, stays, reservationsEnabled, staysEnabled }: RoomsWorkspaceProps) {
-  const navigation = useWorkspaceNavigation();
-  return <section className="room-grid" aria-label="Oda yönetimi">
-    {rooms.length === 0 && <p>Oda kaydı yok. Odaları Ayarlar bölümünden ekleyebilirsiniz.</p>}
-    {rooms.map(room => {
-      const state = projectRoomState(room, stays, reservations, roomToday());
-      const activeStay = stays.find(stay => state.occupancy.stayIds.includes(stay.id))
-        ?? stays.find(stay => state.planning.plannedStayIds.includes(stay.id));
-      return <button type="button" className="card room-card" key={room.id} data-status={state.operationalCondition}
-        aria-label={`${room.name} odasını aç`}
-        onClick={() => navigation.openWorkspace({
-          entityType: "room",
-          entityId: room.id,
-          returnContext: { page: "pension", view: "rooms", entityId: room.id }
-        })}>
-        <strong>{room.number ? `Oda ${room.number} · ${room.name}` : room.name}</strong>
-        <span>{roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
-        <span>{state.occupancy.status === "occupied" ? "Misafir içeride" : "Oda boş"}</span>
-        {staysEnabled && activeStay && <span>{activeStay.customerName} · {formatStayDateRange(activeStay)}</span>}
-        {reservationsEnabled && <span>{state.planning.reservationIds.length} rezervasyon · {state.planning.plannedStayIds.length} planlı konaklama</span>}
-        <small>{room.capacity} kişi · {room.floor || "Kat belirtilmedi"}</small>
-      </button>;
-    })}
-  </section>;
 }

@@ -10,6 +10,7 @@ import type {
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { DatePicker, addDays } from "../ui/DateTimePicker";
+import { SearchSelect } from "../ui/SearchSelect";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
 
 type EditorState = "idle" | "loading" | "error";
@@ -141,25 +142,23 @@ export function ManualReservationEditor({
           </div>}>
 
           <div className="form-grid">
-            <label className="form-field--span form-field form-field--long">
-              Müşteri
-              <select
+            <div className="form-field--span form-field form-field--long">
+              <span>Müşteri</span>
+              <SearchSelect
+                ariaLabel="Müşteri"
                 autoFocus={!isEditing}
-                required
                 disabled={isEditing}
                 value={form.customerId}
-                onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}
-              >
-                {customers.length === 0 ? (
-                  <option value="">Henüz müşteri kaydı yok</option>
-                ) : (
-                  customers.map((customer) => (
-                    <option value={customer.id} key={customer.id}>
-                      {customer.fullName}{customer.phone ? ` · ${customer.phone}` : ""}
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(customerId) => setForm((current) => ({ ...current, customerId }))}
+                placeholder={customers.length === 0 ? "Henüz müşteri kaydı yok" : "Müşteri seçin"}
+                searchPlaceholder="Müşteri adı veya telefon ara"
+                options={customers.map((customer) => ({
+                  id: customer.id,
+                  label: customer.fullName,
+                  description: customer.phone || customer.email || undefined,
+                  keywords: `${customer.phone || ""} ${customer.email || ""}`
+                }))}
+              />
               <small>
                 {isEditing
                   ? "Rezervasyonun müşteri kaydı değiştirilmez."
@@ -167,7 +166,7 @@ export function ManualReservationEditor({
                     ? "Kayıtlı müşteri seçildi."
                     : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}
               </small>
-            </label>
+            </div>
 
             {!isEditing && (
               <div className="form-field--span">
@@ -217,22 +216,24 @@ export function ManualReservationEditor({
               />
             </label>
 
-            <label className="form-field--span form-field form-field--long">
-              Oda
-              <select
+            <div className="form-field--span form-field form-field--long">
+              <span>Oda</span>
+              <SearchSelect
+                ariaLabel="Oda"
                 disabled={isEditing}
                 value={form.roomId}
-                onChange={(event) => setForm((current) => ({ ...current, roomId: event.target.value }))}
-              >
-                <option value="">Odayı daha sonra ata</option>
-                {activeRooms.map((room) => (
-                  <option value={room.id} key={room.id}>
-                    {room.name} · {room.capacity} kişi · {room.status === "available" ? "Boş" : room.status}
-                  </option>
-                ))}
-              </select>
+                onChange={(roomId) => setForm((current) => ({ ...current, roomId }))}
+                placeholder="Odayı daha sonra ata"
+                searchPlaceholder="Oda adı veya numarası ara"
+                options={activeRooms.map((room) => ({
+                  id: room.id,
+                  label: room.name,
+                  description: `${room.capacity} kişi · ${room.status === "available" ? "Boş" : room.status}`,
+                  keywords: `${room.number || ""} ${room.floor || ""}`
+                }))}
+              />
               <small>Mevcut rezervasyonun odasını listeden Oda Ata / Düzenle işlemiyle değiştirin.</small>
-            </label>
+            </div>
 
             <label className="form-field--span form-field form-field--fluid">
               Not

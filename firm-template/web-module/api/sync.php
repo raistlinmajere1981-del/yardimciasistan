@@ -21,7 +21,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings'], true)
+if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -42,6 +42,10 @@ if (!$isAuthorized) {
 try {
     if ($action === 'capabilities') {
         ya_sync_capabilities();
+    }
+
+    if ($action === 'reset_runtime') {
+        ya_sync_reset_runtime();
     }
 
     if ($action === 'pull_requests') {
@@ -141,6 +145,33 @@ function ya_sync_capabilities(): void
         'message' => 'Senkron özellikleri alındı.',
         ...ya_storage_capabilities(),
         'server_time' => $now,
+        'server_revision' => ya_storage_server_revision()
+    ]);
+}
+
+function ya_sync_reset_runtime(): void
+{
+    $deleted = ya_storage_reset_runtime();
+
+    // These files are generated from desktop settings and must not survive a
+    // full reset. The deployment identity and sync secret in config/business.json
+    // are deliberately preserved so the same installation can be configured again.
+    if (is_file(YA_AI_SETTINGS_FILE)) {
+        @unlink(YA_AI_SETTINGS_FILE);
+    }
+    if (is_file(YA_GOOGLE_REVIEWS_SETTINGS_FILE)) {
+        @unlink(YA_GOOGLE_REVIEWS_SETTINGS_FILE);
+    }
+
+    // Room media belongs to the published room catalog. An empty catalog means
+    // there are no retained media files on a genuinely clean web runtime.
+    ya_sync_prune_room_media([]);
+
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Web modülü çalışma verileri temizlendi.',
+        'reset_at' => date(DATE_ATOM),
+        'deleted' => $deleted,
         'server_revision' => ya_storage_server_revision()
     ]);
 }

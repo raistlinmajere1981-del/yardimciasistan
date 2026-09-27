@@ -43,6 +43,35 @@ try {
   await expect(page.getByRole('tabpanel')).toHaveCount(1);
   await expect(page.locator('.settings-category-workspace')).toHaveCount(1);
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+
+  // First-run setup intentionally exposes only Business; the remaining categories appear after the first save.
+  await page.evaluate(() => window.refreshSettings({ setupRequired: true }));
+  await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab')).toHaveCount(1);
+  await expect(tab('İşletme')).toBeVisible();
+  await expect(tab('İşletme Düzeni')).toHaveCount(0);
+  await expect(tab('Servisler')).toHaveCount(0);
+  await expect(tab('Uygulama')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('görünüm');
+  await expect(page.getByRole('button', { name: 'Uygulama · Görünüm', exact: true })).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await page.evaluate(() => window.refreshSettings({ setupRequired: false }));
+  await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab')).toHaveCount(4);
+
+  // Product data belongs only to the retail/barcode profile, not generic catalog users such as restaurant.
+  await select('Servisler');
+  await expect(page.locator('#settings-product-data')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('ürün verisi');
+  await expect(page.getByRole('button', { name: 'Servisler · Ürün Verisi', exact: true })).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: [] }));
+  await expect(page.locator('#settings-product-data')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('ürün verisi');
+  await expect(page.getByRole('button', { name: 'Servisler · Ürün Verisi', exact: true })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [] }));
+  await expect(page.locator('#settings-product-data')).toHaveCount(0);
+  await select('İşletme');
+
   await expect(page.locator('#settings-public-profile')).toHaveAttribute('aria-busy', 'false');
   const googleReviewsSection = page.locator('#settings-google-reviews');
   if (await googleReviewsSection.count()) {
@@ -217,9 +246,41 @@ try {
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 1);
   const savedLayout = (await layoutCalls()).at(-1).input;
   expect(savedLayout.rooms).toHaveLength(2);
-  expect(savedLayout.rooms[0]).toMatchObject({ id: 'room-1', name: 'Deniz Oda', number: 'A1', capacity: 3, nightlyPriceMinor: 175000 });
-  expect(savedLayout.rooms[1]).toMatchObject({ name: 'Bahçe Oda', nightlyPriceMinor: 0 });
+  expect(savedLayout.rooms[0]).toMatchObject({ id: 'room-1', name: 'Deniz Oda', number: 'A1', capacity: 3, nightlyPriceMinor: 175000, outOfService: false });
+  expect(savedLayout.rooms[1]).toMatchObject({ name: 'Bahçe Oda', nightlyPriceMinor: 0, outOfService: false });
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
+  // Out-of-service is a staged BusinessLayout field, not an instant mutation.
+  const outOfServiceBox = page.getByLabel('Oda A1 hizmet dışı', { exact: true });
+  await expect(outOfServiceBox).toBeVisible();
+  await expect(outOfServiceBox).not.toBeChecked();
+  const mediaSelectBefore = await page.locator('.room-media-room-picker select').inputValue().catch(() => '');
+  await outOfServiceBox.check();
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  expect((await layoutCalls()).length).toBe(beforeLayoutSave + 1);
+  const mediaSelectAfter = await page.locator('.room-media-room-picker select').inputValue().catch(() => '');
+  expect(mediaSelectAfter).toBe(mediaSelectBefore);
+  await save();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 2);
+  const outOfServiceSaved = (await layoutCalls()).at(-1).input;
+  expect(outOfServiceSaved.rooms[0]).toMatchObject({ id: 'room-1', outOfService: true });
+  expect(outOfServiceSaved.rooms[1]).toMatchObject({ outOfService: false });
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+  await expect(page.getByLabel('Oda A1 hizmet dışı', { exact: true })).toBeChecked();
+
+  // Uncheck stages a return to service; discard restores the saved out-of-service state.
+  await page.getByLabel('Oda A1 hizmet dışı', { exact: true }).uncheck();
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  await discard();
+  await expect(page.getByLabel('Oda A1 hizmet dışı', { exact: true })).toBeChecked();
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
+  // Return to service persists as outOfService=false through the same staged save.
+  await page.getByLabel('Oda A1 hizmet dışı', { exact: true }).uncheck();
+  await save();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 3);
+  expect((await layoutCalls()).at(-1).input.rooms[0]).toMatchObject({ id: 'room-1', outOfService: false });
+  await expect(page.getByLabel('Oda A1 hizmet dışı', { exact: true })).not.toBeChecked();
 
   // Add -> remove is net-zero dirty; removing an existing room is staged and discard restores it.
   await page.getByRole('button', { name: 'Oda Ekle', exact: true }).click();
@@ -310,13 +371,13 @@ try {
   await page.getByRole('button', { name: 'Şifreyi Kaldır', exact: true }).click();
   await passwordConfirm.getByRole('button', { name: 'Şifreyi Kaldır' }).click();
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'password').at(-1).input)).toEqual({ currentPassword: 'abcdefg', newPassword: '' });
-  await page.getByRole('button', { name: 'Verileri Sıfırla', exact: true }).click();
-  const resetConfirm = page.getByRole('dialog', { name: 'Yerel Verileri Sıfırla' });
-  await expect(resetConfirm.locator('.action-button-danger')).toHaveText('Verileri Sıfırla');
+  await page.getByRole('button', { name: 'Tüm Verileri Sıfırla', exact: true }).click();
+  const resetConfirm = page.getByRole('dialog', { name: 'Tüm Verileri Sıfırla' });
+  await expect(resetConfirm.locator('.action-button-danger')).toHaveText('Tüm Verileri Sıfırla');
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'reset').length)).toBe(0);
-  await page.getByRole('button', { name: 'Verileri Sıfırla', exact: true }).click();
-  await resetConfirm.getByRole('button', { name: 'Verileri Sıfırla' }).click();
+  await page.getByRole('button', { name: 'Tüm Verileri Sıfırla', exact: true }).click();
+  await resetConfirm.getByRole('button', { name: 'Tüm Verileri Sıfırla' }).click();
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'reset').length)).toBe(1);
 
   await page.evaluate(() => window.refreshSettings({ aiApiKeyConfigured: true, aiEnabled: true }));

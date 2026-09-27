@@ -1,6 +1,9 @@
 import { createContext, useContext, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 
 const InsideModal = createContext(false);
+export function useInsideModalSurface() {
+  return useContext(InsideModal);
+}
 type CloseReason = "close-button" | "escape" | "backdrop";
 
 export interface ModalSurfaceProps {

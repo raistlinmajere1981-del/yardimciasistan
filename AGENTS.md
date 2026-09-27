@@ -18,7 +18,7 @@ Authoritative target architecture for new desktop feature/UI/platform work:
 
 - `docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md`
 - `docs/architecture/DOMAIN_DECISIONS_V1.md`
-- `docs/architecture/APPLICATION_PLATFORM_V2_ROADMAP.md`
+- `docs/FEATURE_DEVELOPMENT.md`
 
 Rules:
 
@@ -33,7 +33,7 @@ Rules:
 - Appearance v2 is the only desktop appearance model: scheme + density + scale + accent + font + motion. Do not add legacy easy/pro, data-theme/data-mode or feature-specific theme branches.
 - New staged Settings fields must use the existing category ownership/contribution model. Immediate preferences and operational actions keep their explicit lifecycles; do not create a second Settings persistence path.
 
-See the three architecture documents for details.
+See the current architecture documents and feature guide for details.
 
 ## Architecture
 
@@ -145,16 +145,18 @@ Important command nesting:
 - Local test/dev CLIs such as Vite must use repository-installed binaries directly; do not use `npx` paths that can implicitly download missing packages.
 - Do not additionally run `npm run quality:strict` when the unique strict gates below are run individually.
 
-Milestone unique gates:
+Milestone gate:
 
 ```bash
-npm run check:linux
-npm run lint:strict
-npm run knip:strict
-npm run design:audit:strict
-npm run architecture:audit
-npm run pilot:check
+npm run pre-main
 ```
+
+`pre-main` is the repository-level merge gate. It composes the Linux product checks,
+strict lint/Knip/design/architecture audits, the full pilot gate, current platform/domain
+regressions, Android action regressions, and `git diff --check`.
+
+Run individual gates while diagnosing a failure; do not manually maintain a second
+merge checklist beside `pre-main`.
 
 For Electron refactors, normally include:
 - `npm run typecheck:electron`

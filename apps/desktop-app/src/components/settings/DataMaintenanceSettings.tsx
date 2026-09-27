@@ -213,7 +213,7 @@ export function DataMaintenanceSettings() {
       <div className="settings-panel-header backup-manager-title">
         <div>
           <h3>Veri ve Yedekleme</h3>
-          <p>Yerel verileri yedekleyin, geri yükleyin veya sıfırlayın.</p>
+          <p>Yerel verileri yedekleyin, geri yükleyin veya temiz başlangıç için tamamen sıfırlayın.</p>
         </div>
         {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
       </div>
@@ -229,7 +229,7 @@ export function DataMaintenanceSettings() {
         </button>
         <button className="setup-secondary password-remove-button action-button action-button-danger" type="button" onClick={() => void resetLocalData()} disabled={busy}>
           <Trash2 size={16} aria-hidden="true" />
-          {action === "reset" ? "Sıfırlanıyor" : "Verileri Sıfırla"}
+          {action === "reset" ? "Sıfırlanıyor" : "Tüm Verileri Sıfırla"}
         </button>
       </div>
 

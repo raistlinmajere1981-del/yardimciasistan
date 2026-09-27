@@ -2,10 +2,13 @@ import { useId, type ReactNode } from "react";
 import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
 import { ActionButton } from "./ActionButton";
 import { ModalSurface } from "./ModalSurface";
+import { useDialogFocus } from "./useDialogFocus";
 
 export interface ConfirmDialogProps {
-  /** Reuse the current workspace modal boundary for an in-workspace decision. */
+  /** Reuse the current workspace modal boundary for an inline decision. */
   embedded?: boolean;
+  /** Center the confirmation above the current modal without creating a nested ModalSurface. */
+  withinModal?: boolean;
   tone?: "info" | "warning" | "danger";
   eyebrow?: string;
   title: string;
@@ -22,9 +25,10 @@ export interface ConfirmDialogProps {
 }
 
 /** Controlled decision surface: the owner decides when an operation has succeeded. */
-export function ConfirmDialog({ embedded = false, tone = "info", eyebrow, title, description, details, icon,
+export function ConfirmDialog({ embedded = false, withinModal = false, tone = "info", eyebrow, title, description, details, icon,
   confirmLabel, cancelLabel = "Vazgeç", secondaryLabel, onConfirm, onCancel, onSecondary, busy = false }: ConfirmDialogProps) {
   const id = useId();
+  const withinModalRef = useDialogFocus(withinModal);
   const ToneIcon = tone === "danger" ? ShieldAlert : tone === "warning" ? AlertTriangle : Info;
   const content = <>
     <header className="confirm-dialog__header">
@@ -37,11 +41,17 @@ export function ConfirmDialog({ embedded = false, tone = "info", eyebrow, title,
       {details && <div className="confirm-dialog__details">{details}</div>}
     </div>
     <footer className="confirm-dialog__actions" aria-busy={busy}>
-      <ActionButton variant="ghost" disabled={busy} onClick={onCancel} data-modal-initial-focus>{cancelLabel}</ActionButton>
+      <ActionButton variant="ghost" disabled={busy} onClick={onCancel} data-modal-initial-focus data-dialog-close>{cancelLabel}</ActionButton>
       {secondaryLabel && onSecondary && <ActionButton variant="secondary" disabled={busy} onClick={onSecondary}>{secondaryLabel}</ActionButton>}
       <ActionButton variant={tone === "danger" ? "danger" : "primary"} disabled={busy} onClick={onConfirm}>{confirmLabel}</ActionButton>
     </footer>
   </>;
+  if (withinModal) return <div className="confirm-dialog-layer">
+    <section ref={withinModalRef} className={`confirm-dialog confirm-dialog--embedded confirm-dialog--within-modal confirm-dialog--${tone}`}
+      role="alertdialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined}>
+      {content}
+    </section>
+  </div>;
   if (embedded) return <section className={`confirm-dialog confirm-dialog--embedded confirm-dialog--${tone}`} aria-labelledby={`${id}-title`}>{content}</section>;
   return <ModalSurface className={`confirm-dialog confirm-dialog--${tone}`} labelledBy={`${id}-title`}
     describedBy={description ? `${id}-description` : undefined} onClose={onCancel} closeBlocked={busy} dismissOnBackdrop>{content}</ModalSurface>;

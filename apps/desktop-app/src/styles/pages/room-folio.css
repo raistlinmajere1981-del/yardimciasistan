@@ -1,12 +1,10 @@
-/* Account body uses the Room Workspace scroll owner. */
-.room-folio-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-.room-folio-menu-list, .room-folio-line-list {
+.room-folio-line-list {
   display: grid;
   align-content: start;
   gap: var(--space-2);
 }
 
-.room-folio-menu-list article, .room-folio-line-list article {
+.room-folio-line-list article {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -15,7 +13,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.room-folio-menu-list article > div:first-child, .room-folio-line-list article > div:first-child {
+.room-folio-line-list article > div:first-child {
   display: grid;
   gap: var(--space-1);
   flex: 1 1 var(--field-width-xs);
@@ -23,42 +21,9 @@
   overflow-wrap: anywhere;
 }
 
-.room-folio-menu-list article > div:last-child {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.room-folio-menu-list span, .room-folio-line-list span {
+.room-folio-line-list span {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-}
-
-.room-folio-totals > span {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  overflow-wrap: anywhere;
-}
-
-.room-folio-totals strong {
-  color: var(--color-text);
-  font-size: var(--text-md);
-}
-
-.room-folio-totals .is-waiting {
-  border-color: var(--color-warning-border);
-  background: var(--color-warning-soft);
-}
-
-.room-folio-totals .is-paid {
-  color: var(--color-success);
-  background: var(--color-success-soft);
 }
 
 .room-folio-payment-history {
@@ -78,6 +43,3 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
-
-
-@media (max-width: 760px) { .room-folio-totals { grid-template-columns: minmax(0, 1fr); } }

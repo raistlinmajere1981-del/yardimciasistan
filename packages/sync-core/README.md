@@ -109,7 +109,7 @@ Başarısız bağlantı veya hatalı güvenlik anahtarı durumunda fonksiyonlar 
 Tüm güncel senkron çağrıları anahtarı `X-YA-Sync-Secret` header'ında gönderir; JSON
 gövdesine veya query string'e eklemez. Canlı uzak hedefte HTTPS kullanılmalıdır.
 
-`pushMenu()` PC'deki QR menü verisini `api/sync.php` içindeki `publish_menu` aksiyonuna gönderir. Başarılı yayın sonrası müşteri menüsü `menu.html` üzerinden güncel veriyi okur.
+`pushMenu()` PC'deki QR menü verisini `api/sync.php` içindeki `publish_menu` aksiyonuna gönderir. Başarılı yayın sonrası müşteri menüsü `api/menu.php` üzerinden güncel veriyi okur; web modülü ayrı bir `menu.html` taşımaz.
 
 `pushAndroidSnapshot()` PC'deki local oda, masa, rezervasyon, günlük iş ve müşteri özetini `publish_android_snapshot` aksiyonuna gönderir. Android uygulama aynı veriyi `android_summary` cevabındaki `operations` ve `daily_tasks` alanlarından okur.
 

@@ -13,7 +13,23 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
   let sequence = 0;
   const folios = [];
   const menu = [{ id: 'tea', name: 'Çay', categoryId: 'drinks', categoryName: 'İçecekler', description: '', priceMinor: 5000, currency: 'TRY', stockQuantity: 10, stockConsumptionQuantity: 1 }];
-  window.fixtureDashboard = clone(dashboard);
+  const snapshot = () => {
+    dashboard.revision = (dashboard.revision ?? 0) + 1;
+    dashboard.roomOperations = dashboard.rooms.map(room => ({ roomId: room.id,
+      stays: capabilities.staysEnabled ? dashboard.customerRoomStays.filter(stay => stay.roomId === room.id && ['planned', 'checked_in'].includes(stay.status)) : [],
+      reservations: capabilities.reservationsEnabled ? dashboard.reservations.filter(item => item.roomIds.includes(room.id) && ['pending', 'approved'].includes(item.status)) : [],
+      accounts: capabilities.folioEnabled ? folios.filter(item => item.roomId === room.id && item.status === 'open').map(item => ({
+        folioId: item.id, stayId: item.stayId, stayStatus: dashboard.customerRoomStays.find(stay => stay.id === item.stayId)?.status ?? 'checked_out',
+        customerName: item.customerName, remainingMinor: item.remainingMinor, currency: item.currency
+      })) : []
+    }));
+    window.fixtureDashboard = clone(dashboard);
+    return clone(dashboard);
+  };
+  snapshot();
+  window.fixturePublish = () => window.fixturePublishDashboard?.(snapshot());
+  window.fixturePatch = patch => { Object.assign(dashboard, clone(patch)); window.fixturePublish(); };
+  window.fixtureSetFolios = next => { folios.splice(0, folios.length, ...clone(next)); window.fixturePublish(); };
   window.fixtureCapabilities = capabilities;
   window.fixtureCalls = [];
   window.fixtureReads = [];
@@ -24,26 +40,28 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
   const stamp = () => String(++sequence);
   const data = () => ({ generatedAt: stamp(), rooms: dashboard.rooms.map(item => ({ ...item, nightlyPriceMinor: 10000, currency: 'TRY' })),
     activeStays: dashboard.customerRoomStays.filter(stay => ['planned', 'checked_in'].includes(stay.status)), folios, menuCategories: [{ id: 'drinks', name: 'İçecekler' }], menuItems: menu });
-  const success = (savedId = '') => ({ ok: true, message: 'Kaydedildi.', dashboardData: clone(dashboard), savedId });
-  const financial = folio => ({ ok: true, message: 'Hesap güncellendi.', data: clone(data()), folioId: folio.id });
+  const success = (savedId = '') => ({ ok: true, message: 'Kaydedildi.', dashboardData: snapshot(), savedId });
+  const financial = folio => { window.fixturePublish(); return { ok: true, message: 'Hesap güncellendi.', data: clone(data()), folioId: folio.id }; };
   const totals = folio => { folio.chargeTotalMinor = folio.lodgingTotalMinor + folio.items.reduce((sum, item) => sum + item.lineTotalMinor, 0); folio.paidTotalMinor = folio.payments.reduce((sum, payment) => sum + payment.amountMinor, 0); folio.remainingMinor = folio.chargeTotalMinor - folio.paidTotalMinor; };
   const makeStay = (input, reservationId = '') => {
     const selectedRoom = dashboard.rooms.find(item => item.id === input.roomId);
-    const stay = { ...input, id: `stay-${stamp()}`, reservationId, customerName: customer.fullName, customerPhone: customer.phone, roomName: selectedRoom.name, roomNumber: selectedRoom.number, status: 'planned', createdAt: stamp(), updatedAt: stamp(), checkedInAt: '', checkedOutAt: '' };
-    dashboard.customerRoomStays.push(stay); selectedRoom.status = 'reserved'; selectedRoom.updatedAt = stamp(); return success(stay.id);
+    const status = input.status === 'checked_in' ? 'checked_in' : 'planned';
+    const now = stamp();
+    const stay = { ...input, guestCount: Number(input.guestCount ?? 1), id: `stay-${stamp()}`, reservationId, customerName: customer.fullName, customerPhone: customer.phone, roomName: selectedRoom.name, roomNumber: selectedRoom.number, status, createdAt: now, updatedAt: now, checkedInAt: status === 'checked_in' ? now : '', checkedOutAt: '' };
+    dashboard.customerRoomStays.push(stay); selectedRoom.status = status === 'checked_in' ? 'occupied' : 'reserved'; selectedRoom.updatedAt = stamp(); return success(stay.id);
   };
   window.fixtureState = () => clone({ dashboard, folios, menu });
   window.yardimciDesktop = {
-    getRoomFolioData: async () => {
-      record('read', {});
+    getRoomFolioData: async roomId => {
+      record('read', { roomId });
       const snapshot = clone(data());
       if (window.fixtureDelayReads) return new Promise((resolve, reject) => window.fixtureReads.push({ resolve: (patch = {}) => resolve({ ...snapshot, ...patch }), reject }));
       return snapshot;
     },
     saveManualReservation: async input => { record('assignment', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); booking.roomIds = input.roomId ? [input.roomId] : []; return success(booking.id); },
-    createStayFromReservation: async input => { record('linked', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); return makeStay({ roomId: input.roomId, customerId: booking.customerId, checkInDate: booking.startDate, checkOutDate: booking.endDate, guestCount: booking.guestCount, notes: booking.notes }, booking.id); },
+    createStayFromReservation: async input => { record('linked', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); return makeStay({ roomId: input.roomId, customerId: booking.customerId, checkInDate: booking.startDate, checkOutDate: booking.endDate, guestCount: booking.guestCount, notes: booking.notes, status: input.status === 'checked_in' ? 'checked_in' : 'planned' }, booking.id); },
     assignCustomerRoom: async input => { record('manual', input); return makeStay(input); },
-    updateRoomStatus: async input => { record('room-status', input); const selectedRoom = dashboard.rooms.find(item => item.id === input.roomId); selectedRoom.status = input.status; selectedRoom.updatedAt = stamp(); return success(); },
+    updateRoomStatus: async input => { record('room-status', input); if (window.fixtureDelayRoom) await new Promise(resolve => { window.fixtureReleaseRoom = resolve; }); if (window.fixtureFailRoom) return { ok: false, message: 'Oda durumu kaydedilemedi.' }; const selectedRoom = dashboard.rooms.find(item => item.id === input.roomId); selectedRoom.status = input.status; selectedRoom.updatedAt = stamp(); return success(); },
     checkInStay: async stayId => { record('check-in', stayId); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = 'checked_in'; stay.checkedInAt = stamp(); stay.updatedAt = stamp(); dashboard.rooms.find(item => item.id === stay.roomId).status = 'occupied'; return success(stayId); },
     openRoomFolio: async stayId => {
       record('open-account', stayId);

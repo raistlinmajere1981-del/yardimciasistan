@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type {
+  AssignTableCustomerInput,
   DesktopTable,
   DesktopTableCategory,
   UpdateTableStatusInput
@@ -119,4 +120,21 @@ export function updateTableStatus(db: DatabaseSync, input: UpdateTableStatusInpu
     ok: true,
     message: "Masa durumu güncellendi."
   };
+}
+
+/** Customer relation only: reservations, table status and orders retain their own lifecycles. */
+export function assignTableCustomer(db: DatabaseSync, input: AssignTableCustomerInput): { ok: true; message: string } | { ok: false; message: string } {
+  const tableId = typeof input?.tableId === "string" ? input.tableId.trim() : "";
+  if (!tableId || typeof input?.customerId !== "string") {
+    return { ok: false, message: "Masa müşteri bağı için geçerli kayıt seçilmeli." };
+  }
+  const customerId = input.customerId.trim();
+  const table = db.prepare("SELECT id FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''").get(tableId);
+  if (!table) return { ok: false, message: "Aktif masa bulunamadı." };
+  if (customerId && !db.prepare("SELECT id FROM customers WHERE id = ? AND deleted_at = ''").get(customerId)) {
+    return { ok: false, message: "Müşteri bulunamadı." };
+  }
+  db.prepare("UPDATE tables SET current_customer_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+    .run(customerId, new Date().toISOString(), tableId);
+  return { ok: true, message: customerId ? "Masa müşterisi güncellendi." : "Masa müşteri bağı kaldırıldı." };
 }

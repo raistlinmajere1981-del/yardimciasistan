@@ -12,8 +12,8 @@ on:
       - "scripts/smoke-daily-task-*.mjs"
       - "scripts/smoke-manual-reservation.mjs"
       - "scripts/smoke-manual-restaurant-reservation.mjs"
-      - "scripts/smoke-operation-calendar.mjs"
-      - "scripts/smoke-desktop-frontend-architecture.mjs"
+      - "scripts/smoke-calendar-workspace.mjs"
+      - "scripts/architecture-audit.mjs"
       - "scripts/smoke-sync-timeout.mjs"
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
@@ -35,8 +35,8 @@ on:
       - "scripts/smoke-daily-task-*.mjs"
       - "scripts/smoke-manual-reservation.mjs"
       - "scripts/smoke-manual-restaurant-reservation.mjs"
-      - "scripts/smoke-operation-calendar.mjs"
-      - "scripts/smoke-desktop-frontend-architecture.mjs"
+      - "scripts/smoke-calendar-workspace.mjs"
+      - "scripts/architecture-audit.mjs"
       - "scripts/smoke-sync-timeout.mjs"
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
@@ -70,8 +70,8 @@ jobs:
       - name: Masaüstü strict typecheck
         run: npm run typecheck:strict -w @yardimci-asistan/desktop-app
 
-      - name: Frontend mimari smoke
-        run: node scripts/smoke-desktop-frontend-architecture.mjs
+      - name: Masaüstü mimari audit
+        run: npm run architecture:audit
 
       - name: Masaüstünü derle
         run: npm run build -w @yardimci-asistan/desktop-app
@@ -103,8 +103,8 @@ jobs:
       - name: Restoran rezervasyon smoke
         run: node scripts/smoke-manual-restaurant-reservation.mjs
 
-      - name: Operasyon takvimi smoke
-        run: node scripts/smoke-operation-calendar.mjs
+      - name: Takvim workspace smoke
+        run: node scripts/smoke-calendar-workspace.mjs
 
       - name: Electron başlatma smoke
         run: node scripts/smoke-desktop-xvfb.mjs

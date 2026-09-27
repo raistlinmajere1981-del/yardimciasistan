@@ -163,7 +163,7 @@ const PAYMENT_METHODS = new Set<RoomFolioPaymentMethod>(["cash", "card", "bank",
 export class DesktopRoomFolioService {
   constructor(private readonly databasePath: string) {}
 
-  getData(): DesktopRoomFolioData {
+  getData(roomId?: string): DesktopRoomFolioData {
     const db = this.openDatabase();
     try {
       const roomRows = db.prepare(`
@@ -219,10 +219,11 @@ export class DesktopRoomFolioService {
         JOIN customers ON customers.id = folios.customer_id
         JOIN room_folio_totals AS totals ON totals.folio_id = folios.id
         WHERE folios.deleted_at = ''
+          AND (? = '' OR folios.room_id = ?)
           AND (folios.status = 'open' OR folios.closed_at >= datetime('now', '-30 days'))
         ORDER BY CASE folios.status WHEN 'open' THEN 0 ELSE 1 END, folios.updated_at DESC
-        LIMIT 100
-      `).all() as Array<Record<string, unknown>>;
+        ${roomId ? "" : "LIMIT 100"}
+      `).all(roomId ?? "", roomId ?? "") as Array<Record<string, unknown>>;
 
       const categoryRows = db.prepare(`
         SELECT id, name

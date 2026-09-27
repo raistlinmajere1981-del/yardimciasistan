@@ -44,6 +44,7 @@ import type {
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
+  AssignTableCustomerInput,
   DesktopTableOrder,
   DesktopTableOrderResult,
   UpdateReservationStatusInput,
@@ -189,7 +190,7 @@ export interface DesktopBridge {
   deleteFinanceCategory: (categoryId: string) => Promise<DesktopFinanceMutationResult>;
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => Promise<DesktopFinanceMutationResult>;
   addPensionPayment: (input: AddPensionPaymentInput) => Promise<DesktopFinanceMutationResult>;
-  getRoomFolioData: () => Promise<DesktopRoomFolioData>;
+  getRoomFolioData: (roomId?: string) => Promise<DesktopRoomFolioData>;
   openRoomFolio: (stayId: string) => Promise<DesktopRoomFolioMutationResult>;
   updateRoomFolioDetails: (input: UpdateRoomFolioDetailsInput) => Promise<DesktopRoomFolioMutationResult>;
   addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => Promise<DesktopRoomFolioMutationResult>;
@@ -253,6 +254,7 @@ export interface DesktopBridge {
   deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => Promise<DesktopStatusUpdateResult>;
   updateRoomStatus: (input: UpdateRoomStatusInput) => Promise<DesktopStatusUpdateResult>;
   updateTableStatus: (input: UpdateTableStatusInput) => Promise<DesktopStatusUpdateResult>;
+  assignTableCustomer: (input: AssignTableCustomerInput) => Promise<DesktopStatusUpdateResult>;
   listTableOrders: () => Promise<DesktopTableOrder[]>;
   getActiveTableOrder: (tableId: string) => Promise<DesktopTableOrder | null>;
   openTableOrder: (tableId: string) => Promise<DesktopTableOrderResult>;
@@ -333,7 +335,7 @@ const bridge: DesktopBridge = {
   deleteFinanceCategory: (categoryId: string) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:deleteCategory", categoryId),
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:setReservationTotal", input),
   addPensionPayment: (input: AddPensionPaymentInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:addPensionPayment", input),
-  getRoomFolioData: () => invokeWhenUnlocked<DesktopRoomFolioData>("roomFolio:getData"),
+  getRoomFolioData: (roomId) => invokeWhenUnlocked<DesktopRoomFolioData>("roomFolio:getData", roomId),
   openRoomFolio: (stayId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:open", stayId),
   updateRoomFolioDetails: (input: UpdateRoomFolioDetailsInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:updateDetails", input),
   addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addMenuItem", input),
@@ -440,6 +442,7 @@ const bridge: DesktopBridge = {
   deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => ipcRenderer.invoke("whatsapp:deleteMessage", input),
   updateRoomStatus: (input: UpdateRoomStatusInput) => ipcRenderer.invoke("room:updateStatus", input),
   updateTableStatus: (input: UpdateTableStatusInput) => ipcRenderer.invoke("table:updateStatus", input),
+  assignTableCustomer: (input: AssignTableCustomerInput) => invokeWhenUnlocked<DesktopStatusUpdateResult>("table:assignCustomer", input),
   listTableOrders: () => ipcRenderer.invoke("tableOrder:list"),
   getActiveTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:getActive", tableId),
   openTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:open", tableId),

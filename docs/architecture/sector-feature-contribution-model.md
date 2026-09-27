@@ -182,7 +182,7 @@ npm run smoke:settings-platform
 npm run smoke:workspace-platform
 npm run smoke:pension-workspace
 npm run smoke:restaurant-workspace
-node scripts/smoke-operation-calendar.mjs
+node scripts/smoke-calendar-workspace.mjs
 node scripts/smoke-market-workspace-contract.mjs
 node scripts/smoke-capability-surface-consistency.mjs
 npm run smoke:desktop-renderer

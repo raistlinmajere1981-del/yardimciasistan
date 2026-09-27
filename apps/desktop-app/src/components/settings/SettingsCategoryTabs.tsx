@@ -1,9 +1,10 @@
 import type { KeyboardEvent } from "react";
-import { settingsCategories, type SettingsCategoryId } from "../../app/settings-registry";
+import { settingsCategories, type SettingsCategoryDefinition, type SettingsCategoryId } from "../../app/settings-registry";
 
-export function SettingsCategoryTabs({ active, dirty, onChange }: {
+export function SettingsCategoryTabs({ active, dirty, categories = settingsCategories, onChange }: {
   active: SettingsCategoryId;
   dirty: Partial<Record<SettingsCategoryId, boolean>>;
+  categories?: readonly SettingsCategoryDefinition[];
   onChange: (category: SettingsCategoryId) => boolean | Promise<boolean>;
 }) {
   async function requestChange(category: SettingsCategoryId, focusTarget?: HTMLButtonElement) {
@@ -13,7 +14,7 @@ export function SettingsCategoryTabs({ active, dirty, onChange }: {
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const last = settingsCategories.length - 1;
+    const last = categories.length - 1;
     const next = event.key === "ArrowRight" ? (index + 1) % (last + 1)
       : event.key === "ArrowLeft" ? (index + last) % (last + 1)
       : event.key === "Home" ? 0 : event.key === "End" ? last : null;
@@ -21,12 +22,12 @@ export function SettingsCategoryTabs({ active, dirty, onChange }: {
 
     event.preventDefault();
     const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-    void requestChange(settingsCategories[next].id, tabs?.[next]);
+    void requestChange(categories[next].id, tabs?.[next]);
   }
 
   return (
     <div className="settings-category-tabs" role="tablist" aria-label="Ayar kategorileri">
-      {settingsCategories.map((category, index) => (
+      {categories.map((category, index) => (
         <button
           key={category.id}
           id={`settings-tab-${category.id}`}

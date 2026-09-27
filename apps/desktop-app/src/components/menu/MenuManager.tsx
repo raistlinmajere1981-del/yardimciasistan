@@ -9,6 +9,7 @@ import {
   formatCurrency,
   getMenuStockBadge,
   isQrHiddenByStock,
+  resolveMenuPreviewImageUrl,
   type CategoryFormState,
   type ItemFormState
 } from "./menu-model";
@@ -362,7 +363,10 @@ export function MenuManager({
                     aria-pressed={selectedItemId === item.id}
                     selected={selectedItemId === item.id}
                     title={item.name}
-                    leading={<GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />}
+                    leading={<span className="menu-product-row__leading">
+                      <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />
+                      <MenuProductThumbnail item={item} webModuleUrl={dashboardData.webModuleUrl} />
+                    </span>}
                     meta={(selectedCategoryId ? "" : findMenuCategoryName(item.category_id, dashboardData.menu.categories) + " · ") + formatCurrency(item.price, item.currency) + " · " + (item.is_available ? "Mevcut" : "Kapalı") + (item.is_featured ? " · Öne çıkan" : "")}
                     trailing={(
                       <span className="menu-product-row__trailing">
@@ -456,4 +460,15 @@ function moveId(
   const insertIndex = position === "after" ? targetIndexAfterRemoval + 1 : targetIndexAfterRemoval;
   next.splice(Math.max(0, insertIndex), 0, sourceId);
   return next;
+}
+
+
+function MenuProductThumbnail({ item, webModuleUrl }: {
+  item: PublishedMenuItem;
+  webModuleUrl: string;
+}) {
+  const [failed, setFailed] = useState("");
+  const source = resolveMenuPreviewImageUrl(item.image_url || "", webModuleUrl);
+  if (!source || failed === source) return null;
+  return <img className="menu-product-row__image" src={source} alt="" loading="lazy" onError={() => setFailed(source)} />;
 }

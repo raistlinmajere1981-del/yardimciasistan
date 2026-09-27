@@ -149,6 +149,9 @@ function createSetupFixture() {
 
 function createDashboardFixture() {
   return {
+    revision: 1,
+    roomOperations: null,
+    tableOperations: null,
     databasePath: "/tmp/yardimci-asistan.sqlite",
     backupPath: "/tmp/yardimci-asistan/backups",
     webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",

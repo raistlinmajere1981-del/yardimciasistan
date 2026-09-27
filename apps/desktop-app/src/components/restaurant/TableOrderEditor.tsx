@@ -1,14 +1,16 @@
 import { Minus, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { PublishedQrMenu } from "@yardimci-asistan/sync-core";
+import type { PublishedMenuItem, PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import { IconButton } from "../ui/IconButton";
 import { ActionButton } from "../ui/ActionButton";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import type { useTableOrderController } from "./use-table-order-controller";
-import { formatMoney } from "./table-presentation";
+import { formatMoney, getOrderCurrency } from "./table-presentation";
+import { resolveMenuPreviewImageUrl } from "../menu/menu-model";
 
-export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = false }: {
-  menu: PublishedQrMenu; menuEnabled: boolean; readOnly?: boolean; controller: ReturnType<typeof useTableOrderController>;
+export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, readOnly = false, startControl }: {
+  menu: PublishedQrMenu; webModuleUrl: string; menuEnabled: boolean; readOnly?: boolean; startControl?: import("react").ReactNode; controller: ReturnType<typeof useTableOrderController>;
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,6 +25,7 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
     () => new Map(activeCategories.map((category) => [category.id, category.name])),
     [activeCategories]
   );
+  const menuItemsById = useMemo(() => new Map(menu.items.map(item => [item.id, item])), [menu.items]);
   const availableItems = useMemo(() => {
     if (!menuEnabled) return [];
     const activeCategoryIds = new Set(activeCategories.map((category) => category.id));
@@ -42,11 +45,11 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
   }, [activeCategories, categoryNames, menu.items, menuEnabled, searchQuery, selectedCategoryId]);
 
   return (
-    <div className={`restaurant-order-workspace${menuEnabled ? "" : " is-ticket-only"}`}>
+    <>
               {menuEnabled && <section className="restaurant-order-menu-panel" aria-labelledby="table-order-menu-title">
                 <div className="restaurant-order-panel-heading">
                   <div>
-                    <h3 id="table-order-menu-title">Menüden Ekle</h3>
+                    <h3 id="table-order-menu-title">Menü</h3>
                     <span>{availableItems.length} aktif ürün</span>
                   </div>
                   <label className="form-field form-field--medium restaurant-order-search">
@@ -68,10 +71,13 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
                   {availableItems.length === 0 && <p className="restaurant-order-empty">Aramanıza uyan aktif ve mevcut ürün bulunamadı.</p>}
                   {availableItems.map((item) => (
                     <article className="restaurant-order-product" key={item.id}>
-                      <div>
-                        <span>{categoryNames.get(item.category_id) ?? "Menü"}</span>
-                        <strong>{item.name}</strong>
-                        {item.description && <small>{item.description}</small>}
+                      <div className="restaurant-order-product__main">
+                        <OrderProductImage item={item} webModuleUrl={webModuleUrl} className="restaurant-order-product__image" />
+                        <div className="restaurant-order-product__copy">
+                          <span>{categoryNames.get(item.category_id) ?? "Menü"}</span>
+                          <strong>{item.name}</strong>
+                          {item.description && <small>{item.description}</small>}
+                        </div>
                       </div>
                       <div className="restaurant-order-product__action">
                         <strong>{formatMoney(item.price, item.currency || "TRY")}</strong>
@@ -98,8 +104,26 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
                     <span>{selectedOrder?.itemCount ?? 0} ürün</span>
                   </div>
                 </div>
+                {selectedOrder && <div className="form-field form-field--fluid">
+                  <span>Sipariş durumu</span>
+                  <ChoiceChips
+                    ariaLabel="Sipariş durumu"
+                    value={selectedOrder.status}
+                    disabled={Boolean(busyAction)}
+                    onChange={value => {
+                      if (value !== "open") void controller.status(value as "preparing" | "served" | "payment");
+                    }}
+                    options={[
+                      { id: "open", label: "Açık", disabled: selectedOrder.status !== "open" },
+                      { id: "preparing", label: "Hazırlanıyor" },
+                      { id: "served", label: "Servis edildi" },
+                      { id: "payment", label: "Hesap bekliyor" }
+                    ]}
+                  />
+                </div>}
+                {!selectedOrder && startControl}
                 <div className="restaurant-order-line-list">
-                  {!selectedOrder && <p className="restaurant-order-empty">Aktif adisyon yok. Sipariş Başlat ile başlayın.</p>}
+                  {!selectedOrder && <p className="restaurant-order-empty">Aktif adisyon yok. Sipariş açtığınızda ürün ekleyebilirsiniz.</p>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
                     <p className="restaurant-order-empty">{menuEnabled
                       ? "Henüz ürün eklenmedi. Soldaki aktif menüden ürün seçin."
@@ -108,8 +132,11 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
                   {selectedOrder?.items.map((item) => (
                     <article className="restaurant-order-line" key={item.id}>
                       <div className="restaurant-order-line__main">
-                        <strong>{item.productName}</strong>
-                        <span>{formatMoney(item.unitPrice, item.currency)} • {formatOrderItemStatus(item.status)}</span>
+                        <OrderProductImage item={menuItemsById.get(item.menuItemId)} webModuleUrl={webModuleUrl} className="restaurant-order-line__image" />
+                        <div className="restaurant-order-line__copy">
+                          <strong>{item.productName}</strong>
+                          <span>{formatMoney(item.unitPrice, item.currency)} • {formatOrderItemStatus(item.status)}</span>
+                        </div>
                       </div>
                       <strong className="restaurant-order-line__total">{formatMoney(item.lineTotal, item.currency)}</strong>
                       <div className="restaurant-quantity-control" role="group" aria-label={`${item.productName} adedi`}>
@@ -144,8 +171,9 @@ export function TableOrderEditor({ menu, menuEnabled, controller, readOnly = fal
                   ))}
                 </div>
 
+                {selectedOrder && <div className="restaurant-ticket-total"><span>Adisyon toplamı</span><strong>{formatMoney(selectedOrder.total, getOrderCurrency(selectedOrder))}</strong></div>}
               </section>
-            </div>
+            </>
 
   );
 }
@@ -182,3 +210,15 @@ function formatOrderItemStatus(status: string): string {
   }[status] ?? status;
 }
 
+
+
+function OrderProductImage({ item, webModuleUrl, className }: {
+  item?: PublishedMenuItem;
+  webModuleUrl: string;
+  className: string;
+}) {
+  const [failed, setFailed] = useState("");
+  const source = item ? resolveMenuPreviewImageUrl(item.image_url || "", webModuleUrl) : "";
+  if (!source || source === failed) return null;
+  return <img className={className} src={source} alt={item?.name || ""} loading="lazy" onError={() => setFailed(source)} />;
+}

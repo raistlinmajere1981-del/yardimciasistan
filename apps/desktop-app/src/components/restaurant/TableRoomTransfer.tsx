@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import type { DesktopTableOrder } from "../../../electron/database";
 import type { DesktopRoomFolioData } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
+import { SearchSelect } from "../ui/SearchSelect";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { formatMoney, getOrderCurrency } from "./table-presentation";
 
 /** Target selection inside Table Workspace. Execution belongs to its guarded operation. */
-export function TableRoomTransfer({ order, busy, onTransfer, onCancel }: {
+export function TableRoomTransfer({ order, busy, onTransfer, revision }: {
   order: DesktopTableOrder; busy: boolean;
-  onTransfer: (folioId: string) => void; onCancel: () => void;
+  onTransfer: (folioId: string) => void; revision: number;
 }) {
   const [data, setData] = useState<DesktopRoomFolioData | null>(null);
   const [folioId, setFolioId] = useState("");
@@ -21,24 +22,34 @@ export function TableRoomTransfer({ order, busy, onTransfer, onCancel }: {
       setData(result); setMessage("");
     }).catch(() => { if (current()) setMessage("Açık oda hesapları okunamadı."); });
     return () => { begin(); };
-  }, [begin]);
+  }, [begin, revision]);
   const folios = data?.folios.filter(folio => folio.status === "open") ?? [];
-  return <div className="form-stack">
+  return <div className="operation-section form-stack" aria-label="Odaya yazdırma">
+    <h4>Odaya yazdırma</h4>
     <p>Bu aktarım masa adisyonunu kapatır; tahsilat oda hesabı üzerinden yapılır.</p>
     <p>{order.tableName} · {formatMoney(order.total, getOrderCurrency(order))}</p>
-    <label className="form-field">Oda hesabı
-      <select aria-label="Oda hesabı" value={folioId} onChange={event => setFolioId(event.target.value)} disabled={busy}>
-        <option value="">Oda hesabı seçin</option>
-        {folios.map(folio => <option key={folio.id} value={folio.id}>
-          {folio.roomNumber ? `Oda ${folio.roomNumber}` : folio.roomName} · {folio.customerName || "Misafir"}
-        </option>)}
-      </select>
-    </label>
+    <div className="form-field form-field--fluid">
+      <span>Oda hesabı</span>
+      <SearchSelect
+        ariaLabel="Oda hesabı"
+        value={folioId}
+        onChange={setFolioId}
+        disabled={busy}
+        placeholder="Oda hesabı seçin"
+        searchPlaceholder="Oda veya misafir ara"
+        options={folios.map(folio => ({
+          id: folio.id,
+          label: folio.roomNumber ? `Oda ${folio.roomNumber}` : folio.roomName,
+          description: `${folio.customerName || "Misafir"} · ${formatMoney(folio.remainingMinor / 100, folio.currency)} açık`,
+          keywords: `${folio.roomName} ${folio.roomNumber} ${folio.customerName}`
+        }))}
+      />
+    </div>
     {message && <p role="status">{message}</p>}
     {data && folios.length === 0 && <p>Açık oda hesabı yok. Önce Pansiyon üzerinden oda hesabını açın.</p>}
     <div className="page-toolbar">
-      <ActionButton onClick={() => onTransfer(folioId)} disabled={busy || !folios.some(folio => folio.id === folioId)}>Aktarımı Onayla</ActionButton>
-      <ActionButton variant="secondary" onClick={onCancel} disabled={busy}>Vazgeç</ActionButton>
+      <ActionButton onClick={() => onTransfer(folioId)} disabled={busy || !folios.some(folio => folio.id === folioId)}>Odaya Yaz</ActionButton>
+
     </div>
   </div>;
 }

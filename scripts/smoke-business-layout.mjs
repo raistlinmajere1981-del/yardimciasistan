@@ -86,6 +86,7 @@ try {
   const initial = getBusinessLayout(database.databasePath);
   assert.deepEqual(initial.capabilities, { rooms: true, tables: true });
   assert.equal(initial.rooms.length, 2);
+  for (const room of initial.rooms) assert.equal(room.outOfService, false);
   assert.deepEqual(initial.tableCategories, [
     { name: "Salon", tableCount: 2 },
     { name: "Teras", tableCount: 1 }
@@ -106,7 +107,8 @@ try {
         description: "Deniz manzaralı oda",
         priceNote: "",
         nightlyPriceMinor: 250000,
-        currency: "TRY"
+        currency: "TRY",
+        outOfService: false
       },
       {
         clientKey: "draft-new-room",
@@ -119,7 +121,8 @@ try {
         description: "",
         priceNote: "",
         nightlyPriceMinor: 180000,
-        currency: "TRY"
+        currency: "TRY",
+        outOfService: false
       }
     ],
     tableCategories: [
@@ -132,7 +135,8 @@ try {
   assert.equal(save.layout.rooms[0].id, firstRoom.id);
   assert.equal(save.layout.rooms[0].name, "Deniz Oda");
   assert.equal(save.layout.rooms[0].nightlyPriceMinor, 250000);
-  assert.ok(save.layout.rooms.some((room) => room.name === "Bahçe Oda" && room.id && room.id !== firstRoom.id));
+  assert.equal(save.layout.rooms[0].outOfService, false);
+  assert.ok(save.layout.rooms.some((room) => room.name === "Bahçe Oda" && room.id && room.id !== firstRoom.id && room.outOfService === false));
   assert.deepEqual(save.layout.tableCategories, [
     { name: "İç Salon", tableCount: 1 },
     { name: "Bahçe", tableCount: 2 }
@@ -170,7 +174,8 @@ try {
         description: removableRoom.description,
         priceNote: removableRoom.priceNote,
         nightlyPriceMinor: removableRoom.nightlyPriceMinor,
-        currency: removableRoom.currency
+        currency: removableRoom.currency,
+        outOfService: false
       }
     ],
     tableCategories: [
@@ -209,11 +214,146 @@ try {
       description: "",
       priceNote: "",
       nightlyPriceMinor: 0,
-      currency: "TRY"
+      currency: "TRY",
+      outOfService: false
     }]
   });
   assert.equal(unknownRoom.ok, false);
   assert.match(unknownRoom.message, /artık mevcut değil/iu);
+
+  // Out-of-service is a BusinessLayout status, not is_active, with operational preservation.
+  const layoutForOos = getBusinessLayout(database.databasePath);
+  const oosTarget = layoutForOos.rooms.find((room) => room.id !== firstRoom.id);
+  assert.ok(oosTarget);
+  assert.equal(oosTarget.outOfService, false);
+  const toRoomInput = (room, overrides = {}) => ({
+    id: room.id,
+    name: room.name,
+    number: room.number,
+    capacity: room.capacity,
+    bedInfo: room.bedInfo,
+    floor: room.floor,
+    features: room.features,
+    description: room.description,
+    priceNote: room.priceNote,
+    nightlyPriceMinor: room.nightlyPriceMinor,
+    currency: room.currency,
+    outOfService: false,
+    ...overrides
+  });
+
+  const takeOut = saveBusinessLayout(database.databasePath, {
+    rooms: layoutForOos.rooms.map((room) => toRoomInput(room, room.id === oosTarget.id ? { outOfService: true } : {}))
+  });
+  assert.equal(takeOut.ok, true, takeOut.ok ? "" : takeOut.message);
+  assert.equal(takeOut.layout.rooms.find((room) => room.id === oosTarget.id)?.outOfService, true);
+  const readStatus = (roomId) => {
+    const reader = new DatabaseSync(database.databasePath);
+    try {
+      return reader.prepare("SELECT status, is_active FROM rooms WHERE id = ?").get(roomId);
+    } finally {
+      reader.close();
+    }
+  };
+  const oosRow = readStatus(oosTarget.id);
+  assert.equal(oosRow.status, "out_of_service");
+  assert.equal(Number(oosRow.is_active), 1);
+
+  const bringBack = saveBusinessLayout(database.databasePath, {
+    rooms: takeOut.layout.rooms.map((room) => toRoomInput(room, room.id === oosTarget.id ? { outOfService: false } : {}))
+  });
+  assert.equal(bringBack.ok, true, bringBack.ok ? "" : bringBack.message);
+  assert.equal(bringBack.layout.rooms.find((room) => room.id === oosTarget.id)?.outOfService, false);
+  assert.equal(readStatus(oosTarget.id).status, "available");
+
+  // Explicit false must preserve cleaning/maintenance instead of forcing available.
+  const preserveBase = getBusinessLayout(database.databasePath);
+  const preserveTarget = preserveBase.rooms.find((room) => room.id !== firstRoom.id);
+  assert.ok(preserveTarget);
+  const rawStatus = new DatabaseSync(database.databasePath);
+  try {
+    for (const status of ["cleaning", "maintenance"]) {
+      rawStatus.prepare("UPDATE rooms SET status = ? WHERE id = ?").run(status, preserveTarget.id);
+      const preserved = saveBusinessLayout(database.databasePath, {
+        rooms: getBusinessLayout(database.databasePath).rooms.map((room) => toRoomInput(room))
+      });
+      assert.equal(preserved.ok, true, preserved.ok ? "" : preserved.message);
+      assert.equal(preserved.layout.rooms.find((room) => room.id === preserveTarget.id)?.outOfService, false);
+      assert.equal(readStatus(preserveTarget.id).status, status);
+    }
+    rawStatus.prepare("UPDATE rooms SET status = 'available' WHERE id = ?").run(preserveTarget.id);
+  } finally {
+    rawStatus.close();
+  }
+
+  // Occupied rooms cannot be taken out of service through BusinessLayout.
+  const occupiedLayout = getBusinessLayout(database.databasePath);
+  const occupiedAttempt = saveBusinessLayout(database.databasePath, {
+    rooms: occupiedLayout.rooms.map((room) => toRoomInput(room, room.id === firstRoom.id ? { outOfService: true } : {}))
+  });
+  assert.equal(occupiedAttempt.ok, false);
+  assert.match(occupiedAttempt.message, /hizmet dışına alınamaz/iu);
+
+  // New rooms default to in-service; explicit true creates out_of_service.
+  const withNew = saveBusinessLayout(database.databasePath, {
+    rooms: [
+      ...getBusinessLayout(database.databasePath).rooms.map((room) => toRoomInput(room)),
+      { clientKey: "oos-new-default", name: "Varsayılan Oda", number: "999", capacity: 2, bedInfo: "", floor: "", features: [], description: "", priceNote: "", nightlyPriceMinor: 0, currency: "TRY", outOfService: false },
+      { clientKey: "oos-new-out", name: "Kapalı Oda", number: "998", capacity: 2, bedInfo: "", floor: "", features: [], description: "", priceNote: "", nightlyPriceMinor: 0, currency: "TRY", outOfService: true }
+    ]
+  });
+  assert.equal(withNew.ok, true, withNew.ok ? "" : withNew.message);
+  assert.equal(withNew.layout.rooms.find((room) => room.name === "Varsayılan Oda")?.outOfService, false);
+  assert.equal(withNew.layout.rooms.find((room) => room.name === "Kapalı Oda")?.outOfService, true);
+  const closedReader = new DatabaseSync(database.databasePath);
+  try {
+    assert.equal(
+      closedReader.prepare("SELECT status FROM rooms WHERE name = 'Kapalı Oda' AND deleted_at = '' LIMIT 1").get()?.status,
+      "out_of_service"
+    );
+  } finally {
+    closedReader.close();
+  }
+
+  // Historical inconsistency: an out_of_service room with an unfinished task
+  // cannot be reactivated until the blocker is cleared; the normal path keeps working.
+  const inconsistentBase = getBusinessLayout(database.databasePath);
+  const inconsistentTarget = inconsistentBase.rooms.find((room) => room.name === "Varsayılan Oda");
+  assert.ok(inconsistentTarget);
+  assert.equal(inconsistentTarget.outOfService, false);
+  const inconsistentTakeOut = saveBusinessLayout(database.databasePath, {
+    rooms: inconsistentBase.rooms.map((room) => toRoomInput(room, room.id === inconsistentTarget.id ? { outOfService: true } : {}))
+  });
+  assert.equal(inconsistentTakeOut.ok, true, inconsistentTakeOut.ok ? "" : inconsistentTakeOut.message);
+  assert.equal(inconsistentTakeOut.layout.rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, true);
+  const blockerDb = new DatabaseSync(database.databasePath);
+  try {
+    blockerDb.prepare(
+      "INSERT INTO daily_tasks (id, title, status, related_type, related_id, created_at, updated_at) " +
+      "VALUES ('oos-blocker-task', 'Tarihsel oda görevi', 'pending', 'room', ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')"
+    ).run(inconsistentTarget.id);
+  } finally {
+    blockerDb.close();
+  }
+  const blockedReactivate = saveBusinessLayout(database.databasePath, {
+    rooms: getBusinessLayout(database.databasePath).rooms.map((room) => toRoomInput(room, room.id === inconsistentTarget.id ? { outOfService: false } : {}))
+  });
+  assert.equal(blockedReactivate.ok, false);
+  assert.match(blockedReactivate.message, /yeniden hizmete alınamaz/iu);
+  assert.equal(readStatus(inconsistentTarget.id).status, "out_of_service");
+  assert.equal(getBusinessLayout(database.databasePath).rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, true);
+  const unblockDb = new DatabaseSync(database.databasePath);
+  try {
+    unblockDb.prepare("DELETE FROM daily_tasks WHERE id = 'oos-blocker-task'").run();
+  } finally {
+    unblockDb.close();
+  }
+  const normalReactivate = saveBusinessLayout(database.databasePath, {
+    rooms: getBusinessLayout(database.databasePath).rooms.map((room) => toRoomInput(room, room.id === inconsistentTarget.id ? { outOfService: false } : {}))
+  });
+  assert.equal(normalReactivate.ok, true, normalReactivate.ok ? "" : normalReactivate.message);
+  assert.equal(normalReactivate.layout.rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, false);
+  assert.equal(readStatus(inconsistentTarget.id).status, "available");
 
   console.log("business-layout-smoke-ok: atomic room/table layout, archive, blocker and partial update verified");
 } finally {

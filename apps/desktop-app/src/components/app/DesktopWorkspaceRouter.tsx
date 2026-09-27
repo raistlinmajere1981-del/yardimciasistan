@@ -1,3 +1,4 @@
+import { RoomsWorkspace } from "../pension/RoomsWorkspace";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES,
@@ -39,7 +40,6 @@ import { RestaurantReservationsWorkspace } from "../operations/RestaurantReserva
 import {
   DailyTasksWorkspace,
   ReservationsWorkspace,
-  RoomsWorkspace,
   formatTaskDue
 } from "../operations/OperationWorkspaces";
 import { SettingsWorkspace } from "../settings/SettingsWorkspace";
@@ -52,6 +52,7 @@ import { usePensionPageController } from "../pension/pension-page-state";
 import { PensionPage } from "../../pages/PensionPage";
 import { ReportsPage } from "../../pages/ReportsPage";
 import { RestaurantPage } from "../../pages/RestaurantPage";
+import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
 interface DesktopWorkspaceRouterProps {
   activePage: DesktopPage;
@@ -195,6 +196,7 @@ export function DesktopWorkspaceRouter({
 
   const pensionController = usePensionPageController();
   const calendarController = useCalendarPageController();
+  const workspaceNavigation = useWorkspaceNavigation();
   const C = BUSINESS_CAPABILITIES;
   const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
   const customersEnabled = runtimeHasCapability(businessCapabilities, C.CUSTOMERS);
@@ -242,22 +244,49 @@ export function DesktopWorkspaceRouter({
     openDashboardCustomerWork(request);
   }
 
-  function openRequestReservation(request: SyncedCustomerRequest) {
-    const reservation = surfaceData.reservations.find((item) => item.requestId === request.id);
-    if (!reservation) {
-      setSyncState("error");
-      setStatusMessage("Talebe bağlı rezervasyon bulunamadı.");
-      return;
-    }
-
-    if (!isReservationTypeAvailable(enabledCapabilities, reservation.reservationType, {
+  function openAssignedReservationWorkspace(
+    reservation: DesktopDashboardData["reservations"][number],
+    returnPage: DesktopPage
+  ) {
+    const domain = getReservationDomain(reservation.reservationType, {
       roomIds: reservation.roomIds,
       tableIds: reservation.tableIds
-    })) {
-      setSyncState("error");
-      setStatusMessage("Bu rezervasyon alanı işletmenin etkin yeteneklerinde kullanılamıyor.");
-      return;
+    });
+    const roomId = reservation.roomIds.length === 1 ? reservation.roomIds[0] : "";
+    if (
+      roomId
+      && roomsEnabled
+      && (domain === "accommodation" || domain === "mixed" || domain === "generic")
+      && surfaceData.rooms.some((room) => room.id === roomId)
+    ) {
+      return workspaceNavigation.openWorkspace({
+        entityType: "room",
+        entityId: roomId,
+        mode: "stay",
+        reservationId: reservation.id,
+        customerId: reservation.customerId,
+        returnContext: { page: returnPage, entityId: reservation.id }
+      });
     }
+
+    const tableId = reservation.tableIds.length === 1 ? reservation.tableIds[0] : "";
+    if (
+      tableId
+      && tablesEnabled
+      && (domain === "food_service" || domain === "mixed" || domain === "generic")
+      && surfaceData.tables.some((table) => table.id === tableId)
+    ) {
+      return workspaceNavigation.openWorkspace({
+        entityType: "table",
+        entityId: tableId,
+        mode: "customer",
+        returnContext: { page: returnPage, entityId: reservation.id }
+      });
+    }
+    return false;
+  }
+
+  function openReservationList(reservation: DesktopDashboardData["reservations"][number]) {
     const domain = getReservationDomain(reservation.reservationType, {
       roomIds: reservation.roomIds,
       tableIds: reservation.tableIds
@@ -275,6 +304,26 @@ export function DesktopWorkspaceRouter({
     setStatusMessage("Bu rezervasyon için etkin bir operasyon alanı bulunmuyor.");
   }
 
+  function openRequestReservation(request: SyncedCustomerRequest) {
+    const reservation = surfaceData.reservations.find((item) => item.requestId === request.id);
+    if (!reservation) {
+      setSyncState("error");
+      setStatusMessage("Talebe bağlı rezervasyon bulunamadı.");
+      return;
+    }
+
+    if (!isReservationTypeAvailable(enabledCapabilities, reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    })) {
+      setSyncState("error");
+      setStatusMessage("Bu rezervasyon alanı işletmenin etkin yeteneklerinde kullanılamıyor.");
+      return;
+    }
+    if (openAssignedReservationWorkspace(reservation, activePage)) return;
+    openReservationList(reservation);
+  }
+
   function openDashboardReservation(reservation: DesktopDashboardData["reservations"][number]) {
     if (!isReservationTypeAvailable(enabledCapabilities, reservation.reservationType, {
       roomIds: reservation.roomIds,
@@ -284,26 +333,8 @@ export function DesktopWorkspaceRouter({
       setStatusMessage("Bu rezervasyon alanı işletmenin etkin yeteneklerinde kullanılamıyor.");
       return;
     }
-    const request = surfaceData.requests.find((item) => item.id === reservation.requestId);
-    if (request) {
-      openDashboardCustomerWork(request);
-      return;
-    }
-    const domain = getReservationDomain(reservation.reservationType, {
-      roomIds: reservation.roomIds,
-      tableIds: reservation.tableIds
-    });
-    if ((domain === "food_service" || (domain === "generic" && !accommodationReservationsEnabled))
-        && foodReservationsEnabled) {
-      requestPageChange("restaurant");
-      return;
-    }
-    if (accommodationReservationsEnabled) {
-      requestPageChange("pension");
-      return;
-    }
-    setSyncState("error");
-    setStatusMessage("Bu rezervasyonun bağlı müşteri talebi bulunamadı.");
+    if (openAssignedReservationWorkspace(reservation, "dashboard")) return;
+    openReservationList(reservation);
   }
 
   async function handleSaveSetup(input: import("../../../electron/database").SaveInitialSetupInput) {
@@ -461,9 +492,9 @@ export function DesktopWorkspaceRouter({
           ) : null}
           rooms={(
             <RoomsWorkspace
-              rooms={surfaceData.rooms}
-              reservations={pensionReservations}
-              stays={surfaceData.customerRoomStays}
+              data={surfaceData}
+              onDashboard={setDashboardData}
+              folioEnabled={accommodationFolioEnabled}
               reservationsEnabled={accommodationReservationsEnabled}
               staysEnabled={accommodationStaysEnabled}
             />

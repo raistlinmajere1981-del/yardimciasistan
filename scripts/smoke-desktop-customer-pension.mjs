@@ -52,6 +52,7 @@ try {
         nightlyPriceMinor: 150000,
         currency: "TRY",
         sortOrder: index + 1,
+        outOfService: room.status === "out_of_service",
         canRemove: room.status !== "occupied" && room.status !== "reserved",
         removeBlockReason: room.status === "occupied" || room.status === "reserved" ? "Oda durumu aktif kullanım gösteriyor." : ""
       })),
@@ -140,6 +141,7 @@ try {
               nightlyPriceMinor: room.nightlyPriceMinor,
               currency: room.currency,
               sortOrder: index + 1,
+              outOfService: room.outOfService === true,
               canRemove: true,
               removeBlockReason: ""
             }))
@@ -274,21 +276,21 @@ try {
     await closeDialog();
     await capture('rooms');
     const unavailableRoom = page.getByRole('button', { name: 'Ek Oda 3 odasını aç', exact: true });
-    await expect(unavailableRoom).toContainText('Hizmet dışı');
+    await expect(page.getByRole('article').filter({ has: unavailableRoom })).toContainText('Hizmet dışı');
     await expect(page.getByLabel('Oda yönetimi', { exact: true }).getByRole('combobox')).toHaveCount(0);
-    await page.getByLabel('Oda yönetimi', { exact: true }).getByRole('button').first().click();
+    await page.getByLabel('Oda yönetimi', { exact: true }).getByRole('button', { name: /odasını aç$/ }).first().click();
     await capture('room-workspace');
-    await page.getByRole('dialog').getByRole('tab', { name: 'Hesap', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('region', { name: 'Misafir Hesabı', exact: true })).toBeVisible();
     await capture('folio-account');
-    await page.getByRole('dialog').getByRole('button', { name: 'Ödeme Al', exact: true }).click();
+    await expect(page.getByRole('dialog').getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
     await capture('folio-payment');
-    await page.getByRole('dialog').getByRole('button', { name: 'Vazgeç', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Misafir Çıkışı', exact: true }).first().click();
-    await expect(page.getByRole('heading', { name: 'Misafir Çıkışı', exact: true })).toBeVisible();
+    const checkoutConfirmation = page.getByRole('alertdialog', { name: 'Misafir çıkışı', exact: true });
+    await expect(checkoutConfirmation).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(1);
-    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(checkoutConfirmation).toContainText('Çıkış tamamlanır');
     await capture('checkout-confirmation');
-    await page.getByRole('button', { name: 'Vazgeç', exact: true }).click();
+    await checkoutConfirmation.getByRole('button', { name: 'Vazgeç', exact: true }).click();
     await closeDialog();
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
     await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();

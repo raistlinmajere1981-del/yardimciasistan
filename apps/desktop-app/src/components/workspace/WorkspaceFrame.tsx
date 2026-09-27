@@ -8,6 +8,7 @@ import type { WorkspacePresentation } from "./workspace-intent";
 export const WorkspaceCanvasContext = createContext<RefObject<HTMLElement | null> | null>(null);
 
 interface WorkspaceFrameProps extends Omit<ModalSurfaceProps, "labelledBy" | "children" | "className"> {
+  className?: string;
   title: ReactNode;
   context?: ReactNode;
   actions?: ReactNode;
@@ -21,7 +22,7 @@ interface WorkspaceFrameProps extends Omit<ModalSurfaceProps, "labelledBy" | "ch
   bodyScroll?: "body" | "panes";
 }
 
-export function WorkspaceFrame({ title, context, actions, navigation, footer, children, presentation,
+export function WorkspaceFrame({ title, context, actions, navigation, footer, children, presentation, className = "",
   onPresentationChange, closeLabel = "Çalışma alanını kapat", bodyScroll = "body", ...modal }: WorkspaceFrameProps) {
   const id = useId();
   const marker = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export function WorkspaceFrame({ title, context, actions, navigation, footer, ch
   }, [canvas]);
 
   return (
-    <ModalSurface {...modal} labelledBy={`${id}-title`} className={`workspace-frame workspace-frame--${presentation}`}>
+    <ModalSurface {...modal} labelledBy={`${id}-title`} className={`workspace-frame workspace-frame--${presentation} ${className}`}>
       <header className="workspace-frame__header">
         <div ref={marker} className="workspace-frame__identity">
           <h2 id={`${id}-title`} tabIndex={-1} data-modal-initial-focus>{title}</h2>

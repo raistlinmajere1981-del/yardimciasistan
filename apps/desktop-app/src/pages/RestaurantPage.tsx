@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { DesktopDashboardData, DesktopTableOrder, DesktopStatusUpdateResult } from "../../electron/database";
+import { useState, type ReactNode } from "react";
+import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../electron/database";
 import { tableWorkspaceDefinition } from "../app/workspace-definitions";
 import { OperationsBoardLayout } from "../components/operations/OperationsBoardLayout";
-import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "../components/restaurant/table-presentation";
-import { ActionButton } from "../components/ui/ActionButton";
-import { StatusBadge } from "../components/ui/StatusBadge";
+import { getTableStatusAction } from "../components/restaurant/table-presentation";
+import { TableResourceCard } from "../components/restaurant/TableResourceCard";
 import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
-import { WorkspaceHost, useWorkspaceNavigation } from "../components/workspace/WorkspaceNavigation";
+import { WorkspaceHost } from "../components/workspace/WorkspaceNavigation";
+import { ChoiceChips } from "../components/ui/ChoiceChips";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
@@ -35,55 +35,10 @@ export function RestaurantPage({
   onDashboardDataChanged,
   onUpdateTableStatus
 }: RestaurantPageProps) {
-  const navigation = useWorkspaceNavigation();
   const [group, setGroup] = useState("all");
   const [status, setStatus] = useState("all");
-  const [orders, setOrders] = useState<DesktopTableOrder[]>([]);
-  const [message, setMessage] = useState("");
-  const revision = useRef(0);
-  const activeOrders = useMemo(
-    () => new Map(
-      orders
-        .filter((order) => ["open", "preparing", "served", "payment"].includes(order.status))
-        .map((order) => [order.tableId, order])
-    ),
-    [orders]
-  );
   const groups = [...new Set(data.tables.map((table) => table.area.trim() || "Genel"))];
-
-  useEffect(() => {
-    if (!ordersEnabled) {
-      setOrders([]);
-      return;
-    }
-
-    let active = true;
-    const request = ++revision.current;
-    const bridge = window.yardimciDesktop;
-    if (!bridge || typeof bridge.listTableOrders !== "function") return;
-
-    void bridge.listTableOrders().then((result) => {
-      if (!active) return;
-      setOrders((current) => request === revision.current
-        ? result
-        : [...current, ...result.filter((order) => !current.some((item) => item.id === order.id))]);
-    }).catch(() => {
-      if (active && request === revision.current) {
-        setMessage("Adisyonlar okunamadı. Masa açıldığında yeniden kontrol edilir.");
-      }
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [ordersEnabled]);
-
-  function orderChanged(order: DesktopTableOrder) {
-    revision.current += 1;
-    setOrders((current) => current.some((item) => item.id === order.id)
-      ? current.map((item) => item.id === order.id ? order : item)
-      : [order, ...current]);
-  }
+  const summaries = new Map(data.tableOperations?.map(item => [item.tableId, item]));
 
   const tableToolbar = (
     <div className="hospitality-resource-toolbar" aria-label="Masa filtreleri">
@@ -94,70 +49,39 @@ export function RestaurantPage({
           {groups.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
       </label>
-      <label className="form-field">
-        Masa filtresi
-        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="all">Tüm masalar</option>
-          <option value="available">Boş</option>
-          <option value="occupied">Dolu</option>
-          {reservationsEnabled && <option value="reserved">Rezerve</option>}
-          {ordersEnabled && <option value="bill_waiting">Hesap</option>}
-        </select>
-      </label>
+      <div className="form-field">
+        <span>Masa filtresi</span>
+        <ChoiceChips
+          ariaLabel="Masa filtresi"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { id: "all", label: "Tümü" },
+            { id: "available", label: "Boş" },
+            { id: "occupied", label: "Dolu" },
+            ...(reservationsEnabled ? [{ id: "reserved", label: "Rezerve" }] : []),
+            ...(ordersEnabled ? [{ id: "bill_waiting", label: "Hesap" }] : [])
+          ]}
+        />
+      </div>
     </div>
   );
 
   const tableFloor = (
     <div className="restaurant-table-area-list" aria-label="Masa yönetimi">
-      {message && <p role="status">{message}</p>}
       {data.tables.length === 0 && <p>Masa kaydı yok. Masa kategorilerini Temel Ayarlar bölümünden belirleyebilirsiniz.</p>}
       {groups.filter((name) => group === "all" || name === group).map((name) => (
         <section className="table-area-group" key={name}>
           <header className="table-area-heading">
             <h3>{name}</h3>
           </header>
-          <div className="restaurant-table-grid">
+          <div className="resource-grid">
             {data.tables
               .filter((table) => (table.area.trim() || "Genel") === name
                 && (status === "all" || (getTableStatusAction(table.status) || table.status) === status))
-              .map((table) => {
-                const order = activeOrders.get(table.id);
-                return (
-                  <article className="card restaurant-table-card" data-status={table.status} key={table.id}>
-                    <header className="card__header restaurant-table-card__header">
-                      <h2>{table.name}</h2>
-                      <StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
-                    </header>
-                    {order && (
-                      <div className="restaurant-table-card__order-state">
-                        <span>Aktif adisyon</span>
-                        <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>
-                      </div>
-                    )}
-                    <div className="restaurant-table-card__summary">
-                      <span>{table.capacity} kişilik masa</span>
-                      {order && (
-                        <>
-                          <span>{order.itemCount} ürün</span>
-                          <strong>{formatMoney(order.total, getOrderCurrency(order))}</strong>
-                        </>
-                      )}
-                      {reservationsEnabled && <span>{table.activeReservationTitle || "Rezervasyon yok"}</span>}
-                    </div>
-                    <ActionButton
-                      size="sm"
-                      aria-label={`${table.name} masasını aç`}
-                      onClick={() => navigation.openWorkspace({
-                        entityType: "table",
-                        entityId: table.id,
-                        returnContext: { page: "restaurant", view: "floor", entityId: table.id }
-                      })}
-                    >
-                      Masayı Aç
-                    </ActionButton>
-                  </article>
-                );
-              })}
+              .map(table => <TableResourceCard key={table.id} table={table} summary={summaries.get(table.id)}
+                capabilities={{ ordersEnabled, reservationsEnabled, menuEnabled }} onDashboard={onDashboardDataChanged}
+                onUpdateTableStatus={onUpdateTableStatus} />)}
           </div>
         </section>
       ))}
@@ -190,14 +114,12 @@ export function RestaurantPage({
         definition={tableWorkspaceDefinition}
         context={{
           data,
-          orders,
           ordersEnabled,
           menuEnabled,
           customersEnabled,
           reservationsEnabled,
           roomFolioTransferEnabled,
           onUpdateTableStatus,
-          onOrderChanged: orderChanged,
           onDashboardDataChanged
         }}
       />

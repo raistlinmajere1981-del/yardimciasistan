@@ -1186,7 +1186,8 @@ function assertCapabilitiesShape() {
       "android_device_permissions",
       "versioned_publications",
       "idempotent_publications",
-      "server_revision"
+      "server_revision",
+      "runtime_reset"
     ],
     server_time: undefined,
     server_revision: undefined

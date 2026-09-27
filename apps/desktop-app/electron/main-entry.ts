@@ -2,6 +2,7 @@ import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { getSyncCapabilities, resetHostingRuntime } from "@yardimci-asistan/sync-core";
 import { DesktopDatabase } from "./database";
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
 import {
@@ -15,6 +16,7 @@ import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 import { registerBusinessCapabilityIpcHandlers } from "./business-capability-ipc";
 import { registerBusinessLayoutIpcHandlers } from "./business-layout-ipc";
 import { registerCommerceIpcHandlers } from "./commerce-ipc";
+import { getWebSyncConfig } from "./sync-config";
 import { registerDiagnosticsIpcHandlers } from "./ipc/diagnostics-ipc";
 import {
   assertPersistedBusinessCapability,
@@ -224,7 +226,13 @@ const mainProcessReady = import("./main");
 // hesabı, commerce, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı
 // testi IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı initialization adımından
 // sonra yapılır.
-void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanionSnapshotDirty, scheduleAutomaticSyncSoon }) => {
+void mainProcessReady.then(async ({
+  assertAppSessionUnlocked,
+  markLocalCompanionSnapshotDirty,
+  scheduleAutomaticSyncSoon,
+  suspendAutomaticSyncForMaintenance,
+  resumeAutomaticSyncAfterMaintenanceAbort
+}) => {
   await app.whenReady();
   setImmediate(() => {
     const databasePath = () => resolveDatabasePath(userDataPath());
@@ -263,7 +271,56 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanion
     };
 
     registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked });
-    registerDataMaintenanceIpcHandlers(userDataPath);
+    registerDataMaintenanceIpcHandlers(userDataPath, {
+      resetConnectedWebRuntime: async () => {
+        const database = new DesktopDatabase({
+          appPath: app.getAppPath(),
+          userDataPath: userDataPath(),
+          backupPath: resolveProjectBackupPath()
+        });
+        try {
+          database.initialize();
+          const { baseUrl, syncSecret } = getWebSyncConfig(database.getSetupData());
+          const normalizedBaseUrl = String(baseUrl ?? "").trim();
+          const normalizedSecret = String(syncSecret ?? "").trim();
+          if (!normalizedBaseUrl || !normalizedSecret || normalizedSecret === "change-this-secret") {
+            return { ok: true, skipped: true, message: "Bağlı web modülü yapılandırılmamış." };
+          }
+
+          const capabilities = await getSyncCapabilities({
+            baseUrl: normalizedBaseUrl,
+            syncSecret: normalizedSecret
+          });
+          if (!capabilities.ok) {
+            return { ok: false, message: capabilities.message };
+          }
+          if (!capabilities.features.includes("runtime_reset")) {
+            return {
+              ok: false,
+              message: "Web modülü temiz başlangıç sıfırlamasını desteklemiyor. Web modülü paketini güncelleyip tekrar deneyin."
+            };
+          }
+
+          await suspendAutomaticSyncForMaintenance();
+          try {
+            const result = await resetHostingRuntime({
+              baseUrl: normalizedBaseUrl,
+              syncSecret: normalizedSecret
+            });
+            if (!result.ok) {
+              resumeAutomaticSyncAfterMaintenanceAbort();
+              return { ok: false, message: result.message };
+            }
+            return { ok: true, message: result.message };
+          } catch (error) {
+            resumeAutomaticSyncAfterMaintenanceAbort();
+            throw error;
+          }
+        } finally {
+          database.close();
+        }
+      }
+    });
     registerDesktopUpdateIpcHandlers(userDataPath);
     startAutomaticDesktopUpdateChecks(userDataPath);
 

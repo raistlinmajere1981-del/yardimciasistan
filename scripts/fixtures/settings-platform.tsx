@@ -30,6 +30,7 @@ let layout = {
     floor: "",
     priceNote: "",
     sortOrder: 1,
+    outOfService: false,
     canRemove: true,
     removeBlockReason: ""
   }],
@@ -113,6 +114,7 @@ window.yardimciDesktop = {
           nightlyPriceMinor: room.nightlyPriceMinor,
           currency: room.currency,
           sortOrder: index + 1,
+          outOfService: room.outOfService === true,
           canRemove: true,
           removeBlockReason: ""
         }))
@@ -149,7 +151,7 @@ window.yardimciDesktop = {
   updateAppPassword: async input => { window.settingsCalls.push({ kind: "password", input }); return { ok: true, message: "Şifre kaydedildi", status: { passwordConfigured: Boolean(input.newPassword) } }; },
   onDataMaintenanceConfirmation: listener => { maintenanceConfirmation = listener; return () => { maintenanceConfirmation = null; }; },
   resetLocalData: async () => {
-    const approved = await maintenanceConfirmation?.({ title: "Yerel Verileri Sıfırla", description: "Bu bilgisayardaki Yardımcı Asistan verileri sıfırlanacak.", details: "İşlemden önce otomatik güvenlik yedeği alınır.", confirmLabel: "Verileri Sıfırla" });
+    const approved = await maintenanceConfirmation?.({ title: "Tüm Verileri Sıfırla", description: "Bu bilgisayardaki Yardımcı Asistan verileri sıfırlanacak.", details: "İşlemden önce otomatik güvenlik yedeği alınır.", confirmLabel: "Tüm Verileri Sıfırla" });
     if (!approved) return { ok: false, cancelled: true, message: "Veri sıfırlama iptal edildi." };
     window.settingsCalls.push({ kind: "reset" });
     return { ok: true, message: "Sıfırlama hazırlandı." };

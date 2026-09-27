@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import type {
+  AssignTableCustomerInput,
   DesktopDatabase,
   DesktopStatusUpdateResult,
   UpdateRoomStatusInput,
@@ -9,9 +10,10 @@ import type {
 
 export function registerRoomTableIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
 }) {
-  const { getDatabase, assertCapability } = options;
+  const { getDatabase, assertCapability, assertUnlocked } = options;
 
   ipcMain.handle("room:updateStatus", (_event, input: UpdateRoomStatusInput): DesktopStatusUpdateResult => {
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Oda yönetimi bu işletmede etkin değil.");
@@ -19,6 +21,13 @@ export function registerRoomTableIpcHandlers(options: {
       assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS, "Odayı rezerve etmek için konaklama rezervasyonları etkin olmalı.");
     }
     return getDatabase().updateRoomStatus(input);
+  });
+
+  ipcMain.handle("table:assignCustomer", (_event, input: AssignTableCustomerInput): DesktopStatusUpdateResult => {
+    assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.FOOD_TABLES, "Masa yönetimi bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    return getDatabase().assignTableCustomer(input);
   });
 
   ipcMain.handle("table:updateStatus", (_event, input: UpdateTableStatusInput): DesktopStatusUpdateResult => {

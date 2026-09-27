@@ -204,6 +204,10 @@ export type DesktopAndroidDeviceMutationResult =
   | { ok: false; message: string; devices: DesktopAndroidDevice[] };
 
 export interface DesktopDashboardData {
+  /** Monotonic across facade instances in the main process. */
+  revision: number;
+  roomOperations: DesktopRoomOperations[] | null;
+  tableOperations: DesktopTableOperations[] | null;
   databasePath: string;
   backupPath: string;
   webModuleUrl: string;
@@ -222,6 +226,29 @@ export interface DesktopDashboardData {
   summary: DashboardSummary;
   attention: DesktopOperationalAttention;
   birthdayOverview: DesktopBirthdayOverview;
+}
+
+export interface DesktopRoomAccountSummary {
+  folioId: string;
+  stayId: string;
+  stayStatus: string;
+  customerName: string;
+  remainingMinor: number;
+  currency: string;
+}
+
+export interface DesktopRoomOperations {
+  roomId: string;
+  /** All active stays, independent of the recent-history limit. */
+  stays: DesktopCustomerRoomStay[];
+  reservations: DesktopReservation[];
+  accounts: DesktopRoomAccountSummary[];
+}
+
+export interface DesktopTableOperations {
+  tableId: string;
+  order: Pick<DesktopTableOrder, "id" | "status" | "itemCount" | "total" | "openedAt" | "updatedAt"> & { currency: string } | null;
+  reservations: DesktopReservation[];
 }
 
 export type DesktopReportPreset = "today" | "yesterday" | "last7" | "last30" | "custom";
@@ -629,6 +656,8 @@ export interface SaveCustomerInput {
 export interface CreateStayFromReservationInput {
   reservationId: string;
   roomId?: string;
+  /** Defaults to planned for legacy callers; direct room entry requests checked_in. */
+  status?: "planned" | "checked_in";
 }
 
 export interface AssignCustomerRoomInput {
@@ -773,6 +802,12 @@ export interface UpdateRequestStatusInput {
 export interface UpdateRoomStatusInput {
   roomId: string;
   status: string;
+}
+
+export interface AssignTableCustomerInput {
+  tableId: string;
+  /** Empty string removes the customer relation. */
+  customerId: string;
 }
 
 export interface UpdateTableStatusInput {

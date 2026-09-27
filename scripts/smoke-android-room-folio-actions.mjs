@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { DesktopRoomFolioService } = require("../apps/desktop-app/dist-electron/room-folio.js");
 const { DesktopFinanceService } = require("../apps/desktop-app/dist-electron/finance.js");
+const { saveBusinessLayout } = require("../apps/desktop-app/dist-electron/business-layout.js");
 
 const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-android-room-folio-"));
 const database = new DesktopDatabase({
@@ -22,10 +23,26 @@ try {
   database.initialize();
   const setup = database.saveInitialSetup(createSmokeSetupInput({
     businessName: "Android Folio Test", phone: "+905550003002", whatsapp: "+905550003002",
-    syncSecret: "android-folio-test-secret", servicePreferences: { whatsapp: false, android: true },
-    initialCounts: { rooms: 1, tables: 0 }
+    syncSecret: "android-folio-test-secret", servicePreferences: { whatsapp: false, android: true }
   }));
   assert.equal(setup.ok, true, setup.message);
+
+  const layoutSeed = saveBusinessLayout(database.databasePath, {
+    rooms: [{
+      clientKey: "android-folio-room",
+      name: "Android Folio Oda",
+      number: "101",
+      capacity: 2,
+      bedInfo: "1 çift kişilik yatak",
+      floor: "",
+      features: [],
+      description: "",
+      priceNote: "",
+      nightlyPriceMinor: 120000,
+      currency: "TRY"
+    }]
+  });
+  assert.equal(layoutSeed.ok, true, layoutSeed.ok ? "" : layoutSeed.message);
   database.upsertAndroidDeviceSightings([{
     device_id: DEVICE_ID,
     device_name: "Room Folio Smoke",
@@ -98,7 +115,8 @@ try {
     service_orders: true,
     cashier: true,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   });
   assert.equal(groupsUpdated.ok, true, groupsUpdated.message);
   device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);

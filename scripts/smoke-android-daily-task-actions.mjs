@@ -14,8 +14,7 @@ try {
     phone: "+905550004040",
     whatsapp: "+905550004040",
     syncSecret: "android-daily-task-secret-123",
-    servicePreferences: { whatsapp: false, android: true },
-    initialCounts: { rooms: 1, tables: 1 }
+    servicePreferences: { whatsapp: false, android: true }
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
 

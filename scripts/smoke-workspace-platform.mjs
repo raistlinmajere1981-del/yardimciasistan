@@ -45,7 +45,7 @@ try {
   expect(await page.locator('dialog').count()).toBe(0);
   expect(await page.evaluate(() => window.openTable())).toBe(true);
   await expect(page.getByRole('dialog', { name: 'Table 1' })).toBeVisible();
-  expect(await page.evaluate(() => window.presentation)).toBe('full-canvas');
+  expect(await page.evaluate(() => window.presentation)).toBe('centered');
   // Generation validity applies to any completion path; unmount invalidates the last one.
   expect(await page.evaluate(() => {
     const old = window.beginGeneration();
@@ -67,7 +67,7 @@ try {
   await swapped.keyboard.press('Escape');
   await expect(swapped.getByRole('dialog')).toHaveCount(0);
   await swapped.evaluate(() => window.openTable());
-  await expect.poll(() => swapped.evaluate(() => window.presentation)).toBe('centered');
+  await expect.poll(() => swapped.evaluate(() => window.presentation)).toBe('full-canvas');
   await swapped.close();
   await page.getByLabel('Feature filter').fill('preserved filter');
   await page.getByRole('button', { name: 'Entry one' }).click();
@@ -79,6 +79,7 @@ try {
   await expect(dialog.getByRole('tab', { name: 'Account', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(dialog.getByRole('heading', { name: 'Room 101' })).toBeFocused();
   expect(await dialog.evaluate(el => el.matches(':modal'))).toBe(true);
+  await dialog.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
   const centered = await dialog.boundingBox();
   expect(centered.width).toBeLessThan(1440);
   expect(centered.x).toBeGreaterThan(0);
@@ -118,6 +119,7 @@ try {
   expect(canvas.x).toBeCloseTo(content.x, 0);
   expect(canvas.y).toBeCloseTo(shellHeader.y + shellHeader.height, 0);
   await dialog.getByRole('button', { name: 'Ortalanmış görünüme dön' }).click();
+  await dialog.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
   expect(await dialog.boundingBox()).toEqual(centered);
   const account = dialog.getByRole('tab', { name: 'Account', exact: true });
   await account.focus();

@@ -26,8 +26,8 @@ try {
     const enabledCapabilities = ['core.customers','core.requests','core.business_profile','accommodation.rooms','accommodation.reservations','food_service.tables','food_service.menu','food_service.orders','service.whatsapp','service.android','service.ai'];
     let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'], socialLinks: [] };
     let rooms = [
-      { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', capacity: 2, bedInfo: '1 çift kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 240000, currency: 'TRY', sortOrder: 1, canRemove: true, removeBlockReason: '' },
-      { id: 'room_design_102', name: 'Smoke Aile Odası', number: '102', capacity: 4, bedInfo: '1 çift + 2 tek kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 320000, currency: 'TRY', sortOrder: 2, canRemove: true, removeBlockReason: '' }
+      { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', capacity: 2, bedInfo: '1 çift kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 240000, currency: 'TRY', sortOrder: 1, outOfService: false, canRemove: true, removeBlockReason: '' },
+      { id: 'room_design_102', name: 'Smoke Aile Odası', number: '102', capacity: 4, bedInfo: '1 çift + 2 tek kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 320000, currency: 'TRY', sortOrder: 2, outOfService: false, canRemove: true, removeBlockReason: '' }
     ];
     let businessLayout = {
       capabilities: { rooms: true, tables: true },
@@ -101,6 +101,7 @@ try {
             nightlyPriceMinor: room.nightlyPriceMinor,
             currency: room.currency,
             sortOrder: index + 1,
+            outOfService: room.outOfService === true,
             canRemove: true,
             removeBlockReason: ''
           }));

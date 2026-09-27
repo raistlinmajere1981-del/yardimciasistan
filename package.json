@@ -102,12 +102,20 @@
     "smoke:hospitality-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-hospitality-domain.mjs",
     "smoke:pension-workspace": "node scripts/smoke-pension-workspace.mjs",
     "smoke:restaurant-workspace": "node scripts/smoke-restaurant-workspace.mjs",
+    "smoke:table-customer": "tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-table-customer.mjs",
     "smoke:table-order-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-desktop-menu-db.mjs --table-orders-only",
     "smoke:settings-platform": "node scripts/smoke-settings-platform.mjs",
     "smoke:sector-feature-contributions": "node scripts/smoke-sector-feature-contributions.mjs",
     "smoke:business-layout": "node scripts/smoke-business-layout.mjs",
     "smoke:table-categories-db": "node scripts/smoke-table-categories-db.mjs",
-    "smoke:setup-profile-contract": "node scripts/smoke-setup-profile-contract.mjs"
+    "smoke:setup-profile-contract": "node scripts/smoke-setup-profile-contract.mjs",
+    "smoke:operations-ui": "node scripts/smoke-operations-card-models.mjs && node scripts/smoke-operations-cards.mjs",
+    "smoke:operations-projections": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-operations-projections.mjs",
+    "clean:artifacts": "node scripts/clean-artifacts.mjs",
+    "clean:artifacts:dry": "node scripts/clean-artifacts.mjs --dry-run",
+    "clean:artifacts:all": "node scripts/clean-artifacts.mjs --all",
+    "smoke:pre-main:extras": "npm run smoke:settings-platform && npm run smoke:business-layout && npm run smoke:hospitality-domain && npm run smoke:pension-workspace && npm run smoke:restaurant-workspace && npm run smoke:operations-ui && npm run smoke:operations-projections && npm run smoke:table-customer && npm run smoke:diagnostics && npm run smoke:workspace-platform && node scripts/smoke-android-reservation-actions.mjs && node scripts/smoke-android-daily-task-actions.mjs && node scripts/smoke-android-finance-actions.mjs && node scripts/smoke-android-room-folio-actions.mjs",
+    "pre-main": "npm run check:linux && npm run lint:strict && npm run knip:strict && npm run design:audit:strict && npm run architecture:audit && npm run pilot:check:full && npm run smoke:pre-main:extras && git diff --check"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",
