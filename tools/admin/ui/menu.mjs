@@ -34,6 +34,7 @@ const SECTIONS = {
   },
   build: {
     title: "Build / Release", groups: [
+      ["Sürüm", ["product-version-show", "product-version-set"]],
       ["Derleme", ["build-packages", "build-apps", "build-all"]],
       ["Paketleme", ["pack-desktop-dir", "pack-desktop-linux", "pack-desktop-win", "pack-desktop-win32", "pack-web-module", "android-release-apk", "android-release-aab"]],
       ["Release akışları", ["release-desktop-linux", "release-android"]],
