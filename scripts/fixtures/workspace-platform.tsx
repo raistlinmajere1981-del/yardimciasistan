@@ -29,7 +29,7 @@ function FixtureWorkspace() {
   const mode = intent.mode ?? "summary";
   return <WorkspaceTabs value={mode}>
     <WorkspaceFrame title={`${intent.entityType === "room" ? "Room" : "Table"} ${intent.entityId}`} context={intent.action ?? "Inspect"} presentation={presentation}
-      onPresentationChange={nav.updateWorkspacePresentation} onClose={nav.closeWorkspace} closeBlocked={blocked}
+      onPresentationChange={nav.updateWorkspacePresentation} onClose={() => nav.closeWorkspace()} closeBlocked={blocked}
       returnFocusRef={nav.returnFocusRef} dismissOnBackdrop
       navigation={<WorkspaceTabList label="Room modes" tabs={[{ id: "summary", label: "Summary" }, { id: "account", label: "Account" }, { id: "history", label: "History" }]} onChange={mode => nav.updateWorkspaceMode({ entityType: "room", mode: mode as "summary" | "account" | "history" })} />}
       footer={<button onClick={() => { setBusy(false); setDirty(false); }}>Clear guard</button>}>
@@ -61,8 +61,8 @@ function Unlocked() {
   test.changePresentation = () => nav.updateWorkspacePresentation(nav.current?.presentation === "centered" ? "full-canvas" : "centered");
   return <AppShell contentRef={contentRef} sidebar={<aside className="sidebar">Sidebar</aside>}
     header={<PageHeader title="Feature page" />} overlay={<>
-      <WorkspaceHost definition={{ ...roomWorkspaceDefinition, render: () => <FixtureWorkspace /> }} context={{}} />
-      <WorkspaceHost definition={{ ...tableWorkspaceDefinition, render: () => <FixtureWorkspace /> }} context={{}} />
+      <WorkspaceHost definition={{ ...roomWorkspaceDefinition, sessionPage: undefined, render: () => <FixtureWorkspace /> }} context={{}} />
+      <WorkspaceHost definition={{ ...tableWorkspaceDefinition, sessionPage: undefined, render: () => <FixtureWorkspace /> }} context={{}} />
       {surface === "diagnostics" && <DiagnosticsViewer onClose={() => setSurface(null)} />}
       {surface === "form" && <FormDialog title="Bounded task" onClose={() => setSurface(null)} onSubmit={e => { e.preventDefault(); setSurface(null); }} footer={<button type="submit">Save task</button>}><label>Task name<input /></label></FormDialog>}
     </>}>
@@ -82,9 +82,12 @@ function Harness() {
   const [nested, setNested] = useState(false);
   const [locked, setLocked] = useState(false);
   test.lock = () => setLocked(true);
+  // This harness proves the transient modal host. Hospitality sessions are covered
+  // by the pension/restaurant workspace smokes, so session ownership is stripped here.
+  const transientDefinitions = workspaceDefinitions.map(item => ({ ...item, sessionPage: undefined }));
   if (nested) return <ExpectedModalBoundary><WorkspaceFrame title="Outer" presentation="centered" onClose={() => {}}>
     <FormDialog title="Forbidden nested task" onClose={() => {}} onSubmit={e => e.preventDefault()} footer={<button type="submit">Confirm</button>}>Nested</FormDialog>
   </WorkspaceFrame></ExpectedModalBoundary>;
-  return locked ? <><button onClick={() => setNested(true)}>Test nested contract</button><button onClick={() => setLocked(false)}>Unlock</button></> : <WorkspaceNavigationProvider definitions={new URLSearchParams(location.search).has("swap") ? workspaceDefinitions.map(item => ({ ...item, defaultPresentation: item.defaultPresentation === "centered" ? "full-canvas" : "centered" })) : workspaceDefinitions} page="pension"><Unlocked /></WorkspaceNavigationProvider>;
+  return locked ? <><button onClick={() => setNested(true)}>Test nested contract</button><button onClick={() => setLocked(false)}>Unlock</button></> : <WorkspaceNavigationProvider definitions={new URLSearchParams(location.search).has("swap") ? transientDefinitions.map(item => ({ ...item, defaultPresentation: item.defaultPresentation === "centered" ? "full-canvas" : "centered" })) : transientDefinitions} page="pension"><Unlocked /></WorkspaceNavigationProvider>;
 }
 createRoot(document.getElementById("root")!).render(<StrictMode><Harness /></StrictMode>);

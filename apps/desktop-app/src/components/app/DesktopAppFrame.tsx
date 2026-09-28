@@ -28,8 +28,8 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
-import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
-import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
+import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
+import { HospitalityWorkspaceHost, WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
 interface DesktopAppFrameProps {
   activePage: DesktopPage;
@@ -75,6 +75,7 @@ function DesktopAppFrameContent({
   children
 }: DesktopAppFrameProps) {
   const contentRef = useRef<HTMLElement>(null);
+  const { hospitalitySessions } = useWorkspaceNavigation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const { setupData } = setupController;
@@ -112,6 +113,16 @@ function DesktopAppFrameContent({
   const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
   const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
   const inventoryEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.INVENTORY);
+  const accommodationStaysEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS);
+  const accommodationReservationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS);
+  const accommodationFolioEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO);
+  const foodReservationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS);
+  const foodOrdersEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_ORDERS);
+  const hospitalityWorkspaceActive = activePage === "pension"
+    ? Boolean(hospitalitySessions.pension)
+    : activePage === "restaurant"
+      ? Boolean(hospitalitySessions.restaurant)
+      : false;
   const automaticSyncNeedsAttention = automaticSyncStatus.phase === "offline" || automaticSyncStatus.phase === "error";
   const automaticSyncDisplayMessage = automaticSyncStatus.phase === "offline"
     ? OFFLINE_SYNC_MESSAGE
@@ -247,6 +258,48 @@ function DesktopAppFrameContent({
           )}
         />
       )}
+      workspaceActive={hospitalityWorkspaceActive}
+      workspaceLayer={(
+        <>
+          <HospitalityWorkspaceHost
+            page="pension"
+            activePage={activePage}
+            definition={roomWorkspaceDefinition}
+            context={{
+              data: surfaceData,
+              onDashboard: desktopSyncController.setDashboardData,
+              staysEnabled: accommodationStaysEnabled,
+              reservationsEnabled: accommodationReservationsEnabled,
+              customersEnabled,
+              aiEnabled,
+              onSaveCustomer: customerController.handleSaveCustomer,
+              onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
+              onSaveReservation: operationController.handleSaveManualReservation,
+              folioEnabled: accommodationFolioEnabled,
+              menuEnabled
+            }}
+          />
+          <HospitalityWorkspaceHost
+            page="restaurant"
+            activePage={activePage}
+            definition={tableWorkspaceDefinition}
+            context={{
+              data: surfaceData,
+              ordersEnabled: foodOrdersEnabled,
+              menuEnabled,
+              customersEnabled,
+              reservationsEnabled: foodReservationsEnabled,
+              roomFolioTransferEnabled: foodOrdersEnabled && accommodationFolioEnabled,
+              onUpdateTableStatus: operationController.handleUpdateTableStatus,
+              aiEnabled,
+              onSaveCustomer: customerController.handleSaveCustomer,
+              onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
+              onSaveReservation: operationController.handleSaveManualRestaurantReservation,
+              onDashboardDataChanged: desktopSyncController.setDashboardData
+            }}
+          />
+        </>
+      )}
       overlay={(
         <>
           <WorkspaceHost definition={customerWorkspaceDefinition} context={{
@@ -278,18 +331,6 @@ function DesktopAppFrameContent({
             onReload: marketController.reloadCatalog,
             onProductSaved: marketController.upsertProduct,
             onStateChange: marketController.handleStateChange
-          }} />
-          <WorkspaceHost definition={roomWorkspaceDefinition} context={{
-            data: surfaceData,
-            onDashboard: desktopSyncController.setDashboardData,
-            staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
-            reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS),
-            customersEnabled,
-            aiEnabled,
-            onSaveCustomer: customerController.handleSaveCustomer,
-            onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
-            onSaveReservation: operationController.handleSaveManualReservation,
-            folioEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO), menuEnabled
           }} />
           {diagnosticsOpen ? (
             <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />

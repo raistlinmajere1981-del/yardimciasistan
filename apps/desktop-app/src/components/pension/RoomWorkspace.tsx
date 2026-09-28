@@ -9,7 +9,7 @@ import type {
   SaveManualReservationInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
-import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
+import { WorkspacePageFrame } from "../workspace/WorkspaceFrame";
 import { OperationPanel } from "../workspace/OperationPanel";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import type { RoomWorkspaceIntent } from "../workspace/workspace-intent";
@@ -51,7 +51,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   const [quickCustomerId, setQuickCustomerId] = useState("");
   const dirty = Object.values(dirtyForms).some(Boolean);
   const busy = operations.busy || account.busy;
-  const blocked = useWorkspaceCloseGuard({ busy, dirty });
+  const blocked = useWorkspaceCloseGuard({ busy, dirty, scope: { entityType: "room", entityId: intent.entityId } });
   const surface = useRef<HTMLDivElement>(null);
   const history = intent.mode === "history";
   const accountFocus = useRef("");
@@ -87,9 +87,8 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
     panel?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [history, intent.mode, intent.action, intent.stayId, intent.folioId]);
   const { room, state } = model;
-  if (!room || !state) return <WorkspaceFrame title="Oda kullanılamıyor" presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()}
-    returnFocusRef={navigation.returnFocusRef}><p>Oda kaydı bulunamadı veya bu yetenek kullanılamıyor.</p></WorkspaceFrame>;
-  return <WorkspaceFrame title={roomIdentity(room)} className="operations-workspace" bodyScroll="panes"
+  if (!room || !state) return <WorkspacePageFrame title="Oda kullanılamıyor" onClose={() => navigation.closeWorkspace({ entityType: "room", entityId: intent.entityId })}><p>Oda kaydı bulunamadı veya bu yetenek kullanılamıyor.</p></WorkspacePageFrame>;
+  return <WorkspacePageFrame title={roomIdentity(room)} className="operations-workspace" bodyScroll="panes"
     context={history && <div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
       <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
     navigation={!history && <ResourceWorkspaceSummary label="Oda özeti" imageSrc="./assets/default-room.png"
@@ -117,7 +116,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       {intent.returnContext?.page === "restaurant" && intent.returnContext.entityId && <ActionButton variant="secondary" disabled={busy || dirty}
         onClick={() => navigation.openWorkspace({ entityType: "table", entityId: intent.returnContext!.entityId!, mode: "account", action: "room-transfer",
           returnContext: { page: "restaurant", view: "floor" } })}>Masa Hesabına Dön</ActionButton>}</>}
-    presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()} closeBlocked={blocked || Boolean(quickAction)} returnFocusRef={navigation.returnFocusRef}
+    onClose={() => navigation.closeWorkspace({ entityType: "room", entityId: intent.entityId })} closeBlocked={blocked || Boolean(quickAction)}
     footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}
     overlay={!history && quickAction ? <>
       {quickAction === "customer" && <CustomerCreateEditor
@@ -157,5 +156,5 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       </OperationPanel>
     </div>
     {history && <RoomHistory model={model} operations={operations} account={account} disabled={busy} />}
-  </WorkspaceFrame>;
+  </WorkspacePageFrame>;
 }

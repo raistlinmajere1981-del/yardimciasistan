@@ -9,7 +9,7 @@ import type {
   SaveCustomerInput,
   SaveManualRestaurantReservationInput
 } from "../../../electron/database";
-import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
+import { WorkspacePageFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { OperationPanel } from "../workspace/OperationPanel";
 import type { TableWorkspaceIntent } from "../workspace/workspace-intent";
@@ -49,10 +49,10 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   const [returnRequested, setReturnRequested] = useState(false);
   const [transferCommitted, setTransferCommitted] = useState(false);
   const [clock, setClock] = useState(Date.now());
-  const blocked = useWorkspaceCloseGuard({ busy: controller.busy, dirty: controller.dirty });
+  const blocked = useWorkspaceCloseGuard({ busy: controller.busy, dirty: controller.dirty, scope: { entityType: "table", entityId: intent.entityId } });
   const table = data.tables.find(item => item.id === intent.entityId);
   const order = controller.active;
-  useEffect(() => { if (returnRequested && !blocked) navigation.closeWorkspace(); }, [returnRequested, blocked, navigation]);
+  useEffect(() => { if (returnRequested && !blocked) navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); }, [returnRequested, blocked, navigation]);
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useLayoutEffect(() => {
     if (history) return;
@@ -73,7 +73,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   }, [history, ordersEnabled, data.revision]);
   async function requestReturn() {
     if (controller.busy) return;
-    if (controller.loading || !controller.loaded) { navigation.closeWorkspace(); return; }
+    if (controller.loading || !controller.loaded) { navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); return; }
     if (await controller.run(async () => true)) setReturnRequested(true);
   }
   async function closeTableOrder(status: "paid" | "cancelled") {
@@ -106,8 +106,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       return true;
     });
   }
-  if (!table) return <WorkspaceFrame title="Masa kullanılamıyor" presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()}
-    returnFocusRef={navigation.returnFocusRef}><p>Masa kaydı bulunamadı.</p></WorkspaceFrame>;
+  if (!table) return <WorkspacePageFrame title="Masa kullanılamıyor" onClose={() => navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId })}><p>Masa kaydı bulunamadı.</p></WorkspacePageFrame>;
   const cardModel = getTableCardModel(table, data.tableOperations?.find(item => item.tableId === table.id),
     { ordersEnabled, menuEnabled, reservationsEnabled }, new Date().toLocaleDateString("sv-SE"));
   const canStart = cardModel.quickAction?.kind === "start";
@@ -125,8 +124,8 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       quickCustomerId={quickCustomerId}
       onCloseOrder={status => void closeTableOrder(status)} onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)} onUpdateTableStatus={onUpdateTableStatus} />
   </OperationPanel>;
-  return <WorkspaceFrame title={table.name} className="operations-workspace" presentation={navigation.current!.presentation} closeLabel="Floor'a dön"
-    onClose={() => void requestReturn()} closeBlocked={controller.busy || Boolean(quickAction)} returnFocusRef={navigation.returnFocusRef} bodyScroll="panes"
+  return <WorkspacePageFrame title={table.name} className="operations-workspace" closeLabel="Masa çalışma alanını kapat"
+    onClose={() => void requestReturn()} closeBlocked={controller.busy || Boolean(quickAction)} bodyScroll="panes"
     context={history && <div className="table-workspace-context"><span>{table.area || "Genel"}</span>
       <StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
       {order && <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>}
@@ -196,5 +195,5 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
         <span>{new Date(item.closedAt).toLocaleString("tr-TR")} · {formatMoney(item.total, getOrderCurrency(item))}</span>
       </article>)}
     </section>}
-  </WorkspaceFrame>;
+  </WorkspacePageFrame>;
 }

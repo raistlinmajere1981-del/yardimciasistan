@@ -31,8 +31,8 @@ try {
   }
   const page = await open('pension');
   const card = number => page.getByRole('article', { name: `Oda ${number}`, exact: true });
-  const dialog = page.getByRole('dialog');
-  const close = () => dialog.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
+  const workspace = page.locator('.workspace-page-frame');
+  const close = () => workspace.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
   const orderBefore = await page.locator('.resource-card h3').allTextContents();
   await expect(card(103)).toContainText('Konaklayanlar · 2 kişi');
   await expect(card(103)).toContainText('Ece Yılmaz');
@@ -40,23 +40,23 @@ try {
 
   // The card surface is the only detail launcher; opening it is read-only.
   await card(103).getByRole('button', { name: 'Oda 103 odasını aç' }).tap();
-  await expect(dialog.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('Ece Yılmaz');
-  await expect(dialog.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('3.600');
+  await expect(workspace.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('Ece Yılmaz');
+  await expect(workspace.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('3.600');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind !== 'read'))).toEqual([]);
   await close();
-  await expect(card(103).getByRole('button', { name: 'Oda 103 odasını aç' })).toBeFocused();
+  await expect(card(103).getByRole('button', { name: 'Oda 103 odasını aç' })).toBeVisible();
   await expect(card(103).getByRole('button', { name: 'Ayrıntı', exact: true })).toHaveCount(0);
 
   // Non-interactive card body is also a launcher; embedded controls keep their own click target.
   await card(103).locator('.resource-card__facts').click();
-  await expect(dialog).toBeVisible();
+  await expect(workspace).toBeVisible();
   await close();
 
   // A planned stay is completed inside the workspace instead of duplicating the workflow on the card.
   await card(102).getByRole('button', { name: 'Oda 102 odasını aç' }).click();
-  await expect(dialog.getByRole('button', { name: 'Giriş Yap', exact: true })).toBeVisible();
+  await expect(workspace.getByRole('button', { name: 'Giriş Yap', exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'check-in').length)).toBe(0);
-  await dialog.getByRole('button', { name: 'Giriş Yap' }).click();
+  await workspace.getByRole('button', { name: 'Giriş Yap' }).click();
   expect(await page.evaluate(() => window.fixtureCalls.find(call => call.kind === 'check-in').input)).toBe('stay-1');
   await close();
   await expect(card(102)).toContainText('Misafir içeride');
@@ -70,7 +70,7 @@ try {
   await page.evaluate(() => { window.fixtureDelayRoom = true; window.fixtureFailRoom = true; });
   await roomStatus.getByRole('button', { name: 'Hazır', exact: true }).evaluate(el => { el.click(); el.click(); });
   await expect(page.locator('.confirm-dialog')).toHaveCount(0);
-  await expect(page.locator('.workspace-frame')).toHaveCount(0);
+  await expect(page.locator('.workspace-page-frame')).toHaveCount(0);
   await expect(card(101)).toContainText('İşlem sürüyor');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'room-status').length)).toBe(1);
   await page.evaluate(() => window.fixtureReleaseRoom());
@@ -100,18 +100,21 @@ try {
   // Card checkout opens the room workspace; physical departure never invents a payment.
   const paymentsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);
   await card(103).getByRole('button', { name: 'Misafir çıkışı', exact: true }).click();
-  await expect(page.locator('.workspace-frame')).toHaveCount(1);
-  const checkoutAccount = dialog.getByRole('region', { name: 'Mevcut konaklama hesabı', exact: true });
-  const checkoutOperations = dialog.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true });
+  await expect(page.locator('.workspace-page-frame')).toHaveCount(1);
+  const checkoutAccount = workspace.getByRole('region', { name: 'Mevcut konaklama hesabı', exact: true });
+  const checkoutOperations = workspace.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true });
   await checkoutAccount.getByLabel('Ödeme tutarı').fill('3600');
   await checkoutAccount.getByRole('button', { name: 'Ödemeyi Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.fixtureState().folios.find(item => item.stayId === 'stay-2').remainingMinor)).toBe(0);
   await checkoutOperations.getByRole('button', { name: 'Misafir Çıkışı', exact: true }).click();
-  const confirm = dialog.getByRole('alertdialog', { name: 'Misafir çıkışı', exact: true });
+  const confirm = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
   await expect(confirm).toContainText('Ece Yılmaz');
   await expect(confirm).toContainText('Kalan hesap');
   await expect(confirm.getByRole('group', { name: 'Çıkış ödeme yöntemi', exact: true })).toHaveCount(0);
   await confirm.getByRole('button', { name: 'Tüm Misafirlerin Çıkışını Yap', exact: true }).click();
+  await expect(workspace).toContainText('Misafir çıkışı tamamlandı');
+  await close();
+  await expect(workspace).toHaveCount(0);
   await expect(card(103).getByRole('group', { name: 'Oda 103 fiziksel durumunu değiştir', exact: true })
     .getByRole('button', { name: 'Temizlik', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentsBeforeCheckout + 1);
@@ -133,16 +136,16 @@ try {
 
   const restaurant = await open('restaurant');
   const table = number => restaurant.getByRole('article', { name: `Masa ${number}`, exact: true });
-  const rd = restaurant.getByRole('dialog');
-  const floor = () => rd.getByRole('button', { name: "Floor'a dön", exact: true }).click();
+  const rworkspace = restaurant.locator('.workspace-page-frame');
+  const floor = () => rworkspace.getByRole('button', { name: 'Masa çalışma alanını kapat', exact: true }).click();
   expect(await restaurant.evaluate(() => window.fixtureCalls)).toEqual([]);
 
   // Card surface opens the table without creating an order.
   await table(1).getByRole('button', { name: 'Masa 1 masasını aç' }).tap();
-  await expect(rd.getByRole('button', { name: 'Sipariş Aç', exact: true })).toBeEnabled();
+  await expect(rworkspace.getByRole('button', { name: 'Sipariş Aç', exact: true })).toBeEnabled();
   expect(await restaurant.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'start'))).toEqual([]);
   await floor();
-  await expect(table(1).getByRole('button', { name: 'Masa 1 masasını aç' })).toBeFocused();
+  await expect(table(1).getByRole('button', { name: 'Masa 1 masasını aç' })).toBeVisible();
   await expect(table(1).getByRole('button', { name: 'Ayrıntı', exact: true })).toHaveCount(0);
 
   // Quick order creation is confirmed and stays on the floor.
@@ -154,7 +157,7 @@ try {
   await tableConfirm.getByRole('button', { name: 'Sipariş aç', exact: true }).evaluate(el => { el.click(); el.click(); });
   expect(await restaurant.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'start').length)).toBe(1);
   await restaurant.evaluate(() => window.fixtureResolveStart());
-  await expect(rd).toHaveCount(0);
+  await expect(rworkspace).toHaveCount(0);
   await expect(table(1)).toContainText('Sipariş alınıyor');
 
   // Service lifecycle and physical table statuses are direct chips; account close remains a guarded quick action.
@@ -175,7 +178,7 @@ try {
   tableConfirm = restaurant.locator('.confirm-dialog');
   await expect(tableConfirm).toContainText('450');
   await tableConfirm.getByRole('button', { name: 'Hesabı kapat', exact: true }).click();
-  await expect(rd).toHaveCount(0);
+  await expect(rworkspace).toHaveCount(0);
   expect(await restaurant.evaluate(() => window.fixtureCalls.find(call => call.kind === 'close').id)).toBe('order-2');
   await expect(table(3)).toContainText('Servise hazır');
   await restaurant.close();
@@ -204,13 +207,12 @@ try {
         await visual.screenshot({ animations: 'disabled', path: `${screenshots}/${kind}-accounts-${width}-${scheme}-${density}.png` });
       }
       await visual.locator('.resource-card').nth(2).getByRole('button', { name: / aç$/ }).click();
-      const overlay = visual.getByRole('dialog');
-      await expect(overlay).toHaveClass(/workspace-frame--centered/);
-      const box = await overlay.boundingBox();
-      expect(box.x).toBeGreaterThan(0); expect(box.y).toBeGreaterThan(0);
-      expect(box.x + box.width).toBeLessThan(width); expect(box.y + box.height).toBeLessThan(height);
+      const overlay = visual.locator('.workspace-page-frame');
+      await expect(overlay).toBeVisible();
+      expect(await overlay.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
       await visual.screenshot({ animations: "disabled", path: `${screenshots}/${kind}-overlay-${width}-${scheme}-${density}.png` });
-      await visual.keyboard.press('Escape');
+      await overlay.getByRole('button', { name: /alışma alanını kapat/i }).click();
+      await expect(overlay).toHaveCount(0);
     }
     await visual.emulateMedia({ reducedMotion: 'reduce' });
     expect(await visual.locator('.resource-card').first().evaluate(el => parseFloat(getComputedStyle(el).transitionDuration))).toBeLessThan(0.002);

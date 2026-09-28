@@ -68,7 +68,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const presentation = navigation.current?.presentation ?? "centered";
 
   if (!customer) {
-    return <WorkspaceFrame title="Müşteri bulunamadı" context="Kayıt yenilenmiş veya silinmiş olabilir." presentation={presentation} onPresentationChange={navigation.updateWorkspacePresentation} onClose={navigation.closeWorkspace} closeBlocked={closeBlocked} returnFocusRef={navigation.returnFocusRef} dismissOnBackdrop>
+    return <WorkspaceFrame title="Müşteri bulunamadı" context="Kayıt yenilenmiş veya silinmiş olabilir." presentation={presentation} onPresentationChange={navigation.updateWorkspacePresentation} onClose={() => navigation.closeWorkspace()} closeBlocked={closeBlocked} returnFocusRef={navigation.returnFocusRef} dismissOnBackdrop>
       <div className="empty-state"><strong>Müşteri kaydı artık kullanılamıyor.</strong><p>Çalışma alanını kapatıp müşteri listesini yenileyin.</p></div>
     </WorkspaceFrame>;
   }
@@ -99,7 +99,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
       navigation={<WorkspaceTabList label="Müşteri çalışma alanı" tabs={tabs} onChange={(nextMode) => navigation.updateWorkspaceMode({ entityType: "customer", mode: nextMode })} />}
       presentation={presentation}
       onPresentationChange={navigation.updateWorkspacePresentation}
-      onClose={navigation.closeWorkspace}
+      onClose={() => navigation.closeWorkspace()}
       closeBlocked={closeBlocked}
       returnFocusRef={navigation.returnFocusRef}
       dismissOnBackdrop

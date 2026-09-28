@@ -210,7 +210,7 @@ export function ProductWorkspace({
       context="Katalog yenilenmiş veya ürün artık kullanılamıyor olabilir."
       presentation={presentation}
       onPresentationChange={navigation.updateWorkspacePresentation}
-      onClose={navigation.closeWorkspace}
+      onClose={() => navigation.closeWorkspace()}
       closeBlocked={closeBlocked}
       returnFocusRef={navigation.returnFocusRef}
       dismissOnBackdrop
@@ -230,7 +230,7 @@ export function ProductWorkspace({
       navigation={<WorkspaceTabList label="Ürün çalışma alanı" tabs={tabs} onChange={(nextMode) => navigation.updateWorkspaceMode({ entityType: "product", mode: nextMode })} />}
       presentation={presentation}
       onPresentationChange={navigation.updateWorkspacePresentation}
-      onClose={navigation.closeWorkspace}
+      onClose={() => navigation.closeWorkspace()}
       closeBlocked={closeBlocked}
       returnFocusRef={navigation.returnFocusRef}
       dismissOnBackdrop

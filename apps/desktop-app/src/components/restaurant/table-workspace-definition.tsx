@@ -9,5 +9,6 @@ export const tableWorkspaceDefinition: WorkspaceDefinition<
 > = {
   entityType: "table",
   defaultPresentation: "centered",
+  sessionPage: "restaurant",
   render: (intent, context) => <TableWorkspace {...context} intent={intent} />
 };

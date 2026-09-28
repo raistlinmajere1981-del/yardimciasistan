@@ -11,3 +11,28 @@
 .content--workspace { display: flex; flex-direction: column; overflow: hidden; }
 .content--workspace > .page-header { flex: none; }
 .content--workspace > .page-content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+
+/* Persistent hospitality workspaces replace the route body without unmounting either session. */
+.persistent-workspace-layer {
+  display: none;
+  min-width: 0;
+  min-height: 0;
+}
+.page-content.is-workspace-active > :not(.persistent-workspace-layer) {
+  display: none;
+}
+.page-content.is-workspace-active > .persistent-workspace-layer {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+.persistent-workspace-slot {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.persistent-workspace-slot[hidden] { display: none; }
