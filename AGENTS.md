@@ -164,7 +164,7 @@ Rules:
   runs reuse them once.
 - Device-required and live-service checks must be marked manual in the registry rather
   than silently entering portable Full Verify.
-- Every new `scripts/smoke-*.` file must be registered or explicitly classified as a
+- Every new `scripts/smoke-*` file must be registered or explicitly classified as a
   helper; `scripts/test-verification-registry.mjs` enforces this.
 - Local checks must use repository-installed Electron/Vite binaries; do not use `npx`
   paths that can download missing packages.
