@@ -182,6 +182,15 @@ try {
   assert.ok(folio);
   assert.equal(folio.extrasTotalMinor, menuItem.priceMinor + 20000);
 
+  const secondGuest = database.saveCustomer({ fullName: "Folio İkinci Misafir", phone: "", email: "", notes: "", tags: [],
+    identityType: "", identityNumber: "", nationality: "", birthDate: "", gender: "", documentSerialNumber: "",
+    documentExpiryDate: "", birthPlace: "", motherName: "", fatherName: "", issuingAuthority: "", address: "" });
+  assert.equal(secondGuest.ok, true, secondGuest.message);
+  assert.equal(database.addStayGuest({ stayId: "room_folio_smoke_stay", customerId: secondGuest.savedId }).ok, true);
+  folio = service.getData().folios.find((item) => item.id === opened.folioId);
+  assert.ok(folio);
+  assert.equal(folio.guestCount, 2, "Folio guest count follows registered stay guests, not the planned estimate.");
+
   const details = service.updateFolioDetails({
     folioId: opened.folioId,
     guestCount: 3,
@@ -193,7 +202,7 @@ try {
   assert.equal(details.ok, true);
   folio = details.data.folios.find((item) => item.id === opened.folioId);
   assert.ok(folio);
-  assert.equal(folio.guestCount, 3);
+  assert.equal(folio.guestCount, 2, "Folio details cannot override the registered guest count.");
   assert.equal(folio.lodgingTotalMinor, 480000);
 
   const financeBefore = finance.getData();

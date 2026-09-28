@@ -58,13 +58,13 @@ try {
   expect(await customerCalls()).toEqual([{ kind: 'customer', tableId: 'table-a', customerId: 'customer-a' }]);
   await expect(button('Müşteriyi Bağla')).toBeDisabled();
   await page.evaluate(() => { window.fixtureDelayCustomer = false; window.fixtureResolveCustomer(); });
-  await expect(customerPanel.locator('p')).toHaveText('Pilot Misafir');
+  await expect(customerPanel.locator('p').first()).toHaveText('Pilot Misafir');
   expect((await state()).orders).toEqual([]);
   await chooseSearchSelect(customerPanel, 'Müşteri seç', /İkinci Misafir/);
   await button('Müşteriyi Değiştir').click();
-  await expect(customerPanel.locator('p')).toHaveText('İkinci Misafir');
+  await expect(customerPanel.locator('p').first()).toHaveText('İkinci Misafir');
   await button('Bağı Kaldır').click();
-  await expect(customerPanel.locator('p')).toHaveText('Masaya bağlı müşteri yok.');
+  await expect(customerPanel.locator('p').first()).toHaveText('Masaya bağlı müşteri yok.');
   expect((await state()).dashboard.tables[0].currentCustomerId).toBe('');
   await expect(customerSelect).toContainText('Müşteri seçin');
   await captureOperationWorkspace(page, 'table-empty');
@@ -86,7 +86,7 @@ try {
   const unchangedOrder = structuredClone((await state()).orders[0]);
   await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   await button('Müşteriyi Bağla').click();
-  await expect(customerPanel.locator('p')).toHaveText('Pilot Misafir');
+  await expect(customerPanel.locator('p').first()).toHaveText('Pilot Misafir');
   expect((await state()).orders[0]).toEqual(unchangedOrder);
   await button('Bağı Kaldır').click();
   await captureOperationWorkspace(page, 'table-active');
@@ -157,21 +157,43 @@ try {
   await expect(dialog.getByRole('region', { name: 'Masa, Müşteri ve Hesap', exact: true })).toContainText('Rezervasyon ·');
   await button('Sipariş Aç').click(); await button('Çay ürününü siparişe ekle').click();
   await button('Çay satırını sil').click(); expect((await state()).orders[0].items).toHaveLength(0);
-  await button('Çay ürününü siparişe ekle').click(); await note.fill('Odaya aktarım notu');
-  await dialog.getByRole('group', { name: 'Sipariş durumu', exact: true }).getByRole('button', { name: 'Hesap bekliyor', exact: true }).click();
-  await expect(dialog.getByLabel('Oda hesabı', { exact: true })).toBeVisible();
+  await button('Çay ürününü siparişe ekle').click();
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /İkinci Misafir/); await button('Müşteriyi Bağla').click();
+  await expect(customerPanel.locator('p').first()).toHaveText('İkinci Misafir');
+  await expect(customerPanel.getByLabel('Konaklama başlatılacak oda', { exact: true })).toBeVisible();
+  await expect(button('Konaklama Başlat')).toBeVisible();
+  await expect(dialog.getByText('Aktif konaklama', { exact: false })).toHaveCount(0);
+  await expect(dialog.getByText('Bu müşteri için uygun aktif oda hesabı yok. Konaklama ve hesabın para birimini kontrol edin.')).toBeVisible();
+  await expect(button('Oda Hesabına Aktar')).toBeDisabled();
+  await expect(dialog.getByLabel('Oda hesabı', { exact: true })).toHaveCount(0);
+  await chooseSearchSelect(dialog, 'Konaklama başlatılacak oda', /Oda 102/);
+  await button('Konaklama Başlat').click();
+  await expect(page.getByRole('button', { name: 'Masa Hesabına Dön', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Masa Hesabına Dön', exact: true }).click();
+  await expect(dialog.getByRole('heading', { level: 2 })).toHaveText('Bahçe 1');
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/); await button('Müşteriyi Değiştir').click();
+  await expect(customerPanel.locator('p').first()).toHaveText('Pilot Misafir');
+  await expect(dialog.getByText('Aktif konaklama · Oda 101')).toBeVisible();
+  await expect(customerPanel.getByLabel('Konaklama başlatılacak oda', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('Oda 101 · Ortak hesap · Pilot Misafir')).toBeVisible();
+  await expect(dialog.getByLabel('Oda hesabı', { exact: true })).toHaveCount(0);
   await expect(page.locator('[aria-modal="true"]')).toHaveCount(1);
-  await dialog.getByLabel('Oda hesabı', { exact: true }).click();
-  await dialog.getByRole('dialog', { name: 'Oda hesabı seçici', exact: true }).getByRole('option').first().click();
+  await note.fill('Odaya aktarım notu'); await note.press('Tab');
+  await expect.poll(async () => (await state()).orders[0].items[0].note).toBe('Odaya aktarım notu');
   await page.evaluate(() => { window.fixtureFailTransfer = true; });
-  await button('Odaya Yaz').click(); await expect(dialog.getByRole('alert')).toHaveText('Aktarım reddedildi.');
+  await button('Oda Hesabına Aktar · Oda 101').click(); await expect(dialog.getByRole('alert')).toHaveText('Aktarım reddedildi.');
   const stock = (await state()).dashboard.menu.items[0].stock_quantity;
   await page.evaluate(() => { window.fixtureFailTransfer = false; window.fixtureDelayTransfer = true; });
-  await button('Odaya Yaz').click(); await expect(button("Floor'a dön")).toBeDisabled();
+  await button('Oda Hesabına Aktar · Oda 101').click(); await expect(button("Floor'a dön")).toBeDisabled();
   await page.evaluate(() => { window.fixtureDelayTransfer = false; window.fixtureResolveTransfer(); });
   await expect(dialog).toHaveCount(0);
   const transferred = await state(); expect(transferred.transfers).toBe(1); expect(transferred.finance).toBe(1);
   expect(transferred.orders[0].items[0].note).toBe('Odaya aktarım notu'); expect(transferred.dashboard.menu.items[0].stock_quantity).toBe(stock);
+  expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'transfer').map(call => call.input.folioId))).toEqual(['folio-a', 'folio-a']);
+  await page.evaluate(() => {
+    const tables = structuredClone(window.fixtureState().dashboard.tables);
+    tables[0].currentCustomerId = ''; window.fixturePatch({ tables });
+  });
 
   // A delayed customer reply (and repeated dashboard delivery) cannot roll back a newer projection.
   await button('Bahçe 1 masasını aç').click();
@@ -183,11 +205,11 @@ try {
     const tables = structuredClone(window.fixtureState().dashboard.tables);
     tables[0].currentCustomerId = 'customer-b'; window.fixturePatch({ tables });
   });
-  await expect(customerPanel.locator('p')).toHaveText('İkinci Misafir');
+  await expect(customerPanel.locator('p').first()).toHaveText('İkinci Misafir');
   await page.evaluate(() => { window.fixtureDelayCustomer = false; window.fixtureResolveCustomer(); });
   await expect(button('Bağı Kaldır')).toBeEnabled();
   await page.evaluate(() => window.fixturePublishDashboard(window.fixtureCustomerResponse));
-  await expect(customerPanel.locator('p')).toHaveText('İkinci Misafir');
+  await expect(customerPanel.locator('p').first()).toHaveText('İkinci Misafir');
   await button('Bağı Kaldır').click();
   await button("Floor'a dön").click();
 
@@ -214,13 +236,13 @@ try {
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([]);
       await chooseSearchSelect(surface, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
       await surface.getByRole('button', { name: 'Müşteriyi Bağla', exact: true }).click();
-      await expect(surface.getByRole('region', { name: 'Masa müşterisi' }).locator('p')).toHaveText('Pilot Misafir');
+      await expect(surface.getByRole('region', { name: 'Masa müşterisi' }).locator('p').first()).toHaveText('Pilot Misafir');
       expect(await variantPage.evaluate(() => window.fixtureState().orders)).toEqual([]);
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([{ kind: 'customer', tableId: 'table-a', customerId: 'customer-a' }]);
     } else {
       await surface.getByRole('button', { name: 'Sipariş Aç' }).click();
       if (variant === 'no-menu') await expect(surface.getByLabel('Sipariş için ürün ara')).toHaveCount(0);
-      if (variant === 'no-transfer') await expect(surface.getByRole('button', { name: 'Odaya Yaz' })).toHaveCount(0);
+      if (variant === 'no-transfer') await expect(surface.getByRole('button', { name: 'Oda Hesabına Aktar' })).toHaveCount(0);
     }
     await variantPage.close();
   }

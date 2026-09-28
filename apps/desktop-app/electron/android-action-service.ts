@@ -545,6 +545,9 @@ export function applyAndroidCustomerRoomAssignment(
   const checkInDate = normalizeDateInput(androidPayloadString(action.payload, "check_in_date"));
   const checkOutDate = normalizeDateInput(androidPayloadString(action.payload, "check_out_date"));
   const guestCount = normalizeInteger(Number(action.payload.guest_count ?? 1));
+  if (guestCount > 1 && action.payload.status === "checked_in") {
+    return { ok: false, message: "Çok kişili girişte her misafiri masaüstündeki konaklama listesine ekleyin." };
+  }
   const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["planned", "checked_in"]);
   const notes = normalizeLimitedText(action.payload.notes, 2000);
   if (!customerId || !roomId || !checkInDate || !status) {
@@ -655,7 +658,7 @@ export function applyAndroidCustomerRoomStayStatus(
   const previousStatus = String(stay.status ?? "");
   const allowedTransitions: Record<string, string[]> = {
     planned: ["checked_in", "cancelled"],
-    checked_in: ["cancelled"],
+    checked_in: [],
     cancelled: ["planned"],
     checked_out: []
   };

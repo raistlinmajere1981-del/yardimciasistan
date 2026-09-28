@@ -56,14 +56,22 @@ function createReservationStayInTransaction(db: DatabaseSync, input: CreateStayF
     return { ok: false as const, message: "Rezervasyonun giriş ve çıkış tarihleri geçersiz." };
   }
   const roomIds = parseStringArray(reservation.room_ids_json);
+  if (roomIds.length > 1) return { ok: false as const, message: "Çok odalı rezervasyonu oda başına ayrı rezervasyonlara ayırın; kapora ve ücret her odaya tekrar yazılamaz." };
   const roomId = String(input?.roomId ?? (roomIds.length === 1 ? roomIds[0] : "")).trim();
-  if (!roomId || !roomIds.includes(roomId)) return { ok: false as const, message: "Rezervasyona atanmış bir oda seçilmeli." };
-  const duplicate = db.prepare("SELECT id FROM customer_room_stays WHERE reservation_id = ? AND room_id = ? AND status IN ('planned', 'checked_in') AND deleted_at = ''").get(reservationId, roomId);
-  if (duplicate) return { ok: false as const, message: "Bu rezervasyon ve oda için aktif konaklama zaten var." };
+  if (!roomId || (roomIds.length && !roomIds.includes(roomId))) return { ok: false as const, message: "Rezervasyona atanmış bir oda seçilmeli." };
+  const duplicate = db.prepare("SELECT id, status, room_id FROM customer_room_stays WHERE reservation_id = ? AND status <> 'cancelled' AND deleted_at = '' ORDER BY created_at DESC LIMIT 1").get(reservationId) as { id: string; status: string; room_id: string } | undefined;
+  if (duplicate?.status === "checked_out") return { ok: false as const, message: "Bu rezervasyonun konaklaması tamamlandı. Yeni giriş için yeni rezervasyon oluşturun." };
+  if (duplicate && duplicate.room_id !== roomId) return { ok: false as const, message: "Bu rezervasyonun konaklaması başka odaya taşındı. Mevcut konaklamayı açın." };
+  if (duplicate) return input?.status === "checked_in" && duplicate.status === "planned"
+    ? updateCustomerRoomStayStatus(db, { stayId: duplicate.id, status: "checked_in" })
+    : { ok: true as const, savedId: duplicate.id, message: "Mevcut konaklama kullanılıyor." };
+  if (!roomIds.length) db.prepare("UPDATE reservations SET room_ids_json = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+    .run(JSON.stringify([roomId]), new Date().toISOString(), reservationId);
   return createCustomerStay(db, {
-    customerId: String(reservation.customer_id), roomId,
+    customerId: input.primaryCustomerId || String(reservation.customer_id), roomId,
     checkInDate: String(reservation.start_date), checkOutDate: String(reservation.end_date),
-    guestCount: Number(reservation.guest_count), notes: String(reservation.notes),
+    guestCount: input.guestCustomerIds?.length ?? Number(reservation.guest_count), notes: String(reservation.notes),
+    guestCustomerIds: input.guestCustomerIds,
     status: input?.status === "checked_in" ? "checked_in" : "planned"
   }, reservationId);
 }
@@ -76,6 +84,14 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   const guestCount = normalizeInteger(Number(input?.guestCount));
   const status = input?.status === "checked_in" ? "checked_in" : input?.status === "planned" ? "planned" : "";
   const notes = normalizeLimitedText(input?.notes, 2000);
+  const guestIds = Array.isArray(input?.guestCustomerIds) ? input.guestCustomerIds.map(id => String(id).trim()) : [customerId];
+  if (!guestIds.includes(customerId) || guestIds.some(id => !id) || new Set(guestIds).size !== guestIds.length || guestIds.length > 50) {
+    return { ok: false, message: "Ana müşteri listede olmalı; her misafir yalnız bir kez seçilmeli." };
+  }
+  if (status === "checked_in" && guestCount !== guestIds.length) {
+    return { ok: false, message: "Giriş için her misafire ayrı müşteri kaydı ekleyin. Kişi sayısı misafir listesiyle aynı olmalı." };
+  }
+  if (guestIds.length > guestCount) return { ok: false, message: "Misafir listesi planlanan kişi sayısını aşıyor." };
   if (!customerId || !roomId || !checkInDate || !status) {
     return { ok: false, message: "Müşteri, oda, giriş tarihi ve konaklama durumu seçilmeli." };
   }
@@ -97,6 +113,13 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   }
   if (!room || Number(room.is_active ?? 0) !== 1) {
     return { ok: false, message: "Atama yapılacak aktif oda bulunamadı." };
+  }
+  if (status === "checked_in" && db.prepare("SELECT 1 FROM customer_room_stays WHERE room_id = ? AND status = 'checked_in' AND deleted_at = ''").get(roomId)) {
+    return { ok: false, message: "Odada zaten giriş yapmış bir konaklama var." };
+  }
+  for (const guestId of guestIds) {
+    if (!db.prepare("SELECT 1 FROM customers WHERE id = ? AND deleted_at = ''").get(guestId)) return { ok: false, message: "Misafir kaydı bulunamadı." };
+    if (guestId !== customerId && findStoredActiveCustomerRoomStay(db, guestId)) return { ok: false, message: "Seçilen misafirlerden biri başka bir aktif konaklamada." };
   }
   const activeCustomerStay = findStoredActiveCustomerRoomStay(db, customerId);
   if (activeCustomerStay) {
@@ -146,6 +169,10 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
         now,
         now
       );
+    for (const guestId of guestIds.filter(guestId => guestId !== customerId)) {
+      db.prepare(`INSERT INTO stay_guests (id, stay_id, customer_id, status, checked_in_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run(createId("guest_"), id, guestId, status, status === "checked_in" ? now : "", now, now);
+    }
     refreshRoomStatusFromStays(db, roomId, now, false);
     insertDatabaseEvent(db, {
       type: "customer.room_assigned",
@@ -209,7 +236,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
   }
   const allowedTransitions: Record<string, string[]> = {
     planned: ["checked_in", "cancelled"],
-    checked_in: ["cancelled"],
+    checked_in: [],
     cancelled: ["planned"],
     checked_out: []
   };
@@ -238,8 +265,14 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
   }
 
   const now = new Date().toISOString();
-  db.exec("BEGIN IMMEDIATE");
+  db.exec("SAVEPOINT stay_status");
   try {
+    if (status === "checked_in") {
+      const guests = db.prepare("SELECT COUNT(*) AS count FROM stay_guests WHERE stay_id = ? AND status = 'planned'").get(stayId) as { count: number };
+      if (!guests.count) throw new Error("Konaklamaya en az bir misafir eklenmeli.");
+      db.prepare("UPDATE customer_room_stays SET guest_count = ? WHERE id = ?").run(guests.count, stayId);
+      db.prepare("UPDATE room_folios SET guest_count = ?, updated_at = ?, sync_status = 'local_only' WHERE stay_id = ? AND status = 'open'").run(guests.count, now, stayId);
+    }
     db
       .prepare(`
           UPDATE customer_room_stays
@@ -268,9 +301,9 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE stay_status");
   } catch {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO stay_status; RELEASE stay_status");
     return { ok: false, message: "Konaklama durumu güncellenemedi." };
   }
 

@@ -100,6 +100,7 @@
     "smoke:diagnostics": "node scripts/smoke-desktop-logging-contract.mjs && node scripts/smoke-diagnostics-cli.mjs",
     "smoke:workspace-platform": "node scripts/smoke-workspace-platform.mjs",
     "smoke:hospitality-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-hospitality-domain.mjs",
+    "smoke:hospitality-guests": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-hospitality-guests.mjs",
     "smoke:pension-workspace": "node scripts/smoke-pension-workspace.mjs",
     "smoke:restaurant-workspace": "node scripts/smoke-restaurant-workspace.mjs",
     "smoke:table-customer": "tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-table-customer.mjs",

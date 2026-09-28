@@ -16,7 +16,7 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous,
     {controller.loading && <p role="status">Hesap hazırlanıyor…</p>}
     {previous.some(folio => folio.remainingMinor > 0) && <p className="operation-prior-debt">Önceki borç · {minorMoney(previous.reduce((total, folio) => total + Math.max(0, folio.remainingMinor), 0))} · Aşağıda ayrı hesaplarda</p>}
     <section aria-label="Mevcut konaklama hesabı" className="form-stack">
-      <h4>Mevcut konaklama</h4>
+      <h4>Ortak konaklama hesabı</h4>
       {current ? <AccountRecord key={current.id} folio={current} controller={controller} menuEnabled={menuEnabled} disabled={disabled} onDirty={dirty => onDirty(current.id, dirty)} />
         : <><p>{ambiguous ? "Birden fazla girişli konaklama var; mevcut hesap belirlenemedi. Konaklama kayıtlarını kontrol edin." : currentStayId ? "Bu konaklama için hesap henüz açılmadı." : "Aktif misafir hesabı yok. Giriş tamamlandığında konaklama hesabı burada görünür."}</p>
           {currentStayId && <ActionButton disabled={disabled} onClick={() => void controller.mutate(() => window.yardimciDesktop!.openRoomFolio(currentStayId))}>Hesabı Aç</ActionButton>}</>}
@@ -68,7 +68,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     if (approved) void controller.mutate(() => window.yardimciDesktop!.checkoutRoomFolio({ folioId: folio.id }));
   }
   return <><article className="room-account-record form-stack" tabIndex={-1} data-folio-id={folio.id} data-stay-id={folio.stayId}>
-    <div><strong>{folio.customerName}</strong><p>{departed ? "Çıkışı yapılmış konaklama" : open ? "Açık hesap" : "Kapalı hesap"} · {formatDateRange(folio.checkInDate, folio.plannedCheckOutDate)}</p></div>
+    <div><strong>Hesap sahibi: {folio.customerName}</strong><p>{departed ? "Çıkışı yapılmış konaklama" : open ? "Açık hesap" : "Kapalı hesap"} · {formatDateRange(folio.checkInDate, folio.plannedCheckOutDate)}</p></div>
     <dl className="operation-facts">
       <div><dt>Konaklama · {folio.nights} gece</dt><dd>{minorMoney(folio.lodgingTotalMinor)}</dd></div>
       <div><dt>Ekstralar / indirimler</dt><dd>{minorMoney(folio.chargeTotalMinor - folio.lodgingTotalMinor)}</dd></div>

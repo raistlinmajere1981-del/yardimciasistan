@@ -163,8 +163,8 @@ const PAYMENT_METHODS = new Set<RoomFolioPaymentMethod>(["cash", "card", "bank",
 export class DesktopRoomFolioService {
   constructor(private readonly databasePath: string) {}
 
-  getData(roomId?: string): DesktopRoomFolioData {
-    const db = this.openDatabase();
+  getData(roomId?: string, connection?: DatabaseSync): DesktopRoomFolioData {
+    const db = connection ?? this.openDatabase();
     try {
       const roomRows = db.prepare(`
         SELECT id, name, number, capacity, nightly_price_minor, price_currency
@@ -203,6 +203,7 @@ export class DesktopRoomFolioService {
           rooms.name
       `).all() as Array<Record<string, unknown>>;
 
+      // Keep active-stay accounts reachable; only unrelated/history accounts are capped.
       const folioRows = db.prepare(`
         SELECT
           folios.*,
@@ -221,8 +222,19 @@ export class DesktopRoomFolioService {
         WHERE folios.deleted_at = ''
           AND (? = '' OR folios.room_id = ?)
           AND (folios.status = 'open' OR folios.closed_at >= datetime('now', '-30 days'))
+          ${roomId ? "" : `AND (
+            folios.stay_id IN (SELECT id FROM customer_room_stays WHERE deleted_at = '' AND status IN ('planned', 'checked_in'))
+            OR folios.id IN (
+              SELECT history.id FROM room_folios history
+              WHERE history.deleted_at = ''
+                AND (history.status = 'open' OR history.closed_at >= datetime('now', '-30 days'))
+                AND NOT EXISTS (SELECT 1 FROM customer_room_stays s WHERE s.id = history.stay_id
+                  AND s.deleted_at = '' AND s.status IN ('planned', 'checked_in'))
+              ORDER BY CASE history.status WHEN 'open' THEN 0 ELSE 1 END, history.updated_at DESC, history.id
+              LIMIT 100
+            )
+          )`}
         ORDER BY CASE folios.status WHEN 'open' THEN 0 ELSE 1 END, folios.updated_at DESC
-        ${roomId ? "" : "LIMIT 100"}
       `).all(roomId ?? "", roomId ?? "") as Array<Record<string, unknown>>;
 
       const categoryRows = db.prepare(`
@@ -262,22 +274,23 @@ export class DesktopRoomFolioService {
         menuItems: menuRows.map(mapMenuItem)
       };
     } finally {
-      db.close();
+      if (!connection) db.close();
     }
   }
 
-  openFolio(stayIdValue: string): DesktopRoomFolioMutationResult {
+  openFolio(stayIdValue: string, connection?: DatabaseSync): DesktopRoomFolioMutationResult {
     const stayId = cleanText(stayIdValue, 180);
     if (!stayId) return { ok: false, message: "Konaklama kaydı bulunamadı." };
 
-    const db = this.openDatabase();
+    const db = connection ?? this.openDatabase();
     let folioId = "";
     try {
       const existing = db.prepare(`
-        SELECT id FROM room_folios WHERE stay_id = ? AND deleted_at = ''
-      `).get(stayId) as { id?: string } | undefined;
+        SELECT id, status FROM room_folios WHERE stay_id = ? AND deleted_at = ''
+      `).get(stayId) as { id?: string; status: string } | undefined;
       if (existing?.id) {
-        return { ok: true, message: "Oda adisyonu zaten açık.", data: this.getData(), folioId: existing.id };
+        if (existing.status !== "open") return { ok: false, message: "Bu konaklamanın hesabı kapalı." };
+        return { ok: true, message: "Oda adisyonu zaten açık.", data: this.getData(undefined, db), folioId: existing.id };
       }
 
       const stay = db.prepare(`
@@ -321,7 +334,7 @@ export class DesktopRoomFolioService {
       const now = new Date().toISOString();
       folioId = `room_folio_${randomUUID()}`;
 
-      db.exec("BEGIN");
+      db.exec("SAVEPOINT folio_open");
       try {
         db.prepare(`
           INSERT INTO room_folios (
@@ -368,23 +381,22 @@ export class DesktopRoomFolioService {
           );
         }
 
-        db.exec("COMMIT");
+        db.exec("RELEASE folio_open");
       } catch (error) {
-        db.exec("ROLLBACK");
+        db.exec("ROLLBACK TO folio_open; RELEASE folio_open");
         throw error;
       }
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Oda adisyonu açılamadı.") };
     } finally {
-      db.close();
+      if (!connection) db.close();
     }
 
-    return { ok: true, message: "Oda adisyonu açıldı.", data: this.getData(), folioId };
+    return { ok: true, message: "Oda adisyonu açıldı.", data: this.getData(undefined, connection), folioId };
   }
 
   updateFolioDetails(input: UpdateRoomFolioDetailsInput): DesktopRoomFolioMutationResult {
     const folioId = cleanText(input?.folioId, 180);
-    const guestCount = clampGuestCount(input?.guestCount);
     const checkInDate = normalizeDate(input?.checkInDate);
     const checkOutDate = normalizeDate(input?.plannedCheckOutDate, true);
     const nightlyPriceMinor = nonNegativeAmount(input?.nightlyPriceMinor);
@@ -398,6 +410,7 @@ export class DesktopRoomFolioService {
     try {
       const current = this.requireOpenFolio(db, folioId);
       if (!current) return { ok: false, message: "Açık oda adisyonu bulunamadı." };
+      const guestCount = clampGuestCount(current.guest_count);
       const totals = this.getTotals(db, folioId);
       const manualOverride = Boolean(input?.lodgingManualOverride);
       const requestedTotal = manualOverride

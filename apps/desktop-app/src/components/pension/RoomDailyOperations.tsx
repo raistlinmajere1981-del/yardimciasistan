@@ -1,5 +1,3 @@
-import { useRef } from "react";
-import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
 import { ChoiceChips } from "../ui/ChoiceChips";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
@@ -8,11 +6,11 @@ import { RoomCheckoutConfirmationDetails } from "./RoomCheckoutConfirmation";
 import { formatDateRange } from "./folio-format";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomStayOperations } from "./use-room-stay-operations";
+import type { DesktopDashboardData } from "../../../electron/database";
 
-export function RoomDailyOperations({ model, operations, disabled }: {
-  model: RoomWorkspaceModel; operations: RoomStayOperations; disabled: boolean;
+export function RoomDailyOperations({ model, operations, disabled, data }: {
+  model: RoomWorkspaceModel; operations: RoomStayOperations; disabled: boolean; data: DesktopDashboardData;
 }) {
-  const checkoutMethod = useRef<RoomFolioPaymentMethod>("cash");
   const { confirm, confirmDialog } = useConfirmDialog();
   const { room, state, active } = model;
   if (!room || !state) return null;
@@ -20,24 +18,24 @@ export function RoomDailyOperations({ model, operations, disabled }: {
   const isOutOfService = currentRoom.status === "out_of_service" || state.operationalCondition === "out_of_service";
 
   async function requestCheckout(stay: typeof active[number]) {
-    checkoutMethod.current = "cash";
     const account = model.operations?.accounts.find(item => item.stayId === stay.id);
+    const guestIds = (stay.guests ?? []).filter(guest => guest.status === "checked_in").map(guest => guest.customerId);
+    const openOrders = (data.tableOperations ?? []).filter(table => table.order && data.tables.some(resource => resource.id === table.tableId && guestIds.includes(resource.currentCustomerId)));
     const approved = await confirm({
       eyebrow: currentRoom.name,
       title: "Misafir çıkışı",
       description: account?.remainingMinor
-        ? "Kalan tutar seçilen ödeme yöntemiyle tahsil edilir; çıkış ve hesap kapanışı birlikte tamamlanır."
+        ? "Tüm misafirlerin çıkışı yapılır. Kalan borç ortak hesapta açık kalır; tahsilat ayrıca kaydedilir."
         : "Misafir çıkışı tamamlanır; varsa oda hesabı kapatılır ve oda temizlik durumuna geçer.",
-      confirmLabel: "Çıkış ve Hesabı Kapat",
+      confirmLabel: "Tüm Misafirlerin Çıkışını Yap",
       tone: account?.remainingMinor ? "warning" : "info",
-      details: <RoomCheckoutConfirmationDetails
+      details: <><RoomCheckoutConfirmationDetails
         roomLabel={currentRoom.number ? `Oda ${currentRoom.number}` : currentRoom.name}
         stay={stay}
         account={account}
-        onPaymentMethodChange={method => { checkoutMethod.current = method; }}
-      />
+      />{openOrders.length > 0 && <p role="alert">Misafirlere bağlı {openOrders.length} açık restoran adisyonu var. Bunlar oda hesabına dahil değil; aktarımı çıkıştan önce tamamlayın.</p>}</>
     });
-    if (approved) void operations.checkout(stay.id, checkoutMethod.current);
+    if (approved) void operations.checkout(stay.id);
   }
 
   async function requestCancel(stay: typeof active[number]) {
@@ -60,10 +58,11 @@ export function RoomDailyOperations({ model, operations, disabled }: {
   return <>
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
       <h4>{stay.customerName}</h4>
-      {model.canCheckIn(stay.id) && <ActionButton disabled={disabled} onClick={() => void operations.checkIn(stay.id)}>Giriş Yap</ActionButton>}
+      {model.canCheckIn(stay.id) && <><p>Giriş yalnız listedeki {(stay.guests ?? []).filter(guest => guest.status === "planned").length} kayıtlı misafir için yapılır.</p>
+        <ActionButton disabled={disabled} onClick={() => void operations.checkIn(stay.id)}>Giriş Yap</ActionButton></>}
       {stay.status === "planned" && !model.canCheckIn(stay.id) && <p>Giriş için oda hazır, boş ve konaklama kayıtları çakışmasız olmalı.</p>}
       {stay.status === "checked_in" && <ActionButton disabled={disabled} onClick={() => void requestCheckout(stay)}>Misafir Çıkışı</ActionButton>}
-      <ActionButton variant="danger" disabled={disabled} onClick={() => void requestCancel(stay)}>{stay.status === "planned" ? "Planı İptal Et" : "Konaklamayı İptal Et"}</ActionButton>
+      {stay.status === "planned" && <ActionButton variant="danger" disabled={disabled} onClick={() => void requestCancel(stay)}>Planı İptal Et</ActionButton>}
     </section>)}
     {isOutOfService && <section className="operation-section form-stack">
       <h4>Oda hazırlığı</h4>

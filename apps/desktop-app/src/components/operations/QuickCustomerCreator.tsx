@@ -13,6 +13,7 @@ interface QuickCustomerCreatorProps {
   disabled?: boolean;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onCreated: (customerId: string) => void;
+  onDirty?: (dirty: boolean) => void;
 }
 
 function createQuickCustomerInput(fullName: string, phone: string): SaveCustomerInput {
@@ -23,7 +24,7 @@ function createQuickCustomerInput(fullName: string, phone: string): SaveCustomer
   });
 }
 
-export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: QuickCustomerCreatorProps) {
+export function QuickCustomerCreator({ disabled = false, onSave, onCreated, onDirty }: QuickCustomerCreatorProps) {
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -37,6 +38,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
     setPhone("");
     setState("idle");
     setMessage("");
+    onDirty?.(false);
   }
 
   if (!open) {
@@ -49,6 +51,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
           disabled={disabled}
           onClick={() => {
             setOpen(true);
+            onDirty?.(true);
             setState("idle");
             setMessage("");
           }}
@@ -66,7 +69,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
       <div className="page-toolbar">
         <div>
           <strong>Yeni müşteri</strong>
-          <small>Rezervasyondan çıkmadan temel müşteri kaydını oluşturun.</small>
+          <small>Her misafir için ayrı kayıt oluşturun. Telefon zorunlu değildir.</small>
         </div>
         <button
           className="drawer-close-button"
@@ -95,7 +98,6 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
           Telefon
           <input
             type="tel"
-            required
             maxLength={32}
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
@@ -113,11 +115,13 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
         <ActionButton
           size="sm"
           type="button"
-          disabled={state === "loading" || !fullName.trim() || !phone.trim()}
+          disabled={disabled || state === "loading" || !fullName.trim()}
           onClick={async () => {
             setState("loading");
             setMessage("Müşteri kaydediliyor...");
-            const result = await onSave(createQuickCustomerInput(fullName, phone));
+            let result: DesktopCustomerMutationResult;
+            try { result = await onSave(createQuickCustomerInput(fullName, phone)); }
+            catch { setState("error"); setMessage("Müşteri kaydedilemedi; yeniden deneyin."); return; }
             if (!result.ok) {
               setState("error");
               setMessage(result.message);
@@ -125,6 +129,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
             }
 
             const savedCustomer = result.dashboardData.customers.find((customer) => customer.id === result.savedId);
+            onDirty?.(false);
             onCreated(result.savedId);
             setOpen(false);
             setFullName("");

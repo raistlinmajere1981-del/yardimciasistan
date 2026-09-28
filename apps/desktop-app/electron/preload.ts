@@ -60,6 +60,9 @@ import type {
   DesktopStockImageApplyResult,
   SaveCustomerInput,
   AssignCustomerRoomInput,
+  StayGuestInput,
+  CheckoutStayGuestInput,
+  MoveStayRoomInput,
   CreateStayFromReservationInput,
   UpdateCustomerRoomStayStatusInput,
   DesktopCustomerMutationResult,
@@ -245,6 +248,10 @@ export interface DesktopBridge {
   setWhatsAppUserActivity: (active: boolean) => void;
   takeoverWhatsAppWebview: () => Promise<{ ok: boolean; message: string }>;
   assignCustomerRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
+  addStayGuest: (input: StayGuestInput) => Promise<DesktopCustomerMutationResult>;
+  changeStayPrimary: (input: StayGuestInput) => Promise<DesktopCustomerMutationResult>;
+  checkoutStayGuest: (input: CheckoutStayGuestInput) => Promise<DesktopCustomerMutationResult>;
+  moveStayRoom: (input: MoveStayRoomInput) => Promise<DesktopCustomerMutationResult>;
   createStayFromReservation: (input: CreateStayFromReservationInput) => Promise<DesktopCustomerMutationResult>;
   checkInStay: (stayId: string) => Promise<DesktopCustomerMutationResult>;
   checkoutStay: (stayId: string) => Promise<DesktopCustomerMutationResult>;
@@ -433,6 +440,10 @@ const bridge: DesktopBridge = {
   setWhatsAppUserActivity: (active: boolean) => ipcRenderer.send("whatsapp:userActivity", active),
   takeoverWhatsAppWebview: () => ipcRenderer.invoke("whatsapp:takeoverWebview"),
   assignCustomerRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),
+  addStayGuest: (input: StayGuestInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:addStayGuest", input),
+  changeStayPrimary: (input: StayGuestInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:changeStayPrimary", input),
+  checkoutStayGuest: (input: CheckoutStayGuestInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkoutStayGuest", input),
+  moveStayRoom: (input: MoveStayRoomInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:moveStayRoom", input),
   createStayFromReservation: (input: CreateStayFromReservationInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:createStayFromReservation", input),
   checkInStay: (stayId: string) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkInStay", stayId),
   checkoutStay: (stayId: string) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkoutStay", stayId),

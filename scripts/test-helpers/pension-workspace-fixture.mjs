@@ -40,15 +40,34 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
   const stamp = () => String(++sequence);
   const data = () => ({ generatedAt: stamp(), rooms: dashboard.rooms.map(item => ({ ...item, nightlyPriceMinor: 10000, currency: 'TRY' })),
     activeStays: dashboard.customerRoomStays.filter(stay => ['planned', 'checked_in'].includes(stay.status)), folios, menuCategories: [{ id: 'drinks', name: 'İçecekler' }], menuItems: menu });
-  const success = (savedId = '') => ({ ok: true, message: 'Kaydedildi.', dashboardData: snapshot(), savedId });
+  const success = (savedId = '', message = 'Kaydedildi.') => ({ ok: true, message, dashboardData: snapshot(), savedId });
   const financial = folio => { window.fixturePublish(); return { ok: true, message: 'Hesap güncellendi.', data: clone(data()), folioId: folio.id }; };
   const totals = folio => { folio.chargeTotalMinor = folio.lodgingTotalMinor + folio.items.reduce((sum, item) => sum + item.lineTotalMinor, 0); folio.paidTotalMinor = folio.payments.reduce((sum, payment) => sum + payment.amountMinor, 0); folio.remainingMinor = folio.chargeTotalMinor - folio.paidTotalMinor; };
+  const openFolioFor = stay => {
+    let folio = folios.find(item => item.stayId === stay.id);
+    if (!folio) { folio = { id: `folio-${stay.id}`, stayId: stay.id, roomId: stay.roomId, roomName: stay.roomName, roomNumber: stay.roomNumber, customerId: stay.customerId, customerName: stay.customerName,
+      reservationId: stay.reservationId, status: 'open', guestCount: stay.guestCount, checkInDate: stay.checkInDate, plannedCheckOutDate: stay.checkOutDate,
+      nights: 2, nightlyPriceMinor: 10000, currency: 'TRY', lodgingTotalMinor: 20000, lodgingManualOverride: false, chargeTotalMinor: 20000, paidTotalMinor: 0, remainingMinor: 20000, items: [], payments: [], openedAt: '2030-10-01T10:00:00Z' }; folios.push(folio); }
+    return folio;
+  };
   const makeStay = (input, reservationId = '') => {
     const selectedRoom = dashboard.rooms.find(item => item.id === input.roomId);
     const status = input.status === 'checked_in' ? 'checked_in' : 'planned';
+    if (status === 'checked_in' && capabilities.folioEnabled && window.fixtureFailOpening) {
+      return { ok: false, message: 'Giriş tamamlanamadı; konaklama, misafir ve hesap değişiklikleri geri alındı.' };
+    }
     const now = stamp();
-    const stay = { ...input, guestCount: Number(input.guestCount ?? 1), id: `stay-${stamp()}`, reservationId, customerName: customer.fullName, customerPhone: customer.phone, roomName: selectedRoom.name, roomNumber: selectedRoom.number, status, createdAt: now, updatedAt: now, checkedInAt: status === 'checked_in' ? now : '', checkedOutAt: '' };
-    dashboard.customerRoomStays.push(stay); selectedRoom.status = status === 'checked_in' ? 'occupied' : 'reserved'; selectedRoom.updatedAt = stamp(); return success(stay.id);
+    const guestIds = Array.isArray(input.guestCustomerIds) && input.guestCustomerIds.length ? input.guestCustomerIds : [input.customerId];
+    const stay = { ...input, guestCount: guestIds.length || Number(input.guestCount ?? 1), id: `stay-${stamp()}`, reservationId, customerId: guestIds[0] ?? input.customerId, customerName: customer.fullName, customerPhone: customer.phone, roomName: selectedRoom.name, roomNumber: selectedRoom.number, status, createdAt: now, updatedAt: now, checkedInAt: status === 'checked_in' ? now : '', checkedOutAt: '',
+      guests: guestIds.map((customerId, index) => ({ id: `guest-${now}-${index}`, customerId, customerName: customer.fullName, status, checkedInAt: status === 'checked_in' ? now : '', checkedOutAt: '', identityReady: true })),
+      pendingNotificationCount: 0 };
+    dashboard.customerRoomStays.push(stay); selectedRoom.status = status === 'checked_in' ? 'occupied' : 'reserved'; selectedRoom.updatedAt = stamp();
+    // Desktop arrival coordinates the enabled Folio in the same entry transaction.
+    if (status === 'checked_in' && capabilities.folioEnabled && !window.fixtureFailOpening) {
+      openFolioFor(stay);
+      return success(stay.id, 'Misafir girişi tamamlandı · Oda hesabı açıldı.');
+    }
+    return success(stay.id, 'Misafir girişi tamamlandı.');
   };
   window.fixtureState = () => clone({ dashboard, folios, menu });
   window.yardimciDesktop = {
@@ -59,7 +78,7 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
       return snapshot;
     },
     saveManualReservation: async input => { record('assignment', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); booking.roomIds = input.roomId ? [input.roomId] : []; return success(booking.id); },
-    createStayFromReservation: async input => { record('linked', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); return makeStay({ roomId: input.roomId, customerId: booking.customerId, checkInDate: booking.startDate, checkOutDate: booking.endDate, guestCount: booking.guestCount, notes: booking.notes, status: input.status === 'checked_in' ? 'checked_in' : 'planned' }, booking.id); },
+    createStayFromReservation: async input => { record('linked', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); return makeStay({ roomId: input.roomId, customerId: input.primaryCustomerId ?? booking.customerId, guestCustomerIds: input.guestCustomerIds ?? [input.primaryCustomerId ?? booking.customerId], checkInDate: booking.startDate, checkOutDate: booking.endDate, guestCount: booking.guestCount, notes: booking.notes, status: input.status === 'checked_in' ? 'checked_in' : 'planned' }, booking.id); },
     assignCustomerRoom: async input => { record('manual', input); return makeStay(input); },
     updateRoomStatus: async input => { record('room-status', input); if (window.fixtureDelayRoom) await new Promise(resolve => { window.fixtureReleaseRoom = resolve; }); if (window.fixtureFailRoom) return { ok: false, message: 'Oda durumu kaydedilemedi.' }; const selectedRoom = dashboard.rooms.find(item => item.id === input.roomId); selectedRoom.status = input.status; selectedRoom.updatedAt = stamp(); return success(); },
     checkInStay: async stayId => { record('check-in', stayId); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = 'checked_in'; stay.checkedInAt = stamp(); stay.updatedAt = stamp(); dashboard.rooms.find(item => item.id === stay.roomId).status = 'occupied'; return success(stayId); },
@@ -68,14 +87,10 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
       if (window.fixtureFailOpening) return { ok: false, message: 'Hesap açılamadı.' };
       const stay = dashboard.customerRoomStays.find(item => item.id === stayId);
       if (stay.status !== 'checked_in') throw Error('Explicit check-in required');
-      let folio = folios.find(item => item.stayId === stayId);
-      if (!folio) { folio = { id: `folio-${stayId}`, stayId, roomId: stay.roomId, roomName: stay.roomName, roomNumber: stay.roomNumber, customerId: stay.customerId, customerName: stay.customerName,
-        reservationId: stay.reservationId, status: 'open', guestCount: stay.guestCount, checkInDate: stay.checkInDate, plannedCheckOutDate: stay.checkOutDate,
-        nights: 2, nightlyPriceMinor: 10000, currency: 'TRY', lodgingTotalMinor: 20000, lodgingManualOverride: false, chargeTotalMinor: 20000, paidTotalMinor: 0, remainingMinor: 20000, items: [], payments: [], openedAt: '2030-10-01T10:00:00Z' }; folios.push(folio); }
-      return financial(folio);
+      return financial(openFolioFor(stay));
     },
     updateCustomerRoomStayStatus: async ({ stayId, status }) => { record('stay-status', { stayId, status }); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = status; stay.updatedAt = stamp(); return success(stayId); },
-    checkoutStay: async stayId => { record('checkout', stayId); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = 'checked_out'; stay.checkedOutAt = stamp(); stay.updatedAt = stamp(); dashboard.rooms.find(item => item.id === stay.roomId).status = 'cleaning'; const folio = folios.find(item => item.stayId === stayId); if (folio?.remainingMinor === 0) folio.status = 'closed'; return success(stayId); },
+    checkoutStay: async stayId => { record('checkout', stayId); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = 'checked_out'; stay.checkedOutAt = stamp(); stay.updatedAt = stamp(); dashboard.rooms.find(item => item.id === stay.roomId).status = 'cleaning'; const folio = folios.find(item => item.stayId === stayId); if (folio?.remainingMinor === 0) folio.status = 'closed'; return success(stayId, 'Misafir çıkışı tamamlandı. Oda temizlik bekliyor.'); },
     addRoomFolioPayment: async input => {
       record('payment', input);
       if (window.fixtureDelayPayment) await new Promise(resolve => { window.fixtureReleasePayment = resolve; });

@@ -12,6 +12,8 @@ export function RoomHistory({ model, operations, account, disabled }: {
     <h3>Yakın dönem kayıtları</h3><p>Yakın dönem konaklamalar ve mevcut hesaplar gösterilir; tam geçmiş değildir.</p>
     {model.stays.map(stay => <article className="operation-section" key={stay.id}><strong>{stay.customerName}</strong>
       <p>{formatCustomerRoomStayStatus(stay.status)} · {formatStayDateRange(stay)}</p>
+      {(stay.guests ?? []).map(guest => <p key={guest.id}>{guest.customerName} · {guest.checkedInAt ? formatDateTime(guest.checkedInAt) : "Giriş yok"} → {guest.checkedOutAt ? formatDateTime(guest.checkedOutAt) : "Çıkış yok"}</p>)}
+      {stay.pendingNotificationCount > 0 && <p>Kimlik bildirimi bekleyen: {stay.pendingNotificationCount} · Otomatik gönderim bağlı değil.</p>}
       {stay.status === "cancelled" && model.canCreate && <ActionButton variant="secondary" disabled={disabled}
         onClick={() => void operations.mutate("operations", () => window.yardimciDesktop!.updateCustomerRoomStayStatus({ stayId: stay.id, status: "planned" }))}>Yeniden Planla</ActionButton>}
     </article>)}

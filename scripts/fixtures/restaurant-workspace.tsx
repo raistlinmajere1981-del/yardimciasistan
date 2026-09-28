@@ -1,10 +1,10 @@
 import "@fontsource-variable/ibm-plex-sans/wght.css";
 import { useDashboardSnapshot } from "../../apps/desktop-app/src/app/use-dashboard-snapshot";
-import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
+import { roomWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
-import { WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
+import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { RestaurantPage } from "../../apps/desktop-app/src/pages/RestaurantPage";
 import { RestaurantReservationsWorkspace } from "../../apps/desktop-app/src/components/operations/RestaurantReservationsWorkspace";
 import { DailyTasksWorkspace } from "../../apps/desktop-app/src/components/operations/OperationWorkspaces";
@@ -24,7 +24,9 @@ function Fixture() {
   return <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="restaurant">
     <AppShell contentScroll="workspace" contentRef={content}
       sidebar={<aside className="sidebar"><button>Restoran</button></aside>}
-      header={<header className="page-header"><h1>Restoran</h1></header>}>
+      header={<header className="page-header"><h1>Restoran</h1></header>}
+      overlay={<WorkspaceHost definition={roomWorkspaceDefinition} context={{ data, onDashboard: setData,
+        staysEnabled: true, reservationsEnabled: capabilities.reservationsEnabled, folioEnabled: true, menuEnabled: capabilities.menuEnabled }} />}>
       <Controls />
       <RestaurantPage data={data} {...capabilities} tasksEnabled tasks={<DailyTasksWorkspace scope="restaurant" tasks={data.dailyTasks} onSave={async () => ({ ok: false, message: "fixture" })} onDelete={async () => ({ ok: false, message: "fixture" })} onUpdateStatus={() => {}} />} onDashboardDataChanged={setData}
         onUpdateTableStatus={async (tableId, status) => { const result = await window.yardimciDesktop.updateTableStatus({ tableId, status }); if (result.ok) setData(result.dashboardData); return result; }}

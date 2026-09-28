@@ -45,7 +45,8 @@ export function getCustomers(db: DatabaseSync): DesktopCustomer[] {
         FROM customers
         LEFT JOIN requests ON requests.customer_id = customers.id AND requests.deleted_at = ''
         LEFT JOIN reservations ON reservations.customer_id = customers.id AND reservations.deleted_at = ''
-        LEFT JOIN customer_room_stays ON customer_room_stays.customer_id = customers.id AND customer_room_stays.deleted_at = ''
+        LEFT JOIN stay_guests ON stay_guests.customer_id = customers.id
+        LEFT JOIN customer_room_stays ON customer_room_stays.id = stay_guests.stay_id AND customer_room_stays.deleted_at = ''
         WHERE customers.deleted_at = ''
         GROUP BY customers.id
         ORDER BY

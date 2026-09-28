@@ -12,11 +12,11 @@ export function refreshRoomStatusFromStays(db: DatabaseSync, roomId: string, now
   if (!room) return;
   let next = room.status;
   const operational = ["cleaning", "maintenance", "out_of_service"].includes(room.status);
-  if (active) {
+  if (checkoutToCleaning && active?.status !== "checked_in") {
+    next = "cleaning";
+  } else if (active) {
     // Planning/occupancy must not erase a persisted operational restriction.
     if (!operational) next = active.status === "checked_in" ? "occupied" : "reserved";
-  } else if (checkoutToCleaning) {
-    next = "cleaning";
   } else if (["occupied", "reserved"].includes(room.status)) {
     const reservation = db.prepare(`
       SELECT 1 FROM reservations, json_each(reservations.room_ids_json) AS assigned

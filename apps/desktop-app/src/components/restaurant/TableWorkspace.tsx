@@ -61,7 +61,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
     if (await controller.closeTableOrder(status)) setReturnRequested(true);
   }
   async function transferTableOrderToRoomFolio(folioId: string) {
-    if (!order || !roomFolioTransferEnabled || order.status !== "payment" || order.total <= 0 || transferCommitted) return;
+    if (!order || !roomFolioTransferEnabled || order.total <= 0 || transferCommitted) return;
     await controller.run(async isCurrent => {
       const bridge = window.yardimciDesktop!;
       const input = { folioId, kind: "manual_charge" as const,

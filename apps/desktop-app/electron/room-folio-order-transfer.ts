@@ -20,8 +20,11 @@ export function transferTableOrderToRoomFolio(
   const db = new DatabaseSync(databasePath);
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec("PRAGMA busy_timeout = 5000;");
+  let inTransaction = false;
 
   try {
+    db.exec("BEGIN IMMEDIATE");
+    inTransaction = true;
     const existing = db.prepare(`
       SELECT folio_id
       FROM room_folio_table_order_transfers
@@ -40,10 +43,10 @@ export function transferTableOrderToRoomFolio(
     }
 
     const folio = db.prepare(`
-      SELECT id, currency
-      FROM room_folios
-      WHERE id = ? AND deleted_at = '' AND status = 'open'
-    `).get(folioId) as { id?: string; currency?: string } | undefined;
+      SELECT f.id, f.currency, f.stay_id
+      FROM room_folios f JOIN customer_room_stays s ON s.id = f.stay_id
+      WHERE f.id = ? AND f.deleted_at = '' AND f.status = 'open' AND s.status = 'checked_in' AND s.deleted_at = ''
+    `).get(folioId) as { id?: string; currency?: string; stay_id: string } | undefined;
     if (!folio?.id) {
       return { ok: false, message: "Açık oda hesabı bulunamadı." };
     }
@@ -55,6 +58,7 @@ export function transferTableOrderToRoomFolio(
         orders.status,
         orders.total,
         tables.name AS table_name,
+        tables.current_customer_id AS customer_id,
         COALESCE((
           SELECT items.currency
           FROM table_order_items AS items
@@ -70,8 +74,11 @@ export function transferTableOrderToRoomFolio(
     if (!order) {
       return { ok: false, message: "Restoran adisyonu bulunamadı." };
     }
-    if (String(order.status ?? "") !== "payment") {
-      return { ok: false, message: "Odaya aktarmadan önce adisyonu Hesap Bekliyor durumuna alın." };
+    if (!["open", "preparing", "served", "payment"].includes(String(order.status ?? ""))) {
+      return { ok: false, message: "Yalnız açık restoran adisyonu odaya aktarılabilir." };
+    }
+    if (order.customer_id && !db.prepare("SELECT 1 FROM stay_guests WHERE stay_id = ? AND customer_id = ? AND status = 'checked_in'").get(folio.stay_id, String(order.customer_id))) {
+      return { ok: false, message: "Masa müşterisi seçilen odada konaklamıyor." };
     }
 
     const amountMinor = Math.round(Math.max(0, Number(order.total ?? 0)) * 100);
@@ -92,7 +99,6 @@ export function transferTableOrderToRoomFolio(
     const label = `Restoran · ${tableName}`;
     const note = `Masa adisyonu · ${tableOrderId}`;
 
-    db.exec("BEGIN IMMEDIATE");
     try {
       // Stok burada değiştirilmez. Restoran siparişi oluşturulurken ürün stokları
       // zaten düşürülmüştür; oda folyosuna yalnız parasal toplam taşınır.
@@ -122,7 +128,7 @@ export function transferTableOrderToRoomFolio(
       db.prepare(`
         UPDATE table_orders
         SET status = 'paid', closed_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'payment'
+        WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')
       `).run(now, now, tableOrderId);
 
       db.prepare(`
@@ -133,8 +139,10 @@ export function transferTableOrderToRoomFolio(
       `).run(now, String(order.table_id ?? ""));
 
       db.exec("COMMIT");
+      inTransaction = false;
     } catch (error) {
       db.exec("ROLLBACK");
+      inTransaction = false;
       throw error;
     }
   } catch (error) {
@@ -144,6 +152,7 @@ export function transferTableOrderToRoomFolio(
     }
     return { ok: false, message: "Restoran adisyonu oda hesabına aktarılamadı." };
   } finally {
+    if (inTransaction) db.exec("ROLLBACK");
     db.close();
   }
 

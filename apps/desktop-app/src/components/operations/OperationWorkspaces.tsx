@@ -32,6 +32,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 import { ChoiceChips } from "../ui/ChoiceChips";
+import { SearchSelect } from "../ui/SearchSelect";
 
 function getReservationStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) return "danger";
@@ -267,6 +268,7 @@ export function ReservationsWorkspace({
   const setStatusFilter = (value: string) => pension ? pension.setFilters(current => ({ ...current, reservationStatus: value })) : setLocalStatus(value);
   const setDateFilter = (value: string) => pension ? pension.setFilters(current => ({ ...current, reservationDate: value })) : setLocalDate(value);
   const [assignment, setAssignment] = useState<DesktopDashboardData["reservations"][number] | null>(null);
+  const [entryRooms, setEntryRooms] = useState<Record<string, string>>({});
   const [manualEditorOpen, setManualEditorOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState<DesktopDashboardData["reservations"][number] | null>(null);
   const filteredReservations = useMemo(
@@ -370,20 +372,27 @@ export function ReservationsWorkspace({
                       Onayla
                     </ActionButton>
                   )}
-                  {reservation.roomIds.length === 1 && rooms.some(room => room.id === reservation.roomIds[0]) && (
+                  {reservation.reservationType === "room" && reservation.status === "approved" && reservation.roomIds.length <= 1 && <>
+                    {!reservation.roomIds.length && <SearchSelect ariaLabel={`${reservation.title || reservation.customerName} giriş odası`} value={entryRooms[reservation.id] || ""}
+                      placeholder="Giriş yapılacak oda" onChange={id => setEntryRooms(current => ({ ...current, [reservation.id]: id }))}
+                      options={rooms.filter(room => room.isActive && !["occupied", "cleaning", "maintenance", "out_of_service"].includes(room.status))
+                        .map(room => ({ id: room.id, label: room.number ? `Oda ${room.number}` : room.name }))} />}
                     <ActionButton
                       variant="secondary"
                       size="sm"
                       onClick={() => navigation.openWorkspace({
                         entityType: "room",
-                        entityId: reservation.roomIds[0],
+                        entityId: reservation.roomIds[0] || entryRooms[reservation.id],
                         mode: "stay",
+                        action: "linked-stay",
+                        reservationId: reservation.id,
                         returnContext: { page: "pension", view: "reservations", entityId: reservation.id }
                       })}
+                      disabled={!reservation.roomIds[0] && !entryRooms[reservation.id]}
                     >
-                      Odayı Aç
+                      Giriş Yap
                     </ActionButton>
-                  )}
+                  </>}
                   {reservation.reservationType === "room" && ["pending", "approved"].includes(reservation.status) && reservation.roomIds.length <= 1 && (
                     <ActionButton variant="secondary" size="sm" onClick={() => setAssignment(reservation)}>
                       Oda Ata / Düzenle

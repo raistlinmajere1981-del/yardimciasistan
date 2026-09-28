@@ -161,7 +161,23 @@ export interface DesktopCustomerRoomStay {
   checkedOutAt: string;
   createdAt: string;
   updatedAt: string;
+  guests: DesktopStayGuest[];
+  pendingNotificationCount: number;
 }
+
+export interface DesktopStayGuest {
+  id: string;
+  customerId: string;
+  customerName: string;
+  status: "planned" | "checked_in" | "checked_out" | "cancelled";
+  checkedInAt: string;
+  checkedOutAt: string;
+  identityReady: boolean;
+}
+
+export interface StayGuestInput { stayId: string; customerId: string }
+export interface CheckoutStayGuestInput extends StayGuestInput { nextPrimaryCustomerId?: string }
+export interface MoveStayRoomInput { stayId: string; roomId: string }
 
 export interface DesktopPreparedMessage {
   id: string;
@@ -654,13 +670,17 @@ export interface SaveCustomerInput {
 }
 
 export interface CreateStayFromReservationInput {
+  requestId?: string;
   reservationId: string;
   roomId?: string;
   /** Defaults to planned for legacy callers; direct room entry requests checked_in. */
   status?: "planned" | "checked_in";
+  guestCustomerIds?: string[];
+  primaryCustomerId?: string;
 }
 
 export interface AssignCustomerRoomInput {
+  requestId?: string;
   customerId: string;
   roomId: string;
   checkInDate: string;
@@ -668,6 +688,7 @@ export interface AssignCustomerRoomInput {
   guestCount: number;
   notes: string;
   status: "planned" | "checked_in";
+  guestCustomerIds?: string[];
 }
 
 export interface UpdateCustomerRoomStayStatusInput {

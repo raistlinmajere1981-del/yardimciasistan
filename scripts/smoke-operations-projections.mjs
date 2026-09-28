@@ -20,15 +20,17 @@ try {
   const [room, otherRoom] = initial.rooms;
   const [table] = initial.tables;
   db.prepare("INSERT INTO customers (id, full_name, phone, created_at, updated_at) VALUES ('guest', 'Projection guest', '', '', '')").run();
-  const insertStay = db.prepare(`INSERT INTO customer_room_stays (id, customer_id, room_id, status, check_in_date, check_out_date, created_at, updated_at) VALUES (?, 'guest', ?, ?, ?, '2040-01-03', '', '')`);
-  insertStay.run('target-stay', room.id, 'planned', '2035-01-01');
-  insertStay.run('old-stay', room.id, 'checked_out', '2020-01-01');
+  const insertCustomer = db.prepare("INSERT INTO customers (id, full_name, phone, created_at, updated_at) VALUES (?, ?, '', '', '')");
+  const insertStay = db.prepare(`INSERT INTO customer_room_stays (id, customer_id, room_id, status, check_in_date, check_out_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '2040-01-03', '', '')`);
+  insertStay.run('target-stay', 'guest', room.id, 'planned', '2035-01-01');
+  insertStay.run('old-stay', 'guest', room.id, 'checked_out', '2020-01-01');
   const insertFolio = db.prepare(`INSERT INTO room_folios (id, stay_id, room_id, customer_id, check_in_date, lodging_total_minor, opened_at, created_at, updated_at) VALUES (?, ?, ?, 'guest', '2035-01-01', 25000, '', '', ?)`);
   insertFolio.run('target-folio', 'target-stay', room.id, '2000-01-01');
   insertFolio.run('old-folio', 'old-stay', room.id, '2000-01-02');
   // More active stays and open accounts than bounded history supports.
   for (let i = 0; i < 505; i++) {
-    insertStay.run(`filler-${i}`, otherRoom.id, 'planned', '2039-01-01');
+    insertCustomer.run(`filler-guest-${i}`, `Filler guest ${i}`);
+    insertStay.run(`filler-${i}`, `filler-guest-${i}`, otherRoom.id, 'planned', '2039-01-01');
     if (i < 105) insertFolio.run(`filler-folio-${i}`, `filler-${i}`, otherRoom.id, '2039-01-01');
   }
   db.prepare(`INSERT INTO reservations (id, customer_id, reservation_type, status, title, start_date, end_date, room_ids_json, created_at, updated_at) VALUES ('target-booking', 'guest', 'room', 'approved', 'Upcoming', '2040-01-04', '2040-01-06', ?, '', '')`).run(JSON.stringify([room.id]));
@@ -43,7 +45,14 @@ try {
   assert.equal(target.accounts.find(item => item.stayId === 'target-stay').folioId, 'target-folio');
   assert.equal(target.accounts.find(item => item.folioId === 'old-folio').stayStatus, 'checked_out');
   const folios = new DesktopRoomFolioService(database.databasePath);
-  assert.equal(folios.getData().folios.some(item => item.id === 'target-folio'), false);
+  const globalFolios = folios.getData();
+  const activeStayIds = new Set(globalFolios.activeStays.map(item => item.id));
+  assert.equal(globalFolios.folios.some(item => item.id === 'target-folio'), true,
+    'An older active account must remain reachable in the global projection.');
+  assert.equal(globalFolios.folios.filter(item => activeStayIds.has(item.stayId)).length, 106,
+    'The history limit must not truncate any active-stay accounts.');
+  assert.equal(globalFolios.folios.some(item => item.id === 'old-folio'), true,
+    'Active accounts must not consume the separate history allowance.');
   assert.deepEqual(folios.getData(room.id).folios.map(item => item.id).sort(), ['old-folio', 'target-folio']);
   assert.equal(db.prepare('PRAGMA data_version').get().data_version, beforeChanges);
   assert.deepEqual(snapshot.rooms.map(item => item.id), initial.rooms.map(item => item.id));

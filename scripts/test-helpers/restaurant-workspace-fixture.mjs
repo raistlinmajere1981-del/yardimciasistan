@@ -8,6 +8,18 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
   dashboard.customers = [{ ...dashboard.customers[0], id: 'customer-a', fullName: 'Pilot Misafir', phone: '05550000000' }];
   dashboard.customers.push({ ...dashboard.customers[0], id: 'customer-b', fullName: 'İkinci Misafir' });
   dashboard.reservations = [];
+  const stayRoom = dashboard.rooms[0];
+  const stay = { id: 'stay-a', customerId: 'customer-a', customerName: 'Pilot Misafir', customerPhone: '05550000000',
+    roomId: stayRoom.id, roomName: stayRoom.name, roomNumber: stayRoom.number, reservationId: '', status: 'checked_in',
+    checkInDate: now.slice(0, 10), checkOutDate: now.slice(0, 10), guestCount: 1, notes: '', source: '',
+    checkedInAt: now, checkedOutAt: '', createdAt: now, updatedAt: now,
+    guests: [{ id: 'guest-a', customerId: 'customer-a', customerName: 'Pilot Misafir', status: 'checked_in',
+      checkedInAt: now, checkedOutAt: '', identityReady: true }], pendingNotificationCount: 0 };
+  dashboard.customerRoomStays = [stay];
+  dashboard.roomOperations = dashboard.rooms.map(room => ({ roomId: room.id,
+    stays: room.id === stayRoom.id ? [stay] : [], reservations: [],
+    accounts: room.id === stayRoom.id ? [{ folioId: 'folio-a', stayId: 'stay-a', stayStatus: 'checked_in',
+      customerName: 'Pilot Misafir', remainingMinor: 5000, currency: 'TRY' }] : [] }));
   dashboard.menu.categories = [{ id: 'category-a', name: 'İçecek', is_active: true, sort_order: 1 }];
   dashboard.menu.items = [{ id: 'menu-a', name: 'Çay', description: '', category_id: 'category-a', is_available: true,
     image_url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect width="48" height="48" fill="%23888"/%3E%3C/svg%3E',
@@ -103,7 +115,12 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
       return response;
     },
     updateTableStatus: async ({ tableId, status }) => { calls.push({ kind: 'table-status' }); dashboard.tables.find(table => table.id === tableId).status = status; return copy({ ok: true, message: 'Masa durumu güncellendi.', dashboardData: snapshot() }); },
-    getRoomFolioData: async () => { calls.push({ kind: 'folios' }); await wait('Folio'); return { folios: [{ id: 'folio-a', status: 'open', roomNumber: '101', customerName: 'Pilot Misafir' }] }; },
+    getRoomFolioData: async () => { calls.push({ kind: 'folios' }); await wait('Folio'); return { folios: [{ id: 'folio-a', stayId: 'stay-a',
+      roomId: stayRoom.id, roomName: stayRoom.name, roomNumber: '101', customerId: 'customer-a', customerName: 'Pilot Misafir',
+      reservationId: '', status: 'open', guestCount: 1, checkInDate: now.slice(0, 10), plannedCheckOutDate: now.slice(0, 10),
+      nights: 1, nightlyPriceMinor: 10000, currency: 'TRY', lodgingTotalMinor: 10000, lodgingManualOverride: false,
+      extrasTotalMinor: 0, chargeTotalMinor: 10000, paidTotalMinor: 5000, remainingMinor: 5000, creditMinor: 0,
+      openedAt: now, closedAt: '', note: '', items: [], payments: [] }] }; },
     addRoomFolioManualItem: async input => {
       calls.push({ kind: 'transfer', input }); await wait('Transfer');
       if (window.fixtureFailTransfer) return { ok: false, message: 'Aktarım reddedildi.' };

@@ -34,7 +34,7 @@ try {
   const dialog = page.getByRole('dialog');
   const close = () => dialog.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
   const orderBefore = await page.locator('.resource-card h3').allTextContents();
-  await expect(card(103)).toContainText('Mevcut misafir');
+  await expect(card(103)).toContainText('Konaklayanlar · 2 kişi');
   await expect(card(103)).toContainText('Ece Yılmaz');
   await expect(card(103)).toContainText('Önceki misafir · Selin Aras');
 
@@ -97,14 +97,21 @@ try {
   });
   await expect(card(101).getByRole('group', { name: 'Oda 101 fiziksel durumunu değiştir', exact: true })).toBeVisible();
 
-  // Current guest checkout is a true card quick action: it must not open the workspace and settles the current folio.
+  // Card checkout opens the room workspace; physical departure never invents a payment.
   const paymentsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);
   await card(103).getByRole('button', { name: 'Misafir çıkışı', exact: true }).click();
-  const confirm = page.locator('.confirm-dialog');
-  await expect(page.locator('.workspace-frame')).toHaveCount(0);
+  await expect(page.locator('.workspace-frame')).toHaveCount(1);
+  const checkoutAccount = dialog.getByRole('region', { name: 'Mevcut konaklama hesabı', exact: true });
+  const checkoutOperations = dialog.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true });
+  await checkoutAccount.getByLabel('Ödeme tutarı').fill('3600');
+  await checkoutAccount.getByRole('button', { name: 'Ödemeyi Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.fixtureState().folios.find(item => item.stayId === 'stay-2').remainingMinor)).toBe(0);
+  await checkoutOperations.getByRole('button', { name: 'Misafir Çıkışı', exact: true }).click();
+  const confirm = dialog.getByRole('alertdialog', { name: 'Misafir çıkışı', exact: true });
   await expect(confirm).toContainText('Ece Yılmaz');
   await expect(confirm).toContainText('Kalan hesap');
-  await confirm.getByRole('button', { name: 'Çıkış ve Hesabı Kapat', exact: true }).click();
+  await expect(confirm.getByRole('group', { name: 'Çıkış ödeme yöntemi', exact: true })).toHaveCount(0);
+  await confirm.getByRole('button', { name: 'Tüm Misafirlerin Çıkışını Yap', exact: true }).click();
   await expect(card(103).getByRole('group', { name: 'Oda 103 fiziksel durumunu değiştir', exact: true })
     .getByRole('button', { name: 'Temizlik', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentsBeforeCheckout + 1);

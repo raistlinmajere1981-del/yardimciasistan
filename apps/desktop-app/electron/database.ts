@@ -1,5 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { getHospitalityOperations } from "./database/hospitality-operations-store.js";
+import { DesktopRoomFolioService } from "./room-folio.js";
+import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
+import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
+export type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -300,6 +304,20 @@ export class DesktopDatabase {
 
       if (!existingDomainObject) {
         this.db.exec(schemaSql);
+      }
+
+      // Install the current guest model from its canonical schema, once. Existing
+      // stays retain their known primary guest; unnamed occupants are never invented.
+      if (!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'stay_guests'").get()) {
+        const guestSchema = schemaSql.split("-- BEGIN HOSPITALITY GUEST SCHEMA")[1]?.split("-- END HOSPITALITY GUEST SCHEMA")[0];
+        if (!guestSchema) throw new Error("Konaklama misafir şeması bulunamadı.");
+        this.db.exec(guestSchema);
+        this.db.exec(`INSERT INTO stay_guests (id, stay_id, customer_id, status, checked_in_at, checked_out_at, created_at, updated_at)
+          SELECT 'guest_' || id, id, customer_id, status, checked_in_at, checked_out_at, created_at, updated_at
+          FROM customer_room_stays WHERE deleted_at = '';
+          INSERT INTO stay_room_history (id, stay_id, room_id, entered_at, left_at)
+          SELECT 'room_' || id, id, room_id, checked_in_at, checked_out_at FROM customer_room_stays
+          WHERE deleted_at = '' AND checked_in_at != '';`);
       }
 
       const requiredTables = ["android_local_credentials", "desktop_sync_identity", "settings"];
@@ -669,21 +687,62 @@ export class DesktopDatabase {
   }
 
   assignCustomerToRoom(input: AssignCustomerRoomInput): DesktopCustomerMutationResult {
-    const result = assignStoredCustomerToRoom(this.db, input);
-    if (!result.ok) {
-      return result;
-    }
-    return { ...result, dashboardData: this.getDashboardData() };
+    return this.completeStayEntry(() => assignStoredCustomerToRoom(this.db, input), input.status === "checked_in", input);
   }
 
   createStayFromReservation(input: CreateStayFromReservationInput): DesktopCustomerMutationResult {
-    const result = createStoredStayFromReservation(this.db, input);
+    return this.completeStayEntry(() => createStoredStayFromReservation(this.db, input), input.status === "checked_in", input);
+  }
+
+  /** Explicit arrival coordinates the enabled financial account in the same transaction. */
+  checkInStay(stayId: string): DesktopCustomerMutationResult {
+    return this.completeStayEntry(() => updateStoredCustomerRoomStayStatus(this.db, { stayId, status: "checked_in" }), true);
+  }
+
+  private completeStayEntry(operation: () => Omit<Extract<DesktopCustomerMutationResult, { ok: true }>, "dashboardData"> | Extract<DesktopCustomerMutationResult, { ok: false }>,
+    checkIn: boolean, input?: AssignCustomerRoomInput | CreateStayFromReservationInput): DesktopCustomerMutationResult {
+    let result: ReturnType<typeof operation>;
+    this.db.exec("SAVEPOINT hospitality_entry");
+    try {
+      const receipt = input?.requestId ? this.db.prepare("SELECT stay_id, input_json FROM hospitality_entry_receipts WHERE request_id = ?").get(input.requestId) as { stay_id: string; input_json: string } | undefined : undefined;
+      if (receipt && receipt.input_json !== JSON.stringify(input)) result = { ok: false, message: "Giriş isteği değişti; yeni işlem başlatın." };
+      else if (receipt) result = { ok: true, savedId: receipt.stay_id, message: "Bu giriş daha önce tamamlandı." };
+      else {
+        result = operation();
+        if (result.ok && checkIn && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)) {
+          const folio = new DesktopRoomFolioService(this.databasePath).openFolio(result.savedId, this.db);
+          if (!folio.ok) result = folio;
+        }
+        if (result.ok && input?.requestId) this.db.prepare("INSERT INTO hospitality_entry_receipts (request_id, input_json, stay_id) VALUES (?, ?, ?)")
+          .run(input.requestId, JSON.stringify(input), result.savedId);
+      }
+      if (!result.ok) this.db.exec("ROLLBACK TO hospitality_entry");
+      this.db.exec("RELEASE hospitality_entry");
+    } catch {
+      this.db.exec("ROLLBACK TO hospitality_entry; RELEASE hospitality_entry");
+      return { ok: false, message: "Giriş tamamlanamadı; konaklama, misafir ve hesap değişiklikleri geri alındı." };
+    }
     return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
-  /** Explicit arrival; opening a financial account is a separate operation. */
-  checkInStay(stayId: string): DesktopCustomerMutationResult {
-    return this.updateCustomerRoomStayStatus({ stayId, status: "checked_in" });
+  addStayGuest(input: StayGuestInput): DesktopCustomerMutationResult {
+    const result = addStayGuest(this.db, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
+  }
+
+  changeStayPrimary(input: StayGuestInput): DesktopCustomerMutationResult {
+    const result = changeStayPrimary(this.db, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
+  }
+
+  checkoutStayGuest(input: CheckoutStayGuestInput): DesktopCustomerMutationResult {
+    const result = checkoutStayGuest(this.db, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
+  }
+
+  moveStayRoom(input: MoveStayRoomInput): DesktopCustomerMutationResult {
+    const result = moveStayRoom(this.db, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
   checkoutStay(stayId: string): DesktopCustomerMutationResult {
@@ -691,6 +750,7 @@ export class DesktopDatabase {
   }
 
   updateCustomerRoomStayStatus(input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult {
+    if (input.status === "checked_in") return this.checkInStay(input.stayId);
     const result = updateStoredCustomerRoomStayStatus(this.db, input);
     if (!result.ok) {
       return result;
@@ -1898,12 +1958,15 @@ export class DesktopDatabase {
     if (creditDebt) {
       return { ok: false, message: "Bu müşterinin açık veresiye borcu var." };
     }
+    if (this.db.prepare("SELECT 1 FROM room_folios WHERE customer_id = ? AND deleted_at = '' AND status = 'open'").get(customerId)) {
+      return { ok: false, message: "Bu müşterinin açık konaklama hesabı var; önce hesabı sonuçlandırın." };
+    }
     const activeStay = this.db
       .prepare(`
         SELECT customer_room_stays.id, rooms.name AS room_name
         FROM customer_room_stays
         JOIN rooms ON rooms.id = customer_room_stays.room_id
-        WHERE customer_room_stays.customer_id = ?
+        WHERE EXISTS (SELECT 1 FROM stay_guests g WHERE g.stay_id = customer_room_stays.id AND g.customer_id = ? AND g.status IN ('planned', 'checked_in'))
           AND customer_room_stays.status IN ('planned', 'checked_in')
           AND customer_room_stays.deleted_at = ''
         LIMIT 1

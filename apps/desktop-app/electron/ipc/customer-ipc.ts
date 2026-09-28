@@ -2,6 +2,9 @@ import { ipcMain } from "electron";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import type {
   AssignCustomerRoomInput,
+  StayGuestInput,
+  CheckoutStayGuestInput,
+  MoveStayRoomInput,
   CreateStayFromReservationInput,
   DesktopCustomerMutationResult,
   DesktopDatabase,
@@ -19,6 +22,28 @@ export function registerCustomerIpcHandlers(options: {
 }) {
   const { getDatabase, assertCapability, finalizeRecordDeletion, finalizeCustomerMutation } = options;
 
+  function assertStayAccess() {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
+  }
+  ipcMain.handle("customer:addStayGuest", (_event, input: StayGuestInput) => {
+    assertStayAccess();
+    return finalizeCustomerMutation(getDatabase().addStayGuest(input));
+  });
+  ipcMain.handle("customer:changeStayPrimary", (_event, input: StayGuestInput) => {
+    assertStayAccess();
+    return finalizeCustomerMutation(getDatabase().changeStayPrimary(input));
+  });
+  ipcMain.handle("customer:checkoutStayGuest", (_event, input: CheckoutStayGuestInput) => {
+    assertStayAccess();
+    return finalizeCustomerMutation(getDatabase().checkoutStayGuest(input));
+  });
+  ipcMain.handle("customer:moveStayRoom", (_event, input: MoveStayRoomInput) => {
+    assertStayAccess();
+    return finalizeCustomerMutation(getDatabase().moveStayRoom(input));
+  });
+
   ipcMain.handle("customer:delete", (_event, customerId: unknown): DesktopStatusUpdateResult => {
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     return finalizeRecordDeletion(getDatabase().deleteCustomer(String(customerId ?? "")));
@@ -30,6 +55,7 @@ export function registerCustomerIpcHandlers(options: {
   });
 
   ipcMain.handle("customer:assignRoom", (_event, input: AssignCustomerRoomInput): DesktopCustomerMutationResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama ataması bu işletmede etkin değil.");
     return finalizeCustomerMutation(getDatabase().assignCustomerToRoom(input));

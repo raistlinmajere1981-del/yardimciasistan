@@ -244,7 +244,7 @@ try {
     await expect(customerWorkspace.getByRole('alert').filter({ hasText: 'Bu tutar mevcut borçtan büyük.' })).toBeVisible();
     await customerWorkspace.getByRole('form', { name: 'Tahsilat', exact: true }).getByRole('button', { name: 'Vazgeç', exact: true }).click();
     await customerWorkspace.getByRole('tab', { name: 'Özet', exact: true }).click();
-    await customerWorkspace.getByRole('button', { name: 'Odaya Ata', exact: true }).click();
+    await customerWorkspace.getByRole('button', { name: 'Konaklama Başlat', exact: true }).click();
     await capture('room-assignment');
     await closeDialog();
     await page.getByLabel('Ara', { exact: true }).fill('no-match-stage2a');

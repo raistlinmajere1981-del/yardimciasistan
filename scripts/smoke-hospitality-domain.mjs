@@ -26,7 +26,7 @@ try {
   const folios = new DesktopRoomFolioService(database.databasePath);
   const stayRow = id => db.prepare('SELECT * FROM customer_room_stays WHERE id = ?').get(id);
   const roomStatus = id => db.prepare('SELECT status FROM rooms WHERE id = ?').get(id).status;
-  const manual = (roomId, overrides = {}) => database.assignCustomerToRoom({ customerId, roomId, checkInDate: '2035-09-01', checkOutDate: '2035-09-04', guestCount: 2, notes: '', status: 'checked_in', ...overrides });
+  const manual = (roomId, overrides = {}) => database.assignCustomerToRoom({ customerId, roomId, checkInDate: '2035-09-01', checkOutDate: '2035-09-04', guestCount: 1, guestCustomerIds: [customerId], notes: '', status: 'checked_in', ...overrides });
   const reservation = (roomId, overrides = {}) => {
     const result = database.saveManualReservation({ customerId, roomId, startDate: '2035-09-01', endDate: '2035-09-04', guestCount: 2, notes: 'source notes', ...overrides });
     assert.equal(result.ok, true, result.message);
@@ -76,44 +76,49 @@ try {
   db.prepare("UPDATE customers SET deleted_at = 'deleted' WHERE id = ?").run(customerId);
   fail(database.createStayFromReservation({ reservationId: booking.id }));
   db.prepare("UPDATE customers SET deleted_at = '' WHERE id = ?").run(customerId);
-  const linked = ok(database.createStayFromReservation({ reservationId: booking.id, status: 'checked_in' }));
+  const linked = ok(database.createStayFromReservation({ reservationId: booking.id, status: 'checked_in', guestCustomerIds: [customerId], primaryCustomerId: customerId }));
   const linkedRow = stayRow(linked.savedId);
-  for (const [field, value] of Object.entries({ reservation_id: booking.id, customer_id: customerId, room_id: rooms[1].id, check_in_date: booking.start_date, check_out_date: booking.end_date, guest_count: booking.guest_count, status: 'checked_in' })) assert.equal(linkedRow[field], value);
+  for (const [field, value] of Object.entries({ reservation_id: booking.id, customer_id: customerId, room_id: rooms[1].id, check_in_date: booking.start_date, check_out_date: booking.end_date, status: 'checked_in' })) assert.equal(linkedRow[field], value);
+  assert.equal(linkedRow.guest_count, 1, 'Actual arrivals come from the registered guest list');
+  assert.equal(db.prepare('SELECT guest_count FROM reservations WHERE id = ?').get(booking.id).guest_count, booking.guest_count, 'Expected booking occupancy is preserved');
   assert.ok(linkedRow.checked_in_at, 'Direct check-in must stamp arrival');
   assert.equal(roomStatus(rooms[1].id), 'occupied', 'Direct check-in occupies the room');
-  fail(database.createStayFromReservation({ reservationId: booking.id }));
+  assert.equal(ok(database.createStayFromReservation({ reservationId: booking.id })).savedId, linked.savedId, 'Same reservation and room reuses the existing stay');
   assert.equal(db.prepare('SELECT status FROM reservations WHERE id = ?').get(booking.id).status, 'approved');
   assert.equal(stayRow(linked.savedId).status, 'checked_in');
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM room_folios WHERE stay_id = ?').get(linked.savedId).n, 0, 'Direct check-in does not auto-open a Folio; the workspace opens it explicitly');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM room_folios WHERE stay_id = ?').get(linked.savedId).n, 1, 'Direct check-in coordinates the enabled Folio in the same entry transaction');
   assert.equal(db.prepare('SELECT status FROM reservations WHERE id = ?').get(booking.id).status, 'approved');
   // Aynı müşteri ikinci odada aktif olamaz: desktop + Android/domain reddi Oda bilgisiyle gelir.
-  const secondActiveDesktop = database.assignCustomerToRoom({ customerId, roomId: rooms[2].id, checkInDate: '2035-09-01', checkOutDate: '2035-09-04', guestCount: 2, notes: '', status: 'checked_in' });
+  const secondActiveDesktop = database.assignCustomerToRoom({ customerId, roomId: rooms[2].id, checkInDate: '2035-09-01', checkOutDate: '2035-09-04', guestCount: 1, guestCustomerIds: [customerId], notes: '', status: 'checked_in' });
   assert.equal(secondActiveDesktop.ok, false);
   assert.match(secondActiveDesktop.message, /Oda .*için aktif/);
   database.upsertAndroidDeviceSightings([{ device_id: 'hospitality-single-active', device_name: 'Single active', app_version: 'smoke', first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString() }]);
   database.setAndroidDeviceActive('hospitality-single-active', true);
   database.setAndroidDeviceRole('hospitality-single-active', 'admin');
-  const secondActiveAndroid = database.applyAndroidAction({ id: 'hospitality-second-active-android', action_type: 'customer_room_assign', payload: { customer_id: customerId, room_id: rooms[2].id, check_in_date: '2035-09-01', check_out_date: '2035-09-04', guest_count: 2, notes: '', status: 'checked_in' }, created_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), device_id: 'hospitality-single-active', device_name: 'Single active', app_version: 'smoke', status: 'pending', error_message: '' });
+  const secondActiveAndroid = database.applyAndroidAction({ id: 'hospitality-second-active-android', action_type: 'customer_room_assign', payload: { customer_id: customerId, room_id: rooms[2].id, check_in_date: '2035-09-01', check_out_date: '2035-09-04', guest_count: 1, notes: '', status: 'checked_in' }, created_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), device_id: 'hospitality-single-active', device_name: 'Single active', app_version: 'smoke', status: 'pending', error_message: '' });
   assert.equal(secondActiveAndroid.ok, false);
   assert.match(secondActiveAndroid.message, /Oda .*için aktif/);
+  const multiPersonAndroid = database.applyAndroidAction({ id: 'hospitality-multi-person-android', action_type: 'customer_room_assign', payload: { customer_id: customerId, room_id: rooms[2].id, check_in_date: '2035-09-01', check_out_date: '2035-09-04', guest_count: 2, notes: '', status: 'checked_in' }, created_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), device_id: 'hospitality-single-active', device_name: 'Single active', app_version: 'smoke', status: 'pending', error_message: '' });
+  assert.equal(multiPersonAndroid.ok, false);
+  assert.match(multiPersonAndroid.message, /masaüst/);
   ok(database.checkoutStay(linked.savedId));
   assert.equal(stayRow(linked.savedId).status, 'checked_out');
 
-  // Multi-room selection is explicit; total guest count is conservatively capacity-checked per selected room.
+  // Multi-room reservations are split per room; price/deposit allocation per room does not exist yet.
   // Aynı müşteri iki odada aynı anda aktif olamaz, bu yüzden ikinci oda önce reddedilir.
   const multi = reservation(rooms[2].id);
   db.prepare('UPDATE reservations SET room_ids_json = ? WHERE id = ?').run(JSON.stringify([rooms[2].id, rooms[3].id]), multi.id);
   fail(database.createStayFromReservation({ reservationId: multi.id }));
-  const multiFirst = ok(database.createStayFromReservation({ reservationId: multi.id, roomId: rooms[2].id, status: 'checked_in' }));
+  fail(database.createStayFromReservation({ reservationId: multi.id, roomId: rooms[2].id, status: 'checked_in' }));
+  db.prepare('UPDATE reservations SET room_ids_json = ? WHERE id = ?').run(JSON.stringify([rooms[2].id]), multi.id);
+  const multiFirst = ok(database.createStayFromReservation({ reservationId: multi.id, roomId: rooms[2].id, status: 'checked_in', guestCustomerIds: [customerId], primaryCustomerId: customerId }));
   assert.equal(stayRow(multiFirst.savedId).status, 'checked_in');
   assert.equal(stayRow(multiFirst.savedId).reservation_id, multi.id);
-  const multiSecondBlocked = database.createStayFromReservation({ reservationId: multi.id, roomId: rooms[3].id, status: 'checked_in' });
+  const multiSecondBlocked = database.createStayFromReservation({ reservationId: multi.id, roomId: rooms[3].id, status: 'checked_in', guestCustomerIds: [customerId], primaryCustomerId: customerId });
   assert.equal(multiSecondBlocked.ok, false);
-  assert.match(multiSecondBlocked.message, /Oda .*için aktif/);
   ok(database.checkoutStay(multiFirst.savedId));
-  const multiSecond = ok(database.createStayFromReservation({ reservationId: multi.id, roomId: rooms[3].id, status: 'checked_in' }));
-  assert.equal(stayRow(multiSecond.savedId).reservation_id, multi.id);
-  ok(database.checkoutStay(multiSecond.savedId));
+  db.prepare('UPDATE reservations SET room_ids_json = ? WHERE id = ?').run(JSON.stringify([rooms[3].id]), multi.id);
+  fail(database.createStayFromReservation({ reservationId: multi.id, roomId: rooms[3].id, status: 'checked_in', guestCustomerIds: [customerId], primaryCustomerId: customerId }));
 
   // F / G / E: both checkout entries share debt/zero semantics, finance happens once, payments do not close accounts.
   for (const [index, viaFolio, amount] of [[4, false, 0], [5, true, 0], [6, false, 10000], [7, true, 10000]]) {
@@ -160,17 +165,24 @@ try {
   // Tek-aktif kuralı nedeniyle ikinci kayıt farklı müşteriyle yapılır; aynı müşteri ikinci odada reddedilir.
   const secondCustomer = ok(database.saveCustomer({ fullName: 'Domain second guest', phone: '', email: '', notes: '', tags: [], identityType: '', identityNumber: '', nationality: '', birthDate: '', gender: '', documentSerialNumber: '', documentExpiryDate: '', birthPlace: '', motherName: '', fatherName: '', issuingAuthority: '', address: '' }));
   const secondCustomerId = secondCustomer.savedId;
-  const manualAs = (cid, roomId, overrides = {}) => database.assignCustomerToRoom({ customerId: cid, roomId, checkInDate: '2035-09-01', checkOutDate: '2035-09-04', guestCount: 2, notes: '', status: 'checked_in', ...overrides });
+  const manualAs = (cid, roomId, overrides = {}) => database.assignCustomerToRoom({ customerId: cid, roomId, checkInDate: '2035-09-01', checkOutDate: '2035-09-04', guestCount: 1, guestCustomerIds: [cid], notes: '', status: 'checked_in', ...overrides });
   for (const [index, otherStatus, expected] of [[8, 'checked_in', 'occupied'], [9, 'planned', 'reserved']]) {
     const first = ok(manual(rooms[index].id));
     const blockedSameCustomer = manual(rooms[index].id, { checkInDate: '2035-09-05', checkOutDate: '2035-09-08', status: otherStatus });
     assert.equal(blockedSameCustomer.ok, false);
-    assert.match(blockedSameCustomer.message, /Oda .*için aktif/);
-    const second = ok(manualAs(secondCustomerId, rooms[index].id, { checkInDate: '2035-09-05', checkOutDate: '2035-09-08', status: otherStatus }));
-    ok(database.checkoutStay(first.savedId));
-    assert.equal(roomStatus(rooms[index].id), expected);
-    if (otherStatus === 'planned') ok(database.updateCustomerRoomStayStatus({ stayId: second.savedId, status: 'cancelled' }));
-    else ok(database.checkoutStay(second.savedId));
+    assert.match(blockedSameCustomer.message, /Odada zaten giriş|Oda .*için aktif/);
+    if (otherStatus === 'planned') {
+      const second = ok(manualAs(secondCustomerId, rooms[index].id, { checkInDate: '2035-09-05', checkOutDate: '2035-09-08', status: 'planned' }));
+      ok(database.checkoutStay(first.savedId));
+      assert.equal(roomStatus(rooms[index].id), 'cleaning', 'Physical departure needs cleaning even with a later planned stay');
+      ok(database.updateCustomerRoomStayStatus({ stayId: second.savedId, status: 'cancelled' }));
+    } else {
+      ok(database.checkoutStay(first.savedId));
+      ok(database.updateRoomStatus({ roomId: rooms[index].id, status: 'available' }));
+      const second = ok(manualAs(secondCustomerId, rooms[index].id, { checkInDate: '2035-09-05', checkOutDate: '2035-09-08', status: 'checked_in' }));
+      assert.equal(roomStatus(rooms[index].id), expected);
+      ok(database.checkoutStay(second.savedId));
+    }
   }
 
   // Conflict must not inherit the old 80-row dashboard limit or exempt another booking of the same customer.

@@ -269,3 +269,68 @@ This preserves the original intent: common composition is extracted only after e
 Old smoke tests that require a drawer, exact panel stack, anchor navigation or obsolete label must be rewritten when that presentation is intentionally removed.
 
 Business regression tests remain authoritative until the corresponding domain behavior is intentionally changed.
+
+---
+
+## D-017 — Registered guests own their individual arrival and departure
+
+**Status:** ACCEPTED (2026-09-28)
+
+A Stay represents one group occupying one room, with a shared Folio. Each person,
+including children and infants, has a Customer and a `stay_guests` participation record.
+No anonymous occupants are created from `guest_count`. Reservation guest count remains
+the expected occupancy; actual arrival count comes from the selected registered people.
+Late arrivals join the same Stay. Each participation records actual timestamps; a return
+after departure creates a new participation rather than overwriting history.
+
+One person cannot belong to two active Stay guest lists. One room cannot have two
+checked-in Stays. Overlapping planned allocations remain prohibited. Independent
+concurrent room accounts and split guest billing are deferred.
+
+## D-018 — Primary guest and billing customer have different lifecycles
+
+**Status:** ACCEPTED (2026-09-28)
+
+The primary guest is the current group contact, not a second ledger owner. They can be
+replaced by another active guest. If they depart while others remain, the replacement is
+selected explicitly. The original Folio billing customer and existing debt remain intact;
+changing a contact does not silently transfer financial responsibility.
+
+Individual departure keeps the group, room and account active. Final/group departure
+uses canonical hospitality checkout. It never invents a payment. Remaining debt keeps
+the Folio open; the vacated room needs cleaning even if another future Stay is planned.
+
+## D-019 — Desktop arrival is one atomic application operation
+
+**Status:** ACCEPTED (2026-09-28)
+
+Desktop arrival coordinates creation/reuse of the Stay, all selected guests, reservation
+room assignment when missing, explicit check-in and enabled Folio initialization in one
+SQLite transaction. Its request receipt prevents duplicate retries. Low-level ownership
+remains separate; a second renderer financial-opening step is unnecessary.
+
+Room moves preserve Stay/Folio identity, financial history and agreed pricing. Previous
+room occupancy and each guest's reporting events remain recorded. Multi-room reservation
+conversion is rejected until room-specific deposit/price allocation exists.
+
+## D-020 — Restaurant transfer resolves active guest membership
+
+**Status:** ACCEPTED (2026-09-28)
+
+Any checked-in participant can identify the shared room account. A unique eligible
+account is suggested automatically. Prior departed guests' open debt is not a transfer
+target. Any open restaurant-order state can transfer the whole order atomically; a
+separate payment-waiting step is unnecessary. The server validates membership, account
+lifecycle and currency under its transaction. Existing no-double-stock/no-cash-receipt
+and idempotent transfer semantics remain. Partial item transfer is deferred.
+
+## D-021 — Local notification preparation is not KBS delivery
+
+**Status:** ACCEPTED (2026-09-28); external integration DEFERRED
+
+Individual arrival/departure and room changes create local pending notification records.
+Pending identity data follows corrections in the canonical Customer record. Completed
+delivery records must not be rewritten by later customer edits. No provider connection,
+MERNİS verification, automatic sender or delivery acknowledgement is fabricated.
+The UI explicitly states that notification must still be completed in the official system.
+This is an integration foundation, not a claim of certified regulatory compliance.

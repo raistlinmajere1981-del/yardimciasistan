@@ -1969,3 +1969,127 @@ BEGIN
   SET deleted_at = NEW.updated_at, updated_at = NEW.updated_at
   WHERE source_type = 'restaurant_order' AND source_id = NEW.id;
 END;
+
+-- BEGIN HOSPITALITY GUEST SCHEMA
+CREATE UNIQUE INDEX idx_stay_one_occupied_room ON customer_room_stays(room_id)
+  WHERE status = 'checked_in' AND deleted_at = '';
+CREATE TABLE hospitality_entry_receipts (
+  request_id TEXT PRIMARY KEY,
+  input_json TEXT NOT NULL,
+  stay_id TEXT NOT NULL REFERENCES customer_room_stays(id)
+);
+CREATE TABLE stay_guests (
+  id TEXT PRIMARY KEY,
+  stay_id TEXT NOT NULL REFERENCES customer_room_stays(id),
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  status TEXT NOT NULL CHECK (status IN ('planned', 'checked_in', 'checked_out', 'cancelled')),
+  checked_in_at TEXT NOT NULL DEFAULT '',
+  checked_out_at TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_stay_guests_active_customer ON stay_guests(customer_id)
+  WHERE status IN ('planned', 'checked_in');
+CREATE INDEX idx_stay_guests_stay ON stay_guests(stay_id, status);
+
+-- Local reporting outbox. A queued record is NOT proof of delivery to EGM/Jandarma.
+-- Identity snapshots are protected domain data, never diagnostic/event-log payloads.
+CREATE TABLE hospitality_notifications (
+  id TEXT PRIMARY KEY,
+  guest_id TEXT NOT NULL REFERENCES stay_guests(id),
+  stay_id TEXT NOT NULL REFERENCES customer_room_stays(id),
+  room_id TEXT NOT NULL REFERENCES rooms(id),
+  kind TEXT NOT NULL CHECK (kind IN ('arrival', 'departure', 'room_change')),
+  occurred_at TEXT NOT NULL,
+  identity_snapshot TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  provider TEXT NOT NULL DEFAULT '',
+  provider_reference TEXT NOT NULL DEFAULT '',
+  sent_at TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_hospitality_notifications_pending ON hospitality_notifications(stay_id, status);
+
+CREATE TABLE stay_room_history (
+  id TEXT PRIMARY KEY,
+  stay_id TEXT NOT NULL REFERENCES customer_room_stays(id),
+  room_id TEXT NOT NULL REFERENCES rooms(id),
+  entered_at TEXT NOT NULL,
+  left_at TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TRIGGER trg_stay_guest_initial AFTER INSERT ON customer_room_stays
+BEGIN
+  INSERT INTO stay_guests (id, stay_id, customer_id, status, checked_in_at, checked_out_at, created_at, updated_at)
+  VALUES ('guest_' || NEW.id, NEW.id, NEW.customer_id, NEW.status, NEW.checked_in_at, NEW.checked_out_at, NEW.created_at, NEW.updated_at);
+  INSERT INTO stay_room_history (id, stay_id, room_id, entered_at)
+  SELECT 'room_' || NEW.id, NEW.id, NEW.room_id, NEW.checked_in_at WHERE NEW.status = 'checked_in';
+END;
+
+CREATE TRIGGER trg_stay_guest_lifecycle_guard BEFORE UPDATE OF status ON customer_room_stays
+WHEN OLD.status != NEW.status
+BEGIN
+  SELECT CASE WHEN OLD.status = 'checked_in' AND NEW.status = 'cancelled'
+    THEN RAISE(ABORT, 'Konaklayan misafirler için çıkış işlemini kullanın.') END;
+  SELECT CASE WHEN NEW.status = 'checked_in' AND NEW.guest_count !=
+    (SELECT COUNT(*) FROM stay_guests WHERE stay_id = NEW.id AND status = 'planned')
+    THEN RAISE(ABORT, 'Her misafir için müşteri kaydı eklenmeli.') END;
+  SELECT CASE WHEN NEW.status = 'checked_in' AND EXISTS
+    (SELECT 1 FROM rooms WHERE id = NEW.room_id AND (is_active != 1 OR deleted_at != '' OR status IN ('cleaning', 'maintenance', 'out_of_service')))
+    THEN RAISE(ABORT, 'Giriş için oda hazır olmalı.') END;
+  SELECT CASE WHEN NEW.status = 'checked_in' AND EXISTS
+    (SELECT 1 FROM rooms WHERE id = NEW.room_id AND capacity > 0 AND capacity < NEW.guest_count)
+    THEN RAISE(ABORT, 'Misafir sayısı oda kapasitesini aşıyor.') END;
+  SELECT CASE WHEN NEW.status = 'checked_in' AND EXISTS
+    (SELECT 1 FROM customer_room_stays WHERE room_id = NEW.room_id AND id != NEW.id AND status = 'checked_in' AND deleted_at = '')
+    THEN RAISE(ABORT, 'Odada zaten giriş yapmış bir konaklama var.') END;
+END;
+
+CREATE TRIGGER trg_stay_guest_lifecycle AFTER UPDATE OF status ON customer_room_stays
+WHEN OLD.status != NEW.status
+BEGIN
+  UPDATE stay_guests SET status = NEW.status,
+    checked_in_at = CASE WHEN NEW.status = 'checked_in' THEN NEW.checked_in_at ELSE checked_in_at END,
+    checked_out_at = CASE WHEN NEW.status = 'checked_out' THEN NEW.checked_out_at ELSE checked_out_at END,
+    updated_at = NEW.updated_at
+  WHERE stay_id = NEW.id AND (status IN ('planned', 'checked_in') OR (NEW.status = 'planned' AND status = 'cancelled'));
+  INSERT INTO stay_room_history (id, stay_id, room_id, entered_at)
+  SELECT lower(hex(randomblob(16))), NEW.id, NEW.room_id, NEW.checked_in_at WHERE NEW.status = 'checked_in';
+  UPDATE stay_room_history SET left_at = NEW.checked_out_at
+    WHERE stay_id = NEW.id AND left_at = '' AND NEW.status = 'checked_out';
+END;
+
+CREATE TRIGGER trg_stay_guest_arrival AFTER INSERT ON stay_guests
+WHEN NEW.status = 'checked_in'
+BEGIN
+  INSERT INTO hospitality_notifications (id, guest_id, stay_id, room_id, kind, occurred_at, identity_snapshot, created_at)
+  SELECT lower(hex(randomblob(16))), NEW.id, NEW.stay_id, s.room_id, 'arrival', NEW.checked_in_at,
+    json_object('customerId', c.id, 'fullName', c.full_name, 'identityType', c.identity_type,
+      'identityNumber', c.identity_number, 'nationality', c.nationality, 'birthDate', c.birth_date,
+      'documentSerialNumber', c.document_serial_number, 'roomNumber', r.number), NEW.updated_at
+  FROM customers c JOIN customer_room_stays s ON s.id = NEW.stay_id JOIN rooms r ON r.id = s.room_id WHERE c.id = NEW.customer_id;
+END;
+
+CREATE TRIGGER trg_stay_guest_notification AFTER UPDATE OF status ON stay_guests
+WHEN OLD.status != NEW.status AND NEW.status IN ('checked_in', 'checked_out')
+BEGIN
+  INSERT INTO hospitality_notifications (id, guest_id, stay_id, room_id, kind, occurred_at, identity_snapshot, created_at)
+  SELECT lower(hex(randomblob(16))), NEW.id, NEW.stay_id, s.room_id,
+    CASE NEW.status WHEN 'checked_in' THEN 'arrival' ELSE 'departure' END,
+    CASE NEW.status WHEN 'checked_in' THEN NEW.checked_in_at ELSE NEW.checked_out_at END,
+    json_object('customerId', c.id, 'fullName', c.full_name, 'identityType', c.identity_type,
+      'identityNumber', c.identity_number, 'nationality', c.nationality, 'birthDate', c.birth_date,
+      'documentSerialNumber', c.document_serial_number, 'roomNumber', r.number), NEW.updated_at
+  FROM customers c JOIN customer_room_stays s ON s.id = NEW.stay_id JOIN rooms r ON r.id = s.room_id WHERE c.id = NEW.customer_id;
+END;
+CREATE TRIGGER trg_customer_pending_hospitality_identity
+AFTER UPDATE OF full_name, identity_type, identity_number, nationality, birth_date, document_serial_number ON customers
+BEGIN
+  UPDATE hospitality_notifications
+  SET identity_snapshot = json_patch(identity_snapshot,
+    json_object('fullName', NEW.full_name, 'identityType', NEW.identity_type,
+      'identityNumber', NEW.identity_number, 'nationality', NEW.nationality,
+      'birthDate', NEW.birth_date, 'documentSerialNumber', NEW.document_serial_number))
+  WHERE status != 'sent' AND guest_id IN (SELECT id FROM stay_guests WHERE customer_id = NEW.id);
+END;
+-- END HOSPITALITY GUEST SCHEMA

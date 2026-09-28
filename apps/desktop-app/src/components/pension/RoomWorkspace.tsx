@@ -28,7 +28,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   // Current account always follows the actual checked-in stay. Prior-account intents focus their own context below.
   const account = useRoomFolioController(intent.entityId, folioEnabled, model.refreshKey, { stayId: model.currentStay?.id,
     folioId: model.currentStay ? model.operations?.accounts.find(item => item.stayId === model.currentStay!.id)?.folioId : undefined });
-  const operations = useRoomStayOperations(model, account, folioEnabled, onDashboard);
+  const operations = useRoomStayOperations(model, account, onDashboard);
   const [dirtyForms, setDirtyForms] = useState<Record<string, boolean>>({});
   const [draftEpoch, setDraftEpoch] = useState(0);
   const dirty = Object.values(dirtyForms).some(Boolean);
@@ -37,6 +37,13 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   const surface = useRef<HTMLDivElement>(null);
   const history = intent.mode === "history";
   const accountFocus = useRef("");
+  const followedStay = useRef(model.currentStay?.id);
+  useEffect(() => {
+    if (model.currentStay) { followedStay.current = model.currentStay.id; return; }
+    if (busy || dirty || !followedStay.current) return;
+    const moved = data.roomOperations?.flatMap(item => item.stays).find(stay => stay.id === followedStay.current && stay.status === "checked_in");
+    if (moved && moved.roomId !== intent.entityId) navigation.openWorkspace({ ...intent, entityId: moved.roomId, stayId: moved.id });
+  }, [model.currentStay, data.roomOperations, busy, dirty, intent, navigation]);
   const accountDraftDirty = Object.entries(dirtyForms).some(([key, value]) => value && !["stay", "condition", "assignment"].includes(key));
   useEffect(() => {
     if (history || account.loading || !folioEnabled) return;
@@ -67,8 +74,11 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   return <WorkspaceFrame title={roomIdentity(room)} className="operations-workspace" bodyScroll="panes"
     context={<div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
       <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
-    actions={<ActionButton variant="ghost" disabled={busy} onClick={() => navigation.updateWorkspaceMode({ entityType: "room", mode: history ? "summary" : "history" })}>
-      {history ? `← ${roomIdentity(room)}'e dön` : "Geçmiş"}</ActionButton>}
+    actions={<><ActionButton variant="ghost" disabled={busy} onClick={() => navigation.updateWorkspaceMode({ entityType: "room", mode: history ? "summary" : "history" })}>
+      {history ? `← ${roomIdentity(room)}'e dön` : "Geçmiş"}</ActionButton>
+      {intent.returnContext?.page === "restaurant" && intent.returnContext.entityId && <ActionButton variant="secondary" disabled={busy || dirty}
+        onClick={() => navigation.openWorkspace({ entityType: "table", entityId: intent.returnContext!.entityId!, mode: "account", action: "room-transfer",
+          returnContext: { page: "restaurant", view: "floor" } })}>Masa Hesabına Dön</ActionButton>}</>}
     presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()} closeBlocked={blocked} returnFocusRef={navigation.returnFocusRef}
     footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}>
     <div ref={surface} className="operation-surface" hidden={history} key={draftEpoch}>
@@ -77,7 +87,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
         {account.selected?.status === "open" && <RoomAccountDetails key={account.selected.id} folio={account.selected} controller={account} disabled={busy || account.loading} onDirty={value => setDirty("account-details", value)} />}
       </OperationPanel>
       <OperationPanel title="Günlük Oda İşlemleri" id="room-operations">
-        <RoomDailyOperations model={model} operations={operations} disabled={busy || accountDraftDirty} />
+        <RoomDailyOperations model={model} data={data} operations={operations} disabled={busy || accountDraftDirty} />
         {account.selected?.status === "open" && <RoomAccountAdjustments key={account.selected.id} folio={account.selected} controller={account} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />}
         {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId} onDirty={setDirty} />}
       </OperationPanel>

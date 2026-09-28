@@ -1,19 +1,16 @@
 import { BedDouble, CalendarDays, CircleAlert, UserRound, Wallet } from "lucide-react";
 import { useRef, useState } from "react";
 import type { DesktopRoom, DesktopDashboardData } from "../../../electron/database";
-import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import type { DesktopRoomOperations } from "../../../electron/database-types";
 import { ResourceCard } from "../operations/ResourceCard";
 import { ActionButton } from "../ui/ActionButton";
 import { ChoiceChips } from "../ui/ChoiceChips";
-import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { getRoomCardModel, roomIdentity, type RoomCardCapabilities } from "./room-card-model";
 import { setRoomOperationalStatus } from "./room-operations";
 import { roomToday } from "./room-presentation";
 import { formatDateRange, minorMoney } from "./folio-format";
-import { RoomCheckoutConfirmationDetails } from "./RoomCheckoutConfirmation";
 
 export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
   room: DesktopRoom; summary?: DesktopRoomOperations; capabilities: RoomCardCapabilities;
@@ -24,9 +21,7 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const running = useRef(false);
-  const checkoutMethod = useRef<RoomFolioPaymentMethod>("cash");
   const begin = useRequestGeneration();
-  const { confirm, confirmDialog } = useConfirmDialog();
   const isOutOfService = model.physical === "out_of_service" || room.status === "out_of_service";
   const canSetPhysicalStatus = Boolean(summary && room.isActive && !isOutOfService && !model.current.length && !model.planned.length);
   const physicalValue = model.physical === "ready" ? "available" : model.physical;
@@ -57,54 +52,11 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
     }
   }
 
-  async function quickAction() {
+  function quickAction() {
     const action = model.quickAction;
     if (running.current || !action) return;
-    const stay = model.current.find(item => item.id === action.stayId);
-    checkoutMethod.current = "cash";
-    const approved = await confirm({
-      eyebrow: roomIdentity(room),
-      title: "Misafir çıkışı",
-      description: model.currentAccount?.remainingMinor
-        ? "Kalan tutar seçilen ödeme yöntemiyle tahsil edilir; çıkış ve hesap kapanışı birlikte tamamlanır."
-        : "Misafir çıkışı tamamlanır; varsa oda hesabı kapatılır ve oda temizlik durumuna geçer.",
-      confirmLabel: "Çıkış ve Hesabı Kapat",
-      tone: model.currentAccount?.remainingMinor ? "warning" : "info",
-      details: stay
-        ? <RoomCheckoutConfirmationDetails
-            roomLabel={roomIdentity(room)}
-            stay={stay}
-            account={model.currentAccount}
-            onPaymentMethodChange={method => { checkoutMethod.current = method; }}
-          />
-        : undefined
-    });
-    if (!approved) return;
-
-    running.current = true;
-    setBusy(true);
-    setFeedback("");
-    const current = begin();
-    try {
-      if (action.kind === "checkout" && model.currentAccount?.remainingMinor) {
-        const payment = await window.yardimciDesktop!.addRoomFolioPayment({
-          folioId: model.currentAccount.folioId,
-          amountMinor: model.currentAccount.remainingMinor,
-          paymentMethod: checkoutMethod.current
-        });
-        if (!current()) return;
-        if (!payment.ok) { setFeedback(payment.message); return; }
-      }
-      const result = await window.yardimciDesktop!.checkoutStay(action.stayId);
-      if (!current()) return;
-      if (result.ok) onDashboard(result.dashboardData);
-      else setFeedback(result.message);
-    } catch {
-      if (current()) setFeedback("İşlem sonucu doğrulanamadı. Yenileyip kontrol edin.");
-    } finally {
-      running.current = false;
-      if (current()) setBusy(false);
-    }
+    navigation.openWorkspace({ entityType: "room", entityId: room.id, mode: "stay", action: "checkout", stayId: action.stayId,
+      returnContext: { page: "pension", view: "rooms", entityId: room.id } });
   }
 
   return <>
@@ -137,10 +89,13 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
         )}
         {model.current.length > 0 && <span><UserRound size={16} />Misafir içeride</span>}
       </>}
-      action={model.quickAction && <ActionButton disabled={busy} onClick={() => void quickAction()}>{model.quickAction.label}</ActionButton>}
+      action={model.quickAction ? <ActionButton disabled={busy} onClick={quickAction}>{model.quickAction.label}</ActionButton>
+        : capabilities.staysEnabled && summary && model.physical === "ready" && !model.current.length && !model.planned.length
+          && room.status !== "occupied" && <ActionButton disabled={busy} onClick={() => navigation.openWorkspace({ entityType: "room", entityId: room.id,
+            mode: "stay", action: "check-in", returnContext: { page: "pension", view: "rooms", entityId: room.id } })}>Giriş Yap</ActionButton>}
     >
       {!summary ? <p className="resource-card__notice"><CircleAlert size={16} />Güncel özet alınamadı.</p> : <>
-        {model.current.map(stay => <div className="resource-card__fact" key={stay.id}><span>Mevcut misafir</span><strong>{stay.customerName}</strong><small>{formatDateRange(stay.checkInDate, stay.checkOutDate)}</small></div>)}
+        {model.current.map(stay => <div className="resource-card__fact" key={stay.id}><span>Konaklayanlar · {stay.guestCount} kişi</span><strong>{stay.customerName}{stay.guestCount > 1 ? ` +${stay.guestCount - 1}` : ""}</strong><small>{formatDateRange(stay.checkInDate, stay.checkOutDate)}</small></div>)}
         {model.planned[0] && <div className="resource-card__fact"><span><CalendarDays size={15} />Planlı giriş</span><strong>{model.planned[0].customerName}</strong><small>{formatDateRange(model.planned[0].checkInDate, model.planned[0].checkOutDate)}</small></div>}
         {model.upcoming && <div className="resource-card__fact"><span><CalendarDays size={15} />Yaklaşan rezervasyon{model.upcoming.status === "pending" && " · Onay bekliyor"}</span><strong>{model.upcoming.customerName || model.upcoming.title}</strong><small>{formatDateRange(model.upcoming.startDate, model.upcoming.endDate)}</small></div>}
         {model.currentAccount && <div className="resource-card__balance"><span><Wallet size={16} />Mevcut hesap</span><strong>{model.currentAccount.remainingMinor > 0 ? minorMoney(model.currentAccount.remainingMinor, model.currentAccount.currency) : "Ödendi"}</strong></div>}
@@ -148,6 +103,5 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
         {!model.current.length && !model.planned.length && !model.upcoming && model.physical === "ready" && <p className="resource-card__notice">{room.status === "occupied" ? "Oda dolu" : room.status === "reserved" ? "Oda ayrılmış" : "Konaklamaya hazır"}</p>}
       </>}
     </ResourceCard>
-    {confirmDialog}
   </>;
 }

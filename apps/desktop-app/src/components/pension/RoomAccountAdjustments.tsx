@@ -106,7 +106,7 @@ export function RoomAccountDetails({ folio, controller, disabled, onDirty }: {
           <DatePicker ariaLabel="Çıkış tarihi" value={draft.end} min={draft.start || undefined} disabled={disabled}
             onChange={end => { setDraft({ ...draft, end }); onDirty(true); }} />
         </div>
-        <label className="form-field">Kişi sayısı<input type="number" required min={1} max={50} value={draft.guestCount} onChange={event => setDraft({ ...draft, guestCount: Number(event.target.value) })} /></label>
+        <p>Kişi sayısı: {folio.guestCount} · Misafir listesinden yönetilir.</p>
         <label className="form-field">Gecelik fiyat<MoneyInput required value={draft.nightly} onChange={nightly => setDraft({ ...draft, nightly })} /></label>
       </div>
       <label className="form-check"><input type="checkbox" checked={draft.manual} onChange={event => setDraft({ ...draft, manual: event.target.checked })} />Toplamı elle belirle</label>

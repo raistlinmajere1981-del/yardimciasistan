@@ -979,9 +979,10 @@ try {
         const customer = currentDashboardData.customers.find((item) => item.id === input.customerId);
         const room = currentDashboardData.rooms.find((item) => item.id === input.roomId);
         const now = "2026-07-28T12:10:00+03:00";
+        const guestIds = Array.isArray(input.guestCustomerIds) && input.guestCustomerIds.length ? input.guestCustomerIds : [customer.id];
         const stay = {
           id: savedId,
-          customerId: customer.id,
+          customerId: guestIds[0],
           customerName: customer.fullName,
           customerPhone: customer.phone,
           roomId: room.id,
@@ -991,13 +992,16 @@ try {
           status: input.status,
           checkInDate: input.checkInDate,
           checkOutDate: input.checkOutDate,
-          guestCount: input.guestCount,
+          guestCount: guestIds.length,
           notes: input.notes,
           source: "desktop_manual",
           checkedInAt: input.status === "checked_in" ? now : "",
           checkedOutAt: "",
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
+          guests: guestIds.map((customerId, index) => ({ id: `guest-smoke-${index}`, customerId, customerName: customer.fullName,
+            status: input.status, checkedInAt: input.status === "checked_in" ? now : "", checkedOutAt: "", identityReady: true })),
+          pendingNotificationCount: 0
         };
         currentDashboardData = {
           ...currentDashboardData,
@@ -1011,7 +1015,7 @@ try {
         };
         return {
           ok: true,
-          message: "Müşteri oda kaydı oluşturuldu.",
+          message: "Misafir girişi tamamlandı.",
           savedId,
           dashboardData: currentDashboardData
         };
@@ -1372,22 +1376,19 @@ try {
   const assignableRoomCard = conversionPage.getByRole("button", { name: "Smoke Aile Odası odasını aç" });
   await assignableRoomCard.click();
   const stayWorkspace = conversionPage.getByRole("dialog");
-  await chooseSearchSelect(stayWorkspace, "Müşteri", /^Kimlik Smoke(?:\s|$)/);
+  await chooseSearchSelect(stayWorkspace, "Ana misafir", /^Kimlik Smoke(?:\s|$)/);
   await chooseDate(stayWorkspace, "Giriş tarihi", "2026-08-01");
   await chooseDate(stayWorkspace, "Çıkış tarihi", "2026-08-03");
-  await stayWorkspace.getByLabel("Kişi sayısı").fill("2");
+  await stayWorkspace.getByText("Giriş notu", { exact: true }).click();
   await stayWorkspace.getByLabel("Giriş notu").fill("Manuel resepsiyon ataması.");
   const directEntryForm = stayWorkspace.getByRole("form", { name: "Misafir girişi", exact: true });
-  await directEntryForm.getByRole("button", { name: "Giriş Yap", exact: true }).click();
-  const directEntryConfirm = conversionPage.getByRole("alertdialog", { name: "Misafir girişi", exact: true });
-  await expect(directEntryConfirm).toBeVisible();
-  await expect(directEntryConfirm.getByRole("button", { name: "Girişi Onayla", exact: true })).toBeVisible();
-  await directEntryConfirm.getByRole("button", { name: "Girişi Onayla", exact: true }).click();
-  await expect(stayWorkspace.getByText("Manuel giriş · Rezervasyondan bağımsız", { exact: true })).toBeVisible();
+  await directEntryForm.getByRole("button", { name: /Giriş Yap/, exact: false }).click();
+  await expect(stayWorkspace.getByText("Konaklayan misafirler", { exact: true })).toBeVisible();
   await expect(stayWorkspace.getByText(/Misafir girişi tamamlandı/)).toBeVisible();
-  await stayWorkspace.getByRole("button", { name: "Misafir Çıkışı", exact: true }).first().click();
+  const stayOperations = stayWorkspace.getByRole("region", { name: "Günlük Oda İşlemleri", exact: true });
+  await stayOperations.getByRole("button", { name: "Misafir Çıkışı", exact: true }).click();
   await conversionPage.getByRole("alertdialog", { name: "Misafir çıkışı", exact: true })
-    .getByRole("button", { name: "Çıkış ve Hesabı Kapat", exact: true }).click();
+    .getByRole("button", { name: "Tüm Misafirlerin Çıkışını Yap", exact: true }).click();
   await stayWorkspace.getByRole("button", { name: "Geçmiş", exact: true }).click();
   await expect(stayWorkspace.getByRole("region", { name: "Oda geçmişi" })).toContainText("Çıkış yaptı");
   await stayWorkspace.getByRole("button", { name: "Çalışma alanını kapat" }).click();

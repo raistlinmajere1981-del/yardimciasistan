@@ -56,7 +56,9 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
 
   const selectedRequests = useMemo<SyncedCustomerRequest[]>(() => customer ? data.requests.filter((request) => request.customer_id === customer.id || request.customer_phone === customer.phone) : [], [customer, data.requests]);
   const selectedReservations = useMemo(() => customer ? data.reservations.filter((reservation) => reservation.customerId === customer.id || reservation.customerPhone === customer.phone) : [], [customer, data.reservations]);
-  const selectedStays = useMemo(() => customer ? data.customerRoomStays.filter((stay) => stay.customerId === customer.id) : [], [customer, data.customerRoomStays]);
+  const selectedStays = useMemo(() => customer ? data.customerRoomStays.filter((stay) => stay.guests?.some(guest => guest.customerId === customer.id) || stay.customerId === customer.id) : [], [customer, data.customerRoomStays]);
+  const activeStay = customer ? (data.roomOperations?.flatMap(room => room.stays) ?? data.customerRoomStays).find(stay =>
+    stay.guests?.some(guest => guest.customerId === customer.id && ["planned", "checked_in"].includes(guest.status))) : undefined;
 
   const tabs: readonly { id: CustomerWorkspaceMode; label: string }[] = customerCreditEnabled
     ? [{ id: "summary", label: "Özet" }, { id: "details", label: "Bilgiler" }, { id: "history", label: "Geçmiş" }, { id: "account", label: "Hesap" }]
@@ -136,9 +138,11 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
             <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => leaveFor(() => onWhatsApp(customer))} disabled={!customer.phone}><MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz</ActionButton>
           </div>}
 
-          {staysEnabled && <div className="action-row customer-stay-actions">
+          {staysEnabled && activeStay && <div className="action-row"><span>{activeStay.roomNumber ? `Oda ${activeStay.roomNumber}` : activeStay.roomName} · Aktif konaklama</span>
+            <ActionButton onClick={() => navigation.openWorkspace({ entityType: "room", entityId: activeStay.roomId, mode: "stay", returnContext: { page: "customerWork", entityId: customer.id } })}>Konaklamayı Aç</ActionButton></div>}
+          {staysEnabled && !activeStay && <div className="action-row customer-stay-actions">
             <label className="form-field form-field--medium">Konaklama odası<select aria-label="Konaklama odası" value={entryRoomId} onChange={(event) => setEntryRoomId(event.target.value)}>{data.rooms.filter((room) => room.isActive).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select></label>
-            <ActionButton size="sm" type="button" onClick={() => navigation.openWorkspace({ entityType: "room", entityId: entryRoomId, mode: "stay", action: "create-stay", customerId: customer.id, returnContext: { page: "customerWork", entityId: customer.id } })} disabled={!entryRoomId}><BedDouble size={16} aria-hidden="true" />Odaya Ata</ActionButton>
+            <ActionButton size="sm" type="button" onClick={() => navigation.openWorkspace({ entityType: "room", entityId: entryRoomId, mode: "stay", action: "create-stay", customerId: customer.id, returnContext: { page: "customerWork", entityId: customer.id } })} disabled={!entryRoomId}><BedDouble size={16} aria-hidden="true" />Konaklama Başlat</ActionButton>
           </div>}
 
           <div className="action-row">

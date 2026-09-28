@@ -41,7 +41,18 @@ export function getCustomerRoomStays(db: DatabaseSync, scope: "recent" | "active
       `)
     .all() as Array<Record<string, unknown>>;
 
-  return rows.map((row) => mapCustomerRoomStayRow(row));
+  const guests = db.prepare(`SELECT g.*, c.full_name,
+    (c.identity_type != '' AND c.identity_number != '' AND c.birth_date != '' AND c.nationality != '') AS identity_ready
+    FROM stay_guests g JOIN customers c ON c.id = g.customer_id`).all() as Array<Record<string, unknown>>;
+  const pending = db.prepare(`SELECT stay_id, COUNT(*) AS count FROM hospitality_notifications WHERE status != 'sent' GROUP BY stay_id`)
+    .all() as Array<{ stay_id: string; count: number }>;
+  return rows.map(row => ({ ...mapCustomerRoomStayRow(row),
+    guests: guests.filter(guest => guest.stay_id === row.id).map(guest => ({
+      id: String(guest.id), customerId: String(guest.customer_id), customerName: String(guest.full_name),
+      status: guest.status as DesktopCustomerRoomStay["guests"][number]["status"],
+      checkedInAt: String(guest.checked_in_at), checkedOutAt: String(guest.checked_out_at), identityReady: Boolean(guest.identity_ready)
+    })), pendingNotificationCount: pending.find(item => item.stay_id === row.id)?.count ?? 0
+  }));
 }
 
 function mapCustomerRoomStayRow(row: Record<string, unknown>): DesktopCustomerRoomStay {
@@ -63,7 +74,9 @@ function mapCustomerRoomStayRow(row: Record<string, unknown>): DesktopCustomerRo
     checkedInAt: String(row.checked_in_at ?? ""),
     checkedOutAt: String(row.checked_out_at ?? ""),
     createdAt: String(row.created_at ?? ""),
-    updatedAt: String(row.updated_at ?? "")
+    updatedAt: String(row.updated_at ?? ""),
+    guests: [],
+    pendingNotificationCount: 0
   };
 }
 
@@ -90,7 +103,7 @@ export function findActiveCustomerRoomStay(
         rooms.number AS room_number
       FROM customer_room_stays
       JOIN rooms ON rooms.id = customer_room_stays.room_id
-      WHERE customer_room_stays.customer_id = ?
+      WHERE EXISTS (SELECT 1 FROM stay_guests g WHERE g.stay_id = customer_room_stays.id AND g.customer_id = ? AND g.status IN ('planned', 'checked_in'))
         AND customer_room_stays.id != ?
         AND customer_room_stays.status IN ('planned', 'checked_in')
         AND customer_room_stays.deleted_at = ''
