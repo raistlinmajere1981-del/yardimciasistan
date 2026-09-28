@@ -110,7 +110,7 @@
 .workspace-form-overlay__card > form {
   display: flex;
   flex-direction: column;
-  max-height: calc(100dvh / var(--ui-scale) - var(--space-8));
+  max-height: calc(100dvh / var(--ui-scale) - var(--space-8) - var(--space-8));
 }
 .workspace-form-overlay__card .workspace-frame__body {
   flex: 1 1 auto;
@@ -120,6 +120,8 @@
 }
 .workspace-form-overlay__card .workspace-frame__footer {
   flex: 0 0 auto;
+  min-height: calc(var(--control-height-lg) + var(--space-6));
+  background: var(--color-bg-panel);
 }
 
 /* Feature page toolbar is fixed; only the selected operational view scrolls. */
