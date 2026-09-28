@@ -1,5 +1,5 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import type { WorkspaceDefinition, WorkspaceDefinitionMetadata } from "./workspace-definition";
+import type { WorkspaceDefinition, WorkspaceDefinitionMetadata, WorkspaceSessionPage } from "./workspace-definition";
 import type { DesktopPage } from "../../app/navigation";
 import type { WorkspaceIntent, WorkspaceModeUpdate, WorkspacePresentation, WorkspaceReturnContext } from "./workspace-intent";
 
@@ -7,7 +7,7 @@ interface WorkspaceState {
   intent: WorkspaceIntent;
   presentation: WorkspacePresentation;
 }
-type HospitalityPage = "pension" | "restaurant";
+type HospitalityPage = WorkspaceSessionPage;
 type HospitalityWorkspaceIntent = Extract<WorkspaceIntent, { entityType: "room" | "table" }>;
 
 interface OpenWorkspaceOptions {
@@ -30,10 +30,8 @@ interface WorkspaceNavigation {
 }
 const NavigationContext = createContext<WorkspaceNavigation | null>(null);
 
-function hospitalityPage(intent: WorkspaceIntent): HospitalityPage | null {
-  if (intent.entityType === "room") return "pension";
-  if (intent.entityType === "table") return "restaurant";
-  return null;
+function sessionPageFor(definitions: readonly WorkspaceDefinitionMetadata[], entityType: WorkspaceIntent["entityType"]) {
+  return definitions.find(item => item.entityType === entityType)?.sessionPage ?? null;
 }
 
 function guardKey(scope?: CloseGuardScope) {
@@ -77,7 +75,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
       const definition = definitions.find(item => item.entityType === intent.entityType);
       if (!definition || !intent.entityId.trim()) return false;
 
-      const ownerPage = hospitalityPage(intent);
+      const ownerPage = definition.sessionPage ?? null;
       if (ownerPage) {
         const existing = hospitalitySessions[ownerPage];
         if (existing && !guardAllows(existing)) return false;
@@ -146,7 +144,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
       }
     },
     updateWorkspaceMode({ entityType, mode, action }) {
-      const ownerPage = entityType === "room" ? "pension" : entityType === "table" ? "restaurant" : null;
+      const ownerPage = sessionPageFor(definitions, entityType);
       if (ownerPage) {
         setHospitalitySessions((sessions) => {
           const state = sessions[ownerPage];
@@ -197,7 +195,7 @@ export function WorkspaceHost<I extends WorkspaceIntent, Context>({ definition, 
   context: NoInfer<Context>;
 }) {
   const { current } = useWorkspaceNavigation();
-  if (!current || current.intent.entityType !== definition.entityType || hospitalityPage(current.intent)) return null;
+  if (!current || current.intent.entityType !== definition.entityType || definition.sessionPage) return null;
   return <WorkspaceInstance key={`${current.intent.entityType}:${current.intent.entityId}`}>
     {definition.render(current.intent as I, context)}
   </WorkspaceInstance>;
