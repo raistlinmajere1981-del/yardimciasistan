@@ -1,5 +1,4 @@
-import { FormDialog } from "../ui/FormDialog";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarPlus, Save } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
@@ -9,6 +8,7 @@ import type {
   SaveManualReservationInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { FormDialog } from "../ui/FormDialog";
 import { DatePicker, addDays } from "../ui/DateTimePicker";
 import { SearchSelect } from "../ui/SearchSelect";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
@@ -21,6 +21,8 @@ interface ManualReservationEditorProps {
   customers: DesktopDashboardData["customers"];
   rooms: DesktopDashboardData["rooms"];
   reservation?: Reservation | null;
+  initialRoomId?: string;
+  embedded?: boolean;
   onClose: () => void;
   onSave: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
@@ -44,7 +46,8 @@ function localDateKey(dayOffset = 0) {
 
 function createInitialForm(
   customers: DesktopDashboardData["customers"],
-  reservation?: Reservation | null
+  reservation?: Reservation | null,
+  initialRoomId = ""
 ): ManualReservationFormState {
   if (reservation) {
     return {
@@ -59,7 +62,7 @@ function createInitialForm(
 
   return {
     customerId: customers[0]?.id ?? "",
-    roomId: "",
+    roomId: initialRoomId,
     startDate: localDateKey(),
     endDate: localDateKey(1),
     guestCount: 1,
@@ -72,188 +75,197 @@ export function ManualReservationEditor({
   customers,
   rooms,
   reservation = null,
+  initialRoomId = "",
+  embedded = false,
   onClose,
   onSave,
   onSaveCustomer
 }: ManualReservationEditorProps) {
-  const [form, setForm] = useState<ManualReservationFormState>(() => createInitialForm(customers, reservation));
+  const [form, setForm] = useState<ManualReservationFormState>(() => createInitialForm(customers, reservation, initialRoomId));
   const [state, setState] = useState<EditorState>("idle");
   const [message, setMessage] = useState("");
   const isEditing = Boolean(reservation);
   const isManualReservation = Boolean(reservation?.requestId.startsWith("manual:"));
   const detailsEditable = !isEditing || isManualReservation;
   const activeRooms = useMemo(
-    () => rooms.filter((room) => room.isActive || reservation?.roomIds.includes(room.id)),
-    [reservation, rooms]
+    () => rooms.filter((room) => room.isActive || reservation?.roomIds.includes(room.id) || room.id === initialRoomId),
+    [initialRoomId, reservation, rooms]
   );
   const selectedCustomer = customers.find((customer) => customer.id === form.customerId);
+  const title = isEditing ? "Rezervasyonu düzenle" : "Yeni rezervasyon ekle";
 
   useEffect(() => {
     if (!open) return;
-    setForm(createInitialForm(customers, reservation));
+    setForm(createInitialForm(customers, reservation, initialRoomId));
     setState("idle");
     setMessage("");
-  }, [customers, open, reservation]);
-
+    // Açık formda hızlı müşteri eklenince taslağı sıfırlama.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, reservation?.id, initialRoomId]);
 
   if (!open) return null;
 
-  return (
-    <FormDialog title={isEditing ? "Rezervasyonu düzenle" : "Yeni rezervasyon ekle"} onClose={onClose} closeBlocked={state === "loading"}
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setState("loading");
-            setMessage(isEditing ? "Rezervasyon güncelleniyor..." : "Rezervasyon kaydediliyor...");
-            const result = await onSave({
-              reservationId: reservation?.id,
-              customerId: form.customerId,
-              roomId: form.roomId || undefined,
-              startDate: form.startDate,
-              endDate: form.endDate,
-              guestCount: form.guestCount,
-              notes: form.notes
-            });
-            if (!result.ok) {
-              setState("error");
-              setMessage(result.message);
-              return;
-            }
-            onClose();
-          }}
-      footer={<div className="form-actions">
-            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
-              Vazgeç
-            </ActionButton>
-            <ActionButton
-              type="submit"
-              disabled={
-                state === "loading"
-                || !form.customerId
-                || !form.startDate
-                || !form.endDate
-                || form.guestCount < 1
-              }
-            >
-              {state === "loading" ? <CalendarPlus size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
-              {state === "loading"
-                ? (isEditing ? "Güncelleniyor" : "Kaydediliyor")
-                : (isEditing ? "Değişiklikleri Kaydet" : "Rezervasyonu Kaydet")}
-            </ActionButton>
-          </div>}>
+  async function submitReservation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setState("loading");
+    setMessage(isEditing ? "Rezervasyon güncelleniyor..." : "Rezervasyon kaydediliyor...");
+    const result = await onSave({
+      reservationId: reservation?.id,
+      customerId: form.customerId,
+      roomId: form.roomId || undefined,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      guestCount: form.guestCount,
+      notes: form.notes
+    });
+    if (!result.ok) {
+      setState("error");
+      setMessage(result.message);
+      return;
+    }
+    onClose();
+  }
 
-          <div className="form-grid">
-            <div className="form-field--span form-field form-field--long">
-              <span>Müşteri</span>
-              <SearchSelect
-                ariaLabel="Müşteri"
-                autoFocus={!isEditing}
-                disabled={isEditing}
-                value={form.customerId}
-                onChange={(customerId) => setForm((current) => ({ ...current, customerId }))}
-                placeholder={customers.length === 0 ? "Henüz müşteri kaydı yok" : "Müşteri seçin"}
-                searchPlaceholder="Müşteri adı veya telefon ara"
-                options={customers.map((customer) => ({
-                  id: customer.id,
-                  label: customer.fullName,
-                  description: customer.phone || customer.email || undefined,
-                  keywords: `${customer.phone || ""} ${customer.email || ""}`
-                }))}
-              />
-              <small>
-                {isEditing
-                  ? "Rezervasyonun müşteri kaydı değiştirilmez."
-                  : selectedCustomer
-                    ? "Kayıtlı müşteri seçildi."
-                    : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}
-              </small>
-            </div>
+  const fields = <>
+    <div className="form-grid">
+      <div className="form-field--span form-field form-field--long">
+        <span>Müşteri</span>
+        <SearchSelect
+          ariaLabel="Müşteri"
+          autoFocus={!isEditing}
+          disabled={isEditing}
+          value={form.customerId}
+          onChange={(customerId) => setForm((current) => ({ ...current, customerId }))}
+          placeholder={customers.length === 0 ? "Henüz müşteri kaydı yok" : "Müşteri seçin"}
+          searchPlaceholder="Müşteri adı veya telefon ara"
+          options={customers.map((customer) => ({
+            id: customer.id,
+            label: customer.fullName,
+            description: customer.phone || customer.email || undefined,
+            keywords: `${customer.phone || ""} ${customer.email || ""}`
+          }))}
+        />
+        <small>
+          {isEditing
+            ? "Rezervasyonun müşteri kaydı değiştirilmez."
+            : selectedCustomer
+              ? "Kayıtlı müşteri seçildi."
+              : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}
+        </small>
+      </div>
 
-            {!isEditing && (
-              <div className="form-field--span">
-                <QuickCustomerCreator
-                  disabled={state === "loading"}
-                  onSave={onSaveCustomer}
-                  onCreated={(customerId) => setForm((current) => ({ ...current, customerId }))}
-                />
-              </div>
-            )}
+      {!isEditing && (
+        <div className="form-field--span">
+          <QuickCustomerCreator
+            disabled={state === "loading"}
+            onSave={onSaveCustomer}
+            onCreated={(customerId) => setForm((current) => ({ ...current, customerId }))}
+          />
+        </div>
+      )}
 
-            <div className="form-field form-field--short">
-              <span>Giriş tarihi</span>
-              <DatePicker
-                ariaLabel="Giriş tarihi"
-                disabled={!detailsEditable}
-                value={form.startDate}
-                onChange={(value) => setForm((current) => ({ ...current, startDate: value }))}
-              />
-            </div>
+      <div className="form-field form-field--short">
+        <span>Giriş tarihi</span>
+        <DatePicker
+          ariaLabel="Giriş tarihi"
+          disabled={!detailsEditable}
+          value={form.startDate}
+          onChange={(value) => setForm((current) => ({ ...current, startDate: value }))}
+        />
+      </div>
 
-            <div className="form-field form-field--short">
-              <span>Çıkış tarihi</span>
-              <DatePicker
-                ariaLabel="Çıkış tarihi"
-                disabled={!detailsEditable}
-                min={form.startDate || undefined}
-                value={form.endDate}
-                presets={form.startDate ? [1, 2, 7, 10].map((days) => ({
-                  label: `${days} gün`,
-                  value: addDays(form.startDate, days)
-                })) : []}
-                onChange={(value) => setForm((current) => ({ ...current, endDate: value }))}
-              />
-            </div>
+      <div className="form-field form-field--short">
+        <span>Çıkış tarihi</span>
+        <DatePicker
+          ariaLabel="Çıkış tarihi"
+          disabled={!detailsEditable}
+          min={form.startDate || undefined}
+          value={form.endDate}
+          presets={form.startDate ? [1, 2, 7, 10].map((days) => ({
+            label: `${days} gün`,
+            value: addDays(form.startDate, days)
+          })) : []}
+          onChange={(value) => setForm((current) => ({ ...current, endDate: value }))}
+        />
+      </div>
 
-            <label className="form-field form-field--xs">
-              Kişi sayısı
-              <input
-                type="number"
-                min={1}
-                max={99}
-                required
-                disabled={!detailsEditable}
-                value={form.guestCount}
-                onChange={(event) => setForm((current) => ({ ...current, guestCount: Number(event.target.value) }))}
-              />
-            </label>
+      <label className="form-field form-field--xs">
+        Kişi sayısı
+        <input
+          type="number"
+          min={1}
+          max={99}
+          required
+          disabled={!detailsEditable}
+          value={form.guestCount}
+          onChange={(event) => setForm((current) => ({ ...current, guestCount: Number(event.target.value) }))}
+        />
+      </label>
 
-            <div className="form-field--span form-field form-field--long">
-              <span>Oda</span>
-              <SearchSelect
-                ariaLabel="Oda"
-                disabled={isEditing}
-                value={form.roomId}
-                onChange={(roomId) => setForm((current) => ({ ...current, roomId }))}
-                placeholder="Odayı daha sonra ata"
-                searchPlaceholder="Oda adı veya numarası ara"
-                options={activeRooms.map((room) => ({
-                  id: room.id,
-                  label: room.name,
-                  description: `${room.capacity} kişi · ${room.status === "available" ? "Boş" : room.status}`,
-                  keywords: `${room.number || ""} ${room.floor || ""}`
-                }))}
-              />
-              <small>Mevcut rezervasyonun odasını listeden Oda Ata / Düzenle işlemiyle değiştirin.</small>
-            </div>
+      <div className="form-field--span form-field form-field--long">
+        <span>Oda</span>
+        <SearchSelect
+          ariaLabel="Oda"
+          disabled={isEditing}
+          value={form.roomId}
+          onChange={(roomId) => setForm((current) => ({ ...current, roomId }))}
+          placeholder="Odayı daha sonra ata"
+          searchPlaceholder="Oda adı veya numarası ara"
+          options={activeRooms.map((room) => ({
+            id: room.id,
+            label: room.name,
+            description: `${room.capacity} kişi · ${room.status === "available" ? "Boş" : room.status}`,
+            keywords: `${room.number || ""} ${room.floor || ""}`
+          }))}
+        />
+        <small>{initialRoomId && !isEditing ? "Açık çalışma alanındaki oda seçili geldi." : "Mevcut rezervasyonun odasını listeden Oda Ata / Düzenle işlemiyle değiştirin."}</small>
+      </div>
 
-            <label className="form-field--span form-field form-field--fluid">
-              Not
-              <textarea
-                maxLength={2000}
-                value={form.notes}
-                onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                placeholder="Örn. Telefonla alındı, geç giriş yapacak."
-              />
-            </label>
-          </div>
+      <label className="form-field--span form-field form-field--fluid">
+        Not
+        <textarea
+          maxLength={2000}
+          value={form.notes}
+          onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+          placeholder="Örn. Telefonla alındı, geç giriş yapacak."
+        />
+      </label>
+    </div>
 
-          {isEditing && !isManualReservation && (
-            <p className="form-status">
-              Web talebinden oluşan rezervasyonda tarih ve kişi bilgisi talep kaydıyla bağlıdır; burada oda ve not değiştirilebilir.
-            </p>
-          )}
-          {message && <p className={`form-status sync-${state}`}>{message}</p>}
+    {isEditing && !isManualReservation && (
+      <p className="form-status">
+        Web talebinden oluşan rezervasyonda tarih ve kişi bilgisi talep kaydıyla bağlıdır; burada oda ve not değiştirilebilir.
+      </p>
+    )}
+    {message && <p className={`form-status sync-${state}`}>{message}</p>}
+  </>;
 
+  const actions = <div className="form-actions">
+    <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
+      Vazgeç
+    </ActionButton>
+    <ActionButton
+      type="submit"
+      disabled={state === "loading" || !form.customerId || !form.startDate || !form.endDate || form.guestCount < 1}
+    >
+      {state === "loading" ? <CalendarPlus size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+      {state === "loading"
+        ? (isEditing ? "Güncelleniyor" : "Kaydediliyor")
+        : (isEditing ? "Değişiklikleri Kaydet" : "Rezervasyonu Kaydet")}
+    </ActionButton>
+  </div>;
 
-    </FormDialog>
-  );
+  if (embedded) {
+    return <section className="operation-section form-stack workspace-quick-action" aria-label={title}>
+      <div className="page-toolbar">
+        <div><strong>{title}</strong><small>Bu çalışma alanındaki oda rezervasyonda seçili gelir.</small></div>
+        <ActionButton variant="ghost" size="sm" type="button" disabled={state === "loading"} onClick={onClose}>Kapat</ActionButton>
+      </div>
+      <form className="form-stack" onSubmit={submitReservation}>{fields}{actions}</form>
+    </section>;
+  }
+
+  return <FormDialog title={title} onClose={onClose} closeBlocked={state === "loading"} onSubmit={submitReservation} footer={actions}>
+    {fields}
+  </FormDialog>;
 }
