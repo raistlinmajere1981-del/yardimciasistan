@@ -230,7 +230,7 @@ export function createTerminalUI({ input = defaultInput, output = defaultOutput 
             render(); return;
           }
           if (key.name === "pagedown") {
-            for (let I = 0; i < 6; i += 1) selected = nextSelectableIndex(filtered, selected, 1);
+            for (let i = 0; i < 6; i += 1) selected = nextSelectableIndex(filtered, selected, 1);
             render(); return;
           }
           if (key.name === "backspace" && searching) {
