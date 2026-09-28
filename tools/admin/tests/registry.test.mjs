@@ -42,10 +42,11 @@ test("kategoriler ve site/cwd tutarlılığı", () => {
 });
 
 test("temel preset ve akışlar mevcut", () => {
-  for (const id of ["dev-check", "full-verify", "release-check", "android-release-flow", "bs-deploy-flow", "release-desktop-linux", "product-version-show", "product-version-set", "fresh-full"]) {
+  for (const id of ["verify-dev", "verify-domain", "verify-full", "verify-pre-main", "verify-release", "android-release-flow", "bs-deploy-flow", "release-desktop-linux", "product-version-show", "product-version-set", "fresh-full"]) {
     assert.ok(getTask(id), id);
   }
-  assert.equal(getTask("dev-check").stopOnError, false);
+  assert.equal(getTask("verify-full").kind, "task");
+  assert.equal(getTask("verify-pre-main").kind, "task");
   assert.equal(getTask("release-desktop-linux").stopOnError, true);
 });
 
@@ -64,4 +65,15 @@ test("Build / Release menüsü ürün sürümü işlemlerini gösterir", () => {
   const visible = new Set(SECTIONS.build.groups.flatMap(([, ids]) => ids));
   assert.ok(visible.has("product-version-show"));
   assert.ok(visible.has("product-version-set"));
+});
+
+
+test("Kontroller menüsü yalnız canonical verify presetlerini gösterir", () => {
+  const visible = new Set(SECTIONS.checks.groups.flatMap(([, ids]) => ids));
+  for (const id of ["verify-dev", "verify-domain", "verify-full", "verify-pre-main", "verify-release"]) {
+    assert.ok(visible.has(id), id);
+  }
+  for (const stale of ["pilot-check", "pilot-check-full", "check-linux", "pre-main", "dev-check", "full-verify", "release-check"]) {
+    assert.equal(visible.has(stale), false, stale);
+  }
 });
