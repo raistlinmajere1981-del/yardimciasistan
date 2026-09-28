@@ -93,6 +93,20 @@
 .operations-workspace .workspace-frame__identity--summary .resource-workspace-summary__detail {
   margin-inline-start: auto;
 }
+.operations-workspace .workspace-status-chips {
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.operations-workspace .workspace-status-chips::-webkit-scrollbar { display: none; }
+.operations-workspace .workspace-status-chips button {
+  min-height: var(--control-height-sm);
+  flex: 0 0 auto;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
 .operation-surface--sections { padding: var(--space-3); gap: var(--space-3); }
 .operation-surface--sections > .restaurant-order-menu-panel,
 .operation-surface--sections > .restaurant-order-ticket-panel {
