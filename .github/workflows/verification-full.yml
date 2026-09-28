@@ -42,6 +42,13 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Java kur
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
       - name: Bağımlılıkları kur
         run: npm ci
 
