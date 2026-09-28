@@ -3,6 +3,7 @@ import { CalendarPlus, UserPlus } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
+  DesktopIdentityImageAnalyzeResult,
   DesktopStatusUpdateResult,
   SaveCustomerInput,
   SaveManualReservationInput
@@ -25,18 +26,19 @@ import { RoomReservationControl } from "./RoomReservationControl";
 import { RoomDailyOperations } from "./RoomDailyOperations";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualReservationEditor } from "../operations/ManualReservationEditor";
-import { QuickCustomerCreator } from "../operations/QuickCustomerCreator";
+import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
 import { StatusBadge } from "../ui/StatusBadge";
 
 export interface RoomWorkspaceProps {
   intent: RoomWorkspaceIntent; data: DesktopDashboardData; onDashboard: (data: DesktopDashboardData) => void;
-  staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean;
+  staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean; aiEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onSaveReservation: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
 }
 
 export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reservationsEnabled, folioEnabled, menuEnabled,
-  customersEnabled, onSaveCustomer, onSaveReservation }: RoomWorkspaceProps) {
+  customersEnabled, aiEnabled, onSaveCustomer, onAnalyzeIdentity, onSaveReservation }: RoomWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const model = getRoomWorkspaceModel(data, intent.entityId, staysEnabled, reservationsEnabled);
   // Current account always follows the actual checked-in stay. Prior-account intents focus their own context below.
@@ -115,34 +117,29 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       {intent.returnContext?.page === "restaurant" && intent.returnContext.entityId && <ActionButton variant="secondary" disabled={busy || dirty}
         onClick={() => navigation.openWorkspace({ entityType: "table", entityId: intent.returnContext!.entityId!, mode: "account", action: "room-transfer",
           returnContext: { page: "restaurant", view: "floor" } })}>Masa Hesabına Dön</ActionButton>}</>}
-    presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()} closeBlocked={blocked} returnFocusRef={navigation.returnFocusRef}
-    footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}>
-    {!history && quickAction === "customer" && <QuickCustomerCreator
-      initialOpen
-      showTrigger={false}
-      disabled={busy}
-      onSave={onSaveCustomer}
-      onDirty={value => setDirty("quick-customer", value)}
-      onCreated={customerId => {
-        setQuickCustomerId(customerId);
-        setDirty("quick-customer", false);
-        setQuickAction(null);
-      }}
-      onClose={() => {
-        setDirty("quick-customer", false);
-        setQuickAction(null);
-      }}
-    />}
-    {!history && quickAction === "reservation" && <ManualReservationEditor
-      open
-      embedded
-      customers={data.customers}
-      rooms={data.rooms}
-      initialRoomId={room.id}
-      onClose={() => setQuickAction(null)}
-      onSave={onSaveReservation}
-      onSaveCustomer={onSaveCustomer}
-    />}
+    presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()} closeBlocked={blocked || Boolean(quickAction)} returnFocusRef={navigation.returnFocusRef}
+    footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}
+    overlay={!history && quickAction ? <>
+      {quickAction === "customer" && <CustomerCreateEditor
+        open
+        withinWorkspace
+        aiEnabled={aiEnabled}
+        onClose={() => setQuickAction(null)}
+        onSave={onSaveCustomer}
+        onAnalyzeIdentity={onAnalyzeIdentity}
+        onCreated={customerId => setQuickCustomerId(customerId)}
+      />}
+      {quickAction === "reservation" && <ManualReservationEditor
+        open
+        embedded
+        customers={data.customers}
+        rooms={data.rooms}
+        initialRoomId={room.id}
+        onClose={() => setQuickAction(null)}
+        onSave={onSaveReservation}
+        onSaveCustomer={onSaveCustomer}
+      />}
+    </> : undefined}>
     <div ref={surface} className="operation-surface operation-surface--sections" hidden={history} key={draftEpoch}>
       <OperationPanel title="Oda ve Misafir" id="room-stay">
         <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled}
