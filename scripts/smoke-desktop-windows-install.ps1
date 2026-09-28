@@ -35,14 +35,55 @@ if (-not $appExe) {
 
 $databasePath = Join-Path $dataDir "yardimci-asistan.sqlite"
 $backupPath = Join-Path $dataDir "backups"
+$currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+$installAclRestricted = $false
+
+function Protect-InstallDirectory {
+  Write-Host "Install dir yazma koruması uygulanıyor: $currentIdentity"
+  & icacls.exe $installDir /deny "${currentIdentity}:(OI)(CI)W" | Out-Host
+  if ($LASTEXITCODE -ne 0) {
+    throw "Install dir ACL yazma koruması uygulanamadı. ExitCode=$LASTEXITCODE"
+  }
+  $script:installAclRestricted = $true
+
+  $probe = Join-Path $installDir ".yardimci-write-probe"
+  $writeBlocked = $false
+  try {
+    [System.IO.File]::WriteAllText($probe, "write-must-fail")
+  } catch {
+    $writeBlocked = $true
+  } finally {
+    Remove-Item $probe -Force -ErrorAction SilentlyContinue
+  }
+  if (-not $writeBlocked) {
+    throw "Install dir yazılabilir kaldı; Program Files yetki modeli smoke tarafından taklit edilemedi."
+  }
+  Write-Host "Install dir yazma denemesi beklendiği gibi engellendi."
+}
+
+function Restore-InstallDirectoryAcl {
+  if (-not $script:installAclRestricted) {
+    return
+  }
+  & icacls.exe $installDir /remove:d $currentIdentity /T /C | Out-Host
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Install dir ACL geri yükleme tamamlanamadı. ExitCode=$LASTEXITCODE"
+  }
+  $script:installAclRestricted = $false
+}
+
 $previousDataDir = $env:YA_DESKTOP_DATA_DIR
+$previousBackupDir = $env:YA_DESKTOP_BACKUP_DIR
 $previousLogging = $env:ELECTRON_ENABLE_LOGGING
 $env:YA_DESKTOP_DATA_DIR = $dataDir
+Remove-Item Env:YA_DESKTOP_BACKUP_DIR -ErrorAction SilentlyContinue
 $env:ELECTRON_ENABLE_LOGGING = "1"
 
 $app = $null
 try {
-  Write-Host "Launching installed app: $($appExe.FullName)"
+  Protect-InstallDirectory
+
+  Write-Host "Launching installed app with read-only install dir: $($appExe.FullName)"
   $app = Start-Process -FilePath $appExe.FullName -ArgumentList @("--disable-gpu") -PassThru
 
   $deadline = (Get-Date).AddSeconds(45)
@@ -60,7 +101,10 @@ try {
     throw "Kurulu uygulama ilk veritabanını oluşturmadı: $databasePath"
   }
   if (-not (Test-Path $backupPath)) {
-    throw "Kurulu uygulama yedek klasörünü oluşturmadı: $backupPath"
+    throw "Kurulu uygulama kullanıcı veri kökünde yedek klasörünü oluşturmadı: $backupPath"
+  }
+  if ((Test-Path (Join-Path $installDir "backup")) -or (Test-Path (Join-Path $installDir "backups"))) {
+    throw "Kurulu uygulama install dir içine yazılabilir yedek alanı oluşturmaya çalıştı."
   }
 
   & node (Join-Path $repoRoot "scripts\smoke-desktop-windows-data.mjs") $dataDir
@@ -72,8 +116,16 @@ try {
     Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 500
   }
-  $env:YA_DESKTOP_DATA_DIR = $previousDataDir
-  $env:ELECTRON_ENABLE_LOGGING = $previousLogging
+  Restore-InstallDirectoryAcl
+
+  if ($null -eq $previousDataDir) { Remove-Item Env:YA_DESKTOP_DATA_DIR -ErrorAction SilentlyContinue }
+  else { $env:YA_DESKTOP_DATA_DIR = $previousDataDir }
+
+  if ($null -eq $previousBackupDir) { Remove-Item Env:YA_DESKTOP_BACKUP_DIR -ErrorAction SilentlyContinue }
+  else { $env:YA_DESKTOP_BACKUP_DIR = $previousBackupDir }
+
+  if ($null -eq $previousLogging) { Remove-Item Env:ELECTRON_ENABLE_LOGGING -ErrorAction SilentlyContinue }
+  else { $env:ELECTRON_ENABLE_LOGGING = $previousLogging }
 }
 
 $uninstaller = Get-ChildItem -Path $installDir -Filter "*.exe" -File |
