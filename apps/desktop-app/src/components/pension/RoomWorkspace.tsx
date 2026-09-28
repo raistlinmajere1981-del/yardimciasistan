@@ -27,7 +27,8 @@ import { RoomDailyOperations } from "./RoomDailyOperations";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualReservationEditor } from "../operations/ManualReservationEditor";
 import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
-import { StatusBadge } from "../ui/StatusBadge";
+import { ChoiceChips } from "../ui/ChoiceChips";
+import { setRoomOperationalStatus } from "./room-operations";
 
 export interface RoomWorkspaceProps {
   intent: RoomWorkspaceIntent; data: DesktopDashboardData; onDashboard: (data: DesktopDashboardData) => void;
@@ -92,9 +93,26 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
     context={history && <div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
       <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
     headerSummary={!history && <ResourceWorkspaceSummary label="Oda özeti" imageSrc="./assets/default-room.png"
-      facts={<><strong>{roomIdentity(room)}</strong><span>{room.capacity} kişilik</span>{room.floor && <span>Kat: {room.floor}</span>}{room.bedInfo && <span>{room.bedInfo}</span>}</>}
-      status={<><StatusBadge tone={state.occupancy.status === "occupied" ? "info" : "neutral"}>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</StatusBadge>
-        <StatusBadge tone="neutral">Fiziksel: {roomConditionLabel[state.operationalCondition]}</StatusBadge>{!room.isActive && <StatusBadge tone="warning">Etkin değil</StatusBadge>}</>}>
+      facts={<>
+        <strong>{roomIdentity(room)}</strong><span>{room.capacity} kişilik</span>{room.floor && <span>Kat: {room.floor}</span>}{room.bedInfo && <span>{room.bedInfo}</span>}
+        {model.canSetCondition && <ChoiceChips
+          className="workspace-status-chips"
+          ariaLabel="Fiziksel oda durumu"
+          value={state.operationalCondition === "ready" ? "available" : state.operationalCondition}
+          disabled={busy}
+          onChange={value => {
+            const current = state.operationalCondition === "ready" ? "available" : state.operationalCondition;
+            if (value === current || value === "out_of_service") return;
+            void operations.mutate("operations", () => setRoomOperationalStatus(room.id, value));
+          }}
+          options={[
+            { id: "available", label: "Hazır" },
+            { id: "cleaning", label: "Temizlik" },
+            { id: "maintenance", label: "Bakımda" }
+          ]}
+        />}
+      </>}
+      status={null}>
       {model.currentStay ? <span>{model.currentStay.customerName} · {model.currentStay.guestCount} kişi</span>
         : <span>{model.conflict ? "Konaklama kayıtlarını kontrol edin." : model.active.length ? "Planlanan konaklama var." : "Aktif konaklama yok."}</span>}
     </ResourceWorkspaceSummary>}
