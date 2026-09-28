@@ -145,7 +145,7 @@ function prepareRestoredStateForFullRepublish() {
   const restoredDatabase = new DesktopDatabase({
     appPath: app.getAppPath(),
     userDataPath: restoredUserDataPath,
-    backupPath: resolveProjectBackupPath()
+    backupPath: resolveProjectBackupPath(restoredUserDataPath)
   });
   try {
     restoredDatabase.initialize();
@@ -178,7 +178,7 @@ function prepareRestoredStateForFullRepublish() {
   const database = new DesktopDatabase({
     appPath: app.getAppPath(),
     userDataPath: restoredUserDataPath,
-    backupPath: resolveProjectBackupPath()
+    backupPath: resolveProjectBackupPath(restoredUserDataPath)
   });
   try {
     database.initialize();
@@ -246,7 +246,7 @@ void mainProcessReady.then(async ({
       const database = new DesktopDatabase({
         appPath: app.getAppPath(),
         userDataPath: userDataPath(),
-        backupPath: resolveProjectBackupPath()
+        backupPath: resolveProjectBackupPath(userDataPath())
       });
       try {
         database.initialize();
@@ -276,7 +276,7 @@ void mainProcessReady.then(async ({
         const database = new DesktopDatabase({
           appPath: app.getAppPath(),
           userDataPath: userDataPath(),
-          backupPath: resolveProjectBackupPath()
+          backupPath: resolveProjectBackupPath(userDataPath())
         });
         try {
           database.initialize();
