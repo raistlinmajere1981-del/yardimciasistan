@@ -24,38 +24,28 @@ export const TASK_CATEGORIES = {
 const NPM = "npm";
 
 export const TASKS = [
-  // ---------- Kontroller: hızlı ----------
-  { id: "doctor", kind: "task", title: "Ortam kontrolü (doctor)", category: "checks", command: NPM, args: ["run", "doctor"], preflight: null },
-  { id: "typecheck", kind: "task", title: "Typecheck (tüm workspace'ler)", category: "checks", command: NPM, args: ["run", "typecheck"], preflight: "basic" },
-  { id: "typecheck-electron", kind: "task", title: "Typecheck Electron", category: "checks", command: NPM, args: ["run", "typecheck:electron"], preflight: "basic" },
-  { id: "lint", kind: "task", title: "Lint", category: "checks", command: NPM, args: ["run", "lint"], preflight: "basic" },
-  { id: "lint-strict", kind: "task", title: "Lint Strict", category: "checks", command: NPM, args: ["run", "lint:strict"], preflight: "basic" },
-  { id: "lint-php", kind: "task", title: "PHP lint (web modülü)", category: "checks", command: NPM, args: ["run", "lint:php"], preflight: "basic" },
-  { id: "knip-strict", kind: "task", title: "Knip Strict (ölü kod/bağımlılık)", category: "checks", command: NPM, args: ["run", "knip:strict"], preflight: "basic" },
-  { id: "test-all", kind: "task", title: "Birim testleri (tüm workspace'ler)", category: "checks", command: NPM, args: ["test"], preflight: "basic" },
-  { id: "e2e", kind: "task", title: "E2E (Playwright)", category: "checks", command: NPM, args: ["run", "e2e"], preflight: "basic" },
-  { id: "arch-audit", kind: "task", title: "Mimari denetimi", category: "checks", command: NPM, args: ["run", "architecture:audit"], preflight: "basic" },
-  { id: "design-audit-strict", kind: "task", title: "Tasarım sistemi denetimi (strict)", category: "checks", command: NPM, args: ["run", "design:audit:strict"], preflight: "basic" },
+  // ---------- Kontroller ----------
+  { id: "verify-dev", kind: "task", title: "Dev Check", category: "checks", command: NPM, args: ["run", "verify:dev"], preflight: "basic", impact: ["Hızlı geliştirme kapısı; aynı prerequisite iki kez çalışmaz."] },
+  { id: "verify-domain", kind: "task", title: "Domain Check", category: "checks", command: "node", args: ["scripts/verify.mjs", "--domain"], argsPrompt: [{ key: "domain", flag: null, prompt: "Domain (örn. hospitality, android, finance, web, desktop)", required: true }], preflight: "basic", impact: ["Seçilen domain'in kontrollerini ve gerekli prerequisite'leri bir kez çalıştırır."] },
+  { id: "verify-check", kind: "task", title: "Tek kontrol çalıştır", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check"], argsPrompt: [{ key: "check", flag: null, prompt: "Kontrol id (verify:list ile görülebilir)", required: true }], preflight: "basic" },
+  { id: "verify-full", kind: "task", title: "Full Verify", category: "checks", command: NPM, args: ["run", "verify:full"], preflight: "basic", impact: ["Portable ürün testlerini, build/typecheck prerequisite'lerini tekrar etmeden çalıştırır."] },
+  { id: "verify-pre-main", kind: "task", title: "Pre-main", category: "checks", command: NPM, args: ["run", "verify:pre-main"], preflight: "basic", impact: ["Full Verify + strict lint/Knip/design/architecture + git diff kapısı."] },
+  { id: "verify-release", kind: "task", title: "Release Check", category: "checks", command: NPM, args: ["run", "verify:release"], preflight: "release", impact: ["Pre-main kapsamına paketleme ve release artifact doğrulamalarını ekler."] },
+  { id: "verify-list", kind: "task", title: "Kontrol/preset/domain listesini göster", category: "checks", command: NPM, args: ["run", "verify:list"], preflight: null },
+  { id: "verify-plan", kind: "task", title: "Pre-main planını göster", category: "checks", command: NPM, args: ["run", "verify:plan"], preflight: null },
 
-  // ---------- Kontroller: bileşik ----------
-  { id: "pilot-check", kind: "task", title: "Pilot Check", category: "checks", command: NPM, args: ["run", "pilot:check"], preflight: "basic", impact: ["Paketleri derler; kaynak kodu değiştirmez."] },
-  { id: "pilot-check-android", kind: "task", title: "Pilot Check (Android)", category: "checks", command: NPM, args: ["run", "pilot:check:android"], preflight: "android" },
-  { id: "pilot-check-full", kind: "task", title: "Pilot Check (Full)", category: "checks", command: NPM, args: ["run", "pilot:check:full"], preflight: "basic", impact: ["Uzun sürer; paketleri derler."] },
-  { id: "check", kind: "task", title: "Check (typecheck+test+build+e2e)", category: "checks", command: NPM, args: ["run", "check"], preflight: "basic", impact: ["Uzun sürer; paketleri derler."] },
-  { id: "check-linux", kind: "task", title: "Check Linux (tam ürün kontrolü)", category: "checks", command: NPM, args: ["run", "check:linux"], preflight: "basic", impact: ["En uzun kontrol; tüm smoke/build adımlarını çalıştırır."] },
-  { id: "pre-main", kind: "task", title: "Pre-main (merge kapısı)", category: "checks", command: NPM, args: ["run", "pre-main"], preflight: "basic", impact: ["Merge öncesi tam kapı; uzun sürer."] },
-
-  // ---------- Kontroller: temsilci tekil smoke'lar ----------
-  { id: "smoke-local-lab", kind: "task", title: "Smoke: yerel lab (web modülü)", category: "checks", command: NPM, args: ["run", "smoke:local-lab"], preflight: "basic" },
-  { id: "smoke-web-form-api", kind: "task", title: "Smoke: web form API", category: "checks", command: NPM, args: ["run", "smoke:web-form-api"], preflight: "basic" },
-  { id: "smoke-web-module", kind: "task", title: "Smoke: web modülü menü", category: "checks", command: NPM, args: ["run", "smoke:web-module"], preflight: "basic" },
-  { id: "smoke-desktop-clean-startup", kind: "task", title: "Smoke: desktop temiz açılış", category: "checks", command: NPM, args: ["run", "smoke:desktop:linux", "--", "--no-build"], preflight: null, impact: ["Geçici dizin kullanır; gerçek veriye dokunmaz."] },
-  { id: "smoke-diagnostics", kind: "task", title: "Smoke: tanılama sözleşmesi", category: "checks", command: NPM, args: ["run", "smoke:diagnostics"], preflight: "basic" },
-
-  // ---------- Kontrol grupları / presetler ----------
-  { id: "dev-check", kind: "group", title: "Dev Check", category: "checks", steps: ["doctor", "typecheck", "lint"], stopOnError: false },
-  { id: "full-verify", kind: "group", title: "Full Verify", category: "checks", steps: ["lint-strict", "knip-strict", "typecheck", "test-all", "arch-audit", "design-audit-strict"], stopOnError: false },
-  { id: "release-check", kind: "workflow", title: "Release Check (pre-main)", category: "checks", steps: ["pre-main"], stopOnError: true, preflight: "release" },
+  // Dar teşhis kontrolleri de aynı verification registry üzerinden gider.
+  { id: "doctor", kind: "task", title: "Ortam kontrolü (doctor)", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "doctor"], preflight: null },
+  { id: "typecheck", kind: "task", title: "Typecheck (tüm workspace'ler)", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "typecheck"], preflight: "basic" },
+  { id: "typecheck-electron", kind: "task", title: "Typecheck Electron", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "typecheck-electron"], preflight: "basic" },
+  { id: "lint-strict", kind: "task", title: "Lint Strict", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "lint-strict"], preflight: "basic" },
+  { id: "lint-php", kind: "task", title: "PHP lint", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "php-lint"], preflight: "basic" },
+  { id: "knip-strict", kind: "task", title: "Knip Strict", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "knip-strict"], preflight: "basic" },
+  { id: "test-all", kind: "task", title: "Birim testleri", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "unit-tests"], preflight: "basic" },
+  { id: "e2e", kind: "task", title: "E2E (Playwright)", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "e2e"], preflight: "basic" },
+  { id: "arch-audit", kind: "task", title: "Mimari denetimi", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "architecture-audit"], preflight: "basic" },
+  { id: "design-audit-strict", kind: "task", title: "Tasarım sistemi denetimi", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "design-audit-strict"], preflight: "basic" },
+  { id: "smoke-diagnostics", kind: "task", title: "Tanılama domain kontrolü", category: "checks", command: "node", args: ["scripts/verify.mjs", "--domain", "diagnostics"], preflight: "basic" },
 
   // ---------- Android ----------
   { id: "android-devices", kind: "task", title: "Bağlı cihazları göster", category: "android", command: "adb", args: ["devices", "-l"], preflight: null },
