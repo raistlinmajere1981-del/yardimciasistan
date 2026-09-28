@@ -49,6 +49,7 @@ import { MarketPage } from "../../pages/MarketPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
 import { useCalendarPageController } from "../calendar/calendar-page-state";
 import { usePensionPageController } from "../pension/pension-page-state";
+import { useRestaurantPageController } from "../restaurant/restaurant-page-state";
 import { PensionPage } from "../../pages/PensionPage";
 import { ReportsPage } from "../../pages/ReportsPage";
 import { RestaurantPage } from "../../pages/RestaurantPage";
@@ -195,6 +196,7 @@ export function DesktopWorkspaceRouter({
   } = deviceController;
 
   const pensionController = usePensionPageController();
+  const restaurantController = useRestaurantPageController();
   const calendarController = useCalendarPageController();
   const workspaceNavigation = useWorkspaceNavigation();
   const C = BUSINESS_CAPABILITIES;
@@ -509,6 +511,7 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "restaurant" ? (
         <RestaurantPage
+          controller={restaurantController}
           data={surfaceData}
           reservationsEnabled={foodReservationsEnabled}
           onUpdateTableStatus={handleUpdateTableStatus}
