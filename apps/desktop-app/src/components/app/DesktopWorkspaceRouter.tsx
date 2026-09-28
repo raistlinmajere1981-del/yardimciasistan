@@ -1,4 +1,4 @@
-import { RoomsWorkspace } from "../pension/RoomsWorkspace";
+import { RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES,
@@ -492,6 +492,14 @@ export function DesktopWorkspaceRouter({
               onOpenWhatsApp={openReservationWhatsApp}
             />
           ) : null}
+          roomToolbar={(
+            <RoomFiltersToolbar
+              data={surfaceData}
+              folioEnabled={accommodationFolioEnabled}
+              reservationsEnabled={accommodationReservationsEnabled}
+              staysEnabled={accommodationStaysEnabled}
+            />
+          )}
           rooms={(
             <RoomsWorkspace
               data={surfaceData}
