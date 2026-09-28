@@ -123,6 +123,7 @@ const PACKAGE_ONLY_SMOKE_FILES = new Set([
   "scripts/smoke-public-room-availability-publication.mjs",
   "scripts/smoke-public-room-availability.php",
   "scripts/smoke-stock-image-analysis.mjs",
+  "scripts/smoke-live-ai.mjs",
   "scripts/smoke-sync-timeout.mjs",
   "scripts/smoke-web-form-api.mjs",
   "scripts/smoke-web-module-menu.mjs",
@@ -136,10 +137,10 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 
 const BASE_CHECKS = [
   check("version-contract-tests", "Ürün sürüm sözleşmesi testleri", "node", ["--test", "scripts/test-product-version.mjs"], {
-    phase: 5, presets: ["full"], domains: ["release"]
+    phase: 5, presets: ["full"], domains: ["platform"]
   }),
   check("version-check", "Ürün sürümü tutarlılığı", "node", ["scripts/product-version.mjs", "check"], {
-    phase: 5, presets: ["dev", "full"], domains: ["release"]
+    phase: 5, presets: ["dev", "full"], domains: ["platform"]
   }),
   check("verification-registry-tests", "Doğrulama registry testleri", "node", ["--test", "scripts/test-verification-registry.mjs"], {
     phase: 5, presets: ["full"], domains: ["platform"]
@@ -252,7 +253,11 @@ export function getVerificationCheck(id) {
 }
 
 export function verificationDomains() {
-  return [...new Set(VERIFICATION_CHECKS.flatMap((item) => item.domains))].sort();
+  return [...new Set(
+    VERIFICATION_CHECKS
+      .filter((item) => item.presets.includes("full") || item.manual)
+      .flatMap((item) => item.domains)
+  )].sort();
 }
 
 export function createVerificationPlan({ preset, domain, checkId, includeManual = false, platform = process.platform } = {}) {
@@ -281,6 +286,7 @@ export function createVerificationPlan({ preset, domain, checkId, includeManual 
   } else if (domain) {
     roots = VERIFICATION_CHECKS.filter((item) =>
       item.domains.includes(domain)
+      && (item.presets.includes("full") || (includeManual && item.manual))
       && (includeManual || !item.manual)
       && supportsPlatform(item, platform)
     );
@@ -400,6 +406,9 @@ function smokeLabel(file) {
 
 function smokeRequires(file) {
   if (file === "scripts/smoke-desktop-package.mjs") return ["package-desktop-dir"];
+  if (file === "scripts/smoke-android-device-ui.mjs") {
+    return ["build-packages", "build-desktop", "build-android-debug"];
+  }
   if (PACKAGE_ONLY_SMOKE_FILES.has(file)) return ["build-packages"];
   return ["build-packages", "build-desktop"];
 }
