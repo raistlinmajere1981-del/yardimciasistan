@@ -23,7 +23,7 @@ interface WorkspaceNavigation {
   hospitalitySessions: Record<HospitalityPage, WorkspaceState | null>;
   returnFocusRef: RefObject<HTMLElement | null>;
   openWorkspace: (intent: WorkspaceIntent, options?: OpenWorkspaceOptions) => boolean;
-  closeWorkspace: () => boolean;
+  closeWorkspace: (scope?: CloseGuardScope) => boolean;
   updateWorkspacePresentation: (presentation: WorkspacePresentation) => void;
   updateWorkspaceMode: (update: WorkspaceModeUpdate) => void;
   registerCloseGuard: (guard: () => boolean, scope?: CloseGuardScope) => () => void;
@@ -110,7 +110,21 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
       });
       return true;
     },
-    closeWorkspace() {
+    closeWorkspace(scope) {
+      if (scope) {
+        const ownerPage = sessionPageFor(definitions, scope.entityType);
+        if (ownerPage) {
+          const session = hospitalitySessions[ownerPage];
+          if (!session || session.intent.entityType !== scope.entityType || session.intent.entityId !== scope.entityId || !guardAllows(session)) return false;
+          const context = session.intent.returnContext ?? {};
+          setHospitalitySessions((sessions) => ({ ...sessions, [ownerPage]: null }));
+          hospitalityOnReturn.current[ownerPage]?.(context);
+          hospitalityOnReturn.current[ownerPage] = undefined;
+          return true;
+        }
+        if (!transient || transient.intent.entityType !== scope.entityType || transient.intent.entityId !== scope.entityId) return false;
+      }
+
       if (transient) {
         const transientGuard = guards.current.get("transient");
         if (transientGuard && !transientGuard()) return false;
