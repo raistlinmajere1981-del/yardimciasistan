@@ -3,6 +3,7 @@ import { CalendarPlus, UserPlus } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
+  DesktopIdentityImageAnalyzeResult,
   DesktopStatusUpdateResult,
   DesktopTableOrder,
   SaveCustomerInput,
@@ -16,7 +17,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualRestaurantReservationEditor } from "../operations/ManualRestaurantReservationEditor";
-import { QuickCustomerCreator } from "../operations/QuickCustomerCreator";
+import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
 import { getTableCardModel } from "./table-card-model";
 import { TableOrderEditor } from "./TableOrderEditor";
 import { TableAccountPanel } from "./TableAccountPanel";
@@ -24,9 +25,11 @@ import { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone } from "./table-presentation";
 
 export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, customersEnabled, reservationsEnabled,
-  roomFolioTransferEnabled, onDashboardDataChanged, onUpdateTableStatus, onSaveCustomer, onSaveReservation }: {
+  roomFolioTransferEnabled, onDashboardDataChanged, onUpdateTableStatus, aiEnabled, onSaveCustomer, onAnalyzeIdentity, onSaveReservation }: {
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
+  aiEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onSaveReservation: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   intent: TableWorkspaceIntent; data: DesktopDashboardData;
   ordersEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean;
@@ -123,7 +126,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       onCloseOrder={status => void closeTableOrder(status)} onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)} onUpdateTableStatus={onUpdateTableStatus} />
   </OperationPanel>;
   return <WorkspaceFrame title={table.name} className="operations-workspace" presentation={navigation.current!.presentation} closeLabel="Floor'a dön"
-    onClose={() => void requestReturn()} closeBlocked={controller.busy} returnFocusRef={navigation.returnFocusRef} bodyScroll="panes"
+    onClose={() => void requestReturn()} closeBlocked={controller.busy || Boolean(quickAction)} returnFocusRef={navigation.returnFocusRef} bodyScroll="panes"
     context={history && <div className="table-workspace-context"><span>{table.area || "Genel"}</span>
       <StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
       {order && <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>}
@@ -160,28 +163,28 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
         if (transferred) onOrderChanged(transferred);
         onDashboardDataChanged(dashboard); setReturnRequested(true); return true;
       })}>Görünümü Yenile</ActionButton>}
-    </div>}>
-    {!history && quickAction === "customer" && <QuickCustomerCreator
-      initialOpen
-      showTrigger={false}
-      disabled={disabled}
-      onSave={onSaveCustomer}
-      onCreated={customerId => {
-        setQuickCustomerId(customerId);
-        setQuickAction(null);
-      }}
-      onClose={() => setQuickAction(null)}
-    />}
-    {!history && quickAction === "reservation" && <ManualRestaurantReservationEditor
-      open
-      embedded
-      customers={data.customers}
-      tables={data.tables}
-      initialTableId={table.id}
-      onClose={() => setQuickAction(null)}
-      onSave={onSaveReservation}
-      onSaveCustomer={onSaveCustomer}
-    />}
+    </div>}
+    overlay={!history && quickAction ? <>
+      {quickAction === "customer" && <CustomerCreateEditor
+        open
+        withinWorkspace
+        aiEnabled={aiEnabled}
+        onClose={() => setQuickAction(null)}
+        onSave={onSaveCustomer}
+        onAnalyzeIdentity={onAnalyzeIdentity}
+        onCreated={customerId => setQuickCustomerId(customerId)}
+      />}
+      {quickAction === "reservation" && <ManualRestaurantReservationEditor
+        open
+        embedded
+        customers={data.customers}
+        tables={data.tables}
+        initialTableId={table.id}
+        onClose={() => setQuickAction(null)}
+        onSave={onSaveReservation}
+        onSaveCustomer={onSaveCustomer}
+      />}
+    </> : undefined}>
     <div ref={surface} className={`operation-surface operation-surface--sections operation-surface--table${!ordersEnabled || !menuEnabled ? " operation-surface--two" : !order ? " operation-surface--empty-table" : ""}`} hidden={history}>
       {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} controller={controller} readOnly={transferCommitted} accountPanel={accountPanel} />
         : <><OperationPanel title="Masa İşlemleri"><p>Sipariş yönetimi etkin değil. Masa hazırlığını sağdaki panelden yönetebilirsiniz.</p></OperationPanel>{accountPanel}</>}
