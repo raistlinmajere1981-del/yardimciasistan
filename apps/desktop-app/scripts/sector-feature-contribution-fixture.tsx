@@ -11,7 +11,7 @@ import { toSetupForm } from "../src/app/setup-model";
 import { pensionNavigationContribution } from "../src/components/pension/pension-navigation";
 import { roomWorkspaceDefinition } from "../src/components/pension/room-workspace-definition";
 import { AppShell } from "../src/components/layout/AppShell";
-import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../src/components/workspace/WorkspaceNavigation";
+import { HospitalityWorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../src/components/workspace/WorkspaceNavigation";
 import "../src/styles/index.css";
 
 const fixtureWindow = window as unknown as {
@@ -88,15 +88,18 @@ function ContributionFixture() {
 
   return <AppShell
     contentScroll="workspace"
-    sidebar={<aside className="sidebar">Stage 9 fixture</aside>}
-    header={<header className="page-header"><h1>Test Feature</h1></header>}
-    overlay={<WorkspaceHost
+    workspaceActive={Boolean(navigation.hospitalitySessions.pension)}
+    workspaceLayer={<HospitalityWorkspaceHost
+      page="pension"
+      activePage="pension"
       definition={testFeatureComposition.workspace}
       context={{ data, onDashboard: setData, ...fixtureWindow.fixtureCapabilities, customersEnabled: false, aiEnabled: false,
         onSaveCustomer: async () => ({ ok: false as const, message: "fixture" }),
         onAnalyzeIdentity: async () => ({ ok: false as const, message: "fixture" }),
         onSaveReservation: async () => ({ ok: false as const, message: "fixture" }) }}
     />}
+    sidebar={<aside className="sidebar">Stage 9 fixture</aside>}
+    header={<header className="page-header"><h1>Test Feature</h1></header>}
   >
     <section aria-label="Test feature katkıları" className="form-stack">
       <nav aria-label="Test feature navigation">
