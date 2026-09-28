@@ -226,6 +226,7 @@ const SMOKE_CHECKS = SMOKE_FILES
     const releaseOnly = RELEASE_ONLY_SMOKE_FILES.has(file);
     const command = file.endsWith(".php") ? "php" : "node";
     const requires = smokeRequires(file);
+    const args = file === "scripts/smoke-android-device-ui.mjs" ? [file, "--no-build"] : [file];
     const options = {
       phase: releaseOnly ? 90 : 50,
       presets: manual ? [] : releaseOnly ? ["release"] : ["full"],
@@ -234,7 +235,7 @@ const SMOKE_CHECKS = SMOKE_FILES
       manual,
       platforms: LINUX_ONLY_SMOKE_FILES.has(file) ? ["linux"] : undefined
     };
-    return check(smokeId(file), smokeLabel(file), command, [file], options);
+    return check(smokeId(file), smokeLabel(file), command, args, options);
   });
 
 export const VERIFICATION_CHECKS = [...BASE_CHECKS, ...SMOKE_CHECKS];
