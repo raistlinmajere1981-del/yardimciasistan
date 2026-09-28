@@ -421,7 +421,7 @@ function smokeDomains(file) {
   if (/android/.test(name)) domains.add("android");
   if (/web|sync|public-room|connection/.test(name)) domains.add("web");
   if (/market|commerce|menu|stock|barcode|label/.test(name)) domains.add("commerce");
-  if (/pension|hospitality|room|reservation|table/.test(name)) domains.add("hospitality");
+  if (/pension|restaurant|hospitality|room|reservation|table/.test(name)) domains.add("hospitality");
   if (/finance|folio|transfer/.test(name)) {
     domains.add("finance");
     domains.add("hospitality");
