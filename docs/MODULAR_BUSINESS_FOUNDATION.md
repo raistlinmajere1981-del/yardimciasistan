@@ -297,7 +297,7 @@ npm run verify:domain -- platform
 npm run verify:pre-main
 ```
 
-Eski ayrı `check-modular-foundation.mjs` zinciri kaldırılmıştır. Capability,
+Eski ayrı modular-foundation composite zinciri kaldırılmıştır. Capability,
 commerce ve Market smoke'ları canonical verification registry'de bağımsız leaf
 kontrollerdir; Full/Pre-main planında prerequisite'leriyle birlikte yalnız bir kez
 çalışırlar.
@@ -786,7 +786,7 @@ görselleri `artifacts/screenshots/m83-credit-whatsapp/` altındadır (git dış
 - `npm run verify:full`: `Doğrulama planı temiz.`;
   strict kalite kapıları ve tüm M7/M8 smoke'ları geçti.
 - M8.1, M8.2 ve yeni M8.3 targeted smoke'ları ayrıca geçti.
-- `npm run smoke:desktop-renderer`: `desktop-renderer-ok`; mevcut request/AI
+- `npm run verify:check -- desktop-renderer`: mevcut request/AI
   WhatsApp aktarımı, safe/WebView düzeni ve onaylı gönderim kontrolleri korundu.
   Test dış WhatsApp servisine gerçek mesaj göndermez.
 - `npm run android:debug`: `BUILD SUCCESSFUL`; Android source değişmedi.
