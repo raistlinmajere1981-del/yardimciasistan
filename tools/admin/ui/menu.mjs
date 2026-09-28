@@ -14,7 +14,7 @@ import { BLACKSEA_ROOT, REPO_ROOT } from "../lib/paths.mjs";
 import { getGitStatus, renderStatusBar } from "./status.mjs";
 import { createTerminalUI } from "./terminal.mjs";
 
-const SECTIONS = {
+export const SECTIONS = {
   checks: {
     title: "Kontroller", groups: [
       ["Presetler", ["dev-check", "full-verify", "release-check"]],
