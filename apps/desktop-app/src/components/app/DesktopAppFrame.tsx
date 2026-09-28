@@ -18,6 +18,7 @@ import type {
   MenuController,
   MarketController,
   MessagingController,
+  OperationController,
   SetupController
 } from "../../app/controller-types";
 import type { DesktopDashboardData } from "../../../electron/database";
@@ -43,6 +44,7 @@ interface DesktopAppFrameProps {
   menuController: MenuController;
   messagingController: MessagingController;
   customerController: CustomerController;
+  operationController: OperationController;
   marketController: MarketController;
   children: ReactNode;
 }
@@ -68,6 +70,7 @@ function DesktopAppFrameContent({
   menuController,
   messagingController,
   customerController,
+  operationController,
   marketController,
   children
 }: DesktopAppFrameProps) {
@@ -103,6 +106,7 @@ function DesktopAppFrameContent({
     [automaticSyncStatus, businessCapabilities, dashboardData]
   );
   const whatsappEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP);
+  const customersEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS);
   const aiEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.AI);
   const menuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_MENU);
   const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
@@ -280,6 +284,9 @@ function DesktopAppFrameContent({
             onDashboard: desktopSyncController.setDashboardData,
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS),
+            customersEnabled,
+            onSaveCustomer: customerController.handleSaveCustomer,
+            onSaveReservation: operationController.handleSaveManualReservation,
             folioEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO), menuEnabled
           }} />
           {diagnosticsOpen ? (
