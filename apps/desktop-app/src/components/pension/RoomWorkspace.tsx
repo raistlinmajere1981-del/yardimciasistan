@@ -1,5 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { DesktopDashboardData } from "../../../electron/database";
+import { CalendarPlus, UserPlus } from "lucide-react";
+import type {
+  DesktopCustomerMutationResult,
+  DesktopDashboardData,
+  DesktopStatusUpdateResult,
+  SaveCustomerInput,
+  SaveManualReservationInput
+} from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { OperationPanel } from "../workspace/OperationPanel";
@@ -17,14 +24,19 @@ import { RoomStayPanel } from "./RoomStayPanel";
 import { RoomReservationControl } from "./RoomReservationControl";
 import { RoomDailyOperations } from "./RoomDailyOperations";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
+import { ManualReservationEditor } from "../operations/ManualReservationEditor";
+import { QuickCustomerCreator } from "../operations/QuickCustomerCreator";
 import { StatusBadge } from "../ui/StatusBadge";
 
 export interface RoomWorkspaceProps {
   intent: RoomWorkspaceIntent; data: DesktopDashboardData; onDashboard: (data: DesktopDashboardData) => void;
-  staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean; menuEnabled: boolean;
+  staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean;
+  onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  onSaveReservation: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
 }
 
-export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reservationsEnabled, folioEnabled, menuEnabled }: RoomWorkspaceProps) {
+export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reservationsEnabled, folioEnabled, menuEnabled,
+  customersEnabled, onSaveCustomer, onSaveReservation }: RoomWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const model = getRoomWorkspaceModel(data, intent.entityId, staysEnabled, reservationsEnabled);
   // Current account always follows the actual checked-in stay. Prior-account intents focus their own context below.
@@ -33,6 +45,8 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   const operations = useRoomStayOperations(model, account, onDashboard);
   const [dirtyForms, setDirtyForms] = useState<Record<string, boolean>>({});
   const [draftEpoch, setDraftEpoch] = useState(0);
+  const [quickAction, setQuickAction] = useState<"customer" | "reservation" | null>(null);
+  const [quickCustomerId, setQuickCustomerId] = useState("");
   const dirty = Object.values(dirtyForms).some(Boolean);
   const busy = operations.busy || account.busy;
   const blocked = useWorkspaceCloseGuard({ busy, dirty });
@@ -83,16 +97,56 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       {model.currentStay ? <span>{model.currentStay.customerName} · {model.currentStay.guestCount} kişi</span>
         : <span>{model.conflict ? "Konaklama kayıtlarını kontrol edin." : model.active.length ? "Planlanan konaklama var." : "Aktif konaklama yok."}</span>}
     </ResourceWorkspaceSummary>}
-    actions={<><ActionButton variant="ghost" disabled={busy} onClick={() => navigation.updateWorkspaceMode({ entityType: "room", mode: history ? "summary" : "history" })}>
-      {history ? `← ${roomIdentity(room)}'e dön` : "Geçmiş"}</ActionButton>
+    actions={<>
+      {!history && customersEnabled && <ActionButton variant="secondary" size="sm" disabled={busy}
+        onClick={() => setQuickAction(current => current === "customer" ? null : "customer")}>
+        <UserPlus size={15} aria-hidden="true" />Müşteri Ekle
+      </ActionButton>}
+      {!history && customersEnabled && reservationsEnabled && <ActionButton variant="secondary" size="sm" disabled={busy}
+        onClick={() => setQuickAction(current => current === "reservation" ? null : "reservation")}>
+        <CalendarPlus size={15} aria-hidden="true" />Rezervasyon Ekle
+      </ActionButton>}
+      <ActionButton variant="ghost" disabled={busy} onClick={() => {
+        setQuickAction(null);
+        navigation.updateWorkspaceMode({ entityType: "room", mode: history ? "summary" : "history" });
+      }}>
+        {history ? `← ${roomIdentity(room)}'e dön` : "Geçmiş"}
+      </ActionButton>
       {intent.returnContext?.page === "restaurant" && intent.returnContext.entityId && <ActionButton variant="secondary" disabled={busy || dirty}
         onClick={() => navigation.openWorkspace({ entityType: "table", entityId: intent.returnContext!.entityId!, mode: "account", action: "room-transfer",
           returnContext: { page: "restaurant", view: "floor" } })}>Masa Hesabına Dön</ActionButton>}</>}
     presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()} closeBlocked={blocked} returnFocusRef={navigation.returnFocusRef}
     footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}>
+    {!history && quickAction === "customer" && <QuickCustomerCreator
+      initialOpen
+      showTrigger={false}
+      disabled={busy}
+      onSave={onSaveCustomer}
+      onDirty={value => setDirty("quick-customer", value)}
+      onCreated={customerId => {
+        setQuickCustomerId(customerId);
+        setDirty("quick-customer", false);
+        setQuickAction(null);
+      }}
+      onClose={() => {
+        setDirty("quick-customer", false);
+        setQuickAction(null);
+      }}
+    />}
+    {!history && quickAction === "reservation" && <ManualReservationEditor
+      open
+      embedded
+      customers={data.customers}
+      rooms={data.rooms}
+      initialRoomId={room.id}
+      onClose={() => setQuickAction(null)}
+      onSave={onSaveReservation}
+      onSaveCustomer={onSaveCustomer}
+    />}
     <div ref={surface} className="operation-surface operation-surface--sections" hidden={history} key={draftEpoch}>
       <OperationPanel title="Oda ve Misafir" id="room-stay">
-        <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled} onDirty={value => setDirty("stay", value)} />
+        <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled}
+          quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")} onDirty={value => setDirty("stay", value)} />
         {account.selected?.status === "open" && <RoomAccountDetails key={account.selected.id} folio={account.selected} controller={account} disabled={busy || account.loading} onDirty={value => setDirty("account-details", value)} />}
       </OperationPanel>
       <OperationPanel title={model.active.length ? "Günlük Oda İşlemleri" : "Oda Hazırlığı ve Rezervasyon"} id="room-operations">
