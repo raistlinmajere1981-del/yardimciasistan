@@ -4,21 +4,23 @@ Bu belge ilk gerçek işletme tanıtımından önce uygulanacak kısa ama sert s
 
 ## 1. Otomatik kapı
 
-Repo kökünde önce temel pilot kontrolü çalıştırılır:
+Repo kökünde portable ürün doğrulaması çalıştırılır:
 
 ```bash
-node scripts/pilot-check-v2.mjs
+npm run verify:full
 ```
 
-Bu mod Android SDK, fiziksel telefon ve Playwright tarayıcı kurulumunu zorunlu tutmadan ürün omurgasını tarar. Sonuç ayrıca `artifacts/pilot-check/latest.json` dosyasına yazılır.
+Bu plan build/typecheck prerequisite'lerini tek kez çalıştırır, portable smoke'ları
+de-duplicate eder ve sonucu `artifacts/verify/latest.json` dosyasına yazar.
 
-Daha geniş tur için:
+Birleşme öncesi daha sert kapı için:
 
 ```bash
-node scripts/pilot-check-v2.mjs --full
+npm run verify:pre-main
 ```
 
-`--full` modunda uygun platformda Electron/Xvfb, Android debug build ve Playwright e2e de devreye girer.
+Pre-main, Full Verify kapsamına strict lint/Knip/design/architecture denetimlerini ve
+`git diff --check` kapısını ekler.
 
 ### Otomatik kapı kabul kriteri
 
@@ -26,7 +28,7 @@ node scripts/pilot-check-v2.mjs --full
 - başarısız veya atlanmış temel kontrol olmaması
 - web talebi, otomatik sync, Android cihaz onayı/tokenı, finans, oda hesabı, restoran→oda transferi ve demo-flow testlerinin geçmesi
 
-Bir build ön koşulu başarısız olursa sonraki testlerin ürettiği ikincil hatalar anlamlı olmayacağı için runner onları `skipped` olarak işaretler.
+Bir prerequisite başarısız olursa ona bağımlı kontroller ikincil gürültü üretmemesi için `skipped` olarak işaretlenir.
 
 ---
 

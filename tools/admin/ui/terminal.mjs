@@ -100,6 +100,7 @@ function wrapLine(value, width) {
 function rawSession({ input, output, onKey }) {
   emitKeypressEvents(input);
   const hadRaw = Boolean(input.isRaw);
+  const wasPaused = typeof input.isPaused === "function" ? input.isPaused() : true;
   if (input.isTTY && typeof input.setRawMode === "function") input.setRawMode(true);
   input.resume();
   output.write(ANSI.hideCursor);
@@ -110,6 +111,7 @@ function rawSession({ input, output, onKey }) {
   return () => {
     input.off("keypress", handler);
     if (input.isTTY && typeof input.setRawMode === "function" && !hadRaw) input.setRawMode(false);
+    if (wasPaused && typeof input.pause === "function") input.pause();
     output.write(ANSI.showCursor + ANSI.reset);
   };
 }
@@ -309,6 +311,7 @@ export function createTerminalUI({ input = defaultInput, output = defaultOutput 
     close: () => {
       closed = true;
       if (input.isTTY && typeof input.setRawMode === "function" && input.isRaw) input.setRawMode(false);
+      if (typeof input.pause === "function") input.pause();
       output.write(ANSI.showCursor + ANSI.reset);
     },
   };

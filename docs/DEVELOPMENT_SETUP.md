@@ -143,14 +143,14 @@ Uygulama açılışında SQLite dosyası otomatik oluşturulur. Testlerde gerçe
 
 İlk açılışta güncel `schema.sql` doğrudan uygulanır. Tarihsel veritabanı upgrade zinciri desteklenmez; temiz kurulum gerçek kullanıcı verisi olmadan başlar ve hazır demo işletme/veri yüklenmez.
 
-Linux'ta Electron pencere açılışını sanal ekranla kontrol etmek için:
+Linux'ta desktop renderer ve gerçek Electron/Xvfb açılışını dar olarak kontrol etmek için:
 
 ```bash
-npm run smoke:desktop-renderer
-npm run smoke:desktop:linux
+npm run verify:check -- desktop-renderer
+npm run verify:check -- desktop-xvfb
 ```
 
-`smoke:desktop-renderer` QR menü yönetimi, WhatsApp çalışma alanı, web talebi çekme, kurulum ekranı ve ana panel işlemlerini tarayıcı önizlemesiyle kontrol eder. `smoke:desktop:linux` desktop build sonrası local SQLite menü kaydetme smoke testini ve Electron Xvfb pencere açılışını birlikte çalıştırır.
+`desktop-renderer` QR menü yönetimi, WhatsApp çalışma alanı, web talebi çekme, kurulum ekranı ve ana panel davranışlarını tarayıcı fixture'ı ile doğrular. `desktop-xvfb` ise registry'nin hazırladığı ortak desktop build çıktısını yeniden derlemeden gerçek Electron penceresiyle sınar.
 
 PHP endpoint söz dizimi kontrolü:
 
@@ -369,20 +369,38 @@ npm run smoke:local-demo -- --skip-android
 
 İlk Android build hattı Gradle'a bağlı değildir; kurulu Android SDK içindeki `aapt2`, `d8`, `zipalign` ve `apksigner` araçlarını kullanır. Debug imzası `apps/android-app/.debug/` altında yerel olarak korunur; böylece telefona tekrar kurulumda debug imzası değişmez. Bağlantı kararı için `docs/dev/ANDROID_CONNECTION_PLAN.md` dosyasına bakın.
 
-## Tek Komut Kontrol
+## Doğrulama Komutları
 
-Geniş kontrol:
-
-```bash
-npm run check
-```
-
-Bu komut typecheck, unit test, build ve Playwright e2e testlerini çalıştırır.
-
-Linux üzerinde tüm yerel zinciri kontrol etmek için:
+Günlük hızlı kontrol:
 
 ```bash
-npm run check:linux
+npm run verify:dev
 ```
 
-Bu komut ortam doktoru, PHP lint, yerel laboratuvar smoke testi, web modül QR menü smoke testi, genel kontrol, Android APK build, Android hosting hazırlık smoke testi, desktop renderer smoke testi, desktop menü DB smoke testi ve Electron Xvfb smoke testini birlikte çalıştırır.
+Belirli bir alan üzerinde çalışırken yalnız ilgili domain ve prerequisite'leri çalıştırın:
+
+```bash
+npm run verify:domain -- hospitality
+npm run verify:domain -- android
+npm run verify:domain -- web
+```
+
+Tüm portable ürün kontrolü:
+
+```bash
+npm run verify:full
+```
+
+Merge öncesi tek repository kapısı:
+
+```bash
+npm run verify:pre-main
+```
+
+Release artifact doğrulamaları için:
+
+```bash
+npm run verify:release
+```
+
+Runner build/typecheck prerequisite'lerini tek kez çalıştırır ve aynı smoke farklı kapsamlardan seçilse bile tekrar koşturmaz. `npm run verify:list` mevcut preset/domain/kontrol id'lerini gösterir.

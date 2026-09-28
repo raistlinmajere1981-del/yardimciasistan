@@ -24,38 +24,28 @@ export const TASK_CATEGORIES = {
 const NPM = "npm";
 
 export const TASKS = [
-  // ---------- Kontroller: hızlı ----------
-  { id: "doctor", kind: "task", title: "Ortam kontrolü (doctor)", category: "checks", command: NPM, args: ["run", "doctor"], preflight: null },
-  { id: "typecheck", kind: "task", title: "Typecheck (tüm workspace'ler)", category: "checks", command: NPM, args: ["run", "typecheck"], preflight: "basic" },
-  { id: "typecheck-electron", kind: "task", title: "Typecheck Electron", category: "checks", command: NPM, args: ["run", "typecheck:electron"], preflight: "basic" },
-  { id: "lint", kind: "task", title: "Lint", category: "checks", command: NPM, args: ["run", "lint"], preflight: "basic" },
-  { id: "lint-strict", kind: "task", title: "Lint Strict", category: "checks", command: NPM, args: ["run", "lint:strict"], preflight: "basic" },
-  { id: "lint-php", kind: "task", title: "PHP lint (web modülü)", category: "checks", command: NPM, args: ["run", "lint:php"], preflight: "basic" },
-  { id: "knip-strict", kind: "task", title: "Knip Strict (ölü kod/bağımlılık)", category: "checks", command: NPM, args: ["run", "knip:strict"], preflight: "basic" },
-  { id: "test-all", kind: "task", title: "Birim testleri (tüm workspace'ler)", category: "checks", command: NPM, args: ["test"], preflight: "basic" },
-  { id: "e2e", kind: "task", title: "E2E (Playwright)", category: "checks", command: NPM, args: ["run", "e2e"], preflight: "basic" },
-  { id: "arch-audit", kind: "task", title: "Mimari denetimi", category: "checks", command: NPM, args: ["run", "architecture:audit"], preflight: "basic" },
-  { id: "design-audit-strict", kind: "task", title: "Tasarım sistemi denetimi (strict)", category: "checks", command: NPM, args: ["run", "design:audit:strict"], preflight: "basic" },
+  // ---------- Kontroller ----------
+  { id: "verify-dev", kind: "task", title: "Dev Check", category: "checks", command: NPM, args: ["run", "verify:dev"], preflight: "basic", impact: ["Hızlı geliştirme kapısı; aynı prerequisite iki kez çalışmaz."] },
+  { id: "verify-domain", kind: "task", title: "Domain Check", category: "checks", command: "node", args: ["scripts/verify.mjs", "--domain"], argsPrompt: [{ key: "domain", flag: null, prompt: "Domain (örn. hospitality, android, finance, web, desktop)", required: true }], preflight: "basic", impact: ["Seçilen domain'in kontrollerini ve gerekli prerequisite'leri bir kez çalıştırır."] },
+  { id: "verify-check", kind: "task", title: "Tek kontrol çalıştır", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check"], argsPrompt: [{ key: "check", flag: null, prompt: "Kontrol id (verify:list ile görülebilir)", required: true }], preflight: "basic" },
+  { id: "verify-full", kind: "task", title: "Full Verify", category: "checks", command: NPM, args: ["run", "verify:full"], preflight: "basic", impact: ["Portable ürün testlerini, build/typecheck prerequisite'lerini tekrar etmeden çalıştırır."] },
+  { id: "verify-pre-main", kind: "task", title: "Pre-main", category: "checks", command: NPM, args: ["run", "verify:pre-main"], preflight: "basic", impact: ["Full Verify + strict lint/Knip/design/architecture + git diff kapısı."] },
+  { id: "verify-release", kind: "task", title: "Release Check", category: "checks", command: NPM, args: ["run", "verify:release"], preflight: "release", impact: ["Pre-main kapsamına paketleme ve release artifact doğrulamalarını ekler."] },
+  { id: "verify-list", kind: "task", title: "Kontrol/preset/domain listesini göster", category: "checks", command: NPM, args: ["run", "verify:list"], preflight: null },
+  { id: "verify-plan", kind: "task", title: "Pre-main planını göster", category: "checks", command: NPM, args: ["run", "verify:plan"], preflight: null },
 
-  // ---------- Kontroller: bileşik ----------
-  { id: "pilot-check", kind: "task", title: "Pilot Check", category: "checks", command: NPM, args: ["run", "pilot:check"], preflight: "basic", impact: ["Paketleri derler; kaynak kodu değiştirmez."] },
-  { id: "pilot-check-android", kind: "task", title: "Pilot Check (Android)", category: "checks", command: NPM, args: ["run", "pilot:check:android"], preflight: "android" },
-  { id: "pilot-check-full", kind: "task", title: "Pilot Check (Full)", category: "checks", command: NPM, args: ["run", "pilot:check:full"], preflight: "basic", impact: ["Uzun sürer; paketleri derler."] },
-  { id: "check", kind: "task", title: "Check (typecheck+test+build+e2e)", category: "checks", command: NPM, args: ["run", "check"], preflight: "basic", impact: ["Uzun sürer; paketleri derler."] },
-  { id: "check-linux", kind: "task", title: "Check Linux (tam ürün kontrolü)", category: "checks", command: NPM, args: ["run", "check:linux"], preflight: "basic", impact: ["En uzun kontrol; tüm smoke/build adımlarını çalıştırır."] },
-  { id: "pre-main", kind: "task", title: "Pre-main (merge kapısı)", category: "checks", command: NPM, args: ["run", "pre-main"], preflight: "basic", impact: ["Merge öncesi tam kapı; uzun sürer."] },
-
-  // ---------- Kontroller: temsilci tekil smoke'lar ----------
-  { id: "smoke-local-lab", kind: "task", title: "Smoke: yerel lab (web modülü)", category: "checks", command: NPM, args: ["run", "smoke:local-lab"], preflight: "basic" },
-  { id: "smoke-web-form-api", kind: "task", title: "Smoke: web form API", category: "checks", command: NPM, args: ["run", "smoke:web-form-api"], preflight: "basic" },
-  { id: "smoke-web-module", kind: "task", title: "Smoke: web modülü menü", category: "checks", command: NPM, args: ["run", "smoke:web-module"], preflight: "basic" },
-  { id: "smoke-desktop-clean-startup", kind: "task", title: "Smoke: desktop temiz açılış", category: "checks", command: NPM, args: ["run", "smoke:desktop:linux", "--", "--no-build"], preflight: null, impact: ["Geçici dizin kullanır; gerçek veriye dokunmaz."] },
-  { id: "smoke-diagnostics", kind: "task", title: "Smoke: tanılama sözleşmesi", category: "checks", command: NPM, args: ["run", "smoke:diagnostics"], preflight: "basic" },
-
-  // ---------- Kontrol grupları / presetler ----------
-  { id: "dev-check", kind: "group", title: "Dev Check", category: "checks", steps: ["doctor", "typecheck", "lint"], stopOnError: false },
-  { id: "full-verify", kind: "group", title: "Full Verify", category: "checks", steps: ["lint-strict", "knip-strict", "typecheck", "test-all", "arch-audit", "design-audit-strict"], stopOnError: false },
-  { id: "release-check", kind: "workflow", title: "Release Check (pre-main)", category: "checks", steps: ["pre-main"], stopOnError: true, preflight: "release" },
+  // Dar teşhis kontrolleri de aynı verification registry üzerinden gider.
+  { id: "doctor", kind: "task", title: "Ortam kontrolü (doctor)", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "doctor"], preflight: null },
+  { id: "typecheck", kind: "task", title: "Typecheck (tüm workspace'ler)", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "typecheck"], preflight: "basic" },
+  { id: "typecheck-electron", kind: "task", title: "Typecheck Electron", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "typecheck-electron"], preflight: "basic" },
+  { id: "lint-strict", kind: "task", title: "Lint Strict", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "lint-strict"], preflight: "basic" },
+  { id: "lint-php", kind: "task", title: "PHP lint", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "php-lint"], preflight: "basic" },
+  { id: "knip-strict", kind: "task", title: "Knip Strict", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "knip-strict"], preflight: "basic" },
+  { id: "test-all", kind: "task", title: "Birim testleri", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "unit-tests"], preflight: "basic" },
+  { id: "e2e", kind: "task", title: "E2E (Playwright)", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "e2e"], preflight: "basic" },
+  { id: "arch-audit", kind: "task", title: "Mimari denetimi", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "architecture-audit"], preflight: "basic" },
+  { id: "design-audit-strict", kind: "task", title: "Tasarım sistemi denetimi", category: "checks", command: "node", args: ["scripts/verify.mjs", "--check", "design-audit-strict"], preflight: "basic" },
+  { id: "smoke-diagnostics", kind: "task", title: "Tanılama domain kontrolü", category: "checks", command: "node", args: ["scripts/verify.mjs", "--domain", "diagnostics"], preflight: "basic" },
 
   // ---------- Android ----------
   { id: "android-devices", kind: "task", title: "Bağlı cihazları göster", category: "android", command: "adb", args: ["devices", "-l"], preflight: null },
@@ -82,7 +72,7 @@ export const TASKS = [
   { id: "android-release-flow", kind: "workflow", title: "Release APK üret + yükle", category: "android", steps: ["android-release-apk", "android-install-nobuild"], stopOnError: true, preflight: "android" },
 
   // ---------- Web / Deploy: Yardımcı Asistan (Alwaysdata) ----------
-  { id: "ya-local-check", kind: "group", title: "YA lokal kontrol", category: "web", site: "ya", steps: ["lint-php", "smoke-web-module", "smoke-web-form-api"], stopOnError: false },
+  { id: "ya-local-check", kind: "task", title: "YA lokal kontrol", category: "web", site: "ya", command: "node", args: ["scripts/verify.mjs", "--domain", "web"], preflight: "basic", impact: ["Web domain kontrolleri ve gerekli prerequisite'ler tek plan içinde çalışır."] },
   { id: "ya-pack", kind: "task", title: "YA web paketini hazırla", category: "web", site: "ya", command: NPM, args: ["run", "pack:web-module"], preflight: "basic", impact: ["artifacts/web-module-deploy yeniden üretilir; canlıya dokunmaz."] },
   { id: "ya-prepare-install", kind: "task", title: "YA kurulum paketi hazırla (yeni secret)", category: "web", site: "ya", command: NPM, args: ["run", "prepare:web-install", "--"], argsPrompt: [{ key: "url", flag: "--url", prompt: "Web modül adresi (örn. https://firma.com/yardimci-asistan)", required: true }, { key: "name", flag: "--name", prompt: "İşletme adı (boş bırakılabilir)", required: false }], preflight: "basic", confirm: "Yeni 256-bit sync secret üretilir ve paket hazırlanır.", impact: ["artifacts/web-module-deploy/install-info.txt yazılır (600 izinli).", "Secret yalnızca bu dosyadadır; Git'e eklenmez."] },
   { id: "ya-deploy-dry", kind: "task", title: "YA deploy farkını göster (dry-run)", category: "web", site: "ya", command: NPM, args: ["run", "deploy:web", "--", "--dry-run"], preflight: "deploy-ya", impact: ["Sunucuda değişiklik yapılmaz."] },
@@ -108,6 +98,8 @@ export const TASKS = [
   { id: "landing-deploy", kind: "task", title: "Landing deploy (www kökü)", category: "web", site: "landing", command: NPM, args: ["run", "deploy:landing", "--", "--yes"], preflight: "basic", confirm: "Canlı landing (www kökü) güncellenir; web modülüne dokunmaz.", impact: ["www/yardimci-asistan/** alanına yazılmaz.", "Backup + atomic deploy + HTTP smoke yapılır."] },
 
   // ---------- Build / Release ----------
+  { id: "product-version-show", kind: "task", title: "Ürün sürümünü göster", category: "build", command: "node", args: ["scripts/product-version.mjs", "show"], preflight: "basic" },
+  { id: "product-version-set", kind: "task", title: "Ürün sürümünü güncelle (Desktop + Android)", category: "build", command: "node", args: ["scripts/product-version.mjs", "set"], argsPrompt: [{ key: "version", flag: null, prompt: "Yeni ürün sürümü (x.y.z, örn. 0.1.8)", required: true }], preflight: "basic", confirm: "Desktop ve Android aynı ürün sürümüne geçirilir; Android versionCode otomatik 1 artırılır.", impact: ["product-version.json tek sürüm kaynağıdır.", "Desktop/Android package metadata ve package-lock otomatik senkronlanır.", "Binary üretmez; yalnız sürüm metadata'sını günceller."] },
   { id: "build-packages", kind: "task", title: "Paketleri derle", category: "build", command: NPM, args: ["run", "build:packages"], preflight: "basic" },
   { id: "build-apps", kind: "task", title: "Uygulamaları derle", category: "build", command: NPM, args: ["run", "build:apps"], preflight: "basic" },
   { id: "build-all", kind: "task", title: "Tümünü derle", category: "build", command: NPM, args: ["run", "build"], preflight: "basic" },

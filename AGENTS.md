@@ -133,37 +133,64 @@ Rules:
 
 ## Tests and checks
 
-Use the narrowest useful checks during a stage, then full checkpoints at meaningful milestones.
+All repository-level verification orchestration is owned by:
 
-Important command nesting:
-- `npm run check:linux` already runs `npm run check`.
-- Do not run `npm run check` separately when running `check:linux`.
-- Inside `check:linux`, `npm run check` is the shared build barrier; dependent smoke/package steps after it should reuse those outputs through `:no-build` variants instead of rebuilding packages/apps.
-- Standalone smoke/package commands should remain self-contained and may keep their own build step.
-- `pilot:check` preflight builds packages before web-module packaging, so its packaging step should reuse the existing widget build.
-- Local checks must use the installed Electron runtime directly; do not invoke Electron through `npx` or let `electron-builder` redownload the Electron distribution when `node_modules/electron/dist` is available.
-- Local test/dev CLIs such as Vite must use repository-installed binaries directly; do not use `npx` paths that can implicitly download missing packages.
-- Do not additionally run `npm run quality:strict` when the unique strict gates below are run individually.
+- `scripts/verification-registry.mjs` — one canonical definition per leaf check
+- `scripts/verify.mjs` — prerequisite expansion, de-duplication, execution and JSON reporting
 
-Milestone gate:
+Do not create a second aggregate runner or compose verification presets inside another
+npm script. A prerequisite such as package build, desktop build or typecheck must be
+represented once in the registry and referenced through `requires`.
+
+Primary commands:
 
 ```bash
-npm run pre-main
+npm run verify:dev
+npm run verify:domain -- hospitality
+npm run verify:full
+npm run verify:pre-main
+npm run verify:release
 ```
 
-`pre-main` is the repository-level merge gate. It composes the Linux product checks,
-strict lint/Knip/design/architecture audits, the full pilot gate, current platform/domain
-regressions, Android action regressions, and `git diff --check`.
+Use `npm run verify:list` to see check/domain ids and
+`npm run verify:check -- <id>` for narrow diagnosis. The runner de-duplicates a
+check by id, so Full/Pre-main/Release must not re-run the same smoke through another
+composite package.
 
-Run individual gates while diagnosing a failure; do not manually maintain a second
-merge checklist beside `pre-main`.
+Rules:
+- Keep individual smoke files executable on their own when practical, but do not wrap
+  them in aggregate build+smoke chains for repository gates.
+- Shared/package/desktop build barriers belong in the verification registry; aggregate
+  runs reuse them once.
+- Device-required and live-service checks must be marked manual in the registry rather
+  than silently entering portable Full Verify.
+- Every new `scripts/smoke-*` file must be registered or explicitly classified as a
+  helper; `scripts/test-verification-registry.mjs` enforces this.
+- Local checks must use repository-installed Electron/Vite binaries; do not use `npx`
+  paths that can download missing packages.
+- Run the narrowest domain/check while iterating. Do not manually reproduce a second
+  merge checklist.
+
+Merge gate:
+
+```bash
+npm run verify:pre-main
+```
+
+Release artifact gate:
+
+```bash
+npm run verify:release
+```
 
 For Electron refactors, normally include:
-- `npm run typecheck:electron`
-- targeted smoke tests for the touched domain
+- `npm run verify:check -- typecheck-electron`
+- `npm run verify:domain -- <touched-domain>`
 - `git diff --check`
 
-Prefer behavior/contract tests over tests that parse a specific function body or source-file location. If a source-structure assertion is unavoidable, keep it minimal and update it when ownership moves.
+Prefer behavior/contract tests over tests that parse a specific function body or
+source-file location. If a source-structure assertion is unavoidable, keep it minimal
+and update it when ownership moves.
 
 ## Refactor discipline
 

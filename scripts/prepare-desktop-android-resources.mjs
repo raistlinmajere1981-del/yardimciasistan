@@ -14,7 +14,7 @@ if (!["linux", "win32"].includes(targetPlatform)) {
   fail(`Desteklenmeyen Android Platform-Tools hedefi: ${targetPlatform}`);
 }
 
-const version = readVersionProperties(join(repoRoot, "apps", "android-app", "version.properties"));
+const version = readProductVersion(join(repoRoot, "product-version.json"));
 const releaseApk = join(
   repoRoot,
   "apps",
@@ -161,15 +161,15 @@ function resolvePlatformToolsSource(platform) {
     .find((candidate) => existsSync(candidate)) ?? "";
 }
 
-function readVersionProperties(path) {
+function readProductVersion(path) {
   if (!existsSync(path)) {
-    fail(`Android sürüm dosyası bulunamadı: ${path}`);
+    fail(`Ürün sürüm dosyası bulunamadı: ${path}`);
   }
-  const text = readFileSync(path, "utf8");
-  const versionName = text.match(/^VERSION_NAME=(.+)$/m)?.[1]?.trim() ?? "";
-  const versionCode = Number(text.match(/^VERSION_CODE=(\d+)$/m)?.[1] ?? 0);
-  if (!versionName || !Number.isInteger(versionCode) || versionCode <= 0) {
-    fail("Android version.properties geçersiz.");
+  const value = JSON.parse(readFileSync(path, "utf8"));
+  const versionName = String(value.version ?? "").trim();
+  const versionCode = Number(value.androidVersionCode ?? 0);
+  if (!/^\d+\.\d+\.\d+$/.test(versionName) || !Number.isInteger(versionCode) || versionCode <= 0) {
+    fail("product-version.json geçersiz.");
   }
   return { versionName, versionCode };
 }

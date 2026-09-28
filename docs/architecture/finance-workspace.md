@@ -117,19 +117,8 @@ Stage closure passed locally:
 ```text
 npm run typecheck
 npm run smoke:finance-workspace
-node scripts/smoke-finance-service.mjs
-node scripts/smoke-finance-db.mjs
-node scripts/smoke-room-folio-service.mjs
-node scripts/smoke-stage2c-core-workspaces.mjs
-
-npm run smoke:desktop-renderer
-npm run lint:strict
-npm run knip:strict
-npm run architecture:audit
-npm run design:audit:strict
-npm run pilot:check
-git diff --check
-npm run check:linux
+npm run verify:domain -- finance
+npm run verify:pre-main
 ```
 
 Final Astra review: `STAGE8D_FINAL=pass`.

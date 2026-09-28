@@ -8,10 +8,10 @@
   "scripts": {
     "dev": "node scripts/start-dev.mjs",
     "build": "tsc -p tsconfig.json --noEmit && vite build --config vite.renderer.config.ts && tsc -p tsconfig.electron.json",
-    "pack:dir": "node ../../scripts/prepare-desktop-android-resources.mjs --allow-debug --allow-missing && electron-builder --dir --config electron-builder.linux.yml --publish never",
-    "pack:linux": "node ../../scripts/prepare-desktop-android-resources.mjs --platform linux --allow-debug --allow-missing && electron-builder --linux AppImage --config electron-builder.linux.yml --publish never",
-    "pack:win": "node ../../scripts/prepare-desktop-android-resources.mjs --platform win32 --allow-debug --allow-missing && electron-builder --win nsis --config electron-builder.yml --publish never",
-    "pack:win32": "node ../../scripts/prepare-desktop-android-resources.mjs --platform win32 --allow-debug --allow-missing && electron-builder --win nsis --ia32 --config electron-builder.win32.yml --publish never",
+    "pack:dir": "node ../../scripts/product-version.mjs check && node ../../scripts/prepare-desktop-android-resources.mjs --allow-debug --allow-missing && electron-builder --dir --config electron-builder.linux.yml --publish never",
+    "pack:linux": "node ../../scripts/product-version.mjs check && node ../../scripts/prepare-desktop-android-resources.mjs --platform linux --allow-debug --allow-missing && electron-builder --linux AppImage --config electron-builder.linux.yml --publish never",
+    "pack:win": "node ../../scripts/product-version.mjs check && node ../../scripts/prepare-desktop-android-resources.mjs --platform win32 --allow-debug --allow-missing && electron-builder --win nsis --config electron-builder.yml --publish never",
+    "pack:win32": "node ../../scripts/product-version.mjs check && node ../../scripts/prepare-desktop-android-resources.mjs --platform win32 --allow-debug --allow-missing && electron-builder --win nsis --ia32 --config electron-builder.win32.yml --publish never",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "typecheck:strict": "tsc -p tsconfig.json --noEmit --noUnusedLocals && tsc -p tsconfig.electron.json --noEmit --noUnusedLocals"
   },

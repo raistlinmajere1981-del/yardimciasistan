@@ -112,7 +112,7 @@ The browser fixture verifies:
 - unmount/remount does not reset selected date
 - unmount/remount does not reset day/week mode
 
-The smoke is included in `smoke:desktop-renderer` and `pilot:check`.
+The smoke is registered as the `calendar-workspace` leaf check and is included in Full Verify.
 
 The existing static `smoke-calendar-workspace` was also extended to guard the router-owned Calendar controller contract.
 
@@ -136,21 +136,11 @@ This is a page-context ownership migration, not a Calendar domain redesign.
 Stage closure passed locally:
 
 ```text
-npm run typecheck
-npm run typecheck:electron
-npm run smoke:calendar-workspace
-node scripts/smoke-calendar-workspace.mjs
-npm run smoke:desktop-renderer
+npm run verify:check -- calendar-workspace
+npm run verify:domain -- desktop
+npm run verify:pre-main
 
-npm run lint:strict
-npm run knip:strict
-npm run architecture:audit
-npm run design:audit:strict
-npm run pilot:check
-
-git diff --check
 git status --short --branch
-npm run check:linux
 ```
 
 No high-risk persistence, transaction or concurrency boundary was introduced, so Stage 8G did not require an Astra architecture checkpoint.
