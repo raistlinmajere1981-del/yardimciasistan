@@ -19,9 +19,9 @@ export async function captureOperationWorkspace(page, scene) {
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width + 1);
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(height + 1);
     expect(await workspace.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
-    expect(await page.locator('.operation-surface').evaluate(element => element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+    expect(await workspace.locator('.operation-surface').evaluate(element => element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
-    expect(await page.locator('.operation-surface').evaluate(element => [...element.querySelectorAll('button, input:not([type="checkbox"]), select, summary')]
+    expect(await workspace.locator('.operation-surface').evaluate(element => [...element.querySelectorAll('button, input:not([type="checkbox"]), select, summary')]
       .filter(control => control.getClientRects().length).every(control => control.getBoundingClientRect().height >= 43))).toBe(true);
     await page.screenshot({ path: `${directory}/${scene}-${width}x${height}-${scheme}.png` });
   }
