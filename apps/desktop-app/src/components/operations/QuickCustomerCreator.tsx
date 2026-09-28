@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, UserPlus, X } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
@@ -41,6 +41,12 @@ export function QuickCustomerCreator({
   const [phone, setPhone] = useState("");
   const [state, setState] = useState<QuickCustomerState>("idle");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (initialOpen) onDirty?.(true);
+    // initialOpen is a mount-time mode used by workspace quick actions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function closeEditor() {
     if (state === "loading") return;
