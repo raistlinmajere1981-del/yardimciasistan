@@ -337,10 +337,11 @@ if (!hasSingleInstanceLock) {
     session.fromPartition(WHATSAPP_WEB_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
     configureDesktopMediaPermissions();
 
+    const runtimeDataRoot = resolveRuntimeDataRoot();
     desktopDatabase = new DesktopDatabase({
       appPath: app.getAppPath(),
-      userDataPath: resolveRuntimeDataRoot(),
-      backupPath: resolveProjectBackupPath()
+      userDataPath: runtimeDataRoot,
+      backupPath: resolveProjectBackupPath(runtimeDataRoot)
     });
     desktopDatabase.initialize();
     appLockService = new DesktopAppLockService({
