@@ -186,7 +186,7 @@ try {
   await account.getByRole('button', { name: 'Ödemeyi Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.fixtureState().folios[0].remainingMinor)).toBe(0);
   await operations.getByRole('button', { name: 'Misafir Çıkışı', exact: true }).click();
-  const checkoutConfirm = page.getByRole('alertdialog', { name: 'Misafir çıkışı', exact: true });
+  const checkoutConfirm = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
   await expect(checkoutConfirm).toContainText('Kalan hesap');
   await expect(checkoutConfirm).toContainText('hesap kapanır');
   await expect(checkoutConfirm.getByRole('group', { name: 'Çıkış ödeme yöntemi', exact: true })).toHaveCount(0);

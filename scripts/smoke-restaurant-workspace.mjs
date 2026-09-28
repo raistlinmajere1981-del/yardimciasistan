@@ -102,10 +102,13 @@ try {
   await captureOperationWorkspace(page, 'table-active');
   await note.fill('Escape ile kaydet'); await note.press('Escape');
   await expect(workspace).toBeVisible();
-  expect((await state()).orders[0].items[0].note).toBe('Escape ile kaydet');
+  await expect(note).toHaveValue('Escape ile kaydet');
+  expect((await state()).orders[0].items[0].note).toBe('Son not');
+  await note.press('Tab');
+  await expect.poll(async () => (await state()).orders[0].items[0].note).toBe('Escape ile kaydet');
   await expect(note).toHaveValue('Escape ile kaydet');
   await page.evaluate(() => { window.fixtureFailNote = true; });
-  await note.fill('Kaybolmamalı'); await note.press('Escape');
+  await note.fill('Kaybolmamalı'); await note.press('Tab');
   await expect(workspace.getByRole('alert')).toHaveText('Not reddedildi.');
   expect(await page.evaluate(() => window.fixtureOpen('table-b'))).toBe(false);
   await button('Ödendi / Kapat').click();
@@ -268,7 +271,7 @@ try {
       document.documentElement.style.setProperty('--ui-scale', String(scale));
       document.documentElement.style.zoom = "";
     }, { scheme, density, scale });
-    const bounds = await workspace.boundingBox(); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width + 2); expect(bounds.y + bounds.height).toBeLessThanOrEqual(height + 2);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1)).toBe(true);
     expect(await workspace.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 
   }

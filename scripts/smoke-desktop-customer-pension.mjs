@@ -199,6 +199,12 @@ try {
     await expect(dialog).toHaveCount(0);
     expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
   };
+  const closeHospitalityWorkspace = async () => {
+    const workspace = page.locator('.workspace-page-frame');
+    await expect(workspace).toBeVisible();
+    await workspace.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
+    await expect(workspace).toHaveCount(0);
+  };
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[600,800]]) {
     await page.setViewportSize({ width, height });
     await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
@@ -245,8 +251,12 @@ try {
     await customerWorkspace.getByRole('form', { name: 'Tahsilat', exact: true }).getByRole('button', { name: 'Vazgeç', exact: true }).click();
     await customerWorkspace.getByRole('tab', { name: 'Özet', exact: true }).click();
     await customerWorkspace.getByRole('button', { name: 'Konaklama Başlat', exact: true }).click();
+    const roomAssignmentWorkspace = page.locator('.workspace-page-frame');
+    await expect(roomAssignmentWorkspace).toBeVisible();
     await capture('room-assignment');
-    await closeDialog();
+    await roomAssignmentWorkspace.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
+    await expect(roomAssignmentWorkspace).toHaveCount(0);
+    await expect(page.getByLabel('Ara', { exact: true })).toBeVisible();
     await page.getByLabel('Ara', { exact: true }).fill('no-match-stage2a');
     await expect(page.getByText('Müşteri bulunamadı.', { exact: true })).toBeVisible();
     await capture('customers-empty');
@@ -279,19 +289,25 @@ try {
     await expect(page.getByRole('article').filter({ has: unavailableRoom })).toContainText('Hizmet dışı');
     await expect(page.getByLabel('Oda yönetimi', { exact: true }).getByRole('combobox')).toHaveCount(0);
     await page.getByLabel('Oda yönetimi', { exact: true }).getByRole('button', { name: /odasını aç$/ }).first().click();
+    const roomWorkspace = page.locator('.workspace-page-frame');
+    await expect(roomWorkspace).toBeVisible();
     await capture('room-workspace');
-    await expect(page.getByRole('dialog').getByRole('region', { name: 'Misafir Hesabı', exact: true })).toBeVisible();
+    await expect(roomWorkspace.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toBeVisible();
     await capture('folio-account');
-    await expect(page.getByRole('dialog').getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
+    await expect(roomWorkspace.getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
     await capture('folio-payment');
-    await page.getByRole('dialog').getByRole('button', { name: 'Misafir Çıkışı', exact: true }).first().click();
-    const checkoutConfirmation = page.getByRole('alertdialog', { name: 'Misafir çıkışı', exact: true });
+    const checkoutButton = roomWorkspace.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true })
+      .getByRole('button', { name: 'Misafir Çıkışı', exact: true });
+    await checkoutButton.scrollIntoViewIfNeeded();
+    await checkoutButton.click();
+    const checkoutConfirmation = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
     await expect(checkoutConfirmation).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(1);
     await expect(checkoutConfirmation).toContainText('Çıkış tamamlanır');
     await capture('checkout-confirmation');
     await checkoutConfirmation.getByRole('button', { name: 'Vazgeç', exact: true }).click();
-    await closeDialog();
+    await expect(checkoutConfirmation).toHaveCount(0);
+    await closeHospitalityWorkspace();
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
     await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
     await expect(page.getByRole('tab', { name: 'İşletme Düzeni', exact: true })).toHaveAttribute('aria-selected', 'true');
