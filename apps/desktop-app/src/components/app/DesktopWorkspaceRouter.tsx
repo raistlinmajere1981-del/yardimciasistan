@@ -357,8 +357,6 @@ export function DesktopWorkspaceRouter({
           setupData={setupData}
           automaticSyncStatus={automaticSyncStatus}
           features={runtimeFeatures}
-          aiEnabled={aiEnabled}
-          customersEnabled={customersEnabled}
           requestsEnabled={requestsEnabled}
           tasksEnabled={tasksEnabled}
           calendarEnabled={runtimeHasCapability(businessCapabilities, C.CALENDAR)}
@@ -430,8 +428,7 @@ export function DesktopWorkspaceRouter({
               stays={surfaceData.customerRoomStays}
               aiEnabled={aiEnabled}
               onSave={handleSaveCustomer}
-              onAnalyzeIdentity={handleAnalyzeIdentityImage}
-            />
+                />
           )}
           messages={(
             <CustomerMessagesWorkspace
@@ -484,8 +481,7 @@ export function DesktopWorkspaceRouter({
               rooms={surfaceData.rooms}
               customers={surfaceData.customers}
               whatsappEnabled={customerMessagingEnabled}
-              onSaveCustomer={handleSaveCustomer}
-              onSaveManual={handleSaveManualReservation}
+                  onSaveManual={handleSaveManualReservation}
               onUpdateStatus={handleUpdateReservationStatus}
               onOpenWhatsApp={openReservationWhatsApp}
             />
@@ -518,10 +514,8 @@ export function DesktopWorkspaceRouter({
           onUpdateTableStatus={handleUpdateTableStatus}
           onSaveCustomer={handleSaveCustomer}
           onAnalyzeIdentity={handleAnalyzeIdentityImage}
-          onSaveReservation={handleSaveManualRestaurantReservation}
           ordersEnabled={foodOrdersEnabled}
           menuEnabled={foodMenuEnabled}
-          roomFolioTransferEnabled={foodOrdersEnabled && accommodationFolioEnabled}
           tasksEnabled={tasksEnabled}
           onDashboardDataChanged={setDashboardData}
           reservations={foodReservationsEnabled ? (
