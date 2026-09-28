@@ -1,13 +1,15 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../electron/database";
 import { OperationsBoardLayout } from "../components/operations/OperationsBoardLayout";
 import { getTableStatusAction } from "../components/restaurant/table-presentation";
+import type { useRestaurantPageController } from "../components/restaurant/restaurant-page-state";
 import { TableResourceCard } from "../components/restaurant/TableResourceCard";
 import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
 import { ChoiceChips } from "../components/ui/ChoiceChips";
 import { ActionButton } from "../components/ui/ActionButton";
 
 interface RestaurantPageProps {
+  controller: ReturnType<typeof useRestaurantPageController>;
   data: DesktopDashboardData;
   reservationsEnabled: boolean;
   ordersEnabled: boolean;
@@ -20,6 +22,7 @@ interface RestaurantPageProps {
 }
 
 export function RestaurantPage({
+  controller,
   data,
   reservationsEnabled,
   ordersEnabled,
@@ -30,8 +33,10 @@ export function RestaurantPage({
   onDashboardDataChanged,
   onUpdateTableStatus
 }: RestaurantPageProps) {
-  const [group, setGroup] = useState("all");
-  const [status, setStatus] = useState("all");
+  const { filters, setFilters } = controller;
+  const { group, status } = filters;
+  const setGroup = (value: string) => setFilters((current) => ({ ...current, group: value }));
+  const setStatus = (value: string) => setFilters((current) => ({ ...current, status: value }));
   const groups = [...new Set(data.tables.map((table) => table.area.trim() || "Genel"))];
   const summaries = new Map(data.tableOperations?.map(item => [item.tableId, item]));
   const groupTables = data.tables.filter(table => group === "all" || (table.area.trim() || "Genel") === group);
