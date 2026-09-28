@@ -23,18 +23,18 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const entryDirty = useRef(false);
   function markEntry(value: boolean) { entryDirty.current = value; onDirty(value); }
   const { room, state, active, reservations } = model;
-  if (!room || !state) return null;
-  const eligible = reservations.filter(item => item.reservationType === "room" && item.status === "approved"
-    && (!item.roomIds.length || item.roomIds.includes(room.id)) && !model.stays.some(stay => stay.reservationId === item.id && stay.status !== "cancelled"));
+  const eligible = room ? reservations.filter(item => item.reservationType === "room" && item.status === "approved"
+    && (!item.roomIds.length || item.roomIds.includes(room.id)) && !model.stays.some(stay => stay.reservationId === item.id && stay.status !== "cancelled")) : [];
   const selected = eligible.find(item => item.id === reservationId);
   const primary = draft.customerId || selected?.customerId || "";
   const guestIds = [...new Set([primary, ...additional].filter(Boolean))];
   const allActive = data.roomOperations?.flatMap(item => item.stays) ?? data.customerRoomStays;
   const unavailable = allActive.flatMap(stay => (stay.guests ?? []).filter(guest => ["planned", "checked_in"].includes(guest.status)).map(guest => guest.customerId));
-  const canEnter = model.canCreate && primary && guestIds.length > 0 && !guestIds.some(id => unavailable.includes(id))
-    && (room.capacity <= 0 || guestIds.length <= room.capacity);
+  const canEnter = Boolean(room) && model.canCreate && primary && guestIds.length > 0 && !guestIds.some(id => unavailable.includes(id))
+    && (!room || room.capacity <= 0 || guestIds.length <= room.capacity);
 
   useEffect(() => {
+    if (!room || !state) return;
     const customerId = quickCustomerId?.trim();
     if (!customerId || quickCustomerRequest.current === customerId) return;
     if (active.length > 1) {
@@ -64,7 +64,9 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     }
     markEntry(true);
     onQuickCustomerHandled?.();
-  }, [active, additional, onQuickCustomerHandled, operations, primary, quickCustomerId]);
+  }, [active, additional, onQuickCustomerHandled, operations, primary, quickCustomerId, room, state]);
+
+  if (!room || !state) return null;
 
   async function enter() {
     if (!canEnter || !room) return;
