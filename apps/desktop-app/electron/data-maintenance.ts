@@ -8,7 +8,6 @@ import {
   DESKTOP_DATABASE_FILE_NAME,
   resolveAssetsPath,
   resolveBackupRoot,
-  resolveDataRoot,
   resolveDatabasePath,
   resolveMaintenancePath,
   resolvePendingMaintenanceMarkerPath,
@@ -102,16 +101,11 @@ const BACKUP_MANIFEST_FILE = "backup.json";
 const QR_IMAGE_DIRECTORY = "qr-menu-images";
 const ASSET_DIRECTORY = "assets";
 
-export function resolveProjectBackupPath(dataRoot?: string) {
-  const resolvedDataRoot = dataRoot ?? resolveDataRoot({
-    isPackaged: app.isPackaged,
-    appPath: app.getAppPath(),
-    defaultUserDataPath: app.getPath("userData")
-  });
+export function resolveProjectBackupPath(dataRoot: string) {
   return resolveBackupRoot({
     isPackaged: app.isPackaged,
     appPath: app.getAppPath(),
-    dataRoot: resolvedDataRoot
+    dataRoot
   });
 }
 
