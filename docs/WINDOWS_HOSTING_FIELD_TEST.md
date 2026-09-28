@@ -13,10 +13,11 @@ Bu test sırasında güvenlik anahtarını veya API anahtarlarını sohbet ekran
 ## 1. Kurulum ve İlk Açılış
 
 - Windows installer ile uygulamayı kurun.
-- Uygulamanın normal kullanıcı yetkisiyle açıldığını doğrulayın.
+- Uygulamanın normal kullanıcı yetkisiyle açıldığını doğrulayın. Kurulum Program Files altında olsa bile uygulama yönetici olarak çalışmayı gerektirmemelidir.
 - Firma adı ve kullanılacak modüllerin doğru göründüğünü kontrol edin.
 - Uygulamayı kapatıp yeniden açın; ayarların ve yerel kayıtların korunduğunu doğrulayın.
 - `Ayarlar → Gelişmiş Ayarlar → Bu Bilgisayar` bölümünde yerel kayıt dosyası ve yedek klasörünün oluştuğunu kontrol edin.
+- Veritabanı, log, asset ve `backups` klasörlerinin uygulama EXE'sinin yanında değil kullanıcı veri alanında bulunduğunu doğrulayın. Program Files içindeki kurulum klasörü runtime tarafından yazılabilir veri alanı olarak kullanılmamalıdır.
 
 ## 2. Web Modülü Bağlantısı
 
