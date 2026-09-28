@@ -56,44 +56,5 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci
 
-      - name: Ortak paketleri derle
-        run: npm run build:packages
-
-      - name: Senkron çekirdek testleri
-        run: npm test -w @yardimci-asistan/sync-core
-
-      - name: Hosting Android sözleşme smoke
-        run: node scripts/smoke-android-hosting-contract.mjs
-
-      - name: Web modülü PHP lint
-        run: node scripts/php-lint.mjs
-
-      - name: Android cihaz onay sınırı smoke
-        run: node scripts/smoke-android-device-approval-hosting.mjs
-
-      - name: Android cihaz token güvenliği smoke
-        run: node scripts/smoke-android-device-token.mjs
-
-      - name: Release APK ortak anahtar gömmez smoke
-        run: node scripts/smoke-android-release-connection.mjs
-
-      - name: Masaüstü veri katmanını derle
-        run: npm run build -w @yardimci-asistan/desktop-app
-
-      - name: Android rezervasyon veri akışı smoke
-        run: node scripts/smoke-android-reservation-actions.mjs
-
-      - name: Android günlük iş veri akışı smoke
-        run: node scripts/smoke-android-daily-task-actions.mjs
-
-      - name: Android mobil Kasa veri akışı smoke
-        run: node scripts/smoke-android-finance-actions.mjs
-
-      - name: Android oda hesabı veri akışı smoke
-        run: node scripts/smoke-android-room-folio-actions.mjs
-
-      - name: Hosting otomatik senkron smoke
-        run: node scripts/smoke-automatic-sync.mjs
-
-      - name: Android birim testleri ve debug APK
-        run: npm run smoke:android:build
+      - name: Android domain doğrulaması
+        run: npm run verify:domain -- android
