@@ -118,12 +118,13 @@
     "clean:artifacts:dry": "node scripts/clean-artifacts.mjs --dry-run",
     "clean:artifacts:all": "node scripts/clean-artifacts.mjs --all",
     "smoke:pre-main:extras": "npm run smoke:settings-platform && npm run smoke:business-layout && npm run smoke:hospitality-domain && npm run smoke:pension-workspace && npm run smoke:restaurant-workspace && npm run smoke:operations-ui && npm run smoke:operations-projections && npm run smoke:table-customer && npm run smoke:diagnostics && npm run smoke:workspace-platform && node scripts/smoke-android-reservation-actions.mjs && node scripts/smoke-android-daily-task-actions.mjs && node scripts/smoke-android-finance-actions.mjs && node scripts/smoke-android-room-folio-actions.mjs",
-    "pre-main": "npm run version:check && npm run check:linux && npm run lint:strict && npm run knip:strict && npm run design:audit:strict && npm run architecture:audit && npm run pilot:check:full && npm run smoke:pre-main:extras && git diff --check",
+    "pre-main": "npm run test:product-version && npm run version:check && npm run check:linux && npm run lint:strict && npm run knip:strict && npm run design:audit:strict && npm run architecture:audit && npm run pilot:check:full && npm run smoke:pre-main:extras && git diff --check",
     "version:show": "node scripts/product-version.mjs show",
     "version:check": "node scripts/product-version.mjs check",
     "version:sync": "node scripts/product-version.mjs sync",
     "version:set": "node scripts/product-version.mjs set",
-    "version:bump": "node scripts/product-version.mjs bump"
+    "version:bump": "node scripts/product-version.mjs bump",
+    "test:product-version": "node --test scripts/test-product-version.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",
