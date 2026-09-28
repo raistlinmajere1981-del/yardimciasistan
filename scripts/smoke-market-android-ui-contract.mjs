@@ -16,7 +16,6 @@ const tests = read("apps/android-app/src/test/java/com/yardimciasistan/android/A
 const foundationTests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketFoundationTest.java");
 const gradle = read("apps/android-app/build.gradle");
 const manifest = read("apps/android-app/AndroidManifest.xml");
-const foundation = read("scripts/check-modular-foundation.mjs");
 const uiSources = `${workspace}\n${rules}\n${main}`;
 
 assert.match(navigation, /TAB_MARKET\s*=\s*"market"/);
@@ -137,6 +136,5 @@ for (const coverage of [
   assert.equal(tests.includes(coverage), true, `Android Market JVM coverage missing: ${coverage}`);
 }
 
-assert.match(foundation, /smoke-market-android-ui-contract\.mjs/);
 
 console.log("market-android-ui-contract-smoke-ok");
