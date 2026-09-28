@@ -52,7 +52,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   const blocked = useWorkspaceCloseGuard({ busy: controller.busy, dirty: controller.dirty, scope: { entityType: "table", entityId: intent.entityId } });
   const table = data.tables.find(item => item.id === intent.entityId);
   const order = controller.active;
-  useEffect(() => { if (returnRequested && !blocked) navigation.closeWorkspace(); }, [returnRequested, blocked, navigation]);
+  useEffect(() => { if (returnRequested && !blocked) navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); }, [returnRequested, blocked, navigation]);
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useLayoutEffect(() => {
     if (history) return;
@@ -73,7 +73,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   }, [history, ordersEnabled, data.revision]);
   async function requestReturn() {
     if (controller.busy) return;
-    if (controller.loading || !controller.loaded) { navigation.closeWorkspace(); return; }
+    if (controller.loading || !controller.loaded) { navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); return; }
     if (await controller.run(async () => true)) setReturnRequested(true);
   }
   async function closeTableOrder(status: "paid" | "cancelled") {
@@ -106,7 +106,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       return true;
     });
   }
-  if (!table) return <WorkspacePageFrame title="Masa kullanılamıyor" onClose={() => navigation.closeWorkspace()}><p>Masa kaydı bulunamadı.</p></WorkspacePageFrame>;
+  if (!table) return <WorkspacePageFrame title="Masa kullanılamıyor" onClose={() => navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId })}><p>Masa kaydı bulunamadı.</p></WorkspacePageFrame>;
   const cardModel = getTableCardModel(table, data.tableOperations?.find(item => item.tableId === table.id),
     { ordersEnabled, menuEnabled, reservationsEnabled }, new Date().toLocaleDateString("sv-SE"));
   const canStart = cardModel.quickAction?.kind === "start";
