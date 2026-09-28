@@ -16,6 +16,19 @@
 }
 .modal-surface::backdrop { background: var(--color-backdrop); }
 .workspace-frame[open] { display: flex; flex-direction: column; }
+.workspace-page-frame {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-panel);
+}
 .workspace-frame--centered {
   width: min(var(--dialog-width-lg), calc(100vw / var(--ui-scale) - var(--space-4)));
   height: calc(100dvh / var(--ui-scale) - var(--space-10));
