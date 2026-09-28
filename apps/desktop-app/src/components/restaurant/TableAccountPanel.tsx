@@ -10,9 +10,10 @@ import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, formatTableStatus, getTableStatusAction } from "./table-presentation";
 
 export function TableAccountPanel({ table, data, controller, disabled, customersEnabled, reservationsEnabled, ordersEnabled,
-  roomFolioTransferEnabled, duration, onCloseOrder, onTransfer, onUpdateTableStatus }: {
+  roomFolioTransferEnabled, duration, quickCustomerId, onCloseOrder, onTransfer, onUpdateTableStatus }: {
   table: DesktopDashboardData["tables"][number]; data: DesktopDashboardData; controller: ReturnType<typeof useTableOrderController>;
   disabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean; ordersEnabled: boolean; roomFolioTransferEnabled: boolean; duration: number;
+  quickCustomerId?: string;
   onCloseOrder: (status: "paid" | "cancelled") => void; onTransfer: (folioId: string) => void;
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
 }) {
@@ -27,6 +28,9 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
       returnContext: { page: "restaurant", view: "floor", entityId: table.id } });
   }, [entryRequested, controller.busy, controller.dirty, entryRoomId, table.currentCustomerId, table.id, navigation]);
   const [customerDraft, setCustomerDraft] = useState<string | null>(null);
+  useEffect(() => {
+    if (quickCustomerId) setCustomerDraft(quickCustomerId);
+  }, [quickCustomerId]);
   const order = controller.active;
   const relatedReservations = reservationsEnabled ? data.reservations.filter(item => item.tableIds.includes(table.id)
     && !["rejected", "cancelled", "completed"].includes(item.status)) : [];
