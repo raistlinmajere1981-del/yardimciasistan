@@ -6,8 +6,8 @@
     "build": "npm run debug",
     "test": "node ../../scripts/run-android-gradle.mjs testDebugUnitTest",
     "debug": "node ../../scripts/run-android-gradle.mjs assembleDebug",
-    "release-apk": "node ../../scripts/run-android-gradle.mjs assembleRelease",
-    "release-aab": "node ../../scripts/run-android-gradle.mjs bundleRelease",
+    "release-apk": "node ../../scripts/product-version.mjs check && node ../../scripts/run-android-gradle.mjs assembleRelease",
+    "release-aab": "node ../../scripts/product-version.mjs check && node ../../scripts/run-android-gradle.mjs bundleRelease",
     "smoke": "node ../../scripts/run-android-gradle.mjs testDebugUnitTest assembleDebug"
   }
 }
