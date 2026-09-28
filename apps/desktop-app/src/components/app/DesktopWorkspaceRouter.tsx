@@ -515,6 +515,8 @@ export function DesktopWorkspaceRouter({
           reservationsEnabled={foodReservationsEnabled}
           customersEnabled={customersEnabled}
           onUpdateTableStatus={handleUpdateTableStatus}
+          onSaveCustomer={handleSaveCustomer}
+          onSaveReservation={handleSaveManualRestaurantReservation}
           ordersEnabled={foodOrdersEnabled}
           menuEnabled={foodMenuEnabled}
           roomFolioTransferEnabled={foodOrdersEnabled && accommodationFolioEnabled}
