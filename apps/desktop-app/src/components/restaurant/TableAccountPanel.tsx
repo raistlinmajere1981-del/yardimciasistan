@@ -1,21 +1,19 @@
 import { useEffect, useState } from "react";
-import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../../electron/database";
+import type { DesktopDashboardData } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
-import { ChoiceChips } from "../ui/ChoiceChips";
 import { SearchSelect } from "../ui/SearchSelect";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { TableRoomTransfer } from "./TableRoomTransfer";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import type { useTableOrderController } from "./use-table-order-controller";
-import { formatMoney, getOrderCurrency, formatTableStatus, getTableStatusAction } from "./table-presentation";
+import { formatMoney, getOrderCurrency } from "./table-presentation";
 
-export function TableAccountPanel({ table, data, controller, disabled, customersEnabled, reservationsEnabled, ordersEnabled,
-  roomFolioTransferEnabled, quickCustomerId, onCloseOrder, onTransfer, onUpdateTableStatus }: {
+export function TableAccountPanel({ table, data, controller, disabled, customersEnabled, reservationsEnabled,
+  roomFolioTransferEnabled, quickCustomerId, onCloseOrder, onTransfer }: {
   table: DesktopDashboardData["tables"][number]; data: DesktopDashboardData; controller: ReturnType<typeof useTableOrderController>;
-  disabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean; ordersEnabled: boolean; roomFolioTransferEnabled: boolean;
+  disabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean; roomFolioTransferEnabled: boolean;
   quickCustomerId?: string;
   onCloseOrder: (status: "paid" | "cancelled") => void; onTransfer: (folioId: string) => void;
-  onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
 }) {
   const { confirm, confirmDialog } = useConfirmDialog();
   const navigation = useWorkspaceNavigation();
@@ -44,7 +42,6 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
     if (!customersEnabled || disabled) return;
     if (await controller.assignTableCustomer(customerId)) setCustomerDraft(customerId);
   }
-  const tableStatus = getTableStatusAction(table.status) || table.status;
   async function requestOrderClose(status: "paid" | "cancelled") {
     if (!order) return;
     const cancelling = status === "cancelled";
@@ -110,36 +107,6 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
       {customerStay && <p>Aktif konaklama · {customerStay.roomNumber ? `Oda ${customerStay.roomNumber}` : customerStay.roomName}</p>}
     </section>}
     {relatedReservations.map(item => <article className="operation-section" key={item.id}><h4>{item.customerName || item.title}</h4><p>Rezervasyon · {item.startDate} {item.time} · {item.guestCount} kişi</p></article>)}
-    {!order && <section className="operation-section form-stack">
-      <h4>Masa hazırlığı</h4>
-      <div className="form-field form-field--fluid">
-        <span>Masa durumu</span>
-        <ChoiceChips
-          ariaLabel={`${table.name} durumunu değiştir`}
-          value={tableStatus}
-          disabled={disabled}
-          onChange={value => {
-            if (value === tableStatus) return;
-            void controller.run(async isCurrent => {
-              const result = await onUpdateTableStatus(table.id, value);
-              if (!isCurrent()) return false;
-              controller.feedback(result.message, !result.ok);
-              return result.ok;
-            });
-          }}
-          options={[
-            ...(!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
-              ? [{ id: tableStatus, label: formatTableStatus(table.status), disabled: true }]
-              : []),
-            { id: "available", label: "Boş" },
-            { id: "occupied", label: "Dolu" },
-            ...(reservationsEnabled ? [{ id: "reserved", label: "Rezerve" }] : []),
-            ...(ordersEnabled ? [{ id: "bill_waiting", label: "Hesap" }] : []),
-            { id: "cleaning", label: "Temizlik" }
-          ]}
-        />
-      </div>
-    </section>}
     <p role={controller.error ? "alert" : "status"}>{controller.busy ? "İşlem kaydediliyor..." : controller.loading ? "Adisyon yükleniyor..." : controller.message}</p>
     {confirmDialog}
   </>;
