@@ -9,6 +9,7 @@ import type {
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
+import { WorkspaceFormOverlay } from "../workspace/WorkspaceFormOverlay";
 import { DatePicker, addDays } from "../ui/DateTimePicker";
 import { SearchSelect } from "../ui/SearchSelect";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
@@ -256,13 +257,9 @@ export function ManualReservationEditor({
   </div>;
 
   if (embedded) {
-    return <section className="operation-section form-stack workspace-quick-action" aria-label={title}>
-      <div className="page-toolbar">
-        <div><strong>{title}</strong><small>Bu çalışma alanındaki oda rezervasyonda seçili gelir.</small></div>
-        <ActionButton variant="ghost" size="sm" type="button" disabled={state === "loading"} onClick={onClose}>Kapat</ActionButton>
-      </div>
-      <form className="form-stack" onSubmit={submitReservation}>{fields}{actions}</form>
-    </section>;
+    return <WorkspaceFormOverlay title={title} onClose={onClose} closeBlocked={state === "loading"} onSubmit={submitReservation} footer={actions}>
+      {fields}
+    </WorkspaceFormOverlay>;
   }
 
   return <FormDialog title={title} onClose={onClose} closeBlocked={state === "loading"} onSubmit={submitReservation} footer={actions}>
