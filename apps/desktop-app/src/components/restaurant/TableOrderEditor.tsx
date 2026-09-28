@@ -4,7 +4,6 @@ import type { PublishedMenuItem, PublishedQrMenu } from "@yardimci-asistan/sync-
 import { IconButton } from "../ui/IconButton";
 import { ActionButton } from "../ui/ActionButton";
 import { SegmentedControl } from "../ui/SegmentedControl";
-import { ChoiceChips } from "../ui/ChoiceChips";
 import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency } from "./table-presentation";
 import { resolveMenuPreviewImageUrl } from "../menu/menu-model";
@@ -102,23 +101,6 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                     <span>{selectedOrder?.itemCount ?? 0} ürün</span>
                   </div>
                 </div>
-                {selectedOrder && <div className="form-field form-field--fluid">
-                  <span>Sipariş durumu</span>
-                  <ChoiceChips
-                    ariaLabel="Sipariş durumu"
-                    value={selectedOrder.status}
-                    disabled={Boolean(busyAction)}
-                    onChange={value => {
-                      if (value !== "open") void controller.status(value as "preparing" | "served" | "payment");
-                    }}
-                    options={[
-                      { id: "open", label: "Açık", disabled: selectedOrder.status !== "open" },
-                      { id: "preparing", label: "Hazırlanıyor" },
-                      { id: "served", label: "Servis edildi" },
-                      { id: "payment", label: "Hesap bekliyor" }
-                    ]}
-                  />
-                </div>}
                 <div className="restaurant-order-line-list">
                   {!selectedOrder && <p className="restaurant-order-empty">Aktif adisyon yok. Sipariş açtığınızda ürün ekleyebilirsiniz.</p>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
