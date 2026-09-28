@@ -91,7 +91,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   return <WorkspacePageFrame title={roomIdentity(room)} className="operations-workspace" bodyScroll="panes"
     context={history && <div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
       <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
-    navigation={!history && <ResourceWorkspaceSummary label="Oda özeti" imageSrc="./assets/default-room.png"
+    headerSummary={!history && <ResourceWorkspaceSummary label="Oda özeti" imageSrc="./assets/default-room.png"
       facts={<><strong>{roomIdentity(room)}</strong><span>{room.capacity} kişilik</span>{room.floor && <span>Kat: {room.floor}</span>}{room.bedInfo && <span>{room.bedInfo}</span>}</>}
       status={<><StatusBadge tone={state.occupancy.status === "occupied" ? "info" : "neutral"}>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</StatusBadge>
         <StatusBadge tone="neutral">Fiziksel: {roomConditionLabel[state.operationalCondition]}</StatusBadge>{!room.isActive && <StatusBadge tone="warning">Etkin değil</StatusBadge>}</>}>
