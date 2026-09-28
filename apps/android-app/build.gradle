@@ -2,25 +2,19 @@ plugins {
   id "com.android.application" version "9.3.0"
 }
 
-def versionFile = file("version.properties")
-if (!versionFile.isFile()) {
-  throw new GradleException("Android sürüm dosyası bulunamadı: ${versionFile}")
+def productVersionFile = file("../../product-version.json")
+if (!productVersionFile.isFile()) {
+  throw new GradleException("Ürün sürüm dosyası bulunamadı: ${productVersionFile}")
 }
 
-def androidVersion = new Properties()
-versionFile.withInputStream { androidVersion.load(it) }
-def versionCodeText = androidVersion.getProperty("VERSION_CODE", "").trim()
-def versionNameText = androidVersion.getProperty("VERSION_NAME", "").trim()
+def productVersion = new groovy.json.JsonSlurper().parse(productVersionFile)
+def versionCodeText = productVersion.androidVersionCode?.toString()?.trim() ?: ""
+def versionNameText = productVersion.version?.toString()?.trim() ?: ""
 if (!(versionCodeText ==~ /[1-9][0-9]*/)) {
-  throw new GradleException("VERSION_CODE pozitif bir tam sayı olmalı.")
+  throw new GradleException("androidVersionCode pozitif bir tam sayı olmalı.")
 }
-if (!(versionNameText ==~ /[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?/)) {
-  throw new GradleException("VERSION_NAME SemVer biçiminde olmalı (ör. 0.1.0).")
-}
-
-def packageVersion = new groovy.json.JsonSlurper().parse(file("package.json")).version?.toString()
-if (packageVersion != versionNameText) {
-  throw new GradleException("package.json version (${packageVersion}) ile VERSION_NAME (${versionNameText}) aynı olmalı.")
+if (!(versionNameText ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
+  throw new GradleException("Ürün sürümü x.y.z biçiminde olmalı (ör. 0.1.8).")
 }
 
 def localKeystoreProperties = new Properties()
