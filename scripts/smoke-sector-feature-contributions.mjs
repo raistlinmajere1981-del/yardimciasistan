@@ -89,12 +89,14 @@ try {
 
   const launcher = page.getByRole("button", { name: "Test oda çalışma alanını aç" });
   await launcher.click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("heading", { level: 2 })).toHaveText("Pilot 101");
-  await expect(dialog.getByRole("region", { name: "Oda ve Misafir", exact: true })).toBeVisible();
-  await dialog.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
-  await expect(launcher).toBeFocused();
+  const workspace = page.locator(".workspace-page-frame");
+  await expect(workspace).toBeVisible();
+  await expect(workspace.getByRole("heading", { level: 2 })).toHaveText("Pilot 101");
+  await expect(workspace.getByRole("region", { name: "Oda ve Misafir", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  await expect(workspace).toHaveCount(0);
+  await expect(launcher).toBeVisible();
 
   expect(errors).toEqual([]);
   console.log("sector-feature-contributions-smoke-ok: typed conditions, navigation, staged settings, canonical workspace");
