@@ -35,6 +35,7 @@ extraMetadata:
 
 win:
   icon: assets/app-icon.ico
+  requestedExecutionLevel: asInvoker
   target:
     - target: nsis
       arch:
