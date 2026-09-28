@@ -49,7 +49,7 @@ export function MenuItemWorkspace({
         context="Kayıt yenilenmiş veya silinmiş olabilir."
         presentation={presentation}
         onPresentationChange={navigation.updateWorkspacePresentation}
-        onClose={navigation.closeWorkspace}
+        onClose={() => navigation.closeWorkspace()}
         closeBlocked={closeBlocked}
         returnFocusRef={navigation.returnFocusRef}
         dismissOnBackdrop
@@ -115,7 +115,7 @@ export function MenuItemWorkspace({
         actions={<StatusBadge tone={item.is_available ? "success" : "neutral"}>{item.is_available ? "Mevcut" : "Kapalı"}</StatusBadge>}
         presentation={presentation}
         onPresentationChange={navigation.updateWorkspacePresentation}
-        onClose={navigation.closeWorkspace}
+        onClose={() => navigation.closeWorkspace()}
         closeBlocked={closeBlocked}
         returnFocusRef={navigation.returnFocusRef}
         dismissOnBackdrop

@@ -359,6 +359,8 @@ export function DesktopWorkspaceRouter({
           setupData={setupData}
           automaticSyncStatus={automaticSyncStatus}
           features={runtimeFeatures}
+          aiEnabled={aiEnabled}
+          customersEnabled={customersEnabled}
           requestsEnabled={requestsEnabled}
           tasksEnabled={tasksEnabled}
           calendarEnabled={runtimeHasCapability(businessCapabilities, C.CALENDAR)}
