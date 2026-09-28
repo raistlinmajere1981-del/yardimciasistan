@@ -44,11 +44,7 @@ Existing preload, IPC and SQLite contracts are unchanged.
 Run locally:
 
 ```fish
-npm run typecheck
-npm run smoke:workspace-platform
-npm run smoke:desktop-renderer
-npm run lint:strict
-npm run architecture:audit
-npm run design:audit:strict
-git diff --check
+npm run verify:check -- workspace-platform
+npm run verify:domain -- commerce
+npm run verify:pre-main
 ```
