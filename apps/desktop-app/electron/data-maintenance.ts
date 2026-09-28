@@ -101,11 +101,11 @@ const BACKUP_MANIFEST_FILE = "backup.json";
 const QR_IMAGE_DIRECTORY = "qr-menu-images";
 const ASSET_DIRECTORY = "assets";
 
-export function resolveProjectBackupPath() {
+export function resolveProjectBackupPath(dataRoot: string) {
   return resolveBackupRoot({
     isPackaged: app.isPackaged,
     appPath: app.getAppPath(),
-    execDir: path.dirname(process.execPath)
+    dataRoot
   });
 }
 
@@ -115,7 +115,7 @@ function resolvePaths(userDataPath: string): DataMaintenancePaths {
     userDataPath,
     databasePath: resolveDatabasePath(userDataPath),
     assetsPath: resolveAssetsPath(userDataPath),
-    projectBackupPath: resolveProjectBackupPath(),
+    projectBackupPath: resolveProjectBackupPath(userDataPath),
     maintenancePath,
     markerPath: resolvePendingMaintenanceMarkerPath(userDataPath),
     stagedRestorePath: resolveStagedRestorePath(userDataPath),

@@ -22,7 +22,7 @@ export interface BackupRootResolutionInput {
   envBackupDir?: string;
   isPackaged: boolean;
   appPath?: string;
-  execDir?: string;
+  dataRoot?: string;
 }
 
 function readEnvOverride(value: string | undefined): string {
@@ -61,15 +61,18 @@ export function resolveBackupRoot(input: BackupRootResolutionInput): string {
     if (repoRoot) return path.join(repoRoot, "backup");
   }
 
-  if (input.isPackaged && input.execDir) {
-    return path.join(input.execDir, "backup");
+  if (input.isPackaged) {
+    if (!input.dataRoot) {
+      throw new Error("Paketlenmiş uygulamada yedek kökü için yazılabilir veri kökü gerekli.");
+    }
+    return path.join(path.resolve(input.dataRoot), "backups");
   }
 
   if (input.appPath) {
     return path.resolve(input.appPath, "..", "..", "backup");
   }
 
-  throw new Error("Yedek kökü çözülemedi: appPath veya execDir gerekli.");
+  throw new Error("Yedek kökü çözülemedi: appPath veya dataRoot gerekli.");
 }
 
 export function resolveDatabasePath(dataRoot: string): string {

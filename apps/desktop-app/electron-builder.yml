@@ -35,6 +35,7 @@ extraMetadata:
 
 win:
   icon: assets/app-icon.ico
+  requestedExecutionLevel: asInvoker
   target:
     - target: nsis
       arch:
@@ -43,6 +44,8 @@ win:
 
 nsis:
   oneClick: false
+  # Per-machine Program Files install is intentional. Packaged runtime data,
+  # logs, assets and backups must stay under Electron userData, never beside the exe.
   perMachine: true
   packElevateHelper: true
   allowToChangeInstallationDirectory: true
