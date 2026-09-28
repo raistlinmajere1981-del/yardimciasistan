@@ -112,10 +112,12 @@ const dp = await importDataPaths();
   assert.equal(withOverride, path.resolve(override));
   console.log("✓ YA_DESKTOP_BACKUP_DIR override kazanır");
 
-  // packaged fallback
-  const packaged = dp.resolveBackupRoot({ isPackaged: true, appPath, execDir: "/tmp/app-exec" });
-  assert.equal(packaged, path.join("/tmp/app-exec", "backup"));
-  console.log("✓ backup resolver packaged execDir/backup olur");
+  // packaged backup follows the writable data root, never the executable directory.
+  const packagedDataRoot = path.join(os.tmpdir(), "yardimci-packaged-user-data");
+  const packaged = dp.resolveBackupRoot({ isPackaged: true, appPath, dataRoot: packagedDataRoot });
+  assert.equal(packaged, path.join(packagedDataRoot, "backups"));
+  assert.ok(!packaged.includes("app-exec"), "packaged backup executable directory altında olmamalı");
+  console.log("✓ backup resolver packaged dataRoot/backups olur");
 }
 
 // 8) path traversal ile asset root dışına çıkılamaz
