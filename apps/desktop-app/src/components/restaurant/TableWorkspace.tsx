@@ -122,7 +122,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
     {ordersEnabled && !order && startControl}
     <TableAccountPanel table={table} data={data} controller={controller} disabled={disabled} customersEnabled={customersEnabled}
       reservationsEnabled={reservationsEnabled} ordersEnabled={ordersEnabled} roomFolioTransferEnabled={roomFolioTransferEnabled}
-      duration={duration} quickCustomerId={quickCustomerId}
+      quickCustomerId={quickCustomerId}
       onCloseOrder={status => void closeTableOrder(status)} onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)} onUpdateTableStatus={onUpdateTableStatus} />
   </OperationPanel>;
   return <WorkspaceFrame title={table.name} className="operations-workspace" presentation={navigation.current!.presentation} closeLabel="Floor'a dön"
