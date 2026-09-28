@@ -289,29 +289,20 @@ Workspace tests
 Capability/commerce/Market smokes
 ```
 
-Önemli komutlar:
+Önemli doğrulama komutları:
 
 ```bash
-npm run lint
-npm run knip
-npm run design:audit:strict
-npm run architecture:audit
-npm run quality:strict
+npm run verify:domain -- commerce
+npm run verify:domain -- platform
+npm run verify:pre-main
 ```
 
-Tam modüler temel checkpoint'i:
+Eski ayrı `check-modular-foundation.mjs` zinciri kaldırılmıştır. Capability,
+commerce ve Market smoke'ları canonical verification registry'de bağımsız leaf
+kontrollerdir; Full/Pre-main planında prerequisite'leriyle birlikte yalnız bir kez
+çalışırlar.
 
-```bash
-node scripts/check-modular-foundation.mjs
-```
-
-Başarı çıktısı:
-
-```text
-modular-foundation-check-ok
-```
-
-Runner'ın kritik smoke zinciri:
+Kritik smoke sözleşmeleri:
 
 ```text
 business-capabilities-smoke-ok
