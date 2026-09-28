@@ -52,23 +52,24 @@ export function RestaurantPage({
 
   const tableToolbar = (
     <div className="hospitality-resource-toolbar" aria-label="Masa filtreleri">
-      <label className="form-field">
-        Masa grubu
-        <select value={group} onChange={(event) => setGroup(event.target.value)}>
-          <option value="all">Tüm gruplar</option>
-          {groups.map((name) => <option key={name} value={name}>{name}</option>)}
-        </select>
-      </label>
-      <div className="form-field">
-        <span>Masa filtresi</span>
-        <ChoiceChips
-          ariaLabel="Masa filtresi"
-          value={status}
-          onChange={setStatus}
-          options={statusOptions.map(option => ({ ...option,
-            label: `${option.label} (${groupTables.filter(table => matchesStatus(table, option.id)).length})` }))}
-        />
-      </div>
+      <select
+        className="hospitality-resource-toolbar__select"
+        aria-label="Masa grubu"
+        value={group}
+        onChange={(event) => setGroup(event.target.value)}
+      >
+        <option value="all">Tüm gruplar</option>
+        {groups.map((name) => <option key={name} value={name}>{name}</option>)}
+      </select>
+      <ChoiceChips
+        ariaLabel="Masa filtresi"
+        value={status}
+        onChange={setStatus}
+        options={statusOptions.map(option => ({
+          ...option,
+          label: `${option.label} (${groupTables.filter(table => matchesStatus(table, option.id)).length})`
+        }))}
+      />
     </div>
   );
 
