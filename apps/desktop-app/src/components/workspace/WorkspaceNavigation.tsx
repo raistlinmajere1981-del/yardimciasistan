@@ -79,11 +79,21 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
       if (ownerPage) {
         const existing = hospitalitySessions[ownerPage];
         if (existing && !guardAllows(existing)) return false;
-        // Hospitality sessions are page content, but a currently-open modal still owns interaction.
-        if (document.querySelector('dialog[open], [aria-modal="true"]')) return false;
+        // A transient workspace may deliberately hand off into a room/table session.
+        // Unrelated dialogs still block a new hospitality surface.
+        if (transient) {
+          const transientGuard = guards.current.get("transient");
+          if (transientGuard && !transientGuard()) return false;
+        } else if (document.querySelector('dialog[open], [aria-modal="true"]')) {
+          return false;
+        }
 
         const sameEntity = existing?.intent.entityType === intent.entityType && existing.intent.entityId === intent.entityId;
         if (!sameEntity) hospitalityOnReturn.current[ownerPage] = options?.onReturn;
+        if (transient) {
+          setTransient(null);
+          transientOnReturn.current = undefined;
+        }
         setHospitalitySessions((sessions) => ({
           ...sessions,
           [ownerPage]: {
