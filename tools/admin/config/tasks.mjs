@@ -108,6 +108,8 @@ export const TASKS = [
   { id: "landing-deploy", kind: "task", title: "Landing deploy (www kökü)", category: "web", site: "landing", command: NPM, args: ["run", "deploy:landing", "--", "--yes"], preflight: "basic", confirm: "Canlı landing (www kökü) güncellenir; web modülüne dokunmaz.", impact: ["www/yardimci-asistan/** alanına yazılmaz.", "Backup + atomic deploy + HTTP smoke yapılır."] },
 
   // ---------- Build / Release ----------
+  { id: "product-version-show", kind: "task", title: "Ürün sürümünü göster", category: "build", command: "node", args: ["scripts/product-version.mjs", "show"], preflight: "basic" },
+  { id: "product-version-set", kind: "task", title: "Ürün sürümünü güncelle (Desktop + Android)", category: "build", command: "node", args: ["scripts/product-version.mjs", "set"], argsPrompt: [{ key: "version", flag: null, prompt: "Yeni ürün sürümü (x.y.z, örn. 0.1.8)", required: true }], preflight: "basic", confirm: "Desktop ve Android aynı ürün sürümüne geçirilir; Android versionCode otomatik 1 artırılır.", impact: ["product-version.json tek sürüm kaynağıdır.", "Desktop/Android package metadata ve package-lock otomatik senkronlanır.", "Binary üretmez; yalnız sürüm metadata'sını günceller."] },
   { id: "build-packages", kind: "task", title: "Paketleri derle", category: "build", command: NPM, args: ["run", "build:packages"], preflight: "basic" },
   { id: "build-apps", kind: "task", title: "Uygulamaları derle", category: "build", command: NPM, args: ["run", "build:apps"], preflight: "basic" },
   { id: "build-all", kind: "task", title: "Tümünü derle", category: "build", command: NPM, args: ["run", "build"], preflight: "basic" },
