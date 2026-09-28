@@ -143,14 +143,14 @@ Uygulama açılışında SQLite dosyası otomatik oluşturulur. Testlerde gerçe
 
 İlk açılışta güncel `schema.sql` doğrudan uygulanır. Tarihsel veritabanı upgrade zinciri desteklenmez; temiz kurulum gerçek kullanıcı verisi olmadan başlar ve hazır demo işletme/veri yüklenmez.
 
-Linux'ta Electron pencere açılışını sanal ekranla kontrol etmek için:
+Linux'ta desktop renderer ve gerçek Electron/Xvfb açılışını dar olarak kontrol etmek için:
 
 ```bash
-npm run smoke:desktop-renderer
-npm run smoke:desktop:linux
+npm run verify:check -- desktop-renderer
+npm run verify:check -- desktop-xvfb
 ```
 
-`smoke:desktop-renderer` QR menü yönetimi, WhatsApp çalışma alanı, web talebi çekme, kurulum ekranı ve ana panel işlemlerini tarayıcı önizlemesiyle kontrol eder. `smoke:desktop:linux` desktop build sonrası local SQLite menü kaydetme smoke testini ve Electron Xvfb pencere açılışını birlikte çalıştırır.
+`desktop-renderer` QR menü yönetimi, WhatsApp çalışma alanı, web talebi çekme, kurulum ekranı ve ana panel davranışlarını tarayıcı fixture'ı ile doğrular. `desktop-xvfb` ise registry'nin hazırladığı ortak desktop build çıktısını yeniden derlemeden gerçek Electron penceresiyle sınar.
 
 PHP endpoint söz dizimi kontrolü:
 
