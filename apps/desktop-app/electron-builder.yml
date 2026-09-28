@@ -43,6 +43,8 @@ win:
 
 nsis:
   oneClick: false
+  # Per-machine Program Files install is intentional. Packaged runtime data,
+  # logs, assets and backups must stay under Electron userData, never beside the exe.
   perMachine: true
   packElevateHelper: true
   allowToChangeInstallationDirectory: true
