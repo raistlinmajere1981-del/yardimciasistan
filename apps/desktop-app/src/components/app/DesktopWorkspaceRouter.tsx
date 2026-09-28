@@ -514,8 +514,10 @@ export function DesktopWorkspaceRouter({
           data={surfaceData}
           reservationsEnabled={foodReservationsEnabled}
           customersEnabled={customersEnabled}
+          aiEnabled={aiEnabled}
           onUpdateTableStatus={handleUpdateTableStatus}
           onSaveCustomer={handleSaveCustomer}
+          onAnalyzeIdentity={handleAnalyzeIdentityImage}
           onSaveReservation={handleSaveManualRestaurantReservation}
           ordersEnabled={foodOrdersEnabled}
           menuEnabled={foodMenuEnabled}
