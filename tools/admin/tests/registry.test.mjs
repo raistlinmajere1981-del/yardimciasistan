@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TASK_CATEGORIES, TASKS, getTask, validateRegistry } from "../config/tasks.mjs";
+import { SECTIONS } from "../ui/menu.mjs";
 
 test("registry geçerli: hata yok, id'ler benzersiz", () => {
   assert.deepEqual(validateRegistry(), []);
@@ -56,4 +57,11 @@ test("tehlikeli işlemlerde confirm/impact açıklaması var", () => {
   for (const id of ["fresh-lab-once", "fresh-desktop-data", "fresh-artifacts"]) {
     assert.ok(getTask(id).impact?.length > 0, `${id}: impact açıklaması gerekli`);
   }
+});
+
+
+test("Build / Release menüsü ürün sürümü işlemlerini gösterir", () => {
+  const visible = new Set(SECTIONS.build.groups.flatMap(([, ids]) => ids));
+  assert.ok(visible.has("product-version-show"));
+  assert.ok(visible.has("product-version-set"));
 });
