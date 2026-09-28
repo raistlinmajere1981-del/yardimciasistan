@@ -428,7 +428,8 @@ export function DesktopWorkspaceRouter({
               stays={surfaceData.customerRoomStays}
               aiEnabled={aiEnabled}
               onSave={handleSaveCustomer}
-                />
+              onAnalyzeIdentity={handleAnalyzeIdentityImage}
+            />
           )}
           messages={(
             <CustomerMessagesWorkspace
@@ -481,7 +482,8 @@ export function DesktopWorkspaceRouter({
               rooms={surfaceData.rooms}
               customers={surfaceData.customers}
               whatsappEnabled={customerMessagingEnabled}
-                  onSaveManual={handleSaveManualReservation}
+              onSaveCustomer={handleSaveCustomer}
+              onSaveManual={handleSaveManualReservation}
               onUpdateStatus={handleUpdateReservationStatus}
               onOpenWhatsApp={openReservationWhatsApp}
             />
@@ -509,11 +511,7 @@ export function DesktopWorkspaceRouter({
         <RestaurantPage
           data={surfaceData}
           reservationsEnabled={foodReservationsEnabled}
-          customersEnabled={customersEnabled}
-          aiEnabled={aiEnabled}
           onUpdateTableStatus={handleUpdateTableStatus}
-          onSaveCustomer={handleSaveCustomer}
-          onAnalyzeIdentity={handleAnalyzeIdentityImage}
           ordersEnabled={foodOrdersEnabled}
           menuEnabled={foodMenuEnabled}
           tasksEnabled={tasksEnabled}
