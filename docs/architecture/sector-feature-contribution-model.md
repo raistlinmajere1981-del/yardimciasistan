@@ -176,27 +176,13 @@ This keeps the regression test aligned with the one-entity/one-workspace rule in
 Stage 9 closure passed locally, including the final combined fixture:
 
 ```text
-npm run typecheck
-npm run smoke:sector-feature-contributions
-npm run smoke:settings-platform
-npm run smoke:workspace-platform
-npm run smoke:pension-workspace
-npm run smoke:restaurant-workspace
-node scripts/smoke-calendar-workspace.mjs
-node scripts/smoke-market-workspace-contract.mjs
-node scripts/smoke-capability-surface-consistency.mjs
-npm run smoke:desktop-renderer
-
-npm run lint:strict
-npm run knip:strict
-npm run architecture:audit
-npm run design:audit:strict
-npm run pilot:check
-git diff --check
-npm run check:linux
+npm run verify:check -- sector-feature-contributions
+npm run verify:domain -- desktop
+npm run verify:domain -- hospitality
+npm run verify:pre-main
 ```
 
-After the browser-level exit fixture was added, `smoke:sector-feature-contributions`, `pilot:check` and `knip:strict` were rerun during fixture hardening; the final reported runs were clean.
+After the browser-level exit fixture was added, the `sector-feature-contributions` leaf check and Pre-main Verify were rerun during fixture hardening; the final reported runs were clean.
 
 ## Stage 10 handoff
 
