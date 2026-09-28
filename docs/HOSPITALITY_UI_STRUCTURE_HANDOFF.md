@@ -109,15 +109,12 @@ Repo kurallarındaki kurulu yerel runtime/binary kullanımına uyun.
 Dar başlangıç kontrolleri:
 
 ```bash
-npm run typecheck -w @yardimci-asistan/desktop-app
-npm run smoke:pension-workspace
-npm run smoke:restaurant-workspace
-npm run smoke:operations-ui
-npm run design:audit:strict
+npm run verify:domain -- hospitality
+npm run verify:check -- design-audit-strict
 git diff --check
 ```
 
-Birleşme öncesi tek milestone kapısı `npm run pre-main`; ayrıca ikinci bir tam
+Birleşme öncesi tek milestone kapısı `npm run verify:pre-main`; ayrıca ikinci bir tam
 check listesi oluşturmayın. Hataları başlangıç commit'i ile karşılaştırıp bu
 değişiklikten gelenler ve önceden var olanlar olarak kanıtlarıyla ayırın.
 
