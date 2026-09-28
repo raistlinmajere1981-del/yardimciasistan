@@ -14,6 +14,7 @@ interface WorkspaceFrameProps extends Omit<ModalSurfaceProps, "labelledBy" | "ch
   actions?: ReactNode;
   navigation?: ReactNode;
   footer?: ReactNode;
+  overlay?: ReactNode;
   children: ReactNode;
   presentation: WorkspacePresentation;
   onPresentationChange?: (presentation: WorkspacePresentation) => void;
@@ -22,7 +23,7 @@ interface WorkspaceFrameProps extends Omit<ModalSurfaceProps, "labelledBy" | "ch
   bodyScroll?: "body" | "panes";
 }
 
-export function WorkspaceFrame({ title, context, actions, navigation, footer, children, presentation, className = "",
+export function WorkspaceFrame({ title, context, actions, navigation, footer, overlay, children, presentation, className = "",
   onPresentationChange, closeLabel = "Çalışma alanını kapat", bodyScroll = "body", ...modal }: WorkspaceFrameProps) {
   const id = useId();
   const marker = useRef<HTMLDivElement>(null);
@@ -69,6 +70,7 @@ export function WorkspaceFrame({ title, context, actions, navigation, footer, ch
       {navigation && <div className="workspace-frame__navigation">{navigation}</div>}
       <div className={`workspace-frame__body workspace-frame__body--${bodyScroll}`}>{children}</div>
       {footer && <footer className="workspace-frame__footer">{footer}</footer>}
+      {overlay}
     </ModalSurface>
   );
 }
