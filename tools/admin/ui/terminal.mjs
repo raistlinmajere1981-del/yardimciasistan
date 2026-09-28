@@ -239,7 +239,7 @@ export function createTerminalUI({ input = defaultInput, output = defaultOutput 
             selected = firstSelectableIndex(filtered, 0);
             render(); return;
           }
-          if (str === "/" && !searching) {
+          if (searchable && str === "/" && !searching) {
             searching = true;
             query = "";
             render(); return;

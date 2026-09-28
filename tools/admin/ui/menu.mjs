@@ -578,26 +578,3 @@ export async function mainLoop(ui) {
     else await sectionScreen(ui, key);
   }
 }
-berleme)" },
-  { key: "git", label: "Git (günlük işlemler)" },
-  { key: "devtools", label: "Geliştirici Araçları" },
-  { key: "history", label: "Son Çalıştırmalar" },
-];
-
-export async function mainLoop(ui) {
-  for (;;) {
-    const choice = await askChoice(ui, "Yardımcı Asistan — Geliştirici Konsolu", MAIN.map((m) => ({ label: m.label })), { extra: [{ key: "n", label: "npm script çalıştır…", id: "npm" }] });
-    if (choice.action === "back") {
-      const quit = (await ui.ask("Çıkılsın mı? [e/H] ")).trim().toLowerCase();
-      if (quit === "e" || quit === "evet") return;
-      continue;
-    }
-    if (choice.action === "search") { await palette(ui); continue; }
-    if (choice.action === "extra") { await npmScriptRunner(ui); continue; }
-    if (choice.action !== "pick") continue;
-    const key = MAIN[choice.index].key;
-    if (key === "git") await gitSection(ui);
-    else if (key === "history") await historySection(ui);
-    else await sectionScreen(ui, key);
-  }
-}
