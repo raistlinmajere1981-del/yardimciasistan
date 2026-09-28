@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
+  DesktopIdentityImageAnalyzeResult,
   DesktopStatusUpdateResult,
   SaveCustomerInput,
   SaveManualRestaurantReservationInput
@@ -26,7 +27,9 @@ interface RestaurantPageProps {
   reservations: ReactNode;
   tasks: ReactNode;
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
+  aiEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onSaveReservation: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
@@ -43,7 +46,9 @@ export function RestaurantPage({
   tasks,
   onDashboardDataChanged,
   onUpdateTableStatus,
+  aiEnabled,
   onSaveCustomer,
+  onAnalyzeIdentity,
   onSaveReservation
 }: RestaurantPageProps) {
   const [group, setGroup] = useState("all");
@@ -138,7 +143,9 @@ export function RestaurantPage({
           reservationsEnabled,
           roomFolioTransferEnabled,
           onUpdateTableStatus,
+          aiEnabled,
           onSaveCustomer,
+          onAnalyzeIdentity,
           onSaveReservation,
           onDashboardDataChanged
         }}
