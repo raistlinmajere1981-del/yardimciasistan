@@ -7,12 +7,10 @@ import type {
   SaveCustomerInput,
   SaveManualRestaurantReservationInput
 } from "../../electron/database";
-import { tableWorkspaceDefinition } from "../app/workspace-definitions";
 import { OperationsBoardLayout } from "../components/operations/OperationsBoardLayout";
 import { getTableStatusAction } from "../components/restaurant/table-presentation";
 import { TableResourceCard } from "../components/restaurant/TableResourceCard";
 import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
-import { WorkspaceHost } from "../components/workspace/WorkspaceNavigation";
 import { ChoiceChips } from "../components/ui/ChoiceChips";
 import { ActionButton } from "../components/ui/ActionButton";
 
@@ -133,23 +131,7 @@ export function RestaurantPage({
           } : null}
         />
       </FeatureWorkspacePage>
-      <WorkspaceHost
-        definition={tableWorkspaceDefinition}
-        context={{
-          data,
-          ordersEnabled,
-          menuEnabled,
-          customersEnabled,
-          reservationsEnabled,
-          roomFolioTransferEnabled,
-          onUpdateTableStatus,
-          aiEnabled,
-          onSaveCustomer,
-          onAnalyzeIdentity,
-          onSaveReservation,
-          onDashboardDataChanged
-        }}
-      />
+
     </>
   );
 }
