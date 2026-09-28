@@ -10,9 +10,9 @@ import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, formatTableStatus, getTableStatusAction } from "./table-presentation";
 
 export function TableAccountPanel({ table, data, controller, disabled, customersEnabled, reservationsEnabled, ordersEnabled,
-  roomFolioTransferEnabled, duration, quickCustomerId, onCloseOrder, onTransfer, onUpdateTableStatus }: {
+  roomFolioTransferEnabled, quickCustomerId, onCloseOrder, onTransfer, onUpdateTableStatus }: {
   table: DesktopDashboardData["tables"][number]; data: DesktopDashboardData; controller: ReturnType<typeof useTableOrderController>;
-  disabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean; ordersEnabled: boolean; roomFolioTransferEnabled: boolean; duration: number;
+  disabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean; ordersEnabled: boolean; roomFolioTransferEnabled: boolean;
   quickCustomerId?: string;
   onCloseOrder: (status: "paid" | "cancelled") => void; onTransfer: (folioId: string) => void;
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
