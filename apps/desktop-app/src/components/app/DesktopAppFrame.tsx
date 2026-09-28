@@ -285,7 +285,9 @@ function DesktopAppFrameContent({
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS),
             customersEnabled,
+            aiEnabled,
             onSaveCustomer: customerController.handleSaveCustomer,
+            onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
             onSaveReservation: operationController.handleSaveManualReservation,
             folioEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO), menuEnabled
           }} />
