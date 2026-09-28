@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { defaultRoomAssignmentForm, formatStayDateRange } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
@@ -10,14 +10,16 @@ import type { RoomStayOperations } from "./use-room-stay-operations";
 import { StayGuestPicker } from "./StayGuestPicker";
 import { StayGuestList } from "./StayGuestList";
 
-export function RoomStayPanel({ model, data, intent, operations, disabled, staysEnabled, onDirty }: {
+export function RoomStayPanel({ model, data, intent, operations, disabled, staysEnabled, quickCustomerId, onQuickCustomerHandled, onDirty }: {
   model: RoomWorkspaceModel; data: DesktopDashboardData; intent: RoomWorkspaceIntent; operations: RoomStayOperations;
-  disabled: boolean; staysEnabled: boolean; onDirty: (dirty: boolean) => void;
+  disabled: boolean; staysEnabled: boolean; quickCustomerId?: string; onQuickCustomerHandled?: () => void;
+  onDirty: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState(() => defaultRoomAssignmentForm(intent.customerId ?? "", intent.entityId));
   const [additional, setAdditional] = useState<string[]>([]);
   const [reservationId, setReservationId] = useState(intent.reservationId ?? "");
   const request = useRef({ signature: "", id: "" });
+  const quickCustomerRequest = useRef("");
   const entryDirty = useRef(false);
   const quickDirty = useRef(false);
   function markEntry(value: boolean) { entryDirty.current = value; onDirty(value || quickDirty.current); }
@@ -33,6 +35,35 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const unavailable = allActive.flatMap(stay => (stay.guests ?? []).filter(guest => ["planned", "checked_in"].includes(guest.status)).map(guest => guest.customerId));
   const canEnter = model.canCreate && primary && guestIds.length > 0 && !guestIds.some(id => unavailable.includes(id))
     && (room.capacity <= 0 || guestIds.length <= room.capacity);
+
+  useEffect(() => {
+    const customerId = quickCustomerId?.trim();
+    if (!customerId || quickCustomerRequest.current === customerId) return;
+    if (active.length > 1) return;
+
+    if (active.length === 1) {
+      const stay = active[0];
+      if ((stay.guests ?? []).some(guest => guest.customerId === customerId && ["planned", "checked_in"].includes(guest.status))) {
+        onQuickCustomerHandled?.();
+        return;
+      }
+      quickCustomerRequest.current = customerId;
+      void operations.mutate("stay", () => window.yardimciDesktop!.addStayGuest({ stayId: stay.id, customerId }))
+        .finally(() => {
+          quickCustomerRequest.current = "";
+          onQuickCustomerHandled?.();
+        });
+      return;
+    }
+
+    if (!primary) {
+      setDraft(current => ({ ...current, customerId }));
+    } else if (customerId !== primary && !additional.includes(customerId)) {
+      setAdditional(current => [...current, customerId]);
+    }
+    markEntry(true);
+    onQuickCustomerHandled?.();
+  }, [active, additional, onQuickCustomerHandled, operations, primary, quickCustomerId]);
 
   async function enter() {
     if (!canEnter || !room) return;
