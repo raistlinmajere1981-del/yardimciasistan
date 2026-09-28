@@ -140,13 +140,6 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
         />
       </div>
     </section>}
-    <section className="operation-section form-stack" aria-label="Masa bilgileri">
-    <h4>Masa bilgileri</h4>
-    <dl className="operation-facts"><div><dt>Masa</dt><dd>{table.name} · {table.area || "Genel"}</dd></div>
-      <div><dt>Durum</dt><dd>{formatTableStatus(table.status)}</dd></div><div><dt>Kapasite</dt><dd>{table.capacity} kişi</dd></div>
-      {order && <div><dt>Açık kalma süresi</dt><dd>{duration} dk</dd></div>}
-    </dl>
-    </section>
     <p role={controller.error ? "alert" : "status"}>{controller.busy ? "İşlem kaydediliyor..." : controller.loading ? "Adisyon yükleniyor..." : controller.message}</p>
     {confirmDialog}
   </>;
