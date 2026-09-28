@@ -18,6 +18,8 @@ on:
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
       - "scripts/test-helpers/**"
+      - "scripts/verify.mjs"
+      - "scripts/verification-registry.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
   push:
@@ -41,6 +43,8 @@ on:
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
       - "scripts/test-helpers/**"
+      - "scripts/verify.mjs"
+      - "scripts/verification-registry.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
 
