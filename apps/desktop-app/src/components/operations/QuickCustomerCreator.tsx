@@ -11,9 +11,12 @@ type QuickCustomerState = "idle" | "loading" | "success" | "error";
 
 interface QuickCustomerCreatorProps {
   disabled?: boolean;
+  initialOpen?: boolean;
+  showTrigger?: boolean;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onCreated: (customerId: string) => void;
   onDirty?: (dirty: boolean) => void;
+  onClose?: () => void;
 }
 
 function createQuickCustomerInput(fullName: string, phone: string): SaveCustomerInput {
@@ -24,8 +27,16 @@ function createQuickCustomerInput(fullName: string, phone: string): SaveCustomer
   });
 }
 
-export function QuickCustomerCreator({ disabled = false, onSave, onCreated, onDirty }: QuickCustomerCreatorProps) {
-  const [open, setOpen] = useState(false);
+export function QuickCustomerCreator({
+  disabled = false,
+  initialOpen = false,
+  showTrigger = true,
+  onSave,
+  onCreated,
+  onDirty,
+  onClose
+}: QuickCustomerCreatorProps) {
+  const [open, setOpen] = useState(initialOpen);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [state, setState] = useState<QuickCustomerState>("idle");
@@ -39,9 +50,11 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated, onDi
     setState("idle");
     setMessage("");
     onDirty?.(false);
+    onClose?.();
   }
 
   if (!open) {
+    if (!showTrigger) return null;
     return (
       <div className="reservation-quick-customer-entry">
         <ActionButton
