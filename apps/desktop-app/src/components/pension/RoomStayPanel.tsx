@@ -21,9 +21,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const request = useRef({ signature: "", id: "" });
   const quickCustomerRequest = useRef("");
   const entryDirty = useRef(false);
-  const quickDirty = useRef(false);
-  function markEntry(value: boolean) { entryDirty.current = value; onDirty(value || quickDirty.current); }
-  function markQuick(value: boolean) { quickDirty.current = value; onDirty(value || entryDirty.current); }
+  function markEntry(value: boolean) { entryDirty.current = value; onDirty(value); }
   const { room, state, active, reservations } = model;
   if (!room || !state) return null;
   const eligible = reservations.filter(item => item.reservationType === "room" && item.status === "approved"
@@ -111,8 +109,8 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
           <span>{data.customers.find(customer => customer.id === id)?.fullName || "Müşteri"}{id === primary ? " · Ana misafir" : " · Misafir"}</span>
           {id !== primary && <ActionButton type="button" variant="ghost" onClick={() => { setAdditional(current => current.filter(value => value !== id)); markEntry(true); }}>Listeden Çıkar</ActionButton>}
         </div>)}
-        <StayGuestPicker data={data} selectedIds={guestIds} operations={operations} disabled={disabled || (room.capacity > 0 && guestIds.length >= room.capacity)}
-          onDirty={markQuick} onSelect={id => { if (!primary) setDraft(current => ({ ...current, customerId: id })); else setAdditional(current => [...current, id]); markEntry(true); }} />
+        <StayGuestPicker data={data} selectedIds={guestIds} disabled={disabled || (room.capacity > 0 && guestIds.length >= room.capacity)}
+          onSelect={id => { if (!primary) setDraft(current => ({ ...current, customerId: id })); else setAdditional(current => [...current, id]); markEntry(true); }} />
         <p>{guestIds.length} kayıtlı misafir · Çocuk ve bebekler dahil herkes ayrı müşteri olarak eklenir.</p>
         {!selected && <div className="operation-fields">
           <div className="form-field"><span>Giriş tarihi</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate} onChange={value => { setDraft({ ...draft, checkInDate: value }); markEntry(true); }} /></div>
@@ -125,6 +123,5 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
       </fieldset>
     </form>}
     {operations.feedback?.panel === "stay" && <p role={operations.feedback.error ? "alert" : "status"}>{operations.feedback.message}</p>}
-    <details className="operation-section"><summary>Oda bilgileri</summary><p>{room.capacity} kişilik · {room.bedInfo || "Yatak bilgisi yok"}</p></details>
   </>;
 }
