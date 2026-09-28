@@ -39,7 +39,10 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   useEffect(() => {
     const customerId = quickCustomerId?.trim();
     if (!customerId || quickCustomerRequest.current === customerId) return;
-    if (active.length > 1) return;
+    if (active.length > 1) {
+      onQuickCustomerHandled?.();
+      return;
+    }
 
     if (active.length === 1) {
       const stay = active[0];
