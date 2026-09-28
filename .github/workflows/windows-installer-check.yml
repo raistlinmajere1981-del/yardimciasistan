@@ -28,7 +28,7 @@ on:
       - ".github/workflows/windows-installer-check.yml"
 
 jobs:
-  windows-pilot:
+  windows-installer:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
@@ -61,7 +61,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: yardimci-asistan-windows-pilot
+          name: yardimci-asistan-windows-installer
           path: |
             dist/desktop/YardimciAsistan-Setup-*.exe
             dist/desktop/*.yml
