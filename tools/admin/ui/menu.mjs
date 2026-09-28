@@ -442,7 +442,7 @@ async function historySection(ui) {
   for (;;) {
     const runs = listRuns(20);
     const vcs = currentVcs();
-    const { lastPass, currentMismatch } = lastPassFor("full-verify", vcs.branch, vcs.commit);
+    const { lastPass, currentMismatch } = lastPassFor("verify-full", vcs.branch, vcs.commit);
     const body = lastPass
       ? [`Son Full Verify: ${lastPass.commit}${currentMismatch ? " — mevcut HEAD için değil" : " — mevcut HEAD"}`]
       : ["Henüz başarılı Full Verify kaydı yok."];
