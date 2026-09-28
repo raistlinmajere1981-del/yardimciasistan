@@ -495,17 +495,31 @@ function readPackageScripts() {
   }
 }
 
-async function npmScriptRunner(ui, filter = "") {
+async function npmScriptRunner(ui, initialQuery = "") {
   const scripts = readPackageScripts();
-  if (Object.keys(scripts).length === 0) { console.log("package.json okunamadı."); return; }
-  const names = Object.keys(scripts).filter((n) => n.toLowerCase().includes(filter.toLowerCase()));
-  if (names.length === 0) { console.log("Eşleşen npm script yok."); return; }
-  const list = names.slice(0, 40);
-  const choice = await askChoice(ui, `npm script çalıştır (${names.length} eşleşme${names.length > 40 ? ", ilk 40" : ""})`, list.map((n) => ({ label: `${n} — ${(scripts[n] ?? "").slice(0, 80)}` })));
+  const names = Object.keys(scripts).sort((a, b) => a.localeCompare(b));
+  if (!names.length) {
+    await ui.viewText({ title: "npm Scriptleri", text: "package.json okunamadı veya script bulunamadı." });
+    return;
+  }
+  const choice = await ui.select({
+    title: "npm script çalıştır",
+    status: renderStatusBar(),
+    items: names.map((name) => ({
+      label: name,
+      description: String(scripts[name] ?? "").slice(0, 140),
+      searchText: `${name} ${scripts[name] ?? ""}`,
+      value: name,
+    })),
+    startSearch: Boolean(initialQuery),
+    initialQuery,
+  });
   if (choice.action !== "pick") return;
-  const name = list[choice.index];
-  const entry = { id: `npm:${name}`, kind: "task", title: `npm run ${name}`, category: "checks", command: "npm", args: ["run", name], preflight: "basic" };
-  await executeEntry(ui, entry);
+  const name = choice.item.value;
+  await executeEntry(ui, {
+    id: `npm:${name}`, kind: "task", title: `npm run ${name}`,
+    category: "checks", command: "npm", args: ["run", name], preflight: "basic",
+  });
 }
 
 export async function palette(ui) {
