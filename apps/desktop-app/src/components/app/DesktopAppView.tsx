@@ -115,6 +115,7 @@ export function DesktopAppView({
       menuController={menuController}
       messagingController={messagingController}
       customerController={customerController}
+      operationController={operationController}
       marketController={marketController}
     >
       <DesktopWorkspaceRouter
