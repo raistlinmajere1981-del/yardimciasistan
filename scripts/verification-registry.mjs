@@ -431,6 +431,16 @@ function smokeDomains(file) {
   }
   if (/diagnostic|logging/.test(name)) domains.add("diagnostics");
   if (/capability|business-|setup-profile|database-schema|data-paths|deletions/.test(name)) domains.add("platform");
+
+  // Cross-domain flows whose filenames do not fully describe ownership.
+  if (name === "automatic-sync") domains.add("android");
+  if (name === "local-companion-server") {
+    domains.add("android");
+    domains.add("desktop");
+  }
+  if (name === "market-companion-desktop-inbox") domains.add("android");
+  if (name === "web-connection-test") domains.add("desktop");
+
   if (domains.size === 0) domains.add("platform");
   return [...domains];
 }
