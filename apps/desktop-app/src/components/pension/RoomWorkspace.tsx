@@ -87,7 +87,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
     panel?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [history, intent.mode, intent.action, intent.stayId, intent.folioId]);
   const { room, state } = model;
-  if (!room || !state) return <WorkspacePageFrame title="Oda kullanılamıyor" onClose={() => navigation.closeWorkspace()}><p>Oda kaydı bulunamadı veya bu yetenek kullanılamıyor.</p></WorkspacePageFrame>;
+  if (!room || !state) return <WorkspacePageFrame title="Oda kullanılamıyor" onClose={() => navigation.closeWorkspace({ entityType: "room", entityId: intent.entityId })}><p>Oda kaydı bulunamadı veya bu yetenek kullanılamıyor.</p></WorkspacePageFrame>;
   return <WorkspacePageFrame title={roomIdentity(room)} className="operations-workspace" bodyScroll="panes"
     context={history && <div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
       <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
@@ -116,7 +116,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       {intent.returnContext?.page === "restaurant" && intent.returnContext.entityId && <ActionButton variant="secondary" disabled={busy || dirty}
         onClick={() => navigation.openWorkspace({ entityType: "table", entityId: intent.returnContext!.entityId!, mode: "account", action: "room-transfer",
           returnContext: { page: "restaurant", view: "floor" } })}>Masa Hesabına Dön</ActionButton>}</>}
-    onClose={() => navigation.closeWorkspace()} closeBlocked={blocked || Boolean(quickAction)}
+    onClose={() => navigation.closeWorkspace({ entityType: "room", entityId: intent.entityId })} closeBlocked={blocked || Boolean(quickAction)}
     footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}
     overlay={!history && quickAction ? <>
       {quickAction === "customer" && <CustomerCreateEditor
