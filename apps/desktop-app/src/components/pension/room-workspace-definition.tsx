@@ -9,5 +9,6 @@ export const roomWorkspaceDefinition: WorkspaceDefinition<
 > = {
   entityType: "room",
   defaultPresentation: "centered",
+  sessionPage: "pension",
   render: (intent, context) => <RoomWorkspace {...context} intent={intent} />
 };
