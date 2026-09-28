@@ -20,7 +20,7 @@
   min-height: 0;
 }
 .page-content.is-workspace-active > :not(.persistent-workspace-layer) {
-  display: none !important;
+  display: none;
 }
 .page-content.is-workspace-active > .persistent-workspace-layer {
   display: flex;
@@ -35,4 +35,4 @@
   display: flex;
   flex-direction: column;
 }
-.persistent-workspace-slot[hidden] { display: none !important; }
+.persistent-workspace-slot[hidden] { display: none; }

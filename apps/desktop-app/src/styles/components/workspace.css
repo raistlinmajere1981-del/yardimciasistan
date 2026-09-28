@@ -54,6 +54,10 @@
 .workspace-frame__header { border-bottom: 1px solid var(--color-border); }
 .workspace-frame__header h2 { margin: 0; font-size: var(--text-lg); }
 .workspace-frame__identity { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .workspace-frame__header { flex-wrap: wrap; }
+  .workspace-frame__identity { flex: 1 1 12rem; }
+}
 .workspace-frame__context { color: var(--color-text-muted); font-size: var(--text-xs); }
 .workspace-frame__actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .workspace-frame__navigation { flex: 0 0 auto; min-width: 0; }
