@@ -9,6 +9,7 @@ import type {
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
+import { WorkspaceFormOverlay } from "../workspace/WorkspaceFormOverlay";
 import { DatePicker, TimePicker } from "../ui/DateTimePicker";
 import { SearchSelect } from "../ui/SearchSelect";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
@@ -218,13 +219,10 @@ export function ManualRestaurantReservationEditor({
   </>;
 
   if (embedded) {
-    return <section className="operation-section form-stack workspace-quick-action" aria-label="Yeni masa rezervasyonu">
-      <div className="page-toolbar">
-        <div><strong>Yeni masa rezervasyonu</strong><small>Bu çalışma alanındaki masa rezervasyonda seçili gelir.</small></div>
-        <ActionButton variant="ghost" size="sm" type="button" disabled={busy} onClick={onClose}>Kapat</ActionButton>
-      </div>
-      <form className="form-stack" onSubmit={submitReservation}>{fields}{feedback}{actions}</form>
-    </section>;
+    return <WorkspaceFormOverlay title="Yeni masa rezervasyonu" onClose={onClose} closeBlocked={busy} onSubmit={submitReservation} footer={actions}>
+      {fields}
+      {feedback}
+    </WorkspaceFormOverlay>;
   }
 
   return <FormDialog title="Yeni masa rezervasyonu" onClose={onClose} closeBlocked={busy} footer={actions} onSubmit={submitReservation}>
