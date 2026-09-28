@@ -12,6 +12,7 @@ interface WorkspaceChromeProps {
   title: ReactNode;
   context?: ReactNode;
   actions?: ReactNode;
+  headerSummary?: ReactNode;
   navigation?: ReactNode;
   footer?: ReactNode;
   overlay?: ReactNode;
@@ -30,6 +31,7 @@ function WorkspaceChrome({
   title,
   context,
   actions,
+  headerSummary,
   navigation,
   footer,
   overlay,
@@ -45,9 +47,18 @@ function WorkspaceChrome({
 }: WorkspaceChromeProps) {
   return <>
     <header className="workspace-frame__header">
-      <div className="workspace-frame__identity">
-        <h2 ref={titleRef} id={titleId} tabIndex={-1} data-modal-initial-focus>{title}</h2>
-        {context && <div className="workspace-frame__context">{context}</div>}
+      <div className={`workspace-frame__identity${headerSummary ? " workspace-frame__identity--summary" : ""}`}>
+        <h2
+          ref={titleRef}
+          id={titleId}
+          tabIndex={-1}
+          data-modal-initial-focus
+          className={headerSummary ? "workspace-frame__title--visually-hidden" : undefined}
+        >
+          {title}
+        </h2>
+        {headerSummary}
+        {!headerSummary && context && <div className="workspace-frame__context">{context}</div>}
       </div>
       <div className="workspace-frame__actions">
         {actions}
@@ -70,6 +81,7 @@ interface WorkspaceFrameProps extends Omit<ModalSurfaceProps, "labelledBy" | "ch
   title: ReactNode;
   context?: ReactNode;
   actions?: ReactNode;
+  headerSummary?: ReactNode;
   navigation?: ReactNode;
   footer?: ReactNode;
   overlay?: ReactNode;
@@ -81,7 +93,7 @@ interface WorkspaceFrameProps extends Omit<ModalSurfaceProps, "labelledBy" | "ch
   bodyScroll?: "body" | "panes";
 }
 
-export function WorkspaceFrame({ title, context, actions, navigation, footer, overlay, children, presentation, className = "",
+export function WorkspaceFrame({ title, context, actions, headerSummary, navigation, footer, overlay, children, presentation, className = "",
   onPresentationChange, closeLabel = "Çalışma alanını kapat", bodyScroll = "body", ...modal }: WorkspaceFrameProps) {
   const id = useId();
   const marker = useRef<HTMLDivElement>(null);
@@ -116,6 +128,7 @@ export function WorkspaceFrame({ title, context, actions, navigation, footer, ov
         title={title}
         context={context}
         actions={actions}
+        headerSummary={headerSummary}
         navigation={navigation}
         footer={footer}
         overlay={overlay}
@@ -133,11 +146,12 @@ export function WorkspaceFrame({ title, context, actions, navigation, footer, ov
   );
 }
 
-export function WorkspacePageFrame({ title, context, actions, navigation, footer, overlay, children, className = "",
+export function WorkspacePageFrame({ title, context, actions, headerSummary, navigation, footer, overlay, children, className = "",
   closeBlocked = false, closeLabel = "Çalışma alanını kapat", bodyScroll = "body", onClose }: {
   title: ReactNode;
   context?: ReactNode;
   actions?: ReactNode;
+  headerSummary?: ReactNode;
   navigation?: ReactNode;
   footer?: ReactNode;
   overlay?: ReactNode;
@@ -159,6 +173,7 @@ export function WorkspacePageFrame({ title, context, actions, navigation, footer
       title={title}
       context={context}
       actions={actions}
+      headerSummary={headerSummary}
       navigation={navigation}
       footer={footer}
       overlay={overlay}
