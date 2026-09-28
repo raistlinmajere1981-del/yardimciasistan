@@ -151,7 +151,7 @@ The fixture renders Dashboard without a `window.yardimciDesktop` bridge and veri
 - reservation inspection remains a launcher callback
 - Customer Work and daily AI actions remain external launchers
 
-The smoke is included in both `smoke:desktop-renderer` and `pilot:check`.
+The smoke is registered as the `dashboard-workspace` leaf check and is included in Full Verify.
 
 ## Domain boundaries preserved
 
@@ -173,23 +173,11 @@ The change is an ownership cleanup, not a Dashboard redesign.
 Stage closure passed locally:
 
 ```text
-npm run typecheck
-npm run typecheck:electron
-npm run smoke:dashboard-workspace
-npm run smoke:desktop-renderer
+npm run verify:check -- dashboard-workspace
+npm run verify:domain -- desktop
+npm run verify:pre-main
 
-node scripts/smoke-stage2c-core-workspaces.mjs
-node scripts/smoke-calendar-workspace.mjs
-
-npm run lint:strict
-npm run knip:strict
-npm run architecture:audit
-npm run design:audit:strict
-npm run pilot:check
-
-git diff --check
 git status --short --branch
-npm run check:linux
 ```
 
 No high-risk persistence or transaction boundary was introduced, so Stage 8F did not require an Astra architecture checkpoint.

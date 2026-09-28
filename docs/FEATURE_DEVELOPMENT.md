@@ -107,21 +107,17 @@ Prefer this order:
 
 Do not preserve migration-era DOM geometry through regex/source-text smoke tests.
 
-Useful milestone gates:
+Useful verification flow:
 
 ```fish
-npm run typecheck
-npm run smoke:desktop-renderer
-npm run lint:strict
-npm run knip:strict
-npm run knip:exports
-npm run design:audit:strict
-npm run architecture:audit
-npm run pilot:check
-git diff --check
+npm run verify:dev
+npm run verify:domain -- <touched-domain>
+npm run verify:pre-main
 ```
 
-Use the narrowest relevant subset while iterating.
+Use `npm run verify:check -- <id>` for a single failing contract and
+`npm run verify:list` to discover ids. The canonical runner owns build/typecheck
+prerequisites and de-duplicates them; do not manually stack old aggregate suites.
 
 ## 10. Definition of done
 

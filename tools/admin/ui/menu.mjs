@@ -17,10 +17,9 @@ import { createTerminalUI } from "./terminal.mjs";
 export const SECTIONS = {
   checks: {
     title: "Kontroller", groups: [
-      ["Presetler", ["dev-check", "full-verify", "release-check"]],
-      ["Hızlı kontroller", ["doctor", "typecheck", "typecheck-electron", "lint", "lint-strict", "lint-php", "knip-strict", "test-all", "e2e", "arch-audit", "design-audit-strict"]],
-      ["Bileşik kontroller", ["pilot-check", "pilot-check-android", "pilot-check-full", "check", "check-linux", "pre-main"]],
-      ["Tekil smoke'lar", ["smoke-local-lab", "smoke-web-form-api", "smoke-web-module", "smoke-desktop-clean-startup", "smoke-diagnostics"]],
+      ["Doğrulama presetleri", ["verify-dev", "verify-domain", "verify-full", "verify-pre-main", "verify-release"]],
+      ["Teşhis", ["verify-check", "verify-list", "verify-plan"]],
+      ["Dar kapılar", ["doctor", "typecheck", "typecheck-electron", "lint-strict", "lint-php", "knip-strict", "test-all", "e2e", "arch-audit", "design-audit-strict", "smoke-diagnostics"]],
     ],
   },
   android: {
@@ -443,7 +442,7 @@ async function historySection(ui) {
   for (;;) {
     const runs = listRuns(20);
     const vcs = currentVcs();
-    const { lastPass, currentMismatch } = lastPassFor("full-verify", vcs.branch, vcs.commit);
+    const { lastPass, currentMismatch } = lastPassFor("verify-full", vcs.branch, vcs.commit);
     const body = lastPass
       ? [`Son Full Verify: ${lastPass.commit}${currentMismatch ? " — mevcut HEAD için değil" : " — mevcut HEAD"}`]
       : ["Henüz başarılı Full Verify kaydı yok."];

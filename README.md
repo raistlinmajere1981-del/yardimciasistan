@@ -151,45 +151,43 @@ QR menü + Android operasyon snapshot'ı
 
 ## Kalite Kapıları
 
-Repo artık yalnız build/test ile kontrol edilmez.
+Repo artık tek bir doğrulama registry'si ve runner üzerinden kontrol edilir.
 
 ```text
+TypeScript
+Workspace/unit testleri
+Capability/commerce smoke testleri
 ESLint
 Knip
 Design system debt audit
 Architecture audit
-TypeScript
-Workspace tests
-Capability/commerce smoke testleri
 ```
 
-Günlük kalite kontrolü:
+Günlük hızlı kontrol:
 
 ```bash
-npm run quality:strict
+npm run verify:dev
 ```
 
-Capability-first ve commerce temelinin tam checkpoint'i:
+Capability/commerce alanına odaklı kontrol:
 
 ```bash
-node scripts/check-modular-foundation.mjs
+npm run verify:domain -- commerce
 ```
 
-Başarı çıktısı:
+Tüm portable ürün doğrulaması:
 
-```text
-modular-foundation-check-ok
+```bash
+npm run verify:full
 ```
 
-Bu runner build, quality gate ve aşağıdaki kritik sözleşmeleri birlikte doğrular:
+Birleşme öncesi tek kapı:
 
-```text
-business-capabilities-smoke-ok
-capability-runtime-v2-smoke-ok
-setup-capability-contract-smoke-ok
-commerce-foundation-smoke-ok
-commerce-runtime-smoke-ok
+```bash
+npm run verify:pre-main
 ```
+
+Runner build/typecheck prerequisite'lerini ve aynı leaf smoke'u bir plan içinde yalnız bir kez çalıştırır.
 
 ## Geliştirici Komutları
 
@@ -208,10 +206,10 @@ Desktop:
 npm run dev:desktop
 ```
 
-Daha geniş Linux doğrulaması:
+Daha geniş doğrulama:
 
 ```bash
-npm run check:linux
+npm run verify:full
 ```
 
 Android geliştirme:
@@ -244,6 +242,6 @@ Başlıca sözleşmeler:
 
 Pansiyon/restoran omurgası, capability-first modüler altyapı ve Market/perakende MVP'si oluşturulmuştur. Market tarafında masaüstü operasyonları, Android companion, kamera barkod akışı, doğrudan mobil ürün kaydı, telefon sepetleri ve bilinmeyen barkod için Product Data entegrasyonu çalışır durumdadır.
 
-Yeni geliştirme paketlerinden önce `node scripts/check-modular-foundation.mjs` yeşil olmalıdır. Güncel capability kararları, Market/Android sınırları, Product Data ve durable asset modeli [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) içinde kayıtlıdır.
+Yeni geliştirme paketlerinden önce ilgili domain doğrulaması; birleşme öncesinde ise `npm run verify:pre-main` yeşil olmalıdır. Güncel capability kararları, Market/Android sınırları, Product Data ve durable asset modeli [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) içinde kayıtlıdır.
 
 Güncel masaüstü veritabanı `apps/desktop-app/db/schema.sql` ile doğrudan oluşturulur. `profile_id` ve `business_capabilities` current sözleşmedir; tarihsel schema upgrade zinciri yoktur. Backup/restore yalnız güncel `yardimci-asistan-backup-v2` formatını kabul eder.

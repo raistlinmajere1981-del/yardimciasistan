@@ -18,6 +18,8 @@ on:
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
       - "scripts/test-helpers/**"
+      - "scripts/verify.mjs"
+      - "scripts/verification-registry.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
   push:
@@ -41,6 +43,8 @@ on:
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
       - "scripts/test-helpers/**"
+      - "scripts/verify.mjs"
+      - "scripts/verification-registry.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
 
@@ -61,50 +65,5 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci
 
-      - name: Ortak paketleri derle
-        run: npm run build:packages
-
-      - name: Web widget doğrudan talep smoke
-        run: node scripts/smoke-web-widget-module.mjs
-
-      - name: Masaüstü strict typecheck
-        run: npm run typecheck:strict -w @yardimci-asistan/desktop-app
-
-      - name: Masaüstü mimari audit
-        run: npm run architecture:audit
-
-      - name: Masaüstünü derle
-        run: npm run build -w @yardimci-asistan/desktop-app
-
-      - name: Senkron HTTP zaman aşımı smoke
-        run: node scripts/smoke-sync-timeout.mjs
-
-      - name: Web bağlantı testi smoke
-        run: node scripts/smoke-web-connection-test.mjs
-
-      - name: Finans veritabanı smoke
-        run: node scripts/smoke-finance-db.mjs
-
-      - name: Finans servis smoke
-        run: node scripts/smoke-finance-service.mjs
-
-      - name: Oda adisyonu servis smoke
-        run: node scripts/smoke-room-folio-service.mjs
-
-      - name: Restoran adisyonunu odaya yaz smoke
-        run: node scripts/smoke-room-folio-table-order-transfer.mjs
-
-      - name: Manuel günlük iş smoke
-        run: node scripts/smoke-daily-task-management.mjs
-
-      - name: Doğrudan rezervasyon smoke
-        run: node scripts/smoke-manual-reservation.mjs
-
-      - name: Restoran rezervasyon smoke
-        run: node scripts/smoke-manual-restaurant-reservation.mjs
-
-      - name: Takvim workspace smoke
-        run: node scripts/smoke-calendar-workspace.mjs
-
-      - name: Electron başlatma smoke
-        run: node scripts/smoke-desktop-xvfb.mjs
+      - name: Finans domain doğrulaması
+        run: npm run verify:domain -- finance

@@ -1,4 +1,4 @@
-name: Pilot Core Gate
+name: Verification Full Gate
 
 on:
   workflow_dispatch:
@@ -8,9 +8,11 @@ on:
       - "packages/**"
       - "firm-template/**"
       - "scripts/**"
+      - "tools/admin/**"
       - "package.json"
       - "package-lock.json"
-      - ".github/workflows/pilot-core-check.yml"
+      - "product-version.json"
+      - ".github/workflows/verification-full.yml"
   push:
     branches:
       - main
@@ -19,14 +21,16 @@ on:
       - "packages/**"
       - "firm-template/**"
       - "scripts/**"
+      - "tools/admin/**"
       - "package.json"
       - "package-lock.json"
-      - ".github/workflows/pilot-core-check.yml"
+      - "product-version.json"
+      - ".github/workflows/verification-full.yml"
 
 jobs:
-  pilot-core:
+  verify-full:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - name: Kodu al
@@ -38,6 +42,13 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Java kur
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
       - name: Bağımlılıkları kur
         run: npm ci
 
@@ -46,14 +57,14 @@ jobs:
           php --version
           php -r 'if (!extension_loaded("pdo_sqlite")) { fwrite(STDERR, "pdo_sqlite missing\n"); exit(1); }'
 
-      - name: Pilot core kapısını çalıştır
-        run: npm run pilot:check
+      - name: Full Verify
+        run: npm run verify:full
 
-      - name: Pilot raporunu sakla
+      - name: Verify raporunu sakla
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pilot-core-report
-          path: artifacts/pilot-check/latest.json
+          name: verify-full-report
+          path: artifacts/verify/latest.json
           if-no-files-found: warn
           retention-days: 14
