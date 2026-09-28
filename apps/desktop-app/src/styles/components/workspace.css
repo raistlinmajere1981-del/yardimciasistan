@@ -54,6 +54,25 @@
 .workspace-frame__header { border-bottom: 1px solid var(--color-border); }
 .workspace-frame__header h2 { margin: 0; font-size: var(--text-lg); }
 .workspace-frame__identity { min-width: 0; overflow-wrap: anywhere; }
+.workspace-frame__identity--summary { flex: 1 1 auto; }
+.workspace-frame__title--visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.workspace-frame__identity--summary .resource-workspace-summary {
+  padding: 0;
+  border-bottom: 0;
+}
+.workspace-frame__identity--summary .resource-workspace-summary__detail {
+  margin-inline-start: auto;
+}
 @media (max-width: 700px) {
   .workspace-frame__header { flex-wrap: wrap; }
   .workspace-frame__identity { flex: 1 1 12rem; }
