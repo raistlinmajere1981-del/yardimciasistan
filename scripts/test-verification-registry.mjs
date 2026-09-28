@@ -71,3 +71,20 @@ test("scripts altındaki tüm smoke dosyaları registry'de veya açıkça helper
   const missing = files.filter((file) => !registered.has(file) && !IGNORED_SMOKE_FILES.has(file));
   assert.deepEqual(missing, []);
 });
+
+
+test("domain plan release-only paketleme adımlarını içermez", () => {
+  const desktop = new Set(createVerificationPlan({ domain: "desktop", platform: "linux" }).map((item) => item.id));
+  const android = new Set(createVerificationPlan({ domain: "android", platform: "linux" }).map((item) => item.id));
+  assert.equal(desktop.has("package-desktop-dir"), false);
+  assert.equal(desktop.has("desktop-package"), false);
+  assert.equal(android.has("android-release-apk"), false);
+  assert.equal(android.has("android-release-aab"), false);
+});
+
+test("Android domain sync ve local companion çapraz akışlarını kapsar", () => {
+  const ids = new Set(createVerificationPlan({ domain: "android", platform: "linux" }).map((item) => item.id));
+  assert.ok(ids.has("automatic-sync"));
+  assert.ok(ids.has("local-companion-server"));
+  assert.ok(ids.has("market-companion-desktop-inbox"));
+});
