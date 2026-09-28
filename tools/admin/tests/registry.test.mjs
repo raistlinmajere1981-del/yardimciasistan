@@ -41,7 +41,7 @@ test("kategoriler ve site/cwd tutarlılığı", () => {
 });
 
 test("temel preset ve akışlar mevcut", () => {
-  for (const id of ["dev-check", "full-verify", "release-check", "android-release-flow", "bs-deploy-flow", "release-desktop-linux", "fresh-full"]) {
+  for (const id of ["dev-check", "full-verify", "release-check", "android-release-flow", "bs-deploy-flow", "release-desktop-linux", "product-version-show", "product-version-set", "fresh-full"]) {
     assert.ok(getTask(id), id);
   }
   assert.equal(getTask("dev-check").stopOnError, false);
