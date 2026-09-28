@@ -72,7 +72,7 @@ try {
   const operations = workspace.locator('#room-operations');
   const account = workspace.getByRole('region', { name: 'Misafir Hesabı', exact: true });
   await expect(stayPanel.getByLabel('Ana misafir', { exact: true })).toBeVisible();
-  await expect(operations.getByLabel('Fiziksel oda durumu')).toBeVisible();
+  await expect(workspace.getByLabel('Fiziksel oda durumu')).toBeVisible();
   await expect(operations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toBeVisible();
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => !['read', 'assignment'].includes(call.kind)))).toEqual([]);
@@ -201,8 +201,9 @@ try {
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentCallsBeforeCheckout + 1);
   await expect(account.getByRole('region', { name: 'Mevcut konaklama hesabı' })).toContainText('Aktif misafir hesabı yok');
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toContainText('Önceki konaklamalardan açık hesap yok.');
-  await operations.getByRole('group', { name: 'Fiziksel oda durumu', exact: true }).getByRole('button', { name: 'Hazır', exact: true }).click();
-  await expect(workspace.getByText('Fiziksel: Hazır', { exact: true })).toBeVisible();
+  const roomCondition = workspace.getByRole('group', { name: 'Fiziksel oda durumu', exact: true });
+  await roomCondition.getByRole('button', { name: 'Hazır', exact: true }).click();
+  await expect(roomCondition.getByRole('button', { name: 'Hazır', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await button('Çalışma alanını kapat').click();
   await expect(workspace).toHaveCount(0);
   await expect(button('Pilot 102 odasını aç')).toBeVisible();
@@ -220,7 +221,7 @@ try {
   await button('Pilot 102 odasını aç').click();
   const outOperations = workspace.locator('#room-operations');
   await expect(outOperations).toContainText('Oda hizmet dışı. Ayarlar > İşletme Düzeni > Oda Yönetimi');
-  await expect(outOperations.getByLabel('Fiziksel oda durumu')).toHaveCount(0);
+  await expect(workspace.getByLabel('Fiziksel oda durumu')).toHaveCount(0);
   await expect(outOperations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await button('Çalışma alanını kapat').click();
   await page.evaluate(() => {
