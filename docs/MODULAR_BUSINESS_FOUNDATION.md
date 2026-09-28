@@ -555,7 +555,7 @@ MVP'nin amacı ileri ERP/muhasebe değildir. Küçük işletmede ürün bulma, s
 Yeni session'ın ilk işi repo head'ini okuyup aşağıdaki checkpoint'i doğrulamak olmalıdır:
 
 ```bash
-node scripts/check-modular-foundation.mjs
+npm run verify:full
 ```
 
 Bu yeşil değilse yeni sektör veya ileri Market geliştirmesine başlanmamalıdır.
@@ -619,7 +619,7 @@ currency bazında pozitif borçlar, son hareket zamanı ve son tahsilat bilgisin
 - `npm run build:packages` ve desktop build: geçti.
 - `npm run test`: 87 Node testi ve 30 Android testi, sıfır hata.
 - Yeni targeted smoke: `market-customer-credit-foundation-smoke-ok`.
-- `node scripts/check-modular-foundation.mjs`: `modular-foundation-check-ok`;
+- `npm run verify:full`: `Doğrulama planı temiz.`;
   lint, Knip, design/architecture, typecheck ve tüm M7 smoke'ları geçti.
 - `npm run android:debug`: `BUILD SUCCESSFUL`; Android source değişmedi.
 - Ek record-deletions, customer-room-management, app-lock, finance-db,
@@ -691,7 +691,7 @@ tahsilat, düzeltme, geçmiş ve silme gerçek uygulama koduyla çalışır.
 
 - `npm run build:packages` ve desktop build geçti.
 - `npm run test`: 87 Node testi ve 30 Android testi, sıfır hata.
-- `node scripts/check-modular-foundation.mjs`: `modular-foundation-check-ok`;
+- `npm run verify:full`: `Doğrulama planı temiz.`;
   lint, Knip, design/architecture, typecheck ve tüm M7/M8 smoke'ları geçti.
 - M8.1 targeted smoke: `market-customer-credit-foundation-smoke-ok`.
 - M8.2 targeted smoke: `market-customer-credit-ui-contract-smoke-ok`;
@@ -783,7 +783,7 @@ görselleri `artifacts/screenshots/m83-credit-whatsapp/` altındadır (git dış
 - `npm run build:packages` ve desktop build geçti.
 - `npm run test`: 91 Node testi (12 WhatsApp bridge testi dahil) ve 30 Android
   testi, sıfır hata.
-- `node scripts/check-modular-foundation.mjs`: `modular-foundation-check-ok`;
+- `npm run verify:full`: `Doğrulama planı temiz.`;
   strict kalite kapıları ve tüm M7/M8 smoke'ları geçti.
 - M8.1, M8.2 ve yeni M8.3 targeted smoke'ları ayrıca geçti.
 - `npm run smoke:desktop-renderer`: `desktop-renderer-ok`; mevcut request/AI
