@@ -92,7 +92,10 @@ function ContributionFixture() {
     header={<header className="page-header"><h1>Test Feature</h1></header>}
     overlay={<WorkspaceHost
       definition={testFeatureComposition.workspace}
-      context={{ data, onDashboard: setData, ...fixtureWindow.fixtureCapabilities }}
+      context={{ data, onDashboard: setData, ...fixtureWindow.fixtureCapabilities, customersEnabled: false, aiEnabled: false,
+        onSaveCustomer: async () => ({ ok: false as const, message: "fixture" }),
+        onAnalyzeIdentity: async () => ({ ok: false as const, message: "fixture" }),
+        onSaveReservation: async () => ({ ok: false as const, message: "fixture" }) }}
     />}
   >
     <section aria-label="Test feature katkıları" className="form-stack">

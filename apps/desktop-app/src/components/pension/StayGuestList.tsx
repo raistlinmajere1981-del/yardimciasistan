@@ -50,7 +50,7 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty }: {
         options={guests.filter(guest => guest.customerId !== stay.customerId).map(guest => ({ id: guest.customerId, label: guest.customerName }))} /></div>}
     <p>Hesap konaklamanın ortak hesabıdır. Ana misafirin değişmesi hesap sahibini veya geçmiş borçları değiştirmez.</p>
     <div className="stay-secondary-controls">
-    <div className="form-stack"><StayGuestPicker data={data} selectedIds={guests.map(guest => guest.customerId)} disabled={disabled} operations={operations} onDirty={onDirty}
+    <div className="form-stack"><StayGuestPicker data={data} selectedIds={guests.map(guest => guest.customerId)} disabled={disabled}
       onSelect={id => void operations.mutate("stay", () => window.yardimciDesktop!.addStayGuest({ stayId: stay.id, customerId: id }))} /></div>
     {stay.status === "checked_in" && <div className="form-stack">
       <div className="form-field"><span>Odayı değiştir</span><SearchSelect ariaLabel="Yeni oda" value={nextRoom} disabled={disabled} onChange={id => { setNextRoom(id); onDirty(Boolean(id)); }}
