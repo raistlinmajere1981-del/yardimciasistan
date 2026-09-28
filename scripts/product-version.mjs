@@ -3,11 +3,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const versionPath = resolve(repoRoot, "product-version.json");
-const desktopPackagePath = resolve(repoRoot, "apps", "desktop-app", "package.json");
-const androidPackagePath = resolve(repoRoot, "apps", "android-app", "package.json");
-const lockPath = resolve(repoRoot, "package-lock.json");
-
 export function readProductVersion(root = repoRoot) {
   const value = JSON.parse(readFileSync(resolve(root, "product-version.json"), "utf8"));
   validateVersion(value.version);
