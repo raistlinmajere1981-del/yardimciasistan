@@ -5,6 +5,7 @@ import type { DesktopRoomOperations } from "../../../electron/database-types";
 import { ResourceCard } from "../operations/ResourceCard";
 import { ActionButton } from "../ui/ActionButton";
 import { ChoiceChips } from "../ui/ChoiceChips";
+import { StatusBadge } from "../ui/StatusBadge";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { getRoomCardModel, roomIdentity, type RoomCardCapabilities } from "./room-card-model";
@@ -61,6 +62,7 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
 
   return <>
     <ResourceCard
+      imageSrc="./assets/default-room.png"
       title={roomIdentity(room)}
       subtitle={[room.capacity > 0 ? `${room.capacity} kişi` : "", room.floor].filter(Boolean).join(" · ")}
       icon={<BedDouble size={22} />}
@@ -71,6 +73,9 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
       onOpen={open}
       openLabel={`${room.name} odasını aç`}
       status={<>
+        <StatusBadge tone={!summary ? "neutral" : model.current.length || room.status === "occupied" ? "info" : "neutral"}>
+          {!summary ? "Doluluk doğrulanamadı" : model.current.length || room.status === "occupied" ? "Dolu" : "Boş"}
+        </StatusBadge>
         {isOutOfService ? (
           <span className="resource-card__out-of-service">Hizmet dışı</span>
         ) : (
@@ -89,10 +94,10 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
         )}
         {model.current.length > 0 && <span><UserRound size={16} />Misafir içeride</span>}
       </>}
-      action={model.quickAction ? <ActionButton disabled={busy} onClick={quickAction}>{model.quickAction.label}</ActionButton>
+      action={<><ActionButton variant="secondary" disabled={busy} onClick={open}>Odayı Aç</ActionButton>{model.quickAction ? <ActionButton disabled={busy} onClick={quickAction}>{model.quickAction.label}</ActionButton>
         : capabilities.staysEnabled && summary && model.physical === "ready" && !model.current.length && !model.planned.length
           && room.status !== "occupied" && <ActionButton disabled={busy} onClick={() => navigation.openWorkspace({ entityType: "room", entityId: room.id,
-            mode: "stay", action: "check-in", returnContext: { page: "pension", view: "rooms", entityId: room.id } })}>Giriş Yap</ActionButton>}
+            mode: "stay", action: "check-in", returnContext: { page: "pension", view: "rooms", entityId: room.id } })}>Giriş Yap</ActionButton>}</>}
     >
       {!summary ? <p className="resource-card__notice"><CircleAlert size={16} />Güncel özet alınamadı.</p> : <>
         {model.current.map(stay => <div className="resource-card__fact" key={stay.id}><span>Konaklayanlar · {stay.guestCount} kişi</span><strong>{stay.customerName}{stay.guestCount > 1 ? ` +${stay.guestCount - 1}` : ""}</strong><small>{formatDateRange(stay.checkInDate, stay.checkOutDate)}</small></div>)}

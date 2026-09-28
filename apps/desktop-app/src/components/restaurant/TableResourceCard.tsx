@@ -116,6 +116,7 @@ export function TableResourceCard({ table, summary, capabilities, onDashboard, o
 
   return <>
     <ResourceCard
+      imageSrc="./assets/default-table.png"
       title={table.name}
       subtitle={[table.area, table.capacity > 0 ? `${table.capacity} kişi` : ""].filter(Boolean).join(" · ")}
       icon={<UtensilsCrossed size={22} />}
@@ -154,7 +155,8 @@ export function TableResourceCard({ table, summary, capabilities, onDashboard, o
           />}
       onOpen={open}
       openLabel={`${table.name} masasını aç`}
-      action={quickAction && <ActionButton disabled={busy} onClick={() => void runQuickAction()}>{quickAction.label}</ActionButton>}
+      action={<><ActionButton variant="secondary" disabled={busy} onClick={open}>Detay Gör</ActionButton>
+        {quickAction && <ActionButton disabled={busy} onClick={() => void runQuickAction()}>{quickAction.label}</ActionButton>}</>}
     >
       {!summary ? <p className="resource-card__notice"><CircleAlert size={16} />Güncel adisyon bilgisi alınamadı.</p> : <>
         {order && <><div className="resource-card__fact"><span><ReceiptText size={16} />{order.itemCount > 0 ? `${order.itemCount} ürün` : "Sipariş alınıyor"}</span>

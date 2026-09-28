@@ -23,6 +23,17 @@
   transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard), background var(--motion-normal) var(--ease-standard);
 }
 .resource-card[data-tone="success"] { --resource-tone: var(--color-success); }
+.resource-card__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 12 / 5;
+  object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+}
 .resource-card[data-tone="info"] { --resource-tone: var(--color-info); }
 .resource-card[data-tone="warning"] { --resource-tone: var(--color-warning); }
 .resource-card[data-tone="danger"] { --resource-tone: var(--color-danger); }

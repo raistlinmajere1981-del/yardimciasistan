@@ -61,11 +61,18 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
     if (approved) onCloseOrder(status);
   }
   return <>
-    <dl className="operation-facts"><div><dt>Masa</dt><dd>{table.name} · {table.area || "Genel"}</dd></div>
-      <div><dt>Durum</dt><dd>{formatTableStatus(table.status)}</dd></div><div><dt>Kapasite</dt><dd>{table.capacity} kişi</dd></div>
-      {order && <div><dt>Açık kalma süresi</dt><dd>{duration} dk</dd></div>}
-    </dl>
-    {customersEnabled && <section className="operation-section form-stack" aria-label="Masa müşterisi">
+    {order && <section className="operation-section form-stack" aria-label="Masa hesabı">
+      <h4>Hesap</h4><dl className="operation-facts">
+        <div><dt>Ara toplam</dt><dd>{formatMoney(order.subtotal, getOrderCurrency(order))}</dd></div>
+        <div><dt>İndirim</dt><dd>{formatMoney(order.discountTotal, getOrderCurrency(order))}</dd></div>
+        <div className="operation-balance"><dt>Kalan / toplam</dt><dd>{formatMoney(order.total, getOrderCurrency(order))}</dd></div>
+      </dl>
+      <p>Tahsilatı aldıktan sonra adisyonu ödendi olarak kapatın.</p>
+      <ActionButton disabled={disabled} onClick={() => void requestOrderClose("paid")}>Ödendi / Kapat</ActionButton>
+      {roomFolioTransferEnabled && order.total > 0 && <TableRoomTransfer key={order.id} order={order} busy={disabled} onTransfer={onTransfer} revision={data.revision} customerId={table.currentCustomerId} dashboard={data} />}
+      <ActionButton variant="danger" disabled={disabled} onClick={() => void requestOrderClose("cancelled")}>Adisyonu İptal Et</ActionButton>
+    </section>}
+    {customersEnabled && <section className="operation-section form-stack" aria-label="Masa müşterisi" tabIndex={-1}>
       <h4>Müşteri</h4><p>{customer?.fullName || "Masaya bağlı müşteri yok."}</p>
       <div className="form-field form-field--fluid">
         <span>Müşteri seç</span>
@@ -84,9 +91,11 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
           }))}
         />
       </div>
+      <div className="action-row">
       <ActionButton disabled={disabled || !selectedCustomerId || selectedCustomerId === table.currentCustomerId}
         onClick={() => void assignCustomer(selectedCustomerId)}>{table.currentCustomerId ? "Müşteriyi Değiştir" : "Müşteriyi Bağla"}</ActionButton>
       {table.currentCustomerId && <ActionButton variant="secondary" disabled={disabled} onClick={() => void assignCustomer("")}>Bağı Kaldır</ActionButton>}
+      </div>
       {roomFolioTransferEnabled && customer && !customerStay && <div className="form-stack">
         <div className="form-field"><span>Konaklama odası</span><SearchSelect ariaLabel="Konaklama başlatılacak oda" value={entryRoomId} onChange={setEntryRoomId} disabled={disabled}
           options={data.rooms.filter(room => room.isActive && room.status === "available").map(room => ({ id: room.id, label: room.number ? `Oda ${room.number}` : room.name }))} /></div>
@@ -97,17 +106,7 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
       {customerStay && <p>Aktif konaklama · {customerStay.roomNumber ? `Oda ${customerStay.roomNumber}` : customerStay.roomName}</p>}
     </section>}
     {relatedReservations.map(item => <article className="operation-section" key={item.id}><h4>{item.customerName || item.title}</h4><p>Rezervasyon · {item.startDate} {item.time} · {item.guestCount} kişi</p></article>)}
-    {order ? <section className="operation-section form-stack" aria-label="Masa hesabı">
-      <h4>Hesap</h4><dl className="operation-facts">
-        <div><dt>Ara toplam</dt><dd>{formatMoney(order.subtotal, getOrderCurrency(order))}</dd></div>
-        <div><dt>İndirim</dt><dd>{formatMoney(order.discountTotal, getOrderCurrency(order))}</dd></div>
-        <div className="operation-balance"><dt>Kalan / toplam</dt><dd>{formatMoney(order.total, getOrderCurrency(order))}</dd></div>
-      </dl>
-      <p>Tahsilatı aldıktan sonra adisyonu ödendi olarak kapatın.</p>
-      <ActionButton disabled={disabled} onClick={() => void requestOrderClose("paid")}>Ödendi / Kapat</ActionButton>
-      {roomFolioTransferEnabled && order.total > 0 && <TableRoomTransfer key={order.id} order={order} busy={disabled} onTransfer={onTransfer} revision={data.revision} customerId={table.currentCustomerId} dashboard={data} />}
-      <ActionButton variant="danger" disabled={disabled} onClick={() => void requestOrderClose("cancelled")}>Adisyonu İptal Et</ActionButton>
-    </section> : <section className="operation-section form-stack">
+    {!order && <section className="operation-section form-stack">
       <h4>Masa hazırlığı</h4>
       <div className="form-field form-field--fluid">
         <span>Masa durumu</span>
@@ -137,6 +136,13 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
         />
       </div>
     </section>}
+    <section className="operation-section form-stack" aria-label="Masa bilgileri">
+    <h4>Masa bilgileri</h4>
+    <dl className="operation-facts"><div><dt>Masa</dt><dd>{table.name} · {table.area || "Genel"}</dd></div>
+      <div><dt>Durum</dt><dd>{formatTableStatus(table.status)}</dd></div><div><dt>Kapasite</dt><dd>{table.capacity} kişi</dd></div>
+      {order && <div><dt>Açık kalma süresi</dt><dd>{duration} dk</dd></div>}
+    </dl>
+    </section>
     <p role={controller.error ? "alert" : "status"}>{controller.busy ? "İşlem kaydediliyor..." : controller.loading ? "Adisyon yükleniyor..." : controller.message}</p>
     {confirmDialog}
   </>;

@@ -23,7 +23,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.table-area-heading h3 {
+.table-area-heading strong {
   margin: 0;
   color: var(--color-text);
   font-size: var(--text-md);
@@ -33,6 +33,13 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+
+details.table-area-group { display: block; }
+details.table-area-group > summary { cursor: pointer; min-height: var(--control-height-md); }
+details.table-area-group > summary::before { content: "+"; }
+details.table-area-group[open] > summary::before { content: "−"; }
+details.table-area-group > summary > strong { flex: 1; }
+details.table-area-group > .resource-grid { margin-top: var(--space-3); }
 
 :is(.restaurant-order-menu-panel, .restaurant-order-ticket-panel) {
   display: grid;

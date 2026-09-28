@@ -1,5 +1,5 @@
 import { Minus, Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import type { PublishedMenuItem, PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import { IconButton } from "../ui/IconButton";
 import { ActionButton } from "../ui/ActionButton";
@@ -9,8 +9,8 @@ import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency } from "./table-presentation";
 import { resolveMenuPreviewImageUrl } from "../menu/menu-model";
 
-export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, readOnly = false, startControl }: {
-  menu: PublishedQrMenu; webModuleUrl: string; menuEnabled: boolean; readOnly?: boolean; startControl?: import("react").ReactNode; controller: ReturnType<typeof useTableOrderController>;
+export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, readOnly = false, accountPanel }: {
+  menu: PublishedQrMenu; webModuleUrl: string; menuEnabled: boolean; readOnly?: boolean; accountPanel: ReactNode; controller: ReturnType<typeof useTableOrderController>;
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -44,9 +44,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
       .sort(compareMenuRecords);
   }, [activeCategories, categoryNames, menu.items, menuEnabled, searchQuery, selectedCategoryId]);
 
-  return (
-    <>
-              {menuEnabled && <section className="restaurant-order-menu-panel" aria-labelledby="table-order-menu-title">
+  const menuPanel = menuEnabled && <section className="restaurant-order-menu-panel" aria-labelledby="table-order-menu-title">
                 <div className="restaurant-order-panel-heading">
                   <div>
                     <h3 id="table-order-menu-title">Menü</h3>
@@ -95,9 +93,9 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                     </article>
                   ))}
                 </div>
-              </section>}
+              </section>;
 
-              <section className="restaurant-order-ticket-panel" aria-labelledby="table-order-ticket-title">
+  const ticketPanel = <section className="restaurant-order-ticket-panel" aria-labelledby="table-order-ticket-title">
                 <div className="restaurant-order-panel-heading restaurant-order-ticket-heading">
                   <div>
                     <h3 id="table-order-ticket-title">Aktif Adisyon</h3>
@@ -121,7 +119,6 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                     ]}
                   />
                 </div>}
-                {!selectedOrder && startControl}
                 <div className="restaurant-order-line-list">
                   {!selectedOrder && <p className="restaurant-order-empty">Aktif adisyon yok. Sipariş açtığınızda ürün ekleyebilirsiniz.</p>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
@@ -172,10 +169,11 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                 </div>
 
                 {selectedOrder && <div className="restaurant-ticket-total"><span>Adisyon toplamı</span><strong>{formatMoney(selectedOrder.total, getOrderCurrency(selectedOrder))}</strong></div>}
-              </section>
-            </>
-
-  );
+              </section>;
+  // Keyed sections keep customer drafts and menu filters mounted when an order starts.
+  const panels = [<Fragment key="menu">{menuPanel}</Fragment>, <Fragment key="ticket">{ticketPanel}</Fragment>];
+  const context = <Fragment key="context">{accountPanel}</Fragment>;
+  return <>{selectedOrder ? [...panels, context] : [context, ...panels]}</>;
 }
 
 function formatOrderMenuStock(quantity: number | null | undefined, unit: "piece" | "gram"): string {

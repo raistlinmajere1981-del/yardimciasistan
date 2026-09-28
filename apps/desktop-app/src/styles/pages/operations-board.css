@@ -146,6 +146,10 @@
   align-content: start;
 }
 
+/* Size each row from its own content, rather than the tallest card in the whole board. */
+.operations-board__pane--center .resource-grid { grid-auto-rows: auto; }
+.operations-board__pane--center .resource-card { min-height: 0; }
+
 .hospitality-resource-toolbar {
   display: flex;
   flex-wrap: wrap;

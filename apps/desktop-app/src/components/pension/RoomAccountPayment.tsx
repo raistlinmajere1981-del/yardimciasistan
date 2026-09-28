@@ -18,6 +18,7 @@ export function RoomAccountPayment({ folio, controller, disabled, onDirty }: {
     void controller.mutate(() => window.yardimciDesktop!.addRoomFolioPayment({ folioId: folio.id, amountMinor: value, paymentMethod: method }))
       .then(result => { if (result?.ok) { setAmount(null); onDirty(false); } });
   }}>
+    <h4>Ödeme al</h4>
     <fieldset className="form-stack" disabled={disabled || folio.remainingMinor <= 0}>
       <div className="operation-fields">
         <label className="form-field">Ödeme tutarı<MoneyInput required value={amount ?? minorToInput(folio.remainingMinor)} onChange={value => { setAmount(value); onDirty(true); }} /></label>

@@ -15,7 +15,7 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous,
   return <>
     {controller.loading && <p role="status">Hesap hazırlanıyor…</p>}
     {previous.some(folio => folio.remainingMinor > 0) && <p className="operation-prior-debt">Önceki borç · {minorMoney(previous.reduce((total, folio) => total + Math.max(0, folio.remainingMinor), 0))} · Aşağıda ayrı hesaplarda</p>}
-    <section aria-label="Mevcut konaklama hesabı" className="form-stack">
+    <section aria-label="Mevcut konaklama hesabı" className="operation-section form-stack">
       <h4>Ortak konaklama hesabı</h4>
       {current ? <AccountRecord key={current.id} folio={current} controller={controller} menuEnabled={menuEnabled} disabled={disabled} onDirty={dirty => onDirty(current.id, dirty)} />
         : <><p>{ambiguous ? "Birden fazla girişli konaklama var; mevcut hesap belirlenemedi. Konaklama kayıtlarını kontrol edin." : currentStayId ? "Bu konaklama için hesap henüz açılmadı." : "Aktif misafir hesabı yok. Giriş tamamlandığında konaklama hesabı burada görünür."}</p>

@@ -16,6 +16,8 @@ import { useRoomStayOperations } from "./use-room-stay-operations";
 import { RoomStayPanel } from "./RoomStayPanel";
 import { RoomReservationControl } from "./RoomReservationControl";
 import { RoomDailyOperations } from "./RoomDailyOperations";
+import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
+import { StatusBadge } from "../ui/StatusBadge";
 
 export interface RoomWorkspaceProps {
   intent: RoomWorkspaceIntent; data: DesktopDashboardData; onDashboard: (data: DesktopDashboardData) => void;
@@ -72,8 +74,15 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   if (!room || !state) return <WorkspaceFrame title="Oda kullanılamıyor" presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()}
     returnFocusRef={navigation.returnFocusRef}><p>Oda kaydı bulunamadı veya bu yetenek kullanılamıyor.</p></WorkspaceFrame>;
   return <WorkspaceFrame title={roomIdentity(room)} className="operations-workspace" bodyScroll="panes"
-    context={<div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
+    context={history && <div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
       <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
+    navigation={!history && <ResourceWorkspaceSummary label="Oda özeti" imageSrc="./assets/default-room.png"
+      facts={<><strong>{roomIdentity(room)}</strong><span>{room.capacity} kişilik</span>{room.floor && <span>Kat: {room.floor}</span>}{room.bedInfo && <span>{room.bedInfo}</span>}</>}
+      status={<><StatusBadge tone={state.occupancy.status === "occupied" ? "info" : "neutral"}>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</StatusBadge>
+        <StatusBadge tone="neutral">Fiziksel: {roomConditionLabel[state.operationalCondition]}</StatusBadge>{!room.isActive && <StatusBadge tone="warning">Etkin değil</StatusBadge>}</>}>
+      {model.currentStay ? <span>{model.currentStay.customerName} · {model.currentStay.guestCount} kişi</span>
+        : <span>{model.conflict ? "Konaklama kayıtlarını kontrol edin." : model.active.length ? "Planlanan konaklama var." : "Aktif konaklama yok."}</span>}
+    </ResourceWorkspaceSummary>}
     actions={<><ActionButton variant="ghost" disabled={busy} onClick={() => navigation.updateWorkspaceMode({ entityType: "room", mode: history ? "summary" : "history" })}>
       {history ? `← ${roomIdentity(room)}'e dön` : "Geçmiş"}</ActionButton>
       {intent.returnContext?.page === "restaurant" && intent.returnContext.entityId && <ActionButton variant="secondary" disabled={busy || dirty}
@@ -81,12 +90,12 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           returnContext: { page: "restaurant", view: "floor" } })}>Masa Hesabına Dön</ActionButton>}</>}
     presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()} closeBlocked={blocked} returnFocusRef={navigation.returnFocusRef}
     footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}>
-    <div ref={surface} className="operation-surface" hidden={history} key={draftEpoch}>
+    <div ref={surface} className="operation-surface operation-surface--sections" hidden={history} key={draftEpoch}>
       <OperationPanel title="Oda ve Misafir" id="room-stay">
         <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled} onDirty={value => setDirty("stay", value)} />
         {account.selected?.status === "open" && <RoomAccountDetails key={account.selected.id} folio={account.selected} controller={account} disabled={busy || account.loading} onDirty={value => setDirty("account-details", value)} />}
       </OperationPanel>
-      <OperationPanel title="Günlük Oda İşlemleri" id="room-operations">
+      <OperationPanel title={model.active.length ? "Günlük Oda İşlemleri" : "Oda Hazırlığı ve Rezervasyon"} id="room-operations">
         <RoomDailyOperations model={model} data={data} operations={operations} disabled={busy || accountDraftDirty} />
         {account.selected?.status === "open" && <RoomAccountAdjustments key={account.selected.id} folio={account.selected} controller={account} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />}
         {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId} onDirty={setDirty} />}

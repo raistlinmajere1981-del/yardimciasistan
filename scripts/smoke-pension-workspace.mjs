@@ -68,7 +68,7 @@ try {
   await button('Çalışma alanını kapat').click();
   await button('Pilot 102 odasını aç').click();
   const stayPanel = dialog.getByRole('region', { name: 'Oda ve Misafir', exact: true });
-  const operations = dialog.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true });
+  const operations = dialog.locator('#room-operations');
   const account = dialog.getByRole('region', { name: 'Misafir Hesabı', exact: true });
   await expect(stayPanel.getByLabel('Ana misafir', { exact: true })).toBeVisible();
   await expect(operations.getByLabel('Fiziksel oda durumu')).toBeVisible();
@@ -194,7 +194,7 @@ try {
   await expect(account.getByRole('region', { name: 'Mevcut konaklama hesabı' })).toContainText('Aktif misafir hesabı yok');
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toContainText('Önceki konaklamalardan açık hesap yok.');
   await operations.getByRole('group', { name: 'Fiziksel oda durumu', exact: true }).getByRole('button', { name: 'Hazır', exact: true }).click();
-  await expect(dialog.getByText('Fiziksel durum: Hazır', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Fiziksel: Hazır', { exact: true })).toBeVisible();
   await button('Çalışma alanını kapat').click(); await expect(button('Pilot 102 odasını aç')).toBeFocused();
 
   // Out-of-service rooms leave daily operations: no chips, read-only card and workspace guidance.
@@ -208,7 +208,7 @@ try {
   await expect(outOfServiceCard.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await expect(outOfServiceCard.locator('.resource-card__out-of-service')).toContainText('Hizmet dışı');
   await button('Pilot 102 odasını aç').click();
-  const outOperations = dialog.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true });
+  const outOperations = dialog.locator('#room-operations');
   await expect(outOperations).toContainText('Oda hizmet dışı. Ayarlar > İşletme Düzeni > Oda Yönetimi');
   await expect(outOperations.getByLabel('Fiziksel oda durumu')).toHaveCount(0);
   await expect(outOperations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);

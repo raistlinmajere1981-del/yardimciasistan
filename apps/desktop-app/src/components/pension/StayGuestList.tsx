@@ -49,11 +49,9 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty }: {
       <SearchSelect ariaLabel="Yeni ana misafir" value={nextPrimary} disabled={disabled} onChange={setNextPrimary}
         options={guests.filter(guest => guest.customerId !== stay.customerId).map(guest => ({ id: guest.customerId, label: guest.customerName }))} /></div>}
     <p>Hesap konaklamanın ortak hesabıdır. Ana misafirin değişmesi hesap sahibini veya geçmiş borçları değiştirmez.</p>
-    <StayGuestPicker data={data} selectedIds={guests.map(guest => guest.customerId)} disabled={disabled} operations={operations} onDirty={onDirty}
-      onSelect={id => void operations.mutate("stay", () => window.yardimciDesktop!.addStayGuest({ stayId: stay.id, customerId: id }))} />
-    {(stay.guests ?? []).some(guest => guest.status === "checked_out") && <details><summary>Ayrılan misafirler</summary>
-      {stay.guests.filter(guest => guest.status === "checked_out").map(guest => <p key={guest.id}>{guest.customerName} · {new Date(guest.checkedOutAt).toLocaleString("tr-TR")}</p>)}
-    </details>}
+    <div className="stay-secondary-controls">
+    <div className="form-stack"><StayGuestPicker data={data} selectedIds={guests.map(guest => guest.customerId)} disabled={disabled} operations={operations} onDirty={onDirty}
+      onSelect={id => void operations.mutate("stay", () => window.yardimciDesktop!.addStayGuest({ stayId: stay.id, customerId: id }))} /></div>
     {stay.status === "checked_in" && <div className="form-stack">
       <div className="form-field"><span>Odayı değiştir</span><SearchSelect ariaLabel="Yeni oda" value={nextRoom} disabled={disabled} onChange={id => { setNextRoom(id); onDirty(Boolean(id)); }}
         options={data.rooms.filter(room => room.id !== stay.roomId && room.isActive && !["cleaning", "maintenance", "out_of_service", "occupied"].includes(room.status))
@@ -63,6 +61,10 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty }: {
         if (await operations.mutate("stay", () => window.yardimciDesktop!.moveStayRoom({ stayId: stay.id, roomId: nextRoom }))) { setNextRoom(""); onDirty(false); }
       }}>Odayı Değiştir</ActionButton>
     </div>}
+    </div>
+    {(stay.guests ?? []).some(guest => guest.status === "checked_out") && <details><summary>Ayrılan misafirler</summary>
+      {stay.guests.filter(guest => guest.status === "checked_out").map(guest => <p key={guest.id}>{guest.customerName} · {new Date(guest.checkedOutAt).toLocaleString("tr-TR")}</p>)}
+    </details>}
     <p role="status">Kimlik bildirimi: {stay.pendingNotificationCount ?? 0} bekleyen kayıt. Otomatik EGM/Jandarma gönderimi bağlı değil; bildirimleri resmî sistem üzerinden tamamlayın.</p>
     {confirmDialog}
   </>;

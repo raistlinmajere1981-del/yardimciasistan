@@ -1,11 +1,12 @@
 import { useId, type MouseEvent, type ReactNode } from "react";
 
 /** Presentation only. Resource identity, facts and operations belong to the feature. */
-export function ResourceCard({ title, subtitle, icon, status, tone, children, action, onOpen, openLabel, busy, feedback, error }: {
+export function ResourceCard({ title, subtitle, icon, status, tone, children, action, onOpen, openLabel, busy, feedback, error, imageSrc }: {
   title: string; subtitle?: string; icon: ReactNode; status: ReactNode;
   tone: "neutral" | "success" | "info" | "warning" | "danger";
   children: ReactNode; action?: ReactNode; onOpen: () => void; openLabel: string;
   busy?: boolean; feedback?: string; error?: boolean;
+  imageSrc?: string;
 }) {
   const id = useId();
   const openFromCardSurface = (event: MouseEvent<HTMLElement>) => {
@@ -15,6 +16,7 @@ export function ResourceCard({ title, subtitle, icon, status, tone, children, ac
     onOpen();
   };
   return <article className="resource-card" data-tone={tone} aria-labelledby={`${id}-title`} aria-busy={busy || undefined} onClick={openFromCardSurface}>
+    {imageSrc && <img className="resource-card__image" src={imageSrc} alt="" title="Temsili görsel" loading="lazy" decoding="async" width={1536} height={1024} />}
     <header className="resource-card__header">
       <button className="resource-card__open-hit-area" type="button" aria-label={openLabel} disabled={busy}
         onClick={(event) => { event.stopPropagation(); onOpen(); }} />

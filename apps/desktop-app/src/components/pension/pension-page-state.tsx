@@ -4,6 +4,8 @@ export interface PensionFilters {
   reservationStatus: string;
   reservationDate: string;
   taskStatus: string;
+  roomFloor: string;
+  roomFilter: string;
 }
 
 /** Page controller stays mounted in the router so panel filters survive workspace/page transitions. */
@@ -11,7 +13,9 @@ export function usePensionPageController() {
   const [filters, setFilters] = useState<PensionFilters>({
     reservationStatus: "all",
     reservationDate: "",
-    taskStatus: "pending"
+    taskStatus: "pending",
+    roomFloor: "all",
+    roomFilter: "all"
   });
   return { filters, setFilters };
 }
