@@ -128,6 +128,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
           if (!session || session.intent.entityType !== scope.entityType || session.intent.entityId !== scope.entityId || !guardAllows(session)) return false;
           const context = session.intent.returnContext ?? {};
           setHospitalitySessions((sessions) => ({ ...sessions, [ownerPage]: null }));
+          if (context.page && context.page !== page) onReturnPage?.(context.page);
           hospitalityOnReturn.current[ownerPage]?.(context);
           hospitalityOnReturn.current[ownerPage] = undefined;
           return true;
@@ -151,6 +152,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
       if (!session || !guardAllows(session)) return false;
       const context = session.intent.returnContext ?? {};
       setHospitalitySessions((sessions) => ({ ...sessions, [page]: null }));
+      if (context.page && context.page !== page) onReturnPage?.(context.page);
       hospitalityOnReturn.current[page]?.(context);
       hospitalityOnReturn.current[page] = undefined;
       return true;
