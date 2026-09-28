@@ -1,12 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type {
-  DesktopCustomerMutationResult,
-  DesktopDashboardData,
-  DesktopIdentityImageAnalyzeResult,
-  DesktopStatusUpdateResult,
-  SaveCustomerInput,
-  SaveManualRestaurantReservationInput
-} from "../../electron/database";
+import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../electron/database";
 import { OperationsBoardLayout } from "../components/operations/OperationsBoardLayout";
 import { getTableStatusAction } from "../components/restaurant/table-presentation";
 import { TableResourceCard } from "../components/restaurant/TableResourceCard";
@@ -19,16 +12,10 @@ interface RestaurantPageProps {
   reservationsEnabled: boolean;
   ordersEnabled: boolean;
   menuEnabled: boolean;
-  customersEnabled: boolean;
-  roomFolioTransferEnabled: boolean;
   tasksEnabled: boolean;
   reservations: ReactNode;
   tasks: ReactNode;
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
-  aiEnabled: boolean;
-  onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
-  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
-  onSaveReservation: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
 
@@ -37,17 +24,11 @@ export function RestaurantPage({
   reservationsEnabled,
   ordersEnabled,
   menuEnabled,
-  customersEnabled,
-  roomFolioTransferEnabled,
   tasksEnabled,
   reservations,
   tasks,
   onDashboardDataChanged,
-  onUpdateTableStatus,
-  aiEnabled,
-  onSaveCustomer,
-  onAnalyzeIdentity,
-  onSaveReservation
+  onUpdateTableStatus
 }: RestaurantPageProps) {
   const [group, setGroup] = useState("all");
   const [status, setStatus] = useState("all");
