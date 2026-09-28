@@ -9,6 +9,7 @@ interface PensionPageProps {
   tasksEnabled: boolean;
   reservations: ReactNode;
   rooms: ReactNode;
+  roomToolbar?: ReactNode;
   tasks: ReactNode;
 }
 
@@ -18,6 +19,7 @@ export function PensionPage({
   tasksEnabled,
   reservations,
   rooms,
+  roomToolbar,
   tasks
 }: PensionPageProps) {
   return (
@@ -32,6 +34,7 @@ export function PensionPage({
           center={{
             title: "Odalar",
             ariaLabel: "Odalar paneli",
+            toolbar: roomToolbar,
             content: rooms
           }}
           right={tasksEnabled ? {
