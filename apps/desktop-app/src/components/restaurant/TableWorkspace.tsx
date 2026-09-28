@@ -15,6 +15,7 @@ import { OperationPanel } from "../workspace/OperationPanel";
 import type { TableWorkspaceIntent } from "../workspace/workspace-intent";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualRestaurantReservationEditor } from "../operations/ManualRestaurantReservationEditor";
 import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
@@ -22,7 +23,7 @@ import { getTableCardModel } from "./table-card-model";
 import { TableOrderEditor } from "./TableOrderEditor";
 import { TableAccountPanel } from "./TableAccountPanel";
 import { useTableOrderController } from "./use-table-order-controller";
-import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone } from "./table-presentation";
+import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "./table-presentation";
 
 export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, customersEnabled, reservationsEnabled,
   roomFolioTransferEnabled, onDashboardDataChanged, onUpdateTableStatus, aiEnabled, onSaveCustomer, onAnalyzeIdentity, onSaveReservation }: {
@@ -112,6 +113,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   const canStart = cardModel.quickAction?.kind === "start";
   const duration = order ? Math.max(0, Math.floor((clock - new Date(order.openedAt).getTime()) / 60_000)) : 0;
   const disabled = controller.busy || controller.loading || !controller.loaded || transferCommitted;
+  const tableStatus = getTableStatusAction(table.status) || table.status;
   const startControl = <div className="restaurant-start form-stack">
     <h4>{canStart ? "Masa siparişe hazır" : "Masa hazırlığını kontrol edin"}</h4>
     <p>{canStart ? "Sipariş açarak bu masa için yeni bir adisyon başlatın." : "Bu masa şu an sipariş başlatmaya uygun değil."}</p>
@@ -120,9 +122,9 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   const accountPanel = <OperationPanel title="Masa, Müşteri ve Hesap" id="table-account" className="operation-panel--table-context">
     {ordersEnabled && !order && startControl}
     <TableAccountPanel table={table} data={data} controller={controller} disabled={disabled} customersEnabled={customersEnabled}
-      reservationsEnabled={reservationsEnabled} ordersEnabled={ordersEnabled} roomFolioTransferEnabled={roomFolioTransferEnabled}
+      reservationsEnabled={reservationsEnabled} roomFolioTransferEnabled={roomFolioTransferEnabled}
       quickCustomerId={quickCustomerId}
-      onCloseOrder={status => void closeTableOrder(status)} onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)} onUpdateTableStatus={onUpdateTableStatus} />
+      onCloseOrder={status => void closeTableOrder(status)} onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)} />
   </OperationPanel>;
   return <WorkspacePageFrame title={table.name} className="operations-workspace" closeLabel="Masa çalışma alanını kapat"
     onClose={() => void requestReturn()} closeBlocked={controller.busy || Boolean(quickAction)} bodyScroll="panes"
@@ -145,10 +147,49 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       }}>{history ? "← Masaya dön" : "Geçmiş"}</ActionButton>}
     </>}
     headerSummary={!history && <ResourceWorkspaceSummary label="Masa özeti" imageSrc="./assets/default-table.png"
-      facts={<><strong>{table.name}</strong><span>{table.area || "Genel"}</span><span>{table.capacity} kişilik</span></>}
-      status={<><StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
-        {order && <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>}
-        {!table.isActive && <StatusBadge tone="warning">Etkin değil</StatusBadge>}</>}>
+      facts={<>
+        <strong>{table.name}</strong><span>{table.area || "Genel"}</span><span>{table.capacity} kişilik</span>
+        {order ? <ChoiceChips
+          className="workspace-status-chips"
+          ariaLabel="Sipariş durumu"
+          value={order.status}
+          disabled={disabled}
+          onChange={value => {
+            if (value !== "open") void controller.status(value as "preparing" | "served" | "payment");
+          }}
+          options={[
+            { id: "open", label: "Açık", disabled: order.status !== "open" },
+            { id: "preparing", label: "Hazırlanıyor" },
+            { id: "served", label: "Servis edildi" },
+            { id: "payment", label: "Hesap bekliyor" }
+          ]}
+        /> : <ChoiceChips
+          className="workspace-status-chips"
+          ariaLabel={`${table.name} durumunu değiştir`}
+          value={tableStatus}
+          disabled={disabled}
+          onChange={value => {
+            if (value === tableStatus) return;
+            void controller.run(async isCurrent => {
+              const result = await onUpdateTableStatus(table.id, value);
+              if (!isCurrent()) return false;
+              controller.feedback(result.message, !result.ok);
+              return result.ok;
+            });
+          }}
+          options={[
+            ...(!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
+              ? [{ id: tableStatus, label: formatTableStatus(table.status), disabled: true }]
+              : []),
+            { id: "available", label: "Boş" },
+            { id: "occupied", label: "Dolu" },
+            ...(reservationsEnabled ? [{ id: "reserved", label: "Rezerve" }] : []),
+            ...(ordersEnabled ? [{ id: "bill_waiting", label: "Hesap" }] : []),
+            { id: "cleaning", label: "Temizlik" }
+          ]}
+        />}
+      </>}
+      status={null}>
       {!ordersEnabled ? <span>Sipariş yönetimi etkin değil.</span> : controller.loading ? <span>Adisyon yükleniyor…</span> : !controller.loaded ? <span>Adisyon bilgisi alınamadı.</span>
         : order ? <span>{order.itemCount} ürün · {duration} dk · {formatMoney(order.total, getOrderCurrency(order))}</span>
           : <span>Aktif adisyon yok.</span>}
