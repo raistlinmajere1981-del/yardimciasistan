@@ -1,7 +1,5 @@
 import { ActionButton } from "../ui/ActionButton";
-import { ChoiceChips } from "../ui/ChoiceChips";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
-import { setRoomOperationalStatus } from "./room-operations";
 import { RoomCheckoutConfirmationDetails } from "./RoomCheckoutConfirmation";
 import { formatDateRange } from "./folio-format";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
@@ -67,28 +65,6 @@ export function RoomDailyOperations({ model, operations, disabled, data }: {
     {isOutOfService && <section className="operation-section form-stack">
       <h4>Oda hazırlığı</h4>
       <p>Oda hizmet dışı. Ayarlar &gt; İşletme Düzeni &gt; Oda Yönetimi&apos;nden yeniden kullanıma alınabilir.</p>
-    </section>}
-    {!isOutOfService && model.canSetCondition && <section className="operation-section form-stack">
-      <h4>Oda hazırlığı</h4>
-      <div className="form-field form-field--fluid">
-        <span>Fiziksel oda durumu</span>
-        <ChoiceChips
-          ariaLabel="Fiziksel oda durumu"
-          value={state.operationalCondition === "ready" ? "available" : state.operationalCondition}
-          disabled={disabled || !model.canSetCondition}
-          onChange={value => {
-            if (value === "out_of_service") return;
-            const current = state.operationalCondition === "ready" ? "available" : state.operationalCondition;
-            if (value === current) return;
-            void operations.mutate("operations", () => setRoomOperationalStatus(room.id, value));
-          }}
-          options={[
-            { id: "available", label: "Hazır" },
-            { id: "cleaning", label: "Temizlik bekliyor" },
-            { id: "maintenance", label: "Bakımda" }
-          ]}
-        />
-      </div>
     </section>}
     {operations.feedback?.panel === "operations" && <p role={operations.feedback.error ? "alert" : "status"}>{operations.feedback.message}</p>}
     {confirmDialog}
