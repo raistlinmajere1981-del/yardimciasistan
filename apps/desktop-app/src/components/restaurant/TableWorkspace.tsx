@@ -144,7 +144,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
         navigation.updateWorkspaceMode({ entityType: "table", mode: history ? "order" : "history" });
       }}>{history ? "← Masaya dön" : "Geçmiş"}</ActionButton>}
     </>}
-    navigation={!history && <ResourceWorkspaceSummary label="Masa özeti" imageSrc="./assets/default-table.png"
+    headerSummary={!history && <ResourceWorkspaceSummary label="Masa özeti" imageSrc="./assets/default-table.png"
       facts={<><strong>{table.name}</strong><span>{table.area || "Genel"}</span><span>{table.capacity} kişilik</span></>}
       status={<><StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
         {order && <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>}
