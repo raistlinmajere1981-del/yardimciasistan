@@ -70,23 +70,8 @@ Retrying recovery only calls the draft-review operation; it never repeats the sa
 Stage closure passed locally:
 
 ```text
-npm run typecheck
-npm run smoke:workspace-platform
-node scripts/smoke-market-quick-sale-contract.mjs
-node scripts/smoke-market-quick-sale-session.mjs
-node scripts/smoke-market-customer-credit-ui-contract.mjs
-node scripts/smoke-market-customer-credit-whatsapp.mjs
-node scripts/smoke-market-companion-desktop-inbox.mjs
-node scripts/smoke-market-live-scanner-contract.mjs
-node scripts/smoke-market-sale-runtime.mjs
-node scripts/check-modular-foundation.mjs
-npm run lint:strict
-npm run knip:strict
-npm run architecture:audit
-npm run design:audit:strict
-npm run pilot:check
-git diff --check
-npm run check:linux
+npm run verify:domain -- commerce
+npm run verify:pre-main
 ```
 
 Final Astra review: `STAGE8B_FINAL=pass`.
