@@ -38,6 +38,7 @@ export async function gitStatus() { return git(["status", "--short", "--branch"]
 export async function gitDiff(staged = false) { return staged ? git(["diff", "--cached"]) : git(["diff"]); }
 export async function gitLog(n = 15) { return git(["log", `--max-count=${n}`, "--oneline", "--decorate"]); }
 export async function gitBranches() { return git(["branch", "-vv"]); }
+export async function gitBranchNames() { return git(["branch", "--format=%(refname:short)"]); }
 export async function gitFetch() { return git(["fetch", "--prune"]); }
 export async function gitPull() { return git(["pull", "--ff-only"]); }
 export async function gitPush() { return git(["push"]); }

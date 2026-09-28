@@ -1,7 +1,5 @@
-import { createInterface } from "node:readline/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { stdin as input, stdout as output } from "node:process";
 import { getSiteProfiles } from "../config/sites.mjs";
 import { TASK_CATEGORIES, TASKS, getTask } from "../config/tasks.mjs";
 import { copyText, saveReportFile } from "../clipboard.mjs";
@@ -14,8 +12,7 @@ import { formatPreflight, runPreflight } from "../runners/preflight.mjs";
 import { runSteps } from "../runners/workflow.mjs";
 import { BLACKSEA_ROOT, REPO_ROOT } from "../lib/paths.mjs";
 import { getGitStatus, renderStatusBar } from "./status.mjs";
-
-const BACK_KEYS = new Set(["b", "B", "\x1b", "geri"]);
+import { createTerminalUI } from "./terminal.mjs";
 
 const SECTIONS = {
   checks: {
@@ -57,37 +54,54 @@ const SECTIONS = {
 };
 
 export function createUI() {
-  const rl = createInterface({ input, output, terminal: true });
-  return {
-    rl,
-    close: () => rl.close(),
-    ask: (q) => rl.question(q),
-  };
+  return createTerminalUI();
 }
 
-function header(title) {
-  return `\n===== ${title} =====\n${renderStatusBar()}\n${"-".repeat(60)}`;
+async function askChoice(ui, title, items, { extra = [], body = [] } = {}) {
+  const decorated = items.map((item, index) => ({
+    ...item,
+    separator: Boolean(item.separator ?? item.sep),
+    value: { kind: "item", index },
+  }));
+  if (extra.length) {
+    decorated.push({ label: "Diğer", separator: true });
+    for (const item of extra) {
+      decorated.push({
+        label: item.label,
+        description: item.description,
+        searchText: item.searchText ?? item.label,
+        value: { kind: "extra", id: item.id },
+      });
+    }
+  }
+  const choice = await ui.select({
+    title,
+    status: renderStatusBar(),
+    body,
+    items: decorated,
+  });
+  if (choice.action !== "pick") return { action: choice.action };
+  if (choice.item.value?.kind === "extra") {
+    return { action: "extra", id: choice.item.value.id };
+  }
+  const index = choice.item.value?.index;
+  return { action: "pick", index, item: items[index] };
 }
 
-async function askChoice(ui, title, items, { extra = [] } = {}) {
-  console.log(header(title));
-  items.forEach((it, i) => console.log(`  ${i + 1}) ${it.label}`));
-  extra.forEach((e) => console.log(`  ${e.key}) ${e.label}`));
-  console.log("  b) Geri   /) Ara");
-  const ans = (await ui.ask("\nSeçim: ")).trim();
-  if (BACK_KEYS.has(ans)) return { action: "back" };
-  if (ans === "/") return { action: "search" };
-  const hitExtra = extra.find((e) => e.key === ans);
-  if (hitExtra) return { action: "extra", id: hitExtra.id };
-  const n = Number(ans);
-  if (Number.isInteger(n) && n >= 1 && n <= items.length) return { action: "pick", index: n - 1 };
-  console.log("Geçersiz seçim.");
-  return { action: "retry" };
-}
-
-async function confirm(ui, reason) {
-  const ans = (await ui.ask(`\nONAY: ${reason}\nDevam edilsin mi? [e/H] `)).trim().toLowerCase();
-  return ans === "e" || ans === "evet" || ans === "y" || ans === "yes";
+async function confirm(ui, reason, details = []) {
+  const choice = await ui.select({
+    title: "Onay",
+    status: renderStatusBar(),
+    body: [reason, ...details.map((line) => `• ${line}`)],
+    searchable: false,
+    initialValue: false,
+    footer: "↑↓ seç · Enter onayla · Esc vazgeç",
+    items: [
+      { label: "Vazgeç", value: false },
+      { label: "Devam et", value: true },
+    ],
+  });
+  return choice.action === "pick" && choice.item.value === true;
 }
 
 export function currentVcs() {
@@ -201,35 +215,52 @@ async function finishRaw(ui, entry, args, raw, vcs, startedAll, rerun) {
   return raw;
 }
 
-function tailLines(text, n = 40) {
-  const lines = text.split("\n");
-  return lines.length > n ? `... (${lines.length - n} satır üstte)\n${lines.slice(-n).join("\n")}` : text;
+function tailLines(text, n = 4) {
+  const lines = String(text ?? "").split("\n").filter((line, index, all) => line || index < all.length - 1);
+  return lines.length > n ? [`… ${lines.length - n} satır üstte`, ...lines.slice(-n)] : lines;
 }
 
-/** Çıktı ekranı: c özet kopyala / a ham kopyala / s kaydet / r tekrar / b geri */
+/** Sonuç ekranı: seçimler ok tuşlarıyla; log ayrıca kaydırılabilir. */
 export async function outputScreen(ui, run) {
-  console.log(`\n----- ${run.title} -----`);
-  console.log(buildSummary(run));
-  console.log("----- ÇIKTI (son 40 satır) -----");
-  console.log(tailLines(run.fullLog || "(çıktı yok)", 40));
-  console.log("-------------------------------");
+  let notice = "";
   for (;;) {
-    const k = (await ui.ask("[c] özet kopyala · [a] ham çıktı kopyala · [s] dosyaya kaydet · [r] tekrar · [b] geri: ")).trim();
-    if (BACK_KEYS.has(k) || k === "") return;
-    if (k === "c") {
-      const r = copyText(buildSummary(run));
-      console.log(r.ok ? `Özet panoya kopyalandı (${r.method}).` : `Pano yok: ${r.reason}. [s] ile dosyaya kaydedin.`);
-    } else if (k === "a") {
-      const r = copyText(buildFullReport({ summary: buildSummary(run), fullLog: run.fullLog }));
-      console.log(r.ok ? `Ham çıktı panoya kopyalandı (${r.method}).` : `Pano yok: ${r.reason}. [s] ile dosyaya kaydedin.`);
-    } else if (k === "s") {
-      const p = saveReportFile(run.title, buildFullReport({ summary: buildSummary(run), fullLog: run.fullLog }));
-      console.log(`Rapor kaydedildi: ${p}`);
-    } else if (k === "r") {
+    const summary = buildSummary(run);
+    const body = [
+      `Sonuç: ${run.exitCode === 0 ? "PASS" : "FAIL"} · exit ${run.exitCode} · ${formatDuration(run.durationMs)}`,
+      `Branch: ${run.branch || "-"} @ ${run.commit || "-"}`,
+      notice,
+      "Son çıktı:",
+      ...tailLines(run.fullLog || "(çıktı yok)", 4),
+    ].filter(Boolean);
+    const choice = await ui.select({
+      title: `Sonuç — ${run.title}`,
+      status: renderStatusBar(),
+      body,
+      searchable: false,
+      footer: "↑↓ seç · Enter uygula · Esc geri",
+      items: [
+        { label: "Tam çıktıyı görüntüle", value: "view" },
+        { label: "Özeti panoya kopyala", value: "copy-summary" },
+        { label: "Tam raporu panoya kopyala", value: "copy-full" },
+        { label: "Raporu dosyaya kaydet", value: "save" },
+        { label: "Tekrar çalıştır", value: "rerun" },
+        { label: "Geri", value: "back" },
+      ],
+    });
+    if (choice.action !== "pick" || choice.item.value === "back") return;
+    if (choice.item.value === "view") {
+      await ui.viewText({ title: run.title, text: run.fullLog || "(çıktı yok)" });
+    } else if (choice.item.value === "copy-summary") {
+      const result = copyText(summary);
+      notice = result.ok ? `Özet panoya kopyalandı (${result.method}).` : `Pano yok: ${result.reason}`;
+    } else if (choice.item.value === "copy-full") {
+      const result = copyText(buildFullReport({ summary, fullLog: run.fullLog }));
+      notice = result.ok ? `Tam rapor panoya kopyalandı (${result.method}).` : `Pano yok: ${result.reason}`;
+    } else if (choice.item.value === "save") {
+      notice = `Rapor kaydedildi: ${saveReportFile(run.title, buildFullReport({ summary, fullLog: run.fullLog }))}`;
+    } else if (choice.item.value === "rerun") {
       await run.rerun?.();
       return;
-    } else {
-      console.log("Bilinmeyen tuş.");
     }
   }
 }
@@ -242,29 +273,23 @@ async function sectionScreen(ui, key) {
   const sec = SECTIONS[key];
   for (;;) {
     const items = [];
-    for (const [gtitle, ids] of sec.groups) {
-      items.push({ label: `── ${gtitle} ──`, sep: true });
+    for (const [groupTitle, ids] of sec.groups) {
+      items.push({ label: groupTitle, separator: true });
       for (const id of ids) {
-        const t = getTask(id);
-        if (!t) continue;
-        if (t.site === "blacksea" && !blackseaOk) continue;
-        items.push({ label: `${t.title}${t.kind !== "task" ? ` [${t.kind === "group" ? "grup" : "workflow"}]` : ""}`, id });
+        const task = getTask(id);
+        if (!task) continue;
+        if (task.site === "blacksea" && !blackseaOk) continue;
+        items.push({
+          label: task.title,
+          description: task.kind === "task" ? task.id : `${task.kind === "group" ? "Grup" : "Workflow"} · ${task.id}`,
+          searchText: `${task.id} ${groupTitle}`,
+          id,
+        });
       }
     }
-    console.log(header(sec.title));
-    let n = 0;
-    const indexMap = new Map();
-    for (const it of items) {
-      if (it.sep) console.log(`  ${it.label}`);
-      else { n += 1; indexMap.set(n, it.id); console.log(`  ${n}) ${it.label}`); }
-    }
-    console.log("  b) Geri   /) Ara");
-    const ans = (await ui.ask("\nSeçim: ")).trim();
-    if (BACK_KEYS.has(ans)) return;
-    if (ans === "/") { await palette(ui); continue; }
-    const id = indexMap.get(Number(ans));
-    if (!id) { console.log("Geçersiz seçim."); continue; }
-    await executeEntry(ui, getTask(id));
+    const choice = await askChoice(ui, sec.title, items);
+    if (choice.action !== "pick") return;
+    if (choice.item?.id) await executeEntry(ui, getTask(choice.item.id));
   }
 }
 
@@ -303,12 +328,32 @@ async function siteScreen(ui, profile) {
 
 // ---------- Git ekranı ----------
 
+async function chooseLocalBranch(ui, title, { exclude = [], initialValue } = {}) {
+  const raw = await gitops.gitBranchNames();
+  if (raw.exitCode !== 0) {
+    await ui.viewText({ title: "Branch listesi alınamadı", text: raw.stderr || raw.stdout });
+    return null;
+  }
+  const blocked = new Set(exclude);
+  const branches = raw.stdout.split("\n").map((name) => name.trim()).filter(Boolean).filter((name) => !blocked.has(name));
+  if (!branches.length) return null;
+  const choice = await ui.select({
+    title,
+    status: renderStatusBar(),
+    items: branches.map((name) => ({ label: name, value: name, searchText: name })),
+    initialValue,
+  });
+  return choice.action === "pick" ? choice.item.value : null;
+}
+
 async function gitSection(ui) {
   for (;;) {
-    const choice = await askChoice(ui, "Git (günlük işlemler)", gitops.GIT_OPS.map((o) => ({ label: `${o.title}\n      ${o.git}` })));
-    if (choice.action === "back") return;
-    if (choice.action === "search") { await palette(ui); continue; }
-    if (choice.action !== "pick") continue;
+    const choice = await askChoice(ui, "Git — günlük işlemler", gitops.GIT_OPS.map((op) => ({
+      label: op.title,
+      description: op.git,
+      searchText: `${op.id} ${op.title} ${op.git}`,
+    })));
+    if (choice.action !== "pick") return;
     await runGitOp(ui, gitops.GIT_OPS[choice.index].id);
   }
 }
@@ -339,10 +384,22 @@ async function runGitOp(ui, opId, preset = {}) {
       const changed = await gitops.gitChangedFiles();
       console.log("\nStagelenmiş:\n" + (changed.staged.stdout.trim() || "  (yok)"));
       console.log("\nStagelenmemiş:\n" + (changed.unstaged.stdout.trim() || "  (yok)"));
-      const stageAll = (await ui.ask("Tümünü stage'le? (git add -A) [e/H] ")).trim().toLowerCase();
+      const stageChoice = await ui.select({
+        title: "Commit — stage seçimi",
+        status: renderStatusBar(),
+        body: ["Commit öncesi hangi dosyalar stage edilsin?"],
+        searchable: false,
+        initialValue: false,
+        footer: "↑↓ seç · Enter devam · Esc iptal",
+        items: [
+          { label: "Yalnızca zaten staged olanları kullan", description: "git add çalıştırılmaz", value: false },
+          { label: "Tüm değişiklikleri stage et", description: "git add -A", value: true },
+        ],
+      });
+      if (stageChoice.action !== "pick") return null;
       const message = preset.message ?? await ui.ask("Commit mesajı: ");
       if (!message.trim()) { console.log("İptal edildi (boş mesaj)."); return null; }
-      const raw = await gitops.gitCommit(message.trim(), stageAll === "e" || stageAll === "evet");
+      const raw = await gitops.gitCommit(message.trim(), stageChoice.item.value);
       await recordGit(ui, "commit", "commit", `git commit -m "${message.trim()}"`, raw, vcs);
       if (opId === "commit-push" && raw.exitCode === 0) {
         if (!(await confirm(ui, "Commit başarılı; push yapılsın mı?"))) return null;
@@ -350,28 +407,30 @@ async function runGitOp(ui, opId, preset = {}) {
       }
       return null;
     }
-    case "switch":
+    case "switch": {
+      const name = preset.name ?? await chooseLocalBranch(ui, "Geçilecek branch", { exclude: [vcs.branch] });
+      if (!name) return null;
+      return recordGit(ui, opId, "branch değiştir", `git switch ${name}`, await gitops.gitSwitch(name), vcs);
+    }
     case "create": {
-      const name = preset.name ?? (await ui.ask(opId === "switch" ? "Geçilecek branch: " : "Yeni branch adı: ")).trim();
-      if (!name) { console.log("İptal edildi."); return null; }
-      const raw = opId === "switch" ? await gitops.gitSwitch(name) : await gitops.gitCreate(name);
-      return recordGit(ui, opId, opId, opId === "switch" ? `git switch ${name}` : `git switch -c ${name}`, raw, vcs);
+      const name = preset.name ?? (await ui.ask("Yeni branch adı: ")).trim();
+      if (!name) return null;
+      return recordGit(ui, opId, "branch oluştur", `git switch -c ${name}`, await gitops.gitCreate(name), vcs);
     }
     case "merge": {
-      const source = preset.source ?? (await ui.ask("Kaynak branch (merge edilecek): ")).trim();
-      const target = preset.target ?? (await ui.ask("Hedef branch: ")).trim();
-      if (!source || !target) { console.log("İptal edildi."); return null; }
-      console.log(`\n${await gitops.gitMergePlan(source, target)}`);
-      console.log("Conflict çıkarsa işlem durur; otomatik çözüm yapılmaz.");
-      if (!(await confirm(ui, `git switch ${target} + git merge ${source} çalıştırılsın mı?`))) { console.log("İptal edildi."); return null; }
-      const raw = await gitops.gitMerge(source, target);
-      return recordGit(ui, opId, "merge", `git switch ${target} && git merge ${source}`, raw, vcs);
+      const source = preset.source ?? await chooseLocalBranch(ui, "Merge — kaynak branch", { initialValue: vcs.branch });
+      if (!source) return null;
+      const target = preset.target ?? await chooseLocalBranch(ui, "Merge — hedef branch", { exclude: [source], initialValue: "main" });
+      if (!target) return null;
+      const plan = await gitops.gitMergePlan(source, target);
+      if (!(await confirm(ui, "Branch'ler birleştirilecek.", [...plan.trim().split("\n"), "Conflict çıkarsa işlem durur; otomatik çözüm yapılmaz."]))) return null;
+      return recordGit(ui, opId, "merge", `git switch ${target} && git merge ${source}`, await gitops.gitMerge(source, target), vcs);
     }
     case "delete": {
-      const name = preset.name ?? (await ui.ask("Silinecek branch: ")).trim();
-      if (!name) { console.log("İptal edildi."); return null; }
-      if (!(await confirm(ui, `git branch -d ${name} (güvenli silme; merge edilmemişse reddedilir)`))) { console.log("İptal edildi."); return null; }
-      return recordGit(ui, opId, "delete", `git branch -d ${name}`, await gitops.gitDelete(name), vcs);
+      const name = preset.name ?? await chooseLocalBranch(ui, "Silinecek branch", { exclude: [vcs.branch] });
+      if (!name) return null;
+      if (!(await confirm(ui, `${name} branch'i güvenli biçimde silinsin mi?`, [`git branch -d ${name}`, "Merge edilmemiş branch Git tarafından reddedilir."]))) return null;
+      return recordGit(ui, opId, "branch sil", `git branch -d ${name}`, await gitops.gitDelete(name), vcs);
     }
     default: console.log("Bilinmeyen git işlemi."); return null;
   }
@@ -382,24 +441,27 @@ async function runGitOp(ui, opId, preset = {}) {
 async function historySection(ui) {
   for (;;) {
     const runs = listRuns(20);
-    console.log(header("Son Çalıştırmalar"));
-    if (runs.length === 0) { console.log("  (henüz kayıt yok)"); }
-    runs.forEach((r, i) => {
-      console.log(`  ${i + 1}) ${r.title}  ${r.pass ? "PASS" : "FAIL"}  ${timeAgo(r.ts)}  [${r.branch}@${r.commit}]`);
-    });
-    // Full Verify HEAD uyarısı
     const vcs = currentVcs();
     const { lastPass, currentMismatch } = lastPassFor("full-verify", vcs.branch, vcs.commit);
-    if (lastPass) {
-      console.log(`\n  Son Full Verify: ${lastPass.commit}${currentMismatch ? " — UYARI: mevcut HEAD için değil" : " (mevcut HEAD ile aynı)"}`);
-    }
-    console.log("  b) Geri   /) Ara");
-    const ans = (await ui.ask("\nSeçim (detay için numara): ")).trim();
-    if (BACK_KEYS.has(ans)) return;
-    if (ans === "/") { await palette(ui); continue; }
-    const run = runs[Number(ans) - 1];
-    if (!run) { console.log("Geçersiz seçim."); continue; }
-    await historyDetail(ui, run.seq);
+    const body = lastPass
+      ? [`Son Full Verify: ${lastPass.commit}${currentMismatch ? " — mevcut HEAD için değil" : " — mevcut HEAD"}`]
+      : ["Henüz başarılı Full Verify kaydı yok."];
+    const items = runs.length
+      ? runs.map((run) => ({
+          label: `${run.pass ? "✓" : "✗"} ${run.title}`,
+          description: `${timeAgo(run.ts)} · ${run.branch}@${run.commit}`,
+          searchText: `${run.title} ${run.refId} ${run.branch} ${run.commit}`,
+          value: run.seq,
+        }))
+      : [{ label: "Henüz kayıt yok", disabled: true }];
+    const choice = await ui.select({
+      title: "Son Çalıştırmalar",
+      status: renderStatusBar(),
+      body,
+      items,
+    });
+    if (choice.action !== "pick") return;
+    await historyDetail(ui, choice.item.value);
   }
 }
 
@@ -447,25 +509,76 @@ async function npmScriptRunner(ui, filter = "") {
 }
 
 export async function palette(ui) {
-  const q = (await ui.ask("\n/ Ara (örn. android, blacksea, deploy, smoke): ")).trim().toLowerCase();
-  if (!q) return;
-  const hits = TASKS.filter((t) => `${t.id} ${t.title}`.toLowerCase().includes(q)).slice(0, 20);
-  const labels = hits.map((t) => ({ label: `[${TASK_CATEGORIES[t.category]}] ${t.title}` }));
-  labels.push({ label: `npm script ara: "${q}"`, npm: true });
-  const choice = await askChoice(ui, `Sonuçlar: "${q}"`, labels);
+  const scripts = readPackageScripts();
+  const taskItems = TASKS.map((task) => ({
+    label: task.title,
+    description: `${TASK_CATEGORIES[task.category]} · ${task.id}`,
+    searchText: `${task.id} ${task.title} ${TASK_CATEGORIES[task.category]}`,
+    value: { kind: "task", id: task.id },
+  }));
+  const scriptItems = Object.keys(scripts).sort((a, b) => a.localeCompare(b)).map((name) => ({
+    label: `npm run ${name}`,
+    description: String(scripts[name] ?? "").slice(0, 140),
+    searchText: `${name} ${scripts[name] ?? ""}`,
+    value: { kind: "npm", name },
+  }));
+  const choice = await ui.select({
+    title: "Komut Paleti",
+    status: renderStatusBar(),
+    body: ["Yazmaya başlayarak task, workflow veya npm script ara."],
+    items: [...taskItems, ...scriptItems],
+    startSearch: true,
+    footer: "yaz: filtrele · ↑↓ seç · Enter çalıştır · Esc geri",
+  });
   if (choice.action !== "pick") return;
-  if (labels[choice.index].npm) return npmScriptRunner(ui, q);
-  await executeEntry(ui, hits[choice.index]);
+  if (choice.item.value.kind === "task") return executeEntry(ui, getTask(choice.item.value.id));
+  const name = choice.item.value.name;
+  return executeEntry(ui, {
+    id: `npm:${name}`, kind: "task", title: `npm run ${name}`,
+    category: "checks", command: "npm", args: ["run", name], preflight: "basic",
+  });
 }
 
 // ---------- Ana menü ----------
 
 const MAIN = [
-  { key: "checks", label: "Kontroller (test/check grupları)" },
-  { key: "android", label: "Android (build/kur/cihaz)" },
-  { key: "web", label: "Web / Deploy (site profilleri)" },
-  { key: "build", label: "Build / Release (binary üret, yayınlama)" },
-  { key: "fresh", label: "Temiz Başlangıç (sonuç seç, flag ezberleme)" },
+  { key: "search", label: "Komut Ara", description: "Task, workflow ve npm scriptlerini tek yerde filtrele" },
+  { key: "checks", label: "Kontroller", description: "Test/check grupları ve doğrulama presetleri" },
+  { key: "android", label: "Android", description: "Build, kurulum, cihaz ve bağlantı işlemleri" },
+  { key: "web", label: "Web / Deploy", description: "Site profilleri, deploy ve canlı doğrulama" },
+  { key: "build", label: "Build / Release", description: "Binary ve APK/AAB üret; yayınlama ayrı" },
+  { key: "fresh", label: "Temiz Başlangıç", description: "Fresh/clean flag ezberlemeden sonuç seç" },
+  { key: "git", label: "Git", description: "Günlük güvenli Git işlemleri" },
+  { key: "devtools", label: "Geliştirici Araçları", description: "Dev sunucuları, loglar ve tanılama" },
+  { key: "history", label: "Son Çalıştırmalar", description: "Rapor, log ve tekrar çalıştırma" },
+  { key: "npm", label: "npm Scriptleri", description: "package.json scriptlerini filtreleyerek çalıştır" },
+];
+
+export async function mainLoop(ui) {
+  for (;;) {
+    const choice = await ui.select({
+      title: "Yardımcı Asistan — Geliştirici Konsolu v2",
+      status: renderStatusBar(),
+      items: MAIN.map((item) => ({
+        label: item.label,
+        description: item.description,
+        searchText: `${item.key} ${item.label} ${item.description}`,
+        value: item.key,
+      })),
+    });
+    if (choice.action !== "pick") {
+      if (choice.action === "exit" || await confirm(ui, "Geliştirici konsolundan çıkılsın mı?")) return;
+      continue;
+    }
+    const key = choice.item.value;
+    if (key === "search") await palette(ui);
+    else if (key === "npm") await npmScriptRunner(ui);
+    else if (key === "git") await gitSection(ui);
+    else if (key === "history") await historySection(ui);
+    else await sectionScreen(ui, key);
+  }
+}
+berleme)" },
   { key: "git", label: "Git (günlük işlemler)" },
   { key: "devtools", label: "Geliştirici Araçları" },
   { key: "history", label: "Son Çalıştırmalar" },
