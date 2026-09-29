@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   getTableSmokingPolicyLabel,
@@ -7,11 +7,13 @@ import {
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { TablePublicDetailsEditor } from "../operations/TablePublicDetailsEditor";
 import { ActionButton } from "../ui/ActionButton";
+import { TableMediaPanel } from "./TableMediaPanel";
 
 type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
 
 export function LayoutSettingsSection({ controller }: { controller: BusinessLayoutController }) {
   const [editingTableId, setEditingTableId] = useState("");
+  const [mediaTableKey, setMediaTableKey] = useState("");
   const {
     draft,
     loading,
@@ -19,7 +21,9 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     updateTable,
     updateTableCategory,
     addTableCategory,
-    removeTableCategory
+    removeTableCategory,
+    tableMediaRevision,
+    reportTableMediaDirty
   } = controller;
 
   if (!draft.capabilities.tables) return null;
@@ -29,6 +33,17 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     return total + (Number.isFinite(count) && count > 0 ? count : 0);
   }, 0);
   const editingTable = draft.tables.find((table) => table.id === editingTableId) ?? null;
+  const mediaTable = draft.tables.find((table) => table.key === mediaTableKey) ?? draft.tables[0] ?? null;
+
+  useEffect(() => {
+    if (draft.tables.length === 0) {
+      setMediaTableKey("");
+      return;
+    }
+    if (!draft.tables.some((table) => table.key === mediaTableKey)) {
+      setMediaTableKey(draft.tables[0].key);
+    }
+  }, [draft.tables, mediaTableKey]);
 
   return (
     <section id="settings-operations" tabIndex={-1} className="settings-daily-section table-layout-settings">
@@ -137,6 +152,25 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
           )}
         </fieldset>
       </div>
+
+      <TableMediaPanel
+        table={mediaTable ? {
+          id: mediaTable.id,
+          key: mediaTable.key,
+          name: mediaTable.name,
+          area: mediaTable.area
+        } : null}
+        tables={draft.tables.map((table) => ({
+          id: table.id,
+          key: table.key,
+          name: table.name,
+          area: table.area
+        }))}
+        disabled={loading || saving}
+        revision={tableMediaRevision}
+        onTableChange={setMediaTableKey}
+        onDirtyChange={reportTableMediaDirty}
+      />
 
       <TablePublicDetailsEditor
         open={Boolean(editingTable)}
