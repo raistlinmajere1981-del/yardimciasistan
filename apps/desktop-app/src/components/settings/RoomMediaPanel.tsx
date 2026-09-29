@@ -50,31 +50,37 @@ export function RoomMediaPanel({
       revision={revision}
       onResourceChange={onRoomChange}
       onDirtyChange={onDirtyChange}
-      listMedia={async (roomId) => window.yardimciDesktop?.listRoomMedia(roomId) ?? []}
-      addMedia={async (roomId) => {
-        const bridge = window.yardimciDesktop;
-        if (!bridge) return unavailable([]);
-        return bridge.addRoomMedia({ roomId });
-      }}
-      updateMedia={async (roomId, item, kind: PublicResourceMediaKind) => {
-        const bridge = window.yardimciDesktop;
-        if (!bridge) return unavailable([]);
-        return bridge.updateRoomMedia({
-          roomId,
-          mediaId: item.id,
-          kind,
-          title: item.title
-        });
-      }}
-      deleteMedia={async (roomId, item) => {
-        const bridge = window.yardimciDesktop;
-        if (!bridge) return unavailable([]);
-        return bridge.deleteRoomMedia({ roomId, mediaId: item.id });
-      }}
+      listMedia={listRoomMedia}
+      addMedia={addRoomMedia}
+      updateMedia={updateRoomMedia}
+      deleteMedia={deleteRoomMedia}
     />
   );
 }
 
 function unavailable(media: RoomMediaAsset[]) {
   return { ok: false, message: "Oda medyası bu ortamda kullanılamıyor.", media, dirty: false };
+}
+
+
+async function listRoomMedia(roomId: string) {
+  return window.yardimciDesktop?.listRoomMedia(roomId) ?? [];
+}
+
+async function addRoomMedia(roomId: string) {
+  const bridge = window.yardimciDesktop;
+  if (!bridge) return unavailable([]);
+  return bridge.addRoomMedia({ roomId });
+}
+
+async function updateRoomMedia(roomId: string, item: RoomMediaAsset, kind: PublicResourceMediaKind) {
+  const bridge = window.yardimciDesktop;
+  if (!bridge) return unavailable([]);
+  return bridge.updateRoomMedia({ roomId, mediaId: item.id, kind, title: item.title });
+}
+
+async function deleteRoomMedia(roomId: string, item: RoomMediaAsset) {
+  const bridge = window.yardimciDesktop;
+  if (!bridge) return unavailable([]);
+  return bridge.deleteRoomMedia({ roomId, mediaId: item.id });
 }
