@@ -63,7 +63,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
     <>
       <ResourceManagementWorkspace
         id="settings-rooms"
-        className="room-management-workspace"
+        className="room-resource-workspace"
         title="Oda Yönetimi"
         subtitle="Pansiyon"
         publishChecked={draft.publication.rooms}
