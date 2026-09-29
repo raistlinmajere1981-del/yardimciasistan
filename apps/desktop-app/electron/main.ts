@@ -65,6 +65,7 @@ import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
 import { AndroidInstallationService } from "./android-installation-service";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
 import { registerRoomMediaIpcHandlers } from "./room-media-ipc";
+import { registerTableMediaIpcHandlers } from "./table-media-ipc";
 import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 import { registerImageAnalysisIpcHandlers } from "./ipc/image-analysis-ipc";
 import {
@@ -709,6 +710,13 @@ function registerIpcHandlers() {
   });
 
   registerRoomMediaIpcHandlers({
+    userDataPath: () => getDatabase().userDataPath,
+    assertUnlocked: assertAppSessionUnlocked,
+    assertCapability: assertDesktopCapability,
+    onCommit: () => getSyncCoordinator().scheduleSoon()
+  });
+
+  registerTableMediaIpcHandlers({
     userDataPath: () => getDatabase().userDataPath,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability,
