@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   getTableSmokingPolicyLabel,
   type SaveTablePublicDetailsInput
@@ -7,6 +7,7 @@ import {
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { TablePublicDetailsEditor } from "../operations/TablePublicDetailsEditor";
 import { ActionButton } from "../ui/ActionButton";
+import { ResourceManagementWorkspace } from "./ResourceManagementWorkspace";
 import { TableMediaPanel } from "./TableMediaPanel";
 
 type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
@@ -47,158 +48,155 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
   const mediaTable = draft.tables.find((table) => table.key === mediaTableKey) ?? draft.tables[0] ?? null;
 
   return (
-    <section id="settings-operations" tabIndex={-1} className="settings-daily-section table-layout-settings">
-      <div className="settings-panel">
-        <fieldset className="settings-resource-fields table-category-editor" disabled={loading || saving}>
-          <div className="settings-panel-header table-category-heading">
-            <div>
-              <h2>Masa kategorileri</h2>
-              <p>{tableCountTotal} masa</p>
+    <>
+      <ResourceManagementWorkspace
+        id="settings-operations"
+        className="table-layout-settings"
+        title="Masa Yönetimi"
+        subtitle="Restoran"
+        publishChecked={draft.publication.tables}
+        publishAriaLabel="Masa web yayını"
+        disabled={loading || saving}
+        onPublishChange={(tables) => updatePublication({ tables })}
+        toolbar={
+          <>
+            <div className="resource-management-toolbar-copy">
+              <strong>Masa kategorileri</strong>
+              <span>{tableCountTotal} masa</span>
             </div>
             <ActionButton
               variant="secondary"
               size="sm"
               className="table-category-add"
               type="button"
+              disabled={loading || saving}
               onClick={addTableCategory}
             >
               <Plus size={15} aria-hidden="true" />
               Kategori Ekle
             </ActionButton>
-          </div>
-
-          <div className="settings-panel-body">
-            {draft.tableCategories.length > 0 && (
-              <div className="table-category-list">
-                {draft.tableCategories.map((category, index) => (
-                  <div className="table-category-row" key={category.key}>
-                    <label className="form-field form-field--medium">
-                      <span>Kategori adı</span>
-                      <input
-                        value={category.name}
-                        onChange={(event) => updateTableCategory(category.key, "name", event.target.value)}
-                        placeholder={index === 0 ? "Örn. Salon" : "Örn. Bahçe"}
-                        maxLength={50}
-                      />
-                    </label>
-                    <label className="form-field form-field--xs table-category-count">
-                      <span>Masa</span>
-                      <input
-                        value={category.tableCount}
-                        onChange={(event) => updateTableCategory(category.key, "tableCount", event.target.value)}
-                        inputMode="numeric"
-                        min="1"
-                        max="200"
-                        step="1"
-                        type="number"
-                      />
-                    </label>
-                    <ActionButton
-                      variant="ghost"
-                      size="sm"
-                      className="table-category-remove"
-                      type="button"
-                      onClick={() => removeTableCategory(category.key)}
-                      aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
-                      title="Kategoriyi kaldır"
-                    >
-                      <Trash2 size={15} aria-hidden="true" />
-                    </ActionButton>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </fieldset>
-      </div>
-
-      <div className="settings-panel">
-        <div className="settings-panel-header table-public-heading">
-          <div>
-            <h2>Web yayını</h2>
-            <p>Restoran ve masa detaylarının web sitesindeki görünürlüğü</p>
-          </div>
-        </div>
-        <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving}>
-          <div className="settings-publication-control">
-            <label className="form-check setup-checkline">
-              <input
-                type="checkbox"
-                checked={draft.publication.tables}
-                onChange={(event) => updatePublication({ tables: event.target.checked })}
-              />
-              <span>
-                <strong>Restoran / masaları web sitesinde yayınla</strong>
-                <small>Kapalıysa masa kataloğu ve masa detayları web sitesinden kaldırılır.</small>
-              </span>
-            </label>
-          </div>
-        </fieldset>
-      </div>
-
-      <div className="settings-panel">
-        <div className="settings-panel-header table-public-heading">
-          <div>
-            <h2>Masa bilgileri</h2>
-            <p>Kapasite ve müşteriye gösterilecek detaylar</p>
-          </div>
-        </div>
-        <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving}>
-          {draft.tables.length === 0 ? (
-            <p className="table-category-empty">
-              Önce masa kategorilerini kaydedin. Oluşan masaların detayları burada düzenlenir.
-            </p>
-          ) : (
-            <div className="table-public-resource-list" aria-label="Masa müşteri bilgileri">
-              <div className="table-public-resource-head">
-                <span>Masa</span>
-                <span>Bölüm</span>
-                <span>Kapasite</span>
-                <span>Sigara</span>
-                <span aria-hidden="true" />
-              </div>
-              {draft.tables.map((table) => (
-                <div className="table-public-resource-row" key={table.key}>
-                  <strong>{table.name}</strong>
-                  <span>{table.area || "—"}</span>
-                  <span>{table.capacity} kişi</span>
-                  <span>{table.smokingPolicy === "unspecified" ? "Belirtilmedi" : getTableSmokingPolicyLabel(table.smokingPolicy)}</span>
+          </>
+        }
+        media={
+          <TableMediaPanel
+            table={mediaTable ? {
+              id: mediaTable.id,
+              key: mediaTable.key,
+              name: mediaTable.name,
+              area: mediaTable.area
+            } : null}
+            embedded
+            disabled={loading || saving}
+            revision={tableMediaRevision}
+            onDirtyChange={reportTableMediaDirty}
+          />
+        }
+      >
+        <fieldset className="settings-resource-fields table-management-fields" disabled={loading || saving}>
+          {draft.tableCategories.length > 0 ? (
+            <div className="table-category-list">
+              {draft.tableCategories.map((category, index) => (
+                <div className="table-category-row" key={category.key}>
+                  <label className="form-field form-field--medium">
+                    <span>Kategori adı</span>
+                    <input
+                      value={category.name}
+                      onChange={(event) => updateTableCategory(category.key, "name", event.target.value)}
+                      placeholder={index === 0 ? "Örn. Salon" : "Örn. Bahçe"}
+                      maxLength={50}
+                    />
+                  </label>
+                  <label className="form-field form-field--xs table-category-count">
+                    <span>Masa</span>
+                    <input
+                      value={category.tableCount}
+                      onChange={(event) => updateTableCategory(category.key, "tableCount", event.target.value)}
+                      inputMode="numeric"
+                      min="1"
+                      max="200"
+                      step="1"
+                      type="number"
+                    />
+                  </label>
                   <ActionButton
-                    variant="secondary"
+                    variant="ghost"
                     size="sm"
+                    className="table-category-remove"
                     type="button"
-                    onClick={() => {
-                      setMediaTableKey(table.key);
-                      setEditingTableId(table.id);
-                    }}
+                    onClick={() => removeTableCategory(category.key)}
+                    aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
+                    title="Kategoriyi kaldır"
                   >
-                    Detaylar
+                    <Trash2 size={15} aria-hidden="true" />
                   </ActionButton>
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="table-category-empty">
+              Henüz masa kategorisi yok. Kategori Ekle ile ilk bölümü oluşturabilirsiniz.
+            </p>
           )}
-        </fieldset>
-      </div>
 
-      <TableMediaPanel
-        table={mediaTable ? {
-          id: mediaTable.id,
-          key: mediaTable.key,
-          name: mediaTable.name,
-          area: mediaTable.area
-        } : null}
-        tables={draft.tables.map((table) => ({
-          id: table.id,
-          key: table.key,
-          name: table.name,
-          area: table.area
-        }))}
-        disabled={loading || saving}
-        revision={tableMediaRevision}
-        onTableChange={setMediaTableKey}
-        onDirtyChange={reportTableMediaDirty}
-      />
+          <section className="resource-management-subsection">
+            <div className="resource-management-subsection-heading">
+              <div>
+                <h3>Masa bilgileri</h3>
+                <p>Kapasite ve müşteriye gösterilecek detaylar</p>
+              </div>
+            </div>
+
+            {draft.tables.length === 0 ? (
+              <p className="table-category-empty">
+                Kategorileri kaydedince oluşan masalar burada listelenir.
+              </p>
+            ) : (
+              <div className="table-public-resource-list" aria-label="Masa müşteri bilgileri">
+                <div className="table-public-resource-head">
+                  <span>Masa</span>
+                  <span>Bölüm</span>
+                  <span>Kapasite</span>
+                  <span>Sigara</span>
+                  <span aria-hidden="true" />
+                </div>
+                {draft.tables.map((table) => {
+                  const selected = mediaTable?.key === table.key;
+                  return (
+                    <div
+                      className={`table-public-resource-row${selected ? " is-media-selected" : ""}`}
+                      key={table.key}
+                      onClick={() => setMediaTableKey(table.key)}
+                    >
+                      <strong>{table.name}</strong>
+                      <span>{table.area || "—"}</span>
+                      <span>{table.capacity} kişi</span>
+                      <span>
+                        {table.smokingPolicy === "unspecified"
+                          ? "Belirtilmedi"
+                          : getTableSmokingPolicyLabel(table.smokingPolicy)}
+                      </span>
+                      <ActionButton
+                        variant="secondary"
+                        size="sm"
+                        type="button"
+                        className="room-management-details-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setMediaTableKey(table.key);
+                          setEditingTableId(table.id);
+                        }}
+                      >
+                        <Pencil size={14} aria-hidden="true" />
+                        Detaylar
+                      </ActionButton>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </fieldset>
+      </ResourceManagementWorkspace>
 
       <TablePublicDetailsEditor
         open={Boolean(editingTable)}
@@ -216,6 +214,6 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
           return { ok: true, message: "Masa detayları taslağa uygulandı." };
         }}
       />
-    </section>
+    </>
   );
 }
