@@ -15,11 +15,18 @@ export function createPublicRoomCatalog(
 ): RoomPublicCatalog {
   const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   if (!hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS)) {
-    return { version: 1, updatedAt: "", rooms: [] };
+    return { version: 1, enabled: false, updatedAt: "", rooms: [] };
   }
 
   const db = new DatabaseSync(databasePath);
   try {
+    const publication = db.prepare(
+      "SELECT publish_rooms_web FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1"
+    ).get() as { publish_rooms_web?: unknown } | undefined;
+    const publicationEnabled = Number(publication?.publish_rooms_web ?? 1) === 1;
+    if (!publicationEnabled) {
+      return { version: 1, enabled: false, updatedAt: "", rooms: [] };
+    }
     const rows = db.prepare(`
       SELECT id, name, number, capacity, bed_info, floor, features_json,
              description, price_note, nightly_price_minor, price_currency,
@@ -53,6 +60,7 @@ export function createPublicRoomCatalog(
 
     return {
       version: 1,
+      enabled: true,
       updatedAt,
       rooms: rooms.map(({ updatedAt: _updatedAt, ...room }) => room)
     };
