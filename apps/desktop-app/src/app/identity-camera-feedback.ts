@@ -43,7 +43,21 @@ function trySpeak(text: string, fallbackTone: IdentityCameraFeedbackTone): boole
     utterance.voice = voice;
     utterance.lang = voice.lang || "tr-TR";
     utterance.rate = 0.96;
-    utterance.onerror = () => playFeedbackTone(fallbackTone);
+
+    let started = false;
+    const fallbackTimer = window.setTimeout(() => {
+      if (!started) playFeedbackTone(fallbackTone);
+    }, 500);
+    utterance.onstart = () => {
+      started = true;
+      window.clearTimeout(fallbackTimer);
+    };
+    utterance.onend = () => window.clearTimeout(fallbackTimer);
+    utterance.onerror = () => {
+      window.clearTimeout(fallbackTimer);
+      playFeedbackTone(fallbackTone);
+    };
+
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
     return true;
