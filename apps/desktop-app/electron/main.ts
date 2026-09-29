@@ -79,7 +79,6 @@ import { createPublicRoomCatalog } from "./public-room-catalog-publication";
 import { createPublicTableCatalog } from "./public-table-catalog-publication";
 import { publishPendingRoomMedia } from "./room-media-publication";
 import { publishPendingTableMedia } from "./table-media-publication";
-import { registerBusinessLayoutIpcHandlers } from "./business-layout-ipc";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerGoogleReviewsSettingsIpcHandlers } from "./google-reviews-settings-ipc";
 import { getGoogleReviewsSettings, publishGoogleReviewsSettings } from "./google-reviews-settings";
@@ -588,14 +587,6 @@ function registerIpcHandlers() {
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability
-  });
-
-  registerBusinessLayoutIpcHandlers({
-    databasePath: () => getDatabase().databasePath,
-    assertUnlocked: assertAppSessionUnlocked,
-    onMutation: () => {
-      getSyncCoordinator().scheduleSoon();
-    }
   });
 
   registerBusinessPublicProfileIpcHandlers({
