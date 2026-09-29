@@ -47,15 +47,15 @@ export interface ResourceMediaServiceConfig {
 }
 
 export interface ResourceMediaUpdateInput {
-  resourceId: string;
-  mediaId: string;
-  kind: PublicResourceMediaKind;
-  title: string;
+  resourceId: unknown;
+  mediaId: unknown;
+  kind: unknown;
+  title: unknown;
 }
 
 export interface ResourceMediaDeleteInput {
-  resourceId: string;
-  mediaId: string;
+  resourceId: unknown;
+  mediaId: unknown;
 }
 
 export function createPublicResourceMediaService(config: ResourceMediaServiceConfig) {
@@ -65,8 +65,8 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
   async function addFromDialog(
     userDataPath: string,
     owner: BrowserWindow | null,
-    resourceIdValue: string,
-    preferredKindValue?: PublicResourceMediaKind
+    resourceIdValue: unknown,
+    preferredKindValue?: unknown
   ): Promise<PublicResourceMediaMutationResult<ResourceMediaAsset>> {
     const resourceId = normalizeId(resourceIdValue);
     if (!resourceId) return failure(`${config.singularLabel} kimliği geçersiz.`, []);
