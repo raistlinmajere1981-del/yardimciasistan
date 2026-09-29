@@ -49,31 +49,37 @@ export function TableMediaPanel({
       revision={revision}
       onResourceChange={onTableChange}
       onDirtyChange={onDirtyChange}
-      listMedia={async (tableId) => window.yardimciDesktop?.listTableMedia(tableId) ?? []}
-      addMedia={async (tableId) => {
-        const bridge = window.yardimciDesktop;
-        if (!bridge) return unavailable([]);
-        return bridge.addTableMedia({ tableId });
-      }}
-      updateMedia={async (tableId, item, kind: PublicResourceMediaKind) => {
-        const bridge = window.yardimciDesktop;
-        if (!bridge) return unavailable([]);
-        return bridge.updateTableMedia({
-          tableId,
-          mediaId: item.id,
-          kind,
-          title: item.title
-        });
-      }}
-      deleteMedia={async (tableId, item) => {
-        const bridge = window.yardimciDesktop;
-        if (!bridge) return unavailable([]);
-        return bridge.deleteTableMedia({ tableId, mediaId: item.id });
-      }}
+      listMedia={listTableMedia}
+      addMedia={addTableMedia}
+      updateMedia={updateTableMedia}
+      deleteMedia={deleteTableMedia}
     />
   );
 }
 
 function unavailable(media: TableMediaAsset[]) {
   return { ok: false, message: "Masa medyası bu ortamda kullanılamıyor.", media, dirty: false };
+}
+
+
+async function listTableMedia(tableId: string) {
+  return window.yardimciDesktop?.listTableMedia(tableId) ?? [];
+}
+
+async function addTableMedia(tableId: string) {
+  const bridge = window.yardimciDesktop;
+  if (!bridge) return unavailable([]);
+  return bridge.addTableMedia({ tableId });
+}
+
+async function updateTableMedia(tableId: string, item: TableMediaAsset, kind: PublicResourceMediaKind) {
+  const bridge = window.yardimciDesktop;
+  if (!bridge) return unavailable([]);
+  return bridge.updateTableMedia({ tableId, mediaId: item.id, kind, title: item.title });
+}
+
+async function deleteTableMedia(tableId: string, item: TableMediaAsset) {
+  const bridge = window.yardimciDesktop;
+  if (!bridge) return unavailable([]);
+  return bridge.deleteTableMedia({ tableId, mediaId: item.id });
 }
