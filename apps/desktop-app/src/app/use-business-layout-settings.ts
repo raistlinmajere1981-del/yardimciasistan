@@ -513,16 +513,6 @@ function cloneDraft(value: BusinessLayoutDraft): BusinessLayoutDraft {
   return {
     rooms: value.rooms.map((room) => ({ ...room, features: [...room.features] })),
     tables: value.tables.map((table) => ({ ...table, features: [...table.features] })),
-    tables: value.tables.map((table) => ({
-      id: table.id,
-      name: table.name.trim(),
-      area: table.area.trim(),
-      capacity: table.capacity,
-      description: table.description.trim(),
-      features: normalizeTablePublicFeatures(table.features),
-      smokingPolicy: normalizeTableSmokingPolicy(table.smokingPolicy),
-      sortOrder: table.sortOrder
-    })),
     tableCategories: value.tableCategories.map((category) => ({ ...category })),
     capabilities: { ...value.capabilities }
   };
@@ -543,6 +533,16 @@ function comparableDraft(value: BusinessLayoutDraft): string {
       priceMinor: parseMoneyToMinor(room.price),
       currency: room.currency,
       outOfService: room.outOfService === true
+    })),
+    tables: value.tables.map((table) => ({
+      id: table.id,
+      name: table.name.trim(),
+      area: table.area.trim(),
+      capacity: table.capacity,
+      description: table.description.trim(),
+      features: normalizeTablePublicFeatures(table.features),
+      smokingPolicy: normalizeTableSmokingPolicy(table.smokingPolicy),
+      sortOrder: table.sortOrder
     })),
     tableCategories: value.tableCategories.map((category) => ({
       sourceName: category.sourceName,
