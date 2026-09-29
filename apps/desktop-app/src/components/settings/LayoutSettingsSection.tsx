@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   getTableSmokingPolicyLabel,
@@ -28,10 +28,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     const count = Number(category.tableCount);
     return total + (Number.isFinite(count) && count > 0 ? count : 0);
   }, 0);
-  const editingTable = useMemo(
-    () => draft.tables.find((table) => table.id === editingTableId) ?? null,
-    [draft.tables, editingTableId]
-  );
+  const editingTable = draft.tables.find((table) => table.id === editingTableId) ?? null;
 
   return (
     <section id="settings-operations" tabIndex={-1} className="settings-daily-section table-layout-settings">
