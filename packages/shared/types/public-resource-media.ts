@@ -46,3 +46,9 @@ export function isPublicResourceMediaKind(value: unknown): value is PublicResour
   return typeof value === "string"
     && (PUBLIC_RESOURCE_MEDIA_KINDS as readonly string[]).includes(value);
 }
+
+
+export interface PublicResourceCoverPreview {
+  resourceId: string;
+  previewDataUrl: string;
+}
