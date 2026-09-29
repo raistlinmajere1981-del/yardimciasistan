@@ -350,6 +350,18 @@ export class DesktopDatabase {
         }
       }
 
+      const tableColumns = this.db.prepare("PRAGMA table_info(tables)").all() as Array<{ name?: string }>;
+      const tableColumnNames = new Set(tableColumns.map((column) => String(column.name ?? "")));
+      for (const columnName of [
+        "public_description",
+        "public_features_json",
+        "smoking_policy"
+      ]) {
+        if (!tableColumnNames.has(columnName)) {
+          throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
+        }
+      }
+
       this.ensureSyncClientId();
       this.db.exec("COMMIT");
     } catch (error) {
