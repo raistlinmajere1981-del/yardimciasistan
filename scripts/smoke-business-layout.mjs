@@ -91,6 +91,22 @@ try {
     { name: "Salon", tableCount: 2 },
     { name: "Teras", tableCount: 1 }
   ]);
+  assert.equal(initial.tables.length, 3);
+  assert.deepEqual(
+    initial.tables.map((table) => ({
+      name: table.name,
+      area: table.area,
+      capacity: table.capacity,
+      description: table.description,
+      features: table.features,
+      smokingPolicy: table.smokingPolicy
+    })),
+    [
+      { name: "Salon 1", area: "Salon", capacity: 4, description: "", features: [], smokingPolicy: "unspecified" },
+      { name: "Salon 2", area: "Salon", capacity: 4, description: "", features: [], smokingPolicy: "unspecified" },
+      { name: "Teras 1", area: "Teras", capacity: 4, description: "", features: [], smokingPolicy: "unspecified" }
+    ]
+  );
 
   const firstRoom = initial.rooms[0];
   const removedRoom = initial.rooms[1];
@@ -201,6 +217,66 @@ try {
     { name: "Salon", tableCount: 1 },
     { name: "Bahçe", tableCount: 2 }
   ]);
+
+  const tableBeforeProfile = getBusinessLayout(database.databasePath).tables[0];
+  assert.ok(tableBeforeProfile);
+  const tableReader = new DatabaseSync(database.databasePath);
+  let operationalTableBefore;
+  try {
+    operationalTableBefore = tableReader.prepare(
+      "SELECT name, area, status, current_customer_id, current_reservation_id, notes, is_active, sort_order " +
+      "FROM tables WHERE id = ?"
+    ).get(tableBeforeProfile.id);
+  } finally {
+    tableReader.close();
+  }
+  assert.ok(operationalTableBefore);
+
+  const tableProfileSave = saveBusinessLayout(database.databasePath, {
+    tables: [{
+      id: tableBeforeProfile.id,
+      capacity: 6,
+      description: "Deniz tarafında, geniş aile masası.",
+      features: ["outdoor", "sea_view", "internal_secret"],
+      smokingPolicy: "outdoor_only"
+    }]
+  });
+  assert.equal(tableProfileSave.ok, true, tableProfileSave.ok ? "" : tableProfileSave.message);
+  const profiledTable = tableProfileSave.layout.tables.find((table) => table.id === tableBeforeProfile.id);
+  assert.ok(profiledTable);
+  assert.equal(profiledTable.capacity, 6);
+  assert.equal(profiledTable.description, "Deniz tarafında, geniş aile masası.");
+  assert.deepEqual(profiledTable.features, ["outdoor", "sea_view"]);
+  assert.equal(profiledTable.smokingPolicy, "outdoor_only");
+
+  const tableAfterDb = new DatabaseSync(database.databasePath);
+  try {
+    const operationalTableAfter = tableAfterDb.prepare(
+      "SELECT name, area, status, current_customer_id, current_reservation_id, notes, is_active, sort_order, " +
+      "public_description, public_features_json, smoking_policy FROM tables WHERE id = ?"
+    ).get(tableBeforeProfile.id);
+    assert.ok(operationalTableAfter);
+    for (const field of ["name", "area", "status", "current_customer_id", "current_reservation_id", "notes", "is_active", "sort_order"]) {
+      assert.equal(operationalTableAfter[field], operationalTableBefore[field], `Public table edit must preserve ${field}`);
+    }
+    assert.equal(operationalTableAfter.public_description, "Deniz tarafında, geniş aile masası.");
+    assert.deepEqual(JSON.parse(String(operationalTableAfter.public_features_json ?? "[]")), ["outdoor", "sea_view"]);
+    assert.equal(operationalTableAfter.smoking_policy, "outdoor_only");
+  } finally {
+    tableAfterDb.close();
+  }
+
+  const invalidTableCapacity = saveBusinessLayout(database.databasePath, {
+    tables: [{
+      id: tableBeforeProfile.id,
+      capacity: 0,
+      description: "",
+      features: [],
+      smokingPolicy: "non_smoking"
+    }]
+  });
+  assert.equal(invalidTableCapacity.ok, false);
+  assert.match(invalidTableCapacity.message, /masa kapasitesi/i);
 
   const unknownRoom = saveBusinessLayout(database.databasePath, {
     rooms: [{
@@ -355,7 +431,7 @@ try {
   assert.equal(normalReactivate.layout.rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, false);
   assert.equal(readStatus(inconsistentTarget.id).status, "available");
 
-  console.log("business-layout-smoke-ok: atomic room/table layout, archive, blocker and partial update verified");
+  console.log("business-layout-smoke-ok: atomic room/table layout, public table details, archive, blocker and partial update verified");
 } finally {
   database.close();
   rmSync(dataDir, { recursive: true, force: true });
