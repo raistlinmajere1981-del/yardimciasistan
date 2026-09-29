@@ -34,6 +34,7 @@ try {
   const workspace = page.locator('.workspace-page-frame');
   const close = () => workspace.getByRole('button', { name: 'Çalışma alanını kapat', exact: true }).click();
   const orderBefore = await page.locator('.resource-card h3').allTextContents();
+  await expect(card(101).locator('.resource-card__image')).toHaveAttribute('src', /^data:image\/svg\+xml/);
   await expect(card(103)).toContainText('Konaklayanlar · 2 kişi');
   await expect(card(103)).toContainText('Ece Yılmaz');
   await expect(card(103)).toContainText('Önceki misafir · Selin Aras');
@@ -139,6 +140,7 @@ try {
   const rworkspace = restaurant.locator('.workspace-page-frame');
   const floor = () => rworkspace.getByRole('button', { name: 'Masa çalışma alanını kapat', exact: true }).click();
   expect(await restaurant.evaluate(() => window.fixtureCalls)).toEqual([]);
+  await expect(table(1).locator('.resource-card__image')).toHaveAttribute('src', /^data:image\/svg\+xml/);
 
   // Card surface opens the table without creating an order.
   await table(1).getByRole('button', { name: 'Masa 1 masasını aç' }).tap();
