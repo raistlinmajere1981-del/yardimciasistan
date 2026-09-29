@@ -415,8 +415,8 @@ try {
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
   // Room/table web publication toggles are staged with Business Layout.
-  const roomPublication = page.getByRole('checkbox', { name: 'Odaları web sitesinde yayınla', exact: true });
-  const tablePublication = page.getByRole('checkbox', { name: 'Restoran / masaları web sitesinde yayınla', exact: true });
+  const roomPublication = page.getByRole('checkbox', { name: /^Odaları web sitesinde yayınla/ });
+  const tablePublication = page.getByRole('checkbox', { name: /^Restoran \/ masaları web sitesinde yayınla/ });
   await expect(roomPublication).toBeChecked();
   await expect(tablePublication).not.toBeChecked();
   const beforePublicationSave = (await layoutCalls()).length;
