@@ -20,6 +20,8 @@ import type {
   AddRoomMediaInput,
   DeleteRoomMediaInput,
   RoomMediaAsset,
+  RoomMediaDraftResult,
+  RoomMediaDraftState,
   RoomMediaMutationResult,
   UpdateRoomMediaInput
 } from "@yardimci-asistan/shared";
@@ -215,6 +217,9 @@ export interface DesktopBridge {
   getBusinessLayout: () => Promise<BusinessLayoutSnapshot>;
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => Promise<BusinessLayoutSaveResult>;
   listRoomMedia: (roomId: string) => Promise<RoomMediaAsset[]>;
+  getRoomMediaDraftState: () => Promise<RoomMediaDraftState>;
+  commitRoomMediaDraft: () => Promise<RoomMediaDraftResult>;
+  discardRoomMediaDraft: () => Promise<RoomMediaDraftResult>;
   addRoomMedia: (input: AddRoomMediaInput) => Promise<RoomMediaMutationResult>;
   updateRoomMedia: (input: UpdateRoomMediaInput) => Promise<RoomMediaMutationResult>;
   deleteRoomMedia: (input: DeleteRoomMediaInput) => Promise<RoomMediaMutationResult>;
@@ -373,6 +378,9 @@ const bridge: DesktopBridge = {
   getBusinessLayout: () => invokeWhenUnlocked<BusinessLayoutSnapshot>("businessLayout:get"),
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => invokeWhenUnlocked<BusinessLayoutSaveResult>("businessLayout:save", input),
   listRoomMedia: (roomId: string) => invokeWhenUnlocked<RoomMediaAsset[]>("roomMedia:list", roomId),
+  getRoomMediaDraftState: () => invokeWhenUnlocked<RoomMediaDraftState>("roomMedia:draftState"),
+  commitRoomMediaDraft: () => invokeWhenUnlocked<RoomMediaDraftResult>("roomMedia:commitDraft"),
+  discardRoomMediaDraft: () => invokeWhenUnlocked<RoomMediaDraftResult>("roomMedia:discardDraft"),
   addRoomMedia: (input: AddRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:add", input),
   updateRoomMedia: (input: UpdateRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:update", input),
   deleteRoomMedia: (input: DeleteRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:delete", input),

@@ -12,7 +12,7 @@ type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
 export function RoomManagementSection({ controller }: { controller: BusinessLayoutController }) {
   const [editingKey, setEditingKey] = useState("");
   const [mediaRoomKey, setMediaRoomKey] = useState("");
-  const { draft, loading, saving, updateRoom, addRoom, removeRoom } = controller;
+  const { draft, loading, saving, mediaRevision, updateRoom, addRoom, removeRoom, reportMediaDirty } = controller;
   const rooms = draft.rooms;
   const roomsEnabled = draft.capabilities.rooms;
 
@@ -161,7 +161,9 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
           number: room.number
         }))}
         disabled={loading || saving}
+        revision={mediaRevision}
         onRoomChange={setMediaRoomKey}
+        onDirtyChange={reportMediaDirty}
       />
 
       <RoomPublicDetailsEditor

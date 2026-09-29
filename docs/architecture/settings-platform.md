@@ -95,8 +95,11 @@ the owning category indicator but never to Setup payload/save validation.
 - Operations layout: getBusinessLayout/saveBusinessLayout owns rooms and table
   categories as one staged collection. RoomPublicDetailsEditor edits the same local
   collection draft; it no longer performs a separate database save. Room removal is
-  staged and backend-protected, then archived transactionally on save. Folio-specific
-  nightly price override remains a separate financial concept.
+  staged and backend-protected, then archived transactionally on save. Room media uses
+  the same category contract: add/type/delete operations mutate a main-process staging
+  manifest, staged files are isolated from publication, Save commits the manifest and
+  only then schedules web sync, and Discard removes staged files and reloads canonical
+  media. Folio-specific nightly price override remains a separate financial concept.
 - Update URL/auto-check: saveUpdatePreferences remains its backend resource, but its
   draft participates in the Application category footer. Returning to the persisted
   value clears dirty state; Varsayılana Dön stages the default instead of persisting
@@ -139,7 +142,9 @@ room-details dialog and the unsaved-changes decision are each single-layer dialo
 
 ## Lifetime and deliberate limits
 
-Guarantee: draft lifetime is the mounted Settings page. Category/search switches and
+Guarantee: draft lifetime is the mounted Settings page. Room-media staging is also
+process-local; stale staging files from an interrupted process are cleaned before the
+next media session. Category/search switches and
 page navigation cannot destroy a dirty active draft without an explicit save/discard/stay
 decision. Draft persistence across restart, generic rebase/CRDT, a global state library,
 settings DSL/form generator/plugin discovery and backend Setup category-patch/versioning

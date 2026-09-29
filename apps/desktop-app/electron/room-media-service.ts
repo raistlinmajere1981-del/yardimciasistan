@@ -6,6 +6,8 @@ import type {
   AddRoomMediaInput,
   DeleteRoomMediaInput,
   RoomMediaAsset,
+  RoomMediaDraftResult,
+  RoomMediaDraftState,
   RoomMediaMutationResult,
   RoomPublicMedia,
   RoomPublicMediaKind,
@@ -33,6 +35,9 @@ interface RoomMediaManifest {
   media: StoredRoomMediaAsset[];
 }
 
+const activeDrafts = new Map<string, RoomMediaManifest>();
+const cleanedStagingRoots = new Set<string>();
+
 export async function addRoomMediaFromDialog(
   userDataPath: string,
   owner: BrowserWindow | null,
@@ -54,10 +59,15 @@ export async function addRoomMediaFromDialog(
     ? await dialog.showOpenDialog(owner, pickerOptions)
     : await dialog.showOpenDialog(pickerOptions);
   if (result.canceled || result.filePaths.length === 0) {
-    return { ok: true, message: "Dosya seçimi iptal edildi.", media: listRoomMedia(userDataPath, roomId) };
+    return {
+      ok: true,
+      message: "Dosya seçimi iptal edildi.",
+      media: listRoomMedia(userDataPath, roomId),
+      dirty: getRoomMediaDraftState(userDataPath).dirty
+    };
   }
 
-  const manifest = readManifest(userDataPath);
+  const manifest = getDraftManifest(userDataPath);
   const now = new Date().toISOString();
   let roomMedia = manifest.media.filter((item) => item.roomId === roomId);
   const retained = manifest.media.filter((item) => item.roomId !== roomId);
@@ -72,7 +82,9 @@ export async function addRoomMediaFromDialog(
 
       if (SINGLETON_KINDS.has(detectedKind)) {
         const replaced = roomMedia.filter((item) => item.kind === detectedKind);
-        for (const item of replaced) removeStoredFile(userDataPath, item);
+        for (const item of replaced) {
+          if (isStagedAsset(item)) removeStoredFile(userDataPath, item);
+        }
         roomMedia = roomMedia.filter((item) => item.kind !== detectedKind);
       }
 
@@ -82,26 +94,26 @@ export async function addRoomMediaFromDialog(
         detectedKind,
         sourcePath,
         nextOrder++,
-        now
+        now,
+        "staging"
       ));
     }
   } catch (error) {
     return failure(
       error instanceof Error ? error.message : "Medya dosyası eklenemedi.",
-      toPublicLocalAssets(userDataPath, roomMedia)
+      toPublicLocalAssets(userDataPath, roomMedia),
+      getRoomMediaDraftState(userDataPath).dirty
     );
   }
 
-  writeManifest(userDataPath, {
-    version: 1,
-    media: [...retained, ...roomMedia]
-  });
+  manifest.media = [...retained, ...roomMedia];
   return {
     ok: true,
     message: result.filePaths.length > 1
-      ? `${result.filePaths.length} medya dosyası eklendi.`
-      : "Oda medyası eklendi.",
-    media: listRoomMedia(userDataPath, roomId)
+      ? `${result.filePaths.length} medya dosyası taslağa eklendi.`
+      : "Oda medyası taslağa eklendi.",
+    media: listRoomMedia(userDataPath, roomId),
+    dirty: getRoomMediaDraftState(userDataPath).dirty
   };
 }
 
@@ -114,9 +126,9 @@ export function updateRoomMedia(
   const kind = normalizeKind(input?.kind);
   if (!roomId || !mediaId || !kind) return failure("Medya kaydı geçersiz.", []);
 
-  const manifest = readManifest(userDataPath);
+  const manifest = getDraftManifest(userDataPath);
   const target = manifest.media.find((item) => item.roomId === roomId && item.id === mediaId);
-  if (!target) return failure("Medya kaydı bulunamadı.", listRoomMedia(userDataPath, roomId));
+  if (!target) return failure("Medya kaydı bulunamadı.", listRoomMedia(userDataPath, roomId), getRoomMediaDraftState(userDataPath).dirty);
 
   if (kind === "video" && !target.mimeType.startsWith("video/")) {
     return failure("Görsel dosyası video olarak işaretlenemez.", listRoomMedia(userDataPath, roomId));
@@ -135,8 +147,12 @@ export function updateRoomMedia(
   target.kind = kind;
   target.title = cleanText(input.title, 240);
   target.updatedAt = new Date().toISOString();
-  writeManifest(userDataPath, manifest);
-  return { ok: true, message: "Medya bilgisi güncellendi.", media: listRoomMedia(userDataPath, roomId) };
+  return {
+    ok: true,
+    message: "Medya bilgisi taslakta güncellendi.",
+    media: listRoomMedia(userDataPath, roomId),
+    dirty: getRoomMediaDraftState(userDataPath).dirty
+  };
 }
 
 export function deleteRoomMedia(
@@ -147,34 +163,130 @@ export function deleteRoomMedia(
   const mediaId = normalizeId(input?.mediaId);
   if (!roomId || !mediaId) return failure("Medya kaydı geçersiz.", []);
 
-  const manifest = readManifest(userDataPath);
+  const manifest = getDraftManifest(userDataPath);
   const target = manifest.media.find((item) => item.roomId === roomId && item.id === mediaId);
-  if (!target) return failure("Medya kaydı bulunamadı.", listRoomMedia(userDataPath, roomId));
+  if (!target) return failure("Medya kaydı bulunamadı.", listRoomMedia(userDataPath, roomId), getRoomMediaDraftState(userDataPath).dirty);
 
-  removeStoredFile(userDataPath, target);
+  if (isStagedAsset(target)) removeStoredFile(userDataPath, target);
   manifest.media = manifest.media.filter((item) => item.id !== mediaId);
-  writeManifest(userDataPath, manifest);
-  return { ok: true, message: "Medya kaldırıldı.", media: listRoomMedia(userDataPath, roomId) };
+  return {
+    ok: true,
+    message: "Medya taslaktan kaldırıldı.",
+    media: listRoomMedia(userDataPath, roomId),
+    dirty: getRoomMediaDraftState(userDataPath).dirty
+  };
 }
 
 export function listRoomMedia(userDataPath: string, roomId: string): RoomMediaAsset[] {
+  ensureStagingRootClean(userDataPath);
   const normalized = normalizeId(roomId);
   if (!normalized) return [];
+  const manifest = activeDrafts.get(draftKey(userDataPath)) ?? readManifest(userDataPath);
   return sortMedia(
     toPublicLocalAssets(
       userDataPath,
-      readManifest(userDataPath).media.filter((item) => item.roomId === normalized)
+      manifest.media.filter((item) => item.roomId === normalized)
     )
   );
 }
 
+export function getRoomMediaDraftState(userDataPath: string): RoomMediaDraftState {
+  ensureStagingRootClean(userDataPath);
+  const draft = activeDrafts.get(draftKey(userDataPath));
+  return { dirty: Boolean(draft && isDraftDirty(userDataPath, draft)) };
+}
+
+export function commitRoomMediaDraft(userDataPath: string): RoomMediaDraftResult {
+  ensureStagingRootClean(userDataPath);
+  const key = draftKey(userDataPath);
+  const draft = activeDrafts.get(key);
+  if (!draft || !isDraftDirty(userDataPath, draft)) {
+    activeDrafts.delete(key);
+    clearStagingRoot(userDataPath);
+    return { ok: true, message: "Oda medyalarında değişiklik yok.", dirty: false, changed: false };
+  }
+
+  const canonical = readManifest(userDataPath);
+  const canonicalById = new Map(canonical.media.map((item) => [item.id, item] as const));
+  const copiedFiles: string[] = [];
+
+  try {
+    const committedMedia = draft.media.map((item) => {
+      if (!isStagedAsset(item)) {
+        const latest = canonicalById.get(item.id);
+        return {
+          ...item,
+          remoteUrl: latest?.remoteUrl ?? item.remoteUrl
+        };
+      }
+
+      const source = storedAssetAbsolutePath(userDataPath, item);
+      if (!source || !fs.existsSync(source)) {
+        throw new Error(`${item.originalName || "Oda medyası"} staging alanında bulunamadı.`);
+      }
+      const extension = path.extname(item.storedPath).toLowerCase();
+      const relativeDirectory = path.join("files", normalizeId(item.roomId));
+      const directory = path.join(mediaRoot(userDataPath), relativeDirectory);
+      fs.mkdirSync(directory, { recursive: true });
+      const storedPath = path.join(relativeDirectory, item.id + extension);
+      const destination = path.join(mediaRoot(userDataPath), storedPath);
+      fs.copyFileSync(source, destination);
+      copiedFiles.push(destination);
+      return { ...item, storedPath, remoteUrl: "" };
+    });
+
+    const nextManifest: RoomMediaManifest = { version: 1, media: committedMedia };
+    writeManifest(userDataPath, nextManifest);
+
+    const retainedIds = new Set(committedMedia.map((item) => item.id));
+    for (const item of canonical.media) {
+      if (!retainedIds.has(item.id)) removeStoredFile(userDataPath, item);
+    }
+
+    activeDrafts.delete(key);
+    clearStagingRoot(userDataPath);
+    return { ok: true, message: "Oda medyaları kaydedildi.", dirty: false, changed: true };
+  } catch (error) {
+    for (const file of copiedFiles) {
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        // Best-effort cleanup; canonical manifest remains authoritative.
+      }
+    }
+    return {
+      ok: false,
+      message: error instanceof Error && error.message ? error.message : "Oda medyaları kaydedilemedi.",
+      dirty: true,
+      changed: false
+    };
+  }
+}
+
+export function discardRoomMediaDraft(userDataPath: string): RoomMediaDraftResult {
+  ensureStagingRootClean(userDataPath);
+  const key = draftKey(userDataPath);
+  const draft = activeDrafts.get(key);
+  const changed = Boolean(draft && isDraftDirty(userDataPath, draft));
+  activeDrafts.delete(key);
+  clearStagingRoot(userDataPath);
+  return {
+    ok: true,
+    message: changed ? "Oda medyası değişiklikleri geri alındı." : "Oda medyalarında bekleyen değişiklik yok.",
+    dirty: false,
+    changed
+  };
+}
+
 export function listPendingRoomMedia(userDataPath: string): StoredRoomMediaAsset[] {
+  ensureStagingRootClean(userDataPath);
   return readManifest(userDataPath).media
     .filter((item) => !item.remoteUrl && storedFileExists(userDataPath, item))
     .sort((a, b) => a.roomId.localeCompare(b.roomId) || a.sortOrder - b.sortOrder);
 }
 
 export function getRoomPublishedMedia(userDataPath: string, roomId: string): RoomPublicMedia[] {
+  ensureStagingRootClean(userDataPath);
   return readManifest(userDataPath).media
     .filter((item) => item.roomId === roomId && item.remoteUrl)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -192,12 +304,11 @@ export function getRoomMediaUploadSource(userDataPath: string, mediaId: string):
   asset: StoredRoomMediaAsset;
   absolutePath: string;
 } | null {
+  ensureStagingRootClean(userDataPath);
   const asset = readManifest(userDataPath).media.find((item) => item.id === mediaId);
   if (!asset) return null;
-  const absolutePath = path.resolve(mediaRoot(userDataPath), asset.storedPath);
-  const root = path.resolve(mediaRoot(userDataPath));
-  if (absolutePath !== root && !absolutePath.startsWith(root + path.sep)) return null;
-  if (!fs.existsSync(absolutePath)) return null;
+  const absolutePath = storedAssetAbsolutePath(userDataPath, asset);
+  if (!absolutePath || !fs.existsSync(absolutePath)) return null;
   return { asset, absolutePath };
 }
 
@@ -212,6 +323,12 @@ export function markRoomMediaPublished(
   asset.remoteUrl = String(remoteUrl ?? "").trim();
   asset.updatedAt = new Date().toISOString();
   writeManifest(userDataPath, manifest);
+  const draft = activeDrafts.get(draftKey(userDataPath));
+  const draftAsset = draft?.media.find((item) => item.id === mediaId);
+  if (draftAsset) {
+    draftAsset.remoteUrl = asset.remoteUrl;
+    draftAsset.updatedAt = asset.updatedAt;
+  }
 }
 
 function copySelectedFile(
@@ -220,7 +337,8 @@ function copySelectedFile(
   kind: RoomPublicMediaKind,
   sourcePath: string,
   sortOrder: number,
-  now: string
+  now: string,
+  storageArea: "files" | "staging" = "files"
 ): StoredRoomMediaAsset {
   const extension = path.extname(sourcePath).toLowerCase();
   const isVideo = VIDEO_EXTENSIONS.has(extension);
@@ -241,7 +359,7 @@ function copySelectedFile(
 
   const mediaId = "room_media_" + crypto.randomUUID().replaceAll("-", "");
   const safeRoom = normalizeId(roomId);
-  const relativeDirectory = path.join("files", safeRoom);
+  const relativeDirectory = path.join(storageArea, safeRoom);
   const directory = path.join(mediaRoot(userDataPath), relativeDirectory);
   fs.mkdirSync(directory, { recursive: true });
   const storedPath = path.join(relativeDirectory, mediaId + extension);
@@ -343,11 +461,11 @@ function toPublicLocalAsset(userDataPath: string, item: StoredRoomMediaAsset): R
 
 function createPreviewDataUrl(userDataPath: string, item: StoredRoomMediaAsset): string {
   if (!item.mimeType.startsWith("image/")) return "";
-  const source = getRoomMediaUploadSource(userDataPath, item.id);
-  if (!source) return "";
+  const absolutePath = storedAssetAbsolutePath(userDataPath, item);
+  if (!absolutePath || !fs.existsSync(absolutePath)) return "";
 
   try {
-    const image = nativeImage.createFromPath(source.absolutePath);
+    const image = nativeImage.createFromPath(absolutePath);
     if (image.isEmpty()) return "";
     return image.resize({
       width: 160,
@@ -360,17 +478,84 @@ function createPreviewDataUrl(userDataPath: string, item: StoredRoomMediaAsset):
 }
 
 function removeStoredFile(userDataPath: string, item: StoredRoomMediaAsset): void {
-  const source = getRoomMediaUploadSource(userDataPath, item.id);
-  if (!source) return;
+  const absolutePath = storedAssetAbsolutePath(userDataPath, item);
+  if (!absolutePath || !fs.existsSync(absolutePath)) return;
   try {
-    fs.unlinkSync(source.absolutePath);
+    fs.unlinkSync(absolutePath);
   } catch {
     // The manifest remains authoritative even if an already-missing file cannot be removed.
   }
 }
 
 function storedFileExists(userDataPath: string, item: StoredRoomMediaAsset): boolean {
-  return Boolean(getRoomMediaUploadSource(userDataPath, item.id));
+  const absolutePath = storedAssetAbsolutePath(userDataPath, item);
+  return Boolean(absolutePath && fs.existsSync(absolutePath));
+}
+
+function storedAssetAbsolutePath(userDataPath: string, item: StoredRoomMediaAsset): string | null {
+  const absolutePath = path.resolve(mediaRoot(userDataPath), item.storedPath);
+  const root = path.resolve(mediaRoot(userDataPath));
+  if (absolutePath !== root && !absolutePath.startsWith(root + path.sep)) return null;
+  return absolutePath;
+}
+
+function getDraftManifest(userDataPath: string): RoomMediaManifest {
+  ensureStagingRootClean(userDataPath);
+  const key = draftKey(userDataPath);
+  const existing = activeDrafts.get(key);
+  if (existing) return existing;
+  const draft = cloneManifest(readManifest(userDataPath));
+  activeDrafts.set(key, draft);
+  return draft;
+}
+
+function cloneManifest(manifest: RoomMediaManifest): RoomMediaManifest {
+  return {
+    version: 1,
+    media: manifest.media.map((item) => ({ ...item }))
+  };
+}
+
+function isDraftDirty(userDataPath: string, draft: RoomMediaManifest): boolean {
+  return comparableManifest(draft) !== comparableManifest(readManifest(userDataPath));
+}
+
+function comparableManifest(manifest: RoomMediaManifest): string {
+  return JSON.stringify(manifest.media.map((item) => ({
+    id: item.id,
+    roomId: item.roomId,
+    kind: item.kind,
+    originalName: item.originalName,
+    mimeType: item.mimeType,
+    title: item.title,
+    sortOrder: item.sortOrder,
+    sizeBytes: item.sizeBytes,
+    storedPath: item.storedPath,
+    contentHash: item.contentHash
+  })));
+}
+
+function isStagedAsset(item: StoredRoomMediaAsset): boolean {
+  return item.storedPath.split(/[\\/]+/)[0] === "staging";
+}
+
+function draftKey(userDataPath: string): string {
+  return path.resolve(userDataPath);
+}
+
+function stagingRoot(userDataPath: string): string {
+  return path.join(mediaRoot(userDataPath), "staging");
+}
+
+function ensureStagingRootClean(userDataPath: string): void {
+  const root = path.resolve(stagingRoot(userDataPath));
+  if (cleanedStagingRoots.has(root)) return;
+  fs.rmSync(root, { recursive: true, force: true });
+  cleanedStagingRoots.add(root);
+}
+
+function clearStagingRoot(userDataPath: string): void {
+  fs.rmSync(stagingRoot(userDataPath), { recursive: true, force: true });
 }
 
 function mediaRoot(userDataPath: string): string {
@@ -418,6 +603,6 @@ function sortMedia<T extends { sortOrder: number; id: string }>(media: T[]): T[]
   return [...media].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
 }
 
-function failure(message: string, media: RoomMediaAsset[]): RoomMediaMutationResult {
-  return { ok: false, message, media };
+function failure(message: string, media: RoomMediaAsset[], dirty = false): RoomMediaMutationResult {
+  return { ok: false, message, media, dirty };
 }

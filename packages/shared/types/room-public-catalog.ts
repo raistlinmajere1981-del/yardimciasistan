@@ -67,6 +67,14 @@ export interface DeleteRoomMediaInput {
   mediaId: string;
 }
 
+export interface RoomMediaDraftState {
+  dirty: boolean;
+}
+
+export type RoomMediaDraftResult =
+  | { ok: true; message: string; dirty: false; changed: boolean }
+  | { ok: false; message: string; dirty: boolean; changed: false };
+
 export type RoomMediaMutationResult =
-  | { ok: true; message: string; media: RoomMediaAsset[] }
-  | { ok: false; message: string; media: RoomMediaAsset[] };
+  | { ok: true; message: string; media: RoomMediaAsset[]; dirty?: boolean }
+  | { ok: false; message: string; media: RoomMediaAsset[]; dirty?: boolean };

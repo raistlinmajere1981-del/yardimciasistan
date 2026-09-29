@@ -62,6 +62,8 @@ export function useBusinessLayoutSettings(options: {
   const [loading, setLoading] = useState(enabled);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const [mediaDirty, setMediaDirty] = useState(false);
+  const [mediaRevision, setMediaRevision] = useState(0);
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"idle" | "success" | "error">("idle");
 
@@ -79,6 +81,7 @@ export function useBusinessLayoutSettings(options: {
       draftRef.current = next;
       setDraftState(next);
       setLoading(false);
+      setMediaDirty(false);
       setState("idle");
       setMessage("");
       return;
@@ -92,8 +95,12 @@ export function useBusinessLayoutSettings(options: {
     }
     setLoading(true);
     try {
-      const snapshot = await bridge.getBusinessLayout();
+      const [snapshot, mediaState] = await Promise.all([
+        bridge.getBusinessLayout(),
+        bridge.getRoomMediaDraftState?.() ?? Promise.resolve({ dirty: false })
+      ]);
       applyCanonical(snapshot);
+      setMediaDirty(mediaState.dirty);
       setState("idle");
       setMessage("");
     } catch (error) {
@@ -119,8 +126,8 @@ export function useBusinessLayoutSettings(options: {
   }, [state]);
 
   const dirty = useMemo(
-    () => comparableDraft(draft) !== comparableDraft(baselineRef.current),
-    [draft]
+    () => comparableDraft(draft) !== comparableDraft(baselineRef.current) || mediaDirty,
+    [draft, mediaDirty]
   );
 
   const updateRoom = useCallback((key: string, patch: Partial<BusinessLayoutRoomDraft>) => {
@@ -232,13 +239,20 @@ export function useBusinessLayoutSettings(options: {
       setMessage(validationMessage);
       return { ok: false, message: validationMessage };
     }
-    if (comparableDraft(draftRef.current) === comparableDraft(baselineRef.current)) {
-      return { ok: true, changed: false };
-    }
+
+    const layoutChanged = comparableDraft(draftRef.current) !== comparableDraft(baselineRef.current);
+    const mediaChanged = mediaDirty;
+    if (!layoutChanged && !mediaChanged) return { ok: true, changed: false };
 
     const bridge = window.yardimciDesktop;
-    if (!bridge?.saveBusinessLayout) {
+    if (layoutChanged && !bridge?.saveBusinessLayout) {
       const errorMessage = "İşletme düzeni bu ortamda kullanılamıyor.";
+      setState("error");
+      setMessage(errorMessage);
+      return { ok: false, message: errorMessage };
+    }
+    if (mediaChanged && !bridge?.commitRoomMediaDraft) {
+      const errorMessage = "Oda medyası taslağı kaydedilemiyor. Uygulamayı yeniden başlatın.";
       setState("error");
       setMessage(errorMessage);
       return { ok: false, message: errorMessage };
@@ -248,47 +262,68 @@ export function useBusinessLayoutSettings(options: {
     setSaving(true);
     setMessage("İşletme düzeni kaydediliyor…");
     try {
-      const current = draftRef.current;
-      const input: SaveBusinessLayoutInput = {
-        rooms: current.capabilities.rooms
-          ? current.rooms.map((room) => ({
-              id: room.id || undefined,
-              clientKey: room.id ? undefined : room.key,
-              name: room.name,
-              number: room.number,
-              capacity: room.capacity,
-              bedInfo: room.bedInfo,
-              floor: room.floor,
-              features: room.features,
-              description: room.description,
-              priceNote: room.priceNote,
-              // validate() rejects blank/invalid prices before save, so the
-              // fallback below is unreachable in practice.
-              nightlyPriceMinor: parseMoneyToMinor(room.price) ?? 0,
-              currency: room.currency,
-              outOfService: room.outOfService
-            }))
-          : undefined,
-        tableCategories: current.capabilities.tables
-          ? current.tableCategories.map((category) => ({
-              sourceName: category.sourceName,
-              name: category.name,
-              tableCount: Number(category.tableCount)
-            }))
-          : undefined
-      };
-      const result = await bridge.saveBusinessLayout(input);
-      if (!result.ok) {
-        setState("error");
-        setMessage(result.message);
-        return { ok: false, message: result.message };
+      let changed = false;
+      const messages: string[] = [];
+
+      if (layoutChanged) {
+        const current = draftRef.current;
+        const input: SaveBusinessLayoutInput = {
+          rooms: current.capabilities.rooms
+            ? current.rooms.map((room) => ({
+                id: room.id || undefined,
+                clientKey: room.id ? undefined : room.key,
+                name: room.name,
+                number: room.number,
+                capacity: room.capacity,
+                bedInfo: room.bedInfo,
+                floor: room.floor,
+                features: room.features,
+                description: room.description,
+                priceNote: room.priceNote,
+                nightlyPriceMinor: parseMoneyToMinor(room.price) ?? 0,
+                currency: room.currency,
+                outOfService: room.outOfService
+              }))
+            : undefined,
+          tableCategories: current.capabilities.tables
+            ? current.tableCategories.map((category) => ({
+                sourceName: category.sourceName,
+                name: category.name,
+                tableCount: Number(category.tableCount)
+              }))
+            : undefined
+        };
+        const result = await bridge!.saveBusinessLayout(input);
+        if (!result.ok) {
+          setState("error");
+          setMessage(result.message);
+          return { ok: false, message: result.message };
+        }
+        applyCanonical(result.layout);
+        changed = true;
+        messages.push(result.message);
       }
 
-      applyCanonical(result.layout);
+      if (mediaChanged) {
+        const mediaResult = await bridge!.commitRoomMediaDraft();
+        setMediaDirty(mediaResult.dirty);
+        if (!mediaResult.ok) {
+          setState("error");
+          setMessage(mediaResult.message);
+          return { ok: false, message: mediaResult.message };
+        }
+        changed ||= mediaResult.changed;
+        if (mediaResult.changed) {
+          setMediaRevision((current) => current + 1);
+          messages.push(mediaResult.message);
+        }
+      }
+
       await onDashboardRefresh?.();
+      const successMessage = messages.join(" ") || "İşletme düzeni kaydedildi.";
       setState("success");
-      setMessage(result.message);
-      return { ok: true, changed: true, message: result.message };
+      setMessage(successMessage);
+      return { ok: true, changed, message: successMessage };
     } catch (error) {
       const errorMessage = error instanceof Error && error.message
         ? error.message
@@ -300,16 +335,45 @@ export function useBusinessLayoutSettings(options: {
       savingRef.current = false;
       setSaving(false);
     }
-  }, [applyCanonical, enabled, onDashboardRefresh, validate]);
+  }, [applyCanonical, enabled, mediaDirty, onDashboardRefresh, validate]);
 
-  const discard = useCallback(() => {
-    if (savingRef.current) return;
+  const discard = useCallback(async () => {
+    if (savingRef.current) return false;
     const next = cloneDraft(baselineRef.current);
     draftRef.current = next;
     setDraftState(next);
+
+    if (mediaDirty && window.yardimciDesktop?.discardRoomMediaDraft) {
+      try {
+        const result = await window.yardimciDesktop.discardRoomMediaDraft();
+        setMediaDirty(result.dirty);
+        if (!result.ok) {
+          setState("error");
+          setMessage(result.message);
+          return false;
+        }
+        if (result.changed) setMediaRevision((current) => current + 1);
+      } catch (error) {
+        setState("error");
+        setMessage(error instanceof Error && error.message ? error.message : "Oda medyası değişiklikleri geri alınamadı.");
+        return false;
+      }
+    } else {
+      setMediaDirty(false);
+    }
+
+    setState("idle");
+    setMessage("");
+    return true;
+  }, [mediaDirty]);
+
+  const reportMediaDirty = useCallback((dirtyValue: boolean) => {
+    setMediaDirty(dirtyValue);
     setState("idle");
     setMessage("");
   }, []);
+
+
 
   return {
     draft,
@@ -324,6 +388,8 @@ export function useBusinessLayoutSettings(options: {
     updateTableCategory,
     addTableCategory,
     removeTableCategory,
+    mediaRevision,
+    reportMediaDirty,
     save,
     discard,
     refresh: load

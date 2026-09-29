@@ -32,7 +32,9 @@ interface RoomMediaPanelProps {
   room: RoomMediaPanelRoom | null;
   rooms: RoomMediaPanelRoom[];
   disabled?: boolean;
+  revision: number;
   onRoomChange: (key: string) => void;
+  onDirtyChange: (dirty: boolean) => void;
 }
 
 type MediaState = "idle" | "loading" | "error";
@@ -65,7 +67,7 @@ function MediaKindIcon({ kind }: { kind: RoomPublicMediaKind }) {
   return <FileImage size={20} aria-hidden="true" />;
 }
 
-export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: RoomMediaPanelProps) {
+export function RoomMediaPanel({ room, rooms, disabled = false, revision, onRoomChange, onDirtyChange }: RoomMediaPanelProps) {
   const [media, setMedia] = useState<RoomMediaAsset[]>([]);
   const [state, setState] = useState<MediaState>("idle");
   const [message, setMessage] = useState("");
@@ -97,7 +99,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
     return () => {
       cancelled = true;
     };
-  }, [mediaRoomId]);
+  }, [mediaRoomId, revision]);
 
   const addMedia = async () => {
     const bridge = window.yardimciDesktop;
@@ -109,6 +111,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
       setMedia(result.media);
       setState(result.ok ? "idle" : "error");
       setMessage(result.message.includes("iptal") ? "" : result.message);
+      if (typeof result.dirty === "boolean") onDirtyChange(result.dirty);
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "Medya eklenemedi.");
@@ -133,6 +136,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
       setMedia(result.media);
       setState(result.ok ? "idle" : "error");
       setMessage(result.message);
+      if (typeof result.dirty === "boolean") onDirtyChange(result.dirty);
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "Medya türü güncellenemedi.");
@@ -149,6 +153,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
       setMedia(result.media);
       setState(result.ok ? "idle" : "error");
       setMessage(result.message);
+      if (typeof result.dirty === "boolean") onDirtyChange(result.dirty);
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "Medya kaldırılamadı.");
@@ -199,7 +204,7 @@ export function RoomMediaPanel({ room, rooms, disabled = false, onRoomChange }: 
           </p>
         )}
         <p className="room-media-panel-note">
-          JPG · PNG · WebP · MP4 · WebM
+          JPG · PNG · WebP · MP4 · WebM · Değişiklikler Kaydet'e kadar web'e gönderilmez.
         </p>
         {message && (
           <p className={state === "error" ? "form-status sync-error" : "form-status"}>

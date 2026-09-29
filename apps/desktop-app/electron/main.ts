@@ -712,7 +712,7 @@ function registerIpcHandlers() {
     userDataPath: () => getDatabase().userDataPath,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability,
-    onMutation: () => getSyncCoordinator().scheduleSoon()
+    onCommit: () => getSyncCoordinator().scheduleSoon()
   });
 
   registerTableOrderIpcHandlers({

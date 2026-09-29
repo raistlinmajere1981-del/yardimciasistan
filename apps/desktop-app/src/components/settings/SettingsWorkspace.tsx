@@ -216,25 +216,25 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     return { ok: true, changed };
   }
 
-  function discardCategory(categoryId: SettingsCategoryId) {
+  async function discardCategory(categoryId: SettingsCategoryId): Promise<boolean> {
     if (categoryId === "business") {
       drafts.discard("business");
       profile.discard();
       googleReviews.discard();
-      return;
+      return true;
     }
     if (categoryId === "operations") {
-      layout.discard();
-      return;
+      return await layout.discard();
     }
     if (categoryId === "services") {
       drafts.discard("services");
       androidPermissions.discard();
       ai.invalidate();
-      return;
+      return true;
     }
     appearance.discard();
     updates.discard();
+    return true;
   }
 
   function commitTransition(transition: PendingCategoryTransition, afterGuard = false) {
@@ -280,9 +280,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     await saveCategory(active);
   }
 
-  function discardCurrentCategory() {
+  async function discardCurrentCategory() {
     if (categoryBusy) return;
-    discardCategory(active);
+    await discardCategory(active);
   }
 
   async function saveAndContinue() {
@@ -304,16 +304,22 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     }
   }
 
-  function discardAndContinue() {
+  async function discardAndContinue() {
     if (!pendingTransition || guardBusy || categoryBusy) return;
-    discardCategory(active);
-    const transition = pendingTransition;
-    setPendingTransition(null);
-    if (transition.kind === "category") {
-      commitTransition(transition, true);
-    } else {
-      if (active === "services") ai.invalidate();
-      transition.continueNavigation();
+    setGuardBusy(true);
+    try {
+      const discarded = await discardCategory(active);
+      if (!discarded) return;
+      const transition = pendingTransition;
+      setPendingTransition(null);
+      if (transition.kind === "category") {
+        commitTransition(transition, true);
+      } else {
+        if (active === "services") ai.invalidate();
+        transition.continueNavigation();
+      }
+    } finally {
+      setGuardBusy(false);
     }
   }
 
@@ -487,7 +493,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               variant="secondary"
               type="button"
               disabled={categoryBusy || guardBusy || !categoryDirty}
-              onClick={discardCurrentCategory}
+              onClick={() => { void discardCurrentCategory(); }}
             >
               Değişiklikleri Geri Al
             </ActionButton>
@@ -500,7 +506,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         busy={guardBusy || categoryBusy}
         categoryTitle={category.title}
         onSaveAndContinue={() => { void saveAndContinue(); }}
-        onDiscardAndContinue={discardAndContinue}
+        onDiscardAndContinue={() => { void discardAndContinue(); }}
         onStay={() => {
           if (!guardBusy) setPendingTransition(null);
         }}
