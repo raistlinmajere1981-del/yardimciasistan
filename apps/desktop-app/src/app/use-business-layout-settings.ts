@@ -308,6 +308,9 @@ export function useBusinessLayoutSettings(options: {
         const mediaResult = await bridge!.commitRoomMediaDraft();
         setMediaDirty(mediaResult.dirty);
         if (!mediaResult.ok) {
+          // The layout above may already be committed; refresh so the
+          // dashboard never stays behind a persisted layout change.
+          if (changed) await onDashboardRefresh?.();
           setState("error");
           setMessage(mediaResult.message);
           return { ok: false, message: mediaResult.message };
@@ -343,7 +346,13 @@ export function useBusinessLayoutSettings(options: {
     draftRef.current = next;
     setDraftState(next);
 
-    if (mediaDirty && window.yardimciDesktop?.discardRoomMediaDraft) {
+    if (mediaDirty) {
+      if (!window.yardimciDesktop?.discardRoomMediaDraft) {
+        const errorMessage = "Oda medyası taslağı geri alınamıyor. Uygulamayı yeniden başlatın.";
+        setState("error");
+        setMessage(errorMessage);
+        return false;
+      }
       try {
         const result = await window.yardimciDesktop.discardRoomMediaDraft();
         setMediaDirty(result.dirty);
@@ -358,8 +367,6 @@ export function useBusinessLayoutSettings(options: {
         setMessage(error instanceof Error && error.message ? error.message : "Oda medyası değişiklikleri geri alınamadı.");
         return false;
       }
-    } else {
-      setMediaDirty(false);
     }
 
     setState("idle");

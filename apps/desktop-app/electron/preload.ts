@@ -25,7 +25,7 @@ import type {
   RoomMediaMutationResult,
   UpdateRoomMediaInput
 } from "@yardimci-asistan/shared";
-import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
+import type { PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
   DesktopDashboardData,
   DesktopSetupData,
@@ -235,7 +235,6 @@ export interface DesktopBridge {
   applyBusinessProfile: (profileId: string, preserveUserOverrides?: boolean) => Promise<BusinessCapabilitySnapshot>;
   commerce: DesktopCommerceBridge;
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
-  setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDevicePermissionGroupsBatch: (updates: DesktopAndroidPermissionGroupsUpdate[]) => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
   resetAndroidDevicePermissions: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
@@ -431,7 +430,6 @@ const bridge: DesktopBridge = {
     receivePurchase: (input) => invokeWhenUnlocked<CommercePurchaseOrderDetail>("commerce:purchase:receive", input)
   },
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
-  setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => ipcRenderer.invoke("androidDevice:setPermissionGroups", deviceId, groups),
   setAndroidDevicePermissionGroupsBatch: (updates: DesktopAndroidPermissionGroupsUpdate[]) => ipcRenderer.invoke("androidDevice:setPermissionGroupsBatch", updates),
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
   resetAndroidDevicePermissions: (deviceId: string) => ipcRenderer.invoke("androidDevice:resetPermissions", deviceId),

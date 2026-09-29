@@ -228,7 +228,7 @@ export function AndroidDevicesSection({
                 <dl className="android-device-details">
                   <div><dt>Son bağlantı</dt><dd>{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : "Henüz yok"}</dd></div>
                   <div><dt>Uygulama</dt><dd>{device.appVersion || "Sürüm bilinmiyor"}</dd></div>
-                  <div><dt>Görev özeti</dt><dd>{androidDevicePermissionSummary(device, permissionGroupOptions)}</dd></div>
+                  <div><dt>Görev özeti</dt><dd>{androidDevicePermissionSummary({ ...device, permissionGroups }, permissionGroupOptions)}</dd></div>
                 </dl>
                 {device.role === "admin" ? (
                   <div className="android-device-all-permissions">

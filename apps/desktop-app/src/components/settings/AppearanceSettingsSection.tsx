@@ -52,10 +52,15 @@ export function useAppearanceSettings(
   useEffect(() => {
     if (canonicalRef.current === canonicalPreferences) return;
     canonicalRef.current = canonicalPreferences;
+    // Adopt the new commit point as baseline, but never overwrite an active
+    // dirty draft with an external refresh. Discard restores these values.
     const next = cloneUiPreferences(canonicalPreferences);
+    const wasDirty = !sameUiPreferences(draftRef.current, baselineRef.current);
     baselineRef.current = next;
-    draftRef.current = next;
-    setPreferencesState(next);
+    if (!wasDirty) {
+      draftRef.current = cloneUiPreferences(next);
+      setPreferencesState(cloneUiPreferences(next));
+    }
   }, [canonicalPreferences]);
 
   const onPreferencesChange = useCallback((next: UiPreferences) => {

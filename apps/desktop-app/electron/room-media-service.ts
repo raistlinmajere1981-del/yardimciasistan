@@ -69,9 +69,11 @@ export async function addRoomMediaFromDialog(
 
   const manifest = getDraftManifest(userDataPath);
   const now = new Date().toISOString();
-  let roomMedia = manifest.media.filter((item) => item.roomId === roomId);
+  const baseRoomMedia = manifest.media.filter((item) => item.roomId === roomId);
   const retained = manifest.media.filter((item) => item.roomId !== roomId);
-  let nextOrder = roomMedia.reduce((max, item) => Math.max(max, item.sortOrder), 0) + 1;
+  let nextOrder = baseRoomMedia.reduce((max, item) => Math.max(max, item.sortOrder), 0) + 1;
+  let roomMedia = [...baseRoomMedia];
+  const addedIds = new Set<string>();
 
   try {
     for (const sourcePath of result.filePaths) {
@@ -81,14 +83,10 @@ export async function addRoomMediaFromDialog(
       }
 
       if (SINGLETON_KINDS.has(detectedKind)) {
-        const replaced = roomMedia.filter((item) => item.kind === detectedKind);
-        for (const item of replaced) {
-          if (isStagedAsset(item)) removeStoredFile(userDataPath, item);
-        }
         roomMedia = roomMedia.filter((item) => item.kind !== detectedKind);
       }
 
-      roomMedia.push(copySelectedFile(
+      const added = copySelectedFile(
         userDataPath,
         roomId,
         detectedKind,
@@ -96,16 +94,30 @@ export async function addRoomMediaFromDialog(
         nextOrder++,
         now,
         "staging"
-      ));
+      );
+      addedIds.add(added.id);
+      roomMedia.push(added);
     }
   } catch (error) {
+    // The draft manifest is untouched until every file copies successfully, so
+    // only the files staged by this failed batch need cleanup here.
+    for (const item of roomMedia) {
+      if (addedIds.has(item.id)) removeStoredFile(userDataPath, item);
+    }
     return failure(
       error instanceof Error ? error.message : "Medya dosyası eklenemedi.",
-      toPublicLocalAssets(userDataPath, roomMedia),
+      listRoomMedia(userDataPath, roomId),
       getRoomMediaDraftState(userDataPath).dirty
     );
   }
 
+  // Replaced singleton entries leave the draft only now. Canonical files of
+  // replaced entries are deleted on commit (or retained on discard); only
+  // orphaned staged files are removed immediately.
+  const finalIds = new Set(roomMedia.map((item) => item.id));
+  for (const item of baseRoomMedia) {
+    if (!finalIds.has(item.id) && isStagedAsset(item)) removeStoredFile(userDataPath, item);
+  }
   manifest.media = [...retained, ...roomMedia];
   return {
     ok: true,
@@ -131,10 +143,18 @@ export function updateRoomMedia(
   if (!target) return failure("Medya kaydı bulunamadı.", listRoomMedia(userDataPath, roomId), getRoomMediaDraftState(userDataPath).dirty);
 
   if (kind === "video" && !target.mimeType.startsWith("video/")) {
-    return failure("Görsel dosyası video olarak işaretlenemez.", listRoomMedia(userDataPath, roomId));
+    return failure(
+      "Görsel dosyası video olarak işaretlenemez.",
+      listRoomMedia(userDataPath, roomId),
+      getRoomMediaDraftState(userDataPath).dirty
+    );
   }
   if (kind !== "video" && !target.mimeType.startsWith("image/")) {
-    return failure("Video dosyası görsel türüne çevrilemez.", listRoomMedia(userDataPath, roomId));
+    return failure(
+      "Video dosyası görsel türüne çevrilemez.",
+      listRoomMedia(userDataPath, roomId),
+      getRoomMediaDraftState(userDataPath).dirty
+    );
   }
 
   if (SINGLETON_KINDS.has(kind)) {

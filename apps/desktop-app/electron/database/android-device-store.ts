@@ -211,8 +211,8 @@ export function setAndroidDevicePermissionGroupsBatch(
       }
       seen.add(deviceId);
 
-      const row = db.prepare("SELECT role FROM android_devices WHERE device_id = ?").get(deviceId) as { role?: unknown } | undefined;
-      if (!row) {
+      const row = db.prepare("SELECT role, revoked_at FROM android_devices WHERE device_id = ?").get(deviceId) as { role?: unknown; revoked_at?: unknown } | undefined;
+      if (!row || String(row.revoked_at ?? "").trim()) {
         db.exec("ROLLBACK");
         transactionStarted = false;
         return { ok: false, message: "Görev alanı değiştirilecek telefon artık mevcut değil.", devices: getAndroidDevices(db, enabledCapabilities) };

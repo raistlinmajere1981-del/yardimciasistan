@@ -33,12 +33,6 @@ export function registerAndroidDeviceIpcHandlers(options: {
     return finalizeDeviceMutation(result);
   });
 
-  ipcMain.handle("androidDevice:setPermissionGroups", (_event, deviceId: unknown, groups: unknown): DesktopAndroidDeviceMutationResult => {
-    assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
-    const result = getDatabase().setAndroidDevicePermissionGroups(String(deviceId ?? ""), groups);
-    return finalizeDeviceMutation(result);
-  });
-
   ipcMain.handle("androidDevice:setPermissionGroupsBatch", (_event, updates: DesktopAndroidPermissionGroupsUpdate[]): DesktopAndroidDeviceMutationResult => {
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     return finalizeDeviceMutation(getDatabase().setAndroidDevicePermissionGroupsBatch(updates));
