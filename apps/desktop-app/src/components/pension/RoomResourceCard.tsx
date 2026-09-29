@@ -13,9 +13,10 @@ import { setRoomOperationalStatus } from "./room-operations";
 import { roomToday } from "./room-presentation";
 import { formatDateRange, minorMoney } from "./folio-format";
 
-export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
+export function RoomResourceCard({ room, summary, capabilities, onDashboard, imageSrc }: {
   room: DesktopRoom; summary?: DesktopRoomOperations; capabilities: RoomCardCapabilities;
   onDashboard: (data: DesktopDashboardData) => void;
+  imageSrc?: string;
 }) {
   const navigation = useWorkspaceNavigation();
   const model = getRoomCardModel(room, summary, capabilities, roomToday());
@@ -62,7 +63,7 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard }: {
 
   return <>
     <ResourceCard
-      imageSrc="./assets/default-room.png"
+      imageSrc={imageSrc || "./assets/default-room.png"}
       title={roomIdentity(room)}
       subtitle={[room.capacity > 0 ? `${room.capacity} kişi` : "", room.floor].filter(Boolean).join(" · ")}
       icon={<BedDouble size={22} />}
