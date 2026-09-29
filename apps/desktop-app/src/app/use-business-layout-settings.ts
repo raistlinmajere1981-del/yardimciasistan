@@ -342,10 +342,10 @@ export function useBusinessLayoutSettings(options: {
 
   const discard = useCallback(async () => {
     if (savingRef.current) return false;
-    const next = cloneDraft(baselineRef.current);
-    draftRef.current = next;
-    setDraftState(next);
 
+    // Discard is one category operation. Do not reset the in-memory layout
+    // draft until the filesystem-backed media draft is known to be discarded;
+    // otherwise a media failure would silently lose unrelated unsaved layout edits.
     if (mediaDirty) {
       if (!window.yardimciDesktop?.discardRoomMediaDraft) {
         const errorMessage = "Oda medyası taslağı geri alınamıyor. Uygulamayı yeniden başlatın.";
@@ -369,6 +369,9 @@ export function useBusinessLayoutSettings(options: {
       }
     }
 
+    const next = cloneDraft(baselineRef.current);
+    draftRef.current = next;
+    setDraftState(next);
     setState("idle");
     setMessage("");
     return true;
