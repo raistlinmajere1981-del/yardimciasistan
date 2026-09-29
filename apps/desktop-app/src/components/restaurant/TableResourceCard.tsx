@@ -12,11 +12,12 @@ import { getTableCardModel } from "./table-card-model";
 import { closeTableOrder, startTableOrder, setTableOrderStatus } from "./table-order-operations";
 import { formatMoney, formatTableStatus, getTableStatusAction } from "./table-presentation";
 
-export function TableResourceCard({ table, summary, capabilities, onDashboard, onUpdateTableStatus }: {
+export function TableResourceCard({ table, summary, capabilities, onDashboard, onUpdateTableStatus, imageSrc }: {
   table: DesktopTable; summary?: DesktopTableOperations;
   capabilities: { ordersEnabled: boolean; reservationsEnabled: boolean; menuEnabled: boolean };
   onDashboard: (data: DesktopDashboardData) => void;
   onUpdateTableStatus: (id: string, status: string) => Promise<DesktopStatusUpdateResult>;
+  imageSrc?: string;
 }) {
   const navigation = useWorkspaceNavigation();
   const { order, upcoming, blocked, conflict, quickAction } = getTableCardModel(table, summary, capabilities, new Date().toLocaleDateString("sv-SE"));
@@ -116,7 +117,7 @@ export function TableResourceCard({ table, summary, capabilities, onDashboard, o
 
   return <>
     <ResourceCard
-      imageSrc="./assets/default-table.png"
+      imageSrc={imageSrc || "./assets/default-table.png"}
       title={table.name}
       subtitle={[table.area, table.capacity > 0 ? `${table.capacity} kişi` : ""].filter(Boolean).join(" · ")}
       icon={<UtensilsCrossed size={22} />}
