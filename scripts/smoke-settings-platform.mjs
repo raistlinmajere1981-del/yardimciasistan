@@ -190,12 +190,22 @@ try {
   await expect(page.getByRole('searchbox', { name: 'Ayarlarda ara' })).toHaveValue('');
   await expect(page.locator('#settings-appearance')).toBeFocused();
 
-  // Appearance is immediate and does not dirty Application.
+  // Appearance joins the Application draft and is not applied until category save.
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'system');
   await page.getByRole('radio', { name: 'Koyu', exact: true }).check();
+  await expect(tab('Uygulama')).toContainText('Değişiklik var');
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'system');
+  await discard();
+  await expect(page.getByRole('radio', { name: 'Sistem', exact: true })).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'system');
+  await expect(tab('Uygulama')).not.toContainText('Değişiklik var');
+
+  await page.getByRole('radio', { name: 'Koyu', exact: true }).check();
+  await save();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await expect(tab('Uygulama')).not.toContainText('Değişiklik var');
 
-  // Update preferences now use the category footer and baseline comparison.
+  // Update preferences use the same category footer and baseline comparison.
   const updateInput = page.getByLabel('Güncelleme sunucusu');
   await updateInput.fill('https://new-update.example.test');
   await expect(tab('Uygulama')).toContainText('Değişiklik var');

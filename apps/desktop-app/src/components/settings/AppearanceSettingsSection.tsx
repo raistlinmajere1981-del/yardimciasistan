@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { SettingsOperationResult } from "../../app/settings-save";
 import {
   UI_ACCENT_OPTIONS,
   UI_DENSITY_OPTIONS,
@@ -36,16 +38,76 @@ const APPEARANCE_MOTION_LABELS = {
   reduced: "Azaltılmış"
 } as const;
 
-export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange }: {
-  uiPreferences: UiPreferences;
-  onUiPreferencesChange: (preferences: UiPreferences) => void;
+export function useAppearanceSettings(
+  canonicalPreferences: UiPreferences,
+  onCommit: (preferences: UiPreferences) => void
+) {
+  const [preferences, setPreferencesState] = useState<UiPreferences>(
+    () => cloneUiPreferences(canonicalPreferences)
+  );
+  const draftRef = useRef(preferences);
+  const baselineRef = useRef(cloneUiPreferences(canonicalPreferences));
+  const canonicalRef = useRef(canonicalPreferences);
+
+  useEffect(() => {
+    if (canonicalRef.current === canonicalPreferences) return;
+    canonicalRef.current = canonicalPreferences;
+    const next = cloneUiPreferences(canonicalPreferences);
+    baselineRef.current = next;
+    draftRef.current = next;
+    setPreferencesState(next);
+  }, [canonicalPreferences]);
+
+  const onPreferencesChange = useCallback((next: UiPreferences) => {
+    const draft = cloneUiPreferences(next);
+    draftRef.current = draft;
+    setPreferencesState(draft);
+  }, []);
+
+  const dirty = !sameUiPreferences(preferences, baselineRef.current);
+
+  const save = useCallback((): SettingsOperationResult => {
+    if (sameUiPreferences(draftRef.current, baselineRef.current)) {
+      return { ok: true, changed: false };
+    }
+
+    const next = cloneUiPreferences(draftRef.current);
+    onCommit(next);
+    canonicalRef.current = next;
+    baselineRef.current = next;
+    draftRef.current = next;
+    setPreferencesState(next);
+    return { ok: true, changed: true, message: "Görünüm tercihleri kaydedildi." };
+  }, [onCommit]);
+
+  const discard = useCallback(() => {
+    const next = cloneUiPreferences(baselineRef.current);
+    draftRef.current = next;
+    setPreferencesState(next);
+  }, []);
+
+  return {
+    preferences,
+    onPreferencesChange,
+    dirty,
+    save,
+    discard
+  };
+}
+
+type AppearanceSettingsController = ReturnType<typeof useAppearanceSettings>;
+
+export function AppearanceSettingsSection({ controller }: {
+  controller: AppearanceSettingsController;
 }) {
+  const { preferences: uiPreferences, onPreferencesChange } = controller;
+
   return (
           <section id="settings-appearance" tabIndex={-1} className="settings-application-subsection settings-panel appearance-settings">
             <div className="settings-panel-header">
               <div>
                 <h3>Görünüm</h3>
-                <p>Seçimler anında uygulanır ve bu cihazda saklanır.</p>
+                <p>Seçimler Kaydet ile uygulanır ve bu cihazda saklanır.</p>
               </div>
             </div>
           <div className="settings-panel-body">
@@ -57,7 +119,7 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
                   <label key={scheme} className={`appearance-option${uiPreferences.scheme === scheme ? " is-selected" : ""}`}>
                     <input
                       checked={uiPreferences.scheme === scheme}
-                      onChange={() => onUiPreferencesChange({ ...uiPreferences, scheme })}
+                      onChange={() => onPreferencesChange({ ...uiPreferences, scheme })}
                       name="appearance-scheme"
                       type="radio"
                       value={scheme}
@@ -74,7 +136,7 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
                   <label key={density} className={`appearance-option${uiPreferences.density === density ? " is-selected" : ""}`}>
                     <input
                       checked={uiPreferences.density === density}
-                      onChange={() => onUiPreferencesChange({ ...uiPreferences, density })}
+                      onChange={() => onPreferencesChange({ ...uiPreferences, density })}
                       name="appearance-density"
                       type="radio"
                       value={density}
@@ -91,7 +153,7 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
                   <label key={accent} className={`appearance-option${uiPreferences.accent === accent ? " is-selected" : ""}`}>
                     <input
                       checked={uiPreferences.accent === accent}
-                      onChange={() => onUiPreferencesChange({ ...uiPreferences, accent })}
+                      onChange={() => onPreferencesChange({ ...uiPreferences, accent })}
                       name="appearance-accent"
                       type="radio"
                       value={accent}
@@ -105,7 +167,7 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
               Arayüz ölçeği
               <select
                 value={String(uiPreferences.scale)}
-                onChange={(event) => onUiPreferencesChange({ ...uiPreferences, scale: Number(event.target.value) })}
+                onChange={(event) => onPreferencesChange({ ...uiPreferences, scale: Number(event.target.value) })}
               >
                 {UI_SCALE_OPTIONS.map((scale) => (
                   <option value={scale} key={scale}>{Math.round(scale * 100)}%</option>
@@ -119,7 +181,7 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
                   <label key={font} className={`appearance-option${uiPreferences.font === font ? " is-selected" : ""}`}>
                     <input
                       checked={uiPreferences.font === font}
-                      onChange={() => onUiPreferencesChange({ ...uiPreferences, font })}
+                      onChange={() => onPreferencesChange({ ...uiPreferences, font })}
                       name="appearance-font"
                       type="radio"
                       value={font}
@@ -136,7 +198,7 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
                   <label key={motion} className={`appearance-option${uiPreferences.motion === motion ? " is-selected" : ""}`}>
                     <input
                       checked={uiPreferences.motion === motion}
-                      onChange={() => onUiPreferencesChange({ ...uiPreferences, motion })}
+                      onChange={() => onPreferencesChange({ ...uiPreferences, motion })}
                       name="appearance-motion"
                       type="radio"
                       value={motion}
@@ -151,4 +213,18 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
           </section>
 
   );
+}
+
+function cloneUiPreferences(preferences: UiPreferences): UiPreferences {
+  return { ...preferences };
+}
+
+function sameUiPreferences(left: UiPreferences, right: UiPreferences) {
+  return left.version === right.version
+    && left.scheme === right.scheme
+    && left.density === right.density
+    && left.scale === right.scale
+    && left.accent === right.accent
+    && left.font === right.font
+    && left.motion === right.motion;
 }

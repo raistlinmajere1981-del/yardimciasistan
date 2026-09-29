@@ -21,7 +21,7 @@ import { SettingsCategoryTabs } from "./SettingsCategoryTabs";
 import { SettingsUnsavedChangesDialog } from "./SettingsUnsavedChangesDialog";
 import { BusinessSettingsSection } from "./BusinessSettingsSection";
 import { ServicesSettingsSection, type ServicesSettingsProps } from "./ServicesSettingsSection";
-import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
+import { AppearanceSettingsSection, useAppearanceSettings } from "./AppearanceSettingsSection";
 import {
   BusinessPublicProfileSection,
   BusinessSocialLinksSection,
@@ -92,6 +92,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     enabled: initialized,
     onDashboardRefresh: props.onDashboardRefresh
   });
+  const appearance = useAppearanceSettings(props.uiPreferences, props.onUiPreferencesChange);
   const updates = useUpdateSettings(initialized);
   const password = usePasswordSettings({
     configured: props.setupData.appPasswordConfigured,
@@ -117,7 +118,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     business: drafts.dirty.business || profile.dirty || googleReviews.dirty,
     operations: layout.dirty,
     services: drafts.dirty.services,
-    application: updates.dirty
+    application: appearance.dirty || updates.dirty
   };
   const categoryDirty = dirty[active];
 
@@ -174,7 +175,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       return drafts.save("services");
     }
 
-    return updates.savePreferences();
+    let changed = false;
+    if (updates.dirty) {
+      const updateResult = await updates.savePreferences();
+      if (!updateResult.ok) return updateResult;
+      changed ||= updateResult.changed;
+    }
+    if (appearance.dirty) {
+      const appearanceResult = appearance.save();
+      if (!appearanceResult.ok) return appearanceResult;
+      changed ||= appearanceResult.changed;
+    }
+    return { ok: true, changed };
   }
 
   function discardCategory(categoryId: SettingsCategoryId) {
@@ -193,6 +205,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       ai.invalidate();
       return;
     }
+    appearance.discard();
     updates.discard();
   }
 
@@ -413,10 +426,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
           {active === "application" && (
             <div id="settings-application" className="settings-application-workspace">
-              <AppearanceSettingsSection
-                uiPreferences={props.uiPreferences}
-                onUiPreferencesChange={props.onUiPreferencesChange}
-              />
+              <AppearanceSettingsSection controller={appearance} />
               {initialized && <UpdateSettings controller={updates} />}
               <PasswordSettings controller={password} />
               {initialized && (

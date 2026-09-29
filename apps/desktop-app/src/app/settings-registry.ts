@@ -10,7 +10,7 @@ export const settingsCategories: readonly SettingsCategoryDefinition[] = [
   { id: "business", title: "İşletme", description: "İşletme kimliği, sektör ve müşteriye açık bilgiler." },
   { id: "operations", title: "İşletme Düzeni", description: "Oda ve masa düzeni; bağımsız oda profilleri." },
   { id: "services", title: "Servisler", description: "Bağlantılar, eşitleme ve yardımcı servisler." },
-  { id: "application", title: "Uygulama", description: "Anında görünüm tercihleri, güvenlik ve bakım işlemleri." }
+  { id: "application", title: "Uygulama", description: "Görünüm tercihleri, güvenlik ve bakım işlemleri." }
 ];
 export interface SettingsSectionDefinition {
   id: string;
@@ -46,7 +46,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-web-test", category: "services", title: "Web Bağlantısını Dene", keywords: "bağlantı test", persistence: "action" },
   { id: "settings-ai", category: "services", title: "AI Yardımcı", keywords: "openai gemini google studio groq openrouter model api anahtarı zaman aşımı", persistence: "staged" },
   { id: "settings-ai-test", category: "services", title: "AI Bağlantısını Dene", keywords: "model test", persistence: "action" },
-  { id: "settings-appearance", category: "application", title: "Görünüm", keywords: "renk düzeni tema sistem koyu açık yoğunluk ölçek vurgu yazı tipi hareket", persistence: "immediate" },
+  { id: "settings-appearance", category: "application", title: "Görünüm", keywords: "renk düzeni tema sistem koyu açık yoğunluk ölçek vurgu yazı tipi hareket", persistence: "resource" },
   { id: "settings-updates", category: "application", title: "Güncelleme tercihleri", keywords: "sunucu otomatik kontrol", persistence: "resource", visible: (_, initialized) => initialized },
   { id: "settings-update-actions", category: "application", title: "Güncellemeler", keywords: "kontrol indir yeniden başlat", persistence: "action", visible: (_, initialized) => initialized },
   { id: "settings-password", category: "application", title: "Uygulama Şifresi", keywords: "parola güvenlik kilit sıfırla değiştir", persistence: "action" },

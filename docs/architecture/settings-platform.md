@@ -12,7 +12,7 @@ Workspace / Operation contracts and static Room/Table composition are unchanged.
 | İşletme | Identity/contact, sector + optional capabilities; public business profile | Setup staged; separate profile resource |
 | İşletme Düzeni | Room collection/profile/default nightly prices, table categories | Transactional BusinessLayout staged resource |
 | Servisler | WhatsApp/birthdays, Android/local network, product data, web sync, AI profiles | Setup staged; connection/device actions remain commands |
-| Uygulama | Appearance, update preferences, password/security, updates and backups | Immediate appearance; staged update preferences; explicit commands |
+| Uygulama | Appearance, update preferences, password/security, updates and backups | Staged appearance + update preferences; explicit commands |
 
 `app/settings-registry.ts` contains static TypeScript category and section definitions:
 id (also the focus target), category, title, keywords, persistence kind and a narrow
@@ -23,7 +23,9 @@ explicit component in the category composition, not a runtime plugin.
 
 Persistence kinds are `staged`, `immediate`, `action`, `resource`. Mixed surfaces have
 separate metadata entries: web/AI configuration vs tests, Android configuration vs
-device operations, update preferences vs check/download/restart.
+device operations, appearance/update preference resources vs update check/download/restart.
+The appearance resource is staged by the Application category even though its persisted
+storage remains the existing device-local UI preference store.
 
 ## Setup draft ownership and save
 
@@ -103,9 +105,11 @@ the owning category indicator but never to Setup payload/save validation.
   device role/permissions/install/revoke and maintenance commands are explicit actions.
   No category Save invokes them. Errors/results belong to their respective sections.
 
-Appearance remains owned by DesktopAppView's existing immediate apply/save flow.
-Scheme (including system), density, scale, accent, font and motion and the v2
-localStorage contract are unchanged. It never marks a category dirty.
+Appearance remains persisted and applied by DesktopAppView, but Settings edits a local
+Application-category draft. Scheme (including system), density, scale, accent, font and
+motion do not reach DesktopAppView until the category Save succeeds. Discard restores the
+last committed values. The v2 localStorage contract is unchanged; appearance now contributes
+to the Application dirty marker and leave guard.
 
 ## Navigation, search, layout and accessibility
 
@@ -116,7 +120,9 @@ selectors. Dirty state is textual, not color-only.
 
 The existing Page Header is followed by a named search field, fixed category navigation,
 fixed category header, one flexible local scroll body and contextual category actions.
-Application has no category Save. Responsive forms use one column at narrow widths;
+Application uses the same category Save/Discard footer for appearance and update-preference
+drafts; password, update and maintenance commands remain explicit actions. Responsive forms
+use one column at narrow widths;
 category tabs scroll horizontally where necessary. The shell treats Settings as bounded
 workspace content, avoiding document overflow. Legacy anchor primary navigation and its
 CSS were removed; stable IDs remain solely for search/focus.
