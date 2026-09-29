@@ -245,7 +245,9 @@ try {
   await expect(page.getByLabel('Oda 101 adı', { exact: true })).toHaveValue('Oda 101');
   await page.getByLabel('Oda 101 adı', { exact: true }).fill('Deniz Oda');
   await page.getByLabel('Oda 101 gecelik fiyatı').fill('1750');
-  await page.getByRole('button', { name: 'Detaylar', exact: true }).click();
+  await page.getByLabel('Oda adı ve fiyatları')
+    .getByRole('button', { name: 'Detaylar', exact: true })
+    .click();
   const roomDialog = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle' });
   await expect(roomDialog).toBeVisible();
   await expect(roomDialog).toHaveClass(/form-dialog/);
