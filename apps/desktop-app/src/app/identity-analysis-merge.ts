@@ -16,8 +16,6 @@ const FIELD_LABELS: Record<keyof IdentityDocumentFields, string> = {
   address: "adres"
 };
 
-const FIELD_KEYS = Object.keys(FIELD_LABELS) as Array<keyof IdentityDocumentFields>;
-
 export interface MergedIdentityAnalysis {
   fields: IdentityDocumentFields;
   warnings: string[];

@@ -74,7 +74,12 @@ export function IdentityCameraCapture({
     setStatus(files.length > 1 ? "Ön ve arka yüz alındı. Kimlik bilgileri okunuyor..." : "Kimlik alındı. Bilgiler okunuyor...");
     speak("Kimlik alındı.");
 
-    const result = await onCaptured(files);
+    let result: { ok: boolean; message: string };
+    try {
+      result = await onCaptured(files);
+    } catch {
+      result = { ok: false, message: "Kimlik görseli okunamadı." };
+    }
     if (result.ok) {
       setStatus(result.message);
       speak("İşlem tamam.");

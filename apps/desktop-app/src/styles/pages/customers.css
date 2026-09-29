@@ -461,7 +461,7 @@
   aspect-ratio: 1.586 / 1;
   transform: translate(-50%, -50%);
   border: 2px solid color-mix(in srgb, var(--color-security-accent) 82%, transparent);
-  border-radius: calc(var(--radius-panel) * 0.72);
+  border-radius: var(--radius-panel);
   box-shadow: 0 0 0 999px color-mix(in srgb, var(--color-security-backdrop) 28%, transparent);
   pointer-events: none;
 }
