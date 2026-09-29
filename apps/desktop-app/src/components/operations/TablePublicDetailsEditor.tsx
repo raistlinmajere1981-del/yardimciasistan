@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Save } from "lucide-react";
 import {
   TABLE_PUBLIC_DETAIL_LIMITS,
@@ -61,11 +61,17 @@ function toggleFeature(features: TablePublicFeatureId[], featureId: TablePublicF
 export function TablePublicDetailsEditor({ open, table, onClose, onSave }: TablePublicDetailsEditorProps) {
   const [form, setForm] = useState<TablePublicDetailsFormState>(() => toForm(table));
   const [saving, setSaving] = useState(false);
+  const seededTableIdRef = useRef("");
   const capacity = useMemo(() => Number.parseInt(form.capacity, 10), [form.capacity]);
   const validCapacity = Number.isInteger(capacity) && capacity > 0 && capacity <= 100;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !table) {
+      seededTableIdRef.current = "";
+      return;
+    }
+    if (seededTableIdRef.current === table.id) return;
+    seededTableIdRef.current = table.id;
     setForm(toForm(table));
     setSaving(false);
   }, [open, table]);
