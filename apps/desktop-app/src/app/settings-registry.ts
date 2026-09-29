@@ -8,7 +8,7 @@ export type StagedSettingsCategoryId = "business" | "services";
 export interface SettingsCategoryDefinition { id: SettingsCategoryId; title: string; description: string }
 export const settingsCategories: readonly SettingsCategoryDefinition[] = [
   { id: "business", title: "İşletme", description: "İşletme kimliği, sektör ve müşteriye açık bilgiler." },
-  { id: "operations", title: "İşletme Düzeni", description: "Oda ve masa düzeni; bağımsız oda profilleri." },
+  { id: "operations", title: "İşletme Düzeni", description: "Oda ve masa düzeni; müşteriye açık detaylar ve medya." },
   { id: "services", title: "Servisler", description: "Bağlantılar, eşitleme ve yardımcı servisler." },
   { id: "application", title: "Uygulama", description: "Görünüm tercihleri, güvenlik ve bakım işlemleri." }
 ];
@@ -24,8 +24,8 @@ export interface SettingsSectionDefinition {
 const layoutSettingsDefinition = {
   id: "settings-operations",
   category: "operations",
-  title: "Masa kategorileri",
-  keywords: "masa kategorileri salon bahçe işletme düzeni",
+  title: "Masa yönetimi",
+  keywords: "masa kategorileri salon bahçe kapasite sigara manzara detay medya fotoğraf video işletme düzeni",
   persistence: "resource",
   visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ACCOMMODATION_ROOMS) || caps.includes(C.FOOD_TABLES)
 } satisfies SettingsSectionDefinition;
@@ -37,7 +37,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-social-links", category: "business", title: "Sosyal Medya", keywords: "facebook instagram youtube tiktok x sosyal medya profil bağlantı link", persistence: "resource", visible: (_, initialized) => initialized },
   { id: "settings-google-reviews", category: "business", title: "Google Yorumları", keywords: "google places yorum değerlendirme puan place id api anahtarı", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   layoutSettingsDefinition,
-  { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
+  { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },
   { id: "settings-devices", category: "services", title: "Telefon Kurulumu", keywords: "android usb cihaz eşleme rol izin görev kur kaldır", persistence: "action", visible: (caps, initialized) => initialized && caps.includes(C.ANDROID) },
