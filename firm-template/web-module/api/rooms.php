@@ -13,7 +13,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 try {
     $catalog = ya_storage_get_publication('room_catalog', [
         'version' => 1,
-        'enabled' => true,
+        'enabled' => false,
         'updated_at' => '',
         'rooms' => []
     ]);
@@ -37,7 +37,10 @@ if (trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
     exit;
 }
 
-$enabled = ($catalog['enabled'] ?? true) === true;
+$hasPublication = $publication !== [];
+$enabled = array_key_exists('enabled', $catalog)
+    ? ($catalog['enabled'] === true)
+    : $hasPublication;
 $rooms = $enabled && is_array($catalog['rooms'] ?? null) ? array_values($catalog['rooms']) : [];
 usort($rooms, static function (array $left, array $right): int {
     $order = ((int) ($left['sort_order'] ?? 0)) <=> ((int) ($right['sort_order'] ?? 0));
