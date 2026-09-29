@@ -655,6 +655,7 @@ try {
       client_id: "desktop-web-room-catalog-smoke",
       room_catalog: {
         version: 1,
+        enabled: true,
         updated_at: "2026-09-26T12:00:00+03:00",
         rooms: [
           {
@@ -690,6 +691,7 @@ try {
   expect(roomsResponse.ok()).toBe(true);
   expect(await roomsResponse.json()).toMatchObject({
     ok: true,
+    enabled: true,
     rooms: [{
       id: "room_101",
       name: "Oda 101",
@@ -711,6 +713,184 @@ try {
   const publishedRoomMedia = await page.request.get(`${baseUrl}${roomMediaUploadResult.url}`);
   expect(publishedRoomMedia.ok()).toBe(true);
   expect(publishedRoomMedia.headers()["content-type"]).toContain("image/png");
+
+
+  const roomCatalogDisabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_room_catalog",
+      client_id: "desktop-web-room-catalog-smoke",
+      room_catalog: {
+        version: 1,
+        enabled: false,
+        updated_at: "2026-09-26T12:05:00+03:00",
+        rooms: []
+      }
+    }
+  });
+  expect(roomCatalogDisabled.ok()).toBe(true);
+  const disabledRoomsResponse = await page.request.get(`${baseUrl}/api/rooms.php`);
+  expect(disabledRoomsResponse.ok()).toBe(true);
+  expect(await disabledRoomsResponse.json()).toMatchObject({
+    ok: true,
+    enabled: false,
+    rooms: []
+  });
+  // Visibility changes must not delete canonical media: re-enabling should
+  // reuse the already-published URL without another upload.
+  expect((await page.request.get(`${baseUrl}${roomMediaUploadResult.url}`)).ok()).toBe(true);
+
+  const roomCatalogReenabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_room_catalog",
+      client_id: "desktop-web-room-catalog-smoke",
+      room_catalog: {
+        version: 1,
+        enabled: true,
+        updated_at: "2026-09-26T12:06:00+03:00",
+        rooms: [{
+          id: "room_101",
+          name: "Oda 101",
+          number: "101",
+          capacity: 2,
+          bed_info: "1 çift kişilik yatak",
+          floor: "1. kat",
+          features: ["wifi", "private_bathroom"],
+          description: "Deniz tarafında sakin oda.",
+          price_note: "Sezona göre değişebilir.",
+          nightly_price_minor: 250000,
+          currency: "TRY",
+          sort_order: 1,
+          media: [{
+            id: "room_media_smoke_cover",
+            kind: "cover",
+            url: roomMediaUploadResult.url,
+            mime_type: "image/png",
+            title: "Oda 101 kapak",
+            sort_order: 1
+          }]
+        }]
+      }
+    }
+  });
+  expect(roomCatalogReenabled.ok()).toBe(true);
+
+  const tableMediaUpload = await page.request.post(`${baseUrl}/api/table-media.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    multipart: {
+      client_id: "desktop-web-table-catalog-smoke",
+      table_id: "table_teras_1",
+      media_id: "table_media_smoke_cover",
+      kind: "cover",
+      content_hash: "41c651b0bf0bf4f02c4cdd09779fb742cf34494ec72e07e7f3e0682a5676480a",
+      file: {
+        name: "table-cover.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQ8cAAAAASUVORK5CYII=",
+          "base64"
+        )
+      }
+    }
+  });
+  expect(tableMediaUpload.ok()).toBe(true);
+  const tableMediaUploadResult = await tableMediaUpload.json();
+  expect(tableMediaUploadResult).toMatchObject({ ok: true, mime_type: "image/png" });
+  expect(tableMediaUploadResult.url).toMatch(/\/media\/tables\/table_teras_1\/table_media_smoke_cover\.png$/);
+
+  const tableCatalogPayload = {
+    version: 1,
+    enabled: true,
+    updated_at: "2026-09-29T19:00:00+03:00",
+    tables: [{
+      id: "table_teras_1",
+      name: "Teras 1",
+      area: "Teras",
+      capacity: 4,
+      description: "Deniz tarafındaki masa.",
+      features: ["outdoor", "sea_view", "internal_secret"],
+      smoking_policy: "outdoor_only",
+      sort_order: 1,
+      media: [{
+        id: "table_media_smoke_cover",
+        kind: "cover",
+        url: tableMediaUploadResult.url,
+        mime_type: "image/png",
+        title: "Teras masa kapak",
+        sort_order: 1
+      }]
+    }]
+  };
+  const tableCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_table_catalog",
+      client_id: "desktop-web-table-catalog-smoke",
+      table_catalog: tableCatalogPayload
+    }
+  });
+  expect(tableCatalogPublish.ok()).toBe(true);
+  expect(await tableCatalogPublish.json()).toMatchObject({ ok: true, table_count: 1 });
+
+  const tablesResponse = await page.request.get(`${baseUrl}/api/tables.php`);
+  expect(tablesResponse.ok()).toBe(true);
+  expect(await tablesResponse.json()).toMatchObject({
+    ok: true,
+    enabled: true,
+    tables: [{
+      id: "table_teras_1",
+      name: "Teras 1",
+      area: "Teras",
+      capacity: 4,
+      description: "Deniz tarafındaki masa.",
+      features: ["outdoor", "sea_view"],
+      smoking_policy: "outdoor_only",
+      media: [{
+        id: "table_media_smoke_cover",
+        kind: "cover",
+        url: tableMediaUploadResult.url,
+        mime_type: "image/png"
+      }]
+    }]
+  });
+  expect((await page.request.get(`${baseUrl}${tableMediaUploadResult.url}`)).ok()).toBe(true);
+
+  const tableCatalogDisabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_table_catalog",
+      client_id: "desktop-web-table-catalog-smoke",
+      table_catalog: {
+        version: 1,
+        enabled: false,
+        updated_at: "2026-09-29T19:01:00+03:00",
+        tables: []
+      }
+    }
+  });
+  expect(tableCatalogDisabled.ok()).toBe(true);
+  const disabledTablesResponse = await page.request.get(`${baseUrl}/api/tables.php`);
+  expect(disabledTablesResponse.ok()).toBe(true);
+  expect(await disabledTablesResponse.json()).toMatchObject({
+    ok: true,
+    enabled: false,
+    tables: []
+  });
+  expect((await page.request.get(`${baseUrl}${tableMediaUploadResult.url}`)).ok()).toBe(true);
+
+  const tableCatalogReenabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_table_catalog",
+      client_id: "desktop-web-table-catalog-smoke",
+      table_catalog: {
+        ...tableCatalogPayload,
+        updated_at: "2026-09-29T19:02:00+03:00"
+      }
+    }
+  });
+  expect(tableCatalogReenabled.ok()).toBe(true);
 
   const aiCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
@@ -770,6 +950,7 @@ try {
     business: {
       display_name: "Nehir Tekel",
       profile_id: "market",
+      public_surfaces: expect.arrayContaining(["rooms", "restaurant"]),
       whatsapp_enabled: false,
       address: "Gebeş, Sahil Sokak No:45/1, Cide / Kastamonu",
       latitude: 41.891571,
