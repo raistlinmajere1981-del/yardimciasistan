@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Camera, Sparkles } from "lucide-react";
 import type { DesktopIdentityImageAnalyzeResult } from "../../../electron/database";
 import { mergeIdentityImageAnalyses } from "../../app/identity-analysis-merge";
+import { primeIdentityCameraFeedback } from "../../app/identity-camera-feedback";
 import type { CustomerFormState } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 import { DatePicker } from "../ui/DateTimePicker";
@@ -131,7 +132,7 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           </div>
           <div className="action-row">
             <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
-            <ActionButton variant="secondary" size="sm" type="button" disabled={!aiEnabled || analysisState === "loading"} onClick={() => setCameraOpen(true)}>
+            <ActionButton variant="secondary" size="sm" type="button" disabled={!aiEnabled || analysisState === "loading"} onClick={() => { primeIdentityCameraFeedback(); setCameraOpen(true); }}>
               <Camera size={15} aria-hidden="true" />
               Kimliği kameradan tara
             </ActionButton>

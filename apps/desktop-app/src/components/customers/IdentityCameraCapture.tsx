@@ -4,8 +4,11 @@ import {
   evaluateIdentityFrame,
   IDENTITY_CAMERA_ANALYSIS_HEIGHT,
   IDENTITY_CAMERA_ANALYSIS_WIDTH,
+  IDENTITY_CAMERA_GUIDE_COVERAGE_MIN,
+  IDENTITY_CAMERA_GUIDE_DENSITY_MIN,
   type IdentityFrameQuality
 } from "../../app/identity-camera-quality";
+import { announceIdentityCamera } from "../../app/identity-camera-feedback";
 import { ActionButton } from "../ui/ActionButton";
 import { WorkspaceSubflowOverlay } from "../workspace/WorkspaceSubflowOverlay";
 
@@ -64,7 +67,7 @@ export function IdentityCameraCapture({
       resetSampling();
       setSide("back");
       setStatus("Ön yüz alındı. Kimliği çevirin ve arka yüzünü çerçeveye yerleştirin.");
-      speak("Kimliği çevirin.");
+      announceIdentityCamera("Kimliği çevirin.", "prompt");
       processingRef.current = false;
       return;
     }
@@ -72,7 +75,7 @@ export function IdentityCameraCapture({
     const files = frontFileRef.current ? [frontFileRef.current, file] : [file];
     setPhase("processing");
     setStatus(files.length > 1 ? "Ön ve arka yüz alındı. Kimlik bilgileri okunuyor..." : "Kimlik alındı. Bilgiler okunuyor...");
-    speak("Kimlik alındı.");
+    announceIdentityCamera("Kimlik alındı.", "ready");
 
     let result: { ok: boolean; message: string };
     try {
@@ -82,7 +85,7 @@ export function IdentityCameraCapture({
     }
     if (result.ok) {
       setStatus(result.message);
-      speak("İşlem tamam.");
+      announceIdentityCamera("İşlem tamam.", "success");
       onClose();
       return;
     }
@@ -92,7 +95,7 @@ export function IdentityCameraCapture({
     setSide("front");
     setPhase("capturing");
     setStatus(`${result.message} Kimliği yeniden gösterin.`);
-    speak("Kimlik okunamadı, tekrar deneyin.");
+    announceIdentityCamera("Kimlik okunamadı, tekrar deneyin.", "error");
     processingRef.current = false;
   }, [captureBackSide, onCaptured, onClose, resetSampling, side]);
 
@@ -125,8 +128,8 @@ export function IdentityCameraCapture({
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: 2560 },
+            height: { ideal: 1440 }
           }
         });
         if (cancelled) {
@@ -143,7 +146,7 @@ export function IdentityCameraCapture({
 
         setPhase("capturing");
         setStatus("Kimliği kameraya gösterin.");
-        speak("Kimliği kameraya gösterin.");
+        announceIdentityCamera("Kimliği kameraya gösterin.", "prompt");
       } catch (error) {
         setPhase("error");
         if (error instanceof DOMException && error.name === "NotAllowedError") {
@@ -184,7 +187,7 @@ export function IdentityCameraCapture({
       if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth <= 0 || video.videoHeight <= 0) return;
       lastSampleAt = timestamp;
 
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      drawVideoCover(context, video, canvas.width, canvas.height);
       const frame = evaluateIdentityFrame(
         context.getImageData(0, 0, canvas.width, canvas.height),
         previousLumaRef.current
@@ -204,7 +207,7 @@ export function IdentityCameraCapture({
       stableFramesRef.current += 1;
       if (!stableSpeechRef.current) {
         stableSpeechRef.current = true;
-        speak("Sabit tutun.");
+        announceIdentityCamera("Sabit tutun.", "ready");
       }
       if (stableFramesRef.current < 3 || candidatesRef.current.length >= 3) return;
 
@@ -257,7 +260,7 @@ export function IdentityCameraCapture({
         ["Keskinlik", quality.sharpness >= 80],
         ["Hareket", quality.motion <= 0.04],
         ["Işık", quality.brightness >= 48 && quality.brightness <= 220 && quality.clipping <= 0.4],
-        ["Kadraj", quality.guideCoverage >= 0.48 && quality.guideDensity >= 0.008]
+        ["Kadraj", quality.guideCoverage >= IDENTITY_CAMERA_GUIDE_COVERAGE_MIN && quality.guideDensity >= IDENTITY_CAMERA_GUIDE_DENSITY_MIN]
       ] as const
     : [];
 
@@ -316,7 +319,7 @@ async function captureVideoFrame(video: HTMLVideoElement, side: CaptureSide): Pr
     throw new Error("camera_frame_unavailable");
   }
 
-  const maxDimension = 2200;
+  const maxDimension = 2560;
   const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(sourceWidth * scale));
@@ -325,7 +328,7 @@ async function captureVideoFrame(video: HTMLVideoElement, side: CaptureSide): Pr
   if (!context) throw new Error("camera_canvas_unavailable");
 
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
   if (!blob || blob.size <= 0) throw new Error("camera_blob_unavailable");
 
   return new File(
@@ -335,15 +338,27 @@ async function captureVideoFrame(video: HTMLVideoElement, side: CaptureSide): Pr
   );
 }
 
-function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") return;
-  try {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "tr-TR";
-    utterance.rate = 0.96;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  } catch {
-    // Speech feedback is best-effort; camera capture must not depend on it.
+function drawVideoCover(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  targetWidth: number,
+  targetHeight: number
+) {
+  const sourceWidth = video.videoWidth;
+  const sourceHeight = video.videoHeight;
+  const sourceAspect = sourceWidth / sourceHeight;
+  const targetAspect = targetWidth / targetHeight;
+
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceWidth;
+  let sh = sourceHeight;
+  if (sourceAspect > targetAspect) {
+    sw = sourceHeight * targetAspect;
+    sx = (sourceWidth - sw) / 2;
+  } else if (sourceAspect < targetAspect) {
+    sh = sourceWidth / targetAspect;
+    sy = (sourceHeight - sh) / 2;
   }
+  context.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
 }

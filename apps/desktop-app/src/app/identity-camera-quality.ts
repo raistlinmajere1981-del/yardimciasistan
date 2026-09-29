@@ -11,10 +11,16 @@ export interface IdentityFrameQuality {
   luma: Uint8Array;
 }
 
-export const IDENTITY_CAMERA_ANALYSIS_WIDTH = 320;
-export const IDENTITY_CAMERA_ANALYSIS_HEIGHT = 180;
+export const IDENTITY_CAMERA_ANALYSIS_WIDTH = 400;
+export const IDENTITY_CAMERA_ANALYSIS_HEIGHT = 225;
+export const IDENTITY_CAMERA_GUIDE_WIDTH_RATIO = 0.88;
+export const IDENTITY_CAMERA_GUIDE_HEIGHT_RATIO = 0.84;
+export const IDENTITY_CAMERA_GUIDE_COVERAGE_MIN = 0.44;
+export const IDENTITY_CAMERA_GUIDE_DENSITY_MIN = 0.007;
 
 const ID_CARD_ASPECT = 85.6 / 53.98;
+const IDENTITY_CAMERA_SHARPNESS_MIN = 80;
+const IDENTITY_CAMERA_MOTION_MAX = 0.04;
 
 export function evaluateIdentityFrame(
   imageData: ImageData,
@@ -68,8 +74,8 @@ export function evaluateIdentityFrame(
     ? Math.max(0, laplacianSquaredSum / laplacianSamples - laplacianMean * laplacianMean)
     : 0;
 
-  const maxGuideWidth = Math.floor(width * 0.8);
-  const maxGuideHeight = Math.floor(height * 0.72);
+  const maxGuideWidth = Math.floor(width * IDENTITY_CAMERA_GUIDE_WIDTH_RATIO);
+  const maxGuideHeight = Math.floor(height * IDENTITY_CAMERA_GUIDE_HEIGHT_RATIO);
   let guideWidth = maxGuideWidth;
   let guideHeight = Math.floor(guideWidth / ID_CARD_ASPECT);
   if (guideHeight > maxGuideHeight) {
@@ -104,7 +110,9 @@ export function evaluateIdentityFrame(
   const clippingScore = Math.max(0, 1 - clipping / 0.45);
   const motionScore = hasMotionBaseline ? Math.max(0, 1 - motion / 0.075) : 0;
   const sharpnessScore = Math.min(1, sharpness / 650);
-  const guideScore = Math.min(1, guideCoverage / 0.72) * Math.min(1, guideDensity / 0.035);
+  const guideScore =
+    Math.min(1, guideCoverage / 0.68)
+    * Math.min(1, guideDensity / 0.032);
   const score = (
     exposureScore * 0.18
     + clippingScore * 0.12
@@ -114,19 +122,21 @@ export function evaluateIdentityFrame(
   );
 
   const exposureOk = brightness >= 48 && brightness <= 220 && clipping <= 0.4;
-  const motionOk = hasMotionBaseline && motion <= 0.04;
-  const sharpnessOk = sharpness >= 80;
-  const guideOk = guideCoverage >= 0.48 && guideDensity >= 0.008;
+  const motionOk = hasMotionBaseline && motion <= IDENTITY_CAMERA_MOTION_MAX;
+  const sharpnessOk = sharpness >= IDENTITY_CAMERA_SHARPNESS_MIN;
+  const guideOk =
+    guideCoverage >= IDENTITY_CAMERA_GUIDE_COVERAGE_MIN
+    && guideDensity >= IDENTITY_CAMERA_GUIDE_DENSITY_MIN;
   const acceptable = exposureOk && motionOk && sharpnessOk && guideOk;
 
   let hint = "Kimliği kameraya gösterin.";
-  if (hasMotionBaseline && motion > 0.04) {
+  if (hasMotionBaseline && motion > IDENTITY_CAMERA_MOTION_MAX) {
     hint = "Sabit tutun.";
   } else if (brightness < 48) {
     hint = "Ortam çok karanlık. Kimliği biraz daha aydınlatın.";
   } else if (brightness > 220 || clipping > 0.4) {
     hint = "Işık çok güçlü. Parlamayı azaltın.";
-  } else if (sharpness < 80) {
+  } else if (sharpness < IDENTITY_CAMERA_SHARPNESS_MIN) {
     hint = "Kimliği biraz yaklaştırın ve kamerayı sabit tutun.";
   } else if (!guideOk) {
     hint = "Kimliği çerçevenin içine yerleştirin.";

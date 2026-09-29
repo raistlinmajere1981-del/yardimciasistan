@@ -429,8 +429,16 @@
   font-size: var(--text-xs);
 }
 
+.form-dialog:has(.identity-camera-overlay) {
+  width: min(76rem, calc(100vw / var(--ui-scale) - var(--space-4)));
+  height: calc(100dvh / var(--ui-scale) - var(--space-6));
+}
+.form-dialog:has(.identity-camera-overlay) > form {
+  height: 100%;
+}
 .identity-camera-overlay .workspace-subflow-overlay__card {
-  width: min(60rem, 100%);
+  width: min(70rem, 100%);
+  height: min(100%, 52rem);
 }
 .identity-camera {
   display: grid;
@@ -441,7 +449,7 @@
   display: grid;
   place-items: center;
   aspect-ratio: 16 / 9;
-  min-height: 18rem;
+  min-height: 22rem;
   overflow: hidden;
   background: var(--color-security-field);
   border: 1px solid var(--color-border-strong);
@@ -450,14 +458,14 @@
 .identity-camera__viewport video {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   background: var(--color-security-field);
 }
 .identity-camera__guide {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(78%, 42rem);
+  width: min(88%, 52rem);
   aspect-ratio: 1.586 / 1;
   transform: translate(-50%, -50%);
   border: 2px solid color-mix(in srgb, var(--color-security-accent) 82%, transparent);
@@ -552,6 +560,6 @@
 }
 
 @media (max-width: 760px) {
-  .identity-camera__viewport { min-height: 13rem; }
+  .identity-camera__viewport { min-height: 15rem; }
   .identity-camera__footer { align-items: stretch; flex-direction: column; }
 }
