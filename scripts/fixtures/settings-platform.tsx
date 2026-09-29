@@ -7,6 +7,7 @@ import { settingsCapabilities } from "../../apps/desktop-app/src/app/settings-re
 import { toSetupForm } from "../../apps/desktop-app/src/app/setup-model";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
 import { SettingsWorkspace } from "../../apps/desktop-app/src/components/settings/SettingsWorkspace";
+import type { BusinessLayoutSnapshot } from "../../apps/desktop-app/electron/business-layout";
 import type { PageLeaveGuard } from "../../apps/desktop-app/src/app/page-navigation-guard";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
 import { readUiPreferences, applyUiPreferences, saveUiPreferences } from "../../apps/desktop-app/src/ui-preferences";
@@ -15,7 +16,7 @@ import "../../apps/desktop-app/src/styles/index.css";
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
 let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"], socialLinks: [] };
-let layout = {
+let layout: BusinessLayoutSnapshot = {
   capabilities: { rooms: true, tables: true },
   rooms: [{
     id: "room-1",
