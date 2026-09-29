@@ -1,4 +1,8 @@
-import type { PublicResourceMediaKind, RoomMediaAsset } from "@yardimci-asistan/shared";
+import type {
+  PublicResourceMediaAssetFields,
+  PublicResourceMediaKind,
+  RoomMediaAsset
+} from "@yardimci-asistan/shared";
 import {
   PublicResourceMediaPanel,
   type PublicResourceMediaPanelResource
@@ -73,13 +77,13 @@ async function addRoomMedia(roomId: string) {
   return bridge.addRoomMedia({ roomId });
 }
 
-async function updateRoomMedia(roomId: string, item: RoomMediaAsset, kind: PublicResourceMediaKind) {
+async function updateRoomMedia(roomId: string, item: PublicResourceMediaAssetFields, kind: PublicResourceMediaKind) {
   const bridge = window.yardimciDesktop;
   if (!bridge) return unavailable([]);
   return bridge.updateRoomMedia({ roomId, mediaId: item.id, kind, title: item.title });
 }
 
-async function deleteRoomMedia(roomId: string, item: RoomMediaAsset) {
+async function deleteRoomMedia(roomId: string, item: PublicResourceMediaAssetFields) {
   const bridge = window.yardimciDesktop;
   if (!bridge) return unavailable([]);
   return bridge.deleteRoomMedia({ roomId, mediaId: item.id });
