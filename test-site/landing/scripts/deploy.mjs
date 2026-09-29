@@ -221,6 +221,17 @@ runLocal("php", ["-l", localIndex]);
 runLocal("sh", ["-c", `find '${localDemo}' -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`]);
 console.log("Demo PHP dosyalari temiz.");
 
+step("Yerel demo JavaScript syntax kontrolu");
+for (const script of [
+  join(localDemo, "assets", "js", "site.js"),
+  join(localDemo, "assets", "js", "rooms.js"),
+  join(localDemo, "assets", "js", "tables.js"),
+  join(localDemo, "assets", "js", "qr-menu.js")
+]) {
+  runLocal(process.execPath, ["--check", script]);
+}
+console.log("Demo JavaScript dosyalari temiz.");
+
 // Eski hardcoded test degeri: bilerek parcali yazildi ki bu dosya
 // repo genelinde literal taramasina takilmasin. Guard amaclidir,
 // deploy edilen bir secret degildir.
