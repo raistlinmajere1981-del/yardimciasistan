@@ -62,6 +62,10 @@ export interface ResourceMediaDeleteInput {
 export function createPublicResourceMediaService(config: ResourceMediaServiceConfig) {
   const activeDrafts = new Map<string, ResourceMediaManifest>();
   const cleanedStagingRoots = new Set<string>();
+  const coverPreviewCache = new Map<string, {
+    signature: string;
+    previews: PublicResourceCoverPreview[];
+  }>();
 
   async function addFromDialog(
     userDataPath: string,
@@ -238,26 +242,45 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
   function listCoverPreviews(userDataPath: string): PublicResourceCoverPreview[] {
     ensureStagingRootClean(userDataPath);
     const manifest = readManifest(userDataPath);
-    const byResource = new Map<string, StoredResourceMediaAsset[]>();
+    const candidates = manifest.media.filter((item) => item.mimeType.startsWith("image/"));
+    const signature = JSON.stringify(candidates.map((item) => ({
+      id: item.id,
+      resourceId: item.resourceId,
+      kind: item.kind,
+      sortOrder: item.sortOrder,
+      storedPath: item.storedPath,
+      contentHash: item.contentHash
+    })));
+    const key = draftKey(userDataPath);
+    const cached = coverPreviewCache.get(key);
+    if (cached?.signature === signature) {
+      return cached.previews.map((item) => ({ ...item }));
+    }
 
-    for (const item of manifest.media) {
-      if (!item.mimeType.startsWith("image/") || !storedFileExists(userDataPath, item)) continue;
+    const byResource = new Map<string, StoredResourceMediaAsset[]>();
+    for (const item of candidates) {
+      if (!storedFileExists(userDataPath, item)) continue;
       const items = byResource.get(item.resourceId) ?? [];
       items.push(item);
       byResource.set(item.resourceId, items);
     }
 
-    const result: PublicResourceCoverPreview[] = [];
+    const previews: PublicResourceCoverPreview[] = [];
     for (const [resourceId, items] of byResource) {
       const sorted = sortMedia(items);
       const selected = sorted.find((item) => item.kind === "cover")
         ?? sorted.find((item) => item.kind === "photo");
       if (!selected) continue;
       const previewDataUrl = createPreviewDataUrl(userDataPath, selected, 640, 400);
-      if (previewDataUrl) result.push({ resourceId, previewDataUrl });
+      if (previewDataUrl) previews.push({ resourceId, previewDataUrl });
     }
 
-    return result.sort((a, b) => a.resourceId.localeCompare(b.resourceId));
+    previews.sort((a, b) => a.resourceId.localeCompare(b.resourceId));
+    coverPreviewCache.set(key, {
+      signature,
+      previews: previews.map((item) => ({ ...item }))
+    });
+    return previews;
   }
 
   function getDraftState(userDataPath: string): PublicResourceMediaDraftState {
