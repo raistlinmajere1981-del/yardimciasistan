@@ -325,6 +325,34 @@ try {
   await expect(page.locator('.room-media-card')).toHaveCount(1);
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
+  // Failed media discard must preserve unrelated layout edits as well as keep
+  // the category dirty; a second successful discard clears both atomically
+  // from the user's point of view.
+  await page.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await page.getByLabel('Oda A1 adı', { exact: true }).fill('Korunacak Taslak');
+  await page.evaluate(() => {
+    window.__settingsOriginalMediaDiscard = window.yardimciDesktop.discardRoomMediaDraft;
+    window.yardimciDesktop.discardRoomMediaDraft = async () => ({
+      ok: false,
+      message: 'Medya geri alma testi başarısız.',
+      dirty: true,
+      changed: false
+    });
+  });
+  await discard();
+  await expect(page.getByText('Medya geri alma testi başarısız.', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Korunacak Taslak');
+  await expect(page.locator('.room-media-card')).toHaveCount(2);
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  await page.evaluate(() => {
+    window.yardimciDesktop.discardRoomMediaDraft = window.__settingsOriginalMediaDiscard;
+    delete window.__settingsOriginalMediaDiscard;
+  });
+  await discard();
+  await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Deniz Oda');
+  await expect(page.locator('.room-media-card')).toHaveCount(1);
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
   // Add -> remove is net-zero dirty; removing an existing room is staged and discard restores it.
   await page.getByRole('button', { name: 'Oda Ekle', exact: true }).click();
   await page.getByRole('button', { name: 'Yeni Oda satırını kaldır', exact: true }).click();
