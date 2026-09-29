@@ -5,6 +5,7 @@ import { usePensionPage } from "./pension-page-state";
 import { roomToday } from "./room-presentation";
 import { ChoiceChips } from "../ui/ChoiceChips";
 import { ActionButton } from "../ui/ActionButton";
+import { useResourceCoverPreviews } from "../operations/use-resource-cover-previews";
 
 const roomFilterOptions = [
   { id: "all", label: "Tümü" },
@@ -73,12 +74,14 @@ export function RoomsWorkspace({ data, onDashboard, ...capabilities }: RoomCardC
   const floor = page?.filters.roomFloor ?? "all";
   const filter = page?.filters.roomFilter ?? "all";
   const { summaries, rooms } = getRoomBrowserState(data, capabilities, floor);
+  const coverPreviews = useResourceCoverPreviews("room", data.revision);
   const visible = rooms.filter(item => item.matches(filter));
 
   return <div className="rooms-browser">
     <section className="resource-grid" aria-label="Oda yönetimi">
       {data.rooms.length === 0 && <p>Oda kaydı yok. Odaları Ayarlar bölümünden ekleyebilirsiniz.</p>}
-      {visible.map(({ room }) => <RoomResourceCard key={room.id} room={room} summary={summaries.get(room.id)} capabilities={capabilities} onDashboard={onDashboard} />)}
+      {visible.map(({ room }) => <RoomResourceCard key={room.id} room={room} summary={summaries.get(room.id)}
+        capabilities={capabilities} onDashboard={onDashboard} imageSrc={coverPreviews[room.id]} />)}
     </section>
     {data.rooms.length > 0 && visible.length === 0 && <div className="form-stack" role="status"><p>Bu filtrelere uyan oda yok.</p>
       {page && <ActionButton variant="secondary" onClick={() => page.setFilters(current => ({ ...current, roomFloor: "all", roomFilter: "all" }))}>Oda Filtrelerini Temizle</ActionButton>}
