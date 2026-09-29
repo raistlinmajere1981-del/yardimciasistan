@@ -180,16 +180,13 @@ export function createTerminalUI({ input = defaultInput, output = defaultOutput 
           }
           const prefix = i === selected ? "›" : " ";
           const marker = item.disabled ? "×" : " ";
-          let line = `${prefix} ${marker} ${truncate(item.label, cols - 7)}`;
+          const description = item.description ? ` — ${item.description}` : "";
+          let line = `${prefix} ${marker} ${truncate(`${item.label}${description}`, cols - 5)}`;
           if (item.disabled) line = `${ANSI.dim}${line}${ANSI.reset}`;
           else if (i === selected) line = `${ANSI.reverse}${line}${ANSI.reset}`;
           lines.push(line);
         }
         if (end < filtered.length) lines.push(`${ANSI.dim}  ↓ ${filtered.length - end} öğe daha${ANSI.reset}`);
-      }
-      const current = filtered[selected];
-      if (current?.description) {
-        lines.push("", `${ANSI.dim}${truncate(current.description, cols - 2)}${ANSI.reset}`);
       }
       lines.push("", `${ANSI.dim}${footer}${ANSI.reset}`);
       writeLines(output, lines);
