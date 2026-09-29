@@ -28,3 +28,24 @@ test("olmayan komut spawn hatası verir", async () => {
 test("formatCmd boşluklu argümanları tırnaklar", () => {
   assert.equal(formatCmd("git", ["commit", "-m", "iki kelime"]), 'git commit -m "iki kelime"');
 });
+
+
+test("stream modu çıktıyı canlı yazarken logu da korur", async () => {
+  let liveOut = "";
+  let liveErr = "";
+  const stdoutSink = { write(chunk) { liveOut += String(chunk); return true; } };
+  const stderrSink = { write(chunk) { liveErr += String(chunk); return true; } };
+  const r = await runCommand({
+    command: process.execPath,
+    args: ["-e", "console.log('canli-out'); console.error('canli-err')"],
+    cwd: "repo",
+    mode: "stream",
+    stdoutSink,
+    stderrSink
+  });
+  assert.equal(r.exitCode, 0);
+  assert.match(liveOut, /canli-out/);
+  assert.match(liveErr, /canli-err/);
+  assert.match(r.stdout, /canli-out/);
+  assert.match(r.stderr, /canli-err/);
+});
