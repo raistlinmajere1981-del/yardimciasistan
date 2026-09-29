@@ -21,11 +21,12 @@ category staged-action availability consume the same metadata. Components retain
 normal typed props and field handlers. A new section contributes metadata plus an
 explicit component in the category composition, not a runtime plugin.
 
-Persistence kinds are `staged`, `immediate`, `action`, `resource`. Mixed surfaces have
-separate metadata entries: web/AI configuration vs tests, Android configuration vs
-device operations, appearance/update preference resources vs update check/download/restart.
-The appearance resource is staged by the Application category even though its persisted
-storage remains the existing device-local UI preference store.
+Persistence kinds are `staged`, `action` and `resource`. There is intentionally no
+`immediate` settings persistence kind anymore. Editable values either join their owning
+category draft or an explicit resource draft; commands such as tests, installs, password
+operations and maintenance remain actions. Appearance/update preferences are Application
+resources even though appearance still persists through the existing device-local UI
+preference store.
 
 ## Setup draft ownership and save
 

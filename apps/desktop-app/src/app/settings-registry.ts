@@ -17,7 +17,7 @@ export interface SettingsSectionDefinition {
   category: SettingsCategoryId;
   title: string;
   keywords: string;
-  persistence: "staged" | "immediate" | "action" | "resource";
+  persistence: "staged" | "action" | "resource";
   condition?: CapabilityCondition;
   visible?: (capabilities: readonly BusinessCapability[], initialized: boolean) => boolean;
 }
