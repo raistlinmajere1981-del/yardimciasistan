@@ -17,10 +17,8 @@ interface RoomMediaPanelRoom {
 
 interface RoomMediaPanelProps {
   room: RoomMediaPanelRoom | null;
-  rooms: RoomMediaPanelRoom[];
   disabled?: boolean;
   revision: number;
-  onRoomChange: (key: string) => void;
   onDirtyChange: (dirty: boolean) => void;
 }
 
@@ -35,10 +33,8 @@ function toResource(room: RoomMediaPanelRoom): PublicResourceMediaPanelResource 
 
 export function RoomMediaPanel({
   room,
-  rooms,
   disabled = false,
   revision,
-  onRoomChange,
   onDirtyChange
 }: RoomMediaPanelProps) {
   return (
@@ -49,10 +45,9 @@ export function RoomMediaPanel({
       ariaLabel="Oda medyaları"
       emptyHint="Seçili odaya ilk fotoğrafı veya panoramayı ekleyin."
       resource={room ? toResource(room) : null}
-      resources={rooms.map(toResource)}
+      showResourcePicker={false}
       disabled={disabled}
       revision={revision}
-      onResourceChange={onRoomChange}
       onDirtyChange={onDirtyChange}
       listMedia={listRoomMedia}
       addMedia={addRoomMedia}
