@@ -73,3 +73,33 @@ test("terminal UI seçim sonrasında stdin pause durumunu geri yükler ve close'
   assert.equal(input.isPaused(), true);
   assert.equal(input.isRaw, false);
 });
+
+
+test("terminal menü açıklamayı seçenek satırında gösterir", async () => {
+  class FakeInput extends EventEmitter {
+    constructor() {
+      super();
+      this.isTTY = true;
+      this.isRaw = false;
+      this.paused = true;
+    }
+    setRawMode(value) { this.isRaw = value; }
+    resume() { this.paused = false; return this; }
+    pause() { this.paused = true; return this; }
+    isPaused() { return this.paused; }
+  }
+
+  const writes = [];
+  const input = new FakeInput();
+  const output = { rows: 24, columns: 120, write(value) { writes.push(String(value)); return true; } };
+  const ui = createTerminalUI({ input, output });
+  const pending = ui.select({
+    title: "Kontroller",
+    items: [{ label: "Full Verify", description: "Tüm portable ürün testleri", value: "full" }]
+  });
+
+  assert.match(writes.join(""), /Full Verify — Tüm portable ürün testleri/);
+  input.emit("keypress", "", { name: "escape" });
+  await pending;
+  ui.close();
+});
