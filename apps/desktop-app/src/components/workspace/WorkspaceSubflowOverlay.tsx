@@ -70,6 +70,7 @@ export function WorkspaceSubflowOverlay({
           return;
         }
         if (event.key !== "Tab") return;
+        event.stopPropagation();
 
         const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
           'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]'
