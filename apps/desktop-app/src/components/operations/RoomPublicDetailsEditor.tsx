@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Save } from "lucide-react";
 import {
   ROOM_PUBLIC_DETAIL_LIMITS,
@@ -69,9 +69,15 @@ function toggleFeature(features: RoomPublicFeatureId[], featureId: RoomPublicFea
 export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPublicDetailsEditorProps) {
   const [form, setForm] = useState<RoomPublicDetailsFormState>(() => toForm(room));
   const [state, setState] = useState<EditorState>("idle");
+  const seededRoomIdRef = useRef("");
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !room) {
+      seededRoomIdRef.current = "";
+      return;
+    }
+    if (seededRoomIdRef.current === room.id) return;
+    seededRoomIdRef.current = room.id;
     setForm(toForm(room));
     setState("idle");
   }, [open, room]);
