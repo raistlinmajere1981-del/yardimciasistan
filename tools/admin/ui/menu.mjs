@@ -281,8 +281,10 @@ async function sectionScreen(ui, key) {
         if (task.site === "blacksea" && !blackseaOk) continue;
         items.push({
           label: task.title,
-          description: task.kind === "task" ? task.id : `${task.kind === "group" ? "Grup" : "Workflow"} · ${task.id}`,
-          searchText: `${task.id} ${groupTitle}`,
+          description: task.description ?? (task.kind === "task"
+            ? task.id
+            : `${task.kind === "group" ? "Grup" : "Workflow"} · ${task.id}`),
+          searchText: `${task.id} ${groupTitle} ${task.description ?? ""}`,
           id,
         });
       }
