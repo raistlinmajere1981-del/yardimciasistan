@@ -53,30 +53,11 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
         id="settings-operations"
         className="table-resource-workspace"
         title="Masa Yönetimi"
-        subtitle="Restoran"
+        subtitle={`Restoran · ${tableCountTotal} masa`}
         publishChecked={draft.publication.tables}
         publishAriaLabel="Masa web yayını"
         disabled={loading || saving}
         onPublishChange={(tables) => updatePublication({ tables })}
-        toolbar={
-          <>
-            <div className="resource-management-toolbar-copy">
-              <strong>Masa kategorileri</strong>
-              <span>{tableCountTotal} masa</span>
-            </div>
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              className="table-category-add"
-              type="button"
-              disabled={loading || saving}
-              onClick={addTableCategory}
-            >
-              <Plus size={15} aria-hidden="true" />
-              Kategori Ekle
-            </ActionButton>
-          </>
-        }
         media={
           <TableMediaPanel
             table={mediaTable ? {
@@ -118,24 +99,47 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                       type="number"
                     />
                   </label>
-                  <ActionButton
-                    variant="ghost"
-                    size="sm"
-                    className="table-category-remove"
-                    type="button"
-                    onClick={() => removeTableCategory(category.key)}
-                    aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
-                    title="Kategoriyi kaldır"
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                  </ActionButton>
+                  <div className="table-category-row-actions">
+                    {index === 0 && (
+                      <ActionButton
+                        variant="secondary"
+                        size="sm"
+                        className="table-category-add"
+                        type="button"
+                        onClick={addTableCategory}
+                      >
+                        <Plus size={15} aria-hidden="true" />
+                        Kategori Ekle
+                      </ActionButton>
+                    )}
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      className="table-category-remove"
+                      type="button"
+                      onClick={() => removeTableCategory(category.key)}
+                      aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
+                      title="Kategoriyi kaldır"
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                    </ActionButton>
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="table-category-empty">
-              Henüz masa kategorisi yok. Kategori Ekle ile ilk bölümü oluşturabilirsiniz.
-            </p>
+            <div className="table-category-empty table-category-empty-with-action">
+              <span>Henüz masa kategorisi yok.</span>
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={addTableCategory}
+              >
+                <Plus size={15} aria-hidden="true" />
+                Kategori Ekle
+              </ActionButton>
+            </div>
           )}
 
           <section className="resource-management-subsection">
