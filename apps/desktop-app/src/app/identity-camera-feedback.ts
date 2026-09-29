@@ -1,5 +1,7 @@
 export type IdentityCameraFeedbackTone = "prompt" | "ready" | "success" | "error";
 
+const FEEDBACK_GAIN = 0.14;
+
 let audioContext: AudioContext | null = null;
 
 export function primeIdentityCameraFeedback() {
@@ -71,10 +73,10 @@ function playFeedbackTone(kind: IdentityCameraFeedbackTone) {
   if (!context) return;
 
   const patterns: Record<IdentityCameraFeedbackTone, Array<[number, number, number]>> = {
-    prompt: [[520, 0, 0.08]],
-    ready: [[640, 0, 0.07]],
-    success: [[660, 0, 0.07], [840, 0.1, 0.09]],
-    error: [[280, 0, 0.11], [220, 0.14, 0.13]]
+    prompt: [[520, 0, 0.14]],
+    ready: [[640, 0, 0.12]],
+    success: [[660, 0, 0.12], [840, 0.14, 0.16]],
+    error: [[300, 0, 0.16], [220, 0.19, 0.2]]
   };
 
   const start = context.currentTime + 0.015;
@@ -85,10 +87,10 @@ function playFeedbackTone(kind: IdentityCameraFeedbackTone) {
     for (const [frequency, offset, duration] of patterns[kind]) {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
-      oscillator.type = "sine";
+      oscillator.type = "triangle";
       oscillator.frequency.setValueAtTime(frequency, start + offset);
       gain.gain.setValueAtTime(0.0001, start + offset);
-      gain.gain.exponentialRampToValueAtTime(0.035, start + offset + 0.01);
+      gain.gain.exponentialRampToValueAtTime(FEEDBACK_GAIN, start + offset + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + duration);
       oscillator.connect(gain);
       gain.connect(context.destination);
