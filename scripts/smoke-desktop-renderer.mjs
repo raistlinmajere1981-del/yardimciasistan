@@ -1406,7 +1406,7 @@ try {
   await expect(customerEditor.getByRole("button", { name: "Doğum tarihi", exact: true })).toHaveAttribute("data-picker-value", "1991-04-23");
   await customerEditor.getByLabel("Telefon").fill("+905551112244");
   await customerEditor.getByLabel("Not", { exact: true }).fill("Resepsiyondan manuel oluşturulan müşteri kartı.");
-  await customerEditor.getByRole("button", { name: "Müşteri Kartını Kaydet" }).click();
+  await customerEditor.getByRole("button", { name: "Kaydet", exact: true }).click();
   await expect(customerEditor).toHaveCount(0);
   const createdCustomer = conversionPage.getByRole("dialog", { name: "Kimlik Smoke" });
   await expect(createdCustomer).toBeVisible();

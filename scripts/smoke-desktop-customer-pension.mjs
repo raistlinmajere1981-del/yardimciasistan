@@ -332,7 +332,7 @@ try {
   await page.getByRole('button', { name: 'Yeni Müşteri', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Ad soyad', { exact: true }).fill('Migration Misafiri');
   await page.getByRole('dialog').getByLabel('Telefon', { exact: true }).fill('05321234567');
-  await page.getByRole('button', { name: 'Müşteri Kartını Kaydet', exact: true }).click();
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   const createdCustomerWorkspace = page.getByRole('dialog', { name: 'Migration Misafiri' });
   await expect(createdCustomerWorkspace).toBeVisible();
   const customerCall = await page.evaluate(() => window.__designCalls.find(call => call.kind === 'customer'));
