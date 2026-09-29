@@ -71,6 +71,10 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
   };
   window.fixtureState = () => clone({ dashboard, folios, menu });
   window.yardimciDesktop = {
+    listRoomMediaCoverPreviews: async () => dashboard.rooms.slice(0, 1).map(room => ({
+      resourceId: room.id,
+      previewDataUrl: "data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="640" height="400"%3E%3Crect width="640" height="400" fill="%23888"/%3E%3C/svg%3E"
+    })),
     getRoomFolioData: async roomId => {
       record('read', { roomId });
       const snapshot = clone(data());
