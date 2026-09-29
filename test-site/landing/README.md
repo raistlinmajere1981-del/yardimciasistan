@@ -11,6 +11,7 @@ landing yüzeyi (`www/` kökü) ile ilgilenir. Web modülüne dokunmaz.
 | Katman | Canlı path | Kaynak |
 |---|---|---|
 | Landing (bu repo) | `/home/yardimciasistan/www/index.php` + `/home/yardimciasistan/www/assets/` + `/home/yardimciasistan/www/favicon.png` | Bu repo (`index.php`, `assets/`, `favicon.png`) |
+| Canlı referans demo | `/home/yardimciasistan/www/demo/` | Bu repo (`demo/`); masaüstünden yayınlanan public veriyi gerçek web modülünden okur |
 | Kurulum dosyaları | `/home/yardimciasistan/www/downloads/` | Ana monorepo release çıktıları; yalnız `--with-downloads` ile yayınlanır |
 | Web modülü (ayrı) | `/home/yardimciasistan/www/yardimci-asistan/` | Ana `YardimciAsistan` repo + `scripts/deploy-web.sh` |
 
@@ -156,3 +157,16 @@ curl -sL https://yardimciasistan.alwaysdata.net/ | head -n 20
 
 - `20260918T203012Z`: önceki canlı `index.html` + patch öncesi bundle'lar
   (`backups/landing-sync-key-20260918T203012Z/`).
+
+
+## Canlı public-site referansı
+
+`https://yardimciasistan.alwaysdata.net/demo/` müşteri sitesinin geliştirme ve entegrasyon laboratuvarıdır. BlackSea sitesindeki Yardımcı Asistan tarafından beslenen yüzeylerin ürün markasından bağımsız örnekleri burada tutulur:
+
+- `/demo/odalar/` ve `/demo/odalar/oda/?id=...`: public oda kataloğu ve yayınlanmış medya
+- `/demo/qr-menu/`: QR menü yayını
+- `/demo/yorumlar/`: Google Reviews public yüzeyi
+- `/demo/iletisim/`: business context, harita, sosyal kanallar ve WhatsApp görünürlüğü
+- `/demo/restoran/`: Table Public Catalog geliştirme alanı
+
+Demo fixture veri kullanmaz; `/yardimci-asistan/api/*` uçlarını tüketir. Deploy scripti `demo/` ağacını `www/demo/` altında kaynak kontrollü içerik olarak `--delete` ile aynalar. `www/yardimci-asistan/` web modülüne dokunulmaz.

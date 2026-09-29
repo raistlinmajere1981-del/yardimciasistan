@@ -34,6 +34,7 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
   </head>
   <body>
     <div id="root"></div>
+    <a href="/demo/" aria-label="Yardımcı Asistan canlı web demosunu aç" style="position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 16px;border-radius:999px;background:#0e7490;color:#fff;text-decoration:none;font:700 12px/1.2 Inter,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.22)">Canlı Web Demosu ↗</a>
     <script>
       window.__YA_SYNC_KEY__ = <?php echo json_encode($syncKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
     </script>

@@ -6,6 +6,7 @@
  *   www/index.php
  *   www/favicon.png
  *   www/assets/  (add/update, never delete)
+ *   www/demo/    (source-controlled reference site; mirrored with --delete)
  *
  * With --with-downloads it also deploys the current release artifacts:
  *   www/downloads/YardimciAsistan-Setup-<version>.exe
@@ -88,8 +89,9 @@ for (const cmd of ["ssh", "scp", "rsync", "php"]) {
 const localIndex = join(repoRoot, "index.php");
 const localFavicon = join(repoRoot, "favicon.png");
 const localAssets = join(repoRoot, "assets");
+const localDemo = join(repoRoot, "demo");
 const landingBundle = join(localAssets, "index-t2kNTUv0.js");
-const requiredLocal = [localIndex, localFavicon, landingBundle, join(localAssets, "index-fcReLA3k.css")];
+const requiredLocal = [localIndex, localFavicon, landingBundle, join(localAssets, "index-fcReLA3k.css"), join(localDemo, "index.php"), join(localDemo, "assets", "css", "site.css"), join(localDemo, "assets", "js", "site.js")];
 for (const f of requiredLocal) {
   if (!existsSync(f)) fail(`Yerel kaynak dosya eksik: ${f}`);
 }
@@ -204,6 +206,8 @@ if (withDownloads) {
 
 step("Yerel PHP syntax kontrolu");
 runLocal("php", ["-l", localIndex]);
+runLocal("sh", ["-c", `find '${localDemo}' -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`]);
+console.log("Demo PHP dosyalari temiz.");
 
 // Eski hardcoded test degeri: bilerek parcali yazildi ki bu dosya
 // repo genelinde literal taramasina takilmasin. Guard amaclidir,
@@ -211,7 +215,7 @@ runLocal("php", ["-l", localIndex]);
 const STALE_HARDCODED = ["112233", "445566"].join("");
 
 step("Kaynakta hardcoded secret taramasi");
-const hardcodedHits = grepLocal(STALE_HARDCODED, [localIndex, localAssets]);
+const hardcodedHits = grepLocal(STALE_HARDCODED, [localIndex, localAssets, localDemo]);
 if (hardcodedHits.length > 0) {
   console.error(hardcodedHits.join("\n"));
   fail("Kaynakta hardcoded deger var; deploy durduruldu.");
@@ -224,7 +228,7 @@ if (!liveSecret) fail("Canli sync_secret okunamadi; deploy durduruldu.");
 console.log(`Canli sync_secret uzunlugu: ${liveSecret.length}`);
 
 step("Gercek secret'in kaynaga gomulmedigi kontrol ediliyor");
-const leakHits = grepLocalFixedString(liveSecret, [localIndex, localAssets]);
+const leakHits = grepLocalFixedString(liveSecret, [localIndex, localAssets, localDemo]);
 if (leakHits.length > 0) {
   console.error(leakHits.join("\n"));
   fail("Kaynak dosyalarda canli secret bulunuyor; deploy durduruldu.");
@@ -258,6 +262,16 @@ if (dryRun) {
     "ssh -o BatchMode=yes -o ConnectTimeout=15",
     `${localAssets}/`,
     `${deployHost}:${remoteWww}/assets/`
+  ]);
+  console.log("Demo site farklari (kaynak agaci birebir yonetilir):");
+  runLocal("rsync", [
+    "-azn",
+    "--delete",
+    "--itemize-changes",
+    "-e",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15",
+    `${localDemo}/`,
+    `${deployHost}:${remoteWww}/demo/`
   ]);
   if (withDownloads) {
     step("Dry-run: kurulum dosyalari");
@@ -296,7 +310,8 @@ sshRun(`mkdir -p ${remoteBackup} && test ! -e ${remoteTmpIndex} && test ! -e ${r
 sshRun(
   `cd ${remoteWww} && ` +
     `for f in index.php index.html favicon.png; do [ -f "$f" ] && cp -p "$f" ${remoteBackup}/ || true; done && ` +
-    `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ls -la ${remoteBackup}/`
+    `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ` +
+    `[ -d demo ] && cp -a demo ${remoteBackup}/ || true && ls -la ${remoteBackup}/`
 );
 
 step("Gecici isimle upload + syntax kontrolu");
@@ -316,6 +331,19 @@ runLocal("rsync", [
   `${localAssets}/`,
   `${deployHost}:${remoteWww}/assets/`
 ]);
+
+step("Canli referans demo sitesi yayinlaniyor");
+sshRun(`mkdir -p '${remoteWww}/demo'`);
+runLocal("rsync", [
+  "-az",
+  "--delete",
+  "--omit-dir-times",
+  "-e",
+  "ssh -o BatchMode=yes -o ConnectTimeout=15",
+  `${localDemo}/`,
+  `${deployHost}:${remoteWww}/demo/`
+]);
+sshRun(`find '${remoteWww}/demo' -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`);
 
 if (withDownloads) {
   step("Kurulum dosyalari atomik olarak yayinlaniyor");
@@ -555,6 +583,12 @@ async function smoke(base, secret) {
     fail("Canli sync key degeri config ile eslesmiyor.");
   }
   console.log("Kok: 200, sync key config ile ayni, hardcoded yok.");
+
+  for (const path of ["/demo/", "/demo/odalar/", "/demo/odalar/oda/", "/demo/qr-menu/", "/demo/yorumlar/", "/demo/iletisim/", "/demo/restoran/"]) {
+    const page = await get(path);
+    if (page.response.status !== 200) fail(`Demo route HTTP smoke basarisiz: ${path} -> ${page.response.status}`);
+  }
+  console.log("Demo public-site route'lari: 200.");
 
   const menu = await get("/yardimci-asistan/api/menu.php");
   if (menu.response.status !== 200 || !menu.text.includes('"ok":true')) fail("menu.php saglik kontrolu basarisiz.");
