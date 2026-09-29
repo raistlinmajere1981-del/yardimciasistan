@@ -167,6 +167,6 @@ curl -sL https://yardimciasistan.alwaysdata.net/ | head -n 20
 - `/demo/qr-menu/`: QR menü yayını
 - `/demo/yorumlar/`: Google Reviews public yüzeyi
 - `/demo/iletisim/`: business context, harita, sosyal kanallar ve WhatsApp görünürlüğü
-- `/demo/restoran/`: Table Public Catalog geliştirme alanı
+- `/demo/restoran/` ve `/demo/restoran/masa/?id=...`: public masa kataloğu, müşteri detayları ve yayınlanmış medya
 
 Demo fixture veri kullanmaz; `/yardimci-asistan/api/*` uçlarını tüketir. Deploy scripti `demo/` ağacını `www/demo/` altında kaynak kontrollü içerik olarak `--delete` ile aynalar. `www/yardimci-asistan/` web modülüne dokunulmaz.
