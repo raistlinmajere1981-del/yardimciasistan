@@ -61,6 +61,7 @@ export interface BusinessLayoutDraft {
   rooms: BusinessLayoutRoomDraft[];
   tables: BusinessLayoutTableDraft[];
   tableCategories: BusinessLayoutTableCategoryDraft[];
+  publication: BusinessLayoutSnapshot["publication"];
   capabilities: BusinessLayoutSnapshot["capabilities"];
 }
 
@@ -202,6 +203,13 @@ export function useBusinessLayoutSettings(options: {
     setDraft((current) => ({
       ...current,
       rooms: current.rooms.filter((candidate) => candidate.key !== key)
+    }));
+  }, [setDraft]);
+
+  const updatePublication = useCallback((patch: Partial<BusinessLayoutSnapshot["publication"]>) => {
+    setDraft((current) => ({
+      ...current,
+      publication: { ...current.publication, ...patch }
     }));
   }, [setDraft]);
 
@@ -352,7 +360,11 @@ export function useBusinessLayoutSettings(options: {
                 name: category.name,
                 tableCount: Number(category.tableCount)
               }))
-            : undefined
+            : undefined,
+          publication: {
+            ...(current.capabilities.rooms ? { rooms: current.publication.rooms } : {}),
+            ...(current.capabilities.tables ? { tables: current.publication.tables } : {})
+          }
         };
         const result = await bridge!.saveBusinessLayout(input);
         if (!result.ok) {
@@ -493,6 +505,7 @@ export function useBusinessLayoutSettings(options: {
     updateRoom,
     addRoom,
     removeRoom,
+    updatePublication,
     updateTable,
     updateTableCategory,
     addTableCategory,
@@ -517,6 +530,7 @@ function snapshotToDraft(snapshot: BusinessLayoutSnapshot): BusinessLayoutDraft 
       name: category.name,
       tableCount: String(category.tableCount)
     })),
+    publication: { ...snapshot.publication },
     capabilities: { ...snapshot.capabilities }
   };
 }
@@ -560,6 +574,7 @@ function emptyDraft(): BusinessLayoutDraft {
     rooms: [],
     tables: [],
     tableCategories: [],
+    publication: { rooms: false, tables: false },
     capabilities: { rooms: false, tables: false }
   };
 }
@@ -569,6 +584,7 @@ function cloneDraft(value: BusinessLayoutDraft): BusinessLayoutDraft {
     rooms: value.rooms.map((room) => ({ ...room, features: [...room.features] })),
     tables: value.tables.map((table) => ({ ...table, features: [...table.features] })),
     tableCategories: value.tableCategories.map((category) => ({ ...category })),
+    publication: { ...value.publication },
     capabilities: { ...value.capabilities }
   };
 }
@@ -604,6 +620,7 @@ function comparableDraft(value: BusinessLayoutDraft): string {
       name: category.name.trim(),
       tableCount: Number(category.tableCount)
     })),
+    publication: value.publication,
     capabilities: value.capabilities
   });
 }
