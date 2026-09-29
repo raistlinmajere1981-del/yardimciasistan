@@ -43,6 +43,7 @@ interface PublicResourceMediaPanelProps {
   resource: PublicResourceMediaPanelResource | null;
   resources?: PublicResourceMediaPanelResource[];
   showResourcePicker?: boolean;
+  embedded?: boolean;
   disabled?: boolean;
   revision: number;
   onResourceChange?: (key: string) => void;
@@ -94,6 +95,7 @@ export function PublicResourceMediaPanel({
   resource,
   resources = [],
   showResourcePicker = true,
+  embedded = false,
   disabled = false,
   revision,
   onResourceChange,
@@ -188,7 +190,10 @@ export function PublicResourceMediaPanel({
   };
 
   return (
-    <aside className="settings-panel room-media-panel" aria-label={ariaLabel}>
+    <aside
+      className={`${embedded ? "resource-media-panel--embedded " : "settings-panel "}room-media-panel`}
+      aria-label={ariaLabel}
+    >
       <div className="settings-panel-header room-media-panel-header">
         <div>
           <h3>{title}</h3>
