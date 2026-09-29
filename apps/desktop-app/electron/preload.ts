@@ -20,7 +20,7 @@ import type {
   AddRoomMediaInput,
   AddTableMediaInput,
   DeleteRoomMediaInput,
-  type PublicResourceCoverPreview,
+  PublicResourceCoverPreview,
   DeleteTableMediaInput,
   RoomMediaAsset,
   RoomMediaDraftResult,
