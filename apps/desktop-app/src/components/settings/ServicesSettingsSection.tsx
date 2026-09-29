@@ -68,10 +68,9 @@ export function ServicesSettingsSection({
     update("birthdaySettings", { ...form.birthdaySettings, [key]: value });
   };
 
-  return (<>
-        <WebSettingsSection form={form} onFormChange={onFormChange} />
-
+  return (
         <div id="settings-connections" className="settings-services-workspace">
+          <WebSettingsSection form={form} onFormChange={onFormChange} />
 
           <section id="settings-whatsapp" tabIndex={-1} className={`settings-service-card${form.whatsappEnabled ? " is-enabled" : " is-disabled"}`}>
             <div className="settings-service-card-header">
@@ -250,8 +249,14 @@ export function ServicesSettingsSection({
             </fieldset>
           </section>
           )}
-        </div>
 
-        <AiSettingsSection form={form} onFormChange={onFormChange} onTestAiConnection={onTestAiConnection} aiConnectionTestState={aiConnectionTestState} aiConnectionTestMessage={aiConnectionTestMessage} />
-  </>);
+          <AiSettingsSection
+            form={form}
+            onFormChange={onFormChange}
+            onTestAiConnection={onTestAiConnection}
+            aiConnectionTestState={aiConnectionTestState}
+            aiConnectionTestMessage={aiConnectionTestMessage}
+          />
+        </div>
+  );
 }
