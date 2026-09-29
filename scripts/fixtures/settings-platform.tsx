@@ -34,6 +34,10 @@ let layout = {
     canRemove: true,
     removeBlockReason: ""
   }],
+  tables: [
+    { id: "table-1", name: "Salon 1", area: "Salon", capacity: 4, description: "", features: [], smokingPolicy: "unspecified", sortOrder: 1 },
+    { id: "table-2", name: "Salon 2", area: "Salon", capacity: 4, description: "", features: [], smokingPolicy: "unspecified", sortOrder: 2 }
+  ],
   tableCategories: [{ name: "Salon", tableCount: 2 }]
 };
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
@@ -142,6 +146,21 @@ window.yardimciDesktop = {
           canRemove: true,
           removeBlockReason: ""
         }))
+      };
+    }
+    if (input.tables) {
+      layout = {
+        ...layout,
+        tables: layout.tables.map((table) => {
+          const update = input.tables.find((candidate) => candidate.id === table.id);
+          return update ? {
+            ...table,
+            capacity: update.capacity,
+            description: update.description,
+            features: [...update.features],
+            smokingPolicy: update.smokingPolicy
+          } : table;
+        })
       };
     }
     if (input.tableCategories) {
