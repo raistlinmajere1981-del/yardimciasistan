@@ -1,17 +1,17 @@
 import type { RoomPublicFeatureId } from "./room-public-details";
+import type {
+  PublicResourceMedia,
+  PublicResourceMediaAssetFields,
+  PublicResourceMediaDraftResult,
+  PublicResourceMediaDraftState,
+  PublicResourceMediaKind,
+  PublicResourceMediaMutationResult
+} from "./public-resource-media";
 
 export const ROOM_PUBLIC_CATALOG_VERSION = 1 as const;
 
-export type RoomPublicMediaKind = "cover" | "photo" | "panorama_360" | "panorama_180" | "video";
-
-export interface RoomPublicMedia {
-  id: string;
-  kind: RoomPublicMediaKind;
-  url: string;
-  mimeType: string;
-  title: string;
-  sortOrder: number;
-}
+export type RoomPublicMediaKind = PublicResourceMediaKind;
+export type RoomPublicMedia = PublicResourceMedia;
 
 export interface RoomPublicCatalogRoom {
   id: string;
@@ -35,19 +35,8 @@ export interface RoomPublicCatalog {
   rooms: RoomPublicCatalogRoom[];
 }
 
-
-export interface RoomMediaAsset {
-  id: string;
+export interface RoomMediaAsset extends PublicResourceMediaAssetFields {
   roomId: string;
-  kind: RoomPublicMediaKind;
-  originalName: string;
-  mimeType: string;
-  title: string;
-  sortOrder: number;
-  sizeBytes: number;
-  updatedAt: string;
-  remoteUrl: string;
-  previewDataUrl?: string;
 }
 
 export interface AddRoomMediaInput {
@@ -67,14 +56,6 @@ export interface DeleteRoomMediaInput {
   mediaId: string;
 }
 
-export interface RoomMediaDraftState {
-  dirty: boolean;
-}
-
-export type RoomMediaDraftResult =
-  | { ok: true; message: string; dirty: false; changed: boolean }
-  | { ok: false; message: string; dirty: boolean; changed: false };
-
-export type RoomMediaMutationResult =
-  | { ok: true; message: string; media: RoomMediaAsset[]; dirty?: boolean }
-  | { ok: false; message: string; media: RoomMediaAsset[]; dirty?: boolean };
+export type RoomMediaDraftState = PublicResourceMediaDraftState;
+export type RoomMediaDraftResult = PublicResourceMediaDraftResult;
+export type RoomMediaMutationResult = PublicResourceMediaMutationResult<RoomMediaAsset>;
