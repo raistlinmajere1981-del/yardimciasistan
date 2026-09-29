@@ -2,6 +2,7 @@ import type { BrowserWindow } from "electron";
 import type {
   AddRoomMediaInput,
   DeleteRoomMediaInput,
+  PublicResourceCoverPreview,
   RoomMediaAsset,
   RoomMediaDraftResult,
   RoomMediaDraftState,
@@ -55,6 +56,10 @@ export function deleteRoomMedia(userDataPath: string, input: DeleteRoomMediaInpu
 
 export function listRoomMedia(userDataPath: string, roomId: string): RoomMediaAsset[] {
   return service.list(userDataPath, roomId).map(toRoomAsset);
+}
+
+export function listRoomMediaCoverPreviews(userDataPath: string): PublicResourceCoverPreview[] {
+  return service.listCoverPreviews(userDataPath);
 }
 
 export function getRoomMediaDraftState(userDataPath: string): RoomMediaDraftState {
