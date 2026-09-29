@@ -34,7 +34,6 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
   </head>
   <body>
     <div id="root"></div>
-    <a href="/demo/" aria-label="Yardımcı Asistan canlı web demosunu aç" style="position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 16px;border-radius:999px;background:#0e7490;color:#fff;text-decoration:none;font:700 12px/1.2 Inter,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.22)">Canlı Web Demosu ↗</a>
     <script>
       window.__YA_SYNC_KEY__ = <?php echo json_encode($syncKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
     </script>
@@ -65,6 +64,30 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
               if (code.textContent !== want) {
                 code.textContent = want;
               }
+            }
+          } catch (e) {}
+        }
+        function patchDemoNavigation() {
+          try {
+            var existing = document.querySelectorAll('[data-ya-demo-nav="1"]');
+            if (existing.length > 0) {
+              return;
+            }
+            var links = document.querySelectorAll("a");
+            for (var i = 0; i < links.length; i++) {
+              var link = links[i];
+              if ((link.textContent || "").trim() !== "Canlı Sistem") {
+                continue;
+              }
+              var demoLink = document.createElement("a");
+              demoLink.href = "/demo/";
+              demoLink.textContent = "Web Demosu";
+              demoLink.setAttribute("data-ya-demo-nav", "1");
+              if (link.className) {
+                demoLink.className = link.className;
+              }
+              link.insertAdjacentElement("afterend", demoLink);
+              return;
             }
           } catch (e) {}
         }
@@ -157,6 +180,7 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
           var observer = new MutationObserver(function () {
             patchSyncKeyDisplay();
             patchX86Download();
+            patchDemoNavigation();
           });
           observer.observe(document.documentElement, {
             childList: true,
@@ -168,6 +192,7 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
         var timer = setInterval(function () {
           patchSyncKeyDisplay();
           patchX86Download();
+          patchDemoNavigation();
           attempts += 1;
           if (attempts > 40) {
             clearInterval(timer);
@@ -181,6 +206,7 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
         } else {
           patchSyncKeyDisplay();
           patchX86Download();
+          patchDemoNavigation();
         }
       })();
     </script>
