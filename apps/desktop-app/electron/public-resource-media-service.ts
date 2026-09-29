@@ -5,6 +5,7 @@ import { dialog, nativeImage, type BrowserWindow, type OpenDialogOptions } from 
 import {
   isPublicResourceMediaKind,
   type PublicResourceMedia,
+  type PublicResourceCoverPreview,
   type PublicResourceMediaAssetFields,
   type PublicResourceMediaDraftResult,
   type PublicResourceMediaDraftState,
@@ -232,6 +233,31 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
         manifest.media.filter((item) => item.resourceId === resourceId)
       )
     );
+  }
+
+  function listCoverPreviews(userDataPath: string): PublicResourceCoverPreview[] {
+    ensureStagingRootClean(userDataPath);
+    const manifest = readManifest(userDataPath);
+    const byResource = new Map<string, StoredResourceMediaAsset[]>();
+
+    for (const item of manifest.media) {
+      if (!item.mimeType.startsWith("image/") || !storedFileExists(userDataPath, item)) continue;
+      const items = byResource.get(item.resourceId) ?? [];
+      items.push(item);
+      byResource.set(item.resourceId, items);
+    }
+
+    const result: PublicResourceCoverPreview[] = [];
+    for (const [resourceId, items] of byResource) {
+      const sorted = sortMedia(items);
+      const selected = sorted.find((item) => item.kind === "cover")
+        ?? sorted.find((item) => item.kind === "photo");
+      if (!selected) continue;
+      const previewDataUrl = createPreviewDataUrl(userDataPath, selected, 640, 400);
+      if (previewDataUrl) result.push({ resourceId, previewDataUrl });
+    }
+
+    return result.sort((a, b) => a.resourceId.localeCompare(b.resourceId));
   }
 
   function getDraftState(userDataPath: string): PublicResourceMediaDraftState {
@@ -500,14 +526,19 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
     });
   }
 
-  function createPreviewDataUrl(userDataPath: string, item: StoredResourceMediaAsset): string {
+  function createPreviewDataUrl(
+    userDataPath: string,
+    item: StoredResourceMediaAsset,
+    width = 160,
+    height = 110
+  ): string {
     if (!item.mimeType.startsWith("image/")) return "";
     const absolutePath = storedAssetAbsolutePath(userDataPath, item);
     if (!absolutePath || !fs.existsSync(absolutePath)) return "";
     try {
       const image = nativeImage.createFromPath(absolutePath);
       if (image.isEmpty()) return "";
-      return image.resize({ width: 160, height: 110, quality: "good" }).toDataURL();
+      return image.resize({ width, height, quality: "good" }).toDataURL();
     } catch {
       return "";
     }
@@ -608,6 +639,7 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
     update,
     remove,
     list,
+    listCoverPreviews,
     getDraftState,
     commitDraft,
     discardDraft,
