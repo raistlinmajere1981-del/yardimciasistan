@@ -1841,3 +1841,17 @@
     justify-content: flex-start;
   }
 }
+
+
+/* Disabled service cards stay header-only; draft toggles expand immediately. */
+.settings-service-card.is-disabled > .settings-service-card-header {
+  border-bottom: 0;
+}
+
+.settings-service-card.is-disabled {
+  min-height: 0;
+}
+
+.settings-service-card.is-disabled .settings-service-card-header {
+  padding-block: var(--space-3);
+}
