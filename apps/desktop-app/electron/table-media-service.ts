@@ -2,6 +2,7 @@ import type { BrowserWindow } from "electron";
 import type {
   AddTableMediaInput,
   DeleteTableMediaInput,
+  PublicResourceCoverPreview,
   TableMediaAsset,
   TableMediaDraftResult,
   TableMediaDraftState,
@@ -55,6 +56,10 @@ export function deleteTableMedia(userDataPath: string, input: DeleteTableMediaIn
 
 export function listTableMedia(userDataPath: string, tableId: string): TableMediaAsset[] {
   return service.list(userDataPath, tableId).map(toTableAsset);
+}
+
+export function listTableMediaCoverPreviews(userDataPath: string): PublicResourceCoverPreview[] {
+  return service.listCoverPreviews(userDataPath);
 }
 
 export function getTableMediaDraftState(userDataPath: string): TableMediaDraftState {
