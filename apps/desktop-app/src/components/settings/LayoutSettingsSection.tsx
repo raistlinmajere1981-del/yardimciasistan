@@ -116,7 +116,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
         <div className="settings-panel-header table-public-heading">
           <div>
             <h2>Web yayını</h2>
-            <p>Restoran ve masa detaylarının public sitede görünürlüğü</p>
+            <p>Restoran ve masa detaylarının web sitesindeki görünürlüğü</p>
           </div>
         </div>
         <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving}>
@@ -167,7 +167,10 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                     variant="secondary"
                     size="sm"
                     type="button"
-                    onClick={() => setEditingTableId(table.id)}
+                    onClick={() => {
+                      setMediaTableKey(table.key);
+                      setEditingTableId(table.id);
+                    }}
                   >
                     Detaylar
                   </ActionButton>
