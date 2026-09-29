@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { DesktopDashboardData, DesktopStatusUpdateResult } from "../../electron/database";
 import { OperationsBoardLayout } from "../components/operations/OperationsBoardLayout";
+import { useResourceCoverPreviews } from "../components/operations/use-resource-cover-previews";
 import { getTableStatusAction } from "../components/restaurant/table-presentation";
 import type { useRestaurantPageController } from "../components/restaurant/restaurant-page-state";
 import { TableResourceCard } from "../components/restaurant/TableResourceCard";
@@ -35,6 +36,7 @@ export function RestaurantPage({
 }: RestaurantPageProps) {
   const { filters, setFilters } = controller;
   const { group, status } = filters;
+  const coverPreviews = useResourceCoverPreviews("table", data.revision);
   const setGroup = (value: string) => setFilters((current) => ({ ...current, group: value }));
   const setStatus = (value: string) => setFilters((current) => ({ ...current, status: value }));
   const groups = [...new Set(data.tables.map((table) => table.area.trim() || "Genel"))];
@@ -89,7 +91,7 @@ export function RestaurantPage({
               .filter((table) => (table.area.trim() || "Genel") === name)
               .map(table => <TableResourceCard key={table.id} table={table} summary={summaries.get(table.id)}
                 capabilities={{ ordersEnabled, reservationsEnabled, menuEnabled }} onDashboard={onDashboardDataChanged}
-                onUpdateTableStatus={onUpdateTableStatus} />)}
+                onUpdateTableStatus={onUpdateTableStatus} imageSrc={coverPreviews[table.id]} />)}
           </div>
         </details>
       ))}
