@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Save } from "lucide-react";
+import { Plus, Save } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
   DesktopIdentityImageAnalyzeResult,
@@ -11,7 +11,8 @@ import { FormDialog } from "../ui/FormDialog";
 import { WorkspaceFormOverlay } from "../workspace/WorkspaceFormOverlay";
 import { CustomerFormFields } from "./CustomerFormFields";
 
-type SaveState = "idle" | "loading" | "error";
+type SaveState = "idle" | "loading" | "success" | "error";
+type SaveMode = "close" | "continue";
 
 interface CustomerCreateEditorProps {
   open: boolean;
@@ -33,12 +34,14 @@ export function CustomerCreateEditor({
   onCreated
 }: CustomerCreateEditorProps) {
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(null));
+  const [formRevision, setFormRevision] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setForm(toCustomerForm(null));
+    setFormRevision((revision) => revision + 1);
     setSaveState("idle");
     setSaveMessage("");
   }, [open]);
@@ -47,6 +50,14 @@ export function CustomerCreateEditor({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const mode: SaveMode = submitter instanceof HTMLButtonElement && submitter.value === "continue"
+      ? "continue"
+      : "close";
+    await saveCustomer(mode);
+  }
+
+  async function saveCustomer(mode: SaveMode) {
     setSaveState("loading");
     setSaveMessage("Müşteri kartı kaydediliyor...");
     const result = await onSave(customerFormToInput(form));
@@ -55,20 +66,38 @@ export function CustomerCreateEditor({
       setSaveMessage(result.message);
       return;
     }
+
+    if (mode === "continue") {
+      setForm(toCustomerForm(null));
+      setFormRevision((revision) => revision + 1);
+      setSaveState("success");
+      setSaveMessage("Müşteri kaydedildi. Yeni müşteri için form hazır.");
+      return;
+    }
+
     onCreated(result.savedId);
     onClose();
   }
 
   const body = <div className="form-stack customer-create-form">
-    <CustomerFormFields form={form} aiEnabled={aiEnabled} onChange={setForm} onAnalyzeIdentity={onAnalyzeIdentity} />
+    <CustomerFormFields
+      key={formRevision}
+      form={form}
+      aiEnabled={aiEnabled}
+      onChange={setForm}
+      onAnalyzeIdentity={onAnalyzeIdentity}
+    />
   </div>;
 
   const footer = <>
-    {saveMessage && <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>}
+    {saveMessage && <p className={"form-status sync-" + saveState} role={saveState === "error" ? "alert" : "status"}>{saveMessage}</p>}
     <div className="action-row">
       <ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={onClose}>Vazgeç</ActionButton>
-      <ActionButton type="submit" disabled={saveState === "loading"}>
-        <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}
+      <ActionButton variant="secondary" type="submit" name="saveMode" value="continue" disabled={saveState === "loading"}>
+        <Plus size={16} aria-hidden="true" />Kaydet ve Yeni Ekle
+      </ActionButton>
+      <ActionButton type="submit" name="saveMode" value="close" disabled={saveState === "loading"}>
+        <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Kaydet"}
       </ActionButton>
     </div>
   </>;
