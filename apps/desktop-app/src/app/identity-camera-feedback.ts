@@ -1,6 +1,7 @@
 export type IdentityCameraFeedbackTone = "prompt" | "ready" | "success" | "error";
 
 const FEEDBACK_GAIN = 0.14;
+const SUCCESS_FEEDBACK_GAIN = 0.22;
 
 let audioContext: AudioContext | null = null;
 
@@ -89,8 +90,9 @@ function playFeedbackTone(kind: IdentityCameraFeedbackTone) {
       const gain = context.createGain();
       oscillator.type = "triangle";
       oscillator.frequency.setValueAtTime(frequency, start + offset);
+      const peakGain = kind === "success" ? SUCCESS_FEEDBACK_GAIN : FEEDBACK_GAIN;
       gain.gain.setValueAtTime(0.0001, start + offset);
-      gain.gain.exponentialRampToValueAtTime(FEEDBACK_GAIN, start + offset + 0.015);
+      gain.gain.exponentialRampToValueAtTime(peakGain, start + offset + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + duration);
       oscillator.connect(gain);
       gain.connect(context.destination);
