@@ -19,6 +19,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     loading,
     saving,
     updateTable,
+    updatePublication,
     updateTableCategory,
     addTableCategory,
     removeTableCategory,
@@ -107,6 +108,30 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                 ))}
               </div>
             )}
+          </div>
+        </fieldset>
+      </div>
+
+      <div className="settings-panel">
+        <div className="settings-panel-header table-public-heading">
+          <div>
+            <h2>Web yayını</h2>
+            <p>Restoran ve masa detaylarının public sitede görünürlüğü</p>
+          </div>
+        </div>
+        <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving}>
+          <div className="settings-publication-control">
+            <label className="form-check setup-checkline">
+              <input
+                type="checkbox"
+                checked={draft.publication.tables}
+                onChange={(event) => updatePublication({ tables: event.target.checked })}
+              />
+              <span>
+                <strong>Restoran / masaları web sitesinde yayınla</strong>
+                <small>Kapalıysa masa kataloğu ve masa detayları web sitesinden kaldırılır.</small>
+              </span>
+            </label>
           </div>
         </fieldset>
       </div>
