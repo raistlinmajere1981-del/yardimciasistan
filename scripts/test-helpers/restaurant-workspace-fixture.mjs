@@ -60,7 +60,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
   window.yardimciDesktop = {
     listTableMediaCoverPreviews: async () => dashboard.tables.slice(0, 1).map(table => ({
       resourceId: table.id,
-      previewDataUrl: "data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="640" height="400"%3E%3Crect width="640" height="400" fill="%23888"/%3E%3C/svg%3E"
+      previewDataUrl: "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22640%22%20height=%22400%22%3E%3Crect%20width=%22640%22%20height=%22400%22%20fill=%22%23888%22/%3E%3C/svg%3E"
     })),
     getDashboardData: async () => snapshot(),
     listTableOrders: async () => { calls.push({ kind: 'list' }); return copy(orders); },
