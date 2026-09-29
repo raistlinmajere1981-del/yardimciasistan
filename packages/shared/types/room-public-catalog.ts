@@ -31,6 +31,7 @@ export interface RoomPublicCatalogRoom {
 
 export interface RoomPublicCatalog {
   version: typeof ROOM_PUBLIC_CATALOG_VERSION;
+  enabled: boolean;
   updatedAt: string;
   rooms: RoomPublicCatalogRoom[];
 }
