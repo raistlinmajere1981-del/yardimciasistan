@@ -23,7 +23,7 @@ Ortam değişkenleri:
   YARDIMCI_ASISTAN_PUBLIC_URL           Canlı web modülü adresi
 
 Normal yayında script canlı data/, config/business.json, config/*.local.*,
-knowledge/, assets/ ve kökteki .env* dosyalarını korur. --fresh kullanıldığında
+knowledge/, assets/, media/ ve kökteki .env* dosyalarını korur. --fresh kullanıldığında
 bu veriler yeni sürüme taşınmaz; eski kurulum yine sunucudaki yedek dizinine alınır.
 EOF
 }
@@ -106,6 +106,7 @@ if [[ "$fresh_install" == false ]]; then
     '--exclude=/config/*.local.json'
     '--exclude=/knowledge/***'
     '--exclude=/assets/***'
+    '--exclude=/media/***'
     '--exclude=/.env'
     '--exclude=/.env.*'
   )
@@ -196,7 +197,7 @@ printf '\nHedef: %s:%s\n' "$deploy_host" "$remote_root"
 if [[ "$fresh_install" == true ]]; then
   printf 'Mod: temiz kurulum; eski runtime/config yeni sürüme taşınmayacak.\n\n'
 else
-  printf 'Korunan: data/, firma ve yerel config, knowledge/, assets/, .env*\n\n'
+  printf 'Korunan: data/, firma ve yerel config, knowledge/, assets/, media/, .env*\n\n'
 fi
 
 show_dry_run() {
@@ -227,6 +228,10 @@ show_dry_run() {
   rsync -aznci --omit-dir-times --itemize-changes \
     -e "$rsync_ssh" \
     "$package_dir/knowledge/.htaccess" "$deploy_host:$remote_root/knowledge/.htaccess" \
+    | filter_rsync_changes
+  rsync -aznci --omit-dir-times --itemize-changes \
+    -e "$rsync_ssh" \
+    "$package_dir/media/.htaccess" "$deploy_host:$remote_root/media/.htaccess" \
     | filter_rsync_changes
 }
 
@@ -353,6 +358,11 @@ if [[ -d "$remote_backup/assets" ]]; then
   mkdir -p "$remote_stage/assets"
   rsync -a "$remote_backup/assets/" "$remote_stage/assets/"
 fi
+if [[ -d "$remote_backup/media" ]]; then
+  mkdir -p "$remote_stage/media"
+  rsync -a --exclude='/.htaccess' \
+    "$remote_backup/media/" "$remote_stage/media/"
+fi
 
 for preserved_file in "$remote_backup"/.env "$remote_backup"/.env.*; do
   [[ -f "$preserved_file" ]] || continue
@@ -382,7 +392,7 @@ if [[ -n "$verification" ]]; then
 fi
 
 printf 'Korumalı klasörlerin erişim dosyaları karşılaştırılıyor...\n'
-for protected_file in data/.htaccess knowledge/.htaccess; do
+for protected_file in data/.htaccess knowledge/.htaccess media/.htaccess; do
   protected_verification="$(
     rsync -aznci --omit-dir-times --itemize-changes \
       -e "$rsync_ssh" \
@@ -423,5 +433,5 @@ printf 'Önceki sürüm ve veri yedeği: %s\n' "$remote_backup"
 if [[ "$fresh_install" == true ]]; then
   printf 'Temiz kurulum tamamlandı; eski runtime/config yalnız yedekte tutuluyor.\n'
 else
-  printf 'Canlı runtime verileri, firma ayarları, bilgi dosyaları ve assetler korundu.\n'
+  printf 'Canlı runtime verileri, firma ayarları, bilgi dosyaları, assetler ve medya korundu.\n'
 fi
