@@ -1,13 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import type { SaveRoomPublicDetailsInput } from "@yardimci-asistan/shared";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  formatMinorCurrency,
+  parseMoneyToMinor,
+  type SaveRoomPublicDetailsInput
+} from "@yardimci-asistan/shared";
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 import { ActionButton } from "../ui/ActionButton";
-import { MoneyInput } from "../ui/MoneyInput";
 import { RoomMediaPanel } from "./RoomMediaPanel";
 
 type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
+
+function roomBedSummary(bedInfo: string) {
+  const text = bedInfo.trim();
+  if (!text) return "—";
+
+  const counts = [...text.matchAll(/\b(\d+)\s*(?=(?:çift|tek|queen|king|ranza|yatak))/gi)]
+    .map((match) => Number(match[1]))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const total = counts.reduce((sum, value) => sum + value, 0);
+  if (total > 0) return `${total} yatak`;
+
+  const bedWordCount = (text.match(/\byatak\b/gi) ?? []).length;
+  return bedWordCount > 0 ? `${bedWordCount} yatak` : "—";
+}
+
+function roomPriceSummary(price: string, currency: string) {
+  const minor = parseMoneyToMinor(price);
+  return minor === null ? "—" : formatMinorCurrency(minor, currency || "TRY");
+}
 
 export function RoomManagementSection({ controller }: { controller: BusinessLayoutController }) {
   const [editingKey, setEditingKey] = useState("");
@@ -45,33 +67,32 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
             <h2>Oda Yönetimi</h2>
             <p>Pansiyon</p>
           </div>
-          <ActionButton
-            variant="secondary"
-            size="sm"
-            type="button"
-            disabled={loading || saving}
-            onClick={addRoom}
-          >
-            <Plus size={15} aria-hidden="true" />
-            Oda Ekle
-          </ActionButton>
+          <div className="room-management-heading-actions">
+            <label className="room-management-publication-toggle">
+              <input
+                type="checkbox"
+                aria-label="Oda web yayını"
+                checked={draft.publication.rooms}
+                disabled={loading || saving}
+                onChange={(event) => updatePublication({ rooms: event.target.checked })}
+              />
+              <span>Webde yayınla</span>
+            </label>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              type="button"
+              disabled={loading || saving}
+              onClick={addRoom}
+            >
+              <Plus size={15} aria-hidden="true" />
+              Oda Ekle
+            </ActionButton>
+          </div>
         </div>
 
         <fieldset disabled={saving || loading} className="settings-resource-fields settings-panel-body room-management-panel-body">
-          <div className="settings-publication-control">
-            <label className="form-check setup-checkline">
-              <input
-                type="checkbox"
-                checked={draft.publication.rooms}
-                onChange={(event) => updatePublication({ rooms: event.target.checked })}
-              />
-              <span>
-                <strong>Odaları web sitesinde yayınla</strong>
-                <small>Kapalıysa oda kataloğu ve oda detayları web sitesinden kaldırılır.</small>
-              </span>
-            </label>
-          </div>
-          <div className="room-management-list" aria-label="Oda adı ve fiyatları">
+          <div className="room-management-list" aria-label="Oda özetleri">
             {loading ? (
               <div className="room-management-loading">Odalar hazırlanıyor…</div>
             ) : rooms.length === 0 ? (
@@ -81,8 +102,9 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
                 <div className="room-management-list-head">
                   <span aria-hidden="true" />
                   <span>Oda</span>
-                  <span>Oda adı</span>
-                  <span>Gecelik fiyat</span>
+                  <span>Yatak</span>
+                  <span>Fiyat</span>
+                  <span>Kat</span>
                   <span aria-hidden="true" />
                 </div>
                 {rooms.map((room) => {
@@ -105,52 +127,38 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
                       />
                       <div className="room-management-identity">
                         <strong>{identity}</strong>
-                        <button
-                          className="room-management-details-button"
+                        <span>{room.name}</span>
+                      </div>
+                      <span className="room-management-summary">{roomBedSummary(room.bedInfo)}</span>
+                      <span className="room-management-summary">{roomPriceSummary(room.price, room.currency)}</span>
+                      <span className="room-management-summary">{room.floor || "—"}</span>
+                      <div className="room-management-row-actions" onClick={(event) => event.stopPropagation()}>
+                        <ActionButton
+                          variant="secondary"
+                          size="sm"
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          className="room-management-details-button"
+                          onClick={() => {
                             setMediaRoomKey(room.key);
                             setEditingKey(room.key);
                           }}
                         >
+                          <Pencil size={14} aria-hidden="true" />
                           Detaylar
-                        </button>
+                        </ActionButton>
+                        <ActionButton
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          className="room-management-remove"
+                          disabled={!room.canRemove}
+                          onClick={() => removeRoom(room.key)}
+                          aria-label={`${identity} satırını kaldır`}
+                          title={room.canRemove ? "Odayı kaldır" : room.removeBlockReason}
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                        </ActionButton>
                       </div>
-                      <input
-                        className="room-management-name"
-                        value={room.name}
-                        maxLength={120}
-                        placeholder="Örn. Bahçe Katı Standart Oda"
-                        aria-label={`${identity} adı`}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => updateRoom(room.key, { name: event.target.value })}
-                      />
-                      <div className="room-management-price-wrap" onClick={(event) => event.stopPropagation()}>
-                        <MoneyInput
-                          className="room-management-price"
-                          value={room.price}
-                          placeholder="Örn. 1.250,00"
-                          aria-label={`${identity} gecelik fiyatı`}
-                          onChange={(price) => updateRoom(room.key, { price })}
-                        />
-                        <span>₺ / gece</span>
-                      </div>
-                      <ActionButton
-                        variant="ghost"
-                        size="sm"
-                        type="button"
-                        className="room-management-remove"
-                        disabled={!room.canRemove}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          removeRoom(room.key);
-                        }}
-                        aria-label={`${identity} satırını kaldır`}
-                        title={room.canRemove ? "Odayı kaldır" : room.removeBlockReason}
-                      >
-                        <Trash2 size={15} aria-hidden="true" />
-                      </ActionButton>
                     </div>
                   );
                 })}
@@ -167,15 +175,8 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
           name: mediaRoom.name,
           number: mediaRoom.number
         } : null}
-        rooms={rooms.map((room) => ({
-          id: room.id,
-          key: room.key,
-          name: room.name,
-          number: room.number
-        }))}
         disabled={loading || saving}
         revision={mediaRevision}
-        onRoomChange={setMediaRoomKey}
         onDirtyChange={reportMediaDirty}
       />
 
@@ -190,7 +191,8 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
           floor: editingRoom.floor,
           features: editingRoom.features,
           description: editingRoom.description,
-          priceNote: editingRoom.priceNote
+          priceNote: editingRoom.priceNote,
+          price: editingRoom.price
         } : null}
         onClose={() => setEditingKey("")}
         onSave={async (input: SaveRoomPublicDetailsInput) => {
@@ -204,7 +206,8 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
             floor: input.floor,
             features: input.features,
             description: input.description,
-            priceNote: input.priceNote
+            priceNote: input.priceNote,
+            price: input.price
           });
           return { ok: true, message: "Oda detayları taslağa uygulandı." };
         }}
