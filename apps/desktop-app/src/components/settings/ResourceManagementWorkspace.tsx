@@ -9,7 +9,6 @@ interface ResourceManagementWorkspaceProps {
   publishAriaLabel: string;
   disabled?: boolean;
   onPublishChange: (checked: boolean) => void;
-  toolbar?: ReactNode;
   children: ReactNode;
   media: ReactNode;
 }
@@ -23,7 +22,6 @@ export function ResourceManagementWorkspace({
   publishAriaLabel,
   disabled = false,
   onPublishChange,
-  toolbar,
   children,
   media
 }: ResourceManagementWorkspaceProps) {
@@ -53,11 +51,6 @@ export function ResourceManagementWorkspace({
           </div>
 
           <div className="resource-management-main-body">
-            {toolbar && (
-              <div className="resource-management-toolbar">
-                {toolbar}
-              </div>
-            )}
             <div className="resource-management-content">
               {children}
             </div>
