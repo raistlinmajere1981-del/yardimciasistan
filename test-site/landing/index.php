@@ -202,6 +202,7 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
           document.addEventListener("DOMContentLoaded", function () {
             patchSyncKeyDisplay();
             patchX86Download();
+            patchDemoNavigation();
           });
         } else {
           patchSyncKeyDisplay();
