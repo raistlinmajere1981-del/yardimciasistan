@@ -51,7 +51,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     <>
       <ResourceManagementWorkspace
         id="settings-operations"
-        className="table-layout-settings"
+        className="table-resource-workspace"
         title="Masa Yönetimi"
         subtitle="Restoran"
         publishChecked={draft.publication.tables}
