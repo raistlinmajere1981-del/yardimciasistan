@@ -23,6 +23,7 @@ const {
   pushAiSettings,
   pushBusinessContext,
   pushRoomCatalog,
+  pushTableCatalog,
   pushAndroidSnapshot,
   pushMenu,
   pullRequests,
@@ -1027,6 +1028,7 @@ test("pushRoomCatalog publishes only customer-facing room data", async () => {
     clientId: "desktop-1",
     catalog: {
       version: 1,
+      enabled: true,
       updatedAt: "2026-09-26T12:00:00Z",
       rooms: [{
         id: "room_101",
@@ -1056,6 +1058,75 @@ test("pushRoomCatalog publishes only customer-facing room data", async () => {
   });
   assert.equal(result.ok, true);
   assert.equal(calls[0].action, "publish_room_catalog");
+  assert.equal(calls[0].room_catalog.enabled, true);
   assert.equal(calls[0].room_catalog.rooms[0].name, "Oda 101");
   assert.equal("status" in calls[0].room_catalog.rooms[0], false);
 });
+
+test("pushTableCatalog publishes only customer-facing table data", async () => {
+  const calls = [];
+  const result = await pushTableCatalog({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "sync-secret",
+    clientId: "desktop-1",
+    catalog: {
+      version: 1,
+      enabled: true,
+      updatedAt: "2026-09-29T18:00:00Z",
+      tables: [{
+        id: "table_1",
+        name: "Teras 1",
+        area: "Teras",
+        capacity: 4,
+        description: "Deniz tarafındaki masa.",
+        features: ["outdoor", "sea_view"],
+        smokingPolicy: "outdoor_only",
+        sortOrder: 1,
+        media: [{
+          id: "table_media_1",
+          kind: "cover",
+          url: "/yardimci-asistan/media/tables/table_1/table_media_1.webp",
+          mimeType: "image/webp",
+          title: "Teras masası",
+          sortOrder: 1
+        }]
+      }]
+    },
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({
+        ok: true,
+        message: "Masa kataloğu yayınlandı.",
+        published_at: "2026-09-29T18:00:01Z",
+        table_count: 1
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].action, "publish_table_catalog");
+  assert.equal(calls[0].table_catalog.enabled, true);
+  assert.deepEqual(calls[0].table_catalog.tables[0], {
+    id: "table_1",
+    name: "Teras 1",
+    area: "Teras",
+    capacity: 4,
+    description: "Deniz tarafındaki masa.",
+    features: ["outdoor", "sea_view"],
+    smoking_policy: "outdoor_only",
+    sort_order: 1,
+    media: [{
+      id: "table_media_1",
+      kind: "cover",
+      url: "/yardimci-asistan/media/tables/table_1/table_media_1.webp",
+      mime_type: "image/webp",
+      title: "Teras masası",
+      sort_order: 1
+    }]
+  });
+  assert.equal("status" in calls[0].table_catalog.tables[0], false);
+  assert.equal("current_customer_id" in calls[0].table_catalog.tables[0], false);
+  assert.equal("current_reservation_id" in calls[0].table_catalog.tables[0], false);
+  assert.equal("notes" in calls[0].table_catalog.tables[0], false);
+});
+
