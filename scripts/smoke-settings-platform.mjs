@@ -242,39 +242,59 @@ try {
 
   // Operations is one collection draft: room + room details + table categories, one footer save.
   await select('İşletme Düzeni');
-  await expect(page.getByLabel('Oda 101 adı', { exact: true })).toHaveValue('Oda 101');
-  await page.getByLabel('Oda 101 adı', { exact: true }).fill('Deniz Oda');
-  await page.getByLabel('Oda 101 gecelik fiyatı').fill('1750');
-  await page.getByLabel('Oda adı ve fiyatları')
-    .getByRole('button', { name: 'Detaylar', exact: true })
-    .click();
+  const roomRows = page.locator('.room-management-row');
+  await expect(roomRows).toHaveCount(1);
+  await roomRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
   const roomDialog = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle' });
   await expect(roomDialog).toBeVisible();
   await expect(roomDialog).toHaveClass(/form-dialog/);
   await expect(roomDialog.locator('.panel')).toHaveCount(2);
+  await roomDialog.getByLabel('Oda adı').fill('Deniz Oda');
   await roomDialog.getByLabel('Oda numarası').fill('A1');
   await roomDialog.getByLabel('Kapasite').fill('3');
+  await roomDialog.getByLabel('Kat / konum').fill('2. kat');
+  await roomDialog.getByLabel('Yatak bilgisi').fill('1 çift kişilik + 1 tek kişilik yatak');
+  await roomDialog.getByLabel('Gecelik fiyat').fill('1750');
   await roomDialog.getByLabel('Açıklama').fill('Kaydedilmemiş oda taslağı korunmalı.');
   await page.evaluate(() => window.refreshSettings({}));
+  await expect(roomDialog.getByLabel('Oda adı')).toHaveValue('Deniz Oda');
   await expect(roomDialog.getByLabel('Oda numarası')).toHaveValue('A1');
   await expect(roomDialog.getByLabel('Kapasite')).toHaveValue('3');
+  await expect(roomDialog.getByLabel('Kat / konum')).toHaveValue('2. kat');
+  await expect(roomDialog.getByLabel('Yatak bilgisi')).toHaveValue('1 çift kişilik + 1 tek kişilik yatak');
+  await expect(roomDialog.getByLabel('Gecelik fiyat')).toHaveValue('1750');
   await expect(roomDialog.getByLabel('Açıklama')).toHaveValue('Kaydedilmemiş oda taslağı korunmalı.');
   await roomDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect(roomDialog).toHaveCount(0);
+  await expect(roomRows.first()).toContainText('Deniz Oda');
+  await expect(roomRows.first()).toContainText('2 yatak');
+  await expect(roomRows.first()).toContainText('1.750,00');
+  await expect(roomRows.first()).toContainText('2. kat');
 
   const beforeLayoutSave = (await layoutCalls()).length;
   await page.getByRole('button', { name: 'Oda Ekle', exact: true }).click();
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
   expect((await layoutCalls()).length).toBe(beforeLayoutSave);
-
-  const newRoom = page.getByLabel('Yeni Oda adı', { exact: true });
-  await expect(newRoom).toBeVisible();
-  await newRoom.fill('Bahçe Oda');
+  await expect(roomRows).toHaveCount(2);
+  await roomRows.last().getByRole('button', { name: 'Detaylar', exact: true }).click();
+  await expect(roomDialog).toBeVisible();
+  await roomDialog.getByLabel('Oda adı').fill('Bahçe Oda');
+  await roomDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(roomDialog).toHaveCount(0);
   await save();
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 1);
   const savedLayout = (await layoutCalls()).at(-1).input;
   expect(savedLayout.rooms).toHaveLength(2);
-  expect(savedLayout.rooms[0]).toMatchObject({ id: 'room-1', name: 'Deniz Oda', number: 'A1', capacity: 3, nightlyPriceMinor: 175000, outOfService: false });
+  expect(savedLayout.rooms[0]).toMatchObject({
+    id: 'room-1',
+    name: 'Deniz Oda',
+    number: 'A1',
+    capacity: 3,
+    bedInfo: '1 çift kişilik + 1 tek kişilik yatak',
+    floor: '2. kat',
+    nightlyPriceMinor: 175000,
+    outOfService: false
+  });
   expect(savedLayout.rooms[1]).toMatchObject({ name: 'Bahçe Oda', nightlyPriceMinor: 0, outOfService: false });
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
@@ -282,12 +302,13 @@ try {
   const outOfServiceBox = page.getByLabel('Oda A1 hizmet dışı', { exact: true });
   await expect(outOfServiceBox).toBeVisible();
   await expect(outOfServiceBox).not.toBeChecked();
-  const mediaSelectBefore = await page.locator('.room-media-room-picker select').inputValue().catch(() => '');
+  const roomMediaPanel = page.getByLabel('Oda medyaları');
+  await expect(roomMediaPanel.getByRole('combobox')).toHaveCount(0);
+  await roomRows.first().click();
+  await expect(roomMediaPanel.getByText('Oda A1 · Deniz Oda', { exact: true })).toBeVisible();
   await outOfServiceBox.check();
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
   expect((await layoutCalls()).length).toBe(beforeLayoutSave + 1);
-  const mediaSelectAfter = await page.locator('.room-media-room-picker select').inputValue().catch(() => '');
-  expect(mediaSelectAfter).toBe(mediaSelectBefore);
   await save();
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 2);
   const outOfServiceSaved = (await layoutCalls()).at(-1).input;
@@ -312,7 +333,6 @@ try {
 
   // Room media is staged with the operations category: add dirties without a
   // layout write, save commits the staging, discard restores canonical media.
-  const roomMediaPanel = page.getByLabel('Oda medyaları');
   const tableMediaPanel = page.getByLabel('Masa medyaları');
   const mediaCommitCalls = () => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'room-media-commit'));
   await roomMediaPanel.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
@@ -338,7 +358,7 @@ try {
   // the category dirty; a second successful discard clears both atomically
   // from the user's point of view.
   await roomMediaPanel.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
-  await page.getByLabel('Oda A1 adı', { exact: true }).fill('Korunacak Taslak');
+  await outOfServiceBox.check();
   await page.evaluate(() => {
     window.__settingsOriginalMediaDiscard = window.yardimciDesktop.discardRoomMediaDraft;
     window.yardimciDesktop.discardRoomMediaDraft = async () => ({
@@ -350,7 +370,7 @@ try {
   });
   await discard();
   await expect(page.getByText('Medya geri alma testi başarısız.', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Korunacak Taslak');
+  await expect(outOfServiceBox).toBeChecked();
   await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(2);
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
   await page.evaluate(() => {
@@ -358,7 +378,7 @@ try {
     delete window.__settingsOriginalMediaDiscard;
   });
   await discard();
-  await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Deniz Oda');
+  await expect(outOfServiceBox).not.toBeChecked();
   await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(1);
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
@@ -371,7 +391,7 @@ try {
   await firstRoomRemove.click();
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
   await discard();
-  await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Deniz Oda');
+  await expect(page.getByLabel('Oda özetleri').getByText('Deniz Oda', { exact: true })).toBeVisible();
 
   // Public table details are staged inside Business Layout and persist only
   // through the category footer, never directly from the editor dialog.
@@ -431,7 +451,7 @@ try {
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
   // Room/table web publication toggles are staged with Business Layout.
-  const roomPublication = page.getByRole('checkbox', { name: /^Odaları web sitesinde yayınla/ });
+  const roomPublication = page.getByRole('checkbox', { name: 'Oda web yayını', exact: true });
   const tablePublication = page.getByRole('checkbox', { name: /^Restoran \/ masaları web sitesinde yayınla/ });
   await expect(roomPublication).toBeChecked();
   await expect(tablePublication).not.toBeChecked();
