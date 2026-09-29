@@ -377,8 +377,14 @@ try {
   // through the category footer, never directly from the editor dialog.
   const tableRows = page.locator('.table-public-resource-row');
   await expect(tableRows).toHaveCount(2);
+  const tableMediaPicker = page.getByLabel('Masa medyaları').getByLabel('Masa');
+  await tableRows.nth(1).getByRole('button', { name: 'Detaylar', exact: true }).click();
+  await expect(tableMediaPicker).toHaveValue('table-2');
+  await page.getByRole('dialog', { name: 'Masa bilgilerini düzenle' }).getByRole('button', { name: 'Vazgeç', exact: true }).click();
+
   const beforeTableProfileSave = (await layoutCalls()).length;
   await tableRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
+  await expect(tableMediaPicker).toHaveValue('table-1');
   const tableDialog = page.getByRole('dialog', { name: 'Masa bilgilerini düzenle' });
   await expect(tableDialog).toBeVisible();
   await tableDialog.getByLabel('Kapasite').fill('6');
