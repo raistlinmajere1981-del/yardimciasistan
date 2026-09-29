@@ -2,11 +2,16 @@ import { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
   ROOM_PUBLIC_DETAIL_LIMITS,
+  TABLE_PUBLIC_DETAIL_LIMITS,
   createId,
   normalizeRoomPublicFeatures,
   normalizeTableCategoryInputs,
+  normalizeTablePublicFeatures,
+  normalizeTableSmokingPolicy,
   type BusinessCapability,
-  type RoomPublicFeatureId
+  type RoomPublicFeatureId,
+  type TablePublicFeatureId,
+  type TableSmokingPolicy
 } from "@yardimci-asistan/shared";
 import {
   normalizeTableCategoryName,
@@ -39,8 +44,20 @@ interface BusinessLayoutTableCategory {
   tableCount: number;
 }
 
+export interface BusinessLayoutTable {
+  id: string;
+  name: string;
+  area: string;
+  capacity: number;
+  description: string;
+  features: TablePublicFeatureId[];
+  smokingPolicy: TableSmokingPolicy;
+  sortOrder: number;
+}
+
 export interface BusinessLayoutSnapshot {
   rooms: BusinessLayoutRoom[];
+  tables: BusinessLayoutTable[];
   tableCategories: BusinessLayoutTableCategory[];
   capabilities: {
     rooms: boolean;
@@ -70,8 +87,17 @@ interface BusinessLayoutTableCategoryInput {
   tableCount: number;
 }
 
+interface BusinessLayoutTableInput {
+  id: string;
+  capacity: number;
+  description: string;
+  features: readonly string[];
+  smokingPolicy: string;
+}
+
 export interface SaveBusinessLayoutInput {
   rooms?: BusinessLayoutRoomInput[];
+  tables?: BusinessLayoutTableInput[];
   tableCategories?: BusinessLayoutTableCategoryInput[];
 }
 
@@ -94,6 +120,14 @@ interface NormalizedRoomInput {
   outOfService: boolean;
 }
 
+interface NormalizedTableInput {
+  id: string;
+  capacity: number;
+  description: string;
+  features: TablePublicFeatureId[];
+  smokingPolicy: TableSmokingPolicy;
+}
+
 export function getBusinessLayout(databasePath: string): BusinessLayoutSnapshot {
   const db = openDatabase(databasePath);
   try {
@@ -113,6 +147,9 @@ export function saveBusinessLayout(
   const tableResolution = normalizeTableCategoryInputs(input?.tableCategories);
   if (!tableResolution.ok) return tableResolution;
 
+  const tableProfileResolution = normalizeTableInputs(input?.tables);
+  if (!tableProfileResolution.ok) return tableProfileResolution;
+
   const db = openDatabase(databasePath);
   let transactionStarted = false;
   try {
@@ -127,7 +164,7 @@ export function saveBusinessLayout(
       transactionStarted = false;
       return { ok: false, message: "Oda yönetimi bu işletme profilinde etkin değil." };
     }
-    if (tableResolution.categories !== undefined && !tablesEnabled) {
+    if ((tableResolution.categories !== undefined || tableProfileResolution.tables !== undefined) && !tablesEnabled) {
       db.exec("ROLLBACK");
       transactionStarted = false;
       return { ok: false, message: "Masa yönetimi bu işletme profilinde etkin değil." };
@@ -161,6 +198,15 @@ export function saveBusinessLayout(
     }
     if (tableResolution.categories !== undefined) {
       reconcileTableCategories(db, tableResolution.categories, now, getProtectedTableIds(db));
+    }
+    if (tableProfileResolution.tables !== undefined) {
+      const tableCheck = validateTableTargets(db, tableProfileResolution.tables);
+      if (!tableCheck.ok) {
+        db.exec("ROLLBACK");
+        transactionStarted = false;
+        return tableCheck;
+      }
+      updateTablePublicDetails(db, tableProfileResolution.tables, now);
     }
 
     db.exec("COMMIT");
@@ -201,6 +247,7 @@ function getBusinessLayoutFromDb(db: DatabaseSync): BusinessLayoutSnapshot {
   const tablesEnabled = hasCapability(db, BUSINESS_CAPABILITIES.FOOD_TABLES);
   return {
     rooms: roomsEnabled ? listRooms(db) : [],
+    tables: tablesEnabled ? listTables(db) : [],
     tableCategories: tablesEnabled
       ? getTableCategories(db).map((category) => ({ name: category.name, tableCount: category.tableCount }))
       : [],
@@ -250,6 +297,102 @@ function listRooms(db: DatabaseSync): BusinessLayoutRoom[] {
       removeBlockReason
     };
   });
+}
+
+function listTables(db: DatabaseSync): BusinessLayoutTable[] {
+  const rows = db.prepare(
+    "SELECT id, name, area, capacity, public_description, public_features_json, smoking_policy, sort_order " +
+    "FROM tables WHERE deleted_at = '' AND is_active = 1 " +
+    "ORDER BY sort_order ASC, name ASC"
+  ).all() as Array<Record<string, unknown>>;
+
+  return rows.map((row) => ({
+    id: text(row.id),
+    name: text(row.name),
+    area: text(row.area),
+    capacity: Math.max(1, Math.trunc(Number(row.capacity ?? 1) || 1)),
+    description: text(row.public_description),
+    features: normalizeTablePublicFeatures(parseStringArray(row.public_features_json)),
+    smokingPolicy: normalizeTableSmokingPolicy(row.smoking_policy),
+    sortOrder: Math.max(0, Math.trunc(Number(row.sort_order ?? 0) || 0))
+  })).filter((table) => table.id && table.name);
+}
+
+function normalizeTableInputs(
+  input: BusinessLayoutTableInput[] | undefined
+): { ok: true; tables: NormalizedTableInput[] | undefined } | { ok: false; message: string } {
+  if (input === undefined) return { ok: true, tables: undefined };
+  if (!Array.isArray(input)) return { ok: false, message: "Masa detayları geçerli bir liste olmalı." };
+  if (input.length > 500) return { ok: false, message: "En fazla 500 masa detayı düzenlenebilir." };
+
+  const ids = new Set<string>();
+  const tables: NormalizedTableInput[] = [];
+
+  for (const candidate of input) {
+    const id = cleanSingleLine(candidate?.id, 180);
+    const capacity = Number(candidate?.capacity);
+    const description = normalizeMultiline(candidate?.description);
+    if (!id) return { ok: false, message: "Masa kimliği geçersiz." };
+    if (ids.has(id)) return { ok: false, message: "Aynı masa birden fazla kez düzenlenemez." };
+    ids.add(id);
+    if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 100) {
+      return { ok: false, message: "Masa kapasitesi 1 ile 100 arasında olmalı." };
+    }
+    if (description.length > TABLE_PUBLIC_DETAIL_LIMITS.description) {
+      return { ok: false, message: "Masa açıklaması izin verilen uzunluğu aşıyor." };
+    }
+
+    tables.push({
+      id,
+      capacity,
+      description,
+      features: normalizeTablePublicFeatures(candidate?.features ?? []),
+      smokingPolicy: normalizeTableSmokingPolicy(candidate?.smokingPolicy)
+    });
+  }
+
+  return { ok: true, tables };
+}
+
+function validateTableTargets(
+  db: DatabaseSync,
+  tables: NormalizedTableInput[]
+): { ok: true } | { ok: false; message: string } {
+  const activeIds = new Set(
+    (db.prepare("SELECT id FROM tables WHERE deleted_at = '' AND is_active = 1").all() as Array<{ id?: string }>)
+      .map((row) => text(row.id))
+      .filter(Boolean)
+  );
+  for (const table of tables) {
+    if (!activeIds.has(table.id)) {
+      return { ok: false, message: "Düzenlenecek masalardan biri artık mevcut değil." };
+    }
+  }
+  return { ok: true };
+}
+
+function updateTablePublicDetails(
+  db: DatabaseSync,
+  tables: NormalizedTableInput[],
+  now: string
+) {
+  const statement = db.prepare(
+    "UPDATE tables SET capacity = ?, public_description = ?, public_features_json = ?, smoking_policy = ?, " +
+    "updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = '' AND is_active = 1"
+  );
+  for (const table of tables) {
+    const result = statement.run(
+      table.capacity,
+      table.description,
+      JSON.stringify(table.features),
+      table.smokingPolicy,
+      now,
+      table.id
+    );
+    if (Number(result.changes) !== 1) {
+      throw new Error("Masa detayları kaydedilemedi.");
+    }
+  }
 }
 
 function normalizeRoomInputs(
