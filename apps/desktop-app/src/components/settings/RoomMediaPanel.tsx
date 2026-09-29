@@ -17,6 +17,7 @@ interface RoomMediaPanelRoom {
 
 interface RoomMediaPanelProps {
   room: RoomMediaPanelRoom | null;
+  embedded?: boolean;
   disabled?: boolean;
   revision: number;
   onDirtyChange: (dirty: boolean) => void;
@@ -33,6 +34,7 @@ function toResource(room: RoomMediaPanelRoom): PublicResourceMediaPanelResource 
 
 export function RoomMediaPanel({
   room,
+  embedded = false,
   disabled = false,
   revision,
   onDirtyChange
@@ -46,6 +48,7 @@ export function RoomMediaPanel({
       emptyHint="Seçili odaya ilk fotoğrafı veya panoramayı ekleyin."
       resource={room ? toResource(room) : null}
       showResourcePicker={false}
+      embedded={embedded}
       disabled={disabled}
       revision={revision}
       onDirtyChange={onDirtyChange}
