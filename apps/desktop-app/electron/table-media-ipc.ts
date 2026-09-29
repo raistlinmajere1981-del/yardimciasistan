@@ -3,6 +3,7 @@ import {
   BUSINESS_CAPABILITIES,
   type AddTableMediaInput,
   type BusinessCapability,
+  type PublicResourceCoverPreview,
   type DeleteTableMediaInput,
   type TableMediaAsset,
   type TableMediaDraftResult,
@@ -17,6 +18,7 @@ import {
   discardTableMediaDraft,
   getTableMediaDraftState,
   listTableMedia,
+  listTableMediaCoverPreviews,
   updateTableMedia
 } from "./table-media-service";
 
@@ -30,6 +32,12 @@ export function registerTableMediaIpcHandlers(options: {
     options.assertUnlocked();
     options.assertCapability(BUSINESS_CAPABILITIES.FOOD_TABLES, "Masa medyası bu işletmede etkin değil.");
     return listTableMedia(options.userDataPath(), tableId);
+  });
+
+  ipcMain.handle("tableMedia:coverPreviews", (): PublicResourceCoverPreview[] => {
+    options.assertUnlocked();
+    options.assertCapability(BUSINESS_CAPABILITIES.FOOD_TABLES, "Masa medyası bu işletmede etkin değil.");
+    return listTableMediaCoverPreviews(options.userDataPath());
   });
 
   ipcMain.handle("tableMedia:draftState", (): TableMediaDraftState => {
