@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ROOM_PUBLIC_DETAIL_LIMITS,
+  TABLE_PUBLIC_DETAIL_LIMITS,
   formatMinorToInput as minorToInput,
   normalizeRoomPublicFeatures,
   normalizeTableCategoryInputs,
+  normalizeTablePublicFeatures,
+  normalizeTableSmokingPolicy,
   parseMoneyToMinor,
-  type RoomPublicFeatureId
+  type RoomPublicFeatureId,
+  type TablePublicFeatureId,
+  type TableSmokingPolicy
 } from "@yardimci-asistan/shared";
 import type {
   BusinessLayoutRoom,
   BusinessLayoutSnapshot,
+  BusinessLayoutTable,
   SaveBusinessLayoutInput
 } from "../../electron/business-layout";
 import type { SettingsOperationResult } from "./settings-save";
@@ -32,6 +38,18 @@ export interface BusinessLayoutRoomDraft {
   removeBlockReason: string;
 }
 
+export interface BusinessLayoutTableDraft {
+  key: string;
+  id: string;
+  name: string;
+  area: string;
+  capacity: number;
+  description: string;
+  features: TablePublicFeatureId[];
+  smokingPolicy: TableSmokingPolicy;
+  sortOrder: number;
+}
+
 interface BusinessLayoutTableCategoryDraft {
   key: string;
   sourceName: string;
@@ -41,6 +59,7 @@ interface BusinessLayoutTableCategoryDraft {
 
 export interface BusinessLayoutDraft {
   rooms: BusinessLayoutRoomDraft[];
+  tables: BusinessLayoutTableDraft[];
   tableCategories: BusinessLayoutTableCategoryDraft[];
   capabilities: BusinessLayoutSnapshot["capabilities"];
 }
@@ -177,6 +196,13 @@ export function useBusinessLayoutSettings(options: {
     }));
   }, [setDraft]);
 
+  const updateTable = useCallback((key: string, patch: Partial<BusinessLayoutTableDraft>) => {
+    setDraft((current) => ({
+      ...current,
+      tables: current.tables.map((table) => table.key === key ? { ...table, ...patch } : table)
+    }));
+  }, [setDraft]);
+
   const updateTableCategory = useCallback((key: string, field: "name" | "tableCount", value: string) => {
     setDraft((current) => ({
       ...current,
@@ -218,6 +244,15 @@ export function useBusinessLayoutSettings(options: {
     }
 
     if (draftRef.current.capabilities.tables) {
+      for (const table of draftRef.current.tables) {
+        if (!Number.isInteger(table.capacity) || table.capacity < 1 || table.capacity > 100) {
+          return "Masa kapasitesi 1 ile 100 arasında olmalı.";
+        }
+        if (table.description.trim().length > TABLE_PUBLIC_DETAIL_LIMITS.description) {
+          return "Masa açıklaması çok uzun.";
+        }
+      }
+
       const result = normalizeTableCategoryInputs(
         draftRef.current.tableCategories.map((category) => ({
           sourceName: category.sourceName,
@@ -241,6 +276,7 @@ export function useBusinessLayoutSettings(options: {
     }
 
     const layoutChanged = comparableDraft(draftRef.current) !== comparableDraft(baselineRef.current);
+    const tableDetailsChanged = comparableTableDetails(draftRef.current.tables) !== comparableTableDetails(baselineRef.current.tables);
     const mediaChanged = mediaDirty;
     if (!layoutChanged && !mediaChanged) return { ok: true, changed: false };
 
@@ -283,6 +319,15 @@ export function useBusinessLayoutSettings(options: {
                 nightlyPriceMinor: parseMoneyToMinor(room.price) ?? 0,
                 currency: room.currency,
                 outOfService: room.outOfService
+              }))
+            : undefined,
+          tables: current.capabilities.tables && tableDetailsChanged
+            ? current.tables.map((table) => ({
+                id: table.id,
+                capacity: table.capacity,
+                description: table.description,
+                features: table.features,
+                smokingPolicy: table.smokingPolicy
               }))
             : undefined,
           tableCategories: current.capabilities.tables
@@ -395,6 +440,7 @@ export function useBusinessLayoutSettings(options: {
     updateRoom,
     addRoom,
     removeRoom,
+    updateTable,
     updateTableCategory,
     addTableCategory,
     removeTableCategory,
@@ -409,6 +455,7 @@ export function useBusinessLayoutSettings(options: {
 function snapshotToDraft(snapshot: BusinessLayoutSnapshot): BusinessLayoutDraft {
   return {
     rooms: snapshot.rooms.map(toRoomDraft),
+    tables: snapshot.tables.map(toTableDraft),
     tableCategories: snapshot.tableCategories.map((category) => ({
       key: nextLocalKey("table-category"),
       sourceName: category.name,
@@ -439,9 +486,24 @@ function toRoomDraft(room: BusinessLayoutRoom): BusinessLayoutRoomDraft {
   };
 }
 
+function toTableDraft(table: BusinessLayoutTable): BusinessLayoutTableDraft {
+  return {
+    key: table.id,
+    id: table.id,
+    name: table.name,
+    area: table.area,
+    capacity: table.capacity,
+    description: table.description,
+    features: normalizeTablePublicFeatures(table.features),
+    smokingPolicy: normalizeTableSmokingPolicy(table.smokingPolicy),
+    sortOrder: table.sortOrder
+  };
+}
+
 function emptyDraft(): BusinessLayoutDraft {
   return {
     rooms: [],
+    tables: [],
     tableCategories: [],
     capabilities: { rooms: false, tables: false }
   };
@@ -450,6 +512,17 @@ function emptyDraft(): BusinessLayoutDraft {
 function cloneDraft(value: BusinessLayoutDraft): BusinessLayoutDraft {
   return {
     rooms: value.rooms.map((room) => ({ ...room, features: [...room.features] })),
+    tables: value.tables.map((table) => ({ ...table, features: [...table.features] })),
+    tables: value.tables.map((table) => ({
+      id: table.id,
+      name: table.name.trim(),
+      area: table.area.trim(),
+      capacity: table.capacity,
+      description: table.description.trim(),
+      features: normalizeTablePublicFeatures(table.features),
+      smokingPolicy: normalizeTableSmokingPolicy(table.smokingPolicy),
+      sortOrder: table.sortOrder
+    })),
     tableCategories: value.tableCategories.map((category) => ({ ...category })),
     capabilities: { ...value.capabilities }
   };
@@ -478,4 +551,15 @@ function comparableDraft(value: BusinessLayoutDraft): string {
     })),
     capabilities: value.capabilities
   });
+}
+
+
+function comparableTableDetails(tables: BusinessLayoutTableDraft[]): string {
+  return JSON.stringify(tables.map((table) => ({
+    id: table.id,
+    capacity: table.capacity,
+    description: table.description.trim(),
+    features: normalizeTablePublicFeatures(table.features),
+    smokingPolicy: normalizeTableSmokingPolicy(table.smokingPolicy)
+  })));
 }
