@@ -1080,7 +1080,9 @@ function ya_sync_publish_room_catalog(array $payload): void
         'rooms' => $rooms
     ];
     $publication = ya_storage_publish('room_catalog', $catalog, $clientId, null, '', $now);
-    ya_sync_prune_room_media($rooms);
+    if (($catalog['enabled'] ?? true) === true) {
+        ya_sync_prune_room_media($rooms);
+    }
 
     ya_sync_response(200, [
         'ok' => true,
@@ -1217,7 +1219,9 @@ function ya_sync_publish_table_catalog(array $payload): void
         'tables' => $tables
     ];
     $publication = ya_storage_publish('table_catalog', $catalog, $clientId, null, '', $now);
-    ya_sync_prune_table_media($tables);
+    if (($catalog['enabled'] ?? false) === true) {
+        ya_sync_prune_table_media($tables);
+    }
 
     ya_sync_response(200, [
         'ok' => true,
