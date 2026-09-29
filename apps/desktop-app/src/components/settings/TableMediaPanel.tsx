@@ -1,4 +1,8 @@
-import type { PublicResourceMediaKind, TableMediaAsset } from "@yardimci-asistan/shared";
+import type {
+  PublicResourceMediaAssetFields,
+  PublicResourceMediaKind,
+  TableMediaAsset
+} from "@yardimci-asistan/shared";
 import {
   PublicResourceMediaPanel,
   type PublicResourceMediaPanelResource
@@ -72,13 +76,13 @@ async function addTableMedia(tableId: string) {
   return bridge.addTableMedia({ tableId });
 }
 
-async function updateTableMedia(tableId: string, item: TableMediaAsset, kind: PublicResourceMediaKind) {
+async function updateTableMedia(tableId: string, item: PublicResourceMediaAssetFields, kind: PublicResourceMediaKind) {
   const bridge = window.yardimciDesktop;
   if (!bridge) return unavailable([]);
   return bridge.updateTableMedia({ tableId, mediaId: item.id, kind, title: item.title });
 }
 
-async function deleteTableMedia(tableId: string, item: TableMediaAsset) {
+async function deleteTableMedia(tableId: string, item: PublicResourceMediaAssetFields) {
   const bridge = window.yardimciDesktop;
   if (!bridge) return unavailable([]);
   return bridge.deleteTableMedia({ tableId, mediaId: item.id });
