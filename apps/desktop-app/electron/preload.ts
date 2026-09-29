@@ -18,12 +18,19 @@ import type {
   ProductLookupResponse,
   SaveBusinessPublicProfileInput,
   AddRoomMediaInput,
+  AddTableMediaInput,
   DeleteRoomMediaInput,
+  DeleteTableMediaInput,
   RoomMediaAsset,
   RoomMediaDraftResult,
   RoomMediaDraftState,
   RoomMediaMutationResult,
-  UpdateRoomMediaInput
+  TableMediaAsset,
+  TableMediaDraftResult,
+  TableMediaDraftState,
+  TableMediaMutationResult,
+  UpdateRoomMediaInput,
+  UpdateTableMediaInput
 } from "@yardimci-asistan/shared";
 import type { PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
@@ -223,6 +230,13 @@ export interface DesktopBridge {
   addRoomMedia: (input: AddRoomMediaInput) => Promise<RoomMediaMutationResult>;
   updateRoomMedia: (input: UpdateRoomMediaInput) => Promise<RoomMediaMutationResult>;
   deleteRoomMedia: (input: DeleteRoomMediaInput) => Promise<RoomMediaMutationResult>;
+  listTableMedia: (tableId: string) => Promise<TableMediaAsset[]>;
+  getTableMediaDraftState: () => Promise<TableMediaDraftState>;
+  commitTableMediaDraft: () => Promise<TableMediaDraftResult>;
+  discardTableMediaDraft: () => Promise<TableMediaDraftResult>;
+  addTableMedia: (input: AddTableMediaInput) => Promise<TableMediaMutationResult>;
+  updateTableMedia: (input: UpdateTableMediaInput) => Promise<TableMediaMutationResult>;
+  deleteTableMedia: (input: DeleteTableMediaInput) => Promise<TableMediaMutationResult>;
   getBusinessPublicProfile: () => Promise<BusinessPublicProfile>;
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => Promise<BusinessPublicProfileSaveResult>;
   getGoogleReviewsSettings: () => Promise<GoogleReviewsSettings>;
@@ -383,6 +397,13 @@ const bridge: DesktopBridge = {
   addRoomMedia: (input: AddRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:add", input),
   updateRoomMedia: (input: UpdateRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:update", input),
   deleteRoomMedia: (input: DeleteRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:delete", input),
+  listTableMedia: (tableId: string) => invokeWhenUnlocked<TableMediaAsset[]>("tableMedia:list", tableId),
+  getTableMediaDraftState: () => invokeWhenUnlocked<TableMediaDraftState>("tableMedia:draftState"),
+  commitTableMediaDraft: () => invokeWhenUnlocked<TableMediaDraftResult>("tableMedia:commitDraft"),
+  discardTableMediaDraft: () => invokeWhenUnlocked<TableMediaDraftResult>("tableMedia:discardDraft"),
+  addTableMedia: (input: AddTableMediaInput) => invokeWhenUnlocked<TableMediaMutationResult>("tableMedia:add", input),
+  updateTableMedia: (input: UpdateTableMediaInput) => invokeWhenUnlocked<TableMediaMutationResult>("tableMedia:update", input),
+  deleteTableMedia: (input: DeleteTableMediaInput) => invokeWhenUnlocked<TableMediaMutationResult>("tableMedia:delete", input),
   getBusinessPublicProfile: () => invokeWhenUnlocked<BusinessPublicProfile>("businessPublicProfile:get"),
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => invokeWhenUnlocked<BusinessPublicProfileSaveResult>("businessPublicProfile:save", input),
   getGoogleReviewsSettings: () => invokeWhenUnlocked<GoogleReviewsSettings>("googleReviews:getSettings"),
