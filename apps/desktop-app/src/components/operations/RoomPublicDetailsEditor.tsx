@@ -9,6 +9,7 @@ import {
 } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
+import { MoneyInput } from "../ui/MoneyInput";
 
 type EditorState = "idle" | "loading" | "error";
 
@@ -22,6 +23,11 @@ interface RoomPublicDetailsEditorRoom {
   features: RoomPublicFeatureId[];
   description: string;
   priceNote: string;
+  price: string;
+}
+
+interface RoomPublicDetailsEditorSaveInput extends SaveRoomPublicDetailsInput {
+  price: string;
 }
 
 interface RoomPublicDetailsSaveResult {
@@ -33,7 +39,7 @@ interface RoomPublicDetailsEditorProps {
   open: boolean;
   room: RoomPublicDetailsEditorRoom | null;
   onClose: () => void;
-  onSave: (input: SaveRoomPublicDetailsInput) => Promise<RoomPublicDetailsSaveResult>;
+  onSave: (input: RoomPublicDetailsEditorSaveInput) => Promise<RoomPublicDetailsSaveResult>;
 }
 
 interface RoomPublicDetailsFormState {
@@ -45,6 +51,7 @@ interface RoomPublicDetailsFormState {
   features: RoomPublicFeatureId[];
   description: string;
   priceNote: string;
+  price: string;
 }
 
 function toForm(room: RoomPublicDetailsEditorRoom | null): RoomPublicDetailsFormState {
@@ -56,7 +63,8 @@ function toForm(room: RoomPublicDetailsEditorRoom | null): RoomPublicDetailsForm
     floor: room?.floor ?? "",
     features: normalizeRoomPublicFeatures(room?.features ?? []),
     description: room?.description ?? "",
-    priceNote: room?.priceNote ?? ""
+    priceNote: room?.priceNote ?? "",
+    price: room?.price ?? "0"
   };
 }
 
@@ -112,7 +120,8 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
           floor: form.floor.trim(),
           features: normalizeRoomPublicFeatures(form.features),
           description: form.description.trim(),
-          priceNote: form.priceNote.trim()
+          priceNote: form.priceNote.trim(),
+          price: form.price
         });
 
         if (!result.ok) {
@@ -193,13 +202,22 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                 placeholder="Örn. 1. kat"
               />
             </label>
-            <label className="form-field--span form-field form-field--long">
+            <label className="form-field form-field--medium">
               Yatak bilgisi
               <input
                 maxLength={ROOM_PUBLIC_DETAIL_LIMITS.bedInfo}
                 value={form.bedInfo}
                 onChange={(event) => setForm((current) => ({ ...current, bedInfo: event.target.value }))}
                 placeholder="Örn. 1 çift kişilik + 1 tek kişilik yatak"
+              />
+            </label>
+            <label className="form-field form-field--short">
+              Gecelik fiyat (₺)
+              <MoneyInput
+                value={form.price}
+                onChange={(price) => setForm((current) => ({ ...current, price }))}
+                aria-label="Gecelik fiyat"
+                placeholder="Örn. 1.250,00"
               />
             </label>
           </div>
