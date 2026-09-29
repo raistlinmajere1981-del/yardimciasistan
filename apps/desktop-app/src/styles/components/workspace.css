@@ -166,3 +166,37 @@
   from { opacity: 0; transform: translateY(var(--space-2)); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+
+.workspace-subflow-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-4);
+  background: var(--color-backdrop);
+}
+.workspace-subflow-overlay__card {
+  display: flex;
+  flex-direction: column;
+  width: min(var(--dialog-width-lg), 100%);
+  height: min(100%, 46rem);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-lg);
+}
+.workspace-subflow-overlay__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4);
+}

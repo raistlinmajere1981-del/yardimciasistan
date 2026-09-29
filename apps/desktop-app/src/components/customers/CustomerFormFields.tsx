@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Camera, Sparkles } from "lucide-react";
 import type { DesktopIdentityImageAnalyzeResult } from "../../../electron/database";
+import { mergeIdentityImageAnalyses } from "../../app/identity-analysis-merge";
 import type { CustomerFormState } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 import { DatePicker } from "../ui/DateTimePicker";
+import { IdentityCameraCapture } from "./IdentityCameraCapture";
 
 type AnalysisState = "idle" | "loading" | "success" | "error";
 
@@ -18,43 +20,54 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
   const identityFileRef = useRef<HTMLInputElement>(null);
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [analysisMessage, setAnalysisMessage] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [scanBackSide, setScanBackSide] = useState(false);
 
   const update = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
     onChange({ ...form, [field]: value });
   };
 
-  async function analyzeIdentity(file: File | undefined) {
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+  async function analyzeIdentityFiles(files: File[]): Promise<{ ok: boolean; message: string }> {
+    if (!aiEnabled) {
+      const message = "Kimlik görseli analizi için AI bağlantısını etkinleştirin.";
       setAnalysisState("error");
-      setAnalysisMessage("JPG, PNG veya WebP biçiminde bir kimlik görseli seçin.");
-      if (identityFileRef.current) identityFileRef.current.value = "";
-      return;
+      setAnalysisMessage(message);
+      return { ok: false, message };
     }
-    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
-      setAnalysisState("error");
-      setAnalysisMessage("Kimlik görseli boş olamaz ve en fazla 10 MB olabilir.");
-      if (identityFileRef.current) identityFileRef.current.value = "";
-      return;
+    if (files.length === 0) {
+      return { ok: false, message: "Kimlik görseli alınamadı." };
+    }
+
+    for (const file of files) {
+      const validationMessage = validateIdentityFile(file);
+      if (validationMessage) {
+        setAnalysisState("error");
+        setAnalysisMessage(validationMessage);
+        return { ok: false, message: validationMessage };
+      }
     }
 
     setAnalysisState("loading");
-    setAnalysisMessage("Kimlik görseli AI ile okunuyor...");
-    let result: DesktopIdentityImageAnalyzeResult;
-    try {
-      result = await onAnalyzeIdentity(file);
-    } catch {
-      result = { ok: false, message: "Kimlik görseli okunamadı." };
-    }
-    if (identityFileRef.current) identityFileRef.current.value = "";
+    setAnalysisMessage(files.length > 1 ? "Kimliğin ön ve arka yüzü AI ile okunuyor..." : "Kimlik görseli AI ile okunuyor...");
 
-    if (!result.ok) {
-      setAnalysisState("error");
-      setAnalysisMessage(result.message);
-      return;
+    const analyses = [];
+    for (const file of files) {
+      let result: DesktopIdentityImageAnalyzeResult;
+      try {
+        result = await onAnalyzeIdentity(file);
+      } catch {
+        result = { ok: false, message: "Kimlik görseli okunamadı." };
+      }
+      if (!result.ok) {
+        setAnalysisState("error");
+        setAnalysisMessage(result.message);
+        return { ok: false, message: result.message };
+      }
+      analyses.push(result.analysis);
     }
 
-    const fields = result.analysis.fields;
+    const merged = mergeIdentityImageAnalyses(analyses);
+    const fields = merged.fields;
     onChange({
       ...form,
       fullName: fields.full_name || form.fullName,
@@ -71,12 +84,22 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
       issuingAuthority: fields.issuing_authority || form.issuingAuthority,
       address: fields.address || form.address
     });
+
+    const baseMessage = files.length > 1
+      ? "Kimliğin ön ve arka yüzü okundu. Kaydetmeden önce bilgileri kontrol edin."
+      : "Kimlik alanları okundu. Kaydetmeden önce bilgileri kontrol edin.";
+    const message = merged.warnings.length > 0
+      ? baseMessage + " Kontrol: " + merged.warnings.join(" ")
+      : baseMessage;
     setAnalysisState("success");
-    setAnalysisMessage(
-      result.analysis.warnings.length > 0
-        ? result.message + " Kontrol: " + result.analysis.warnings.join(" ")
-        : result.message
-    );
+    setAnalysisMessage(message);
+    return { ok: true, message };
+  }
+
+  async function analyzeSelectedIdentity(file: File | undefined) {
+    if (!file) return;
+    await analyzeIdentityFiles([file]);
+    if (identityFileRef.current) identityFileRef.current.value = "";
   }
 
   return (
@@ -107,13 +130,29 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
             <strong>Kimlik kartı bilgileri</strong>
           </div>
           <div className="action-row">
-            <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeIdentity(event.target.files?.[0])} />
+            <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
+            <ActionButton variant="secondary" size="sm" type="button" disabled={!aiEnabled || analysisState === "loading"} onClick={() => setCameraOpen(true)}>
+              <Camera size={15} aria-hidden="true" />
+              Kimliği kameradan tara
+            </ActionButton>
             <ActionButton variant="secondary" size="sm" type="button" disabled={!aiEnabled || analysisState === "loading"} onClick={() => identityFileRef.current?.click()}>
               <Sparkles size={15} aria-hidden="true" />
-              {analysisState === "loading" ? "Okunuyor" : "Kimlikten AI ile Doldur"}
+              {analysisState === "loading" ? "Okunuyor" : "Dosyadan AI ile Doldur"}
             </ActionButton>
           </div>
         </div>
+        <label className="form-check identity-back-side-toggle">
+          <input
+            checked={scanBackSide}
+            disabled={!aiEnabled || analysisState === "loading"}
+            onChange={(event) => setScanBackSide(event.target.checked)}
+            type="checkbox"
+          />
+          <span>
+            <strong>Kimliğin arka yüzünü de tara</strong>
+            <small>Ön ve arka yüz çekilir; iki görüntü de hazır olduktan sonra AI analizi başlar.</small>
+          </span>
+        </label>
         {!aiEnabled && <p className="identity-ai-note">Kimlik görseli analizi için Ayarlar bölümünden AI bağlantısını etkinleştirin.</p>}
         <div className="form-grid">
           <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
@@ -135,6 +174,22 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
         </div>
         {analysisMessage && <p className={"form-status sync-" + analysisState} role={analysisState === "error" ? "alert" : "status"}>{analysisMessage}</p>}
       </section>
+
+      {cameraOpen && <IdentityCameraCapture
+        captureBackSide={scanBackSide}
+        onClose={() => setCameraOpen(false)}
+        onCaptured={analyzeIdentityFiles}
+      />}
     </>
   );
+}
+
+function validateIdentityFile(file: File): string {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    return "JPG, PNG veya WebP biçiminde bir kimlik görseli seçin.";
+  }
+  if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+    return "Kimlik görseli boş olamaz ve en fazla 10 MB olabilir.";
+  }
+  return "";
 }

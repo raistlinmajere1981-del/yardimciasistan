@@ -414,3 +414,144 @@
 
   .customer-workspace-savebar { align-items: stretch; flex-direction: column; }
 }
+
+
+.identity-back-side-toggle {
+  align-items: flex-start;
+  max-width: 34rem;
+}
+.identity-back-side-toggle > span {
+  display: grid;
+  gap: var(--space-1);
+}
+.identity-back-side-toggle small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.identity-camera-overlay .workspace-subflow-overlay__card {
+  width: min(60rem, 100%);
+}
+.identity-camera {
+  display: grid;
+  gap: var(--space-3);
+}
+.identity-camera__viewport {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  min-height: 18rem;
+  overflow: hidden;
+  background: var(--color-security-field);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-panel);
+}
+.identity-camera__viewport video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--color-security-field);
+}
+.identity-camera__guide {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(78%, 42rem);
+  aspect-ratio: 1.586 / 1;
+  transform: translate(-50%, -50%);
+  border: 2px solid color-mix(in srgb, var(--color-security-accent) 82%, transparent);
+  border-radius: calc(var(--radius-panel) * 0.72);
+  box-shadow: 0 0 0 999px color-mix(in srgb, var(--color-security-backdrop) 28%, transparent);
+  pointer-events: none;
+}
+.identity-camera__guide > span {
+  position: absolute;
+  left: var(--space-2);
+  top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-security-text);
+  background: color-mix(in srgb, var(--color-security-backdrop) 78%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+.identity-camera__viewport-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--color-security-text);
+  background: color-mix(in srgb, var(--color-security-backdrop) 76%, transparent);
+}
+.identity-camera__status {
+  display: grid;
+  gap: var(--space-1);
+}
+.identity-camera__status span,
+.identity-camera__flow-note,
+.identity-camera__shortcut {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.identity-camera__quality {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.identity-camera__quality > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+.identity-camera__quality > span > i {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--color-border-strong);
+  border-radius: 50%;
+}
+.identity-camera__quality > span.is-ready {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 30%, var(--color-border));
+}
+.identity-camera__quality > span.is-ready > i {
+  background: var(--color-success);
+}
+.identity-camera__quality > .identity-camera__candidate-count {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+}
+.identity-camera__flow-note {
+  margin: 0;
+}
+.identity-camera__footer {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.identity-camera__analysis-canvas {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .identity-camera__viewport { min-height: 13rem; }
+  .identity-camera__footer { align-items: stretch; flex-direction: column; }
+}
