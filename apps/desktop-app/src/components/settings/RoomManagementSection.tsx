@@ -8,6 +8,7 @@ import type { useBusinessLayoutSettings } from "../../app/use-business-layout-se
 import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { RoomMediaPanel } from "./RoomMediaPanel";
+import { ResourceManagementWorkspace } from "./ResourceManagementWorkspace";
 
 type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
 
@@ -59,38 +60,44 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
   if (!roomsEnabled) return null;
 
   return (
-    <section id="settings-rooms" tabIndex={-1} className="room-management-workspace">
-      <div className="settings-panel room-management-settings">
-        <div className="settings-panel-header room-management-heading">
-          <div>
-            <h2>Oda Yönetimi</h2>
-            <p>Pansiyon</p>
-          </div>
-          <div className="room-management-heading-actions">
-            <label className="room-management-publication-toggle">
-              <input
-                type="checkbox"
-                aria-label="Oda web yayını"
-                checked={draft.publication.rooms}
-                disabled={loading || saving}
-                onChange={(event) => updatePublication({ rooms: event.target.checked })}
-              />
-              <span>Webde yayınla</span>
-            </label>
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              type="button"
-              disabled={loading || saving}
-              onClick={addRoom}
-            >
-              <Plus size={15} aria-hidden="true" />
-              Oda Ekle
-            </ActionButton>
-          </div>
-        </div>
-
-        <fieldset disabled={saving || loading} className="settings-resource-fields settings-panel-body room-management-panel-body">
+    <>
+      <ResourceManagementWorkspace
+        id="settings-rooms"
+        className="room-management-workspace"
+        title="Oda Yönetimi"
+        subtitle="Pansiyon"
+        publishChecked={draft.publication.rooms}
+        publishAriaLabel="Oda web yayını"
+        disabled={loading || saving}
+        onPublishChange={(rooms) => updatePublication({ rooms })}
+        toolbar={
+          <ActionButton
+            variant="secondary"
+            size="sm"
+            type="button"
+            disabled={loading || saving}
+            onClick={addRoom}
+          >
+            <Plus size={15} aria-hidden="true" />
+            Oda Ekle
+          </ActionButton>
+        }
+        media={
+          <RoomMediaPanel
+            room={mediaRoom ? {
+              id: mediaRoom.id,
+              key: mediaRoom.key,
+              name: mediaRoom.name,
+              number: mediaRoom.number
+            } : null}
+            embedded
+            disabled={loading || saving}
+            revision={mediaRevision}
+            onDirtyChange={reportMediaDirty}
+          />
+        }
+      >
+        <fieldset disabled={saving || loading} className="settings-resource-fields">
           <div className="room-management-list" aria-label="Oda özetleri">
             {loading ? (
               <div className="room-management-loading">Odalar hazırlanıyor…</div>
@@ -165,19 +172,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
             )}
           </div>
         </fieldset>
-      </div>
-
-      <RoomMediaPanel
-        room={mediaRoom ? {
-          id: mediaRoom.id,
-          key: mediaRoom.key,
-          name: mediaRoom.name,
-          number: mediaRoom.number
-        } : null}
-        disabled={loading || saving}
-        revision={mediaRevision}
-        onDirtyChange={reportMediaDirty}
-      />
+      </ResourceManagementWorkspace>
 
       <RoomPublicDetailsEditor
         open={Boolean(editingRoom)}
@@ -211,6 +206,6 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
           return { ok: true, message: "Oda detayları taslağa uygulandı." };
         }}
       />
-    </section>
+    </>
   );
 }
