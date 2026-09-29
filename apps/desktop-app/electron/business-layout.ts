@@ -55,10 +55,16 @@ export interface BusinessLayoutTable {
   sortOrder: number;
 }
 
+export interface BusinessLayoutPublication {
+  rooms: boolean;
+  tables: boolean;
+}
+
 export interface BusinessLayoutSnapshot {
   rooms: BusinessLayoutRoom[];
   tables: BusinessLayoutTable[];
   tableCategories: BusinessLayoutTableCategory[];
+  publication: BusinessLayoutPublication;
   capabilities: {
     rooms: boolean;
     tables: boolean;
@@ -99,6 +105,7 @@ export interface SaveBusinessLayoutInput {
   rooms?: BusinessLayoutRoomInput[];
   tables?: BusinessLayoutTableInput[];
   tableCategories?: BusinessLayoutTableCategoryInput[];
+  publication?: Partial<BusinessLayoutPublication>;
 }
 
 export type BusinessLayoutSaveResult =
@@ -158,6 +165,12 @@ export function saveBusinessLayout(
 
     const roomsEnabled = hasCapability(db, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS);
     const tablesEnabled = hasCapability(db, BUSINESS_CAPABILITIES.FOOD_TABLES);
+    const publication = normalizePublicationInput(input?.publication);
+    if (!publication.ok) {
+      db.exec("ROLLBACK");
+      transactionStarted = false;
+      return publication;
+    }
 
     if (roomResolution.rooms !== undefined && !roomsEnabled) {
       db.exec("ROLLBACK");
@@ -168,6 +181,16 @@ export function saveBusinessLayout(
       db.exec("ROLLBACK");
       transactionStarted = false;
       return { ok: false, message: "Masa yönetimi bu işletme profilinde etkin değil." };
+    }
+    if (publication.value?.rooms !== undefined && !roomsEnabled) {
+      db.exec("ROLLBACK");
+      transactionStarted = false;
+      return { ok: false, message: "Oda web yayını bu işletme profilinde etkin değil." };
+    }
+    if (publication.value?.tables !== undefined && !tablesEnabled) {
+      db.exec("ROLLBACK");
+      transactionStarted = false;
+      return { ok: false, message: "Masa web yayını bu işletme profilinde etkin değil." };
     }
 
     if (roomResolution.rooms !== undefined) {
@@ -208,6 +231,9 @@ export function saveBusinessLayout(
       }
       updateTablePublicDetails(db, tableProfileResolution.tables, now);
     }
+    if (publication.value !== undefined) {
+      updatePublicationSettings(db, publication.value, now);
+    }
 
     db.exec("COMMIT");
     transactionStarted = false;
@@ -245,12 +271,17 @@ function openDatabase(databasePath: string): DatabaseSync {
 function getBusinessLayoutFromDb(db: DatabaseSync): BusinessLayoutSnapshot {
   const roomsEnabled = hasCapability(db, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS);
   const tablesEnabled = hasCapability(db, BUSINESS_CAPABILITIES.FOOD_TABLES);
+  const publication = getPublicationSettings(db);
   return {
     rooms: roomsEnabled ? listRooms(db) : [],
     tables: tablesEnabled ? listTables(db) : [],
     tableCategories: tablesEnabled
       ? getTableCategories(db).map((category) => ({ name: category.name, tableCount: category.tableCount }))
       : [],
+    publication: {
+      rooms: roomsEnabled && publication.rooms,
+      tables: tablesEnabled && publication.tables
+    },
     capabilities: {
       rooms: roomsEnabled,
       tables: tablesEnabled
@@ -265,6 +296,61 @@ function hasCapability(db: DatabaseSync, capability: BusinessCapability): boolea
     "WHERE business.deleted_at = '' AND business_capabilities.capability_id = ? " +
     "AND business_capabilities.is_enabled = 1 LIMIT 1"
   ).get(capability));
+}
+
+function getPublicationSettings(db: DatabaseSync): BusinessLayoutPublication {
+  const row = db.prepare(
+    "SELECT publish_rooms_web, publish_tables_web FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1"
+  ).get() as { publish_rooms_web?: unknown; publish_tables_web?: unknown } | undefined;
+  return {
+    rooms: Number(row?.publish_rooms_web ?? 1) === 1,
+    tables: Number(row?.publish_tables_web ?? 0) === 1
+  };
+}
+
+function normalizePublicationInput(
+  input: Partial<BusinessLayoutPublication> | undefined
+): { ok: true; value: Partial<BusinessLayoutPublication> | undefined } | { ok: false; message: string } {
+  if (input === undefined) return { ok: true, value: undefined };
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ok: false, message: "Web yayın ayarları geçersiz." };
+  }
+  const value: Partial<BusinessLayoutPublication> = {};
+  if ("rooms" in input) {
+    if (typeof input.rooms !== "boolean") return { ok: false, message: "Oda web yayın ayarı geçersiz." };
+    value.rooms = input.rooms;
+  }
+  if ("tables" in input) {
+    if (typeof input.tables !== "boolean") return { ok: false, message: "Masa web yayın ayarı geçersiz." };
+    value.tables = input.tables;
+  }
+  return { ok: true, value };
+}
+
+function updatePublicationSettings(
+  db: DatabaseSync,
+  publication: Partial<BusinessLayoutPublication>,
+  now: string
+): void {
+  const assignments: string[] = [];
+  const values: Array<number | string> = [];
+  if (publication.rooms !== undefined) {
+    assignments.push("publish_rooms_web = ?");
+    values.push(publication.rooms ? 1 : 0);
+  }
+  if (publication.tables !== undefined) {
+    assignments.push("publish_tables_web = ?");
+    values.push(publication.tables ? 1 : 0);
+  }
+  if (assignments.length === 0) return;
+  assignments.push("updated_at = ?", "sync_status = 'local_only'");
+  values.push(now);
+  const result = db.prepare(
+    `UPDATE business SET ${assignments.join(", ")} WHERE deleted_at = ''`
+  ).run(...values);
+  if (Number(result.changes) < 1) {
+    throw new Error("Web yayın ayarları kaydedilemedi.");
+  }
 }
 
 function listRooms(db: DatabaseSync): BusinessLayoutRoom[] {
