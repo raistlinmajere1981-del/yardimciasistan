@@ -350,6 +350,17 @@ export class DesktopDatabase {
         }
       }
 
+      const businessColumns = this.db.prepare("PRAGMA table_info(business)").all() as Array<{ name?: string }>;
+      const businessColumnNames = new Set(businessColumns.map((column) => String(column.name ?? "")));
+      for (const columnName of [
+        "publish_rooms_web",
+        "publish_tables_web"
+      ]) {
+        if (!businessColumnNames.has(columnName)) {
+          throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
+        }
+      }
+
       const tableColumns = this.db.prepare("PRAGMA table_info(tables)").all() as Array<{ name?: string }>;
       const tableColumnNames = new Set(tableColumns.map((column) => String(column.name ?? "")));
       for (const columnName of [
