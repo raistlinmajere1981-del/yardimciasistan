@@ -414,6 +414,30 @@ try {
   await expect(tableMediaPanel.locator('.room-media-card')).toHaveCount(1);
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
+  // Room/table web publication toggles are staged with Business Layout.
+  const roomPublication = page.getByRole('checkbox', { name: 'Odaları web sitesinde yayınla', exact: true });
+  const tablePublication = page.getByRole('checkbox', { name: 'Restoran / masaları web sitesinde yayınla', exact: true });
+  await expect(roomPublication).toBeChecked();
+  await expect(tablePublication).not.toBeChecked();
+  const beforePublicationSave = (await layoutCalls()).length;
+  await roomPublication.uncheck();
+  await tablePublication.check();
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  expect((await layoutCalls()).length).toBe(beforePublicationSave);
+  await save();
+  expect((await layoutCalls()).length).toBe(beforePublicationSave + 1);
+  expect((await layoutCalls()).at(-1).input.publication).toEqual({ rooms: false, tables: true });
+  await expect(roomPublication).not.toBeChecked();
+  await expect(tablePublication).toBeChecked();
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
+  await roomPublication.check();
+  await tablePublication.uncheck();
+  await discard();
+  await expect(roomPublication).not.toBeChecked();
+  await expect(tablePublication).toBeChecked();
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
   // Invalid table collection is rejected locally and never reaches persistence.
   const beforeInvalidLayout = (await layoutCalls()).length;
   await page.getByLabel('Kategori adı').first().fill('');
