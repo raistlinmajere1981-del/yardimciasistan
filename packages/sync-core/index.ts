@@ -9,7 +9,8 @@ import {
   type CustomerRequest,
   type ISODateTimeString,
   type MenuStockUnit,
-  type RoomPublicCatalog
+  type RoomPublicCatalog,
+  type TablePublicCatalog
 } from "@yardimci-asistan/shared";
 
 export interface SyncCoreConfig {
@@ -73,6 +74,11 @@ export interface PushBusinessContextOptions extends SyncCoreConfig {
 export interface PushRoomCatalogOptions extends SyncCoreConfig {
   clientId: string;
   catalog: RoomPublicCatalog;
+}
+
+export interface PushTableCatalogOptions extends SyncCoreConfig {
+  clientId: string;
+  catalog: TablePublicCatalog;
 }
 
 export interface PushAiCatalogOptions extends SyncCoreConfig {
@@ -1277,6 +1283,16 @@ export interface PushRoomCatalogSuccess {
   deduplicated?: boolean;
 }
 
+export interface PushTableCatalogSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  table_count: number;
+  source_revision?: number;
+  server_revision?: number;
+  deduplicated?: boolean;
+}
+
 export interface PushAiCatalogSuccess {
   ok: true;
   message: string;
@@ -1295,6 +1311,7 @@ export type PushAndroidSnapshotResult = PushAndroidSnapshotSuccess | SyncFailure
 export type PushAiSettingsResult = PushAiSettingsSuccess | SyncFailure;
 export type PushBusinessContextResult = PushBusinessContextSuccess | SyncFailure;
 export type PushRoomCatalogResult = PushRoomCatalogSuccess | SyncFailure;
+export type PushTableCatalogResult = PushTableCatalogSuccess | SyncFailure;
 export type PushAiCatalogResult = PushAiCatalogSuccess | SyncFailure;
 export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
 export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
@@ -1480,6 +1497,7 @@ export async function pushRoomCatalog(options: PushRoomCatalogOptions): Promise<
     client_id: options.clientId,
     room_catalog: {
       version: options.catalog.version,
+      enabled: options.catalog.enabled,
       updated_at: options.catalog.updatedAt,
       rooms: options.catalog.rooms.map((room) => ({
         id: room.id,
@@ -1495,6 +1513,36 @@ export async function pushRoomCatalog(options: PushRoomCatalogOptions): Promise<
         currency: room.currency,
         sort_order: room.sortOrder,
         media: room.media.map((media) => ({
+          id: media.id,
+          kind: media.kind,
+          url: media.url,
+          mime_type: media.mimeType,
+          title: media.title,
+          sort_order: media.sortOrder
+        }))
+      }))
+    }
+  });
+}
+
+export async function pushTableCatalog(options: PushTableCatalogOptions): Promise<PushTableCatalogResult> {
+  return syncRequest<PushTableCatalogSuccess>(options, {
+    action: "publish_table_catalog",
+    client_id: options.clientId,
+    table_catalog: {
+      version: options.catalog.version,
+      enabled: options.catalog.enabled,
+      updated_at: options.catalog.updatedAt,
+      tables: options.catalog.tables.map((table) => ({
+        id: table.id,
+        name: table.name,
+        area: table.area,
+        capacity: table.capacity,
+        description: table.description,
+        features: table.features,
+        smoking_policy: table.smokingPolicy,
+        sort_order: table.sortOrder,
+        media: table.media.map((media) => ({
           id: media.id,
           kind: media.kind,
           url: media.url,
