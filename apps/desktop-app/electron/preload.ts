@@ -20,6 +20,7 @@ import type {
   AddRoomMediaInput,
   AddTableMediaInput,
   DeleteRoomMediaInput,
+  type PublicResourceCoverPreview,
   DeleteTableMediaInput,
   RoomMediaAsset,
   RoomMediaDraftResult,
@@ -224,6 +225,7 @@ export interface DesktopBridge {
   getBusinessLayout: () => Promise<BusinessLayoutSnapshot>;
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => Promise<BusinessLayoutSaveResult>;
   listRoomMedia: (roomId: string) => Promise<RoomMediaAsset[]>;
+  listRoomMediaCoverPreviews: () => Promise<PublicResourceCoverPreview[]>;
   getRoomMediaDraftState: () => Promise<RoomMediaDraftState>;
   commitRoomMediaDraft: () => Promise<RoomMediaDraftResult>;
   discardRoomMediaDraft: () => Promise<RoomMediaDraftResult>;
@@ -231,6 +233,7 @@ export interface DesktopBridge {
   updateRoomMedia: (input: UpdateRoomMediaInput) => Promise<RoomMediaMutationResult>;
   deleteRoomMedia: (input: DeleteRoomMediaInput) => Promise<RoomMediaMutationResult>;
   listTableMedia: (tableId: string) => Promise<TableMediaAsset[]>;
+  listTableMediaCoverPreviews: () => Promise<PublicResourceCoverPreview[]>;
   getTableMediaDraftState: () => Promise<TableMediaDraftState>;
   commitTableMediaDraft: () => Promise<TableMediaDraftResult>;
   discardTableMediaDraft: () => Promise<TableMediaDraftResult>;
@@ -391,6 +394,7 @@ const bridge: DesktopBridge = {
   getBusinessLayout: () => invokeWhenUnlocked<BusinessLayoutSnapshot>("businessLayout:get"),
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => invokeWhenUnlocked<BusinessLayoutSaveResult>("businessLayout:save", input),
   listRoomMedia: (roomId: string) => invokeWhenUnlocked<RoomMediaAsset[]>("roomMedia:list", roomId),
+  listRoomMediaCoverPreviews: () => invokeWhenUnlocked<PublicResourceCoverPreview[]>("roomMedia:coverPreviews"),
   getRoomMediaDraftState: () => invokeWhenUnlocked<RoomMediaDraftState>("roomMedia:draftState"),
   commitRoomMediaDraft: () => invokeWhenUnlocked<RoomMediaDraftResult>("roomMedia:commitDraft"),
   discardRoomMediaDraft: () => invokeWhenUnlocked<RoomMediaDraftResult>("roomMedia:discardDraft"),
@@ -398,6 +402,7 @@ const bridge: DesktopBridge = {
   updateRoomMedia: (input: UpdateRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:update", input),
   deleteRoomMedia: (input: DeleteRoomMediaInput) => invokeWhenUnlocked<RoomMediaMutationResult>("roomMedia:delete", input),
   listTableMedia: (tableId: string) => invokeWhenUnlocked<TableMediaAsset[]>("tableMedia:list", tableId),
+  listTableMediaCoverPreviews: () => invokeWhenUnlocked<PublicResourceCoverPreview[]>("tableMedia:coverPreviews"),
   getTableMediaDraftState: () => invokeWhenUnlocked<TableMediaDraftState>("tableMedia:draftState"),
   commitTableMediaDraft: () => invokeWhenUnlocked<TableMediaDraftResult>("tableMedia:commitDraft"),
   discardTableMediaDraft: () => invokeWhenUnlocked<TableMediaDraftResult>("tableMedia:discardDraft"),
