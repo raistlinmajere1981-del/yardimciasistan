@@ -2,6 +2,7 @@ import {
   PhpHostingSyncTransport,
   pushAiCatalog,
   pushRoomCatalog,
+  pushTableCatalog,
   type AndroidOperationsSnapshot,
   type AndroidSyncAction,
   type SyncCapabilitiesSuccess,
@@ -13,7 +14,8 @@ import {
   hasBusinessCapability,
   type BusinessAiCatalog,
   type BusinessCapability,
-  type RoomPublicCatalog
+  type RoomPublicCatalog,
+  type TablePublicCatalog
 } from "@yardimci-asistan/shared";
 import {
   DesktopDatabase,
@@ -70,6 +72,11 @@ export interface SyncCoordinatorOptions {
     config: { baseUrl: string; syncSecret: string },
     clientId: string
   ) => Promise<{ ok: boolean; message: string; uploaded?: number; status?: number }>;
+  createTableCatalog?: () => TablePublicCatalog;
+  prepareTableCatalog?: (
+    config: { baseUrl: string; syncSecret: string },
+    clientId: string
+  ) => Promise<{ ok: boolean; message: string; uploaded?: number; status?: number }>;
   onDashboardChanged: () => void;
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
@@ -96,6 +103,8 @@ export class SyncCoordinator {
   private lastAiCatalogPayload = "";
   private roomCatalogSupported: boolean | null = null;
   private lastRoomCatalogPayload = "";
+  private tableCatalogSupported: boolean | null = null;
+  private lastTableCatalogPayload = "";
   private suspendedForMaintenance = false;
 
   constructor(private readonly options: SyncCoordinatorOptions) {}
@@ -107,6 +116,8 @@ export class SyncCoordinator {
     this.lastAiCatalogPayload = "";
     this.roomCatalogSupported = null;
     this.lastRoomCatalogPayload = "";
+    this.tableCatalogSupported = null;
+    this.lastTableCatalogPayload = "";
     this.emitStatus();
     this.initialTimer = setTimeout(() => {
       this.initialTimer = null;
@@ -380,6 +391,11 @@ export class SyncCoordinator {
       errors.push(roomCatalogError);
     }
 
+    const tableCatalogError = await this.publishTableCatalogIfChanged(config, clientId);
+    if (tableCatalogError) {
+      errors.push(tableCatalogError);
+    }
+
     const aiCatalogError = await this.publishAiCatalogIfChanged(config, clientId);
     if (aiCatalogError) {
       errors.push(aiCatalogError);
@@ -586,16 +602,21 @@ export class SyncCoordinator {
   ): Promise<string> {
     if (this.roomCatalogSupported === false) return "";
 
-    const preparation = await this.options.prepareRoomCatalog?.(config, clientId);
-    if (preparation && !preparation.ok) {
-      if ([400, 404, 405].includes(preparation.status ?? 0)) {
-        this.roomCatalogSupported = false;
-        return "";
+    let catalog = this.options.createRoomCatalog?.() ?? { version: 1, enabled: false, updatedAt: "", rooms: [] };
+    if (catalog.enabled) {
+      const preparation = await this.options.prepareRoomCatalog?.(config, clientId);
+      if (preparation && !preparation.ok) {
+        if ([400, 404, 405].includes(preparation.status ?? 0)) {
+          this.roomCatalogSupported = false;
+          return "";
+        }
+        return preparation.message;
       }
-      return preparation.message;
+      if (preparation?.uploaded) {
+        catalog = this.options.createRoomCatalog?.() ?? catalog;
+      }
     }
 
-    const catalog = this.options.createRoomCatalog?.() ?? { version: 1, updatedAt: "", rooms: [] };
     const payload = JSON.stringify(catalog);
     if (payload === this.lastRoomCatalogPayload) return "";
 
@@ -628,6 +649,67 @@ export class SyncCoordinator {
     this.options.database.recordSyncEvent({
       direction: "push",
       entityType: "room_catalog",
+      ok: false,
+      recordCount: 0,
+      message: result.message,
+      status: result.status
+    });
+    return result.message;
+  }
+
+  private async publishTableCatalogIfChanged(
+    config: { baseUrl: string; syncSecret: string },
+    clientId: string
+  ): Promise<string> {
+    if (this.tableCatalogSupported === false) return "";
+
+    let catalog = this.options.createTableCatalog?.() ?? { version: 1, enabled: false, updatedAt: "", tables: [] };
+    if (catalog.enabled) {
+      const preparation = await this.options.prepareTableCatalog?.(config, clientId);
+      if (preparation && !preparation.ok) {
+        if ([400, 404, 405].includes(preparation.status ?? 0)) {
+          this.tableCatalogSupported = false;
+          return "";
+        }
+        return preparation.message;
+      }
+      if (preparation?.uploaded) {
+        catalog = this.options.createTableCatalog?.() ?? catalog;
+      }
+    }
+
+    const payload = JSON.stringify(catalog);
+    if (payload === this.lastTableCatalogPayload) return "";
+
+    const runtimeFetch = globalThis.fetch;
+    const result = await pushTableCatalog({
+      ...config,
+      clientId,
+      catalog,
+      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
+    });
+
+    if (result.ok) {
+      this.tableCatalogSupported = true;
+      this.lastTableCatalogPayload = payload;
+      this.options.database.recordSyncEvent({
+        direction: "push",
+        entityType: "table_catalog",
+        ok: true,
+        recordCount: result.table_count,
+        message: result.message
+      });
+      return "";
+    }
+
+    if ([400, 404, 405].includes(result.status ?? 0)) {
+      this.tableCatalogSupported = false;
+      return "";
+    }
+
+    this.options.database.recordSyncEvent({
+      direction: "push",
+      entityType: "table_catalog",
       ok: false,
       recordCount: 0,
       message: result.message,
