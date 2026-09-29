@@ -77,3 +77,12 @@ test("Kontroller menüsü yalnız canonical verify presetlerini gösterir", () =
     assert.equal(visible.has(stale), false, stale);
   }
 });
+
+
+test("canonical verify taskları açıklamalı ve canlı stream modunda", () => {
+  for (const id of ["verify-dev", "verify-domain", "verify-check", "verify-full", "verify-pre-main", "verify-release", "verify-list", "verify-plan"]) {
+    const task = getTask(id);
+    assert.ok(task.description, `${id}: kısa açıklama gerekli`);
+    assert.equal(task.mode, "stream", `${id}: canlı çıktı stream modunda olmalı`);
+  }
+});
