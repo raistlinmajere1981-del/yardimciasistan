@@ -13,6 +13,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 try {
     $catalog = ya_storage_get_publication('room_catalog', [
         'version' => 1,
+        'enabled' => true,
         'updated_at' => '',
         'rooms' => []
     ]);
@@ -36,7 +37,8 @@ if (trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
     exit;
 }
 
-$rooms = is_array($catalog['rooms'] ?? null) ? array_values($catalog['rooms']) : [];
+$enabled = ($catalog['enabled'] ?? true) === true;
+$rooms = $enabled && is_array($catalog['rooms'] ?? null) ? array_values($catalog['rooms']) : [];
 usort($rooms, static function (array $left, array $right): int {
     $order = ((int) ($left['sort_order'] ?? 0)) <=> ((int) ($right['sort_order'] ?? 0));
     return $order !== 0 ? $order : strcmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''));
@@ -45,6 +47,7 @@ usort($rooms, static function (array $left, array $right): int {
 ya_rooms_response(200, [
     'ok' => true,
     'version' => (int) ($catalog['version'] ?? 1),
+    'enabled' => $enabled,
     'updated_at' => (string) ($catalog['updated_at'] ?? ''),
     'rooms' => $rooms,
     'source_revision' => (int) ($publication['source_revision'] ?? 0),
