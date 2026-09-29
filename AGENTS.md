@@ -8,7 +8,9 @@ This file defines repository-wide working rules for coding agents. Prefer the na
 
 - Monorepo root: `~/YardimciAsistan`
 - Default branch: `main`
-- Create a focused branch for maintenance/refactor work; do not develop directly on `main`.
+- Default to a single development line on `main` for normal sequential work.
+- Create a focused branch only when work is genuinely parallel, experimental/high-risk, or needs isolation (for example a new sector developed alongside ongoing mainline work).
+- Do not create branches merely as a ritual for ordinary maintenance/refactor tasks.
 - Do not use force-push, history rewrites, stash/pop, or discard unrelated working-tree changes.
 - Treat existing unrelated changes as owned by another task unless explicitly instructed otherwise.
 
