@@ -811,6 +811,10 @@ CREATE TABLE tables (
   name TEXT NOT NULL,
   area TEXT NOT NULL DEFAULT '',
   capacity INTEGER NOT NULL DEFAULT 1,
+  public_description TEXT NOT NULL DEFAULT '',
+  public_features_json TEXT NOT NULL DEFAULT '[]',
+  smoking_policy TEXT NOT NULL DEFAULT 'unspecified'
+    CHECK (smoking_policy IN ('unspecified', 'non_smoking', 'smoking_allowed', 'outdoor_only')),
   status TEXT NOT NULL DEFAULT 'available',
   current_customer_id TEXT NOT NULL DEFAULT '',
   current_reservation_id TEXT NOT NULL DEFAULT '',
