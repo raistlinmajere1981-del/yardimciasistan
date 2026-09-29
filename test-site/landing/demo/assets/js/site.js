@@ -154,7 +154,7 @@
       });
 
       const business = data?.business || {};
-      const businessName = String(business.business_name || business.name || "").trim();
+      const businessName = String(business.display_name || business.business_name || business.name || "").trim();
       if (businessName) {
         document.querySelectorAll("[data-business-name]").forEach((node) => {
           node.textContent = businessName;
