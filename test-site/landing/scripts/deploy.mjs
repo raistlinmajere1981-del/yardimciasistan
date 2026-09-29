@@ -91,7 +91,19 @@ const localFavicon = join(repoRoot, "favicon.png");
 const localAssets = join(repoRoot, "assets");
 const localDemo = join(repoRoot, "demo");
 const landingBundle = join(localAssets, "index-t2kNTUv0.js");
-const requiredLocal = [localIndex, localFavicon, landingBundle, join(localAssets, "index-fcReLA3k.css"), join(localDemo, "index.php"), join(localDemo, "assets", "css", "site.css"), join(localDemo, "assets", "js", "site.js")];
+const requiredLocal = [
+  localIndex,
+  localFavicon,
+  landingBundle,
+  join(localAssets, "index-fcReLA3k.css"),
+  join(localDemo, "index.php"),
+  join(localDemo, "assets", "css", "site.css"),
+  join(localDemo, "assets", "js", "site.js"),
+  join(localDemo, "assets", "js", "rooms.js"),
+  join(localDemo, "assets", "js", "tables.js"),
+  join(localDemo, "restoran", "index.php"),
+  join(localDemo, "restoran", "masa", "index.php")
+];
 for (const f of requiredLocal) {
   if (!existsSync(f)) fail(`Yerel kaynak dosya eksik: ${f}`);
 }
@@ -584,7 +596,7 @@ async function smoke(base, secret) {
   }
   console.log("Kok: 200, sync key config ile ayni, hardcoded yok.");
 
-  for (const path of ["/demo/", "/demo/odalar/", "/demo/odalar/oda/", "/demo/qr-menu/", "/demo/yorumlar/", "/demo/iletisim/", "/demo/restoran/"]) {
+  for (const path of ["/demo/", "/demo/odalar/", "/demo/odalar/oda/", "/demo/qr-menu/", "/demo/yorumlar/", "/demo/iletisim/", "/demo/restoran/", "/demo/restoran/masa/"]) {
     const page = await get(path);
     if (page.response.status !== 200) fail(`Demo route HTTP smoke basarisiz: ${path} -> ${page.response.status}`);
   }
