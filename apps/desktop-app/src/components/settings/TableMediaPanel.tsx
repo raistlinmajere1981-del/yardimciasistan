@@ -17,10 +17,9 @@ interface TableMediaPanelTable {
 
 interface TableMediaPanelProps {
   table: TableMediaPanelTable | null;
-  tables: TableMediaPanelTable[];
+  embedded?: boolean;
   disabled?: boolean;
   revision: number;
-  onTableChange: (key: string) => void;
   onDirtyChange: (dirty: boolean) => void;
 }
 
@@ -34,10 +33,9 @@ function toResource(table: TableMediaPanelTable): PublicResourceMediaPanelResour
 
 export function TableMediaPanel({
   table,
-  tables,
+  embedded = false,
   disabled = false,
   revision,
-  onTableChange,
   onDirtyChange
 }: TableMediaPanelProps) {
   return (
@@ -48,10 +46,10 @@ export function TableMediaPanel({
       ariaLabel="Masa medyaları"
       emptyHint="Seçili masaya ilk fotoğrafı veya görünümü ekleyin."
       resource={table ? toResource(table) : null}
-      resources={tables.map(toResource)}
+      showResourcePicker={false}
+      embedded={embedded}
       disabled={disabled}
       revision={revision}
-      onResourceChange={onTableChange}
       onDirtyChange={onDirtyChange}
       listMedia={listTableMedia}
       addMedia={addTableMedia}
