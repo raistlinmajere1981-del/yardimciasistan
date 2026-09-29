@@ -76,7 +76,10 @@ import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { publishBusinessAiContext } from "./business-ai-context-service";
 import { createBusinessAiCatalog } from "./business-ai-catalog-service";
 import { createPublicRoomCatalog } from "./public-room-catalog-publication";
+import { createPublicTableCatalog } from "./public-table-catalog-publication";
 import { publishPendingRoomMedia } from "./room-media-publication";
+import { publishPendingTableMedia } from "./table-media-publication";
+import { registerBusinessLayoutIpcHandlers } from "./business-layout-ipc";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerGoogleReviewsSettingsIpcHandlers } from "./google-reviews-settings-ipc";
 import { getGoogleReviewsSettings, publishGoogleReviewsSettings } from "./google-reviews-settings";
@@ -367,6 +370,16 @@ if (!hasSingleInstanceLock) {
         config,
         clientId
       ),
+      createTableCatalog: () => createPublicTableCatalog(
+        getDatabase().databasePath,
+        getDatabase().getEnabledBusinessCapabilities(),
+        getDatabase().userDataPath
+      ),
+      prepareTableCatalog: (config, clientId) => publishPendingTableMedia(
+        getDatabase().userDataPath,
+        config,
+        clientId
+      ),
       onDashboardChanged: () => {
         markLocalCompanionSnapshotDirty();
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
@@ -575,6 +588,14 @@ function registerIpcHandlers() {
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability
+  });
+
+  registerBusinessLayoutIpcHandlers({
+    databasePath: () => getDatabase().databasePath,
+    assertUnlocked: assertAppSessionUnlocked,
+    onMutation: () => {
+      getSyncCoordinator().scheduleSoon();
+    }
   });
 
   registerBusinessPublicProfileIpcHandlers({
