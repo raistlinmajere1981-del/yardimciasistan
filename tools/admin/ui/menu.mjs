@@ -192,7 +192,7 @@ export async function executeEntry(ui, entry, { extraArgsByStep = {} } = {}) {
     raw = await runCommand({ command, args, cwd: entry.cwd ?? "repo", mode: "inherit" });
     raw = { ...raw, stdout: "(etkileşimli çalıştı; çıktı yakalanmadı)", stderr: "" };
   } else {
-    raw = await runCommand({ command, args, cwd: entry.cwd ?? "repo", mode: "capture" });
+    raw = await runCommand({ command, args, cwd: entry.cwd ?? "repo", mode: entry.mode ?? "capture" });
   }
   return finishRaw(ui, entry, args, raw, vcs, startedAll, () => executeEntry(ui, entry));
 }
