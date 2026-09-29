@@ -12,6 +12,8 @@ const {
   getBusinessLayout,
   saveBusinessLayout
 } = require("../apps/desktop-app/dist-electron/business-layout.js");
+const { createPublicRoomCatalog } = require("../apps/desktop-app/dist-electron/public-room-catalog-publication.js");
+const { createPublicTableCatalog } = require("../apps/desktop-app/dist-electron/public-table-catalog-publication.js");
 
 const root = process.cwd();
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-business-layout-"));
@@ -114,6 +116,31 @@ try {
   });
   assert.equal(publicationSave.ok, true, publicationSave.ok ? "" : publicationSave.message);
   assert.deepEqual(publicationSave.layout.publication, { rooms: false, tables: true });
+
+  const enabledCapabilities = database.getEnabledBusinessCapabilities();
+  const disabledRoomCatalog = createPublicRoomCatalog(
+    database.databasePath,
+    enabledCapabilities,
+    database.userDataPath
+  );
+  assert.deepEqual(disabledRoomCatalog, {
+    version: 1,
+    enabled: false,
+    updatedAt: "",
+    rooms: []
+  });
+
+  const publishedTableCatalog = createPublicTableCatalog(
+    database.databasePath,
+    enabledCapabilities,
+    database.userDataPath
+  );
+  assert.equal(publishedTableCatalog.enabled, true);
+  assert.equal(publishedTableCatalog.tables.length, 3);
+  assert.equal("status" in publishedTableCatalog.tables[0], false);
+  assert.equal("currentCustomerId" in publishedTableCatalog.tables[0], false);
+  assert.equal("currentReservationId" in publishedTableCatalog.tables[0], false);
+  assert.equal("notes" in publishedTableCatalog.tables[0], false);
 
   const publicationDb = new DatabaseSync(database.databasePath);
   try {
