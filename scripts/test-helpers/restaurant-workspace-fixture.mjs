@@ -58,6 +58,10 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     return copy({ ok: true, message: 'İşlem kaydedildi.', order, dashboardData: snapshot() });
   };
   window.yardimciDesktop = {
+    listTableMediaCoverPreviews: async () => dashboard.tables.slice(0, 1).map(table => ({
+      resourceId: table.id,
+      previewDataUrl: "data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="640" height="400"%3E%3Crect width="640" height="400" fill="%23888"/%3E%3C/svg%3E"
+    })),
     getDashboardData: async () => snapshot(),
     listTableOrders: async () => { calls.push({ kind: 'list' }); return copy(orders); },
     getActiveTableOrder: async id => {
