@@ -38,7 +38,8 @@ let layout = {
     { id: "table-1", name: "Salon 1", area: "Salon", capacity: 4, description: "", features: [], smokingPolicy: "unspecified", sortOrder: 1 },
     { id: "table-2", name: "Salon 2", area: "Salon", capacity: 4, description: "", features: [], smokingPolicy: "unspecified", sortOrder: 2 }
   ],
-  tableCategories: [{ name: "Salon", tableCount: 2 }]
+  tableCategories: [{ name: "Salon", tableCount: 2 }],
+  publication: { rooms: true, tables: false }
 };
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
 let mediaSeq = 0;
@@ -175,6 +176,12 @@ window.yardimciDesktop = {
       layout = {
         ...layout,
         tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
+      };
+    }
+    if (input.publication) {
+      layout = {
+        ...layout,
+        publication: { ...layout.publication, ...input.publication }
       };
     }
 
