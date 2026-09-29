@@ -50,6 +50,14 @@ if ($runtimeCapabilities !== null) {
     $publicSurfaces = ya_business_profile_public_surfaces($profileId);
 }
 
+if (ya_business_publication_enabled('room_catalog', true)) {
+    $publicSurfaces[] = 'rooms';
+}
+if (ya_business_publication_enabled('table_catalog', false)) {
+    $publicSurfaces[] = 'restaurant';
+}
+$publicSurfaces = array_values(array_unique($publicSurfaces));
+
 ya_business_response(200, [
     'ok' => true,
     'business' => [
@@ -118,6 +126,24 @@ function ya_business_public_context(): array
     } catch (Throwable) {
         return [];
     }
+}
+
+function ya_business_publication_enabled(string $name, bool $legacyDefault): bool
+{
+    try {
+        $catalog = ya_storage_get_publication($name, []);
+    } catch (Throwable) {
+        return false;
+    }
+
+    $publication = is_array($catalog['_publication'] ?? null) ? $catalog['_publication'] : [];
+    if ($publication === []) {
+        return false;
+    }
+    if (array_key_exists('enabled', $catalog)) {
+        return ($catalog['enabled'] ?? false) === true;
+    }
+    return $legacyDefault;
 }
 
 function ya_business_google_reviews_enabled(): bool
@@ -190,7 +216,7 @@ function ya_business_normalize_public_surfaces(mixed $value): array
     if (!is_array($value)) {
         return [];
     }
-    $allowed = ['accommodation', 'food_service', 'menu', 'qr_menu', 'catalog', 'directions'];
+    $allowed = ['accommodation', 'food_service', 'menu', 'qr_menu', 'catalog', 'directions', 'rooms', 'restaurant'];
     $normalized = [];
     foreach ($value as $surface) {
         $surface = ya_business_string($surface);
