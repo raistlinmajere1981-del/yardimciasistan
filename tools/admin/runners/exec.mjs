@@ -6,10 +6,20 @@ import { resolveCwd } from "../lib/paths.mjs";
  * spawn(command, args) kullanılır (fish dahil her shell ile uyumlu).
  *
  * mode "capture": stdout/stderr toplanır, history/rapor için döner.
+ * mode "stream": stdout/stderr canlı terminale yazılır ve aynı anda history/rapor için yakalanır.
  * mode "inherit": etkileşimli (deploy onayı, dev server) işlemler için
  *   terminal doğrudan bağlanır; çıktı yakalanmaz.
  */
-export function runCommand({ command, args = [], cwd = "repo", env = {}, timeoutMs = 0, mode = "capture" }) {
+export function runCommand({
+  command,
+  args = [],
+  cwd = "repo",
+  env = {},
+  timeoutMs = 0,
+  mode = "capture",
+  stdoutSink = process.stdout,
+  stderrSink = process.stderr
+}) {
   const start = Date.now();
   return new Promise((resolve) => {
     let child;
@@ -38,14 +48,18 @@ export function runCommand({ command, args = [], cwd = "repo", env = {}, timeout
     let timedOut = false;
     let timer = null;
 
-    if (mode === "capture") {
+    if (mode === "capture" || mode === "stream") {
       child.stdout?.on("data", (chunk) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
         if (stdout.length > 512_000) stdout = stdout.slice(-256_000);
+        if (mode === "stream") stdoutSink?.write?.(text);
       });
       child.stderr?.on("data", (chunk) => {
-        stderr += chunk.toString();
+        const text = chunk.toString();
+        stderr += text;
         if (stderr.length > 512_000) stderr = stderr.slice(-256_000);
+        if (mode === "stream") stderrSink?.write?.(text);
       });
     }
 
