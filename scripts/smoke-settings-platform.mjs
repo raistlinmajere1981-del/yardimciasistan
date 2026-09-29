@@ -364,6 +364,34 @@ try {
   await discard();
   await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Deniz Oda');
 
+  // Public table details are staged inside Business Layout and persist only
+  // through the category footer, never directly from the editor dialog.
+  const tableRows = page.locator('.table-public-resource-row');
+  await expect(tableRows).toHaveCount(2);
+  const beforeTableProfileSave = (await layoutCalls()).length;
+  await tableRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
+  const tableDialog = page.getByRole('dialog', { name: 'Masa bilgilerini düzenle' });
+  await expect(tableDialog).toBeVisible();
+  await tableDialog.getByLabel('Kapasite').fill('6');
+  await tableDialog.getByLabel('Sigara kullanımı').selectOption('outdoor_only');
+  await tableDialog.getByRole('checkbox', { name: 'Açık alan', exact: true }).check();
+  await tableDialog.getByRole('checkbox', { name: 'Deniz manzarası', exact: true }).check();
+  await tableDialog.getByLabel('Açıklama').fill('Deniz tarafında geniş aile masası.');
+  await tableDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(tableDialog).toHaveCount(0);
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  expect((await layoutCalls()).length).toBe(beforeTableProfileSave);
+  await save();
+  expect((await layoutCalls()).length).toBe(beforeTableProfileSave + 1);
+  expect((await layoutCalls()).at(-1).input.tables[0]).toMatchObject({
+    id: 'table-1',
+    capacity: 6,
+    description: 'Deniz tarafında geniş aile masası.',
+    features: ['outdoor', 'sea_view'],
+    smokingPolicy: 'outdoor_only'
+  });
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
   // Invalid table collection is rejected locally and never reaches persistence.
   const beforeInvalidLayout = (await layoutCalls()).length;
   await page.getByLabel('Kategori adı').first().fill('');
