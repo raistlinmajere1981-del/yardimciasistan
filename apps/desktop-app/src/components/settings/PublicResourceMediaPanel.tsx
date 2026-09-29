@@ -41,10 +41,11 @@ interface PublicResourceMediaPanelProps {
   ariaLabel: string;
   emptyHint: string;
   resource: PublicResourceMediaPanelResource | null;
-  resources: PublicResourceMediaPanelResource[];
+  resources?: PublicResourceMediaPanelResource[];
+  showResourcePicker?: boolean;
   disabled?: boolean;
   revision: number;
-  onResourceChange: (key: string) => void;
+  onResourceChange?: (key: string) => void;
   onDirtyChange: (dirty: boolean) => void;
   listMedia: (resourceId: string) => Promise<PublicResourceMediaAssetFields[]>;
   addMedia: (resourceId: string) => Promise<MediaMutationResult>;
@@ -91,7 +92,8 @@ export function PublicResourceMediaPanel({
   ariaLabel,
   emptyHint,
   resource,
-  resources,
+  resources = [],
+  showResourcePicker = true,
   disabled = false,
   revision,
   onResourceChange,
@@ -196,21 +198,28 @@ export function PublicResourceMediaPanel({
       </div>
 
       <div className="room-media-panel-controls">
-        <label className="form-field room-media-room-picker">
-          <span>{resourceLabel}</span>
-          <select
-            value={resource?.key ?? ""}
-            disabled={disabled || resources.length === 0}
-            onChange={(event) => onResourceChange(event.target.value)}
-          >
-            {resources.length === 0 && <option value="">{resourceLabel} yok</option>}
-            {resources.map((candidate) => (
-              <option key={candidate.key} value={candidate.key}>
-                {candidate.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {showResourcePicker ? (
+          <label className="form-field room-media-room-picker">
+            <span>{resourceLabel}</span>
+            <select
+              value={resource?.key ?? ""}
+              disabled={disabled || resources.length === 0}
+              onChange={(event) => onResourceChange?.(event.target.value)}
+            >
+              {resources.length === 0 && <option value="">{resourceLabel} yok</option>}
+              {resources.map((candidate) => (
+                <option key={candidate.key} value={candidate.key}>
+                  {candidate.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <div className="room-media-selected-resource" aria-live="polite">
+            <span>Seçili {resourceLabel.toLocaleLowerCase("tr-TR")}</span>
+            <strong>{resource?.label ?? `${resourceLabel} seçin`}</strong>
+          </div>
+        )}
 
         <ActionButton
           type="button"
