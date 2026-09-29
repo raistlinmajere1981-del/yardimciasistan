@@ -86,7 +86,12 @@ try {
       tableCategories: [
         { name: "Bahçe", tableCount: 1 },
         { name: "Salon", tableCount: 1 }
-      ]
+      ],
+      tables: [
+        { id: "table-1", name: "Bahçe 1", area: "Bahçe", capacity: 4, description: "", features: [], smokingPolicy: "unspecified", sortOrder: 1 },
+        { id: "table-2", name: "Salon 1", area: "Salon", capacity: 4, description: "", features: [], smokingPolicy: "unspecified", sortOrder: 2 }
+      ],
+      publication: { rooms: false, tables: false }
     };
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
@@ -418,18 +423,21 @@ try {
   await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode/)).toHaveCount(0);
   expect(await settings.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await sectionNav.getByRole("tab", { name: "İşletme Düzeni", exact: true }).click();
-  const tableCategoryEditor = page.locator(".table-category-editor");
-  await expect(tableCategoryEditor.getByText("Masa kategorileri", { exact: true })).toBeVisible();
-  await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
-  await expect(tableCategoryEditor.locator(".table-category-heading > div > p")).toHaveText("2 masa");
-  await expect(tableCategoryEditor.locator(".table-category-row").nth(0).getByRole("textbox")).toHaveValue("Bahçe");
-  await expect(tableCategoryEditor.locator(".table-category-row").nth(1).getByRole("textbox")).toHaveValue("Salon");
-  await tableCategoryEditor.getByRole("button", { name: "Kategori Ekle" }).click();
-  await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(3);
-  await tableCategoryEditor.locator(".table-category-row").nth(2).getByRole("textbox").fill("Teras");
-  await expect(tableCategoryEditor.locator(".table-category-heading > div > p")).toHaveText("3 masa");
-  await tableCategoryEditor.getByRole("button", { name: "Teras satırını kaldır" }).click();
-  await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
+  const tableWorkspace = page.locator("#settings-operations");
+  await expect(tableWorkspace.getByRole("heading", { name: "Masa Yönetimi", exact: true })).toBeVisible();
+  await expect(tableWorkspace).toContainText("Restoran · 2 masa");
+  const tableCategoryList = tableWorkspace.locator(".table-category-list");
+  await expect(tableCategoryList.locator(".table-category-row")).toHaveCount(2);
+  await expect(tableCategoryList.locator(".table-category-row").nth(0).getByLabel("Kategori adı")).toHaveValue("Bahçe");
+  await expect(tableCategoryList.locator(".table-category-row").nth(1).getByLabel("Kategori adı")).toHaveValue("Salon");
+  // Kategori Ekle ilk kategori satırının en sağında yer alır.
+  await expect(tableCategoryList.locator(".table-category-row").first().getByRole("button", { name: "Kategori Ekle", exact: true })).toBeVisible();
+  await tableCategoryList.locator(".table-category-row").first().getByRole("button", { name: "Kategori Ekle", exact: true }).click();
+  await expect(tableCategoryList.locator(".table-category-row")).toHaveCount(3);
+  await tableCategoryList.locator(".table-category-row").nth(2).getByLabel("Kategori adı").fill("Teras");
+  await expect(tableWorkspace).toContainText("Restoran · 3 masa");
+  await tableCategoryList.getByRole("button", { name: "Teras satırını kaldır" }).click();
+  await expect(tableCategoryList.locator(".table-category-row")).toHaveCount(2);
   await sectionNav.getByRole("tab", { name: "Servisler", exact: true }).click();
   const androidDeviceSection = page.locator(".settings-android-devices-section");
   await expect(androidDeviceSection.getByRole("heading", { name: "Telefon Kurulumu" })).toBeVisible();
@@ -571,7 +579,7 @@ try {
   await page.locator(".setup-ai-section").getByRole("checkbox").check();
   await expect(page.getByLabel("Servis sağlayıcı")).toBeEnabled();
   await page.locator(".setup-ai-section").getByRole("checkbox").uncheck();
-  await expect(page.getByLabel("Servis sağlayıcı")).toBeDisabled();
+  await expect(page.getByLabel("Servis sağlayıcı")).toHaveCount(0);
   await page.getByRole("tab", { name: /^Servisler/ }).click();
   await page.locator(".setup-ai-section").getByRole("checkbox").check();
   await expect(page.locator(".settings-web-section .setup-section-title > p")).toHaveCount(0);
@@ -1537,7 +1545,18 @@ try {
       tableCategories: [...new Set(currentDashboardData.tables.map((table) => table.area || "Genel"))].map((name) => ({
         name,
         tableCount: currentDashboardData.tables.filter((table) => (table.area || "Genel") === name).length
-      }))
+      })),
+      tables: currentDashboardData.tables.map((table, index) => ({
+        id: table.id,
+        name: table.name,
+        area: table.area || "Genel",
+        capacity: table.capacity ?? 4,
+        description: "",
+        features: [],
+        smokingPolicy: "unspecified",
+        sortOrder: index + 1
+      })),
+      publication: { rooms: false, tables: false }
     };
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,

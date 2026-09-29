@@ -59,7 +59,18 @@ try {
       tableCategories: [...new Set(dashboard.tables.map(table => table.area || "Genel"))].map(name => ({
         name,
         tableCount: dashboard.tables.filter(table => (table.area || "Genel") === name).length
-      }))
+      })),
+      tables: dashboard.tables.map((table, index) => ({
+        id: table.id,
+        name: table.name,
+        area: table.area || "Genel",
+        capacity: table.capacity ?? 4,
+        description: "",
+        features: [],
+        smokingPolicy: "unspecified",
+        sortOrder: index + 1
+      })),
+      publication: { rooms: false, tables: false }
     };
     const record = (kind, input) => { window.__designCalls.push({ kind, input }); return { ok: true, message: 'Kaydedildi.', dashboardData: dashboard, savedId: input.id || 'stage2-customer' }; };
     window.yardimciDesktop = {
@@ -311,7 +322,7 @@ try {
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
     await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
     await expect(page.getByRole('tab', { name: 'İşletme Düzeni', exact: true })).toHaveAttribute('aria-selected', 'true');
-    await page.getByLabel('Oda adı ve fiyatları').getByRole('button', { name: 'Detaylar', exact: true }).first().click();
+    await page.getByLabel('Oda özetleri').getByRole('button', { name: 'Detaylar', exact: true }).first().click();
     await capture('room-editor');
     await closeDialog();
   }

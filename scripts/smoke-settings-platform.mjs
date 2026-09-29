@@ -397,14 +397,16 @@ try {
   // through the category footer, never directly from the editor dialog.
   const tableRows = page.locator('.table-public-resource-row');
   await expect(tableRows).toHaveCount(2);
-  const tableMediaPicker = page.getByLabel('Masa medyaları').getByLabel('Masa');
+  // Masa medya seçimi listeden yapılır: satıra tıklayınca panel seçili masayı gösterir.
+  await tableRows.nth(1).locator('strong').click();
+  await expect(tableMediaPanel.getByText('Salon 2 · Salon', { exact: true })).toBeVisible();
   await tableRows.nth(1).getByRole('button', { name: 'Detaylar', exact: true }).click();
-  await expect(tableMediaPicker).toHaveValue('table-2');
   await page.getByRole('dialog', { name: 'Masa bilgilerini düzenle' }).getByRole('button', { name: 'Vazgeç', exact: true }).click();
 
   const beforeTableProfileSave = (await layoutCalls()).length;
+  await tableRows.first().locator('strong').click();
+  await expect(tableMediaPanel.getByText('Salon 1 · Salon', { exact: true })).toBeVisible();
   await tableRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
-  await expect(tableMediaPicker).toHaveValue('table-1');
   const tableDialog = page.getByRole('dialog', { name: 'Masa bilgilerini düzenle' });
   await expect(tableDialog).toBeVisible();
   await tableDialog.getByLabel('Kapasite').fill('6');
@@ -452,7 +454,7 @@ try {
 
   // Room/table web publication toggles are staged with Business Layout.
   const roomPublication = page.getByRole('checkbox', { name: 'Oda web yayını', exact: true });
-  const tablePublication = page.getByRole('checkbox', { name: /^Restoran \/ masaları web sitesinde yayınla/ });
+  const tablePublication = page.getByRole('checkbox', { name: 'Masa web yayını', exact: true });
   await expect(roomPublication).toBeChecked();
   await expect(tablePublication).not.toBeChecked();
   const beforePublicationSave = (await layoutCalls()).length;
@@ -571,7 +573,10 @@ try {
   const callsBeforeKeyDelete = (await setupCalls()).length;
   await page.getByRole('button', { name: 'Kayıtlı Anahtarı Sil', exact: true }).click();
   await keyConfirm.getByRole('button', { name: 'Anahtarı Sil' }).click();
-  await expect(page.getByRole('button', { name: 'Anahtar silinecek' })).toBeDisabled();
+  // Silme staged: AI kapanır ve yalnız header görünür; gerçek silme kategori Kaydet ile olur.
+  await expect(page.locator('.setup-ai-section')).toContainText('Kapalı');
+  await expect(page.getByRole('button', { name: 'Anahtar silinecek' })).toHaveCount(0);
+  await expect(tab('Servisler')).toContainText('Değişiklik var');
   expect((await setupCalls()).length).toBe(callsBeforeKeyDelete);
   await save();
   expect((await setupCalls()).at(-1).input.clearAiApiKey).toBe(true);

@@ -32,6 +32,17 @@ try {
     let businessLayout = {
       capabilities: { rooms: true, tables: true },
       rooms,
+      tables: dashboard.tables.map((table, index) => ({
+        id: table.id,
+        name: table.name,
+        area: table.area || 'Genel',
+        capacity: table.capacity ?? 4,
+        description: '',
+        features: [],
+        smokingPolicy: 'unspecified',
+        sortOrder: index + 1
+      })),
+      publication: { rooms: false, tables: false },
       tableCategories: [...new Set(dashboard.tables.map(table => table.area || 'Genel'))].map(name => ({
         name,
         tableCount: dashboard.tables.filter(table => (table.area || 'Genel') === name).length
@@ -320,9 +331,16 @@ try {
   });
 
   await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
-  await page.getByLabel('Oda 101 adı', { exact: true }).fill('Güncellenen Oda');
-  await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  const designRoomRows = page.locator('.room-management-row');
+  await expect(designRoomRows).toHaveCount(2);
+  await designRoomRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
+  const designRoomDialog = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle' });
+  await expect(designRoomDialog).toBeVisible();
+  await designRoomDialog.getByLabel('Oda adı').fill('Güncellenen Oda');
+  await designRoomDialog.getByLabel('Gecelik fiyat').fill('2750');
+  await designRoomDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(designRoomDialog).toHaveCount(0);
+  await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'layout')?.input.rooms?.[0]?.name)).toBe('Güncellenen Oda');
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
 
@@ -378,14 +396,18 @@ try {
   await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
 
   await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
-  const roomPriceInput = page.getByLabel('Oda 101 gecelik fiyatı', { exact: true });
+  await designRoomRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
+  await expect(designRoomDialog).toBeVisible();
+  const roomPriceInput = designRoomDialog.getByLabel('Gecelik fiyat', { exact: true });
   const roomPriceBefore = await roomPriceInput.inputValue();
   await roomPriceInput.fill('-1');
   // MoneyInput rejects the sign at keystroke level: the last valid value stays,
   // the draft remains clean, so save/discard stay disabled and nothing persists.
   await expect(roomPriceInput).toHaveValue(roomPriceBefore);
-  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeDisabled();
+  await designRoomDialog.getByRole('button', { name: 'Vazgeç', exact: true }).click();
+  await expect(designRoomDialog).toHaveCount(0);
+  await expect(page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
+  await expect(page.locator('.settings-category-actions').getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
 
   await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
