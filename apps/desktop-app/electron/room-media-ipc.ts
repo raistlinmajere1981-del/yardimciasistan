@@ -3,6 +3,7 @@ import {
   BUSINESS_CAPABILITIES,
   type AddRoomMediaInput,
   type BusinessCapability,
+  type PublicResourceCoverPreview,
   type DeleteRoomMediaInput,
   type RoomMediaAsset,
   type RoomMediaDraftResult,
@@ -17,6 +18,7 @@ import {
   discardRoomMediaDraft,
   getRoomMediaDraftState,
   listRoomMedia,
+  listRoomMediaCoverPreviews,
   updateRoomMedia
 } from "./room-media-service";
 
@@ -30,6 +32,12 @@ export function registerRoomMediaIpcHandlers(options: {
     options.assertUnlocked();
     options.assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Oda medyası bu işletmede etkin değil.");
     return listRoomMedia(options.userDataPath(), roomId);
+  });
+
+  ipcMain.handle("roomMedia:coverPreviews", (): PublicResourceCoverPreview[] => {
+    options.assertUnlocked();
+    options.assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Oda medyası bu işletmede etkin değil.");
+    return listRoomMediaCoverPreviews(options.userDataPath());
   });
 
   ipcMain.handle("roomMedia:draftState", (): RoomMediaDraftState => {
