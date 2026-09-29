@@ -69,6 +69,8 @@ export function ServicesSettingsSection({
   };
 
   return (<>
+        <WebSettingsSection form={form} onFormChange={onFormChange} />
+
         <div id="settings-connections" className="settings-services-workspace">
 
           <section id="settings-whatsapp" tabIndex={-1} className={`settings-service-card${form.whatsappEnabled ? " is-enabled" : " is-disabled"}`}>
@@ -82,7 +84,8 @@ export function ServicesSettingsSection({
                 <span>{form.whatsappEnabled ? "Açık" : "Kapalı"}</span>
               </label>
             </div>
-            <fieldset className="settings-service-card-body setup-birthday-settings form-stack" disabled={!form.whatsappEnabled}>
+            {form.whatsappEnabled && (
+            <fieldset className="settings-service-card-body setup-birthday-settings form-stack">
               <div className="setup-section-title setup-section-title--subsection">
                 <h3>Doğum Günü Mesajları</h3>
               </div>
@@ -138,6 +141,7 @@ export function ServicesSettingsSection({
               </label>
             </div>
             </fieldset>
+            )}
           </section>
 
           <section id="settings-android" tabIndex={-1} className={`settings-service-card${form.androidEnabled ? " is-enabled" : " is-disabled"}`}>
@@ -151,8 +155,8 @@ export function ServicesSettingsSection({
                 <span>{form.androidEnabled ? "Açık" : "Kapalı"}</span>
               </label>
             </div>
-            <div className="settings-service-card-body">
-              {form.androidEnabled && (
+            {form.androidEnabled && (
+              <div className="settings-service-card-body">
                 <div className="form-stack">
                   <label className="form-check setup-checkline">
                     <input
@@ -166,32 +170,32 @@ export function ServicesSettingsSection({
                     Aynı ağda masaüstü bulunursa Android doğrudan bağlanır; ulaşılamazsa web bağlantısı otomatik kullanılır.
                   </small>
                 </div>
-              )}
-              {!form.androidEnabled ? (
-                <p className="settings-service-empty">Android bağlantısı kapalı.</p>
-              ) : setupData.setupRequired || !setupData.servicePreferences.android ? (
-                <p className="settings-service-empty">İlk ayar kaydından sonra Android cihazları burada yönetebilirsiniz.</p>
-              ) : (
-                <AndroidDevicesSection
-                  devices={dashboardData?.androidDevices ?? []}
-                  enabledCapabilities={enabledCapabilities}
-                  state={androidDeviceState}
-                  message={androidDeviceMessage}
-                  installState={androidInstallState}
-                  installMessage={androidInstallMessage}
-                  installSnapshot={androidInstallSnapshot}
-                  onRefreshInstallDevices={onRefreshAndroidInstallDevices}
-                  onInstallApp={onInstallAndroidApp}
-                  onProvisionApp={onProvisionAndroidApp}
-                  onSetRole={onSetAndroidDeviceRole}
-                  permissionGroupsByDevice={androidPermissionGroups}
-                  onPermissionGroupsChange={onAndroidPermissionGroupsChange}
-                  onSetActive={onSetAndroidDeviceActive}
-                  onResetPermissions={onResetAndroidDevicePermissions}
-                  onRevoke={onRevokeAndroidDevice}
-                />
-              )}
-            </div>
+                {setupData.setupRequired || !setupData.servicePreferences.android ? (
+                  <p className="settings-service-empty">
+                    Android servisini Kaydet ile etkinleştirdikten sonra cihaz yönetimi kullanılabilir.
+                  </p>
+                ) : (
+                  <AndroidDevicesSection
+                    devices={dashboardData?.androidDevices ?? []}
+                    enabledCapabilities={enabledCapabilities}
+                    state={androidDeviceState}
+                    message={androidDeviceMessage}
+                    installState={androidInstallState}
+                    installMessage={androidInstallMessage}
+                    installSnapshot={androidInstallSnapshot}
+                    onRefreshInstallDevices={onRefreshAndroidInstallDevices}
+                    onInstallApp={onInstallAndroidApp}
+                    onProvisionApp={onProvisionAndroidApp}
+                    onSetRole={onSetAndroidDeviceRole}
+                    permissionGroupsByDevice={androidPermissionGroups}
+                    onPermissionGroupsChange={onAndroidPermissionGroupsChange}
+                    onSetActive={onSetAndroidDeviceActive}
+                    onResetPermissions={onResetAndroidDevicePermissions}
+                    onRevoke={onRevokeAndroidDevice}
+                  />
+                )}
+              </div>
+            )}
           </section>
 
           {hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.RETAIL_BARCODE) && (
@@ -248,7 +252,6 @@ export function ServicesSettingsSection({
           )}
         </div>
 
-        <WebSettingsSection form={form} onFormChange={onFormChange} />
         <AiSettingsSection form={form} onFormChange={onFormChange} onTestAiConnection={onTestAiConnection} aiConnectionTestState={aiConnectionTestState} aiConnectionTestMessage={aiConnectionTestMessage} />
   </>);
 }
