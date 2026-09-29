@@ -196,7 +196,7 @@ try {
   await expect(tab('Uygulama')).toContainText('Değişiklik var');
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'system');
   await discard();
-  await expect(page.getByRole('radio', { name: 'Sistem', exact: true })).toBeChecked();
+  await expect(page.getByRole('group', { name: 'Renk düzeni' }).getByRole('radio', { name: 'Sistem', exact: true })).toBeChecked();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'system');
   await expect(tab('Uygulama')).not.toContainText('Değişiklik var');
 
@@ -228,6 +228,17 @@ try {
   await save();
   expect((await updateCalls()).length).toBe(beforeResetSave + 1);
   expect((await updateCalls()).at(-1).input.customBaseUrl).toBe('');
+
+  // Appearance draft joins the same leave guard; discard restores committed values.
+  await page.getByRole('group', { name: 'Yoğunluk' }).getByRole('radio', { name: 'Kompakt', exact: true }).check();
+  await expect(tab('Uygulama')).toContainText('Değişiklik var');
+  await select('İşletme');
+  await expect(guard()).toBeVisible();
+  await guard().getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
+  await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+  await select('Uygulama');
+  await expect(page.getByRole('group', { name: 'Yoğunluk' }).getByRole('radio', { name: 'Rahat', exact: true })).toBeChecked();
+  await expect(tab('Uygulama')).not.toContainText('Değişiklik var');
 
   // Operations is one collection draft: room + room details + table categories, one footer save.
   await select('İşletme Düzeni');
@@ -291,6 +302,28 @@ try {
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length)).toBe(beforeLayoutSave + 3);
   expect((await layoutCalls()).at(-1).input.rooms[0]).toMatchObject({ id: 'room-1', outOfService: false });
   await expect(page.getByLabel('Oda A1 hizmet dışı', { exact: true })).not.toBeChecked();
+
+  // Room media is staged with the operations category: add dirties without a
+  // layout write, save commits the staging, discard restores canonical media.
+  const mediaCommitCalls = () => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'room-media-commit'));
+  await page.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await expect(page.locator('.room-media-card')).toHaveCount(1);
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  expect((await layoutCalls()).length).toBe(beforeLayoutSave + 3);
+  await save();
+  expect((await mediaCommitCalls()).length).toBe(1);
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+  await expect(page.locator('.room-media-card')).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await expect(page.locator('.room-media-card')).toHaveCount(2);
+  await select('İşletme');
+  await expect(guard()).toBeVisible();
+  await guard().getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
+  await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+  await select('İşletme Düzeni');
+  await expect(page.locator('.room-media-card')).toHaveCount(1);
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
   // Add -> remove is net-zero dirty; removing an existing room is staged and discard restores it.
   await page.getByRole('button', { name: 'Oda Ekle', exact: true }).click();
@@ -404,6 +437,30 @@ try {
   expect((await setupCalls()).length).toBe(callsBeforeKeyDelete);
   await save();
   expect((await setupCalls()).at(-1).input.clearAiApiKey).toBe(true);
+
+  // Staff permission checkboxes are staged and committed as one batch write.
+  await page.evaluate(() => window.refreshSettings({ servicePreferences: { whatsapp: false, android: true } }));
+  await select('Servisler');
+  const permissionGroups = page.getByRole('group', { name: 'Görev alanları' });
+  const firstPermissionBox = permissionGroups.getByRole('checkbox').first();
+  await expect(firstPermissionBox).toBeVisible();
+  const androidBatchCalls = () => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'android-permissions'));
+  const batchBefore = (await androidBatchCalls()).length;
+  const initiallyChecked = await firstPermissionBox.isChecked();
+  await firstPermissionBox.click();
+  await expect(tab('Servisler')).toContainText('Değişiklik var');
+  expect((await androidBatchCalls()).length).toBe(batchBefore);
+  await save();
+  expect((await androidBatchCalls()).length).toBe(batchBefore + 1);
+  expect((await androidBatchCalls()).at(-1).input[0].deviceId).toBe('android-smoke-staff-01');
+  await expect(tab('Servisler')).not.toContainText('Değişiklik var');
+
+  await firstPermissionBox.click();
+  await expect(tab('Servisler')).toContainText('Değişiklik var');
+  await discard();
+  await expect(firstPermissionBox).toBeChecked({ checked: !initiallyChecked });
+  await expect(tab('Servisler')).not.toContainText('Değişiklik var');
+  await page.evaluate(() => window.refreshSettings({ servicePreferences: { whatsapp: false, android: false } }));
 
   // Responsive body remains bounded after the new footer/dialog architecture.
   for (const width of [1440, 1024, 900, 760, 600]) {

@@ -187,6 +187,8 @@ try {
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
     if (density === 'comfortable') await page.getByRole('radio', { name: 'Rahat', exact: true }).click();
+    // Appearance is staged: apply through the category save before asserting.
+    await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', scheme);
     await expect(page.locator('html')).toHaveAttribute('data-density', density);
     expect(await page.locator('html').evaluate(el => getComputedStyle(el).colorScheme)).toBe(scheme);

@@ -302,13 +302,20 @@ try {
           ? [...new Set([...device.permissions, "table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"])]
           : device.permissions.filter((permission) => !["table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"].includes(permission))
       }), role === "admin" ? "Telefon yönetici yapıldı." : "Telefon personel yapıldı."),
-      setAndroidDevicePermissionGroups: async (deviceId, permissionGroups) => mutateDevice(deviceId, (device) => ({
-        ...device,
-        permissionGroups,
-        permissions: permissionGroups.cashier
-          ? [...new Set([...device.permissions, "table_order.close_paid"])]
-          : device.permissions.filter((permission) => permission !== "table_order.close_paid")
-      }), "Telefon görev alanları güncellendi."),
+      setAndroidDevicePermissionGroupsBatch: async (updates) => {
+        let devices = currentDashboardData.androidDevices;
+        for (const update of updates ?? []) {
+          devices = devices.map((device) => device.deviceId === update?.deviceId ? {
+            ...device,
+            permissionGroups: update.groups,
+            permissions: update.groups.cashier
+              ? [...new Set([...device.permissions, "table_order.close_paid"])]
+              : device.permissions.filter((permission) => permission !== "table_order.close_paid")
+          } : device);
+        }
+        currentDashboardData = { ...currentDashboardData, androidDevices: devices };
+        return { ok: true, message: "Telefon görev alanları kaydedildi.", devices };
+      },
       setAndroidDeviceActive: async (deviceId, active) => mutateDevice(deviceId, (device) => ({ ...device, isActive: active, revokedAt: active ? "" : device.revokedAt }), active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi."),
       resetAndroidDevicePermissions: async (deviceId) => mutateDevice(deviceId, (device) => ({
         ...device,
@@ -443,8 +450,14 @@ try {
   const cashierGroup = androidDeviceSection.getByRole("checkbox", { name: /Kasa \/ Hesap/ });
   await expect(cashierGroup).not.toBeChecked();
   await cashierGroup.check();
+  // The checkbox stages into the Services draft: the summary follows the
+  // draft, but nothing is persisted before the category save.
   await expect(androidDeviceSection.getByText("Servis + Kasa + Oda işleri", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText("Telefon görev alanları güncellendi.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Servisler/ })).toContainText("Değişiklik var");
+  await expect(androidDeviceSection.getByText("Telefon görev alanları kaydedildi.", { exact: true })).toHaveCount(0);
+  await page.locator(".settings-category-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
+  await expect(page.locator(".settings-category-actions").getByText("Telefon görev alanları kaydedildi.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Servisler/ })).not.toContainText("Değişiklik var");
   await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
   await expect(androidDeviceSection.getByText("Yönetici", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Etkin yeteneklerde tüm izinler", { exact: true })).toBeVisible();
@@ -496,15 +509,24 @@ try {
   await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Mercan", exact: true })).toBeChecked();
   await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1");
+  const saveApplicationCategory = () => page.locator(".settings-category-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
+  const applicationTab = () => page.getByRole("tab", { name: /^Uygulama/ });
   await page.getByLabel("Arayüz ölçeği").selectOption("1.1");
+  await expect(applicationTab()).toContainText("Değişiklik var");
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1");
+  await saveApplicationCategory();
+  await expect(applicationTab()).not.toContainText("Değişiklik var");
   await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
   await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1.1");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ version: 2, scheme: "dark", density: "compact", scale: 1.1, accent: "coral", font: "plex", motion: "system" });
   await page.getByRole("radio", { name: "Mavi", exact: true }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
+  await saveApplicationCategory();
   await expect(page.locator("html")).toHaveAttribute("data-accent", "blue");
   await expect(page.getByRole("radio", { name: "Mercan", exact: true })).not.toBeChecked();
   await page.getByRole("radio", { name: "Mercan", exact: true }).check();
+  await saveApplicationCategory();
   await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Ayarlar" }).click();
@@ -518,18 +540,28 @@ try {
   await page.getByLabel("Arayüz ölçeği").selectOption("1");
   await page.getByRole("radio", { name: "Açık", exact: true }).check();
   await expect(page.getByRole("radio", { name: "Açık", exact: true })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+  await saveApplicationCategory();
   await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
   await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" });
   await page.getByRole("radio", { name: "Koyu", exact: true }).check();
   await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
+  await saveApplicationCategory();
   await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
   await page.getByRole("radio", { name: "Açık", exact: true }).check();
   await expect(page.getByRole("radio", { name: "Açık", exact: true })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+  await saveApplicationCategory();
   await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
   await page.getByRole("radio", { name: "Rahat", exact: true }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+  await saveApplicationCategory();
   await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
   await page.getByRole("radio", { name: "Kompakt", exact: true }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+  await saveApplicationCategory();
   await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");

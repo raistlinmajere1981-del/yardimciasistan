@@ -357,6 +357,8 @@ try {
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
     if (density === 'comfortable') await page.getByRole('radio', { name: 'Rahat', exact: true }).click();
+    // Appearance is staged: apply through the category save before asserting.
+    await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
     for (const name of ['Müşteri İşleri', 'Pansiyon']) {
       await page.locator('.sidebar').getByRole('button', { name, exact: true }).click();
       await capture(`${name}-${scheme}-${density}`);

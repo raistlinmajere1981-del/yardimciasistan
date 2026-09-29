@@ -416,6 +416,8 @@ try {
   for (const scheme of ['light','dark']) {
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
+    // Appearance is staged: apply through the category save so captures show the applied theme.
+    await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
     await page.locator('.content').evaluate(el => el.scrollTop = 0);
     await page.screenshot({ animations: "disabled", path: `${output}/settings-compact-${scheme}.png` });
   }

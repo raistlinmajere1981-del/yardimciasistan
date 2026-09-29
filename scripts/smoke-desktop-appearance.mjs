@@ -117,7 +117,25 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
     expect(Object.values(actualTokens).every((value) => value.trim().length > 0)).toBe(true);
 
     const lightSystemTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
+    const saveAppearance = () => page.locator(".settings-category-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
+    const applicationTab = () => page.getByRole("tab", { name: /^Uygulama/ });
+
+    // Staged appearance: selecting a value dirties the category, but neither
+    // the document nor localStorage changes until the category is saved.
     await page.getByRole("radio", { name: "Koyu", exact: true }).check();
+    await expect(applicationTab()).toContainText("Değişiklik var");
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
+    expect(await readStoredPreferences(page)).toEqual({
+      version: 2,
+      scheme: "system",
+      density: "comfortable",
+      scale: 1,
+      accent: "coral",
+      font: "plex",
+      motion: "system"
+    });
+    await saveAppearance();
+    await expect(applicationTab()).not.toContainText("Değişiklik var");
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
     expect(await page.evaluate(() => ({
@@ -139,6 +157,10 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
     });
 
     await page.getByRole("radio", { name: "Açık", exact: true }).check();
+    await expect(applicationTab()).toContainText("Değişiklik var");
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+    await saveAppearance();
+    await expect(applicationTab()).not.toContainText("Değişiklik var");
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
@@ -165,6 +187,10 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
     });
 
     await page.getByRole("radio", { name: "Kompakt", exact: true }).check();
+    await expect(applicationTab()).toContainText("Değişiklik var");
+    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+    await saveAppearance();
+    await expect(applicationTab()).not.toContainText("Değişiklik var");
     await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
     await expect(page.getByRole("radio", { name: "Kompakt", exact: true })).toBeChecked();
     await expect(page.getByLabel("Arayüz ölçeği")).toBeVisible();
@@ -181,6 +207,8 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
     });
 
     await page.getByRole("radio", { name: "Koyu", exact: true }).check();
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
+    await saveAppearance();
     await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
@@ -195,10 +223,13 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
     });
 
     await page.getByRole("radio", { name: "Mavi", exact: true }).check();
+    await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
+    await saveAppearance();
     await expect(page.locator("html")).toHaveAttribute("data-accent", "blue");
     const blueAccentTokens = await readRootTokens(page, ["--color-accent", "--color-focus"]);
     expect(blueAccentTokens["--color-accent"]).not.toBe(darkThemeTokens["--color-accent"]);
     await page.getByRole("radio", { name: "Mercan", exact: true }).check();
+    await saveAppearance();
     await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
 
     await page.reload({ waitUntil: "domcontentloaded" });

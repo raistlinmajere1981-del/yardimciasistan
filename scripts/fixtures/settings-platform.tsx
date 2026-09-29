@@ -37,6 +37,30 @@ let layout = {
   tableCategories: [{ name: "Salon", tableCount: 2 }]
 };
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
+let mediaSeq = 0;
+let mediaCanonical: Array<Record<string, unknown>> = [];
+let mediaDraft: Array<Record<string, unknown>> | null = null;
+const mediaStagedDirty = () => mediaDraft !== null && JSON.stringify(mediaDraft) !== JSON.stringify(mediaCanonical);
+const mediaVisible = (roomId: string) => (mediaDraft ?? mediaCanonical)
+  .filter((item) => item.roomId === roomId)
+  .map((item) => ({ ...item }));
+let androidDevices = [
+  {
+    id: "android-device-row-1",
+    deviceId: "android-smoke-staff-01",
+    deviceName: "Personel Telefonu",
+    appVersion: "1.0",
+    role: "staff",
+    isActive: true,
+    permissionGroups: { service_orders: true, cashier: false, rooms_tasks: true, customer_reservation: false, market_operations: false },
+    permissions: [],
+    firstSeenAt: "",
+    lastSeenAt: "",
+    createdAt: "",
+    updatedAt: "",
+    revokedAt: ""
+  }
+];
 let pageLeaveGuard: PageLeaveGuard | null = null;
 window.settingsPageLeaveCompleted = false;
 window.requestSettingsPageLeave = () => {
@@ -62,7 +86,7 @@ window.yardimciDesktop = {
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
     canonical = { ...canonical, ...input, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured };
-    return { ok: true, message: "Kaydedildi", setupData: structuredClone(canonical), dashboardData: defaultDashboardData };
+    return { ok: true, message: "Kaydedildi", setupData: structuredClone(canonical), dashboardData: { ...defaultDashboardData, androidDevices: structuredClone(androidDevices) } };
   },
   getBusinessPublicProfile: async () => profile,
   saveBusinessPublicProfile: async input => { window.settingsCalls.push({ kind: "profile", input }); if (window.failProfile) return { ok: false, message: "Profil hatası" }; profile = input; return { ok: true, message: "Müşteri bilgileri kaydedildi", profile }; },
@@ -140,10 +164,52 @@ window.yardimciDesktop = {
       })
     };
   },
-  listRoomMedia: async () => [],
-  addRoomMedia: async () => ({ ok: true, message: "Medya eklendi.", media: [] }),
-  updateRoomMedia: async () => ({ ok: true, message: "Medya güncellendi.", media: [] }),
-  deleteRoomMedia: async () => ({ ok: true, message: "Medya kaldırıldı.", media: [] }),
+  listRoomMedia: async (roomId) => mediaVisible(String(roomId ?? "")),
+  addRoomMedia: async (input) => {
+    const roomId = String(input?.roomId ?? "");
+    if (!mediaDraft) mediaDraft = structuredClone(mediaCanonical);
+    mediaSeq += 1;
+    mediaDraft.push({ id: `media-${mediaSeq}`, roomId, kind: "photo", originalName: `oda-fotograf-${mediaSeq}.jpg`, mimeType: "image/jpeg", title: "", sortOrder: mediaDraft.length + 1, sizeBytes: 2048, updatedAt: new Date().toISOString(), remoteUrl: "", previewDataUrl: "" });
+    return { ok: true, message: "Oda medyası taslağa eklendi.", media: mediaVisible(roomId), dirty: mediaStagedDirty() };
+  },
+  updateRoomMedia: async (input) => {
+    const roomId = String(input?.roomId ?? "");
+    if (!mediaDraft) mediaDraft = structuredClone(mediaCanonical);
+    const target = mediaDraft.find((item) => item.roomId === roomId && item.id === input?.mediaId);
+    if (!target) return { ok: false, message: "Medya kaydı bulunamadı.", media: mediaVisible(roomId), dirty: mediaStagedDirty() };
+    target.kind = input?.kind ?? target.kind;
+    return { ok: true, message: "Medya bilgisi taslakta güncellendi.", media: mediaVisible(roomId), dirty: mediaStagedDirty() };
+  },
+  deleteRoomMedia: async (input) => {
+    const roomId = String(input?.roomId ?? "");
+    if (!mediaDraft) mediaDraft = structuredClone(mediaCanonical);
+    mediaDraft = mediaDraft.filter((item) => !(item.roomId === roomId && item.id === input?.mediaId));
+    return { ok: true, message: "Medya taslaktan kaldırıldı.", media: mediaVisible(roomId), dirty: mediaStagedDirty() };
+  },
+  getRoomMediaDraftState: async () => ({ dirty: mediaStagedDirty() }),
+  commitRoomMediaDraft: async () => {
+    window.settingsCalls.push({ kind: "room-media-commit" });
+    if (!mediaStagedDirty()) { mediaDraft = null; return { ok: true, message: "Oda medyalarında değişiklik yok.", dirty: false, changed: false }; }
+    mediaCanonical = mediaDraft;
+    mediaDraft = null;
+    return { ok: true, message: "Oda medyaları kaydedildi.", dirty: false, changed: true };
+  },
+  discardRoomMediaDraft: async () => {
+    const changed = mediaStagedDirty();
+    mediaDraft = null;
+    return { ok: true, message: changed ? "Oda medyası değişiklikleri geri alındı." : "Oda medyalarında bekleyen değişiklik yok.", dirty: false, changed };
+  },
+  setAndroidDevicePermissionGroupsBatch: async (updates) => {
+    window.settingsCalls.push({ kind: "android-permissions", input: updates });
+    for (const update of updates ?? []) {
+      const device = androidDevices.find((candidate) => candidate.deviceId === update?.deviceId);
+      if (!device || device.role !== "staff" || device.revokedAt) {
+        return { ok: false, message: "Görev alanı değiştirilecek telefon artık mevcut değil.", devices: structuredClone(androidDevices) };
+      }
+      device.permissionGroups = { ...update.groups };
+    }
+    return { ok: true, message: "Telefon görev alanları kaydedildi.", devices: structuredClone(androidDevices) };
+  },
   getUpdateStatus: async () => updateStatus,
   onUpdateStatusChanged: () => () => {},
   saveUpdatePreferences: async input => { window.settingsCalls.push({ kind: "update-preferences", input }); if (window.failUpdate) return { ok: false, message: "Güncelleme tercih hatası", status: updateStatus }; updateStatus = { ...updateStatus, ...input }; return { ok: true, message: "Güncelleme tercihleri kaydedildi", status: updateStatus }; },
@@ -162,7 +228,7 @@ function Fixture() {
   const setup = useSetupController();
   const [ready, setReady] = useState(false);
   const [preferences, setPreferences] = useState(readUiPreferences);
-  const [, setDashboard] = useState(defaultDashboardData);
+  const [dashboard, setDashboard] = useState(() => ({ ...defaultDashboardData, androidDevices: structuredClone(androidDevices) }));
   useEffect(() => { setup.applyBootstrapSetup(canonical, false); setReady(true); }, []);
   useEffect(() => { applyUiPreferences(preferences); saveUiPreferences(preferences); }, [preferences]);
   window.refreshSettings = patch => { canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
@@ -171,11 +237,14 @@ function Fixture() {
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { profileId: setup.setupData.profileId, enabledCapabilities: capabilities }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><h1>Ayarlar</h1></header>}>
-      {ready && <SettingsWorkspace setupData={setup.setupData} dashboardData={defaultDashboardData}
+      {ready && <SettingsWorkspace setupData={setup.setupData} dashboardData={dashboard}
         onSave={input => setup.saveSetup(input, setDashboard)}
         uiPreferences={preferences}
         onUiPreferencesChange={setPreferences}
         onAppPasswordConfiguredChange={setup.setPasswordConfigured}
+        onDashboardRefresh={async () => {
+          setDashboard((current) => ({ ...current, androidDevices: structuredClone(androidDevices) }));
+        }}
         registerPageLeaveGuard={(guard) => {
           pageLeaveGuard = guard;
           return () => {
