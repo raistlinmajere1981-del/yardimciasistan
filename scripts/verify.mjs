@@ -74,7 +74,8 @@ console.log(`Seçim: ${selectionLabel(selection)}`);
 console.log(`Plan: ${plan.length} benzersiz kontrol\n`);
 
 const results = new Map();
-for (const item of plan) {
+for (const [index, item] of plan.entries()) {
+  const progress = `[${index + 1}/${plan.length}]`;
   const blockedBy = item.requires.filter((id) => {
     const dependency = results.get(id);
     return dependency && dependency.status !== "passed";
@@ -92,12 +93,12 @@ for (const item of plan) {
     };
     results.set(item.id, result);
     report.checks.push(result);
-    console.log(`- ${item.label} · ${result.reason}`);
+    console.log(`- ${progress} ${item.label} · ${result.reason}`);
     save();
     continue;
   }
 
-  const result = run(item);
+  const result = run(item, progress);
   results.set(item.id, result);
   report.checks.push(result);
   save();
@@ -121,8 +122,8 @@ for (const item of skipped) console.log(`  - ${item.label} · ${item.reason}`);
 if (report.result !== "passed") process.exitCode = 1;
 else console.log("\nDoğrulama planı temiz.");
 
-function run(item) {
-  console.log(`\n▶ [${item.id}] ${item.label}`);
+function run(item, progress) {
+  console.log(`\n▶ ${progress} [${item.id}] ${item.label}`);
   const startedAt = Date.now();
   const command = resolveCommand(item.command);
   const out = spawnSync(command, item.args, {
@@ -133,7 +134,7 @@ function run(item) {
   });
   const duration = Date.now() - startedAt;
   const passed = out.status === 0 && !out.error;
-  console.log(`${passed ? "✓" : "✗"} ${item.label} (${duration} ms)`);
+  console.log(`${passed ? "✓" : "✗"} ${progress} ${item.label} (${duration} ms)`);
   return {
     id: item.id,
     label: item.label,
