@@ -21,7 +21,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
+if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -110,6 +110,10 @@ try {
 
     if ($action === 'publish_room_catalog') {
         ya_sync_publish_room_catalog($payload);
+    }
+
+    if ($action === 'publish_table_catalog') {
+        ya_sync_publish_table_catalog($payload);
     }
 
     if ($action === 'publish_ai_catalog') {
@@ -1071,6 +1075,7 @@ function ya_sync_publish_room_catalog(array $payload): void
     $now = date(DATE_ATOM);
     $catalog = [
         'version' => 1,
+        'enabled' => ya_sync_bool($candidate['enabled'] ?? true),
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'rooms' => $rooms
     ];
@@ -1129,6 +1134,143 @@ function ya_sync_prune_room_media(array $rooms): void
         $remaining = glob($roomDirectory . '/*') ?: [];
         if ($remaining === []) {
             @rmdir($roomDirectory);
+        }
+    }
+}
+
+function ya_sync_publish_table_catalog(array $payload): void
+{
+    $candidate = $payload['table_catalog'] ?? null;
+    if (!is_array($candidate)) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Yayınlanacak masa kataloğu bulunamadı.']);
+    }
+
+    $allowedFeatures = [
+        'indoor',
+        'outdoor',
+        'terrace',
+        'window_side',
+        'sea_view',
+        'garden_view',
+        'quiet_area',
+        'wheelchair_friendly'
+    ];
+    $allowedSmokingPolicies = ['unspecified', 'non_smoking', 'smoking_allowed', 'outdoor_only'];
+    $tables = [];
+
+    foreach (($candidate['tables'] ?? []) as $rawTable) {
+        if (!is_array($rawTable)) continue;
+        $id = mb_substr(ya_sync_string($rawTable['id'] ?? ''), 0, 180);
+        $name = mb_substr(ya_sync_string($rawTable['name'] ?? ''), 0, 120);
+        if ($id === '' || $name === '') continue;
+
+        $media = [];
+        foreach (($rawTable['media'] ?? []) as $rawMedia) {
+            if (!is_array($rawMedia)) continue;
+            $kind = ya_sync_string($rawMedia['kind'] ?? '');
+            if (!in_array($kind, ['cover', 'photo', 'panorama_360', 'panorama_180', 'video'], true)) continue;
+            $url = mb_substr(ya_sync_string($rawMedia['url'] ?? ''), 0, 2048);
+            if ($url === '') continue;
+            $media[] = [
+                'id' => mb_substr(ya_sync_string($rawMedia['id'] ?? ''), 0, 180),
+                'kind' => $kind,
+                'url' => $url,
+                'mime_type' => mb_substr(ya_sync_string($rawMedia['mime_type'] ?? ''), 0, 120),
+                'title' => mb_substr(ya_sync_string($rawMedia['title'] ?? ''), 0, 240),
+                'sort_order' => max(0, ya_sync_int($rawMedia['sort_order'] ?? 0, 0))
+            ];
+        }
+
+        $features = array_values(array_filter(
+            array_slice(ya_sync_string_array($rawTable['features'] ?? []), 0, 32),
+            static fn (string $feature): bool => in_array($feature, $allowedFeatures, true)
+        ));
+        $smokingPolicy = ya_sync_string($rawTable['smoking_policy'] ?? 'unspecified');
+        if (!in_array($smokingPolicy, $allowedSmokingPolicies, true)) {
+            $smokingPolicy = 'unspecified';
+        }
+
+        $tables[] = [
+            'id' => $id,
+            'name' => $name,
+            'area' => mb_substr(ya_sync_string($rawTable['area'] ?? ''), 0, 120),
+            'capacity' => max(1, min(100, ya_sync_int($rawTable['capacity'] ?? 1, 1))),
+            'description' => mb_substr(ya_sync_string($rawTable['description'] ?? ''), 0, 1200),
+            'features' => $features,
+            'smoking_policy' => $smokingPolicy,
+            'sort_order' => max(0, ya_sync_int($rawTable['sort_order'] ?? 0, 0)),
+            'media' => $media
+        ];
+    }
+
+    usort($tables, static fn (array $a, array $b): int =>
+        ((int) ($a['sort_order'] ?? 0) <=> (int) ($b['sort_order'] ?? 0))
+        ?: strcmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''))
+    );
+
+    $clientId = ya_sync_require_client_id($payload);
+    $now = date(DATE_ATOM);
+    $catalog = [
+        'version' => 1,
+        'enabled' => ya_sync_bool($candidate['enabled'] ?? false),
+        'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
+        'tables' => $tables
+    ];
+    $publication = ya_storage_publish('table_catalog', $catalog, $clientId, null, '', $now);
+    ya_sync_prune_table_media($tables);
+
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Masa kataloğu yayınlandı.',
+        'published_at' => $now,
+        'table_count' => count($tables),
+        'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'],
+        'deduplicated' => $publication['deduplicated']
+    ]);
+}
+
+function ya_sync_prune_table_media(array $tables): void
+{
+    $root = YA_BASE_DIR . '/media/tables';
+    if (!is_dir($root)) {
+        return;
+    }
+
+    $keep = [];
+    foreach ($tables as $table) {
+        if (!is_array($table)) continue;
+        foreach (($table['media'] ?? []) as $media) {
+            if (!is_array($media)) continue;
+            $url = ya_sync_string($media['url'] ?? '');
+            if ($url === '') continue;
+            $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+            $marker = '/media/tables/';
+            $position = strpos($path, $marker);
+            if ($position === false) continue;
+            $relative = substr($path, $position + strlen($marker));
+            $segments = array_values(array_filter(array_map('rawurldecode', explode('/', $relative)), static fn (string $value): bool => $value !== ''));
+            if (count($segments) !== 2) continue;
+            [$tableId, $fileName] = $segments;
+            if (preg_match('/^[A-Za-z0-9._:-]{1,180}$/', $tableId) !== 1) continue;
+            if (preg_match('/^[A-Za-z0-9._-]{1,220}$/', $fileName) !== 1) continue;
+            $keep[$tableId . '/' . $fileName] = true;
+        }
+    }
+
+    foreach (glob($root . '/*', GLOB_ONLYDIR) ?: [] as $tableDirectory) {
+        $tableId = basename($tableDirectory);
+        if (preg_match('/^[A-Za-z0-9._:-]{1,180}$/', $tableId) !== 1) continue;
+        foreach (glob($tableDirectory . '/*') ?: [] as $file) {
+            if (!is_file($file)) continue;
+            $key = $tableId . '/' . basename($file);
+            if (!isset($keep[$key])) {
+                @unlink($file);
+            }
+        }
+        $remaining = glob($tableDirectory . '/*') ?: [];
+        if ($remaining === []) {
+            @rmdir($tableDirectory);
         }
     }
 }
