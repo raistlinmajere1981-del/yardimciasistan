@@ -253,7 +253,7 @@
 
     let payload = null;
     try {
-      const response = await fetch("/api/google-reviews.php", {
+      const response = await fetch("/yardimci-asistan/api/google-reviews.php", {
         headers: { Accept: "application/json" },
         cache: "no-store"
       });
