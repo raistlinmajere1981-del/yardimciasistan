@@ -26,15 +26,6 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     reportTableMediaDirty
   } = controller;
 
-  if (!draft.capabilities.tables) return null;
-
-  const tableCountTotal = draft.tableCategories.reduce((total, category) => {
-    const count = Number(category.tableCount);
-    return total + (Number.isFinite(count) && count > 0 ? count : 0);
-  }, 0);
-  const editingTable = draft.tables.find((table) => table.id === editingTableId) ?? null;
-  const mediaTable = draft.tables.find((table) => table.key === mediaTableKey) ?? draft.tables[0] ?? null;
-
   useEffect(() => {
     if (draft.tables.length === 0) {
       setMediaTableKey("");
@@ -44,6 +35,15 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
       setMediaTableKey(draft.tables[0].key);
     }
   }, [draft.tables, mediaTableKey]);
+
+  if (!draft.capabilities.tables) return null;
+
+  const tableCountTotal = draft.tableCategories.reduce((total, category) => {
+    const count = Number(category.tableCount);
+    return total + (Number.isFinite(count) && count > 0 ? count : 0);
+  }, 0);
+  const editingTable = draft.tables.find((table) => table.id === editingTableId) ?? null;
+  const mediaTable = draft.tables.find((table) => table.key === mediaTableKey) ?? draft.tables[0] ?? null;
 
   return (
     <section id="settings-operations" tabIndex={-1} className="settings-daily-section table-layout-settings">
