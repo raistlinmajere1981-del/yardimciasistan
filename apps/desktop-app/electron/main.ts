@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
+import { installDesktopContextMenu } from "./desktop-context-menu";
 import { desktopLog } from "./desktop-logger";
 import { LocalCompanionServer } from "./local-companion-server";
 import { LocalCompanionPairingService } from "./local-companion-pairing-service";
@@ -277,6 +278,7 @@ function createMainWindow() {
   });
 
   window.removeMenu();
+  installDesktopContextMenu(window);
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) {
