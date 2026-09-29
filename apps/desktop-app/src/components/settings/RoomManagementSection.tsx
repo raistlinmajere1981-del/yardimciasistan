@@ -12,7 +12,7 @@ type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
 export function RoomManagementSection({ controller }: { controller: BusinessLayoutController }) {
   const [editingKey, setEditingKey] = useState("");
   const [mediaRoomKey, setMediaRoomKey] = useState("");
-  const { draft, loading, saving, mediaRevision, updateRoom, addRoom, removeRoom, reportMediaDirty } = controller;
+  const { draft, loading, saving, mediaRevision, updateRoom, addRoom, removeRoom, updatePublication, reportMediaDirty } = controller;
   const rooms = draft.rooms;
   const roomsEnabled = draft.capabilities.rooms;
 
@@ -58,6 +58,19 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
         </div>
 
         <fieldset disabled={saving || loading} className="settings-resource-fields settings-panel-body room-management-panel-body">
+          <div className="settings-publication-control">
+            <label className="form-check setup-checkline">
+              <input
+                type="checkbox"
+                checked={draft.publication.rooms}
+                onChange={(event) => updatePublication({ rooms: event.target.checked })}
+              />
+              <span>
+                <strong>Odaları web sitesinde yayınla</strong>
+                <small>Kapalıysa oda kataloğu ve oda detayları web sitesinden kaldırılır.</small>
+              </span>
+            </label>
+          </div>
           <div className="room-management-list" aria-label="Oda adı ve fiyatları">
             {loading ? (
               <div className="room-management-loading">Odalar hazırlanıyor…</div>
