@@ -139,6 +139,10 @@ required_package_files=(
   api/business.php
   api/chat.php
   api/menu.php
+  api/rooms.php
+  api/room-media.php
+  api/tables.php
+  api/table-media.php
   api/sync.php
   config/business.json
   data/.htaccess
@@ -401,6 +405,10 @@ if command -v curl >/dev/null 2>&1; then
       "${public_url%/}/api/menu.php" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
       "${public_url%/}/api/business.php" >/dev/null \
+    || ! curl --fail --silent --show-error --max-time 20 \
+      "${public_url%/}/api/rooms.php" >/dev/null \
+    || ! curl --fail --silent --show-error --max-time 20 \
+      "${public_url%/}/api/tables.php" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
       -X OPTIONS "${public_url%/}/api/chat.php" >/dev/null; then
     printf 'Yayın uygulandı ancak canlı HTTP kontrolü başarısız oldu.\n' >&2
