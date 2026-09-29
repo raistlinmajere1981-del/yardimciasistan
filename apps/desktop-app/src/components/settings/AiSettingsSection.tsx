@@ -152,6 +152,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               <span>{form.aiEnabled ? "Açık" : "Kapalı"}</span>
             </label>
           </div>
+          {form.aiEnabled && (
           <div className="settings-service-card-body">
           <div className="form-grid">
             <div className="setup-ai-provider-row form-field--span">
@@ -275,6 +276,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
           </div>
           {form.aiService !== "gemini" && renderAiConnectionActions(false)}
           </div>
+          )}
         </section>
 
   );
