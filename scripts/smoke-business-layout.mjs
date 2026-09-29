@@ -85,6 +85,7 @@ try {
 
   const initial = getBusinessLayout(database.databasePath);
   assert.deepEqual(initial.capabilities, { rooms: true, tables: true });
+  assert.deepEqual(initial.publication, { rooms: true, tables: false });
   assert.equal(initial.rooms.length, 2);
   for (const room of initial.rooms) assert.equal(room.outOfService, false);
   assert.deepEqual(initial.tableCategories, [
@@ -107,6 +108,23 @@ try {
       { name: "Teras 1", area: "Teras", capacity: 4, description: "", features: [], smokingPolicy: "unspecified" }
     ]
   );
+
+  const publicationSave = saveBusinessLayout(database.databasePath, {
+    publication: { rooms: false, tables: true }
+  });
+  assert.equal(publicationSave.ok, true, publicationSave.ok ? "" : publicationSave.message);
+  assert.deepEqual(publicationSave.layout.publication, { rooms: false, tables: true });
+
+  const publicationDb = new DatabaseSync(database.databasePath);
+  try {
+    const row = publicationDb.prepare(
+      "SELECT publish_rooms_web, publish_tables_web FROM business WHERE deleted_at = '' LIMIT 1"
+    ).get();
+    assert.equal(Number(row.publish_rooms_web), 0);
+    assert.equal(Number(row.publish_tables_web), 1);
+  } finally {
+    publicationDb.close();
+  }
 
   const firstRoom = initial.rooms[0];
   const removedRoom = initial.rooms[1];
@@ -431,7 +449,7 @@ try {
   assert.equal(normalReactivate.layout.rooms.find((room) => room.id === inconsistentTarget.id)?.outOfService, false);
   assert.equal(readStatus(inconsistentTarget.id).status, "available");
 
-  console.log("business-layout-smoke-ok: atomic room/table layout, public table details, archive, blocker and partial update verified");
+  console.log("business-layout-smoke-ok: atomic room/table layout, publication visibility, public table details, archive, blocker and partial update verified");
 } finally {
   database.close();
   rmSync(dataDir, { recursive: true, force: true });
