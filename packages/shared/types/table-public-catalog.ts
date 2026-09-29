@@ -27,6 +27,7 @@ export interface TablePublicCatalogTable {
 
 export interface TablePublicCatalog {
   version: typeof TABLE_PUBLIC_CATALOG_VERSION;
+  enabled: boolean;
   updatedAt: string;
   tables: TablePublicCatalogTable[];
 }
