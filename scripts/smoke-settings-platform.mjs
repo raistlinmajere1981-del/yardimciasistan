@@ -254,6 +254,11 @@ try {
   await expect(roomDialog.locator('.panel')).toHaveCount(2);
   await roomDialog.getByLabel('Oda numarası').fill('A1');
   await roomDialog.getByLabel('Kapasite').fill('3');
+  await roomDialog.getByLabel('Açıklama').fill('Kaydedilmemiş oda taslağı korunmalı.');
+  await page.evaluate(() => window.refreshSettings({}));
+  await expect(roomDialog.getByLabel('Oda numarası')).toHaveValue('A1');
+  await expect(roomDialog.getByLabel('Kapasite')).toHaveValue('3');
+  await expect(roomDialog.getByLabel('Açıklama')).toHaveValue('Kaydedilmemiş oda taslağı korunmalı.');
   await roomDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect(roomDialog).toHaveCount(0);
 
@@ -381,6 +386,11 @@ try {
   await tableDialog.getByRole('checkbox', { name: 'Açık alan', exact: true }).check();
   await tableDialog.getByRole('checkbox', { name: 'Deniz manzarası', exact: true }).check();
   await tableDialog.getByLabel('Açıklama').fill('Deniz tarafında geniş aile masası.');
+  await page.evaluate(() => window.refreshSettings({}));
+  await expect(tableDialog.getByLabel('Kapasite')).toHaveValue('6');
+  await expect(tableDialog.getByLabel('Açıklama')).toHaveValue('Deniz tarafında geniş aile masası.');
+  await expect(tableDialog.getByRole('checkbox', { name: 'Açık alan', exact: true })).toBeChecked();
+  await expect(tableDialog.getByRole('checkbox', { name: 'Deniz manzarası', exact: true })).toBeChecked();
   await tableDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect(tableDialog).toHaveCount(0);
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
