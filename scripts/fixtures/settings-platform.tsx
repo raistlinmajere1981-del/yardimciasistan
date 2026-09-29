@@ -48,6 +48,14 @@ const mediaStagedDirty = () => mediaDraft !== null && JSON.stringify(mediaDraft)
 const mediaVisible = (roomId: string) => (mediaDraft ?? mediaCanonical)
   .filter((item) => item.roomId === roomId)
   .map((item) => ({ ...item }));
+
+let tableMediaSeq = 0;
+let tableMediaCanonical: Array<Record<string, unknown>> = [];
+let tableMediaDraft: Array<Record<string, unknown>> | null = null;
+const tableMediaStagedDirty = () => tableMediaDraft !== null && JSON.stringify(tableMediaDraft) !== JSON.stringify(tableMediaCanonical);
+const tableMediaVisible = (tableId: string) => (tableMediaDraft ?? tableMediaCanonical)
+  .filter((item) => item.tableId === tableId)
+  .map((item) => ({ ...item }));
 let androidDevices = [
   {
     id: "android-device-row-1",
@@ -217,6 +225,44 @@ window.yardimciDesktop = {
     const changed = mediaStagedDirty();
     mediaDraft = null;
     return { ok: true, message: changed ? "Oda medyası değişiklikleri geri alındı." : "Oda medyalarında bekleyen değişiklik yok.", dirty: false, changed };
+  },
+  listTableMedia: async (tableId) => tableMediaVisible(String(tableId ?? "")),
+  addTableMedia: async (input) => {
+    const tableId = String(input?.tableId ?? "");
+    if (!tableMediaDraft) tableMediaDraft = structuredClone(tableMediaCanonical);
+    tableMediaSeq += 1;
+    tableMediaDraft.push({ id: `table-media-${tableMediaSeq}`, tableId, kind: "photo", originalName: `masa-fotograf-${tableMediaSeq}.jpg`, mimeType: "image/jpeg", title: "", sortOrder: tableMediaDraft.length + 1, sizeBytes: 2048, updatedAt: new Date().toISOString(), remoteUrl: "", previewDataUrl: "" });
+    return { ok: true, message: "Masa medyası taslağa eklendi.", media: tableMediaVisible(tableId), dirty: tableMediaStagedDirty() };
+  },
+  updateTableMedia: async (input) => {
+    const tableId = String(input?.tableId ?? "");
+    if (!tableMediaDraft) tableMediaDraft = structuredClone(tableMediaCanonical);
+    const target = tableMediaDraft.find((item) => item.tableId === tableId && item.id === input?.mediaId);
+    if (!target) return { ok: false, message: "Medya kaydı bulunamadı.", media: tableMediaVisible(tableId), dirty: tableMediaStagedDirty() };
+    target.kind = input?.kind ?? target.kind;
+    return { ok: true, message: "Medya bilgisi taslakta güncellendi.", media: tableMediaVisible(tableId), dirty: tableMediaStagedDirty() };
+  },
+  deleteTableMedia: async (input) => {
+    const tableId = String(input?.tableId ?? "");
+    if (!tableMediaDraft) tableMediaDraft = structuredClone(tableMediaCanonical);
+    tableMediaDraft = tableMediaDraft.filter((item) => !(item.tableId === tableId && item.id === input?.mediaId));
+    return { ok: true, message: "Medya taslaktan kaldırıldı.", media: tableMediaVisible(tableId), dirty: tableMediaStagedDirty() };
+  },
+  getTableMediaDraftState: async () => ({ dirty: tableMediaStagedDirty() }),
+  commitTableMediaDraft: async () => {
+    window.settingsCalls.push({ kind: "table-media-commit" });
+    if (!tableMediaStagedDirty()) {
+      tableMediaDraft = null;
+      return { ok: true, message: "Masa medyalarında değişiklik yok.", dirty: false, changed: false };
+    }
+    tableMediaCanonical = tableMediaDraft;
+    tableMediaDraft = null;
+    return { ok: true, message: "Masa medyaları kaydedildi.", dirty: false, changed: true };
+  },
+  discardTableMediaDraft: async () => {
+    const changed = tableMediaStagedDirty();
+    tableMediaDraft = null;
+    return { ok: true, message: changed ? "Masa medyası değişiklikleri geri alındı." : "Masa medyalarında bekleyen değişiklik yok.", dirty: false, changed };
   },
   setAndroidDevicePermissionGroupsBatch: async (updates) => {
     window.settingsCalls.push({ kind: "android-permissions", input: updates });
