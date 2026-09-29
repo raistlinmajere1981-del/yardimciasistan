@@ -99,7 +99,18 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                       type="number"
                     />
                   </label>
-                  <div className="table-category-row-actions">
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    className="table-category-remove"
+                    type="button"
+                    onClick={() => removeTableCategory(category.key)}
+                    aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
+                    title="Kategoriyi kaldır"
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                  </ActionButton>
+                  <div className="table-category-add-slot">
                     {index === 0 && (
                       <ActionButton
                         variant="secondary"
@@ -112,17 +123,6 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                         Kategori Ekle
                       </ActionButton>
                     )}
-                    <ActionButton
-                      variant="ghost"
-                      size="sm"
-                      className="table-category-remove"
-                      type="button"
-                      onClick={() => removeTableCategory(category.key)}
-                      aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
-                      title="Kategoriyi kaldır"
-                    >
-                      <Trash2 size={15} aria-hidden="true" />
-                    </ActionButton>
                   </div>
                 </div>
               ))}
