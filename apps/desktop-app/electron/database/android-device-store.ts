@@ -6,10 +6,11 @@ import {
   ANDROID_STAFF_PERMISSIONS,
   androidPermissionsForGroups
 } from "@yardimci-asistan/sync-core";
-import type { AndroidDeviceSighting, AndroidSnapshotPermissionProfile } from "@yardimci-asistan/sync-core";
+import type { AndroidDeviceSighting, AndroidPermissionGroups, AndroidSnapshotPermissionProfile } from "@yardimci-asistan/sync-core";
 import type {
   DesktopAndroidDevice,
-  DesktopAndroidDeviceMutationResult
+  DesktopAndroidDeviceMutationResult,
+  DesktopAndroidPermissionGroupsUpdate
 } from "../database-types.js";
 import {
   androidPermissionsForRole,
@@ -182,6 +183,87 @@ export function setAndroidDevicePermissionGroups(db: DatabaseSync, deviceIdInput
   return Number(result.changes) === 1
     ? { ok: true, message: "Telefon görev alanları güncellendi.", devices: getAndroidDevices(db, enabledCapabilities) }
     : { ok: false, message: "Telefon kaydı bulunamadı.", devices: getAndroidDevices(db, enabledCapabilities) };
+}
+
+export function setAndroidDevicePermissionGroupsBatch(
+  db: DatabaseSync,
+  updatesInput: DesktopAndroidPermissionGroupsUpdate[],
+  enabledCapabilities: ReadonlySet<BusinessCapability>
+): DesktopAndroidDeviceMutationResult {
+  if (!Array.isArray(updatesInput) || updatesInput.length === 0) {
+    return { ok: true, message: "Telefon görev alanlarında değişiklik yok.", devices: getAndroidDevices(db, enabledCapabilities) };
+  }
+
+  const normalized: Array<{ deviceId: string; groups: AndroidPermissionGroups }> = [];
+  const seen = new Set<string>();
+  let transactionStarted = false;
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    transactionStarted = true;
+
+    for (const update of updatesInput) {
+      const deviceId = normalizeAndroidDeviceId(update?.deviceId);
+      const groups = normalizeAndroidPermissionGroupsInput(update?.groups);
+      if (!deviceId || !groups || seen.has(deviceId)) {
+        db.exec("ROLLBACK");
+        transactionStarted = false;
+        return { ok: false, message: "Telefon görev alanı taslağı geçersiz.", devices: getAndroidDevices(db, enabledCapabilities) };
+      }
+      seen.add(deviceId);
+
+      const row = db.prepare("SELECT role FROM android_devices WHERE device_id = ?").get(deviceId) as { role?: unknown } | undefined;
+      if (!row) {
+        db.exec("ROLLBACK");
+        transactionStarted = false;
+        return { ok: false, message: "Görev alanı değiştirilecek telefon artık mevcut değil.", devices: getAndroidDevices(db, enabledCapabilities) };
+      }
+      if (normalizeAndroidDeviceRole(row.role) === "admin") {
+        db.exec("ROLLBACK");
+        transactionStarted = false;
+        return { ok: false, message: "Yönetici cihazların görev alanı taslağı kaydedilemez.", devices: getAndroidDevices(db, enabledCapabilities) };
+      }
+      normalized.push({ deviceId, groups });
+    }
+
+    const statement = db.prepare(
+      "UPDATE android_devices SET permission_groups_json = ?, permissions_json = ?, updated_at = ? WHERE device_id = ?"
+    );
+    const now = new Date().toISOString();
+    for (const update of normalized) {
+      const result = statement.run(
+        JSON.stringify(update.groups),
+        JSON.stringify(androidPermissionsForGroups(update.groups)),
+        now,
+        update.deviceId
+      );
+      if (Number(result.changes) !== 1) {
+        throw new Error("Telefon görev alanları toplu olarak kaydedilemedi.");
+      }
+    }
+
+    db.exec("COMMIT");
+    transactionStarted = false;
+    return {
+      ok: true,
+      message: normalized.length === 1
+        ? "Telefon görev alanları kaydedildi."
+        : `${normalized.length} telefonun görev alanları kaydedildi.`,
+      devices: getAndroidDevices(db, enabledCapabilities)
+    };
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {
+        // Preserve the original write failure.
+      }
+    }
+    return {
+      ok: false,
+      message: error instanceof Error && error.message ? error.message : "Telefon görev alanları kaydedilemedi.",
+      devices: getAndroidDevices(db, enabledCapabilities)
+    };
+  }
 }
 
 export function setAndroidDeviceActive(db: DatabaseSync, deviceIdInput: string, active: boolean, enabledCapabilities: ReadonlySet<BusinessCapability>): DesktopAndroidDeviceMutationResult {

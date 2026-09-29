@@ -1,6 +1,5 @@
 import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import type { DesktopAndroidDevice, DesktopDashboardData } from "../../electron/database";
 import type { DesktopAndroidInstallationSnapshot } from "../../electron/android-installation-service";
 import type { SyncState } from "./runtime-state";
@@ -146,18 +145,6 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     );
   }
 
-  function handleSetAndroidDevicePermissionGroups(deviceId: string, groups: AndroidPermissionGroups) {
-    if (!window.yardimciDesktop) {
-      setAndroidDeviceState("error");
-      setAndroidDeviceMessage("Telefon yönetimi hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    void runAndroidDeviceMutation(
-      "Telefon görev alanları güncelleniyor...",
-      () => window.yardimciDesktop!.setAndroidDevicePermissionGroups(deviceId, groups)
-    );
-  }
-
   function handleSetAndroidDeviceActive(deviceId: string, active: boolean) {
     if (!window.yardimciDesktop) return;
     void runAndroidDeviceMutation(
@@ -220,7 +207,6 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     handleInstallAndroidApp,
     handleProvisionAndroidApp,
     handleSetAndroidDeviceRole,
-    handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
     handleResetAndroidDevicePermissions,
     handleRevokeAndroidDevice,

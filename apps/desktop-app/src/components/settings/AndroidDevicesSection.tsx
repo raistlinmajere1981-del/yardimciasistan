@@ -37,7 +37,8 @@ interface AndroidDevicesSectionProps {
   onInstallApp?: (serial: string) => void;
   onProvisionApp?: (serial: string) => void;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
-  onSetPermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
+  permissionGroupsByDevice?: Record<string, AndroidPermissionGroups>;
+  onPermissionGroupsChange?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetActive?: (deviceId: string, active: boolean) => void;
   onResetPermissions?: (deviceId: string) => void;
   onRevoke?: (device: DesktopAndroidDevice) => void;
@@ -55,7 +56,8 @@ export function AndroidDevicesSection({
   onInstallApp,
   onProvisionApp,
   onSetRole,
-  onSetPermissionGroups,
+  permissionGroupsByDevice,
+  onPermissionGroupsChange,
   onSetActive,
   onResetPermissions,
   onRevoke
@@ -209,6 +211,7 @@ export function AndroidDevicesSection({
         <div className="android-device-list">
           {availableDevices.map((device) => {
             const shortId = compactAndroidDeviceId(device.deviceId);
+            const permissionGroups = permissionGroupsByDevice?.[device.deviceId] ?? device.permissionGroups;
             return (
               <article className={`android-device-card${device.isActive ? "" : " is-inactive"}`} key={device.deviceId}>
                 <div className="android-device-identity">
@@ -240,17 +243,17 @@ export function AndroidDevicesSection({
                     <legend>Görev alanları</legend>
                     <div className="android-device-permission-grid">
                       {permissionGroupOptions.map((group) => {
-                        const checked = Boolean(device.permissionGroups?.[group.id]);
+                        const checked = Boolean(permissionGroups?.[group.id]);
                         return (
                           <label className={`android-permission-group${checked ? " is-selected" : ""}`} key={group.id}>
                             <input
                               type="checkbox"
                               checked={checked}
-                              onChange={(event) => onSetPermissionGroups?.(
+                              onChange={(event) => onPermissionGroupsChange?.(
                                 device.deviceId,
-                                androidPermissionGroupsWith(device, group.id, event.target.checked)
+                                androidPermissionGroupsWith(permissionGroups, group.id, event.target.checked)
                               )}
-                              disabled={busy || !onSetPermissionGroups}
+                              disabled={busy || !onPermissionGroupsChange}
                             />
                             <span>
                               <strong>{group.label}</strong>
@@ -322,13 +325,13 @@ function compactAndroidDeviceId(deviceId: string): string {
 }
 
 function androidPermissionGroupsWith(
-  device: DesktopAndroidDevice,
+  current: AndroidPermissionGroups,
   changedGroupId: AndroidPermissionGroupId,
   enabled: boolean
 ): AndroidPermissionGroups {
   return Object.fromEntries(ANDROID_PERMISSION_GROUP_OPTIONS.map((group) => [
     group.id,
-    group.id === changedGroupId ? enabled : Boolean(device.permissionGroups?.[group.id])
+    group.id === changedGroupId ? enabled : Boolean(current?.[group.id])
   ])) as AndroidPermissionGroups;
 }
 

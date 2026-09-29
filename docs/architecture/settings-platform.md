@@ -102,8 +102,10 @@ the owning category indicator but never to Setup payload/save validation.
   value clears dirty state; Varsayılana Dön stages the default instead of persisting
   immediately.
 - Password change/remove/reset, update check/download/restart/default reset,
-  device role/permissions/install/revoke and maintenance commands are explicit actions.
-  No category Save invokes them. Errors/results belong to their respective sections.
+  device role/active/install/revoke and maintenance commands are explicit actions.
+  Android staff permission-group checkboxes are a Services-category draft and are
+  committed together through one transactional batch write. No category Save invokes
+  the explicit device commands. Errors/results belong to their respective sections.
 
 Appearance remains persisted and applied by DesktopAppView, but Settings edits a local
 Application-category draft. Scheme (including system), density, scale, accent, font and

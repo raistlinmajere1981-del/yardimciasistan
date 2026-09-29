@@ -62,6 +62,7 @@ import type {
   DesktopPreparedMessage,
   DesktopAndroidDevice,
   DesktopAndroidActionFailure,
+  DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopDashboardData,
   DesktopReportRangeInput,
@@ -127,6 +128,7 @@ export type {
   DesktopPreparedMessage,
   DesktopAndroidDevice,
   DesktopAndroidActionFailure,
+  DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopDashboardData,
   DesktopReportPreset,
@@ -513,6 +515,10 @@ export class DesktopDatabase {
 
   setAndroidDevicePermissionGroups(deviceIdInput: string, groupsInput: unknown): DesktopAndroidDeviceMutationResult {
     return setStoredAndroidDevicePermissionGroups(this.db, deviceIdInput, groupsInput, new Set(this.getEnabledBusinessCapabilities()));
+  }
+
+  setAndroidDevicePermissionGroupsBatch(updates: DesktopAndroidPermissionGroupsUpdate[]): DesktopAndroidDeviceMutationResult {
+    return setStoredAndroidDevicePermissionGroupsBatch(this.db, updates, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   setAndroidDeviceActive(deviceIdInput: string, active: boolean): DesktopAndroidDeviceMutationResult {
@@ -2203,6 +2209,7 @@ import {
   upsertAndroidDeviceSightings as upsertStoredAndroidDeviceSightings,
   setAndroidDeviceRole as setStoredAndroidDeviceRole,
   setAndroidDevicePermissionGroups as setStoredAndroidDevicePermissionGroups,
+  setAndroidDevicePermissionGroupsBatch as setStoredAndroidDevicePermissionGroupsBatch,
   setAndroidDeviceActive as setStoredAndroidDeviceActive,
   resetAndroidDevicePermissions as resetStoredAndroidDevicePermissions,
   revokeAndroidDevice as revokeStoredAndroidDevice,

@@ -39,6 +39,7 @@ import type {
   RequestAiSuggestionResult,
   RewriteRequestAiSuggestionInput,
   DailyBusinessEvaluationResult,
+  DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopStatusUpdateResult,
   UpdateRequestStatusInput,
@@ -230,6 +231,7 @@ export interface DesktopBridge {
   commerce: DesktopCommerceBridge;
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => Promise<DesktopAndroidDeviceMutationResult>;
+  setAndroidDevicePermissionGroupsBatch: (updates: DesktopAndroidPermissionGroupsUpdate[]) => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
   resetAndroidDevicePermissions: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
   revokeAndroidDevice: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
@@ -422,6 +424,7 @@ const bridge: DesktopBridge = {
   },
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => ipcRenderer.invoke("androidDevice:setPermissionGroups", deviceId, groups),
+  setAndroidDevicePermissionGroupsBatch: (updates: DesktopAndroidPermissionGroupsUpdate[]) => ipcRenderer.invoke("androidDevice:setPermissionGroupsBatch", updates),
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
   resetAndroidDevicePermissions: (deviceId: string) => ipcRenderer.invoke("androidDevice:resetPermissions", deviceId),
   revokeAndroidDevice: (deviceId: string) => ipcRenderer.invoke("androidDevice:revoke", deviceId),

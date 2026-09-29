@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import type {
   DesktopAndroidDeviceMutationResult,
+  DesktopAndroidPermissionGroupsUpdate,
   DesktopDatabase
 } from "../database";
 import type {
@@ -36,6 +37,11 @@ export function registerAndroidDeviceIpcHandlers(options: {
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     const result = getDatabase().setAndroidDevicePermissionGroups(String(deviceId ?? ""), groups);
     return finalizeDeviceMutation(result);
+  });
+
+  ipcMain.handle("androidDevice:setPermissionGroupsBatch", (_event, updates: DesktopAndroidPermissionGroupsUpdate[]): DesktopAndroidDeviceMutationResult => {
+    assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
+    return finalizeDeviceMutation(getDatabase().setAndroidDevicePermissionGroupsBatch(updates));
   });
 
   ipcMain.handle("androidDevice:setActive", (_event, deviceId: unknown, active: unknown): DesktopAndroidDeviceMutationResult => {

@@ -26,7 +26,8 @@ export interface ServicesSettingsProps {
   onInstallAndroidApp?: (serial: string) => void;
   onProvisionAndroidApp?: (serial: string) => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
-  onSetAndroidDevicePermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
+  androidPermissionGroups?: Record<string, AndroidPermissionGroups>;
+  onAndroidPermissionGroupsChange?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
   onResetAndroidDevicePermissions?: (deviceId: string) => void;
   onRevokeAndroidDevice?: (device: DesktopAndroidDevice) => void;
@@ -50,7 +51,8 @@ export function ServicesSettingsSection({
   onInstallAndroidApp,
   onProvisionAndroidApp,
   onSetAndroidDeviceRole,
-  onSetAndroidDevicePermissionGroups,
+  androidPermissionGroups,
+  onAndroidPermissionGroupsChange,
   onSetAndroidDeviceActive,
   onResetAndroidDevicePermissions,
   onRevokeAndroidDevice,
@@ -182,7 +184,8 @@ export function ServicesSettingsSection({
                   onInstallApp={onInstallAndroidApp}
                   onProvisionApp={onProvisionAndroidApp}
                   onSetRole={onSetAndroidDeviceRole}
-                  onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
+                  permissionGroupsByDevice={androidPermissionGroups}
+                  onPermissionGroupsChange={onAndroidPermissionGroupsChange}
                   onSetActive={onSetAndroidDeviceActive}
                   onResetPermissions={onResetAndroidDevicePermissions}
                   onRevoke={onRevokeAndroidDevice}

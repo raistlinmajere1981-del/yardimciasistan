@@ -7,6 +7,7 @@ import { StagedSettingsContributionSlot } from "../../app/settings-section-contr
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
 import { useSettingsAiTest } from "../../app/use-settings-ai-test";
 import { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
+import { useAndroidDevicePermissionSettings } from "../../app/use-android-device-permission-settings";
 import {
   isSettingsSectionVisible,
   searchSettings,
@@ -93,6 +94,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     onDashboardRefresh: props.onDashboardRefresh
   });
   const appearance = useAppearanceSettings(props.uiPreferences, props.onUiPreferencesChange);
+  const androidPermissions = useAndroidDevicePermissionSettings({
+    devices: props.dashboardData?.androidDevices ?? [],
+    enabled: initialized && props.setupData.servicePreferences.android,
+    onDashboardRefresh: props.onDashboardRefresh
+  });
   const updates = useUpdateSettings(initialized);
   const password = usePasswordSettings({
     configured: props.setupData.appPasswordConfigured,
@@ -117,7 +123,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const dirty: Record<SettingsCategoryId, boolean> = {
     business: drafts.dirty.business || profile.dirty || googleReviews.dirty,
     operations: layout.dirty,
-    services: drafts.dirty.services,
+    services: drafts.dirty.services || androidPermissions.dirty,
     application: appearance.dirty || updates.dirty
   };
   const categoryDirty = dirty[active];
@@ -126,21 +132,27 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     ? layout.loading || layout.saving
     : active === "application"
       ? updates.busy
-      : drafts.busy || (active === "business" && (profile.saving || googleReviews.saving || googleReviews.testing));
+      : drafts.busy
+      || (active === "services" && androidPermissions.busy)
+      || (active === "business" && (profile.saving || googleReviews.saving || googleReviews.testing));
 
   const categorySaving = active === "operations"
     ? layout.saving
     : active === "application"
       ? updates.action === "save"
       : setupCategory
-        ? drafts.feedback[setupCategory]?.state === "loading" || (active === "business" && (profile.saving || googleReviews.saving))
+        ? drafts.feedback[setupCategory]?.state === "loading"
+          || (active === "services" && androidPermissions.busy)
+          || (active === "business" && (profile.saving || googleReviews.saving))
         : false;
 
   const feedback = active === "operations"
     ? (layout.message ? { state: layout.state, message: layout.message } : undefined)
-    : setupCategory
-      ? drafts.feedback[setupCategory]
-      : undefined;
+    : setupCategory === "services" && androidPermissions.message
+      ? { state: androidPermissions.state, message: androidPermissions.message }
+      : setupCategory
+        ? drafts.feedback[setupCategory]
+        : undefined;
 
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities)
     .filter((result) => initialized || result.category === "business");
@@ -172,7 +184,22 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     }
 
     if (categoryId === "services") {
-      return drafts.save("services");
+      let changed = false;
+      if (drafts.dirty.services) {
+        const setupResult = await drafts.save("services");
+        if (!setupResult.ok) return setupResult;
+        changed ||= setupResult.changed;
+      }
+      if (!drafts.form.androidEnabled) {
+        androidPermissions.discard();
+        return { ok: true, changed };
+      }
+      if (androidPermissions.dirty) {
+        const permissionResult = await androidPermissions.save();
+        if (!permissionResult.ok) return permissionResult;
+        changed ||= permissionResult.changed;
+      }
+      return { ok: true, changed };
     }
 
     let changed = false;
@@ -202,6 +229,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     }
     if (categoryId === "services") {
       drafts.discard("services");
+      androidPermissions.discard();
       ai.invalidate();
       return;
     }
@@ -410,6 +438,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   form={drafts.form}
                   onFormChange={drafts.setDraft}
                   enabledCapabilities={capabilities}
+                  androidPermissionGroups={androidPermissions.draft}
+                  onAndroidPermissionGroupsChange={androidPermissions.update}
                 />
               </fieldset>
               <StagedSettingsContributionSlot

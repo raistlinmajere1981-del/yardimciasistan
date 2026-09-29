@@ -215,6 +215,11 @@ export interface DesktopAndroidActionFailure {
   createdAt: string;
 }
 
+export interface DesktopAndroidPermissionGroupsUpdate {
+  deviceId: string;
+  groups: AndroidPermissionGroups;
+}
+
 export type DesktopAndroidDeviceMutationResult =
   | { ok: true; message: string; devices: DesktopAndroidDevice[] }
   | { ok: false; message: string; devices: DesktopAndroidDevice[] };

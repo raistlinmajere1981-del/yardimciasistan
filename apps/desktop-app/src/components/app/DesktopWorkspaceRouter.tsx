@@ -189,7 +189,6 @@ export function DesktopWorkspaceRouter({
     handleInstallAndroidApp,
     handleProvisionAndroidApp,
     handleSetAndroidDeviceRole,
-    handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
     handleResetAndroidDevicePermissions,
     handleRevokeAndroidDevice
@@ -610,7 +609,6 @@ export function DesktopWorkspaceRouter({
           onInstallAndroidApp={handleInstallAndroidApp}
           onProvisionAndroidApp={handleProvisionAndroidApp}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
-          onSetAndroidDevicePermissionGroups={handleSetAndroidDevicePermissionGroups}
           onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
           onResetAndroidDevicePermissions={handleResetAndroidDevicePermissions}
           onRevokeAndroidDevice={handleRevokeAndroidDevice}
