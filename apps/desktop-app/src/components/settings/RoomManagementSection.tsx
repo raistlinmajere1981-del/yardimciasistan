@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   formatMinorCurrency,
-  parseMoneyToMinor,
-  type SaveRoomPublicDetailsInput
+  parseMoneyToMinor
 } from "@yardimci-asistan/shared";
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
@@ -195,7 +194,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
           price: editingRoom.price
         } : null}
         onClose={() => setEditingKey("")}
-        onSave={async (input: SaveRoomPublicDetailsInput) => {
+        onSave={async (input) => {
           const room = rooms.find((candidate) => candidate.key === input.roomId);
           if (!room) return { ok: false, message: "Oda bulunamadı." };
           updateRoom(room.key, {
