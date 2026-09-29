@@ -307,30 +307,32 @@ try {
 
   // Room media is staged with the operations category: add dirties without a
   // layout write, save commits the staging, discard restores canonical media.
+  const roomMediaPanel = page.getByLabel('Oda medyaları');
+  const tableMediaPanel = page.getByLabel('Masa medyaları');
   const mediaCommitCalls = () => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'room-media-commit'));
-  await page.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
-  await expect(page.locator('.room-media-card')).toHaveCount(1);
+  await roomMediaPanel.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(1);
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
   expect((await layoutCalls()).length).toBe(beforeLayoutSave + 3);
   await save();
   expect((await mediaCommitCalls()).length).toBe(1);
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
-  await expect(page.locator('.room-media-card')).toHaveCount(1);
+  await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(1);
 
-  await page.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
-  await expect(page.locator('.room-media-card')).toHaveCount(2);
+  await roomMediaPanel.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(2);
   await select('İşletme');
   await expect(guard()).toBeVisible();
   await guard().getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
   await select('İşletme Düzeni');
-  await expect(page.locator('.room-media-card')).toHaveCount(1);
+  await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(1);
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
   // Failed media discard must preserve unrelated layout edits as well as keep
   // the category dirty; a second successful discard clears both atomically
   // from the user's point of view.
-  await page.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await roomMediaPanel.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
   await page.getByLabel('Oda A1 adı', { exact: true }).fill('Korunacak Taslak');
   await page.evaluate(() => {
     window.__settingsOriginalMediaDiscard = window.yardimciDesktop.discardRoomMediaDraft;
@@ -344,7 +346,7 @@ try {
   await discard();
   await expect(page.getByText('Medya geri alma testi başarısız.', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Korunacak Taslak');
-  await expect(page.locator('.room-media-card')).toHaveCount(2);
+  await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(2);
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
   await page.evaluate(() => {
     window.yardimciDesktop.discardRoomMediaDraft = window.__settingsOriginalMediaDiscard;
@@ -352,7 +354,7 @@ try {
   });
   await discard();
   await expect(page.getByLabel('Oda A1 adı', { exact: true })).toHaveValue('Deniz Oda');
-  await expect(page.locator('.room-media-card')).toHaveCount(1);
+  await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(1);
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
   // Add -> remove is net-zero dirty; removing an existing room is staged and discard restores it.
@@ -392,6 +394,24 @@ try {
     features: ['outdoor', 'sea_view'],
     smokingPolicy: 'outdoor_only'
   });
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
+  // Table media uses the same staged category contract as room media.
+  const tableMediaCommitCalls = () => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'table-media-commit'));
+  await expect(tableMediaPanel.locator('.room-media-card')).toHaveCount(0);
+  await tableMediaPanel.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await expect(tableMediaPanel.locator('.room-media-card')).toHaveCount(1);
+  await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
+  expect((await tableMediaCommitCalls()).length).toBe(0);
+  await save();
+  expect((await tableMediaCommitCalls()).length).toBe(1);
+  await expect(tableMediaPanel.locator('.room-media-card')).toHaveCount(1);
+  await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
+
+  await tableMediaPanel.getByRole('button', { name: 'Fotoğraf / video ekle', exact: true }).click();
+  await expect(tableMediaPanel.locator('.room-media-card')).toHaveCount(2);
+  await discard();
+  await expect(tableMediaPanel.locator('.room-media-card')).toHaveCount(1);
   await expect(tab('İşletme Düzeni')).not.toContainText('Değişiklik var');
 
   // Invalid table collection is rejected locally and never reaches persistence.
