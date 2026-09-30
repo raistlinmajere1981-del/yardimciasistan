@@ -6,6 +6,8 @@ import type {
   GenerateDesktopReportAiResult
 } from "./database";
 import { createDesktopAiConfig } from "./ai-config";
+import { createDiagnosticOperationId } from "./desktop-logger";
+import { logAiOperationCompleted, logAiOperationStarted } from "./ai-diagnostics";
 import {
   buildReportAiMessages,
   buildReportAiPayload,
@@ -42,11 +44,15 @@ export async function generateDesktopReportAiComment(
     return { ok: true, content: "Bu dönem için yeterli veri yok." };
   }
 
+  const operationId = createDiagnosticOperationId("ai-report");
+  const startedAt = Date.now();
+  logAiOperationStarted("report", config, operationId);
   try {
     const completion = await generateConfiguredChat({
       ...config,
       messages: buildReportAiMessages(mode, payload, setup.businessName || "İşletme")
     });
+    logAiOperationCompleted("report", config, completion, startedAt, operationId);
     if (!completion.ok) {
       return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
     }
@@ -54,7 +60,17 @@ export async function generateDesktopReportAiComment(
     return sanitized.ok
       ? sanitized
       : { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
-  } catch {
+  } catch (error) {
+    logAiOperationCompleted("report", config, {
+      ok: false,
+      provider: config.provider,
+      service: config.service,
+      model: config.model,
+      message: "AI rapor işlemi beklenmedik biçimde kesildi.",
+      error: error instanceof Error ? error.message : String(error),
+      reason: "provider_error",
+      fallbackAnswer: ""
+    }, startedAt, operationId);
     return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
   }
 }
