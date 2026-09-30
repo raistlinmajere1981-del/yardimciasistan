@@ -48,10 +48,27 @@
 .room-account-record + .room-account-record { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
 .operations-workspace .restaurant-order-ticket-panel { display: flex; flex-direction: column; }
 .operations-workspace .restaurant-order-line-list { flex: 1; }
-.operations-workspace .restaurant-order-line { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+.operations-workspace .restaurant-order-line {
+  grid-template-columns:
+    minmax(0, 1fr)
+    calc((var(--control-height-lg) * 2) + var(--space-6))
+    6.5rem
+    var(--control-height-lg);
+}
 .operations-workspace .restaurant-order-line__remove { grid-column: 4; grid-row: 1; }
-.operations-workspace .restaurant-quantity-control { grid-column: 2; grid-row: 1; grid-template-columns: var(--control-height-lg) minmax(var(--space-6), auto) var(--control-height-lg); justify-self: start; }
-.operations-workspace .restaurant-order-line__total { grid-column: 3; grid-row: 1; }
+.operations-workspace .restaurant-quantity-control {
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: var(--control-height-lg) var(--space-6) var(--control-height-lg);
+  width: calc((var(--control-height-lg) * 2) + var(--space-6));
+  justify-self: stretch;
+}
+.operations-workspace .restaurant-order-line__total {
+  grid-column: 3;
+  grid-row: 1;
+  width: 6.5rem;
+  text-align: end;
+}
 .operations-workspace .restaurant-order-line__note,
 .operations-workspace .restaurant-order-line__note-toggle { grid-column: 1 / -1; grid-row: 2; }
 .restaurant-ticket-total { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
