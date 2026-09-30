@@ -83,10 +83,10 @@ try {
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays.length)).toBe(0);
   await chooseSearchSelect(stayPanel, 'İlgili rezervasyon', /Kompakt Misafir 1.*Beklenen 1 kişi/);
   const entryForm = stayPanel.getByRole('form', { name: 'Misafir girişi', exact: true });
-  await expect(entryForm.getByText(/Giriş yalnız aşağıda kayıtlı 1 kişi için yapılır/, { exact: false })).toBeVisible();
+  await expect(entryForm).toContainText('Beklenen 1 kişi');
   const callsBeforeEntry = await page.evaluate(() => window.fixtureCalls.length);
   await entryForm.getByRole('button', { name: /Giriş Yap/, exact: false }).click();
-  await expect(stayPanel).toContainText('Rezervasyon bağlantısı korunuyor.');
+  await expect(stayPanel.getByRole('button', { name: /Kompakt Misafir 1 misafir slotu/ })).toBeVisible();
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].reservationId)).toBe('booking-0');
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].status)).toBe('checked_in');
   expect(await page.evaluate(() => window.fixtureState().dashboard.rooms.find(room => room.id === 'room-102').status)).toBe('occupied');
