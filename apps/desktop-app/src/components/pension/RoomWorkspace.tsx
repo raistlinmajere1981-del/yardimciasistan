@@ -13,7 +13,7 @@ import { OperationPanel } from "../workspace/OperationPanel";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import type { RoomWorkspaceIntent } from "../workspace/workspace-intent";
 import { RoomAccount } from "./RoomAccount";
-import { RoomAccountAdjustments, RoomAccountDetails } from "./RoomAccountAdjustments";
+import { RoomAccountAdjustments } from "./RoomAccountAdjustments";
 import { useRoomFolioController } from "./use-room-folio-controller";
 import { RoomHistory } from "./RoomHistory";
 import { roomConditionLabel } from "./room-presentation";
@@ -22,7 +22,8 @@ import { getRoomWorkspaceModel } from "./room-workspace-model";
 import { useRoomStayOperations } from "./use-room-stay-operations";
 import { RoomStayPanel } from "./RoomStayPanel";
 import { RoomReservationControl } from "./RoomReservationControl";
-import { RoomDailyOperations } from "./RoomDailyOperations";
+import { RoomCheckoutAction, RoomDailyOperations } from "./RoomDailyOperations";
+import { RoomStayDates } from "./RoomStayDates";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualReservationEditor } from "../operations/ManualReservationEditor";
 import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
@@ -116,6 +117,12 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
         : <span>{model.conflict ? "Konaklama kayıtlarını kontrol edin." : model.active.length ? "Planlanan konaklama var." : `0/${room.capacity} dolu`}</span>}
     </ResourceWorkspaceSummary>}
     actions={<>
+      {!history && model.currentStay && <RoomCheckoutAction
+        model={model}
+        data={data}
+        operations={operations}
+        disabled={busy || accountDraftDirty}
+      />}
       <ActionButton variant="ghost" disabled={busy} onClick={() => {
         setQuickAction(null);
         navigation.updateWorkspaceMode({ entityType: "room", mode: history ? "summary" : "history" });
@@ -150,11 +157,17 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
     </> : undefined}>
     <div ref={surface} className="operation-surface operation-surface--sections operation-surface--room" hidden={history} key={draftEpoch}>
       <OperationPanel title="Misafirler ve Konaklama" id="room-stay">
+        {account.selected?.status === "open" && <RoomStayDates
+          key={account.selected.id}
+          folio={account.selected}
+          controller={account}
+          disabled={busy || account.loading}
+          onDirty={value => setDirty("stay-dates", value)}
+        />}
         <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled}
           quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")}
           onCreateCustomer={customersEnabled ? () => setQuickAction("customer") : undefined}
           onDirty={value => setDirty("stay", value)} />
-        {account.selected?.status === "open" && <RoomAccountDetails key={account.selected.id} folio={account.selected} controller={account} disabled={busy || account.loading} onDirty={value => setDirty("account-details", value)} />}
       </OperationPanel>
       <OperationPanel title="Oda İşlemleri" id="room-operations">
         <RoomDailyOperations model={model} data={data} operations={operations} disabled={busy || accountDraftDirty} />
