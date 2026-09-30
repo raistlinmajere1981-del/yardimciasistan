@@ -8,11 +8,12 @@ import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency } from "./table-presentation";
 import { resolveMenuPreviewImageUrl } from "../menu/menu-model";
 
-export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, readOnly = false, accountPanel }: {
-  menu: PublishedQrMenu; webModuleUrl: string; menuEnabled: boolean; readOnly?: boolean; accountPanel: ReactNode; controller: ReturnType<typeof useTableOrderController>;
+export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrder, controller, readOnly = false, accountPanel }: {
+  menu: PublishedQrMenu; webModuleUrl: string; menuEnabled: boolean; canStartOrder: boolean; readOnly?: boolean; accountPanel: ReactNode; controller: ReturnType<typeof useTableOrderController>;
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(() => new Set());
   const selectedOrder = controller.active;
   const noteDrafts = controller.notes;
   const busyAction = controller.busy || controller.loading || readOnly;
@@ -83,7 +84,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                           variant="secondary"
                           size="sm"
                           onClick={() => void controller.addItem(item.id)}
-                          disabled={!selectedOrder || Boolean(busyAction) || (item.stock_quantity !== null && item.stock_quantity < menuStockConsumption(item.stock_consumption_quantity))}
+                          disabled={Boolean(busyAction) || (!selectedOrder && !canStartOrder) || (item.stock_quantity !== null && item.stock_quantity < menuStockConsumption(item.stock_consumption_quantity))}
                           aria-label={`${item.name} ürününü siparişe ekle`}
                         >
                           <Plus size={15} aria-hidden="true" /> Ekle
@@ -102,11 +103,9 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                   </div>
                 </div>
                 <div className="restaurant-order-line-list">
-                  {!selectedOrder && <p className="restaurant-order-empty">Aktif adisyon yok. Sipariş açtığınızda ürün ekleyebilirsiniz.</p>}
+                  {!selectedOrder && <p className="restaurant-order-empty">{canStartOrder ? "Henüz ürün yok." : "Bu masa şu an sipariş almaya uygun değil."}</p>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
-                    <p className="restaurant-order-empty">{menuEnabled
-                      ? "Henüz ürün eklenmedi. Soldaki aktif menüden ürün seçin."
-                      : "Bu adisyonda henüz ürün yok."}</p>
+                    <p className="restaurant-order-empty">Henüz ürün yok.</p>
                   )}
                   {selectedOrder?.items.map((item) => (
                     <article className="restaurant-order-line" key={item.id}>
@@ -128,7 +127,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                           aria-label={`${item.productName} adetini artır`}
                         ><Plus size={14} aria-hidden="true" /></IconButton>
                       </div>
-                      <input
+                      {(expandedNotes.has(item.id) || Boolean(noteDrafts[item.id])) ? <input
                         className="restaurant-order-line__note"
                         value={noteDrafts[item.id] ?? ""}
                         onChange={(event) => {
@@ -144,7 +143,16 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
                         aria-label={`${item.productName} notu`}
                         disabled={Boolean(busyAction)}
                         maxLength={500}
-                      />
+                      /> : <ActionButton
+                        className="restaurant-order-line__note-toggle"
+                        variant="ghost"
+                        size="sm"
+                        disabled={Boolean(busyAction)}
+                        aria-label={`${item.productName} için not ekle`}
+                        onClick={() => setExpandedNotes(current => new Set(current).add(item.id))}
+                      >
+                        Not ekle
+                      </ActionButton>}
                       <ActionButton className="restaurant-order-line__remove" variant="danger" size="sm" onClick={() => void controller.removeItem(item.id)} disabled={Boolean(busyAction)} aria-label={`${item.productName} satırını sil`}><Trash2 size={15} aria-hidden="true" /></ActionButton>
                     </article>
                   ))}
@@ -152,10 +160,12 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, controller, 
 
                 {selectedOrder && <div className="restaurant-ticket-total"><span>Adisyon toplamı</span><strong>{formatMoney(selectedOrder.total, getOrderCurrency(selectedOrder))}</strong></div>}
               </section>;
-  // Keyed sections keep customer drafts and menu filters mounted when an order starts.
-  const panels = [<Fragment key="menu">{menuPanel}</Fragment>, <Fragment key="ticket">{ticketPanel}</Fragment>];
-  const context = <Fragment key="context">{accountPanel}</Fragment>;
-  return <>{selectedOrder ? [...panels, context] : [context, ...panels]}</>;
+  // Keep all three panes mounted and in a stable order while the order lifecycle changes.
+  return <>
+    <Fragment key="menu">{menuPanel}</Fragment>
+    <Fragment key="ticket">{ticketPanel}</Fragment>
+    <Fragment key="context">{accountPanel}</Fragment>
+  </>;
 }
 
 function formatOrderMenuStock(quantity: number | null | undefined, unit: "piece" | "gram"): string {
