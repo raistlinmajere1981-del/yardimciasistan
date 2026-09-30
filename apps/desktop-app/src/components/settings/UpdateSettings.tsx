@@ -92,7 +92,7 @@ export function useUpdateSettings(enabled: boolean) {
     const validationMessage = validatePreferences();
     if (validationMessage) {
       setError(true);
-      setLocalMessage(validationMessage);
+      setLocalMessage("");
       return { ok: false, message: validationMessage };
     }
     if (baseUrl === baselineBaseUrlRef.current && autoCheckEnabled === baselineAutoCheckRef.current) {
@@ -102,13 +102,13 @@ export function useUpdateSettings(enabled: boolean) {
     const bridge = window.yardimciDesktop;
     if (!bridge?.saveUpdatePreferences) {
       const message = "Güncelleme ayarları kaydedilemiyor. Uygulamayı yeniden başlatın.";
-      setLocalMessage(message);
+      setLocalMessage("");
       return { ok: false, message };
     }
 
     setError(false);
     setAction("save");
-    setLocalMessage("Güncelleme ayarları kaydediliyor...");
+    setLocalMessage("");
     try {
       const result = await bridge.saveUpdatePreferences({
         customBaseUrl: status && baseUrl.trim() === status.defaultBaseUrl.trim() ? "" : baseUrl,
@@ -117,7 +117,7 @@ export function useUpdateSettings(enabled: boolean) {
       setStatus(result.status);
       if (!result.ok) {
         setError(true);
-        setLocalMessage(result.message);
+        setLocalMessage("");
         return { ok: false, message: result.message };
       }
       const nextBaseUrl = result.status.customBaseUrl || result.status.defaultBaseUrl;
@@ -125,12 +125,12 @@ export function useUpdateSettings(enabled: boolean) {
       setAutoCheckEnabled(result.status.autoCheckEnabled);
       baselineBaseUrlRef.current = nextBaseUrl;
       baselineAutoCheckRef.current = result.status.autoCheckEnabled;
-      setLocalMessage(result.message);
+      setLocalMessage("");
       return { ok: true, changed: true, message: result.message };
     } catch {
       setError(true);
       const message = "Güncelleme ayarları kaydedilemedi.";
-      setLocalMessage(message);
+      setLocalMessage("");
       return { ok: false, message };
     } finally {
       setAction(null);
@@ -141,7 +141,7 @@ export function useUpdateSettings(enabled: boolean) {
     if (busy || !status) return;
     setError(false);
     setBaseUrl(status.defaultBaseUrl);
-    setLocalMessage("Varsayılan güncelleme sunucusu taslağa uygulandı.");
+    setLocalMessage("");
   }
 
   async function checkNow() {
@@ -205,7 +205,7 @@ export function useUpdateSettings(enabled: boolean) {
     setBaseUrl(baselineBaseUrlRef.current);
     setAutoCheckEnabled(baselineAutoCheckRef.current);
     setError(false);
-    setLocalMessage("Güncelleme tercihleri geri alındı.");
+    setLocalMessage("");
   }
 
   return {
