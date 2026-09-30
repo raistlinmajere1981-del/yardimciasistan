@@ -34,6 +34,26 @@ function getRoomBrowserState(data: DesktopDashboardData, capabilities: RoomCardC
   return { summaries, rooms };
 }
 
+export function RoomCategoryControl({ data }: {
+  data: DesktopDashboardData;
+}) {
+  const page = usePensionPage();
+  if (!page) return null;
+
+  const floor = page.filters.roomFloor ?? "all";
+  const floors = [...new Set(data.rooms.map(room => room.floor.trim()).filter(Boolean))];
+
+  return <select
+    className="hospitality-resource-title-select"
+    aria-label="Kat"
+    value={floor}
+    onChange={event => page.setFilters(current => ({ ...current, roomFloor: event.target.value }))}
+  >
+    <option value="all">Tüm Kategoriler</option>
+    {floors.map(name => <option key={name} value={name}>{name}</option>)}
+  </select>;
+}
+
 export function RoomFiltersToolbar({ data, ...capabilities }: RoomCardCapabilities & {
   data: DesktopDashboardData;
 }) {
@@ -42,19 +62,9 @@ export function RoomFiltersToolbar({ data, ...capabilities }: RoomCardCapabiliti
 
   const floor = page.filters.roomFloor ?? "all";
   const filter = page.filters.roomFilter ?? "all";
-  const floors = [...new Set(data.rooms.map(room => room.floor.trim()).filter(Boolean))];
   const { rooms } = getRoomBrowserState(data, capabilities, floor);
 
   return <div className="hospitality-resource-toolbar" aria-label="Oda filtreleri">
-    <select
-      className="hospitality-resource-toolbar__select"
-      aria-label="Kat"
-      value={floor}
-      onChange={event => page.setFilters(current => ({ ...current, roomFloor: event.target.value }))}
-    >
-      <option value="all">Tüm katlar</option>
-      {floors.map(name => <option key={name} value={name}>{name}</option>)}
-    </select>
     <ChoiceChips
       ariaLabel="Oda filtresi"
       value={filter}
