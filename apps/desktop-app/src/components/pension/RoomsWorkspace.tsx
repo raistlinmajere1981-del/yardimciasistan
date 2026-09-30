@@ -49,7 +49,7 @@ export function RoomCategoryControl({ data }: {
     value={floor}
     onChange={event => page.setFilters(current => ({ ...current, roomFloor: event.target.value }))}
   >
-    <option value="all">Tüm Kategoriler</option>
+    <option value="all">Tüm Katlar</option>
     {floors.map(name => <option key={name} value={name}>{name}</option>)}
   </select>;
 }
