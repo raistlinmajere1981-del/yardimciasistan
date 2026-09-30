@@ -80,18 +80,22 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
       const missingIdentity = selectedCustomers.filter(customer =>
         !customer.identityType || (!customer.identityNumber && !customer.documentSerialNumber) || !customer.nationality || !customer.birthDate
       );
+      const kbsReady = data.kbsOverview.configured && missingIdentity.length === 0;
       const approved = await confirm({
         eyebrow: "Kimlik Bildirim Sistemi",
         title: "Misafir girişini onaylayın",
-        tone: missingIdentity.length > 0 ? "warning" : "info",
-        confirmLabel: missingIdentity.length > 0 ? "Giriş Yap, Bildirimi Beklet" : "Giriş Yap ve Bildirimi Hazırla",
-        description: missingIdentity.length > 0
-          ? "Oda girişi kaydedilecek. Kimlik bilgileri eksik misafirlerin KBS bildirimi bekleyecek; bilgiler tamamlandıktan sonra Müşteriler → Kimlik Bildirimleri bölümünden gönderilebilecek."
-          : "Oda girişi kaydedilecek ve her misafir için KBS giriş bildirimi oluşturulacak.",
+        tone: kbsReady ? "info" : "warning",
+        confirmLabel: kbsReady ? "Giriş Yap ve Bildirimi Hazırla" : "Giriş Yap, Bildirimi Beklet",
+        description: !data.kbsOverview.configured
+          ? "Oda girişi kaydedilecek. KBS bağlantı ayarları tamamlanmadığı için bildirimler bekleyecek."
+          : missingIdentity.length > 0
+            ? "Oda girişi kaydedilecek. Kimlik bilgileri eksik misafirlerin KBS bildirimi bekleyecek; bilgiler tamamlandıktan sonra Müşteriler → Kimlik Bildirimleri bölümünden gönderilebilecek."
+            : "Oda girişi kaydedilecek ve her misafir için KBS giriş bildirimi oluşturulacak.",
         details: <dl className="info-list">
           <div><dt>Oda</dt><dd>{room.number ? "Oda " + room.number : room.name}</dd></div>
           <div><dt>Misafir</dt><dd>{guestIds.length} kişi</dd></div>
           <div><dt>Kurum</dt><dd>{data.kbsOverview.provider === "jandarma" ? "Jandarma KBS" : "Emniyet KBS"}</dd></div>
+          <div><dt>Bağlantı</dt><dd>{data.kbsOverview.configured ? "Ayarlar hazır" : "Ayarlar eksik"}</dd></div>
           <div><dt>Kimlik durumu</dt><dd>{missingIdentity.length > 0 ? String(missingIdentity.length) + " misafirde eksik" : "Tüm misafirlerde hazır"}</dd></div>
           {missingIdentity.length > 0 && <div><dt>Eksik kayıtlar</dt><dd>{missingIdentity.map(customer => customer.fullName).join(", ")}</dd></div>}
         </dl>
