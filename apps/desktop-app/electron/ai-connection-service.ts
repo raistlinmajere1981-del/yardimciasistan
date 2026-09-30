@@ -1,12 +1,16 @@
 import {
+  classifyAIProviderFailure,
   generateConfiguredChat,
   listGoogleAiStudioModels,
   rankGoogleAiStudioModels,
-  verifyGoogleAiStudioVisionModel
+  verifyGoogleAiStudioVisionModel,
+  type AICompletionFailureReason
 } from "@yardimci-asistan/ai-core";
 import type { DesktopDatabase } from "./database";
 import { normalizeAiTimeoutSeconds } from "./ai-config";
 import { getEffectiveAiApiKey } from "./ai-secret-service";
+import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
+import { logAiOperationCompleted, logAiOperationStarted } from "./ai-diagnostics";
 
 const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -67,6 +71,8 @@ export async function testAiConnection(
 
   const apiKey = String(input?.apiKey ?? "").trim() || (input?.useStoredApiKey ? getEffectiveAiApiKey(database, service) : "");
   const timeoutSeconds = normalizeAiTimeoutSeconds(timeoutCandidate);
+  const operationId = createDiagnosticOperationId("ai-connection");
+  const operationStartedAt = Date.now();
 
   if (service === "gemini") {
     const modelListResult = await listGoogleAiStudioModels({
@@ -75,6 +81,23 @@ export async function testAiConnection(
       timeoutMs: timeoutSeconds * 1000
     });
     if (!modelListResult.ok) {
+      const classification = classifyAIProviderFailure({
+        status: modelListResult.status,
+        message: modelListResult.message
+      });
+      desktopLog.warn({
+        scope: "ai",
+        event: "ai.connection-test.model-list.failed",
+        message: "AI model listesi alınamadı.",
+        operationId,
+        meta: {
+          service,
+          status: modelListResult.status ?? 0,
+          reason: classification.reason,
+          providerMessage: modelListResult.message,
+          durationMs: Date.now() - operationStartedAt
+        }
+      });
       return {
         ok: false,
         message: modelListResult.message
@@ -113,6 +136,17 @@ export async function testAiConnection(
   const attemptedModels: string[] = [];
   for (const candidate of modelCandidates) {
     attemptedModels.push(candidate);
+    const candidateConfig = {
+      enabled: true,
+      provider: "openai_compatible" as const,
+      service,
+      baseUrl,
+      model: candidate,
+      apiKey,
+      timeoutMs: timeoutSeconds * 1000
+    };
+    const candidateStartedAt = Date.now();
+    logAiOperationStarted("connection-test", candidateConfig, operationId);
     result = service === "gemini"
       ? await verifyGoogleAiStudioVisionModel({
           baseUrl,
@@ -140,6 +174,7 @@ export async function testAiConnection(
             }
           ]
         });
+    logAiOperationCompleted("connection-test", candidateConfig, result, candidateStartedAt, operationId);
     if (result.ok) {
       model = candidate;
       break;
@@ -194,7 +229,7 @@ function shouldTryNextGoogleModel(result: { status?: number; message: string }) 
 
 function formatAiConnectionFailure(
   model: string,
-  result: { status?: number; message: string } | null,
+  result: { status?: number; message: string; reason?: AICompletionFailureReason; retryAfterSeconds?: number } | null,
   attemptedModels: string[]
 ) {
   if (!result) {
@@ -202,8 +237,18 @@ function formatAiConnectionFailure(
   }
 
   const attempted = attemptedModels.length > 1 ? ` Denenen modeller: ${attemptedModels.join(", ")}.` : "";
-  if (result.status === 429) {
-    return `${model} modeli için kullanılabilir Google kotası bulunamadı (HTTP 429). Rate Limit ekranında limiti 0'dan büyük bir model seçin veya faturalandırmayı etkinleştirin.${attempted}`;
+  if (result.reason === "quota_exhausted") {
+    return `${model} modeli için kullanılabilir AI kotası kalmadı${result.status ? ` (HTTP ${result.status})` : ""}. Kota/faturalandırma durumunu kontrol edin.${attempted}`;
+  }
+  if (result.reason === "rate_limited" || result.status === 429) {
+    const retry = result.retryAfterSeconds ? ` Yaklaşık ${result.retryAfterSeconds} saniye sonra tekrar deneyin.` : " Kısa süre sonra tekrar deneyin.";
+    return `${model} modeli geçici istek sınırına ulaştı${result.status ? ` (HTTP ${result.status})` : ""}.${retry}${attempted}`;
+  }
+  if (result.reason === "service_busy") {
+    return `${model} modeli şu anda yoğun veya geçici olarak kullanılamıyor. Bir süre sonra tekrar deneyin.${attempted}`;
+  }
+  if (result.reason === "timeout") {
+    return `${model} modeli zamanında yanıt vermedi. Ağ durumunu ve AI servis yoğunluğunu kontrol edip tekrar deneyin.${attempted}`;
   }
   if (result.status === 401 || result.status === 403) {
     return `Google AI Studio erişim anahtarı veya proje yetkisi kabul edilmedi (HTTP ${result.status}). Anahtar durumunu ve proje erişimini kontrol edin.`;
