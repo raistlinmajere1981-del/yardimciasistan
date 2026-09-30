@@ -5,6 +5,7 @@ import type {
   DesktopDatabase,
   DesktopTableOrder,
   DesktopTableOrderResult,
+  UpdateTableOrderDiscountInput,
   UpdateTableOrderItemNoteInput,
   UpdateTableOrderItemQuantityInput,
   UpdateTableOrderStatusInput
@@ -69,6 +70,14 @@ export function registerTableOrderIpcHandlers(options: {
       : invalidTableOrderPayload("Silinecek sipariş satırı geçersiz.");
   });
 
+  ipcMain.handle("tableOrder:updateDiscount", (_event, input: unknown): DesktopTableOrderResult => {
+    assertFoodOrdersAccess();
+    const parsedInput = parseUpdateTableOrderDiscountInput(input);
+    return parsedInput
+      ? getDatabase().updateTableOrderDiscount(parsedInput)
+      : invalidTableOrderPayload("İndirim bilgisi geçersiz.");
+  });
+
   ipcMain.handle("tableOrder:updateStatus", (_event, input: unknown): DesktopTableOrderResult => {
     assertFoodOrdersAccess();
     const parsedInput = parseUpdateTableOrderStatusInput(input);
@@ -128,6 +137,16 @@ function parseUpdateTableOrderItemNoteInput(value: unknown): UpdateTableOrderIte
   const record = toUnknownRecord(value);
   return record && typeof record.itemId === "string" && typeof record.note === "string"
     ? { itemId: record.itemId, note: record.note }
+    : null;
+}
+
+function parseUpdateTableOrderDiscountInput(value: unknown): UpdateTableOrderDiscountInput | null {
+  const record = toUnknownRecord(value);
+  return record
+    && typeof record.orderId === "string"
+    && typeof record.discountTotal === "number"
+    && Number.isFinite(record.discountTotal)
+    ? { orderId: record.orderId, discountTotal: record.discountTotal }
     : null;
 }
 
