@@ -66,3 +66,39 @@ export interface DesktopDiagnosticReadResult {
   events: DesktopDiagnosticEvent[];
   hasMore: boolean;
 }
+
+
+export interface DesktopDiagnosticSupportSession {
+  session: DesktopDiagnosticSessionSummary;
+  events: DesktopDiagnosticEvent[];
+}
+
+export interface DesktopSupportScreenshotDraft {
+  previewDataUrl: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+}
+
+export interface DesktopSupportReportDraft {
+  screenshot: DesktopSupportScreenshotDraft | null;
+  sessions: DesktopDiagnosticSessionSummary[];
+  sessionCount: number;
+  totalLogBytes: number;
+}
+
+export interface DesktopSupportReportActionResult {
+  ok: boolean;
+  message: string;
+  draft: DesktopSupportReportDraft;
+}
+
+export interface DesktopSupportReportSendInput {
+  note?: string;
+}
+
+export interface DesktopSupportReportSendResult {
+  ok: boolean;
+  message: string;
+  reportId?: string;
+}
