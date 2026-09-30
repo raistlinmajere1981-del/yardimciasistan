@@ -258,23 +258,26 @@ try {
       checkoutStay: input => { routed.push(input); return { ok: true, savedId: input }; }
     }),
     finalizeCustomerMutation: result => ({ ...result, finalized: true }),
+    finalizeCheckInMutation: async result => ({ ...result, finalized: true }),
+    finalizeCheckoutMutation: async result => ({ ...result, finalized: true }),
+    finalizeRoomChangeMutation: async result => ({ ...result, finalized: true }),
     finalizeRecordDeletion: result => result
   });
   for (const [channel, input] of [['customer:createStayFromReservation', { reservationId: 'r', roomId: 'room' }], ['customer:checkInStay', 'stay'], ['customer:checkoutStay', 'stay']]) {
     locked = true;
     gateCalls.length = 0;
-    assert.throws(() => handlers.get(channel)({}, input), /locked/);
+    await assert.rejects(() => handlers.get(channel)({}, input), /locked/);
     assert.deepEqual(gateCalls, ['session']);
     locked = false;
     deniedCapability = 'accommodation.stays';
-    assert.throws(() => handlers.get(channel)({}, input), /capability/);
+    await assert.rejects(() => handlers.get(channel)({}, input), /capability/);
     deniedCapability = '';
     if (channel.endsWith('createStayFromReservation')) {
       deniedCapability = 'accommodation.reservations';
-      assert.throws(() => handlers.get(channel)({}, input), /capability/);
+      await assert.rejects(() => handlers.get(channel)({}, input), /capability/);
       deniedCapability = '';
     }
-    assert.equal(handlers.get(channel)({}, input).finalized, true);
+    assert.equal((await handlers.get(channel)({}, input)).finalized, true);
     assert.deepEqual(routed.at(-1), input);
   }
   assert.equal(routed.length, 3, 'Denied calls must never mutate');
