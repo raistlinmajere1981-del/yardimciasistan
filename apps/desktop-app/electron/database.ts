@@ -7,6 +7,8 @@ import {
   retryHospitalityNotification
 } from "./database/hospitality-notification-store.js";
 import { DesktopRoomFolioService } from "./room-folio.js";
+import { KbsDeliveryService } from "./kbs-delivery-service.js";
+import type { KbsProviderAdapter } from "./kbs-provider-adapter.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
 import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
 export type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
@@ -73,6 +75,7 @@ import type {
   DesktopDashboardData,
   DesktopHospitalityNotification,
   DesktopKbsOverview,
+  DesktopKbsDeliveryMutationResult,
   DesktopReportRangeInput,
   DesktopReportData,
   DesktopAiService,
@@ -141,6 +144,7 @@ export type {
   DesktopDashboardData,
   DesktopHospitalityNotification,
   DesktopKbsOverview,
+  DesktopKbsDeliveryMutationResult,
   DesktopReportPreset,
   DesktopReportRangeInput,
   DesktopReportPeriod,
@@ -715,6 +719,19 @@ export class DesktopDatabase {
     const result = retryHospitalityNotification(this.db, notificationId);
     if (!result.ok) return result;
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  async deliverKbsNotification(
+    notificationId: string,
+    adapter: KbsProviderAdapter
+  ): Promise<DesktopKbsDeliveryMutationResult> {
+    const service = new KbsDeliveryService(this.db, [adapter]);
+    const result = await service.deliver(notificationId, adapter.provider);
+    const dashboardData = this.getDashboardData();
+    if (result.ok) {
+      return { ...result, dashboardData };
+    }
+    return { ...result, dashboardData };
   }
 
   deleteCustomer(customerIdInput: string): DesktopStatusUpdateResult {
