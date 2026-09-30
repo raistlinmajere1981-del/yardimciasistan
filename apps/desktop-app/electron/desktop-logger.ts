@@ -15,6 +15,7 @@ import type {
   DesktopDiagnosticReadResult,
   DesktopDiagnosticSessionManifest,
   DesktopDiagnosticSessionSummary,
+  DesktopDiagnosticSupportSession,
   DesktopDiagnosticWriteInput
 } from "./diagnostics-contract";
 
@@ -522,6 +523,37 @@ export function listDiagnosticSessions(): DesktopDiagnosticSessionSummary[] {
   } catch {
     return [];
   }
+}
+
+export function createDiagnosticSupportSnapshot(sessionLimit = 3): DesktopDiagnosticSupportSession[] {
+  flushPendingEvents();
+  const limit = Math.max(1, Math.min(3, Math.trunc(sessionLimit)));
+  return listDiagnosticSessions().slice(0, limit).map((summary) => {
+    const resolved = resolveSessionDirectory(summary.sessionId);
+    const events: DesktopDiagnosticEvent[] = [];
+    if (resolved) {
+      try {
+        const files = fs.readdirSync(resolved.path)
+          .filter((fileName) => /^events-\d{3}\.jsonl$/.test(fileName))
+          .sort();
+        for (const fileName of files) {
+          const content = fs.readFileSync(path.join(resolved.path, fileName), "utf8");
+          for (const line of content.split("\n")) {
+            if (!line.trim()) continue;
+            try {
+              const event = JSON.parse(line) as DesktopDiagnosticEvent;
+              if (event && Number.isInteger(event.sequence)) events.push(event);
+            } catch {
+              // Ignore a partial line left by a hard stop.
+            }
+          }
+        }
+      } catch {
+        // Keep the manifest even if one chunk cannot be read.
+      }
+    }
+    return { session: summary, events };
+  });
 }
 
 function resolveSessionDirectory(sessionIdValue: unknown): { path: string; manifest: DesktopDiagnosticSessionManifest } | null {
