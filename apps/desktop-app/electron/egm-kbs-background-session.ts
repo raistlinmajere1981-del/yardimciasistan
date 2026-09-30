@@ -48,16 +48,16 @@ export class EgmKbsBackgroundSession {
   }
 
   destroy() {
+    const view = this.view;
+    const host = this.host;
+    this.view = null;
+    this.host = null;
     this.driver.detach();
 
-    const contents = this.view?.webContents;
-    this.view = null;
+    const contents = view?.webContents;
     if (contents && !contents.isDestroyed()) {
       contents.close({ waitForBeforeUnload: false });
     }
-
-    const host = this.host;
-    this.host = null;
     if (host && !host.isDestroyed()) {
       host.destroy();
     }
@@ -107,8 +107,11 @@ export class EgmKbsBackgroundSession {
     this.driver.attachWebContents(view.webContents);
 
     view.webContents.once("destroyed", () => {
-      if (this.view === view) this.view = null;
-      if (this.host === host) this.host = null;
+      if (this.view !== view) return;
+      this.view = null;
+      this.host = null;
+      this.driver.detach();
+      if (!host.isDestroyed()) host.destroy();
     });
 
     try {
