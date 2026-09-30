@@ -504,10 +504,13 @@ export class SyncCoordinator {
           message: result.message,
           status: result.status
         });
+        this.logSyncFailure("requests-pull", result, { page, cursor });
         return { count, error: result.message };
       }
       if (typeof result.next_cursor !== "number") {
-        return { count, error: "Web modülü geçerli bir talep cursor değeri döndürmedi." };
+        const message = "Web modülü geçerli bir talep cursor değeri döndürmedi.";
+        this.logSyncFailure("requests-pull", { message, error: "invalid_response" }, { page, cursor });
+        return { count, error: message };
       }
       this.options.database.upsertRequests(result.requests, result.next_cursor);
       count += result.requests.length;
@@ -532,6 +535,10 @@ export class SyncCoordinator {
     }
     const result = await transport.acknowledgeRequests({ throughSeq: runtime.requestCursor });
     if (!result.ok) {
+      this.logSyncFailure("requests-ack", result, {
+        requestCursor: runtime.requestCursor,
+        acknowledgedCursor: runtime.acknowledgedCursor
+      });
       return result.message;
     }
     this.options.database.acknowledgeRequestCursor(result.acknowledged_cursor);
@@ -551,6 +558,7 @@ export class SyncCoordinator {
     }
     const pulled = await transport.pullAndroidActions({ limit: 100 });
     if (!pulled.ok) {
+      this.logSyncFailure("android-actions-pull", pulled);
       return { pulled: 0, applied: 0, failed: 0, devicesChanged: 0, error: pulled.message };
     }
     const devicesChanged = this.options.database.upsertAndroidDeviceSightings(pulled.devices ?? []);
@@ -569,6 +577,9 @@ export class SyncCoordinator {
         errorMessage: local.ok ? "" : local.message
       });
       if (!completion.ok) {
+        this.logSyncFailure("android-action-complete", completion, {
+          actionType: action.action_type
+        });
         return { pulled: pulled.count, applied, failed, devicesChanged, error: completion.message };
       }
       if (local.ok) {
@@ -624,7 +635,9 @@ export class SyncCoordinator {
 
     const runtimeFetch = globalThis.fetch;
     if (!runtimeFetch) {
-      return "Canlı müsaitlik yayını için ağ istemcisi kullanılamıyor.";
+      const message = "Canlı müsaitlik yayını için ağ istemcisi kullanılamıyor.";
+      this.logSyncFailure("availability", { message, error: "fetch_unavailable" });
+      return message;
     }
 
     const endpoint = `${config.baseUrl.trim().replace(/\/$/, "")}/api/availability-sync.php`;
@@ -647,18 +660,36 @@ export class SyncCoordinator {
         // Older hosting packages do not have the availability endpoint. Keep
         // existing sync healthy until the web module is upgraded.
         this.availabilityHeartbeatSupported = false;
+        desktopLog.info({
+          scope: "sync",
+          event: "sync.availability.unsupported",
+          message: "Canlı müsaitlik endpoint'i bu hosting sürümünde yok.",
+          operationId: this.activeOperationId,
+          meta: { target: safeWebTarget(endpoint), status: 404 }
+        });
         return "";
       }
 
       const result = (await response.json().catch(() => null)) as AvailabilityHeartbeatResponse | null;
       if (!response.ok || result?.ok !== true) {
-        return String(result?.message || `Canlı müsaitlik yayını tamamlanamadı (HTTP ${response.status}).`);
+        const message = String(result?.message || `Canlı müsaitlik yayını tamamlanamadı (HTTP ${response.status}).`);
+        this.logSyncFailure("availability", { status: response.status, message }, {
+          endpoint: safeWebTarget(endpoint)
+        });
+        return message;
       }
 
       this.availabilityHeartbeatSupported = true;
       return "";
-    } catch {
-      return "Canlı müsaitlik yayını sırasında web modülüne ulaşılamadı.";
+    } catch (error) {
+      const message = "Canlı müsaitlik yayını sırasında web modülüne ulaşılamadı.";
+      this.logSyncFailure("availability", {
+        message,
+        error: error instanceof Error ? error.message : String(error)
+      }, {
+        endpoint: safeWebTarget(endpoint)
+      });
+      return message;
     }
   }
 
@@ -672,6 +703,10 @@ export class SyncCoordinator {
     if (catalog.enabled) {
       const preparation = await this.options.prepareRoomCatalog?.(config, clientId);
       if (preparation && !preparation.ok) {
+        this.logSyncFailure("room-catalog-prepare", {
+          status: preparation.status,
+          message: preparation.message
+        });
         if ([400, 404, 405].includes(preparation.status ?? 0)) {
           this.roomCatalogSupported = false;
           return "";
@@ -708,10 +743,12 @@ export class SyncCoordinator {
     }
 
     if ([400, 404, 405].includes(result.status ?? 0)) {
+      this.logSyncFailure("room-catalog", result);
       this.roomCatalogSupported = false;
       return "";
     }
 
+    this.logSyncFailure("room-catalog", result);
     this.options.database.recordSyncEvent({
       direction: "push",
       entityType: "room_catalog",
@@ -733,6 +770,10 @@ export class SyncCoordinator {
     if (catalog.enabled) {
       const preparation = await this.options.prepareTableCatalog?.(config, clientId);
       if (preparation && !preparation.ok) {
+        this.logSyncFailure("table-catalog-prepare", {
+          status: preparation.status,
+          message: preparation.message
+        });
         if ([400, 404, 405].includes(preparation.status ?? 0)) {
           this.tableCatalogSupported = false;
           return "";
@@ -769,10 +810,12 @@ export class SyncCoordinator {
     }
 
     if ([400, 404, 405].includes(result.status ?? 0)) {
+      this.logSyncFailure("table-catalog", result);
       this.tableCatalogSupported = false;
       return "";
     }
 
+    this.logSyncFailure("table-catalog", result);
     this.options.database.recordSyncEvent({
       direction: "push",
       entityType: "table_catalog",
@@ -816,10 +859,12 @@ export class SyncCoordinator {
     }
 
     if ([400, 404, 405].includes(result.status ?? 0)) {
+      this.logSyncFailure("ai-catalog", result);
       this.aiCatalogSupported = false;
       return "";
     }
 
+    this.logSyncFailure("ai-catalog", result);
     this.options.database.recordSyncEvent({
       direction: "push",
       entityType: "ai_catalog",
@@ -869,6 +914,11 @@ export class SyncCoordinator {
         continue;
       }
       const nextAttemptAt = calculateNextAttempt(job.attemptCount);
+      this.logSyncFailure("outbox", result, {
+        jobType: job.jobType,
+        attemptCount: job.attemptCount,
+        nextAttemptAt
+      });
       this.options.database.failSyncJob(job.jobKey, job.sourceRevision, result.message, nextAttemptAt);
       this.options.database.recordSyncEvent({
         direction: "push",
