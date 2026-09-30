@@ -26,6 +26,8 @@ const MAX_STRING_LENGTH = 4_000;
 const MAX_META_DEPTH = 4;
 const MAX_META_KEYS = 60;
 const MAX_ARRAY_ITEMS = 50;
+const INFO_FLUSH_INTERVAL_MS = 250;
+const INFO_FLUSH_BYTES = 32 * 1024;
 const SESSION_ID_PATTERN = /^[0-9A-Z_-]{12,80}$/i;
 const EVENT_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,119}$/;
 
@@ -56,6 +58,9 @@ let initialized = false;
 let ipcWrapped = false;
 let consoleWrapped = false;
 let processHooksInstalled = false;
+let pendingEventLines: string[] = [];
+let pendingEventBytes = 0;
+let pendingFlushTimer: NodeJS.Timeout | null = null;
 
 function sanitizeText(value: string, maxLength = MAX_STRING_LENGTH): string {
   return value
@@ -150,13 +155,47 @@ function writeManifest() {
   }
 }
 
+function flushPendingEvents() {
+  if (pendingFlushTimer) {
+    clearTimeout(pendingFlushTimer);
+    pendingFlushTimer = null;
+  }
+  if (!currentEventFilePath || pendingEventLines.length === 0) {
+    pendingEventLines = [];
+    pendingEventBytes = 0;
+    return;
+  }
+  try {
+    fs.appendFileSync(currentEventFilePath, pendingEventLines.join(""), { encoding: "utf8", mode: 0o600 });
+  } catch {
+    // Diagnostics must never stop the desktop process.
+  } finally {
+    pendingEventLines = [];
+    pendingEventBytes = 0;
+    writeManifest();
+  }
+}
+
+function schedulePendingFlush() {
+  if (pendingFlushTimer) return;
+  pendingFlushTimer = setTimeout(() => {
+    pendingFlushTimer = null;
+    flushPendingEvents();
+  }, INFO_FLUSH_INTERVAL_MS);
+  pendingFlushTimer.unref();
+}
+
 function ensureEventFile(recordBytes: number) {
   if (!currentEventFilePath) return;
   try {
     const size = fs.existsSync(currentEventFilePath) ? fs.statSync(currentEventFilePath).size : 0;
-    if (size > 0 && size + recordBytes > MAX_EVENT_FILE_BYTES) {
-      currentChunk += 1;
-      currentEventFilePath = path.join(sessionPath, eventFileName(currentChunk));
+    if (size > 0 && size + pendingEventBytes + recordBytes > MAX_EVENT_FILE_BYTES) {
+      flushPendingEvents();
+      const flushedSize = fs.existsSync(currentEventFilePath) ? fs.statSync(currentEventFilePath).size : 0;
+      if (flushedSize > 0 && flushedSize + recordBytes > MAX_EVENT_FILE_BYTES) {
+        currentChunk += 1;
+        currentEventFilePath = path.join(sessionPath, eventFileName(currentChunk));
+      }
     }
   } catch {
     // Best effort rotation; the append path remains usable.
@@ -191,13 +230,23 @@ function appendStructured(
       ...(input.error !== undefined ? { error: sanitizeError(input.error) } : {})
     };
     const serialized = `${JSON.stringify(record)}\n`;
-    ensureEventFile(Buffer.byteLength(serialized));
-    fs.appendFileSync(currentEventFilePath, serialized, { encoding: "utf8", mode: 0o600 });
+    const serializedBytes = Buffer.byteLength(serialized);
+    ensureEventFile(serializedBytes);
 
     sessionManifest.eventCount += 1;
     if (level === "WARN") sessionManifest.warnCount += 1;
     if (level === "ERROR") sessionManifest.errorCount += 1;
-    writeManifest();
+
+    if (level === "INFO") {
+      pendingEventLines.push(serialized);
+      pendingEventBytes += serializedBytes;
+      if (pendingEventBytes >= INFO_FLUSH_BYTES) flushPendingEvents();
+      else schedulePendingFlush();
+    } else {
+      flushPendingEvents();
+      fs.appendFileSync(currentEventFilePath, serialized, { encoding: "utf8", mode: 0o600 });
+      writeManifest();
+    }
     return record;
   } catch {
     return null;
@@ -270,6 +319,15 @@ function installProcessHooks() {
       event: "process.uncaught-exception",
       message: `Yakalanmamış istisna izlendi (${origin}).`,
       error
+    });
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    desktopLog.error({
+      scope: "process",
+      event: "process.unhandled-rejection",
+      message: "Main process içinde işlenmeyen Promise reddi izlendi.",
+      error: reason
     });
   });
 
@@ -385,6 +443,12 @@ export function initializeDesktopLogging(options: InitializeDesktopLoggingOption
     currentEventFilePath = path.join(sessionPath, eventFileName(1));
     currentChunk = 1;
     currentSequence = 0;
+    pendingEventLines = [];
+    pendingEventBytes = 0;
+    if (pendingFlushTimer) {
+      clearTimeout(pendingFlushTimer);
+      pendingFlushTimer = null;
+    }
     sessionManifest = {
       version: 1,
       sessionId,
@@ -426,16 +490,19 @@ export function initializeDesktopLogging(options: InitializeDesktopLoggingOption
 
 export function finalizeDesktopLogging(reason = "quit") {
   if (!initialized || !sessionManifest) return;
+  flushPendingEvents();
   sessionManifest.endedAt = new Date().toISOString();
   sessionManifest.endReason = sanitizeText(reason, 120);
   writeManifest();
 }
 
 export function getCurrentDiagnosticSession(): DesktopDiagnosticSessionSummary | null {
+  flushPendingEvents();
   return sessionManifest ? toSummary(sessionManifest, sessionPath) : null;
 }
 
 export function listDiagnosticSessions(): DesktopDiagnosticSessionSummary[] {
+  flushPendingEvents();
   if (!sessionsPath) return [];
   try {
     return fs.readdirSync(sessionsPath, { withFileTypes: true })
@@ -471,6 +538,7 @@ function eventMatches(record: DesktopDiagnosticEvent, input: DesktopDiagnosticRe
 }
 
 export function readDiagnosticSession(inputValue: unknown): DesktopDiagnosticReadResult | null {
+  flushPendingEvents();
   const input = inputValue && typeof inputValue === "object" && !Array.isArray(inputValue)
     ? inputValue as DesktopDiagnosticReadInput
     : {};
