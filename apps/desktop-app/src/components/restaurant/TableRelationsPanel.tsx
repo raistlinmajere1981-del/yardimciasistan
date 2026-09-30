@@ -93,7 +93,7 @@ export function TableRelationsPanel({
         {customersEnabled && <ActionButton variant="ghost" size="sm" disabled={disabled} onClick={onCreateCustomer}>
           <UserPlus size={14} aria-hidden="true" />Yeni müşteri
         </ActionButton>}
-        {reservationsEnabled && <ActionButton variant="ghost" size="sm" disabled={disabled} onClick={onCreateReservation}>
+        {customersEnabled && reservationsEnabled && <ActionButton variant="ghost" size="sm" disabled={disabled} onClick={onCreateReservation}>
           <CalendarPlus size={14} aria-hidden="true" />Rezervasyon
         </ActionButton>}
       </div>
