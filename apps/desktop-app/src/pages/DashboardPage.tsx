@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock3,
+  IdCard,
   MessageCircle,
   MessageSquareText,
   PackageMinus,
@@ -51,6 +52,7 @@ interface DashboardPageProps {
   availableRoomCount: number;
   onReplyRequest: (request: DashboardRequest) => void;
   onOpenCustomerWork: (request?: DashboardRequest) => void;
+  onOpenKbs: () => void;
   onOpenReservation: (reservation: DesktopDashboardData["reservations"][number]) => void;
   onCompleteTask: (taskId: string) => void;
   dailyAiState: SyncState;
@@ -82,6 +84,7 @@ export function DashboardPage({
   availableRoomCount,
   onReplyRequest,
   onOpenCustomerWork,
+  onOpenKbs,
   onOpenReservation,
   onCompleteTask,
   dailyAiState,
@@ -127,7 +130,8 @@ export function DashboardPage({
     + pendingReservationCount
     + birthdayAttentionCount
     + paymentWaitingCount
-    + stockAttentionCount;
+    + stockAttentionCount
+    + (data.kbsOverview.enabled ? data.kbsOverview.activeUnsentCount : 0);
   const visiblePriorityItems = dashboard.priorityItems;
   const visibleScheduleItems = dashboard.scheduleItems;
   const hasCapacityMetrics = features.rooms || features.tables || (features.whatsapp && customersEnabled);
@@ -212,6 +216,11 @@ export function DashboardPage({
           )}
           {stockAttentionCount > 0 && (
             <AttentionCard tone={operationalAttention.outOfStockItems > 0 ? "danger" : "wait"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
+          )}
+          {data.kbsOverview.enabled && data.kbsOverview.activeUnsentCount > 0 && (
+            <button className="dashboard-attention-button" type="button" onClick={onOpenKbs}>
+              <AttentionCard tone={data.kbsOverview.failedCount > 0 ? "danger" : "wait"} icon={IdCard} value={data.kbsOverview.activeUnsentCount} label="kimlik bildirimi bekliyor" />
+            </button>
           )}
         </div>
       </section>
