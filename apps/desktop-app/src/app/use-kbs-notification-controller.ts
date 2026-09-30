@@ -28,6 +28,30 @@ export function useKbsNotificationController({
     );
   }
 
+  async function send(notificationId: string) {
+    if (!window.yardimciDesktop || busyNotificationId) return null;
+    setBusyNotificationId(notificationId);
+    setSyncState("loading");
+    setStatusMessage("Kimlik bildirimi gönderiliyor...");
+    setMessage("Kimlik bildirimi gönderiliyor...");
+    try {
+      const result = await window.yardimciDesktop.sendKbsNotification(notificationId);
+      setDashboardData(result.dashboardData);
+      setStatusMessage(result.message);
+      setMessage(result.message);
+      setSyncState(result.ok || result.state !== "failed" ? "success" : "error");
+      return result;
+    } catch {
+      const errorMessage = "Kimlik bildirimi gönderim denemesi tamamlanamadı.";
+      setSyncState("error");
+      setStatusMessage(errorMessage);
+      setMessage(errorMessage);
+      return null;
+    } finally {
+      setBusyNotificationId("");
+    }
+  }
+
   async function mutate(
     notificationId: string,
     loadingMessage: string,
@@ -66,7 +90,8 @@ export function useKbsNotificationController({
     busyNotificationId,
     message,
     markExternallySent,
-    retry
+    retry,
+    send
   };
 }
 
