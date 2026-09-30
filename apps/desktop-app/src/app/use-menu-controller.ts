@@ -44,6 +44,15 @@ export function useMenuController({
   const [itemForm, setItemForm] = useState<ItemFormState>(initialItemForm);
 
   useEffect(() => {
+    if (menuPublishState !== "success") return;
+    const timer = window.setTimeout(() => {
+      setMenuPublishState("idle");
+      setMenuStatusMessage("Menü yayına hazır.");
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [menuPublishState]);
+
+  useEffect(() => {
     if (selectedCategoryId && !dashboardData.menu.categories.some((category) => category.id === selectedCategoryId)) {
       const nextCategory = [...dashboardData.menu.categories].sort(compareMenuRecords)[0];
       setSelectedCategoryId(nextCategory?.id ?? "");
