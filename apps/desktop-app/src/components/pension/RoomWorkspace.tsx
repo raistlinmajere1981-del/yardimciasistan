@@ -94,7 +94,14 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
     headerSummary={!history && <ResourceWorkspaceSummary label="Oda özeti" imageSrc="./assets/default-room.png"
       facts={<>
-        <strong>{roomIdentity(room)}</strong><span>{room.capacity} kişilik</span>{room.floor && <span>Kat: {room.floor}</span>}{room.bedInfo && <span>{room.bedInfo}</span>}
+        <div className="room-workspace-summary__copy">
+          <strong>{roomIdentity(room)}</strong>
+          <div className="room-workspace-summary__meta">
+            <span>{room.capacity} kişilik</span>
+            {room.floor && <span>Kat: {room.floor}</span>}
+            {room.bedInfo && <span>{room.bedInfo}</span>}
+          </div>
+        </div>
         {model.canSetCondition && <ChoiceChips
           className="workspace-status-chips"
           ariaLabel="Fiziksel oda durumu"
