@@ -21,7 +21,7 @@ import { writeRendererDiagnostic } from "./app/diagnostics-client";
 function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [syncState, setSyncState] = useState<SyncState>("idle");
-  const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
+  const [statusMessage, setStatusMessage] = useState("");
   const [customerWorkTab, setCustomerWorkTab] = useState<CustomerWorkTab>("customers");
   const pageLeaveGuardRef = useRef<PageLeaveGuard | null>(null);
   const lastNavigationDiagnosticRef = useRef("");
@@ -48,6 +48,15 @@ function App() {
     setSyncState(state);
     setStatusMessage(message);
   }), []);
+
+  useEffect(() => {
+    if (syncState !== "success" || !statusMessage) return;
+    const timer = window.setTimeout(() => {
+      setSyncState("idle");
+      setStatusMessage("");
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [statusMessage, syncState]);
 
   useEffect(() => {
     const key = `${activePage}:${activePage === "customerWork" ? customerWorkTab : ""}`;
