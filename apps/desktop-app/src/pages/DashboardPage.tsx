@@ -220,7 +220,16 @@ export function DashboardPage({
           {data.kbsOverview.enabled && data.kbsOverview.activeUnsentCount > 0 && (
             <button className={"dashboard-attention-card dashboard-attention-button tone-" + (data.kbsOverview.failedCount > 0 ? "danger" : "wait")} type="button" onClick={onOpenKbs}>
               <span className="dashboard-attention-icon" aria-hidden="true"><IdCard size={19} /></span>
-              <div><strong>{data.kbsOverview.activeUnsentCount}</strong><span>kimlik bildirimi bekliyor</span></div>
+              <div>
+                <strong>{data.kbsOverview.activeUnsentCount}</strong>
+                <span>
+                  {data.kbsOverview.failedCount > 0
+                    ? String(data.kbsOverview.failedCount) + " gönderim hatası var"
+                    : data.kbsOverview.activeMissingIdentityCount > 0
+                      ? String(data.kbsOverview.activeMissingIdentityCount) + " misafirde kimlik eksik"
+                      : "kimlik bildirimi bekliyor"}
+                </span>
+              </div>
             </button>
           )}
         </div>
