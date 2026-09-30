@@ -217,20 +217,19 @@ try {
 
   // A delayed customer reply (and repeated dashboard delivery) cannot roll back a newer projection.
   await button('Bahçe 1 masasını aç').click();
-  await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   await page.evaluate(() => { window.fixtureDelayCustomer = true; });
-  await button('Müşteriyi Bağla').click();
+  await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   await expect.poll(() => page.evaluate(() => typeof window.fixtureResolveCustomer)).toBe('function');
   await page.evaluate(() => {
     const tables = structuredClone(window.fixtureState().dashboard.tables);
     tables[0].currentCustomerId = 'customer-b'; window.fixturePatch({ tables });
   });
-  await expect(customerPanel.locator('p').first()).toHaveText('İkinci Misafir');
+  await expect(customerSelect).toContainText('İkinci Misafir');
   await page.evaluate(() => { window.fixtureDelayCustomer = false; window.fixtureResolveCustomer(); });
-  await expect(button('Bağı Kaldır')).toBeEnabled();
+  await expect(button('Bağı kaldır')).toBeEnabled();
   await page.evaluate(() => window.fixturePublishDashboard(window.fixtureCustomerResponse));
-  await expect(customerPanel.locator('p').first()).toHaveText('İkinci Misafir');
-  await button('Bağı Kaldır').click();
+  await expect(customerSelect).toContainText('İkinci Misafir');
+  await button('Bağı kaldır').click();
   await button("Masa çalışma alanını kapat").click();
 
   // Read completion from an earlier entity cannot overwrite the new workspace.
@@ -240,14 +239,14 @@ try {
   await page.evaluate(() => { window.fixtureDelayRead = false; window.fixtureOpen('table-b'); });
   await expect(workspace.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
   await page.evaluate(() => window.fixtureResolveRead());
-  await expect(button('Sipariş Aç')).toBeEnabled(); await expect(workspace.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
+  await expect(workspace.getByRole('button', { name: 'Çay ürününü siparişe ekle' })).toBeEnabled();
+  await expect(workspace.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
   await button("Masa çalışma alanını kapat").click();
   for (const variant of ['tables-only', 'no-menu', 'no-customers', 'no-reservations', 'no-transfer', 'no-catalog']) {
     const variantPage = await open(variant), surface = variantPage.locator('.workspace-page-frame:visible');
     if (variant === 'no-reservations') await expect(variantPage.getByRole('region', { name: 'Restoran rezervasyonları', exact: true })).toHaveCount(0);
     await variantPage.getByRole('button', { name: 'Bahçe 1 masasını aç' }).click();
     if (variant === 'no-customers') {
-      await expect(surface.getByRole('region', { name: 'Masa müşterisi' })).toHaveCount(0);
       await expect(surface.getByLabel('Müşteri seç', { exact: true })).toHaveCount(0);
       expect(await variantPage.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'customer'))).toEqual([]);
     }
@@ -255,19 +254,18 @@ try {
       await expect(surface.locator('.workspace-tabs')).toHaveCount(0);
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([]);
       await chooseSearchSelect(surface, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
-      await surface.getByRole('button', { name: 'Müşteriyi Bağla', exact: true }).click();
-      await expect(surface.getByRole('region', { name: 'Masa müşterisi' }).locator('p').first()).toHaveText('Pilot Misafir');
+      await expect(surface.getByLabel('Müşteri seç', { exact: true })).toContainText('Pilot Misafir');
       expect(await variantPage.evaluate(() => window.fixtureState().orders)).toEqual([]);
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([{ kind: 'customer', tableId: 'table-a', customerId: 'customer-a' }]);
     } else {
-      await surface.getByRole('button', { name: 'Sipariş Aç' }).click();
+      if (variant !== 'no-menu') await surface.getByRole('button', { name: 'Çay ürününü siparişe ekle' }).click();
       if (variant === 'no-menu') await expect(surface.getByLabel('Sipariş için ürün ara')).toHaveCount(0);
-      if (variant === 'no-transfer') await expect(surface.getByRole('button', { name: 'Oda Hesabına Aktar' })).toHaveCount(0);
+      if (variant === 'no-transfer') await expect(surface.getByRole('button', { name: 'Odaya Aktar' })).toHaveCount(0);
     }
     await variantPage.close();
   }
   await page.getByLabel('Masa grubu').selectOption('all'); await button('Salon 1 masasını aç').click();
-  await button('Sipariş Aç').click(); await button('Çay ürününü siparişe ekle').click();
+  await button('Çay ürününü siparişe ekle').click();
 
   for (const [width, height, scheme, density, scale] of [[1366, 768, 'light', 'compact', 1], [1024, 768, 'dark', 'comfortable', 1.1], [600, 800, 'light', 'comfortable', 1]]) {
     await page.setViewportSize({ width, height });
