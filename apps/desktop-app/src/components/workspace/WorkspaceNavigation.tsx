@@ -2,6 +2,7 @@ import { createContext, useContext, useLayoutEffect, useRef, useState, type Reac
 import type { WorkspaceDefinition, WorkspaceDefinitionMetadata, WorkspaceSessionPage } from "./workspace-definition";
 import type { DesktopPage } from "../../app/navigation";
 import type { WorkspaceIntent, WorkspaceModeUpdate, WorkspacePresentation, WorkspaceReturnContext } from "./workspace-intent";
+import { writeRendererDiagnostic } from "../../app/diagnostics-client";
 
 interface WorkspaceState {
   intent: WorkspaceIntent;
@@ -104,6 +105,20 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
             presentation: sameEntity ? existing!.presentation : definition.defaultPresentation
           }
         }));
+        writeRendererDiagnostic({
+          level: "INFO",
+          scope: "navigation",
+          event: "navigation.workspace.opened",
+          message: "Çalışma alanı açıldı.",
+          meta: {
+            page,
+            ownerPage,
+            entityType: intent.entityType,
+            mode: intent.mode,
+            action: intent.action || "",
+            persistent: true
+          }
+        });
         if (page !== ownerPage) onReturnPage?.(ownerPage);
         return true;
       }
@@ -118,6 +133,19 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
         intent: { ...intent, returnContext: sameEntity ? transient!.intent.returnContext : { page, ...intent.returnContext } },
         presentation: sameEntity ? transient!.presentation : definition.defaultPresentation
       });
+      writeRendererDiagnostic({
+        level: "INFO",
+        scope: "navigation",
+        event: "navigation.workspace.opened",
+        message: "Çalışma alanı açıldı.",
+        meta: {
+          page,
+          entityType: intent.entityType,
+          mode: intent.mode,
+          action: intent.action || "",
+          persistent: false
+        }
+      });
       return true;
     },
     closeWorkspace(scope) {
@@ -131,6 +159,13 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
           if (context.page && context.page !== page) onReturnPage?.(context.page);
           hospitalityOnReturn.current[ownerPage]?.(context);
           hospitalityOnReturn.current[ownerPage] = undefined;
+          writeRendererDiagnostic({
+            level: "INFO",
+            scope: "navigation",
+            event: "navigation.workspace.closed",
+            message: "Çalışma alanı kapatıldı.",
+            meta: { page, ownerPage, entityType: scope.entityType, persistent: true }
+          });
           return true;
         }
         if (!transient || transient.intent.entityType !== scope.entityType || transient.intent.entityId !== scope.entityId) return false;
@@ -144,6 +179,13 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
         if (context.page && context.page !== page) onReturnPage?.(context.page);
         transientOnReturn.current?.(context);
         transientOnReturn.current = undefined;
+        writeRendererDiagnostic({
+          level: "INFO",
+          scope: "navigation",
+          event: "navigation.workspace.closed",
+          message: "Çalışma alanı kapatıldı.",
+          meta: { page, entityType: transient.intent.entityType, persistent: false }
+        });
         return true;
       }
 
@@ -155,6 +197,13 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
       if (context.page && context.page !== page) onReturnPage?.(context.page);
       hospitalityOnReturn.current[page]?.(context);
       hospitalityOnReturn.current[page] = undefined;
+      writeRendererDiagnostic({
+        level: "INFO",
+        scope: "navigation",
+        event: "navigation.workspace.closed",
+        message: "Çalışma alanı kapatıldı.",
+        meta: { page, entityType: session.intent.entityType, persistent: true }
+      });
       return true;
     },
     updateWorkspacePresentation(presentation) {
