@@ -55,7 +55,7 @@ export interface BusinessLayoutTable {
   sortOrder: number;
 }
 
-export interface BusinessLayoutPublication {
+interface BusinessLayoutPublication {
   rooms: boolean;
   tables: boolean;
 }

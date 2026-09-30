@@ -32,7 +32,7 @@ export interface CustomerWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-export type MenuItemWorkspaceMode = "details" | "stock" | "media";
+type MenuItemWorkspaceMode = "details" | "stock" | "media";
 
 export interface MenuItemWorkspaceIntent {
   entityType: "menu-item";
@@ -58,8 +58,8 @@ export type WorkspaceModeUpdate = {
   [Entity in WorkspaceIntent["entityType"]]: Pick<Extract<WorkspaceIntent, { entityType: Entity }>, "entityType" | "mode" | "action">
 }[WorkspaceIntent["entityType"]];
 
-export type PensionView = "rooms" | "reservations" | "daily-tasks";
-export type RestaurantView = "floor" | "reservations" | "daily-tasks";
+type PensionView = "rooms" | "reservations" | "daily-tasks";
+type RestaurantView = "floor" | "reservations" | "daily-tasks";
 export type MarketView = "quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels";
 
 /** View names belong to their originating page, independently of the entity opened. */

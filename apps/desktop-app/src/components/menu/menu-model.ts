@@ -184,7 +184,7 @@ export function getMenuStockBadge(item: PublishedMenuItem): { label: string; ton
   return { label: formatStockQuantity(item.stock_quantity, item.stock_unit), tone: "ok" };
 }
 
-export function formatStockQuantity(quantity: number, unit: "piece" | "gram"): string {
+function formatStockQuantity(quantity: number, unit: "piece" | "gram"): string {
   const value = Number.isFinite(quantity) ? new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 }).format(quantity) : "0";
   return `${value} ${stockUnitShortLabel(unit)}`;
 }

@@ -13,7 +13,7 @@ export function assignReservationRoom(reservation: Reservation, roomId: string,
     startDate: reservation.startDate, endDate: reservation.endDate, guestCount: reservation.guestCount, notes: reservation.notes });
 }
 
-export function ReservationRoomAssignment({ reservations, rooms, reservationId, roomId, fixed, onChange }: {
+function ReservationRoomAssignment({ reservations, rooms, reservationId, roomId, fixed, onChange }: {
   reservations: Reservation[]; rooms: DesktopDashboardData["rooms"];
   reservationId: string; roomId: string; fixed: "room" | "reservation";
   onChange: (reservationId: string, roomId: string) => void;

@@ -60,10 +60,3 @@ export function saveSidebarCollapsedPreference(collapsed: boolean) {
     // Depolama kapalıysa menü tercihi yalnız bu oturumda geçerli kalır.
   }
 }
-
-export function automaticSyncTone(status: AutomaticSyncStatus): SyncState {
-  if (status.phase === "syncing") return "loading";
-  if (status.phase === "success") return "success";
-  if (status.phase === "offline" || status.phase === "error") return "error";
-  return "idle";
-}

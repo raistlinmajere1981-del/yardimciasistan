@@ -230,7 +230,7 @@ export interface DesktopCustomerRoomStay {
   pendingNotificationCount: number;
 }
 
-export interface DesktopStayGuest {
+interface DesktopStayGuest {
   id: string;
   customerId: string;
   customerName: string;
@@ -403,7 +403,7 @@ export interface DesktopReportAttentionItem {
   detail: string;
 }
 
-export interface DesktopOperationalAttention {
+interface DesktopOperationalAttention {
   pendingRequests: number;
   pendingReservations: number;
   paymentWaitingTables: number;

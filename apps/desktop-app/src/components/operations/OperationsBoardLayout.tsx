@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export interface OperationsBoardPane {
+interface OperationsBoardPane {
   title: string;
   toolbar?: ReactNode;
   content: ReactNode;

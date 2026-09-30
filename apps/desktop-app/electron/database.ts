@@ -143,7 +143,6 @@ export type {
   DesktopKbsDeliveryMutationResult,
   DesktopReportPreset,
   DesktopReportRangeInput,
-  DesktopReportPeriod,
   DesktopReportStockMovement,
   DesktopReportData,
   DesktopReportQueryResult,
