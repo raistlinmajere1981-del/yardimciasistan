@@ -1,5 +1,4 @@
 import { BedDouble, Plus, X, UserRound } from "lucide-react";
-import { ActionButton } from "../ui/ActionButton";
 import { IconButton } from "../ui/IconButton";
 
 export interface RoomGuestSlotPerson {
@@ -66,7 +65,6 @@ export function RoomGuestSlots({
   selectedIndex = -1,
   disabled = false,
   onSelectSlot,
-  onAddSlot,
   onRemoveExtraSlot
 }: {
   capacity: number;
@@ -76,7 +74,6 @@ export function RoomGuestSlots({
   selectedIndex?: number;
   disabled?: boolean;
   onSelectSlot: (slotIndex: number, guest?: RoomGuestSlotPerson) => void;
-  onAddSlot?: () => void;
   onRemoveExtraSlot?: (slotIndex: number) => void;
 }) {
   const baseSlotCount = Math.max(1, capacity, guests.length);
@@ -107,17 +104,6 @@ export function RoomGuestSlots({
   }
 
   return <div className="room-bed-layout" aria-label="Oda misafir slotları">
-    {onAddSlot && <div className="room-bed-layout__toolbar">
-      <span>{guests.length} misafir · {capacity} kişilik oda</span>
-      <ActionButton
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={disabled || baseSlotCount + extraSlots >= 50}
-        onClick={onAddSlot}
-      >+ Slot</ActionButton>
-    </div>}
-
     {groups.map((group, groupIndex) => <section className="room-bed-group" key={`${group.label}-${groupIndex}`}>
       <header><BedDouble size={16} aria-hidden="true" /><strong>{group.label}</strong></header>
       <div className="room-guest-slots">
