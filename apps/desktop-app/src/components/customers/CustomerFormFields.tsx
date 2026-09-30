@@ -134,8 +134,17 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           <div className="page-toolbar__copy">
             <strong>Kimlik kartı bilgileri</strong>
           </div>
-          <div className="action-row">
+          <div className="action-row identity-scan-actions">
             <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
+            <label className="form-check identity-back-side-toggle">
+              <input
+                checked={scanBackSide}
+                disabled={!aiEnabled || analysisState === "loading"}
+                onChange={(event) => setScanBackSide(event.target.checked)}
+                type="checkbox"
+              />
+              <strong>Ön/arka</strong>
+            </label>
             <ActionButton variant="secondary" size="sm" type="button" disabled={!aiEnabled || analysisState === "loading"} onClick={() => { primeIdentityCameraFeedback(); setCameraOpen(true); }}>
               <Camera size={15} aria-hidden="true" />
               Kimliği kameradan tara
@@ -146,15 +155,6 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
             </ActionButton>
           </div>
         </div>
-        <label className="form-check identity-back-side-toggle">
-          <input
-            checked={scanBackSide}
-            disabled={!aiEnabled || analysisState === "loading"}
-            onChange={(event) => setScanBackSide(event.target.checked)}
-            type="checkbox"
-          />
-          <strong>Kimliğin arka yüzünü de tara</strong>
-        </label>
         <div className="form-grid">
           <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
             <option value="">Seçilmedi</option><option value="tc_identity_card">T.C. Kimlik Kartı</option><option value="passport">Pasaport</option><option value="other">Diğer</option>
@@ -172,7 +172,7 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
                   onChange={(event) => update("birthdayMessageEnabled", event.target.checked)}
                   type="checkbox"
                 />
-                <strong>Doğum günü mesajı gönder</strong>
+                <strong>Mesaj gönder</strong>
               </label>
             </div>
           </div>
