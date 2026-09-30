@@ -22,6 +22,22 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
   const [filter, setFilter] = useState<KbsFilter>("attention");
   const overview = data.kbsOverview;
 
+  async function markExternal(notification: DesktopDashboardData["hospitalityNotifications"][number]) {
+    const approved = await confirm({
+      eyebrow: "Kimlik Bildirim Sistemi",
+      title: "Haricen bildirildi olarak işaretle",
+      tone: "warning",
+      confirmLabel: "Bildirildi Olarak İşaretle",
+      description: "Bu işlem yalnızca yerel kaydı tamamlanmış sayar; resmi KBS sistemine yeni bir bildirim göndermez.",
+      details: <dl className="info-list">
+        <div><dt>Misafir</dt><dd>{notification.customerName}</dd></div>
+        <div><dt>Oda</dt><dd>{roomLabel(notification.roomNumber, notification.roomName)}</dd></div>
+        <div><dt>İşlem</dt><dd>{kindLabel(notification.kind)}</dd></div>
+      </dl>
+    });
+    if (approved) await controller.markExternallySent(notification.id);
+  }
+
   const notifications = useMemo(() => data.hospitalityNotifications.filter((item) => {
     if (filter === "attention") return item.status !== "sent";
     if (filter === "all") return true;
