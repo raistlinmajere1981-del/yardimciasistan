@@ -10,7 +10,6 @@ export interface KbsSettings {
   username: string;
   authorizedIdentityNumber: string;
   passwordConfigured: boolean;
-  secondFactorConfigured: boolean;
 }
 
 export interface SaveKbsSettingsInput {
@@ -21,8 +20,6 @@ export interface SaveKbsSettingsInput {
   authorizedIdentityNumber: string;
   password: string;
   clearPassword: boolean;
-  secondFactorSecret: string;
-  clearSecondFactorSecret: boolean;
 }
 
 export type KbsSettingsSaveResult =
@@ -46,7 +43,6 @@ export interface KbsRuntimeCredentials {
   username: string;
   authorizedIdentityNumber: string;
   password: string;
-  secondFactorSecret: string;
 }
 
 interface StoredKbsSettings {
@@ -56,7 +52,6 @@ interface StoredKbsSettings {
   username: string;
   authorizedIdentityNumber: string;
   encryptedPassword: string;
-  encryptedSecondFactorSecret: string;
 }
 
 const SAFE_STORAGE_PREFIX = "safe-storage:v1:";
@@ -71,8 +66,7 @@ export function getKbsSettings(databasePath: string): KbsSettings {
     facilityCode: stored.facilityCode,
     username: stored.username,
     authorizedIdentityNumber: stored.authorizedIdentityNumber,
-    passwordConfigured: Boolean(stored.encryptedPassword),
-    secondFactorConfigured: Boolean(stored.encryptedSecondFactorSecret)
+    passwordConfigured: Boolean(stored.encryptedPassword)
   };
 }
 
@@ -80,22 +74,12 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
   const current = readStoredSettings(databasePath);
   const normalized = normalizeInput(input);
   const validation = validateInput(normalized, {
-    passwordAvailable: Boolean(normalized.password) || (!normalized.clearPassword && Boolean(current.encryptedPassword)),
-    secondFactorAvailable: Boolean(normalized.secondFactorSecret)
-      || (!normalized.clearSecondFactorSecret && Boolean(current.encryptedSecondFactorSecret))
+    passwordAvailable: Boolean(normalized.password) || (!normalized.clearPassword && Boolean(current.encryptedPassword))
   });
   if (validation) return { ok: false, message: validation };
 
   const passwordUpdate = resolveSecretUpdate(normalized.password, normalized.clearPassword, current.encryptedPassword, "KBS parolası");
   if (!passwordUpdate.ok) return passwordUpdate;
-  const secondFactorUpdate = resolveSecretUpdate(
-    normalized.secondFactorSecret,
-    normalized.clearSecondFactorSecret,
-    current.encryptedSecondFactorSecret,
-    "EGMSEC anahtarı"
-  );
-  if (!secondFactorUpdate.ok) return secondFactorUpdate;
-
   const db = new DatabaseSync(databasePath);
   try {
     ensureKbsSettingsTable(db);
@@ -104,7 +88,7 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
       INSERT INTO kbs_service_settings (
         id, enabled, provider, facility_code, username, authorized_identity_number,
         password_encrypted, second_factor_secret_encrypted, created_at, updated_at
-      ) VALUES ('primary', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES ('primary', ?, ?, ?, ?, ?, ?, '', ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         enabled = excluded.enabled,
         provider = excluded.provider,
@@ -121,7 +105,6 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
       normalized.username,
       normalized.authorizedIdentityNumber,
       passwordUpdate.encryptedValue,
-      secondFactorUpdate.encryptedValue,
       now,
       now
     );
@@ -156,11 +139,8 @@ export function resolveKbsRuntimeCredentials(
   };
   const password = normalized.password
     || (normalized.clearPassword ? "" : decryptSecret(current.encryptedPassword));
-  const secondFactorSecret = normalized.secondFactorSecret
-    || (normalized.clearSecondFactorSecret ? "" : decryptSecret(current.encryptedSecondFactorSecret));
   const validation = validateInput(normalized, {
-    passwordAvailable: Boolean(password),
-    secondFactorAvailable: Boolean(secondFactorSecret)
+    passwordAvailable: Boolean(password)
   });
   if (validation) return { ok: false, message: validation };
   return {
@@ -170,8 +150,7 @@ export function resolveKbsRuntimeCredentials(
       facilityCode: normalized.facilityCode,
       username: normalized.username,
       authorizedIdentityNumber: normalized.authorizedIdentityNumber,
-      password,
-      secondFactorSecret
+      password
     }
   };
 }
@@ -240,8 +219,7 @@ function readStoredSettings(databasePath: string): StoredKbsSettings {
       facilityCode: String(row?.facility_code ?? "").trim(),
       username: String(row?.username ?? "").trim(),
       authorizedIdentityNumber: String(row?.authorized_identity_number ?? "").trim(),
-      encryptedPassword: String(row?.password_encrypted ?? "").trim(),
-      encryptedSecondFactorSecret: String(row?.second_factor_secret_encrypted ?? "").trim()
+      encryptedPassword: String(row?.password_encrypted ?? "").trim()
     };
   } finally {
     db.close();
@@ -273,15 +251,13 @@ function normalizeInput(input: SaveKbsSettingsInput): SaveKbsSettingsInput {
     username: String(input?.username ?? "").trim(),
     authorizedIdentityNumber: String(input?.authorizedIdentityNumber ?? "").replace(/\D/g, ""),
     password: String(input?.password ?? "").trim(),
-    clearPassword: input?.clearPassword === true,
-    secondFactorSecret: String(input?.secondFactorSecret ?? "").replace(/[\s-]+/g, "").toUpperCase(),
-    clearSecondFactorSecret: input?.clearSecondFactorSecret === true
+    clearPassword: input?.clearPassword === true
   };
 }
 
 function validateInput(
   input: SaveKbsSettingsInput,
-  availability: { passwordAvailable: boolean; secondFactorAvailable: boolean }
+  availability: { passwordAvailable: boolean }
 ): string | null {
   if (!input.enabled) return null;
   if (!/^\d{11}$/.test(input.authorizedIdentityNumber)) {
@@ -300,9 +276,6 @@ function validateInput(
   }
   if (!input.username || input.username.length > 120 || /[\x00-\x1F\x7F]/.test(input.username)) {
     return "EGM KBS kullanıcı adı gerekli.";
-  }
-  if (input.secondFactorSecret && !/^[A-Z2-7]+=*$/.test(input.secondFactorSecret)) {
-    return "EGMSEC/TOTP anahtarı geçersiz görünüyor.";
   }
   return null;
 }
