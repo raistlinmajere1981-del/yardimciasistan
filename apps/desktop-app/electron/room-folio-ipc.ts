@@ -8,6 +8,7 @@ import {
   type CheckoutRoomFolioInput,
   type DesktopRoomFolioData,
   type DesktopRoomFolioMutationResult,
+  type SetRoomFolioDiscountInput,
   type UpdateRoomFolioDetailsInput,
   type UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
@@ -115,6 +116,11 @@ export function registerRoomFolioIpcHandlers(options: {
       }));
     }
     return finalize(service().addManualItem(input));
+  });
+
+  ipcMain.handle("roomFolio:setDiscount", (_event, input: SetRoomFolioDiscountInput): DesktopRoomFolioMutationResult => {
+    assertAccess();
+    return finalize(service().setDiscount(input));
   });
 
   ipcMain.handle("roomFolio:removeItem", (_event, itemId: string): DesktopRoomFolioMutationResult => {
