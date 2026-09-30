@@ -123,19 +123,37 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
             description={notification.status === "sent"
               ? "Gönderim: " + formatDateTime(notification.sentAt || notification.occurredAt) + (notification.provider ? " · " + providerLabel(notification.provider) : "")
               : "İşlem zamanı: " + formatDateTime(notification.occurredAt)}
-            actions={<ActionButton
-              variant="secondary"
-              size="sm"
-              onClick={() => navigation.openWorkspace({
-                entityType: "customer",
-                entityId: notification.customerId,
-                mode: notification.identityReady ? "summary" : "details",
-                returnContext: { page: "customerWork", entityId: notification.customerId }
-              })}
-            >
-              <UserRound size={15} aria-hidden="true" />
-              {notification.identityReady ? "Müşteriyi Aç" : "Kimliği Tamamla"}
-            </ActionButton>}
+            actions={<>
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                onClick={() => navigation.openWorkspace({
+                  entityType: "customer",
+                  entityId: notification.customerId,
+                  mode: notification.identityReady ? "summary" : "details",
+                  returnContext: { page: "customerWork", entityId: notification.customerId }
+                })}
+              >
+                <UserRound size={15} aria-hidden="true" />
+                {notification.identityReady ? "Müşteriyi Aç" : "Kimliği Tamamla"}
+              </ActionButton>
+              {notification.status === "failed" && <ActionButton
+                variant="secondary"
+                size="sm"
+                disabled={controller.busyNotificationId === notification.id}
+                onClick={() => { void controller.retry(notification.id); }}
+              >
+                Tekrar Kuyruğa Al
+              </ActionButton>}
+              {notification.status !== "sent" && <ActionButton
+                variant="ghost"
+                size="sm"
+                disabled={controller.busyNotificationId === notification.id}
+                onClick={() => { void markExternal(notification); }}
+              >
+                Haricen Bildirildi
+              </ActionButton>}
+            </>}
           />
         ))}
       </DataList>
