@@ -20,6 +20,9 @@ try {
     tableCategories: [{ name: "Restaurant", tableCount: 1 }] });
   db = new DatabaseSync(database.databasePath);
   db.exec("PRAGMA foreign_keys = ON");
+  const kbsEnabledAt = new Date().toISOString();
+  db.prepare("INSERT INTO kbs_service_settings (id, enabled, provider, created_at, updated_at) VALUES ('primary', 1, 'egm', ?, ?)")
+    .run(kbsEnabledAt, kbsEnabledAt);
   const rooms = database.getDashboardData().rooms;
   const customers = ["Ana Misafir", "İkinci Misafir", "Çocuk Misafir", "Yeni Misafir"].map(fullName => ok(database.saveCustomer({
     fullName, phone: "", email: "", notes: "", tags: [], identityType: "", identityNumber: "", nationality: "", birthDate: "",
