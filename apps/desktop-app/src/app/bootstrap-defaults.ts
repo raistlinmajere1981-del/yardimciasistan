@@ -33,6 +33,18 @@ export const defaultDashboardData: DesktopDashboardData = {
   dailyTasks: [],
   customers: [],
   customerRoomStays: [],
+  hospitalityNotifications: [],
+  kbsOverview: {
+    enabled: false,
+    configured: false,
+    provider: "egm",
+    pendingCount: 0,
+    failedCount: 0,
+    sentCount: 0,
+    checkedInGuestCount: 0,
+    activeUnsentCount: 0,
+    activeMissingIdentityCount: 0
+  },
   androidDevices: [],
   paymentWaitingTableOrders: [],
   androidActionFailures: [],
