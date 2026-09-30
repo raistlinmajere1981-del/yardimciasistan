@@ -295,7 +295,7 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     const bridge = window.yardimciDesktop;
     if (!bridge?.saveBusinessPublicProfile) {
       const message = "Müşteriye açık işletme bilgileri kaydedilemiyor. Uygulamayı yeniden başlatın.";
-      reportProfileStatus("error", message);
+      setFeedback({ error: false, message: "" });
       return { ok: false, message };
     }
 
@@ -308,18 +308,18 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     try {
       const result = await bridge.saveBusinessPublicProfile(inputResult.input);
       if (!result.ok) {
-        reportProfileStatus("error", result.message);
+        setFeedback({ error: false, message: "" });
         return { ok: false, message: result.message };
       }
       const nextDraft = toDraft(result.profile);
       setDraft(nextDraft);
       initialDraftRef.current = nextDraft;
       setCoordinateError("");
-      reportProfileStatus("success", result.message);
+      setFeedback({ error: false, message: "" });
       return { ok: true, changed: true, message: result.message };
     } catch {
       const message = "Müşteriye açık işletme bilgileri kaydedilemedi.";
-      reportProfileStatus("error", message);
+      setFeedback({ error: false, message: "" });
       return { ok: false, message };
     } finally {
       saveInFlight.current = false;
@@ -332,7 +332,7 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     if (saving || !initialDraftRef.current) return;
     setDraft(initialDraftRef.current);
     setCoordinateError("");
-    setFeedback({ error: false, message: "Müşteriye açık bilgiler geri alındı." });
+    setFeedback({ error: false, message: "" });
   }
   return { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, addSocialLink, setSocialLinkPlatform, setSocialLinkUrl, removeSocialLink, lookupBusinessAddress, selectAddressCandidate, save, feedback, dirty, discard };
 }
