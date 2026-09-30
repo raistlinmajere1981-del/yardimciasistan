@@ -89,8 +89,8 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
     db.prepare(`
       INSERT INTO kbs_service_settings (
         id, enabled, provider, facility_code, username, authorized_identity_number,
-        password_encrypted, second_factor_secret_encrypted, created_at, updated_at
-      ) VALUES ('primary', ?, ?, ?, ?, ?, ?, '', ?, ?)
+        password_encrypted, created_at, updated_at
+      ) VALUES ('primary', ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         enabled = excluded.enabled,
         provider = excluded.provider,
@@ -98,7 +98,6 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
         username = excluded.username,
         authorized_identity_number = excluded.authorized_identity_number,
         password_encrypted = excluded.password_encrypted,
-        second_factor_secret_encrypted = excluded.second_factor_secret_encrypted,
         updated_at = excluded.updated_at
     `).run(
       normalized.enabled ? 1 : 0,
@@ -244,7 +243,6 @@ function ensureKbsSettingsTable(db: DatabaseSync) {
       username TEXT NOT NULL DEFAULT '',
       authorized_identity_number TEXT NOT NULL DEFAULT '',
       password_encrypted TEXT NOT NULL DEFAULT '',
-      second_factor_secret_encrypted TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
