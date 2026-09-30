@@ -1,10 +1,12 @@
 import "@fontsource-variable/ibm-plex-sans/wght.css";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { DesktopPage } from "../../apps/desktop-app/src/app/navigation";
 import { useDashboardSnapshot } from "../../apps/desktop-app/src/app/use-dashboard-snapshot";
 import { roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
+import { GlobalMessageBar } from "../../apps/desktop-app/src/components/layout/GlobalMessageBar";
+import { subscribeAppStatus, type AppStatusDetail } from "../../apps/desktop-app/src/app/runtime-state";
 import {
   HospitalityWorkspaceHost,
   WorkspaceNavigationProvider,
@@ -15,6 +17,17 @@ import { RestaurantPage } from "../../apps/desktop-app/src/pages/RestaurantPage"
 import { RestaurantReservationsWorkspace } from "../../apps/desktop-app/src/components/operations/RestaurantReservationsWorkspace";
 import { DailyTasksWorkspace } from "../../apps/desktop-app/src/components/operations/OperationWorkspaces";
 import "../../apps/desktop-app/src/styles/index.css";
+
+function FixtureStatusHost() {
+  const [status, setStatus] = useState<AppStatusDetail | null>(null);
+  useEffect(() => subscribeAppStatus(setStatus), []);
+  return status ? (
+    <GlobalMessageBar
+      tone={status.state === "error" ? "error" : status.state === "success" ? "success" : "loading"}
+      message={status.message}
+    />
+  ) : null;
+}
 
 function Fixture() {
   const [page, setPage] = useState<DesktopPage>("restaurant");
@@ -115,7 +128,7 @@ function FixtureShell({ page, setPage, data, setData, capabilities, content, res
       <button onClick={() => setPage("pension")}>Pansiyon</button>
       <button onClick={() => setPage("dashboard")}>Ana Sayfa</button>
     </aside>}
-    header={<header className="page-header"><h1>{page === "restaurant" ? "Restoran" : page === "pension" ? "Pansiyon" : "Ana Sayfa"}</h1></header>}
+    header={<header className="page-header"><h1>{page === "restaurant" ? "Restoran" : page === "pension" ? "Pansiyon" : "Ana Sayfa"}</h1><FixtureStatusHost /></header>}
   >
     <Controls />
     {page === "restaurant" ? <RestaurantPage
