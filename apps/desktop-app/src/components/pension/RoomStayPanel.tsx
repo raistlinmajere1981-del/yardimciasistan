@@ -23,6 +23,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const [additional, setAdditional] = useState<string[]>([]);
   const [reservationId, setReservationId] = useState(intent.reservationId ?? "");
   const [selectedSlot, setSelectedSlot] = useState(-1);
+  const [extraSlots, setExtraSlots] = useState(0);
   const request = useRef({ signature: "", id: "" });
   const quickCustomerRequest = useRef("");
   const entryDirty = useRef(false);
@@ -41,8 +42,8 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     primary: id === primary
   }));
   const selectedDraftGuestId = selectedSlot >= 0 ? guestIds[selectedSlot] : undefined;
-  const canEnter = Boolean(room) && model.canCreate && primary && guestIds.length > 0 && !guestIds.some(id => unavailable.includes(id))
-    && (!room || room.capacity <= 0 || guestIds.length <= room.capacity);
+  const canEnter = Boolean(room) && model.canCreate && primary && guestIds.length > 0 && guestIds.length <= 50
+    && !guestIds.some(id => unavailable.includes(id));
 
   function removeDraftGuest(customerId: string) {
     if (customerId === primary) {
@@ -134,7 +135,14 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
         guestCustomerIds: guestIds, requestId: request.current.id })
       : await operations.checkInCustomer({ customerId: primary, roomId: room.id, checkInDate: draft.checkInDate, checkOutDate: draft.checkOutDate,
         guestCount: guestIds.length, guestCustomerIds: guestIds, notes: draft.notes, requestId: request.current.id });
-    if (ok) { markEntry(false); setAdditional([]); setReservationId(""); setSelectedSlot(-1); setDraft(defaultRoomAssignmentForm("", intent.entityId)); }
+    if (ok) {
+      markEntry(false);
+      setAdditional([]);
+      setReservationId("");
+      setSelectedSlot(-1);
+      setExtraSlots(0);
+      setDraft(defaultRoomAssignmentForm("", intent.entityId));
+    }
   }
 
   return <>
@@ -168,19 +176,28 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
           capacity={room.capacity}
           bedInfo={room.bedInfo}
           guests={draftGuests}
+          extraSlots={extraSlots}
           selectedIndex={selectedSlot}
           disabled={disabled}
           onSelectSlot={(index) => setSelectedSlot(index)}
+          onAddSlot={() => setExtraSlots(current => Math.min(50, current + 1))}
+          onRemoveExtraSlot={() => {
+            setExtraSlots(current => Math.max(0, current - 1));
+            setSelectedSlot(-1);
+          }}
         />
         {selectedSlot >= guestIds.length && <section className="room-slot-editor form-stack" aria-label="Boş slota misafir ata">
           <div className="room-inline-action-row">
             <StayGuestPicker
               data={data}
               selectedIds={guestIds}
-              disabled={disabled || (room.capacity > 0 && guestIds.length >= room.capacity)}
+              disabled={disabled || guestIds.length >= 50}
               onSelect={id => {
+                const baseSlotCount = Math.max(1, room.capacity, guestIds.length);
+                const consumesManualSlot = selectedSlot >= baseSlotCount;
                 if (!primary) setDraft(current => ({ ...current, customerId: id }));
                 else setAdditional(current => [...current, id]);
+                if (consumesManualSlot) setExtraSlots(current => Math.max(0, current - 1));
                 setSelectedSlot(-1);
                 markEntry(true);
               }}
