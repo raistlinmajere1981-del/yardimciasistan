@@ -52,6 +52,10 @@ export function TableRelationsPanel({
   const selectedCustomerId = customerDraft ?? (data.customers.some(item => item.id === table.currentCustomerId) ? table.currentCustomerId : "");
 
   useEffect(() => {
+    setCustomerDraft(null);
+  }, [table.currentCustomerId]);
+
+  useEffect(() => {
     if (!entryRequested || controller.busy || controller.dirty) return;
     setEntryRequested(false);
     navigation.openWorkspace({
