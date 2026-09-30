@@ -5,8 +5,9 @@ import { assignReservationRoom } from "./ReservationRoomAssignment";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomStayOperations } from "./use-room-stay-operations";
 
-export function RoomReservationControl({ model, operations, disabled, initialReservationId, onDirty }: {
+export function RoomReservationControl({ model, operations, disabled, initialReservationId, onCreateReservation, onDirty }: {
   model: RoomWorkspaceModel; operations: RoomStayOperations; disabled: boolean; initialReservationId?: string;
+  onCreateReservation?: () => void;
   onDirty: (key: string, dirty: boolean) => void;
 }) {
   const [reservationId, setReservationId] = useState(initialReservationId ?? "");
@@ -21,7 +22,10 @@ export function RoomReservationControl({ model, operations, disabled, initialRes
       const reservation = assignable.find(item => item.id === reservationId);
       if (reservation) void operations.mutate("operations", () => assignReservationRoom(reservation, room.id)).then(ok => { if (ok) onDirty("assignment", false); });
     }}>
-      <h4>Rezervasyon ataması</h4>
+      <div className="room-section-heading">
+        <h4>Rezervasyon</h4>
+        {onCreateReservation && <ActionButton type="button" variant="ghost" size="sm" disabled={disabled} onClick={onCreateReservation}>+ Yeni rezervasyon</ActionButton>}
+      </div>
       <fieldset className="form-stack" disabled={disabled}>
         <div className="form-field form-field--fluid">
           <span>Atanacak rezervasyon</span>
@@ -41,6 +45,6 @@ export function RoomReservationControl({ model, operations, disabled, initialRes
           />
         </div>
         <ActionButton variant="secondary" type="submit" disabled={!assignable.some(item => item.id === reservationId)}>Rezervasyonu Ata</ActionButton>
-      </fieldset><p>Yalnız oda ataması kaydedilir; konaklama oluşturulmaz.</p>
+      </fieldset>
     </form>;
 }
