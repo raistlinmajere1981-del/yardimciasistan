@@ -5,6 +5,7 @@ import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdenti
 import { customerFormToInput, formatCustomerGender, formatCustomerLastContactDate, formatCustomerRoomStayStatus, formatCustomerSource, formatIdentityType, formatStayDateRange, hasCustomerIdentityDetails, toCustomerForm, type CustomerFormState } from "../../app/customer-model";
 import { formatDateForDisplay, formatRequestStatus, formatRequestType, formatReservationDate, formatReservationStatus } from "../../app/record-formatters";
 import { customerCreditError } from "../../app/customer-credit-ui";
+import { reportAppStatus } from "../../app/runtime-state";
 import type { EphemeralWhatsAppHandoff } from "../../app/whatsapp-handoff";
 import type { CustomerWorkspaceIntent, CustomerWorkspaceMode } from "../workspace/workspace-intent";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
@@ -39,9 +40,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
   const [baseline, setBaseline] = useState<CustomerFormState>(() => toCustomerForm(customer));
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [saveMessage, setSaveMessage] = useState("Değişiklikler yalnız bu müşteri kartına kaydedilir.");
   const [entryRoomId, setEntryRoomId] = useState(data.rooms.find((room) => room.isActive)?.id ?? "");
-  const [deleteError, setDeleteError] = useState("");
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
   const closeBlocked = useWorkspaceCloseGuard({ busy: saveState === "loading", dirty });
 
@@ -51,7 +50,6 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     setForm(next);
     setBaseline(next);
     setSaveState("idle");
-    setSaveMessage("Değişiklikler yalnız bu müşteri kartına kaydedilir.");
   }, [baseline.id, customer]);
 
   const selectedRequests = useMemo<SyncedCustomerRequest[]>(() => customer ? data.requests.filter((request) => request.customer_id === customer.id || request.customer_phone === customer.phone) : [], [customer, data.requests]);
@@ -75,16 +73,13 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
 
   async function saveCustomer() {
     setSaveState("loading");
-    setSaveMessage("Müşteri kartı kaydediliyor...");
     const result = await onSave(customerFormToInput(form));
     if (!result.ok) {
       setSaveState("error");
-      setSaveMessage(result.message);
       return;
     }
     setBaseline(form);
     setSaveState("success");
-    setSaveMessage(result.message);
   }
 
   function leaveFor(action: () => void) {
@@ -147,18 +142,15 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
 
           <div className="action-row">
             <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={async () => {
-              setDeleteError("");
               try {
                 const result = await onDelete(customer);
                 if (result?.ok) navigation.closeWorkspace();
-                else if (result && !result.ok) setDeleteError(result.message);
-                else setDeleteError("Müşteri silinemedi. Yeniden deneyin.");
+                else if (!result) reportAppStatus("error", "Müşteri silinemedi. Yeniden deneyin.");
               } catch (error) {
-                setDeleteError(customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
+                reportAppStatus("error", customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
               }
             }}><Trash2 size={16} aria-hidden="true" />Müşteriyi Sil</ActionButton>
           </div>
-          {deleteError && <p role="alert">{deleteError}</p>}
         </div>
       </WorkspaceTabPanel>
 
@@ -166,9 +158,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
         <form className="form-stack customer-workspace-form" onSubmit={(event) => { event.preventDefault(); void saveCustomer(); }}>
           <CustomerFormFields form={form} aiEnabled={aiEnabled} onChange={setForm} onAnalyzeIdentity={onAnalyzeIdentity} />
           <div className="customer-workspace-savebar">
-            <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
             <div className="action-row">
-              <ActionButton variant="secondary" type="button" disabled={saveState === "loading" || !dirty} onClick={() => { setForm(baseline); setSaveState("idle"); setSaveMessage("Kaydedilmemiş değişiklikler geri alındı."); }}>Değişiklikleri Geri Al</ActionButton>
+              <ActionButton variant="secondary" type="button" disabled={saveState === "loading" || !dirty} onClick={() => { setForm(baseline); setSaveState("idle"); }}>Değişiklikleri Geri Al</ActionButton>
               <ActionButton type="submit" disabled={saveState === "loading" || !dirty}><Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}</ActionButton>
             </div>
           </div>
