@@ -370,6 +370,9 @@ if (!hasSingleInstanceLock) {
       getSyncStatus: () => syncCoordinator?.getStatus(),
       onUnlocked: () => {
         void birthdayScheduler?.evaluateNow();
+      },
+      onLocked: () => {
+        egmKbsBackgroundSession.destroy();
       }
     });
     syncCoordinator = new SyncCoordinator({
