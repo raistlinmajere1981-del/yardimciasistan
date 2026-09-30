@@ -725,7 +725,8 @@ function registerIpcHandlers() {
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability,
     finalizeRecordDeletion: finalizeDesktopRecordDeletion,
-    finalizeCustomerMutation: finalizeDesktopCustomerMutation
+    finalizeCustomerMutation: finalizeDesktopCustomerMutation,
+    finalizeCheckInMutation: finalizeDesktopCheckInMutation
   });
 
   registerWhatsAppWebviewIpcEvents({
@@ -932,6 +933,36 @@ function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult):
     getSyncCoordinator().scheduleSoon();
   }
   return result;
+}
+
+async function finalizeDesktopCheckInMutation(
+  result: DesktopCustomerMutationResult
+): Promise<DesktopCustomerMutationResult> {
+  if (!result.ok) return result;
+
+  const overview = result.dashboardData.kbsOverview;
+  if (overview.enabled && overview.configured) {
+    const pendingArrivals = result.dashboardData.hospitalityNotifications.filter((notification) =>
+      notification.stayId === result.savedId
+      && notification.kind === "arrival"
+      && notification.status !== "sent"
+      && notification.identityReady
+    );
+
+    for (const notification of pendingArrivals) {
+      await getDatabase().deliverKbsNotification(
+        notification.id,
+        [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
+      );
+    }
+
+    result = {
+      ...result,
+      dashboardData: getDatabase().getDashboardData()
+    };
+  }
+
+  return finalizeDesktopCustomerMutation(result);
 }
 
 function finalizeStockImageApply(result: DesktopStockImageApplyResult): DesktopStockImageApplyResult {
