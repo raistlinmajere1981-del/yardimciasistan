@@ -235,7 +235,7 @@ function DesktopAppFrameContent({
           ) : undefined}
           action={(
             <div className="page-header-tools">
-              {activePage === "menu" ? (
+              {activePage === "menu" && (
                 <>
                   <button className="action-button action-button-secondary action-button-sm secondary-sync-action" type="button" onClick={openMenuPreview}>
                     <Eye size={16} aria-hidden="true" />
@@ -248,12 +248,11 @@ function DesktopAppFrameContent({
                     </button>
                   )}
                 </>
-              ) : (
-                <SyncStatusIndicator
-                  automaticSyncStatus={automaticSyncStatus}
-                  onSync={() => void handlePullRequests()}
-                />
               )}
+              <SyncStatusIndicator
+                automaticSyncStatus={automaticSyncStatus}
+                onSync={() => void handlePullRequests()}
+              />
               {notificationsEnabled && <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />}
               <button
                 className="diagnostics-trigger"
