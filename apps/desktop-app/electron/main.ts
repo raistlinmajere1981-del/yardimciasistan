@@ -120,6 +120,7 @@ const egmKbsBackgroundDriver = new EgmKbsWebviewDriver();
 const egmKbsBackgroundSession = new EgmKbsBackgroundSession(egmKbsBackgroundDriver);
 const egmKbsProviderAdapter = new EgmKbsProviderAdapter(egmKbsBackgroundSession);
 const jandarmaKbsProviderAdapter = new JandarmaKbsProviderAdapter();
+const kbsDeliveryInFlight = new Map<string, Promise<DesktopKbsDeliveryMutationResult>>();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
 const C = BUSINESS_CAPABILITIES;
@@ -145,6 +146,23 @@ function reconcileEgmKbsBackgroundSession() {
   } else {
     egmKbsBackgroundSession.destroy();
   }
+}
+
+function deliverKbsNotificationOnce(notificationIdInput: string): Promise<DesktopKbsDeliveryMutationResult> {
+  const notificationId = notificationIdInput.trim();
+  const existing = kbsDeliveryInFlight.get(notificationId);
+  if (existing) return existing;
+
+  const delivery = getDatabase().deliverKbsNotification(
+    notificationId,
+    [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
+  ).finally(() => {
+    if (kbsDeliveryInFlight.get(notificationId) === delivery) {
+      kbsDeliveryInFlight.delete(notificationId);
+    }
+  });
+  kbsDeliveryInFlight.set(notificationId, delivery);
+  return delivery;
 }
 
 function assertDesktopRequestType(requestType: string) {
@@ -642,10 +660,7 @@ function registerIpcHandlers() {
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability,
-    deliverNotification: (notificationId) => getDatabase().deliverKbsNotification(
-      notificationId,
-      [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
-    ),
+    deliverNotification: deliverKbsNotificationOnce,
     onSettingsSaved: () => {
       reconcileEgmKbsBackgroundSession();
     }
@@ -976,10 +991,10 @@ function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult):
   return result;
 }
 
-async function finalizeDesktopHospitalityMutation(
+function finalizeDesktopHospitalityMutation(
   result: DesktopCustomerMutationResult,
   kinds: readonly ("arrival" | "departure" | "room_change")[]
-): Promise<DesktopCustomerMutationResult> {
+): DesktopCustomerMutationResult {
   if (!result.ok) return result;
 
   const overview = result.dashboardData.kbsOverview;
@@ -989,48 +1004,47 @@ async function finalizeDesktopHospitalityMutation(
       && kinds.includes(notification.kind)
       && notification.status !== "sent"
     );
-    const pending = relevant.filter((notification) => notification.identityReady);
-    const outcomes: DesktopKbsDeliveryMutationResult[] = [];
-
-    for (const notification of pending) {
-      outcomes.push(await getDatabase().deliverKbsNotification(
-        notification.id,
-        [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
-      ));
-    }
-
-    const missingIdentityCount = relevant.length - pending.length;
-    const sentCount = outcomes.filter((outcome) => outcome.ok && outcome.state === "sent").length;
-    const interactionCount = outcomes.filter((outcome) => !outcome.ok && outcome.state === "interaction_required").length;
-    const failedCount = outcomes.filter((outcome) => !outcome.ok && outcome.state === "failed").length;
-    const waitingCount = outcomes.filter((outcome) => !outcome.ok && outcome.state === "waiting").length;
+    const ready = relevant.filter((notification) => notification.identityReady);
+    const missingIdentityCount = relevant.length - ready.length;
     const notes = [
-      sentCount > 0 ? `KBS: ${sentCount} bildirim gönderildi.` : "",
-      interactionCount > 0 ? "KBS oturumu veya kullanıcı doğrulaması gerekiyor." : "",
-      failedCount > 0 ? `KBS: ${failedCount} bildirim hata verdi.` : "",
-      waitingCount > 0 ? `KBS: ${waitingCount} bildirim bekliyor.` : "",
+      ready.length > 0 ? `KBS: ${ready.length} bildirim arka planda işleniyor.` : "",
       missingIdentityCount > 0 ? `KBS: ${missingIdentityCount} misafirde kimlik bilgisi eksik.` : ""
     ].filter(Boolean);
 
-    result = {
-      ...result,
-      message: notes.length ? `${result.message} ${notes.join(" ")}` : result.message,
-      dashboardData: getDatabase().getDashboardData()
-    };
+    if (notes.length) {
+      result = { ...result, message: `${result.message} ${notes.join(" ")}` };
+    }
+
+    if (ready.length > 0) {
+      void (async () => {
+        for (const notification of ready) {
+          await deliverKbsNotificationOnce(notification.id);
+        }
+        notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+      })().catch((error) => {
+        desktopLog.error({
+          scope: "kbs",
+          event: "kbs.background-delivery.failed",
+          message: "KBS arka plan gönderim akışı tamamlanamadı.",
+          error
+        });
+        notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+      });
+    }
   }
 
   return finalizeDesktopCustomerMutation(result);
 }
 
-function finalizeDesktopCheckInMutation(result: DesktopCustomerMutationResult) {
+async function finalizeDesktopCheckInMutation(result: DesktopCustomerMutationResult) {
   return finalizeDesktopHospitalityMutation(result, ["arrival"]);
 }
 
-function finalizeDesktopCheckoutMutation(result: DesktopCustomerMutationResult) {
+async function finalizeDesktopCheckoutMutation(result: DesktopCustomerMutationResult) {
   return finalizeDesktopHospitalityMutation(result, ["departure"]);
 }
 
-function finalizeDesktopRoomChangeMutation(result: DesktopCustomerMutationResult) {
+async function finalizeDesktopRoomChangeMutation(result: DesktopCustomerMutationResult) {
   return finalizeDesktopHospitalityMutation(result, ["room_change"]);
 }
 
