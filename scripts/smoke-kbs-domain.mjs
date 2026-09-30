@@ -122,7 +122,7 @@ try {
   const snapshot = parseKbsIdentitySnapshot(arrival.identity_snapshot);
   assert.ok(snapshot);
   assert.equal(snapshot.customerId, readyCustomer);
-  assert.equal(snapshot.phone, "+905550000001");
+  assert.equal(snapshot.phone, "+905550000002");
   assert.equal(snapshot.motherName, "Anne");
   assert.equal(snapshot.fatherName, "Baba");
   assert.equal(hasKbsIdentityMinimum(snapshot), true);
