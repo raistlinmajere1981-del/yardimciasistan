@@ -100,7 +100,7 @@ function ya_support_rate_limit(string $root, string $clientId): void {
     @chmod($file, 0600);
 }
 
-function ya_support_validate_session(array $session): int {
+function ya_support_validate_session(array $session): array {
     $manifest = $session['session'] ?? null;
     $events = $session['events'] ?? null;
     if (!is_array($manifest) || !is_array($events)) {
@@ -112,6 +112,8 @@ function ya_support_validate_session(array $session): int {
     if (!is_string($manifest['startedAt'] ?? null) || strtotime($manifest['startedAt']) === false) {
         throw new InvalidArgumentException('Tanılama oturum zamanı geçersiz.');
     }
+    $warnCount = 0;
+    $errorCount = 0;
     foreach ($events as $event) {
         if (!is_array($event)) throw new InvalidArgumentException('Tanılama kaydı geçersiz.');
         if (!is_int($event['sequence'] ?? null)) throw new InvalidArgumentException('Tanılama sırası geçersiz.');
@@ -121,8 +123,15 @@ function ya_support_validate_session(array $session): int {
         if (!is_string($event['event'] ?? null) || strlen($event['event']) > 120) {
             throw new InvalidArgumentException('Tanılama olay adı geçersiz.');
         }
+        if (($event['level'] ?? null) === 'WARN') $warnCount++;
+        if (($event['level'] ?? null) === 'ERROR') $errorCount++;
     }
-    return count($events);
+    return [
+        'event_count' => count($events),
+        'warn_count' => $warnCount,
+        'error_count' => $errorCount,
+        'abrupt' => empty($manifest['endedAt'])
+    ];
 }
 
 function ya_support_validate_bundle(array $bundle): array {
@@ -151,9 +160,16 @@ function ya_support_validate_bundle(array $bundle): array {
         throw new InvalidArgumentException('Rapor 1 ile 3 tanılama oturumu içermeli.');
     }
     $eventCount = 0;
+    $warnCount = 0;
+    $errorCount = 0;
+    $abruptSessionCount = 0;
     foreach ($sessions as $session) {
         if (!is_array($session)) throw new InvalidArgumentException('Tanılama oturumu geçersiz.');
-        $eventCount += ya_support_validate_session($session);
+        $sessionFacts = ya_support_validate_session($session);
+        $eventCount += $sessionFacts['event_count'];
+        $warnCount += $sessionFacts['warn_count'];
+        $errorCount += $sessionFacts['error_count'];
+        if ($sessionFacts['abrupt']) $abruptSessionCount++;
         if ($eventCount > YA_SUPPORT_MAX_EVENTS) {
             throw new InvalidArgumentException('Destek raporunda çok fazla tanılama kaydı var.');
         }
@@ -179,6 +195,9 @@ function ya_support_validate_bundle(array $bundle): array {
     return [
         'session_count' => count($sessions),
         'event_count' => $eventCount,
+        'warn_count' => $warnCount,
+        'error_count' => $errorCount,
+        'abrupt_session_count' => $abruptSessionCount,
         'screenshot_bytes' => $screenshotBytes,
         'note_present' => $note !== ''
     ];
@@ -245,6 +264,9 @@ try {
         'arch' => (string) ($bundle['app']['arch'] ?? ''),
         'session_count' => $facts['session_count'],
         'event_count' => $facts['event_count'],
+        'warn_count' => $facts['warn_count'],
+        'error_count' => $facts['error_count'],
+        'abrupt_session_count' => $facts['abrupt_session_count'],
         'screenshot_bytes' => $facts['screenshot_bytes'],
         'note_present' => $facts['note_present'],
         'compressed_bytes' => strlen($raw),
