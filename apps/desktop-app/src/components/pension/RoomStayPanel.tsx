@@ -151,7 +151,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
       <div className="room-section-heading">
         <h4>Misafirler</h4>
-        <span>{stay.guestCount}/{room.capacity} dolu</span>
+        <span>{stay.guestCount > room.capacity ? `${stay.guestCount} kişi · ${room.capacity} kişilik oda` : `${stay.guestCount}/${room.capacity} dolu`}</span>
       </div>
       <StayGuestList stay={stay} data={data} operations={operations} disabled={disabled} onDirty={onDirty} onCreateCustomer={onCreateCustomer} />
     </section>)}
