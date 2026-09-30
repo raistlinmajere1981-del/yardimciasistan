@@ -87,6 +87,7 @@ const SMOKE_FILES = [
   "scripts/smoke-setup-profile-contract.mjs",
   "scripts/smoke-stock-image-analysis.mjs",
   "scripts/smoke-stock-image-import-db.mjs",
+  "scripts/smoke-support-endpoint.mjs",
   "scripts/smoke-sync-timeout.mjs",
   "scripts/smoke-table-categories-db.mjs",
   "scripts/smoke-table-customer.mjs",
