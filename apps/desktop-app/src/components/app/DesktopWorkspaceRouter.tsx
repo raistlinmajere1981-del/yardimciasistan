@@ -9,6 +9,7 @@ import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useDashboardAi } from "../../app/use-dashboard-ai";
+import { useKbsNotificationController } from "../../app/use-kbs-notification-controller";
 import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
 import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "../../app/operations";
@@ -226,6 +227,11 @@ export function DesktopWorkspaceRouter({
     return domain === "accommodation" || domain === "mixed" || domain === "generic";
   });
   const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
+  const kbsController = useKbsNotificationController({
+    setDashboardData,
+    setSyncState,
+    setStatusMessage
+  });
 
   const surfaceSelectedRequest = surfaceData.requests.find((request) => request.id === selectedRequest?.id)
     ?? surfaceData.requests[0];
@@ -457,6 +463,7 @@ export function DesktopWorkspaceRouter({
             <KbsAutomationWorkspace
               data={surfaceData}
               selectedCustomerId={selectedKbsCustomerId}
+              controller={kbsController}
             />
           )}
           messages={(
