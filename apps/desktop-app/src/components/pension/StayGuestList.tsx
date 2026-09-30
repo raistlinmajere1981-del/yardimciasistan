@@ -67,6 +67,16 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
   }
 
   return <>
+    <div className="room-section-heading">
+      <h4>Misafirler</h4>
+      <ActionButton
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={disabled || Math.max(1, room?.capacity ?? 0, guests.length) + extraSlots >= 50}
+        onClick={() => setExtraSlots(current => Math.min(50, current + 1))}
+      >+ Slot Ekle</ActionButton>
+    </div>
     <RoomGuestSlots
       capacity={room?.capacity ?? Math.max(1, guests.length)}
       bedInfo={room?.bedInfo ?? ""}
@@ -79,7 +89,6 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
         setAddingGuest(!guest);
         if (!guest) setNextPrimary("");
       }}
-      onAddSlot={() => setExtraSlots(current => Math.min(50, current + 1))}
       onRemoveExtraSlot={() => {
         setExtraSlots(current => Math.max(0, current - 1));
         setSelectedSlot(-1);
