@@ -25,6 +25,7 @@ export function getHospitalityNotifications(db: DatabaseSync): DesktopHospitalit
       c.identity_number,
       c.nationality,
       c.birth_date,
+      c.document_serial_number,
       s.status AS stay_status,
       s.check_in_date,
       s.check_out_date,
@@ -62,7 +63,7 @@ export function getHospitalityNotifications(db: DatabaseSync): DesktopHospitalit
     checkOutDate: String(row.check_out_date ?? ""),
     identityReady: Boolean(
       String(row.identity_type ?? "")
-      && String(row.identity_number ?? "")
+      && (String(row.identity_number ?? "") || String(row.document_serial_number ?? ""))
       && String(row.nationality ?? "")
       && String(row.birth_date ?? "")
     )
@@ -118,7 +119,7 @@ export function getKbsOverview(db: DatabaseSync): DesktopKbsOverview {
     WHERE g.status = 'checked_in'
       AND (
         c.identity_type = ''
-        OR c.identity_number = ''
+        OR (c.identity_number = '' AND c.document_serial_number = '')
         OR c.nationality = ''
         OR c.birth_date = ''
       )
