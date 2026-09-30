@@ -117,7 +117,8 @@
     "test:verification-registry": "node --test scripts/test-verification-registry.mjs",
     "smoke:room-public-details": "node scripts/smoke-room-public-details.mjs",
     "deploy:support": "bash scripts/deploy-support.sh",
-    "smoke:support-endpoint": "node scripts/smoke-support-endpoint.mjs"
+    "smoke:support-endpoint": "node scripts/smoke-support-endpoint.mjs",
+    "smoke:clean-start": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-clean-start.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",
