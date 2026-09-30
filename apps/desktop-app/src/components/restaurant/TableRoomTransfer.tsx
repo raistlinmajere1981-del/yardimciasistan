@@ -86,13 +86,15 @@ export function TableRoomTransfer({ order, busy, onTransfer, revision, customerI
         keywords: `${folio.roomName} ${folio.roomNumber} ${folio.customerName}`
       }))}
     />}
-    {selected && <div className="table-relation-summary">
-      <strong>{selected.roomNumber ? `Oda ${selected.roomNumber}` : selected.roomName}</strong>
-      <small>{selected.customerName || "Misafir"} · açık hesap</small>
-    </div>}
-    {message && <span className="table-relation-empty" role="status">{message}</span>}
-    {data && folios.length === 0 && <span className="table-relation-empty">Uygun açık oda hesabı yok.</span>}
-    <ActionButton size="sm" onClick={() => void requestTransfer()} disabled={busy || loading || !selected}>Odaya Aktar</ActionButton>
+    <div className="table-room-transfer-row">
+      {selected ? <div className="table-relation-summary">
+        <strong>{selected.roomNumber ? `Oda ${selected.roomNumber}` : selected.roomName}</strong>
+        <small>{selected.customerName || "Misafir"} · açık hesap</small>
+      </div> : <span className="table-relation-empty">
+        {message || (data && folios.length === 0 ? "Uygun açık oda hesabı yok." : "Oda hesabı seçin.")}
+      </span>}
+      <ActionButton size="sm" onClick={() => void requestTransfer()} disabled={busy || loading || !selected}>Odaya Aktar</ActionButton>
+    </div>
     {confirmDialog}
   </div>;
 }
