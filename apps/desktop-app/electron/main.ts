@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import { installDesktopContextMenu } from "./desktop-context-menu";
@@ -44,7 +44,9 @@ import {
 } from "./database";
 import { DesktopFinanceService } from "./finance";
 import { resolveProjectBackupPath } from "./data-maintenance";
-import { resolveDataRoot } from "./data-paths.js";
+import { archiveLocalDataForCleanStart } from "./clean-start.js";
+import { inspectDesktopDatabaseCompatibility } from "./desktop-database-compatibility.js";
+import { resolveDataRoot, resolveDatabasePath } from "./data-paths.js";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
 import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
 import { DesktopRoomFolioService, type DesktopRoomFolio } from "./room-folio";
@@ -262,6 +264,104 @@ function resolveRuntimeDataRoot(): string {
   });
 }
 
+async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> {
+  const forcedCleanStart = process.argv.includes("--clean-start");
+  const compatibility = inspectDesktopDatabaseCompatibility(resolveDatabasePath(dataRoot));
+
+  if (!forcedCleanStart && (compatibility.state === "fresh" || compatibility.state === "current")) {
+    return true;
+  }
+
+  const automaticReason = compatibility.state === "incompatible"
+    ? "Bu sürüm, bilgisayardaki eski Yardımcı Asistan veritabanı şemasıyla çalışamıyor."
+    : compatibility.state === "unreadable"
+      ? "Bilgisayardaki Yardımcı Asistan veritabanı güvenli biçimde okunamadı."
+      : "Teknik temiz başlangıç istendi.";
+
+  desktopLog.warn({
+    scope: "startup",
+    event: "startup.clean-start.required",
+    message: automaticReason,
+    meta: {
+      forced: forcedCleanStart,
+      compatibility: compatibility.state,
+      reason: compatibility.reason
+    }
+  });
+
+  const response = dialog.showMessageBoxSync({
+    type: "warning",
+    title: "Yardımcı Asistan — Temiz Başlangıç",
+    message: automaticReason,
+    detail: [
+      "Temiz Başlat seçilirse mevcut yerel veriler silinmek yerine kurtarma amacıyla legacy-data klasörüne taşınır.",
+      "Yeni sürüm daha sonra sıfır veritabanıyla açılır. Program kurulumu ve yeni sürüm dosyaları etkilenmez.",
+      "",
+      `Tanılama: ${compatibility.reason}`
+    ].join("\n"),
+    buttons: ["Temiz Başlat", "Uygulamayı Kapat"],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true
+  });
+
+  if (response !== 0) {
+    desktopLog.info({
+      scope: "startup",
+      event: "startup.clean-start.cancelled",
+      message: "Temiz başlangıç kullanıcı tarafından iptal edildi.",
+      meta: { compatibility: compatibility.state }
+    });
+    return false;
+  }
+
+  try {
+    const archived = archiveLocalDataForCleanStart(dataRoot);
+    try {
+      await session.defaultSession.clearStorageData({ storages: ["localstorage"] });
+    } catch (error) {
+      desktopLog.warn({
+        scope: "startup",
+        event: "startup.clean-start.preferences-clear.failed",
+        message: "Temiz başlangıç sırasında arayüz tercihleri temizlenemedi.",
+        error
+      });
+    }
+
+    desktopLog.info({
+      scope: "startup",
+      event: "startup.clean-start.completed",
+      message: "Yerel veriler arşivlendi; uygulama temiz başlangıçla devam ediyor.",
+      meta: {
+        forced: forcedCleanStart,
+        compatibility: compatibility.state,
+        archived: archived.archived,
+        archiveDirectory: archived.archiveDirectory,
+        movedEntries: archived.movedEntries
+      }
+    });
+    return true;
+  } catch (error) {
+    desktopLog.error({
+      scope: "startup",
+      event: "startup.clean-start.failed",
+      message: "Temiz başlangıç için yerel veriler güvenli biçimde arşivlenemedi.",
+      error
+    });
+    dialog.showMessageBoxSync({
+      type: "error",
+      title: "Temiz Başlangıç Tamamlanamadı",
+      message: "Yerel veriler güvenli biçimde hazırlanamadığı için uygulama açılmadı.",
+      detail: "Hiçbir yeni veritabanı oluşturulmadan uygulama kapatılacak. Mevcut verileri kontrol edip tekrar deneyebilirsiniz.",
+      buttons: ["Kapat"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    });
+    return false;
+  }
+}
+
 if (process.env.YA_DESKTOP_DATA_DIR) {
   app.setPath("userData", path.resolve(process.env.YA_DESKTOP_DATA_DIR));
 }
@@ -412,12 +512,17 @@ if (!hasSingleInstanceLock) {
     window.focus();
   });
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
+    const runtimeDataRoot = resolveRuntimeDataRoot();
+    if (!await prepareRuntimeDataForStartup(runtimeDataRoot)) {
+      app.quit();
+      return;
+    }
+
     session.fromPartition(WHATSAPP_WEB_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
     session.fromPartition(EGM_KBS_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
     configureDesktopMediaPermissions();
 
-    const runtimeDataRoot = resolveRuntimeDataRoot();
     desktopDatabase = new DesktopDatabase({
       appPath: app.getAppPath(),
       userDataPath: runtimeDataRoot,
