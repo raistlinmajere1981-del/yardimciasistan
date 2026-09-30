@@ -128,7 +128,7 @@ function FixtureShell({ page, setPage, data, setData, capabilities, content, res
       <button onClick={() => setPage("pension")}>Pansiyon</button>
       <button onClick={() => setPage("dashboard")}>Ana Sayfa</button>
     </aside>}
-    header={<header className="page-header"><h1>{page === "restaurant" ? "Restoran" : page === "pension" ? "Pansiyon" : "Ana Sayfa"}</h1><FixtureStatusHost /></header>}
+    header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">{page === "restaurant" ? "Restoran" : page === "pension" ? "Pansiyon" : "Ana Sayfa"}</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}
   >
     <Controls />
     {page === "restaurant" ? <RestaurantPage
