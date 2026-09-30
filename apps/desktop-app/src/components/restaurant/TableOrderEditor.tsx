@@ -126,10 +126,9 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrde
                         <OrderProductImage item={menuItemsById.get(item.menuItemId)} webModuleUrl={webModuleUrl} className="restaurant-order-line__image" />
                         <div className="restaurant-order-line__copy">
                           <strong>{item.productName}</strong>
-                          <span>{formatMoney(item.unitPrice, item.currency)} • {formatOrderItemStatus(item.status)}</span>
+                          <span>{formatMoney(item.unitPrice, item.currency)}</span>
                         </div>
                       </div>
-                      <strong className="restaurant-order-line__total">{formatMoney(item.lineTotal, item.currency)}</strong>
                       <div className="restaurant-quantity-control" role="group" aria-label={`${item.productName} adedi`}>
                         <IconButton size="sm" onClick={() => void controller.quantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1 || Boolean(busyAction)} aria-label={`${item.productName} adetini azalt`}><Minus size={14} aria-hidden="true" /></IconButton>
                         <output>{item.quantity}</output>
@@ -140,6 +139,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrde
                           aria-label={`${item.productName} adetini artır`}
                         ><Plus size={14} aria-hidden="true" /></IconButton>
                       </div>
+                      <strong className="restaurant-order-line__total">{formatMoney(item.lineTotal, item.currency)}</strong>
                       {(expandedNotes.has(item.id) || Boolean(noteDrafts[item.id])) ? <input
                         className="restaurant-order-line__note"
                         value={noteDrafts[item.id] ?? ""}
@@ -203,17 +203,6 @@ function menuStockConsumption(value: number | undefined): number {
 function compareMenuRecords(a: { sort_order: number; name: string }, b: { sort_order: number; name: string }) {
   return a.sort_order - b.sort_order || a.name.localeCompare(b.name, "tr-TR");
 }
-
-function formatOrderItemStatus(status: string): string {
-  return {
-    open: "Açık",
-    preparing: "Hazırlanıyor",
-    served: "Servis edildi",
-    cancelled: "İptal"
-  }[status] ?? status;
-}
-
-
 
 function OrderProductImage({ item, webModuleUrl, className }: {
   item?: PublishedMenuItem;
