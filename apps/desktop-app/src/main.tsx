@@ -4,28 +4,10 @@ import "@fontsource-variable/ibm-plex-sans/wght.css";
 import App from "./App";
 import "./styles/index.css";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
+import { serializeRendererError, writeRendererDiagnostic } from "./app/diagnostics-client";
+import { RootErrorBoundary } from "./components/app/RootErrorBoundary";
 
 applyUiPreferences(readUiPreferences());
-
-function serializeRendererError(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    };
-  }
-  return {
-    name: "Error",
-    message: typeof error === "string" ? error : String(error)
-  };
-}
-
-function writeRendererDiagnostic(input: Parameters<NonNullable<typeof window.yardimciDesktop>["writeDiagnosticEvent"]>[0]) {
-  const writer = window.yardimciDesktop?.writeDiagnosticEvent;
-  if (!writer) return;
-  void writer(input).catch(() => undefined);
-}
 
 window.addEventListener("error", (event) => {
   writeRendererDiagnostic({
@@ -56,7 +38,9 @@ window.addEventListener("unhandledrejection", (event) => {
 const root = createRoot(document.getElementById("root") as HTMLElement);
 root.render(
   <StrictMode>
-    <App />
+    <RootErrorBoundary>
+      <App />
+    </RootErrorBoundary>
   </StrictMode>
 );
 
