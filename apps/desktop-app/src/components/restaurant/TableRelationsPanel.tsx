@@ -75,7 +75,6 @@ export function TableRelationsPanel({
     void controller.assignTableCustomer(quickCustomerId).then(ok => {
       if (!ok) {
         setCustomerDraft(table.currentCustomerId || "");
-        quickAssignmentRef.current = "";
       }
     });
   }, [controller, disabled, quickCustomerId, table.currentCustomerId]);
