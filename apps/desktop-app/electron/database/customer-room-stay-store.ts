@@ -42,7 +42,7 @@ export function getCustomerRoomStays(db: DatabaseSync, scope: "recent" | "active
     .all() as Array<Record<string, unknown>>;
 
   const guests = db.prepare(`SELECT g.*, c.full_name,
-    (c.identity_type != '' AND c.identity_number != '' AND c.birth_date != '' AND c.nationality != '') AS identity_ready
+    (c.identity_type != '' AND (c.identity_number != '' OR c.document_serial_number != '') AND c.birth_date != '' AND c.nationality != '') AS identity_ready
     FROM stay_guests g JOIN customers c ON c.id = g.customer_id`).all() as Array<Record<string, unknown>>;
   const pending = db.prepare(`SELECT stay_id, COUNT(*) AS count FROM hospitality_notifications WHERE status != 'sent' GROUP BY stay_id`)
     .all() as Array<{ stay_id: string; count: number }>;
