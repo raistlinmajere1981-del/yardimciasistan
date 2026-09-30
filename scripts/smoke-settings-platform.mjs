@@ -65,6 +65,7 @@ try {
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
   await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: [] }));
   await expect(page.locator('#settings-product-data')).toBeVisible();
+  await expect(page.locator('#settings-kbs')).toHaveCount(0);
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('ürün verisi');
   await expect(page.getByRole('button', { name: 'Servisler · Ürün Verisi', exact: true })).toBeVisible();
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
