@@ -2,6 +2,7 @@ import { startTableOrder, setTableOrderStatus } from "./table-order-operations";
 import { useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData, DesktopTableOrder, DesktopTableOrderResult } from "../../../electron/database";
 import { useRequestGeneration } from "../workspace/use-request-generation";
+import { reportAppStatus } from "../../app/runtime-state";
 
 /** Entity lifetime only. The page owns the order projection; SQLite owns persisted orders. */
 export function useTableOrderController(tableId: string, enabled: boolean,
@@ -11,8 +12,6 @@ export function useTableOrderController(tableId: string, enabled: boolean,
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(enabled);
   const [loaded, setLoaded] = useState(!enabled);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState(false);
   const [dirty, setDirty] = useState(false);
   const alive = useRef(true);
   const running = useRef(false);
@@ -30,8 +29,8 @@ export function useTableOrderController(tableId: string, enabled: boolean,
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   function feedback(text: string, failed = false) {
-    if (!alive.current) return;
-    setMessage(text); setError(failed);
+    if (!alive.current || !text.trim()) return;
+    reportAppStatus(failed ? "error" : "success", text);
   }
   function apply(next: DesktopTableOrder, dashboard?: DesktopDashboardData) {
     if (!alive.current || next.tableId !== tableId) return false;
@@ -106,7 +105,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
   /** Every mutation and close/return shares the same flush and synchronous busy gate. */
   async function run(operation: (isCurrent: () => boolean) => Promise<boolean>): Promise<boolean> {
     if (running.current || loading || !loaded || !alive.current) return false;
-    running.current = true; setBusy(true); setError(false);
+    running.current = true; setBusy(true);
     try {
       if (!await flushNotes() || !alive.current) return false;
       return await operation(() => alive.current);
@@ -131,7 +130,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
     return window.yardimciDesktop;
   };
   const active = order && ["open", "preparing", "served", "payment"].includes(order.status) ? order : null;
-  return { order, active, notes, dirty, busy, loading, loaded, message, error, editNote, flushNotes, run, feedback,
+  return { order, active, notes, dirty, busy, loading, loaded, editNote, flushNotes, run, feedback,
     assignTableCustomer: (customerId: string) => {
       if (!customerCapability.current) return Promise.resolve(false);
       return run(async isCurrent => {
