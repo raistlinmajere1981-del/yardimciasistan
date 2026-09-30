@@ -177,12 +177,11 @@ export function MarketProductsWorkspace({
     if (priceError) {
       setSaveState("error");
       setSaveMessage(priceError);
-      onStateChange("error", priceError);
       return;
     }
     const isCurrent = beginCreateRequest();
     setSaveState("loading");
-    setSaveMessage("Ürün kartı kaydediliyor...");
+    setSaveMessage("");
     let saved: CatalogProduct;
     try {
       saved = await bridge.saveProduct(productFormToSaveInput(productForm));
@@ -191,7 +190,7 @@ export function MarketProductsWorkspace({
       if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
       setSaveState("error");
-      setSaveMessage(message);
+      setSaveMessage("");
       onStateChange("error", message);
       return;
     }
