@@ -1,5 +1,5 @@
 import { RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES,
   getReservationDomain,
@@ -33,6 +33,7 @@ import type {
 import type { UiPreferences } from "../../ui-preferences";
 import { CustomerMessagesWorkspace } from "../customers/CustomerMessagesWorkspace";
 import { CustomersWorkspace } from "../customers/CustomersWorkspace";
+import { KbsAutomationWorkspace } from "../customers/KbsAutomationWorkspace";
 import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
 import { WhatsAppWorkspace } from "../messages/MessageWorkspaces";
 import { MenuManager } from "../menu/MenuManager";
@@ -167,6 +168,7 @@ export function DesktopWorkspaceRouter({
     handleConvertRequestToReservation,
     handleUpdateRequestStatus,
     handleDeleteRequest,
+    handleDeleteCustomer,
     handleSaveCustomer,
     handleAnalyzeIdentityImage
   } = customerController;
@@ -223,6 +225,8 @@ export function DesktopWorkspaceRouter({
     });
     return domain === "accommodation" || domain === "mixed" || domain === "generic";
   });
+  const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
+
   const surfaceSelectedRequest = surfaceData.requests.find((request) => request.id === selectedRequest?.id)
     ?? surfaceData.requests[0];
   const runtimeFeatures = {
@@ -352,6 +356,7 @@ export function DesktopWorkspaceRouter({
 
   return (
     <>
+      {customerController.confirmDialog}
       {activePage === "dashboard" ? (
         <DashboardPage
           data={surfaceData}
@@ -397,6 +402,7 @@ export function DesktopWorkspaceRouter({
         <CustomerWorkPage
           requestsEnabled={requestsEnabled}
           whatsappEnabled={customerMessagingEnabled}
+          kbsEnabled={surfaceData.kbsOverview.enabled}
           activeTab={customerWorkTab}
           onTabChange={setCustomerWorkTab}
           requests={(
@@ -429,9 +435,23 @@ export function DesktopWorkspaceRouter({
             <CustomersWorkspace
               customers={surfaceData.customers}
               stays={surfaceData.customerRoomStays}
+              reservations={surfaceData.reservations}
+              notifications={surfaceData.hospitalityNotifications}
+              kbsOverview={surfaceData.kbsOverview}
               aiEnabled={aiEnabled}
               onSave={handleSaveCustomer}
               onAnalyzeIdentity={handleAnalyzeIdentityImage}
+              onDelete={handleDeleteCustomer}
+              onOpenKbs={(customerId) => {
+                setSelectedKbsCustomerId(customerId);
+                setCustomerWorkTab("kbs");
+              }}
+            />
+          )}
+          kbs={(
+            <KbsAutomationWorkspace
+              data={surfaceData}
+              selectedCustomerId={selectedKbsCustomerId}
             />
           )}
           messages={(
