@@ -318,6 +318,7 @@ export interface DesktopBridge {
   addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) => Promise<DesktopTableOrderResult>;
   updateTableOrderItemQuantity: (itemId: string, quantity: number) => Promise<DesktopTableOrderResult>;
   updateTableOrderItemNote: (itemId: string, note: string) => Promise<DesktopTableOrderResult>;
+  updateTableOrderDiscount: (orderId: string, discountTotal: number) => Promise<DesktopTableOrderResult>;
   removeTableOrderItem: (itemId: string) => Promise<DesktopTableOrderResult>;
   updateTableOrderStatus: (orderId: string, status: string) => Promise<DesktopTableOrderResult>;
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => Promise<DesktopTableOrderResult>;
@@ -537,6 +538,7 @@ const bridge: DesktopBridge = {
   addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) => ipcRenderer.invoke("tableOrder:addItem", { orderId, menuItemId, quantity, note }),
   updateTableOrderItemQuantity: (itemId: string, quantity: number) => ipcRenderer.invoke("tableOrder:updateItemQuantity", { itemId, quantity }),
   updateTableOrderItemNote: (itemId: string, note: string) => ipcRenderer.invoke("tableOrder:updateItemNote", { itemId, note }),
+  updateTableOrderDiscount: (orderId: string, discountTotal: number) => ipcRenderer.invoke("tableOrder:updateDiscount", { orderId, discountTotal }),
   removeTableOrderItem: (itemId: string) => ipcRenderer.invoke("tableOrder:removeItem", itemId),
   updateTableOrderStatus: (orderId: string, status: string) => ipcRenderer.invoke("tableOrder:updateStatus", { orderId, status }),
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => ipcRenderer.invoke("tableOrder:close", { orderId, status }),
