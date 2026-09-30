@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { reportAppStatus } from "../../app/runtime-state";
 import type {
   AssignCustomerRoomInput,
   CreateStayFromReservationInput,
@@ -14,7 +15,6 @@ import type { RoomFolioController } from "./use-room-folio-controller";
 export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFolioController,
   onDashboard: (data: DesktopDashboardData) => void) {
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<{ panel: "stay" | "operations"; message: string; error: boolean } | null>(null);
   const running = useRef(false);
   const begin = useRequestGeneration();
 
@@ -22,18 +22,21 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
     if (running.current || account.busy) return false;
     running.current = true;
     const current = begin();
-    setBusy(true); setFeedback(null);
+    setBusy(true);
     try {
       const result = await operation();
       if (!current()) return false;
-      if (!result.ok) { setFeedback({ panel, error: true, message: result.message }); return false; }
+      if (!result.ok) {
+        reportAppStatus("error", result.message);
+        return false;
+      }
       onDashboard(result.dashboardData);
       const detail = await after?.(result.dashboardData);
       if (!current()) return false;
-      setFeedback({ panel, error: false, message: detail || result.message });
+      reportAppStatus("success", detail || result.message);
       return true;
     } catch {
-      if (current()) setFeedback({ panel, error: true, message: "İşlem sonucu doğrulanamadı. Yenilemeden yeniden göndermeyin." });
+      if (current()) reportAppStatus("error", "İşlem sonucu doğrulanamadı. Yenilemeden yeniden göndermeyin.");
       return false;
     } finally { running.current = false; if (current()) setBusy(false); }
   }
@@ -65,6 +68,6 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
     return ok ? saved : { ok: false, message: "Müşteri kaydı tamamlanamadı; bilgileri kontrol edin." };
   }
 
-  return { busy, feedback, mutate, checkInCustomer, checkInReservation, checkIn, checkout, saveCustomer };
+  return { busy, mutate, checkInCustomer, checkInReservation, checkIn, checkout, saveCustomer };
 }
 export type RoomStayOperations = ReturnType<typeof useRoomStayOperations>;
