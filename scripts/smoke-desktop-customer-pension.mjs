@@ -263,7 +263,7 @@ try {
     await expect(addressField).toHaveAttribute('rows', '2');
     expect(await noteField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
     expect(await addressField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
-    const birthdayToggle = customerWorkspace.getByRole('checkbox', { name: 'Doğum günü mesajı gönder', exact: true });
+    const birthdayToggle = customerWorkspace.getByRole('checkbox', { name: 'Mesaj gönder', exact: true });
     await expect(birthdayToggle).toBeDisabled();
     await expect(birthdayToggle).not.toBeChecked();
 
