@@ -120,7 +120,10 @@ export function moveStayRoom(db: DatabaseSync, input: MoveStayRoomInput): Result
       SELECT lower(hex(randomblob(16))), g.id, g.stay_id, ?, 'room_change', ?,
         json_object('customerId', c.id, 'fullName', c.full_name, 'identityType', c.identity_type,
           'identityNumber', c.identity_number, 'nationality', c.nationality, 'birthDate', c.birth_date,
-          'previousRoomId', ?, 'roomNumber', r.number), ?
+          'documentSerialNumber', c.document_serial_number, 'documentExpiryDate', c.document_expiry_date,
+          'gender', c.gender, 'birthPlace', c.birth_place, 'motherName', c.mother_name,
+          'fatherName', c.father_name, 'issuingAuthority', c.issuing_authority, 'address', c.address,
+          'phone', c.phone, 'previousRoomId', ?, 'roomNumber', r.number), ?
       FROM stay_guests g JOIN customers c ON c.id = g.customer_id JOIN rooms r ON r.id = ?
       WHERE g.stay_id = ? AND g.status = 'checked_in'`).run(input.roomId, now, stay.room_id, now, input.roomId, stay.id);
     refreshRoomStatusFromStays(db, stay.room_id, now, true);
