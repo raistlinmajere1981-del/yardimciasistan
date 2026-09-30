@@ -7,20 +7,26 @@
 }
 .table-discount-summary dd {
   display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
   min-width: 0;
 }
 .table-discount-summary dd > small[role="alert"] {
+  flex-basis: 100%;
   color: var(--color-danger);
+  text-align: end;
 }
 .table-discount-inline-editor {
   display: grid;
-  grid-template-columns: minmax(5rem, 1fr) auto auto;
+  grid-template-columns: minmax(4.5rem, 1fr) auto auto;
   align-items: center;
   gap: var(--space-2);
-  width: min(100%, 22rem);
+  width: 100%;
+  max-width: 22rem;
+  margin-inline-start: auto;
 }
 .table-discount-inline-editor input {
   min-width: 0;
