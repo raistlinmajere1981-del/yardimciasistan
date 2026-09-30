@@ -383,9 +383,6 @@ export function RequestsWorkspace({
           }}
           footer={(
             <>
-              {manualRequestState !== "idle" && manualRequestMessage && (
-                <p className={`form-status sync-${manualRequestState}`} role="status">{manualRequestMessage}</p>
-              )}
               <div className="action-row manual-request-dialog-actions">
                 <ActionButton variant="secondary" type="button" disabled={manualRequestState === "loading"} onClick={() => setManualFormOpen(false)}>
                   Vazgeç
