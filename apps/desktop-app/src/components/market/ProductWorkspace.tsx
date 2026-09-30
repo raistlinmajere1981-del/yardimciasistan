@@ -126,12 +126,11 @@ export function ProductWorkspace({
     if (priceError) {
       setSaveState("error");
       setSaveMessage(priceError);
-      onStateChange("error", priceError);
       return;
     }
     const isCurrent = beginSaveRequest();
     setSaveState("loading");
-    setSaveMessage("Ürün kartı kaydediliyor...");
+    setSaveMessage("");
     let saved: CatalogProduct;
     try {
       saved = await bridge.saveProduct(productFormToSaveInput(form));
@@ -140,7 +139,7 @@ export function ProductWorkspace({
       if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
       setSaveState("error");
-      setSaveMessage(message);
+      setSaveMessage("");
       onStateChange("error", message);
       return;
     }
@@ -193,7 +192,7 @@ export function ProductWorkspace({
     if (!isCurrent()) return;
     const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
     setSaveState("success");
-    setSaveMessage(message);
+    setSaveMessage("Değişiklikler yalnız bu ürün kartına kaydedilir.");
     onStateChange("success", message);
   }
 
@@ -240,7 +239,7 @@ export function ProductWorkspace({
           <ActionButton variant="secondary" type="button" disabled={busy || saveState === "loading" || !dirty} onClick={() => {
             setForm(baseline);
             setSaveState("idle");
-            setSaveMessage("Kaydedilmemiş değişiklikler geri alındı.");
+            setSaveMessage("Değişiklikler yalnız bu ürün kartına kaydedilir.");
           }}>Değişiklikleri Geri Al</ActionButton>
           <ActionButton type="button" disabled={busy || saveState === "loading" || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
             <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
