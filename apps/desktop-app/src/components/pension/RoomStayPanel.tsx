@@ -141,9 +141,10 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     {confirmDialog}
     {model.conflict && <p role="alert">Oda kayıtlarında çakışma var. Yeni girişten önce kayıtları kontrol edin.</p>}
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
-      <h4>{stay.status === "checked_in" ? "Konaklayan misafirler" : "Planlanan misafirler"}</h4>
-      <p>{formatStayDateRange(stay)} · {stay.guestCount} kişi</p>
-      {stay.reservationId && <p>Rezervasyon bağlantısı korunuyor.</p>}
+      <div className="room-section-heading">
+        <h4>Misafirler</h4>
+        <span>{formatStayDateRange(stay)} · {stay.guestCount}/{room.capacity} dolu</span>
+      </div>
       <StayGuestList stay={stay} data={data} operations={operations} disabled={disabled} onDirty={onDirty} onCreateCustomer={onCreateCustomer} />
     </section>)}
     {staysEnabled && !active.length && room.isActive && <form className="operation-section form-stack" aria-label="Misafir girişi"
@@ -155,8 +156,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
             options={eligible.map(item => ({ id: item.id, label: item.customerName || item.title, description: `${item.startDate} – ${item.endDate} · Beklenen ${item.guestCount} kişi` }))}
             onChange={id => { setReservationId(id); setDraft(current => ({ ...current, customerId: eligible.find(item => item.id === id)?.customerId || "" })); setAdditional([]); markEntry(true); }} />
         </div>}
-        {selected && <p>Rezervasyon: {selected.startDate} – {selected.endDate} · Beklenen {selected.guestCount} kişi.
-          Giriş yalnız aşağıda kayıtlı {guestIds.length} kişi için yapılır; sonradan gelenler aynı konaklamaya eklenir.</p>}
+        {selected && <p>Rezervasyon · {selected.startDate} – {selected.endDate} · Beklenen {selected.guestCount} kişi</p>}
         <RoomGuestSlots
           capacity={room.capacity}
           bedInfo={room.bedInfo}
