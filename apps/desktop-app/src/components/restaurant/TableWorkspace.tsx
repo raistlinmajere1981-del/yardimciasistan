@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CalendarPlus, UserPlus } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
@@ -15,13 +14,13 @@ import { OperationPanel } from "../workspace/OperationPanel";
 import type { TableWorkspaceIntent } from "../workspace/workspace-intent";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
-import { ChoiceChips } from "../ui/ChoiceChips";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualRestaurantReservationEditor } from "../operations/ManualRestaurantReservationEditor";
 import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
 import { getTableCardModel } from "./table-card-model";
 import { TableOrderEditor } from "./TableOrderEditor";
 import { TableAccountPanel } from "./TableAccountPanel";
+import { TableRelationsPanel } from "./TableRelationsPanel";
 import { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "./table-presentation";
 
@@ -57,7 +56,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useLayoutEffect(() => {
     if (history) return;
-    const target = intent.mode === "customer" ? '#table-account [aria-label="Masa müşterisi"]' : "#table-account";
+    const target = intent.mode === "customer" ? '#table-account [aria-label="Müşteri ve konaklama"]' : "#table-account";
     const panel = intent.mode === "account" || intent.mode === "customer" || intent.action === "room-transfer"
       ? surface.current?.querySelector<HTMLElement>(target) : null;
     panel?.focus({ preventScroll: true }); panel?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -114,17 +113,26 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   const duration = order ? Math.max(0, Math.floor((clock - new Date(order.openedAt).getTime()) / 60_000)) : 0;
   const disabled = controller.busy || controller.loading || !controller.loaded || transferCommitted;
   const tableStatus = getTableStatusAction(table.status) || table.status;
-  const startControl = <div className="restaurant-start form-stack">
-    <h4>{canStart ? "Masa siparişe hazır" : "Masa hazırlığını kontrol edin"}</h4>
-    <p>{canStart ? "Sipariş açarak bu masa için yeni bir adisyon başlatın." : "Bu masa şu an sipariş başlatmaya uygun değil."}</p>
-    {canStart && <ActionButton disabled={disabled} onClick={() => void controller.startTableOrder()}>Sipariş Aç</ActionButton>}
-  </div>;
-  const accountPanel = <OperationPanel title="Masa, Müşteri ve Hesap" id="table-account" className="operation-panel--table-context">
-    {ordersEnabled && !order && startControl}
-    <TableAccountPanel table={table} data={data} controller={controller} disabled={disabled} customersEnabled={customersEnabled}
-      reservationsEnabled={reservationsEnabled} roomFolioTransferEnabled={roomFolioTransferEnabled}
+  const accountPanel = <OperationPanel title="Hesap ve İlişkiler" id="table-account" className="operation-panel--table-context">
+    <TableAccountPanel
+      table={table}
+      controller={controller}
+      disabled={disabled}
+      onCloseOrder={status => void closeTableOrder(status)}
+    />
+    <TableRelationsPanel
+      table={table}
+      data={data}
+      controller={controller}
+      disabled={disabled}
+      customersEnabled={customersEnabled}
+      reservationsEnabled={reservationsEnabled}
+      roomFolioTransferEnabled={roomFolioTransferEnabled}
       quickCustomerId={quickCustomerId}
-      onCloseOrder={status => void closeTableOrder(status)} onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)} />
+      onCreateCustomer={() => setQuickAction("customer")}
+      onCreateReservation={() => setQuickAction("reservation")}
+      onTransfer={folioId => void transferTableOrderToRoomFolio(folioId)}
+    />
   </OperationPanel>;
   return <WorkspacePageFrame title={table.name} className="operations-workspace" closeLabel="Masa çalışma alanını kapat"
     onClose={() => void requestReturn()} closeBlocked={controller.busy || Boolean(quickAction)} bodyScroll="panes"
@@ -133,14 +141,6 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       {order && <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>}
     </div>}
     actions={<>
-      {!history && customersEnabled && <ActionButton variant="secondary" size="sm" disabled={controller.busy}
-        onClick={() => setQuickAction(current => current === "customer" ? null : "customer")}>
-        <UserPlus size={15} aria-hidden="true" />Müşteri Ekle
-      </ActionButton>}
-      {!history && customersEnabled && reservationsEnabled && <ActionButton variant="secondary" size="sm" disabled={controller.busy}
-        onClick={() => setQuickAction(current => current === "reservation" ? null : "reservation")}>
-        <CalendarPlus size={15} aria-hidden="true" />Rezervasyon Ekle
-      </ActionButton>}
       {ordersEnabled && <ActionButton variant="ghost" disabled={controller.busy} onClick={() => {
         setQuickAction(null);
         navigation.updateWorkspaceMode({ entityType: "table", mode: history ? "order" : "history" });
@@ -149,26 +149,27 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
     headerSummary={!history && <ResourceWorkspaceSummary label="Masa özeti" imageSrc="./assets/default-table.png"
       facts={<>
         <strong>{table.name}</strong><span>{table.area || "Genel"}</span><span>{table.capacity} kişilik</span>
-        {order ? <ChoiceChips
-          className="workspace-status-chips"
-          ariaLabel="Sipariş durumu"
+        {order ? <select
+          className={`table-workspace-status-select is-${getOrderBadge(order.status).tone}`}
+          aria-label="Sipariş durumu"
           value={order.status}
           disabled={disabled}
-          onChange={value => {
-            if (value !== "open") void controller.status(value as "preparing" | "served" | "payment");
+          onChange={event => {
+            const value = event.target.value;
+            if (value !== order.status && value !== "open") void controller.status(value as "preparing" | "served" | "payment");
           }}
-          options={[
-            { id: "open", label: "Açık", disabled: order.status !== "open" },
-            { id: "preparing", label: "Hazırlanıyor" },
-            { id: "served", label: "Servis edildi" },
-            { id: "payment", label: "Hesap bekliyor" }
-          ]}
-        /> : <ChoiceChips
-          className="workspace-status-chips"
-          ariaLabel={`${table.name} durumunu değiştir`}
+        >
+          <option value="open" disabled={order.status !== "open"}>Açık</option>
+          <option value="preparing">Hazırlanıyor</option>
+          <option value="served">Servis edildi</option>
+          <option value="payment">Hesap bekliyor</option>
+        </select> : <select
+          className={`table-workspace-status-select is-${getResourceStatusTone(table.status)}`}
+          aria-label={`${table.name} durumunu değiştir`}
           value={tableStatus}
           disabled={disabled}
-          onChange={value => {
+          onChange={event => {
+            const value = event.target.value;
             if (value === tableStatus) return;
             void controller.run(async isCurrent => {
               const result = await onUpdateTableStatus(table.id, value);
@@ -177,17 +178,15 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
               return result.ok;
             });
           }}
-          options={[
-            ...(!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
-              ? [{ id: tableStatus, label: formatTableStatus(table.status), disabled: true }]
-              : []),
-            { id: "available", label: "Boş" },
-            { id: "occupied", label: "Dolu" },
-            ...(reservationsEnabled ? [{ id: "reserved", label: "Rezerve" }] : []),
-            ...(ordersEnabled ? [{ id: "bill_waiting", label: "Hesap" }] : []),
-            { id: "cleaning", label: "Temizlik" }
-          ]}
-        />}
+        >
+          {!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
+            && <option value={tableStatus} disabled>{formatTableStatus(table.status)}</option>}
+          <option value="available">Boş</option>
+          <option value="occupied">Dolu</option>
+          {reservationsEnabled && <option value="reserved">Rezerve</option>}
+          {ordersEnabled && <option value="bill_waiting">Hesap</option>}
+          <option value="cleaning">Temizlik</option>
+        </select>}
       </>}
       status={null}>
       {!ordersEnabled ? <span>Sipariş yönetimi etkin değil.</span> : controller.loading ? <span>Adisyon yükleniyor…</span> : !controller.loaded ? <span>Adisyon bilgisi alınamadı.</span>
@@ -225,8 +224,8 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
         onSaveCustomer={onSaveCustomer}
       />}
     </> : undefined}>
-    <div ref={surface} className={`operation-surface operation-surface--sections operation-surface--table${!ordersEnabled || !menuEnabled ? " operation-surface--two" : !order ? " operation-surface--empty-table" : ""}`} hidden={history}>
-      {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} controller={controller} readOnly={transferCommitted} accountPanel={accountPanel} />
+    <div ref={surface} className={`operation-surface operation-surface--sections operation-surface--table${!ordersEnabled || !menuEnabled ? " operation-surface--two" : ""}`} hidden={history}>
+      {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} canStartOrder={canStart} controller={controller} readOnly={transferCommitted} accountPanel={accountPanel} />
         : <><OperationPanel title="Masa İşlemleri"><p>Sipariş yönetimi etkin değil. Masa hazırlığını sağdaki panelden yönetebilirsiniz.</p></OperationPanel>{accountPanel}</>}
     </div>
     {history && <section className="operation-history form-stack" aria-label="Masa geçmişi">
