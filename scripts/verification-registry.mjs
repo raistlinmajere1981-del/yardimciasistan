@@ -442,6 +442,11 @@ function smokeDomains(file) {
   }
   if (name === "market-companion-desktop-inbox") domains.add("android");
   if (name === "web-connection-test") domains.add("desktop");
+  if (name === "kbs-domain") {
+    domains.add("hospitality");
+    domains.add("customers");
+    domains.add("desktop");
+  }
 
   if (domains.size === 0) domains.add("platform");
   return [...domains];
