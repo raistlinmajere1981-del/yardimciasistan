@@ -250,7 +250,6 @@ function DesktopAppFrameContent({
                 </>
               ) : (
                 <SyncStatusIndicator
-                  syncState={syncState}
                   automaticSyncStatus={automaticSyncStatus}
                   onSync={() => void handlePullRequests()}
                 />
