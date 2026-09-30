@@ -73,8 +73,6 @@ import type {
   DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopDashboardData,
-  DesktopHospitalityNotification,
-  DesktopKbsOverview,
   DesktopKbsDeliveryMutationResult,
   DesktopReportRangeInput,
   DesktopReportData,
