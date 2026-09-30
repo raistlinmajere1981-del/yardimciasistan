@@ -2085,7 +2085,10 @@ BEGIN
   SELECT lower(hex(randomblob(16))), NEW.id, NEW.stay_id, s.room_id, 'arrival', NEW.checked_in_at,
     json_object('customerId', c.id, 'fullName', c.full_name, 'identityType', c.identity_type,
       'identityNumber', c.identity_number, 'nationality', c.nationality, 'birthDate', c.birth_date,
-      'documentSerialNumber', c.document_serial_number, 'roomNumber', r.number), NEW.updated_at
+      'documentSerialNumber', c.document_serial_number, 'documentExpiryDate', c.document_expiry_date,
+      'gender', c.gender, 'birthPlace', c.birth_place, 'motherName', c.mother_name,
+      'fatherName', c.father_name, 'issuingAuthority', c.issuing_authority, 'address', c.address,
+      'phone', c.phone, 'roomNumber', r.number), NEW.updated_at
   FROM customers c JOIN customer_room_stays s ON s.id = NEW.stay_id JOIN rooms r ON r.id = s.room_id WHERE c.id = NEW.customer_id;
 END;
 
@@ -2102,13 +2105,17 @@ BEGIN
   FROM customers c JOIN customer_room_stays s ON s.id = NEW.stay_id JOIN rooms r ON r.id = s.room_id WHERE c.id = NEW.customer_id;
 END;
 CREATE TRIGGER trg_customer_pending_hospitality_identity
-AFTER UPDATE OF full_name, identity_type, identity_number, nationality, birth_date, document_serial_number ON customers
+AFTER UPDATE OF full_name, phone, identity_type, identity_number, nationality, birth_date, gender,
+  document_serial_number, document_expiry_date, birth_place, mother_name, father_name, issuing_authority, address ON customers
 BEGIN
   UPDATE hospitality_notifications
   SET identity_snapshot = json_patch(identity_snapshot,
-    json_object('fullName', NEW.full_name, 'identityType', NEW.identity_type,
-      'identityNumber', NEW.identity_number, 'nationality', NEW.nationality,
-      'birthDate', NEW.birth_date, 'documentSerialNumber', NEW.document_serial_number))
+    json_object('fullName', NEW.full_name, 'phone', NEW.phone, 'identityType', NEW.identity_type,
+      'identityNumber', NEW.identity_number, 'nationality', NEW.nationality, 'birthDate', NEW.birth_date,
+      'gender', NEW.gender, 'documentSerialNumber', NEW.document_serial_number,
+      'documentExpiryDate', NEW.document_expiry_date, 'birthPlace', NEW.birth_place,
+      'motherName', NEW.mother_name, 'fatherName', NEW.father_name,
+      'issuingAuthority', NEW.issuing_authority, 'address', NEW.address))
   WHERE status != 'sent' AND guest_id IN (SELECT id FROM stay_guests WHERE customer_id = NEW.id);
 END;
 -- END HOSPITALITY GUEST SCHEMA
