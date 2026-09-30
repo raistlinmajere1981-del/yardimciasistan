@@ -1,7 +1,9 @@
 import type { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
 import {
+  classifyJandarmaOperationResult,
   prepareJandarmaArrival,
   selectJandarmaOperation,
+  type JandarmaOperationResult,
   type KbsDeliveryInput,
   type KbsDeliveryResult,
   type KbsProviderAdapter
@@ -50,8 +52,14 @@ export class EgmKbsProviderAdapter implements KbsProviderAdapter {
   }
 }
 
+interface JandarmaKbsTransport {
+  send(operation: string, input: KbsDeliveryInput): Promise<JandarmaOperationResult>;
+}
+
 export class JandarmaKbsProviderAdapter implements KbsProviderAdapter {
   readonly provider = "jandarma" as const;
+
+  constructor(private readonly transport?: JandarmaKbsTransport) {}
 
   async send(input: KbsDeliveryInput): Promise<KbsDeliveryResult> {
     const selected = selectJandarmaOperation(input);
@@ -82,13 +90,18 @@ export class JandarmaKbsProviderAdapter implements KbsProviderAdapter {
       }
     }
 
-    return {
-      ok: false,
-      state: "waiting",
-      provider: this.provider,
-      retryable: true,
-      code: "jandarma_soap_binding_unverified",
-      message: `Jandarma KBS ${selected.selection.operation} verisi hazır. SOAP action/namespace gerçek WSDL ile doğrulanmadan canlı gönderim yapılmayacak.`
-    };
+    if (!this.transport) {
+      return {
+        ok: false,
+        state: "waiting",
+        provider: this.provider,
+        retryable: true,
+        code: "jandarma_soap_binding_unverified",
+        message: `Jandarma KBS ${selected.selection.operation} verisi hazır. SOAP action/namespace gerçek WSDL ile doğrulanmadan canlı gönderim yapılmayacak.`
+      };
+    }
+
+    const result = await this.transport.send(selected.selection.operation, input);
+    return classifyJandarmaOperationResult(result, input.notificationId);
   }
 }
