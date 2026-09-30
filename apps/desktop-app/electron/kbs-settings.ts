@@ -40,6 +40,15 @@ export type KbsConnectionTestResult =
     }
   | { ok: false; message: string };
 
+export interface KbsRuntimeCredentials {
+  provider: KbsProvider;
+  facilityCode: string;
+  username: string;
+  authorizedIdentityNumber: string;
+  password: string;
+  secondFactorSecret: string;
+}
+
 interface StoredKbsSettings {
   enabled: boolean;
   provider: KbsProvider;
@@ -129,12 +138,22 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
   };
 }
 
-export async function testKbsConnection(
+export function resolveKbsRuntimeCredentials(
   databasePath: string,
-  input: SaveKbsSettingsInput
-): Promise<KbsConnectionTestResult> {
+  input?: SaveKbsSettingsInput
+): { ok: true; credentials: KbsRuntimeCredentials } | { ok: false; message: string } {
   const current = readStoredSettings(databasePath);
-  const normalized = normalizeInput(input);
+  const normalized = input ? normalizeInput(input) : {
+    enabled: current.enabled,
+    provider: current.provider,
+    facilityCode: current.facilityCode,
+    username: current.username,
+    authorizedIdentityNumber: current.authorizedIdentityNumber,
+    password: "",
+    clearPassword: false,
+    secondFactorSecret: "",
+    clearSecondFactorSecret: false
+  };
   const password = normalized.password
     || (normalized.clearPassword ? "" : decryptSecret(current.encryptedPassword));
   const secondFactorSecret = normalized.secondFactorSecret
@@ -144,6 +163,26 @@ export async function testKbsConnection(
     secondFactorAvailable: Boolean(secondFactorSecret)
   });
   if (validation) return { ok: false, message: validation };
+  return {
+    ok: true,
+    credentials: {
+      provider: normalized.provider,
+      facilityCode: normalized.facilityCode,
+      username: normalized.username,
+      authorizedIdentityNumber: normalized.authorizedIdentityNumber,
+      password,
+      secondFactorSecret
+    }
+  };
+}
+
+export async function testKbsConnection(
+  databasePath: string,
+  input: SaveKbsSettingsInput
+): Promise<KbsConnectionTestResult> {
+  const resolved = resolveKbsRuntimeCredentials(databasePath, input);
+  if (!resolved.ok) return resolved;
+  const normalized = normalizeInput(input);
 
   if (normalized.provider === "egm") {
     return {
