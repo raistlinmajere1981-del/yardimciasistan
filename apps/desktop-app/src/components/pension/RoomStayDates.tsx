@@ -38,8 +38,8 @@ export function RoomStayDates({ folio, controller, disabled, onDirty }: {
   }
 
   return <section className="room-stay-dates" aria-label="Konaklama tarihleri">
-    <div className="form-field">
-      <span>Giriş tarihi</span>
+    <div className="form-field room-stay-date-field">
+      <span>Giriş</span>
       <DatePicker
         ariaLabel="Giriş tarihi"
         value={draft.start}
@@ -48,8 +48,8 @@ export function RoomStayDates({ folio, controller, disabled, onDirty }: {
         onChange={start => update({ ...draft, start })}
       />
     </div>
-    <div className="form-field">
-      <span>Çıkış tarihi</span>
+    <div className="form-field room-stay-date-field">
+      <span>Çıkış</span>
       <DatePicker
         ariaLabel="Çıkış tarihi"
         value={draft.end}
