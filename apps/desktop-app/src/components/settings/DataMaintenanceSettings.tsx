@@ -2,8 +2,8 @@ import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { FolderOpen, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DesktopBackupListItem } from "../../../electron/data-maintenance";
+import { reportAppStatus } from "../../app/runtime-state";
 
-type MaintenanceState = "idle" | "loading" | "success" | "error";
 type MaintenanceAction = "load" | "backup" | "open-root" | "open-item" | "restore" | "delete" | "reset" | null;
 
 export function DataMaintenanceSettings() {
@@ -11,11 +11,9 @@ export function DataMaintenanceSettings() {
   useEffect(() => window.yardimciDesktop?.onDataMaintenanceConfirmation?.(
     (request) => confirm({ ...request, tone: "danger" })
   ), [confirm]);
-  const [state, setState] = useState<MaintenanceState>("idle");
   const [action, setAction] = useState<MaintenanceAction>("load");
   const [activeBackupId, setActiveBackupId] = useState("");
   const [backups, setBackups] = useState<DesktopBackupListItem[]>([]);
-  const [message, setMessage] = useState("Yedekler okunuyor...");
 
   const busy = action !== null;
 
@@ -27,8 +25,7 @@ export function DataMaintenanceSettings() {
     const bridge = window.yardimciDesktop;
     if (!bridge?.listLocalBackups) {
       setAction(null);
-      setState("error");
-      setMessage("Yedek yönetimi hazır değil. Uygulamayı yeniden başlatın.");
+      reportAppStatus("error", "Yedek yönetimi hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -37,15 +34,11 @@ export function DataMaintenanceSettings() {
       const result = await bridge.listLocalBackups();
       setBackups(result.backups);
       if (!result.ok) {
-        setState("error");
-        setMessage(result.message);
+        reportAppStatus("error", result.message);
         return;
       }
-      setState("idle");
-      setMessage("");
     } catch {
-      setState("error");
-      setMessage("Yedek listesi okunamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
+      reportAppStatus("error", "Yedek listesi okunamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
     } finally {
       setAction(null);
     }
@@ -55,28 +48,22 @@ export function DataMaintenanceSettings() {
     if (busy) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.createManualBackup) {
-      setState("error");
-      setMessage("Yedekleme hazır değil. Uygulamayı yeniden başlatın.");
+      reportAppStatus("error", "Yedekleme hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
     setAction("backup");
     setActiveBackupId("");
-    setState("loading");
-    setMessage("Yerel kayıtlar ve kalıcı görseller yedekleniyor...");
     try {
       const result = await bridge.createManualBackup();
       if (!result.ok) {
-        setState("error");
-        setMessage(result.message);
+        reportAppStatus("error", result.message);
         return;
       }
       setBackups(result.backups);
-      setState("success");
-      setMessage(result.message);
+      reportAppStatus("success", result.message);
     } catch {
-      setState("error");
-      setMessage("Yedek oluşturulamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
+      reportAppStatus("error", "Yedek oluşturulamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
     } finally {
       setAction(null);
     }
@@ -90,11 +77,9 @@ export function DataMaintenanceSettings() {
     setActiveBackupId("");
     try {
       const result = await bridge.openLocalBackupDirectory();
-      setState(result.ok ? "success" : "error");
-      setMessage(result.message);
+      reportAppStatus(result.ok ? "success" : "error", result.message);
     } catch {
-      setState("error");
-      setMessage("Yedek klasörü açılamadı.");
+      reportAppStatus("error", "Yedek klasörü açılamadı.");
     } finally {
       setAction(null);
     }
@@ -108,11 +93,9 @@ export function DataMaintenanceSettings() {
     setActiveBackupId(backupId);
     try {
       const result = await bridge.openLocalBackupItemDirectory(backupId);
-      setState(result.ok ? "success" : "error");
-      setMessage(result.message);
+      reportAppStatus(result.ok ? "success" : "error", result.message);
     } catch {
-      setState("error");
-      setMessage("Yedek klasörü açılamadı.");
+      reportAppStatus("error", "Yedek klasörü açılamadı.");
     } finally {
       setAction(null);
       setActiveBackupId("");
@@ -123,27 +106,21 @@ export function DataMaintenanceSettings() {
     if (busy) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.restoreLocalBackup) {
-      setState("error");
-      setMessage("Geri yükleme hazır değil. Uygulamayı yeniden başlatın.");
+      reportAppStatus("error", "Geri yükleme hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
     setAction("restore");
     setActiveBackupId(backupId);
-    setState("loading");
-    setMessage("Geri yükleme onayı bekleniyor...");
     try {
       const result = await bridge.restoreLocalBackup(backupId);
       if (!result.ok) {
-        setState(result.cancelled ? "idle" : "error");
-        setMessage(result.message);
+        if (!result.cancelled) reportAppStatus("error", result.message);
         return;
       }
-      setState("success");
-      setMessage(result.message);
+      reportAppStatus("success", result.message);
     } catch {
-      setState("error");
-      setMessage("Geri yükleme başlatılamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
+      reportAppStatus("error", "Geri yükleme başlatılamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
     } finally {
       setAction(null);
       setActiveBackupId("");
@@ -156,21 +133,16 @@ export function DataMaintenanceSettings() {
     if (!bridge?.deleteLocalBackup) return;
     setAction("delete");
     setActiveBackupId(backupId);
-    setState("loading");
-    setMessage("Yedek silme onayı bekleniyor...");
     try {
       const result = await bridge.deleteLocalBackup(backupId);
       if (result.backups) setBackups(result.backups);
       if (!result.ok) {
-        setState(result.cancelled ? "idle" : "error");
-        setMessage(result.message);
+        if (!result.cancelled) reportAppStatus("error", result.message);
         return;
       }
-      setState("success");
-      setMessage(result.message);
+      reportAppStatus("success", result.message);
     } catch {
-      setState("error");
-      setMessage("Yedek silinemedi.");
+      reportAppStatus("error", "Yedek silinemedi.");
     } finally {
       setAction(null);
       setActiveBackupId("");
@@ -181,27 +153,21 @@ export function DataMaintenanceSettings() {
     if (busy) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.resetLocalData) {
-      setState("error");
-      setMessage("Veri sıfırlama hazır değil. Uygulamayı yeniden başlatın.");
+      reportAppStatus("error", "Veri sıfırlama hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
     setAction("reset");
     setActiveBackupId("");
-    setState("loading");
-    setMessage("Sıfırlama onayı bekleniyor...");
     try {
       const result = await bridge.resetLocalData();
       if (!result.ok) {
-        setState(result.cancelled ? "idle" : "error");
-        setMessage(result.message);
+        if (!result.cancelled) reportAppStatus("error", result.message);
         return;
       }
-      setState("success");
-      setMessage(result.message);
+      reportAppStatus("success", result.message);
     } catch {
-      setState("error");
-      setMessage("Veriler sıfırlanamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
+      reportAppStatus("error", "Veriler sıfırlanamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
     } finally {
       setAction(null);
     }
@@ -274,12 +240,6 @@ export function DataMaintenanceSettings() {
           );
         })}
       </div>
-
-      {message && (
-        <p className={`menu-status sync-${state}`} role="status" aria-live="polite">
-          {message}
-        </p>
-      )}
       </div>
     </div>
   );
