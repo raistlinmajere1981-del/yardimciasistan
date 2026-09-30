@@ -1,10 +1,12 @@
 import "@fontsource-variable/ibm-plex-sans/wght.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { DesktopPage } from "../../apps/desktop-app/src/app/navigation";
 import { useDashboardSnapshot } from "../../apps/desktop-app/src/app/use-dashboard-snapshot";
 import { customerWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
+import { GlobalMessageBar } from "../../apps/desktop-app/src/components/layout/GlobalMessageBar";
+import { subscribeAppStatus, type AppStatusDetail } from "../../apps/desktop-app/src/app/runtime-state";
 import { RoomsWorkspace } from "../../apps/desktop-app/src/components/pension/RoomsWorkspace";
 import { usePensionPageController } from "../../apps/desktop-app/src/components/pension/pension-page-state";
 import { ReservationsWorkspace, DailyTasksWorkspace } from "../../apps/desktop-app/src/components/operations/OperationWorkspaces";
@@ -17,6 +19,17 @@ import {
 } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { PensionPage } from "../../apps/desktop-app/src/pages/PensionPage";
 import "../../apps/desktop-app/src/styles/index.css";
+
+function FixtureStatusHost() {
+  const [status, setStatus] = useState<AppStatusDetail | null>(null);
+  useEffect(() => subscribeAppStatus(setStatus), []);
+  return status ? (
+    <GlobalMessageBar
+      tone={status.state === "error" ? "error" : status.state === "success" ? "success" : "loading"}
+      message={status.message}
+    />
+  ) : null;
+}
 
 function Fixture() {
   const [page, setPage] = useState<DesktopPage>("pension");
@@ -66,7 +79,7 @@ function FixtureShell({ page, setPage, data, setData, capabilities, pension, sav
       <button onClick={() => setPage("customerWork")}>Müşteriler</button>
       <button onClick={() => setPage("dashboard")}>Ana Sayfa</button>
     </aside>}
-    header={<header className="page-header"><h1>{page === "pension" ? "Pansiyon" : page === "customerWork" ? "Müşteriler" : "Ana Sayfa"}</h1></header>}
+    header={<header className="page-header"><h1>{page === "pension" ? "Pansiyon" : page === "customerWork" ? "Müşteriler" : "Ana Sayfa"}</h1><FixtureStatusHost /></header>}
     overlay={<>
       <Controls refresh={() => setData(current => ({ ...current, rooms: current.rooms.map(room => ({ ...room, updatedAt: String(Math.random()) })) }))} />
       <WorkspaceHost definition={customerWorkspaceDefinition} context={{
