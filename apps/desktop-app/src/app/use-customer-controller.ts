@@ -42,11 +42,15 @@ export function useCustomerController({
 
   async function handleCreateManualRequest() {
     setManualRequestState("loading");
-    setManualRequestMessage("Manuel talep kaydediliyor...");
+    setManualRequestMessage("");
+    setSyncState("loading");
+    setStatusMessage("Manuel talep kaydediliyor...");
 
     if (!window.yardimciDesktop) {
       setManualRequestState("error");
-      setManualRequestMessage("Talep kaydı hazır değil. Uygulamayı yeniden başlatın.");
+      setManualRequestMessage("");
+      setSyncState("error");
+      setStatusMessage("Talep kaydı hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -68,7 +72,9 @@ export function useCustomerController({
     const result = await window.yardimciDesktop.createManualRequest(input);
     if (!result.ok) {
       setManualRequestState("error");
-      setManualRequestMessage(result.message);
+      setManualRequestMessage("");
+      setSyncState("error");
+      setStatusMessage(result.message);
       return;
     }
 
@@ -81,7 +87,7 @@ export function useCustomerController({
       priority: manualRequestForm.priority
     });
     setManualRequestState("success");
-    setManualRequestMessage(result.message);
+    setManualRequestMessage("");
     setSyncState("success");
     setStatusMessage(result.message);
   }
