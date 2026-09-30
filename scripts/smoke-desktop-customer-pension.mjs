@@ -324,12 +324,12 @@ try {
     const roomWorkspace = page.locator('.workspace-page-frame');
     await expect(roomWorkspace).toBeVisible();
     await capture('room-workspace');
-    await expect(roomWorkspace.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toBeVisible();
+    await expect(roomWorkspace.getByRole('region', { name: 'Hesap', exact: true })).toBeVisible();
     await capture('folio-account');
     await expect(roomWorkspace.getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
     await capture('folio-payment');
-    const checkoutButton = roomWorkspace.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true })
-      .getByRole('button', { name: 'Misafir Çıkışı', exact: true });
+    const checkoutButton = roomWorkspace.getByRole('region', { name: 'Oda İşlemleri', exact: true })
+      .getByRole('button', { name: 'Çıkışı Tamamla', exact: true });
     await checkoutButton.scrollIntoViewIfNeeded();
     await checkoutButton.click();
     const checkoutConfirmation = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
