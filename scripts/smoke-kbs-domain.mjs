@@ -97,7 +97,10 @@ try {
 
   enableKbs("egm");
 
-  const readyCustomer = ok(database.saveCustomer(customerInput("KBS Hazır Misafir", { identityNumber: "10000000214" }))).savedId;
+  const readyCustomer = ok(database.saveCustomer(customerInput("KBS Hazır Misafir", {
+    identityNumber: "10000000214",
+    phone: "+905550000002"
+  }))).savedId;
   const readyStay = ok(database.assignCustomerToRoom({
     customerId: readyCustomer,
     roomId: rooms[1].id,
@@ -199,6 +202,7 @@ try {
 
   // Missing identity remains pending and does not call the provider.
   const incompleteCustomer = ok(database.saveCustomer(customerInput("Kimliği Eksik", {
+    phone: "+905550000003",
     identityNumber: "",
     documentSerialNumber: "",
     birthDate: ""
