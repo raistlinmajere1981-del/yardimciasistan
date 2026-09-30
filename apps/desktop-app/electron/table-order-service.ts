@@ -398,10 +398,11 @@ export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string): Des
 
 export function updateTableOrderDiscount(db: DatabaseSync, input: UpdateTableOrderDiscountInput): DesktopTableOrderResult {
   const orderId = input.orderId.trim();
-  const discountTotal = roundMoney(Number(input.discountTotal));
-  if (!orderId || !Number.isFinite(discountTotal) || discountTotal < 0) {
+  const rawDiscountTotal = Number(input.discountTotal);
+  if (!orderId || !Number.isFinite(rawDiscountTotal) || rawDiscountTotal < 0) {
     return { ok: false, message: "İndirim tutarı geçersiz." };
   }
+  const discountTotal = roundMoney(rawDiscountTotal);
 
   const now = new Date().toISOString();
   db.exec("BEGIN IMMEDIATE");
