@@ -19,8 +19,6 @@ interface KbsDraft {
   authorizedIdentityNumber: string;
   password: string;
   clearPassword: boolean;
-  secondFactorSecret: string;
-  clearSecondFactorSecret: boolean;
 }
 
 type KbsWebViewElement = HTMLElement & {
@@ -34,8 +32,7 @@ const EMPTY_SETTINGS: KbsSettings = {
   facilityCode: "",
   username: "",
   authorizedIdentityNumber: "",
-  passwordConfigured: false,
-  secondFactorConfigured: false
+  passwordConfigured: false
 };
 
 function toDraft(settings: KbsSettings): KbsDraft {
@@ -46,9 +43,7 @@ function toDraft(settings: KbsSettings): KbsDraft {
     username: settings.username,
     authorizedIdentityNumber: settings.authorizedIdentityNumber,
     password: "",
-    clearPassword: false,
-    secondFactorSecret: "",
-    clearSecondFactorSecret: false
+    clearPassword: false
   };
 }
 
@@ -89,9 +84,7 @@ export function useKbsSettings(enabled: boolean) {
     || draft.username.trim() !== settings.username
     || draft.authorizedIdentityNumber.replace(/\D/g, "") !== settings.authorizedIdentityNumber
     || Boolean(draft.password.trim())
-    || draft.clearPassword
-    || Boolean(draft.secondFactorSecret.trim())
-    || draft.clearSecondFactorSecret;
+    || draft.clearPassword;
 
   const update = <K extends keyof KbsDraft>(key: K, value: KbsDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -105,9 +98,7 @@ export function useKbsSettings(enabled: boolean) {
     username: draft.username.trim(),
     authorizedIdentityNumber: draft.authorizedIdentityNumber.replace(/\D/g, ""),
     password: draft.password.trim(),
-    clearPassword: draft.clearPassword,
-    secondFactorSecret: draft.secondFactorSecret.trim(),
-    clearSecondFactorSecret: draft.clearSecondFactorSecret
+    clearPassword: draft.clearPassword
   }), [draft]);
 
   const save = useCallback(async (): Promise<SettingsOperationResult> => {
@@ -210,9 +201,8 @@ export function KbsSettingsSection({
   const [webTestEpoch, setWebTestEpoch] = useState(0);
   const webViewRef = useRef<KbsWebViewElement | null>(null);
   const registeredWebviewId = useRef<number | null>(null);
-  const autoAttempt = useRef({ credentials: false, otp: false });
+  const autoAttempt = useRef({ credentials: false });
   const passwordConfigured = settings.passwordConfigured && !draft.clearPassword;
-  const secondFactorConfigured = settings.secondFactorConfigured && !draft.clearSecondFactorSecret;
 
   useEffect(() => {
     if (!webLoginOpen) return;
@@ -265,14 +255,7 @@ export function KbsSettingsSection({
       }
 
       if (inspected.state === "otp_required") {
-        if (autoAttempt.current.otp) {
-          setWebSessionMessage("EGMSEC doğrulaması tamamlanmadı. Kodu webview üzerinden kontrol edin.");
-          return;
-        }
-        const result = await prepareEgmLogin();
-        if (!active) return;
-        if (result.state === "otp_submitted") autoAttempt.current.otp = true;
-        setWebSessionMessage(result.message);
+        setWebSessionMessage("EGMSEC uygulamasındaki geçici şifreyi webview üzerinden girin. Doğrulama tamamlanınca oturum kalıcı olarak kullanılacak.");
         return;
       }
 
@@ -304,7 +287,7 @@ export function KbsSettingsSection({
   async function runTest() {
     const result = await testConnection();
     if (result.ok && result.requiresWebLogin) {
-      autoAttempt.current = { credentials: false, otp: false };
+      autoAttempt.current = { credentials: false };
       setWebLoginOpen(true);
       setWebError("");
       setWebSessionMessage("EGM KBS oturumu hazırlanıyor...");
@@ -405,36 +388,12 @@ export function KbsSettingsSection({
               />
               <small>{passwordConfigured ? "Parola bu cihazda şifreli saklanıyor." : "Parola kaydedildiğinde işletim sistemi anahtar kasasıyla korunur."}</small>
             </label>
-
-            {draft.provider === "egm" && (
-              <label className="form-field form-field--medium">
-                EGMSEC / TOTP anahtarı
-                <input
-                  type="password"
-                  value={draft.secondFactorSecret}
-                  onChange={(event) => {
-                    update("secondFactorSecret", event.target.value);
-                    if (event.target.value) update("clearSecondFactorSecret", false);
-                  }}
-                  placeholder={secondFactorConfigured ? "Kayıtlı anahtarı değiştirmek için yeni değer girin" : "İsteğe bağlı"}
-                  autoComplete="new-password"
-                />
-                <small>Tam otomatik oturum yenilemesi için kullanılabilir. Anahtar yalnız bu cihazda şifreli saklanır.</small>
-              </label>
-            )}
           </div>
 
           {settings.passwordConfigured && (
             <label className="setting-switch-row">
               <span><strong>Kayıtlı parolayı sil</strong></span>
               <input type="checkbox" checked={draft.clearPassword} onChange={(event) => update("clearPassword", event.target.checked)} />
-            </label>
-          )}
-
-          {draft.provider === "egm" && settings.secondFactorConfigured && (
-            <label className="setting-switch-row">
-              <span><strong>Kayıtlı EGMSEC/TOTP anahtarını sil</strong></span>
-              <input type="checkbox" checked={draft.clearSecondFactorSecret} onChange={(event) => update("clearSecondFactorSecret", event.target.checked)} />
             </label>
           )}
 
