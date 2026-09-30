@@ -145,7 +145,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               try {
                 const result = await onDelete(customer);
                 if (result?.ok) navigation.closeWorkspace();
-                else if (!result) reportAppStatus("error", "Müşteri silinemedi. Yeniden deneyin.");
+                else if (result && !result.ok) reportAppStatus("error", result.message);
               } catch (error) {
                 reportAppStatus("error", customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
               }

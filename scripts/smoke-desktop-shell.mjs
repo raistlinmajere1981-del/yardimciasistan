@@ -250,6 +250,9 @@ try {
   await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   await leaveDialog.getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Bugün ne var?', level: 1, exact: true })).toBeVisible();
+  await expect(page.locator('.global-message-bar')).toContainText('değişiklikleri geri alındı');
+  // Isolate sync-silent: central success auto-clears, wait for idle before asserting silence.
+  await expect(page.locator('.global-message-bar')).toHaveCount(0, { timeout: 10000 });
 
   await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   await expect(page.locator('.global-message-bar')).toHaveCount(0);

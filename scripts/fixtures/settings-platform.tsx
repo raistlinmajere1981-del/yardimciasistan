@@ -9,8 +9,21 @@ import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/ap
 import { SettingsWorkspace } from "../../apps/desktop-app/src/components/settings/SettingsWorkspace";
 import type { PageLeaveGuard } from "../../apps/desktop-app/src/app/page-navigation-guard";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
+import { GlobalMessageBar } from "../../apps/desktop-app/src/components/layout/GlobalMessageBar";
+import { subscribeAppStatus, type AppStatusDetail } from "../../apps/desktop-app/src/app/runtime-state";
 import { readUiPreferences, applyUiPreferences, saveUiPreferences } from "../../apps/desktop-app/src/ui-preferences";
 import "../../apps/desktop-app/src/styles/index.css";
+
+function FixtureStatusHost() {
+  const [status, setStatus] = useState<AppStatusDetail | null>(null);
+  useEffect(() => subscribeAppStatus(setStatus), []);
+  return status ? (
+    <GlobalMessageBar
+      tone={status.state === "error" ? "error" : status.state === "success" ? "success" : "loading"}
+      message={status.message}
+    />
+  ) : null;
+}
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
@@ -328,7 +341,7 @@ function Fixture() {
   const capabilities = settingsCapabilities(toSetupForm(setup.setupData));
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { profileId: setup.setupData.profileId, enabledCapabilities: capabilities }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
-    <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><h1>Ayarlar</h1></header>}>
+    <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}>
       {ready && <SettingsWorkspace setupData={setup.setupData} dashboardData={dashboard}
         onSave={input => setup.saveSetup(input, setDashboard)}
         uiPreferences={preferences}

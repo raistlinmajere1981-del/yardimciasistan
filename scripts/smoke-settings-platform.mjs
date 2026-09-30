@@ -189,7 +189,7 @@ try {
   await page.evaluate(() => { window.delaySetup = false; window.finishSetup(); });
   await expect(guard()).toBeVisible();
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('Test kayıt hatası', { exact: true })).toBeVisible();
+  await expect(page.locator('.global-message-bar')).toContainText('Test kayıt hatası');
   await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('Hata Taslağı');
   await page.evaluate(() => { window.failSetup = false; });
   await guard().getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
@@ -237,7 +237,7 @@ try {
   await updateInput.fill('https://new-update.example.test');
   await page.evaluate(() => { window.failUpdate = true; });
   await save();
-  await expect(page.getByText('Güncelleme tercih hatası', { exact: true })).toBeVisible();
+  await expect(page.locator('.global-message-bar')).toContainText('Güncelleme tercih hatası');
   await expect(updateInput).toHaveValue('https://new-update.example.test');
   await page.evaluate(() => { window.failUpdate = false; });
   await save();

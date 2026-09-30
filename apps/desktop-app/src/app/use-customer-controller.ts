@@ -178,7 +178,7 @@ export function useCustomerController({
       if (!result.ok) {
         setSyncState("error");
         setStatusMessage(result.message);
-        return;
+        return result;
       }
 
       setDashboardData(result.dashboardData);
@@ -186,9 +186,10 @@ export function useCustomerController({
       setStatusMessage(result.message);
       return result;
     } catch {
+      const result = { ok: false as const, message: "Müşteri silinemedi. Yeniden deneyin." };
       setSyncState("error");
-      setStatusMessage("Müşteri silinemedi. Yeniden deneyin.");
-      return;
+      setStatusMessage(result.message);
+      return result;
     }
   }
 

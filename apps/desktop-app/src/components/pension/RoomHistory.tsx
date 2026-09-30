@@ -24,6 +24,5 @@ export function RoomHistory({ model, operations, account, disabled }: {
       {folio.items.map(item => <p key={item.id}>{item.label} · {minorMoney(item.lineTotalMinor)}</p>)}
       {folio.payments.map(payment => <p key={payment.id}>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)} · {minorMoney(payment.amountMinor)}</p>)}
     </details>)}
-    {operations.feedback && <p role={operations.feedback.error ? "alert" : "status"}>{operations.feedback.message}</p>}
   </section>;
 }
