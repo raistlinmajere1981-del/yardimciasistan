@@ -218,8 +218,9 @@ export function DashboardPage({
             <AttentionCard tone={operationalAttention.outOfStockItems > 0 ? "danger" : "wait"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
           )}
           {data.kbsOverview.enabled && data.kbsOverview.activeUnsentCount > 0 && (
-            <button className="dashboard-attention-button" type="button" onClick={onOpenKbs}>
-              <AttentionCard tone={data.kbsOverview.failedCount > 0 ? "danger" : "wait"} icon={IdCard} value={data.kbsOverview.activeUnsentCount} label="kimlik bildirimi bekliyor" />
+            <button className={"dashboard-attention-card dashboard-attention-button tone-" + (data.kbsOverview.failedCount > 0 ? "danger" : "wait")} type="button" onClick={onOpenKbs}>
+              <span className="dashboard-attention-icon" aria-hidden="true"><IdCard size={19} /></span>
+              <div><strong>{data.kbsOverview.activeUnsentCount}</strong><span>kimlik bildirimi bekliyor</span></div>
             </button>
           )}
         </div>
