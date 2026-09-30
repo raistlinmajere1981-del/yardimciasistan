@@ -134,6 +134,19 @@ function assertDesktopCapability(capability: BusinessCapability, message = "Bu i
   }
 }
 
+function reconcileEgmKbsBackgroundSession() {
+  if (appLockService?.isLocked()) {
+    egmKbsBackgroundSession.destroy();
+    return;
+  }
+  const settings = getKbsSettings(getDatabase().databasePath);
+  if (settings.enabled && settings.provider === "egm") {
+    void egmKbsBackgroundSession.refresh();
+  } else {
+    egmKbsBackgroundSession.destroy();
+  }
+}
+
 function assertDesktopRequestType(requestType: string) {
   assertDesktopCapability(C.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
   const requiredCapability = getRequestTypeRequiredCapability(requestType);
@@ -370,11 +383,13 @@ if (!hasSingleInstanceLock) {
       getSyncStatus: () => syncCoordinator?.getStatus(),
       onUnlocked: () => {
         void birthdayScheduler?.evaluateNow();
+        reconcileEgmKbsBackgroundSession();
       },
       onLocked: () => {
         egmKbsBackgroundSession.destroy();
       }
     });
+    reconcileEgmKbsBackgroundSession();
     syncCoordinator = new SyncCoordinator({
       database: desktopDatabase,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
@@ -631,12 +646,8 @@ function registerIpcHandlers() {
       notificationId,
       [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
     ),
-    onSettingsSaved: (settings) => {
-      if (settings.enabled && settings.provider === "egm") {
-        void egmKbsBackgroundSession.refresh();
-      } else {
-        egmKbsBackgroundSession.destroy();
-      }
+    onSettingsSaved: () => {
+      reconcileEgmKbsBackgroundSession();
     }
   });
 
