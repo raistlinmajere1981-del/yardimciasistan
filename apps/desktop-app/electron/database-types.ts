@@ -142,6 +142,45 @@ export interface DesktopCustomer {
   updatedAt: string;
 }
 
+export type DesktopHospitalityNotificationKind = "arrival" | "departure" | "room_change";
+export type DesktopHospitalityNotificationStatus = "pending" | "sent" | "failed";
+export type DesktopKbsProvider = "egm" | "jandarma";
+
+export interface DesktopHospitalityNotification {
+  id: string;
+  guestId: string;
+  stayId: string;
+  customerId: string;
+  customerName: string;
+  roomId: string;
+  roomName: string;
+  roomNumber: string;
+  kind: DesktopHospitalityNotificationKind;
+  status: DesktopHospitalityNotificationStatus;
+  provider: DesktopKbsProvider | "";
+  providerReference: string;
+  occurredAt: string;
+  sentAt: string;
+  createdAt: string;
+  guestStatus: "planned" | "checked_in" | "checked_out" | "cancelled";
+  stayStatus: string;
+  checkInDate: string;
+  checkOutDate: string;
+  identityReady: boolean;
+}
+
+export interface DesktopKbsOverview {
+  enabled: boolean;
+  configured: boolean;
+  provider: DesktopKbsProvider;
+  pendingCount: number;
+  failedCount: number;
+  sentCount: number;
+  checkedInGuestCount: number;
+  activeUnsentCount: number;
+  activeMissingIdentityCount: number;
+}
+
 export interface DesktopCustomerRoomStay {
   id: string;
   customerId: string;
@@ -240,6 +279,8 @@ export interface DesktopDashboardData {
   dailyTasks: DesktopDailyTask[];
   customers: DesktopCustomer[];
   customerRoomStays: DesktopCustomerRoomStay[];
+  hospitalityNotifications: DesktopHospitalityNotification[];
+  kbsOverview: DesktopKbsOverview;
   androidDevices: DesktopAndroidDevice[];
   paymentWaitingTableOrders: DesktopPaymentWaitingTableOrder[];
   androidActionFailures: DesktopAndroidActionFailure[];

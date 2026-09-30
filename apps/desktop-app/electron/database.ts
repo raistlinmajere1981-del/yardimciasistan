@@ -1,5 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { getHospitalityOperations } from "./database/hospitality-operations-store.js";
+import {
+  getHospitalityNotifications,
+  getKbsOverview
+} from "./database/hospitality-notification-store.js";
 import { DesktopRoomFolioService } from "./room-folio.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
 import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
@@ -65,6 +69,8 @@ import type {
   DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopDashboardData,
+  DesktopHospitalityNotification,
+  DesktopKbsOverview,
   DesktopReportRangeInput,
   DesktopReportData,
   DesktopAiService,
@@ -131,6 +137,8 @@ export type {
   DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopDashboardData,
+  DesktopHospitalityNotification,
+  DesktopKbsOverview,
   DesktopReportPreset,
   DesktopReportRangeInput,
   DesktopReportPeriod,
