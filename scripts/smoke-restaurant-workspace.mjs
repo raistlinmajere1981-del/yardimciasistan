@@ -304,8 +304,10 @@ try {
 
   }
   // Security lock destroys the workspace: pending mutation results cannot update a new entity.
+  await button('Çay için not ekle').click();
+  const salonNote = workspace.getByLabel('Çay notu');
   await page.evaluate(() => { window.fixtureDelayNote = true; });
-  await note.fill('Kilit öncesi'); await note.press('Tab');
+  await salonNote.fill('Kilit öncesi'); await salonNote.press('Tab');
   await expect.poll(() => page.evaluate(() => typeof window.fixtureResolveNote)).toBe('function');
   await page.evaluate(() => window.fixtureLock(true));
   await expect(workspace).toHaveCount(0);
