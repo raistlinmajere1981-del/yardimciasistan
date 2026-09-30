@@ -6,20 +6,24 @@ import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePa
 interface CustomerWorkPageProps {
   requestsEnabled: boolean;
   whatsappEnabled: boolean;
+  kbsEnabled: boolean;
   activeTab: CustomerWorkTab;
   onTabChange: (tab: CustomerWorkTab) => void;
   requests: ReactNode;
   customers: ReactNode;
+  kbs: ReactNode;
   messages: ReactNode;
 }
 
 export function CustomerWorkPage({
   requestsEnabled,
   whatsappEnabled,
+  kbsEnabled,
   activeTab,
   onTabChange,
   requests,
   customers,
+  kbs,
   messages
 }: CustomerWorkPageProps) {
   useEffect(() => {
@@ -27,32 +31,43 @@ export function CustomerWorkPage({
       onTabChange("customers");
       return;
     }
+    if (activeTab === "kbs" && !kbsEnabled) {
+      onTabChange("customers");
+      return;
+    }
     if (activeTab === "prepared" && !whatsappEnabled) {
       onTabChange(requestsEnabled ? "requests" : "customers");
     }
-  }, [activeTab, onTabChange, requestsEnabled, whatsappEnabled]);
+  }, [activeTab, kbsEnabled, onTabChange, requestsEnabled, whatsappEnabled]);
 
   const views: readonly { id: CustomerWorkTab; label: string }[] = [
     { id: "customers" as const, label: "Müşteriler" },
+    ...(kbsEnabled ? [{ id: "kbs" as const, label: "Kimlik Bildirimleri" }] : []),
     ...(requestsEnabled ? [{ id: "requests" as const, label: "Talepler" }] : []),
     ...(whatsappEnabled ? [{ id: "prepared" as const, label: "Hazır Mesajlar" }] : [])
   ];
 
   const normalizedTab: CustomerWorkTab = activeTab === "requests" && !requestsEnabled
     ? "customers"
-    : activeTab === "prepared" && !whatsappEnabled
+    : activeTab === "kbs" && !kbsEnabled
+      ? "customers"
+      : activeTab === "prepared" && !whatsappEnabled
       ? (requestsEnabled ? "requests" : "customers")
       : activeTab;
 
   const content = normalizedTab === "requests"
     ? requests
-    : normalizedTab === "prepared"
-      ? messages
-      : customers;
+    : normalizedTab === "kbs"
+      ? kbs
+      : normalizedTab === "prepared"
+        ? messages
+        : customers;
 
   const bodyLabel = normalizedTab === "requests"
     ? "Talep yönetimi görünümü"
-    : normalizedTab === "prepared"
+    : normalizedTab === "kbs"
+      ? "Kimlik bildirimi yönetimi görünümü"
+      : normalizedTab === "prepared"
       ? "Hazır mesajlar görünümü"
       : "Müşteri yönetimi görünümü";
 
