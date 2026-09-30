@@ -18,7 +18,7 @@ import { matchesCapabilityCondition, type CapabilityCondition } from "./capabili
 export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "reports" | "settings";
 
 /** Customer-work subview id; a view state, not a DesktopPage route. */
-export type CustomerWorkTab = "requests" | "customers" | "prepared";
+export type CustomerWorkTab = "requests" | "customers" | "kbs" | "prepared";
 
 export interface NavigationItem {
   id: DesktopPage;
