@@ -93,6 +93,30 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
       if (stay.status !== 'checked_in') throw Error('Explicit check-in required');
       return financial(openFolioFor(stay));
     },
+    updateRoomFolioDetails: async input => {
+      record('folio-details', input);
+      const folio = folios.find(item => item.id === input.folioId);
+      if (!folio) return { ok: false, message: 'Hesap bulunamadı.' };
+      folio.guestCount = input.guestCount;
+      folio.checkInDate = input.checkInDate;
+      folio.plannedCheckOutDate = input.plannedCheckOutDate;
+      folio.nightlyPriceMinor = input.nightlyPriceMinor;
+      folio.lodgingManualOverride = Boolean(input.lodgingManualOverride);
+      const start = Date.parse(`${input.checkInDate}T00:00:00Z`);
+      const end = input.plannedCheckOutDate ? Date.parse(`${input.plannedCheckOutDate}T00:00:00Z`) : start;
+      folio.nights = Math.max(1, Math.round((end - start) / 86400000));
+      folio.lodgingTotalMinor = folio.lodgingManualOverride
+        ? Number(input.lodgingTotalMinor ?? folio.lodgingTotalMinor)
+        : folio.nightlyPriceMinor * folio.nights;
+      const stay = dashboard.customerRoomStays.find(item => item.id === folio.stayId);
+      if (stay) {
+        stay.checkInDate = input.checkInDate;
+        stay.checkOutDate = input.plannedCheckOutDate;
+        stay.guestCount = input.guestCount;
+      }
+      totals(folio);
+      return financial(folio);
+    },
     updateCustomerRoomStayStatus: async ({ stayId, status }) => { record('stay-status', { stayId, status }); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = status; stay.updatedAt = stamp(); return success(stayId); },
     checkoutStay: async stayId => { record('checkout', stayId); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = 'checked_out'; stay.checkedOutAt = stamp(); stay.updatedAt = stamp(); dashboard.rooms.find(item => item.id === stay.roomId).status = 'cleaning'; const folio = folios.find(item => item.stayId === stayId); if (folio?.remainingMinor === 0) folio.status = 'closed'; return success(stayId, 'Misafir çıkışı tamamlandı. Oda temizlik bekliyor.'); },
     addRoomFolioPayment: async input => {
@@ -107,6 +131,27 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
     addRoomFolioMenuItem: async input => { record('menu', input); const folio = folios.find(item => item.id === input.folioId); const item = menu[0]; item.stockQuantity--; folio.items.push({ id: `item-${stamp()}`, menuItemId: item.id, kind: 'menu', label: item.name, quantity: 1, unitPriceMinor: item.priceMinor, lineTotalMinor: item.priceMinor, note: '' }); totals(folio); return financial(folio); },
     updateRoomFolioItemQuantity: async input => { record('quantity', input); const folio = folios.find(item => item.items.some(line => line.id === input.itemId)); const item = folio.items.find(line => line.id === input.itemId); menu[0].stockQuantity -= input.quantity - item.quantity; item.quantity = input.quantity; item.lineTotalMinor = item.unitPriceMinor * item.quantity; totals(folio); return financial(folio); },
     removeRoomFolioItem: async id => { record('remove', id); const folio = folios.find(item => item.items.some(line => line.id === id)); const item = folio.items.find(line => line.id === id); if (item.kind === 'menu') menu[0].stockQuantity += item.quantity; folio.items = folio.items.filter(line => line.id !== id); totals(folio); return financial(folio); },
-    addRoomFolioManualItem: async input => { record('charge', input); const folio = folios.find(item => item.id === input.folioId); folio.items.push({ ...input, id: `item-${stamp()}`, lineTotalMinor: input.kind === 'discount' ? -input.amountMinor : input.amountMinor }); totals(folio); return financial(folio); }
+    addRoomFolioManualItem: async input => { record('charge', input); const folio = folios.find(item => item.id === input.folioId); folio.items.push({ ...input, id: `item-${stamp()}`, lineTotalMinor: input.kind === 'discount' ? -input.amountMinor : input.amountMinor }); totals(folio); return financial(folio); },
+    setRoomFolioDiscount: async input => {
+      record('discount', input);
+      const folio = folios.find(item => item.id === input.folioId);
+      if (!folio) return { ok: false, message: 'Hesap bulunamadı.' };
+      folio.items = folio.items.filter(item => item.kind !== 'discount');
+      if (input.amountMinor > 0) {
+        folio.items.push({
+          id: `item-${stamp()}`,
+          folioId: input.folioId,
+          kind: 'discount',
+          menuItemId: '',
+          label: 'İndirim',
+          unitPriceMinor: input.amountMinor,
+          quantity: 1,
+          lineTotalMinor: -input.amountMinor,
+          note: ''
+        });
+      }
+      totals(folio);
+      return financial(folio);
+    }
   };
 }
