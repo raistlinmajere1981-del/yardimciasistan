@@ -54,8 +54,10 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
     {controller.error && <ActionButton variant="secondary" disabled={controller.busy} onClick={() => void controller.refresh()}>Hesabı Yenile</ActionButton>}
     {previous.length > 0 && <section className="operation-section room-previous-accounts" aria-label="Önceki hesaplar">
       <details
-        open={previousOpen}
-        onToggle={event => setPreviousOpen(event.currentTarget.open)}
+        open={focusedPrevious || previousOpen}
+        onToggle={event => {
+          if (!focusedPrevious) setPreviousOpen(event.currentTarget.open);
+        }}
       >
         <summary>Önceki hesaplar ({previous.length})</summary>
         <div className="form-stack">
