@@ -14,9 +14,7 @@ export interface ServicesSettingsProps {
   setupData: DesktopSetupData;
   dashboardData?: DesktopDashboardData;
   androidDeviceState?: SyncState;
-  androidDeviceMessage?: string;
   androidInstallState?: SyncState;
-  androidInstallMessage?: string;
   androidInstallSnapshot?: DesktopAndroidInstallationSnapshot | null;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
@@ -39,9 +37,7 @@ export function ServicesSettingsSection({
   setupData,
   dashboardData,
   androidDeviceState = "idle",
-  androidDeviceMessage = "Telefon rolleri ve görev alanları masaüstünden yönetilir.",
   androidInstallState = "idle",
-  androidInstallMessage = "USB Android cihazları aranıyor...",
   androidInstallSnapshot = null,
   aiConnectionTestState,
   aiConnectionTestMessage,
@@ -178,10 +174,8 @@ export function ServicesSettingsSection({
                     devices={dashboardData?.androidDevices ?? []}
                     enabledCapabilities={enabledCapabilities}
                     state={androidDeviceState}
-                    message={androidDeviceMessage}
-                    installState={androidInstallState}
-                    installMessage={androidInstallMessage}
-                    installSnapshot={androidInstallSnapshot}
+                                  installState={androidInstallState}
+                                  installSnapshot={androidInstallSnapshot}
                     onRefreshInstallDevices={onRefreshAndroidInstallDevices}
                     onInstallApp={onInstallAndroidApp}
                     onProvisionApp={onProvisionAndroidApp}
