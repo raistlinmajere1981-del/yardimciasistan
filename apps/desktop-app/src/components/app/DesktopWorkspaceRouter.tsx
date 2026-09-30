@@ -227,6 +227,7 @@ export function DesktopWorkspaceRouter({
     return domain === "accommodation" || domain === "mixed" || domain === "generic";
   });
   const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
+  const [kbsEgmSessionRequest, setKbsEgmSessionRequest] = useState(0);
   const kbsController = useKbsNotificationController({
     setDashboardData,
     setSyncState,
@@ -253,6 +254,17 @@ export function DesktopWorkspaceRouter({
 
   function openDashboardReply(request: SyncedCustomerRequest) {
     openDashboardCustomerWork(request);
+  }
+
+  async function handleCustomerRowKbs(notificationId: string, customerId: string) {
+    const result = await kbsController.send(notificationId);
+    if (!result || result.state !== "interaction_required") return;
+
+    setSelectedKbsCustomerId(customerId);
+    setCustomerWorkTab("kbs");
+    if (surfaceData.kbsOverview.provider === "egm") {
+      setKbsEgmSessionRequest((value) => value + 1);
+    }
   }
 
   function openAssignedReservationWorkspace(
@@ -453,10 +465,7 @@ export function DesktopWorkspaceRouter({
               onSave={handleSaveCustomer}
               onAnalyzeIdentity={handleAnalyzeIdentityImage}
               onDelete={handleDeleteCustomer}
-              onOpenKbs={(customerId) => {
-                setSelectedKbsCustomerId(customerId);
-                setCustomerWorkTab("kbs");
-              }}
+              onSendKbs={handleCustomerRowKbs}
             />
           )}
           kbs={(
@@ -464,6 +473,7 @@ export function DesktopWorkspaceRouter({
               data={surfaceData}
               selectedCustomerId={selectedKbsCustomerId}
               controller={kbsController}
+              egmSessionRequest={kbsEgmSessionRequest}
             />
           )}
           messages={(
