@@ -144,14 +144,12 @@ export function QuickCustomerCreator({
               return;
             }
 
-            const savedCustomer = result.dashboardData.customers.find((customer) => customer.id === result.savedId);
             onDirty?.(false);
             onCreated(result.savedId);
             setOpen(false);
             setFullName("");
             setPhone("");
             setState("success");
-            if (!savedCustomer) reportAppStatus("success", "Yeni müşteri eklendi ve seçildi.");
           }}
         >
           <Save size={15} aria-hidden="true" />
