@@ -21,9 +21,15 @@ interface KbsAutomationWorkspaceProps {
   data: Pick<DesktopDashboardData, "hospitalityNotifications" | "kbsOverview">;
   selectedCustomerId?: string;
   controller: KbsNotificationController;
+  egmSessionRequest?: number;
 }
 
-export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controller }: KbsAutomationWorkspaceProps) {
+export function KbsAutomationWorkspace({
+  data,
+  selectedCustomerId = "",
+  controller,
+  egmSessionRequest = 0
+}: KbsAutomationWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const { confirm, confirmDialog } = useConfirmDialog();
   const [filter, setFilter] = useState<KbsFilter>("attention");
@@ -34,6 +40,14 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
   const registeredWebviewId = useRef<number | null>(null);
   const credentialsAttempted = useRef(false);
   const overview = data.kbsOverview;
+
+  useEffect(() => {
+    if (!egmSessionRequest || overview.provider !== "egm") return;
+    credentialsAttempted.current = false;
+    setEgmSessionOpen(true);
+    setEgmSessionMessage("EGM KBS oturumu hazırlanıyor...");
+    setEgmSessionError("");
+  }, [egmSessionRequest, overview.provider]);
 
   useEffect(() => {
     if (!egmSessionOpen || overview.provider !== "egm") return;
