@@ -17,8 +17,9 @@ export function registerKbsSettingsIpcHandlers(options: {
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   deliverNotification: (notificationId: string) => Promise<DesktopKbsDeliveryMutationResult>;
+  onSettingsSaved?: (settings: KbsSettings) => void | Promise<void>;
 }) {
-  const { getDatabase, assertUnlocked, assertCapability, deliverNotification } = options;
+  const { getDatabase, assertUnlocked, assertCapability, deliverNotification, onSettingsSaved } = options;
 
   ipcMain.handle("kbs:getSettings", (): KbsSettings => {
     assertUnlocked();
@@ -27,9 +28,11 @@ export function registerKbsSettingsIpcHandlers(options: {
 
   ipcMain.handle(
     "kbs:saveSettings",
-    (_event, input: SaveKbsSettingsInput): KbsSettingsSaveResult => {
+    async (_event, input: SaveKbsSettingsInput): Promise<KbsSettingsSaveResult> => {
       assertUnlocked();
-      return saveKbsSettings(getDatabase().databasePath, input);
+      const result = saveKbsSettings(getDatabase().databasePath, input);
+      if (result.ok) await onSettingsSaved?.(result.settings);
+      return result;
     }
   );
 
