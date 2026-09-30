@@ -57,6 +57,7 @@ import { BirthdayScheduler } from "./birthday-scheduler.js";
 import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
 import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
 import { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
+import { EgmKbsBackgroundSession } from "./egm-kbs-background-session.js";
 import { EgmKbsProviderAdapter, JandarmaKbsProviderAdapter } from "./kbs-provider-adapters.js";
 import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
 import { registerReservationIpcHandlers } from "./ipc/reservation-ipc";
@@ -87,6 +88,7 @@ import { registerBusinessPublicProfileIpcHandlers } from "./business-public-prof
 import { registerGoogleReviewsSettingsIpcHandlers } from "./google-reviews-settings-ipc";
 import { registerKbsSettingsIpcHandlers } from "./kbs-settings-ipc";
 import { registerKbsWebviewIpcEvents } from "./kbs-webview-ipc";
+import { EGM_KBS_PARTITION, getKbsSettings } from "./kbs-settings";
 import { getGoogleReviewsSettings, publishGoogleReviewsSettings } from "./google-reviews-settings";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
@@ -113,8 +115,10 @@ let localCompanionServer: LocalCompanionServer | null = null;
 let localCompanionPairingService: LocalCompanionPairingService | null = null;
 let localCompanionMdnsAdvertiser: LocalCompanionMdnsAdvertiser | null = null;
 const birthdayWebviewDriver = new WhatsAppWebviewDriver();
-const egmKbsWebviewDriver = new EgmKbsWebviewDriver();
-const egmKbsProviderAdapter = new EgmKbsProviderAdapter(egmKbsWebviewDriver);
+const egmKbsInteractiveDriver = new EgmKbsWebviewDriver();
+const egmKbsBackgroundDriver = new EgmKbsWebviewDriver();
+const egmKbsBackgroundSession = new EgmKbsBackgroundSession(egmKbsBackgroundDriver);
+const egmKbsProviderAdapter = new EgmKbsProviderAdapter(egmKbsBackgroundSession);
 const jandarmaKbsProviderAdapter = new JandarmaKbsProviderAdapter();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
@@ -315,7 +319,10 @@ function createMainWindow() {
   window.webContents.once("did-finish-load", showMainWindow);
   const showFallback = setTimeout(showMainWindow, 3000);
   showFallback.unref();
-  window.once("closed", () => clearTimeout(showFallback));
+  window.once("closed", () => {
+    clearTimeout(showFallback);
+    egmKbsBackgroundSession.destroy();
+  });
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     void window.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -348,6 +355,7 @@ if (!hasSingleInstanceLock) {
 
   void app.whenReady().then(() => {
     session.fromPartition(WHATSAPP_WEB_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
+    session.fromPartition(EGM_KBS_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
     configureDesktopMediaPermissions();
 
     const runtimeDataRoot = resolveRuntimeDataRoot();
@@ -619,7 +627,14 @@ function registerIpcHandlers() {
     deliverNotification: (notificationId) => getDatabase().deliverKbsNotification(
       notificationId,
       [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
-    )
+    ),
+    onSettingsSaved: async (settings) => {
+      if (settings.enabled && settings.provider === "egm") {
+        await egmKbsBackgroundSession.refresh();
+      } else {
+        egmKbsBackgroundSession.destroy();
+      }
+    }
   });
 
   registerKbsWebviewIpcEvents({
@@ -627,10 +642,19 @@ function registerIpcHandlers() {
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability,
     isTrustedRendererUrl: isTrustedDesktopRendererUrl,
-    attachWebview: (id) => egmKbsWebviewDriver.attach(id),
-    detachWebview: (id) => egmKbsWebviewDriver.detach(id),
-    inspect: () => egmKbsWebviewDriver.inspect(),
-    prepareLogin: (credentials) => egmKbsWebviewDriver.prepareLogin(credentials)
+    attachWebview: (id) => egmKbsInteractiveDriver.attach(id),
+    detachWebview: (id) => egmKbsInteractiveDriver.detach(id),
+    inspect: async () => {
+      const result = await egmKbsInteractiveDriver.inspect();
+      if (result.state === "authenticated") {
+        const settings = getKbsSettings(getDatabase().databasePath);
+        if (settings.enabled && settings.provider === "egm") {
+          await egmKbsBackgroundSession.refresh();
+        }
+      }
+      return result;
+    },
+    prepareLogin: (credentials) => egmKbsInteractiveDriver.prepareLogin(credentials)
   });
 
   ipcMain.handle("sync:setMarketBarcodeFastPull", (event, enabled: unknown) => {
