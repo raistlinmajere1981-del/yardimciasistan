@@ -136,6 +136,11 @@ try {
       testGoogleReviewsConnection: async () => ({ ok: true, message: "Google Places bağlantısı doğrulandı.", name: "Smoke İşletme", rating: 4.8, userRatingCount: 12 }),
       getBusinessLayout: async () => ({ capabilities: { rooms: false, tables: false }, rooms: [], tableCategories: [] }),
       saveBusinessLayout: async (input) => ({ ok: true, message: "İşletme düzeni kaydedildi.", layout: { capabilities: { rooms: false, tables: false }, rooms: [], tableCategories: [] } }),
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: false, message: "Smoke modunda KBS bağlantısı denenemez." }),
+      inspectEgmKbsSession: async () => ({ ok: false, message: "Smoke modunda EGM oturumu yok." }),
+      prepareEgmKbsLogin: async () => ({ ok: false, message: "Smoke modunda EGM girişi hazırlanamaz." }),
       listRoomMedia: async () => [],
       addRoomMedia: async () => ({ ok: true, message: "Medya eklendi.", media: [] }),
       updateRoomMedia: async () => ({ ok: true, message: "Medya güncellendi.", media: [] }),
@@ -319,6 +324,9 @@ function createSetupData() {
 
 function createDashboardData() {
   return {
+    revision: 1,
+    roomOperations: null,
+    tableOperations: null,
     databasePath: "/tmp/yardimci-asistan-lock-smoke.sqlite",
     backupPath: "/tmp/yardimci-asistan-lock-smoke/backups",
     webModuleUrl: "https://example.test/yardimci-asistan",
@@ -330,9 +338,32 @@ function createDashboardData() {
     dailyTasks: [],
     customers: [],
     customerRoomStays: [],
+    hospitalityNotifications: [],
+    kbsOverview: {
+      enabled: false,
+      configured: false,
+      provider: "egm",
+      pendingCount: 0,
+      failedCount: 0,
+      sentCount: 0,
+      checkedInGuestCount: 0,
+      activeUnsentCount: 0,
+      activeMissingIdentityCount: 0
+    },
     androidDevices: [],
     paymentWaitingTableOrders: [],
     androidActionFailures: [],
+    attention: {
+      pendingRequests: 0,
+      pendingReservations: 0,
+      paymentWaitingTables: 0,
+      overdueTasks: 0,
+      incompleteTasks: 0,
+      outOfStockItems: 0,
+      lowStockItems: 0,
+      totalCount: 0,
+      items: []
+    },
     birthdayOverview: {
       enabled: true,
       mode: "manual",

@@ -470,7 +470,7 @@
   transform: translate(-50%, -50%);
   border: 2px solid color-mix(in srgb, var(--color-security-accent) 82%, transparent);
   border-radius: var(--radius-panel);
-  box-shadow: 0 0 0 999px color-mix(in srgb, var(--color-security-backdrop) 28%, transparent);
+  box-shadow: var(--shadow-camera-backdrop);
   pointer-events: none;
 }
 .identity-camera__guide > span {
@@ -502,6 +502,7 @@
 .identity-camera__status span,
 .identity-camera__flow-note,
 .identity-camera__shortcut {
+  margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
@@ -526,7 +527,7 @@
   width: 0.5rem;
   height: 0.5rem;
   background: var(--color-border-strong);
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
 }
 .identity-camera__quality > span.is-ready {
   color: var(--color-success);
@@ -539,9 +540,6 @@
   color: var(--color-accent);
   background: var(--color-accent-soft);
   border-color: var(--color-accent-border);
-}
-.identity-camera__flow-note {
-  margin: 0;
 }
 .identity-camera__footer {
   display: flex;

@@ -66,9 +66,14 @@ function Harness() {
         <CustomersWorkspace
           customers={dashboardData.customers}
           stays={dashboardData.customerRoomStays}
+          reservations={dashboardData.reservations}
+          notifications={dashboardData.hospitalityNotifications}
+          kbsOverview={dashboardData.kbsOverview}
           aiEnabled={false}
           onSave={customers.handleSaveCustomer}
           onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
+          onDelete={customers.handleDeleteCustomer}
+          onSendKbs={async () => undefined}
         />
         <WorkspaceHost definition={customerWorkspaceDefinition} context={{
           data: dashboardData,

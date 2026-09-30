@@ -41,6 +41,7 @@
   --color-security-success: var(--green-400);
   --color-security-focus: color-mix(in srgb, var(--green-400) 70%, transparent);
   --shadow-security: var(--shadow-xl);
+  --shadow-camera-backdrop: 0 0 0 999px color-mix(in srgb, var(--color-security-backdrop) 28%, transparent);
   --z-security: 10000;
   --radius-control: var(--radius-md);
   --radius-panel: var(--radius-lg);

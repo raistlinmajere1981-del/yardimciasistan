@@ -57,6 +57,8 @@ function assertDesktopCustomerDeletion(database) {
   assert.equal(conversion.ok, true);
   const reservation = conversion.dashboardData.reservations.find((candidate) => candidate.requestId === request.id);
   assert.ok(reservation);
+  const cancellation = database.updateReservationStatus({ reservationId: reservation.id, status: "cancelled" });
+  assert.equal(cancellation.ok, true);
 
   const result = database.deleteCustomer(request.customer_id);
   assert.equal(result.ok, true);

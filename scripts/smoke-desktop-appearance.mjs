@@ -410,6 +410,11 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
         settings: { enabled: input.enabled, placeId: input.placeId, apiKeyConfigured: Boolean(input.apiKey), lastPublishedAt: "", publicationPending: false }
       }),
       testGoogleReviewsConnection: async () => ({ ok: true, message: "Google Places bağlantısı doğrulandı.", name: "Smoke İşletme", rating: 4.8, userRatingCount: 12 }),
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: false, message: "Smoke modunda KBS bağlantısı denenemez." }),
+      inspectEgmKbsSession: async () => ({ ok: false, message: "Smoke modunda EGM oturumu yok." }),
+      prepareEgmKbsLogin: async () => ({ ok: false, message: "Smoke modunda EGM girişi hazırlanamaz." }),
       getRoomFolioData: async () => ({
         generatedAt: "",
         rooms: [],
@@ -495,6 +500,9 @@ function createSetupFixture(setupRequired = true) {
 
 function createEmptyDashboardFixture() {
   return {
+    revision: 1,
+    roomOperations: null,
+    tableOperations: null,
     databasePath: "/tmp/yardimci-asistan-appearance-smoke.sqlite",
     backupPath: "/tmp/yardimci-asistan-appearance-smoke-backups",
     webModuleUrl: "https://example.test/yardimci-asistan",
@@ -506,10 +514,33 @@ function createEmptyDashboardFixture() {
     dailyTasks: [],
     customers: [],
     customerRoomStays: [],
+    hospitalityNotifications: [],
+    kbsOverview: {
+      enabled: false,
+      configured: false,
+      provider: "egm",
+      pendingCount: 0,
+      failedCount: 0,
+      sentCount: 0,
+      checkedInGuestCount: 0,
+      activeUnsentCount: 0,
+      activeMissingIdentityCount: 0
+    },
     androidDevices: [],
     paymentWaitingTableOrders: [],
     androidActionFailures: [],
     menu: { categories: [], items: [], updated_at: "" },
+    attention: {
+      pendingRequests: 0,
+      pendingReservations: 0,
+      paymentWaitingTables: 0,
+      overdueTasks: 0,
+      incompleteTasks: 0,
+      outOfStockItems: 0,
+      lowStockItems: 0,
+      totalCount: 0,
+      items: []
+    },
     summary: {
       newRequests: 0,
       waitingRequests: 0,

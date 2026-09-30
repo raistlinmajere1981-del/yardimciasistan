@@ -94,6 +94,11 @@ try {
         };
       },
       getRoomFolioData: async () => ({ rooms: [], activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: false, message: "Smoke modunda KBS bağlantısı denenemez." }),
+      inspectEgmKbsSession: async () => ({ ok: false, message: "Smoke modunda EGM oturumu yok." }),
+      prepareEgmKbsLogin: async () => ({ ok: false, message: "Smoke modunda EGM girişi hazırlanamaz." }),
       listRoomMedia: async () => [],
       addRoomMedia: async () => ({ ok: true, message: 'Medya eklendi.', media: [] }),
       updateRoomMedia: async () => ({ ok: true, message: 'Medya güncellendi.', media: [] }),
@@ -142,6 +147,7 @@ try {
         await page.screenshot({ path: `${output}/${width}-${suffix}.png` });
       };
       if (name === 'Müşteri İşleri') {
+        await page.getByRole('navigation', { name: 'Müşteri işleri görünümü' }).getByRole('button', { name: 'Talepler', exact: true }).click();
         await page.getByRole('button', { name: 'Elle Talep Ekle', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: 'Yeni talep ekle', exact: true });
         await checkOverlay(dialog, 'request-drawer');

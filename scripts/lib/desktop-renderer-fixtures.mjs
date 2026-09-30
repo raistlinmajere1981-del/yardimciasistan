@@ -378,6 +378,17 @@ function createDashboardFixture() {
       activeMenuCategories: 0,
       availableMenuItems: 0
     },
+    attention: {
+      pendingRequests: 0,
+      pendingReservations: 0,
+      paymentWaitingTables: 0,
+      overdueTasks: 0,
+      incompleteTasks: 0,
+      outOfStockItems: 0,
+      lowStockItems: 0,
+      totalCount: 0,
+      items: []
+    },
     birthdayOverview: {
       enabled: true,
       mode: "manual",

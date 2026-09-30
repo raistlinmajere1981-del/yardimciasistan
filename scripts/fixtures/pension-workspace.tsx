@@ -109,9 +109,14 @@ function FixtureShell({ page, setPage, data, setData, capabilities, pension, sav
     /> : page === "customerWork" ? <CustomersWorkspace
       customers={data.customers}
       stays={data.customerRoomStays}
+      reservations={data.reservations}
+      notifications={data.hospitalityNotifications ?? []}
+      kbsOverview={data.kbsOverview ?? { enabled: false, configured: false, provider: "egm", pendingCount: 0, failedCount: 0, sentCount: 0, checkedInGuestCount: 0, activeUnsentCount: 0, activeMissingIdentityCount: 0 }}
       aiEnabled={false}
       onSave={async () => ({ ok: false, message: "fixture" })}
       onAnalyzeIdentity={async () => ({ ok: false, message: "fixture" })}
+      onDelete={async () => undefined}
+      onSendKbs={async () => undefined}
     /> : <section aria-label="Ana sayfa fixture"><p>Ana sayfa</p></section>}
   </AppShell>;
 }

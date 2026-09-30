@@ -93,6 +93,11 @@ try {
         userRatingCount: 12
       }),
       getBusinessLayout: async () => structuredClone(businessLayout),
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: false, message: "Smoke modunda KBS bağlantısı denenemez." }),
+      inspectEgmKbsSession: async () => ({ ok: false, message: "Smoke modunda EGM oturumu yok." }),
+      prepareEgmKbsLogin: async () => ({ ok: false, message: "Smoke modunda EGM girişi hazırlanamaz." }),
       listRoomMedia: async () => [],
       addRoomMedia: async () => ({ ok: true, message: 'Medya eklendi.', media: [] }),
       updateRoomMedia: async () => ({ ok: true, message: 'Medya güncellendi.', media: [] }),
