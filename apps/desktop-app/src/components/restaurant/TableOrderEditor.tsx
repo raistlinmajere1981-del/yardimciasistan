@@ -26,6 +26,11 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrde
     [activeCategories]
   );
   const menuItemsById = useMemo(() => new Map(menu.items.map(item => [item.id, item])), [menu.items]);
+  const activeCatalogItemCount = useMemo(() => {
+    if (!menuEnabled) return 0;
+    const activeCategoryIds = new Set(activeCategories.map(category => category.id));
+    return menu.items.filter(item => item.is_available && activeCategoryIds.has(item.category_id)).length;
+  }, [activeCategories, menu.items, menuEnabled]);
   const availableItems = useMemo(() => {
     if (!menuEnabled) return [];
     const activeCategoryIds = new Set(activeCategories.map((category) => category.id));
@@ -103,7 +108,15 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrde
                   </div>
                 </div>
                 <div className="restaurant-order-line-list">
-                  {!selectedOrder && <p className="restaurant-order-empty">{canStartOrder ? "Henüz ürün yok." : "Bu masa şu an sipariş almaya uygun değil."}</p>}
+                  {!selectedOrder && <div className="restaurant-order-empty">
+                    <p>{canStartOrder ? "Henüz ürün yok." : "Bu masa şu an sipariş almaya uygun değil."}</p>
+                    {canStartOrder && (!menuEnabled || activeCatalogItemCount === 0) && <ActionButton
+                      variant="secondary"
+                      size="sm"
+                      disabled={Boolean(busyAction)}
+                      onClick={() => void controller.startTableOrder()}
+                    >Adisyon aç</ActionButton>}
+                  </div>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
                     <p className="restaurant-order-empty">Henüz ürün yok.</p>
                   )}
