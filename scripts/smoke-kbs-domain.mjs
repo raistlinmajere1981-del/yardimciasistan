@@ -28,7 +28,7 @@ function customerInput(fullName, overrides = {}) {
     email: "",
     notes: "",
     tags: [],
-    identityType: "turkish_id",
+    identityType: "tc_identity_card",
     identityNumber: "10000000146",
     nationality: "Türkiye",
     birthDate: "1991-04-23",
