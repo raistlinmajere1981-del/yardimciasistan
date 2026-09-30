@@ -37,8 +37,6 @@
   position: sticky;
   top: 0;
   z-index: var(--z-dropdown);
-  display: grid;
-  gap: var(--space-2);
   min-height: var(--header-height);
   margin: 0;
   padding: var(--space-2) var(--page-padding);
@@ -46,9 +44,9 @@
   border-bottom: 1px solid var(--color-border);
 }
 .page-header__main {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.35fr) max-content;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3) var(--space-4);
+  gap: var(--space-4);
   min-width: 0;
 }
