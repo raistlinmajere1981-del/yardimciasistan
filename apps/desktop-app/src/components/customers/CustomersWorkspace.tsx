@@ -90,7 +90,7 @@ export function CustomersWorkspace({
 
   useEffect(() => {
     if (createOpen || !pendingCustomerId) return;
-    if (navigation.openWorkspace({ entityType: "customer", entityId: pendingCustomerId, mode: "summary", returnContext: { page: "customerWork", entityId: pendingCustomerId } })) {
+    if (navigation.openWorkspace({ entityType: "customer", entityId: pendingCustomerId, mode: "main", returnContext: { page: "customerWork", entityId: pendingCustomerId } })) {
       setPendingCustomerId("");
     }
   }, [createOpen, navigation, pendingCustomerId]);
@@ -126,7 +126,7 @@ export function CustomersWorkspace({
         const openCustomer = () => navigation.openWorkspace({
           entityType: "customer",
           entityId: customer.id,
-          mode: "summary",
+          mode: "main",
           returnContext: { page: "customerWork", entityId: customer.id }
         });
         return <DataListItem
