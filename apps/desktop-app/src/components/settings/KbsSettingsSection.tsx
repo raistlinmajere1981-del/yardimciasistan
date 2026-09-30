@@ -25,6 +25,7 @@ interface KbsDraft {
 
 type KbsWebViewElement = HTMLElement & {
   reload?: () => void;
+  getWebContentsId?: () => number;
 };
 
 const EMPTY_SETTINGS: KbsSettings = {
@@ -151,13 +152,37 @@ export function useKbsSettings(enabled: boolean) {
     }
   }, [buildInput]);
 
+  const inspectEgmSession = useCallback(
+    () => window.yardimciDesktop!.inspectEgmKbsSession(),
+    []
+  );
+
+  const prepareEgmLogin = useCallback(
+    () => window.yardimciDesktop!.prepareEgmKbsLogin(buildInput()),
+    [buildInput]
+  );
+
   const discard = () => {
     if (saving) return;
     setDraft(toDraft(settings));
     setFeedback({ error: false, message: "KBS değişiklikleri geri alındı." });
   };
 
-  return { settings, draft, loading, saving, testing, dirty, feedback, update, save, discard, testConnection };
+  return {
+    settings,
+    draft,
+    loading,
+    saving,
+    testing,
+    dirty,
+    feedback,
+    update,
+    save,
+    discard,
+    testConnection,
+    inspectEgmSession,
+    prepareEgmLogin
+  };
 }
 
 export function KbsSettingsSection({
@@ -167,10 +192,25 @@ export function KbsSettingsSection({
   controller: ReturnType<typeof useKbsSettings>;
   disabled?: boolean;
 }) {
-  const { settings, draft, loading, saving, testing, feedback, update, testConnection } = controller;
+  const {
+    settings,
+    draft,
+    loading,
+    saving,
+    testing,
+    feedback,
+    update,
+    testConnection,
+    inspectEgmSession,
+    prepareEgmLogin
+  } = controller;
   const [webLoginOpen, setWebLoginOpen] = useState(false);
   const [webError, setWebError] = useState("");
+  const [webSessionMessage, setWebSessionMessage] = useState("");
+  const [webTestEpoch, setWebTestEpoch] = useState(0);
   const webViewRef = useRef<KbsWebViewElement | null>(null);
+  const registeredWebviewId = useRef<number | null>(null);
+  const autoAttempt = useRef({ credentials: false, otp: false });
   const passwordConfigured = settings.passwordConfigured && !draft.clearPassword;
   const secondFactorConfigured = settings.secondFactorConfigured && !draft.clearSecondFactorSecret;
 
@@ -178,7 +218,69 @@ export function KbsSettingsSection({
     if (!webLoginOpen) return;
     const webview = webViewRef.current;
     if (!webview) return;
-    const onLoad = () => setWebError("");
+    let active = true;
+
+    const unregister = () => {
+      const id = registeredWebviewId.current;
+      if (id === null) return;
+      try {
+        window.yardimciDesktop?.unregisterKbsWebview?.(id);
+      } finally {
+        if (registeredWebviewId.current === id) registeredWebviewId.current = null;
+      }
+    };
+
+    const register = () => {
+      try {
+        const id = webview.getWebContentsId?.();
+        if (!id || !Number.isInteger(id) || id <= 0 || registeredWebviewId.current === id) return;
+        unregister();
+        window.yardimciDesktop?.registerKbsWebview?.(id);
+        registeredWebviewId.current = id;
+      } catch {
+        setWebSessionMessage("EGM KBS web oturumu otomasyon sürücüsüne bağlanamadı.");
+      }
+    };
+
+    const driveSession = async () => {
+      register();
+      setWebError("");
+      const inspected = await inspectEgmSession();
+      if (!active) return;
+
+      if (inspected.state === "authenticated") {
+        setWebSessionMessage(inspected.message);
+        return;
+      }
+
+      if (inspected.state === "login_required") {
+        if (autoAttempt.current.credentials) {
+          setWebSessionMessage("EGM KBS giriş formu yeniden göründü. Bilgileri kontrol edin veya webview üzerinden giriş yapın.");
+          return;
+        }
+        autoAttempt.current.credentials = true;
+        const result = await prepareEgmLogin();
+        if (active) setWebSessionMessage(result.message);
+        return;
+      }
+
+      if (inspected.state === "otp_required") {
+        if (autoAttempt.current.otp) {
+          setWebSessionMessage("EGMSEC doğrulaması tamamlanmadı. Kodu webview üzerinden kontrol edin.");
+          return;
+        }
+        const result = await prepareEgmLogin();
+        if (!active) return;
+        if (result.state === "otp_submitted") autoAttempt.current.otp = true;
+        setWebSessionMessage(result.message);
+        return;
+      }
+
+      setWebSessionMessage(inspected.message);
+    };
+
+    const onAttach = () => register();
+    const onReady = () => { void driveSession(); };
     const onFail = (event: Event) => {
       const detail = event as Event & { errorCode?: number; errorDescription?: string };
       if (detail.errorCode === -3) return;
@@ -186,19 +288,27 @@ export function KbsSettingsSection({
         ? `EGM KBS sayfası yüklenemedi: ${detail.errorDescription}`
         : "EGM KBS sayfası yüklenemedi.");
     };
-    webview.addEventListener("did-finish-load", onLoad);
+
+    webview.addEventListener("did-attach", onAttach);
+    webview.addEventListener("dom-ready", onReady);
     webview.addEventListener("did-fail-load", onFail);
     return () => {
-      webview.removeEventListener("did-finish-load", onLoad);
+      active = false;
+      webview.removeEventListener("did-attach", onAttach);
+      webview.removeEventListener("dom-ready", onReady);
       webview.removeEventListener("did-fail-load", onFail);
+      unregister();
     };
-  }, [webLoginOpen]);
+  }, [inspectEgmSession, prepareEgmLogin, webLoginOpen, webTestEpoch]);
 
   async function runTest() {
     const result = await testConnection();
     if (result.ok && result.requiresWebLogin) {
+      autoAttempt.current = { credentials: false, otp: false };
       setWebLoginOpen(true);
       setWebError("");
+      setWebSessionMessage("EGM KBS oturumu hazırlanıyor...");
+      setWebTestEpoch((value) => value + 1);
     }
   }
 
@@ -346,6 +456,7 @@ export function KbsSettingsSection({
                 </div>
                 <ActionButton variant="ghost" size="sm" type="button" onClick={() => setWebLoginOpen(false)}>Kapat</ActionButton>
               </div>
+              {webSessionMessage && <p className="form-status" role="status">{webSessionMessage}</p>}
               {webError && (
                 <div className="status-message status-message--danger" role="alert">
                   <span>{webError}</span>
@@ -353,6 +464,7 @@ export function KbsSettingsSection({
                 </div>
               )}
               <webview
+                key={webTestEpoch}
                 ref={webViewRef}
                 className="kbs-login-webview"
                 src={EGM_KBS_PORTAL_URL}
