@@ -108,6 +108,10 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
       now,
       now
     );
+
+    if (!current.enabled && normalized.enabled) {
+      backfillActiveArrivalNotifications(db, now);
+    }
   } finally {
     db.close();
   }
@@ -309,4 +313,52 @@ function decryptSecret(encryptedValue: string): string {
   } catch {
     return "";
   }
+}
+
+
+function backfillActiveArrivalNotifications(db: DatabaseSync, now: string) {
+  db.prepare(`
+    INSERT INTO hospitality_notifications (
+      id, guest_id, stay_id, room_id, kind, occurred_at, identity_snapshot, created_at
+    )
+    SELECT
+      lower(hex(randomblob(16))),
+      g.id,
+      g.stay_id,
+      s.room_id,
+      'arrival',
+      COALESCE(NULLIF(g.checked_in_at, ''), NULLIF(s.checked_in_at, ''), ?),
+      json_object(
+        'customerId', c.id,
+        'fullName', c.full_name,
+        'identityType', c.identity_type,
+        'identityNumber', c.identity_number,
+        'nationality', c.nationality,
+        'birthDate', c.birth_date,
+        'documentSerialNumber', c.document_serial_number,
+        'documentExpiryDate', c.document_expiry_date,
+        'gender', c.gender,
+        'birthPlace', c.birth_place,
+        'motherName', c.mother_name,
+        'fatherName', c.father_name,
+        'issuingAuthority', c.issuing_authority,
+        'address', c.address,
+        'phone', c.phone,
+        'roomNumber', r.number
+      ),
+      ?
+    FROM stay_guests g
+    JOIN customer_room_stays s ON s.id = g.stay_id
+    JOIN customers c ON c.id = g.customer_id
+    JOIN rooms r ON r.id = s.room_id
+    WHERE g.status = 'checked_in'
+      AND s.status = 'checked_in'
+      AND s.deleted_at = ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM hospitality_notifications n
+        WHERE n.guest_id = g.id
+          AND n.kind = 'arrival'
+      )
+  `).run(now, now);
 }
