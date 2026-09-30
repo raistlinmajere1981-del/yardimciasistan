@@ -723,15 +723,47 @@ export class DesktopDatabase {
 
   async deliverKbsNotification(
     notificationId: string,
-    adapter: KbsProviderAdapter
+    adapters: readonly KbsProviderAdapter[]
   ): Promise<DesktopKbsDeliveryMutationResult> {
-    const service = new KbsDeliveryService(this.db, [adapter]);
-    const result = await service.deliver(notificationId, adapter.provider);
+    const overview = getKbsOverview(this.db);
     const dashboardData = this.getDashboardData();
-    if (result.ok) {
-      return { ...result, dashboardData };
+    if (!overview.enabled) {
+      return {
+        ok: false,
+        state: "waiting",
+        provider: overview.provider,
+        retryable: true,
+        code: "kbs_disabled",
+        message: "Kimlik Bildirim Sistemi etkin değil.",
+        dashboardData
+      };
     }
-    return { ...result, dashboardData };
+    if (!overview.configured) {
+      return {
+        ok: false,
+        state: "waiting",
+        provider: overview.provider,
+        retryable: true,
+        code: "kbs_not_configured",
+        message: "KBS bağlantı ayarları tamamlanmadan bildirim gönderilemez.",
+        dashboardData
+      };
+    }
+    const adapter = adapters.find((candidate) => candidate.provider === overview.provider);
+    if (!adapter) {
+      return {
+        ok: false,
+        state: "waiting",
+        provider: overview.provider,
+        retryable: true,
+        code: "provider_adapter_unavailable",
+        message: "Seçili KBS sağlayıcısı için gönderim adapterı hazır değil.",
+        dashboardData
+      };
+    }
+    const service = new KbsDeliveryService(this.db, [adapter]);
+    const result = await service.deliver(notificationId, overview.provider);
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteCustomer(customerIdInput: string): DesktopStatusUpdateResult {
