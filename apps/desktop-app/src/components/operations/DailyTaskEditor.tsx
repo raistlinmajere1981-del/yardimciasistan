@@ -46,13 +46,11 @@ function toForm(task: DesktopDashboardData["dailyTasks"][number] | null): DailyT
 export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTaskEditorProps) {
   const [form, setForm] = useState<DailyTaskFormState>(() => toForm(task));
   const [state, setState] = useState<EditorState>("idle");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setForm(toForm(task));
     setState("idle");
-    setMessage("");
   }, [open, task]);
 
 
@@ -67,7 +65,6 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
-            setMessage("Günlük iş kaydediliyor...");
             const result = await onSave({
               id: task?.id,
               title: form.title,
@@ -78,7 +75,6 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
             });
             if (!result.ok) {
               setState("error");
-              setMessage(result.message);
               return;
             }
             onClose();
@@ -131,8 +127,6 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
               />
             </label>
           </div>
-
-          {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
 
     </FormDialog>
