@@ -256,7 +256,18 @@ try {
     const phoneBounds = await customerWorkspace.getByLabel('Telefon', { exact: true }).boundingBox();
     if (width > 760) expect(phoneBounds.width).toBeLessThan(nameBounds.width);
     else expect(Math.abs(phoneBounds.width - nameBounds.width)).toBeLessThan(2);
-    await customerWorkspace.getByLabel('Adres', { exact: true }).scrollIntoViewIfNeeded();
+
+    const noteField = customerWorkspace.getByLabel('Not', { exact: true });
+    const addressField = customerWorkspace.getByLabel('Adres', { exact: true });
+    await expect(noteField).toHaveAttribute('rows', '2');
+    await expect(addressField).toHaveAttribute('rows', '2');
+    expect(await noteField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
+    expect(await addressField.evaluate((element) => element.tagName)).toBe('TEXTAREA');
+    const birthdayToggle = customerWorkspace.getByRole('checkbox', { name: 'Doğum günü mesajı gönder', exact: true });
+    await expect(birthdayToggle).toBeDisabled();
+    await expect(birthdayToggle).not.toBeChecked();
+
+    await addressField.scrollIntoViewIfNeeded();
     await capture('customer-identity');
 
     await customerWorkspace.getByRole('button', { name: 'Tahsilat Al', exact: true }).click();
