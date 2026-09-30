@@ -60,38 +60,32 @@ export function TableAccountPanel({ table, controller, disabled, onCloseOrder }:
         <div className="table-discount-summary">
           <dt>İndirim</dt>
           <dd>
-            <span>{formatMoney(order.discountTotal, getOrderCurrency(order))}</span>
-            {!discountEditing && <ActionButton variant="ghost" size="sm" disabled={disabled || order.subtotal <= 0} onClick={() => setDiscountEditing(true)}>
-              Düzenle
-            </ActionButton>}
+            {!discountEditing ? <>
+              <span>{formatMoney(order.discountTotal, getOrderCurrency(order))}</span>
+              <ActionButton variant="ghost" size="sm" disabled={disabled || order.subtotal <= 0} onClick={() => setDiscountEditing(true)}>
+                Düzenle
+              </ActionButton>
+            </> : <>
+              <div className="table-discount-inline-editor">
+                <MoneyInput
+                  aria-label="İndirim tutarı"
+                  value={discountDraft}
+                  onChange={setDiscountDraft}
+                  aria-invalid={discountInvalid || undefined}
+                  disabled={disabled}
+                />
+                <ActionButton size="sm" disabled={disabled || discountInvalid} onClick={() => void applyDiscount()}>Uygula</ActionButton>
+                <ActionButton variant="ghost" size="sm" disabled={disabled} onClick={() => {
+                  setDiscountDraft(formatMajorToInput(order.discountTotal));
+                  setDiscountEditing(false);
+                }}>Vazgeç</ActionButton>
+              </div>
+              {discountInvalid && <small role="alert">İndirim 0 ile ara toplam arasında olmalı.</small>}
+            </>}
           </dd>
         </div>
         <div className="operation-balance"><dt>Kalan / toplam</dt><dd>{formatMoney(order.total, getOrderCurrency(order))}</dd></div>
       </dl>
-      {discountEditing && <div className="table-discount-editor">
-        <label className="form-field form-field--fluid">
-          <span>İndirim tutarı</span>
-          <MoneyInput
-            aria-label="İndirim tutarı"
-            value={discountDraft}
-            onChange={setDiscountDraft}
-            aria-invalid={discountInvalid || undefined}
-            disabled={disabled}
-          />
-        </label>
-        <div className="action-row">
-          <ActionButton size="sm" disabled={disabled || discountInvalid} onClick={() => void applyDiscount()}>Uygula</ActionButton>
-          {order.discountTotal > 0 && <ActionButton variant="secondary" size="sm" disabled={disabled} onClick={() => {
-            setDiscountDraft("0");
-            void applyDiscount(0);
-          }}>İndirimi Kaldır</ActionButton>}
-          <ActionButton variant="ghost" size="sm" disabled={disabled} onClick={() => {
-            setDiscountDraft(formatMajorToInput(order.discountTotal));
-            setDiscountEditing(false);
-          }}>Vazgeç</ActionButton>
-        </div>
-        {discountInvalid && <small role="alert">İndirim 0 ile ara toplam arasında olmalı.</small>}
-      </div>}
       <ActionButton disabled={disabled} onClick={() => void requestPaidClose()}>Ödendi / Kapat</ActionButton>
     </section>
     {confirmDialog}
