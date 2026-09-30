@@ -332,7 +332,7 @@ export class DesktopDatabase {
           WHERE deleted_at = '' AND checked_in_at != '';`);
       }
 
-      assertCurrentDesktopSchema(this.db);
+      assertCurrentDesktopSchema(this.db, schemaSql);
 
       this.ensureSyncClientId();
       this.db.exec("COMMIT");
