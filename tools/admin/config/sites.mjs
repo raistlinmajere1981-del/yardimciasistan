@@ -21,6 +21,16 @@ export function getSiteProfiles() {
       deployReadyNote: "deploy-web.sh varsayılan SSH hedefini kullanır.",
     },
     {
+      id: "support",
+      title: "Merkezi Destek",
+      host: "Alwaysdata (SSH, private inbox)",
+      cwd: "repo",
+      available: true,
+      availabilityNote: "",
+      deployReady: true,
+      deployReadyNote: "Destek endpoint'i /support altında; raporlar web root dışında private dizinde tutulur.",
+    },
+    {
       id: "blacksea",
       title: "BlackSea Pansiyon sitesi",
       host: "Natro (FTP/lftp, /httpdocs)",
