@@ -39,7 +39,7 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
         controller={controller}
         menuEnabled={menuEnabled}
         disabled={disabled}
-        onDirty={dirty => onDirty(current.id, dirty)}
+        onDirty={(scope, dirty) => onDirty(`${current.id}:${scope}`, dirty)}
       /> : <>
         <p>{ambiguous
           ? "Birden fazla girişli konaklama var; mevcut hesap belirlenemedi. Konaklama kayıtlarını kontrol edin."
@@ -66,7 +66,7 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
             menuEnabled={menuEnabled}
             departed
             disabled={disabled}
-            onDirty={dirty => onDirty(folio.id, dirty)}
+            onDirty={(scope, dirty) => onDirty(`${folio.id}:${scope}`, dirty)}
           />)}
         </div>
       </details>
@@ -80,7 +80,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
   menuEnabled: boolean;
   departed?: boolean;
   disabled: boolean;
-  onDirty: (dirty: boolean) => void;
+  onDirty: (scope: string, dirty: boolean) => void;
 }) {
   const { confirm, confirmDialog } = useConfirmDialog();
   const open = folio.status === "open";
@@ -112,7 +112,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     setDiscountEditing(false);
     setLodgingDraft(minorToInput(folio.lodgingTotalMinor));
     setDiscountDraft(minorToInput(discountMinor));
-    onDirty(false);
+    onDirty("inline", false);
   }
 
   async function applyLodging() {
@@ -128,7 +128,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     }), "details");
     if (result?.ok) {
       setLodgingEditing(false);
-      onDirty(false);
+      onDirty("inline", false);
     }
   }
 
@@ -140,7 +140,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     }), "adjustments");
     if (result?.ok) {
       setDiscountEditing(false);
-      onDirty(false);
+      onDirty("inline", false);
     }
   }
 
@@ -190,7 +190,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
                 setDiscountEditing(false);
                 setDiscountDraft(minorToInput(discountMinor));
                 setLodgingEditing(true);
-                onDirty(false);
+                onDirty("inline", false);
               }}>Düzenle</ActionButton>}
             </> : <div className="room-account-inline-editor">
               <MoneyInput
@@ -198,7 +198,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
                 value={lodgingDraft}
                 onChange={value => {
                   setLodgingDraft(value);
-                  onDirty(value !== minorToInput(folio.lodgingTotalMinor));
+                  onDirty("lodging", value !== minorToInput(folio.lodgingTotalMinor));
                 }}
                 aria-invalid={lodgingInvalid || undefined}
                 disabled={disabled}
@@ -218,7 +218,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
                 setLodgingEditing(false);
                 setLodgingDraft(minorToInput(folio.lodgingTotalMinor));
                 setDiscountEditing(true);
-                onDirty(false);
+                onDirty("inline", false);
               }}>Düzenle</ActionButton>}
             </> : <div className="room-account-inline-editor">
               <MoneyInput
@@ -226,7 +226,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
                 value={discountDraft}
                 onChange={value => {
                   setDiscountDraft(value);
-                  onDirty(value !== minorToInput(discountMinor));
+                  onDirty("discount", value !== minorToInput(discountMinor));
                 }}
                 aria-invalid={discountInvalid || undefined}
                 disabled={disabled}
@@ -240,7 +240,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
         <div><dt>Ödenen</dt><dd>{minorMoney(folio.paidTotalMinor)}</dd></div>
         <div className="operation-balance"><dt>Kalan</dt><dd>{minorMoney(folio.remainingMinor)}</dd></div>
       </dl>
-      {open && <RoomAccountPayment folio={folio} controller={controller} disabled={disabled} onDirty={onDirty} />}
+      {open && <RoomAccountPayment folio={folio} controller={controller} disabled={disabled} onDirty={dirty => onDirty("payment", dirty)} />}
       {visibleItems.length > 0 && <div className="room-folio-line-list">
         {visibleItems.map(item => <article key={item.id}>
           <div>
