@@ -56,6 +56,7 @@ interface StoredKbsSettings {
 
 const SAFE_STORAGE_PREFIX = "safe-storage:v1:";
 export const EGM_KBS_PORTAL_URL = "https://kbs.egm.gov.tr";
+export const EGM_KBS_PARTITION = "persist:yardimci-kbs-egm";
 export const JANDARMA_KBS_SERVICE_URL = "https://vatandas.jandarma.gov.tr/KBS_Tesis_Servis/SrvShsYtkTml.svc";
 
 export function getKbsSettings(databasePath: string): KbsSettings {
