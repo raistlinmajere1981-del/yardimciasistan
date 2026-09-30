@@ -21,6 +21,7 @@ const SMOKE_FILES = [
   "scripts/smoke-calendar-workspace.mjs",
   "scripts/smoke-capability-runtime.mjs",
   "scripts/smoke-capability-surface-consistency.mjs",
+  "scripts/smoke-clean-start.mjs",
   "scripts/smoke-commerce-foundation.mjs",
   "scripts/smoke-commerce-ipc-contract.mjs",
   "scripts/smoke-commerce-runtime.mjs",
@@ -437,7 +438,11 @@ function smokeDomains(file) {
   if (/capability|business-|setup-profile|database-schema|data-paths|deletions/.test(name)) domains.add("platform");
 
   // Cross-domain flows whose filenames do not fully describe ownership.
-  if (name === "automatic-sync") domains.add("android");
+  if (name === "clean-start") {
+    domains.add("desktop");
+    domains.add("platform");
+  }
+    if (name === "automatic-sync") domains.add("android");
   if (name === "local-companion-server") {
     domains.add("android");
     domains.add("desktop");
