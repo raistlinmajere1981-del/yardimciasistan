@@ -970,6 +970,11 @@ export interface UpdateTableOrderItemNoteInput {
   note: string;
 }
 
+export interface UpdateTableOrderDiscountInput {
+  orderId: string;
+  discountTotal: number;
+}
+
 export interface UpdateTableOrderStatusInput {
   orderId: string;
   status: string;
