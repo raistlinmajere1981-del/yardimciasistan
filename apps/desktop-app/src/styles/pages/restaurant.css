@@ -54,10 +54,6 @@
   flex-wrap: nowrap;
   margin: 0;
 }
-.table-relations-actions .action-button,
-.table-relation-label .action-button {
-  min-height: var(--control-height-sm);
-}
 .table-relation-block {
   display: grid;
   gap: var(--space-2);
@@ -396,17 +392,6 @@ details.table-area-group > .resource-grid { margin-top: var(--space-3); }
   justify-content: end;
 }
 
-
-.operations-workspace .table-workspace-status-select {
-  min-height: var(--control-height-sm);
-}
-.operations-workspace .restaurant-order-line__note-toggle {
-  min-height: var(--control-height-sm);
-}
-.operations-workspace .table-relations-actions .action-button,
-.operations-workspace .table-relation-label .action-button {
-  min-height: var(--control-height-sm);
-}
 
 @media (max-width: 900px) {
   .restaurant-order-product-list { max-height: 32dvh; }
