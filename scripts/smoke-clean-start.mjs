@@ -16,46 +16,21 @@ const {
 function createCurrentSchemaFixture(filePath) {
   const database = new DatabaseSync(filePath);
   try {
-    database.exec(`
-      CREATE TABLE android_local_credentials (id TEXT PRIMARY KEY);
-      CREATE TABLE desktop_sync_identity (id TEXT PRIMARY KEY);
-      CREATE TABLE settings (
-        id TEXT PRIMARY KEY,
-        local_network_enabled INTEGER,
-        ai_service TEXT,
-        ai_last_published_at TEXT,
-        google_reviews_enabled INTEGER,
-        google_place_id TEXT,
-        google_places_api_key_encrypted TEXT,
-        google_reviews_last_published_at TEXT,
-        google_reviews_publish_pending INTEGER,
-        product_data_enabled INTEGER
-      );
-      CREATE TABLE business (
-        id TEXT PRIMARY KEY,
-        publish_rooms_web INTEGER,
-        publish_tables_web INTEGER
-      );
-      CREATE TABLE tables (
-        id TEXT PRIMARY KEY,
-        public_description TEXT,
-        public_features_json TEXT,
-        smoking_policy TEXT
-      );
-    `);
+    database.exec(readFileSync(schemaPath, "utf8"));
   } finally {
     database.close();
   }
 }
 
 const root = mkdtempSync(join(tmpdir(), "ya-clean-start-"));
+const schemaPath = join(process.cwd(), "apps", "desktop-app", "db", "schema.sql");
 try {
   const missingPath = join(root, "missing.sqlite");
-  assert.equal(inspectDesktopDatabaseCompatibility(missingPath).state, "fresh");
+  assert.equal(inspectDesktopDatabaseCompatibility(missingPath, schemaPath).state, "fresh");
 
   const currentPath = join(root, "current.sqlite");
   createCurrentSchemaFixture(currentPath);
-  assert.equal(inspectDesktopDatabaseCompatibility(currentPath).state, "current");
+  assert.equal(inspectDesktopDatabaseCompatibility(currentPath, schemaPath).state, "current");
 
   const legacyPath = join(root, "legacy.sqlite");
   {
@@ -66,13 +41,13 @@ try {
       database.close();
     }
   }
-  const legacy = inspectDesktopDatabaseCompatibility(legacyPath);
+  const legacy = inspectDesktopDatabaseCompatibility(legacyPath, schemaPath);
   assert.equal(legacy.state, "incompatible");
   assert.match(legacy.reason, /Eksik tablo|Eksik alan/);
 
   const brokenPath = join(root, "broken.sqlite");
   writeFileSync(brokenPath, "not-a-sqlite-database");
-  assert.equal(inspectDesktopDatabaseCompatibility(brokenPath).state, "unreadable");
+  assert.equal(inspectDesktopDatabaseCompatibility(brokenPath, schemaPath).state, "unreadable");
 
   const dataRoot = join(root, "archive-fixture");
   mkdirSync(join(dataRoot, "assets", "products"), { recursive: true });
