@@ -333,17 +333,6 @@ function createMainWindow() {
     return { action: "deny" };
   });
 
-  window.webContents.on("render-process-gone", (_event, details) => {
-    desktopLog.error({
-      scope: "renderer",
-      event: "renderer.process-gone",
-      message: "Renderer işlemi beklenmedik biçimde sonlandı.",
-      meta: {
-        reason: details.reason,
-        exitCode: details.exitCode
-      }
-    });
-  });
   window.webContents.on("unresponsive", () => {
     desktopLog.warn({
       scope: "renderer",
