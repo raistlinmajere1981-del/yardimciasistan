@@ -3,6 +3,7 @@ import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type { SaveInitialSetupInput } from "../../../electron/database";
 import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
+import { reportAppStatus } from "../../app/runtime-state";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { StagedSettingsContributionSlot } from "../../app/settings-section-contributions";
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
@@ -149,14 +150,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           || (active === "business" && (profile.saving || googleReviews.saving))
         : false;
 
-  const feedback = active === "operations"
-    ? (layout.message ? { state: layout.state, message: layout.message } : undefined)
-    : setupCategory === "services" && androidPermissions.message
-      ? { state: androidPermissions.state, message: androidPermissions.message }
-      : setupCategory
-        ? drafts.feedback[setupCategory]
-        : undefined;
-
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities)
     .filter((result) => initialized || result.category === "business");
 
@@ -283,21 +276,41 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     });
   }
 
+  function reportSettingsSaveResult(categoryId: SettingsCategoryId, result: SettingsOperationResult) {
+    const title = settingsCategories.find((item) => item.id === categoryId)?.title ?? "Ayarlar";
+    if (!result.ok) {
+      reportAppStatus("error", result.message);
+      return;
+    }
+    if (result.changed) {
+      reportAppStatus("success", result.message || `${title} kaydedildi.`);
+    }
+  }
+
   async function saveCurrentCategory() {
     if (!categoryDirty) return;
-    await saveCategory(active);
+    const categoryId = active;
+    const result = await saveCategory(categoryId);
+    reportSettingsSaveResult(categoryId, result);
   }
 
   async function discardCurrentCategory() {
     if (categoryBusy) return;
-    await discardCategory(active);
+    const categoryId = active;
+    const discarded = await discardCategory(categoryId);
+    if (discarded) {
+      const title = settingsCategories.find((item) => item.id === categoryId)?.title ?? "Ayarlar";
+      reportAppStatus("success", `${title} değişiklikleri geri alındı.`);
+    }
   }
 
   async function saveAndContinue() {
     if (!pendingTransition || guardBusy || categoryBusy) return;
     setGuardBusy(true);
     try {
-      const result = await saveCategory(active);
+      const categoryId = active;
+      const result = await saveCategory(categoryId);
+      reportSettingsSaveResult(categoryId, result);
       if (!result.ok) return;
       const transition = pendingTransition;
       setPendingTransition(null);
@@ -316,8 +329,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     if (!pendingTransition || guardBusy || categoryBusy) return;
     setGuardBusy(true);
     try {
-      const discarded = await discardCategory(active);
+      const categoryId = active;
+      const discarded = await discardCategory(categoryId);
       if (!discarded) return;
+      const title = settingsCategories.find((item) => item.id === categoryId)?.title ?? "Ayarlar";
+      reportAppStatus("success", `${title} değişiklikleri geri alındı.`);
       const transition = pendingTransition;
       setPendingTransition(null);
       if (transition.kind === "category") {
@@ -489,9 +505,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           <footer className="settings-category-actions">
             <div>
               {categoryDirty && <span>Kaydedilmemiş kategori değişiklikleri</span>}
-              {feedback?.message && (
-                <p role={feedback.state === "error" ? "alert" : "status"}>{feedback.message}</p>
-              )}
             </div>
             <ActionButton
               type="button"
