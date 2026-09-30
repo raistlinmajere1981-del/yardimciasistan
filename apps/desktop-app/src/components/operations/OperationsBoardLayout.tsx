@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 interface OperationsBoardPane {
   title: string;
+  titleControl?: ReactNode;
   toolbar?: ReactNode;
   content: ReactNode;
   ariaLabel?: string;
@@ -26,7 +27,10 @@ function OperationsBoardPaneView({
       aria-label={pane.ariaLabel ?? pane.title}
     >
       <header className="operations-board__pane-header">
-        <h2>{pane.title}</h2>
+        <div className="operations-board__pane-title">
+          <h2>{pane.title}</h2>
+          {pane.titleControl}
+        </div>
         {pane.toolbar && <div className="operations-board__pane-toolbar">{pane.toolbar}</div>}
       </header>
       <div className="operations-board__pane-body">{pane.content}</div>
