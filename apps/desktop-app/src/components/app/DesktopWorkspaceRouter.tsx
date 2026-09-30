@@ -372,6 +372,11 @@ export function DesktopWorkspaceRouter({
           availableRoomCount={surfaceData.rooms.filter((room) => getRoomDisplayInfo(room, surfaceData.reservations, surfaceData.customerRoomStays).status === "available").length}
           onReplyRequest={openDashboardReply}
           onOpenCustomerWork={openDashboardCustomerWork}
+          onOpenKbs={() => {
+            setSelectedKbsCustomerId("");
+            setCustomerWorkTab("kbs");
+            requestPageChange("customerWork");
+          }}
           onOpenReservation={openDashboardReservation}
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
           dailyAiState={dashboardAi.state}
