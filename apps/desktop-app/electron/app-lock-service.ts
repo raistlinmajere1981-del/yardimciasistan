@@ -18,12 +18,14 @@ export interface DesktopAppLockServiceOptions {
   database: DesktopDatabase;
   getSyncStatus: () => AutomaticSyncStatus | undefined;
   onUnlocked: () => void;
+  onLocked?: () => void;
 }
 
 export class DesktopAppLockService {
   private readonly database: DesktopDatabase;
   private readonly getSyncStatus: () => AutomaticSyncStatus | undefined;
   private readonly onUnlocked: () => void;
+  private readonly onLocked: () => void;
   private locked: boolean;
   private failureCount = 0;
   private blockedUntil = 0;
@@ -32,6 +34,7 @@ export class DesktopAppLockService {
     this.database = options.database;
     this.getSyncStatus = options.getSyncStatus;
     this.onUnlocked = options.onUnlocked;
+    this.onLocked = options.onLocked ?? (() => undefined);
     this.locked = Boolean(this.database.getAppLockPasswordVerifier());
   }
 
@@ -57,6 +60,7 @@ export class DesktopAppLockService {
 
   lock(): AppLockActionResult {
     this.locked = true;
+    this.onLocked();
     return {
       ok: true,
       message: "Uygulama kilitlendi.",
