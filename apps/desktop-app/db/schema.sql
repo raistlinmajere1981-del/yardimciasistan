@@ -2080,6 +2080,7 @@ END;
 
 CREATE TRIGGER trg_stay_guest_arrival AFTER INSERT ON stay_guests
 WHEN NEW.status = 'checked_in'
+  AND EXISTS (SELECT 1 FROM kbs_service_settings WHERE id = 'primary' AND enabled = 1)
 BEGIN
   INSERT INTO hospitality_notifications (id, guest_id, stay_id, room_id, kind, occurred_at, identity_snapshot, created_at)
   SELECT lower(hex(randomblob(16))), NEW.id, NEW.stay_id, s.room_id, 'arrival', NEW.checked_in_at,
@@ -2093,7 +2094,9 @@ BEGIN
 END;
 
 CREATE TRIGGER trg_stay_guest_notification AFTER UPDATE OF status ON stay_guests
-WHEN OLD.status != NEW.status AND NEW.status IN ('checked_in', 'checked_out')
+WHEN OLD.status != NEW.status
+  AND NEW.status IN ('checked_in', 'checked_out')
+  AND EXISTS (SELECT 1 FROM kbs_service_settings WHERE id = 'primary' AND enabled = 1)
 BEGIN
   INSERT INTO hospitality_notifications (id, guest_id, stay_id, room_id, kind, occurred_at, identity_snapshot, created_at)
   SELECT lower(hex(randomblob(16))), NEW.id, NEW.stay_id, s.room_id,
