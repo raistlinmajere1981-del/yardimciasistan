@@ -48,6 +48,7 @@ const SMOKE_FILES = [
   "scripts/smoke-finance-workspace.mjs",
   "scripts/smoke-hospitality-domain.mjs",
   "scripts/smoke-hospitality-guests.mjs",
+  "scripts/smoke-kbs-domain.mjs",
   "scripts/smoke-live-ai.mjs",
   "scripts/smoke-local-companion-server.mjs",
   "scripts/smoke-manual-reservation.mjs",
