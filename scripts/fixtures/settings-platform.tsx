@@ -92,6 +92,7 @@ window.requestSettingsPageLeave = () => {
 window.settingsCalls = [];
 window.failSetup = false;
 let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false };
+let kbsSettings = { enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false };
 window.yardimciDesktop = {
   getSetupData: async () => structuredClone(canonical),
   saveInitialSetup: async input => {
@@ -118,6 +119,25 @@ window.yardimciDesktop = {
   testGoogleReviewsConnection: async input => {
     window.settingsCalls.push({ kind: "google-reviews-test", input });
     return { ok: true, message: "Google Places bağlantısı doğrulandı.", name: "BlackSea Pansiyon", rating: 4.9, userRatingCount: 42 };
+  },
+  getKbsSettings: async () => structuredClone(kbsSettings),
+  saveKbsSettings: async input => {
+    window.settingsCalls.push({ kind: "kbs", input });
+    kbsSettings = {
+      enabled: input.enabled,
+      provider: input.provider,
+      facilityCode: input.facilityCode,
+      username: input.username,
+      authorizedIdentityNumber: input.authorizedIdentityNumber,
+      passwordConfigured: input.clearPassword ? false : Boolean(input.password) || kbsSettings.passwordConfigured
+    };
+    return { ok: true, message: "Kimlik Bildirim Sistemi ayarları kaydedildi.", settings: structuredClone(kbsSettings) };
+  },
+  testKbsConnection: async input => {
+    window.settingsCalls.push({ kind: "kbs-test", input });
+    return input.provider === "jandarma"
+      ? { ok: true, message: "Jandarma KBS servis adresine ulaşıldı.", provider: "jandarma", credentialsVerified: false, requiresWebLogin: false }
+      : { ok: true, message: "EGM KBS bilgileri hazır.", provider: "egm", credentialsVerified: false, requiresWebLogin: true, portalUrl: "https://kbs.egm.gov.tr" };
   },
   getDashboardData: async () => defaultDashboardData,
   getBusinessLayout: async () => {
