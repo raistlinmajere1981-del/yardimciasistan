@@ -1,21 +1,16 @@
 import { Cloud, CloudOff, RefreshCw, WifiOff } from "lucide-react";
 import type { AutomaticSyncStatus } from "../../../electron/sync-coordinator";
-import type { SyncState } from "../../app/runtime-state";
 
 interface SyncStatusIndicatorProps {
-  syncState: SyncState;
   automaticSyncStatus: AutomaticSyncStatus;
   onSync: () => void;
 }
 
 type IndicatorState = "ready" | "pending" | "syncing" | "offline" | "error" | "disabled";
 
-function resolveIndicatorState(
-  syncState: SyncState,
-  status: AutomaticSyncStatus
-): IndicatorState {
-  if (syncState === "loading") return "syncing";
-  if (syncState === "error" || status.phase === "error") return "error";
+function resolveIndicatorState(status: AutomaticSyncStatus): IndicatorState {
+  if (status.phase === "syncing") return "syncing";
+  if (status.phase === "error") return "error";
   if (status.phase === "offline") return "offline";
   if (status.phase === "disabled" || !status.enabled) return "disabled";
   if (status.pendingJobs > 0) return "pending";
@@ -32,11 +27,10 @@ function indicatorText(state: IndicatorState) {
 }
 
 export function SyncStatusIndicator({
-  syncState,
   automaticSyncStatus,
   onSync
 }: SyncStatusIndicatorProps) {
-  const state = resolveIndicatorState(syncState, automaticSyncStatus);
+  const state = resolveIndicatorState(automaticSyncStatus);
   const label = indicatorText(state);
   const Icon = state === "offline"
     ? WifiOff
