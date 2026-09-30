@@ -181,6 +181,32 @@ export interface DesktopKbsOverview {
   activeMissingIdentityCount: number;
 }
 
+export type DesktopKbsDeliveryState =
+  | "sent"
+  | "already_sent"
+  | "waiting"
+  | "interaction_required"
+  | "failed";
+
+export type DesktopKbsDeliveryMutationResult =
+  | {
+      ok: true;
+      state: "sent" | "already_sent";
+      message: string;
+      provider: DesktopKbsProvider;
+      providerReference: string;
+      dashboardData: DesktopDashboardData;
+    }
+  | {
+      ok: false;
+      state: "waiting" | "interaction_required" | "failed";
+      message: string;
+      provider: DesktopKbsProvider;
+      retryable: boolean;
+      code?: string;
+      dashboardData: DesktopDashboardData;
+    };
+
 export interface DesktopCustomerRoomStay {
   id: string;
   customerId: string;
