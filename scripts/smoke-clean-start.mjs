@@ -126,6 +126,10 @@ try {
   assert.match(mainEntrySource, /startup\.maintenance\.deferred-for-clean-start/);
   assert.match(mainEntrySource, /deferPendingMaintenance \? "" : readPendingMaintenanceKind\(\)/);
 
+  const startDevSource = readFileSync("apps/desktop-app/scripts/start-dev.mjs", "utf8");
+  assert.match(startDevSource, /const electronArgs = process\.argv\.slice\(2\)/);
+  assert.match(startDevSource, /\["electron", "\.", \.\.\.electronArgs\]/);
+
   console.log("clean-start-smoke-ok");
 } finally {
   rmSync(root, { recursive: true, force: true });
