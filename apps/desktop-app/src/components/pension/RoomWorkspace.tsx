@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CalendarPlus, UserPlus } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
@@ -113,18 +112,10 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
         />}
       </>}
       status={null}>
-      {model.currentStay ? <span>{model.currentStay.customerName} · {model.currentStay.guestCount} kişi</span>
-        : <span>{model.conflict ? "Konaklama kayıtlarını kontrol edin." : model.active.length ? "Planlanan konaklama var." : "Aktif konaklama yok."}</span>}
+      {model.currentStay ? <span>{model.currentStay.guestCount}/{room.capacity} dolu · {model.currentStay.customerName}</span>
+        : <span>{model.conflict ? "Konaklama kayıtlarını kontrol edin." : model.active.length ? "Planlanan konaklama var." : `0/${room.capacity} dolu`}</span>}
     </ResourceWorkspaceSummary>}
     actions={<>
-      {!history && customersEnabled && <ActionButton variant="secondary" size="sm" disabled={busy}
-        onClick={() => setQuickAction(current => current === "customer" ? null : "customer")}>
-        <UserPlus size={15} aria-hidden="true" />Müşteri Ekle
-      </ActionButton>}
-      {!history && customersEnabled && reservationsEnabled && <ActionButton variant="secondary" size="sm" disabled={busy}
-        onClick={() => setQuickAction(current => current === "reservation" ? null : "reservation")}>
-        <CalendarPlus size={15} aria-hidden="true" />Rezervasyon Ekle
-      </ActionButton>}
       <ActionButton variant="ghost" disabled={busy} onClick={() => {
         setQuickAction(null);
         navigation.updateWorkspaceMode({ entityType: "room", mode: history ? "summary" : "history" });
@@ -158,17 +149,21 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       />}
     </> : undefined}>
     <div ref={surface} className="operation-surface operation-surface--sections" hidden={history} key={draftEpoch}>
-      <OperationPanel title="Oda ve Misafir" id="room-stay">
+      <OperationPanel title="Misafirler ve Konaklama" id="room-stay">
         <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled}
-          quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")} onDirty={value => setDirty("stay", value)} />
+          quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")}
+          onCreateCustomer={customersEnabled ? () => setQuickAction("customer") : undefined}
+          onDirty={value => setDirty("stay", value)} />
         {account.selected?.status === "open" && <RoomAccountDetails key={account.selected.id} folio={account.selected} controller={account} disabled={busy || account.loading} onDirty={value => setDirty("account-details", value)} />}
       </OperationPanel>
-      <OperationPanel title={model.active.length ? "Günlük Oda İşlemleri" : "Oda Hazırlığı ve Rezervasyon"} id="room-operations">
+      <OperationPanel title="Oda İşlemleri" id="room-operations">
         <RoomDailyOperations model={model} data={data} operations={operations} disabled={busy || accountDraftDirty} />
         {account.selected?.status === "open" && <RoomAccountAdjustments key={account.selected.id} folio={account.selected} controller={account} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />}
-        {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId} onDirty={setDirty} />}
+        {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId}
+          onCreateReservation={customersEnabled ? () => setQuickAction("reservation") : undefined}
+          onDirty={setDirty} />}
       </OperationPanel>
-      <OperationPanel title="Misafir Hesabı" id="room-account">
+      <OperationPanel title="Hesap" id="room-account">
         {folioEnabled ? <RoomAccount controller={account} currentStayId={model.currentStay?.id} ambiguous={Boolean(model.state && model.state.occupancy.stayIds.length > 1)} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />
           : <p>Oda hesabı yönetimi bu işletmede etkin değil.</p>}
       </OperationPanel>
