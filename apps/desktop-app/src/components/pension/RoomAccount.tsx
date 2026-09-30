@@ -21,7 +21,6 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous,
         : <><p>{ambiguous ? "Birden fazla girişli konaklama var; mevcut hesap belirlenemedi. Konaklama kayıtlarını kontrol edin." : currentStayId ? "Bu konaklama için hesap henüz açılmadı." : "Aktif misafir hesabı yok. Giriş tamamlandığında konaklama hesabı burada görünür."}</p>
           {currentStayId && <ActionButton disabled={disabled} onClick={() => void controller.mutate(() => window.yardimciDesktop!.openRoomFolio(currentStayId))}>Hesabı Aç</ActionButton>}</>}
     </section>
-    {controller.feedbackScope === "account" && controller.message && <p role={controller.error ? "alert" : "status"}>{controller.message}</p>}
     {controller.error && <ActionButton variant="secondary" disabled={controller.busy} onClick={() => void controller.refresh()}>Hesabı Yenile</ActionButton>}
     <section className="operation-section form-stack" aria-label="Önceki hesaplar">
       <h4>Önceki hesaplar</h4>
