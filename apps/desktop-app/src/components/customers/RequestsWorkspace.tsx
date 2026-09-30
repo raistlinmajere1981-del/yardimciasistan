@@ -94,7 +94,6 @@ interface RequestsWorkspaceProps {
   aiMessage: string;
   manualRequestForm: ManualRequestFormState;
   manualRequestState: SyncState;
-  manualRequestMessage: string;
   onSelectRequest: (requestId: string) => void;
   onManualRequestFormChange: (form: ManualRequestFormState) => void;
   onCreateManualRequest: () => void;
@@ -119,7 +118,6 @@ export function RequestsWorkspace({
   aiMessage,
   manualRequestForm,
   manualRequestState,
-  manualRequestMessage,
   onSelectRequest,
   onManualRequestFormChange,
   onCreateManualRequest,
