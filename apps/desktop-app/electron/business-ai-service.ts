@@ -16,7 +16,7 @@ import type {
   RewriteRequestAiSuggestionInput
 } from "./database";
 import { createDesktopAiConfig } from "./ai-config";
-import { createDiagnosticOperationId } from "./desktop-logger";
+import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
 import { logAiFallback, logAiOperationCompleted, logAiOperationStarted } from "./ai-diagnostics";
 import { createCurrentBusinessAiContext } from "./business-ai-context-service";
 import { createRelevantBusinessAiCatalogContext } from "./business-ai-catalog-service";
@@ -37,6 +37,12 @@ export async function createOwnerReplySuggestionForRequest(
   const setup = database.getSetupData();
   const businessContext = createCurrentBusinessAiContext(database);
   const catalogContext = createRelevantBusinessAiCatalogContext(database, request.message);
+  const config = createDesktopAiConfig(database, setup);
+  const operationId = createDiagnosticOperationId("ai-owner-reply");
+  const startedAt = Date.now();
+  if (config.enabled && config.provider !== "disabled") {
+    logAiOperationStarted("owner-reply", config, operationId);
+  }
   const suggestion = await generateOwnerReplySuggestion(
     {
       businessName: setup.businessName || "Yardımcı Asistan",
@@ -50,7 +56,7 @@ export async function createOwnerReplySuggestionForRequest(
       businessContext,
       catalogContext
     },
-    createDesktopAiConfig(database, setup)
+    config
   );
 
   const saveResult = database.saveRequestAiSuggestion({
@@ -62,12 +68,34 @@ export async function createOwnerReplySuggestionForRequest(
 
   if (saveResult.ok && suggestion.providerMessage) {
     logAiFallback("owner-reply", suggestion.providerMessage, {
-      requestType: request.request_type
+      requestType: request.request_type,
+      provider: suggestion.provider || config.provider,
+      model: suggestion.model || config.model,
+      reason: suggestion.providerReason || "provider_error",
+      status: suggestion.providerStatus ?? 0,
+      providerCode: suggestion.providerCode || "",
+      retryAfterSeconds: suggestion.retryAfterSeconds ?? 0,
+      durationMs: Date.now() - startedAt
     });
     return {
       ...saveResult,
       message: `${saveResult.message} ${suggestion.providerMessage} Yerel güvenli taslak kullanıldı.`
     };
+  }
+
+  if (saveResult.ok && config.enabled && config.provider !== "disabled") {
+    desktopLog.info({
+      scope: "ai",
+      event: "ai.owner-reply.completed",
+      message: "AI müşteri cevap taslağı işlemi tamamlandı.",
+      operationId,
+      meta: {
+        provider: suggestion.provider || config.provider,
+        model: suggestion.model || config.model,
+        durationMs: Date.now() - startedAt,
+        fallback: suggestion.fallback === true
+      }
+    });
   }
 
   return saveResult;
