@@ -321,12 +321,16 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
   try {
     const archived = archiveLocalDataForCleanStart(dataRoot);
     try {
-      await session.defaultSession.clearStorageData({ storages: ["localstorage"] });
+      await Promise.all([
+        session.defaultSession.clearStorageData(),
+        session.fromPartition(WHATSAPP_WEB_PARTITION).clearStorageData(),
+        session.fromPartition(EGM_KBS_PARTITION).clearStorageData()
+      ]);
     } catch (error) {
       desktopLog.warn({
         scope: "startup",
-        event: "startup.clean-start.preferences-clear.failed",
-        message: "Temiz başlangıç sırasında arayüz tercihleri temizlenemedi.",
+        event: "startup.clean-start.session-data-clear.failed",
+        message: "Temiz başlangıç sırasında kalıcı oturum verilerinin bir bölümü temizlenemedi.",
         error
       });
     }
