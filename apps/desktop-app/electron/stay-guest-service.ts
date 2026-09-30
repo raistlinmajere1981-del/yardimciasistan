@@ -50,9 +50,8 @@ export function addStayGuest(db: DatabaseSync, input: StayGuestInput): Result {
     if (existing?.id === stay.id) return { ok: true, savedId: stay.id, message: "Misafir zaten bu konaklamada." };
     if (existing) return { ok: false, message: "Misafir başka bir aktif konaklamada." };
     if (!db.prepare("SELECT 1 FROM customers WHERE id = ? AND deleted_at = ''").get(input.customerId)) return { ok: false, message: "Müşteri bulunamadı." };
-    const room = db.prepare("SELECT capacity FROM rooms WHERE id = ?").get(stay.room_id) as { capacity: number };
     const { count } = db.prepare("SELECT COUNT(*) AS count FROM stay_guests WHERE stay_id = ? AND status IN ('planned', 'checked_in')").get(stay.id) as { count: number };
-    if (count >= 50 || (room.capacity > 0 && count >= room.capacity)) return { ok: false, message: "Oda kapasitesi dolu." };
+    if (count >= 50) return { ok: false, message: "Bir konaklamaya en fazla 50 misafir eklenebilir." };
     db.prepare(`INSERT INTO stay_guests (id, stay_id, customer_id, status, checked_in_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(createId("guest_"), stay.id, input.customerId, stay.status, stay.status === "checked_in" ? now : "", now, now);
     refreshGuestCount(db, stay, now);
@@ -101,9 +100,8 @@ export function moveStayRoom(db: DatabaseSync, input: MoveStayRoomInput): Result
     const stay = activeStay(db, input.stayId);
     if (!stay || stay.status !== "checked_in") return { ok: false, message: "Giriş yapmış konaklama bulunamadı." };
     if (stay.room_id === input.roomId) return { ok: true, savedId: stay.id, message: "Konaklama zaten bu odada." };
-    const room = db.prepare("SELECT capacity, status FROM rooms WHERE id = ? AND deleted_at = '' AND is_active = 1").get(input.roomId) as { capacity: number; status: string } | undefined;
+    const room = db.prepare("SELECT status FROM rooms WHERE id = ? AND deleted_at = '' AND is_active = 1").get(input.roomId) as { status: string } | undefined;
     if (!room || ["cleaning", "maintenance", "out_of_service", "occupied"].includes(room.status)) return { ok: false, message: "Yeni oda hazır ve boş olmalı." };
-    if (room.capacity > 0 && stay.guest_count > room.capacity) return { ok: false, message: "Yeni odanın kapasitesi yetersiz." };
     const today = new Date(now).toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
     if (hasOverlappingCustomerRoomStay(db, input.roomId, today, stay.check_out_date > today ? stay.check_out_date : "", stay.id)
       || db.prepare("SELECT 1 FROM customer_room_stays WHERE room_id = ? AND status = 'checked_in' AND deleted_at = ''").get(input.roomId)) {
