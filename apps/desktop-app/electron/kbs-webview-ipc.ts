@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { DesktopDatabase } from "./database";
 import type { EgmKbsSessionResult } from "./egm-kbs-webview-driver";
-import { resolveKbsRuntimeCredentials, type SaveKbsSettingsInput } from "./kbs-settings";
+import { resolveKbsRuntimeCredentials, type KbsRuntimeCredentials, type SaveKbsSettingsInput } from "./kbs-settings";
 
 export function registerKbsWebviewIpcEvents(options: {
   getDatabase: () => DesktopDatabase;
@@ -12,7 +12,7 @@ export function registerKbsWebviewIpcEvents(options: {
   attachWebview: (webContentsId: number) => boolean;
   detachWebview: (webContentsId: number) => void;
   inspect: () => Promise<EgmKbsSessionResult>;
-  prepareLogin: (input: SaveKbsSettingsInput) => Promise<EgmKbsSessionResult>;
+  prepareLogin: (credentials: KbsRuntimeCredentials) => Promise<EgmKbsSessionResult>;
 }) {
   const {
     getDatabase,
@@ -63,7 +63,7 @@ export function registerKbsWebviewIpcEvents(options: {
       if (resolved.credentials.provider !== "egm") {
         return { ok: false, state: "unknown", message: "EGM web oturumu yalnız Emniyet KBS sağlayıcısı için kullanılabilir.", url: "" };
       }
-      return prepareLogin(input);
+      return prepareLogin(resolved.credentials);
     }
   );
 }
