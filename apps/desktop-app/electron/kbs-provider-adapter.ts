@@ -76,7 +76,9 @@ export function classifyJandarmaOperationResult(
     || input.code === 103
     || input.code === 104
     || input.code === 105
-    || input.code === 106;
+    || input.code === 106
+    || input.code === 107
+    || input.code === 108;
 
   return {
     ok: false,
@@ -118,15 +120,14 @@ export function selectJandarmaOperation(input: KbsDeliveryInput): JandarmaOperat
     return { ok: false, message: "KBS işlem zamanı geçerli değil." };
   }
 
-  const domestic = isTurkeyNationality(input.identity.nationality);
-  if (domestic && input.identity.identityNumber.replace(/\D/g, "").length !== 11) {
-    return { ok: false, message: "Türkiye uyruklu misafir için 11 haneli kimlik numarası gerekli." };
-  }
-  if (!domestic && !input.identity.documentSerialNumber && !input.identity.identityNumber) {
-    return { ok: false, message: "Yabancı misafir için belge veya kimlik numarası gerekli." };
+  const hasIdentityNumber = input.identity.identityNumber.replace(/\D/g, "").length === 11;
+  if (!hasIdentityNumber && !input.identity.documentSerialNumber) {
+    return { ok: false, message: "Jandarma KBS için 11 haneli TCK/YKN veya yabancı belge numarası gerekli." };
   }
 
-  const operation = domestic
+  // The official contract uses KimlikNo operations for both TCK and YKN.
+  // Yabanci operations are for guests reported by foreign document details.
+  const operation = hasIdentityNumber
     ? input.kind === "arrival"
       ? "MusteriKimlikNoGiris"
       : input.kind === "departure"
@@ -142,7 +143,7 @@ export function selectJandarmaOperation(input: KbsDeliveryInput): JandarmaOperat
     ok: true,
     selection: {
       operation,
-      identityPath: domestic ? "identity_number" : "foreign_document",
+      identityPath: hasIdentityNumber ? "identity_number" : "foreign_document",
       roomNumber,
       occurredAt: formatJandarmaDate(occurredAt),
       identity: input.identity
