@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
-import { app, clipboard, net } from "electron";
+import { app, clipboard, nativeImage, net } from "electron";
 import {
   createDiagnosticSupportSnapshot,
   createDiagnosticOperationId,
@@ -137,13 +137,12 @@ function currentDraft(userDataPath: string): DesktopSupportReportDraft {
   let screenshot: DesktopSupportReportDraft["screenshot"] = null;
   try {
     if (fs.existsSync(filePath)) {
-      const image = clipboard.readImage();
       const bytes = fs.readFileSync(filePath);
-      // Preview from clipboard only if it still contains an image; otherwise keep file metadata without a large IPC payload.
-      const previewDataUrl = !image.isEmpty()
-        ? image.resize({ width: Math.min(720, image.getSize().width || 720) }).toDataURL()
-        : "";
+      const image = nativeImage.createFromBuffer(bytes);
       const size = image.isEmpty() ? { width: 0, height: 0 } : image.getSize();
+      const previewDataUrl = image.isEmpty()
+        ? ""
+        : image.resize({ width: Math.min(720, Math.max(1, size.width)) }).toDataURL();
       screenshot = {
         previewDataUrl,
         width: size.width,
@@ -220,7 +219,7 @@ function readScreenshot(userDataPath: string) {
     if (!fs.existsSync(filePath)) return null;
     const bytes = fs.readFileSync(filePath);
     if (!bytes.length || bytes.length > MAX_SCREENSHOT_BYTES) return null;
-    const image = clipboard.readImage();
+    const image = nativeImage.createFromBuffer(bytes);
     const size = image.isEmpty() ? { width: 0, height: 0 } : image.getSize();
     return {
       mimeType: "image/png" as const,
