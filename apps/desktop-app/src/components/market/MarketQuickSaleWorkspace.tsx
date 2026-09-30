@@ -272,9 +272,6 @@ export function MarketQuickSaleWorkspace({
       return;
     }
     const adapter = barcodeMode === "simulator" ? simulatorAdapter : keyboardAdapter;
-    setBarcodeMessage(barcodeMode === "simulator"
-      ? "Simülatör hazır; test barkodunu girin."
-      : "USB okuyucu hazır; barkodu okutun.");
     return adapter.start((scan) => {
       void handleBarcodeScan(scan);
     });
