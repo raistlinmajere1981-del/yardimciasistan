@@ -2,6 +2,7 @@ import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useCallback, useRef, useState, type FormEvent } from "react";
 import { KeyRound, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import type { SettingsOperationResult } from "../../app/settings-save";
+import { reportAppStatus } from "../../app/runtime-state";
 
 interface PasswordSettingsProps {
   configured: boolean;
@@ -69,7 +70,7 @@ export function usePasswordSettings({ configured, onConfiguredChange }: Password
     if (!hasPasswordDraft) return { ok: true, changed: false };
 
     setBusyAction("save");
-    setMessage("Uygulama şifresi güvenli biçimde kaydediliyor...");
+    setMessage("");
     setMessageTone("idle");
     const bridge = window.yardimciDesktop;
     if (!bridge?.updateAppPassword) {
@@ -87,12 +88,15 @@ export function usePasswordSettings({ configured, onConfiguredChange }: Password
     } catch {
       setBusyAction("");
       const message = "Uygulama şifresi kaydedilemedi. Uygulamayı yeniden başlatıp tekrar deneyin.";
-      showError(message);
+      setMessage("");
+      setMessageTone("idle");
+      reportAppStatus("error", message);
       return { ok: false, message };
     }
     setBusyAction("");
-    setMessage(result.message);
-    setMessageTone(result.ok ? "success" : "error");
+    setMessage("");
+    setMessageTone("idle");
+    reportAppStatus(result.ok ? "success" : "error", result.message);
     if (result.ok) {
       onConfiguredChange(result.status.passwordConfigured);
       clearPasswordFields();
@@ -117,7 +121,7 @@ export function usePasswordSettings({ configured, onConfiguredChange }: Password
     }
 
     setBusyAction("remove");
-    setMessage("Uygulama şifresi kaldırılıyor...");
+    setMessage("");
     setMessageTone("idle");
     let result;
     try {
@@ -127,12 +131,16 @@ export function usePasswordSettings({ configured, onConfiguredChange }: Password
       });
     } catch {
       setBusyAction("");
-      showError("Uygulama şifresi kaldırılamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
+      const message = "Uygulama şifresi kaldırılamadı. Uygulamayı yeniden başlatıp tekrar deneyin.";
+      setMessage("");
+      setMessageTone("idle");
+      reportAppStatus("error", message);
       return;
     }
     setBusyAction("");
-    setMessage(result.message);
-    setMessageTone(result.ok ? "success" : "error");
+    setMessage("");
+    setMessageTone("idle");
+    reportAppStatus(result.ok ? "success" : "error", result.message);
     if (result.ok) {
       onConfiguredChange(false);
       clearPasswordFields();
@@ -153,19 +161,23 @@ export function usePasswordSettings({ configured, onConfiguredChange }: Password
     }
 
     setBusyAction("reset");
-    setMessage("Web güvenlik anahtarı kontrol ediliyor...");
+    setMessage("");
     setMessageTone("idle");
     let result;
     try {
       result = await window.yardimciDesktop.resetAppPassword(webSecurityKey);
     } catch {
       setBusyAction("");
-      showError("Uygulama şifresi sıfırlanamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
+      const message = "Uygulama şifresi sıfırlanamadı. Uygulamayı yeniden başlatıp tekrar deneyin.";
+      setMessage("");
+      setMessageTone("idle");
+      reportAppStatus("error", message);
       return;
     }
     setBusyAction("");
-    setMessage(result.message);
-    setMessageTone(result.ok ? "success" : "error");
+    setMessage("");
+    setMessageTone("idle");
+    reportAppStatus(result.ok ? "success" : "error", result.message);
     if (result.ok) {
       onConfiguredChange(false);
       clearPasswordFields();
