@@ -2101,7 +2101,10 @@ BEGIN
     CASE NEW.status WHEN 'checked_in' THEN NEW.checked_in_at ELSE NEW.checked_out_at END,
     json_object('customerId', c.id, 'fullName', c.full_name, 'identityType', c.identity_type,
       'identityNumber', c.identity_number, 'nationality', c.nationality, 'birthDate', c.birth_date,
-      'documentSerialNumber', c.document_serial_number, 'roomNumber', r.number), NEW.updated_at
+      'documentSerialNumber', c.document_serial_number, 'documentExpiryDate', c.document_expiry_date,
+      'gender', c.gender, 'birthPlace', c.birth_place, 'motherName', c.mother_name,
+      'fatherName', c.father_name, 'issuingAuthority', c.issuing_authority, 'address', c.address,
+      'phone', c.phone, 'roomNumber', r.number), NEW.updated_at
   FROM customers c JOIN customer_room_stays s ON s.id = NEW.stay_id JOIN rooms r ON r.id = s.room_id WHERE c.id = NEW.customer_id;
 END;
 CREATE TRIGGER trg_customer_pending_hospitality_identity
