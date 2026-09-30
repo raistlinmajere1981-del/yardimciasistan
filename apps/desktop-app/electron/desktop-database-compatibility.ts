@@ -15,34 +15,17 @@ export interface DesktopDatabaseCompatibility {
   reason: string;
 }
 
-const REQUIRED_TABLES = [
-  "android_local_credentials",
-  "desktop_sync_identity",
-  "settings"
-] as const;
+interface CanonicalTable {
+  name: string;
+  columns: string[];
+}
 
-const REQUIRED_COLUMNS = {
-  settings: [
-    "local_network_enabled",
-    "ai_service",
-    "ai_last_published_at",
-    "google_reviews_enabled",
-    "google_place_id",
-    "google_places_api_key_encrypted",
-    "google_reviews_last_published_at",
-    "google_reviews_publish_pending",
-    "product_data_enabled"
-  ],
-  business: [
-    "publish_rooms_web",
-    "publish_tables_web"
-  ],
-  tables: [
-    "public_description",
-    "public_features_json",
-    "smoking_policy"
-  ]
-} as const;
+const GUEST_BOOTSTRAP_TABLES = new Set([
+  "hospitality_entry_receipts",
+  "stay_guests",
+  "hospitality_notifications",
+  "stay_room_history"
+]);
 
 function tableExists(database: DatabaseSync, tableName: string) {
   return Boolean(database.prepare(
@@ -57,18 +40,51 @@ function tableColumns(database: DatabaseSync, tableName: string) {
   );
 }
 
-export function currentDesktopSchemaProblem(database: DatabaseSync): string {
-  for (const tableName of REQUIRED_TABLES) {
-    if (!tableExists(database, tableName)) {
-      return `Eksik tablo: ${tableName}`;
-    }
-  }
+function canonicalTables(schemaSql: string): CanonicalTable[] {
+  const canonical = new DatabaseSync(":memory:");
+  try {
+    canonical.exec("PRAGMA foreign_keys = ON;");
+    canonical.exec(schemaSql);
+    const rows = canonical.prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+      ORDER BY name ASC
+    `).all() as Array<{ name?: unknown }>;
 
-  for (const [tableName, requiredColumns] of Object.entries(REQUIRED_COLUMNS)) {
-    const columns = tableColumns(database, tableName);
-    for (const columnName of requiredColumns) {
+    return rows.map((row) => {
+      const name = String(row.name ?? "");
+      return {
+        name,
+        columns: [...tableColumns(canonical, name)]
+      };
+    });
+  } finally {
+    canonical.close();
+  }
+}
+
+function guestBootstrapCanRun(database: DatabaseSync) {
+  return [...GUEST_BOOTSTRAP_TABLES].every((tableName) => !tableExists(database, tableName));
+}
+
+export function currentDesktopSchemaProblem(
+  database: DatabaseSync,
+  schemaSql: string,
+  options: { allowGuestBootstrap?: boolean } = {}
+): string {
+  const allowGuestBootstrap = options.allowGuestBootstrap === true && guestBootstrapCanRun(database);
+
+  for (const table of canonicalTables(schemaSql)) {
+    if (!tableExists(database, table.name)) {
+      if (allowGuestBootstrap && GUEST_BOOTSTRAP_TABLES.has(table.name)) continue;
+      return `Eksik tablo: ${table.name}`;
+    }
+
+    const columns = tableColumns(database, table.name);
+    for (const columnName of table.columns) {
       if (!columns.has(columnName)) {
-        return `Eksik alan: ${tableName}.${columnName}`;
+        return `Eksik alan: ${table.name}.${columnName}`;
       }
     }
   }
@@ -76,18 +92,25 @@ export function currentDesktopSchemaProblem(database: DatabaseSync): string {
   return "";
 }
 
-export function assertCurrentDesktopSchema(database: DatabaseSync) {
-  const problem = currentDesktopSchemaProblem(database);
+export function assertCurrentDesktopSchema(database: DatabaseSync, schemaSql: string) {
+  const problem = currentDesktopSchemaProblem(database, schemaSql);
   if (problem) throw new Error(CURRENT_DESKTOP_SCHEMA_ERROR);
 }
 
-export function inspectDesktopDatabaseCompatibility(databasePath: string): DesktopDatabaseCompatibility {
+export function inspectDesktopDatabaseCompatibility(
+  databasePath: string,
+  schemaPath: string
+): DesktopDatabaseCompatibility {
   if (!fs.existsSync(databasePath)) {
     return { state: "fresh", reason: "Yerel veritabanı henüz oluşturulmamış." };
+  }
+  if (!fs.existsSync(schemaPath)) {
+    return { state: "unreadable", reason: "Güncel masaüstü şeması bulunamadı." };
   }
 
   let database: DatabaseSync | null = null;
   try {
+    const schemaSql = fs.readFileSync(schemaPath, "utf8");
     database = new DatabaseSync(databasePath);
 
     const quickCheckRow = database.prepare("PRAGMA quick_check").get() as Record<string, unknown> | undefined;
@@ -111,7 +134,7 @@ export function inspectDesktopDatabaseCompatibility(databasePath: string): Deskt
       return { state: "fresh", reason: "Yerel veritabanı boş." };
     }
 
-    const problem = currentDesktopSchemaProblem(database);
+    const problem = currentDesktopSchemaProblem(database, schemaSql, { allowGuestBootstrap: true });
     if (problem) {
       return { state: "incompatible", reason: problem };
     }
