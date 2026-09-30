@@ -84,7 +84,6 @@ export function ManualReservationEditor({
 }: ManualReservationEditorProps) {
   const [form, setForm] = useState<ManualReservationFormState>(() => createInitialForm(customers, reservation, initialRoomId));
   const [state, setState] = useState<EditorState>("idle");
-  const [message, setMessage] = useState("");
   const isEditing = Boolean(reservation);
   const isManualReservation = Boolean(reservation?.requestId.startsWith("manual:"));
   const detailsEditable = !isEditing || isManualReservation;
@@ -99,7 +98,6 @@ export function ManualReservationEditor({
     if (!open) return;
     setForm(createInitialForm(customers, reservation, initialRoomId));
     setState("idle");
-    setMessage("");
     // Açık formda hızlı müşteri eklenince taslağı sıfırlama.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reservation?.id, initialRoomId]);
@@ -109,7 +107,6 @@ export function ManualReservationEditor({
   async function submitReservation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("loading");
-    setMessage(isEditing ? "Rezervasyon güncelleniyor..." : "Rezervasyon kaydediliyor...");
     const result = await onSave({
       reservationId: reservation?.id,
       customerId: form.customerId,
@@ -121,7 +118,6 @@ export function ManualReservationEditor({
     });
     if (!result.ok) {
       setState("error");
-      setMessage(result.message);
       return;
     }
     onClose();
@@ -238,7 +234,6 @@ export function ManualReservationEditor({
         Web talebinden oluşan rezervasyonda tarih ve kişi bilgisi talep kaydıyla bağlıdır; burada oda ve not değiştirilebilir.
       </p>
     )}
-    {message && <p className={`form-status sync-${state}`}>{message}</p>}
   </>;
 
   const actions = <div className="form-actions">
