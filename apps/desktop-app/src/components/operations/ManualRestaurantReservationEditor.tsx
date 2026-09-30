@@ -13,6 +13,7 @@ import { WorkspaceFormOverlay } from "../workspace/WorkspaceFormOverlay";
 import { DatePicker, TimePicker } from "../ui/DateTimePicker";
 import { SearchSelect } from "../ui/SearchSelect";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
+import { reportAppStatus } from "../../app/runtime-state";
 
 type EditorState = "idle" | "loading" | "error";
 
@@ -68,7 +69,6 @@ export function ManualRestaurantReservationEditor({
 }: ManualRestaurantReservationEditorProps) {
   const [form, setForm] = useState<RestaurantReservationFormState>(() => createInitialForm(customers, initialTableId));
   const [state, setState] = useState<EditorState>("idle");
-  const [message, setMessage] = useState("");
   const [customerSaving, setCustomerSaving] = useState(false);
   const busy = state === "loading" || customerSaving;
   const activeTables = useMemo(() => tables.filter((table) => table.isActive || table.id === initialTableId), [initialTableId, tables]);
@@ -78,7 +78,6 @@ export function ManualRestaurantReservationEditor({
     if (!open) return;
     setForm(createInitialForm(customers, initialTableId));
     setState("idle");
-    setMessage("");
     // Açık formda hızlı müşteri eklenince taslağı sıfırlama.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialTableId]);
@@ -89,7 +88,6 @@ export function ManualRestaurantReservationEditor({
     event.preventDefault();
     if (busy) return;
     setState("loading");
-    setMessage("Restoran rezervasyonu kaydediliyor...");
     try {
       const result = await onSave({
         customerId: form.customerId,
@@ -101,13 +99,12 @@ export function ManualRestaurantReservationEditor({
       });
       if (!result.ok) {
         setState("error");
-        setMessage(result.message);
         return;
       }
       onClose();
     } catch {
       setState("error");
-      setMessage("Restoran rezervasyonu kaydedilemedi.");
+      reportAppStatus("error", "Restoran rezervasyonu kaydedilemedi.");
     }
   }
 
@@ -215,7 +212,6 @@ export function ManualRestaurantReservationEditor({
     {customers.length === 0 && (
       <p className="form-status">Müşteri listeniz boş. Yeni Müşteri Ekle ile ilk kaydı oluşturabilirsiniz.</p>
     )}
-    {message && <p className={state === "error" ? "status-message status-message--danger" : "form-status"} role="status">{message}</p>}
   </>;
 
   if (embedded) {
