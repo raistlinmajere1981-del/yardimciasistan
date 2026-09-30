@@ -659,6 +659,19 @@ CREATE TABLE rooms (
 , nightly_price_minor INTEGER NOT NULL DEFAULT 0
   CHECK (nightly_price_minor >= 0), price_currency TEXT NOT NULL DEFAULT 'TRY');
 
+CREATE TABLE kbs_service_settings (
+  id TEXT PRIMARY KEY CHECK (id = 'primary'),
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+  provider TEXT NOT NULL DEFAULT 'egm' CHECK (provider IN ('egm', 'jandarma')),
+  facility_code TEXT NOT NULL DEFAULT '',
+  username TEXT NOT NULL DEFAULT '',
+  authorized_identity_number TEXT NOT NULL DEFAULT '',
+  password_encrypted TEXT NOT NULL DEFAULT '',
+  second_factor_secret_encrypted TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE settings (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type { SaveInitialSetupInput } from "../../../electron/database";
 import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
@@ -89,6 +90,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     enabled: initialized
   });
   const googleReviews = useGoogleReviewsSettings(initialized);
+  const kbs = useKbsSettings(initialized && capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS));
   const layout = useBusinessLayoutSettings({
     enabled: initialized,
     onDashboardRefresh: props.onDashboardRefresh
@@ -123,7 +125,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const dirty: Record<SettingsCategoryId, boolean> = {
     business: drafts.dirty.business || profile.dirty || googleReviews.dirty,
     operations: layout.dirty,
-    services: drafts.dirty.services || androidPermissions.dirty,
+    services: drafts.dirty.services || androidPermissions.dirty || kbs.dirty,
     application: appearance.dirty || updates.dirty
   };
   const categoryDirty = dirty[active];
@@ -133,7 +135,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     : active === "application"
       ? updates.busy
       : drafts.busy
-      || (active === "services" && androidPermissions.busy)
+      || (active === "services" && (androidPermissions.busy || kbs.loading || kbs.saving || kbs.testing))
       || (active === "business" && (profile.saving || googleReviews.saving || googleReviews.testing));
 
   const categorySaving = active === "operations"
@@ -142,7 +144,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       ? updates.action === "save"
       : setupCategory
         ? drafts.feedback[setupCategory]?.state === "loading"
-          || (active === "services" && androidPermissions.busy)
+          || (active === "services" && (androidPermissions.busy || kbs.saving))
           || (active === "business" && (profile.saving || googleReviews.saving))
         : false;
 
@@ -396,6 +398,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
                 <BusinessSettingsSection form={drafts.form} onFormChange={drafts.setDraft} />
               </fieldset>
+              {capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS) && (
+                <KbsSettingsSection controller={kbs} disabled={drafts.busy || guardBusy} />
+              )}
               <StagedSettingsContributionSlot
                 category="business"
                 form={drafts.form}

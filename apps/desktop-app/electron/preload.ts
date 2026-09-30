@@ -1,4 +1,10 @@
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
+import type {
+  KbsConnectionTestResult,
+  KbsSettings,
+  KbsSettingsSaveResult,
+  SaveKbsSettingsInput
+} from "./kbs-settings";
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type {
   BusinessCapability,
@@ -245,6 +251,9 @@ export interface DesktopBridge {
   getGoogleReviewsSettings: () => Promise<GoogleReviewsSettings>;
   saveGoogleReviewsSettings: (input: SaveGoogleReviewsSettingsInput) => Promise<GoogleReviewsSettingsSaveResult>;
   testGoogleReviewsConnection: (input: Pick<SaveGoogleReviewsSettingsInput, "placeId" | "apiKey" | "clearApiKey">) => Promise<GoogleReviewsConnectionTestResult>;
+  getKbsSettings: () => Promise<KbsSettings>;
+  saveKbsSettings: (input: SaveKbsSettingsInput) => Promise<KbsSettingsSaveResult>;
+  testKbsConnection: (input: SaveKbsSettingsInput) => Promise<KbsConnectionTestResult>;
   geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
@@ -414,6 +423,9 @@ const bridge: DesktopBridge = {
   getGoogleReviewsSettings: () => invokeWhenUnlocked<GoogleReviewsSettings>("googleReviews:getSettings"),
   saveGoogleReviewsSettings: (input: SaveGoogleReviewsSettingsInput) => invokeWhenUnlocked<GoogleReviewsSettingsSaveResult>("googleReviews:saveSettings", input),
   testGoogleReviewsConnection: (input) => invokeWhenUnlocked<GoogleReviewsConnectionTestResult>("googleReviews:testConnection", input),
+  getKbsSettings: () => invokeWhenUnlocked<KbsSettings>("kbs:getSettings"),
+  saveKbsSettings: (input) => invokeWhenUnlocked<KbsSettingsSaveResult>("kbs:saveSettings", input),
+  testKbsConnection: (input) => invokeWhenUnlocked<KbsConnectionTestResult>("kbs:testConnection", input),
   geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),

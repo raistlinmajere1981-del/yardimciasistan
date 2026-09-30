@@ -82,6 +82,7 @@ import { publishPendingRoomMedia } from "./room-media-publication";
 import { publishPendingTableMedia } from "./table-media-publication";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerGoogleReviewsSettingsIpcHandlers } from "./google-reviews-settings-ipc";
+import { registerKbsSettingsIpcHandlers } from "./kbs-settings-ipc";
 import { getGoogleReviewsSettings, publishGoogleReviewsSettings } from "./google-reviews-settings";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
@@ -600,6 +601,11 @@ function registerIpcHandlers() {
   });
 
   registerGoogleReviewsSettingsIpcHandlers({
+    getDatabase,
+    assertUnlocked: assertAppSessionUnlocked
+  });
+
+  registerKbsSettingsIpcHandlers({
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked
   });
