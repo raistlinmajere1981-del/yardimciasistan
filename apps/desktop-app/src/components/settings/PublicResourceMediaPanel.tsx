@@ -140,7 +140,6 @@ export function PublicResourceMediaPanel({
   const add = async () => {
     if (!resourceId) return;
     setState("loading");
-    setMessage("");
     try {
       const result = await addMedia(resourceId);
       setMedia(result.media);
@@ -161,7 +160,6 @@ export function PublicResourceMediaPanel({
       candidate.id === item.id ? { ...candidate, kind } : candidate
     ));
     setState("loading");
-    setMessage("");
     try {
       const result = await updateMedia(resourceId, item, kind);
       setMedia(result.media);
@@ -177,7 +175,6 @@ export function PublicResourceMediaPanel({
   const remove = async (item: PublicResourceMediaAssetFields) => {
     if (!resourceId) return;
     setState("loading");
-    setMessage("");
     try {
       const result = await deleteMedia(resourceId, item);
       setMedia(result.media);
