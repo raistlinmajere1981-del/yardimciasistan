@@ -145,11 +145,15 @@ export function CustomersWorkspace({
                 variant="secondary"
                 size="sm"
                 type="button"
-                disabled={!row.arrivalNotification.identityReady}
+                disabled={!kbsOverview.configured || !row.arrivalNotification.identityReady}
                 onClick={() => { void onSendKbs(row.arrivalNotification!.id, customer.id); }}
               >
                 <IdCard size={15} aria-hidden="true" />
-                {row.arrivalNotification.identityReady ? "Kimlik Bildir" : "Kimlik Eksik"}
+                {!kbsOverview.configured
+                  ? "KBS Ayarları Eksik"
+                  : row.arrivalNotification.identityReady
+                    ? "Kimlik Bildir"
+                    : "Kimlik Eksik"}
               </ActionButton>
             )}
             <ActionButton variant="danger" size="sm" type="button" onClick={() => { void onDelete(customer); }}>
