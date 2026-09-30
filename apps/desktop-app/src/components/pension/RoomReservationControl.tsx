@@ -13,7 +13,7 @@ export function RoomReservationControl({ model, operations, disabled, initialRes
   const [reservationId, setReservationId] = useState(initialReservationId ?? "");
   const { room, state, active } = model;
   if (!room?.isActive || !state || state.operationalCondition === "maintenance") return null;
-  const assignable = model.reservations.filter(item => item.reservationType === "room" && ["pending", "approved"].includes(item.status) && item.roomIds.length <= 1 && item.guestCount <= room.capacity
+  const assignable = model.reservations.filter(item => item.reservationType === "room" && ["pending", "approved"].includes(item.status) && item.roomIds.length <= 1
     && !model.stays.some(stay => stay.reservationId === item.id && ["planned", "checked_in"].includes(stay.status))
     && !active.some(stay => stay.checkInDate < item.endDate && item.startDate < (stay.checkOutDate || "9999-12-31"))
     && !model.reservations.some(other => other.id !== item.id && other.roomIds.includes(room.id) && ["pending", "approved"].includes(other.status)
