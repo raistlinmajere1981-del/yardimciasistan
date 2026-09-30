@@ -153,3 +153,50 @@ function normalizeGuestStatus(value: unknown): DesktopHospitalityNotification["g
   if (value === "checked_in" || value === "checked_out" || value === "cancelled") return value;
   return "planned";
 }
+
+
+export function markHospitalityNotificationSentExternally(
+  db: DatabaseSync,
+  notificationIdInput: string,
+  provider: "egm" | "jandarma"
+): { ok: true; message: string } | { ok: false; message: string } {
+  const notificationId = notificationIdInput.trim();
+  if (!notificationId) return { ok: false, message: "Kimlik bildirimi seçilmedi." };
+
+  const row = db.prepare("SELECT status FROM hospitality_notifications WHERE id = ? LIMIT 1").get(notificationId) as { status?: string } | undefined;
+  if (!row) return { ok: false, message: "Kimlik bildirimi kaydı bulunamadı." };
+  if (row.status === "sent") return { ok: true, message: "Kimlik bildirimi zaten gönderilmiş olarak kayıtlı." };
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE hospitality_notifications
+    SET status = 'sent',
+        provider = ?,
+        provider_reference = 'external',
+        sent_at = ?
+    WHERE id = ?
+  `).run(provider, now, notificationId);
+  return { ok: true, message: "Kimlik bildirimi haricen gönderilmiş olarak işaretlendi." };
+}
+
+export function retryHospitalityNotification(
+  db: DatabaseSync,
+  notificationIdInput: string
+): { ok: true; message: string } | { ok: false; message: string } {
+  const notificationId = notificationIdInput.trim();
+  if (!notificationId) return { ok: false, message: "Kimlik bildirimi seçilmedi." };
+
+  const row = db.prepare("SELECT status FROM hospitality_notifications WHERE id = ? LIMIT 1").get(notificationId) as { status?: string } | undefined;
+  if (!row) return { ok: false, message: "Kimlik bildirimi kaydı bulunamadı." };
+  if (row.status === "sent") return { ok: false, message: "Gönderilmiş bildirim tekrar kuyruğa alınamaz." };
+
+  db.prepare(`
+    UPDATE hospitality_notifications
+    SET status = 'pending',
+        provider = '',
+        provider_reference = '',
+        sent_at = ''
+    WHERE id = ?
+  `).run(notificationId);
+  return { ok: true, message: "Kimlik bildirimi yeniden gönderim kuyruğuna alındı." };
+}
