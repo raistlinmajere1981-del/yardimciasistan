@@ -945,22 +945,37 @@ async function finalizeDesktopHospitalityMutation(
 
   const overview = result.dashboardData.kbsOverview;
   if (overview.enabled && overview.configured) {
-    const pending = result.dashboardData.hospitalityNotifications.filter((notification) =>
+    const relevant = result.dashboardData.hospitalityNotifications.filter((notification) =>
       notification.stayId === result.savedId
       && kinds.includes(notification.kind)
       && notification.status !== "sent"
-      && notification.identityReady
     );
+    const pending = relevant.filter((notification) => notification.identityReady);
+    const outcomes = [];
 
     for (const notification of pending) {
-      await getDatabase().deliverKbsNotification(
+      outcomes.push(await getDatabase().deliverKbsNotification(
         notification.id,
         [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
-      );
+      ));
     }
+
+    const missingIdentityCount = relevant.length - pending.length;
+    const sentCount = outcomes.filter((outcome) => outcome.ok && outcome.state === "sent").length;
+    const interactionCount = outcomes.filter((outcome) => !outcome.ok && outcome.state === "interaction_required").length;
+    const failedCount = outcomes.filter((outcome) => !outcome.ok && outcome.state === "failed").length;
+    const waitingCount = outcomes.filter((outcome) => !outcome.ok && outcome.state === "waiting").length;
+    const notes = [
+      sentCount > 0 ? `KBS: ${sentCount} bildirim gönderildi.` : "",
+      interactionCount > 0 ? "KBS oturumu veya kullanıcı doğrulaması gerekiyor." : "",
+      failedCount > 0 ? `KBS: ${failedCount} bildirim hata verdi.` : "",
+      waitingCount > 0 ? `KBS: ${waitingCount} bildirim bekliyor.` : "",
+      missingIdentityCount > 0 ? `KBS: ${missingIdentityCount} misafirde kimlik bilgisi eksik.` : ""
+    ].filter(Boolean);
 
     result = {
       ...result,
+      message: notes.length ? `${result.message} ${notes.join(" ")}` : result.message,
       dashboardData: getDatabase().getDashboardData()
     };
   }
