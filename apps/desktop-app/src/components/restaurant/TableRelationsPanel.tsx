@@ -49,8 +49,7 @@ export function TableRelationsPanel({
         stay.status === "checked_in"
         && stay.guests?.some(guest => guest.customerId === customer.id && guest.status === "checked_in"))
     : undefined;
-  const suggestedCustomerId = table.currentCustomerId || reservation?.customerId || "";
-  const selectedCustomerId = customerDraft ?? (data.customers.some(item => item.id === suggestedCustomerId) ? suggestedCustomerId : "");
+  const selectedCustomerId = customerDraft ?? (data.customers.some(item => item.id === table.currentCustomerId) ? table.currentCustomerId : "");
 
   useEffect(() => {
     if (!entryRequested || controller.busy || controller.dirty) return;
