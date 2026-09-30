@@ -2,7 +2,9 @@ import { DatabaseSync } from "node:sqlite";
 import { getHospitalityOperations } from "./database/hospitality-operations-store.js";
 import {
   getHospitalityNotifications,
-  getKbsOverview
+  getKbsOverview,
+  markHospitalityNotificationSentExternally,
+  retryHospitalityNotification
 } from "./database/hospitality-notification-store.js";
 import { DesktopRoomFolioService } from "./room-folio.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
@@ -698,6 +700,20 @@ export class DesktopDatabase {
     if (!result.ok) {
       return result;
     }
+    return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  markKbsNotificationSentExternally(notificationId: string): DesktopStatusUpdateResult {
+    const overview = getKbsOverview(this.db);
+    if (!overview.enabled) return { ok: false, message: "Kimlik Bildirim Sistemi etkin değil." };
+    const result = markHospitalityNotificationSentExternally(this.db, notificationId, overview.provider);
+    if (!result.ok) return result;
+    return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  retryKbsNotification(notificationId: string): DesktopStatusUpdateResult {
+    const result = retryHospitalityNotification(this.db, notificationId);
+    if (!result.ok) return result;
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
