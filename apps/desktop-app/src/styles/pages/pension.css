@@ -138,3 +138,69 @@
     flex-direction: column;
   }
 }
+
+
+.room-stay-dates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.room-stay-dates > .action-button {
+  align-self: end;
+}
+
+.room-account-facts .room-account-editable-row {
+  align-items: center;
+}
+
+.room-account-editable-row dd {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.room-account-inline-editor {
+  display: grid;
+  grid-template-columns: minmax(4.75rem, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 22rem;
+  margin-inline-start: auto;
+}
+
+.room-account-inline-editor input {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .room-stay-dates {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .room-stay-dates > .action-button {
+    justify-self: start;
+  }
+
+  .room-account-editable-row {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .room-account-editable-row dd {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: start;
+  }
+
+  .room-account-inline-editor {
+    max-width: none;
+    margin-inline-start: 0;
+  }
+}
