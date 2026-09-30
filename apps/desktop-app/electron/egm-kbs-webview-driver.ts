@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import { webContents, type WebContents } from "electron";
 import { EGM_KBS_PORTAL_URL, type KbsRuntimeCredentials } from "./kbs-settings.js";
 
@@ -94,24 +93,12 @@ export class EgmKbsWebviewDriver {
     }
 
     if (inspection.state === "otp_required") {
-      if (!credentials.secondFactorSecret) {
-        return {
-          ok: false,
-          state: "otp_required",
-          message: "EGMSEC tek kullanımlık kodu gerekli. Kodu web sayfasına girin veya Ayarlar'da uyumlu TOTP anahtarı tanımlayın.",
-          url: guest.getURL()
-        };
-      }
-      const otp = createTotp(credentials.secondFactorSecret);
-      if (!otp) {
-        return {
-          ok: false,
-          state: "otp_required",
-          message: "Kayıtlı EGMSEC/TOTP anahtarıyla kod üretilemedi. Kodu web sayfasına manuel girin.",
-          url: guest.getURL()
-        };
-      }
-      return this.execute(guest, createOtpScript(otp));
+      return {
+        ok: false,
+        state: "otp_required",
+        message: "EGMSEC uygulamasındaki geçici şifreyi resmi KBS sayfasına girin. Doğrulama sonrası aynı oturum otomasyon için kullanılacak.",
+        url: guest.getURL()
+      };
     }
 
     return inspection;
@@ -306,89 +293,4 @@ function createFirstFactorScript(credentials: KbsRuntimeCredentials): string {
   })()`;
 }
 
-function createOtpScript(otp: string): string {
-  const encoded = JSON.stringify(otp);
-  return `(() => {
-    const OTP = ${encoded};
-    const normalize = (value) => String(value || "")
-      .toLocaleLowerCase("tr-TR")
-      .normalize("NFD")
-      .replace(/[\\u0300-\\u036f]/g, "")
-      .replaceAll("ı", "i")
-      .replaceAll("ş", "s")
-      .replaceAll("ğ", "g")
-      .replaceAll("ü", "u")
-      .replaceAll("ö", "o")
-      .replaceAll("ç", "c")
-      .replace(/\\s+/g, " ")
-      .trim();
-    const visible = (element) => {
-      const style = window.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return !element.disabled && style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
-    };
-    const inputs = Array.from(document.querySelectorAll("input")).filter(visible);
-    const meta = (input) => {
-      const explicit = input.id ? document.querySelector('label[for="' + CSS.escape(input.id) + '"]') : null;
-      const wrapped = input.closest("label");
-      return normalize([
-        input.name,
-        input.id,
-        input.placeholder,
-        input.getAttribute("aria-label"),
-        explicit && explicit.textContent,
-        wrapped && wrapped.textContent
-      ].filter(Boolean).join(" "));
-    };
-    const field = inputs.find((input) => ["egmsec", "tek kullanimlik", "dogrulama kod", "otp", "guvenlik kod"].some((token) => meta(input).includes(token)));
-    if (!field) return { ok: false, state: "otp_required", message: "EGMSEC kod alanı güvenle eşleştirilemedi; kullanıcı girişi bekleniyor." };
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    if (setter) setter.call(field, OTP); else field.value = OTP;
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-    field.dispatchEvent(new Event("change", { bubbles: true }));
-    const form = field.form;
-    const buttons = Array.from((form || document).querySelectorAll('button, input[type="submit"]')).filter(visible);
-    const submit = buttons.find((button) => {
-      const text = normalize(button.textContent || button.value || button.getAttribute("aria-label"));
-      return ["dogrula", "giris", "devam", "onay"].some((token) => text.includes(token));
-    }) || (form && form.querySelector('button[type="submit"], input[type="submit"]'));
-    if (!submit) return { ok: false, state: "otp_required", message: "EGMSEC kodu dolduruldu; gönder düğmesi tanınamadığı için kullanıcı onayı bekleniyor." };
-    submit.click();
-    return { ok: true, state: "otp_submitted", message: "EGMSEC kodu uygulandı; oturum doğrulaması bekleniyor." };
-  })()`;
-}
 
-function createTotp(secret: string, now = Date.now()): string | null {
-  try {
-    const key = decodeBase32(secret);
-    if (key.length === 0) return null;
-    const counter = BigInt(Math.floor(now / 1000 / 30));
-    const buffer = Buffer.alloc(8);
-    buffer.writeBigUInt64BE(counter);
-    const digest = createHmac("sha1", key).update(buffer).digest();
-    const offset = digest[digest.length - 1] & 0x0f;
-    const binary = ((digest[offset] & 0x7f) << 24)
-      | ((digest[offset + 1] & 0xff) << 16)
-      | ((digest[offset + 2] & 0xff) << 8)
-      | (digest[offset + 3] & 0xff);
-    return String(binary % 1_000_000).padStart(6, "0");
-  } catch {
-    return null;
-  }
-}
-
-function decodeBase32(value: string): Buffer {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const normalized = value.toUpperCase().replace(/[=\s-]/g, "");
-  let bits = "";
-  for (const character of normalized) {
-    const index = alphabet.indexOf(character);
-    if (index < 0) throw new Error("invalid_base32");
-    bits += index.toString(2).padStart(5, "0");
-  }
-  const bytes: number[] = [];
-  for (let offset = 0; offset + 8 <= bits.length; offset += 8) {
-    bytes.push(Number.parseInt(bits.slice(offset, offset + 8), 2));
-  }
-  return Buffer.from(bytes);
-}
