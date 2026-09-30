@@ -1,4 +1,4 @@
-import type { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
+import type { EgmKbsSessionResult } from "./egm-kbs-webview-driver.js";
 import {
   classifyJandarmaOperationResult,
   prepareJandarmaArrival,
@@ -9,13 +9,17 @@ import {
   type KbsProviderAdapter
 } from "./kbs-provider-adapter.js";
 
+interface EgmKbsSessionInspector {
+  inspect(): Promise<EgmKbsSessionResult>;
+}
+
 export class EgmKbsProviderAdapter implements KbsProviderAdapter {
   readonly provider = "egm" as const;
 
-  constructor(private readonly driver: EgmKbsWebviewDriver) {}
+  constructor(private readonly sessionInspector: EgmKbsSessionInspector) {}
 
   async send(_input: KbsDeliveryInput): Promise<KbsDeliveryResult> {
-    const session = await this.driver.inspect();
+    const session = await this.sessionInspector.inspect();
 
     if (session.state === "authenticated") {
       return {
