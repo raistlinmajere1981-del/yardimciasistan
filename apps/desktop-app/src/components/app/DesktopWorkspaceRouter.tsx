@@ -161,7 +161,6 @@ export function DesktopWorkspaceRouter({
     manualRequestForm,
     setManualRequestForm,
     manualRequestState,
-    manualRequestMessage,
     setSelectedRequestId,
     selectedRequest,
     convertingRequestId,
@@ -184,9 +183,7 @@ export function DesktopWorkspaceRouter({
   } = operationController;
   const {
     androidDeviceState,
-    androidDeviceMessage,
     androidInstallState,
-    androidInstallMessage,
     androidInstallSnapshot,
     refreshAndroidInstallDevices,
     handleInstallAndroidApp,
@@ -442,8 +439,7 @@ export function DesktopWorkspaceRouter({
               aiMessage={aiMessage}
               manualRequestForm={manualRequestForm}
               manualRequestState={manualRequestState}
-              manualRequestMessage={manualRequestMessage}
-              onSelectRequest={setSelectedRequestId}
+                  onSelectRequest={setSelectedRequestId}
               onManualRequestFormChange={setManualRequestForm}
               onCreateManualRequest={handleCreateManualRequest}
               onWhatsApp={openWhatsApp}
@@ -646,9 +642,7 @@ export function DesktopWorkspaceRouter({
           setupData={setupData}
           dashboardData={surfaceData}
           androidDeviceState={androidDeviceState}
-          androidDeviceMessage={androidDeviceMessage}
           androidInstallState={androidInstallState}
-          androidInstallMessage={androidInstallMessage}
           androidInstallSnapshot={androidInstallSnapshot}
           onRefreshAndroidInstallDevices={refreshAndroidInstallDevices}
           onInstallAndroidApp={handleInstallAndroidApp}
