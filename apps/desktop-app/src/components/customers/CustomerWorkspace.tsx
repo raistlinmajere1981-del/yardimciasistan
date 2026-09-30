@@ -103,6 +103,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     </WorkspaceFrame>;
   }
 
+  const customerId = customer.id;
+
   async function saveCustomer() {
     setSaveState("loading");
     const result = await onSave(customerFormToInput(form));
@@ -124,7 +126,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
       entityId: stay.roomId,
       mode: "stay",
       stayId: stay.id,
-      returnContext: { page: "customerWork", entityId: customer.id }
+      returnContext: { page: "customerWork", entityId: customerId }
     });
   }
 
@@ -185,7 +187,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               entityId: activeStay.roomId,
               mode: "stay",
               stayId: activeStay.id,
-              returnContext: { page: "customerWork", entityId: customer.id }
+              returnContext: { page: "customerWork", entityId: customerId }
             })}>Konaklamayı Aç</ActionButton>
           </> : <>
             <p className="customer-operation-empty">Aktif konaklama yok.</p>
@@ -202,8 +204,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
                 entityId: entryRoomId,
                 mode: "stay",
                 action: "create-stay",
-                customerId: customer.id,
-                returnContext: { page: "customerWork", entityId: customer.id }
+                customerId,
+                returnContext: { page: "customerWork", entityId: customerId }
               })}
               disabled={!entryRoomId}
             >
@@ -235,7 +237,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
 
         {customerCreditEnabled && <CustomerCreditPanel
           key={customer.id}
-          customerId={customer.id}
+          customerId={customerId}
           whatsappEnabled={whatsappEnabled}
           onPreparedWhatsApp={onPreparedCreditWhatsApp ? (message) => leaveFor(() => onPreparedCreditWhatsApp(message)) : undefined}
         />}
