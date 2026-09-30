@@ -115,7 +115,9 @@
     "verify:check": "node scripts/verify.mjs --check",
     "verify:plan": "node scripts/verify.mjs --preset pre-main --plan",
     "test:verification-registry": "node --test scripts/test-verification-registry.mjs",
-    "smoke:room-public-details": "node scripts/smoke-room-public-details.mjs"
+    "smoke:room-public-details": "node scripts/smoke-room-public-details.mjs",
+    "deploy:support": "bash scripts/deploy-support.sh",
+    "smoke:support-endpoint": "node scripts/smoke-support-endpoint.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",
