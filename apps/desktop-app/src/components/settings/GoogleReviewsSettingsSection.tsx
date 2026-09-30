@@ -101,7 +101,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
       return { ok: true, changed: true, message: result.message };
     } catch {
       const message = "Google yorumları ayarları kaydedilemedi.";
-      setFeedback({ error: true, warning: false, message });
+      setFeedback({ error: false, warning: false, message: "" });
       return { ok: false, message };
     } finally {
       saveInFlight.current = false;
@@ -138,7 +138,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
   const discard = () => {
     if (saving) return;
     setDraft(toDraft(settings));
-    setFeedback({ error: false, warning: false, message: "Google yorumları değişiklikleri geri alındı." });
+    setFeedback({ error: false, warning: false, message: "" });
   };
 
   return {
