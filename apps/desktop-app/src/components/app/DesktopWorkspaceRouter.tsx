@@ -1,4 +1,4 @@
-import { RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
+import { RoomCategoryControl, RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
 import { useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES,
@@ -532,6 +532,7 @@ export function DesktopWorkspaceRouter({
               onOpenWhatsApp={openReservationWhatsApp}
             />
           ) : null}
+          roomTitleControl={<RoomCategoryControl data={surfaceData} />}
           roomToolbar={(
             <RoomFiltersToolbar
               data={surfaceData}
