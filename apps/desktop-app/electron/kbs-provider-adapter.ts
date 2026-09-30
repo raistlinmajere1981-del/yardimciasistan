@@ -41,7 +41,7 @@ export interface KbsProviderAdapter {
   send(input: KbsDeliveryInput): Promise<KbsDeliveryResult>;
 }
 
-export type JandarmaResultCode = 0 | 100 | 101 | 102 | 103 | 104 | 105 | 106 | 107 | 108;
+type JandarmaResultCode = 0 | 100 | 101 | 102 | 103 | 104 | 105 | 106 | 107 | 108;
 
 export interface JandarmaOperationResult {
   successful: boolean;
@@ -80,7 +80,7 @@ export function classifyJandarmaOperationResult(
   };
 }
 
-export type JandarmaOperationName =
+type JandarmaOperationName =
   | "MusteriKimlikNoGiris"
   | "MusteriKimlikNoCikis"
   | "MusteriKimlikNoGuncelle"
@@ -88,7 +88,7 @@ export type JandarmaOperationName =
   | "MusteriYabanciCikis"
   | "MusteriYabanciGuncelle";
 
-export interface JandarmaOperationSelection {
+interface JandarmaOperationSelection {
   operation: JandarmaOperationName;
   identityPath: "identity_number" | "foreign_document";
   roomNumber: string;
@@ -96,7 +96,7 @@ export interface JandarmaOperationSelection {
   identity: KbsIdentitySnapshot;
 }
 
-export type JandarmaOperationSelectionResult =
+type JandarmaOperationSelectionResult =
   | { ok: true; selection: JandarmaOperationSelection }
   | { ok: false; message: string };
 
@@ -149,7 +149,7 @@ export function selectJandarmaOperation(input: KbsDeliveryInput): JandarmaOperat
  * Enum wire values are deliberately not guessed here. They are resolved from
  * Jandarma ParametreListele metadata when the SOAP binding is available.
  */
-export interface JandarmaKimlikNoArrivalDraft {
+interface JandarmaKimlikNoArrivalDraft {
   identityNumber: string;
   countryEnumName: string;
   roomNumber: string;
@@ -159,7 +159,7 @@ export interface JandarmaKimlikNoArrivalDraft {
   futureDated: boolean;
 }
 
-export type JandarmaArrivalPreparation =
+type JandarmaArrivalPreparation =
   | { ok: true; path: "identity_number"; draft: JandarmaKimlikNoArrivalDraft }
   | {
       ok: false;
