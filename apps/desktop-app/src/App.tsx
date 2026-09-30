@@ -21,7 +21,7 @@ function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
-  const [customerWorkTab, setCustomerWorkTab] = useState<CustomerWorkTab>("requests");
+  const [customerWorkTab, setCustomerWorkTab] = useState<CustomerWorkTab>("customers");
   const pageLeaveGuardRef = useRef<PageLeaveGuard | null>(null);
 
   const registerPageLeaveGuard = useCallback((guard: PageLeaveGuard) => {
