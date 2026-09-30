@@ -239,7 +239,7 @@ try {
     const deleteCount = await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length);
     await customerWorkspace.getByRole('button', { name: 'Müşteriyi Sil' }).click();
     const deleteConfirm = page.getByRole('dialog', { name: 'Silme onayı' });
-    await expect(deleteConfirm.locator('.action-button-danger')).toHaveText('Sil');
+    await expect(deleteConfirm.getByRole('button', { name: 'Sil', exact: true })).toHaveText('Sil');
     await expect(deleteConfirm).toContainText('müşteri kaydı silinsin mi?');
     await page.keyboard.press('Escape');
     expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length)).toBe(deleteCount);
@@ -264,7 +264,7 @@ try {
     await expect(customerWorkspace.getByRole('alert').filter({ hasText: 'Bu tutar mevcut borçtan büyük.' })).toBeVisible();
     await customerWorkspace.getByRole('form', { name: 'Tahsilat', exact: true }).getByRole('button', { name: 'Vazgeç', exact: true }).click();
     await customerWorkspace.getByRole('tab', { name: 'Özet', exact: true }).click();
-    await customerWorkspace.getByRole('button', { name: 'Konaklama Başlat', exact: true }).click();
+    await customerWorkspace.getByRole('button', { name: 'Konaklamayı Aç', exact: true }).click();
     const roomAssignmentWorkspace = page.locator('.workspace-page-frame');
     await expect(roomAssignmentWorkspace).toBeVisible();
     await capture('room-assignment');

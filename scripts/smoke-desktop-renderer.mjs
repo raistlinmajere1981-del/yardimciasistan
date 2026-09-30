@@ -1854,7 +1854,7 @@ try {
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
 
   await compactPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
-  const compactCustomerRows = compactPage.locator(".customers-workspace .list-row--button");
+  const compactCustomerRows = compactPage.locator(".customers-workspace .customer-record-row");
   await expect(compactCustomerRows).toHaveCount(8);
 
   await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();

@@ -376,7 +376,6 @@ export function DesktopWorkspaceRouter({
 
   return (
     <>
-      {customerController.confirmDialog}
       {activePage === "dashboard" ? (
         <DashboardPage
           data={surfaceData}
