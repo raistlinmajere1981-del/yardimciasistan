@@ -2065,6 +2065,19 @@ export class DesktopDatabase {
     if (this.db.prepare("SELECT 1 FROM room_folios WHERE customer_id = ? AND deleted_at = '' AND status = 'open'").get(customerId)) {
       return { ok: false, message: "Bu müşterinin açık konaklama hesabı var; önce hesabı sonuçlandırın." };
     }
+    if (this.db.prepare("SELECT 1 FROM reservations WHERE customer_id = ? AND status IN ('pending', 'approved') AND deleted_at = '' LIMIT 1").get(customerId)) {
+      return { ok: false, message: "Bu müşterinin aktif rezervasyonu var; önce rezervasyonu tamamlayın veya iptal edin." };
+    }
+    if (this.db.prepare(`
+      SELECT 1
+      FROM hospitality_notifications n
+      JOIN stay_guests g ON g.id = n.guest_id
+      WHERE g.customer_id = ?
+        AND n.status != 'sent'
+      LIMIT 1
+    `).get(customerId)) {
+      return { ok: false, message: "Bu müşterinin tamamlanmamış kimlik bildirimi var; önce bildirimi sonuçlandırın." };
+    }
     const activeStay = this.db
       .prepare(`
         SELECT customer_room_stays.id, rooms.name AS room_name
