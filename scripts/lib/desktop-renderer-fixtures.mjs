@@ -287,6 +287,18 @@ function createDashboardFixture() {
       }
     ],
     customerRoomStays: [],
+    hospitalityNotifications: [],
+    kbsOverview: {
+      enabled: false,
+      configured: false,
+      provider: "egm",
+      pendingCount: 0,
+      failedCount: 0,
+      sentCount: 0,
+      checkedInGuestCount: 0,
+      activeUnsentCount: 0,
+      activeMissingIdentityCount: 0
+    },
     androidDevices: [
       {
         id: "android_device_smoke_001",
