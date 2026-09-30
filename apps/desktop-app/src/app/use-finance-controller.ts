@@ -10,6 +10,7 @@ import type {
 } from "../../electron/finance";
 import type { DesktopRoomFolioData } from "../../electron/room-folio";
 import { runtimeHasCapability } from "./capabilities";
+import { reportAppStatus } from "./runtime-state";
 
 const EMPTY_FINANCE_DATA: DesktopFinanceData = {
   generatedAt: "",
@@ -183,7 +184,7 @@ export function useFinanceController({
         && enabledRef.current
         && financeEnabledRef.current
       ) {
-        setMessage("Kasa bilgileri hazırlanamadı.");
+        reportAppStatus("error", "Kasa bilgileri hazırlanamadı.");
       }
     } finally {
       if (
@@ -293,6 +294,7 @@ export function useFinanceController({
 
     const lock = acquireMutation("save");
     if (!lock) return false;
+    setMessage("");
     const payload = {
       direction: draft.mode,
       amountMinor,
@@ -312,7 +314,10 @@ export function useFinanceController({
         && enabledRef.current
         && financeEnabledRef.current
       );
-      if (contextCurrent) setMessage(result.message);
+      if (contextCurrent) {
+        setMessage("");
+        reportAppStatus(result.ok ? "success" : "error", result.message);
+      }
 
       if (result.ok) {
         if (contextCurrent) {
@@ -332,7 +337,7 @@ export function useFinanceController({
         && enabledRef.current
         && financeEnabledRef.current
       ) {
-        setMessage("Kasa hareketi kaydedilemedi.");
+        reportAppStatus("error", "Kasa hareketi kaydedilemedi.");
       }
       return false;
     } finally {
@@ -349,6 +354,7 @@ export function useFinanceController({
     }
     const lock = acquireMutation("category-save");
     if (!lock) return false;
+    setMessage("");
     try {
       const result = await bridge.saveFinanceCategory({ direction, name: normalizedName });
       const sameOperation = mutationInFlight.current?.id === lock.id;
@@ -358,7 +364,10 @@ export function useFinanceController({
         && enabledRef.current
         && financeEnabledRef.current
       );
-      if (contextCurrent) setMessage(result.message);
+      if (contextCurrent) {
+        setMessage("");
+        reportAppStatus(result.ok ? "success" : "error", result.message);
+      }
       if (result.ok) {
         if (contextCurrent) {
           financeLoadGeneration.current += 1;
@@ -384,7 +393,7 @@ export function useFinanceController({
         && lock.epoch === financeEpoch.current
         && enabledRef.current
         && financeEnabledRef.current
-      ) setMessage("Tür eklenemedi.");
+      ) reportAppStatus("error", "Tür eklenemedi.");
       return false;
     } finally {
       releaseMutation(lock);
@@ -402,6 +411,7 @@ export function useFinanceController({
     if (category.isSystem || !bridge?.deleteFinanceCategory) return false;
     const lock = acquireMutation("category-delete", category.id);
     if (!lock) return false;
+    setMessage("");
     try {
       const result = await bridge.deleteFinanceCategory(category.id);
       const sameOperation = mutationInFlight.current?.id === lock.id;
@@ -411,7 +421,10 @@ export function useFinanceController({
         && enabledRef.current
         && financeEnabledRef.current
       );
-      if (contextCurrent) setMessage(result.message);
+      if (contextCurrent) {
+        setMessage("");
+        reportAppStatus(result.ok ? "success" : "error", result.message);
+      }
       if (result.ok) {
         if (contextCurrent) {
           financeLoadGeneration.current += 1;
@@ -440,7 +453,7 @@ export function useFinanceController({
         && lock.epoch === financeEpoch.current
         && enabledRef.current
         && financeEnabledRef.current
-      ) setMessage("Tür kaldırılamadı.");
+      ) reportAppStatus("error", "Tür kaldırılamadı.");
       return false;
     } finally {
       releaseMutation(lock);
@@ -459,6 +472,7 @@ export function useFinanceController({
     if (entry.sourceType !== "manual" || !bridge?.deleteManualFinanceEntry) return false;
     const lock = acquireMutation("delete", entry.id);
     if (!lock) return false;
+    setMessage("");
     try {
       const result = await bridge.deleteManualFinanceEntry(entry.id);
       const sameOperation = mutationInFlight.current?.id === lock.id;
@@ -469,7 +483,10 @@ export function useFinanceController({
         && enabledRef.current
         && financeEnabledRef.current
       );
-      if (contextCurrent) setMessage(result.message);
+      if (contextCurrent) {
+        setMessage("");
+        reportAppStatus(result.ok ? "success" : "error", result.message);
+      }
       if (result.ok) {
         if (contextCurrent) {
           financeLoadGeneration.current += 1;
@@ -486,7 +503,7 @@ export function useFinanceController({
         && enabledRef.current
         && financeEnabledRef.current
       ) {
-        setMessage("Kasa hareketi kaldırılamadı.");
+        reportAppStatus("error", "Kasa hareketi kaldırılamadı.");
       }
       return false;
     } finally {
