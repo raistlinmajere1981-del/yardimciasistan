@@ -148,7 +148,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
         onSaveCustomer={onSaveCustomer}
       />}
     </> : undefined}>
-    <div ref={surface} className="operation-surface operation-surface--sections" hidden={history} key={draftEpoch}>
+    <div ref={surface} className="operation-surface operation-surface--sections operation-surface--room" hidden={history} key={draftEpoch}>
       <OperationPanel title="Misafirler ve Konaklama" id="room-stay">
         <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled}
           quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")}
