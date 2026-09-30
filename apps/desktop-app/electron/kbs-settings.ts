@@ -133,9 +133,7 @@ export function resolveKbsRuntimeCredentials(
     username: current.username,
     authorizedIdentityNumber: current.authorizedIdentityNumber,
     password: "",
-    clearPassword: false,
-    secondFactorSecret: "",
-    clearSecondFactorSecret: false
+    clearPassword: false
   };
   const password = normalized.password
     || (normalized.clearPassword ? "" : decryptSecret(current.encryptedPassword));
