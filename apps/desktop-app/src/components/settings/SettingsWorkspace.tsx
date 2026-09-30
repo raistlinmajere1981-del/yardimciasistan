@@ -33,6 +33,7 @@ import {
   GoogleReviewsSettingsSection,
   useGoogleReviewsSettings
 } from "./GoogleReviewsSettingsSection";
+import { KbsSettingsSection, useKbsSettings } from "./KbsSettingsSection";
 import { RoomManagementSection } from "./RoomManagementSection";
 import { LayoutSettingsSection } from "./LayoutSettingsSection";
 import { PasswordSettings, usePasswordSettings } from "../security/PasswordSettings";
@@ -194,12 +195,15 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       }
       if (!drafts.form.androidEnabled) {
         androidPermissions.discard();
-        return { ok: true, changed };
-      }
-      if (androidPermissions.dirty) {
+      } else if (androidPermissions.dirty) {
         const permissionResult = await androidPermissions.save();
         if (!permissionResult.ok) return permissionResult;
         changed ||= permissionResult.changed;
+      }
+      if (kbs.dirty) {
+        const kbsResult = await kbs.save();
+        if (!kbsResult.ok) return kbsResult;
+        changed ||= kbsResult.changed;
       }
       return { ok: true, changed };
     }
@@ -231,6 +235,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     if (categoryId === "services") {
       drafts.discard("services");
       androidPermissions.discard();
+      kbs.discard();
       ai.invalidate();
       return true;
     }
@@ -398,9 +403,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
               <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
                 <BusinessSettingsSection form={drafts.form} onFormChange={drafts.setDraft} />
               </fieldset>
-              {capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS) && (
-                <KbsSettingsSection controller={kbs} disabled={drafts.busy || guardBusy} />
-              )}
               <StagedSettingsContributionSlot
                 category="business"
                 form={drafts.form}
@@ -453,6 +455,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   onAndroidPermissionGroupsChange={androidPermissions.update}
                 />
               </fieldset>
+              {capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS) && (
+                <KbsSettingsSection controller={kbs} disabled={drafts.busy || guardBusy} />
+              )}
               <StagedSettingsContributionSlot
                 category="services"
                 form={drafts.form}

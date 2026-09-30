@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  EGM_KBS_PORTAL_URL,
   type KbsConnectionTestResult,
   type KbsProvider,
   type KbsSettings,
@@ -9,6 +8,8 @@ import {
 import type { SettingsOperationResult } from "../../app/settings-save";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
+
+const EGM_KBS_PORTAL_URL = "https://kbs.egm.gov.tr";
 
 interface KbsDraft {
   enabled: boolean;
