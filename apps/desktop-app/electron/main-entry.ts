@@ -1,9 +1,11 @@
 import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
+import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { getSyncCapabilities, resetHostingRuntime } from "@yardimci-asistan/sync-core";
 import { DesktopDatabase } from "./database";
+import { inspectDesktopDatabaseCompatibility } from "./desktop-database-compatibility.js";
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
 import {
   resolveDatabasePath,
@@ -107,6 +109,16 @@ function readPendingMaintenanceKind(): PendingMaintenanceKind {
   }
 }
 
+function shouldDeferPendingMaintenanceToCleanStart(): boolean {
+  if (process.argv.includes("--clean-start")) return true;
+
+  const compatibility = inspectDesktopDatabaseCompatibility(
+    resolveDatabasePath(userDataPath()),
+    path.join(app.getAppPath(), "db", "schema.sql")
+  );
+  return compatibility.state === "incompatible" || compatibility.state === "unreadable";
+}
+
 function installDevelopmentRelaunchBridge() {
   if (app.isPackaged || !process.env.VITE_DEV_SERVER_URL) return;
 
@@ -206,18 +218,27 @@ if (applyPendingDesktopUpdateAtStartup(userDataPath())) {
 // Restore/reset operations are intentionally applied before main.ts opens the
 // long-lived SQLite connection. This keeps WAL state and live database handles
 // out of destructive maintenance operations.
-const pendingMaintenanceKind = readPendingMaintenanceKind();
-applyPendingDataMaintenanceAtStartup(userDataPath());
-if (pendingMaintenanceKind === "restore") {
-  try {
-    prepareRestoredStateForFullRepublish();
-  } catch (error) {
-    desktopLog.error({
-      scope: "restore",
-      event: "restore.republish.failed",
-      message: "Geri yükleme sonrası tam yayın hazırlanamadı.",
-      error
-    });
+const deferPendingMaintenance = shouldDeferPendingMaintenanceToCleanStart();
+const pendingMaintenanceKind = deferPendingMaintenance ? "" : readPendingMaintenanceKind();
+if (deferPendingMaintenance) {
+  desktopLog.warn({
+    scope: "startup",
+    event: "startup.maintenance.deferred-for-clean-start",
+    message: "Eski veri bakımı temiz başlangıç kararı verilene kadar ertelendi."
+  });
+} else {
+  applyPendingDataMaintenanceAtStartup(userDataPath());
+  if (pendingMaintenanceKind === "restore") {
+    try {
+      prepareRestoredStateForFullRepublish();
+    } catch (error) {
+      desktopLog.error({
+        scope: "restore",
+        event: "restore.republish.failed",
+        message: "Geri yükleme sonrası tam yayın hazırlanamadı.",
+        error
+      });
+    }
   }
 }
 const mainProcessReady = import("./main");
