@@ -101,12 +101,15 @@ try {
 
   const accountPanel = workspace.getByRole('region', { name: 'Masa hesabı', exact: true });
   await accountPanel.getByRole('button', { name: 'Düzenle', exact: true }).click();
+  await expect(accountPanel.locator('.table-discount-editor')).toHaveCount(0);
+  await expect(accountPanel.locator('.table-discount-inline-editor')).toBeVisible();
   await accountPanel.getByLabel('İndirim tutarı', { exact: true }).fill('10');
   await accountPanel.getByRole('button', { name: 'Uygula', exact: true }).click();
   await expect.poll(async () => (await state()).orders[0].discountTotal).toBe(10);
   expect((await state()).orders[0].total).toBe(40);
   await accountPanel.getByRole('button', { name: 'Düzenle', exact: true }).click();
-  await accountPanel.getByRole('button', { name: 'İndirimi Kaldır', exact: true }).click();
+  await accountPanel.getByLabel('İndirim tutarı', { exact: true }).fill('0');
+  await accountPanel.getByRole('button', { name: 'Uygula', exact: true }).click();
   await expect.poll(async () => (await state()).orders[0].discountTotal).toBe(0);
   expect((await state()).orders[0].total).toBe(50);
 
