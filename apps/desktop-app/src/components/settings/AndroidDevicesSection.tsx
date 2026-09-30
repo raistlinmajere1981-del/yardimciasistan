@@ -29,9 +29,7 @@ interface AndroidDevicesSectionProps {
   devices: DesktopAndroidDevice[];
   enabledCapabilities: BusinessCapability[];
   state: SyncState;
-  message: string;
   installState: SyncState;
-  installMessage: string;
   installSnapshot: DesktopAndroidInstallationSnapshot | null;
   onRefreshInstallDevices?: () => void;
   onInstallApp?: (serial: string) => void;
@@ -48,9 +46,7 @@ export function AndroidDevicesSection({
   devices,
   enabledCapabilities,
   state,
-  message,
   installState,
-  installMessage,
   installSnapshot,
   onRefreshInstallDevices,
   onInstallApp,
