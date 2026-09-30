@@ -4,6 +4,7 @@ import type {
   AddTableOrderItemInput,
   DesktopTableOrderResult,
   TableOrderStatus,
+  UpdateTableOrderDiscountInput,
   UpdateTableOrderItemNoteInput,
   UpdateTableOrderItemQuantityInput,
   UpdateTableOrderStatusInput
@@ -393,6 +394,57 @@ export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string): Des
   }
 
   return getTableOrderMutationResult(db, orderId, "Ürün adisyondan kaldırıldı.");
+}
+
+export function updateTableOrderDiscount(db: DatabaseSync, input: UpdateTableOrderDiscountInput): DesktopTableOrderResult {
+  const orderId = input.orderId.trim();
+  const discountTotal = roundMoney(Number(input.discountTotal));
+  if (!orderId || !Number.isFinite(discountTotal) || discountTotal < 0) {
+    return { ok: false, message: "İndirim tutarı geçersiz." };
+  }
+
+  const now = new Date().toISOString();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const current = db
+      .prepare("SELECT subtotal, discount_total, status, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+      .get(orderId) as { subtotal?: number; discount_total?: number; status?: string; updated_at?: string } | undefined;
+    if (!current) {
+      db.exec("ROLLBACK");
+      return { ok: false, message: "İndirim uygulanacak aktif adisyon bulunamadı." };
+    }
+
+    const subtotal = roundMoney(Number(current.subtotal ?? 0));
+    if (discountTotal > subtotal) {
+      db.exec("ROLLBACK");
+      return { ok: false, message: "İndirim ara toplamı aşamaz." };
+    }
+
+    const updatedAt = nextMutationTimestamp(current.updated_at, now);
+    db.prepare("UPDATE table_orders SET discount_total = ?, updated_at = ? WHERE id = ?")
+      .run(discountTotal, updatedAt, orderId);
+    recalculateTableOrderTotalInTransaction(db, orderId, now);
+    insertDatabaseEvent(db, {
+      type: "table_order.discount_changed",
+      entityType: "table_order",
+      entityId: orderId,
+      payload: {
+        old_discount_total: roundMoney(Number(current.discount_total ?? 0)),
+        new_discount_total: discountTotal
+      },
+      now
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return getTableOrderMutationResult(
+    db,
+    orderId,
+    discountTotal > 0 ? "Adisyon indirimi güncellendi." : "Adisyon indirimi kaldırıldı."
+  );
 }
 
 export function updateTableOrderStatus(db: DatabaseSync, input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
