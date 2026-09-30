@@ -667,7 +667,6 @@ CREATE TABLE kbs_service_settings (
   username TEXT NOT NULL DEFAULT '',
   authorized_identity_number TEXT NOT NULL DEFAULT '',
   password_encrypted TEXT NOT NULL DEFAULT '',
-  second_factor_secret_encrypted TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
