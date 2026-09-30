@@ -147,7 +147,31 @@ export function useTableOrderController(tableId: string, enabled: boolean,
       });
     },
     startTableOrder: () => mutate(() => startTableOrder(tableId)),
-    addItem: (id: string) => mutate(() => bridge().addTableOrderItem(orderRef.current!.id, id, 1, "")),
+    addItem: (id: string) => {
+      if (orderRef.current) return mutate(() => bridge().addTableOrderItem(orderRef.current!.id, id, 1, ""));
+      if (!enabled) return Promise.resolve(false);
+      return run(async isCurrent => {
+        const opened = await startTableOrder(tableId);
+        if (!isCurrent()) return false;
+        if (!opened.ok) {
+          feedback(opened.message, true);
+          return false;
+        }
+        if (!apply(opened.order, opened.dashboardData)) {
+          feedback("Adisyon yanıtı seçili masayla eşleşmedi; işlem yenilenmeli.", true);
+          return false;
+        }
+        const added = await bridge().addTableOrderItem(opened.order.id, id, 1, "");
+        if (!isCurrent()) return false;
+        feedback(added.message, !added.ok);
+        if (!added.ok) return false;
+        if (!apply(added.order, added.dashboardData)) {
+          feedback("Adisyon yanıtı seçili masayla eşleşmedi; işlem yenilenmeli.", true);
+          return false;
+        }
+        return true;
+      });
+    },
     quantity: (id: string, value: number) => mutate(() => bridge().updateTableOrderItemQuantity(id, value)),
     removeItem: (id: string) => mutate(() => bridge().removeTableOrderItem(id)),
     status: (status: "preparing" | "served" | "payment") => mutate(() => setTableOrderStatus(orderRef.current!.id, status)),
