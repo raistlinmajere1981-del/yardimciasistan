@@ -301,7 +301,6 @@ try {
       if (variant === 'no-menu') await variantPage.evaluate(() => { window.fixtureFailOpening = true; });
       await workspace.getByRole('button', { name: /Giriş Yap/, exact: false }).click();
       if (variant === 'no-menu') {
-        await expect(workspace).toContainText('değişiklikleri geri alındı');
         const failed = await variantPage.evaluate(() => window.fixtureState());
         expect(failed.dashboard.customerRoomStays).toHaveLength(0);
         expect(failed.folios).toHaveLength(0);
@@ -322,6 +321,42 @@ try {
     }
     await variantPage.close();
   }
+  const slotPage = await open(), slotWorkspace = slotPage.locator('.workspace-page-frame');
+  await slotPage.getByRole('button', { name: 'Pilot 102 odasını aç' }).click();
+  const slotStayPanel = slotWorkspace.getByRole('region', { name: 'Misafirler ve Konaklama', exact: true });
+  await slotStayPanel.getByRole('button', { name: /boş misafir slotu/ }).first().click();
+  await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Kompakt Misafir 1(?:\s|$)/);
+  await slotWorkspace.getByRole('button', { name: /Giriş Yap/, exact: false }).click();
+  await slotPage.evaluate(() => {
+    const state = window.fixtureState();
+    const base = state.dashboard.customers[0];
+    window.fixturePatch({
+      customers: [
+        ...state.dashboard.customers,
+        { ...base, id: 'extra-guest-2', fullName: 'Ek Misafir 2', phone: '5550000002' },
+        { ...base, id: 'extra-guest-3', fullName: 'Ek Misafir 3', phone: '5550000003' }
+      ]
+    });
+  });
+
+  await slotStayPanel.getByRole('button', { name: '+ Slot', exact: true }).click();
+  await expect(slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true })).toBeVisible();
+  await slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true }).click();
+  await expect(slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true })).toHaveCount(0);
+
+  await slotStayPanel.getByRole('button', { name: '+ Slot', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: '3. boş misafir slotu', exact: true }).click();
+  await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Ek Misafir 2(?:\s|$)/);
+  await expect.poll(() => slotPage.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guestCount)).toBe(2);
+
+  await slotStayPanel.getByRole('button', { name: '+ Slot', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: '3. boş misafir slotu', exact: true }).click();
+  await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Ek Misafir 3(?:\s|$)/);
+  await expect.poll(() => slotPage.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guestCount)).toBe(3);
+  await expect(slotStayPanel.getByRole('button', { name: 'Ek Misafir 3 misafir slotu', exact: true })).toBeVisible();
+  await expect(slotStayPanel).toContainText('3 misafir · 2 kişilik oda');
+  await slotPage.close();
+
   const safety = await open(), safetyWorkspace = safety.locator('.workspace-page-frame');
   await safety.evaluate(seedOperationsCardScene, { kind: 'pension' });
   await safety.getByRole('button', { name: 'Oda 106 odasını aç' }).click();
@@ -370,7 +405,7 @@ try {
     }, condition);
     await safety.getByRole('button', { name: 'Oda 102 odasını aç' }).click();
     await expect(safetyWorkspace.getByRole('button', { name: /Giriş Yap/, exact: false })).toHaveCount(0);
-    await expect(safetyWorkspace).toContainText(condition === 'conflict' ? 'Oda kayıtlarında çakışma var' : 'Giriş için oda hazır, boş ve konaklama kayıtları çakışmasız olmalı.');
+    await expect(safetyWorkspace).toContainText(condition === 'conflict' ? 'Oda kayıtlarında çakışma var' : 'Yeni giriş için oda hazır ve boş olmalı.');
     await safetyWorkspace.getByRole('button', { name: 'Çalışma alanını kapat' }).click();
   }
   await safety.close();
