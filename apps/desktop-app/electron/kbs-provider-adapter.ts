@@ -41,6 +41,45 @@ export interface KbsProviderAdapter {
   send(input: KbsDeliveryInput): Promise<KbsDeliveryResult>;
 }
 
+export type JandarmaResultCode = 0 | 100 | 101 | 102 | 103 | 104 | 105 | 106 | 107 | 108;
+
+export interface JandarmaOperationResult {
+  successful: boolean;
+  code: JandarmaResultCode;
+  message: string;
+}
+
+export function classifyJandarmaOperationResult(
+  input: JandarmaOperationResult,
+  notificationId: string
+): KbsDeliveryResult {
+  if (input.successful && input.code === 100) {
+    return {
+      ok: true,
+      state: "sent",
+      provider: "jandarma",
+      providerReference: "",
+      message: input.message || "Jandarma KBS bildirimi başarıyla gönderildi."
+    };
+  }
+
+  const retryable = input.code === 0
+    || input.code === 102
+    || input.code === 103
+    || input.code === 104
+    || input.code === 105
+    || input.code === 106;
+
+  return {
+    ok: false,
+    state: "failed",
+    provider: "jandarma",
+    retryable,
+    code: "jandarma_" + String(input.code),
+    message: input.message || jandarmaResultMessage(input.code, notificationId)
+  };
+}
+
 export type JandarmaOperationName =
   | "MusteriKimlikNoGiris"
   | "MusteriKimlikNoCikis"
@@ -229,4 +268,18 @@ function formatJandarmaDate(value: Date): string {
   }).formatToParts(value);
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
   return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")}`;
+}
+
+
+function jandarmaResultMessage(code: JandarmaResultCode, notificationId: string): string {
+  switch (code) {
+    case 101: return "Jandarma KBS kaydı bulunamadı.";
+    case 102: return "Jandarma KBS yeni kayıt işlemi başarısız.";
+    case 103: return "Jandarma KBS güncelleme işlemi başarısız.";
+    case 104: return "Jandarma KBS çıkış işlemi başarısız.";
+    case 105: return "Jandarma KBS veritabanı hatası verdi; işlem yeniden denenebilir.";
+    case 107: return "Jandarma KBS gönderim verilerinden birini geçersiz buldu.";
+    case 108: return "Jandarma KBS yetkilendirmesi başarısız. Tesis kodu, kullanıcı, şifre ve tanımlı IP adresini kontrol edin.";
+    default: return "Jandarma KBS işlemi tamamlanamadı" + (notificationId ? " (" + notificationId + ")" : "") + ".";
+  }
 }
