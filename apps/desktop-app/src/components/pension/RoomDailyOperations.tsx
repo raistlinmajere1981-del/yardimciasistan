@@ -16,14 +16,16 @@ export function RoomCheckoutAction({ model, operations, disabled, data }: {
   const room = model.room;
   const stay = model.currentStay;
   if (!room || !stay || stay.status !== "checked_in") return null;
+  const currentRoom = room;
+  const currentStay = stay;
 
   async function requestCheckout() {
-    const account = model.operations?.accounts.find(item => item.stayId === stay.id);
-    const guestIds = (stay.guests ?? []).filter(guest => guest.status === "checked_in").map(guest => guest.customerId);
+    const account = model.operations?.accounts.find(item => item.stayId === currentStay.id);
+    const guestIds = (currentStay.guests ?? []).filter(guest => guest.status === "checked_in").map(guest => guest.customerId);
     const openOrders = (data.tableOperations ?? []).filter(table => table.order
       && data.tables.some(resource => resource.id === table.tableId && guestIds.includes(resource.currentCustomerId)));
     const approved = await confirm({
-      eyebrow: room.name,
+      eyebrow: currentRoom.name,
       title: "Misafir çıkışı",
       description: account?.remainingMinor
         ? "Tüm misafirlerin çıkışı yapılır. Kalan borç ortak hesapta açık kalır; tahsilat ayrıca kaydedilir."
@@ -32,8 +34,8 @@ export function RoomCheckoutAction({ model, operations, disabled, data }: {
       tone: account?.remainingMinor ? "warning" : "info",
       details: <>
         <RoomCheckoutConfirmationDetails
-          roomLabel={room.number ? `Oda ${room.number}` : room.name}
-          stay={stay}
+          roomLabel={currentRoom.number ? `Oda ${currentRoom.number}` : currentRoom.name}
+          stay={currentStay}
           account={account}
         />
         {openOrders.length > 0 && <p role="alert">
@@ -41,7 +43,7 @@ export function RoomCheckoutAction({ model, operations, disabled, data }: {
         </p>}
       </>
     });
-    if (approved) void operations.checkout(stay.id);
+    if (approved) void operations.checkout(currentStay.id);
   }
 
   return <>
