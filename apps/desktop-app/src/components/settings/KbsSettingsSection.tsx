@@ -119,7 +119,7 @@ export function useKbsSettings(enabled: boolean) {
       return { ok: true, changed: true, message: result.message };
     } catch {
       const message = "Kimlik Bildirim Sistemi ayarları kaydedilemedi.";
-      setFeedback({ error: true, message });
+      setFeedback({ error: false, message: "" });
       return { ok: false, message };
     } finally {
       saveInFlight.current = false;
@@ -156,7 +156,7 @@ export function useKbsSettings(enabled: boolean) {
   const discard = () => {
     if (saving) return;
     setDraft(toDraft(settings));
-    setFeedback({ error: false, message: "KBS değişiklikleri geri alındı." });
+    setFeedback({ error: false, message: "" });
   };
 
   return {
