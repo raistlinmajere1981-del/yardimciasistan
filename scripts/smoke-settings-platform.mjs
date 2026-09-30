@@ -70,6 +70,27 @@ try {
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
   await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [] }));
   await expect(page.locator('#settings-product-data')).toHaveCount(0);
+  await expect(page.locator('#settings-kbs')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('kimlik bildirim');
+  await expect(page.getByRole('button', { name: 'Servisler · Kimlik Bildirim Sistemi', exact: true })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  const kbsCalls = () => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'kbs'));
+  const kbsBefore = (await kbsCalls()).length;
+  await page.getByLabel('Kimlik Bildirim Sistemi servisi').check();
+  await page.getByLabel('KBS kullanıcı adı').fill('smoke-kbs-user');
+  await page.getByLabel('KBS kullanıcı T.C. kimlik no').fill('10000000146');
+  await page.getByLabel('KBS parolası').fill('smoke-kbs-password');
+  await expect(tab('Servisler')).toContainText('Değişiklik var');
+  expect((await kbsCalls()).length).toBe(kbsBefore);
+  await save();
+  expect((await kbsCalls()).length).toBe(kbsBefore + 1);
+  expect((await kbsCalls()).at(-1).input).toMatchObject({
+    enabled: true,
+    provider: 'egm',
+    username: 'smoke-kbs-user',
+    authorizedIdentityNumber: '10000000146'
+  });
+  await expect(tab('Servisler')).not.toContainText('Değişiklik var');
   await select('İşletme');
 
   await expect(page.locator('#settings-public-profile')).toHaveAttribute('aria-busy', 'false');
