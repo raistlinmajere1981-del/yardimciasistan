@@ -32,7 +32,7 @@ export function useRoomFolioController(roomId: string, enabled: boolean, refresh
     void refresh();
   }, [refresh, refreshKey]);
 
-  async function mutate(operation: () => Promise<DesktopRoomFolioMutationResult>, scope: "account" | "adjustments" | "details" = "account") {
+  async function mutate(operation: () => Promise<DesktopRoomFolioMutationResult>, _scope: "account" | "adjustments" | "details" = "account") {
     if (!enabled || mutating.current) return null;
     mutating.current = true;
     const current = begin();
