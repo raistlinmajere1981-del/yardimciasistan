@@ -109,7 +109,7 @@ try {
   await expect(note).toHaveValue('Escape ile kaydet');
   await page.evaluate(() => { window.fixtureFailNote = true; });
   await note.fill('Kaybolmamalı'); await note.press('Tab');
-  await expect(workspace.getByRole('alert')).toHaveText('Not reddedildi.');
+  await expect(page.locator('.global-message-bar')).toContainText('Not reddedildi.');
   expect(await page.evaluate(() => window.fixtureOpen('table-b'))).toBe(false);
   await button('Ödendi / Kapat').click();
   let closeConfirm = page.locator('.confirm-dialog');
@@ -120,7 +120,7 @@ try {
   await button('Ödendi / Kapat').click();
   closeConfirm = page.locator('.confirm-dialog');
   await closeConfirm.getByRole('button', { name: 'Ödendi / Kapat', exact: true }).click();
-  await expect(workspace.getByRole('alert')).toHaveText('Kapatma reddedildi.');
+  await expect(page.locator('.global-message-bar')).toContainText('Kapatma reddedildi.');
   expect((await state()).finance).toBe(0);
   await page.evaluate(() => { window.fixtureFailClose = false; window.fixtureDelayClose = true; });
   await button('Ödendi / Kapat').click();
@@ -195,7 +195,7 @@ try {
   await note.fill('Odaya aktarım notu'); await note.press('Tab');
   await expect.poll(async () => (await state()).orders[0].items[0].note).toBe('Odaya aktarım notu');
   await page.evaluate(() => { window.fixtureFailTransfer = true; });
-  await button('Oda Hesabına Aktar · Oda 101').click(); await expect(workspace.getByRole('alert')).toHaveText('Aktarım reddedildi.');
+  await button('Oda Hesabına Aktar · Oda 101').click(); await expect(page.locator('.global-message-bar')).toContainText('Aktarım reddedildi.');
   const stock = (await state()).dashboard.menu.items[0].stock_quantity;
   await page.evaluate(() => { window.fixtureFailTransfer = false; window.fixtureDelayTransfer = true; });
   await button('Oda Hesabına Aktar · Oda 101').click(); await expect(button("Masa çalışma alanını kapat")).toBeDisabled();
