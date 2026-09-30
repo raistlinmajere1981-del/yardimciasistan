@@ -207,8 +207,14 @@ export async function updateSupportReportStatus(reportId, status, { resolvedInVe
   if (!safeStatus) throw new Error("Geçersiz rapor durumu.");
   const meta = await readSupportReportMeta(reportId);
   const now = new Date().toISOString();
+  const {
+    reviewing_at: _reviewingAt,
+    resolved_at: _resolvedAt,
+    resolved_in_version: _resolvedInVersion,
+    ...baseMeta
+  } = meta;
   const next = {
-    ...meta,
+    ...baseMeta,
     status: safeStatus,
     ...(safeStatus === "reviewing" ? { reviewing_at: now } : {}),
     ...(safeStatus === "resolved"
@@ -225,7 +231,9 @@ export async function updateSupportReportStatus(reportId, status, { resolvedInVe
   const localMeta = join(reportDir, "meta.json");
   writeFileSync(localMeta, JSON.stringify(next, null, 2) + "\n", { mode: 0o600 });
 
-  const destination = `${SUPPORT_HOST}:${reportRemotePath(reportId, "meta.json")}`;
+  const remoteMeta = reportRemotePath(reportId, "meta.json");
+  const remoteTemp = reportRemotePath(reportId, ".meta.admin.tmp");
+  const destination = `${SUPPORT_HOST}:${remoteTemp}`;
   const upload = await runCommand({
     command: "scp",
     args: ["-q", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localMeta, destination],
@@ -233,5 +241,10 @@ export async function updateSupportReportStatus(reportId, status, { resolvedInVe
     mode: "capture"
   });
   if (upload.exitCode !== 0) throw new Error(upload.stderr.trim() || "Rapor durumu güncellenemedi.");
+
+  const activate = await ssh(`chmod 600 ${remoteTemp} && mv ${remoteTemp} ${remoteMeta}`);
+  if (activate.exitCode !== 0) {
+    throw new Error(activate.stderr.trim() || "Rapor durumu atomik olarak etkinleştirilemedi.");
+  }
   return next;
 }
