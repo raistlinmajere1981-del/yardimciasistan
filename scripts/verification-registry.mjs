@@ -407,6 +407,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-support-endpoint.mjs") return [];
   if (file === "scripts/smoke-desktop-package.mjs") return ["package-desktop-dir"];
   if (file === "scripts/smoke-android-device-ui.mjs") {
     return ["build-packages", "build-desktop", "build-android-debug"];
@@ -446,6 +447,10 @@ function smokeDomains(file) {
     domains.add("hospitality");
     domains.add("customers");
     domains.add("desktop");
+  }
+  if (name === "support-endpoint") {
+    domains.add("diagnostics");
+    domains.add("web");
   }
 
   if (domains.size === 0) domains.add("platform");
