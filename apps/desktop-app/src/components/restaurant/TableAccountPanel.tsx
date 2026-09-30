@@ -107,7 +107,6 @@ export function TableAccountPanel({ table, data, controller, disabled, customers
       {customerStay && <p>Aktif konaklama · {customerStay.roomNumber ? `Oda ${customerStay.roomNumber}` : customerStay.roomName}</p>}
     </section>}
     {relatedReservations.map(item => <article className="operation-section" key={item.id}><h4>{item.customerName || item.title}</h4><p>Rezervasyon · {item.startDate} {item.time} · {item.guestCount} kişi</p></article>)}
-    <p role={controller.error ? "alert" : "status"}>{controller.busy ? "İşlem kaydediliyor..." : controller.loading ? "Adisyon yükleniyor..." : controller.message}</p>
     {confirmDialog}
   </>;
 }
