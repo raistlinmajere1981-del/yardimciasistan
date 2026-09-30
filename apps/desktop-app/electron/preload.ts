@@ -254,6 +254,8 @@ export interface DesktopBridge {
   getKbsSettings: () => Promise<KbsSettings>;
   saveKbsSettings: (input: SaveKbsSettingsInput) => Promise<KbsSettingsSaveResult>;
   testKbsConnection: (input: SaveKbsSettingsInput) => Promise<KbsConnectionTestResult>;
+  markKbsNotificationSentExternally: (notificationId: string) => Promise<DesktopStatusUpdateResult>;
+  retryKbsNotification: (notificationId: string) => Promise<DesktopStatusUpdateResult>;
   geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
@@ -426,6 +428,8 @@ const bridge: DesktopBridge = {
   getKbsSettings: () => invokeWhenUnlocked<KbsSettings>("kbs:getSettings"),
   saveKbsSettings: (input) => invokeWhenUnlocked<KbsSettingsSaveResult>("kbs:saveSettings", input),
   testKbsConnection: (input) => invokeWhenUnlocked<KbsConnectionTestResult>("kbs:testConnection", input),
+  markKbsNotificationSentExternally: (notificationId) => invokeWhenUnlocked<DesktopStatusUpdateResult>("kbs:markNotificationSentExternally", notificationId),
+  retryKbsNotification: (notificationId) => invokeWhenUnlocked<DesktopStatusUpdateResult>("kbs:retryNotification", notificationId),
   geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
