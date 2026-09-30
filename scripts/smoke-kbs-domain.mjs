@@ -164,7 +164,9 @@ try {
   assert.equal(failed.ok, false);
   assert.equal(failed.state, "failed");
   const failedRow = db.prepare("SELECT status, provider, provider_reference FROM hospitality_notifications WHERE id = ?").get(arrival.id);
-  assert.deepEqual(failedRow, { status: "failed", provider: "egm", provider_reference: "smoke_failure" });
+  assert.equal(failedRow.status, "failed");
+  assert.equal(failedRow.provider, "egm");
+  assert.equal(failedRow.provider_reference, "smoke_failure");
 
   const sentAdapter = {
     provider: "egm",
