@@ -173,7 +173,7 @@ export function useDesktopSync({
         setAutomaticSyncStatus((current) => ({
           ...current,
           phase: "error",
-          message: "Güncelleme durumu okunamadı. Şimdi Eşitle ile yeniden deneyin."
+          message: "Eşitleme durumu okunamadı. İnternet ve web bağlantısı ayarlarını kontrol edin."
         }));
       });
 
@@ -193,7 +193,7 @@ export function useDesktopSync({
 
   const pullRequests = useCallback(async () => {
     setSyncState("loading");
-    setStatusMessage("Web talepleri kontrol ediliyor...");
+    setStatusMessage("");
 
     const bridge = window.yardimciDesktop;
     if (!bridge) {
@@ -215,8 +215,13 @@ export function useDesktopSync({
             : `${cycle.message} Ekran verileri de yenilenemedi.`);
           return;
         }
-        setSyncState(cycle.ok ? "success" : "error");
-        setStatusMessage(cycle.message);
+        if (cycle.ok) {
+          setSyncState("idle");
+          setStatusMessage("");
+        } else {
+          setSyncState("error");
+          setStatusMessage(cycle.message);
+        }
         return;
       }
 
@@ -234,8 +239,8 @@ export function useDesktopSync({
         setStatusMessage("Web talepleri alındı ancak ekran verileri yenilenemedi. Uygulamayı yeniden başlatmayı deneyin.");
         return;
       }
-      setSyncState("success");
-      setStatusMessage(result.count > 0 ? `${result.count} talep alındı.` : "Yeni talep bulunmuyor.");
+      setSyncState("idle");
+      setStatusMessage("");
     } catch {
       setSyncState("error");
       setStatusMessage("Bağlantı kontrol edilemedi. İnternet ve web modülü ayarlarını kontrol edip yeniden deneyin.");
