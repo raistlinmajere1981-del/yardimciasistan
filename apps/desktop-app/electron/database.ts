@@ -140,8 +140,6 @@ export type {
   DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopDashboardData,
-  DesktopHospitalityNotification,
-  DesktopKbsOverview,
   DesktopKbsDeliveryMutationResult,
   DesktopReportPreset,
   DesktopReportRangeInput,
