@@ -89,9 +89,27 @@ try {
   await button('Çay ürününü siparişe ekle').click();
   await expect.poll(() => page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'start').length)).toBe(1);
   await expect(workspace.locator('.restaurant-order-line__image[alt="Çay"]')).toBeVisible();
-  await expect(workspace.getByLabel('Sipariş durumu')).toHaveValue('open');
+  const firstOrderLine = workspace.locator('.restaurant-order-line').filter({ hasText: 'Çay' }).first();
+  await expect(firstOrderLine).not.toContainText('Açık');
+  const orderStatus = workspace.getByRole('group', { name: 'Sipariş durumu', exact: true });
+  await expect(orderStatus).toBeVisible();
+  await expect(orderStatus.getByRole('button', { name: 'Açık', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(button('Adisyonu İptal Et')).toBeVisible();
+  await expect(workspace.getByText('Diğer işlemler', { exact: true })).toHaveCount(0);
   await expect(button('Tükenen ürününü siparişe ekle')).toBeDisabled();
   await button('Çay adetini artır').click(); expect((await state()).orders[0].total).toBe(50);
+
+  const accountPanel = workspace.getByRole('region', { name: 'Masa hesabı', exact: true });
+  await accountPanel.getByRole('button', { name: 'Düzenle', exact: true }).click();
+  await accountPanel.getByLabel('İndirim tutarı', { exact: true }).fill('10');
+  await accountPanel.getByRole('button', { name: 'Uygula', exact: true }).click();
+  await expect.poll(async () => (await state()).orders[0].discountTotal).toBe(10);
+  expect((await state()).orders[0].total).toBe(40);
+  await accountPanel.getByRole('button', { name: 'Düzenle', exact: true }).click();
+  await accountPanel.getByRole('button', { name: 'İndirimi Kaldır', exact: true }).click();
+  await expect.poll(async () => (await state()).orders[0].discountTotal).toBe(0);
+  expect((await state()).orders[0].total).toBe(50);
+
   await button('Çay adetini azalt').click();
   await expect(workspace.getByLabel('Çay notu')).toHaveCount(0);
   await button('Çay için not ekle').click();
