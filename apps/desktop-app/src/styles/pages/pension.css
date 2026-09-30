@@ -7,6 +7,44 @@
   gap: var(--space-3);
 }
 
+.room-bed-layout__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.room-bed-layout__toolbar > .action-button {
+  flex: 0 0 auto;
+}
+
+.room-guest-slot-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.room-guest-slot-wrap > .room-guest-slot {
+  width: 100%;
+  height: 100%;
+}
+
+.room-guest-slot-wrap.is-manual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.room-guest-slot-wrap.is-manual > .icon-button {
+  align-self: center;
+}
+
+.room-bed-group--manual {
+  border-style: dashed;
+}
+
 .room-bed-group {
   display: grid;
   gap: var(--space-2);
