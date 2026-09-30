@@ -228,6 +228,7 @@ export function DesktopWorkspaceRouter({
   });
   const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
   const [kbsEgmSessionRequest, setKbsEgmSessionRequest] = useState(0);
+  const [kbsSessionRetryNotificationId, setKbsSessionRetryNotificationId] = useState("");
   const kbsController = useKbsNotificationController({
     setDashboardData,
     setSyncState,
@@ -263,6 +264,7 @@ export function DesktopWorkspaceRouter({
     setSelectedKbsCustomerId(customerId);
     setCustomerWorkTab("kbs");
     if (surfaceData.kbsOverview.provider === "egm") {
+      setKbsSessionRetryNotificationId(notificationId);
       setKbsEgmSessionRequest((value) => value + 1);
     }
   }
@@ -474,6 +476,8 @@ export function DesktopWorkspaceRouter({
               selectedCustomerId={selectedKbsCustomerId}
               controller={kbsController}
               egmSessionRequest={kbsEgmSessionRequest}
+              sessionRetryNotificationId={kbsSessionRetryNotificationId}
+              onSessionRetryConsumed={() => setKbsSessionRetryNotificationId("")}
             />
           )}
           messages={(
