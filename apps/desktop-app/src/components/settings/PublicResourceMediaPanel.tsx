@@ -12,6 +12,7 @@ import type {
   PublicResourceMediaKind
 } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
+import { reportAppStatus } from "../../app/runtime-state";
 
 const MEDIA_KIND_OPTIONS: Array<{ id: PublicResourceMediaKind; label: string; chip: string }> = [
   { id: "cover", label: "Kapak görseli", chip: "Kapak" },
@@ -107,7 +108,6 @@ export function PublicResourceMediaPanel({
 }: PublicResourceMediaPanelProps) {
   const [media, setMedia] = useState<PublicResourceMediaAssetFields[]>([]);
   const [state, setState] = useState<MediaState>("idle");
-  const [message, setMessage] = useState("");
 
   const resourceId = resource?.id ?? "";
   const mediaEnabled = Boolean(resourceId) && !disabled;
@@ -115,7 +115,6 @@ export function PublicResourceMediaPanel({
 
   useEffect(() => {
     setMedia([]);
-    setMessage("");
     setState("idle");
 
     if (!resourceId) return;
@@ -130,7 +129,7 @@ export function PublicResourceMediaPanel({
       .catch((error) => {
         if (cancelled) return;
         setState("error");
-        setMessage(error instanceof Error ? error.message : `${resourceLabel} medyaları okunamadı.`);
+        reportAppStatus("error", error instanceof Error ? error.message : `${resourceLabel} medyaları okunamadı.`);
       });
 
     return () => {
@@ -146,11 +145,13 @@ export function PublicResourceMediaPanel({
       const result = await addMedia(resourceId);
       setMedia(result.media);
       setState(result.ok ? "idle" : "error");
-      setMessage(result.message.includes("iptal") ? "" : result.message);
+      if (!result.message.toLocaleLowerCase("tr-TR").includes("iptal")) {
+        reportAppStatus(result.ok ? "success" : "error", result.message);
+      }
       if (typeof result.dirty === "boolean") onDirtyChange(result.dirty);
     } catch (error) {
       setState("error");
-      setMessage(error instanceof Error ? error.message : "Medya eklenemedi.");
+      reportAppStatus("error", error instanceof Error ? error.message : "Medya eklenemedi.");
     }
   };
 
@@ -165,11 +166,11 @@ export function PublicResourceMediaPanel({
       const result = await updateMedia(resourceId, item, kind);
       setMedia(result.media);
       setState(result.ok ? "idle" : "error");
-      setMessage(result.message);
+      reportAppStatus(result.ok ? "success" : "error", result.message);
       if (typeof result.dirty === "boolean") onDirtyChange(result.dirty);
     } catch (error) {
       setState("error");
-      setMessage(error instanceof Error ? error.message : "Medya türü güncellenemedi.");
+      reportAppStatus("error", error instanceof Error ? error.message : "Medya türü güncellenemedi.");
     }
   };
 
@@ -181,11 +182,11 @@ export function PublicResourceMediaPanel({
       const result = await deleteMedia(resourceId, item);
       setMedia(result.media);
       setState(result.ok ? "idle" : "error");
-      setMessage(result.message);
+      reportAppStatus(result.ok ? "success" : "error", result.message);
       if (typeof result.dirty === "boolean") onDirtyChange(result.dirty);
     } catch (error) {
       setState("error");
-      setMessage(error instanceof Error ? error.message : "Medya kaldırılamadı.");
+      reportAppStatus("error", error instanceof Error ? error.message : "Medya kaldırılamadı.");
     }
   };
 
@@ -245,11 +246,6 @@ export function PublicResourceMediaPanel({
         <p className="room-media-panel-note">
           JPG · PNG · WebP · MP4 · WebM · Değişiklikler Kaydet'e kadar web'e gönderilmez.
         </p>
-        {message && (
-          <p className={state === "error" ? "form-status sync-error" : "form-status"}>
-            {message}
-          </p>
-        )}
       </div>
 
       <div className="room-media-panel-scroll">
