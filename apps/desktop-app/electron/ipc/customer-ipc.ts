@@ -28,9 +28,9 @@ export function registerCustomerIpcHandlers(options: {
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
   }
-  ipcMain.handle("customer:addStayGuest", (_event, input: StayGuestInput) => {
+  ipcMain.handle("customer:addStayGuest", async (_event, input: StayGuestInput): Promise<DesktopCustomerMutationResult> => {
     assertStayAccess();
-    return finalizeCustomerMutation(getDatabase().addStayGuest(input));
+    return finalizeCheckInMutation(getDatabase().addStayGuest(input));
   });
   ipcMain.handle("customer:changeStayPrimary", (_event, input: StayGuestInput) => {
     assertStayAccess();
@@ -92,10 +92,14 @@ export function registerCustomerIpcHandlers(options: {
 
   ipcMain.handle(
     "customer:updateRoomStayStatus",
-    (_event, input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult => {
+    async (_event, input: UpdateCustomerRoomStayStatusInput): Promise<DesktopCustomerMutationResult> => {
+      options.assertUnlocked();
       assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
       assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
-      return finalizeCustomerMutation(getDatabase().updateCustomerRoomStayStatus(input));
+      const result = getDatabase().updateCustomerRoomStayStatus(input);
+      return input.status === "checked_in"
+        ? finalizeCheckInMutation(result)
+        : finalizeCustomerMutation(result);
     }
   );
 }
