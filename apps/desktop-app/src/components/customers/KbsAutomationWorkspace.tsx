@@ -223,6 +223,7 @@ export function KbsAutomationWorkspace({
           {overview.provider === "egm" && <ActionButton
             size="sm"
             variant="secondary"
+            disabled={!overview.configured}
             onClick={() => {
               credentialsAttempted.current = false;
               setEgmSessionOpen((open) => !open);
@@ -313,7 +314,7 @@ export function KbsAutomationWorkspace({
               {notification.status !== "sent" && <ActionButton
                 variant="primary"
                 size="sm"
-                disabled={!notification.identityReady || controller.busyNotificationId === notification.id}
+                disabled={!overview.configured || !notification.identityReady || controller.busyNotificationId === notification.id}
                 onClick={() => { void sendNotification(notification.id); }}
               >
                 <IdCard size={15} aria-hidden="true" />
