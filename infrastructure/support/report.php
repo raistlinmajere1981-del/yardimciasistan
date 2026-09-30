@@ -11,6 +11,7 @@ const YA_SUPPORT_MAX_SESSIONS = 3;
 const YA_SUPPORT_MAX_EVENTS = 120000;
 const YA_SUPPORT_HOURLY_LIMIT = 10;
 const YA_SUPPORT_DAILY_LIMIT = 30;
+const YA_SUPPORT_MIN_FREE_BYTES = 512 * 1024 * 1024;
 
 function ya_support_json(int $status, array $payload): never {
     http_response_code($status);
@@ -50,15 +51,9 @@ function ya_support_safe_app_version(string $value): string {
     return preg_match('/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $value) === 1 ? $value : '';
 }
 
-function ya_support_rate_limit(string $root, string $clientId): void {
-    $rateDir = $root . DIRECTORY_SEPARATOR . '.rate';
-    ya_support_ensure_dir($rateDir);
-
-    $remoteIp = trim((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-    $bucket = hash('sha256', $remoteIp . '|' . $clientId);
-    $file = $rateDir . DIRECTORY_SEPARATOR . $bucket . '.json';
+function ya_support_rate_bucket(string $rateDir, string $bucketValue): void {
+    $file = $rateDir . DIRECTORY_SEPARATOR . hash('sha256', $bucketValue) . '.json';
     $now = time();
-
     $handle = fopen($file, 'c+');
     if ($handle === false) {
         throw new RuntimeException('Rate-limit kaydı açılamadı.');
@@ -79,8 +74,6 @@ function ya_support_rate_limit(string $root, string $clientId): void {
 
         $hourCount = count(array_filter($timestamps, static fn(int $stamp): bool => $stamp >= $now - 3600));
         if ($hourCount >= YA_SUPPORT_HOURLY_LIMIT || count($timestamps) >= YA_SUPPORT_DAILY_LIMIT) {
-            flock($handle, LOCK_UN);
-            fclose($handle);
             ya_support_json(429, [
                 'ok' => false,
                 'message' => 'Kısa sürede çok fazla hata raporu gönderildi. Bir süre sonra tekrar deneyin.'
@@ -98,6 +91,14 @@ function ya_support_rate_limit(string $root, string $clientId): void {
         if (is_resource($handle)) fclose($handle);
     }
     @chmod($file, 0600);
+}
+
+function ya_support_rate_limit(string $root, string $clientId): void {
+    $rateDir = $root . DIRECTORY_SEPARATOR . '.rate';
+    ya_support_ensure_dir($rateDir);
+    $remoteIp = trim((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+    ya_support_rate_bucket($rateDir, 'ip:' . $remoteIp);
+    ya_support_rate_bucket($rateDir, 'client:' . $clientId);
 }
 
 function ya_support_validate_session(array $session): array {
@@ -241,6 +242,10 @@ try {
 
     $root = ya_support_storage_root();
     ya_support_ensure_dir($root);
+    $freeBytes = @disk_free_space($root);
+    if (is_float($freeBytes) && $freeBytes < YA_SUPPORT_MIN_FREE_BYTES) {
+        ya_support_json(507, ['ok' => false, 'message' => 'Destek sunucusunda geçici olarak yeterli depolama alanı yok.']);
+    }
     ya_support_rate_limit($root, $clientId);
 
     $reportId = ya_support_report_id();
