@@ -84,6 +84,7 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
   try {
     ensureKbsSettingsTable(db);
     const now = new Date().toISOString();
+    db.exec("BEGIN IMMEDIATE");
     db.prepare(`
       INSERT INTO kbs_service_settings (
         id, enabled, provider, facility_code, username, authorized_identity_number,
@@ -112,6 +113,10 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
     if (!current.enabled && normalized.enabled) {
       backfillActiveArrivalNotifications(db, now);
     }
+    db.exec("COMMIT");
+  } catch {
+    try { db.exec("ROLLBACK"); } catch { /* no active transaction */ }
+    return { ok: false, message: "Kimlik Bildirim Sistemi ayarları kaydedilemedi." };
   } finally {
     db.close();
   }
