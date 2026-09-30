@@ -112,7 +112,8 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     setDiscountEditing(false);
     setLodgingDraft(minorToInput(folio.lodgingTotalMinor));
     setDiscountDraft(minorToInput(discountMinor));
-    onDirty("inline", false);
+    onDirty("lodging", false);
+    onDirty("discount", false);
   }
 
   async function applyLodging() {
@@ -128,7 +129,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     }), "details");
     if (result?.ok) {
       setLodgingEditing(false);
-      onDirty("inline", false);
+      onDirty("lodging", false);
     }
   }
 
@@ -140,7 +141,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     }), "adjustments");
     if (result?.ok) {
       setDiscountEditing(false);
-      onDirty("inline", false);
+      onDirty("discount", false);
     }
   }
 
@@ -190,7 +191,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
                 setDiscountEditing(false);
                 setDiscountDraft(minorToInput(discountMinor));
                 setLodgingEditing(true);
-                onDirty("inline", false);
+                onDirty("discount", false);
               }}>Düzenle</ActionButton>}
             </> : <div className="room-account-inline-editor">
               <MoneyInput
@@ -218,7 +219,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
                 setLodgingEditing(false);
                 setLodgingDraft(minorToInput(folio.lodgingTotalMinor));
                 setDiscountEditing(true);
-                onDirty("inline", false);
+                onDirty("lodging", false);
               }}>Düzenle</ActionButton>}
             </> : <div className="room-account-inline-editor">
               <MoneyInput
