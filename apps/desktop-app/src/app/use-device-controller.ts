@@ -2,7 +2,7 @@ import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopAndroidDevice, DesktopDashboardData } from "../../electron/database";
 import type { DesktopAndroidInstallationSnapshot } from "../../electron/android-installation-service";
-import type { SyncState } from "./runtime-state";
+import { reportAppStatus, type SyncState } from "./runtime-state";
 
 interface UseDeviceControllerOptions {
   setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>;
@@ -27,7 +27,8 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     }
     if (!window.yardimciDesktop?.listAndroidInstallDevices) {
       setAndroidInstallState("error");
-      setAndroidInstallMessage("Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
+      setAndroidInstallMessage("");
+      reportAppStatus("error", "Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
     setAndroidInstallState("loading");
@@ -36,10 +37,12 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
       const snapshot = await window.yardimciDesktop.listAndroidInstallDevices();
       setAndroidInstallSnapshot(snapshot);
       setAndroidInstallState(snapshot.ok ? "success" : "error");
-      setAndroidInstallMessage(snapshot.message);
+      setAndroidInstallMessage("");
+      if (!snapshot.ok) reportAppStatus("error", snapshot.message);
     } catch {
       setAndroidInstallState("error");
-      setAndroidInstallMessage("USB Android cihazları okunamadı.");
+      setAndroidInstallMessage("");
+      reportAppStatus("error", "USB Android cihazları okunamadı.");
     }
   }, [androidEnabled]);
 
@@ -60,15 +63,14 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     try {
       const result = await window.yardimciDesktop.installAndroidApp(serial);
       setAndroidInstallState(result.ok ? "success" : "error");
-      setAndroidInstallMessage(result.message);
+      setAndroidInstallMessage("");
+      reportAppStatus(result.ok ? "success" : "error", result.message);
       await refreshAndroidInstallDevices();
-      if (result.ok) {
-        setAndroidInstallState("success");
-        setAndroidInstallMessage(result.message);
-      }
+      if (result.ok) setAndroidInstallState("success");
     } catch {
       setAndroidInstallState("error");
-      setAndroidInstallMessage("Android uygulaması kurulamadı.");
+      setAndroidInstallMessage("");
+      reportAppStatus("error", "Android uygulaması kurulamadı.");
     }
   }
 
@@ -81,7 +83,8 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     }
     if (!window.yardimciDesktop?.provisionAndroidApp) {
       setAndroidInstallState("error");
-      setAndroidInstallMessage("Android bağlantı aracı hazır değil. Uygulamayı yeniden başlatın.");
+      setAndroidInstallMessage("");
+      reportAppStatus("error", "Android bağlantı aracı hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
     setAndroidInstallState("loading");
@@ -89,15 +92,14 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     try {
       const result = await window.yardimciDesktop.provisionAndroidApp(serial);
       setAndroidInstallState(result.ok ? "success" : "error");
-      setAndroidInstallMessage(result.message);
+      setAndroidInstallMessage("");
+      reportAppStatus(result.ok ? "success" : "error", result.message);
       await refreshAndroidInstallDevices();
-      if (result.ok) {
-        setAndroidInstallState("success");
-        setAndroidInstallMessage(result.message);
-      }
+      if (result.ok) setAndroidInstallState("success");
     } catch {
       setAndroidInstallState("error");
-      setAndroidInstallMessage("Telefon işletmeye bağlanamadı.");
+      setAndroidInstallMessage("");
+      reportAppStatus("error", "Telefon işletmeye bağlanamadı.");
     }
   }
 
@@ -126,17 +128,20 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
       const result = await operation();
       setDashboardData((current) => ({ ...current, androidDevices: result.devices }));
       setAndroidDeviceState(result.ok ? "success" : "error");
-      setAndroidDeviceMessage(result.message);
+      setAndroidDeviceMessage("");
+      reportAppStatus(result.ok ? "success" : "error", result.message);
     } catch {
       setAndroidDeviceState("error");
-      setAndroidDeviceMessage("Telefon ayarı güncellenemedi. Uygulamayı yeniden başlatın.");
+      setAndroidDeviceMessage("");
+      reportAppStatus("error", "Telefon ayarı güncellenemedi. Uygulamayı yeniden başlatın.");
     }
   }
 
   function handleSetAndroidDeviceRole(deviceId: string, role: "admin" | "staff") {
     if (!window.yardimciDesktop) {
       setAndroidDeviceState("error");
-      setAndroidDeviceMessage("Telefon yönetimi hazır değil. Uygulamayı yeniden başlatın.");
+      setAndroidDeviceMessage("");
+      reportAppStatus("error", "Telefon yönetimi hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
     void runAndroidDeviceMutation(
@@ -179,19 +184,22 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
 
     if (!window.yardimciDesktop) {
       setBackupState("error");
-      setBackupMessage("Yedekleme hazır değil. Uygulamayı yeniden başlatın.");
+      setBackupMessage("");
+      reportAppStatus("error", "Yedekleme hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
     const result = await window.yardimciDesktop.createManualBackup();
     if (!result.ok) {
       setBackupState("error");
-      setBackupMessage(result.message);
+      setBackupMessage("");
+      reportAppStatus("error", result.message);
       return;
     }
 
     setBackupState("success");
-    setBackupMessage(`${result.message} ${result.backup.folderName}`);
+    setBackupMessage("");
+    reportAppStatus("success", `${result.message} ${result.backup.folderName}`);
   }
 
   return {
