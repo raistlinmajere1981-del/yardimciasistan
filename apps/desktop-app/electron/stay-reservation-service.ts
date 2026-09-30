@@ -389,19 +389,16 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
     }
   }
 
-  let room: { id?: string; name?: string; capacity?: number; status?: string } | undefined;
+  let room: { id?: string; name?: string; status?: string } | undefined;
   if (roomId) {
     room = db
-      .prepare("SELECT id, name, capacity, status FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-      .get(roomId) as { id?: string; name?: string; capacity?: number; status?: string } | undefined;
+      .prepare("SELECT id, name, status FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+      .get(roomId) as { id?: string; name?: string; status?: string } | undefined;
     if (!room?.id) {
       return { ok: false, message: "Seçilen oda artık kullanılamıyor." };
     }
     if (String(room.status ?? "") === "maintenance") {
       return { ok: false, message: "Bakım durumundaki odaya rezervasyon açılamaz." };
-    }
-    if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity)) {
-      return { ok: false, message: `${String(room.name ?? "Oda")} en fazla ${Number(room.capacity)} kişi kapasitelidir.` };
     }
     if (hasStoredOverlappingCustomerRoomStay(db, roomId, startDate, endDate)) {
       return { ok: false, message: `${String(room.name ?? "Seçilen oda")} bu tarihlerde aktif bir konaklama kaydına bağlı.` };
