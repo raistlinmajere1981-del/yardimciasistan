@@ -144,7 +144,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/m82-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
   const closeCustomerWorkspace = async () => {
-    const workspace = page.getByRole("dialog").filter({ has: page.getByRole("tablist", { name: "Müşteri çalışma alanı" }) });
+    const workspace = page.locator("dialog.customer-workspace-frame");
     if (await workspace.count()) {
       await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
       await expect(workspace).toHaveCount(0);
@@ -153,13 +153,13 @@ try {
   const openCustomerWorkspace = async (name) => {
     await closeCustomerWorkspace();
     await page.getByRole("button", { name }).click();
-    const workspace = page.getByRole("dialog").filter({ has: page.getByRole("tablist", { name: "Müşteri çalışma alanı" }) });
+    const workspace = page.locator("dialog.customer-workspace-frame");
     await expect(workspace).toBeVisible();
     return workspace;
   };
   const openCustomerAccount = async (name) => {
     const workspace = await openCustomerWorkspace(name);
-    await workspace.getByRole("tab", { name: "Hesap", exact: true }).click();
+    await expect(workspace.getByRole("region", { name: "Veresiye hesabı", exact: true })).toBeVisible();
     return workspace;
   };
   await expect(page.getByRole("heading", { name: "Hızlı Satış", exact: true })).toBeVisible();
@@ -242,14 +242,12 @@ try {
   await expect(panel).toHaveCount(0);
   const hiddenPanelCalls = creditCalls().length;
   customerWorkspace = await openCustomerWorkspace(/Zeynep Hesap/);
-  await expect(customerWorkspace.getByRole("tab", { name: "Hesap", exact: true })).toHaveCount(0);
+  await expect(customerWorkspace.getByRole("region", { name: "Veresiye hesabı", exact: true })).toHaveCount(0);
   customerWorkspace = await openCustomerWorkspace(/Ahmet Veresiye/);
-  await expect(customerWorkspace.getByRole("tab", { name: "Hesap", exact: true })).toHaveCount(0);
+  await expect(customerWorkspace.getByRole("region", { name: "Veresiye hesabı", exact: true })).toHaveCount(0);
   assert.equal(creditCalls().length, hiddenPanelCalls, "Changing customers while disabled must not fetch accounts.");
   await page.evaluate(() => window.__m82Toggle(true));
-  await customerWorkspace.getByRole("tab", { name: "Hesap", exact: true }).click();
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");
-  await customerWorkspace.getByRole("tab", { name: "Özet", exact: true }).click();
   const deleteCallsBeforeCancel = calls.filter(call => call.method === "deleteCustomer").length;
   await customerWorkspace.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
   const deleteConfirmation = page.getByRole("dialog", { name: "Silme onayı", exact: true });
@@ -266,7 +264,6 @@ try {
 
   await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu var.");
   await expect(page.getByRole("alert").filter({ hasText: "Bu müşterinin açık veresiye borcu var." })).toHaveCount(0);
-  await customerWorkspace.getByRole("tab", { name: "Hesap", exact: true }).click();
 
   await panel.getByRole("button", { name: "Tahsilat Al", exact: true }).click();
   let payment = panel.getByRole("form", { name: "Tahsilat", exact: true });
