@@ -101,7 +101,6 @@ export function RoomDailyOperations({ model, operations, disabled, data }: {
       <h4>Oda hazırlığı</h4>
       <p>Oda hizmet dışı. Ayarlar &gt; İşletme Düzeni &gt; Oda Yönetimi&apos;nden yeniden kullanıma alınabilir.</p>
     </section>}
-    {operations.feedback?.panel === "operations" && <p role={operations.feedback.error ? "alert" : "status"}>{operations.feedback.message}</p>}
     {confirmDialog}
   </>;
 }
