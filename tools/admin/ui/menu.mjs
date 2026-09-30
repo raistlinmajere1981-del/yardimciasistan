@@ -12,6 +12,16 @@ import { formatPreflight, runPreflight } from "../runners/preflight.mjs";
 import { runSteps } from "../runners/workflow.mjs";
 import { BLACKSEA_ROOT, REPO_ROOT } from "../lib/paths.mjs";
 import { getGitStatus, renderStatusBar } from "./status.mjs";
+import {
+  downloadSupportReport,
+  extractSupportScreenshot,
+  formatSupportReportLog,
+  listSupportReports,
+  openLocalPath,
+  summarizeSupportReport,
+  supportReportsConnectionInfo,
+  updateSupportReportStatus
+} from "../support-reports.mjs";
 import { createTerminalUI } from "./terminal.mjs";
 
 export const SECTIONS = {
@@ -438,6 +448,161 @@ async function runGitOp(ui, opId, preset = {}) {
   }
 }
 
+// ---------- Hata Raporları ----------
+
+function supportStatusLabel(status) {
+  if (status === "resolved") return "✓";
+  if (status === "reviewing") return "◐";
+  return "●";
+}
+
+function formatSupportReceivedAt(value) {
+  const date = new Date(String(value ?? ""));
+  return Number.isNaN(date.getTime()) ? String(value ?? "") : date.toLocaleString("tr-TR");
+}
+
+function supportReportBody(meta, summary) {
+  const lines = [
+    `Durum: ${meta.status ?? "new"} · Sürüm: ${meta.app_version ?? "-"} · ${meta.platform ?? "-"} ${meta.arch ?? ""}`,
+    `Alındı: ${formatSupportReceivedAt(meta.received_at)}`,
+    `Oturum: ${meta.session_count ?? 0} · Kayıt: ${meta.event_count ?? 0} · WARN: ${meta.warn_count ?? 0} · ERROR: ${meta.error_count ?? 0}`,
+    `Ani kapanmış oturum: ${meta.abrupt_session_count ?? 0} · Screenshot: ${Number(meta.screenshot_bytes ?? 0) > 0 ? "var" : "yok"}`,
+  ];
+  if (summary?.note) lines.push(`Kullanıcı notu: ${summary.note}`);
+  if (summary?.recent?.length) {
+    lines.push("", "Son WARN/ERROR:");
+    for (const event of summary.recent.slice(0, 5)) {
+      const reason = event.meta?.reason ? ` · ${event.meta.reason}` : "";
+      lines.push(`• [${event.level}] ${event.scope}/${event.event}${reason} — ${event.message}`);
+    }
+  }
+  return lines;
+}
+
+async function supportReportDetail(ui, initialMeta) {
+  let meta = initialMeta;
+  let downloaded = null;
+  let summary = null;
+  let notice = "";
+
+  async function ensureDownloaded(refresh = false) {
+    if (!downloaded || refresh) {
+      downloaded = await downloadSupportReport(meta.report_id, { refresh });
+      summary = summarizeSupportReport(downloaded.bundle);
+    }
+    return downloaded;
+  }
+
+  for (;;) {
+    try {
+      await ensureDownloaded(false);
+    } catch (error) {
+      notice = `Rapor paketi indirilemedi: ${error instanceof Error ? error.message : String(error)}`;
+    }
+
+    const screenshotAvailable = Number(meta.screenshot_bytes ?? 0) > 0 || summary?.screenshotAttached;
+    const choice = await ui.select({
+      title: `Hata Raporu — ${meta.report_id}`,
+      status: renderStatusBar(),
+      body: [...supportReportBody(meta, summary), ...(notice ? ["", notice] : [])],
+      searchable: false,
+      items: [
+        { label: "Tanılama loglarını görüntüle", value: "logs", disabled: !downloaded },
+        { label: "Ekran görüntüsünü aç", value: "screenshot", disabled: !screenshotAvailable || !downloaded },
+        { label: "Sunucudan yeniden indir", value: "refresh" },
+        { label: "İnceleniyor olarak işaretle", value: "reviewing", disabled: meta.status === "reviewing" },
+        { label: "Çözüldü olarak işaretle", value: "resolved", disabled: meta.status === "resolved" },
+        { label: "Yeni durumuna geri al", value: "new", disabled: meta.status === "new" },
+        { label: "Geri", value: "back" },
+      ],
+      footer: "↑↓ seç · Enter uygula · Esc geri",
+    });
+    if (choice.action !== "pick" || choice.item.value === "back") return;
+
+    try {
+      if (choice.item.value === "logs") {
+        const report = await ensureDownloaded(false);
+        await ui.viewText({
+          title: `${meta.report_id} — tanılama logları`,
+          text: formatSupportReportLog(report.bundle) || "(log kaydı yok)"
+        });
+        notice = "";
+      } else if (choice.item.value === "screenshot") {
+        const report = await ensureDownloaded(false);
+        const screenshotPath = extractSupportScreenshot(report);
+        const result = await openLocalPath(screenshotPath);
+        notice = result.message;
+      } else if (choice.item.value === "refresh") {
+        await ensureDownloaded(true);
+        notice = "Rapor sunucudan yeniden indirildi.";
+      } else if (choice.item.value === "reviewing") {
+        meta = await updateSupportReportStatus(meta.report_id, "reviewing");
+        notice = "Rapor inceleniyor olarak işaretlendi.";
+      } else if (choice.item.value === "resolved") {
+        const version = (await ui.ask("Çözüldüğü sürüm (boş bırakılabilir): ")).trim();
+        meta = await updateSupportReportStatus(meta.report_id, "resolved", { resolvedInVersion: version });
+        notice = version ? `Rapor çözüldü: ${version}` : "Rapor çözüldü olarak işaretlendi.";
+      } else if (choice.item.value === "new") {
+        meta = await updateSupportReportStatus(meta.report_id, "new");
+        notice = "Rapor yeni durumuna alındı.";
+      }
+    } catch (error) {
+      notice = error instanceof Error ? error.message : String(error);
+    }
+  }
+}
+
+async function supportReportsSection(ui) {
+  const connection = supportReportsConnectionInfo();
+  for (;;) {
+    let reports;
+    try {
+      reports = await listSupportReports(100);
+    } catch (error) {
+      await ui.viewText({
+        title: "Hata Raporları",
+        text: [
+          "Destek raporu kutusuna bağlanılamadı.",
+          "",
+          error instanceof Error ? error.message : String(error),
+          "",
+          `SSH: ${connection.host}`,
+          `Dizin: ${connection.remoteRoot}`
+        ].join("\n")
+      });
+      return;
+    }
+
+    const newCount = reports.filter((report) => (report.status ?? "new") === "new").length;
+    const choice = await ui.select({
+      title: "Hata Raporları",
+      status: renderStatusBar(),
+      body: [
+        `${reports.length} rapor · ${newCount} yeni`,
+        "Raporlar private Alwaysdata dizininden SSH ile okunur; public listeleme endpoint'i yoktur."
+      ],
+      items: reports.length
+        ? reports.map((report) => ({
+            label: `${supportStatusLabel(report.status)} ${report.report_id}`,
+            description: [
+              report.app_version || "-",
+              report.platform || "-",
+              `E:${report.error_count ?? 0}`,
+              `W:${report.warn_count ?? 0}`,
+              formatSupportReceivedAt(report.received_at)
+            ].join(" · "),
+            searchText: `${report.report_id} ${report.status} ${report.app_version} ${report.platform}`,
+            value: report.report_id
+          }))
+        : [{ label: "Henüz hata raporu yok", disabled: true }],
+      footer: "↑↓ seç · Enter aç · Esc geri · / filtre"
+    });
+    if (choice.action !== "pick") return;
+    const selected = reports.find((report) => report.report_id === choice.item.value);
+    if (selected) await supportReportDetail(ui, selected);
+  }
+}
+
 // ---------- Son Çalıştırmalar ----------
 
 async function historySection(ui) {
@@ -566,6 +731,7 @@ const MAIN = [
   { key: "fresh", label: "Temiz Başlangıç", description: "Fresh/clean flag ezberlemeden sonuç seç" },
   { key: "git", label: "Git", description: "Günlük güvenli Git işlemleri" },
   { key: "devtools", label: "Geliştirici Araçları", description: "Dev sunucuları, loglar ve tanılama" },
+  { key: "support", label: "Hata Raporları", description: "Kullanıcı screenshot + son oturum tanılama raporlarını incele" },
   { key: "history", label: "Son Çalıştırmalar", description: "Rapor, log ve tekrar çalıştırma" },
   { key: "npm", label: "npm Scriptleri", description: "package.json scriptlerini filtreleyerek çalıştır" },
 ];
@@ -591,6 +757,7 @@ export async function mainLoop(ui) {
     else if (key === "npm") await npmScriptRunner(ui);
     else if (key === "git") await gitSection(ui);
     else if (key === "history") await historySection(ui);
+    else if (key === "support") await supportReportsSection(ui);
     else await sectionScreen(ui, key);
   }
 }
