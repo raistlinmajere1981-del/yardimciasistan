@@ -50,25 +50,37 @@
   grid-column: 1 / -1;
 }
 
-.identity-ai-note {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+.customer-note-field textarea,
+.customer-address-field textarea {
+  min-height: calc(var(--control-height-md) * 2);
+  resize: vertical;
+}
+
+.customer-birth-field {
+  --field-width: 100%;
+}
+
+.customer-birth-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.customer-birth-controls > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .customer-birthday-toggle {
-  align-items: flex-start;
-  padding-top: var(--space-1);
+  flex: 0 0 auto;
+  min-height: var(--control-height-md);
+  white-space: nowrap;
 }
 
-.customer-birthday-toggle > span {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.customer-birthday-toggle small {
+.customer-birthday-toggle:has(input:disabled) {
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
 }
 
 .request-ai-reply {
@@ -505,20 +517,20 @@
     flex-direction: column;
     align-items: stretch;
   }
+  .customer-birth-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .customer-birthday-toggle {
+    min-height: var(--control-height-sm);
+    white-space: normal;
+  }
 }
 
 
 .identity-back-side-toggle {
-  align-items: flex-start;
+  align-items: center;
   max-width: 34rem;
-}
-.identity-back-side-toggle > span {
-  display: grid;
-  gap: var(--space-1);
-}
-.identity-back-side-toggle small {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
 }
 
 .form-dialog:has(.identity-camera-overlay) {
