@@ -90,11 +90,13 @@ export function RoomDailyOperations({ model, operations, disabled, data }: {
 
   return <>
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
-      <h4>{stay.customerName}</h4>
-      {model.canCheckIn(stay.id) && <><p>Giriş yalnız listedeki {(stay.guests ?? []).filter(guest => guest.status === "planned").length} kayıtlı misafir için yapılır.</p>
-        <ActionButton disabled={disabled} onClick={() => void requestCheckIn(stay)}>Giriş Yap</ActionButton></>}
-      {stay.status === "planned" && !model.canCheckIn(stay.id) && <p>Giriş için oda hazır, boş ve konaklama kayıtları çakışmasız olmalı.</p>}
-      {stay.status === "checked_in" && <ActionButton disabled={disabled} onClick={() => void requestCheckout(stay)}>Misafir Çıkışı</ActionButton>}
+      <div className="room-section-heading">
+        <h4>{stay.status === "checked_in" ? "Konaklama" : "Planlanan giriş"}</h4>
+        <span>{formatDateRange(stay.checkInDate, stay.checkOutDate)}</span>
+      </div>
+      {model.canCheckIn(stay.id) && <ActionButton disabled={disabled} onClick={() => void requestCheckIn(stay)}>Giriş Yap</ActionButton>}
+      {stay.status === "planned" && !model.canCheckIn(stay.id) && <p>Giriş için oda hazır ve boş olmalı.</p>}
+      {stay.status === "checked_in" && <ActionButton disabled={disabled} onClick={() => void requestCheckout(stay)}>Çıkışı Tamamla</ActionButton>}
       {stay.status === "planned" && <ActionButton variant="danger" disabled={disabled} onClick={() => void requestCancel(stay)}>Planı İptal Et</ActionButton>}
     </section>)}
     {isOutOfService && <section className="operation-section form-stack">
