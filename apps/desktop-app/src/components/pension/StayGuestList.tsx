@@ -80,21 +80,23 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
     />
 
     {addingGuest && <section className="room-slot-editor form-stack" aria-label="Boş slota misafir ata">
-      <StayGuestPicker
-        data={data}
-        selectedIds={guests.map(guest => guest.customerId)}
-        disabled={disabled || Boolean(room && room.capacity > 0 && guests.length >= room.capacity)}
-        onSelect={id => {
-          void operations.mutate("stay", () => window.yardimciDesktop!.addStayGuest({ stayId: stay.id, customerId: id }))
-            .then(ok => {
-              if (ok) {
-                setAddingGuest(false);
-                setSelectedSlot(-1);
-              }
-            });
-        }}
-      />
-      {onCreateCustomer && <ActionButton variant="secondary" disabled={disabled} onClick={onCreateCustomer}>+ Yeni müşteri</ActionButton>}
+      <div className="room-inline-action-row">
+        <StayGuestPicker
+          data={data}
+          selectedIds={guests.map(guest => guest.customerId)}
+          disabled={disabled || Boolean(room && room.capacity > 0 && guests.length >= room.capacity)}
+          onSelect={id => {
+            void operations.mutate("stay", () => window.yardimciDesktop!.addStayGuest({ stayId: stay.id, customerId: id }))
+              .then(ok => {
+                if (ok) {
+                  setAddingGuest(false);
+                  setSelectedSlot(-1);
+                }
+              });
+          }}
+        />
+        {onCreateCustomer && <ActionButton variant="secondary" disabled={disabled} onClick={onCreateCustomer}>+ Yeni müşteri</ActionButton>}
+      </div>
     </section>}
 
     {selectedGuest && !addingGuest && <section className="room-slot-editor form-stack" aria-label="Misafir işlemleri">
@@ -137,26 +139,27 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
     {stay.status === "checked_in" && <details className="stay-management-details">
       <summary>Konaklama işlemleri</summary>
       <div className="form-stack">
-        <div className="form-field">
-          <span>Odayı değiştir</span>
-          <SearchSelect
-            ariaLabel="Yeni oda"
-            value={nextRoom}
-            disabled={disabled}
-            onChange={id => {
-              setNextRoom(id);
-              onDirty(Boolean(id));
-            }}
-            options={data.rooms
-              .filter(candidate => candidate.id !== stay.roomId && candidate.isActive && !["cleaning", "maintenance", "out_of_service", "occupied"].includes(candidate.status))
-              .map(candidate => ({
-                id: candidate.id,
-                label: candidate.number ? `Oda ${candidate.number}` : candidate.name,
-                description: `${candidate.capacity} kişilik`
-              }))}
-          />
-        </div>
-        <ActionButton variant="secondary" disabled={disabled || !nextRoom} onClick={async () => {
+        <div className="room-inline-action-row">
+          <div className="form-field">
+            <span>Odayı değiştir</span>
+            <SearchSelect
+              ariaLabel="Yeni oda"
+              value={nextRoom}
+              disabled={disabled}
+              onChange={id => {
+                setNextRoom(id);
+                onDirty(Boolean(id));
+              }}
+              options={data.rooms
+                .filter(candidate => candidate.id !== stay.roomId && candidate.isActive && !["cleaning", "maintenance", "out_of_service", "occupied"].includes(candidate.status))
+                .map(candidate => ({
+                  id: candidate.id,
+                  label: candidate.number ? `Oda ${candidate.number}` : candidate.name,
+                  description: `${candidate.capacity} kişilik`
+                }))}
+            />
+          </div>
+          <ActionButton variant="secondary" disabled={disabled || !nextRoom} onClick={async () => {
           if (!await confirm({
             title: "Odayı değiştir",
             description: "Ortak hesap ve anlaşılmış fiyat korunur. Eski oda temizlik bekler.",
@@ -167,7 +170,8 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
             setNextRoom("");
             onDirty(false);
           }
-        }}>Odayı Değiştir</ActionButton>
+          }}>Odayı Değiştir</ActionButton>
+        </div>
       </div>
     </details>}
 
