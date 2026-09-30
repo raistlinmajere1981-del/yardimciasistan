@@ -159,7 +159,7 @@ try {
   const share = () => panel.getByRole("button", { name: "WhatsApp'ta Paylaş", exact: true }).click();
   const preparedCount = () => calls.filter((call) => call.method === "prepareCustomerCreditWhatsApp").length;
   const toggle = (capability, enabled) => page.evaluate(([capability, enabled]) => window.__m83Toggle(capability, enabled), [capability, enabled]);
-  const customerWorkspace = () => page.getByRole("dialog").filter({ has: page.getByRole("tablist", { name: "Müşteri çalışma alanı" }) });
+  const customerWorkspace = () => page.locator("dialog.customer-workspace-frame");
   const closeCustomerWorkspace = async () => {
     const workspace = customerWorkspace();
     if (!await workspace.count()) return;
@@ -180,10 +180,7 @@ try {
     return workspace;
   };
   const openAccount = async () => {
-    const workspace = await ensureCustomerWorkspace();
-    const accountTab = workspace.getByRole("tab", { name: "Hesap", exact: true });
-    await expect(accountTab).toBeVisible();
-    await accountTab.click();
+    await ensureCustomerWorkspace();
     await expect(panel.locator(".customer-credit-balances")).toBeVisible();
     const expand = panel.getByRole("button", { name: "Hesabı Aç", exact: true });
     if (await expand.count()) await expand.click();
@@ -328,7 +325,7 @@ try {
   await expect(panel).toHaveCount(0);
   const activeCustomerWorkspace = customerWorkspace();
   if (await activeCustomerWorkspace.count()) {
-    await expect(activeCustomerWorkspace.getByRole("tab", { name: "Hesap", exact: true })).toHaveCount(0);
+    await expect(activeCustomerWorkspace.getByRole("region", { name: "Veresiye hesabı", exact: true })).toHaveCount(0);
   }
   const hiddenReads = calls.filter((call) => call.method === "getCustomerCreditAccount").length;
   await navigate("Market"); await navigate("Müşteriler");
