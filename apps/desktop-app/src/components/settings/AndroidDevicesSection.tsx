@@ -188,8 +188,6 @@ export function AndroidDevicesSection({
           </div>
         </div>
       )}
-      <p className={`menu-status sync-${installState}`} role={installState === "error" ? "alert" : "status"} aria-live="polite">{installMessage}</p>
-
       <div className="android-devices-heading">
         <div>
           <h3>Cihazlar ve Yetkiler</h3>
@@ -313,7 +311,6 @@ export function AndroidDevicesSection({
           </div>
         </details>
       )}
-      <p className={`menu-status sync-${state}`} role={state === "error" ? "alert" : "status"} aria-live="polite">{message}</p>
     </section>
   );
 }
