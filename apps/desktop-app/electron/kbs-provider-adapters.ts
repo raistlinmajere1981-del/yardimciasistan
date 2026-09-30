@@ -1,6 +1,7 @@
 import type { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
 import {
   prepareJandarmaArrival,
+  selectJandarmaOperation,
   type KbsDeliveryInput,
   type KbsDeliveryResult,
   type KbsProviderAdapter
@@ -53,29 +54,32 @@ export class JandarmaKbsProviderAdapter implements KbsProviderAdapter {
   readonly provider = "jandarma" as const;
 
   async send(input: KbsDeliveryInput): Promise<KbsDeliveryResult> {
-    if (input.kind !== "arrival") {
+    const selected = selectJandarmaOperation(input);
+    if (!selected.ok) {
       return {
         ok: false,
         state: "waiting",
         provider: this.provider,
-        retryable: true,
-        code: "jandarma_operation_binding_pending",
-        message: "Jandarma KBS çıkış ve oda değişikliği SOAP bağları gerçek servis sözleşmesiyle doğrulanmayı bekliyor."
+        retryable: false,
+        code: "jandarma_payload_invalid",
+        message: selected.message
       };
     }
 
-    const prepared = prepareJandarmaArrival(input);
-    if (!prepared.ok) {
-      return {
-        ok: false,
-        state: "waiting",
-        provider: this.provider,
-        retryable: prepared.path !== "invalid",
-        code: prepared.path === "foreign_document"
-          ? "jandarma_foreign_document_binding_pending"
-          : "jandarma_payload_invalid",
-        message: prepared.message
-      };
+    if (selected.selection.operation === "MusteriKimlikNoGiris") {
+      const prepared = prepareJandarmaArrival(input);
+      if (!prepared.ok) {
+        return {
+          ok: false,
+          state: "waiting",
+          provider: this.provider,
+          retryable: prepared.path !== "invalid",
+          code: prepared.path === "foreign_document"
+            ? "jandarma_foreign_document_binding_pending"
+            : "jandarma_payload_invalid",
+          message: prepared.message
+        };
+      }
     }
 
     return {
@@ -84,7 +88,7 @@ export class JandarmaKbsProviderAdapter implements KbsProviderAdapter {
       provider: this.provider,
       retryable: true,
       code: "jandarma_soap_binding_unverified",
-      message: "Jandarma KBS giriş verisi hazır. SOAP action/namespace gerçek WSDL ile doğrulanmadan canlı gönderim yapılmayacak."
+      message: `Jandarma KBS ${selected.selection.operation} verisi hazır. SOAP action/namespace gerçek WSDL ile doğrulanmadan canlı gönderim yapılmayacak.`
     };
   }
 }
