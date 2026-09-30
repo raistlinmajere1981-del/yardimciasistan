@@ -624,3 +624,18 @@
   .kbs-overview-grid { grid-template-columns: minmax(0, 1fr); }
   .customer-filter-row { justify-content: flex-start; }
 }
+
+
+.kbs-operations-session {
+  display: grid;
+  gap: var(--space-3);
+  min-height: 30rem;
+  padding: var(--space-3);
+}
+.kbs-operations-webview {
+  width: 100%;
+  min-height: 34rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--color-bg-panel);
+}
