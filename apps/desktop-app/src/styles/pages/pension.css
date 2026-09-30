@@ -179,9 +179,56 @@
   width: 100%;
 }
 
+
+
+.room-inline-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.room-inline-action-row > .form-field {
+  min-width: 0;
+}
+
+.room-inline-action-row > .action-button {
+  align-self: end;
+  white-space: nowrap;
+}
+
+.room-inline-action-row--charge {
+  grid-template-columns: minmax(5.5rem, 0.62fr) minmax(8rem, 1.38fr) auto;
+}
+
+.room-inline-action-row--payment {
+  grid-template-columns: minmax(5.5rem, 0.62fr) minmax(7rem, 0.82fr) auto;
+}
+
+.room-money-field {
+  max-width: 9rem;
+}
+
+.room-payment-method-field {
+  min-width: 7rem;
+}
+
+.room-money-field input,
+.room-payment-method-field select {
+  width: 100%;
+  min-width: 0;
+}
+
 @media (max-width: 760px) {
-  .room-stay-dates {
+  .room-stay-dates,
+  .room-inline-action-row,
+  .room-inline-action-row--charge,
+  .room-inline-action-row--payment {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .room-money-field {
+    max-width: none;
   }
 
   .room-stay-dates > .action-button {
