@@ -113,6 +113,7 @@ import type {
   AddTableOrderItemInput,
   UpdateTableOrderItemQuantityInput,
   UpdateTableOrderItemNoteInput,
+  UpdateTableOrderDiscountInput,
   UpdateTableOrderStatusInput,
   DesktopTableOrderResult,
   UpdateReservationStatusInput,
@@ -192,6 +193,7 @@ export type {
   AddTableOrderItemInput,
   UpdateTableOrderItemQuantityInput,
   UpdateTableOrderItemNoteInput,
+  UpdateTableOrderDiscountInput,
   UpdateTableOrderStatusInput,
   DesktopTableOrderResult,
   UpdateReservationStatusInput,
@@ -965,6 +967,14 @@ export class DesktopDatabase {
 
   updateTableOrderItemNote(input: UpdateTableOrderItemNoteInput): DesktopTableOrderResult {
     return updateStoredTableOrderItemNote(this.db, input);
+  }
+
+  updateTableOrderDiscount(input: UpdateTableOrderDiscountInput): DesktopTableOrderResult {
+    const result = updateStoredTableOrderDiscount(this.db, input);
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   removeTableOrderItem(itemId: string): DesktopTableOrderResult {
@@ -2295,6 +2305,7 @@ import {
   addTableOrderItem as addStoredTableOrderItem,
   updateTableOrderItemQuantity as updateStoredTableOrderItemQuantity,
   updateTableOrderItemNote as updateStoredTableOrderItemNote,
+  updateTableOrderDiscount as updateStoredTableOrderDiscount,
   removeTableOrderItem as removeStoredTableOrderItem,
   updateTableOrderStatus as updateStoredTableOrderStatus,
   closeTableOrder as closeStoredTableOrder,
