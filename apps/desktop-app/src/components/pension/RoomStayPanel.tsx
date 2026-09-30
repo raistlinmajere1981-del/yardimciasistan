@@ -157,6 +157,13 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
             onChange={id => { setReservationId(id); setDraft(current => ({ ...current, customerId: eligible.find(item => item.id === id)?.customerId || "" })); setAdditional([]); markEntry(true); }} />
         </div>}
         {selected && <p>Rezervasyon · {selected.startDate} – {selected.endDate} · Beklenen {selected.guestCount} kişi</p>}
+        {!selected && <div className="operation-fields room-entry-dates">
+          <div className="form-field"><span>Giriş tarihi</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate}
+            onChange={value => { setDraft({ ...draft, checkInDate: value }); markEntry(true); }} /></div>
+          <div className="form-field"><span>Çıkış tarihi</span><DatePicker ariaLabel="Çıkış tarihi" value={draft.checkOutDate} min={draft.checkInDate || undefined}
+            presets={draft.checkInDate ? [1, 2, 7].map(days => ({ label: `${days} gün`, value: addDays(draft.checkInDate, days) })) : []}
+            onChange={value => { setDraft({ ...draft, checkOutDate: value }); markEntry(true); }} /></div>
+        </div>}
         <RoomGuestSlots
           capacity={room.capacity}
           bedInfo={room.bedInfo}
@@ -186,12 +193,6 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
           </div>
           <ActionButton type="button" variant="ghost" disabled={disabled} onClick={() => removeDraftGuest(selectedDraftGuestId)}>Listeden Çıkar</ActionButton>
         </section>}
-        {!selected && <div className="operation-fields">
-          <div className="form-field"><span>Giriş tarihi</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate} onChange={value => { setDraft({ ...draft, checkInDate: value }); markEntry(true); }} /></div>
-          <div className="form-field"><span>Çıkış tarihi</span><DatePicker ariaLabel="Çıkış tarihi" value={draft.checkOutDate} min={draft.checkInDate || undefined}
-            presets={draft.checkInDate ? [1, 2, 7].map(days => ({ label: `${days} gün`, value: addDays(draft.checkInDate, days) })) : []}
-            onChange={value => { setDraft({ ...draft, checkOutDate: value }); markEntry(true); }} /></div>
-        </div>}
         {!selected && <details><summary>Giriş notu</summary><textarea aria-label="Giriş notu" rows={2} value={draft.notes} onChange={event => { setDraft({ ...draft, notes: event.target.value }); markEntry(true); }} /></details>}
         {model.canCreate ? <ActionButton type="submit" disabled={!canEnter}>Giriş Yap · {guestIds.length} kişi</ActionButton> : <p>Yeni giriş için oda hazır ve boş olmalı.</p>}
       </fieldset>
