@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { Eye, LockKeyhole, RefreshCw, ScrollText, UploadCloud } from "lucide-react";
+import { Eye, LockKeyhole, ScrollText, UploadCloud } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
@@ -24,6 +24,8 @@ import type {
 import type { DesktopDashboardData } from "../../../electron/database";
 import { AppShell } from "../layout/AppShell";
 import { PageHeader } from "../layout/PageHeader";
+import { GlobalMessageBar, type GlobalMessageTone } from "../layout/GlobalMessageBar";
+import { SyncStatusIndicator } from "../layout/SyncStatusIndicator";
 import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
@@ -124,19 +126,41 @@ function DesktopAppFrameContent({
       ? Boolean(hospitalitySessions.restaurant)
       : false;
   const automaticSyncNeedsAttention = automaticSyncStatus.phase === "offline" || automaticSyncStatus.phase === "error";
-  const automaticSyncDisplayMessage = automaticSyncStatus.phase === "offline"
-    ? OFFLINE_SYNC_MESSAGE
-    : automaticSyncNeedsAttention
-      ? automaticSyncStatus.message
-      : automaticSyncStatus.phase === "disabled"
-        ? "Otomatik senkron kapalı."
-        : automaticSyncStatus.lastSuccessAt
-          ? "Tüm veriler güncel."
-          : "Otomatik senkron hazır.";
-  const syncDisplayMessage = syncState === "idle" ? automaticSyncDisplayMessage : statusMessage;
-  const syncDisplayState = syncState === "idle"
-    ? (automaticSyncNeedsAttention ? "error" : "idle")
-    : syncState;
+  const operationNotice = syncState !== "idle" && statusMessage.trim()
+    ? {
+        tone: syncState === "error"
+          ? "error" as GlobalMessageTone
+          : syncState === "success"
+            ? "success" as GlobalMessageTone
+            : "loading" as GlobalMessageTone,
+        message: statusMessage.trim()
+      }
+    : null;
+  const menuNotice = activePage === "menu" && menuPublishState !== "idle" && menuStatusMessage.trim()
+    ? {
+        tone: menuPublishState === "error"
+          ? "error" as GlobalMessageTone
+          : menuPublishState === "success"
+            ? "success" as GlobalMessageTone
+            : "loading" as GlobalMessageTone,
+        message: menuStatusMessage.trim()
+      }
+    : null;
+  const automaticSyncNotice = automaticSyncNeedsAttention
+    ? {
+        tone: "error" as GlobalMessageTone,
+        message: automaticSyncStatus.phase === "offline"
+          ? OFFLINE_SYNC_MESSAGE
+          : automaticSyncStatus.message || "Web eşitleme işlemi tamamlanamadı. Bağlantı ayarlarını kontrol edin."
+      }
+    : null;
+  const centralNotice = operationNotice?.tone === "error"
+    ? operationNotice
+    : menuNotice?.tone === "error"
+      ? menuNotice
+      : automaticSyncNotice
+        ?? operationNotice
+        ?? menuNotice;
 
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
@@ -203,13 +227,16 @@ function DesktopAppFrameContent({
           eyebrow={pageMeta.eyebrow}
           title={pageMeta.title}
           description={pageMeta.description}
+          notice={centralNotice ? (
+            <GlobalMessageBar
+              tone={centralNotice.tone}
+              message={centralNotice.message}
+            />
+          ) : undefined}
           action={(
             <div className="page-header-tools">
               {activePage === "menu" ? (
-                <div className={`sync-pill sync-${menuPublishState}`}>
-                  <span role="status" aria-live="polite">
-                    {qrMenuEnabled ? menuStatusMessage : "Menü içeriği yerel olarak düzenleniyor."}
-                  </span>
+                <>
                   <button className="action-button action-button-secondary action-button-sm secondary-sync-action" type="button" onClick={openMenuPreview}>
                     <Eye size={16} aria-hidden="true" />
                     Önizle
@@ -220,26 +247,13 @@ function DesktopAppFrameContent({
                       Web'e Yayınla
                     </button>
                   )}
-                </div>
-              ) : activePage === "settings" ? null : (
-                <div className={`sync-pill sync-${syncDisplayState}`}>
-                  <span role="status" aria-live="polite">
-                    {syncDisplayMessage}
-                    {automaticSyncNeedsAttention && automaticSyncStatus.pendingJobs > 0
-                      ? ` · ${automaticSyncStatus.pendingJobs} eşitleme bekliyor`
-                      : ""}
-                  </span>
-                  <button
-                    className="action-button action-button-sm"
-                    type="button"
-                    title={automaticSyncNeedsAttention ? automaticSyncStatus.message : "Web ve cihaz verilerini şimdi eşitle"}
-                    onClick={handlePullRequests}
-                    disabled={syncState === "loading"}
-                  >
-                    <RefreshCw size={16} aria-hidden="true" />
-                    {syncState === "loading" ? "Eşitleniyor" : "Şimdi Eşitle"}
-                  </button>
-                </div>
+                </>
+              ) : (
+                <SyncStatusIndicator
+                  syncState={syncState}
+                  automaticSyncStatus={automaticSyncStatus}
+                  onSync={() => void handlePullRequests()}
+                />
               )}
               {notificationsEnabled && <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />}
               <button
