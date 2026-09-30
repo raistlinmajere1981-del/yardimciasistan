@@ -29,9 +29,10 @@ export function TableAccountPanel({ table, controller, disabled, onCloseOrder }:
   }, [order?.id, order?.discountTotal]);
 
   if (!order) return null;
+  const activeOrder = order;
 
   async function applyDiscount(value = discountMajor ?? 0) {
-    if (disabled || !Number.isFinite(value) || value < 0 || value > order.subtotal) return;
+    if (disabled || !Number.isFinite(value) || value < 0 || value > activeOrder.subtotal) return;
     if (await controller.discount(value)) setDiscountEditing(false);
   }
 
@@ -44,8 +45,8 @@ export function TableAccountPanel({ table, controller, disabled, onCloseOrder }:
       tone: "warning",
       details: <dl className="operation-facts">
         <div><dt>Masa</dt><dd>{table.name}</dd></div>
-        <div><dt>Ürün</dt><dd>{order.itemCount} adet</dd></div>
-        <div><dt>Toplam</dt><dd>{formatMoney(order.total, getOrderCurrency(order))}</dd></div>
+        <div><dt>Ürün</dt><dd>{activeOrder.itemCount} adet</dd></div>
+        <div><dt>Toplam</dt><dd>{formatMoney(activeOrder.total, getOrderCurrency(activeOrder))}</dd></div>
       </dl>
     });
     if (approved) onCloseOrder("paid");
