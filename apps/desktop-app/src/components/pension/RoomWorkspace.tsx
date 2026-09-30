@@ -113,7 +113,9 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
         />}
       </>}
       status={null}>
-      {model.currentStay ? <span>{model.currentStay.guestCount}/{room.capacity} dolu · {model.currentStay.customerName}</span>
+      {model.currentStay ? <span>{model.currentStay.guestCount > room.capacity
+        ? `${model.currentStay.guestCount} kişi · ${room.capacity} kişilik oda · ${model.currentStay.customerName}`
+        : `${model.currentStay.guestCount}/${room.capacity} dolu · ${model.currentStay.customerName}`}</span>
         : <span>{model.conflict ? "Konaklama kayıtlarını kontrol edin." : model.active.length ? "Planlanan konaklama var." : `0/${room.capacity} dolu`}</span>}
     </ResourceWorkspaceSummary>}
     actions={<>
