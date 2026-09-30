@@ -360,6 +360,12 @@ details.table-area-group > .resource-grid { margin-top: var(--space-3); }
   text-align: center;
   font-size: var(--text-sm);
 }
+.restaurant-order-empty > p {
+  margin: 0;
+}
+.restaurant-order-empty > .action-button {
+  margin-top: var(--space-3);
+}
 
 .restaurant-reservations-workspace {
   display: grid;
