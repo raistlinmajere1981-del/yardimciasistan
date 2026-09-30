@@ -253,7 +253,9 @@ try {
 
   await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   await expect(page.locator('.global-message-bar')).toHaveCount(0);
+  await expect(page.locator('.page-header__notice')).toHaveCount(1);
   await expect(page.getByText('Şimdi Eşitle', { exact: true })).toHaveCount(0);
+  const headerHeightWithoutNotice = await page.locator('.page-header').evaluate((element) => element.getBoundingClientRect().height);
 
   const syncIndicator = page.getByRole('button', { name: /Eşitleme durumu:/ });
   await expect(syncIndicator).toBeVisible();
@@ -267,6 +269,8 @@ try {
     }));
   });
   await expect(page.locator('.global-message-bar')).toContainText('Smoke merkezi hata mesajı.');
+  const headerHeightWithNotice = await page.locator('.page-header').evaluate((element) => element.getBoundingClientRect().height);
+  expect(Math.abs(headerHeightWithNotice - headerHeightWithoutNotice)).toBeLessThan(0.5);
 
   await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).focus();
   await page.keyboard.press('Tab');
