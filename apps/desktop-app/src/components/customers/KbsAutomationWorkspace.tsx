@@ -303,7 +303,7 @@ export function KbsAutomationWorkspace({
                 onClick={() => navigation.openWorkspace({
                   entityType: "customer",
                   entityId: notification.customerId,
-                  mode: notification.identityReady ? "summary" : "details",
+                  mode: "main",
                   returnContext: { page: "customerWork", entityId: notification.customerId }
                 })}
               >
