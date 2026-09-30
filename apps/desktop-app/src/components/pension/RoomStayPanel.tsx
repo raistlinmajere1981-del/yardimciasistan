@@ -149,16 +149,6 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     {confirmDialog}
     {model.conflict && <p role="alert">Oda kayıtlarında çakışma var. Yeni girişten önce kayıtları kontrol edin.</p>}
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
-      <div className="room-section-heading">
-        <h4>Misafirler</h4>
-        <ActionButton
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={disabled || Math.max(1, room.capacity, (stay.guests ?? []).filter(guest => ["planned", "checked_in"].includes(guest.status)).length) + extraSlots >= 50}
-          onClick={() => setExtraSlots(current => Math.min(50, current + 1))}
-        >+ Slot Ekle</ActionButton>
-      </div>
       <StayGuestList stay={stay} data={data} operations={operations} disabled={disabled} onDirty={onDirty} onCreateCustomer={onCreateCustomer} />
     </section>)}
     {staysEnabled && !active.length && room.isActive && <form className="operation-section form-stack" aria-label="Misafir girişi"
