@@ -68,13 +68,14 @@ try {
   await expect(workspace.getByRole('tab')).toHaveCount(0);
   await button('Çalışma alanını kapat').click();
   await button('Pilot 102 odasını aç').click();
-  const stayPanel = workspace.getByRole('region', { name: 'Oda ve Misafir', exact: true });
+  const stayPanel = workspace.getByRole('region', { name: 'Misafirler ve Konaklama', exact: true });
   const operations = workspace.locator('#room-operations');
-  const account = workspace.getByRole('region', { name: 'Misafir Hesabı', exact: true });
-  await expect(stayPanel.getByLabel('Ana misafir', { exact: true })).toBeVisible();
+  const account = workspace.getByRole('region', { name: 'Hesap', exact: true });
+  await expect(stayPanel.getByLabel('Oda misafir slotları', { exact: true })).toBeVisible();
+  await expect(stayPanel.getByRole('button', { name: /boş misafir slotu/ }).first()).toBeVisible();
   await expect(workspace.getByLabel('Fiziksel oda durumu')).toBeVisible();
   await expect(operations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
-  await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toBeVisible();
+  await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toHaveCount(0);
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => !['read', 'assignment'].includes(call.kind)))).toEqual([]);
   await captureOperationWorkspace(page, 'room-empty');
   await chooseSearchSelect(operations, 'Atanacak rezervasyon', /Pilot rezervasyon 0/);
@@ -102,6 +103,7 @@ try {
     window.fixturePatch({ tables: [{ ...state.dashboard.tables[0], id: 'departure-table', currentCustomerId: customerId }],
       tableOperations: [{ tableId: 'departure-table', order: { id: 'departure-order', status: 'open' } }] });
   });
+  await stayPanel.getByRole('button', { name: /Kompakt Misafir 1 misafir slotu/ }).click();
   await stayPanel.getByRole('button', { name: 'Misafir Çıkışı', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('1 açık restoran adisyonu');
   await expect(page.getByText('Kalan hesap', { exact: true })).toBeVisible();
@@ -135,7 +137,8 @@ try {
   await button('Çalışma alanını kapat').click();
   await button('Pilot 101 odasını aç').click();
   // Başka odada aktif müşteri, misafir listesinde disabled görünür.
-  const otherStayPanel = workspace.getByRole('region', { name: 'Oda ve Misafir', exact: true });
+  const otherStayPanel = workspace.getByRole('region', { name: 'Misafirler ve Konaklama', exact: true });
+  await otherStayPanel.getByRole('button', { name: /boş misafir slotu/ }).first().click();
   await otherStayPanel.getByLabel('Misafir ekle', { exact: true }).click();
   const customerPicker = page.getByRole('dialog', { name: 'Misafir ekle seçici', exact: true });
   const activeOption = customerPicker.getByRole('option', { name: /Aktif konaklaması var/ });
@@ -149,7 +152,7 @@ try {
     window.fixturePatch({ rooms: current.dashboard.rooms.map(room => room.id === 'room-101' ? { ...room, status: 'cleaning' } : room) });
   });
   await button('Pilot 102 odasını aç').click();
-  await expect(operations.getByRole('button', { name: 'Misafir Çıkışı', exact: true })).toBeVisible();
+  await expect(operations.getByRole('button', { name: 'Çıkışı Tamamla', exact: true })).toBeVisible();
   await expect(account.getByLabel('Ödeme tutarı')).toBeVisible();
   await captureOperationWorkspace(page, 'room-occupied');
   await chooseSearchSelect(operations, 'Ürün / hizmet', /Çay/);
@@ -185,7 +188,7 @@ try {
   await account.getByLabel('Ödeme tutarı').fill(String(remainingBeforeCheckout / 100));
   await account.getByRole('button', { name: 'Ödemeyi Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.fixtureState().folios[0].remainingMinor)).toBe(0);
-  await operations.getByRole('button', { name: 'Misafir Çıkışı', exact: true }).click();
+  await operations.getByRole('button', { name: 'Çıkışı Tamamla', exact: true }).click();
   const checkoutConfirm = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
   await expect(checkoutConfirm).toContainText('Kalan hesap');
   await expect(checkoutConfirm).toContainText('hesap kapanır');
@@ -200,7 +203,7 @@ try {
   expect(checkoutPayment.input.amountMinor).toBe(remainingBeforeCheckout);
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentCallsBeforeCheckout + 1);
   await expect(account.getByRole('region', { name: 'Mevcut konaklama hesabı' })).toContainText('Aktif misafir hesabı yok');
-  await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toContainText('Önceki konaklamalardan açık hesap yok.');
+  await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toHaveCount(0);
   const roomCondition = workspace.getByRole('group', { name: 'Fiziksel oda durumu', exact: true });
   await roomCondition.getByRole('button', { name: 'Hazır', exact: true }).click();
   await expect(roomCondition.getByRole('button', { name: 'Hazır', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -238,7 +241,7 @@ try {
   await expect(customerDialog).toHaveCount(0);
   await expect(workspace).toBeVisible();
   const manualEntryForm = workspace.getByRole('form', { name: 'Misafir girişi', exact: true });
-  await expect(manualEntryForm.getByText('Kompakt Misafir 1 · Ana misafir', { exact: true })).toBeVisible();
+  await expect(manualEntryForm.getByRole('button', { name: 'Kompakt Misafir 1 misafir slotu', exact: true })).toBeVisible();
   await chooseDate(workspace, 'Giriş tarihi', '2031-01-01'); await chooseDate(workspace, 'Çıkış tarihi', '2031-01-02');
   await manualEntryForm.getByRole('button', { name: /Giriş Yap/, exact: false }).click();
   await expect.poll(() => page.evaluate(() => window.fixtureState().dashboard.customerRoomStays.length)).toBe(2);
@@ -276,7 +279,8 @@ try {
     if (variant !== 'no-menu') expect(await variantPage.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'read').length)).toBe(0);
     if (variant === 'rooms-only') await expect(workspace.getByRole('button', { name: /Giriş Yap/ })).toHaveCount(0);
     else {
-      await chooseSearchSelect(workspace, 'Ana misafir', /^Kompakt Misafir 1(?:\s|$)/);
+      await workspace.getByRole('button', { name: /boş misafir slotu/ }).first().click();
+      await chooseSearchSelect(workspace, 'Misafir ekle', /^Kompakt Misafir 1(?:\s|$)/);
       if (variant === 'no-menu') await variantPage.evaluate(() => { window.fixtureFailOpening = true; });
       await workspace.getByRole('button', { name: /Giriş Yap/, exact: false }).click();
       if (variant === 'no-menu') {
@@ -285,7 +289,7 @@ try {
         expect(failed.dashboard.customerRoomStays).toHaveLength(0);
         expect(failed.folios).toHaveLength(0);
         expect(failed.dashboard.rooms.find(room => room.id === 'room-102').status).toBe('available');
-        await expect(workspace.getByLabel('Ana misafir', { exact: true })).toContainText('Kompakt Misafir 1');
+        await expect(workspace.getByRole('button', { name: 'Kompakt Misafir 1 misafir slotu', exact: true })).toBeVisible();
         await variantPage.evaluate(() => { window.fixtureFailOpening = false; });
         await workspace.getByRole('button', { name: /Giriş Yap/ }).click();
         await expect(workspace).toContainText('Misafir girişi tamamlandı');
@@ -305,7 +309,7 @@ try {
   const safety = await open(), safetyWorkspace = safety.locator('.workspace-page-frame');
   await safety.evaluate(seedOperationsCardScene, { kind: 'pension' });
   await safety.getByRole('button', { name: 'Oda 106 odasını aç' }).click();
-  await expect(safetyWorkspace.getByLabel('Ana misafir', { exact: true })).toBeVisible();
+  await expect(safetyWorkspace.getByRole('button', { name: /boş misafir slotu/ }).first()).toBeVisible();
   expect(await safety.evaluate(() => window.fixtureCalls.filter(call => call.kind !== 'read'))).toEqual([]);
   await captureOperationWorkspace(safety, 'room-empty');
   const sameSurface = await safetyWorkspace.locator('.operation-surface').elementHandle();
