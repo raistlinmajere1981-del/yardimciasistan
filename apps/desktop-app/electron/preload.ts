@@ -262,6 +262,7 @@ export interface DesktopBridge {
   registerKbsWebview: (webContentsId: number) => void;
   unregisterKbsWebview: (webContentsId: number) => void;
   inspectEgmKbsSession: () => Promise<EgmKbsSessionResult>;
+  prepareStoredEgmKbsLogin: () => Promise<EgmKbsSessionResult>;
   prepareEgmKbsLogin: (input: SaveKbsSettingsInput) => Promise<EgmKbsSessionResult>;
   geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
@@ -441,6 +442,7 @@ const bridge: DesktopBridge = {
   registerKbsWebview: (webContentsId) => ipcRenderer.send("kbs:registerWebview", webContentsId),
   unregisterKbsWebview: (webContentsId) => ipcRenderer.send("kbs:unregisterWebview", webContentsId),
   inspectEgmKbsSession: () => invokeWhenUnlocked<EgmKbsSessionResult>("kbs:inspectEgmSession"),
+  prepareStoredEgmKbsLogin: () => invokeWhenUnlocked<EgmKbsSessionResult>("kbs:prepareStoredEgmLogin"),
   prepareEgmKbsLogin: (input) => invokeWhenUnlocked<EgmKbsSessionResult>("kbs:prepareEgmLogin", input),
   geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
