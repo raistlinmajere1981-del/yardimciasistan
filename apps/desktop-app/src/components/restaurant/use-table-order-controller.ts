@@ -173,6 +173,7 @@ export function useTableOrderController(tableId: string, enabled: boolean,
       });
     },
     quantity: (id: string, value: number) => mutate(() => bridge().updateTableOrderItemQuantity(id, value)),
+    discount: (discountTotal: number) => mutate(() => bridge().updateTableOrderDiscount(orderRef.current!.id, discountTotal)),
     removeItem: (id: string) => mutate(() => bridge().removeTableOrderItem(id)),
     status: (status: "preparing" | "served" | "payment") => mutate(() => setTableOrderStatus(orderRef.current!.id, status)),
     closeTableOrder: (status: "paid" | "cancelled") => mutate(() => bridge().closeTableOrder(orderRef.current!.id, status))
