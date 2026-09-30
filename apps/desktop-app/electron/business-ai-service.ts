@@ -16,6 +16,8 @@ import type {
   RewriteRequestAiSuggestionInput
 } from "./database";
 import { createDesktopAiConfig } from "./ai-config";
+import { createDiagnosticOperationId } from "./desktop-logger";
+import { logAiFallback, logAiOperationCompleted, logAiOperationStarted } from "./ai-diagnostics";
 import { createCurrentBusinessAiContext } from "./business-ai-context-service";
 import { createRelevantBusinessAiCatalogContext } from "./business-ai-catalog-service";
 
@@ -59,6 +61,9 @@ export async function createOwnerReplySuggestionForRequest(
   });
 
   if (saveResult.ok && suggestion.providerMessage) {
+    logAiFallback("owner-reply", suggestion.providerMessage, {
+      requestType: request.request_type
+    });
     return {
       ...saveResult,
       message: `${saveResult.message} ${suggestion.providerMessage} Yerel güvenli taslak kullanıldı.`
@@ -99,6 +104,9 @@ export async function generateDailyBusinessEvaluation(
     };
   }
 
+  const operationId = createDiagnosticOperationId("ai-daily");
+  const startedAt = Date.now();
+  logAiOperationStarted("daily-evaluation", config, operationId);
   const completion = await generateConfiguredChat({
     ...config,
     messages: buildDailyBusinessEvaluationMessages({
@@ -107,6 +115,7 @@ export async function generateDailyBusinessEvaluation(
       businessContext
     })
   });
+  logAiOperationCompleted("daily-evaluation", config, completion, startedAt, operationId);
 
   if (!completion.ok) {
     return {
