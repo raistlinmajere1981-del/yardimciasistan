@@ -5,8 +5,8 @@ import type { RoomFolioController } from "./use-room-folio-controller";
 import { RoomAccountPayment } from "./RoomAccountPayment";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 
-export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous, disabled, onDirty }: {
-  controller: RoomFolioController; menuEnabled: boolean; currentStayId?: string; ambiguous: boolean; disabled: boolean;
+export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolioId, ambiguous, disabled, onDirty }: {
+  controller: RoomFolioController; menuEnabled: boolean; currentStayId?: string; focusFolioId?: string; ambiguous: boolean; disabled: boolean;
   onDirty: (key: string, dirty: boolean) => void;
 }) {
   const current = controller.selected;
@@ -22,12 +22,14 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous,
           {currentStayId && <ActionButton disabled={disabled} onClick={() => void controller.mutate(() => window.yardimciDesktop!.openRoomFolio(currentStayId))}>Hesabı Aç</ActionButton>}</>}
     </section>
     {controller.error && <ActionButton variant="secondary" disabled={controller.busy} onClick={() => void controller.refresh()}>Hesabı Yenile</ActionButton>}
-    {previous.length > 0 && <details className="operation-section room-previous-accounts" aria-label="Önceki hesaplar">
-      <summary>Önceki hesaplar ({previous.length})</summary>
-      <div className="form-stack">
-        {previous.map(folio => <AccountRecord key={folio.id} folio={folio} controller={controller} menuEnabled={menuEnabled} departed disabled={disabled} onDirty={dirty => onDirty(folio.id, dirty)} />)}
-      </div>
-    </details>}
+    {previous.length > 0 && <section className="operation-section room-previous-accounts" aria-label="Önceki hesaplar">
+      <details open={Boolean(focusFolioId && previous.some(folio => folio.id === focusFolioId))}>
+        <summary>Önceki hesaplar ({previous.length})</summary>
+        <div className="form-stack">
+          {previous.map(folio => <AccountRecord key={folio.id} folio={folio} controller={controller} menuEnabled={menuEnabled} departed disabled={disabled} onDirty={dirty => onDirty(folio.id, dirty)} />)}
+        </div>
+      </details>
+    </section>}
   </>;
 }
 
