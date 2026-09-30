@@ -22,7 +22,8 @@ import {
   type DesktopSyncRuntimeStatus
 } from "./database";
 import { findCatalogProductByBarcode } from "./commerce-store";
-import { desktopLog } from "./desktop-logger";
+import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
+import { logWebFailure, safeWebTarget } from "./web-diagnostics";
 import { archiveExternalProductImage } from "./product-data-service";
 import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
 
@@ -106,6 +107,9 @@ export class SyncCoordinator {
   private tableCatalogSupported: boolean | null = null;
   private lastTableCatalogPayload = "";
   private suspendedForMaintenance = false;
+  private activeOperationId = "";
+  private activeCycleStartedAt = 0;
+  private activeTargetUrl = "";
 
   constructor(private readonly options: SyncCoordinatorOptions) {}
 
@@ -269,8 +273,19 @@ export class SyncCoordinator {
       return this.inFlight;
     }
     this.inFlight = this.runCycle(force)
-      .catch(() => {
+      .catch((error) => {
         const message = "Senkron tamamlanamadı. Biraz sonra yeniden denenecek.";
+        desktopLog.error({
+          scope: "sync",
+          event: "sync.cycle.crashed",
+          message: "Senkron döngüsü beklenmedik bir hatayla kesildi.",
+          operationId: this.activeOperationId,
+          meta: {
+            target: safeWebTarget(this.activeTargetUrl),
+            durationMs: this.activeCycleStartedAt ? Date.now() - this.activeCycleStartedAt : 0
+          },
+          error
+        });
         const runtime = this.options.database.getSyncRuntimeStatus();
         this.options.database.recordAutomaticSyncFailure(message);
         this.deferPassiveRetry(runtime.consecutiveFailures);
@@ -315,6 +330,21 @@ export class SyncCoordinator {
       return this.result(false, this.message, empty);
     }
 
+    this.activeOperationId = createDiagnosticOperationId("sync");
+    this.activeCycleStartedAt = Date.now();
+    this.activeTargetUrl = config.baseUrl;
+    desktopLog.info({
+      scope: "sync",
+      event: "sync.cycle.started",
+      message: "Otomatik senkron döngüsü başlatıldı.",
+      operationId: this.activeOperationId,
+      meta: {
+        target: safeWebTarget(config.baseUrl),
+        force,
+        consecutiveFailures: runtime.consecutiveFailures
+      }
+    });
+
     const runtimeFetch = globalThis.fetch;
     const transport = new PhpHostingSyncTransport({
       ...config,
@@ -350,6 +380,18 @@ export class SyncCoordinator {
         this.deferPassiveRetry(runtime.consecutiveFailures);
         this.phase = classifyFailurePhase(capabilities.ok ? undefined : capabilities);
         this.message = message;
+        if (!capabilities.ok) {
+          this.logSyncFailure("capabilities", capabilities);
+        } else {
+          this.logSyncFailure("capabilities", {
+            message,
+            error: "protocol_mismatch"
+          }, {
+            protocolVersion: capabilities.protocol_version,
+            storage: capabilities.storage,
+            missingAndroidCapabilities
+          });
+        }
         return this.result(false, message, counts);
       }
       this.capabilitiesTarget = targetKey;
@@ -414,6 +456,17 @@ export class SyncCoordinator {
       this.nextPassiveRunAt = 0;
       this.phase = "success";
       this.message = buildSuccessMessage(counts);
+      desktopLog.info({
+        scope: "sync",
+        event: "sync.cycle.completed",
+        message: "Otomatik senkron döngüsü tamamlandı.",
+        operationId: this.activeOperationId,
+        meta: {
+          target: safeWebTarget(config.baseUrl),
+          durationMs: Date.now() - this.activeCycleStartedAt,
+          ...counts
+        }
+      });
       return this.result(true, this.message, counts);
     }
 
@@ -422,6 +475,19 @@ export class SyncCoordinator {
     this.options.database.recordAutomaticSyncFailure(this.message);
     this.deferPassiveRetry(runtime.consecutiveFailures);
     this.phase = uniqueErrors.some(isConnectionFailureMessage) ? "offline" : "error";
+    desktopLog.warn({
+      scope: "sync",
+      event: "sync.cycle.incomplete",
+      message: "Otomatik senkron bazı adımları tamamlayamadı.",
+      operationId: this.activeOperationId,
+      meta: {
+        target: safeWebTarget(config.baseUrl),
+        durationMs: Date.now() - this.activeCycleStartedAt,
+        errorCount: uniqueErrors.length,
+        firstError: this.message,
+        ...counts
+      }
+    });
     return this.result(false, this.message, counts);
   }
 
@@ -814,6 +880,25 @@ export class SyncCoordinator {
       errors.push(result.message);
     }
     return { published, errors };
+  }
+
+  private logSyncFailure(
+    stage: string,
+    failure: { status?: number; message?: string; error?: string },
+    meta: Record<string, unknown> = {}
+  ) {
+    return logWebFailure({
+      scope: "sync",
+      event: `sync.${stage}.failed`,
+      message: `Web senkron adımı tamamlanamadı: ${stage}.`,
+      targetUrl: this.activeTargetUrl,
+      failure,
+      operationId: this.activeOperationId,
+      meta: {
+        durationMs: this.activeCycleStartedAt ? Date.now() - this.activeCycleStartedAt : 0,
+        ...meta
+      }
+    });
   }
 
   private result(
