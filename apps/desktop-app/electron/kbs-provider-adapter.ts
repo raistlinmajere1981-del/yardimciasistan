@@ -233,7 +233,7 @@ export function prepareJandarmaArrival(
 export function hasKbsIdentityMinimum(identity: KbsIdentitySnapshot): boolean {
   return Boolean(
     identity.identityType
-    && identity.identityNumber
+    && (identity.identityNumber || identity.documentSerialNumber)
     && identity.nationality
     && identity.birthDate
   );
