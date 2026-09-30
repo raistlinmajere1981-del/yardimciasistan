@@ -1,5 +1,4 @@
 .page-header-copy {
-  flex: 1 1 auto;
   display: grid;
   gap: var(--space-1);
   min-width: 0;
@@ -33,7 +32,6 @@
 
 .page-header__actions {
   min-width: 0;
-  flex: 0 0 auto;
   max-width: 100%;
 }
 
@@ -41,7 +39,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2);
   min-width: 0;
 }
@@ -71,16 +69,25 @@
 .app-lock-trigger:hover { color: var(--color-accent); border-color: var(--color-border-strong); }
 
 .page-header__notice {
+  display: flex;
+  align-items: center;
   min-width: 0;
+  min-height: 30px;
+  visibility: hidden;
+}
+.page-header__notice.has-notice {
+  visibility: visible;
 }
 
 .global-message-bar {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
   min-width: 0;
-  min-height: 30px;
+  height: 30px;
   padding: var(--space-1) var(--space-2);
+  overflow: hidden;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   font-size: var(--text-sm);
@@ -93,7 +100,9 @@
 .global-message-bar__message {
   min-width: 0;
   flex: 1 1 auto;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .global-message-bar__action,
 .global-message-bar__dismiss {
