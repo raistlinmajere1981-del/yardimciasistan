@@ -6,6 +6,7 @@ import type {
   SaveKbsSettingsInput
 } from "./kbs-settings";
 import { contextBridge, ipcRenderer, webFrame } from "electron";
+import type { EgmKbsSessionResult } from "./egm-kbs-webview-driver";
 import type {
   BusinessCapability,
   BusinessPublicProfile,
@@ -256,6 +257,10 @@ export interface DesktopBridge {
   testKbsConnection: (input: SaveKbsSettingsInput) => Promise<KbsConnectionTestResult>;
   markKbsNotificationSentExternally: (notificationId: string) => Promise<DesktopStatusUpdateResult>;
   retryKbsNotification: (notificationId: string) => Promise<DesktopStatusUpdateResult>;
+  registerKbsWebview: (webContentsId: number) => void;
+  unregisterKbsWebview: (webContentsId: number) => void;
+  inspectEgmKbsSession: () => Promise<EgmKbsSessionResult>;
+  prepareEgmKbsLogin: (input: SaveKbsSettingsInput) => Promise<EgmKbsSessionResult>;
   geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
@@ -430,6 +435,10 @@ const bridge: DesktopBridge = {
   testKbsConnection: (input) => invokeWhenUnlocked<KbsConnectionTestResult>("kbs:testConnection", input),
   markKbsNotificationSentExternally: (notificationId) => invokeWhenUnlocked<DesktopStatusUpdateResult>("kbs:markNotificationSentExternally", notificationId),
   retryKbsNotification: (notificationId) => invokeWhenUnlocked<DesktopStatusUpdateResult>("kbs:retryNotification", notificationId),
+  registerKbsWebview: (webContentsId) => ipcRenderer.send("kbs:registerWebview", webContentsId),
+  unregisterKbsWebview: (webContentsId) => ipcRenderer.send("kbs:unregisterWebview", webContentsId),
+  inspectEgmKbsSession: () => invokeWhenUnlocked<EgmKbsSessionResult>("kbs:inspectEgmSession"),
+  prepareEgmKbsLogin: (input) => invokeWhenUnlocked<EgmKbsSessionResult>("kbs:prepareEgmLogin", input),
   geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
