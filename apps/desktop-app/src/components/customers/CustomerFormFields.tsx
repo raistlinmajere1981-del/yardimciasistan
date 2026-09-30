@@ -28,6 +28,14 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
     onChange({ ...form, [field]: value });
   };
 
+  const updateBirthDate = (value: string) => {
+    onChange({
+      ...form,
+      birthDate: value,
+      birthdayMessageEnabled: value ? form.birthdayMessageEnabled : false
+    });
+  };
+
   async function analyzeIdentityFiles(files: File[]): Promise<{ ok: boolean; message: string }> {
     if (!aiEnabled) {
       const message = "Kimlik görseli analizi için AI bağlantısını etkinleştirin.";
@@ -109,7 +117,6 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
         <div className="page-toolbar">
           <div className="page-toolbar__copy">
             <strong>Temel bilgiler</strong>
-            <small>İletişim ve kart görünümü</small>
           </div>
         </div>
         <div className="form-grid">
@@ -117,12 +124,9 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
           <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
-          <label className="form-field--span form-field form-field--fluid">Not<input value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+          <label className="form-field form-field--fluid customer-note-field">Not<textarea rows={2} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+          <label className="form-field form-field--fluid customer-address-field">Adres<textarea rows={2} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
         </div>
-        <label className="form-check customer-birthday-toggle">
-          <input checked={form.birthdayMessageEnabled} onChange={(event) => update("birthdayMessageEnabled", event.target.checked)} type="checkbox" />
-          <strong>Doğum günü mesajı gönder</strong>
-        </label>
       </section>
 
       <section className="panel form-stack identity-form-section">
@@ -149,19 +153,29 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
             onChange={(event) => setScanBackSide(event.target.checked)}
             type="checkbox"
           />
-          <span>
-            <strong>Kimliğin arka yüzünü de tara</strong>
-            <small>Ön ve arka yüz çekilir; iki görüntü de hazır olduktan sonra AI analizi başlar.</small>
-          </span>
+          <strong>Kimliğin arka yüzünü de tara</strong>
         </label>
-        {!aiEnabled && <p className="identity-ai-note">Kimlik görseli analizi için Ayarlar bölümünden AI bağlantısını etkinleştirin.</p>}
         <div className="form-grid">
           <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
             <option value="">Seçilmedi</option><option value="tc_identity_card">T.C. Kimlik Kartı</option><option value="passport">Pasaport</option><option value="other">Diğer</option>
           </select></label>
           <label className="form-field form-field--medium">Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
           <label className="form-field form-field--medium">Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
-          <div className="form-field form-field--short"><span>Doğum tarihi</span><DatePicker ariaLabel="Doğum tarihi" value={form.birthDate} presets={[]} onChange={(value) => update("birthDate", value)} /></div>
+          <div className="form-field form-field--fluid customer-birth-field">
+            <span>Doğum tarihi</span>
+            <div className="customer-birth-controls">
+              <DatePicker ariaLabel="Doğum tarihi" value={form.birthDate} presets={[]} onChange={updateBirthDate} />
+              <label className="form-check customer-birthday-toggle">
+                <input
+                  checked={Boolean(form.birthDate) && form.birthdayMessageEnabled}
+                  disabled={!form.birthDate}
+                  onChange={(event) => update("birthdayMessageEnabled", event.target.checked)}
+                  type="checkbox"
+                />
+                <strong>Doğum günü mesajı gönder</strong>
+              </label>
+            </div>
+          </div>
           <label className="form-field form-field--medium">Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
             <option value="">Seçilmedi</option><option value="female">Kadın</option><option value="male">Erkek</option><option value="unspecified">Belirtilmemiş</option>
           </select></label>
@@ -171,7 +185,6 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           <label className="form-field form-field--medium">Anne adı<input value={form.motherName} onChange={(event) => update("motherName", event.target.value)} /></label>
           <label className="form-field form-field--medium">Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
           <label className="form-field form-field--medium">Veren makam<input value={form.issuingAuthority} onChange={(event) => update("issuingAuthority", event.target.value)} /></label>
-          <label className="form-field--span form-field form-field--fluid">Adres<textarea value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
         </div>
         {analysisMessage && <p className={"form-status sync-" + analysisState} role={analysisState === "error" ? "alert" : "status"}>{analysisMessage}</p>}
       </section>
