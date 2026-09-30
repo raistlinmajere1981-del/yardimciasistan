@@ -107,6 +107,9 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS smoke ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: true, message: "KBS smoke bağlantısı hazır.", provider: "egm", credentialsVerified: false, requiresWebLogin: true, portalUrl: "https://kbs.egm.gov.tr" }),
       getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
       saveGoogleReviewsSettings: async (input) => ({
         ok: true,
@@ -844,6 +847,9 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS smoke ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: true, message: "KBS smoke bağlantısı hazır.", provider: "egm", credentialsVerified: false, requiresWebLogin: true, portalUrl: "https://kbs.egm.gov.tr" }),
       getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
       saveGoogleReviewsSettings: async (input) => ({
         ok: true,
@@ -1572,6 +1578,9 @@ try {
       }),
       getDashboardData: async () => snapshot(),
       getSetupData: async () => setupData,
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS smoke ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: true, message: "KBS smoke bağlantısı hazır.", provider: "egm", credentialsVerified: false, requiresWebLogin: true, portalUrl: "https://kbs.egm.gov.tr" }),
       getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
       saveGoogleReviewsSettings: async (input) => ({
         ok: true,
@@ -1780,6 +1789,9 @@ try {
       }),
       getDashboardData: async () => dashboardData,
       getSetupData: async () => setupData,
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS smoke ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: true, message: "KBS smoke bağlantısı hazır.", provider: "egm", credentialsVerified: false, requiresWebLogin: true, portalUrl: "https://kbs.egm.gov.tr" }),
       getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
       saveGoogleReviewsSettings: async (input) => ({
         ok: true,
@@ -2112,6 +2124,9 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS smoke ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: true, message: "KBS smoke bağlantısı hazır.", provider: "egm", credentialsVerified: false, requiresWebLogin: true, portalUrl: "https://kbs.egm.gov.tr" }),
       getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
       saveGoogleReviewsSettings: async (input) => ({
         ok: true,
@@ -2296,6 +2311,9 @@ try {
       }),
       getDashboardData: async () => dashboardData,
       getSetupData: async () => setupData,
+      getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
+      saveKbsSettings: async (input) => ({ ok: true, message: "KBS smoke ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
+      testKbsConnection: async () => ({ ok: true, message: "KBS smoke bağlantısı hazır.", provider: "egm", credentialsVerified: false, requiresWebLogin: true, portalUrl: "https://kbs.egm.gov.tr" }),
       getGoogleReviewsSettings: async () => ({ enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false }),
       saveGoogleReviewsSettings: async (input) => ({
         ok: true,
