@@ -47,6 +47,23 @@ export function registerKbsWebviewIpcEvents(options: {
     return inspect();
   });
 
+  ipcMain.handle("kbs:prepareStoredEgmLogin", async (event): Promise<EgmKbsSessionResult> => {
+    if (!isTrustedRendererUrl(event.sender.getURL())) {
+      return { ok: false, state: "unavailable", message: "EGM KBS giriş isteği reddedildi.", url: "" };
+    }
+    assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Konaklama yönetimi bu işletmede etkin değil.");
+
+    const resolved = resolveKbsRuntimeCredentials(getDatabase().databasePath);
+    if (!resolved.ok) {
+      return { ok: false, state: "login_required", message: resolved.message, url: "" };
+    }
+    if (resolved.credentials.provider !== "egm") {
+      return { ok: false, state: "unknown", message: "Aktif KBS sağlayıcısı Emniyet değil.", url: "" };
+    }
+    return prepareLogin(resolved.credentials);
+  });
+
   ipcMain.handle(
     "kbs:prepareEgmLogin",
     async (event, input: SaveKbsSettingsInput): Promise<EgmKbsSessionResult> => {
