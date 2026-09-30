@@ -23,7 +23,7 @@ export function RoomDailyOperations({ model, operations, disabled, data }: {
         .map(guest => data.customers.find(customer => customer.id === guest.customerId))
         .filter((customer): customer is DesktopDashboardData["customers"][number] => Boolean(customer));
       const missingIdentity = selectedCustomers.filter(customer =>
-        !customer.identityType || !customer.identityNumber || !customer.nationality || !customer.birthDate
+        !customer.identityType || (!customer.identityNumber && !customer.documentSerialNumber) || !customer.nationality || !customer.birthDate
       );
       const approved = await confirm({
         eyebrow: currentRoom.name,
