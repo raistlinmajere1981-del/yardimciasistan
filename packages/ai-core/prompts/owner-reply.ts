@@ -99,7 +99,8 @@ export async function generateOwnerReplySuggestion(input: OwnerReplyInput, confi
       ...fallbackSuggestion,
       provider: config.provider,
       fallback: true,
-      providerMessage: "AI provider desteklenmiyor."
+      providerMessage: "AI provider desteklenmiyor.",
+      providerReason: "configuration"
     };
   }
 
@@ -115,8 +116,13 @@ export async function generateOwnerReplySuggestion(input: OwnerReplyInput, confi
     return {
       ...fallbackSuggestion,
       provider: result.provider,
+      model: result.model,
       fallback: true,
-      providerMessage: result.message
+      providerMessage: result.message,
+      providerReason: result.reason,
+      providerStatus: result.status,
+      providerCode: result.providerCode,
+      retryAfterSeconds: result.retryAfterSeconds
     };
   }
 
