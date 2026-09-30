@@ -7,6 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const appDir = join(__dirname, "..");
 const repoRoot = join(appDir, "..", "..");
 const DEV_RELAUNCH_EXIT_CODE = 75;
+const electronArgs = process.argv.slice(2);
 
 await run("npm", ["run", "build", "-w", "@yardimci-asistan/shared"], repoRoot);
 await run("npm", ["run", "build", "-w", "@yardimci-asistan/ai-core"], repoRoot);
@@ -24,7 +25,7 @@ let electronStarted = false;
 let electron = null;
 
 function startElectron() {
-  electron = spawn("npx", ["electron", "."], {
+  electron = spawn("npx", ["electron", ".", ...electronArgs], {
     cwd: appDir,
     stdio: "inherit",
     shell: process.platform === "win32",
