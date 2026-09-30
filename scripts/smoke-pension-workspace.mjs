@@ -339,17 +339,17 @@ try {
     });
   });
 
-  await slotStayPanel.getByRole('button', { name: '+ Slot', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: '+ Slot Ekle', exact: true }).click();
   await expect(slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true })).toBeVisible();
   await slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true }).click();
   await expect(slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true })).toHaveCount(0);
 
-  await slotStayPanel.getByRole('button', { name: '+ Slot', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: '+ Slot Ekle', exact: true }).click();
   await slotStayPanel.getByRole('button', { name: '3. boş misafir slotu', exact: true }).click();
   await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Ek Misafir 2(?:\s|$)/);
   await expect.poll(() => slotPage.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guestCount)).toBe(2);
 
-  await slotStayPanel.getByRole('button', { name: '+ Slot', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: '+ Slot Ekle', exact: true }).click();
   await slotStayPanel.getByRole('button', { name: '3. boş misafir slotu', exact: true }).click();
   await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Ek Misafir 3(?:\s|$)/);
   await expect.poll(() => slotPage.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guestCount)).toBe(3);
@@ -405,7 +405,7 @@ try {
     }, condition);
     await safety.getByRole('button', { name: 'Oda 102 odasını aç' }).click();
     await expect(safetyWorkspace.getByRole('button', { name: /Giriş Yap/, exact: false })).toHaveCount(0);
-    await expect(safetyWorkspace).toContainText(condition === 'conflict' ? 'Oda kayıtlarında çakışma var' : 'Yeni giriş için oda hazır ve boş olmalı.');
+    await expect(safetyWorkspace).toContainText(condition === 'conflict' ? 'Oda kayıtlarında çakışma var' : 'Giriş için oda hazır ve boş olmalı.');
     await safetyWorkspace.getByRole('button', { name: 'Çalışma alanını kapat' }).click();
   }
   await safety.close();
