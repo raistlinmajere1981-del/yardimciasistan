@@ -140,6 +140,33 @@
   .operations-workspace .restaurant-order-line-list { overflow: visible; flex: none; }
   .operations-workspace .restaurant-order-menu-panel { border-inline-end: 0; }
 }
+@media (max-width: 760px) {
+  .operations-workspace .restaurant-order-line {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .operations-workspace .restaurant-order-line__main {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .operations-workspace .restaurant-quantity-control {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .operations-workspace .restaurant-order-line__total {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .operations-workspace .restaurant-order-line__remove {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .operations-workspace .restaurant-order-line__note,
+  .operations-workspace .restaurant-order-line__note-toggle {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+}
+
 @media (max-width: 480px) {
   .operation-fields { grid-template-columns: minmax(0, 1fr); }
   .operation-surface--sections .stay-secondary-controls { grid-template-columns: minmax(0, 1fr); }
