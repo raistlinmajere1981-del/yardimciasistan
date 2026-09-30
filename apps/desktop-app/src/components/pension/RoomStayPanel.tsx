@@ -151,7 +151,13 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
       <div className="room-section-heading">
         <h4>Misafirler</h4>
-        <span>{stay.guestCount > room.capacity ? `${stay.guestCount} kişi · ${room.capacity} kişilik oda` : `${stay.guestCount}/${room.capacity} dolu`}</span>
+        <ActionButton
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={disabled || Math.max(1, room.capacity, (stay.guests ?? []).filter(guest => ["planned", "checked_in"].includes(guest.status)).length) + extraSlots >= 50}
+          onClick={() => setExtraSlots(current => Math.min(50, current + 1))}
+        >+ Slot Ekle</ActionButton>
       </div>
       <StayGuestList stay={stay} data={data} operations={operations} disabled={disabled} onDirty={onDirty} onCreateCustomer={onCreateCustomer} />
     </section>)}
@@ -166,12 +172,22 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
         </div>}
         {selected && <p>Rezervasyon · {selected.startDate} – {selected.endDate} · Beklenen {selected.guestCount} kişi</p>}
         {!selected && <div className="operation-fields room-entry-dates">
-          <div className="form-field"><span>Giriş tarihi</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate}
+          <div className="form-field"><span>Giriş</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate}
             onChange={value => { setDraft({ ...draft, checkInDate: value }); markEntry(true); }} /></div>
-          <div className="form-field"><span>Çıkış tarihi</span><DatePicker ariaLabel="Çıkış tarihi" value={draft.checkOutDate} min={draft.checkInDate || undefined}
+          <div className="form-field"><span>Çıkış</span><DatePicker ariaLabel="Çıkış tarihi" value={draft.checkOutDate} min={draft.checkInDate || undefined}
             presets={draft.checkInDate ? [1, 2, 7].map(days => ({ label: `${days} gün`, value: addDays(draft.checkInDate, days) })) : []}
             onChange={value => { setDraft({ ...draft, checkOutDate: value }); markEntry(true); }} /></div>
         </div>}
+        <div className="room-section-heading">
+          <h4>Misafirler</h4>
+          <ActionButton
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={disabled || Math.max(1, room.capacity, guestIds.length) + extraSlots >= 50}
+            onClick={() => setExtraSlots(current => Math.min(50, current + 1))}
+          >+ Slot Ekle</ActionButton>
+        </div>
         <RoomGuestSlots
           capacity={room.capacity}
           bedInfo={room.bedInfo}
@@ -180,7 +196,6 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
           selectedIndex={selectedSlot}
           disabled={disabled}
           onSelectSlot={(index) => setSelectedSlot(index)}
-          onAddSlot={() => setExtraSlots(current => Math.min(50, current + 1))}
           onRemoveExtraSlot={() => {
             setExtraSlots(current => Math.max(0, current - 1));
             setSelectedSlot(-1);
