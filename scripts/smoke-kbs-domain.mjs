@@ -97,7 +97,7 @@ try {
 
   enableKbs("egm");
 
-  const readyCustomer = ok(database.saveCustomer(customerInput("KBS Hazır Misafir"))).savedId;
+  const readyCustomer = ok(database.saveCustomer(customerInput("KBS Hazır Misafir", { identityNumber: "10000000214" }))).savedId;
   const readyStay = ok(database.assignCustomerToRoom({
     customerId: readyCustomer,
     roomId: rooms[1].id,
