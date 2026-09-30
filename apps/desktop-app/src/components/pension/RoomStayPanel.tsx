@@ -173,18 +173,20 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
           onSelectSlot={(index) => setSelectedSlot(index)}
         />
         {selectedSlot >= guestIds.length && <section className="room-slot-editor form-stack" aria-label="Boş slota misafir ata">
-          <StayGuestPicker
-            data={data}
-            selectedIds={guestIds}
-            disabled={disabled || (room.capacity > 0 && guestIds.length >= room.capacity)}
-            onSelect={id => {
-              if (!primary) setDraft(current => ({ ...current, customerId: id }));
-              else setAdditional(current => [...current, id]);
-              setSelectedSlot(-1);
-              markEntry(true);
-            }}
-          />
-          {onCreateCustomer && <ActionButton type="button" variant="secondary" disabled={disabled} onClick={onCreateCustomer}>+ Yeni müşteri</ActionButton>}
+          <div className="room-inline-action-row">
+            <StayGuestPicker
+              data={data}
+              selectedIds={guestIds}
+              disabled={disabled || (room.capacity > 0 && guestIds.length >= room.capacity)}
+              onSelect={id => {
+                if (!primary) setDraft(current => ({ ...current, customerId: id }));
+                else setAdditional(current => [...current, id]);
+                setSelectedSlot(-1);
+                markEntry(true);
+              }}
+            />
+            {onCreateCustomer && <ActionButton type="button" variant="secondary" disabled={disabled} onClick={onCreateCustomer}>+ Yeni müşteri</ActionButton>}
+          </div>
         </section>}
         {selectedDraftGuestId && <section className="room-slot-editor">
           <div className="room-slot-editor__heading">
