@@ -249,7 +249,8 @@ try {
     await expect(customerWorkspace.getByRole('alert')).toHaveCount(0);
     expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length)).toBe(deleteCount + 1);
 
-    await customerWorkspace.getByRole('tab', { name: 'Bilgiler', exact: true }).click();
+    await expect(customerWorkspace.getByRole('tab')).toHaveCount(0);
+    await expect(customerWorkspace.getByLabel('Müşteri işlemleri', { exact: true })).toBeVisible();
     await capture('customer-editor');
     const nameBounds = await customerWorkspace.getByLabel('Ad soyad', { exact: true }).boundingBox();
     const phoneBounds = await customerWorkspace.getByLabel('Telefon', { exact: true }).boundingBox();
@@ -257,13 +258,19 @@ try {
     else expect(Math.abs(phoneBounds.width - nameBounds.width)).toBeLessThan(2);
     await customerWorkspace.getByLabel('Adres', { exact: true }).scrollIntoViewIfNeeded();
     await capture('customer-identity');
-    await customerWorkspace.getByRole('tab', { name: 'Hesap', exact: true }).click();
+
     await customerWorkspace.getByRole('button', { name: 'Tahsilat Al', exact: true }).click();
     await capture('customer-credit-form');
     await customerWorkspace.getByRole('form', { name: 'Tahsilat', exact: true }).getByLabel('Tutar', { exact: true }).fill('99999');
     await expect(customerWorkspace.getByRole('alert').filter({ hasText: 'Bu tutar mevcut borçtan büyük.' })).toBeVisible();
     await customerWorkspace.getByRole('form', { name: 'Tahsilat', exact: true }).getByRole('button', { name: 'Vazgeç', exact: true }).click();
-    await customerWorkspace.getByRole('tab', { name: 'Özet', exact: true }).click();
+
+    await customerWorkspace.getByRole('button', { name: 'Geçmiş', exact: true }).click();
+    await expect(customerWorkspace.getByRole('region', { name: 'Müşteri geçmişi', exact: true })).toBeVisible();
+    await capture('customer-history');
+    await customerWorkspace.getByRole('button', { name: /Müşteriye dön/, exact: true }).click();
+    await expect(customerWorkspace.getByLabel('Müşteri işlemleri', { exact: true })).toBeVisible();
+
     await customerWorkspace.getByRole('button', { name: 'Konaklamayı Aç', exact: true }).click();
     const roomAssignmentWorkspace = page.locator('.workspace-page-frame');
     await expect(roomAssignmentWorkspace).toBeVisible();
