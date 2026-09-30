@@ -56,6 +56,7 @@ import { BirthdayScheduler } from "./birthday-scheduler.js";
 import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
 import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
 import { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
+import { EgmKbsProviderAdapter, JandarmaKbsProviderAdapter } from "./kbs-provider-adapters.js";
 import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
 import { registerReservationIpcHandlers } from "./ipc/reservation-ipc";
 import { registerDailyTaskIpcHandlers } from "./ipc/daily-task-ipc";
@@ -112,6 +113,8 @@ let localCompanionPairingService: LocalCompanionPairingService | null = null;
 let localCompanionMdnsAdvertiser: LocalCompanionMdnsAdvertiser | null = null;
 const birthdayWebviewDriver = new WhatsAppWebviewDriver();
 const egmKbsWebviewDriver = new EgmKbsWebviewDriver();
+const egmKbsProviderAdapter = new EgmKbsProviderAdapter(egmKbsWebviewDriver);
+const jandarmaKbsProviderAdapter = new JandarmaKbsProviderAdapter();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
 const C = BUSINESS_CAPABILITIES;
@@ -611,7 +614,11 @@ function registerIpcHandlers() {
   registerKbsSettingsIpcHandlers({
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
-    assertCapability: assertDesktopCapability
+    assertCapability: assertDesktopCapability,
+    deliverNotification: (notificationId) => getDatabase().deliverKbsNotification(
+      notificationId,
+      [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
+    )
   });
 
   registerKbsWebviewIpcEvents({
