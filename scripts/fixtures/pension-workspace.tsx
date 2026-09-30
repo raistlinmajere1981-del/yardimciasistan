@@ -79,7 +79,7 @@ function FixtureShell({ page, setPage, data, setData, capabilities, pension, sav
       <button onClick={() => setPage("customerWork")}>Müşteriler</button>
       <button onClick={() => setPage("dashboard")}>Ana Sayfa</button>
     </aside>}
-    header={<header className="page-header"><h1>{page === "pension" ? "Pansiyon" : page === "customerWork" ? "Müşteriler" : "Ana Sayfa"}</h1><FixtureStatusHost /></header>}
+    header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">{page === "pension" ? "Pansiyon" : page === "customerWork" ? "Müşteriler" : "Ana Sayfa"}</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}
     overlay={<>
       <Controls refresh={() => setData(current => ({ ...current, rooms: current.rooms.map(room => ({ ...room, updatedAt: String(Math.random()) })) }))} />
       <WorkspaceHost definition={customerWorkspaceDefinition} context={{
