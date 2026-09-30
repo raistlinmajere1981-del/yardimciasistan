@@ -55,8 +55,8 @@ export async function listSupportReports(limit = 80) {
   assertRemoteRoot();
   const delimiter = "__YA_SUPPORT_META_END__";
   const remoteCommand = [
-    `find ${SUPPORT_REMOTE_ROOT} -mindepth 2 -maxdepth 2 -type f -name meta.json -print0 2>/dev/null |`,
-    'while IFS= read -r -d "" f; do',
+    `find ${SUPPORT_REMOTE_ROOT} -mindepth 2 -maxdepth 2 -type f -name meta.json -print 2>/dev/null |`,
+    'while IFS= read -r f; do',
     'cat "$f";',
     `printf '\\n${delimiter}\\n';`,
     "done"
