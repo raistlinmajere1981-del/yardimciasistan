@@ -55,6 +55,7 @@ import { BirthdayDeliveryService } from "./birthday-delivery-service.js";
 import { BirthdayScheduler } from "./birthday-scheduler.js";
 import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
 import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
+import { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
 import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
 import { registerReservationIpcHandlers } from "./ipc/reservation-ipc";
 import { registerDailyTaskIpcHandlers } from "./ipc/daily-task-ipc";
@@ -83,6 +84,7 @@ import { publishPendingTableMedia } from "./table-media-publication";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerGoogleReviewsSettingsIpcHandlers } from "./google-reviews-settings-ipc";
 import { registerKbsSettingsIpcHandlers } from "./kbs-settings-ipc";
+import { registerKbsWebviewIpcEvents } from "./kbs-webview-ipc";
 import { getGoogleReviewsSettings, publishGoogleReviewsSettings } from "./google-reviews-settings";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
@@ -109,6 +111,7 @@ let localCompanionServer: LocalCompanionServer | null = null;
 let localCompanionPairingService: LocalCompanionPairingService | null = null;
 let localCompanionMdnsAdvertiser: LocalCompanionMdnsAdvertiser | null = null;
 const birthdayWebviewDriver = new WhatsAppWebviewDriver();
+const egmKbsWebviewDriver = new EgmKbsWebviewDriver();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
 const C = BUSINESS_CAPABILITIES;
@@ -609,6 +612,17 @@ function registerIpcHandlers() {
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability
+  });
+
+  registerKbsWebviewIpcEvents({
+    getDatabase,
+    assertUnlocked: assertAppSessionUnlocked,
+    assertCapability: assertDesktopCapability,
+    isTrustedRendererUrl: isTrustedDesktopRendererUrl,
+    attachWebview: (id) => egmKbsWebviewDriver.attach(id),
+    detachWebview: (id) => egmKbsWebviewDriver.detach(id),
+    inspect: () => egmKbsWebviewDriver.inspect(),
+    prepareLogin: (credentials) => egmKbsWebviewDriver.prepareLogin(credentials)
   });
 
   ipcMain.handle("sync:setMarketBarcodeFastPull", (event, enabled: unknown) => {
