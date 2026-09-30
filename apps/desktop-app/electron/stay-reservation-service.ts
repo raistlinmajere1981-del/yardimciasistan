@@ -131,9 +131,6 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
     return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
   }
-  if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
-    return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
-  }
   if (hasStoredOverlappingCustomerRoomStay(db, roomId, checkInDate, checkOutDate)) {
     return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
   }
