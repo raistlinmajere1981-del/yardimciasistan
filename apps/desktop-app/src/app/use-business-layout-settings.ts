@@ -19,6 +19,7 @@ import type {
   SaveBusinessLayoutInput
 } from "../../electron/business-layout";
 import type { SettingsOperationResult } from "./settings-save";
+import { reportAppStatus } from "./runtime-state";
 
 export interface BusinessLayoutRoomDraft {
   key: string;
@@ -435,12 +436,14 @@ export function useBusinessLayoutSettings(options: {
       const errorMessage = "Oda medyası taslağı geri alınamıyor. Uygulamayı yeniden başlatın.";
       setState("error");
       setMessage(errorMessage);
+      reportAppStatus("error", errorMessage);
       return false;
     }
     if (tableMediaDirty && !bridge?.discardTableMediaDraft) {
       const errorMessage = "Masa medyası taslağı geri alınamıyor. Uygulamayı yeniden başlatın.";
       setState("error");
       setMessage(errorMessage);
+      reportAppStatus("error", errorMessage);
       return false;
     }
 
@@ -451,6 +454,7 @@ export function useBusinessLayoutSettings(options: {
         if (!result.ok) {
           setState("error");
           setMessage(result.message);
+          reportAppStatus("error", result.message);
           return false;
         }
         if (result.changed) setRoomMediaRevision((current) => current + 1);
@@ -461,15 +465,18 @@ export function useBusinessLayoutSettings(options: {
         if (!result.ok) {
           setState("error");
           setMessage(result.message);
+          reportAppStatus("error", result.message);
           return false;
         }
         if (result.changed) setTableMediaRevision((current) => current + 1);
       }
     } catch (error) {
-      setState("error");
-      setMessage(error instanceof Error && error.message
+      const errorMessage = error instanceof Error && error.message
         ? error.message
-        : "Medya değişiklikleri geri alınamadı.");
+        : "Medya değişiklikleri geri alınamadı.";
+      setState("error");
+      setMessage(errorMessage);
+      reportAppStatus("error", errorMessage);
       return false;
     }
 
