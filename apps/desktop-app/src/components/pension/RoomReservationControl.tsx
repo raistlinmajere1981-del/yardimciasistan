@@ -27,24 +27,26 @@ export function RoomReservationControl({ model, operations, disabled, initialRes
         {onCreateReservation && <ActionButton type="button" variant="ghost" size="sm" disabled={disabled} onClick={onCreateReservation}>+ Yeni rezervasyon</ActionButton>}
       </div>
       <fieldset className="form-stack" disabled={disabled}>
-        <div className="form-field form-field--fluid">
-          <span>Atanacak rezervasyon</span>
-          <SearchSelect
-            ariaLabel="Atanacak rezervasyon"
-            value={reservationId}
-            disabled={disabled}
-            onChange={value => { setReservationId(value); onDirty("assignment", true); }}
-            placeholder="Rezervasyon seçin"
-            searchPlaceholder="Rezervasyon, misafir veya tarih ara"
-            options={assignable.map(item => ({
-              id: item.id,
-              label: item.title || item.customerName || "Rezervasyon",
-              description: `${item.customerName || "Misafir"} · ${item.startDate} – ${item.endDate} · ${item.guestCount} kişi`,
-              keywords: `${item.customerName} ${item.startDate} ${item.endDate}`
-            }))}
-          />
+        <div className="room-inline-action-row">
+          <div className="form-field form-field--fluid">
+            <span>Atanacak rezervasyon</span>
+            <SearchSelect
+              ariaLabel="Atanacak rezervasyon"
+              value={reservationId}
+              disabled={disabled}
+              onChange={value => { setReservationId(value); onDirty("assignment", true); }}
+              placeholder="Rezervasyon seçin"
+              searchPlaceholder="Rezervasyon, misafir veya tarih ara"
+              options={assignable.map(item => ({
+                id: item.id,
+                label: item.title || item.customerName || "Rezervasyon",
+                description: `${item.customerName || "Misafir"} · ${item.startDate} – ${item.endDate} · ${item.guestCount} kişi`,
+                keywords: `${item.customerName} ${item.startDate} ${item.endDate}`
+              }))}
+            />
+          </div>
+          <ActionButton variant="secondary" type="submit" disabled={!assignable.some(item => item.id === reservationId)}>Rezervasyonu Ata</ActionButton>
         </div>
-        <ActionButton variant="secondary" type="submit" disabled={!assignable.some(item => item.id === reservationId)}>Rezervasyonu Ata</ActionButton>
       </fieldset>
     </form>;
 }
