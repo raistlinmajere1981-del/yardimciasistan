@@ -142,9 +142,9 @@ export interface DesktopCustomer {
   updatedAt: string;
 }
 
-export type DesktopHospitalityNotificationKind = "arrival" | "departure" | "room_change";
-export type DesktopHospitalityNotificationStatus = "pending" | "sent" | "failed";
-export type DesktopKbsProvider = "egm" | "jandarma";
+type DesktopHospitalityNotificationKind = "arrival" | "departure" | "room_change";
+type DesktopHospitalityNotificationStatus = "pending" | "sent" | "failed";
+type DesktopKbsProvider = "egm" | "jandarma";
 
 export interface DesktopHospitalityNotification {
   id: string;
@@ -181,7 +181,7 @@ export interface DesktopKbsOverview {
   activeMissingIdentityCount: number;
 }
 
-export type DesktopKbsDeliveryState =
+type DesktopKbsDeliveryState =
   | "sent"
   | "already_sent"
   | "waiting"
