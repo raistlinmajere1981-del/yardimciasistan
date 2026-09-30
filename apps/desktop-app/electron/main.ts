@@ -607,7 +607,8 @@ function registerIpcHandlers() {
 
   registerKbsSettingsIpcHandlers({
     getDatabase,
-    assertUnlocked: assertAppSessionUnlocked
+    assertUnlocked: assertAppSessionUnlocked,
+    assertCapability: assertDesktopCapability
   });
 
   ipcMain.handle("sync:setMarketBarcodeFastPull", (event, enabled: unknown) => {
