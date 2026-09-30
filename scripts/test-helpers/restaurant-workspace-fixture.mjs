@@ -26,6 +26,10 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     price: 25, currency: 'TRY', stock_quantity: 8, stock_unit: 'piece', stock_consumption_quantity: 1, sort_order: 1 },
     { id: 'menu-b', name: 'Tükenen', description: '', category_id: 'category-a', is_available: true,
       price: 10, currency: 'TRY', stock_quantity: 0, stock_unit: 'piece', stock_consumption_quantity: 1, sort_order: 2 }];
+  if (variant === 'no-catalog') {
+    dashboard.menu.categories = [];
+    dashboard.menu.items = [];
+  }
   const capabilities = { ordersEnabled: variant !== 'tables-only', menuEnabled: variant !== 'no-menu',
     reservationsEnabled: variant !== 'no-reservations', customersEnabled: variant !== 'no-customers',
     roomFolioTransferEnabled: !['no-transfer', 'tables-only'].includes(variant) };
