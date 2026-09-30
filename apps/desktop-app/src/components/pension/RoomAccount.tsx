@@ -98,8 +98,11 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
   const extrasMinor = visibleItems.reduce((sum, item) => sum + Math.max(0, item.lineTotalMinor), 0);
   const parsedLodging = parseMoneyToMinor(lodgingDraft);
   const parsedDiscount = parseMoneyToMinor(discountDraft);
-  const lodgingInvalid = parsedLodging === null || parsedLodging < 0;
-  const discountInvalid = parsedDiscount === null || parsedDiscount < 0;
+  const lodgingInvalid = parsedLodging === null
+    || parsedLodging < 0
+    || parsedLodging + extrasMinor - discountMinor < folio.paidTotalMinor;
+  const maxDiscountMinor = Math.max(0, folio.chargeTotalMinor + discountMinor - folio.paidTotalMinor);
+  const discountInvalid = parsedDiscount === null || parsedDiscount < 0 || parsedDiscount > maxDiscountMinor;
 
   useEffect(() => {
     if (!lodgingEditing) setLodgingDraft(minorToInput(folio.lodgingTotalMinor));
