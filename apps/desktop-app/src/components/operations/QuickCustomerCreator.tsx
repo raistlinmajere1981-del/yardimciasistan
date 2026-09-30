@@ -5,6 +5,7 @@ import type {
   SaveCustomerInput
 } from "../../../electron/database";
 import { customerFormToInput, toCustomerForm } from "../../app/customer-model";
+import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
 
 type QuickCustomerState = "idle" | "loading" | "success" | "error";
@@ -40,7 +41,6 @@ export function QuickCustomerCreator({
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [state, setState] = useState<QuickCustomerState>("idle");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (initialOpen) onDirty?.(true);
@@ -54,7 +54,6 @@ export function QuickCustomerCreator({
     setFullName("");
     setPhone("");
     setState("idle");
-    setMessage("");
     onDirty?.(false);
     onClose?.();
   }
@@ -72,13 +71,11 @@ export function QuickCustomerCreator({
             setOpen(true);
             onDirty?.(true);
             setState("idle");
-            setMessage("");
           }}
         >
           <UserPlus size={15} aria-hidden="true" />
           Yeni Müşteri Ekle
         </ActionButton>
-        {state === "success" && message && <small className="reservation-quick-customer-success">{message}</small>}
       </div>
     );
   }
@@ -125,8 +122,6 @@ export function QuickCustomerCreator({
         </label>
       </div>
 
-      {message && state === "error" && <p className="form-status sync-error">{message}</p>}
-
       <div className="form-actions">
         <ActionButton variant="secondary" size="sm" type="button" disabled={state === "loading"} onClick={closeEditor}>
           Vazgeç
@@ -137,13 +132,15 @@ export function QuickCustomerCreator({
           disabled={disabled || state === "loading" || !fullName.trim()}
           onClick={async () => {
             setState("loading");
-            setMessage("Müşteri kaydediliyor...");
             let result: DesktopCustomerMutationResult;
             try { result = await onSave(createQuickCustomerInput(fullName, phone)); }
-            catch { setState("error"); setMessage("Müşteri kaydedilemedi; yeniden deneyin."); return; }
+            catch {
+              setState("error");
+              reportAppStatus("error", "Müşteri kaydedilemedi; yeniden deneyin.");
+              return;
+            }
             if (!result.ok) {
               setState("error");
-              setMessage(result.message);
               return;
             }
 
@@ -154,7 +151,7 @@ export function QuickCustomerCreator({
             setFullName("");
             setPhone("");
             setState("success");
-            setMessage(`${savedCustomer?.fullName || "Yeni müşteri"} eklendi ve seçildi.`);
+            if (!savedCustomer) reportAppStatus("success", "Yeni müşteri eklendi ve seçildi.");
           }}
         >
           <Save size={15} aria-hidden="true" />
