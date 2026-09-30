@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 import { getLocalElectronExecutable } from "./test-helpers/local-electron.mjs";
@@ -15,6 +16,7 @@ if (xvfbCheck.status !== 0) {
   process.exit(1);
 }
 
+const smokeDataDir = createSmokeDataDir();
 const electron = spawn("xvfb-run", ["-a", electronExecutable, "apps/desktop-app", "--no-sandbox"], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"],
@@ -22,7 +24,7 @@ const electron = spawn("xvfb-run", ["-a", electronExecutable, "apps/desktop-app"
   env: {
     ...process.env,
     ELECTRON_ENABLE_LOGGING: "1",
-    YA_DESKTOP_DATA_DIR: createSmokeDataDir()
+    YA_DESKTOP_DATA_DIR: smokeDataDir
   }
 });
 
@@ -44,9 +46,17 @@ electron.stderr.on("data", (chunk) => {
   output += chunk.toString();
 });
 
+electron.on("error", (error) => {
+  clearTimeout(successTimer);
+  cleanupSmokeDataDir();
+  console.error(error);
+  process.exit(1);
+});
+
 electron.on("exit", (code, signal) => {
   exited = true;
   clearTimeout(successTimer);
+  cleanupSmokeDataDir();
 
   if (stoppingAfterSuccessfulStart) {
     console.log("electron-started-ok: app stopped after smoke timeout");
@@ -72,7 +82,9 @@ function stopElectronProcessGroup() {
 }
 
 function createSmokeDataDir() {
-  const directory = join(process.cwd(), "artifacts", "desktop-smoke-data");
-  mkdirSync(directory, { recursive: true });
-  return directory;
+  return mkdtempSync(join(tmpdir(), "yardimci-desktop-xvfb-"));
+}
+
+function cleanupSmokeDataDir() {
+  rmSync(smokeDataDir, { recursive: true, force: true });
 }
