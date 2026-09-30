@@ -111,7 +111,7 @@
 }
 
 .stay-management-details > summary,
-.room-previous-accounts > summary {
+.room-previous-accounts > details > summary {
   cursor: pointer;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -119,11 +119,11 @@
 }
 
 .stay-management-details[open] > summary,
-.room-previous-accounts[open] > summary {
+.room-previous-accounts > details[open] > summary {
   margin-bottom: var(--space-3);
 }
 
-.room-previous-accounts > .form-stack {
+.room-previous-accounts > details > .form-stack {
   margin-top: var(--space-3);
 }
 
