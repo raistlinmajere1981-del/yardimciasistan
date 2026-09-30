@@ -258,8 +258,9 @@ try {
       expect(await variantPage.evaluate(() => window.fixtureState().orders)).toEqual([]);
       expect(await variantPage.evaluate(() => window.fixtureCalls)).toEqual([{ kind: 'customer', tableId: 'table-a', customerId: 'customer-a' }]);
     } else {
-      if (variant !== 'no-menu') await surface.getByRole('button', { name: 'Çay ürününü siparişe ekle' }).click();
+      if (!['no-menu', 'no-catalog'].includes(variant)) await surface.getByRole('button', { name: 'Çay ürününü siparişe ekle' }).click();
       if (variant === 'no-menu') await expect(surface.getByLabel('Sipariş için ürün ara')).toHaveCount(0);
+      if (variant === 'no-catalog') await expect(surface.getByRole('button', { name: /ürününü siparişe ekle/ })).toHaveCount(0);
       if (variant === 'no-transfer') await expect(surface.getByRole('button', { name: 'Odaya Aktar' })).toHaveCount(0);
     }
     await variantPage.close();
