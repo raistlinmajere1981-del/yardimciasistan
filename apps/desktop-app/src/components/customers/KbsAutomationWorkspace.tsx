@@ -45,6 +45,10 @@ export function KbsAutomationWorkspace({
   const credentialsAttempted = useRef(false);
   const pendingSessionRetryId = useRef("");
   const sessionRetryAttempted = useRef(false);
+  const sendRef = useRef(controller.send);
+  const consumeRetryRef = useRef(onSessionRetryConsumed);
+  sendRef.current = controller.send;
+  consumeRetryRef.current = onSessionRetryConsumed;
   const overview = data.kbsOverview;
 
   useEffect(() => {
@@ -97,8 +101,8 @@ export function KbsAutomationWorkspace({
         if (retryId && !sessionRetryAttempted.current) {
           sessionRetryAttempted.current = true;
           pendingSessionRetryId.current = "";
-          onSessionRetryConsumed?.();
-          const retryResult = await controller.send(retryId);
+          consumeRetryRef.current?.();
+          const retryResult = await sendRef.current(retryId);
           if (!active) return;
           setEgmSessionMessage(retryResult?.message || inspected.message);
         }
@@ -141,7 +145,7 @@ export function KbsAutomationWorkspace({
       webview.removeEventListener("did-fail-load", onFail);
       unregister();
     };
-  }, [controller, egmSessionOpen, onSessionRetryConsumed, overview.provider]);
+  }, [egmSessionOpen, overview.provider]);
 
   async function sendNotification(notificationId: string) {
     const result = await controller.send(notificationId);
