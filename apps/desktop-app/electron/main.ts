@@ -628,9 +628,9 @@ function registerIpcHandlers() {
       notificationId,
       [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
     ),
-    onSettingsSaved: async (settings) => {
+    onSettingsSaved: (settings) => {
       if (settings.enabled && settings.provider === "egm") {
-        await egmKbsBackgroundSession.refresh();
+        void egmKbsBackgroundSession.refresh();
       } else {
         egmKbsBackgroundSession.destroy();
       }
