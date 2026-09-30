@@ -107,8 +107,9 @@ try {
     },
     body: compressed
   });
-  assert.equal(upload.status, 201, await upload.text());
-  const result = await upload.json();
+  const uploadBody = await upload.text();
+  assert.equal(upload.status, 201, uploadBody);
+  const result = JSON.parse(uploadBody);
   assert.equal(result.ok, true);
   assert.match(result.report_id, /^YA-\d{6}-\d{6}-[A-F0-9]{6}$/);
 
