@@ -29,7 +29,7 @@ export const SECTIONS = {
     title: "Kontroller", groups: [
       ["Doğrulama presetleri", ["verify-dev", "verify-domain", "verify-full", "verify-pre-main", "verify-release"]],
       ["Teşhis", ["verify-check", "verify-list", "verify-plan"]],
-      ["Dar kapılar", ["doctor", "typecheck", "typecheck-electron", "lint-strict", "lint-php", "knip-strict", "test-all", "e2e", "arch-audit", "design-audit-strict", "smoke-diagnostics"]],
+      ["Dar kapılar", ["doctor", "typecheck", "typecheck-electron", "lint-strict", "lint-php", "knip-strict", "test-all", "e2e", "arch-audit", "design-audit-strict", "smoke-diagnostics", "smoke-support-endpoint"]],
     ],
   },
   android: {
