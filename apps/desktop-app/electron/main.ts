@@ -266,7 +266,10 @@ function resolveRuntimeDataRoot(): string {
 
 async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> {
   const forcedCleanStart = process.argv.includes("--clean-start");
-  const compatibility = inspectDesktopDatabaseCompatibility(resolveDatabasePath(dataRoot));
+  const compatibility = inspectDesktopDatabaseCompatibility(
+    resolveDatabasePath(dataRoot),
+    path.join(app.getAppPath(), "db", "schema.sql")
+  );
 
   if (!forcedCleanStart && (compatibility.state === "fresh" || compatibility.state === "current")) {
     return true;
