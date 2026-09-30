@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, BadgeCheck, BedDouble, IdCard, UserRound } from "lucide-react";
 import type { DesktopDashboardData } from "../../../electron/database";
+import type { KbsNotificationController } from "../../app/use-kbs-notification-controller";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
 type KbsFilter = "attention" | "pending" | "failed" | "sent" | "all";
@@ -11,10 +13,12 @@ type KbsFilter = "attention" | "pending" | "failed" | "sent" | "all";
 interface KbsAutomationWorkspaceProps {
   data: Pick<DesktopDashboardData, "hospitalityNotifications" | "kbsOverview">;
   selectedCustomerId?: string;
+  controller: KbsNotificationController;
 }
 
-export function KbsAutomationWorkspace({ data, selectedCustomerId = "" }: KbsAutomationWorkspaceProps) {
+export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controller }: KbsAutomationWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [filter, setFilter] = useState<KbsFilter>("attention");
   const overview = data.kbsOverview;
 
@@ -25,6 +29,7 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "" }: KbsAut
   }), [data.hospitalityNotifications, filter]);
 
   return <section className="kbs-automation-workspace" aria-label="Kimlik bildirimleri">
+    {confirmDialog}
     <div className="kbs-overview-grid">
       <article className="panel kbs-overview-card">
         <span>Bağlantı</span>
@@ -77,6 +82,7 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "" }: KbsAut
         </div>
       </div>
 
+      {controller.message && <p className="form-status" role="status">{controller.message}</p>}
       <DataList className="kbs-notification-list">
         {notifications.length === 0 ? <div className="empty-state empty-state--compact">
           <BadgeCheck size={24} aria-hidden="true" />
