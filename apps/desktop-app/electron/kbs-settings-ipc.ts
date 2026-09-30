@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
-import type { DesktopStatusUpdateResult } from "./database-types";
+import type { DesktopKbsDeliveryMutationResult, DesktopStatusUpdateResult } from "./database-types";
 import type { DesktopDatabase } from "./database";
 import {
   getKbsSettings,
@@ -16,8 +16,9 @@ export function registerKbsSettingsIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
+  deliverNotification: (notificationId: string) => Promise<DesktopKbsDeliveryMutationResult>;
 }) {
-  const { getDatabase, assertUnlocked, assertCapability } = options;
+  const { getDatabase, assertUnlocked, assertCapability, deliverNotification } = options;
 
   ipcMain.handle("kbs:getSettings", (): KbsSettings => {
     assertUnlocked();
@@ -42,6 +43,12 @@ export function registerKbsSettingsIpcHandlers(options: {
     assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Konaklama yönetimi bu işletmede etkin değil.");
     return getDatabase().retryKbsNotification(String(notificationId ?? ""));
+  });
+
+  ipcMain.handle("kbs:sendNotification", async (_event, notificationId: unknown): Promise<DesktopKbsDeliveryMutationResult> => {
+    assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Konaklama yönetimi bu işletmede etkin değil.");
+    return deliverNotification(String(notificationId ?? ""));
   });
 
   ipcMain.handle(
