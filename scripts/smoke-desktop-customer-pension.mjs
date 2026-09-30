@@ -245,8 +245,8 @@ try {
     expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length)).toBe(deleteCount);
     await customerWorkspace.getByRole('button', { name: 'Müşteriyi Sil' }).click();
     await deleteConfirm.getByRole('button', { name: 'Sil', exact: true }).click();
-    await expect(customerWorkspace.getByRole('alert')).toHaveText('Müşteri silinemedi. Yeniden deneyin.');
-    await expect(page.getByText('Aktif konaklaması olan müşteri silinemez.', { exact: true })).toHaveCount(1);
+    await expect(page.locator('.global-message-bar')).toContainText('Aktif konaklaması olan müşteri silinemez.');
+    await expect(customerWorkspace.getByRole('alert')).toHaveCount(0);
     expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'delete-customer').length)).toBe(deleteCount + 1);
 
     await customerWorkspace.getByRole('tab', { name: 'Bilgiler', exact: true }).click();
