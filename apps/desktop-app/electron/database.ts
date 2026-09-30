@@ -426,6 +426,8 @@ export class DesktopDatabase {
       dailyTasks: getStoredDailyTasks(this.db),
       customers: getStoredCustomers(this.db),
       customerRoomStays: getStoredCustomerRoomStays(this.db),
+      hospitalityNotifications: getHospitalityNotifications(this.db),
+      kbsOverview: getKbsOverview(this.db),
       androidDevices: this.getAndroidDevices(),
       paymentWaitingTableOrders: listPaymentWaitingTableOrders(this.db),
       androidActionFailures: this.getAndroidActionFailures(),
