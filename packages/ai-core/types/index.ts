@@ -39,13 +39,30 @@ export interface AICompletionSuccess {
   fallback?: boolean;
 }
 
+export type AICompletionFailureReason =
+  | "configuration"
+  | "authentication"
+  | "permission"
+  | "quota_exhausted"
+  | "rate_limited"
+  | "service_busy"
+  | "timeout"
+  | "network"
+  | "model_unavailable"
+  | "invalid_request"
+  | "provider_error";
+
 export interface AICompletionFailure {
   ok: false;
   message: string;
   provider: AIProviderName;
   service?: string;
+  model?: string;
   status?: number;
   error?: string;
+  reason?: AICompletionFailureReason;
+  providerCode?: string;
+  retryAfterSeconds?: number;
   fallbackAnswer: string;
 }
 
