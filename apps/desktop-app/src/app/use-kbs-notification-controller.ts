@@ -14,7 +14,6 @@ export function useKbsNotificationController({
   setStatusMessage
 }: UseKbsNotificationControllerOptions) {
   const [busyNotificationId, setBusyNotificationId] = useState("");
-  const [message, setMessage] = useState("");
 
   async function markExternallySent(notificationId: string) {
     return mutate(notificationId, "Kimlik bildirimi kaydı güncelleniyor...", () =>
@@ -33,19 +32,16 @@ export function useKbsNotificationController({
     setBusyNotificationId(notificationId);
     setSyncState("loading");
     setStatusMessage("Kimlik bildirimi gönderiliyor...");
-    setMessage("Kimlik bildirimi gönderiliyor...");
     try {
       const result = await window.yardimciDesktop.sendKbsNotification(notificationId);
       setDashboardData(result.dashboardData);
       setStatusMessage(result.message);
-      setMessage(result.message);
       setSyncState(result.ok || result.state !== "failed" ? "success" : "error");
       return result;
     } catch {
       const errorMessage = "Kimlik bildirimi gönderim denemesi tamamlanamadı.";
       setSyncState("error");
       setStatusMessage(errorMessage);
-      setMessage(errorMessage);
       return null;
     } finally {
       setBusyNotificationId("");
@@ -61,25 +57,21 @@ export function useKbsNotificationController({
     setBusyNotificationId(notificationId);
     setSyncState("loading");
     setStatusMessage(loadingMessage);
-    setMessage(loadingMessage);
     try {
       const result = await operation();
       if (!result.ok) {
         setSyncState("error");
         setStatusMessage(result.message);
-        setMessage(result.message);
         return false;
       }
       setDashboardData(result.dashboardData);
       setSyncState("success");
       setStatusMessage(result.message);
-      setMessage(result.message);
       return true;
     } catch {
       const errorMessage = "Kimlik bildirimi işlemi tamamlanamadı.";
       setSyncState("error");
       setStatusMessage(errorMessage);
-      setMessage(errorMessage);
       return false;
     } finally {
       setBusyNotificationId("");
@@ -88,7 +80,6 @@ export function useKbsNotificationController({
 
   return {
     busyNotificationId,
-    message,
     markExternallySent,
     retry,
     send
