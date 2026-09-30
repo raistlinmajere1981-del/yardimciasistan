@@ -1,23 +1,35 @@
 .room-workspace-context { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
 .rooms-browser { display: grid; align-content: start; gap: var(--space-3); }
 
-
-.room-bed-layout {
+.room-workspace-summary__copy {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-1);
+  min-width: 0;
 }
 
-.room-bed-layout__toolbar {
+.room-workspace-summary__copy > strong {
+  line-height: var(--leading-tight);
+}
+
+.room-workspace-summary__meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-1);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
 
-.room-bed-layout__toolbar > .action-button {
-  flex: 0 0 auto;
+.room-workspace-summary__meta span + span::before {
+  content: "·";
+  margin-inline-end: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+
+.room-bed-layout {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .room-guest-slot-wrap {
@@ -178,15 +190,38 @@
 }
 
 
-.room-stay-dates {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  align-items: end;
+.room-stay-dates,
+.room-entry-dates {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: var(--space-2);
 }
 
+.operation-panel .room-stay-date-field,
+.operation-panel .room-entry-dates .form-field {
+  display: grid;
+  grid-template-columns: auto 7.75rem;
+  align-items: center;
+  gap: var(--space-2);
+  width: auto;
+  flex: 0 1 auto;
+}
+
+.operation-panel .room-stay-date-field > span,
+.operation-panel .room-entry-dates .form-field > span {
+  white-space: nowrap;
+}
+
+.operation-panel .room-stay-date-field input,
+.operation-panel .room-entry-dates .form-field input {
+  min-width: 0;
+  width: 100%;
+}
+
 .room-stay-dates > .action-button {
-  align-self: end;
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 .room-account-facts .room-account-editable-row {
@@ -259,6 +294,16 @@
 
 @media (max-width: 760px) {
   .room-stay-dates,
+  .room-entry-dates {
+    flex-wrap: wrap;
+  }
+
+  .operation-panel .room-stay-date-field,
+  .operation-panel .room-entry-dates .form-field {
+    grid-template-columns: auto minmax(7.5rem, 1fr);
+    width: 100%;
+  }
+
   .room-inline-action-row,
   .room-inline-action-row--charge,
   .room-inline-action-row--payment {
