@@ -726,7 +726,9 @@ function registerIpcHandlers() {
     assertCapability: assertDesktopCapability,
     finalizeRecordDeletion: finalizeDesktopRecordDeletion,
     finalizeCustomerMutation: finalizeDesktopCustomerMutation,
-    finalizeCheckInMutation: finalizeDesktopCheckInMutation
+    finalizeCheckInMutation: finalizeDesktopCheckInMutation,
+    finalizeCheckoutMutation: finalizeDesktopCheckoutMutation,
+    finalizeRoomChangeMutation: finalizeDesktopRoomChangeMutation
   });
 
   registerWhatsAppWebviewIpcEvents({
@@ -935,21 +937,22 @@ function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult):
   return result;
 }
 
-async function finalizeDesktopCheckInMutation(
-  result: DesktopCustomerMutationResult
+async function finalizeDesktopHospitalityMutation(
+  result: DesktopCustomerMutationResult,
+  kinds: readonly ("arrival" | "departure" | "room_change")[]
 ): Promise<DesktopCustomerMutationResult> {
   if (!result.ok) return result;
 
   const overview = result.dashboardData.kbsOverview;
   if (overview.enabled && overview.configured) {
-    const pendingArrivals = result.dashboardData.hospitalityNotifications.filter((notification) =>
+    const pending = result.dashboardData.hospitalityNotifications.filter((notification) =>
       notification.stayId === result.savedId
-      && notification.kind === "arrival"
+      && kinds.includes(notification.kind)
       && notification.status !== "sent"
       && notification.identityReady
     );
 
-    for (const notification of pendingArrivals) {
+    for (const notification of pending) {
       await getDatabase().deliverKbsNotification(
         notification.id,
         [egmKbsProviderAdapter, jandarmaKbsProviderAdapter]
@@ -963,6 +966,18 @@ async function finalizeDesktopCheckInMutation(
   }
 
   return finalizeDesktopCustomerMutation(result);
+}
+
+function finalizeDesktopCheckInMutation(result: DesktopCustomerMutationResult) {
+  return finalizeDesktopHospitalityMutation(result, ["arrival"]);
+}
+
+function finalizeDesktopCheckoutMutation(result: DesktopCustomerMutationResult) {
+  return finalizeDesktopHospitalityMutation(result, ["departure"]);
+}
+
+function finalizeDesktopRoomChangeMutation(result: DesktopCustomerMutationResult) {
+  return finalizeDesktopHospitalityMutation(result, ["room_change"]);
 }
 
 function finalizeStockImageApply(result: DesktopStockImageApplyResult): DesktopStockImageApplyResult {
