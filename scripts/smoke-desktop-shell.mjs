@@ -106,7 +106,43 @@ try {
       listLocalBackups: async () => ({ ok: true, backups: [{ id: 'design-backup', createdAt: '2026-09-13T09:00:00Z', kind: 'manual', sizeBytes: 2048000, imageCount: 3 }] }),
       updateAppPassword: async input => { window.__designCalls.push({ kind: 'password', input }); return { ok: true, message: 'Şifre kaydedildi.', status: { passwordConfigured: true } }; },
       testWebConnection: async () => ({ ok: true, message: 'Bağlantı başarılı.' }),
-      getSyncStatus: async () => ({ enabled: false, phase: 'idle', pendingJobs: 0, consecutiveFailures: 0, message: '', lastError: '' }),
+      getSyncStatus: async () => ({
+        enabled: true,
+        clientId: 'shell-smoke',
+        requestCursor: 0,
+        acknowledgedCursor: 0,
+        lastAttemptAt: '',
+        lastSuccessAt: '',
+        lastError: '',
+        consecutiveFailures: 0,
+        pendingJobs: 0,
+        nextRetryAt: '',
+        phase: 'idle',
+        message: 'Otomatik eşitleme hazır.'
+      }),
+      runSyncNow: async () => ({
+        ok: true,
+        message: 'Eşitleme tamamlandı.',
+        pulledRequests: 0,
+        pulledActions: 0,
+        appliedActions: 0,
+        failedActions: 0,
+        publishedJobs: 0,
+        status: {
+          enabled: true,
+          clientId: 'shell-smoke',
+          requestCursor: 0,
+          acknowledgedCursor: 0,
+          lastAttemptAt: '2026-09-30T16:15:00Z',
+          lastSuccessAt: '2026-09-30T16:15:00Z',
+          lastError: '',
+          consecutiveFailures: 0,
+          pendingJobs: 0,
+          nextRetryAt: '',
+          phase: 'success',
+          message: 'Eşitleme tamamlandı.'
+        }
+      }),
       onSyncStatusChanged: () => () => {},
       onAppLockStateChanged: () => () => {},
       openExternal: async () => true
@@ -214,6 +250,23 @@ try {
   await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   await leaveDialog.getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Bugün ne var?', level: 1, exact: true })).toBeVisible();
+
+  await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
+  await expect(page.locator('.global-message-bar')).toHaveCount(0);
+  await expect(page.getByText('Şimdi Eşitle', { exact: true })).toHaveCount(0);
+
+  const syncIndicator = page.getByRole('button', { name: /Eşitleme durumu:/ });
+  await expect(syncIndicator).toBeVisible();
+  await syncIndicator.click();
+  await expect(page.locator('.global-message-bar')).toHaveCount(0);
+  await expect(page.getByText('Eşitleme tamamlandı.', { exact: true })).toHaveCount(0);
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('yardimci-asistan:app-status', {
+      detail: { state: 'error', message: 'Smoke merkezi hata mesajı.' }
+    }));
+  });
+  await expect(page.locator('.global-message-bar')).toContainText('Smoke merkezi hata mesajı.');
 
   await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).focus();
   await page.keyboard.press('Tab');
