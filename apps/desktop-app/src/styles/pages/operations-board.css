@@ -56,6 +56,21 @@
   font-size: var(--text-md);
 }
 
+.operations-board__pane-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.hospitality-resource-title-select {
+  width: auto;
+  min-width: 9.5rem;
+  max-width: 14rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .operations-board__pane-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -157,11 +172,6 @@
   justify-content: flex-end;
   gap: var(--space-2);
   min-width: 0;
-}
-
-.hospitality-resource-toolbar__select {
-  min-width: var(--field-width-xs);
-  flex: 0 1 var(--field-width-xs);
 }
 
 .operations-board__pane--center .operations-board__pane-header {
