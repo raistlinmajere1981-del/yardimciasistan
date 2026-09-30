@@ -118,6 +118,31 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
       return financial(folio);
     },
     updateCustomerRoomStayStatus: async ({ stayId, status }) => { record('stay-status', { stayId, status }); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = status; stay.updatedAt = stamp(); return success(stayId); },
+    addStayGuest: async ({ stayId, customerId }) => {
+      record('add-guest', { stayId, customerId });
+      const stay = dashboard.customerRoomStays.find(item => item.id === stayId);
+      const selectedCustomer = dashboard.customers.find(item => item.id === customerId);
+      if (!stay || !selectedCustomer) return { ok: false, message: 'Misafir eklenemedi.' };
+      if (stay.guests.some(guest => guest.customerId === customerId && ['planned', 'checked_in'].includes(guest.status))) {
+        return success(stay.id, 'Misafir zaten bu konaklamada.');
+      }
+      if (stay.guests.filter(guest => ['planned', 'checked_in'].includes(guest.status)).length >= 50) {
+        return { ok: false, message: 'Bir konaklamaya en fazla 50 misafir eklenebilir.' };
+      }
+      stay.guests.push({
+        id: `guest-${stamp()}`,
+        customerId,
+        customerName: selectedCustomer.fullName,
+        status: stay.status,
+        checkedInAt: stay.status === 'checked_in' ? stamp() : '',
+        checkedOutAt: '',
+        identityReady: true
+      });
+      stay.guestCount = stay.guests.filter(guest => ['planned', 'checked_in'].includes(guest.status)).length;
+      const folio = folios.find(item => item.stayId === stay.id && item.status === 'open');
+      if (folio) folio.guestCount = stay.guestCount;
+      return success(stay.id, 'Misafir konaklamaya eklendi.');
+    },
     checkoutStay: async stayId => { record('checkout', stayId); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = 'checked_out'; stay.checkedOutAt = stamp(); stay.updatedAt = stamp(); dashboard.rooms.find(item => item.id === stay.roomId).status = 'cleaning'; const folio = folios.find(item => item.stayId === stayId); if (folio?.remainingMinor === 0) folio.status = 'closed'; return success(stayId, 'Misafir çıkışı tamamlandı. Oda temizlik bekliyor.'); },
     addRoomFolioPayment: async input => {
       record('payment', input);
