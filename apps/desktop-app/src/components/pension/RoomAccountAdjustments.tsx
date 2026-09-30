@@ -91,7 +91,6 @@ export function RoomAccountDetails({ folio, controller, disabled, onDirty }: {
       .then(result => { if (result?.ok) { setDraft(null); onDirty(false); } });
   }}>
     <h4>Konaklama ücreti</h4>
-    <p>Bu alanlar hesabın tarih ve ücretlerini günceller.</p>
     <fieldset className="form-stack" disabled={disabled}>
       <div className="operation-fields">
         <div className="form-field">
