@@ -41,6 +41,68 @@ export interface KbsProviderAdapter {
   send(input: KbsDeliveryInput): Promise<KbsDeliveryResult>;
 }
 
+export type JandarmaOperationName =
+  | "MusteriKimlikNoGiris"
+  | "MusteriKimlikNoCikis"
+  | "MusteriKimlikNoGuncelle"
+  | "MusteriYabanciGiris"
+  | "MusteriYabanciCikis"
+  | "MusteriYabanciGuncelle";
+
+export interface JandarmaOperationSelection {
+  operation: JandarmaOperationName;
+  identityPath: "identity_number" | "foreign_document";
+  roomNumber: string;
+  occurredAt: string;
+  identity: KbsIdentitySnapshot;
+}
+
+export type JandarmaOperationSelectionResult =
+  | { ok: true; selection: JandarmaOperationSelection }
+  | { ok: false; message: string };
+
+export function selectJandarmaOperation(input: KbsDeliveryInput): JandarmaOperationSelectionResult {
+  const roomNumber = (input.roomNumber || input.identity.roomNumber).trim();
+  if (!roomNumber) return { ok: false, message: "Konaklama bildirimi için oda numarası gerekli." };
+  if (roomNumber.length > 15) return { ok: false, message: "Jandarma KBS oda numarası en fazla 15 karakter olabilir." };
+
+  const occurredAt = new Date(input.occurredAt);
+  if (!Number.isFinite(occurredAt.getTime())) {
+    return { ok: false, message: "KBS işlem zamanı geçerli değil." };
+  }
+
+  const domestic = isTurkeyNationality(input.identity.nationality);
+  if (domestic && input.identity.identityNumber.replace(/\D/g, "").length !== 11) {
+    return { ok: false, message: "Türkiye uyruklu misafir için 11 haneli kimlik numarası gerekli." };
+  }
+  if (!domestic && !input.identity.documentSerialNumber && !input.identity.identityNumber) {
+    return { ok: false, message: "Yabancı misafir için belge veya kimlik numarası gerekli." };
+  }
+
+  const operation = domestic
+    ? input.kind === "arrival"
+      ? "MusteriKimlikNoGiris"
+      : input.kind === "departure"
+        ? "MusteriKimlikNoCikis"
+        : "MusteriKimlikNoGuncelle"
+    : input.kind === "arrival"
+      ? "MusteriYabanciGiris"
+      : input.kind === "departure"
+        ? "MusteriYabanciCikis"
+        : "MusteriYabanciGuncelle";
+
+  return {
+    ok: true,
+    selection: {
+      operation,
+      identityPath: domestic ? "identity_number" : "foreign_document",
+      roomNumber,
+      occurredAt: formatJandarmaDate(occurredAt),
+      identity: input.identity
+    }
+  };
+}
+
 /**
  * Semantic representation of the documented Jandarma
  * MusteriKimlikNoGirisTalep contract.
@@ -114,13 +176,12 @@ export function prepareJandarmaArrival(
     return { ok: false, path: "invalid", message: "KBS giriş zamanı geçerli değil." };
   }
 
-  const nationality = normalizeNationality(input.identity.nationality);
   return {
     ok: true,
     path: "identity_number",
     draft: {
       identityNumber,
-      countryEnumName: nationality === "turkiye" ? "TURKIYE" : input.identity.nationality.trim().toLocaleUpperCase("tr-TR"),
+      countryEnumName: isTurkeyNationality(input.identity.nationality) ? "TURKIYE" : input.identity.nationality.trim().toLocaleUpperCase("tr-TR"),
       roomNumber,
       arrivalAt: formatJandarmaDate(occurredAt),
       phone: "",
@@ -137,6 +198,11 @@ export function hasKbsIdentityMinimum(identity: KbsIdentitySnapshot): boolean {
     && identity.nationality
     && identity.birthDate
   );
+}
+
+function isTurkeyNationality(value: string): boolean {
+  const normalized = normalizeNationality(value);
+  return ["tr", "tc", "turkiye", "turkey", "turkiyecumhuriyeti"].includes(normalized);
 }
 
 function normalizeNationality(value: string): string {
