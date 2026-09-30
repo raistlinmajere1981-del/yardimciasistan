@@ -21,7 +21,7 @@ interface CustomersWorkspaceProps {
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => void | Promise<unknown>;
-  onOpenKbs: (customerId: string) => void;
+  onSendKbs: (notificationId: string, customerId: string) => void | Promise<unknown>;
 }
 
 export function CustomersWorkspace({
@@ -34,7 +34,7 @@ export function CustomersWorkspace({
   onSave,
   onAnalyzeIdentity,
   onDelete,
-  onOpenKbs
+  onSendKbs
 }: CustomersWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const [searchText, setSearchText] = useState("");
@@ -77,7 +77,7 @@ export function CustomersWorkspace({
       ...customerStays.map((stay) => stay.roomName + " " + stay.roomNumber)
     ].join(" ").toLocaleLowerCase("tr-TR");
 
-    return { customer, activeStay, plannedStay, activeReservations, kbsState, roomText, haystack };
+    return { customer, activeStay, plannedStay, activeReservations, arrivalNotification, kbsState, roomText, haystack };
   }).filter((row) => {
     const searchOk = row.haystack.includes(searchText.trim().toLocaleLowerCase("tr-TR"));
     if (!searchOk) return false;
@@ -140,9 +140,16 @@ export function CustomersWorkspace({
           </>}
           description={(customer.phone || "Telefon yok") + " · " + formatCustomerSource(customer.source)}
           actions={<>
-            {kbsOverview.enabled && row.activeStay && row.kbsState !== "sent" && (
-              <ActionButton variant="secondary" size="sm" type="button" onClick={() => onOpenKbs(customer.id)}>
-                <IdCard size={15} aria-hidden="true" />Kimlik Bildir
+            {kbsOverview.enabled && row.activeStay && row.kbsState !== "sent" && row.arrivalNotification && (
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                type="button"
+                disabled={!row.arrivalNotification.identityReady}
+                onClick={() => { void onSendKbs(row.arrivalNotification!.id, customer.id); }}
+              >
+                <IdCard size={15} aria-hidden="true" />
+                {row.arrivalNotification.identityReady ? "Kimlik Bildir" : "Kimlik Eksik"}
               </ActionButton>
             )}
             <ActionButton variant="danger" size="sm" type="button" onClick={() => { void onDelete(customer); }}>
