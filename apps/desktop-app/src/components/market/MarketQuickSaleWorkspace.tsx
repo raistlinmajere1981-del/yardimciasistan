@@ -133,7 +133,6 @@ export function MarketQuickSaleWorkspace({
   const [categoryId, setCategoryId] = useState("");
   const [barcodeMode, setBarcodeMode] = useState<BarcodeMode>("keyboard-wedge");
   const [simulatedBarcode, setSimulatedBarcode] = useState("");
-  const [barcodeMessage, setBarcodeMessage] = useState("USB okuyucu hazır; barkodu okutun.");
   const [scanning, setScanning] = useState(false);
   const [phoneBarcodeReady, setPhoneBarcodeReady] = useState(false);
   const [lastScanDevice, setLastScanDevice] = useState("");
@@ -223,7 +222,6 @@ export function MarketQuickSaleWorkspace({
     if (!bridge || saleInFlight.current) return "stale" as const;
     const isCurrent = beginBarcodeRequest();
     setSearch("");
-    setBarcodeMessage(`${source}: ${barcode} aranıyor…`);
     try {
       const product = await bridge.findProductByBarcode(barcode);
       if (!isCurrent() || saleInFlight.current) return "stale" as const;
@@ -233,7 +231,6 @@ export function MarketQuickSaleWorkspace({
           if (!isCurrent() || saleInFlight.current) return "stale" as const;
           if (lookup.status === "found") {
             const message = `${lookup.product.name} bulundu; ürün kartı hazırlanıyor.`;
-            setBarcodeMessage(message);
             onStateChange("success", message);
             onExternalProductFound?.(lookup.product);
             return "handoff" as const;
@@ -241,20 +238,17 @@ export function MarketQuickSaleWorkspace({
         }
         if (!isCurrent() || saleInFlight.current) return "stale" as const;
         const message = `Barkod bulunamadı: ${barcode}`;
-        setBarcodeMessage(message);
         onStateChange("error", message);
         return "not_found" as const;
       }
       if (!isCurrent() || saleInFlight.current) return "stale" as const;
       if (addProduct(product)) {
-        setBarcodeMessage(`${product.name} sepete eklendi · ${source}`);
         return "added" as const;
       }
       return "stale" as const;
     } catch (error) {
       if (!isCurrent() || saleInFlight.current) return "stale" as const;
       const message = error instanceof Error ? error.message : "Barkod okunamadı.";
-      setBarcodeMessage(message);
       onStateChange("error", message);
       return "not_found" as const;
     }
@@ -518,7 +512,6 @@ export function MarketQuickSaleWorkspace({
                   </button>
                 </div>
               )}
-              <small className="market-barcode-status" role="status" aria-live="polite">{barcodeMessage}</small>
             </section>
           </div>
         )}
