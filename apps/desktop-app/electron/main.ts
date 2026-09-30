@@ -333,6 +333,45 @@ function createMainWindow() {
     return { action: "deny" };
   });
 
+  window.webContents.on("render-process-gone", (_event, details) => {
+    desktopLog.error({
+      scope: "renderer",
+      event: "renderer.process-gone",
+      message: "Renderer işlemi beklenmedik biçimde sonlandı.",
+      meta: {
+        reason: details.reason,
+        exitCode: details.exitCode
+      }
+    });
+  });
+  window.webContents.on("unresponsive", () => {
+    desktopLog.warn({
+      scope: "renderer",
+      event: "renderer.unresponsive",
+      message: "Renderer geçici olarak yanıt vermiyor."
+    });
+  });
+  window.webContents.on("responsive", () => {
+    desktopLog.info({
+      scope: "renderer",
+      event: "renderer.responsive",
+      message: "Renderer yeniden yanıt vermeye başladı."
+    });
+  });
+  window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedUrl, isMainFrame) => {
+    if (!isMainFrame) return;
+    desktopLog.error({
+      scope: "renderer",
+      event: "renderer.load.failed",
+      message: "Ana renderer yüzeyi yüklenemedi.",
+      meta: {
+        errorCode,
+        errorDescription,
+        url: validatedUrl
+      }
+    });
+  });
+
   let mainWindowShown = false;
   const showMainWindow = () => {
     if (mainWindowShown || window.isDestroyed()) return;
