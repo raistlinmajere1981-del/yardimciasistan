@@ -390,6 +390,12 @@ export function KbsSettingsSection({
             </label>
           </div>
 
+          {draft.provider === "jandarma" && (
+            <div className="status-message status-message--info">
+              <span>Jandarma KBS web servisi, kullanıcı için KBS web arayüzünde tanımlı güncel genel IP adresini de doğrular. İnternet IP adresiniz değişirse KBS tarafındaki IP kaydını güncellemeniz gerekir.</span>
+            </div>
+          )}
+
           {settings.passwordConfigured && (
             <label className="setting-switch-row">
               <span><strong>Kayıtlı parolayı sil</strong></span>
