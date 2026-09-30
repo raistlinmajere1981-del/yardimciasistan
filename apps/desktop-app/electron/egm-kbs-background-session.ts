@@ -106,6 +106,16 @@ export class EgmKbsBackgroundSession {
     this.view = view;
     this.driver.attachWebContents(view.webContents);
 
+    host.once("closed", () => {
+      if (this.host !== host) return;
+      this.host = null;
+      this.view = null;
+      this.driver.detach();
+      if (!view.webContents.isDestroyed()) {
+        view.webContents.close({ waitForBeforeUnload: false });
+      }
+    });
+
     view.webContents.once("destroyed", () => {
       if (this.view !== view) return;
       this.view = null;
