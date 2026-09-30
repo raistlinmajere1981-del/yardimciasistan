@@ -20,8 +20,18 @@ export function registerCustomerIpcHandlers(options: {
   finalizeRecordDeletion: (result: DesktopStatusUpdateResult) => DesktopStatusUpdateResult;
   finalizeCustomerMutation: (result: DesktopCustomerMutationResult) => DesktopCustomerMutationResult;
   finalizeCheckInMutation: (result: DesktopCustomerMutationResult) => Promise<DesktopCustomerMutationResult>;
+  finalizeCheckoutMutation: (result: DesktopCustomerMutationResult) => Promise<DesktopCustomerMutationResult>;
+  finalizeRoomChangeMutation: (result: DesktopCustomerMutationResult) => Promise<DesktopCustomerMutationResult>;
 }) {
-  const { getDatabase, assertCapability, finalizeRecordDeletion, finalizeCustomerMutation, finalizeCheckInMutation } = options;
+  const {
+    getDatabase,
+    assertCapability,
+    finalizeRecordDeletion,
+    finalizeCustomerMutation,
+    finalizeCheckInMutation,
+    finalizeCheckoutMutation,
+    finalizeRoomChangeMutation
+  } = options;
 
   function assertStayAccess() {
     options.assertUnlocked();
@@ -36,13 +46,13 @@ export function registerCustomerIpcHandlers(options: {
     assertStayAccess();
     return finalizeCustomerMutation(getDatabase().changeStayPrimary(input));
   });
-  ipcMain.handle("customer:checkoutStayGuest", (_event, input: CheckoutStayGuestInput) => {
+  ipcMain.handle("customer:checkoutStayGuest", async (_event, input: CheckoutStayGuestInput): Promise<DesktopCustomerMutationResult> => {
     assertStayAccess();
-    return finalizeCustomerMutation(getDatabase().checkoutStayGuest(input));
+    return finalizeCheckoutMutation(getDatabase().checkoutStayGuest(input));
   });
-  ipcMain.handle("customer:moveStayRoom", (_event, input: MoveStayRoomInput) => {
+  ipcMain.handle("customer:moveStayRoom", async (_event, input: MoveStayRoomInput): Promise<DesktopCustomerMutationResult> => {
     assertStayAccess();
-    return finalizeCustomerMutation(getDatabase().moveStayRoom(input));
+    return finalizeRoomChangeMutation(getDatabase().moveStayRoom(input));
   });
 
   ipcMain.handle("customer:delete", (_event, customerId: unknown): DesktopStatusUpdateResult => {
@@ -83,11 +93,11 @@ export function registerCustomerIpcHandlers(options: {
     return finalizeCheckInMutation(getDatabase().checkInStay(stayId));
   });
 
-  ipcMain.handle("customer:checkoutStay", (_event, stayId: string): DesktopCustomerMutationResult => {
+  ipcMain.handle("customer:checkoutStay", async (_event, stayId: string): Promise<DesktopCustomerMutationResult> => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
-    return finalizeCustomerMutation(getDatabase().checkoutStay(stayId));
+    return finalizeCheckoutMutation(getDatabase().checkoutStay(stayId));
   });
 
   ipcMain.handle(
@@ -97,9 +107,9 @@ export function registerCustomerIpcHandlers(options: {
       assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
       assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
       const result = getDatabase().updateCustomerRoomStayStatus(input);
-      return input.status === "checked_in"
-        ? finalizeCheckInMutation(result)
-        : finalizeCustomerMutation(result);
+      if (input.status === "checked_in") return finalizeCheckInMutation(result);
+      if (input.status === "checked_out") return finalizeCheckoutMutation(result);
+      return finalizeCustomerMutation(result);
     }
   );
 }
