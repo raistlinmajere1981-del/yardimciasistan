@@ -124,8 +124,8 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
           <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
-          <label className="form-field form-field--fluid customer-note-field">Not<textarea rows={2} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
-          <label className="form-field form-field--fluid customer-address-field">Adres<textarea rows={2} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
+          <label className="form-field form-field--fluid customer-note-field">Not<textarea aria-label="Not" rows={2} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+          <label className="form-field form-field--fluid customer-address-field">Adres<textarea aria-label="Adres" rows={2} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
         </div>
       </section>
 
