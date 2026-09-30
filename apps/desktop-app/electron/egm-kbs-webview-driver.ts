@@ -29,6 +29,11 @@ export class EgmKbsWebviewDriver {
   attach(webContentsId: number): boolean {
     const candidate = webContents.fromId(webContentsId);
     if (!candidate || candidate.isDestroyed() || candidate.getType() !== "webview") return false;
+    return this.attachWebContents(candidate);
+  }
+
+  attachWebContents(candidate: WebContents): boolean {
+    if (candidate.isDestroyed()) return false;
     if (this.guest === candidate) return true;
     this.detach();
     this.guest = candidate;
