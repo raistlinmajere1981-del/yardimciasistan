@@ -53,7 +53,9 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
   const orderFor = id => orders.find(order => order.id === id);
   const itemOrder = id => orders.find(order => order.items.some(item => item.id === id));
   const result = order => {
-    order.total = order.subtotal = order.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    order.subtotal = order.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    order.discountTotal = Math.max(0, Math.min(Number(order.discountTotal ?? 0), order.subtotal));
+    order.total = Math.max(0, order.subtotal - order.discountTotal);
     order.itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
     order.items.forEach(item => { item.lineTotal = item.quantity * item.unitPrice; });
     order.updatedAt = new Date().toISOString();
@@ -98,6 +100,13 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
       calls.push({ kind: 'note', id, note }); await wait('Note');
       if (window.fixtureFailNote) return { ok: false, message: 'Not reddedildi.' };
       const order = itemOrder(id); order.items.find(item => item.id === id).note = note; return result(order);
+    },
+    updateTableOrderDiscount: async (id, discountTotal) => {
+      calls.push({ kind: 'discount', id, discountTotal });
+      const order = orderFor(id);
+      if (!order || discountTotal < 0 || discountTotal > order.subtotal) return { ok: false, message: 'İndirim geçersiz.' };
+      order.discountTotal = discountTotal;
+      return result(order);
     },
     removeTableOrderItem: async id => {
       calls.push({ kind: 'remove', id }); const order = itemOrder(id);
