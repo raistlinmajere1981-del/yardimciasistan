@@ -84,3 +84,10 @@ test("support report screenshot extracts only valid PNG signature", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("support report listing keeps pathname expansion available", () => {
+  const source = readFileSync(new URL("../support-reports.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /set -f/);
+  assert.match(source, /find \${SUPPORT_REMOTE_ROOT} -mindepth 2 -maxdepth 2 -type f -name meta\.json -print/);
+  assert.match(source, /while IFS= read -r f; do/);
+});
