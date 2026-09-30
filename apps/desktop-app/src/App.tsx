@@ -16,6 +16,7 @@ import { useMessagingController } from "./app/use-messaging-controller";
 import { useOperationController } from "./app/use-operation-controller";
 import { useSetupController } from "./app/use-setup-controller";
 import { DesktopAppView } from "./components/app/DesktopAppView";
+import { writeRendererDiagnostic } from "./app/diagnostics-client";
 
 function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
@@ -23,6 +24,7 @@ function App() {
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
   const [customerWorkTab, setCustomerWorkTab] = useState<CustomerWorkTab>("customers");
   const pageLeaveGuardRef = useRef<PageLeaveGuard | null>(null);
+  const lastNavigationDiagnosticRef = useRef("");
 
   const registerPageLeaveGuard = useCallback((guard: PageLeaveGuard) => {
     pageLeaveGuardRef.current = guard;
@@ -46,6 +48,22 @@ function App() {
     setSyncState(state);
     setStatusMessage(message);
   }), []);
+
+  useEffect(() => {
+    const key = `${activePage}:${activePage === "customerWork" ? customerWorkTab : ""}`;
+    if (lastNavigationDiagnosticRef.current === key) return;
+    lastNavigationDiagnosticRef.current = key;
+    writeRendererDiagnostic({
+      level: "INFO",
+      scope: "navigation",
+      event: "navigation.page.changed",
+      message: "Kullanıcı uygulama görünümünü değiştirdi.",
+      meta: {
+        page: activePage,
+        ...(activePage === "customerWork" ? { customerWorkTab } : {})
+      }
+    });
+  }, [activePage, customerWorkTab]);
 
   const setupController = useSetupController({
     onInitialSetupRequired: () => setActivePage("settings"),
