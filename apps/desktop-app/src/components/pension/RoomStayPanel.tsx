@@ -78,7 +78,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
         .map(id => data.customers.find(customer => customer.id === id))
         .filter((customer): customer is DesktopDashboardData["customers"][number] => Boolean(customer));
       const missingIdentity = selectedCustomers.filter(customer =>
-        !customer.identityType || !customer.identityNumber || !customer.nationality || !customer.birthDate
+        !customer.identityType || (!customer.identityNumber && !customer.documentSerialNumber) || !customer.nationality || !customer.birthDate
       );
       const approved = await confirm({
         eyebrow: "Kimlik Bildirim Sistemi",
