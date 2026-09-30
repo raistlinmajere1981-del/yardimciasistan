@@ -36,14 +36,12 @@ export function CustomerCreateEditor({
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(null));
   const [formRevision, setFormRevision] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setForm(toCustomerForm(null));
     setFormRevision((revision) => revision + 1);
     setSaveState("idle");
-    setSaveMessage("");
   }, [open]);
 
   if (!open) return null;
@@ -59,11 +57,9 @@ export function CustomerCreateEditor({
 
   async function saveCustomer(mode: SaveMode) {
     setSaveState("loading");
-    setSaveMessage("Müşteri kartı kaydediliyor...");
     const result = await onSave(customerFormToInput(form));
     if (!result.ok) {
       setSaveState("error");
-      setSaveMessage(result.message);
       return;
     }
 
@@ -71,7 +67,6 @@ export function CustomerCreateEditor({
       setForm(toCustomerForm(null));
       setFormRevision((revision) => revision + 1);
       setSaveState("success");
-      setSaveMessage("Müşteri kaydedildi. Yeni müşteri için form hazır.");
       return;
     }
 
@@ -89,9 +84,7 @@ export function CustomerCreateEditor({
     />
   </div>;
 
-  const footer = <>
-    {saveMessage && <p className={"form-status sync-" + saveState} role={saveState === "error" ? "alert" : "status"}>{saveMessage}</p>}
-    <div className="action-row">
+  const footer = <div className="action-row">
       <ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={onClose}>Vazgeç</ActionButton>
       <ActionButton variant="secondary" type="submit" name="saveMode" value="continue" disabled={saveState === "loading"}>
         <Plus size={16} aria-hidden="true" />Kaydet ve Yeni Ekle
@@ -99,8 +92,7 @@ export function CustomerCreateEditor({
       <ActionButton type="submit" name="saveMode" value="close" disabled={saveState === "loading"}>
         <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Kaydet"}
       </ActionButton>
-    </div>
-  </>;
+    </div>;
 
   return withinWorkspace
     ? <WorkspaceFormOverlay title="Yeni müşteri ekle" onClose={onClose} closeBlocked={saveState === "loading"} onSubmit={submit} footer={footer}>{body}</WorkspaceFormOverlay>
