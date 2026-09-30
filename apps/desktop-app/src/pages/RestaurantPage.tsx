@@ -52,17 +52,20 @@ export function RestaurantPage({
     { id: "cleaning", label: "Temizlik" }
   ];
 
+  const tableCategoryControl = (
+    <select
+      className="hospitality-resource-title-select"
+      aria-label="Masa grubu"
+      value={group}
+      onChange={(event) => setGroup(event.target.value)}
+    >
+      <option value="all">Tüm Kategoriler</option>
+      {groups.map((name) => <option key={name} value={name}>{name}</option>)}
+    </select>
+  );
+
   const tableToolbar = (
     <div className="hospitality-resource-toolbar" aria-label="Masa filtreleri">
-      <select
-        className="hospitality-resource-toolbar__select"
-        aria-label="Masa grubu"
-        value={group}
-        onChange={(event) => setGroup(event.target.value)}
-      >
-        <option value="all">Tüm gruplar</option>
-        {groups.map((name) => <option key={name} value={name}>{name}</option>)}
-      </select>
       <ChoiceChips
         ariaLabel="Masa filtresi"
         value={status}
@@ -109,6 +112,7 @@ export function RestaurantPage({
           } : null}
           center={{
             title: "Masalar",
+            titleControl: tableCategoryControl,
             ariaLabel: "Masalar paneli",
             toolbar: tableToolbar,
             content: tableFloor
