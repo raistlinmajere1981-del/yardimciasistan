@@ -13,13 +13,14 @@ import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/Wor
 import { OperationPanel } from "../workspace/OperationPanel";
 import type { TableWorkspaceIntent } from "../workspace/workspace-intent";
 import { ActionButton } from "../ui/ActionButton";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
 import { ManualRestaurantReservationEditor } from "../operations/ManualRestaurantReservationEditor";
 import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
 import { getTableCardModel } from "./table-card-model";
 import { TableOrderEditor } from "./TableOrderEditor";
-import { TableAccountPanel } from "./TableAccountPanel";
+import { TableAccountPanel, TableCancelOrderAction } from "./TableAccountPanel";
 import { TableRelationsPanel } from "./TableRelationsPanel";
 import { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "./table-presentation";
@@ -141,6 +142,12 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       {order && <StatusBadge tone={getOrderBadge(order.status).tone}>{getOrderBadge(order.status).label}</StatusBadge>}
     </div>}
     actions={<>
+      {!history && order && <TableCancelOrderAction
+        table={table}
+        order={order}
+        disabled={disabled}
+        onCancelOrder={() => void closeTableOrder("cancelled")}
+      />}
       {ordersEnabled && <ActionButton variant="ghost" disabled={controller.busy} onClick={() => {
         setQuickAction(null);
         navigation.updateWorkspaceMode({ entityType: "table", mode: history ? "order" : "history" });
@@ -148,28 +155,28 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
     </>}
     headerSummary={!history && <ResourceWorkspaceSummary label="Masa özeti" imageSrc="./assets/default-table.png"
       facts={<>
-        <strong>{table.name}</strong><span>{table.area || "Genel"}</span><span>{table.capacity} kişilik</span>
-        {order ? <select
-          className={`table-workspace-status-select is-${getOrderBadge(order.status).tone}`}
-          aria-label="Sipariş durumu"
+        <strong>{table.name}</strong>
+        <span>{table.capacity} kişilik</span>
+        {order ? <ChoiceChips
+          className="workspace-status-chips"
+          ariaLabel="Sipariş durumu"
           value={order.status}
           disabled={disabled}
-          onChange={event => {
-            const value = event.target.value;
-            if (value !== order.status && value !== "open") void controller.status(value as "preparing" | "served" | "payment");
+          onChange={value => {
+            if (value !== "open") void controller.status(value as "preparing" | "served" | "payment");
           }}
-        >
-          <option value="open" disabled={order.status !== "open"}>Açık</option>
-          <option value="preparing">Hazırlanıyor</option>
-          <option value="served">Servis edildi</option>
-          <option value="payment">Hesap bekliyor</option>
-        </select> : <select
-          className={`table-workspace-status-select is-${getResourceStatusTone(table.status)}`}
-          aria-label={`${table.name} durumunu değiştir`}
+          options={[
+            { id: "open", label: "Açık", disabled: order.status !== "open" },
+            { id: "preparing", label: "Hazırlanıyor" },
+            { id: "served", label: "Servis edildi" },
+            { id: "payment", label: "Hesap bekliyor" }
+          ]}
+        /> : <ChoiceChips
+          className="workspace-status-chips"
+          ariaLabel={`${table.name} durumunu değiştir`}
           value={tableStatus}
           disabled={disabled}
-          onChange={event => {
-            const value = event.target.value;
+          onChange={value => {
             if (value === tableStatus) return;
             void controller.run(async isCurrent => {
               const result = await onUpdateTableStatus(table.id, value);
@@ -178,15 +185,17 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
               return result.ok;
             });
           }}
-        >
-          {!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
-            && <option value={tableStatus} disabled>{formatTableStatus(table.status)}</option>}
-          <option value="available">Boş</option>
-          <option value="occupied">Dolu</option>
-          {reservationsEnabled && <option value="reserved">Rezerve</option>}
-          {ordersEnabled && <option value="bill_waiting">Hesap</option>}
-          <option value="cleaning">Temizlik</option>
-        </select>}
+          options={[
+            ...(!["available", "occupied", "reserved", "bill_waiting", "cleaning"].includes(tableStatus)
+              ? [{ id: tableStatus, label: formatTableStatus(table.status), disabled: true }]
+              : []),
+            { id: "available", label: "Boş" },
+            { id: "occupied", label: "Dolu" },
+            ...(reservationsEnabled ? [{ id: "reserved", label: "Rezerve" }] : []),
+            ...(ordersEnabled ? [{ id: "bill_waiting", label: "Hesap" }] : []),
+            { id: "cleaning", label: "Temizlik" }
+          ]}
+        />}
       </>}
       status={null}>
       {!ordersEnabled ? <span>Sipariş yönetimi etkin değil.</span> : controller.loading ? <span>Adisyon yükleniyor…</span> : !controller.loaded ? <span>Adisyon bilgisi alınamadı.</span>
