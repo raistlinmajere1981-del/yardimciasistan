@@ -24,6 +24,7 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
   const [nextPrimary, setNextPrimary] = useState("");
   const [selectedSlot, setSelectedSlot] = useState(-1);
   const [addingGuest, setAddingGuest] = useState(false);
+  const [extraSlots, setExtraSlots] = useState(0);
   const guests = (stay.guests ?? []).filter(guest => ["planned", "checked_in"].includes(guest.status));
   const room = data.rooms.find(item => item.id === stay.roomId);
   const slotGuests = useMemo<RoomGuestSlotPerson[]>(() => guests.map(guest => ({
@@ -70,12 +71,19 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
       capacity={room?.capacity ?? Math.max(1, guests.length)}
       bedInfo={room?.bedInfo ?? ""}
       guests={slotGuests}
+      extraSlots={extraSlots}
       selectedIndex={selectedSlot}
       disabled={disabled}
       onSelectSlot={(index, guest) => {
         setSelectedSlot(index);
         setAddingGuest(!guest);
         if (!guest) setNextPrimary("");
+      }}
+      onAddSlot={() => setExtraSlots(current => Math.min(50, current + 1))}
+      onRemoveExtraSlot={() => {
+        setExtraSlots(current => Math.max(0, current - 1));
+        setSelectedSlot(-1);
+        setAddingGuest(false);
       }}
     />
 
@@ -84,11 +92,14 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
         <StayGuestPicker
           data={data}
           selectedIds={guests.map(guest => guest.customerId)}
-          disabled={disabled || Boolean(room && room.capacity > 0 && guests.length >= room.capacity)}
+          disabled={disabled || guests.length >= 50}
           onSelect={id => {
+            const baseSlotCount = Math.max(1, room?.capacity ?? 0, guests.length);
+            const consumesManualSlot = selectedSlot >= baseSlotCount;
             void operations.mutate("stay", () => window.yardimciDesktop!.addStayGuest({ stayId: stay.id, customerId: id }))
               .then(ok => {
                 if (ok) {
+                  if (consumesManualSlot) setExtraSlots(current => Math.max(0, current - 1));
                   setAddingGuest(false);
                   setSelectedSlot(-1);
                 }
