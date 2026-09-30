@@ -18,7 +18,7 @@ export function useRoomStayOperations(model: RoomWorkspaceModel, account: RoomFo
   const running = useRef(false);
   const begin = useRequestGeneration();
 
-  async function mutate(panel: "stay" | "operations", operation: () => Promise<DesktopStatusUpdateResult>, after?: (dashboard: DesktopDashboardData) => Promise<string | undefined>) {
+  async function mutate(_panel: "stay" | "operations", operation: () => Promise<DesktopStatusUpdateResult>, after?: (dashboard: DesktopDashboardData) => Promise<string | undefined>) {
     if (running.current || account.busy) return false;
     running.current = true;
     const current = begin();
