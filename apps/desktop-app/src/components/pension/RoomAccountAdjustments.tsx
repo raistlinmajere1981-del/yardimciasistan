@@ -25,24 +25,26 @@ export function RoomAccountAdjustments({ folio, controller, menuEnabled, disable
         : window.yardimciDesktop!.addRoomFolioMenuItem({ folioId: folio.id, menuItemId: item.id, quantity: 1 }), "adjustments");
     }}>
       <fieldset className="form-stack" disabled={disabled}>
-        <div className="form-field form-field--fluid">
-          <span>Ürün / hizmet</span>
-          <SearchSelect
-            ariaLabel="Ürün / hizmet"
-            value={itemId}
-            onChange={setItemId}
-            placeholder="Ürün seçin"
-            searchPlaceholder="Ürün, kategori veya açıklama ara"
-            options={controller.data.menuItems.map(item => ({
-              id: item.id,
-              label: item.name,
-              description: `${item.categoryName || "Menü"} · ${minorMoney(item.priceMinor)}${item.stockQuantity === null ? "" : ` · Stok ${item.stockQuantity} ${item.stockUnit || ""}`}`,
-              keywords: `${item.categoryName} ${item.description}`,
-              disabled: item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity
-            }))}
-          />
+        <div className="room-inline-action-row">
+          <div className="form-field form-field--fluid">
+            <span>Ürün / hizmet</span>
+            <SearchSelect
+              ariaLabel="Ürün / hizmet"
+              value={itemId}
+              onChange={setItemId}
+              placeholder="Ürün seçin"
+              searchPlaceholder="Ürün, kategori veya açıklama ara"
+              options={controller.data.menuItems.map(item => ({
+                id: item.id,
+                label: item.name,
+                description: `${item.categoryName || "Menü"} · ${minorMoney(item.priceMinor)}${item.stockQuantity === null ? "" : ` · Stok ${item.stockQuantity} ${item.stockUnit || ""}`}`,
+                keywords: `${item.categoryName} ${item.description}`,
+                disabled: item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity
+              }))}
+            />
+          </div>
+          <ActionButton variant="secondary" type="submit" disabled={!item || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)}>Ürünü Ekle</ActionButton>
         </div>
-        <ActionButton variant="secondary" type="submit" disabled={!item || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)}>Ürünü Ekle</ActionButton>
       </fieldset>
     </form>}
     <form className="form-stack" onChange={() => onDirty("charge", true)} onSubmit={event => {
@@ -52,11 +54,11 @@ export function RoomAccountAdjustments({ folio, controller, menuEnabled, disable
         .then(result => { if (result?.ok) { setAmount(""); setLabel(""); onDirty("charge", false); } });
     }}>
       <fieldset className="form-stack" disabled={disabled}>
-        <div className="operation-fields">
-          <label className="form-field">Ek ücret<MoneyInput required value={amount} onChange={setAmount} /></label>
-          <label className="form-field">Açıklama<input required value={label} onChange={event => setLabel(event.target.value)} /></label>
+        <div className="room-inline-action-row room-inline-action-row--charge">
+          <label className="form-field room-money-field">Ek ücret<MoneyInput required value={amount} onChange={setAmount} /></label>
+          <label className="form-field form-field--fluid">Açıklama<input required value={label} onChange={event => setLabel(event.target.value)} /></label>
+          <ActionButton variant="secondary" type="submit">Ek Ücreti Ekle</ActionButton>
         </div>
-        <ActionButton variant="secondary" type="submit">Ek Ücreti Ekle</ActionButton>
       </fieldset>{error && <p role="alert">{error}</p>}
     </form>
   </section>;
