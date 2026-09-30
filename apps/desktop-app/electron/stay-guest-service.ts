@@ -125,7 +125,8 @@ export function moveStayRoom(db: DatabaseSync, input: MoveStayRoomInput): Result
           'fatherName', c.father_name, 'issuingAuthority', c.issuing_authority, 'address', c.address,
           'phone', c.phone, 'previousRoomId', ?, 'roomNumber', r.number), ?
       FROM stay_guests g JOIN customers c ON c.id = g.customer_id JOIN rooms r ON r.id = ?
-      WHERE g.stay_id = ? AND g.status = 'checked_in'`).run(input.roomId, now, stay.room_id, now, input.roomId, stay.id);
+      WHERE g.stay_id = ? AND g.status = 'checked_in'
+        AND EXISTS (SELECT 1 FROM kbs_service_settings WHERE id = 'primary' AND enabled = 1)`).run(input.roomId, now, stay.room_id, now, input.roomId, stay.id);
     refreshRoomStatusFromStays(db, stay.room_id, now, true);
     refreshRoomStatusFromStays(db, input.roomId, now, false);
     record(db, stay.id, "hospitality.room_changed", now, { previous_room_id: stay.room_id, room_id: input.roomId });
