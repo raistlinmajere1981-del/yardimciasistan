@@ -23,7 +23,7 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
     </section>
     {controller.error && <ActionButton variant="secondary" disabled={controller.busy} onClick={() => void controller.refresh()}>Hesabı Yenile</ActionButton>}
     {previous.length > 0 && <section className="operation-section room-previous-accounts" aria-label="Önceki hesaplar">
-      <details open={Boolean(focusFolioId && previous.some(folio => folio.id === focusFolioId))}>
+      <details key={focusFolioId || "prior"} defaultOpen={Boolean(focusFolioId && previous.some(folio => folio.id === focusFolioId))}>
         <summary>Önceki hesaplar ({previous.length})</summary>
         <div className="form-stack">
           {previous.map(folio => <AccountRecord key={folio.id} folio={folio} controller={controller} menuEnabled={menuEnabled} departed disabled={disabled} onDirty={dirty => onDirty(folio.id, dirty)} />)}
