@@ -870,3 +870,11 @@
     justify-content: flex-start;
   }
 }
+
+
+.dashboard-attention-button {
+  display: contents;
+}
+.dashboard-attention-button .dashboard-attention-card {
+  cursor: pointer;
+}
