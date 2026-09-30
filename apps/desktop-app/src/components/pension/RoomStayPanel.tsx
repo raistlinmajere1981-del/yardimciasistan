@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { defaultRoomAssignmentForm, formatStayDateRange } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
+import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { DatePicker, addDays } from "../ui/DateTimePicker";
 import { SearchSelect } from "../ui/SearchSelect";
 import type { RoomWorkspaceIntent } from "../workspace/workspace-intent";
@@ -15,6 +16,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   disabled: boolean; staysEnabled: boolean; quickCustomerId?: string; onQuickCustomerHandled?: () => void;
   onDirty: (dirty: boolean) => void;
 }) {
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [draft, setDraft] = useState(() => defaultRoomAssignmentForm(intent.customerId ?? "", intent.entityId));
   const [additional, setAdditional] = useState<string[]>([]);
   const [reservationId, setReservationId] = useState(intent.reservationId ?? "");
@@ -70,6 +72,33 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
 
   async function enter() {
     if (!canEnter || !room) return;
+
+    if (data.kbsOverview.enabled) {
+      const selectedCustomers = guestIds
+        .map(id => data.customers.find(customer => customer.id === id))
+        .filter((customer): customer is DesktopDashboardData["customers"][number] => Boolean(customer));
+      const missingIdentity = selectedCustomers.filter(customer =>
+        !customer.identityType || !customer.identityNumber || !customer.nationality || !customer.birthDate
+      );
+      const approved = await confirm({
+        eyebrow: "Kimlik Bildirim Sistemi",
+        title: "Misafir girişini onaylayın",
+        tone: missingIdentity.length > 0 ? "warning" : "info",
+        confirmLabel: missingIdentity.length > 0 ? "Giriş Yap, Bildirimi Beklet" : "Giriş Yap ve Bildirimi Hazırla",
+        description: missingIdentity.length > 0
+          ? "Oda girişi kaydedilecek. Kimlik bilgileri eksik misafirlerin KBS bildirimi bekleyecek; bilgiler tamamlandıktan sonra Müşteriler → Kimlik Bildirimleri bölümünden gönderilebilecek."
+          : "Oda girişi kaydedilecek ve her misafir için KBS giriş bildirimi oluşturulacak.",
+        details: <dl className="info-list">
+          <div><dt>Oda</dt><dd>{room.number ? "Oda " + room.number : room.name}</dd></div>
+          <div><dt>Misafir</dt><dd>{guestIds.length} kişi</dd></div>
+          <div><dt>Kurum</dt><dd>{data.kbsOverview.provider === "jandarma" ? "Jandarma KBS" : "Emniyet KBS"}</dd></div>
+          <div><dt>Kimlik durumu</dt><dd>{missingIdentity.length > 0 ? String(missingIdentity.length) + " misafirde eksik" : "Tüm misafirlerde hazır"}</dd></div>
+          {missingIdentity.length > 0 && <div><dt>Eksik kayıtlar</dt><dd>{missingIdentity.map(customer => customer.fullName).join(", ")}</dd></div>}
+        </dl>
+      });
+      if (!approved) return;
+    }
+
     const input = selected ? { reservationId: selected.id, roomId: room.id, primaryCustomerId: primary, guestCustomerIds: guestIds }
       : { customerId: primary, roomId: room.id, checkInDate: draft.checkInDate, checkOutDate: draft.checkOutDate,
         guestCount: guestIds.length, guestCustomerIds: guestIds, notes: draft.notes };
@@ -84,6 +113,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   }
 
   return <>
+    {confirmDialog}
     {model.conflict && <p role="alert">Oda kayıtlarında çakışma var. Yeni girişten önce kayıtları kontrol edin.</p>}
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
       <h4>{stay.status === "checked_in" ? "Konaklayan misafirler" : "Planlanan misafirler"}</h4>
