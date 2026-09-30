@@ -6,6 +6,8 @@ import {
   type GenerateDesktopFinanceAiResult
 } from "./finance";
 import { createDesktopAiConfig } from "./ai-config";
+import { createDiagnosticOperationId } from "./desktop-logger";
+import { logAiOperationCompleted, logAiOperationStarted } from "./ai-diagnostics";
 import {
   buildFinanceAiMessages,
   buildFinanceAiPayload,
@@ -40,11 +42,15 @@ export async function generateDesktopFinanceAiComment(
     return { ok: true, content: "Bugün için yorumlanacak kasa hareketi yok." };
   }
 
+  const operationId = createDiagnosticOperationId("ai-finance");
+  const startedAt = Date.now();
+  logAiOperationStarted("finance", config, operationId);
   try {
     const completion = await generateConfiguredChat({
       ...config,
       messages: buildFinanceAiMessages(mode, payload, setup.businessName || "İşletme")
     });
+    logAiOperationCompleted("finance", config, completion, startedAt, operationId);
     if (!completion.ok) {
       return { ok: false, message: "Kasa verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
     }
@@ -53,7 +59,17 @@ export async function generateDesktopFinanceAiComment(
     return sanitized.ok
       ? sanitized
       : { ok: false, message: "Kasa verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
-  } catch {
+  } catch (error) {
+    logAiOperationCompleted("finance", config, {
+      ok: false,
+      provider: config.provider,
+      service: config.service,
+      model: config.model,
+      message: "AI kasa işlemi beklenmedik biçimde kesildi.",
+      error: error instanceof Error ? error.message : String(error),
+      reason: "provider_error",
+      fallbackAnswer: ""
+    }, startedAt, operationId);
     return { ok: false, message: "Kasa verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
   }
 }
