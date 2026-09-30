@@ -39,7 +39,8 @@ import {
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
   type DesktopStockImageApplyResult,
-  type DesktopCustomerMutationResult
+  type DesktopCustomerMutationResult,
+  type DesktopKbsDeliveryMutationResult
 } from "./database";
 import { DesktopFinanceService } from "./finance";
 import { resolveProjectBackupPath } from "./data-maintenance";
@@ -951,7 +952,7 @@ async function finalizeDesktopHospitalityMutation(
       && notification.status !== "sent"
     );
     const pending = relevant.filter((notification) => notification.identityReady);
-    const outcomes = [];
+    const outcomes: DesktopKbsDeliveryMutationResult[] = [];
 
     for (const notification of pending) {
       outcomes.push(await getDatabase().deliverKbsNotification(
