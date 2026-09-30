@@ -442,7 +442,7 @@ function smokeDomains(file) {
     domains.add("desktop");
     domains.add("platform");
   }
-    if (name === "automatic-sync") domains.add("android");
+  if (name === "automatic-sync") domains.add("android");
   if (name === "local-companion-server") {
     domains.add("android");
     domains.add("desktop");
