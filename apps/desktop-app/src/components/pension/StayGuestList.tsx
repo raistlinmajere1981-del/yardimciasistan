@@ -38,7 +38,7 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty }: {
       {!guest.identityReady && <p role="status">Kimlik bilgileri eksik; müşteri kartında kimlik türü, numarası, doğum tarihi ve uyruğu tamamlayın.</p>}
       <div className="action-row">
         <ActionButton variant="ghost" disabled={disabled} onClick={() => navigation.openWorkspace({ entityType: "customer", entityId: guest.customerId,
-          mode: "details", returnContext: { page: "pension", view: "rooms", entityId: stay.roomId } })}>Müşteri Kartı</ActionButton>
+          mode: "main", returnContext: { page: "pension", view: "rooms", entityId: stay.roomId } })}>Müşteri Kartı</ActionButton>
         {guest.customerId !== stay.customerId && <ActionButton variant="secondary" disabled={disabled}
           onClick={() => void operations.mutate("stay", () => window.yardimciDesktop!.changeStayPrimary({ stayId: stay.id, customerId: guest.customerId }))}>Ana Misafir Yap</ActionButton>}
         {guest.status === "checked_in" && <ActionButton variant="secondary" disabled={disabled || (guest.customerId === stay.customerId && guests.length > 1 && !guests.some(item => item.customerId === nextPrimary && item.customerId !== stay.customerId))}
