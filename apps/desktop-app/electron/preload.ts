@@ -59,6 +59,7 @@ import type {
   DesktopAndroidPermissionGroupsUpdate,
   DesktopAndroidDeviceMutationResult,
   DesktopStatusUpdateResult,
+  DesktopKbsDeliveryMutationResult,
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
@@ -257,6 +258,7 @@ export interface DesktopBridge {
   testKbsConnection: (input: SaveKbsSettingsInput) => Promise<KbsConnectionTestResult>;
   markKbsNotificationSentExternally: (notificationId: string) => Promise<DesktopStatusUpdateResult>;
   retryKbsNotification: (notificationId: string) => Promise<DesktopStatusUpdateResult>;
+  sendKbsNotification: (notificationId: string) => Promise<DesktopKbsDeliveryMutationResult>;
   registerKbsWebview: (webContentsId: number) => void;
   unregisterKbsWebview: (webContentsId: number) => void;
   inspectEgmKbsSession: () => Promise<EgmKbsSessionResult>;
@@ -435,6 +437,7 @@ const bridge: DesktopBridge = {
   testKbsConnection: (input) => invokeWhenUnlocked<KbsConnectionTestResult>("kbs:testConnection", input),
   markKbsNotificationSentExternally: (notificationId) => invokeWhenUnlocked<DesktopStatusUpdateResult>("kbs:markNotificationSentExternally", notificationId),
   retryKbsNotification: (notificationId) => invokeWhenUnlocked<DesktopStatusUpdateResult>("kbs:retryNotification", notificationId),
+  sendKbsNotification: (notificationId) => invokeWhenUnlocked<DesktopKbsDeliveryMutationResult>("kbs:sendNotification", notificationId),
   registerKbsWebview: (webContentsId) => ipcRenderer.send("kbs:registerWebview", webContentsId),
   unregisterKbsWebview: (webContentsId) => ipcRenderer.send("kbs:unregisterWebview", webContentsId),
   inspectEgmKbsSession: () => invokeWhenUnlocked<EgmKbsSessionResult>("kbs:inspectEgmSession"),
