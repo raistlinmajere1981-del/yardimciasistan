@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData } from "../../../electron/database";
-import { defaultRoomAssignmentForm, formatStayDateRange } from "../../app/customer-model";
+import { defaultRoomAssignmentForm } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { DatePicker, addDays } from "../ui/DateTimePicker";
@@ -143,7 +143,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
       <div className="room-section-heading">
         <h4>Misafirler</h4>
-        <span>{formatStayDateRange(stay)} · {stay.guestCount}/{room.capacity} dolu</span>
+        <span>{stay.guestCount}/{room.capacity} dolu</span>
       </div>
       <StayGuestList stay={stay} data={data} operations={operations} disabled={disabled} onDirty={onDirty} onCreateCustomer={onCreateCustomer} />
     </section>)}
