@@ -998,9 +998,10 @@ function finalizeDesktopHospitalityMutation(
   if (!result.ok) return result;
 
   const overview = result.dashboardData.kbsOverview;
+  const savedId = result.savedId;
   if (overview.enabled && overview.configured) {
     const relevant = result.dashboardData.hospitalityNotifications.filter((notification) =>
-      notification.stayId === result.savedId
+      notification.stayId === savedId
       && kinds.includes(notification.kind)
       && notification.status !== "sent"
     );
