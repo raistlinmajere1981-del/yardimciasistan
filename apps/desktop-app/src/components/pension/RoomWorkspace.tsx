@@ -164,7 +164,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           onDirty={setDirty} />}
       </OperationPanel>
       <OperationPanel title="Hesap" id="room-account">
-        {folioEnabled ? <RoomAccount controller={account} currentStayId={model.currentStay?.id} ambiguous={Boolean(model.state && model.state.occupancy.stayIds.length > 1)} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />
+        {folioEnabled ? <RoomAccount controller={account} currentStayId={model.currentStay?.id} focusFolioId={intent.folioId} ambiguous={Boolean(model.state && model.state.occupancy.stayIds.length > 1)} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />
           : <p>Oda hesabı yönetimi bu işletmede etkin değil.</p>}
       </OperationPanel>
     </div>
