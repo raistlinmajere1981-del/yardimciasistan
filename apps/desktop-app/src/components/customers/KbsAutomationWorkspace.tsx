@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BadgeCheck, BedDouble, IdCard, UserRound } from "lucide-react";
 import type { DesktopDashboardData } from "../../../electron/database";
 import type { KbsNotificationController } from "../../app/use-kbs-notification-controller";
@@ -10,6 +10,13 @@ import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
 type KbsFilter = "attention" | "pending" | "failed" | "sent" | "all";
 
+type KbsWebViewElement = HTMLElement & {
+  getWebContentsId?: () => number;
+  reload?: () => void;
+};
+
+const EGM_KBS_PORTAL_URL = "https://kbs.egm.gov.tr";
+
 interface KbsAutomationWorkspaceProps {
   data: Pick<DesktopDashboardData, "hospitalityNotifications" | "kbsOverview">;
   selectedCustomerId?: string;
@@ -20,7 +27,99 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
   const navigation = useWorkspaceNavigation();
   const { confirm, confirmDialog } = useConfirmDialog();
   const [filter, setFilter] = useState<KbsFilter>("attention");
+  const [egmSessionOpen, setEgmSessionOpen] = useState(false);
+  const [egmSessionMessage, setEgmSessionMessage] = useState("");
+  const [egmSessionError, setEgmSessionError] = useState("");
+  const egmWebviewRef = useRef<KbsWebViewElement | null>(null);
+  const registeredWebviewId = useRef<number | null>(null);
+  const credentialsAttempted = useRef(false);
   const overview = data.kbsOverview;
+
+  useEffect(() => {
+    if (!egmSessionOpen || overview.provider !== "egm") return;
+    const webview = egmWebviewRef.current;
+    if (!webview) return;
+    let active = true;
+
+    const unregister = () => {
+      const id = registeredWebviewId.current;
+      if (id === null) return;
+      try {
+        window.yardimciDesktop?.unregisterKbsWebview?.(id);
+      } finally {
+        if (registeredWebviewId.current === id) registeredWebviewId.current = null;
+      }
+    };
+
+    const register = () => {
+      try {
+        const id = webview.getWebContentsId?.();
+        if (!id || !Number.isInteger(id) || id <= 0 || registeredWebviewId.current === id) return;
+        unregister();
+        window.yardimciDesktop?.registerKbsWebview?.(id);
+        registeredWebviewId.current = id;
+      } catch {
+        setEgmSessionError("EGM KBS web oturumu otomasyon sürücüsüne bağlanamadı.");
+      }
+    };
+
+    const drive = async () => {
+      register();
+      setEgmSessionError("");
+      const inspected = await window.yardimciDesktop!.inspectEgmKbsSession();
+      if (!active) return;
+
+      if (inspected.state === "authenticated") {
+        setEgmSessionMessage(inspected.message);
+        return;
+      }
+      if (inspected.state === "otp_required") {
+        setEgmSessionMessage("EGMSEC uygulamasındaki geçici şifreyi bu sayfaya girin. Doğrulama tamamlandığında aynı oturum sonraki bildirimlerde kullanılacak.");
+        return;
+      }
+      if (inspected.state === "login_required") {
+        if (credentialsAttempted.current) {
+          setEgmSessionMessage("EGM KBS giriş formu yeniden göründü. Kayıtlı bilgileri kontrol edin veya bu sayfadan giriş yapın.");
+          return;
+        }
+        credentialsAttempted.current = true;
+        const result = await window.yardimciDesktop!.prepareStoredEgmKbsLogin();
+        if (active) setEgmSessionMessage(result.message);
+        return;
+      }
+      setEgmSessionMessage(inspected.message);
+    };
+
+    const onAttach = () => register();
+    const onReady = () => { void drive(); };
+    const onFail = (event: Event) => {
+      const detail = event as Event & { errorCode?: number; errorDescription?: string };
+      if (detail.errorCode === -3) return;
+      setEgmSessionError(detail.errorDescription
+        ? "EGM KBS sayfası yüklenemedi: " + detail.errorDescription
+        : "EGM KBS sayfası yüklenemedi.");
+    };
+
+    webview.addEventListener("did-attach", onAttach);
+    webview.addEventListener("dom-ready", onReady);
+    webview.addEventListener("did-fail-load", onFail);
+    return () => {
+      active = false;
+      webview.removeEventListener("did-attach", onAttach);
+      webview.removeEventListener("dom-ready", onReady);
+      webview.removeEventListener("did-fail-load", onFail);
+      unregister();
+    };
+  }, [egmSessionOpen, overview.provider]);
+
+  async function sendNotification(notificationId: string) {
+    const result = await controller.send(notificationId);
+    if (result?.state === "interaction_required" && overview.provider === "egm") {
+      credentialsAttempted.current = false;
+      setEgmSessionOpen(true);
+      setEgmSessionMessage("EGM KBS oturumu hazırlanıyor...");
+    }
+  }
 
   async function markExternal(notification: DesktopDashboardData["hospitalityNotifications"][number]) {
     const approved = await confirm({
@@ -83,7 +182,20 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
           <strong>Bildirim kayıtları</strong>
           <small>Giriş, çıkış ve oda değişikliği kayıtları konaklama misafiri bazında izlenir.</small>
         </div>
-        <div className="action-row" role="group" aria-label="Kimlik bildirimi filtresi">
+        <div className="action-row">
+          {overview.provider === "egm" && <ActionButton
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              credentialsAttempted.current = false;
+              setEgmSessionOpen((open) => !open);
+              setEgmSessionMessage("EGM KBS oturumu hazırlanıyor...");
+              setEgmSessionError("");
+            }}
+          >
+            {egmSessionOpen ? "EGM Oturumunu Kapat" : "EGM Oturumunu Aç"}
+          </ActionButton>}
+          <div className="action-row" role="group" aria-label="Kimlik bildirimi filtresi">
           {([
             ["attention", "İlgi Bekleyen"],
             ["pending", "Bekleyen"],
@@ -95,10 +207,34 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
               {label}
             </ActionButton>
           ))}
+          </div>
         </div>
       </div>
 
-      {controller.message && <p className="form-status" role="status">{controller.message}</p>}
+      {egmSessionOpen && overview.provider === "egm" && <div className="panel kbs-operations-session">
+        <div className="page-toolbar compact">
+          <div className="page-toolbar__copy">
+            <strong>EGM KBS oturumu</strong>
+            <small>Kayıtlı kullanıcı bilgileriyle giriş hazırlanır; EGMSEC geçici şifresi gerekirse bu resmi sayfada siz girersiniz.</small>
+          </div>
+          <ActionButton variant="ghost" size="sm" onClick={() => setEgmSessionOpen(false)}>Kapat</ActionButton>
+        </div>
+        {egmSessionMessage && <p className="form-status" role="status">{egmSessionMessage}</p>}
+        {egmSessionError && <div className="status-message status-message--danger" role="alert">
+          <span>{egmSessionError}</span>
+          <ActionButton size="sm" variant="secondary" onClick={() => egmWebviewRef.current?.reload?.()}>Yeniden Yükle</ActionButton>
+        </div>}
+        <webview
+          ref={egmWebviewRef}
+          className="kbs-operations-webview"
+          src={EGM_KBS_PORTAL_URL}
+          partition="persist:yardimci-kbs-egm"
+          allowpopups
+          webpreferences="contextIsolation=yes,nodeIntegration=no"
+        />
+      </div>}
+
+      {controller.message && <p className="form-status" role="status">{controller.message}</p>
       <DataList className="kbs-notification-list">
         {notifications.length === 0 ? <div className="empty-state empty-state--compact">
           <BadgeCheck size={24} aria-hidden="true" />
@@ -141,7 +277,7 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
                 variant="primary"
                 size="sm"
                 disabled={!notification.identityReady || controller.busyNotificationId === notification.id}
-                onClick={() => { void controller.send(notification.id); }}
+                onClick={() => { void sendNotification(notification.id); }}
               >
                 <IdCard size={15} aria-hidden="true" />
                 {controller.busyNotificationId === notification.id ? "Gönderiliyor" : "Bildir"}
