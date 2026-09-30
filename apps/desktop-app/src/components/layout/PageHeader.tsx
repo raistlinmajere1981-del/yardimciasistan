@@ -30,9 +30,14 @@ export function PageHeader({ title, eyebrow, description, action, notice }: Page
           </div>
           {description && <p className="page-header__subtitle">{description}</p>}
         </div>
+        <div
+          className={`page-header__notice${notice ? " has-notice" : ""}`}
+          aria-hidden={notice ? undefined : true}
+        >
+          {notice}
+        </div>
         {action && <div className="page-header__actions">{action}</div>}
       </div>
-      {notice && <div className="page-header__notice">{notice}</div>}
     </header>
   );
 }
