@@ -20,13 +20,13 @@ export function RoomAccountPayment({ folio, controller, disabled, onDirty }: {
   }}>
     <h4>Ödeme al</h4>
     <fieldset className="form-stack" disabled={disabled || folio.remainingMinor <= 0}>
-      <div className="operation-fields">
-        <label className="form-field">Ödeme tutarı<MoneyInput required value={amount ?? minorToInput(folio.remainingMinor)} onChange={value => { setAmount(value); onDirty(true); }} /></label>
-        <label className="form-field">Ödeme yöntemi<select aria-label="Ödeme yöntemi" value={method} onChange={event => { setMethod(event.target.value as RoomFolioPaymentMethod); onDirty(true); }}>
+      <div className="room-inline-action-row room-inline-action-row--payment">
+        <label className="form-field room-money-field">Ödeme tutarı<MoneyInput required value={amount ?? minorToInput(folio.remainingMinor)} onChange={value => { setAmount(value); onDirty(true); }} /></label>
+        <label className="form-field room-payment-method-field">Ödeme yöntemi<select aria-label="Ödeme yöntemi" value={method} onChange={event => { setMethod(event.target.value as RoomFolioPaymentMethod); onDirty(true); }}>
           <option value="cash">Nakit</option><option value="card">Kart</option><option value="bank">Banka</option><option value="other">Diğer</option>
         </select></label>
+        <ActionButton type="submit">Ödemeyi Kaydet</ActionButton>
       </div>
-      <ActionButton type="submit">Ödemeyi Kaydet</ActionButton>
     </fieldset>
     {error && <p role="alert">{error}</p>}
   </form>;
