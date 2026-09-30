@@ -44,7 +44,7 @@ import {
 } from "./database";
 import { DesktopFinanceService } from "./finance";
 import { resolveProjectBackupPath } from "./data-maintenance";
-import { archiveLocalDataForCleanStart } from "./clean-start.js";
+import { archiveLocalDataForCleanStart, cleanupTransientStateForCleanStart } from "./clean-start.js";
 import { inspectDesktopDatabaseCompatibility } from "./desktop-database-compatibility.js";
 import { resolveDataRoot, resolveDatabasePath } from "./data-paths.js";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
@@ -297,8 +297,8 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
     title: "Yardımcı Asistan — Temiz Başlangıç",
     message: automaticReason,
     detail: [
-      "Temiz Başlat seçilirse mevcut yerel veriler silinmek yerine kurtarma amacıyla legacy-data klasörüne taşınır.",
-      "Yeni sürüm daha sonra sıfır veritabanıyla açılır. Program kurulumu ve yeni sürüm dosyaları etkilenmez.",
+      "Temiz Başlat seçilirse mevcut yerel veriler, görseller, bakım kayıtları ve eski yedekler silinmek yerine kurtarma amacıyla legacy-data klasörüne taşınır.",
+      "Oturumlar ve geçici güncelleme dosyaları temizlenir; tanılama logları korunur. Yeni sürüm sıfır veritabanıyla açılır.",
       "",
       `Tanılama: ${compatibility.reason}`
     ].join("\n"),
@@ -319,18 +319,27 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
   }
 
   try {
-    const archived = archiveLocalDataForCleanStart(dataRoot);
+    const transientCleanup = cleanupTransientStateForCleanStart(dataRoot);
+    const archived = archiveLocalDataForCleanStart(
+      dataRoot,
+      new Date(),
+      resolveProjectBackupPath(dataRoot)
+    );
     try {
-      await Promise.all([
-        session.defaultSession.clearStorageData(),
-        session.fromPartition(WHATSAPP_WEB_PARTITION).clearStorageData(),
-        session.fromPartition(EGM_KBS_PARTITION).clearStorageData()
-      ]);
+      const sessions = [
+        session.defaultSession,
+        session.fromPartition(WHATSAPP_WEB_PARTITION),
+        session.fromPartition(EGM_KBS_PARTITION)
+      ];
+      await Promise.all(sessions.flatMap((persistentSession) => [
+        persistentSession.clearStorageData(),
+        persistentSession.clearCache()
+      ]));
     } catch (error) {
       desktopLog.warn({
         scope: "startup",
         event: "startup.clean-start.session-data-clear.failed",
-        message: "Temiz başlangıç sırasında kalıcı oturum verilerinin bir bölümü temizlenemedi.",
+        message: "Temiz başlangıç sırasında kalıcı oturum veya önbellek verilerinin bir bölümü temizlenemedi.",
         error
       });
     }
@@ -338,13 +347,15 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
     desktopLog.info({
       scope: "startup",
       event: "startup.clean-start.completed",
-      message: "Yerel veriler arşivlendi; uygulama temiz başlangıçla devam ediyor.",
+      message: "Eski çalışma verileri arşivlendi; uygulama temiz başlangıçla devam ediyor.",
       meta: {
         forced: forcedCleanStart,
         compatibility: compatibility.state,
         archived: archived.archived,
         archiveDirectory: archived.archiveDirectory,
-        movedEntries: archived.movedEntries
+        movedEntries: archived.movedEntries,
+        removedTransientEntries: transientCleanup.removedEntries,
+        preservedEntries: transientCleanup.preservedEntries
       }
     });
     return true;
