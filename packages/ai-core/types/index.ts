@@ -96,4 +96,8 @@ export interface OwnerReplySuggestion {
   model?: string;
   fallback?: boolean;
   providerMessage?: string;
+  providerReason?: AICompletionFailureReason;
+  providerStatus?: number;
+  providerCode?: string;
+  retryAfterSeconds?: number;
 }
