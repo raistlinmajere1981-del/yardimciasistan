@@ -94,10 +94,9 @@ try {
   await button('Geçmiş').click(); await button('← Masaya dön').click(); await expect(note).toHaveValue('Son not');
   const unchangedOrder = structuredClone((await state()).orders[0]);
   await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
-  await button('Müşteriyi Bağla').click();
-  await expect(customerPanel.locator('p').first()).toHaveText('Pilot Misafir');
+  await expect(customerSelect).toContainText('Pilot Misafir');
   expect((await state()).orders[0]).toEqual(unchangedOrder);
-  await button('Bağı Kaldır').click();
+  await button('Bağı kaldır').click();
   await captureOperationWorkspace(page, 'table-active');
   await note.fill('Escape ile kaydet'); await note.press('Escape');
   await expect(workspace).toBeVisible();
