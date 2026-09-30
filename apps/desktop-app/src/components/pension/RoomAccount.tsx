@@ -184,7 +184,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
     <article className="room-account-record form-stack" tabIndex={-1} data-folio-id={folio.id} data-stay-id={folio.stayId}>
       <div>
         <strong>Hesap sahibi: {folio.customerName}</strong>
-        <p>{departed ? "Çıkışı yapılmış konaklama" : open ? "Açık hesap" : "Kapalı hesap"} · {formatDateRange(folio.checkInDate, folio.plannedCheckOutDate)}</p>
+        {(departed || !open) && <p>{departed ? "Çıkışı yapılmış konaklama" : "Kapalı hesap"} · {formatDateRange(folio.checkInDate, folio.plannedCheckOutDate)}</p>}
       </div>
       <dl className="operation-facts room-account-facts">
         <div className="room-account-editable-row">
