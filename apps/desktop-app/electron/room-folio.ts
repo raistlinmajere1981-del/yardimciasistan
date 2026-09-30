@@ -143,6 +143,11 @@ export interface AddRoomFolioManualItemInput {
   note?: string;
 }
 
+export interface SetRoomFolioDiscountInput {
+  folioId: string;
+  amountMinor: number;
+}
+
 export interface AddRoomFolioPaymentInput {
   folioId: string;
   amountMinor: number;
@@ -579,6 +584,71 @@ export class DesktopRoomFolioService {
       db.close();
     }
     return { ok: true, message: kind === "discount" ? "İndirim eklendi." : "Ek ücret eklendi.", data: this.getData(), folioId };
+  }
+
+  setDiscount(input: SetRoomFolioDiscountInput): DesktopRoomFolioMutationResult {
+    const folioId = cleanText(input?.folioId, 180);
+    const amountMinor = nonNegativeAmount(input?.amountMinor);
+    if (!folioId || amountMinor === null) {
+      return { ok: false, message: "İndirim tutarı geçersiz." };
+    }
+
+    const db = this.openDatabase();
+    try {
+      if (!this.requireOpenFolio(db, folioId)) return { ok: false, message: "Oda adisyonu kapalı." };
+      const totals = this.getTotals(db, folioId);
+      const existing = db.prepare(`
+        SELECT COALESCE(SUM(-line_total_minor), 0) AS amount_minor
+        FROM room_folio_items
+        WHERE folio_id = ? AND kind = 'discount' AND deleted_at = ''
+      `).get(folioId) as Record<string, unknown> | undefined;
+      const existingDiscountMinor = safeMinor(existing?.amount_minor);
+      const baseTotalMinor = totals.chargeTotalMinor + existingDiscountMinor;
+      if (baseTotalMinor - amountMinor < totals.paidTotalMinor) {
+        return { ok: false, message: "İndirim toplamı alınan ödemenin altına düşüremez." };
+      }
+
+      const now = new Date().toISOString();
+      db.exec("BEGIN");
+      try {
+        db.prepare(`
+          UPDATE room_folio_items
+          SET deleted_at = ?, updated_at = ?, sync_status = 'local_only'
+          WHERE folio_id = ? AND kind = 'discount' AND deleted_at = ''
+        `).run(now, now, folioId);
+
+        if (amountMinor > 0) {
+          db.prepare(`
+            INSERT INTO room_folio_items (
+              id, folio_id, kind, menu_item_id, label, unit_price_minor, quantity,
+              line_total_minor, note, created_at, updated_at, deleted_at, sync_status
+            ) VALUES (?, ?, 'discount', '', 'İndirim', ?, 1, ?, '', ?, ?, '', 'local_only')
+          `).run(
+            `room_folio_item_${randomUUID()}`,
+            folioId,
+            amountMinor,
+            -amountMinor,
+            now,
+            now
+          );
+        }
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    } catch (error) {
+      return { ok: false, message: friendlyDatabaseError(error, "İndirim güncellenemedi.") };
+    } finally {
+      db.close();
+    }
+
+    return {
+      ok: true,
+      message: amountMinor > 0 ? "İndirim güncellendi." : "İndirim kaldırıldı.",
+      data: this.getData(),
+      folioId
+    };
   }
 
   removeItem(itemIdValue: string): DesktopRoomFolioMutationResult {
