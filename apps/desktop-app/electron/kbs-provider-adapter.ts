@@ -8,6 +8,14 @@ export interface KbsIdentitySnapshot {
   nationality: string;
   birthDate: string;
   documentSerialNumber: string;
+  documentExpiryDate: string;
+  gender: string;
+  birthPlace: string;
+  motherName: string;
+  fatherName: string;
+  issuingAuthority: string;
+  address: string;
+  phone: string;
   roomNumber: string;
 }
 
@@ -178,6 +186,14 @@ export function parseKbsIdentitySnapshot(value: string): KbsIdentitySnapshot | n
       nationality: String(raw.nationality ?? "").trim(),
       birthDate: String(raw.birthDate ?? "").trim(),
       documentSerialNumber: String(raw.documentSerialNumber ?? "").trim(),
+      documentExpiryDate: String(raw.documentExpiryDate ?? "").trim(),
+      gender: String(raw.gender ?? "").trim(),
+      birthPlace: String(raw.birthPlace ?? "").trim(),
+      motherName: String(raw.motherName ?? "").trim(),
+      fatherName: String(raw.fatherName ?? "").trim(),
+      issuingAuthority: String(raw.issuingAuthority ?? "").trim(),
+      address: String(raw.address ?? "").trim(),
+      phone: String(raw.phone ?? "").trim(),
       roomNumber: String(raw.roomNumber ?? "").trim()
     };
   } catch {
@@ -223,7 +239,7 @@ export function prepareJandarmaArrival(
       countryEnumName: isTurkeyNationality(input.identity.nationality) ? "TURKIYE" : input.identity.nationality.trim().toLocaleUpperCase("tr-TR"),
       roomNumber,
       arrivalAt: formatJandarmaDate(occurredAt),
-      phone: "",
+      phone: input.identity.phone,
       usageEnumName: "KONAKLAMA",
       futureDated: occurredAt.getTime() > now.getTime()
     }
