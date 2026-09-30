@@ -14,21 +14,20 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, ambiguous,
     && !controller.data.activeStays.some(stay => stay.id === item.stayId && ["planned", "checked_in"].includes(stay.status)));
   return <>
     {controller.loading && <p role="status">Hesap hazırlanıyor…</p>}
-    {previous.some(folio => folio.remainingMinor > 0) && <p className="operation-prior-debt">Önceki borç · {minorMoney(previous.reduce((total, folio) => total + Math.max(0, folio.remainingMinor), 0))} · Aşağıda ayrı hesaplarda</p>}
+    {previous.some(folio => folio.remainingMinor > 0) && <p className="operation-prior-debt">Önceki borç · {minorMoney(previous.reduce((total, folio) => total + Math.max(0, folio.remainingMinor), 0))}</p>}
     <section aria-label="Mevcut konaklama hesabı" className="operation-section form-stack">
-      <h4>Ortak konaklama hesabı</h4>
+      <h4>Konaklama hesabı</h4>
       {current ? <AccountRecord key={current.id} folio={current} controller={controller} menuEnabled={menuEnabled} disabled={disabled} onDirty={dirty => onDirty(current.id, dirty)} />
         : <><p>{ambiguous ? "Birden fazla girişli konaklama var; mevcut hesap belirlenemedi. Konaklama kayıtlarını kontrol edin." : currentStayId ? "Bu konaklama için hesap henüz açılmadı." : "Aktif misafir hesabı yok. Giriş tamamlandığında konaklama hesabı burada görünür."}</p>
           {currentStayId && <ActionButton disabled={disabled} onClick={() => void controller.mutate(() => window.yardimciDesktop!.openRoomFolio(currentStayId))}>Hesabı Aç</ActionButton>}</>}
     </section>
     {controller.error && <ActionButton variant="secondary" disabled={controller.busy} onClick={() => void controller.refresh()}>Hesabı Yenile</ActionButton>}
-    <section className="operation-section form-stack" aria-label="Önceki hesaplar">
-      <h4>Önceki hesaplar</h4>
-      {previous.length === 0 ? <p>Önceki konaklamalardan açık hesap yok.</p> : <>
-        <p>Bu tutarlar mevcut konaklama hesabına dahil değildir.</p>
+    {previous.length > 0 && <details className="operation-section room-previous-accounts" aria-label="Önceki hesaplar">
+      <summary>Önceki hesaplar ({previous.length})</summary>
+      <div className="form-stack">
         {previous.map(folio => <AccountRecord key={folio.id} folio={folio} controller={controller} menuEnabled={menuEnabled} departed disabled={disabled} onDirty={dirty => onDirty(folio.id, dirty)} />)}
-      </>}
-    </section>
+      </div>
+    </details>}
   </>;
 }
 
