@@ -873,8 +873,7 @@
 
 
 .dashboard-attention-button {
-  display: contents;
-}
-.dashboard-attention-button .dashboard-attention-card {
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
