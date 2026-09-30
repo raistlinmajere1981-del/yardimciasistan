@@ -45,7 +45,7 @@
 }
 .page-header__main {
   display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.35fr) max-content;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr) max-content;
   align-items: center;
   gap: var(--space-4);
   min-width: 0;
