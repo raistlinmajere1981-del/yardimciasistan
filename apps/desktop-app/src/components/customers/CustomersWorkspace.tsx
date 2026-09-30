@@ -123,16 +123,22 @@ export function CustomersWorkspace({
     <DataList className="customers-workspace__items">
       {rows.length === 0 ? <div className="empty-state"><Users size={24} aria-hidden="true" /><strong>Müşteri bulunamadı.</strong><p>Arama veya filtreyi değiştirin.</p></div> : rows.map((row) => {
         const customer = row.customer;
+        const openCustomer = () => navigation.openWorkspace({
+          entityType: "customer",
+          entityId: customer.id,
+          mode: "summary",
+          returnContext: { page: "customerWork", entityId: customer.id }
+        });
         return <DataListItem
           className="customer-record-row"
           key={customer.id}
+          onClick={(event) => {
+            const target = event.target as HTMLElement;
+            if (target.closest(".list-row__actions, .customer-record-row__open")) return;
+            openCustomer();
+          }}
           leading={<span className={"status-dot " + (row.activeStay ? "tone-success" : row.activeReservations.length > 0 ? "tone-wait" : "tone-neutral")} aria-hidden="true" />}
-          title={<button className="customer-record-row__open" type="button" onClick={() => navigation.openWorkspace({
-            entityType: "customer",
-            entityId: customer.id,
-            mode: "summary",
-            returnContext: { page: "customerWork", entityId: customer.id }
-          })}>{customer.fullName}</button>}
+          title={<button className="customer-record-row__open" type="button" onClick={openCustomer}>{customer.fullName}</button>}
           meta={<>
             {row.roomText && <span><BedDouble size={14} aria-hidden="true" />{row.roomText}</span>}
             {row.activeReservations.length > 0 && <span><CalendarClock size={14} aria-hidden="true" />{row.activeReservations.length} aktif rezervasyon</span>}
