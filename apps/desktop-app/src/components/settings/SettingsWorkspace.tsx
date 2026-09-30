@@ -204,6 +204,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         const kbsResult = await kbs.save();
         if (!kbsResult.ok) return kbsResult;
         changed ||= kbsResult.changed;
+        if (kbsResult.changed) await props.onDashboardRefresh?.();
       }
       return { ok: true, changed };
     }
