@@ -22,13 +22,17 @@ interface KbsAutomationWorkspaceProps {
   selectedCustomerId?: string;
   controller: KbsNotificationController;
   egmSessionRequest?: number;
+  sessionRetryNotificationId?: string;
+  onSessionRetryConsumed?: () => void;
 }
 
 export function KbsAutomationWorkspace({
   data,
   selectedCustomerId = "",
   controller,
-  egmSessionRequest = 0
+  egmSessionRequest = 0,
+  sessionRetryNotificationId = "",
+  onSessionRetryConsumed
 }: KbsAutomationWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const { confirm, confirmDialog } = useConfirmDialog();
@@ -39,15 +43,19 @@ export function KbsAutomationWorkspace({
   const egmWebviewRef = useRef<KbsWebViewElement | null>(null);
   const registeredWebviewId = useRef<number | null>(null);
   const credentialsAttempted = useRef(false);
+  const pendingSessionRetryId = useRef("");
+  const sessionRetryAttempted = useRef(false);
   const overview = data.kbsOverview;
 
   useEffect(() => {
     if (!egmSessionRequest || overview.provider !== "egm") return;
     credentialsAttempted.current = false;
+    sessionRetryAttempted.current = false;
+    pendingSessionRetryId.current = sessionRetryNotificationId;
     setEgmSessionOpen(true);
     setEgmSessionMessage("EGM KBS oturumu hazırlanıyor...");
     setEgmSessionError("");
-  }, [egmSessionRequest, overview.provider]);
+  }, [egmSessionRequest, overview.provider, sessionRetryNotificationId]);
 
   useEffect(() => {
     if (!egmSessionOpen || overview.provider !== "egm") return;
@@ -85,6 +93,15 @@ export function KbsAutomationWorkspace({
 
       if (inspected.state === "authenticated") {
         setEgmSessionMessage(inspected.message);
+        const retryId = pendingSessionRetryId.current;
+        if (retryId && !sessionRetryAttempted.current) {
+          sessionRetryAttempted.current = true;
+          pendingSessionRetryId.current = "";
+          onSessionRetryConsumed?.();
+          const retryResult = await controller.send(retryId);
+          if (!active) return;
+          setEgmSessionMessage(retryResult?.message || inspected.message);
+        }
         return;
       }
       if (inspected.state === "otp_required") {
@@ -124,12 +141,14 @@ export function KbsAutomationWorkspace({
       webview.removeEventListener("did-fail-load", onFail);
       unregister();
     };
-  }, [egmSessionOpen, overview.provider]);
+  }, [controller, egmSessionOpen, onSessionRetryConsumed, overview.provider]);
 
   async function sendNotification(notificationId: string) {
     const result = await controller.send(notificationId);
     if (result?.state === "interaction_required" && overview.provider === "egm") {
       credentialsAttempted.current = false;
+      sessionRetryAttempted.current = false;
+      pendingSessionRetryId.current = notificationId;
       setEgmSessionOpen(true);
       setEgmSessionMessage("EGM KBS oturumu hazırlanıyor...");
     }
