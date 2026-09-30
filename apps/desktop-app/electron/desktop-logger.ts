@@ -253,6 +253,11 @@ function appendStructured(
   }
 }
 
+export function createDiagnosticOperationId(prefix = "op") {
+  const normalized = String(prefix || "op").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "op";
+  return `${normalized}-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`;
+}
+
 export const desktopLog = {
   info(input: StructuredLogInput) {
     return appendStructured("INFO", "main", input);
