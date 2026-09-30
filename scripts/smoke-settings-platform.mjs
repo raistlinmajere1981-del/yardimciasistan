@@ -391,7 +391,7 @@ try {
     });
   });
   await discard();
-  await expect(page.getByText('Medya geri alma testi başarısız.', { exact: true })).toBeVisible();
+  await expect(page.locator('.global-message-bar')).toContainText('Medya geri alma testi başarısız.');
   await expect(outOfServiceBox).toBeChecked();
   await expect(roomMediaPanel.locator('.room-media-card')).toHaveCount(2);
   await expect(tab('İşletme Düzeni')).toContainText('Değişiklik var');
@@ -541,7 +541,7 @@ try {
   await select('İşletme Düzeni');
   await guard().getByRole('button', { name: 'Kaydet ve geç', exact: true }).click();
   await expect(guard()).toBeVisible();
-  await expect(page.locator('#settings-public-profile').getByRole('alert')).toHaveText('Profil hatası');
+  await expect(page.locator('.global-message-bar')).toContainText('Profil hatası');
   await page.evaluate(() => { window.failProfile = false; });
   await guard().getByRole('button', { name: 'Kaydet ve geç', exact: true }).click();
   await expect(tab('İşletme Düzeni')).toHaveAttribute('aria-selected', 'true');
@@ -555,6 +555,7 @@ try {
   await page.getByRole('button', { name: 'Google Bağlantısını Dene', exact: true }).click();
   await expect(page.locator('#settings-google-reviews')).toContainText('BlackSea Pansiyon');
   await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(page.locator('.global-message-bar')).toContainText('İşletme kaydedildi.');
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'google-reviews').length)).toBe(1);
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'google-reviews').at(-1).input.placeId)).toBe('ChIJBlackSeaFixture');
 
