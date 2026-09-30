@@ -207,6 +207,8 @@ try {
   await expect(customerPanel).toContainText('Pilot Misafir · açık hesap');
   await expect(workspace.getByLabel('Oda hesabı', { exact: true })).toHaveCount(0);
   await expect(page.locator('[aria-modal="true"]')).toHaveCount(0);
+  await expect(note).toHaveCount(0);
+  await button('Çay için not ekle').click();
   await note.fill('Odaya aktarım notu'); await note.press('Tab');
   await expect.poll(async () => (await state()).orders[0].items[0].note).toBe('Odaya aktarım notu');
   await page.evaluate(() => { window.fixtureFailTransfer = true; });
