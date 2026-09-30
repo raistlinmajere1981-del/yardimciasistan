@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../electron/database";
 import { defaultDashboardData } from "./bootstrap-defaults";
-import type { SyncState } from "./runtime-state";
+import { reportAppStatus, type SyncState } from "./runtime-state";
 import {
   buildMenuPreviewData,
   compareMenuRecords,
@@ -136,7 +136,7 @@ export function useMenuController({
     setSelectedItemId("");
     setItemForm(emptyItemForm("", nextSortOrder(dashboardData.menu.items)));
     setMenuEditState("idle");
-    setMenuEditMessage("Yeni kategori.");
+    setMenuEditMessage("");
   }
 
   function startNewItem() {
@@ -144,17 +144,17 @@ export function useMenuController({
     setSelectedItemId("");
     setItemForm(emptyItemForm(categoryId, nextSortOrder(dashboardData.menu.items)));
     setMenuEditState("idle");
-    setMenuEditMessage("Yeni ürün.");
+    setMenuEditMessage("");
   }
 
   async function saveCategory() {
     setMenuEditState("loading");
-    setMenuEditMessage("Kategori kaydediliyor...");
+    setMenuEditMessage("");
 
     const bridge = window.yardimciDesktop;
     if (!bridge) {
       setMenuEditState("error");
-      setMenuEditMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
+      reportAppStatus("error", "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -168,7 +168,7 @@ export function useMenuController({
 
     if (!result.ok) {
       setMenuEditState("error");
-      setMenuEditMessage(result.message);
+      reportAppStatus("error", result.message);
       return;
     }
 
@@ -182,7 +182,8 @@ export function useMenuController({
       setItemForm((current) => ({ ...current, category_id: result.savedId }));
     }
     setMenuEditState("success");
-    setMenuEditMessage(result.message);
+    setMenuEditMessage("");
+    reportAppStatus("success", result.message);
     markMenuDirty();
   }
 
@@ -214,7 +215,7 @@ export function useMenuController({
 
   async function saveItem(): Promise<DesktopMenuSaveResult> {
     setMenuEditState("loading");
-    setMenuEditMessage("Ürün kaydediliyor...");
+    setMenuEditMessage("");
     const priceError = validateItemFormPrice(itemForm);
     if (priceError) {
       setMenuEditState("error");
@@ -223,7 +224,8 @@ export function useMenuController({
     }
     const result = await saveItemForm(itemForm);
     setMenuEditState(result.ok ? "success" : "error");
-    setMenuEditMessage(result.message);
+    setMenuEditMessage("");
+    reportAppStatus(result.ok ? "success" : "error", result.message);
     return result;
   }
 
@@ -236,7 +238,8 @@ export function useMenuController({
     const result = await bridge.reorderMenuRecords({ kind: "categories", orderedIds });
     if (!result.ok) {
       setMenuEditState("error");
-      setMenuEditMessage(result.message);
+      setMenuEditMessage("");
+      reportAppStatus("error", result.message);
       return result;
     }
 
@@ -246,7 +249,8 @@ export function useMenuController({
       setCategoryForm(toCategoryForm(selectedCategory));
     }
     setMenuEditState("success");
-    setMenuEditMessage(result.message);
+    setMenuEditMessage("");
+    reportAppStatus("success", result.message);
     markMenuDirty();
     return result;
   }
@@ -260,7 +264,8 @@ export function useMenuController({
     const result = await bridge.reorderMenuRecords({ kind: "items", categoryId, orderedIds });
     if (!result.ok) {
       setMenuEditState("error");
-      setMenuEditMessage(result.message);
+      setMenuEditMessage("");
+      reportAppStatus("error", result.message);
       return result;
     }
 
@@ -270,7 +275,8 @@ export function useMenuController({
       setItemForm(toItemForm(selectedItem, result.dashboardData.menu.categories[0]?.id ?? ""));
     }
     setMenuEditState("success");
-    setMenuEditMessage(result.message);
+    setMenuEditMessage("");
+    reportAppStatus("success", result.message);
     markMenuDirty();
     return result;
   }
@@ -288,11 +294,11 @@ export function useMenuController({
     }
 
     setMenuEditState("loading");
-    setMenuEditMessage("Kategori ve bağlı ürünler siliniyor...");
+    setMenuEditMessage("");
     const result = await bridge.deleteMenuCategory(categoryForm.id);
     if (!result.ok) {
       setMenuEditState("error");
-      setMenuEditMessage(result.message);
+      reportAppStatus("error", result.message);
       return;
     }
 
@@ -306,7 +312,8 @@ export function useMenuController({
     setSelectedItemId(nextItem?.id ?? "");
     setItemForm(toItemForm(nextItem, nextCategory?.id ?? ""));
     setMenuEditState("success");
-    setMenuEditMessage(result.message);
+    setMenuEditMessage("");
+    reportAppStatus("success", result.message);
     markMenuDirty();
   }
 
@@ -318,6 +325,7 @@ export function useMenuController({
 
     const result = await bridge.deleteMenuItem(itemId);
     if (!result.ok) {
+      reportAppStatus("error", result.message);
       return result;
     }
 
@@ -328,6 +336,7 @@ export function useMenuController({
     setSelectedItemId(nextItem?.id ?? "");
     setItemForm(toItemForm(nextItem, selectedCategoryId || result.dashboardData.menu.categories[0]?.id || ""));
     markMenuDirty();
+    reportAppStatus("success", result.message);
     return result;
   }
 
