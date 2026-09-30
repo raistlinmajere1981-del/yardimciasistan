@@ -1,7 +1,7 @@
 import { webContents, type WebContents } from "electron";
 import { EGM_KBS_PORTAL_URL, type KbsRuntimeCredentials } from "./kbs-settings.js";
 
-export type EgmKbsSessionState =
+type EgmKbsSessionState =
   | "unavailable"
   | "login_required"
   | "otp_required"
