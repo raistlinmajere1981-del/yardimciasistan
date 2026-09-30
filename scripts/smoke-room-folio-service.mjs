@@ -182,6 +182,27 @@ try {
   assert.ok(folio);
   assert.equal(folio.extrasTotalMinor, menuItem.priceMinor + 20000);
 
+  const replacedDiscount = service.setDiscount({ folioId: opened.folioId, amountMinor: 15000 });
+  assert.equal(replacedDiscount.ok, true);
+  folio = replacedDiscount.data.folios.find((item) => item.id === opened.folioId);
+  assert.ok(folio);
+  assert.equal(folio.items.filter((item) => item.kind === "discount").length, 1);
+  assert.equal(folio.items.find((item) => item.kind === "discount")?.lineTotalMinor, -15000);
+  assert.equal(folio.extrasTotalMinor, menuItem.priceMinor + 15000);
+
+  const clearedDiscount = service.setDiscount({ folioId: opened.folioId, amountMinor: 0 });
+  assert.equal(clearedDiscount.ok, true);
+  folio = clearedDiscount.data.folios.find((item) => item.id === opened.folioId);
+  assert.ok(folio);
+  assert.equal(folio.items.some((item) => item.kind === "discount"), false);
+  assert.equal(folio.extrasTotalMinor, menuItem.priceMinor + 30000);
+
+  const restoredDiscount = service.setDiscount({ folioId: opened.folioId, amountMinor: 10000 });
+  assert.equal(restoredDiscount.ok, true);
+  folio = restoredDiscount.data.folios.find((item) => item.id === opened.folioId);
+  assert.ok(folio);
+  assert.equal(folio.extrasTotalMinor, menuItem.priceMinor + 20000);
+
   const secondGuest = database.saveCustomer({ fullName: "Folio İkinci Misafir", phone: "", email: "", notes: "", tags: [],
     identityType: "", identityNumber: "", nationality: "", birthDate: "", gender: "", documentSerialNumber: "",
     documentExpiryDate: "", birthPlace: "", motherName: "", fatherName: "", issuingAuthority: "", address: "" });
