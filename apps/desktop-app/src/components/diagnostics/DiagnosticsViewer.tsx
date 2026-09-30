@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clipboard, Pause, Play, RefreshCw } from "lucide-react";
+import { Bug, Clipboard, Pause, Play, RefreshCw } from "lucide-react";
 import type {
   DesktopDiagnosticEvent,
   DesktopDiagnosticLevel,
@@ -8,6 +8,7 @@ import type {
 } from "../../../electron/diagnostics-contract";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import type { WorkspacePresentation } from "../workspace/workspace-intent";
+import { SupportReportDialog } from "./SupportReportDialog";
 
 interface DiagnosticsViewerProps {
   onClose: () => void;
@@ -32,6 +33,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("Log oturumları yükleniyor...");
   const [copyMessage, setCopyMessage] = useState("");
+  const [supportReportOpen, setSupportReportOpen] = useState(false);
 
   const selectedSession = sessions.find((session) => session.sessionId === sessionId) ?? null;
   const isCurrentSession = Boolean(selectedSession?.current);
@@ -253,6 +255,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
   }
 
   return (
+    <>
     <WorkspaceFrame
       title="Uygulama Logları"
       context={<>{selectedSession?.current ? "Aktif oturum" : "Geçmiş oturum"} · {message}</>}
@@ -272,6 +275,14 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
         >
           <RefreshCw size={15} aria-hidden="true" />
           Yenile
+        </button>
+        <button
+          className="action-button action-button-primary action-button-sm"
+          type="button"
+          onClick={() => setSupportReportOpen(true)}
+        >
+          <Bug size={15} aria-hidden="true" />
+          Hata Bildir
         </button>
         {isCurrentSession && (
           <button
@@ -386,6 +397,8 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
         </aside>
       </div>
     </WorkspaceFrame>
+    {supportReportOpen && <SupportReportDialog onClose={() => setSupportReportOpen(false)} />}
+    </>
   );
 }
 
