@@ -120,6 +120,7 @@ import type {
   CheckoutRoomFolioInput,
   DesktopRoomFolioData,
   DesktopRoomFolioMutationResult,
+  SetRoomFolioDiscountInput,
   UpdateRoomFolioDetailsInput,
   UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
@@ -226,6 +227,7 @@ export interface DesktopBridge {
   addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => Promise<DesktopRoomFolioMutationResult>;
   updateRoomFolioItemQuantity: (input: UpdateRoomFolioItemQuantityInput) => Promise<DesktopRoomFolioMutationResult>;
   addRoomFolioManualItem: (input: AddRoomFolioManualItemInput) => Promise<DesktopRoomFolioMutationResult>;
+  setRoomFolioDiscount: (input: SetRoomFolioDiscountInput) => Promise<DesktopRoomFolioMutationResult>;
   removeRoomFolioItem: (itemId: string) => Promise<DesktopRoomFolioMutationResult>;
   addRoomFolioPayment: (input: AddRoomFolioPaymentInput) => Promise<DesktopRoomFolioMutationResult>;
   voidRoomFolioPayment: (paymentId: string) => Promise<DesktopRoomFolioMutationResult>;
@@ -403,6 +405,7 @@ const bridge: DesktopBridge = {
   addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addMenuItem", input),
   updateRoomFolioItemQuantity: (input: UpdateRoomFolioItemQuantityInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:updateItemQuantity", input),
   addRoomFolioManualItem: (input: AddRoomFolioManualItemInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addManualItem", input),
+  setRoomFolioDiscount: (input: SetRoomFolioDiscountInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:setDiscount", input),
   removeRoomFolioItem: (itemId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:removeItem", itemId),
   addRoomFolioPayment: (input: AddRoomFolioPaymentInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addPayment", input),
   voidRoomFolioPayment: (paymentId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:voidPayment", paymentId),
