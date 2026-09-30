@@ -137,13 +137,22 @@ export function KbsAutomationWorkspace({ data, selectedCustomerId = "", controll
                 <UserRound size={15} aria-hidden="true" />
                 {notification.identityReady ? "Müşteriyi Aç" : "Kimliği Tamamla"}
               </ActionButton>
+              {notification.status !== "sent" && <ActionButton
+                variant="primary"
+                size="sm"
+                disabled={!notification.identityReady || controller.busyNotificationId === notification.id}
+                onClick={() => { void controller.send(notification.id); }}
+              >
+                <IdCard size={15} aria-hidden="true" />
+                {controller.busyNotificationId === notification.id ? "Gönderiliyor" : "Bildir"}
+              </ActionButton>}
               {notification.status === "failed" && <ActionButton
                 variant="secondary"
                 size="sm"
                 disabled={controller.busyNotificationId === notification.id}
                 onClick={() => { void controller.retry(notification.id); }}
               >
-                Tekrar Kuyruğa Al
+                Kuyruğa Al
               </ActionButton>}
               {notification.status !== "sent" && <ActionButton
                 variant="ghost"
