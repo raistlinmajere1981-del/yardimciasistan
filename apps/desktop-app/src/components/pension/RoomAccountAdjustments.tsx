@@ -20,7 +20,6 @@ export function RoomAccountAdjustments({ folio, controller, menuEnabled, disable
   const item = controller.data.menuItems.find(item => item.id === itemId);
   return <section className="operation-section form-stack" aria-label="Hesaba ekle">
     <h4>Hesaba ekle · {folio.customerName}</h4>
-    {controller.feedbackScope === "adjustments" && controller.message && <p role={controller.error ? "alert" : "status"}>{controller.message}</p>}
     {menuEnabled && <form className="form-stack" onSubmit={event => {
       event.preventDefault();
       if (!item || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)) return;
@@ -93,7 +92,6 @@ export function RoomAccountDetails({ folio, controller, disabled, onDirty }: {
   }}>
     <h4>Konaklama ücreti</h4>
     <p>Bu alanlar hesabın tarih ve ücretlerini günceller.</p>
-    {controller.feedbackScope === "details" && controller.message && <p role={controller.error ? "alert" : "status"}>{controller.message}</p>}
     <fieldset className="form-stack" disabled={disabled}>
       <div className="operation-fields">
         <div className="form-field">
