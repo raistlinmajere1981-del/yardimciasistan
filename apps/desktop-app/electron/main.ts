@@ -264,6 +264,12 @@ function resolveRuntimeDataRoot(): string {
   });
 }
 
+function resolveCleanStartBackupRoot(dataRoot: string): string {
+  if (app.isPackaged) return resolveProjectBackupPath(dataRoot);
+  const explicit = String(process.env.YA_DESKTOP_BACKUP_DIR ?? "").trim();
+  return explicit ? path.resolve(explicit) : path.join(dataRoot, "backups");
+}
+
 async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> {
   const forcedCleanStart = process.argv.includes("--clean-start");
   const compatibility = inspectDesktopDatabaseCompatibility(
@@ -323,7 +329,7 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
     const archived = archiveLocalDataForCleanStart(
       dataRoot,
       new Date(),
-      resolveProjectBackupPath(dataRoot)
+      resolveCleanStartBackupRoot(dataRoot)
     );
     try {
       const sessions = [
