@@ -270,7 +270,7 @@ void mainProcessReady.then(async ({
       scheduleAutomaticSyncSoon();
     };
 
-    registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked });
+    registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked, userDataPath });
     registerDataMaintenanceIpcHandlers(userDataPath, {
       resetConnectedWebRuntime: async () => {
         const database = new DesktopDatabase({
