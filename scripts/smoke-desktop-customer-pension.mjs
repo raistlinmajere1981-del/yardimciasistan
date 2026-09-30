@@ -328,8 +328,7 @@ try {
     await capture('folio-account');
     await expect(roomWorkspace.getByLabel('Ödeme tutarı', { exact: true })).toBeVisible();
     await capture('folio-payment');
-    const checkoutButton = roomWorkspace.getByRole('region', { name: 'Oda İşlemleri', exact: true })
-      .getByRole('button', { name: 'Çıkışı Tamamla', exact: true });
+    const checkoutButton = roomWorkspace.getByRole('button', { name: 'Çıkışı Tamamla', exact: true });
     await checkoutButton.scrollIntoViewIfNeeded();
     await checkoutButton.click();
     const checkoutConfirmation = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
