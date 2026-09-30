@@ -52,9 +52,6 @@
 .operations-workspace .restaurant-order-line__remove { grid-column: 2; grid-row: 2; }
 .operations-workspace .restaurant-quantity-control { grid-column: 1; grid-template-columns: var(--control-height-lg) minmax(var(--space-6), auto) var(--control-height-lg); justify-self: start; }
 .restaurant-ticket-total { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
-.restaurant-start { padding: var(--space-3); background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); }
-.restaurant-start :is(h4, p) { margin: 0; }
-
 /* Hospitality sections share geometry; appearance continues to come from app tokens. */
 .resource-workspace-summary {
   display: flex;
@@ -131,11 +128,6 @@
   border-width: 1px 0 0;
   border-radius: 0;
 }
-.operation-surface--empty-table {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
-}
-.operation-surface--empty-table > .operation-panel--table-context { grid-row: span 2; }
 @media (max-width: 1100px) {
   .operation-surface { overflow: auto; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; }
   .operation-panel { display: block; overflow: visible; }
@@ -144,8 +136,6 @@
   .operations-workspace .restaurant-order-product-list { max-height: 36dvh; }
   .operations-workspace .restaurant-order-line-list { overflow: visible; flex: none; }
   .operations-workspace .restaurant-order-menu-panel { border-inline-end: 0; }
-  .operation-surface--empty-table { grid-template-rows: none; }
-  .operation-surface--empty-table > .operation-panel--table-context { grid-row: auto; }
 }
 @media (max-width: 480px) {
   .operation-fields { grid-template-columns: minmax(0, 1fr); }
