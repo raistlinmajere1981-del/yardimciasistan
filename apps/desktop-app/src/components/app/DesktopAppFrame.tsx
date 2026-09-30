@@ -164,6 +164,13 @@ function DesktopAppFrameContent({
     setDiagnosticsOpen(true);
   }
 
+  function handleSidebarNavigate(destination: DesktopPage) {
+    if (destination === "customerWork") {
+      setCustomerWorkTab("customers");
+    }
+    requestPageChange(destination);
+  }
+
   function openDesktopNotification(item: DesktopNotificationItem) {
     if (item.kind === "request" && item.relatedId) {
       setSelectedRequestId(item.relatedId);
@@ -187,7 +194,7 @@ function DesktopAppFrameContent({
           activePage={activePage}
           businessName={setupData.businessName}
           collapsed={sidebarCollapsed}
-          onNavigate={requestPageChange}
+          onNavigate={handleSidebarNavigate}
           onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
         />
       )}
