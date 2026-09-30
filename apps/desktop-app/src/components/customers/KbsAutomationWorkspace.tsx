@@ -272,7 +272,6 @@ export function KbsAutomationWorkspace({
         />
       </div>}
 
-      {controller.message && <p className="form-status" role="status">{controller.message}</p>}
       <DataList className="kbs-notification-list">
         {notifications.length === 0 ? <div className="empty-state empty-state--compact">
           <BadgeCheck size={24} aria-hidden="true" />
