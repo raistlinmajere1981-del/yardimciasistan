@@ -528,9 +528,15 @@
 }
 
 
+.identity-scan-actions {
+  align-items: center;
+}
+
 .identity-back-side-toggle {
   align-items: center;
   max-width: 34rem;
+  min-height: var(--control-height-sm);
+  white-space: nowrap;
 }
 
 .form-dialog:has(.identity-camera-overlay) {
