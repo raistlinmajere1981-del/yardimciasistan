@@ -134,7 +134,11 @@ import type {
   DesktopDiagnosticReadInput,
   DesktopDiagnosticReadResult,
   DesktopDiagnosticSessionSummary,
-  DesktopDiagnosticWriteInput
+  DesktopDiagnosticWriteInput,
+  DesktopSupportReportActionResult,
+  DesktopSupportReportDraft,
+  DesktopSupportReportSendInput,
+  DesktopSupportReportSendResult
 } from "./diagnostics-contract";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
 import type { BusinessPublicProfileSaveResult } from "./business-public-profile";
@@ -187,6 +191,10 @@ export interface DesktopBridge {
   listDiagnosticSessions: () => Promise<DesktopDiagnosticSessionSummary[]>;
   readDiagnosticSession: (input?: DesktopDiagnosticReadInput) => Promise<DesktopDiagnosticReadResult | null>;
   writeDiagnosticEvent: (input: DesktopDiagnosticWriteInput) => Promise<unknown>;
+  getSupportReportDraft: () => Promise<DesktopSupportReportDraft>;
+  addClipboardScreenshot: () => Promise<DesktopSupportReportActionResult>;
+  clearSupportScreenshot: () => Promise<DesktopSupportReportActionResult>;
+  sendSupportReport: (input?: DesktopSupportReportSendInput) => Promise<DesktopSupportReportSendResult>;
   lockApp: () => Promise<AppLockActionResult>;
   unlockApp: (password: string) => Promise<AppLockActionResult>;
   updateAppPassword: (input: UpdateAppPasswordInput) => Promise<AppLockActionResult>;
@@ -368,6 +376,10 @@ const bridge: DesktopBridge = {
   listDiagnosticSessions: () => invokeWhenUnlocked<DesktopDiagnosticSessionSummary[]>("diagnostics:listSessions"),
   readDiagnosticSession: (input = {}) => invokeWhenUnlocked<DesktopDiagnosticReadResult | null>("diagnostics:readSession", input),
   writeDiagnosticEvent: (input: DesktopDiagnosticWriteInput) => ipcRenderer.invoke("diagnostics:writeRendererEvent", input),
+  getSupportReportDraft: () => invokeWhenUnlocked<DesktopSupportReportDraft>("diagnostics:getSupportReportDraft"),
+  addClipboardScreenshot: () => invokeWhenUnlocked<DesktopSupportReportActionResult>("diagnostics:addClipboardScreenshot"),
+  clearSupportScreenshot: () => invokeWhenUnlocked<DesktopSupportReportActionResult>("diagnostics:clearSupportScreenshot"),
+  sendSupportReport: (input = {}) => invokeWhenUnlocked<DesktopSupportReportSendResult>("diagnostics:sendSupportReport", input),
   lockApp: () => ipcRenderer.invoke("appLock:lock"),
   unlockApp: (password: string) => ipcRenderer.invoke("appLock:unlock", password),
   updateAppPassword: (input: UpdateAppPasswordInput) => ipcRenderer.invoke("appLock:updatePassword", input),
