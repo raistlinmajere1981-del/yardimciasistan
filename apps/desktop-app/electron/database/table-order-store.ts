@@ -317,12 +317,12 @@ export function recalculateTableOrderTotalInTransaction(db: DatabaseSync, orderI
   }
 
   const subtotal = roundMoney(Number(row.subtotal ?? 0));
-  const discountTotal = roundMoney(Number(row.discount_total ?? 0));
+  const discountTotal = roundMoney(Math.min(subtotal, Math.max(0, Number(row.discount_total ?? 0))));
   const total = roundMoney(Math.max(0, subtotal - discountTotal));
   const updatedAt = nextMutationTimestamp(row.updated_at, now);
   db
-    .prepare("UPDATE table_orders SET subtotal = ?, total = ?, updated_at = ? WHERE id = ?")
-    .run(subtotal, total, updatedAt, orderId);
+    .prepare("UPDATE table_orders SET subtotal = ?, discount_total = ?, total = ?, updated_at = ? WHERE id = ?")
+    .run(subtotal, discountTotal, total, updatedAt, orderId);
 }
 
 export function getTableOrderMutationResult(db: DatabaseSync, orderId: string, message: string): DesktopTableOrderResult {
