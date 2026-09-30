@@ -158,6 +158,5 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
         {model.canCreate ? <ActionButton type="submit" disabled={!canEnter}>Giriş Yap · {guestIds.length} kişi</ActionButton> : <p>Yeni giriş için oda hazır ve boş olmalı.</p>}
       </fieldset>
     </form>}
-    {operations.feedback?.panel === "stay" && <p role={operations.feedback.error ? "alert" : "status"}>{operations.feedback.message}</p>}
   </>;
 }
