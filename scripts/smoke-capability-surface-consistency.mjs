@@ -177,7 +177,7 @@ assert.match(
   /response\.status === 404[\s\S]{0,120}window\.location\.replace\("\/"\)/,
   "an already-open QR menu page must leave the hidden publication instead of showing an error shell"
 );
-assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
+assert.match(menuManagerSource, /stockImageImportEnabled\s*\?[\s\S]{0,220}<StockImageImportWorkspace/);
 assert.match(menuItemFormFieldsSource, /showStock\s*=\s*inventoryEnabled\s*&&[\s\S]{0,160}mode === "stock"/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
 const normalizedRoomAccountSource = roomAccountSource.replace(/\s+/g, " ");
@@ -189,13 +189,13 @@ assert.match(
 const normalizedRoomAccountAdjustmentsSource = roomAccountAdjustmentsSource.replace(/\s+/g, " ");
 assert.match(
   normalizedRoomAccountAdjustmentsSource,
-  /menuEnabled\s*&&[\s\S]{0,1200}addRoomFolioMenuItem/,
+  /<MenuProductPicker[^>]*enabled=\{menuEnabled\}/,
   "Room account menu surface must remain gated by the food menu capability"
 );
 const normalizedTableOrdersSource = tableOrdersSource.replace(/\s+/g, " ");
 assert.match(
   normalizedTableOrdersSource,
-  /menuEnabled\s*&&\s*<section className="restaurant-order-menu-panel"/,
+  /<MenuProductPicker[^>]*enabled=\{menuEnabled\}/,
   "Restaurant order menu surface must remain gated by the food menu capability"
 );
 assert.match(roomFolioIpcSource, /options\.assertMenuCapability\?\.\(\)/);
