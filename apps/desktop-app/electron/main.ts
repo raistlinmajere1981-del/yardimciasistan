@@ -869,7 +869,8 @@ function registerIpcHandlers() {
     getDatabase,
     assertCapability: assertDesktopCapability,
     assertMenuItemSubfeatureMutation: assertMenuItemSubfeatureMutation,
-    finalizeMutation: finalizeDesktopMenuMutation
+    finalizeMutation: finalizeDesktopMenuMutation,
+    scheduleSync: () => getSyncCoordinator().scheduleSoon()
   });
 
   registerImageAnalysisIpcHandlers({
