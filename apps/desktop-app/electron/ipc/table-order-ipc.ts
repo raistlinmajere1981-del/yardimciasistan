@@ -14,19 +14,25 @@ import type {
 export function registerTableOrderIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
+  hasCapability?: (capability: BusinessCapability) => boolean;
 }) {
-  const { getDatabase, assertCapability } = options;
+  const { getDatabase, assertCapability, hasCapability } = options;
   const assertFoodOrdersAccess = () => assertCapability(
     BUSINESS_CAPABILITIES.FOOD_ORDERS,
     "Sipariş yönetimi bu işletmede etkin değil."
   );
+  const canReadFoodOrders = () => hasCapability
+    ? hasCapability(BUSINESS_CAPABILITIES.FOOD_ORDERS)
+    : true;
 
   ipcMain.handle("tableOrder:list", (): DesktopTableOrder[] => {
+    if (!canReadFoodOrders()) return [];
     assertFoodOrdersAccess();
     return getDatabase().listTableOrders();
   });
 
   ipcMain.handle("tableOrder:getActive", (_event, tableId: unknown): DesktopTableOrder | null => {
+    if (!canReadFoodOrders()) return null;
     assertFoodOrdersAccess();
     return typeof tableId === "string" ? getDatabase().getActiveTableOrder(tableId) : null;
   });
