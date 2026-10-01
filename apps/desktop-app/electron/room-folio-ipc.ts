@@ -24,7 +24,6 @@ export function registerRoomFolioIpcHandlers(options: {
   databasePath: () => string;
   assertUnlocked: () => void;
   assertCapability?: () => void;
-  assertRoomCapability?: () => void;
   hasFolioCapability?: () => boolean;
   canUseMenu?: () => boolean;
   assertMenuCapability?: () => void;
