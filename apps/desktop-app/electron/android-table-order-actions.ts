@@ -17,6 +17,7 @@ import {
   roundMoney
 } from "./database/stock-utils.js";
 import type { AndroidActionMutationResult } from "./database/android-utils.js";
+import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 import {
   androidPayloadNumber,
   androidPayloadString,
@@ -144,36 +145,40 @@ export function applyAndroidTableOrderAddItem(
     if (nextQuantity > 999) {
       return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
     }
-    const stockResult = mutateStoredMenuStock(db, {
-      menuItemId,
-      type: "order_add",
-      quantityChange: -quantity,
-      sourceType: "table_order",
-      sourceId: orderId,
-      actorDeviceId: action.device_id,
-      note: `${productName} Android siparişinden adisyona eklendi.`,
-      now
-    });
-    if (!stockResult.ok) {
-      return stockResult;
+    if (isInventoryTrackingEnabled(db)) {
+      const stockResult = mutateStoredMenuStock(db, {
+        menuItemId,
+        type: "order_add",
+        quantityChange: -quantity,
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: action.device_id,
+        note: `${productName} Android siparişinden adisyona eklendi.`,
+        now
+      });
+      if (!stockResult.ok) {
+        return stockResult;
+      }
     }
     const itemUpdatedAt = nextMutationTimestamp(existingItem.updated_at, now);
     db
       .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
       .run(nextQuantity, roundMoney(unitPrice * nextQuantity), itemUpdatedAt, itemId);
   } else {
-    const stockResult = mutateStoredMenuStock(db, {
-      menuItemId,
-      type: "order_add",
-      quantityChange: -quantity,
-      sourceType: "table_order",
-      sourceId: orderId,
-      actorDeviceId: action.device_id,
-      note: `${productName} Android siparişinden adisyona eklendi.`,
-      now
-    });
-    if (!stockResult.ok) {
-      return stockResult;
+    if (isInventoryTrackingEnabled(db)) {
+      const stockResult = mutateStoredMenuStock(db, {
+        menuItemId,
+        type: "order_add",
+        quantityChange: -quantity,
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: action.device_id,
+        note: `${productName} Android siparişinden adisyona eklendi.`,
+        now
+      });
+      if (!stockResult.ok) {
+        return stockResult;
+      }
     }
     db
       .prepare(`
@@ -216,18 +221,20 @@ export function applyAndroidTableOrderItemQuantity(
   const orderId = String(item.order_id ?? "");
   const previousQuantity = Number(item.quantity ?? 0);
   if (quantity !== previousQuantity) {
-    const stockResult = mutateStoredMenuStock(db, {
-      menuItemId: String(item.menu_item_id ?? ""),
-      type: "order_update",
-      quantityChange: previousQuantity - quantity,
-      sourceType: "table_order",
-      sourceId: orderId,
-      actorDeviceId: action.device_id,
-      note: "Android siparişinde ürün adedi değiştirildi.",
-      now
-    });
-    if (!stockResult.ok) {
-      return stockResult;
+    if (isInventoryTrackingEnabled(db)) {
+      const stockResult = mutateStoredMenuStock(db, {
+        menuItemId: String(item.menu_item_id ?? ""),
+        type: "order_update",
+        quantityChange: previousQuantity - quantity,
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: action.device_id,
+        note: "Android siparişinde ürün adedi değiştirildi.",
+        now
+      });
+      if (!stockResult.ok) {
+        return stockResult;
+      }
     }
   }
   db
@@ -257,18 +264,20 @@ export function applyAndroidTableOrderRemoveItem(
   }
   const updatedAt = nextMutationTimestamp(item.updated_at, now);
   const orderId = String(item.order_id ?? "");
-  const stockResult = mutateStoredMenuStock(db, {
-    menuItemId: String(item.menu_item_id ?? ""),
-    type: "order_remove",
-    quantityChange: Number(item.quantity ?? 0),
-    sourceType: "table_order",
-    sourceId: orderId,
-    actorDeviceId: action.device_id,
-    note: "Ürün Android siparişinden silindi.",
-    now
-  });
-  if (!stockResult.ok) {
-    return stockResult;
+  if (isInventoryTrackingEnabled(db)) {
+    const stockResult = mutateStoredMenuStock(db, {
+      menuItemId: String(item.menu_item_id ?? ""),
+      type: "order_remove",
+      quantityChange: Number(item.quantity ?? 0),
+      sourceType: "table_order",
+      sourceId: orderId,
+      actorDeviceId: action.device_id,
+      note: "Ürün Android siparişinden silindi.",
+      now
+    });
+    if (!stockResult.ok) {
+      return stockResult;
+    }
   }
   db
     .prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?")
@@ -340,7 +349,7 @@ export function applyAndroidTableOrderClose(
     return versionConflict;
   }
   const updatedAt = nextMutationTimestamp(current.updated_at, now);
-  if (status === "cancelled") {
+  if (status === "cancelled" && isInventoryTrackingEnabled(db)) {
     const stockRestore = restoreCancelledOrderStockInTransaction(db, orderId, action.device_id, now);
     if (!stockRestore.ok) {
       return stockRestore;
