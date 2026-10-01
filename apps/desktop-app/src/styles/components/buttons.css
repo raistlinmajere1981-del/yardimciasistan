@@ -1,3 +1,19 @@
+@keyframes action-button-success-flash {
+  50% {
+    color: var(--color-success);
+    background: var(--color-success-soft);
+    border-color: var(--color-success-border);
+  }
+}
+
+@keyframes action-button-error-flash {
+  50% {
+    color: var(--color-danger);
+    background: var(--color-danger-soft);
+    border-color: var(--color-danger-border);
+  }
+}
+
 .action-button {
   display: inline-flex;
   width: fit-content;
@@ -17,10 +33,38 @@
   font-weight: var(--weight-semibold);
   line-height: var(--leading-normal);
   text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--motion-hover) var(--ease-standard),
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard),
+    box-shadow var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
 }
 
 .action-button:hover:not(:disabled) {
   background: var(--color-accent-hover);
+}
+
+.action-button:active:not(:disabled) {
+  transform: translateY(1px) scale(.99);
+}
+
+.action-button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.action-button[aria-busy="true"] {
+  cursor: progress;
+}
+
+.action-button[data-result="success"] {
+  animation: action-button-success-flash var(--motion-feedback) var(--ease-standard);
+}
+
+.action-button[data-result="error"] {
+  animation: action-button-error-flash var(--motion-feedback) var(--ease-standard);
 }
 
 .action-button-secondary {
@@ -34,8 +78,14 @@
   color: var(--color-text-muted);
 }
 
+.action-button-quiet {
+  background: transparent;
+  color: var(--color-text);
+}
+
 .action-button-secondary:hover:not(:disabled),
-.action-button-ghost:hover:not(:disabled) {
+.action-button-ghost:hover:not(:disabled),
+.action-button-quiet:hover:not(:disabled) {
   background: var(--color-bg-hover);
   color: var(--color-text);
 }
