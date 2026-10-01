@@ -19,7 +19,8 @@
   white-space: nowrap;
 }
 
-:is(.status-badge, .status-chip)[data-tone="info"],
+.status-badge[data-tone="info"],
+.status-chip[aria-pressed="true"][data-tone="info"],
 .status-badge.info,
 .status-badge.tone-info {
   --status-tone: var(--color-info);
@@ -27,7 +28,8 @@
   --status-border: var(--color-info-border);
 }
 
-:is(.status-badge, .status-chip)[data-tone="success"],
+.status-badge[data-tone="success"],
+.status-chip[aria-pressed="true"][data-tone="success"],
 .status-badge.success,
 .status-badge.ok,
 .status-badge.tone-ok,
@@ -39,7 +41,8 @@
   --status-border: var(--color-success-border);
 }
 
-:is(.status-badge, .status-chip)[data-tone="warning"],
+.status-badge[data-tone="warning"],
+.status-chip[aria-pressed="true"][data-tone="warning"],
 .status-badge.warning,
 .status-badge.wait,
 .status-badge.tone-wait,
@@ -49,7 +52,8 @@
   --status-border: var(--color-warning-border);
 }
 
-:is(.status-badge, .status-chip)[data-tone="danger"],
+.status-badge[data-tone="danger"],
+.status-chip[aria-pressed="true"][data-tone="danger"],
 .status-badge.danger,
 .status-badge.tone-error {
   --status-tone: var(--color-danger);
