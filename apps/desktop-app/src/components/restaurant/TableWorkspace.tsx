@@ -116,7 +116,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
   const duration = order ? Math.max(0, Math.floor((clock - new Date(order.openedAt).getTime()) / 60_000)) : 0;
   const disabled = controller.busy || controller.loading || !controller.loaded || transferCommitted;
   const tableStatus = getTableStatusAction(table.status) || table.status;
-  const accountPanel = <OperationPanel title="Hesap ve İlişkiler" id="table-account" className="operation-panel--table-context">
+  const accountPanel = <OperationPanel title="Hesap ve İlişkiler" id="table-account" className="operation-panel--table-context" surfaceRole="finance">
     <TableAccountPanel
       table={table}
       controller={controller}
