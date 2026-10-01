@@ -133,7 +133,8 @@ export function DesktopWorkspaceRouter({
     saveItem: handleSaveItem,
     reorderCategories: handleReorderMenuCategories,
     reorderItems: handleReorderMenuItems,
-    deleteCategoryById: handleDeleteMenuCategoryById
+    deleteCategoryById: handleDeleteMenuCategoryById,
+    openMenuPreview
   } = menuController;
   const {
     setSelectedWhatsAppRequestId,
@@ -612,6 +613,7 @@ export function DesktopWorkspaceRouter({
           onReorderItems={handleReorderMenuItems}
           onDeleteCategoryById={handleDeleteMenuCategoryById}
           onDashboardDataChanged={setDashboardData}
+          onPreview={openMenuPreview}
         />
       ) : activePage === "reports" ? (
         <ReportsPage

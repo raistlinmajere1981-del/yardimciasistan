@@ -3,6 +3,7 @@ import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
 import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
+import { QrMenuPanel } from "./QrMenuPanel";
 import {
   compareMenuRecords,
   emptyCategoryForm,
@@ -47,6 +48,7 @@ interface MenuManagerProps {
   onReorderItems: (categoryId: string, orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onDeleteCategoryById: (categoryId: string) => Promise<void>;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
+  onPreview: () => void;
 }
 
 export function MenuManager({
@@ -68,7 +70,8 @@ export function MenuManager({
   onReorderCategories,
   onReorderItems,
   onDeleteCategoryById,
-  onDashboardDataChanged
+  onDashboardDataChanged,
+  onPreview
 }: MenuManagerProps) {
   const navigation = useWorkspaceNavigation();
   const [pendingCategoryDeleteId, setPendingCategoryDeleteId] = useState("");
@@ -253,6 +256,7 @@ export function MenuManager({
           </div>
         ) : undefined}
       >
+        <QrMenuPanel enabled={qrMenuEnabled} webModuleUrl={dashboardData.webModuleUrl} onPreview={onPreview} />
         <div className="menu-management-grid">
           <section className="panel menu-category-panel">
             <div className="panel-heading menu-panel-heading">

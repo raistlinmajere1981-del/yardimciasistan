@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { Eye, LockKeyhole, ScrollText, UploadCloud } from "lucide-react";
+import { LockKeyhole, ScrollText } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
@@ -89,12 +89,8 @@ function DesktopAppFrameContent({
     pullRequests: handlePullRequests
   } = desktopSyncController;
   const {
-    menuPublishState,
-    menuStatusMessage,
     menuPreviewOpen,
     menuPreviewData,
-    publishMenu: handlePublishMenu,
-    openMenuPreview,
     closeMenuPreview
   } = menuController;
   const { setSelectedRequestId } = customerController;
@@ -136,16 +132,6 @@ function DesktopAppFrameContent({
         message: statusMessage.trim()
       }
     : null;
-  const menuNotice = activePage === "menu" && menuPublishState !== "idle" && menuStatusMessage.trim()
-    ? {
-        tone: menuPublishState === "error"
-          ? "error" as GlobalMessageTone
-          : menuPublishState === "success"
-            ? "success" as GlobalMessageTone
-            : "loading" as GlobalMessageTone,
-        message: menuStatusMessage.trim()
-      }
-    : null;
   const automaticSyncNotice = automaticSyncNeedsAttention
     ? {
         tone: "error" as GlobalMessageTone,
@@ -156,11 +142,7 @@ function DesktopAppFrameContent({
     : null;
   const centralNotice = operationNotice?.tone === "error"
     ? operationNotice
-    : menuNotice?.tone === "error"
-      ? menuNotice
-      : automaticSyncNotice
-        ?? operationNotice
-        ?? menuNotice;
+    : automaticSyncNotice ?? operationNotice;
 
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
@@ -235,20 +217,6 @@ function DesktopAppFrameContent({
           ) : undefined}
           action={(
             <div className="page-header-tools">
-              {activePage === "menu" && (
-                <>
-                  <button className="action-button action-button-secondary action-button-sm secondary-sync-action" type="button" onClick={openMenuPreview}>
-                    <Eye size={16} aria-hidden="true" />
-                    Önizle
-                  </button>
-                  {qrMenuEnabled && (
-                    <button className="action-button action-button-sm" type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
-                      <UploadCloud size={16} aria-hidden="true" />
-                      Web'e Yayınla
-                    </button>
-                  )}
-                </>
-              )}
               <SyncStatusIndicator
                 automaticSyncStatus={automaticSyncStatus}
                 onSync={() => void handlePullRequests()}
