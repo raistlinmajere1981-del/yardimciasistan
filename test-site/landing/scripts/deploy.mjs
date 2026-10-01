@@ -361,7 +361,8 @@ sshRun(
   `cd ${remoteWww} && ` +
     `for f in index.php index.html favicon.png; do [ -f "$f" ] && cp -p "$f" ${remoteBackup}/ || true; done && ` +
     `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ` +
-    `[ -d demo ] && cp -a demo ${remoteBackup}/ || true && ls -la ${remoteBackup}/`
+    `for d in inc odalar restoran qr-menu yorumlar iletisim demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
+    `ls -la ${remoteBackup}/`
 );
 
 step("Gecici isimle upload + syntax kontrolu");
