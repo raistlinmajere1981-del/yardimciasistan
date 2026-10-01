@@ -4,6 +4,7 @@ import type { DesktopDashboardData } from "../../../electron/database";
 import type { KbsNotificationController } from "../../app/use-kbs-notification-controller";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListItem } from "../ui/DataList";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
@@ -183,24 +184,24 @@ export function KbsAutomationWorkspace({
   return <section className="kbs-automation-workspace" aria-label="Kimlik bildirimleri">
     {confirmDialog}
     <div className="kbs-overview-grid">
-      <article className="panel kbs-overview-card">
+      <article className="panel kbs-overview-card" data-surface-role="integration">
         <span>Bağlantı</span>
         <strong>{overview.enabled ? (overview.provider === "egm" ? "Emniyet KBS" : "Jandarma KBS") : "Kapalı"}</strong>
-        <StatusBadge tone={!overview.enabled ? "neutral" : overview.configured ? "success" : "wait"}>
+        <StatusBadge tone={!overview.enabled ? "neutral" : overview.configured ? "success" : "warning"}>
           {!overview.enabled ? "Servis kapalı" : overview.configured ? "Ayarlar hazır" : "Ayarlar eksik"}
         </StatusBadge>
       </article>
-      <article className="panel kbs-overview-card">
+      <article className="panel kbs-overview-card" data-surface-role="integration">
         <span>Konaklayan</span>
         <strong>{overview.checkedInGuestCount}</strong>
         <small>şu anda giriş yapmış misafir</small>
       </article>
-      <article className="panel kbs-overview-card">
+      <article className="panel kbs-overview-card" data-surface-role="integration">
         <span>Bildirim bekleyen</span>
         <strong>{overview.activeUnsentCount}</strong>
         <small>{overview.activeMissingIdentityCount > 0 ? String(overview.activeMissingIdentityCount) + " misafirde kimlik bilgisi eksik" : "aktif konaklayanlarda eksik kimlik yok"}</small>
       </article>
-      <article className="panel kbs-overview-card">
+      <article className="panel kbs-overview-card" data-surface-role="integration">
         <span>Gönderim durumu</span>
         <strong>{overview.failedCount > 0 ? String(overview.failedCount) + " hata" : String(overview.sentCount) + " gönderildi"}</strong>
         <small>{overview.pendingCount} kuyrukta</small>
@@ -233,23 +234,22 @@ export function KbsAutomationWorkspace({
           >
             {egmSessionOpen ? "EGM Oturumunu Kapat" : "EGM Oturumunu Aç"}
           </ActionButton>}
-          <div className="action-row" role="group" aria-label="Kimlik bildirimi filtresi">
-          {([
-            ["attention", "İlgi Bekleyen"],
-            ["pending", "Bekleyen"],
-            ["failed", "Hatalı"],
-            ["sent", "Gönderilen"],
-            ["all", "Tümü"]
-          ] as const).map(([id, label]) => (
-            <ActionButton key={id} size="sm" variant={filter === id ? "primary" : "secondary"} onClick={() => setFilter(id)}>
-              {label}
-            </ActionButton>
-          ))}
-          </div>
+          <ChoiceChips
+            ariaLabel="Kimlik bildirimi filtresi"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { id: "attention", label: "İlgi Bekleyen" },
+              { id: "pending", label: "Bekleyen" },
+              { id: "failed", label: "Hatalı" },
+              { id: "sent", label: "Gönderilen" },
+              { id: "all", label: "Tümü" }
+            ]}
+          />
         </div>
       </div>
 
-      {egmSessionOpen && overview.provider === "egm" && <div className="panel kbs-operations-session">
+      {egmSessionOpen && overview.provider === "egm" && <div className="panel kbs-operations-session" data-surface-role="integration">
         <div className="page-toolbar compact">
           <div className="page-toolbar__copy">
             <strong>EGM KBS oturumu</strong>
@@ -313,11 +313,13 @@ export function KbsAutomationWorkspace({
               {notification.status !== "sent" && <ActionButton
                 variant="primary"
                 size="sm"
-                disabled={!overview.configured || !notification.identityReady || controller.busyNotificationId === notification.id}
+                disabled={!overview.configured || !notification.identityReady}
+                busy={controller.busyNotificationId === notification.id}
+                busyLabel="Gönderiliyor…"
                 onClick={() => { void sendNotification(notification.id); }}
               >
                 <IdCard size={15} aria-hidden="true" />
-                {controller.busyNotificationId === notification.id ? "Gönderiliyor" : "Bildir"}
+                Bildir
               </ActionButton>}
               {notification.status === "failed" && <ActionButton
                 variant="secondary"
@@ -358,7 +360,7 @@ function statusLabel(status: DesktopDashboardData["hospitalityNotifications"][nu
 function statusTone(status: DesktopDashboardData["hospitalityNotifications"][number]["status"]): StatusTone {
   if (status === "sent") return "success";
   if (status === "failed") return "danger";
-  return "wait";
+  return "warning";
 }
 
 function providerLabel(provider: string) {
