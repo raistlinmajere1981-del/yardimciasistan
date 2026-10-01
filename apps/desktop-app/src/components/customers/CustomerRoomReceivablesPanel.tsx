@@ -33,6 +33,8 @@ export function CustomerRoomReceivablesPanel({ customerId }: { customerId: strin
   const currencies = new Set(folios.map(folio => folio.currency));
   const total = folios.reduce((sum, folio) => sum + folio.remainingMinor, 0);
 
+  if (!loading && folios.length === 0) return null;
+
   return <section className="panel customer-operation-card customer-room-receivables form-stack" aria-label="Konaklama alacakları">
     <div className="customer-operation-card__heading">
       <div><h3>Konaklama alacakları</h3><small>Çıkış sonrası açık kalan oda hesapları</small></div>
