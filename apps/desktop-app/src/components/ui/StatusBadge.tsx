@@ -1,13 +1,13 @@
 import type { HTMLAttributes } from "react";
 
-export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "muted";
-export type LegacyStatusTone = "wait" | "ok";
+export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "muted" | "wait" | "ok";
+type CanonicalStatusTone = Exclude<StatusTone, "wait" | "ok">;
 
 interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  tone?: StatusTone | LegacyStatusTone;
+  tone?: StatusTone;
 }
 
-function normalizeStatusTone(tone: StatusTone | LegacyStatusTone): StatusTone {
+function normalizeStatusTone(tone: StatusTone): CanonicalStatusTone {
   if (tone === "wait") return "warning";
   if (tone === "ok") return "success";
   return tone;
