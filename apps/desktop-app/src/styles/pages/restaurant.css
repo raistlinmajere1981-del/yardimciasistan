@@ -35,8 +35,7 @@
 .table-relations-section {
   gap: var(--space-3);
 }
-.table-relations-heading,
-.table-relation-label {
+:is(.table-relations-heading, .table-relation-label) {
   display: flex;
   align-items: center;
   justify-content: space-between;
