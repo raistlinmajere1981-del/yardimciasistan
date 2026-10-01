@@ -407,6 +407,50 @@ try {
   expect(visibleQrBusiness.ok()).toBe(true);
   expect((await visibleQrBusiness.json()).business.public_surfaces).toContain("qr_menu");
 
+  const qrModuleDisabledSnapshot = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_android_snapshot",
+      sync_secret: businessConfig.sync_secret,
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 2,
+      idempotency_key: "web-menu-android-qr-off-2",
+      snapshot: {
+        ...androidStockSnapshot,
+        business_capabilities: androidStockSnapshot.business_capabilities.filter((capability) => capability !== "channel.qr_menu"),
+        updated_at: "2026-07-18T10:00:30+03:00"
+      }
+    }
+  });
+  expect(qrModuleDisabledSnapshot.ok()).toBe(true);
+  const qrModuleDisabledMenu = await page.request.get(`${baseUrl}/api/menu.php`);
+  expect(qrModuleDisabledMenu.status()).toBe(404);
+  expect(await qrModuleDisabledMenu.json()).toMatchObject({ ok: false, message: "QR menü etkin değil." });
+  const qrModuleDisabledBusiness = await page.request.get(`${baseUrl}/api/business.php`);
+  expect(qrModuleDisabledBusiness.ok()).toBe(true);
+  expect((await qrModuleDisabledBusiness.json()).business.public_surfaces).not.toContain("qr_menu");
+
+  const qrModuleEnabledSnapshot = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_android_snapshot",
+      sync_secret: businessConfig.sync_secret,
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 3,
+      idempotency_key: "web-menu-android-qr-on-3",
+      snapshot: {
+        ...androidStockSnapshot,
+        updated_at: "2026-07-18T10:00:45+03:00"
+      }
+    }
+  });
+  expect(qrModuleEnabledSnapshot.ok()).toBe(true);
+  const qrModuleEnabledMenu = await page.request.get(`${baseUrl}/api/menu.php`);
+  expect(qrModuleEnabledMenu.ok()).toBe(true);
+  const qrModuleEnabledBusiness = await page.request.get(`${baseUrl}/api/business.php`);
+  expect(qrModuleEnabledBusiness.ok()).toBe(true);
+  expect((await qrModuleEnabledBusiness.json()).business.public_surfaces).toContain("qr_menu");
+
   const androidStockSummaryResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
@@ -494,8 +538,8 @@ try {
       action: "publish_android_snapshot",
       sync_secret: businessConfig.sync_secret,
       client_id: "desktop-web-menu-smoke",
-      source_revision: 2,
-      idempotency_key: "web-menu-android-2",
+      source_revision: 4,
+      idempotency_key: "web-menu-android-4",
       snapshot: {
         ...androidStockSnapshot,
         business_capabilities: [...androidStockSnapshot.business_capabilities, "service.ai"],
