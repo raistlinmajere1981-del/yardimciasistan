@@ -40,6 +40,8 @@ const settingsSource = source("apps/desktop-app/src/components/settings/AndroidD
 const navigationSource = source("apps/desktop-app/src/app/navigation.ts");
 const frameSource = source("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
 const menuManagerSource = source("apps/desktop-app/src/components/menu/MenuManager.tsx");
+const qrMenuPanelSource = source("apps/desktop-app/src/components/menu/QrMenuPanel.tsx");
+const menuIpcSource = source("apps/desktop-app/electron/ipc/menu-ipc.ts");
 const menuItemFormFieldsSource = source("apps/desktop-app/src/components/menu/MenuItemFormFields.tsx");
 const menuPreviewSource = source("apps/desktop-app/src/components/menu/MenuPreview.tsx");
 const roomAccountSource = source("apps/desktop-app/src/components/pension/RoomAccount.tsx");
@@ -107,12 +109,16 @@ assert.deepEqual(customerProjection.customers, []);
 assert.deepEqual(customerProjection.messages, []);
 assert.equal(customerProjection.summary.prepared_whatsapp_messages, 0);
 assert.equal(androidActionAllowedByCapabilities("message_delete", withoutCustomers), false);
-assert.match(frameSource, /qrMenuEnabled\s*&&[\s\S]{0,300}Web'e Yayınla/);
+assert.doesNotMatch(frameSource, /Web'e Yayınla/, "manual menu publish action must stay out of the page header");
 assert.match(
   navigationSource,
-  /pageId:\s*"menu"[\s\S]{0,320}condition:\s*\{\s*allOf:\s*\[C\.FOOD_MENU,\s*C\.QR_MENU\]\s*\}/,
-  "desktop Menu navigation must disappear when QR menu is disabled"
+  /pageId:\s*"menu"[\s\S]{0,320}condition:\s*\{\s*allOf:\s*\[C\.FOOD_MENU\]\s*\}/,
+  "desktop Menu navigation must remain available independently of the QR menu module"
 );
+assert.match(qrMenuPanelSource, /getQrMenuWebPublication/);
+assert.match(qrMenuPanelSource, /setQrMenuWebPublication/);
+assert.match(qrMenuPanelSource, /disabled=\{!moduleEnabled \|\| busy\}/);
+assertHandlerGuard(menuIpcSource, "menu:setWebPublication", "assertCapability(BUSINESS_CAPABILITIES.QR_MENU");
 assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
 assert.match(menuItemFormFieldsSource, /showStock\s*=\s*inventoryEnabled\s*&&[\s\S]{0,160}mode === "stock"/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
