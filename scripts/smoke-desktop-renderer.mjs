@@ -260,6 +260,27 @@ try {
         };
       },
       cancelStockImageAnalysis: async () => true,
+      saveMenuCategory: async (input) => {
+        const savedId = input.id || "menu-category-smoke-created";
+        const existing = currentDashboardData.menu.categories.find((category) => category.id === savedId);
+        const savedCategory = {
+          ...(existing || currentDashboardData.menu.categories[0]),
+          ...input,
+          id: savedId,
+          created_at: existing?.created_at || "2026-07-18T09:00:00Z",
+          updated_at: "2026-07-18T12:00:00Z"
+        };
+        currentDashboardData = {
+          ...currentDashboardData,
+          menu: {
+            ...currentDashboardData.menu,
+            categories: existing
+              ? currentDashboardData.menu.categories.map((category) => category.id === savedId ? savedCategory : category)
+              : [...currentDashboardData.menu.categories, savedCategory]
+          }
+        };
+        return { ok: true, message: "Kategori kaydedildi.", savedId, dashboardData: currentDashboardData };
+      },
       saveMenuItem: async (input) => {
         const savedId = input.id || "menu-item-smoke-created";
         const existing = currentDashboardData.menu.items.find((item) => item.id === savedId);
@@ -434,7 +455,7 @@ try {
   await expect(settings.getByLabel("İşletme açıklaması")).toBeVisible();
   await expect(settings.locator(".settings-profile-options")).toBeVisible();
   await expect(settings.getByText("Ek özellikler")).toBeVisible();
-  await expect(settings.locator(".settings-profile-option")).toHaveCount(6);
+  await expect(settings.locator(".settings-profile-option")).toHaveCount(5);
   await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode/)).toHaveCount(0);
   expect(await settings.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await sectionNav.getByRole("tab", { name: "İşletme Düzeni", exact: true }).click();
@@ -1298,6 +1319,14 @@ try {
       },
       pullRequests: async () => ({ ok: true, count: 0, requests: [] }),
       markRequestsSynced: async () => ({ ok: true, count: 0 }),
+      getRoomFolioData: async () => ({
+        generatedAt: "",
+        rooms: [],
+        activeStays: [],
+        folios: [],
+        menuCategories: [],
+        menuItems: []
+      }),
       pushMenu: async () => ({ ok: true, category_count: 0, item_count: 0 }),
       pushAndroidSnapshot: async () => ({
         ok: true,
@@ -2093,7 +2122,7 @@ try {
   // The workspace renders all sections in one scrolling surface; the inline media preview is present without tab clicks.
   await expect(compactMenuItemWorkspace.locator(".menu-image-inline-preview")).toBeVisible();
   await compactMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
-  await expect(compactPage.locator(".menu-management-grid .menu-record[aria-pressed='true']")).toHaveCount(2);
+  await expect(compactPage.locator(".menu-management-grid .menu-record[aria-pressed='true']")).toHaveCount(1);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-menu-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
