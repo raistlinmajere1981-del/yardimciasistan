@@ -198,6 +198,12 @@ assert.match(
   /<MenuProductPicker[^>]*enabled=\{menuEnabled\}/,
   "Restaurant order menu surface must remain gated by the food menu capability"
 );
+assert.match(roomFolioIpcSource, /if \(!hasRoomCapability\(\)\)[\s\S]{0,120}return unavailableRoomData\(\)/);
+assert.match(
+  frameSource,
+  /enabledHospitalityPages=\{\{[\s\S]{0,300}ACCOMMODATION_ROOMS[\s\S]{0,300}FOOD_TABLES/,
+  "persistent hospitality workspaces must be invalidated when their base sector capability disappears"
+);
 assert.match(roomFolioIpcSource, /options\.assertMenuCapability\?\.\(\)/);
 assert.match(financeIpcSource, /finance:setReservationTotal[\s\S]{0,300}assertAccommodationReservationCapability/);
 assert.match(financeIpcSource, /finance:addPensionPayment[\s\S]{0,300}assertAccommodationFolioCapability/);
