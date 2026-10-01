@@ -67,6 +67,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const registeredGuestIdRef = useRef<number | null>(null);
   const [sendState, setSendState] = useState<SyncState>("idle");
+  const [copyFeedback, setCopyFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
   const [webViewError, setWebViewError] = useState("");
   const recipientPhone = preparedMessage?.phone ?? selectedRequest?.customer_phone;
@@ -160,6 +161,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   }, [view]);
 
   useEffect(() => {
+    setCopyFeedback(null);
     if (!selectedRequest && !preparedMessage) {
       setSendState("idle");
       setWebViewUrl(WHATSAPP_WEB_HOME_URL);
@@ -184,9 +186,12 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
 
     try {
       await navigator.clipboard.writeText(selectedMessage);
+      setCopyFeedback({ tone: "success", message: "Hazır mesaj panoya kopyalandı." });
       reportAppStatus("success", "Hazır mesaj panoya kopyalandı.");
     } catch {
-      reportAppStatus("error", "Mesaj panoya kopyalanamadı. Metni elle kopyalayabilirsiniz.");
+      const message = "Mesaj panoya kopyalanamadı. Metni elle kopyalayabilirsiniz.";
+      setCopyFeedback({ tone: "error", message });
+      reportAppStatus("error", message);
     }
   }
 
@@ -298,7 +303,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   return (
     <section className={`whatsapp-workspace whatsapp-view-${view}`} aria-label={view === "safe" ? "Güvenli mesaj alanı" : "WhatsApp Web alanı"}>
       {confirmDialog}
-      <aside className="panel whatsapp-request-panel">
+      <aside className="panel whatsapp-request-panel" data-surface-role="communication">
         {preparedMessage && <div className="panel-heading compact"><div><strong>{recipientName}</strong><p>{preparedMessageLabel} · mesaj hazırlandı</p><small>Gönderim WhatsApp içinde sizin kontrolünüzde.</small></div></div>}
         <div className="panel-heading compact">
           <h2>Hazır Mesajlar</h2>
@@ -348,7 +353,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
         </DataList>
       </aside>
 
-      {view === "web" && <section className="panel whatsapp-live-panel">
+      {view === "web" && <section className="panel whatsapp-live-panel" data-surface-role="integration">
         <div className="whatsapp-web-control-bar">
           <div className="whatsapp-web-recipient">
             <div>
@@ -380,11 +385,22 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               <ShieldCheck size={15} aria-hidden="true" />
               Güvenli Moda Dön
             </ActionButton>
-            {!preparedMessage && <ActionButton className="whatsapp-approved-send" size="sm" type="button" onClick={approveAndSendMessage} disabled={!webViewPayload || sendState === "loading"}>
+            {!preparedMessage && <ActionButton
+              className="whatsapp-approved-send"
+              size="sm"
+              type="button"
+              onClick={approveAndSendMessage}
+              disabled={!webViewPayload}
+              busy={sendState === "loading"}
+              busyLabel="Doğrulanıyor…"
+            >
               <Send size={15} aria-hidden="true" />
-              {sendState === "loading" ? "Doğrulanıyor" : "Onayla ve Gönder"}
+              Onayla ve Gönder
             </ActionButton>}
           </div>
+          {copyFeedback && <p className={`whatsapp-copy-status ${copyFeedback.tone === "error" ? "sync-error" : "sync-success"}`} role={copyFeedback.tone === "error" ? "alert" : "status"}>
+            <span>{copyFeedback.message}</span>
+          </p>}
 
         </div>
 
@@ -425,7 +441,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
         </div>
       </section>}
 
-      {view === "safe" && <aside className="panel whatsapp-copy-panel">
+      {view === "safe" && <aside className="panel whatsapp-copy-panel" data-surface-role="communication">
         <div className="panel-heading compact">
           <div className="message-detail-title-group">
             <span className="message-detail-category-label">Hazır yanıt</span>
@@ -469,6 +485,9 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
             Mesajı Sil
           </ActionButton>}
         </div>
+        {copyFeedback && <p className={`whatsapp-copy-status ${copyFeedback.tone === "error" ? "sync-error" : "sync-success"}`} role={copyFeedback.tone === "error" ? "alert" : "status"}>
+          <span>{copyFeedback.message}</span>
+        </p>}
       </aside>}
     </section>
   );
