@@ -25,6 +25,10 @@
   overflow: auto;
 }
 
+.menu-qr-service + .menu-management-grid {
+  margin-top: var(--space-3);
+}
+
 .menu-category-panel,
 .menu-product-panel,
 .menu-item-editor {
