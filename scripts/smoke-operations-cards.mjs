@@ -121,14 +121,16 @@ try {
   expect((await page.evaluate(() => window.fixtureState())).folios.find(item => item.stayId === 'stay-2').status).toBe('closed');
 
   // Simulate the dashboard event channel, followed by an older in-flight request.
+  // Prior-account balances are intentionally no longer rendered on cards; use the active stay summary
+  // so this assertion remains about revision ordering rather than removed presentation.
   await page.evaluate(() => {
     const old = structuredClone(window.fixtureDashboard);
     const next = structuredClone(old); next.revision += 10;
-    const account = next.roomOperations?.find(item => item.roomId === 'room-104')?.accounts.find(item => item.stayId === 'stay-3');
-    if (account) account.remainingMinor = 123400;
+    const stay = next.roomOperations?.find(item => item.roomId === 'room-102')?.stays.find(item => item.id === 'stay-1');
+    if (stay) stay.customerName = 'Revision Misafir';
     window.fixturePublishDashboard(next); window.fixturePublishDashboard(old);
   });
-  await expect(card(104)).toContainText('1.234');
+  await expect(card(102)).toContainText('Revision Misafir');
   await page.evaluate(() => window.fixturePublishDashboard({ ...window.fixtureDashboard, revision: 1000, roomOperations: null }));
   await expect(card(104)).toContainText('Güncel özet alınamadı');
   await expect(card(104).getByRole('button', { name: /Misafir çıkışı|Temizliği tamamla/ })).toHaveCount(0);
