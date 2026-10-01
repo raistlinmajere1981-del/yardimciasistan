@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { PublishedMenuItem, PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import type { DesktopRoomFolio } from "../../../electron/room-folio";
 import { MenuProductPicker } from "../menu/MenuProductPicker";
@@ -16,6 +16,53 @@ export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, 
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
   const visibleItems = folio.items.filter(item => item.kind !== "discount");
+  const pickerMenu = useMemo<PublishedQrMenu>(() => {
+    const categoryFallback = new Map(menu.categories.map(category => [category.id, category]));
+    const itemFallback = new Map(menu.items.map(item => [item.id, item]));
+    return {
+      enabled: menu.enabled,
+      updated_at: controller.data.generatedAt || menu.updated_at,
+      categories: controller.data.menuCategories.map((category, index) => {
+        const fallback = categoryFallback.get(category.id);
+        return fallback
+          ? { ...fallback, name: category.name, is_active: true }
+          : {
+              id: category.id,
+              name: category.name,
+              description: "",
+              is_active: true,
+              sort_order: index,
+              created_at: "",
+              updated_at: controller.data.generatedAt
+            };
+      }),
+      items: controller.data.menuItems.map((item, index) => {
+        const fallback = itemFallback.get(item.id);
+        return {
+          id: item.id,
+          category_id: item.categoryId,
+          name: item.name,
+          description: item.description,
+          price: item.priceMinor / 100,
+          currency: item.currency,
+          image_url: fallback?.image_url ?? "",
+          is_available: true,
+          is_featured: fallback?.is_featured ?? false,
+          allergens: fallback?.allergens ?? [],
+          tags: fallback?.tags ?? [],
+          stock_quantity: item.stockQuantity,
+          stock_min_quantity: fallback?.stock_min_quantity ?? null,
+          stock_unit: item.stockUnit === "gram" ? "gram" : "piece",
+          stock_consumption_quantity: item.stockConsumptionQuantity,
+          hide_when_out_of_stock: fallback?.hide_when_out_of_stock ?? false,
+          stock_note: fallback?.stock_note ?? null,
+          sort_order: fallback?.sort_order ?? index,
+          created_at: fallback?.created_at ?? "",
+          updated_at: fallback?.updated_at ?? controller.data.generatedAt
+        };
+      })
+    };
+  }, [controller.data.generatedAt, controller.data.menuCategories, controller.data.menuItems, menu]);
 
   function roomMenuItem(item: PublishedMenuItem) {
     return controller.data.menuItems.find(candidate => candidate.id === item.id);
@@ -38,7 +85,7 @@ export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, 
   return <section className="operation-section form-stack" aria-label="Hesaba ekle">
     <h4>Hesaba ekle · {folio.customerName}</h4>
     <MenuProductPicker
-      menu={menu}
+      menu={pickerMenu}
       webModuleUrl={webModuleUrl}
       enabled={menuEnabled}
       inventoryEnabled={inventoryEnabled}
