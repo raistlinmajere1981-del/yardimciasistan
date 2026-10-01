@@ -1205,6 +1205,29 @@ return ${toPhpArray({
   expect(geminiRequest.body.systemInstruction.parts[0].text).toContain("kesin müsaitlik");
   expect(geminiRequest.body.contents.at(-1)).toMatchObject({ role: "user" });
 
+  // A handoff/fresh-install reset must remove every customer/runtime trace while
+  // preserving only the deployment identity + sync secret in config/business.json.
+  const googleCacheFile = join(webModuleRoot, "data", "google-reviews-cache.json");
+  const legacyBackupFile = join(webModuleRoot, "data", "menu.json.legacy-backup-v1");
+  writeFileSync(googleCacheFile, '{"stale":true}\n');
+  writeFileSync(legacyBackupFile, '{"legacy":true}\n');
+  const resetRuntime = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: { action: "reset_runtime" }
+  });
+  expect(resetRuntime.ok()).toBe(true);
+  const resetRuntimeBody = await resetRuntime.json();
+  expect(resetRuntimeBody).toMatchObject({ ok: true });
+  expect(resetRuntimeBody.deleted.publications).toBeGreaterThan(0);
+  expect(resetRuntimeBody.deleted.public_request_guard_events).toBeGreaterThan(0);
+  expect(JSON.parse(readFileSync(conversationsFile, "utf8"))).toEqual([]);
+  expect(existsSync(aiSettingsFile)).toBe(false);
+  expect(existsSync(join(webModuleRoot, "data", "google-reviews.local.php"))).toBe(false);
+  expect(existsSync(googleCacheFile)).toBe(false);
+  expect(existsSync(legacyBackupFile)).toBe(false);
+  expect(existsSync(join(webModuleRoot, roomMediaUploadResult.url.replace(/^\//, "")))).toBe(false);
+  expect(existsSync(join(webModuleRoot, tableMediaUploadResult.url.replace(/^\//, "")))).toBe(false);
+
   console.log(`web-module-menu-api-ok: ${baseUrl}/api/menu.php`);
 } catch (error) {
   if (serverOutput.trim()) {
