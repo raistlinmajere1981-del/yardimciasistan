@@ -81,8 +81,9 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   useLayoutEffect(() => {
     if (history) return;
     const target = intent.mode === "account" || intent.action === "payment" ? "room-account"
-      : ["check-in", "checkout", "room-status", "assign-reservation"].includes(intent.action ?? "") ? "room-operations"
-        : intent.mode === "stay" || intent.action ? "room-stay" : "";
+      : intent.action === "assign-reservation" ? "room-stay"
+        : ["check-in", "checkout", "room-status"].includes(intent.action ?? "") ? "room-operations"
+          : intent.mode === "stay" || intent.action ? "room-stay" : "";
     const panel = target ? surface.current?.querySelector<HTMLElement>(`#${target}`) : null;
     panel?.focus({ preventScroll: true });
     panel?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -177,13 +178,13 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")}
           onCreateCustomer={customersEnabled ? () => setQuickAction("customer") : undefined}
           onDirty={value => setDirty("stay", value)} />
+        {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId}
+          onCreateReservation={customersEnabled ? () => setQuickAction("reservation") : undefined}
+          onDirty={setDirty} />}
       </OperationPanel>
       <OperationPanel title="Oda İşlemleri" id="room-operations">
         <RoomDailyOperations model={model} data={data} operations={operations} disabled={busy || accountDraftDirty} />
         {account.selected?.status === "open" && <RoomAccountAdjustments key={account.selected.id} folio={account.selected} controller={account} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />}
-        {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId}
-          onCreateReservation={customersEnabled ? () => setQuickAction("reservation") : undefined}
-          onDirty={setDirty} />}
       </OperationPanel>
       <OperationPanel title="Hesap" id="room-account">
         {folioEnabled ? <RoomAccount controller={account} currentStayId={model.currentStay?.id} focusFolioId={intent.folioId} ambiguous={Boolean(model.state && model.state.occupancy.stayIds.length > 1)} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />

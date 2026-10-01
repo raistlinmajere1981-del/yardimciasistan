@@ -247,7 +247,7 @@ function AccountRecord({ folio, controller, menuEnabled, departed = false, disab
         <div className="operation-balance"><dt>Kalan</dt><dd>{minorMoney(folio.remainingMinor)}</dd></div>
       </dl>
       {open && <RoomAccountPayment folio={folio} controller={controller} disabled={disabled} onDirty={dirty => onDirty("payment", dirty)} />}
-      {visibleItems.length > 0 && <div className="room-folio-line-list">
+      {departed && visibleItems.length > 0 && <div className="room-folio-line-list">
         {visibleItems.map(item => <article key={item.id}>
           <div>
             <strong>{item.label}</strong>

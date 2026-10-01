@@ -15,6 +15,7 @@ export function RoomAccountAdjustments({ folio, controller, menuEnabled, disable
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
   const item = controller.data.menuItems.find(item => item.id === itemId);
+  const visibleItems = folio.items.filter(item => item.kind !== "discount");
   return <section className="operation-section form-stack" aria-label="Hesaba ekle">
     <h4>Hesaba ekle · {folio.customerName}</h4>
     {menuEnabled && <form className="form-stack" onSubmit={event => {
@@ -61,5 +62,25 @@ export function RoomAccountAdjustments({ folio, controller, menuEnabled, disable
         </div>
       </fieldset>{error && <p role="alert">{error}</p>}
     </form>
+    {visibleItems.length > 0 && <div className="room-folio-line-list" aria-label="Odaya eklenenler">
+      {visibleItems.map(item => <article key={item.id}>
+        <div>
+          <strong>{item.label}</strong>
+          <span>{item.kind === "menu" ? `${item.quantity} adet · ${minorMoney(item.unitPriceMinor)}` : "Ek ücret"}</span>
+        </div>
+        <b>{minorMoney(item.lineTotalMinor)}</b>
+        <div className="action-row">
+          {item.kind === "menu" && menuEnabled && <>
+            <ActionButton variant="secondary" disabled={disabled} aria-label={`${item.label} miktarını azalt`} onClick={() => void controller.mutate(() => item.quantity <= 1
+              ? window.yardimciDesktop!.removeRoomFolioItem(item.id)
+              : window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: item.id, quantity: item.quantity - 1 }))}>−</ActionButton>
+            <ActionButton variant="secondary" disabled={disabled} aria-label={`${item.label} miktarını artır`} onClick={() => void controller.mutate(() =>
+              window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: item.id, quantity: item.quantity + 1 }))}>+</ActionButton>
+          </>}
+          <ActionButton variant="danger" disabled={disabled} aria-label={`${item.label} kalemini çıkar`} onClick={() =>
+            void controller.mutate(() => window.yardimciDesktop!.removeRoomFolioItem(item.id))}>Çıkar</ActionButton>
+        </div>
+      </article>)}
+    </div>}
   </section>;
 }

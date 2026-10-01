@@ -78,7 +78,8 @@ try {
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toHaveCount(0);
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => !['read', 'assignment'].includes(call.kind)))).toEqual([]);
   await captureOperationWorkspace(page, 'room-empty');
-  await chooseSearchSelect(operations, 'Atanacak rezervasyon', /Pilot rezervasyon 0/);
+  await chooseSearchSelect(stayPanel, 'Atanacak rezervasyon', /Pilot rezervasyon 0/);
+  await expect(operations.getByLabel('Atanacak rezervasyon')).toHaveCount(0);
   await button('Rezervasyonu Ata').click();
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays.length)).toBe(0);
   await chooseSearchSelect(stayPanel, 'İlgili rezervasyon', /Kompakt Misafir 1.*Beklenen 1 kişi/);
@@ -91,6 +92,8 @@ try {
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].status)).toBe('checked_in');
   expect(await page.evaluate(() => window.fixtureState().dashboard.rooms.find(room => room.id === 'room-102').status)).toBe('occupied');
   await expect(account.locator('[data-folio-id]')).toHaveCount(1);
+  await expect(stayPanel.getByRole('region', { name: 'Konaklama işlemleri', exact: true })).toBeVisible();
+  await expect(stayPanel.locator('summary').filter({ hasText: 'Konaklama işlemleri' })).toHaveCount(0);
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guests)).toHaveLength(1);
   const entryCalls = await page.evaluate((before) => window.fixtureCalls.slice(before).map(call => call.kind), callsBeforeEntry);
   expect(entryCalls[0]).toBe('linked');
@@ -171,11 +174,12 @@ try {
   await discountRow.getByLabel('İndirim tutarı', { exact: true }).fill('10');
   await discountRow.getByRole('button', { name: 'Uygula', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.fixtureState().folios[0].items.find(item => item.kind === 'discount')?.lineTotalMinor)).toBe(-1000);
-  await expect(account.locator('.room-folio-line-list').getByText('İndirim', { exact: true })).toHaveCount(0);
+  await expect(operations.locator('.room-folio-line-list').getByText('İndirim', { exact: true })).toHaveCount(0);
   await captureOperationWorkspace(page, 'room-occupied');
   await chooseSearchSelect(operations, 'Ürün / hizmet', /Çay/);
   await button('Ürünü Ekle').click();
-  await expect(account).toContainText('Çay');
+  await expect(operations.getByLabel('Odaya eklenenler')).toContainText('Çay');
+  await expect(account.getByLabel('Odaya eklenenler')).toHaveCount(0);
   expect(await page.evaluate(() => window.fixtureState().menu[0].stockQuantity)).toBe(9);
   await button('Çay miktarını artır').click();
   await expect.poll(() => page.evaluate(() => window.fixtureState().menu[0].stockQuantity)).toBe(8);
@@ -199,7 +203,7 @@ try {
   await page.keyboard.press('Escape'); await expect(workspace).toBeVisible();
   expect(await page.evaluate(() => window.fixtureOpen('room-101'))).toBe(false);
   await button('Ek Ücreti Ekle').click();
-  await expect(account).toContainText('Ek yatak');
+  await expect(operations.getByLabel('Odaya eklenenler')).toContainText('Ek yatak');
   const remainingBeforeCheckout = await page.evaluate(() => window.fixtureState().folios[0].remainingMinor);
   const paymentCallsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);
   // Physical departure never invents a payment: settle the shared account first, then check out.

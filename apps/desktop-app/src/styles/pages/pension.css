@@ -160,7 +160,6 @@
   gap: var(--space-3);
 }
 
-.stay-management-details > summary,
 .room-previous-accounts > details > summary {
   cursor: pointer;
   color: var(--color-text-muted);
@@ -168,7 +167,6 @@
   font-weight: var(--weight-semibold);
 }
 
-.stay-management-details[open] > summary,
 .room-previous-accounts > details[open] > summary {
   margin-bottom: var(--space-3);
 }
@@ -201,9 +199,10 @@
 .operation-panel .room-stay-date-field,
 .operation-panel .room-entry-dates .form-field {
   display: grid;
-  grid-template-columns: auto 7.75rem;
+  grid-template-columns: max-content 7.75rem;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: start;
+  gap: var(--space-1);
   width: auto;
   flex: 0 1 auto;
 }

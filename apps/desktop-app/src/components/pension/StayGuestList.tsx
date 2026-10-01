@@ -156,8 +156,8 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
       </div>
     </section>}
 
-    {stay.status === "checked_in" && <details className="stay-management-details">
-      <summary>Konaklama işlemleri</summary>
+    {stay.status === "checked_in" && <section className="stay-management-details form-stack" aria-label="Konaklama işlemleri">
+      <h4>Konaklama işlemleri</h4>
       <div className="form-stack">
         <div className="room-inline-action-row">
           <div className="form-field">
@@ -193,7 +193,7 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
           }}>Odayı Değiştir</ActionButton>
         </div>
       </div>
-    </details>}
+    </section>}
 
     {(stay.guests ?? []).some(guest => guest.status === "checked_out") && <details>
       <summary>Ayrılan misafirler</summary>
