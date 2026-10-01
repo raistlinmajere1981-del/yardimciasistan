@@ -57,6 +57,13 @@ try {
   await page.evaluate(() => window.refreshSettings({ setupRequired: false }));
   await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab')).toHaveCount(4);
 
+  // Customer credit is a retail-only account model and must not overlap hospitality folios/table accounts.
+  await expect(page.getByLabel('Veresiye / Müşteri Hesabı', { exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: [] }));
+  await expect(page.getByLabel('Veresiye / Müşteri Hesabı', { exact: true })).toBeVisible();
+  await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [] }));
+  await expect(page.getByLabel('Veresiye / Müşteri Hesabı', { exact: true })).toHaveCount(0);
+
   // Product data belongs only to the retail/barcode profile, not generic catalog users such as restaurant.
   await select('Servisler');
   await expect(page.locator('#settings-product-data')).toHaveCount(0);

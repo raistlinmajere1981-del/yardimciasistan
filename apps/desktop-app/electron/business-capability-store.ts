@@ -129,10 +129,10 @@ export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCa
 }
 
 /**
- * Applies a profile as a preset, not as a permanent business type constraint.
- * User overrides survive by default, so profiles remain composable. Before the
- * transaction commits the resulting set is dependency-validated; an orphaned
- * override can never leave runtime in an internally inconsistent state.
+ * Applies a profile as a preset. User overrides survive by default for composable
+ * capabilities, while explicitly profile-scoped capabilities (currently customer
+ * credit) are forced off when the target profile does not support them. Before
+ * commit the resulting set is dependency-validated.
  */
 export function applyBusinessProfileCapabilities(
   databasePath: string,
@@ -208,8 +208,8 @@ export function applyBusinessProfileCapabilities(
 
 /**
  * Writes an explicit operator override. Core capabilities are immutable. Domain
- * capabilities may be composed freely, but a mutation is rejected when it
- * would violate a declared capability dependency.
+ * capabilities are composable unless an explicit profile policy scopes them;
+ * mutations must also satisfy declared capability dependencies.
  */
 export function setBusinessCapability(
   databasePath: string,
