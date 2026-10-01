@@ -95,8 +95,7 @@ function ContributionFixture() {
       definition={testFeatureComposition.workspace}
       context={{ data, onDashboard: setData, ...fixtureWindow.fixtureCapabilities, customersEnabled: false, aiEnabled: false,
         onSaveCustomer: async () => ({ ok: false as const, message: "fixture" }),
-        onAnalyzeIdentity: async () => ({ ok: false as const, message: "fixture" }),
-        onSaveReservation: async () => ({ ok: false as const, message: "fixture" }) }}
+        onAnalyzeIdentity: async () => ({ ok: false as const, message: "fixture" }) }}
     />}
     sidebar={<aside className="sidebar">Stage 9 fixture</aside>}
     header={<header className="page-header"><h1>Test Feature</h1></header>}
