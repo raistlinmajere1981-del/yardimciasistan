@@ -309,6 +309,7 @@ try {
     business_capabilities: [
       "service.android",
       "food_service.menu",
+      "channel.qr_menu",
       "commerce.catalog",
       "commerce.inventory"
     ],
