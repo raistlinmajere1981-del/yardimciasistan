@@ -62,22 +62,31 @@
 
 .menu-sortable-record {
   position: relative;
-  cursor: grab;
   transition: border-color var(--motion-fast) var(--ease-standard),
     background-color var(--motion-fast) var(--ease-standard),
     opacity var(--motion-fast) var(--ease-standard);
 }
 
-.menu-sortable-record:active {
+.menu-drag-handle-hitbox {
+  display: inline-grid;
+  align-self: stretch;
+  place-items: center;
+  min-width: 1.25rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.menu-drag-handle-hitbox:active {
   cursor: grabbing;
 }
 
 .menu-drag-handle {
   flex: 0 0 auto;
   color: var(--color-text-muted);
+  pointer-events: none;
 }
 
-.menu-sortable-record:hover .menu-drag-handle {
+.menu-drag-handle-hitbox:hover .menu-drag-handle {
   color: var(--color-accent);
 }
 
@@ -163,7 +172,8 @@
 }
 
 .menu-category-row__select {
-  justify-self: start;
+  justify-self: stretch;
+  width: 100%;
   min-width: 0;
   padding: 0;
   border: 0;
