@@ -48,6 +48,81 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     window.fixtureDashboard = copy(dashboard);
     return copy(dashboard);
   };
+  const roomFolioData = () => ({
+    generatedAt: now,
+    rooms: dashboard.rooms.map(room => ({
+      id: room.id,
+      name: room.name,
+      number: room.number,
+      capacity: room.capacity,
+      nightlyPriceMinor: 10000,
+      currency: 'TRY'
+    })),
+    activeStays: dashboard.customerRoomStays
+      .filter(item => ['planned', 'checked_in'].includes(item.status))
+      .map(item => ({
+        id: item.id,
+        customerId: item.customerId,
+        customerName: item.customerName,
+        customerPhone: item.customerPhone ?? '',
+        roomId: item.roomId,
+        roomName: item.roomName,
+        roomNumber: item.roomNumber,
+        reservationId: item.reservationId ?? '',
+        status: item.status,
+        checkInDate: item.checkInDate,
+        checkOutDate: item.checkOutDate,
+        guestCount: item.guestCount,
+        nightlyPriceMinor: 10000,
+        currency: 'TRY',
+        folioId: item.id === 'stay-a' ? 'folio-a' : ''
+      })),
+    folios: [{
+      id: 'folio-a',
+      stayId: 'stay-a',
+      roomId: stayRoom.id,
+      roomName: stayRoom.name,
+      roomNumber: '101',
+      customerId: 'customer-a',
+      customerName: 'Pilot Misafir',
+      reservationId: '',
+      status: 'open',
+      guestCount: 1,
+      checkInDate: now.slice(0, 10),
+      plannedCheckOutDate: now.slice(0, 10),
+      nights: 1,
+      nightlyPriceMinor: 10000,
+      currency: 'TRY',
+      lodgingTotalMinor: 10000,
+      lodgingManualOverride: false,
+      extrasTotalMinor: 0,
+      chargeTotalMinor: 10000,
+      paidTotalMinor: 5000,
+      remainingMinor: 5000,
+      creditMinor: 0,
+      openedAt: now,
+      closedAt: '',
+      note: '',
+      items: [],
+      payments: []
+    }],
+    menuCategories: dashboard.menu.categories.map(category => ({
+      id: category.id,
+      name: category.name
+    })),
+    menuItems: dashboard.menu.items.map(item => ({
+      id: item.id,
+      categoryId: item.category_id,
+      categoryName: dashboard.menu.categories.find(category => category.id === item.category_id)?.name ?? '',
+      name: item.name,
+      description: item.description ?? '',
+      priceMinor: Math.round(Number(item.price ?? 0) * 100),
+      currency: item.currency || 'TRY',
+      stockQuantity: item.stock_quantity ?? null,
+      stockConsumptionQuantity: Number(item.stock_consumption_quantity ?? 1),
+      stockUnit: item.stock_unit || 'piece'
+    }))
+  });
   snapshot();
   window.fixturePatch = patch => { Object.assign(dashboard, copy(patch)); window.fixturePublishDashboard?.(snapshot()); };
   window.fixtureSetOrders = next => { orders = copy(next); window.fixturePublishDashboard?.(snapshot()); };
@@ -138,17 +213,16 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
       return response;
     },
     updateTableStatus: async ({ tableId, status }) => { calls.push({ kind: 'table-status' }); dashboard.tables.find(table => table.id === tableId).status = status; return copy({ ok: true, message: 'Masa durumu güncellendi.', dashboardData: snapshot() }); },
-    getRoomFolioData: async () => { calls.push({ kind: 'folios' }); await wait('Folio'); return { folios: [{ id: 'folio-a', stayId: 'stay-a',
-      roomId: stayRoom.id, roomName: stayRoom.name, roomNumber: '101', customerId: 'customer-a', customerName: 'Pilot Misafir',
-      reservationId: '', status: 'open', guestCount: 1, checkInDate: now.slice(0, 10), plannedCheckOutDate: now.slice(0, 10),
-      nights: 1, nightlyPriceMinor: 10000, currency: 'TRY', lodgingTotalMinor: 10000, lodgingManualOverride: false,
-      extrasTotalMinor: 0, chargeTotalMinor: 10000, paidTotalMinor: 5000, remainingMinor: 5000, creditMinor: 0,
-      openedAt: now, closedAt: '', note: '', items: [], payments: [] }] }; },
+    getRoomFolioData: async () => {
+      calls.push({ kind: 'folios' });
+      await wait('Folio');
+      return copy(roomFolioData());
+    },
     addRoomFolioManualItem: async input => {
       calls.push({ kind: 'transfer', input }); await wait('Transfer');
       if (window.fixtureFailTransfer) return { ok: false, message: 'Aktarım reddedildi.' };
       const order = orderFor(input.sourceTableOrderId); order.status = 'paid'; order.closedAt = now; transfers++; result(order);
-      return { ok: true, message: 'Oda hesabına aktarıldı.', data: { folios: [] } };
+      return { ok: true, message: 'Oda hesabına aktarıldı.', data: copy(roomFolioData()) };
     },
     saveCustomer: async input => {
       const customer = { ...dashboard.customers[0], ...input, id: 'customer-new' }; dashboard.customers.push(customer);
