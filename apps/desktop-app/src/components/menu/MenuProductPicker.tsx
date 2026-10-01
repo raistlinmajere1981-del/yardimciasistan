@@ -14,7 +14,7 @@ export function MenuProductPicker({ menu, webModuleUrl, enabled, busy = false, p
   panelAriaLabel: string;
   searchAriaLabel: string;
   addAriaLabel: (item: PublishedMenuItem) => string;
-  onAddItem: (item: PublishedMenuItem) => void | Promise<void>;
+  onAddItem: (item: PublishedMenuItem) => unknown;
   canAddItem?: (item: PublishedMenuItem) => boolean;
   className?: string;
 }) {
@@ -114,7 +114,7 @@ function menuStockConsumption(value: number | undefined): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1;
 }
 
-function formatMenuStock(quantity: number | null | undefined, unit: "piece" | "gram"): string {
+function formatMenuStock(quantity: number | null | undefined, unit: string | undefined): string {
   if (quantity == null) return "Stok takibi yok";
   if (quantity <= 0) return "Stokta yok";
   return `Stok: ${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 }).format(quantity)} ${unit === "gram" ? "g" : "adet"}`;
