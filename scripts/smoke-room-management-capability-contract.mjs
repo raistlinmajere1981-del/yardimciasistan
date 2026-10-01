@@ -61,9 +61,15 @@ const getDataHandler = section(
   'ipcMain.handle("roomFolio:getData"',
   'ipcMain.handle("roomFolio:open"'
 );
+assert.match(getDataHandler, /if \(!hasRoomCapability\(\)\)/);
+assert.match(getDataHandler, /return unavailableRoomData\(\)/);
 assert.match(getDataHandler, /if \(!hasFolioCapability\(\)\)/);
-assert.match(getDataHandler, /assertRoomAccess\(\)/);
 assert.match(getDataHandler, /return roomProfileData\(\)/);
+
+const unavailableProjection = section(roomFolioIpcSource, "const unavailableRoomData", "const roomProfileData");
+for (const emptyDomain of ["rooms: []", "activeStays: []", "folios: []", "menuCategories: []", "menuItems: []"]) {
+  assert.ok(unavailableProjection.includes(emptyDomain), `disabled room projection leaked domain data: ${emptyDomain}`);
+}
 
 const roomProjection = section(roomFolioIpcSource, "const roomProfileData", "const folioData");
 for (const emptyDomain of ["activeStays: []", "folios: []", "menuCategories: []", "menuItems: []"]) {
