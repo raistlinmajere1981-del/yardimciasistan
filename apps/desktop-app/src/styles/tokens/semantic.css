@@ -35,18 +35,18 @@
   --color-selected-border: var(--color-accent-border);
 
   /* Surface role is classification, not status. Tints stay deliberately quiet. */
-  --surface-neutral-bg: var(--color-bg-panel);
-  --surface-neutral-border: var(--color-border);
-  --surface-configuration-bg: var(--color-bg-panel);
-  --surface-configuration-border: var(--color-border-strong);
-  --surface-operation-bg: color-mix(in srgb, var(--color-accent) 4%, var(--color-bg-panel));
-  --surface-operation-border: color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
-  --surface-finance-bg: color-mix(in srgb, var(--color-warning) 4%, var(--color-bg-panel));
-  --surface-finance-border: color-mix(in srgb, var(--color-warning) 18%, var(--color-border));
-  --surface-communication-bg: color-mix(in srgb, var(--color-success) 4%, var(--color-bg-panel));
-  --surface-communication-border: color-mix(in srgb, var(--color-success) 18%, var(--color-border));
-  --surface-integration-bg: color-mix(in srgb, var(--color-info) 4%, var(--color-bg-panel));
-  --surface-integration-border: color-mix(in srgb, var(--color-info) 18%, var(--color-border));
+  --color-role-neutral-bg: var(--color-bg-panel);
+  --color-role-neutral-border: var(--color-border);
+  --color-role-configuration-bg: var(--color-bg-panel);
+  --color-role-configuration-border: var(--color-border-strong);
+  --color-role-operation-bg: color-mix(in srgb, var(--color-accent) 4%, var(--color-bg-panel));
+  --color-role-operation-border: color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
+  --color-role-finance-bg: color-mix(in srgb, var(--color-warning) 4%, var(--color-bg-panel));
+  --color-role-finance-border: color-mix(in srgb, var(--color-warning) 18%, var(--color-border));
+  --color-role-communication-bg: color-mix(in srgb, var(--color-success) 4%, var(--color-bg-panel));
+  --color-role-communication-border: color-mix(in srgb, var(--color-success) 18%, var(--color-border));
+  --color-role-integration-bg: color-mix(in srgb, var(--color-info) 4%, var(--color-bg-panel));
+  --color-role-integration-border: color-mix(in srgb, var(--color-info) 18%, var(--color-border));
   --color-security-backdrop: var(--slate-950);
   --color-security-surface: var(--slate-900);
   --color-security-surface-raised: var(--slate-800);
