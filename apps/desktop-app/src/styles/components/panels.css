@@ -1,5 +1,4 @@
 .surface,
-.panel,
 .setup-section {
   min-width: 0;
   border: 1px solid var(--color-border);
@@ -42,42 +41,47 @@
   margin-bottom: var(--space-3);
 }
 
-.panel, .setup-section { padding: var(--panel-padding); }
-.panel-padding-compact { padding: var(--space-3); }
+.setup-section { padding: var(--panel-padding); }
 
 .panel {
-  --surface-role-bg: var(--surface-neutral-bg);
-  --surface-role-border: var(--surface-neutral-border);
-  background: var(--surface-role-bg);
-  border-color: var(--surface-role-border);
+  --panel-role-bg: var(--color-role-neutral-bg);
+  --panel-role-border: var(--color-role-neutral-border);
+  min-width: 0;
+  padding: var(--panel-padding);
+  border: 1px solid var(--panel-role-border);
+  border-radius: var(--radius-panel);
+  background: var(--panel-role-bg);
+  box-shadow: none;
   transition:
     background-color var(--motion-surface) var(--ease-standard),
     border-color var(--motion-surface) var(--ease-standard);
 }
 
+.panel-padding-compact { padding: var(--space-3); }
+
 .panel[data-surface-role="configuration"] {
-  --surface-role-bg: var(--surface-configuration-bg);
-  --surface-role-border: var(--surface-configuration-border);
+  --panel-role-bg: var(--color-role-configuration-bg);
+  --panel-role-border: var(--color-role-configuration-border);
 }
 
 .panel[data-surface-role="operation"] {
-  --surface-role-bg: var(--surface-operation-bg);
-  --surface-role-border: var(--surface-operation-border);
+  --panel-role-bg: var(--color-role-operation-bg);
+  --panel-role-border: var(--color-role-operation-border);
 }
 
 .panel[data-surface-role="finance"] {
-  --surface-role-bg: var(--surface-finance-bg);
-  --surface-role-border: var(--surface-finance-border);
+  --panel-role-bg: var(--color-role-finance-bg);
+  --panel-role-border: var(--color-role-finance-border);
 }
 
 .panel[data-surface-role="communication"] {
-  --surface-role-bg: var(--surface-communication-bg);
-  --surface-role-border: var(--surface-communication-border);
+  --panel-role-bg: var(--color-role-communication-bg);
+  --panel-role-border: var(--color-role-communication-border);
 }
 
 .panel[data-surface-role="integration"] {
-  --surface-role-bg: var(--surface-integration-bg);
-  --surface-role-border: var(--surface-integration-border);
+  --panel-role-bg: var(--color-role-integration-bg);
+  --panel-role-border: var(--color-role-integration-border);
 }
 
 .page-section__header {
