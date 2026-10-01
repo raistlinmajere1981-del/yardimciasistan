@@ -256,7 +256,9 @@ export function MenuManager({
           </div>
         ) : undefined}
       >
-        <QrMenuPanel enabled={qrMenuEnabled} webModuleUrl={dashboardData.webModuleUrl} onPreview={onPreview} />
+        {qrMenuEnabled && (
+          <QrMenuPanel enabled webModuleUrl={dashboardData.webModuleUrl} onPreview={onPreview} />
+        )}
         <div className="menu-management-grid">
           <section className="panel menu-category-panel">
             <div className="panel-heading menu-panel-heading">
