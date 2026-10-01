@@ -43,7 +43,7 @@ export function MenuProductPicker({ menu, webModuleUrl, enabled, inventoryEnable
 
   if (!enabled) return null;
 
-  return <section className={`restaurant-order-menu-panel${className ? ` ${className}` : ""}`} aria-label={panelAriaLabel}>
+  return <section className={`restaurant-order-menu-panel${className ? ` ${className}` : ""}`} data-surface-role="operation" aria-label={panelAriaLabel}>
     <div className="restaurant-order-panel-heading">
       <div>
         <h3>Menü</h3>
