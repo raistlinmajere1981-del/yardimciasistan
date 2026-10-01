@@ -267,7 +267,7 @@
 .menu-item-stock-section {
   display: grid;
   align-content: start;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .menu-item-section-heading {
@@ -278,7 +278,7 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: start;
-  gap: var(--space-4) var(--space-5);
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -288,36 +288,38 @@
 }
 
 .menu-item-field-name {
-  grid-column: 1 / span 5;
+  grid-column: 1 / span 4;
+  grid-row: 1;
 }
 
 .menu-item-field-category {
-  grid-column: 6 / span 3;
+  grid-column: 5 / span 3;
+  grid-row: 1;
 }
 
 .menu-item-field-price {
-  grid-column: 9 / span 2;
+  grid-column: 8;
+  grid-row: 1;
 }
 
 .menu-item-field-currency {
-  grid-column: 11 / span 2;
+  grid-column: 9;
+  grid-row: 1;
 }
 
 .menu-item-field-description {
-  grid-column: 1 / span 8;
+  grid-column: 1 / span 9;
   grid-row: 2;
-}
-
-.menu-item-field-description textarea {
-  min-height: calc(var(--control-height-lg) * 2.2);
 }
 
 .menu-item-image-editor {
   display: grid;
-  grid-column: 9 / span 4;
-  grid-row: 2 / span 3;
+  grid-column: 10 / span 3;
+  grid-row: 1 / span 4;
   align-self: start;
+  justify-self: end;
   gap: var(--space-2);
+  width: min(100%, 15rem);
   min-width: 0;
 }
 
@@ -341,7 +343,7 @@
 
 .menu-item-field-status {
   display: flex;
-  grid-column: 1 / span 8;
+  grid-column: 1 / span 9;
   grid-row: 4;
   flex-wrap: wrap;
   align-items: center;
@@ -364,7 +366,7 @@
 
 .menu-stock-fields {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-width: 0;
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
@@ -372,9 +374,13 @@
 
 .menu-stock-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns:
+    minmax(7rem, 9rem)
+    minmax(7rem, 9rem)
+    minmax(11rem, 14rem)
+    minmax(12rem, 15rem);
   align-items: end;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -389,11 +395,7 @@
 
 .menu-stock-note {
   --field-width: 100%;
-  width: 100%;
-}
-
-.menu-stock-note textarea {
-  min-height: calc(var(--control-height-lg) * 1.5);
+  width: min(100%, 44rem);
 }
 
 .menu-media-header {
@@ -446,7 +448,8 @@
 .menu-image-preview-frame > img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  padding: var(--space-2);
+  object-fit: contain;
 }
 
 .menu-image-preview-empty {
