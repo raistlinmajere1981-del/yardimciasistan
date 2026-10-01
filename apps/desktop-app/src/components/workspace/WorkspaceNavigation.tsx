@@ -43,10 +43,11 @@ function guardKey(scope?: CloseGuardScope) {
  * Mounted inside the unlocked frame. Hospitality workspaces keep one independent
  * session per owning page; transient entity workspaces keep the legacy modal slot.
  */
-export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, children }: {
+export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, enabledHospitalityPages, children }: {
   page: DesktopPage;
   definitions: readonly WorkspaceDefinitionMetadata[];
   onReturnPage?: (page: DesktopPage) => void;
+  enabledHospitalityPages?: Partial<Record<HospitalityPage, boolean>>;
   children: ReactNode;
 }) {
   const [transient, setTransient] = useState<WorkspaceState | null>(null);
@@ -58,6 +59,21 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
   const transientOnReturn = useRef<OpenWorkspaceOptions["onReturn"]>(undefined);
   const hospitalityOnReturn = useRef<Partial<Record<HospitalityPage, OpenWorkspaceOptions["onReturn"]>>>({});
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const pensionEnabled = enabledHospitalityPages?.pension !== false;
+  const restaurantEnabled = enabledHospitalityPages?.restaurant !== false;
+
+  useLayoutEffect(() => {
+    if (pensionEnabled && restaurantEnabled) return;
+    if (!pensionEnabled) hospitalityOnReturn.current.pension = undefined;
+    if (!restaurantEnabled) hospitalityOnReturn.current.restaurant = undefined;
+    setHospitalitySessions((sessions) => {
+      const next = {
+        pension: pensionEnabled ? sessions.pension : null,
+        restaurant: restaurantEnabled ? sessions.restaurant : null
+      };
+      return next.pension === sessions.pension && next.restaurant === sessions.restaurant ? sessions : next;
+    });
+  }, [pensionEnabled, restaurantEnabled]);
 
   const visibleHospitality = page === "pension" || page === "restaurant" ? hospitalitySessions[page] : null;
   const current = transient ?? visibleHospitality;
@@ -78,6 +94,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, c
 
       const ownerPage = definition.sessionPage ?? null;
       if (ownerPage) {
+        if ((ownerPage === "pension" && !pensionEnabled) || (ownerPage === "restaurant" && !restaurantEnabled)) return false;
         const existing = hospitalitySessions[ownerPage];
         if (existing && !guardAllows(existing)) return false;
         // A transient workspace may deliberately hand off into a room/table session.
