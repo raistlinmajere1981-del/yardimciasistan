@@ -13,6 +13,7 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }:
   const [webEnabled, setWebEnabled] = useState(true);
   const [publicationLoading, setPublicationLoading] = useState(true);
   const [publicationSaving, setPublicationSaving] = useState(false);
+  const [publicationError, setPublicationError] = useState("");
   const [toolsOpen, setToolsOpen] = useState(false);
   const url = useMemo(() => resolveQrMenuPublicUrl(webModuleUrl), [webModuleUrl]);
   const visibleOnWeb = moduleEnabled && webEnabled;
@@ -36,6 +37,7 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }:
       };
     }
 
+    setPublicationError("");
     setPublicationLoading(true);
     void bridge.getQrMenuWebPublication()
       .then((state) => {
@@ -44,7 +46,9 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }:
       })
       .catch(() => {
         if (!active) return;
-        reportAppStatus("error", "QR Menü web görünürlüğü okunamadı.");
+        const message = "QR Menü web görünürlüğü okunamadı.";
+        setPublicationError(message);
+        reportAppStatus("error", message);
       })
       .finally(() => {
         if (active) setPublicationLoading(false);
@@ -63,18 +67,23 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }:
       return;
     }
 
+    setPublicationError("");
     setPublicationSaving(true);
     try {
       const result = await bridge.setQrMenuWebPublication(next);
       if (!result.ok) {
-        reportAppStatus("error", result.message || "QR Menü web görünürlüğü değiştirilemedi.");
+        const message = result.message || "QR Menü web görünürlüğü değiştirilemedi.";
+        setPublicationError(message);
+        reportAppStatus("error", message);
         return;
       }
       setWebEnabled(result.enabled);
       if (!result.enabled) setToolsOpen(false);
       reportAppStatus("success", result.message);
     } catch {
-      reportAppStatus("error", "QR Menü web görünürlüğü değiştirilemedi.");
+      const message = "QR Menü web görünürlüğü değiştirilemedi.";
+      setPublicationError(message);
+      reportAppStatus("error", message);
     } finally {
       setPublicationSaving(false);
     }
@@ -102,18 +111,29 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }:
     URL.revokeObjectURL(href);
   }
 
-  const statusText = !moduleEnabled
-    ? "QR Menü modülü Ayarlar'dan kapalı"
-    : visibleOnWeb
-      ? "Web QR menüsü görünür"
-      : "Web QR menüsü gizli · yerel menü açık";
+  const statusText = publicationLoading
+    ? "Web durumu okunuyor…"
+    : publicationSaving
+      ? "Web görünürlüğü güncelleniyor…"
+      : publicationError
+        ? publicationError
+        : !moduleEnabled
+          ? "QR Menü modülü Ayarlar'dan kapalı"
+          : visibleOnWeb
+            ? "Web QR menüsü görünür"
+            : "Web QR menüsü gizli · yerel menü açık";
 
   return <>
-    <section className={`menu-qr-service${visibleOnWeb ? " is-enabled" : " is-disabled"}`} aria-label="QR Menü">
+    <section
+      className={`menu-qr-service${visibleOnWeb ? " is-enabled" : " is-disabled"}${publicationError ? " has-error" : ""}`}
+      data-surface-role="integration"
+      aria-label="QR Menü"
+      aria-busy={busy || undefined}
+    >
       <div className="menu-qr-service__header">
         <div className="menu-qr-service__identity">
           <strong>QR Menü</strong>
-          <span>{statusText}</span>
+          <span role={publicationError ? "alert" : "status"}>{statusText}</span>
         </div>
         <div className="menu-qr-service__actions">
           <ActionButton variant="secondary" size="sm" onClick={onPreview}>
@@ -131,7 +151,7 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }:
             disabled={!moduleEnabled || busy}
             onChange={(event) => void toggle(event.target.checked)}
           />
-          <span>{visibleOnWeb ? "Webde aktif" : "Webde pasif"}</span>
+          <span>{publicationSaving ? "Güncelleniyor…" : visibleOnWeb ? "Webde aktif" : "Webde pasif"}</span>
         </label>
       </div>
     </section>
