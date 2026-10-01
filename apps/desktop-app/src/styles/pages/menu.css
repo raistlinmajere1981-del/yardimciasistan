@@ -204,8 +204,7 @@
   color: var(--color-accent);
 }
 
-.menu-category-row__select strong,
-.menu-category-row__description {
+:is(.menu-category-row__select strong, .menu-category-row__description) {
   overflow-wrap: anywhere;
 }
 
