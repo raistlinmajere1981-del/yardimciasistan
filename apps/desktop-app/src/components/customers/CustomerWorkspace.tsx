@@ -13,6 +13,7 @@ import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/Wor
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
 import { CustomerCreditPanel } from "./CustomerCreditPanel";
+import { CustomerRoomReceivablesPanel } from "./CustomerRoomReceivablesPanel";
 import { CustomerFormFields } from "./CustomerFormFields";
 import { CustomerHistoryView } from "./CustomerHistoryView";
 
@@ -25,6 +26,7 @@ export interface CustomerWorkspaceProps {
   whatsappEnabled: boolean;
   reservationsEnabled: boolean;
   staysEnabled: boolean;
+  accommodationFolioEnabled: boolean;
   customerCreditEnabled: boolean;
   onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
@@ -41,6 +43,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     whatsappEnabled,
     reservationsEnabled,
     staysEnabled,
+    accommodationFolioEnabled,
     customerCreditEnabled,
     onPreparedCreditWhatsApp,
     onWhatsApp,
@@ -234,6 +237,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
             </> : <small>Talep yok.</small>}
           </div>
         </section>}
+
+        {accommodationFolioEnabled && <CustomerRoomReceivablesPanel key={`room-receivables-${customer.id}`} customerId={customerId} />}
 
         {customerCreditEnabled && <CustomerCreditPanel
           key={customer.id}

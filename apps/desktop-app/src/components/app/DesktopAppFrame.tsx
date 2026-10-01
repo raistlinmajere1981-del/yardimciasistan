@@ -328,6 +328,7 @@ function DesktopAppFrameContent({
             whatsappEnabled,
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS) || runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS),
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
+            accommodationFolioEnabled,
             customerCreditEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),
             onPreparedCreditWhatsApp: messagingController.openPreparedCreditWhatsApp,
             onWhatsApp: messagingController.openCustomerWhatsApp,

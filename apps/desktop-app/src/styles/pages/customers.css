@@ -747,3 +747,32 @@
   border-radius: var(--radius-panel);
   background: var(--color-bg-panel);
 }
+
+.customer-room-receivable-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.customer-room-receivable {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.customer-room-receivable:first-child {
+  border-top: 0;
+}
+
+.customer-room-receivable > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.customer-room-receivable span {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

@@ -8,6 +8,7 @@ import type {
   FinanceDirection,
   FinancePaymentMethod
 } from "../../../electron/finance";
+import type { DesktopRoomFolio } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FormDialog } from "../ui/FormDialog";
@@ -15,7 +16,9 @@ import { DatePicker } from "../ui/DateTimePicker";
 import { MetricCard } from "../ui/MetricCard";
 import { MoneyInput } from "../ui/MoneyInput";
 import { Panel } from "../ui/Panel";
+import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
+import { RoomReceivablePaymentDialog } from "./RoomReceivablePaymentDialog";
 
 type OutstandingRow = {
   id: string;
@@ -24,6 +27,8 @@ type OutstandingRow = {
   status: string;
   dateText: string;
   remainingMinor: number;
+  customerId?: string;
+  folioId?: string;
 };
 
 export function FinanceWorkspace({
@@ -33,6 +38,8 @@ export function FinanceWorkspace({
   controller: FinanceController;
   topPanel?: ReactNode;
 }) {
+  const navigation = useWorkspaceNavigation();
+  const [selectedReceivable, setSelectedReceivable] = useState<DesktopRoomFolio | null>(null);
   const {
     data,
     roomData,
@@ -85,7 +92,9 @@ export function FinanceWorkspace({
         context: folio.roomName || "Oda hesabı",
         status: isOpen ? "Açık oda hesabı" : "Çıkış yaptı · alacak",
         dateText: isOpen && folio.plannedCheckOutDate ? `Planlanan çıkış ${formatDate(folio.plannedCheckOutDate)}` : "",
-        remainingMinor: folio.remainingMinor
+        remainingMinor: folio.remainingMinor,
+        customerId: folio.customerId,
+        folioId: folio.id
       });
     }
 
@@ -225,10 +234,22 @@ export function FinanceWorkspace({
                 {outstandingRows.map((item) => (
                   <article key={item.id} className="finance-outstanding-item">
                     <div className="finance-outstanding-item__main">
-                      <strong>{item.customerName}</strong>
+                      {item.customerId ? <button type="button" className="finance-outstanding-customer" onClick={() => navigation.openWorkspace({
+                        entityType: "customer",
+                        entityId: item.customerId!,
+                        mode: "main",
+                        returnContext: { page: "reports" }
+                      })}>{item.customerName}</button> : <strong>{item.customerName}</strong>}
                       <span>{item.context}{item.dateText ? ` · ${item.dateText}` : ""}</span>
                     </div>
-                    <b className="finance-outstanding-item__amount">{formatMinorCurrency(item.remainingMinor)}</b>
+                    <div className="finance-outstanding-item__actions">
+                      <b className="finance-outstanding-item__amount">{formatMinorCurrency(item.remainingMinor)}</b>
+                      {item.folioId && roomData.folios.find(folio => folio.id === item.folioId)?.status === "open" && <ActionButton
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setSelectedReceivable(roomData.folios.find(folio => folio.id === item.folioId) ?? null)}
+                      >Tahsil Et</ActionButton>}
+                    </div>
                   </article>
                 ))}
               </div>
@@ -236,12 +257,21 @@ export function FinanceWorkspace({
             {outstandingRows.length > 0 && (
               <div className="finance-room-note">
                 <BedDouble size={15} aria-hidden="true" />
-                <span>Tahsilat Pansiyon → Oda Adisyonu içinden yapılır.</span>
+                <span>Oda alacakları buradan veya müşteri kartından tahsil edilebilir.</span>
               </div>
             )}
           </Panel>
         )}
       </div>
+
+      {selectedReceivable && <RoomReceivablePaymentDialog
+        folio={selectedReceivable}
+        closeWhenSettled={!roomData.activeStays.some(stay => stay.id === selectedReceivable.stayId)}
+        onClose={() => setSelectedReceivable(null)}
+        onSaved={async () => {
+          await Promise.all([controller.refreshRoomData(), controller.refreshFinanceData()]);
+        }}
+      />}
 
       {draft.mode && (
         <FormDialog

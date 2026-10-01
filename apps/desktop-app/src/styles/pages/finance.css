@@ -325,3 +325,26 @@
     grid-template-columns: 1fr;
   }
 }
+
+.finance-outstanding-item__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.finance-outstanding-customer {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  text-align: start;
+  cursor: pointer;
+}
+
+.finance-outstanding-customer:hover {
+  text-decoration: underline;
+}
