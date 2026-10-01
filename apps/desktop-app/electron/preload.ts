@@ -349,6 +349,8 @@ export interface DesktopBridge {
   pushMenu: () => Promise<PushMenuResult>;
   pushAndroidSnapshot: () => Promise<PushAndroidSnapshotResult>;
   pushAiSettings: () => Promise<PushAiSettingsResult>;
+  getQrMenuWebPublication: () => Promise<{ enabled: boolean }>;
+  setQrMenuWebPublication: (enabled: boolean) => Promise<{ ok: boolean; message: string; enabled: boolean }>;
   saveMenuCategory: (input: SaveMenuCategoryInput) => Promise<DesktopMenuSaveResult>;
   saveMenuItem: (input: SaveMenuItemInput) => Promise<DesktopMenuSaveResult>;
   reorderMenuRecords: (input: ReorderMenuRecordsInput) => Promise<DesktopStatusUpdateResult>;
@@ -582,6 +584,8 @@ const bridge: DesktopBridge = {
   pushMenu: () => ipcRenderer.invoke("sync:pushMenu"),
   pushAndroidSnapshot: () => ipcRenderer.invoke("sync:pushAndroidSnapshot"),
   pushAiSettings: () => ipcRenderer.invoke("sync:pushAiSettings"),
+  getQrMenuWebPublication: () => ipcRenderer.invoke("menu:getWebPublication"),
+  setQrMenuWebPublication: (enabled: boolean) => ipcRenderer.invoke("menu:setWebPublication", enabled),
   saveMenuCategory: (input: SaveMenuCategoryInput) => ipcRenderer.invoke("menu:saveCategory", input),
   saveMenuItem: (input: SaveMenuItemInput) => ipcRenderer.invoke("menu:saveItem", input),
   reorderMenuRecords: (input: ReorderMenuRecordsInput) => ipcRenderer.invoke("menu:reorder", input),
