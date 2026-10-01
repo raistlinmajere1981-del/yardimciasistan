@@ -313,22 +313,31 @@ export function MenuManager({
                 return <article
                   className={`menu-category-row menu-sortable-record${selectedCategoryId === category.id ? " is-selected" : ""}${dragging?.kind === "category" && dragging.id === category.id ? " is-dragging" : ""}${dropTarget?.id === category.id ? ` is-drop-${dropTarget.position}` : ""}`}
                   key={category.id}
-                  draggable={!reorderBusy}
-                  onDragStart={(event) => handleDragStart(event, "category", category.id)}
                   onDragOver={(event) => handleDragOver(event, category.id)}
                   onDrop={(event) => void handleDrop(event, "category", category.id)}
-                  onDragEnd={finishDrag}
                 >
-                  <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />
-                  <div className="menu-category-row__main">
-                    <button className="menu-category-row__select" type="button" onClick={() => {
+                  <span
+                    className="menu-drag-handle-hitbox"
+                    draggable={!reorderBusy}
+                    onDragStart={(event) => handleDragStart(event, "category", category.id)}
+                    onDragEnd={finishDrag}
+                    onClick={(event) => event.stopPropagation()}
+                    aria-hidden="true"
+                  >
+                    <GripVertical className="menu-drag-handle" size={16} />
+                  </span>
+                  <button
+                    className="menu-category-row__main menu-category-row__select"
+                    type="button"
+                    aria-label={category.name}
+                    onClick={() => {
                       if (!suppressRowClickRef.current) onSelectCategory(category);
-                    }}>
-                      <strong>{category.name}</strong>
-                    </button>
+                    }}
+                  >
+                    <strong>{category.name}</strong>
                     <p className="menu-category-row__description">{category.description || "Açıklama yok."}</p>
                     <span className="menu-category-row__meta">{productCount} ürün</span>
-                  </div>
+                  </button>
                   <StatusBadge tone={category.is_active ? "success" : "neutral"}>
                     {category.is_active ? (qrMenuEnabled ? "Yayında" : "Aktif") : (qrMenuEnabled ? "Gizli" : "Pasif")}
                   </StatusBadge>
@@ -402,11 +411,8 @@ export function MenuManager({
                   <DataListButton
                     className={`menu-record menu-sortable-record${dragging?.kind === "item" && dragging.id === item.id ? " is-dragging" : ""}${dropTarget?.id === item.id ? ` is-drop-${dropTarget.position}` : ""}`}
                     key={item.id}
-                    draggable={!reorderBusy}
-                    onDragStart={(event) => handleDragStart(event, "item", item.id)}
                     onDragOver={(event) => handleDragOver(event, item.id)}
                     onDrop={(event) => void handleDrop(event, "item", item.id)}
-                    onDragEnd={finishDrag}
                     onClick={() => {
                       if (!suppressRowClickRef.current) openItem(item);
                     }}
@@ -414,7 +420,16 @@ export function MenuManager({
                     selected={selectedItemId === item.id}
                     title={item.name}
                     leading={<span className="menu-product-row__leading">
-                      <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />
+                      <span
+                        className="menu-drag-handle-hitbox"
+                        draggable={!reorderBusy}
+                        onDragStart={(event) => handleDragStart(event, "item", item.id)}
+                        onDragEnd={finishDrag}
+                        onClick={(event) => event.stopPropagation()}
+                        aria-hidden="true"
+                      >
+                        <GripVertical className="menu-drag-handle" size={16} />
+                      </span>
                       <MenuProductThumbnail item={item} webModuleUrl={dashboardData.webModuleUrl} />
                     </span>}
                     meta={(selectedCategoryId ? "" : findMenuCategoryName(item.category_id, dashboardData.menu.categories) + " · ") + formatCurrency(item.price, item.currency) + " · " + (item.is_available ? "Mevcut" : "Kapalı") + (item.is_featured ? " · Öne çıkan" : "")}
