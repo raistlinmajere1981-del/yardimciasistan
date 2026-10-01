@@ -163,6 +163,7 @@ try {
       source_revision: 1,
       idempotency_key: "web-menu-fixture-1",
       menu: {
+        enabled: true,
         categories: [
           { id: "cat_breakfast", name: "Kahvaltı", is_active: true, sort_order: 1 },
           { id: "cat_drinks", name: "İçecekler", is_active: true, sort_order: 2 },
@@ -206,6 +207,7 @@ try {
       source_revision: 2,
       idempotency_key: "web-menu-stock-2",
       menu: {
+        enabled: true,
         categories: [
           {
             id: "cat_smoke",
@@ -357,6 +359,54 @@ try {
     }
   });
   expect(androidStockSnapshotResponse.ok()).toBe(true);
+
+  const hiddenQrMenuPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_menu",
+      sync_secret: businessConfig.sync_secret,
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 3,
+      idempotency_key: "web-menu-hidden-3",
+      menu: {
+        enabled: false,
+        categories: stockMenu.categories,
+        items: stockMenu.items,
+        updated_at: stockMenu.updated_at
+      }
+    }
+  });
+  expect(hiddenQrMenuPublish.ok()).toBe(true);
+  const hiddenQrMenuResponse = await page.request.get(`${baseUrl}/api/menu.php`);
+  expect(hiddenQrMenuResponse.status()).toBe(404);
+  expect(await hiddenQrMenuResponse.json()).toMatchObject({ ok: false, message: "QR menü webde gizli." });
+  const hiddenQrBusiness = await page.request.get(`${baseUrl}/api/business.php`);
+  expect(hiddenQrBusiness.ok()).toBe(true);
+  expect((await hiddenQrBusiness.json()).business.public_surfaces).not.toContain("qr_menu");
+
+  const visibleQrMenuPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_menu",
+      sync_secret: businessConfig.sync_secret,
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 4,
+      idempotency_key: "web-menu-visible-4",
+      menu: {
+        enabled: true,
+        categories: stockMenu.categories,
+        items: stockMenu.items,
+        updated_at: stockMenu.updated_at
+      }
+    }
+  });
+  expect(visibleQrMenuPublish.ok()).toBe(true);
+  const visibleQrMenuResponse = await page.request.get(`${baseUrl}/api/menu.php`);
+  expect(visibleQrMenuResponse.ok()).toBe(true);
+  const visibleQrBusiness = await page.request.get(`${baseUrl}/api/business.php`);
+  expect(visibleQrBusiness.ok()).toBe(true);
+  expect((await visibleQrBusiness.json()).business.public_surfaces).toContain("qr_menu");
+
   const androidStockSummaryResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
