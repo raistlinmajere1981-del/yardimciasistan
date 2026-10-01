@@ -51,8 +51,8 @@ try {
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const path = database.databasePath;
-  applyBusinessProfileCapabilities(path, "restaurant", { preserveUserOverrides: false });
-  for (const capability of ["commerce.customer_credit", "retail.barcode", "service.whatsapp"]) setBusinessCapability(path, { capability, enabled: true });
+  applyBusinessProfileCapabilities(path, "market", { preserveUserOverrides: false });
+  for (const capability of ["commerce.customer_credit", "retail.barcode", "service.whatsapp", "customer.requests"]) setBusinessCapability(path, { capability, enabled: true });
   setBusinessCapability(path, { capability: "service.android", enabled: false });
   raw = new DatabaseSync(path);
   // A preexisting, unrelated prepared request exercises the outbox source after credit handoff.
