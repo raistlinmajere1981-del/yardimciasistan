@@ -30,7 +30,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, inventoryEna
     onAddItem={item => controller.addItem(item.id)}
   />;
 
-  const ticketPanel = <section className="restaurant-order-ticket-panel" aria-labelledby="table-order-ticket-title">
+  const ticketPanel = <section className="restaurant-order-ticket-panel" data-surface-role="operation" aria-labelledby="table-order-ticket-title">
                 <div className="restaurant-order-panel-heading restaurant-order-ticket-heading">
                   <div>
                     <h3 id="table-order-ticket-title">Aktif Adisyon</h3>
