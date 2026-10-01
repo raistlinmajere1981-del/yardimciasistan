@@ -47,6 +47,7 @@ const menuPreviewSource = source("apps/desktop-app/src/components/menu/MenuPrevi
 const roomAccountSource = source("apps/desktop-app/src/components/pension/RoomAccount.tsx");
 const roomAccountAdjustmentsSource = source("apps/desktop-app/src/components/pension/RoomAccountAdjustments.tsx");
 const tableOrdersSource = source("apps/desktop-app/src/components/restaurant/TableOrderEditor.tsx");
+const tableOrderIpcSource = source("apps/desktop-app/electron/ipc/table-order-ipc.ts");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
 const financeIpcSource = source("apps/desktop-app/electron/finance-ipc.ts");
 const customerIpcSource = source("apps/desktop-app/electron/ipc/customer-ipc.ts");
@@ -199,6 +200,16 @@ assert.match(
   "Restaurant order menu surface must remain gated by the food menu capability"
 );
 assert.match(roomFolioIpcSource, /if \(!hasRoomCapability\(\)\)[\s\S]{0,120}return unavailableRoomData\(\)/);
+assert.match(
+  handlerSource(tableOrderIpcSource, "tableOrder:getActive"),
+  /if \(!canReadFoodOrders\(\)\) return null/,
+  "stale table workspace reads must resolve empty after food orders are disabled"
+);
+assert.match(
+  handlerSource(tableOrderIpcSource, "tableOrder:list"),
+  /if \(!canReadFoodOrders\(\)\) return \[\]/,
+  "stale table history reads must resolve empty after food orders are disabled"
+);
 assert.match(
   frameSource,
   /enabledHospitalityPages=\{\{[\s\S]{0,300}ACCOMMODATION_ROOMS[\s\S]{0,300}FOOD_TABLES/,
