@@ -36,6 +36,7 @@ import {
   type DesktopSetupSaveResult,
   type SaveInitialSetupInput,
   type SaveMenuItemInput,
+  type DesktopMenuSaveResult,
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
   type DesktopStockImageApplyResult,
@@ -868,7 +869,7 @@ function registerIpcHandlers() {
     getDatabase,
     assertCapability: assertDesktopCapability,
     assertMenuItemSubfeatureMutation: assertMenuItemSubfeatureMutation,
-    finalizeRecordDeletion: finalizeDesktopRecordDeletion
+    finalizeMutation: finalizeDesktopMenuMutation
   });
 
   registerImageAnalysisIpcHandlers({
@@ -1133,6 +1134,19 @@ function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): Deskt
     markLocalCompanionSnapshotDirty();
     androidSnapshotPublishPending = true;
     notifyDesktopDashboardChanged(result.dashboardData);
+    getSyncCoordinator().scheduleSoon();
+  }
+  return result;
+}
+
+function finalizeDesktopMenuMutation<T extends DesktopMenuSaveResult | DesktopStatusUpdateResult>(result: T): T {
+  if (result.ok) {
+    markLocalCompanionSnapshotDirty();
+    androidSnapshotPublishPending = true;
+    notifyDesktopDashboardChanged(result.dashboardData);
+    if (hasBusinessCapability(enabledBusinessCapabilities(), C.QR_MENU)) {
+      getDatabase().queueSyncJob("menu_publish");
+    }
     getSyncCoordinator().scheduleSoon();
   }
   return result;
