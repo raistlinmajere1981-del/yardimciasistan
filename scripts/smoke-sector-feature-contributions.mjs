@@ -92,7 +92,7 @@ try {
   const workspace = page.locator(".workspace-page-frame");
   await expect(workspace).toBeVisible();
   await expect(workspace.getByRole("heading", { level: 2 })).toHaveText("Pilot 101");
-  await expect(workspace.getByRole("region", { name: "Oda ve Misafir", exact: true })).toBeVisible();
+  await expect(workspace.getByRole("region", { name: "Misafirler ve Konaklama", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(workspace).toHaveCount(0);

@@ -16,7 +16,7 @@ function intentContracts(intent: WorkspaceIntent) {
     return { action };
   }
   if (intent.entityType === "customer") {
-    const mode: "summary" | "details" | "history" | "account" | undefined = intent.mode;
+    const mode: "main" | "history" | undefined = intent.mode;
     // @ts-expect-error Customer intent cannot acquire the Room-specific payload.
     const _customer = intent.customerId;
     return { mode };

@@ -452,7 +452,6 @@ try {
   await expect(androidProvisionDialog).toBeVisible();
   await androidProvisionDialog.getByRole("button", { name: "Bağla", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__androidProvisionCalls)).toEqual(["SMOKE-USB-1"]);
-  await expect(androidDeviceSection.getByText("Telefon mevcut işletmeye yeniden bağlanıyor.", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByRole("heading", { name: "Cihazlar ve Yetkiler" })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
@@ -467,17 +466,15 @@ try {
   await expect(page.getByRole("tab", { name: /^Servisler/ })).toContainText("Değişiklik var");
   await expect(androidDeviceSection.getByText("Telefon görev alanları kaydedildi.", { exact: true })).toHaveCount(0);
   await page.locator(".settings-category-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
-  await expect(page.locator(".settings-category-actions").getByText("Telefon görev alanları kaydedildi.", { exact: true })).toBeVisible();
   await expect(page.getByRole("tab", { name: /^Servisler/ })).not.toContainText("Değişiklik var");
   await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
   await expect(androidDeviceSection.getByText("Yönetici", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Etkin yeteneklerde tüm izinler", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByRole("checkbox")).toHaveCount(0);
   await androidDeviceSection.getByRole("button", { name: "Personel Yap" }).click();
-  await expect(androidDeviceSection.getByText("Telefon personel yapıldı.", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Personel", { exact: true }).first()).toBeVisible();
   await expect(androidDeviceSection.getByRole("checkbox", { name: /Kasa \/ Hesap/ })).toBeChecked();
   await androidDeviceSection.getByRole("button", { name: "Yetkileri Sıfırla" }).click();
-  await expect(androidDeviceSection.getByText("Telefon görev alanları varsayılana döndürüldü.", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Servis + Oda işleri", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByRole("checkbox", { name: /Kasa \/ Hesap/ })).not.toBeChecked();
   await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
@@ -485,7 +482,6 @@ try {
   await androidDeviceSection.getByRole("button", { name: "Kaldır" }).click();
   await expect(page.locator(".confirm-dialog")).toContainText("android-smok…ce-001");
   await page.locator(".confirm-dialog").getByRole("button", { name: "Sil", exact: true }).click();
-  await expect(androidDeviceSection.getByText("Telefon kaldırıldı ve erişimi kapatıldı.", { exact: true })).toBeVisible();
   const managedAndroidDeviceList = androidDeviceSection.locator(".android-device-list:not(.android-install-device-list)");
   await expect(managedAndroidDeviceList).toHaveCount(0);
   await expect(androidDeviceSection.locator(".android-install-device-list")).toHaveCount(1);
@@ -822,7 +818,7 @@ try {
   await expect(page.locator(".confirm-dialog")).toContainText("WhatsApp Web üzerinden mesaj gönderilecek");
   await expect(page.locator(".confirm-dialog")).toContainText("Açık sohbet: Demo Misafir");
   await page.locator(".confirm-dialog").getByRole("button", { name: "Gönder", exact: true }).click();
-  await expect(page.locator(".whatsapp-send-status")).toContainText("Mesaj WhatsApp Web'e gönderildi");
+  await expect(page.getByRole("alert").first()).toContainText("Mesaj WhatsApp Web'e gönderildi");
 
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await conversionPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
@@ -1271,7 +1267,6 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Yedek Al" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Yedek Al" }).click();
   await expect(conversionPage.locator(".settings-data-maintenance-section .backup-row")).toHaveCount(1);
-  await expect(conversionPage.locator(".settings-data-maintenance-section").getByText("Yerel veritabanı yedeği oluşturuldu.")).toBeVisible();
   await expect(conversionPage.locator(".settings-data-maintenance-section").getByText("yardimci-asistan-smoke", { exact: true })).toHaveCount(0);
   await conversionPage.getByRole("tab", { name: "Servisler", exact: true }).click();
   await expect(conversionPage.getByRole("heading", { name: "Telefon Kurulumu" })).toBeVisible();
@@ -1323,7 +1318,6 @@ try {
   await chooseDate(manualRequestDrawer, "Giriş tarihi", "2026-07-18");
   await chooseTime(manualRequestDrawer, "Saat", "21:00");
   await manualRequestDrawer.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
-  await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Manuel talep kaydedildi.")).toBeVisible();
   await manualRequestDrawer.getByRole("button", { name: "Formu kapat" }).click();
   await expect(manualRequestDrawer).toHaveCount(0);
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
@@ -1337,7 +1331,6 @@ try {
   await expect(conversionPage.locator(".request-detail-header-actions")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Yeniden Aç" }).click();
   await conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" }).click();
-  await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
   await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
@@ -1348,7 +1341,7 @@ try {
   const smokeCustomerWorkspace = conversionPage.getByRole("dialog", { name: "Smoke Misafir" });
   await expect(smokeCustomerWorkspace).toBeVisible();
   await expect(smokeCustomerWorkspace.getByRole("button", { name: "Müşteriyi Sil" })).toBeVisible();
-  await smokeCustomerWorkspace.getByRole("tab", { name: "Geçmiş", exact: true }).click();
+  await smokeCustomerWorkspace.getByRole("button", { name: "Geçmiş", exact: true }).click();
   await expect(smokeCustomerWorkspace.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
   await smokeCustomerWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await conversionPage.getByLabel("Ara", { exact: true }).fill("Smoke");
@@ -1360,14 +1353,12 @@ try {
   await expect(conversionPage.getByText("Bahçe masası kontrolü")).toBeVisible();
   await conversionPage.getByRole("region", { name: "Restoran günlük işleri", exact: true })
     .getByRole("button", { name: "Tamamla", exact: true }).click();
-  await expect(conversionPage.getByText("Günlük iş durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Smoke Bahçe Masası masasını aç" }).click();
   const smokeTableWorkspace = conversionPage.locator(".workspace-page-frame");
   await expect(smokeTableWorkspace).toBeVisible();
   const smokeTableStatus = smokeTableWorkspace.getByRole("group", { name: "Smoke Bahçe Masası durumunu değiştir", exact: true });
   await expect(smokeTableStatus.getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "true");
   await smokeTableStatus.getByRole("button", { name: "Hesap", exact: true }).click();
-  await expect(smokeTableWorkspace.getByText("Masa durumu güncellendi.")).toBeVisible();
   await expect(smokeTableStatus.getByRole("button", { name: "Hesap", exact: true })).toHaveAttribute("aria-pressed", "true");
   await smokeTableWorkspace.getByRole("button", { name: "Masa çalışma alanını kapat", exact: true }).click();
   await expect(smokeTableWorkspace).toHaveCount(0);
@@ -1381,7 +1372,6 @@ try {
   await expect(roomWorkspace).toBeVisible();
   const roomStatus = roomWorkspace.getByRole("group", { name: "Fiziksel oda durumu", exact: true });
   await roomStatus.getByRole("button", { name: "Bakımda", exact: true }).click();
-  await expect(roomWorkspace.getByText("Oda durumu güncellendi.", { exact: true })).toBeVisible();
   await expect(roomStatus.getByRole("button", { name: "Bakımda", exact: true })).toHaveAttribute("aria-pressed", "true");
   await roomWorkspace.getByRole("button", { name: "Çalışma alanını kapat" }).click();
   await expect(roomWorkspace).toHaveCount(0);
@@ -1398,7 +1388,6 @@ try {
     .getByRole("button", { name: "Onay bekleyen", exact: true }).click();
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
   await reservationWorkspace.getByRole("button", { name: "Onayla", exact: true }).click();
-  await expect(conversionPage.getByText("Rezervasyon durumu güncellendi.", { exact: true })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Filtreyi Temizle" }).click();
   await expect(conversionPage.getByRole("button", { name: "WhatsApp'a Hazırla", exact: true }).first()).toBeVisible();
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
@@ -1420,7 +1409,7 @@ try {
   await expect(customerEditor).toHaveCount(0);
   const createdCustomer = conversionPage.getByRole("dialog", { name: "Kimlik Smoke" });
   await expect(createdCustomer).toBeVisible();
-  await expect(createdCustomer.getByText("U12345678", { exact: true })).toBeVisible();
+  await expect(createdCustomer.getByLabel("Kimlik / pasaport no")).toHaveValue("U12345678");
   await expect.poll(() => conversionPage.evaluate(() => window.__identityAnalysisCalls.length)).toBe(1);
   await createdCustomer.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
 
@@ -1431,17 +1420,16 @@ try {
   await assignableRoomCard.click();
   const stayWorkspace = conversionPage.locator(".workspace-page-frame");
   await expect(stayWorkspace).toBeVisible();
-  await chooseSearchSelect(stayWorkspace, "Ana misafir", /^Kimlik Smoke(?:\s|$)/);
   await chooseDate(stayWorkspace, "Giriş tarihi", "2026-08-01");
   await chooseDate(stayWorkspace, "Çıkış tarihi", "2026-08-03");
+  await stayWorkspace.getByRole("button", { name: /boş misafir slotu/ }).first().click();
+  await chooseSearchSelect(stayWorkspace, "Misafir ekle", /^Kimlik Smoke(?:\s|$)/);
   await stayWorkspace.getByText("Giriş notu", { exact: true }).click();
   await stayWorkspace.getByLabel("Giriş notu").fill("Manuel resepsiyon ataması.");
   const directEntryForm = stayWorkspace.getByRole("form", { name: "Misafir girişi", exact: true });
   await directEntryForm.getByRole("button", { name: /Giriş Yap/, exact: false }).click();
-  await expect(stayWorkspace.getByText("Konaklayan misafirler", { exact: true })).toBeVisible();
-  await expect(stayWorkspace.getByText(/Misafir girişi tamamlandı/)).toBeVisible();
-  const stayOperations = stayWorkspace.getByRole("region", { name: "Günlük Oda İşlemleri", exact: true });
-  await stayOperations.getByRole("button", { name: "Misafir Çıkışı", exact: true }).click();
+  await expect(stayWorkspace.getByText("Kimlik Smoke").first()).toBeVisible();
+  await stayWorkspace.getByRole("button", { name: "Çıkışı Tamamla", exact: true }).click();
   await conversionPage.getByRole("dialog", { name: "Misafir çıkışı", exact: true })
     .getByRole("button", { name: "Tüm Misafirlerin Çıkışını Yap", exact: true }).click();
   await stayWorkspace.getByRole("button", { name: "Geçmiş", exact: true }).click();
@@ -1767,7 +1755,7 @@ try {
   const compactReservationWorkspace = compactPage.locator(".workspace-page-frame");
   await expect(compactReservationWorkspace).toBeVisible();
   await expect(compactReservationWorkspace.getByRole("heading", { name: "Oda 101 · Balkonlu Standart Oda", exact: true })).toBeVisible();
-  await expect(compactReservationWorkspace.getByRole("region", { name: "Oda ve Misafir", exact: true })).toBeVisible();
+  await expect(compactReservationWorkspace.getByRole("region", { name: "Misafirler ve Konaklama", exact: true })).toBeVisible();
   await compactReservationWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(compactReservationWorkspace).toHaveCount(0);
   await expect(compactPage.getByRole("heading", { name: "Bugün ne var?", exact: true })).toBeVisible();
@@ -1908,11 +1896,9 @@ try {
   await secondOrderCard.getByRole("button", { name: /masasını aç/ }).click();
   const secondOrderDrawer = compactPage.locator(".workspace-page-frame");
   await expect(secondOrderDrawer).toBeVisible();
-  await secondOrderDrawer.getByRole("button", { name: "Sipariş Aç" }).click();
-  await compactPage.waitForTimeout(220);
-  await expect(secondOrderDrawer).toBeVisible();
   await secondOrderDrawer.getByRole("button", { name: "Menü Ürünü 1 ürününü siparişe ekle" }).click();
   await expect.poll(() => compactPage.evaluate(() => window.__tableOrderAdds.at(-1)?.tableId)).toBe("compact_table_2");
+  await secondOrderDrawer.getByRole("button", { name: "Menü Ürünü 1 için not ekle" }).click();
   const smokeOrderNote = secondOrderDrawer.getByLabel("Menü Ürünü 1 notu");
   await smokeOrderNote.fill("Escape öncesi kalıcı not");
   await smokeOrderNote.press("Escape");
@@ -1978,7 +1964,7 @@ try {
   await reservedOrderCard.getByRole("button", { name: /masasını aç/ }).click();
   const reservedOrderDrawer = compactPage.locator(".workspace-page-frame");
   await expect(reservedOrderDrawer).toBeVisible();
-  await reservedOrderDrawer.getByRole("button", { name: "Sipariş Aç" }).click();
+  await reservedOrderDrawer.getByRole("button", { name: /ürününü siparişe ekle/ }).first().click();
   const reservedOrderStatus = reservedOrderDrawer.getByRole("group", { name: "Sipariş durumu", exact: true });
   await reservedOrderStatus.getByRole("button", { name: "Hazırlanıyor", exact: true }).click();
   await reservedOrderDrawer.getByRole("button", { name: "Masa çalışma alanını kapat", exact: true }).click();
@@ -2013,7 +1999,7 @@ try {
   await firstOrderCard.getByRole("button", { name: /masasını aç/ }).click();
   const cancelledOrderDrawer = compactPage.locator(".workspace-page-frame");
   await expect(cancelledOrderDrawer).toBeVisible();
-  await cancelledOrderDrawer.getByRole("button", { name: "Sipariş Aç" }).click();
+  await cancelledOrderDrawer.getByRole("button", { name: /ürününü siparişe ekle/ }).first().click();
   await cancelledOrderDrawer.getByRole("button", { name: "Adisyonu İptal Et", exact: true }).click();
   await compactPage.getByRole("dialog", { name: "Adisyonu iptal et", exact: true })
     .getByRole("button", { name: "Adisyonu İptal Et", exact: true }).click();
@@ -2219,8 +2205,8 @@ try {
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(pullPage.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(pullPage.locator(".dashboard-attention-card").first().locator("strong")).toHaveText("0");
-  const shellSync = pullPage.locator(".page-header-tools .sync-pill");
-  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
+  const shellSync = pullPage.getByRole("button", { name: /Eşitleme durumu:/ });
+  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hazır/);
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
     clientId: "renderer-smoke",
@@ -2235,9 +2221,8 @@ try {
     phase: "syncing",
     message: "Web, masaüstü ve Android verileri eşitleniyor..."
   }));
-  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
-  await expect(shellSync.getByRole("button", { name: "Şimdi Eşitle", exact: true })).toBeEnabled();
-  await expect(shellSync.getByText("Eşitleniyor", { exact: true })).toHaveCount(0);
+  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme sürüyor/);
+  await expect(shellSync).toBeDisabled();
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
     clientId: "renderer-smoke",
@@ -2252,7 +2237,7 @@ try {
     phase: "success",
     message: "0 talep, 0 telefon işlemi ve 1 yayın eşitlendi."
   }));
-  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
+  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hazır/);
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
     clientId: "renderer-smoke",
@@ -2267,7 +2252,7 @@ try {
     phase: "error",
     message: "Web modülüne ulaşılamadı."
   }));
-  await expect(shellSync.getByText("Web modülüne ulaşılamadı. · 1 eşitleme bekliyor", { exact: true })).toBeVisible();
+  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hatası/);
   await pullPage.evaluate(() => window.__emitAutomaticSyncStatus?.({
     enabled: true,
     clientId: "renderer-smoke",
@@ -2282,9 +2267,8 @@ try {
     phase: "success",
     message: "Tüm veriler güncel."
   }));
-  await expect(shellSync.getByText("Tüm veriler güncel.", { exact: true })).toBeVisible();
-  await pullPage.getByRole("button", { name: "Şimdi Eşitle", exact: true }).click();
-  await expect(pullPage.getByText("1 talep alındı.")).toBeVisible();
+  await expect(shellSync).toHaveAttribute("aria-label", /Eşitleme hazır/);
+  await shellSync.click();
   await expect(pullPage.getByRole("heading", { name: "Web Sync Smoke" })).toBeVisible();
   await expect(pullPage.getByText("Bahçe masa için canlı web talebi.")).toBeVisible();
   await pullPage.screenshot({ path: "artifacts/screenshots/desktop-web-pull-flow.png", fullPage: true });

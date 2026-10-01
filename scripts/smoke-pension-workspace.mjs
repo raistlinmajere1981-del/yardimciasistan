@@ -354,7 +354,7 @@ try {
   await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Ek Misafir 3(?:\s|$)/);
   await expect.poll(() => slotPage.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guestCount)).toBe(3);
   await expect(slotStayPanel.getByRole('button', { name: 'Ek Misafir 3 misafir slotu', exact: true })).toBeVisible();
-  await expect(slotStayPanel).toContainText('3 misafir · 2 kişilik oda');
+  await expect(slotWorkspace).toContainText('3 kişi · 2 kişilik oda');
   await slotPage.close();
 
   const safety = await open(), safetyWorkspace = safety.locator('.workspace-page-frame');

@@ -71,7 +71,9 @@ try {
   db.prepare("UPDATE rooms SET status = 'reserved', is_active = 0 WHERE id = ?").run(rooms[1].id);
   fail(database.createStayFromReservation({ reservationId: booking.id }));
   db.prepare('UPDATE rooms SET is_active = 1, capacity = 1 WHERE id = ?').run(rooms[1].id);
-  fail(database.createStayFromReservation({ reservationId: booking.id }));
+  // Ek kapasite: planlı dönüşüm nominal kapasiteyi aşabilir (2808f3f6).
+  const overCapacityPlanned = ok(database.createStayFromReservation({ reservationId: booking.id }));
+  ok(database.updateCustomerRoomStayStatus({ stayId: overCapacityPlanned.savedId, status: 'cancelled' }));
   db.prepare('UPDATE rooms SET capacity = 4 WHERE id = ?').run(rooms[1].id);
   db.prepare("UPDATE customers SET deleted_at = 'deleted' WHERE id = ?").run(customerId);
   fail(database.createStayFromReservation({ reservationId: booking.id }));

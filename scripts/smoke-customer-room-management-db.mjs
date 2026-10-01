@@ -76,6 +76,7 @@ try {
 
   const room = database.getDashboardData().rooms.find((candidate) => candidate.isActive && candidate.capacity > 0);
   assert.ok(room);
+  // Ek kapasite: planlı konaklamada nominal kapasite aşılabilir (2808f3f6).
   const tooManyGuests = database.assignCustomerToRoom({
     customerId: first.savedId,
     roomId: room.id,
@@ -85,8 +86,8 @@ try {
     notes: "",
     status: "planned"
   });
-  assert.equal(tooManyGuests.ok, false);
-  assert.match(tooManyGuests.message, /kapasitesi/i);
+  assert.equal(tooManyGuests.ok, true, tooManyGuests.message);
+  assert.equal(database.updateCustomerRoomStayStatus({ stayId: tooManyGuests.savedId, status: "cancelled" }).ok, true);
 
   const assignment = database.assignCustomerToRoom({
     customerId: first.savedId,

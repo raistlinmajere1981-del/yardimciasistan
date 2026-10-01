@@ -41,8 +41,8 @@ try {
 
   // The card surface is the only detail launcher; opening it is read-only.
   await card(103).getByRole('button', { name: 'Oda 103 odasını aç' }).tap();
-  await expect(workspace.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('Ece Yılmaz');
-  await expect(workspace.getByRole('region', { name: 'Misafir Hesabı', exact: true })).toContainText('3.600');
+  await expect(workspace.getByRole('region', { name: 'Hesap', exact: true })).toContainText('Ece Yılmaz');
+  await expect(workspace.getByRole('region', { name: 'Hesap', exact: true })).toContainText('3.600');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind !== 'read'))).toEqual([]);
   await close();
   await expect(card(103).getByRole('button', { name: 'Oda 103 odasını aç' })).toBeVisible();
@@ -103,17 +103,16 @@ try {
   await card(103).getByRole('button', { name: 'Misafir çıkışı', exact: true }).click();
   await expect(page.locator('.workspace-page-frame')).toHaveCount(1);
   const checkoutAccount = workspace.getByRole('region', { name: 'Mevcut konaklama hesabı', exact: true });
-  const checkoutOperations = workspace.getByRole('region', { name: 'Günlük Oda İşlemleri', exact: true });
   await checkoutAccount.getByLabel('Ödeme tutarı').fill('3600');
   await checkoutAccount.getByRole('button', { name: 'Ödemeyi Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.fixtureState().folios.find(item => item.stayId === 'stay-2').remainingMinor)).toBe(0);
-  await checkoutOperations.getByRole('button', { name: 'Misafir Çıkışı', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Çıkışı Tamamla', exact: true }).click();
   const confirm = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
   await expect(confirm).toContainText('Ece Yılmaz');
   await expect(confirm).toContainText('Kalan hesap');
   await expect(confirm.getByRole('group', { name: 'Çıkış ödeme yöntemi', exact: true })).toHaveCount(0);
   await confirm.getByRole('button', { name: 'Tüm Misafirlerin Çıkışını Yap', exact: true }).click();
-  await expect(workspace).toContainText('Misafir çıkışı tamamlandı');
+  await expect(page.getByText(/Misafir çıkışı tamamlandı/)).toBeVisible();
   await close();
   await expect(workspace).toHaveCount(0);
   await expect(card(103).getByRole('group', { name: 'Oda 103 fiziksel durumunu değiştir', exact: true })
@@ -144,7 +143,7 @@ try {
 
   // Card surface opens the table without creating an order.
   await table(1).getByRole('button', { name: 'Masa 1 masasını aç' }).tap();
-  await expect(rworkspace.getByRole('button', { name: 'Sipariş Aç', exact: true })).toBeEnabled();
+  await expect(rworkspace.getByText('Aktif adisyon yok.')).toBeVisible();
   expect(await restaurant.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'start'))).toEqual([]);
   await floor();
   await expect(table(1).getByRole('button', { name: 'Masa 1 masasını aç' })).toBeVisible();
