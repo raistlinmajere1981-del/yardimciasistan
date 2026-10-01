@@ -1,6 +1,6 @@
 (() => {
   const TABLE_API = "/yardimci-asistan/api/tables.php";
-  const DETAIL_PATH = "/demo/restoran/masa/";
+  const DETAIL_PATH = "/restoran/masa/";
 
   const featureCatalog = {
     indoor: "İç mekân",
