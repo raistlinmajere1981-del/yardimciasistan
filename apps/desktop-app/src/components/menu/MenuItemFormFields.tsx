@@ -7,6 +7,7 @@ import {
 } from "./menu-model";
 import { ActionButton } from "../ui/ActionButton";
 import { MoneyInput } from "../ui/MoneyInput";
+import { StatusChip } from "../ui/StatusChip";
 
 const MAX_SOURCE_IMAGE_BYTES = 15 * 1024 * 1024;
 const TARGET_IMAGE_BYTES = 420 * 1024;
@@ -175,9 +176,21 @@ export function MenuItemFormFields({
               </div>
             )}
 
-            <div className="menu-item-field-status">
-              <label className="form-check"><input checked={form.is_available} onChange={(event) => onChange({ ...form, is_available: event.target.checked })} type="checkbox" />Mevcut</label>
-              <label className="form-check"><input checked={form.is_featured} onChange={(event) => onChange({ ...form, is_featured: event.target.checked })} type="checkbox" />Öne çıkar</label>
+            <div className="menu-item-field-status" aria-label="Ürün durumu">
+              <StatusChip
+                tone="success"
+                selected={form.is_available}
+                onClick={() => onChange({ ...form, is_available: !form.is_available })}
+              >
+                Mevcut
+              </StatusChip>
+              <StatusChip
+                tone="warning"
+                selected={form.is_featured}
+                onClick={() => onChange({ ...form, is_featured: !form.is_featured })}
+              >
+                Öne çıkar
+              </StatusChip>
             </div>
 
             <label className="form-field menu-item-field-tags">
