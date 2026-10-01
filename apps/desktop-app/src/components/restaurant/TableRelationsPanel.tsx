@@ -34,6 +34,7 @@ export function TableRelationsPanel({
 }) {
   const navigation = useWorkspaceNavigation();
   const [entryRoomId, setEntryRoomId] = useState("");
+  const [entryRequested, setEntryRequested] = useState(false);
   const [customerDraft, setCustomerDraft] = useState<string | null>(null);
   const quickAssignmentRef = useRef("");
 
@@ -53,6 +54,19 @@ export function TableRelationsPanel({
   useEffect(() => {
     setCustomerDraft(null);
   }, [table.currentCustomerId]);
+
+  useEffect(() => {
+    if (!entryRequested || controller.busy || controller.dirty) return;
+    setEntryRequested(false);
+    navigation.openWorkspace({
+      entityType: "room",
+      entityId: entryRoomId,
+      mode: "stay",
+      action: "create-stay",
+      customerId: table.currentCustomerId,
+      returnContext: { page: "restaurant", view: "floor", entityId: table.id }
+    });
+  }, [entryRequested, controller.busy, controller.dirty, entryRoomId, table.currentCustomerId, table.id, navigation]);
 
   useEffect(() => {
     if (!quickCustomerId || disabled || quickAssignmentRef.current === quickCustomerId || quickCustomerId === table.currentCustomerId) return;
@@ -132,16 +146,7 @@ export function TableRelationsPanel({
             .map(room => ({ id: room.id, label: room.number ? `Oda ${room.number}` : room.name }))}
         />
         <ActionButton variant="secondary" size="sm" disabled={disabled || !entryRoomId} onClick={async () => {
-          const ready = await controller.run(async () => true);
-          if (!ready) return;
-          navigation.openWorkspace({
-            entityType: "room",
-            entityId: entryRoomId,
-            mode: "stay",
-            action: "create-stay",
-            customerId: table.currentCustomerId,
-            returnContext: { page: "restaurant", view: "floor", entityId: table.id }
-          });
+          if (await controller.run(async () => true)) setEntryRequested(true);
         }}>Konaklama Başlat</ActionButton>
       </> : <span className="table-relation-empty">Odayla ilişkilendirmek için müşteri seçin.</span>}
     </div>}
