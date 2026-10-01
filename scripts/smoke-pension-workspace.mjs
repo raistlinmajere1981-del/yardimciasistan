@@ -78,9 +78,9 @@ try {
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toHaveCount(0);
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => !['read', 'assignment'].includes(call.kind)))).toEqual([]);
   await captureOperationWorkspace(page, 'room-empty');
-  await chooseSearchSelect(stayPanel, 'Atanacak rezervasyon', /Pilot rezervasyon 0/);
-  await expect(operations.getByLabel('Atanacak rezervasyon')).toHaveCount(0);
-  await button('Rezervasyonu Ata').click();
+  await expect(stayPanel.getByLabel('Atanacak rezervasyon')).toHaveCount(0);
+  await expect(stayPanel.getByRole('button', { name: 'Rezervasyonu Ata', exact: true })).toHaveCount(0);
+  await expect(stayPanel.getByRole('button', { name: '+ Yeni rezervasyon', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays.length)).toBe(0);
   await chooseSearchSelect(stayPanel, 'İlgili rezervasyon', /Kompakt Misafir 1.*Beklenen 1 kişi/);
   const entryForm = stayPanel.getByRole('form', { name: 'Misafir girişi', exact: true });

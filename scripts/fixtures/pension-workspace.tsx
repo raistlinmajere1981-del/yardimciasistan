@@ -69,7 +69,6 @@ function FixtureShell({ page, setPage, data, setData, capabilities, pension, sav
         aiEnabled: false,
         onSaveCustomer: async () => ({ ok: false, message: "fixture" }),
         onAnalyzeIdentity: async () => ({ ok: false, message: "fixture" }),
-        onSaveReservation: save,
         folioEnabled: capabilities.folioEnabled,
         menuEnabled: capabilities.menuEnabled
       }}

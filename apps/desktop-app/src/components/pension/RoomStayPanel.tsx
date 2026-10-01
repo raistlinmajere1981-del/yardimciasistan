@@ -34,6 +34,12 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const selected = eligible.find(item => item.id === reservationId);
   const primary = draft.customerId || selected?.customerId || "";
   const guestIds = [...new Set([primary, ...additional].filter(Boolean))];
+  const reservationCustomerName = selected
+    ? data.customers.find(customer => customer.id === selected.customerId)?.fullName || selected.customerName || "Rezervasyon müşterisi"
+    : "";
+  const primaryName = primary ? data.customers.find(customer => customer.id === primary)?.fullName || "Müşteri" : "";
+  const reservationCustomerMismatch = Boolean(selected && primary && primary !== selected.customerId);
+  const reservationGuestCountMismatch = Boolean(selected && guestIds.length !== selected.guestCount);
   const allActive = data.roomOperations?.flatMap(item => item.stays) ?? data.customerRoomStays;
   const unavailable = allActive.flatMap(stay => (stay.guests ?? []).filter(guest => ["planned", "checked_in"].includes(guest.status)).map(guest => guest.customerId));
   const draftGuests: RoomGuestSlotPerson[] = guestIds.map(id => ({
@@ -160,7 +166,11 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
             options={eligible.map(item => ({ id: item.id, label: item.customerName || item.title, description: `${item.startDate} – ${item.endDate} · Beklenen ${item.guestCount} kişi` }))}
             onChange={id => { setReservationId(id); setDraft(current => ({ ...current, customerId: eligible.find(item => item.id === id)?.customerId || "" })); setAdditional([]); markEntry(true); }} />
         </div>}
-        {selected && <p>Rezervasyon · {selected.startDate} – {selected.endDate} · Beklenen {selected.guestCount} kişi</p>}
+        {selected && <>
+          <p>Rezervasyon · {selected.startDate} – {selected.endDate} · Beklenen {selected.guestCount} kişi</p>
+          {reservationCustomerMismatch && <p role="alert">Rezervasyon müşterisi {reservationCustomerName}; girişte ana misafir {primaryName} seçildi.</p>}
+          {reservationGuestCountMismatch && <p role="alert">Rezervasyonda {selected.guestCount} kişi bekleniyor; giriş listesinde {guestIds.length} kişi var.</p>}
+        </>}
         {!selected && <div className="operation-fields room-entry-dates">
           <div className="form-field"><span>Giriş</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate}
             onChange={value => { setDraft({ ...draft, checkInDate: value }); markEntry(true); }} /></div>

@@ -293,7 +293,6 @@ function DesktopAppFrameContent({
               aiEnabled,
               onSaveCustomer: customerController.handleSaveCustomer,
               onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
-              onSaveReservation: operationController.handleSaveManualReservation,
               folioEnabled: accommodationFolioEnabled,
               menuEnabled
             }}

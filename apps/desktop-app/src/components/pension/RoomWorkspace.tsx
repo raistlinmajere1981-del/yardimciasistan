@@ -3,9 +3,7 @@ import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
   DesktopIdentityImageAnalyzeResult,
-  DesktopStatusUpdateResult,
-  SaveCustomerInput,
-  SaveManualReservationInput
+  SaveCustomerInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { WorkspacePageFrame } from "../workspace/WorkspaceFrame";
@@ -21,11 +19,9 @@ import { roomIdentity } from "./room-card-model";
 import { getRoomWorkspaceModel } from "./room-workspace-model";
 import { useRoomStayOperations } from "./use-room-stay-operations";
 import { RoomStayPanel } from "./RoomStayPanel";
-import { RoomReservationControl } from "./RoomReservationControl";
 import { RoomCheckoutAction, RoomDailyOperations } from "./RoomDailyOperations";
 import { RoomStayDates } from "./RoomStayDates";
 import { ResourceWorkspaceSummary } from "../operations/ResourceWorkspaceSummary";
-import { ManualReservationEditor } from "../operations/ManualReservationEditor";
 import { CustomerCreateEditor } from "../customers/CustomerCreateEditor";
 import { ChoiceChips } from "../ui/ChoiceChips";
 import { setRoomOperationalStatus } from "./room-operations";
@@ -35,11 +31,10 @@ export interface RoomWorkspaceProps {
   staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean; aiEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
-  onSaveReservation: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
 }
 
 export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reservationsEnabled, folioEnabled, menuEnabled,
-  customersEnabled, aiEnabled, onSaveCustomer, onAnalyzeIdentity, onSaveReservation }: RoomWorkspaceProps) {
+  customersEnabled, aiEnabled, onSaveCustomer, onAnalyzeIdentity }: RoomWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const model = getRoomWorkspaceModel(data, intent.entityId, staysEnabled, reservationsEnabled);
   // Current account always follows the actual checked-in stay. Prior-account intents focus their own context below.
@@ -48,7 +43,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   const operations = useRoomStayOperations(model, account, onDashboard);
   const [dirtyForms, setDirtyForms] = useState<Record<string, boolean>>({});
   const [draftEpoch, setDraftEpoch] = useState(0);
-  const [quickAction, setQuickAction] = useState<"customer" | "reservation" | null>(null);
+  const [quickAction, setQuickAction] = useState<"customer" | null>(null);
   const [quickCustomerId, setQuickCustomerId] = useState("");
   const dirty = Object.values(dirtyForms).some(Boolean);
   const busy = operations.busy || account.busy;
@@ -63,7 +58,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
     const moved = data.roomOperations?.flatMap(item => item.stays).find(stay => stay.id === followedStay.current && stay.status === "checked_in");
     if (moved && moved.roomId !== intent.entityId) navigation.openWorkspace({ ...intent, entityId: moved.roomId, stayId: moved.id });
   }, [model.currentStay, data.roomOperations, busy, dirty, intent, navigation]);
-  const accountDraftDirty = Object.entries(dirtyForms).some(([key, value]) => value && !["stay", "condition", "assignment"].includes(key));
+  const accountDraftDirty = Object.entries(dirtyForms).some(([key, value]) => value && !["stay", "condition"].includes(key));
   useEffect(() => {
     if (history || account.loading || !folioEnabled) return;
     const key = `${intent.mode}|${intent.action}|${intent.folioId}|${intent.stayId}`;
@@ -81,9 +76,8 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   useLayoutEffect(() => {
     if (history) return;
     const target = intent.mode === "account" || intent.action === "payment" ? "room-account"
-      : intent.action === "assign-reservation" ? "room-stay"
-        : ["check-in", "checkout", "room-status"].includes(intent.action ?? "") ? "room-operations"
-          : intent.mode === "stay" || intent.action ? "room-stay" : "";
+      : ["check-in", "checkout", "room-status"].includes(intent.action ?? "") ? "room-operations"
+        : intent.mode === "stay" || intent.action ? "room-stay" : "";
     const panel = target ? surface.current?.querySelector<HTMLElement>(`#${target}`) : null;
     panel?.focus({ preventScroll: true });
     panel?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -144,27 +138,15 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           returnContext: { page: "restaurant", view: "floor" } })}>Masa Hesabına Dön</ActionButton>}</>}
     onClose={() => navigation.closeWorkspace({ entityType: "room", entityId: intent.entityId })} closeBlocked={blocked || Boolean(quickAction)}
     footer={dirty && <div className="action-row"><span>Kaydedilmemiş alanlar var.</span><ActionButton variant="secondary" disabled={busy} onClick={() => { setDirtyForms({}); setDraftEpoch(value => value + 1); }}>Değişiklikleri Bırak</ActionButton></div>}
-    overlay={!history && quickAction ? <>
-      {quickAction === "customer" && <CustomerCreateEditor
-        open
-        withinWorkspace
-        aiEnabled={aiEnabled}
-        onClose={() => setQuickAction(null)}
-        onSave={onSaveCustomer}
-        onAnalyzeIdentity={onAnalyzeIdentity}
-        onCreated={customerId => setQuickCustomerId(customerId)}
-      />}
-      {quickAction === "reservation" && <ManualReservationEditor
-        open
-        embedded
-        customers={data.customers}
-        rooms={data.rooms}
-        initialRoomId={room.id}
-        onClose={() => setQuickAction(null)}
-        onSave={onSaveReservation}
-        onSaveCustomer={onSaveCustomer}
-      />}
-    </> : undefined}>
+    overlay={!history && quickAction === "customer" ? <CustomerCreateEditor
+      open
+      withinWorkspace
+      aiEnabled={aiEnabled}
+      onClose={() => setQuickAction(null)}
+      onSave={onSaveCustomer}
+      onAnalyzeIdentity={onAnalyzeIdentity}
+      onCreated={customerId => setQuickCustomerId(customerId)}
+    /> : undefined}>
     <div ref={surface} className="operation-surface operation-surface--sections operation-surface--room" hidden={history} key={draftEpoch}>
       <OperationPanel title="Misafirler ve Konaklama" id="room-stay">
         {account.selected?.status === "open" && <RoomStayDates
@@ -178,9 +160,6 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")}
           onCreateCustomer={customersEnabled ? () => setQuickAction("customer") : undefined}
           onDirty={value => setDirty("stay", value)} />
-        {reservationsEnabled && <RoomReservationControl model={model} operations={operations} disabled={busy} initialReservationId={intent.reservationId}
-          onCreateReservation={customersEnabled ? () => setQuickAction("reservation") : undefined}
-          onDirty={setDirty} />}
       </OperationPanel>
       <OperationPanel title="Oda İşlemleri" id="room-operations">
         <RoomDailyOperations model={model} data={data} operations={operations} disabled={busy || accountDraftDirty} />
