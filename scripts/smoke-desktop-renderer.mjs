@@ -46,6 +46,8 @@ try {
     window.__reportRanges = [];
     window.__reportAiCalls = [];
     window.__androidProvisionCalls = [];
+    window.__qrMenuWebPublicationChanges = [];
+    let qrMenuWebEnabled = true;
     let businessProfile = {
       description: "Smoke işletme açıklaması",
       latitude: null,
@@ -95,6 +97,16 @@ try {
     };
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
+      getQrMenuWebPublication: async () => ({ enabled: qrMenuWebEnabled }),
+      setQrMenuWebPublication: async (enabled) => {
+        qrMenuWebEnabled = enabled === true;
+        window.__qrMenuWebPublicationChanges.push(qrMenuWebEnabled);
+        return {
+          ok: true,
+          message: qrMenuWebEnabled ? "QR Menü webde görünür." : "QR Menü webde gizlendi.",
+          enabled: qrMenuWebEnabled
+        };
+      },
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "0.1.0",
@@ -715,9 +727,20 @@ try {
   await savedMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   const qrMenuPanel = page.getByRole("region", { name: "QR Menü", exact: true });
   await expect(qrMenuPanel).toBeVisible();
-  await expect(qrMenuPanel.getByLabel("QR Menü aktif", { exact: true })).toBeChecked();
+  const qrMenuWebToggle = qrMenuPanel.getByLabel("QR Menü webde aktif", { exact: true });
+  await expect(qrMenuWebToggle).toBeChecked();
   await expect(qrMenuPanel.getByRole("button", { name: "Önizle", exact: true })).toBeVisible();
   await expect(qrMenuPanel.getByRole("button", { name: "QR Kod", exact: true })).toBeEnabled();
+  await qrMenuWebToggle.click();
+  await expect(qrMenuWebToggle).not.toBeChecked();
+  await expect(qrMenuPanel).toContainText("Web QR menüsü gizli");
+  await expect(qrMenuPanel.getByRole("button", { name: "QR Kod", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Menü", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect.poll(() => page.evaluate(() => window.__qrMenuWebPublicationChanges)).toEqual([false]);
+  await qrMenuWebToggle.click();
+  await expect(qrMenuWebToggle).toBeChecked();
+  await expect(qrMenuPanel.getByRole("button", { name: "QR Kod", exact: true })).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => window.__qrMenuWebPublicationChanges)).toEqual([false, true]);
   await qrMenuPanel.getByRole("button", { name: "Önizle", exact: true }).click();
   const localMenuPreview = page.getByRole("dialog", { name: "Yerel Menü Önizlemesi" });
   await expect(localMenuPreview).toBeVisible();
