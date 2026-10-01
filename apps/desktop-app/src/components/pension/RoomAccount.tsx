@@ -17,8 +17,8 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
   onDirty: (key: string, dirty: boolean) => void;
 }) {
   const current = controller.selected;
-  const currentCustomerId = current?.customerId
-    ?? controller.data.activeStays.find(stay => stay.id === currentStayId)?.customerId
+  const currentCustomerId = controller.data.activeStays.find(stay => stay.id === currentStayId)?.customerId
+    ?? current?.customerId
     ?? "";
   const previous = currentCustomerId ? controller.allFolios.filter(item =>
     item.stayId !== currentStayId
