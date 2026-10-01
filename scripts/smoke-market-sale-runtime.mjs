@@ -99,6 +99,7 @@ try {
   assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 0);
 
   const movementsBeforeInventoryDisabledSale = listRuntimeInventoryMovements(databasePath, { productId: product.id }).length;
+  setBusinessCapability(databasePath, { capability: "retail.purchasing", enabled: false });
   setBusinessCapability(databasePath, { capability: "commerce.inventory", enabled: false });
   const saleWithoutInventory = createRuntimePaidSale(databasePath, {
     paymentMethod: "cash",
@@ -108,6 +109,7 @@ try {
   assert.equal(saleWithoutInventory.status, "paid");
   assert.equal(saleWithoutInventory.total, 75);
   setBusinessCapability(databasePath, { capability: "commerce.inventory", enabled: true });
+  setBusinessCapability(databasePath, { capability: "retail.purchasing", enabled: true });
   assert.equal(
     getRuntimeInventoryBalance(databasePath, product.id).quantity,
     0,
