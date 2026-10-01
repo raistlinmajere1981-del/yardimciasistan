@@ -260,6 +260,22 @@
   gap: var(--space-2);
 }
 
+.room-entry-submit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.room-entry-submit-row input,
+.room-entry-submit-row > .action-button {
+  min-height: var(--control-height-lg);
+}
+
+.room-entry-submit-row > .action-button {
+  white-space: nowrap;
+}
+
 .room-inline-action-row > .form-field {
   min-width: 0;
 }
@@ -304,6 +320,7 @@
   }
 
   .room-inline-action-row,
+  .room-entry-submit-row,
   .room-inline-action-row--charge,
   .room-inline-action-row--payment {
     grid-template-columns: minmax(0, 1fr);

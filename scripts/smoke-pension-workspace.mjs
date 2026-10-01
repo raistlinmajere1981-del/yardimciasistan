@@ -73,6 +73,12 @@ try {
   const account = workspace.getByRole('region', { name: 'Hesap', exact: true });
   await expect(stayPanel.getByLabel('Oda misafir slotları', { exact: true })).toBeVisible();
   await expect(stayPanel.getByRole('button', { name: /boş misafir slotu/ }).first()).toBeVisible();
+  const entryNote = stayPanel.getByLabel('Giriş notu', { exact: true });
+  const entryButton = stayPanel.getByRole('button', { name: /Giriş Yap/, exact: false });
+  await expect(entryNote).toBeVisible();
+  await expect(stayPanel.locator('details').filter({ hasText: 'Giriş notu' })).toHaveCount(0);
+  const [entryNoteBox, entryButtonBox] = await Promise.all([entryNote.boundingBox(), entryButton.boundingBox()]);
+  expect(entryNoteBox && entryButtonBox ? Math.abs(entryNoteBox.height - entryButtonBox.height) : 99).toBeLessThanOrEqual(1);
   await expect(workspace.getByLabel('Fiziksel oda durumu')).toBeVisible();
   await expect(operations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toHaveCount(0);

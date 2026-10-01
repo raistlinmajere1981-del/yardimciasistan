@@ -37,7 +37,7 @@ try {
   await expect(card(101).locator('.resource-card__image')).toHaveAttribute('src', /^data:image\/svg\+xml/);
   await expect(card(103)).toContainText('Konaklayanlar · 2 kişi');
   await expect(card(103)).toContainText('Ece Yılmaz');
-  await expect(card(103)).toContainText('Önceki misafir · Selin Aras');
+  await expect(page.locator('.resource-card').getByText(/Önceki misafir/)).toHaveCount(0);
 
   // The card surface is the only detail launcher; opening it is read-only.
   await card(103).getByRole('button', { name: 'Oda 103 odasını aç' }).tap();

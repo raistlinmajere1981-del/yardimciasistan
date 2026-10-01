@@ -227,8 +227,21 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
           </div>
           <ActionButton type="button" variant="ghost" disabled={disabled} onClick={() => removeDraftGuest(selectedDraftGuestId)}>Listeden Çıkar</ActionButton>
         </section>}
-        {!selected && <details><summary>Giriş notu</summary><textarea aria-label="Giriş notu" rows={2} value={draft.notes} onChange={event => { setDraft({ ...draft, notes: event.target.value }); markEntry(true); }} /></details>}
-        {model.canCreate ? <ActionButton type="submit" disabled={!canEnter}>Giriş Yap · {guestIds.length} kişi</ActionButton> : <p>Yeni giriş için oda hazır ve boş olmalı.</p>}
+        {model.canCreate ? selected
+          ? <ActionButton type="submit" disabled={!canEnter}>Giriş Yap · {guestIds.length} kişi</ActionButton>
+          : <div className="room-entry-submit-row">
+              <label className="form-field">
+                <span>Giriş notu</span>
+                <input
+                  aria-label="Giriş notu"
+                  value={draft.notes}
+                  placeholder="İsteğe bağlı"
+                  onChange={event => { setDraft({ ...draft, notes: event.target.value }); markEntry(true); }}
+                />
+              </label>
+              <ActionButton type="submit" disabled={!canEnter}>Giriş Yap · {guestIds.length} kişi</ActionButton>
+            </div>
+          : <p>Yeni giriş için oda hazır ve boş olmalı.</p>}
       </fieldset>
     </form>}
   </>;
