@@ -127,7 +127,21 @@
 }
 
 details.table-area-group { display: block; }
-details.table-area-group > summary { cursor: pointer; min-height: var(--control-height-md); }
+details.table-area-group > summary {
+  cursor: pointer;
+  min-height: var(--control-height-md);
+  border-radius: var(--radius-control);
+  transition:
+    background-color var(--motion-hover) var(--ease-standard),
+    color var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+details.table-area-group > summary:hover {
+  background: var(--color-bg-hover);
+}
+details.table-area-group > summary:active {
+  transform: translateY(1px) scale(.995);
+}
 details.table-area-group > summary::before { content: "+"; }
 details.table-area-group[open] > summary::before { content: "−"; }
 details.table-area-group > summary > strong { flex: 1; }
@@ -144,19 +158,32 @@ details.table-area-group > .resource-grid { margin-top: var(--space-3); }
 
 .restaurant-order-menu-panel {
   grid-template-rows: auto auto minmax(0, 1fr);
-  border-inline-end: 1px solid var(--color-border);
-  background: var(--color-bg-surface);
+  border-inline-end: 1px solid var(--color-role-operation-border);
+  background: var(--color-role-operation-bg);
+  transition:
+    background-color var(--motion-surface) var(--ease-standard),
+    border-color var(--motion-surface) var(--ease-standard);
 }
 
 .room-folio-menu-panel {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-bg-surface);
+  transition:
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard);
+}
+
+.restaurant-order-line:focus-within {
+  border-color: var(--color-border-strong);
 }
 
 .restaurant-order-ticket-panel {
   grid-template-rows: auto minmax(0, 1fr);
-  background: var(--color-bg-panel);
+  background: var(--color-role-operation-bg);
+  transition:
+    background-color var(--motion-surface) var(--ease-standard),
+    border-color var(--motion-surface) var(--ease-standard);
 }
 
 .restaurant-order-panel-heading {
@@ -229,6 +256,14 @@ details.table-area-group > .resource-grid { margin-top: var(--space-3); }
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-bg-panel);
+  transition:
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard);
+}
+
+.restaurant-order-product:has(.action-button:hover:not(:disabled)) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-hover);
 }
 
 .restaurant-order-product__main {
