@@ -876,6 +876,7 @@ function ya_sync_publish_menu(array $payload): void
     $items = ya_sync_sanitize_menu_items($menu['items'] ?? [], $categoryIds, $now);
 
     $publishedMenu = [
+        'enabled' => ya_sync_bool($menu['enabled'] ?? true),
         'categories' => $categories,
         'items' => $items,
         'updated_at' => $now
