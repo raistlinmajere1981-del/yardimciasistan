@@ -5,8 +5,13 @@
  * Deploys landing code:
  *   www/index.php
  *   www/favicon.png
- *   www/assets/  (add/update, never delete)
- *   www/demo/    (source-controlled reference site; mirrored with --delete)
+ *   www/assets/     (landing + public-site assets; add/update, never delete)
+ *   www/inc/        (public-site shared PHP)
+ *   www/odalar/
+ *   www/restoran/
+ *   www/qr-menu/
+ *   www/yorumlar/
+ *   www/iletisim/
  *
  * With --with-downloads it also deploys the current release artifacts:
  *   www/downloads/YardimciAsistan-Setup-<version>.exe
@@ -90,6 +95,7 @@ const localIndex = join(repoRoot, "index.php");
 const localFavicon = join(repoRoot, "favicon.png");
 const localAssets = join(repoRoot, "assets");
 const localDemo = join(repoRoot, "demo");
+const publicRouteDirs = ["odalar", "restoran", "qr-menu", "yorumlar", "iletisim"];
 const landingBundle = join(localAssets, "index-t2kNTUv0.js");
 const requiredLocal = [
   localIndex,
