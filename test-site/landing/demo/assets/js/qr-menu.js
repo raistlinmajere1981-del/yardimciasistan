@@ -177,6 +177,10 @@
       });
 
       if (response.status === 304) return;
+      if (response.status === 404) {
+        window.location.replace("/");
+        return;
+      }
       if (!response.ok) throw new Error("Menü şu anda okunamadı.");
 
       const payload = await response.json();
