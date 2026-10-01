@@ -367,13 +367,7 @@ export function ReportsPage({
         )}
       </Panel>
 
-      <section aria-labelledby="report-summary-title">
-        <div className="report-section-title">
-          <div>
-            <p>Seçilen dönem</p>
-            <h2 id="report-summary-title">Genel İşletme Özeti</h2>
-          </div>
-        </div>
+      <section aria-label="İşletme özeti">
         <div className="report-summary-metrics">
           {foodOrdersEnabled && <MetricCard compact title="Restoran cirosu" value={money(report.summary.restaurantRevenue)} detail="Yalnız ödenmiş adisyonlar" tone="ok" icon={Banknote} />}
           {foodOrdersEnabled && <MetricCard compact title="Kapatılan adisyon" value={count(report.summary.closedOrders)} detail="Ödendi olarak kapatılan" tone="info" icon={ReceiptText} />}
