@@ -122,10 +122,17 @@ npm run deploy:web -- --fresh --skip-pack
 ```
 
 kullanın. `--fresh`, eski `data/`, `config/business.json`, local config,
-knowledge, assets ve `.env*` dosyalarını yeni sürüme taşımaz. Buna rağmen eski canlı
+knowledge, assets, media ve `.env*` dosyalarını yeni sürüme taşımaz. Buna rağmen eski canlı
 kurulum önce normal yedek dizinine alınır; yani yanlışlık durumunda geri dönüş kopyası
 bulunur. `--fresh` mevcut paket içinde gerçek bir `sync_secret` yoksa çalışmayı
 reddeder.
+
+Yetkili `reset_runtime` aksiyonu da aynı “temiz runtime” anlamını taşır: SQLite
+yayın/istek/action kayıtlarını, Android cihaz token ve bootstrap noncelarını, public
+rate-limit kayıtlarını, AI/Google yerel ayarlarını, AI konuşma geçmişini, eski JSON
+backup kalıntılarını ve oda/masa medyasını temizler. `config/business.json` içindeki
+kurulum kimliği ve sync secret bu API resetinde korunur; yeni secret gereken devirlerde
+`prepare:web-install + deploy:web -- --fresh` kullanılmalıdır.
 
 Kaynak template dosyasını değiştirmeden, sadece üretilecek deploy paketindeki `config/business.json` değerlerini doldurmak için şu ortam değişkenleri kullanılabilir:
 
