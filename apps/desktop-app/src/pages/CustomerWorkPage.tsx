@@ -71,9 +71,12 @@ export function CustomerWorkPage({
       ? "Hazır mesajlar görünümü"
       : "Müşteri yönetimi görünümü";
 
+  const layout = normalizedTab === "customers" ? "flow" : "fill";
+
   return <FeatureWorkspacePage
     label="Müşteri işleri"
     bodyLabel={bodyLabel}
+    layout={layout}
     toolbar={<FeatureViewSelector items={views} value={normalizedTab} onChange={onTabChange} label="Müşteri işleri görünümü" />}
   >{content}</FeatureWorkspacePage>;
 }
