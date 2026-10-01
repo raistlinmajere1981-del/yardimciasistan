@@ -50,6 +50,13 @@ if ($runtimeCapabilities !== null) {
     $publicSurfaces = ya_business_profile_public_surfaces($profileId);
 }
 
+if (!ya_business_publication_enabled('menu', true)) {
+    $publicSurfaces = array_values(array_filter(
+        $publicSurfaces,
+        static fn (string $surface): bool => $surface !== 'qr_menu'
+    ));
+}
+
 if (ya_business_publication_enabled('room_catalog', true)) {
     $publicSurfaces[] = 'rooms';
 }
