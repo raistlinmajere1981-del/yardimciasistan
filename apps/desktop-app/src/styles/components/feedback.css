@@ -31,11 +31,13 @@
   background: var(--color-info);
 }
 
+.status-dot.tone-warning,
 .status-dot.tone-wait {
   color: var(--color-warning);
   background: var(--color-warning);
 }
 
+.status-dot.tone-success,
 .status-dot.tone-ok {
   color: var(--color-success);
   background: var(--color-success);
