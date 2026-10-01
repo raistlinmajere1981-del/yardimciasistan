@@ -244,6 +244,13 @@ QR kod firmanın bu menüyü yerleştirdiği site sayfasına yönlendirilir. PC 
 değişiklik kalıcı outbox üzerinden hosting SQLite'ına otomatik yayınlanır. Site tarafı
 ETag ile menü yayınının güncelliğini periyodik kontrol edebilir.
 
+QR Menü için iki ayrı durum vardır: Ayarlar'daki `channel.qr_menu` modülü ana
+aç/kapat anahtarıdır; modül kapalıysa uygulamadaki QR araçları ve web QR yüzeyi
+kapanır. Menü çalışma alanındaki “QR Menü webde aktif” anahtarı ise modülü
+değiştirmez, yalnız firmanın web sitesindeki QR Menü yüzeyinin yayın görünürlüğünü
+yönetir. Yerel menü kayıtları her iki durumda da `food_service.menu` kapsamında
+çalışmaya devam eder.
+
 Android companion için PC uygulamasından yayınlanan talepler, müşteriler,
 rezervasyonlar, odalar, masalar, menü, aktif adisyonlar, günlük işler ve hazır
 mesajlar hosting SQLite'ında sürümlü `android_snapshot` yayını olarak tutulur;
