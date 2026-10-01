@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
+import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 
 export type RoomFolioPaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
 type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
@@ -871,6 +872,7 @@ export class DesktopRoomFolioService {
     sourceId: string,
     now: string
   ) {
+    if (!isInventoryTrackingEnabled(db)) return;
     if (menu.stock_quantity === null || menu.stock_quantity === undefined) return;
     const before = Math.max(0, Number(menu.stock_quantity) || 0);
     const consumptionPerUnit = Math.max(0.000001, Number(menu.stock_consumption_quantity) || 1);
