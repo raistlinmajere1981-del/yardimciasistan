@@ -102,7 +102,7 @@
 
 .room-guest-slot.is-selected {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 1px var(--color-accent);
+  box-shadow: var(--shadow-selected-ring);
 }
 
 .room-guest-slot.is-empty {
