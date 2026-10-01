@@ -14,8 +14,39 @@ export function registerMenuIpcHandlers(options: {
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   assertMenuItemSubfeatureMutation: (input: SaveMenuItemInput) => void;
   finalizeMutation: <T extends DesktopMenuSaveResult | DesktopStatusUpdateResult>(result: T) => T;
+  scheduleSync: () => void;
 }) {
-  const { getDatabase, assertCapability, assertMenuItemSubfeatureMutation, finalizeMutation } = options;
+  const { getDatabase, assertCapability, assertMenuItemSubfeatureMutation, finalizeMutation, scheduleSync } = options;
+
+  ipcMain.handle("menu:getWebPublication", () => {
+    assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    return { enabled: getDatabase().getQrMenuWebPublicationEnabled() };
+  });
+
+  ipcMain.handle("menu:setWebPublication", (_event, enabled: unknown) => {
+    assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.QR_MENU, "QR Menü modülü Ayarlar'dan etkinleştirilmelidir.");
+    const current = getDatabase().getQrMenuWebPublicationEnabled();
+    if (typeof enabled !== "boolean") {
+      return { ok: false, message: "QR Menü web görünürlüğü geçersiz.", enabled: current };
+    }
+    try {
+      getDatabase().setQrMenuWebPublicationEnabled(enabled);
+      getDatabase().queueSyncJob("menu_publish");
+      scheduleSync();
+      return {
+        ok: true,
+        message: enabled ? "QR Menü webde görünür." : "QR Menü webde gizlendi.",
+        enabled
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error && error.message ? error.message : "QR Menü web görünürlüğü kaydedilemedi.",
+        enabled: current
+      };
+    }
+  });
 
   ipcMain.handle("menu:saveCategory", (_event, input: SaveMenuCategoryInput): DesktopMenuSaveResult => {
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
