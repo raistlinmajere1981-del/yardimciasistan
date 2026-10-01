@@ -169,9 +169,15 @@ if (coreViolations.length) throw new Error(`Shared shell must have zero violatio
 const auditedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup|lock)|components\/(?:cards|data-list|forms|motion))\.css$/;
 const auditViolations = desktopAudit.violations.filter(issue => auditedDesktop.test(issue.file));
 const targetInventory = desktopAudit.inventory.filter(item => auditedDesktop.test(item.file));
+const duplicateSelectorDebt = targetInventory
+  .filter(item => item.duplicateSelectors)
+  .map(item => ({ file: item.file, duplicateSelectors: item.duplicateSelectors }));
 console.log("desktop-audited-inventory", JSON.stringify(targetInventory));
-if (auditViolations.length || targetInventory.some(item => item.duplicateSelectors)) {
-  throw new Error(`Audited desktop styles must have zero violations: ${JSON.stringify(auditViolations)}`);
+if (auditViolations.length || duplicateSelectorDebt.length) {
+  throw new Error(`Audited desktop styles must have zero violations: ${JSON.stringify({
+    violations: auditViolations,
+    duplicateSelectors: duplicateSelectorDebt
+  })}`);
 }
 assertTokenContract();
 const current = readMetrics();
