@@ -1563,8 +1563,16 @@ export class DesktopDatabase {
       .filter(Boolean);
   }
 
-  getQrMenuPublication(): PublishedQrMenu {
+  getQrMenuPublication(): PublishedQrMenu & { enabled: boolean } {
     return getStoredQrMenuPublication(this.db);
+  }
+
+  getQrMenuWebPublicationEnabled(): boolean {
+    return getStoredQrMenuWebPublicationEnabled(this.db);
+  }
+
+  setQrMenuWebPublicationEnabled(enabled: boolean): void {
+    setStoredQrMenuWebPublicationEnabled(this.db, enabled);
   }
 
   getMenuStockMovements(menuItemId = ""): DesktopMenuStockMovement[] {
@@ -2282,6 +2290,8 @@ import {
 import {
   getPublishedMenu as getStoredPublishedMenu,
   getQrMenuPublication as getStoredQrMenuPublication,
+  getQrMenuWebPublicationEnabled as getStoredQrMenuWebPublicationEnabled,
+  setQrMenuWebPublicationEnabled as setStoredQrMenuWebPublicationEnabled,
   saveMenuCategory as saveStoredMenuCategory,
   reorderMenuRecords as reorderStoredMenuRecords,
   deleteMenuCategoryInTransaction as deleteStoredMenuCategoryInTransaction,
