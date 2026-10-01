@@ -1350,9 +1350,11 @@ try {
   await expect(conversionPage.getByRole("region", { name: "Restoran operasyonları", exact: true })).toBeVisible();
   await expect(conversionPage.getByRole("region", { name: "Restoran günlük işleri", exact: true })).toBeVisible();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toHaveCount(0);
-  await expect(conversionPage.getByText("Bahçe masası kontrolü")).toBeVisible();
-  await conversionPage.getByRole("region", { name: "Restoran günlük işleri", exact: true })
-    .getByRole("button", { name: "Tamamla", exact: true }).click();
+  const restaurantTasks = conversionPage.getByRole("region", { name: "Restoran günlük işleri", exact: true });
+  const gardenTask = restaurantTasks.locator(".task-record-row").filter({ hasText: "Bahçe masası kontrolü" });
+  await expect(gardenTask).toBeVisible();
+  await gardenTask.getByRole("button", { name: "Tamamla", exact: true }).click();
+  await expect(gardenTask).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Smoke Bahçe Masası masasını aç" }).click();
   const smokeTableWorkspace = conversionPage.locator(".workspace-page-frame");
   await expect(smokeTableWorkspace).toBeVisible();
@@ -1388,6 +1390,8 @@ try {
     .getByRole("button", { name: "Onay bekleyen", exact: true }).click();
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
   await reservationWorkspace.getByRole("button", { name: "Onayla", exact: true }).click();
+  await expect(conversionPage.getByText(/0\s*görünen kayıt/)).toBeVisible();
+  await expect(reservationWorkspace.getByText("Filtreye uygun rezervasyon yok.", { exact: true })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Filtreyi Temizle" }).click();
   await expect(conversionPage.getByRole("button", { name: "WhatsApp'a Hazırla", exact: true }).first()).toBeVisible();
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
