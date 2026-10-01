@@ -7,8 +7,8 @@ import { MenuProductImage, MenuProductPicker, countActiveMenuItems, isMenuItemOu
 import type { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency } from "./table-presentation";
 
-export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrder, controller, readOnly = false, accountPanel }: {
-  menu: PublishedQrMenu; webModuleUrl: string; menuEnabled: boolean; canStartOrder: boolean; readOnly?: boolean; accountPanel: ReactNode; controller: ReturnType<typeof useTableOrderController>;
+export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, inventoryEnabled = true, canStartOrder, controller, readOnly = false, accountPanel }: {
+  menu: PublishedQrMenu; webModuleUrl: string; menuEnabled: boolean; inventoryEnabled?: boolean; canStartOrder: boolean; readOnly?: boolean; accountPanel: ReactNode; controller: ReturnType<typeof useTableOrderController>;
 }) {
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(() => new Set());
   const selectedOrder = controller.active;
@@ -21,6 +21,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrde
     menu={menu}
     webModuleUrl={webModuleUrl}
     enabled={menuEnabled}
+    inventoryEnabled={inventoryEnabled}
     busy={Boolean(busyAction)}
     panelAriaLabel="Sipariş menüsü"
     searchAriaLabel="Sipariş için ürün ara"
@@ -64,7 +65,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, canStartOrde
                         <IconButton
                           size="sm"
                           onClick={() => void controller.quantity(item.id, item.quantity + 1)}
-                          disabled={item.quantity >= 999 || Boolean(busyAction) || isMenuItemOutOfStock(item.menuItemId, menu)}
+                          disabled={item.quantity >= 999 || Boolean(busyAction) || isMenuItemOutOfStock(item.menuItemId, menu, inventoryEnabled)}
                           aria-label={`${item.productName} adetini artır`}
                         ><Plus size={14} aria-hidden="true" /></IconButton>
                       </div>

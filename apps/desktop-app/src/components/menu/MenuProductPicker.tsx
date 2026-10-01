@@ -5,11 +5,12 @@ import { ActionButton } from "../ui/ActionButton";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { resolveMenuPreviewImageUrl } from "./menu-model";
 
-export function MenuProductPicker({ menu, webModuleUrl, enabled, busy = false, panelAriaLabel, searchAriaLabel,
+export function MenuProductPicker({ menu, webModuleUrl, enabled, inventoryEnabled = true, busy = false, panelAriaLabel, searchAriaLabel,
   addAriaLabel, onAddItem, canAddItem, className = "" }: {
   menu: PublishedQrMenu;
   webModuleUrl: string;
   enabled: boolean;
+  inventoryEnabled?: boolean;
   busy?: boolean;
   panelAriaLabel: string;
   searchAriaLabel: string;
@@ -66,7 +67,7 @@ export function MenuProductPicker({ menu, webModuleUrl, enabled, busy = false, p
     <div className="restaurant-order-product-list">
       {availableItems.length === 0 && <p className="restaurant-order-empty">Aramanıza uyan aktif ve mevcut ürün bulunamadı.</p>}
       {availableItems.map(item => {
-        const disabled = busy || isPublishedMenuItemOutOfStock(item) || (canAddItem ? !canAddItem(item) : false);
+        const disabled = busy || (inventoryEnabled && isPublishedMenuItemOutOfStock(item)) || (canAddItem ? !canAddItem(item) : false);
         return <article className="restaurant-order-product" key={item.id}>
           <div className="restaurant-order-product__main">
             <MenuProductImage item={item} webModuleUrl={webModuleUrl} className="restaurant-order-product__image" />
@@ -78,7 +79,7 @@ export function MenuProductPicker({ menu, webModuleUrl, enabled, busy = false, p
           </div>
           <div className="restaurant-order-product__action">
             <strong>{formatMenuMoney(item.price, item.currency || "TRY")}</strong>
-            <span>{formatMenuStock(item.stock_quantity, item.stock_unit)}</span>
+            {inventoryEnabled && <span>{formatMenuStock(item.stock_quantity, item.stock_unit)}</span>}
             <ActionButton
               variant="secondary"
               size="sm"
@@ -101,7 +102,8 @@ export function countActiveMenuItems(menu: PublishedQrMenu, enabled: boolean): n
   return menu.items.filter(item => item.is_available && activeCategoryIds.has(item.category_id)).length;
 }
 
-export function isMenuItemOutOfStock(menuItemId: string, menu: PublishedQrMenu): boolean {
+export function isMenuItemOutOfStock(menuItemId: string, menu: PublishedQrMenu, inventoryEnabled = true): boolean {
+  if (!inventoryEnabled) return false;
   const item = menu.items.find(candidate => candidate.id === menuItemId);
   return item ? isPublishedMenuItemOutOfStock(item) : false;
 }

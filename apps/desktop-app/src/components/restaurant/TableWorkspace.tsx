@@ -25,7 +25,7 @@ import { TableRelationsPanel } from "./TableRelationsPanel";
 import { useTableOrderController } from "./use-table-order-controller";
 import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "./table-presentation";
 
-export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, customersEnabled, reservationsEnabled,
+export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inventoryEnabled = true, customersEnabled, reservationsEnabled,
   roomFolioTransferEnabled, onDashboardDataChanged, onUpdateTableStatus, aiEnabled, onSaveCustomer, onAnalyzeIdentity, onSaveReservation }: {
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
   aiEnabled: boolean;
@@ -33,7 +33,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onSaveReservation: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   intent: TableWorkspaceIntent; data: DesktopDashboardData;
-  ordersEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean; reservationsEnabled: boolean;
+  ordersEnabled: boolean; menuEnabled: boolean; inventoryEnabled?: boolean; customersEnabled: boolean; reservationsEnabled: boolean;
   roomFolioTransferEnabled: boolean;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }) {
@@ -234,7 +234,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, custo
       />}
     </> : undefined}>
     <div ref={surface} className={`operation-surface operation-surface--sections operation-surface--table${!ordersEnabled || !menuEnabled ? " operation-surface--two" : ""}`} hidden={history}>
-      {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} canStartOrder={canStart} controller={controller} readOnly={transferCommitted} accountPanel={accountPanel} />
+      {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} inventoryEnabled={inventoryEnabled} canStartOrder={canStart} controller={controller} readOnly={transferCommitted} accountPanel={accountPanel} />
         : <><OperationPanel title="Masa İşlemleri"><p>Sipariş yönetimi etkin değil. Masa hazırlığını sağdaki panelden yönetebilirsiniz.</p></OperationPanel>{accountPanel}</>}
     </div>
     {history && <section className="operation-history form-stack" aria-label="Masa geçmişi">
