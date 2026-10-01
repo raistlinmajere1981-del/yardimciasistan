@@ -65,8 +65,8 @@ function getRequestActionMode(status: string): RequestActionMode {
 
 export function getRequestStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) return "danger";
-  if (status === "converted_to_reservation" || status === "answered" || status === "approved") return "ok";
-  if (["new", "pending", "waiting_owner", "waiting_customer"].includes(status)) return "wait";
+  if (status === "converted_to_reservation" || status === "answered" || status === "approved") return "success";
+  if (["new", "pending", "waiting_owner", "waiting_customer"].includes(status)) return "warning";
   return "info";
 }
 
@@ -161,7 +161,7 @@ export function RequestsWorkspace({
 
   return (
     <section className="record-workspace requests-workspace" aria-label="Talep yönetimi">
-      <aside className="panel record-workspace__list">
+      <aside className="panel record-workspace__list" data-surface-role="communication">
         <div className="card__header">
           <div>
             <p>Talepler</p>
@@ -222,12 +222,12 @@ export function RequestsWorkspace({
         </ActionButton>
       </aside>
 
-      <section className="panel record-workspace__detail request-detail-panel">
+      <section className="panel record-workspace__detail request-detail-panel" data-surface-role="communication">
         {selectedRequest ? (
           <>
             <div className="card__header request-detail-header">
               <div className="page-toolbar__copy">
-                <span className="status-badge info">{formatRequestType(selectedRequest.request_type)}</span>
+                <StatusBadge tone="info">{formatRequestType(selectedRequest.request_type)}</StatusBadge>
                 <h2>{selectedRequest.customer_name}</h2>
               </div>
               <div className="request-detail-header-tools">
@@ -322,9 +322,16 @@ export function RequestsWorkspace({
                       <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı daha kısa ve doğrudan yaz.")} disabled={aiState === "loading"}>Daha Kısa</ActionButton>
                       <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı daha samimi ve sıcak yaz.")} disabled={aiState === "loading"}>Daha Samimi</ActionButton>
                       <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı daha resmi ve ölçülü yaz.")} disabled={aiState === "loading"}>Daha Resmi</ActionButton>
-                      <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite(selectedRequest, "Mesajı mevcut talep bilgilerine göre yeniden hazırla.")} disabled={aiState === "loading"}>
+                      <ActionButton
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        onClick={() => onRewrite(selectedRequest, "Mesajı mevcut talep bilgilerine göre yeniden hazırla.")}
+                        busy={aiState === "loading"}
+                        busyLabel="Hazırlanıyor…"
+                      >
                         <Sparkles size={16} aria-hidden="true" />
-                        {aiState === "loading" ? "Hazırlanıyor" : "Yeniden hazırla"}
+                        Yeniden hazırla
                       </ActionButton>
                     </div>
                   </div>
@@ -339,15 +346,28 @@ export function RequestsWorkspace({
                 </ActionButton>
               )}
               {aiEnabled && selectedActionMode === "open" && (
-                <ActionButton variant="ghost" size="sm" type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => onSuggest(selectedRequest)}
+                  busy={suggestingRequestId === selectedRequest.id}
+                  busyLabel="Hazırlanıyor…"
+                >
                   <Sparkles size={16} aria-hidden="true" />
-                  {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Cevap Hazırla"}
+                  AI Cevap Hazırla
                 </ActionButton>
               )}
               {selectedRequestSupportsReservation && (selectedActionMode === "open" || selectedActionMode === "answered") && (
-                <ActionButton size="sm" type="button" onClick={() => onConvert(selectedRequest)} disabled={convertingRequestId === selectedRequest.id}>
+                <ActionButton
+                  size="sm"
+                  type="button"
+                  onClick={() => onConvert(selectedRequest)}
+                  busy={convertingRequestId === selectedRequest.id}
+                  busyLabel="Onaylanıyor…"
+                >
                   <CalendarCheck size={16} aria-hidden="true" />
-                  {convertingRequestId === selectedRequest.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
+                  Rezervasyona Çevir
                 </ActionButton>
               )}
               {selectedRequestSupportsReservation && selectedActionMode === "converted" && (
@@ -385,9 +405,9 @@ export function RequestsWorkspace({
                 <ActionButton variant="secondary" type="button" disabled={manualRequestState === "loading"} onClick={() => setManualFormOpen(false)}>
                   Vazgeç
                 </ActionButton>
-                <ActionButton type="submit" disabled={manualRequestState === "loading"}>
+                <ActionButton type="submit" busy={manualRequestState === "loading"} busyLabel="Kaydediliyor…">
                   <Save size={16} aria-hidden="true" />
-                  {manualRequestState === "loading" ? "Kaydediliyor" : "Manuel Talep Kaydet"}
+                  Manuel Talep Kaydet
                 </ActionButton>
               </div>
             </>
