@@ -144,23 +144,7 @@ export function FinanceWorkspace({
   }
 
   return (
-    <section className="finance-workspace" aria-labelledby="finance-title">
-      <div className="finance-title-row page-toolbar">
-        <div>
-          <p className="panel-eyebrow">Günlük kasa</p>
-          <h2 id="finance-title">Kasa</h2>
-          <p>{accommodationFolioEnabled ? "Bugünün para hareketlerini ve bekleyen oda alacaklarını tek bakışta görün." : "Bugünün para hareketlerini tek bakışta görün."}</p>
-        </div>
-        <div className="finance-primary-actions action-row">
-          <ActionButton variant="primary" onClick={() => openEntry("income")} disabled={saving || loading}>
-            <Plus size={16} aria-hidden="true" /> Gelir Ekle
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => openEntry("expense")} disabled={saving || loading}>
-            <Minus size={16} aria-hidden="true" /> Gider Ekle
-          </ActionButton>
-        </div>
-      </div>
-
+    <section className="finance-workspace" aria-label="Kasa">
       <div className="finance-summary-grid">
         <MetricCard compact title="Bugün Gelen" value={formatMinorCurrency(data.todayIncomeMinor)} detail="Kasaya giren" tone="ok" icon={Banknote} />
         <MetricCard compact title="Bugün Çıkan" value={formatMinorCurrency(data.todayExpenseMinor)} detail="Kaydedilen gider" tone="wait" icon={WalletCards} />
@@ -177,7 +161,15 @@ export function FinanceWorkspace({
               <h3>Son Hareketler</h3>
               <p>Otomatik ve elle eklenen kasa kayıtları</p>
             </div>
-            {loading && <span className="loading-state" role="status">Yükleniyor…</span>}
+            <div className="finance-section-actions action-row">
+              {loading && <span className="loading-state" role="status">Yükleniyor…</span>}
+              <ActionButton variant="primary" onClick={() => openEntry("income")} disabled={saving || loading}>
+                <Plus size={16} aria-hidden="true" /> Gelir Ekle
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={() => openEntry("expense")} disabled={saving || loading}>
+                <Minus size={16} aria-hidden="true" /> Gider Ekle
+              </ActionButton>
+            </div>
           </div>
           {data.recentEntries.length === 0 ? (
             <p className="empty-state">Henüz kasa hareketi yok.</p>

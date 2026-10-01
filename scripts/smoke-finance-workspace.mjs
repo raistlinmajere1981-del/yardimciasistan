@@ -290,6 +290,12 @@ try {
   const odemeSelect = (dialog) => dialog.locator("label:has(span:text-is('Ödeme şekli')) select");
 
   await expect(finance()).toBeVisible();
+  await expect(finance().getByText("Günlük kasa", { exact: true })).toHaveCount(0);
+  await expect(finance().getByRole("heading", { name: "Kasa", exact: true })).toHaveCount(0);
+  await expect(finance().getByText(/Bugünün para hareketlerini/)).toHaveCount(0);
+  const recentHeading = finance().getByRole("heading", { name: "Son Hareketler", exact: true }).locator("..");
+  await expect(recentHeading.getByRole("button", { name: "Gelir Ekle", exact: true })).toBeVisible();
+  await expect(recentHeading.getByRole("button", { name: "Gider Ekle", exact: true })).toBeVisible();
   await expect(page.getByText("Otomatik restoran geliri", { exact: true })).toBeVisible();
   const automaticRow = page.locator(".finance-entry-item").filter({ hasText: "Otomatik restoran geliri" });
   await expect(automaticRow.getByRole("button", { name: "Kasa hareketini kaldır" })).toHaveCount(0);
