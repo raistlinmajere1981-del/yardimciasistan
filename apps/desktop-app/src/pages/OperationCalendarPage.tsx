@@ -169,8 +169,8 @@ export function OperationCalendarPage({
       <div className="operation-calendar-summary" aria-label="Takvim özeti">
         {accommodationReservationsEnabled && <StatusBadge tone="info">{summary.arrivals} giriş</StatusBadge>}
         {accommodationReservationsEnabled && <StatusBadge tone="neutral">{summary.departures} çıkış</StatusBadge>}
-        {foodReservationsEnabled && <StatusBadge tone="ok">{summary.restaurant} restoran rezervasyonu</StatusBadge>}
-        {tasksEnabled && <StatusBadge tone="wait">{summary.pendingTasks} bekleyen iş</StatusBadge>}
+        {foodReservationsEnabled && <StatusBadge tone="success">{summary.restaurant} restoran rezervasyonu</StatusBadge>}
+        {tasksEnabled && <StatusBadge tone="warning">{summary.pendingTasks} bekleyen iş</StatusBadge>}
       </div>
 
       {viewMode === "month" ? (
@@ -198,7 +198,7 @@ export function OperationCalendarPage({
                     }}
                   >
                     <span>{formatMonthDayNumber(date)}</span>
-                    {isToday && <StatusBadge tone="ok">Bugün</StatusBadge>}
+                    {isToday && <StatusBadge tone="success">Bugün</StatusBadge>}
                   </button>
                   <div className="operation-calendar-month-items">
                     {items.length === 0 ? (
@@ -392,10 +392,10 @@ function buildCalendarItems(
 }
 
 function getCalendarItemTone(item: CalendarItem): StatusTone {
-  if (item.kind === "task") return item.task.status === "done" ? "ok" : "wait";
+  if (item.kind === "task") return item.task.status === "done" ? "success" : "warning";
   if (item.kind === "arrival") return "info";
   if (item.kind === "departure") return "neutral";
-  return "ok";
+  return "success";
 }
 
 function getCalendarItemLabel(item: CalendarItem) {
