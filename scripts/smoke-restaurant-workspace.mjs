@@ -166,7 +166,10 @@ try {
   await page.evaluate(() => { window.fixtureDelayClose = false; window.fixtureResolveClose(); });
   await expect(workspace).toHaveCount(0); expect((await state()).finance).toBe(1);
   await button('Bahçe 1 masasını aç').click(); await button('Geçmiş').click();
-  await expect(workspace.getByRole('region', { name: 'Masa geçmişi' })).toContainText('Ödendi');
+  const tableHistory = workspace.getByRole('region', { name: 'Masa geçmişi' });
+  await expect(tableHistory.getByRole('group', { name: 'Masa geçmişi filtresi' })).toBeVisible();
+  await expect(tableHistory).toContainText('Ödendi');
+  await expect(tableHistory).not.toContainText('tam işlem günlüğü değildir');
   await button("Masa çalışma alanını kapat").click();
 
   await button('Yeni Rezervasyon').click();

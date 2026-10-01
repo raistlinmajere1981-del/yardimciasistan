@@ -14,7 +14,6 @@ import { RoomAccount } from "./RoomAccount";
 import { RoomAccountAdjustments } from "./RoomAccountAdjustments";
 import { useRoomFolioController } from "./use-room-folio-controller";
 import { RoomHistory } from "./RoomHistory";
-import { roomConditionLabel } from "./room-presentation";
 import { roomIdentity } from "./room-card-model";
 import { getRoomWorkspaceModel } from "./room-workspace-model";
 import { useRoomStayOperations } from "./use-room-stay-operations";
@@ -85,8 +84,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   const { room, state } = model;
   if (!room || !state) return <WorkspacePageFrame title="Oda kullanılamıyor" onClose={() => navigation.closeWorkspace({ entityType: "room", entityId: intent.entityId })}><p>Oda kaydı bulunamadı veya bu yetenek kullanılamıyor.</p></WorkspacePageFrame>;
   return <WorkspacePageFrame title={roomIdentity(room)} className="operations-workspace" bodyScroll="panes"
-    context={history && <div className="room-workspace-context"><span>Fiziksel durum: {roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
-      <span>Doluluk: {state.occupancy.status === "occupied" ? "Dolu" : "Boş"}</span>{model.currentStay && <span>{model.currentStay.customerName}</span>}</div>}
+    context={history ? <span>Geçmiş</span> : undefined}
     headerSummary={!history && <ResourceWorkspaceSummary label="Oda özeti" imageSrc="./assets/default-room.png"
       facts={<>
         <div className="room-workspace-summary__copy">

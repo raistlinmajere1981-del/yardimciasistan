@@ -209,7 +209,11 @@ try {
   await expect(operations.getByLabel('Açıklama')).toHaveValue('Ek yatak');
   await expect(operations.getByLabel('Ek ücret', { exact: true })).toHaveValue('50');
   await button('Geçmiş').click();
-  await expect(workspace.getByRole('region', { name: 'Oda geçmişi' })).toContainText('tam geçmiş değildir');
+  const roomHistory = workspace.getByRole('region', { name: 'Oda geçmişi' });
+  await expect(roomHistory.getByRole('group', { name: 'Oda geçmişi filtresi' })).toBeVisible();
+  await expect(roomHistory).not.toContainText('tam geçmiş değildir');
+  await expect(workspace.getByText(/Fiziksel durum:/)).toHaveCount(0);
+  await expect(workspace.getByText(/Doluluk:/)).toHaveCount(0);
   await button("← Pilot 102'e dön").click();
   await expect(operations.getByLabel('Açıklama')).toHaveValue('Ek yatak');
   await page.setViewportSize({ width: 1920, height: 1080 });

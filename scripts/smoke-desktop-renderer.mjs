@@ -1342,7 +1342,9 @@ try {
   await expect(smokeCustomerWorkspace).toBeVisible();
   await expect(smokeCustomerWorkspace.getByRole("button", { name: "Müşteriyi Sil" })).toBeVisible();
   await smokeCustomerWorkspace.getByRole("button", { name: "Geçmiş", exact: true }).click();
+  await expect(smokeCustomerWorkspace.getByRole("group", { name: "Müşteri geçmişi filtresi" })).toBeVisible();
   await expect(smokeCustomerWorkspace.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
+  await expect(smokeCustomerWorkspace.getByRole("button", { name: "Odayı Aç", exact: true })).toHaveCount(0);
   await smokeCustomerWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await conversionPage.getByLabel("Ara", { exact: true }).fill("Smoke");
   await conversionPage.getByRole("button", { name: "Restoran" }).click();

@@ -1,47 +1,5 @@
 /* Customer workflow composition; shared controls live in components/. */
 
-.customer-history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-sm)), 1fr));
-  gap: var(--space-3);
-}
-
-.customer-history-grid section {
-  min-width: 0;
-}
-
-.customer-history-grid h3 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-sm);
-}
-
-.customer-history-grid article {
-  display: grid;
-  gap: var(--space-1);
-  padding-block: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.customer-history-grid strong {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: var(--text-sm);
-}
-
-.customer-history-grid span {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.customer-history-grid p {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 .customer-identity-details .data-list {
   padding: var(--space-4);
 }
@@ -462,15 +420,6 @@
 }
 .customer-history-view {
   min-height: 0;
-}
-.customer-history-view .customer-history-grid {
-  align-items: start;
-}
-.customer-history-view .customer-history-grid > .panel {
-  margin: 0;
-}
-.customer-history-view .customer-history-grid article > .action-button {
-  justify-self: start;
 }
 .customer-create-form { gap: var(--space-4); }
 

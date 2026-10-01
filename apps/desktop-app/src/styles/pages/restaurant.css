@@ -1,7 +1,6 @@
 .table-workspace-context { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 .table-workspace-feedback { display: flex; align-items: center; gap: var(--space-3); }
 .table-workspace-feedback p { margin: 0; }
-.table-history-record { padding-block: var(--space-3); border-bottom: 1px solid var(--color-border); }
 .table-account-section > .action-button {
   justify-self: start;
 }
