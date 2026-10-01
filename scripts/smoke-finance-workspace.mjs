@@ -345,7 +345,7 @@ try {
   await expect(finance().getByText("Günlük kasa", { exact: true })).toHaveCount(0);
   await expect(finance().getByRole("heading", { name: "Kasa", exact: true })).toHaveCount(0);
   await expect(finance().getByText(/Bugünün para hareketlerini/)).toHaveCount(0);
-  const recentToolbar = finance().locator(".finance-section-heading");
+  const recentToolbar = finance().locator(".finance-recent-panel .finance-section-heading");
   await expect(recentToolbar.getByRole("heading", { name: "Son Hareketler", exact: true })).toBeVisible();
   await expect(recentToolbar.getByRole("button", { name: "Gelir Ekle", exact: true })).toBeVisible();
   await expect(recentToolbar.getByRole("button", { name: "Gider Ekle", exact: true })).toBeVisible();
