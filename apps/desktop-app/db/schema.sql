@@ -58,6 +58,7 @@ CREATE TABLE business (
   address TEXT NOT NULL DEFAULT '',
   publish_rooms_web INTEGER NOT NULL DEFAULT 1 CHECK (publish_rooms_web IN (0, 1)),
   publish_tables_web INTEGER NOT NULL DEFAULT 0 CHECK (publish_tables_web IN (0, 1)),
+  publish_qr_menu_web INTEGER NOT NULL DEFAULT 1 CHECK (publish_qr_menu_web IN (0, 1)),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT NOT NULL DEFAULT '',
