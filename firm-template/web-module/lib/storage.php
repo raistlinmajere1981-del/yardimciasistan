@@ -83,19 +83,35 @@ function ya_storage_reset_runtime(): array
         'publications',
         'publication_receipts',
         'sync_clients',
-        'sync_meta'
+        'sync_meta',
+        // These tables are created lazily by their own subsystems and may not
+        // exist on installations that never used Android pairing/public forms.
+        'android_device_tokens',
+        'android_bootstrap_nonces',
+        'public_request_guard_events'
     ];
     $deleted = [];
 
     $database->beginTransaction();
     try {
         foreach ($tables as $table) {
+            $exists = $database->prepare(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name LIMIT 1"
+            );
+            $exists->execute([':name' => $table]);
+            if ($exists->fetchColumn() === false) {
+                $deleted[$table] = 0;
+                continue;
+            }
+
             $count = (int) $database->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
             $database->exec('DELETE FROM ' . $table);
             $deleted[$table] = $count;
         }
-        // A clean runtime starts sequence-backed inbound queues from the beginning.
-        $database->exec("DELETE FROM sqlite_sequence WHERE name IN ('web_requests', 'android_actions')");
+        // A clean runtime starts sequence-backed inbound queues/rate-limit ids from the beginning.
+        $database->exec(
+            "DELETE FROM sqlite_sequence WHERE name IN ('web_requests', 'android_actions', 'public_request_guard_events')"
+        );
         $database->commit();
     } catch (Throwable $error) {
         if ($database->inTransaction()) {
