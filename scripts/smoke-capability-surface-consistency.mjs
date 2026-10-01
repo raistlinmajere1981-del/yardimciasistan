@@ -118,6 +118,11 @@ assert.match(
 assert.match(qrMenuPanelSource, /getQrMenuWebPublication/);
 assert.match(qrMenuPanelSource, /setQrMenuWebPublication/);
 assert.match(qrMenuPanelSource, /disabled=\{!moduleEnabled \|\| busy\}/);
+assert.match(
+  menuManagerSource,
+  /qrMenuEnabled\s*&&\s*\([\s\S]{0,180}<QrMenuPanel enabled/,
+  "QR menu controls must disappear when the Settings QR module is disabled"
+);
 assertHandlerGuard(menuIpcSource, "menu:setWebPublication", "assertCapability(BUSINESS_CAPABILITIES.QR_MENU");
 assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
 assert.match(menuItemFormFieldsSource, /showStock\s*=\s*inventoryEnabled\s*&&[\s\S]{0,160}mode === "stock"/);
