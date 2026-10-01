@@ -50,10 +50,9 @@ try {
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const path = database.databasePath;
-  // A restaurant with explicit retail capabilities proves there is no profile gate.
-  applyBusinessProfileCapabilities(path, "restaurant", { preserveUserOverrides: false });
+  // Customer credit is a Market-only capability.
+  applyBusinessProfileCapabilities(path, "market", { preserveUserOverrides: false });
   setBusinessCapability(path, { capability: "commerce.customer_credit", enabled: true });
-  setBusinessCapability(path, { capability: "retail.barcode", enabled: true });
   setBusinessCapability(path, { capability: "service.whatsapp", enabled: false });
   setBusinessCapability(path, { capability: "service.android", enabled: false });
   raw = new DatabaseSync(path);
@@ -131,15 +130,79 @@ try {
     assert.ok(methods[method], `Unexpected bridge call: ${method}`);
     return methods[method](path, ...args);
   });
-  await page.addInitScript(({ dashboard, snapshot, methodNames }) => {
+  await page.addInitScript(({ dashboard, snapshot, methodNames, roomDebtCustomerId }) => {
     window.__m82Initial = { dashboard, snapshot };
     const invoke = (method) => (...args) => window.__m82Call(method, args);
+    const roomFolioData = {
+      generatedAt: "2026-10-01T12:00:00.000Z",
+      rooms: [],
+      activeStays: [],
+      menuCategories: [],
+      menuItems: [],
+      folios: [{
+        id: "folio-room-debt",
+        stayId: "stay-room-debt",
+        roomId: "room-101",
+        roomName: "Oda 101",
+        roomNumber: "101",
+        customerId: roomDebtCustomerId,
+        customerName: "Ahmet Veresiye",
+        reservationId: "",
+        status: "open",
+        guestCount: 1,
+        checkInDate: "2026-09-30",
+        plannedCheckOutDate: "2026-10-01",
+        nights: 1,
+        nightlyPriceMinor: 300000,
+        currency: "TRY",
+        lodgingTotalMinor: 300000,
+        lodgingManualOverride: false,
+        extrasTotalMinor: 0,
+        chargeTotalMinor: 300000,
+        paidTotalMinor: 0,
+        remainingMinor: 300000,
+        creditMinor: 0,
+        openedAt: "2026-09-30T12:00:00.000Z",
+        closedAt: "",
+        note: "",
+        items: [],
+        payments: []
+      }]
+    };
+    const cloneRoomData = () => structuredClone(roomFolioData);
     window.yardimciDesktop = {
       commerce: Object.fromEntries(methodNames.map((method) => [method, invoke(method)])),
-      deleteCustomer: invoke("deleteCustomer"), saveCustomer: invoke("saveCustomer")
+      deleteCustomer: invoke("deleteCustomer"),
+      saveCustomer: invoke("saveCustomer"),
+      getRoomFolioData: async () => cloneRoomData(),
+      addRoomFolioPayment: async ({ folioId, amountMinor, paymentMethod }) => {
+        const folio = roomFolioData.folios.find((item) => item.id === folioId);
+        if (!folio || folio.status !== "open") return { ok: false, message: "Açık oda hesabı bulunamadı." };
+        folio.paidTotalMinor += amountMinor;
+        folio.remainingMinor -= amountMinor;
+        folio.payments.push({
+          id: "payment-room-debt",
+          folioId,
+          amountMinor,
+          currency: folio.currency,
+          paymentMethod,
+          paidAt: new Date().toISOString(),
+          note: "",
+          origin: "direct",
+          createdAt: new Date().toISOString()
+        });
+        return { ok: true, message: "Ödeme alındı.", data: cloneRoomData(), folioId };
+      },
+      checkoutRoomFolio: async ({ folioId }) => {
+        const folio = roomFolioData.folios.find((item) => item.id === folioId);
+        if (!folio) return { ok: false, message: "Oda hesabı bulunamadı." };
+        if (folio.remainingMinor === 0) folio.status = "closed";
+        return { ok: true, message: "Oda hesabı kapatıldı.", data: cloneRoomData(), folioId };
+      }
     };
   }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path),
-    methodNames: [...Object.keys(methods), "setBarcodeScanMode", "consumePendingBarcodeScans"] });
+    methodNames: [...Object.keys(methods), "setBarcodeScanMode", "consumePendingBarcodeScans"],
+    roomDebtCustomerId: customerId });
   const port = server.httpServer.address().port;
   await page.goto(`http://127.0.0.1:${port}/m82-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
@@ -232,6 +295,19 @@ try {
   assert.equal(creditCalls().length, hiddenStart);
   await page.evaluate(() => window.__m82Toggle(true));
   let customerWorkspace = await openCustomerAccount(/Ahmet Veresiye/);
+
+  // A customer workspace is already a ModalSurface: room-debt collection must stay
+  // inside that surface rather than attempting to open a nested FormDialog.
+  const roomReceivables = customerWorkspace.getByRole("region", { name: "Konaklama alacakları", exact: true });
+  await expect(roomReceivables).toBeVisible();
+  await roomReceivables.getByRole("button", { name: "Tahsil Et", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Tahsilat al", exact: true })).toHaveCount(0);
+  const inlineRoomPayment = roomReceivables.getByRole("form", { name: "Tahsilat al", exact: true });
+  await expect(inlineRoomPayment).toBeVisible();
+  await expect(page.locator("dialog.customer-workspace-frame")).toHaveCount(1);
+  await inlineRoomPayment.getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await expect(inlineRoomPayment).toHaveCount(0);
+
   const panel = page.getByRole("region", { name: "Veresiye hesabı" });
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");
   await expect(panel.locator(".customer-credit-balances")).toContainText("€20,00");

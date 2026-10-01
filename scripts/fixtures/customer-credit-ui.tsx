@@ -70,6 +70,7 @@ function Harness() {
             whatsappEnabled: false,
             reservationsEnabled: false,
             staysEnabled: false,
+            accommodationFolioEnabled: true,
             customerCreditEnabled: snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT),
             onWhatsApp: () => undefined,
             onSave: customers.handleSaveCustomer,
