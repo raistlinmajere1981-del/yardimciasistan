@@ -713,8 +713,12 @@ try {
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await embeddedConfirm.getByRole("button", { name: "Vazgeç" }).click();
   await savedMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Önizle", exact: true })).toHaveCount(1);
-  await page.getByRole("button", { name: "Önizle", exact: true }).click();
+  const qrMenuPanel = page.getByRole("region", { name: "QR Menü", exact: true });
+  await expect(qrMenuPanel).toBeVisible();
+  await expect(qrMenuPanel.getByLabel("QR Menü aktif", { exact: true })).toBeChecked();
+  await expect(qrMenuPanel.getByRole("button", { name: "Önizle", exact: true })).toBeVisible();
+  await expect(qrMenuPanel.getByRole("button", { name: "QR Kod", exact: true })).toBeEnabled();
+  await qrMenuPanel.getByRole("button", { name: "Önizle", exact: true }).click();
   const localMenuPreview = page.getByRole("dialog", { name: "Yerel Menü Önizlemesi" });
   await expect(localMenuPreview).toBeVisible();
   await expect(localMenuPreview.getByText("Canlı Serpme Kahvaltı", { exact: true })).toBeVisible();
@@ -725,8 +729,16 @@ try {
   await page.screenshot({ path: "artifacts/screenshots/desktop-local-menu-preview.png", fullPage: true });
   await localMenuPreview.getByRole("button", { name: "Önizlemeyi kapat" }).click();
   await expect(localMenuPreview).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Yayınla", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(0);
+  await qrMenuPanel.getByRole("button", { name: "QR Kod", exact: true }).click();
+  const qrTools = page.getByRole("dialog", { name: "QR Menü", exact: true });
+  await expect(qrTools).toBeVisible();
+  await expect(qrTools.locator(".qr-menu-tools__code svg")).toBeVisible();
+  await expect(qrTools.getByRole("button", { name: "Sayfayı Aç", exact: true })).toBeVisible();
+  await expect(qrTools.getByRole("button", { name: "Bağlantıyı Kopyala", exact: true })).toBeVisible();
+  await expect(qrTools.getByRole("button", { name: "QR Kodu İndir", exact: true })).toBeVisible();
+  await qrTools.getByRole("button", { name: "QR Menü araçlarını kapat", exact: true }).click();
+  await expect(qrTools).toHaveCount(0);
   // Manual sort inputs were removed from the menu UI; the category panel itself is the anchor here.
   await expect(page.locator(".menu-category-panel")).toBeVisible();
   await page.screenshot({ path: "artifacts/screenshots/desktop-qr-menu-manager.png", fullPage: true });
@@ -2035,8 +2047,8 @@ try {
 
   await compactPage.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Menü", exact: true })).toHaveAttribute("aria-current", "page");
-  await compactPage.locator(".menu-category-panel .menu-record").filter({ hasText: "Sıcaklar" }).click();
-  await expect(compactPage.locator(".menu-category-panel .menu-record[aria-pressed='true']")).toContainText("Sıcaklar");
+  await compactPage.locator(".menu-category-row").filter({ hasText: "Sıcaklar" }).getByRole("button", { name: "Sıcaklar", exact: true }).click();
+  await expect(compactPage.locator(".menu-category-row.is-selected")).toContainText("Sıcaklar");
   await compactPage.getByRole("button", { name: "Önizle", exact: true }).click();
   const compactMenuPreview = compactPage.getByRole("dialog", { name: "Yerel Menü Önizlemesi" });
   await expect(compactMenuPreview).toBeVisible();
@@ -2046,9 +2058,9 @@ try {
   await expect(compactMenuPreview.getByRole("button", { name: "Tüm Ürünler" })).toHaveAttribute("aria-pressed", "true");
   await compactMenuPreview.getByRole("button", { name: "Önizlemeyi kapat" }).click();
   await expect(compactMenuPreview).toHaveCount(0);
-  await compactPage.locator(".menu-category-panel .menu-record").filter({ hasText: "Kahvaltı" }).click();
-  await expect(compactPage.locator(".menu-category-panel .menu-record[aria-pressed='true']")).toContainText("Kahvaltı");
-  await expect(compactPage.locator(".menu-category-form")).toBeVisible();
+  await compactPage.locator(".menu-category-row").filter({ hasText: "Kahvaltı" }).getByRole("button", { name: "Kahvaltı", exact: true }).click();
+  await expect(compactPage.locator(".menu-category-row.is-selected")).toContainText("Kahvaltı");
+  await expect(compactPage.locator(".menu-category-create-form")).toBeVisible();
   await compactPage.locator(".menu-product-panel .menu-record").first().click();
   const compactMenuItemWorkspace = compactPage.getByRole("dialog");
   await expect(compactMenuItemWorkspace).toBeVisible();
