@@ -1047,9 +1047,9 @@
 .menu-qr-service {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--surface-integration-border);
+  border: 1px solid var(--color-role-integration-border);
   border-radius: var(--radius-panel);
-  background: var(--surface-integration-bg);
+  background: var(--color-role-integration-bg);
   transition:
     background-color var(--motion-surface) var(--ease-standard),
     border-color var(--motion-surface) var(--ease-standard);
