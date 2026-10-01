@@ -97,10 +97,28 @@ export function getPublishedMenu(db: DatabaseSync): PublishedQrMenu {
   };
 }
 
-export function getQrMenuPublication(db: DatabaseSync): PublishedQrMenu {
+export function getQrMenuWebPublicationEnabled(db: DatabaseSync): boolean {
+  const row = db.prepare(
+    "SELECT publish_qr_menu_web FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1"
+  ).get() as { publish_qr_menu_web?: unknown } | undefined;
+  return Number(row?.publish_qr_menu_web ?? 1) === 1;
+}
+
+export function setQrMenuWebPublicationEnabled(db: DatabaseSync, enabled: boolean): void {
+  const now = new Date().toISOString();
+  const result = db.prepare(
+    "UPDATE business SET publish_qr_menu_web = ?, updated_at = ?, sync_status = 'local_only' WHERE deleted_at = ''"
+  ).run(enabled ? 1 : 0, now);
+  if (Number(result.changes) < 1) {
+    throw new Error("QR Menü web görünürlüğü kaydedilemedi.");
+  }
+}
+
+export function getQrMenuPublication(db: DatabaseSync): PublishedQrMenu & { enabled: boolean } {
   const menu = getPublishedMenu(db);
   return {
     ...menu,
+    enabled: getQrMenuWebPublicationEnabled(db),
     items: menu.items.filter((item) => !(
       item.stock_quantity !== null
       && item.hide_when_out_of_stock
