@@ -53,10 +53,6 @@
   align-self: center;
 }
 
-.room-bed-group--manual {
-  border-style: dashed;
-}
-
 .room-bed-group {
   display: grid;
   gap: var(--space-2);
@@ -69,9 +65,14 @@
 .room-bed-group > header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+.room-bed-group > header > .action-button {
+  flex: 0 0 auto;
 }
 
 .room-guest-slots {

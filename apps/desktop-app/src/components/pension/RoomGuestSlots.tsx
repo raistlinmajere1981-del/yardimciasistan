@@ -1,4 +1,5 @@
-import { BedDouble, Plus, X, UserRound } from "lucide-react";
+import { Plus, X, UserRound } from "lucide-react";
+import { ActionButton } from "../ui/ActionButton";
 import { IconButton } from "../ui/IconButton";
 
 export interface RoomGuestSlotPerson {
@@ -9,76 +10,28 @@ export interface RoomGuestSlotPerson {
   status?: "planned" | "checked_in" | "checked_out" | "cancelled";
 }
 
-interface BedGroup {
-  label: string;
-  slots: number;
-}
-
-function bedLabel(type: string) {
-  const normalized = type.toLocaleLowerCase("tr-TR");
-  if (normalized.includes("çift")) return "Çift kişilik yatak";
-  if (normalized.includes("tek")) return "Tek kişilik yatak";
-  if (normalized.includes("queen")) return "Queen yatak";
-  if (normalized.includes("king")) return "King yatak";
-  if (normalized.includes("ranza")) return "Ranza";
-  return "Yatak";
-}
-
-function bedCapacity(type: string) {
-  const normalized = type.toLocaleLowerCase("tr-TR");
-  return normalized.includes("tek") ? 1 : 2;
-}
-
-export function roomBedGroups(capacity: number, bedInfo: string): BedGroup[] {
-  const safeCapacity = Math.max(1, Math.trunc(capacity) || 1);
-  const groups: BedGroup[] = [];
-  const pattern = /(\d+)\s*(çift kişilik|tek kişilik|queen|king|ranza)(?:\s+yatak)?/gi;
-  for (const match of bedInfo.matchAll(pattern)) {
-    const count = Math.max(0, Number(match[1]) || 0);
-    const type = match[2] ?? "";
-    for (let index = 0; index < count; index += 1) {
-      groups.push({ label: bedLabel(type), slots: bedCapacity(type) });
-    }
-  }
-
-  if (!groups.length) {
-    return [{ label: bedInfo.trim() || "Oda kapasitesi", slots: safeCapacity }];
-  }
-
-  const normalized: BedGroup[] = [];
-  let remaining = safeCapacity;
-  for (const group of groups) {
-    if (remaining <= 0) break;
-    const slots = Math.min(group.slots, remaining);
-    normalized.push({ ...group, slots });
-    remaining -= slots;
-  }
-  if (remaining > 0) normalized.push({ label: "Ek kapasite", slots: remaining });
-  return normalized;
-}
-
 export function RoomGuestSlots({
   capacity,
-  bedInfo,
   guests,
   extraSlots = 0,
   selectedIndex = -1,
   disabled = false,
+  onAddSlot,
   onSelectSlot,
   onRemoveExtraSlot
 }: {
   capacity: number;
-  bedInfo: string;
   guests: RoomGuestSlotPerson[];
   extraSlots?: number;
   selectedIndex?: number;
   disabled?: boolean;
+  onAddSlot?: () => void;
   onSelectSlot: (slotIndex: number, guest?: RoomGuestSlotPerson) => void;
   onRemoveExtraSlot?: (slotIndex: number) => void;
 }) {
-  const baseSlotCount = Math.max(1, capacity, guests.length);
-  const groups = roomBedGroups(baseSlotCount, bedInfo);
-  let slotIndex = 0;
+  const nominalCapacity = Math.max(1, Math.trunc(capacity) || 1);
+  const baseSlotCount = Math.max(nominalCapacity, guests.length);
+  const totalSlots = baseSlotCount + extraSlots;
 
   function renderSlot(currentIndex: number, guest?: RoomGuestSlotPerson) {
     const selected = currentIndex === selectedIndex;
@@ -103,27 +56,25 @@ export function RoomGuestSlots({
     </button>;
   }
 
-  return <div className="room-bed-layout" aria-label="Oda misafir slotları">
-    {groups.map((group, groupIndex) => <section className="room-bed-group" key={`${group.label}-${groupIndex}`}>
-      <header><BedDouble size={16} aria-hidden="true" /><strong>{group.label}</strong></header>
+  return <section className="room-bed-layout" aria-label="Oda misafir slotları">
+    <div className="room-bed-group">
+      <header>
+        <strong>Yatak : {guests.length}/{nominalCapacity} dolu</strong>
+        {onAddSlot && <ActionButton
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={disabled || totalSlots >= 50}
+          onClick={onAddSlot}
+        >Ekle</ActionButton>}
+      </header>
       <div className="room-guest-slots">
-        {Array.from({ length: group.slots }, () => {
-          const currentIndex = slotIndex++;
-          return <div className="room-guest-slot-wrap" key={currentIndex}>
+        {Array.from({ length: totalSlots }, (_, currentIndex) => {
+          const manualIndex = currentIndex - baseSlotCount;
+          const manual = manualIndex >= 0;
+          return <div className={`room-guest-slot-wrap${manual ? " is-manual" : ""}`} key={manual ? `manual-${manualIndex}` : currentIndex}>
             {renderSlot(currentIndex, guests[currentIndex])}
-          </div>;
-        })}
-      </div>
-    </section>)}
-
-    {extraSlots > 0 && <section className="room-bed-group room-bed-group--manual">
-      <header><Plus size={16} aria-hidden="true" /><strong>Ek slotlar</strong></header>
-      <div className="room-guest-slots">
-        {Array.from({ length: extraSlots }, (_, manualIndex) => {
-          const currentIndex = baseSlotCount + manualIndex;
-          return <div className="room-guest-slot-wrap is-manual" key={`manual-${manualIndex}`}>
-            {renderSlot(currentIndex)}
-            {onRemoveExtraSlot && <IconButton
+            {manual && onRemoveExtraSlot && <IconButton
               type="button"
               variant="danger"
               size="sm"
@@ -134,6 +85,6 @@ export function RoomGuestSlots({
           </div>;
         })}
       </div>
-    </section>}
-  </div>;
+    </div>
+  </section>;
 }

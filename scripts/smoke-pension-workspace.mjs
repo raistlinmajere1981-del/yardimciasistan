@@ -71,8 +71,13 @@ try {
   const stayPanel = workspace.getByRole('region', { name: 'Misafirler ve Konaklama', exact: true });
   const operations = workspace.locator('#room-operations');
   const account = workspace.getByRole('region', { name: 'Hesap', exact: true });
-  await expect(stayPanel.getByLabel('Oda misafir slotları', { exact: true })).toBeVisible();
+  const guestSlots = stayPanel.getByLabel('Oda misafir slotları', { exact: true });
+  await expect(guestSlots).toBeVisible();
+  await expect(guestSlots).toContainText('Yatak : 0/2 dolu');
+  await expect(guestSlots.getByText(/Çift kişilik yatak|Tek kişilik yatak/)).toHaveCount(0);
+  await expect(guestSlots.getByRole('button', { name: 'Ekle', exact: true })).toBeVisible();
   await expect(stayPanel.getByRole('button', { name: /boş misafir slotu/ }).first()).toBeVisible();
+  await expect(workspace.getByLabel('Oda özeti').getByText(/0\/2 dolu/)).toHaveCount(0);
   const entryNote = stayPanel.getByLabel('Giriş notu', { exact: true });
   const entryButton = stayPanel.getByRole('button', { name: /Giriş Yap/, exact: false });
   await expect(entryNote).toBeVisible();
@@ -349,22 +354,22 @@ try {
     });
   });
 
-  await slotStayPanel.getByRole('button', { name: '+ Slot Ekle', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: 'Ekle', exact: true }).click();
   await expect(slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true })).toBeVisible();
   await slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true }).click();
   await expect(slotStayPanel.getByRole('button', { name: '1. ek slotu kaldır', exact: true })).toHaveCount(0);
 
-  await slotStayPanel.getByRole('button', { name: '+ Slot Ekle', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: 'Ekle', exact: true }).click();
   await slotStayPanel.getByRole('button', { name: '3. boş misafir slotu', exact: true }).click();
   await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Ek Misafir 2(?:\s|$)/);
   await expect.poll(() => slotPage.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guestCount)).toBe(2);
 
-  await slotStayPanel.getByRole('button', { name: '+ Slot Ekle', exact: true }).click();
+  await slotStayPanel.getByRole('button', { name: 'Ekle', exact: true }).click();
   await slotStayPanel.getByRole('button', { name: '3. boş misafir slotu', exact: true }).click();
   await chooseSearchSelect(slotStayPanel, 'Misafir ekle', /^Ek Misafir 3(?:\s|$)/);
   await expect.poll(() => slotPage.evaluate(() => window.fixtureState().dashboard.customerRoomStays[0].guestCount)).toBe(3);
   await expect(slotStayPanel.getByRole('button', { name: 'Ek Misafir 3 misafir slotu', exact: true })).toBeVisible();
-  await expect(slotWorkspace).toContainText('3 kişi · 2 kişilik oda');
+  await expect(slotStayPanel.getByLabel('Oda misafir slotları', { exact: true })).toContainText('Yatak : 3/2 dolu');
   await slotPage.close();
 
   const safety = await open(), safetyWorkspace = safety.locator('.workspace-page-frame');

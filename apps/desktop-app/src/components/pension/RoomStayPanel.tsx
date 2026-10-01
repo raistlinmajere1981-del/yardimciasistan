@@ -178,23 +178,14 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
             presets={draft.checkInDate ? [1, 2, 7].map(days => ({ label: `${days} gün`, value: addDays(draft.checkInDate, days) })) : []}
             onChange={value => { setDraft({ ...draft, checkOutDate: value }); markEntry(true); }} /></div>
         </div>}
-        <div className="room-section-heading">
-          <h4>Misafirler</h4>
-          <ActionButton
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={disabled || Math.max(1, room.capacity, guestIds.length) + extraSlots >= 50}
-            onClick={() => setExtraSlots(current => Math.min(50, current + 1))}
-          >+ Slot Ekle</ActionButton>
-        </div>
+        <h4>Misafirler</h4>
         <RoomGuestSlots
           capacity={room.capacity}
-          bedInfo={room.bedInfo}
           guests={draftGuests}
           extraSlots={extraSlots}
           selectedIndex={selectedSlot}
           disabled={disabled}
+          onAddSlot={() => setExtraSlots(current => Math.min(50, current + 1))}
           onSelectSlot={(index) => setSelectedSlot(index)}
           onRemoveExtraSlot={() => {
             setExtraSlots(current => Math.max(0, current - 1));
