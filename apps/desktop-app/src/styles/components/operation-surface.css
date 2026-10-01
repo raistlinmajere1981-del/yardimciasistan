@@ -17,9 +17,41 @@
 .operation-surface--table { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.9fr); }
 .operation-surface--room { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr) minmax(0, 0.8fr); }
 .operation-surface--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.operation-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.operation-panel {
+  --operation-panel-bg: var(--color-role-operation-bg);
+  --operation-panel-border: var(--color-role-operation-border);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--operation-panel-bg);
+  border-color: var(--operation-panel-border);
+  transition:
+    background-color var(--motion-surface) var(--ease-standard),
+    border-color var(--motion-surface) var(--ease-standard);
+}
+.operation-panel[data-surface-role="finance"] {
+  --operation-panel-bg: var(--color-role-finance-bg);
+  --operation-panel-border: var(--color-role-finance-border);
+}
+.operation-panel[data-surface-role="configuration"] {
+  --operation-panel-bg: var(--color-role-configuration-bg);
+  --operation-panel-border: var(--color-role-configuration-border);
+}
+.operation-panel[data-surface-role="communication"] {
+  --operation-panel-bg: var(--color-role-communication-bg);
+  --operation-panel-border: var(--color-role-communication-border);
+}
+.operation-panel[data-surface-role="integration"] {
+  --operation-panel-bg: var(--color-role-integration-bg);
+  --operation-panel-border: var(--color-role-integration-border);
+}
 .operation-panel + .operation-panel, .operation-surface--table > .operation-panel { border-inline-start: 1px solid var(--color-border); }
-.operation-panel__heading { padding: var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-bg-surface); }
+.operation-panel__heading {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--operation-panel-border);
+  background: color-mix(in srgb, var(--operation-panel-bg) 82%, var(--color-bg-surface));
+}
 .operation-panel__heading h3 { margin: 0; font-size: var(--text-md); }
 .operation-panel__body { padding: var(--space-4); overflow: auto; overscroll-behavior: contain; min-height: 0; display: flex; flex-direction: column; gap: var(--space-4); }
 .operation-panel :is(h4, p) { margin: 0; }
