@@ -41,14 +41,14 @@ export function RoomReceivablePaymentDialog({ folio, closeWhenSettled, onClose, 
         return;
       }
 
+      let closeWarning = "";
       if (closeWhenSettled && amountMinor === folio.remainingMinor) {
         const closed = await window.yardimciDesktop!.checkoutRoomFolio({ folioId: folio.id });
-        if (!closed.ok) {
-          reportAppStatus("error", `Tahsilat alındı; hesap kapanışı doğrulanamadı. ${closed.message}`);
-        }
+        if (!closed.ok) closeWarning = `Tahsilat alındı; hesap kapanışı doğrulanamadı. ${closed.message}`;
       }
 
-      reportAppStatus("success", amountMinor === folio.remainingMinor ? "Borç tamamen tahsil edildi." : "Tahsilat kaydedildi.");
+      reportAppStatus(closeWarning ? "error" : "success",
+        closeWarning || (amountMinor === folio.remainingMinor ? "Borç tamamen tahsil edildi." : "Tahsilat kaydedildi."));
       await onSaved();
       onClose();
     } catch {
