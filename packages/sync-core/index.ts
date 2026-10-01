@@ -125,6 +125,8 @@ export interface PublishedMenuItem {
 }
 
 export interface PublishedQrMenu {
+  /** Web QR menu publication visibility; omitted payloads remain visible for compatibility. */
+  enabled?: boolean;
   categories: PublishedMenuCategory[];
   items: PublishedMenuItem[];
   updated_at: ISODateTimeString;
