@@ -23,10 +23,13 @@ export function CustomerRoomReceivablesPanel({ customerId }: { customerId: strin
 
   useEffect(() => { void reload(); }, [customerId, reload]);
 
-  const folios = useMemo(() => (data?.folios ?? []).filter(folio =>
-    folio.customerId === customerId && folio.status === "open" && folio.remainingMinor > 0
-  ), [customerId, data?.folios]);
   const activeStayIds = useMemo(() => new Set((data?.activeStays ?? []).map(stay => stay.id)), [data?.activeStays]);
+  const folios = useMemo(() => (data?.folios ?? []).filter(folio =>
+    folio.customerId === customerId
+    && folio.status === "open"
+    && folio.remainingMinor > 0
+    && !activeStayIds.has(folio.stayId)
+  ), [activeStayIds, customerId, data?.folios]);
   const currencies = new Set(folios.map(folio => folio.currency));
   const total = folios.reduce((sum, folio) => sum + folio.remainingMinor, 0);
 

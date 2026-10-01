@@ -26,7 +26,7 @@ export interface CustomerWorkspaceProps {
   whatsappEnabled: boolean;
   reservationsEnabled: boolean;
   staysEnabled: boolean;
-  accommodationFolioEnabled: boolean;
+  accommodationFolioEnabled?: boolean;
   customerCreditEnabled: boolean;
   onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
@@ -43,7 +43,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     whatsappEnabled,
     reservationsEnabled,
     staysEnabled,
-    accommodationFolioEnabled,
+    accommodationFolioEnabled = false,
     customerCreditEnabled,
     onPreparedCreditWhatsApp,
     onWhatsApp,
