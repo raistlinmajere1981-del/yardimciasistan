@@ -165,7 +165,7 @@ export function MenuItemFormFields({
 
             <label className="form-field menu-item-field-description">
               Açıklama
-              <textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ürün açıklaması" />
+              <input value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} placeholder="Ürün açıklaması" />
             </label>
 
             {showInlineMedia && (
@@ -243,7 +243,7 @@ export function MenuItemFormFields({
 
               <label className="form-field menu-stock-note">
                 Stok notu
-                <textarea value={form.stock_note} onChange={(event) => onChange({ ...form, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" />
+                <input value={form.stock_note} onChange={(event) => onChange({ ...form, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" />
               </label>
             </div>
           )}
