@@ -90,7 +90,7 @@ export function RoomsWorkspace({ data, onDashboard, ...capabilities }: RoomCardC
   return <div className="rooms-browser">
     <section className="resource-grid" aria-label="Oda yönetimi">
       {data.rooms.length === 0 && <p>Oda kaydı yok. Odaları Ayarlar bölümünden ekleyebilirsiniz.</p>}
-      {visible.map(({ room }) => <RoomResourceCard key={room.id} room={room} summary={summaries.get(room.id)}
+      {visible.map(({ room }) => <RoomResourceCard key={room.id} room={room} summary={summaries.get(room.id)} data={data}
         capabilities={capabilities} onDashboard={onDashboard} imageSrc={coverPreviews[room.id]} />)}
     </section>
     {data.rooms.length > 0 && visible.length === 0 && <div className="form-stack" role="status"><p>Bu filtrelere uyan oda yok.</p>

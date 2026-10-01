@@ -1,54 +1,31 @@
 import { ActionButton } from "../ui/ActionButton";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
-import { RoomCheckoutConfirmationDetails } from "./RoomCheckoutConfirmation";
+import { useRoomCheckout } from "./use-room-checkout";
 import { formatDateRange } from "./folio-format";
 import type { RoomWorkspaceModel } from "./room-workspace-model";
 import type { RoomStayOperations } from "./use-room-stay-operations";
 import type { DesktopDashboardData } from "../../../electron/database";
 
-export function RoomCheckoutAction({ model, operations, disabled, data }: {
+export function RoomCheckoutAction({ model, disabled, data, folioEnabled, onDashboard }: {
   model: RoomWorkspaceModel;
-  operations: RoomStayOperations;
   disabled: boolean;
   data: DesktopDashboardData;
+  folioEnabled: boolean;
+  onDashboard: (data: DesktopDashboardData) => void;
 }) {
-  const { confirm, confirmDialog } = useConfirmDialog();
-  const room = model.room;
+  const checkout = useRoomCheckout({
+    room: model.room,
+    stay: model.currentStay,
+    data,
+    folioEnabled,
+    onDashboard
+  });
   const stay = model.currentStay;
-  if (!room || !stay || stay.status !== "checked_in") return null;
-  const currentRoom = room;
-  const currentStay = stay;
-
-  async function requestCheckout() {
-    const account = model.operations?.accounts.find(item => item.stayId === currentStay.id);
-    const guestIds = (currentStay.guests ?? []).filter(guest => guest.status === "checked_in").map(guest => guest.customerId);
-    const openOrders = (data.tableOperations ?? []).filter(table => table.order
-      && data.tables.some(resource => resource.id === table.tableId && guestIds.includes(resource.currentCustomerId)));
-    const approved = await confirm({
-      eyebrow: currentRoom.name,
-      title: "Misafir çıkışı",
-      description: account?.remainingMinor
-        ? "Tüm misafirlerin çıkışı yapılır. Kalan borç ortak hesapta açık kalır; tahsilat ayrıca kaydedilir."
-        : "Misafir çıkışı tamamlanır; varsa oda hesabı kapatılır ve oda temizlik durumuna geçer.",
-      confirmLabel: "Tüm Misafirlerin Çıkışını Yap",
-      tone: account?.remainingMinor ? "warning" : "info",
-      details: <>
-        <RoomCheckoutConfirmationDetails
-          roomLabel={currentRoom.number ? `Oda ${currentRoom.number}` : currentRoom.name}
-          stay={currentStay}
-          account={account}
-        />
-        {openOrders.length > 0 && <p role="alert">
-          Misafirlere bağlı {openOrders.length} açık restoran adisyonu var. Bunlar oda hesabına dahil değil; aktarımı çıkıştan önce tamamlayın.
-        </p>}
-      </>
-    });
-    if (approved) void operations.checkout(currentStay.id);
-  }
+  if (!model.room || !stay || stay.status !== "checked_in") return null;
 
   return <>
-    <ActionButton disabled={disabled} onClick={() => void requestCheckout()}>Çıkışı Tamamla</ActionButton>
-    {confirmDialog}
+    <ActionButton disabled={disabled || checkout.busy} onClick={() => void checkout.requestCheckout()}>Çıkışı Tamamla</ActionButton>
+    {checkout.checkoutDialog}
   </>;
 }
 

@@ -12,17 +12,26 @@ import { getRoomCardModel, roomIdentity, type RoomCardCapabilities } from "./roo
 import { setRoomOperationalStatus } from "./room-operations";
 import { roomToday } from "./room-presentation";
 import { formatDateRange, minorMoney } from "./folio-format";
+import { useRoomCheckout } from "./use-room-checkout";
 
-export function RoomResourceCard({ room, summary, capabilities, onDashboard, imageSrc }: {
-  room: DesktopRoom; summary?: DesktopRoomOperations; capabilities: RoomCardCapabilities;
+export function RoomResourceCard({ room, summary, data, capabilities, onDashboard, imageSrc }: {
+  room: DesktopRoom; summary?: DesktopRoomOperations; data: DesktopDashboardData; capabilities: RoomCardCapabilities;
   onDashboard: (data: DesktopDashboardData) => void;
   imageSrc?: string;
 }) {
   const navigation = useWorkspaceNavigation();
   const model = getRoomCardModel(room, summary, capabilities, roomToday());
-  const [busy, setBusy] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const running = useRef(false);
+  const checkout = useRoomCheckout({
+    room,
+    stay: model.current[0],
+    data,
+    folioEnabled: capabilities.folioEnabled,
+    onDashboard
+  });
+  const busy = statusBusy || checkout.busy;
   const begin = useRequestGeneration();
   const isOutOfService = model.physical === "out_of_service" || room.status === "out_of_service";
   const canSetPhysicalStatus = Boolean(summary && room.isActive && !isOutOfService && !model.current.length && !model.planned.length);
@@ -38,7 +47,7 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard, ima
   async function updatePhysicalStatus(status: string) {
     if (running.current || !canSetPhysicalStatus || status === physicalValue || status === "inactive" || status === "out_of_service") return;
     running.current = true;
-    setBusy(true);
+    setStatusBusy(true);
     setFeedback("");
     const current = begin();
     try {
@@ -50,15 +59,13 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard, ima
       if (current()) setFeedback("İşlem sonucu doğrulanamadı. Yenileyip kontrol edin.");
     } finally {
       running.current = false;
-      if (current()) setBusy(false);
+      if (current()) setStatusBusy(false);
     }
   }
 
   function quickAction() {
-    const action = model.quickAction;
-    if (running.current || !action) return;
-    navigation.openWorkspace({ entityType: "room", entityId: room.id, mode: "stay", action: "checkout", stayId: action.stayId,
-      returnContext: { page: "pension", view: "rooms", entityId: room.id } });
+    if (running.current || checkout.busy || !model.quickAction) return;
+    void checkout.requestCheckout();
   }
 
   return <>
@@ -108,5 +115,6 @@ export function RoomResourceCard({ room, summary, capabilities, onDashboard, ima
         {!model.current.length && !model.planned.length && !model.upcoming && model.physical === "ready" && <p className="resource-card__notice">{room.status === "occupied" ? "Oda dolu" : room.status === "reserved" ? "Oda ayrılmış" : "Konaklamaya hazır"}</p>}
       </>}
     </ResourceCard>
+    {checkout.checkoutDialog}
   </>;
 }

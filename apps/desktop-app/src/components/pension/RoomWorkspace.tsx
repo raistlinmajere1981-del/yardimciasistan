@@ -120,7 +120,8 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       {!history && model.currentStay && <RoomCheckoutAction
         model={model}
         data={data}
-        operations={operations}
+        folioEnabled={folioEnabled}
+        onDashboard={onDashboard}
         disabled={busy || accountDraftDirty}
       />}
       <ActionButton variant="ghost" disabled={busy} onClick={() => {

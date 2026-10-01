@@ -220,15 +220,12 @@ try {
   await expect(operations.getByLabel('Odaya eklenenler')).toContainText('Ek yatak');
   const remainingBeforeCheckout = await page.evaluate(() => window.fixtureState().folios[0].remainingMinor);
   const paymentCallsBeforeCheckout = await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length);
-  // Physical departure never invents a payment: settle the shared account first, then check out.
-  await account.getByLabel('Ödeme tutarı').fill(String(remainingBeforeCheckout / 100));
-  await account.getByRole('button', { name: 'Ödemeyi Kaydet', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.fixtureState().folios[0].remainingMinor)).toBe(0);
   await workspace.getByRole('button', { name: 'Çıkışı Tamamla', exact: true }).click();
   const checkoutConfirm = page.getByRole('dialog', { name: 'Misafir çıkışı', exact: true });
   await expect(checkoutConfirm).toContainText('Kalan hesap');
-  await expect(checkoutConfirm).toContainText('hesap kapanır');
-  await expect(checkoutConfirm.getByRole('group', { name: 'Çıkış ödeme yöntemi', exact: true })).toHaveCount(0);
+  await checkoutConfirm.getByRole('checkbox', { name: /Mevcut hesabı tahsil et ve kapat/ }).check();
+  await expect(checkoutConfirm.getByRole('group', { name: 'Çıkış tahsilatı', exact: true })).toBeVisible();
+  await checkoutConfirm.getByLabel('Çıkış ödeme yöntemi').selectOption('bank');
   await checkoutConfirm.getByRole('button', { name: 'Tüm Misafirlerin Çıkışını Yap', exact: true }).click();
   const state = await page.evaluate(() => window.fixtureState());
   expect(state.dashboard.customerRoomStays[0].status).toBe('checked_out');
@@ -236,6 +233,7 @@ try {
   expect(state.folios[0].status).toBe('closed');
   const checkoutPayment = (await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment'))).at(-1);
   expect(checkoutPayment.input.amountMinor).toBe(remainingBeforeCheckout);
+  expect(checkoutPayment.input.paymentMethod).toBe('bank');
   expect(await page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'payment').length)).toBe(paymentCallsBeforeCheckout + 1);
   await expect(account.getByRole('region', { name: 'Mevcut konaklama hesabı' })).toContainText('Aktif misafir hesabı yok');
   await expect(account.getByRole('region', { name: 'Önceki hesaplar' })).toHaveCount(0);
