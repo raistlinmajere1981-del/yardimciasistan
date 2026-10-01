@@ -268,6 +268,7 @@
   display: grid;
   align-content: start;
   gap: var(--space-3);
+  padding: var(--space-3);
 }
 
 .menu-item-section-heading {
@@ -495,7 +496,7 @@
 @container menu-item-form (max-width: 720px) {
   .menu-item-editor-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .menu-item-field-name {
@@ -1022,7 +1023,7 @@
 .menu-item-create-form,
 .menu-item-workspace-form {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
 }
 
