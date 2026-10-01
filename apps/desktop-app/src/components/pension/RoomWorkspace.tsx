@@ -28,12 +28,12 @@ import { setRoomOperationalStatus } from "./room-operations";
 
 export interface RoomWorkspaceProps {
   intent: RoomWorkspaceIntent; data: DesktopDashboardData; onDashboard: (data: DesktopDashboardData) => void;
-  staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean; menuEnabled: boolean; customersEnabled: boolean; aiEnabled: boolean;
+  staysEnabled: boolean; reservationsEnabled: boolean; folioEnabled: boolean; menuEnabled: boolean; inventoryEnabled?: boolean; customersEnabled: boolean; aiEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
 }
 
-export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reservationsEnabled, folioEnabled, menuEnabled,
+export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reservationsEnabled, folioEnabled, menuEnabled, inventoryEnabled = true,
   customersEnabled, aiEnabled, onSaveCustomer, onAnalyzeIdentity }: RoomWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const model = getRoomWorkspaceModel(data, intent.entityId, staysEnabled, reservationsEnabled);
@@ -161,7 +161,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       <OperationPanel title="Oda İşlemleri" id="room-operations">
         <RoomDailyOperations model={model} data={data} operations={operations} disabled={busy || accountDraftDirty} />
         {account.selected?.status === "open" && <RoomAccountAdjustments key={account.selected.id} folio={account.selected} controller={account}
-          menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} disabled={busy || account.loading}
+          menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} inventoryEnabled={inventoryEnabled} disabled={busy || account.loading}
           onDirty={(key, value) => setDirty(key, value)} />}
       </OperationPanel>
       <OperationPanel title="Hesap" id="room-account">

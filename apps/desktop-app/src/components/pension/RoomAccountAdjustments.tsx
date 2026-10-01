@@ -7,9 +7,9 @@ import { MoneyInput } from "../ui/MoneyInput";
 import { minorMoney, parseMoneyToMinor } from "./folio-format";
 import type { RoomFolioController } from "./use-room-folio-controller";
 
-export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, menuEnabled, disabled, onDirty }: {
+export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, menuEnabled, inventoryEnabled, disabled, onDirty }: {
   folio: DesktopRoomFolio; controller: RoomFolioController; menu: PublishedQrMenu; webModuleUrl: string;
-  menuEnabled: boolean; disabled: boolean;
+  menuEnabled: boolean; inventoryEnabled: boolean; disabled: boolean;
   onDirty: (key: string, dirty: boolean) => void;
 }) {
   const [amount, setAmount] = useState("");
@@ -23,7 +23,7 @@ export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, 
 
   function canAddMenuItem(item: PublishedMenuItem) {
     const source = roomMenuItem(item);
-    return Boolean(source && (source.stockQuantity === null || source.stockQuantity >= source.stockConsumptionQuantity));
+    return Boolean(source && (!inventoryEnabled || source.stockQuantity === null || source.stockQuantity >= source.stockConsumptionQuantity));
   }
 
   function addMenuItem(item: PublishedMenuItem) {
@@ -41,6 +41,7 @@ export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, 
       menu={menu}
       webModuleUrl={webModuleUrl}
       enabled={menuEnabled}
+      inventoryEnabled={inventoryEnabled}
       busy={disabled}
       panelAriaLabel="Oda hesabı menüsü"
       searchAriaLabel="Oda hesabı için ürün ara"

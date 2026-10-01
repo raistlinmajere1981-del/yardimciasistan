@@ -294,7 +294,8 @@ function DesktopAppFrameContent({
               onSaveCustomer: customerController.handleSaveCustomer,
               onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
               folioEnabled: accommodationFolioEnabled,
-              menuEnabled
+              menuEnabled,
+              inventoryEnabled
             }}
           />
           <HospitalityWorkspaceHost
@@ -305,6 +306,7 @@ function DesktopAppFrameContent({
               data: surfaceData,
               ordersEnabled: foodOrdersEnabled,
               menuEnabled,
+              inventoryEnabled,
               customersEnabled,
               reservationsEnabled: foodReservationsEnabled,
               roomFolioTransferEnabled: foodOrdersEnabled && accommodationFolioEnabled,
