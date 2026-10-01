@@ -698,8 +698,11 @@ try {
   await expect(categoryEditor.getByLabel("Kategori adı", { exact: true })).toHaveValue("Yerel Kahvaltı");
   await categoryEditor.getByLabel("Açıklama", { exact: true }).fill("Günün kahvaltı seçenekleri");
   await categoryEditor.getByRole("button", { name: "Kaydet", exact: true }).click();
-  await expect(page.locator(".menu-category-row").filter({ hasText: "Yerel Kahvaltı" }).first()).toContainText("Günün kahvaltı seçenekleri");
-  await page.locator(".menu-category-row").filter({ hasText: "Yerel Kahvaltı" }).first().getByRole("button", { name: "Yerel Kahvaltı", exact: true }).click();
+  const savedBreakfastCategory = page.locator(".menu-category-row").filter({ hasText: "Yerel Kahvaltı" }).first();
+  await expect(savedBreakfastCategory).toContainText("Günün kahvaltı seçenekleri");
+  await savedBreakfastCategory.locator(".menu-category-row__description").click();
+  await expect(savedBreakfastCategory).toHaveClass(/is-selected/);
+  await expect(page.locator(".menu-product-panel .menu-record").filter({ hasText: "Yerel Serpme Kahvaltı" }).first()).toBeVisible();
   const productHeading = page.locator(".menu-product-panel .menu-panel-heading");
   await expect(productHeading.getByRole("button", { name: "Ürün ekle", exact: true })).toBeVisible();
   await expect(page.locator(".page-toolbar__actions").getByRole("button", { name: "Ürün ekle", exact: true })).toHaveCount(1);
