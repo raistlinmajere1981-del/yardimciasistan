@@ -80,7 +80,7 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
                 continue;
               }
               var demoLink = document.createElement("a");
-              demoLink.href = "/demo/";
+              demoLink.href = "/odalar/";
               demoLink.textContent = "Web Demosu";
               demoLink.setAttribute("data-ya-demo-nav", "1");
               if (link.className) {
