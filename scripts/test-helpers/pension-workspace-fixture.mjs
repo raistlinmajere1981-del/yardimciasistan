@@ -1,7 +1,10 @@
 // Renderer fixture only. SQLite domain smokes independently verify the mutation semantics.
 export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
   const clone = value => structuredClone(value);
-  const capabilities = { staysEnabled: variant !== 'rooms-only', reservationsEnabled: variant !== 'rooms-only', folioEnabled: !['no-folio', 'rooms-only'].includes(variant), menuEnabled: variant === 'all' };
+  const capabilities = { staysEnabled: variant !== 'rooms-only', reservationsEnabled: variant !== 'rooms-only',
+    folioEnabled: !['no-folio', 'rooms-only'].includes(variant),
+    menuEnabled: ['all', 'no-inventory'].includes(variant),
+    inventoryEnabled: variant !== 'no-inventory' };
   const room = dashboard.rooms[0];
   dashboard.rooms = ['101', '102', '103'].map((number, index) => ({ ...room, id: `room-${number}`, number, name: `Pilot ${number}`, status: index === 2 ? 'maintenance' : index === 0 ? 'cleaning' : 'available', isActive: true }));
   dashboard.customers = dashboard.customers.slice(0, 1).map(customer => ({ identityType: '', identityNumber: '', nationality: '', birthDate: '', gender: '', documentSerialNumber: '', documentExpiryDate: '', birthPlace: '', motherName: '', fatherName: '', issuingAuthority: '', address: '', stayCount: 0, ...customer }));
@@ -12,7 +15,11 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
   dashboard.dailyTasks = [{ ...dashboard.dailyTasks[0], id: 'task-1', title: 'Pilot temizlik', taskType: 'manual_pension', status: 'pending', relatedType: 'room', relatedId: 'room-101' }];
   let sequence = 0;
   const folios = [];
-  const menu = [{ id: 'tea', name: 'Çay', categoryId: 'drinks', categoryName: 'İçecekler', description: '', priceMinor: 5000, currency: 'TRY', stockQuantity: 10, stockConsumptionQuantity: 1 }];
+  const menu = [{ id: 'tea', name: 'Çay', categoryId: 'drinks', categoryName: 'İçecekler', description: '', priceMinor: 5000, currency: 'TRY',
+    stockQuantity: capabilities.inventoryEnabled ? 10 : 0, stockConsumptionQuantity: 1 }];
+  if (!capabilities.inventoryEnabled) {
+    dashboard.menu.items = dashboard.menu.items.map(item => ({ ...item, stock_quantity: 0 }));
+  }
   const snapshot = () => {
     dashboard.revision = (dashboard.revision ?? 0) + 1;
     dashboard.roomOperations = dashboard.rooms.map(room => ({ roomId: room.id,
@@ -153,9 +160,9 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
     },
     voidRoomFolioPayment: async id => { record('void-payment', id); const folio = folios.find(item => item.payments.some(payment => payment.id === id)); folio.payments = folio.payments.filter(payment => payment.id !== id); totals(folio); return financial(folio); },
     checkoutRoomFolio: async input => { record('close-account', input); const folio = folios.find(item => item.id === input.folioId); if (folio.remainingMinor > 0) return { ok: false, message: 'Borç var.' }; folio.status = 'closed'; return financial(folio); },
-    addRoomFolioMenuItem: async input => { record('menu', input); const folio = folios.find(item => item.id === input.folioId); const item = menu[0]; item.stockQuantity--; folio.items.push({ id: `item-${stamp()}`, menuItemId: item.id, kind: 'menu', label: item.name, quantity: 1, unitPriceMinor: item.priceMinor, lineTotalMinor: item.priceMinor, note: '' }); totals(folio); return financial(folio); },
-    updateRoomFolioItemQuantity: async input => { record('quantity', input); const folio = folios.find(item => item.items.some(line => line.id === input.itemId)); const item = folio.items.find(line => line.id === input.itemId); menu[0].stockQuantity -= input.quantity - item.quantity; item.quantity = input.quantity; item.lineTotalMinor = item.unitPriceMinor * item.quantity; totals(folio); return financial(folio); },
-    removeRoomFolioItem: async id => { record('remove', id); const folio = folios.find(item => item.items.some(line => line.id === id)); const item = folio.items.find(line => line.id === id); if (item.kind === 'menu') menu[0].stockQuantity += item.quantity; folio.items = folio.items.filter(line => line.id !== id); totals(folio); return financial(folio); },
+    addRoomFolioMenuItem: async input => { record('menu', input); const folio = folios.find(item => item.id === input.folioId); const item = menu[0]; if (capabilities.inventoryEnabled) item.stockQuantity--; folio.items.push({ id: `item-${stamp()}`, menuItemId: item.id, kind: 'menu', label: item.name, quantity: 1, unitPriceMinor: item.priceMinor, lineTotalMinor: item.priceMinor, note: '' }); totals(folio); return financial(folio); },
+    updateRoomFolioItemQuantity: async input => { record('quantity', input); const folio = folios.find(item => item.items.some(line => line.id === input.itemId)); const item = folio.items.find(line => line.id === input.itemId); if (capabilities.inventoryEnabled) menu[0].stockQuantity -= input.quantity - item.quantity; item.quantity = input.quantity; item.lineTotalMinor = item.unitPriceMinor * item.quantity; totals(folio); return financial(folio); },
+    removeRoomFolioItem: async id => { record('remove', id); const folio = folios.find(item => item.items.some(line => line.id === id)); const item = folio.items.find(line => line.id === id); if (capabilities.inventoryEnabled && item.kind === 'menu') menu[0].stockQuantity += item.quantity; folio.items = folio.items.filter(line => line.id !== id); totals(folio); return financial(folio); },
     addRoomFolioManualItem: async input => { record('charge', input); const folio = folios.find(item => item.id === input.folioId); folio.items.push({ ...input, id: `item-${stamp()}`, lineTotalMinor: input.kind === 'discount' ? -input.amountMinor : input.amountMinor }); totals(folio); return financial(folio); },
     setRoomFolioDiscount: async input => {
       record('discount', input);

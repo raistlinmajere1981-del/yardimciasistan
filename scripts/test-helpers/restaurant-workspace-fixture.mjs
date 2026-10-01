@@ -31,8 +31,12 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     dashboard.menu.items = [];
   }
   const capabilities = { ordersEnabled: variant !== 'tables-only', menuEnabled: variant !== 'no-menu',
+    inventoryEnabled: variant !== 'no-inventory',
     reservationsEnabled: variant !== 'no-reservations', customersEnabled: variant !== 'no-customers',
     roomFolioTransferEnabled: !['no-transfer', 'tables-only'].includes(variant) };
+  if (!capabilities.inventoryEnabled) {
+    dashboard.menu.items = dashboard.menu.items.map(item => ({ ...item, stock_quantity: 0 }));
+  }
   const snapshot = () => {
     dashboard.revision = (dashboard.revision ?? 0) + 1;
     dashboard.tableOperations = dashboard.tables.map(table => ({ tableId: table.id,
@@ -86,15 +90,16 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     },
     addTableOrderItem: async (id, menuId) => {
       calls.push({ kind: 'add', id }); const order = orderFor(id), product = dashboard.menu.items.find(item => item.id === menuId);
-      if (!capabilities.menuEnabled || product.stock_quantity < 1) return { ok: false, message: 'Stok yok.' };
-      product.stock_quantity--;
+      if (!capabilities.menuEnabled || (capabilities.inventoryEnabled && product.stock_quantity < 1)) return { ok: false, message: 'Stok yok.' };
+      if (capabilities.inventoryEnabled) product.stock_quantity--;
       order.items.push({ id: `item-${order.id}-${order.items.length}`, orderId: id, menuItemId: menuId, productName: product.name,
         unitPrice: product.price, currency: 'TRY', quantity: 1, lineTotal: product.price, note: '', status: 'open' });
       return result(order);
     },
     updateTableOrderItemQuantity: async (id, quantity) => {
       calls.push({ kind: 'quantity', id, quantity }); const order = itemOrder(id), item = order.items.find(item => item.id === id);
-      dashboard.menu.items[0].stock_quantity += item.quantity - quantity; item.quantity = quantity; return result(order);
+      if (capabilities.inventoryEnabled) dashboard.menu.items.find(product => product.id === item.menuItemId).stock_quantity += item.quantity - quantity;
+      item.quantity = quantity; return result(order);
     },
     updateTableOrderItemNote: async (id, note) => {
       calls.push({ kind: 'note', id, note }); await wait('Note');
@@ -110,7 +115,8 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     },
     removeTableOrderItem: async id => {
       calls.push({ kind: 'remove', id }); const order = itemOrder(id);
-      dashboard.menu.items[0].stock_quantity += order.items.find(item => item.id === id).quantity;
+      const removed = order.items.find(item => item.id === id);
+      if (capabilities.inventoryEnabled) dashboard.menu.items.find(product => product.id === removed.menuItemId).stock_quantity += removed.quantity;
       order.items = order.items.filter(item => item.id !== id); return result(order);
     },
     updateTableOrderStatus: async (id, status) => { calls.push({ kind: 'status', id, status }); const order = orderFor(id); order.status = status; return result(order); },

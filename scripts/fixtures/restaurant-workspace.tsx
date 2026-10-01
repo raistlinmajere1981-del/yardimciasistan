@@ -89,6 +89,7 @@ function FixtureShell({ page, setPage, data, setData, capabilities, content, res
           data,
           ordersEnabled: capabilities.ordersEnabled,
           menuEnabled: capabilities.menuEnabled,
+          inventoryEnabled: capabilities.inventoryEnabled,
           customersEnabled: capabilities.customersEnabled,
           reservationsEnabled: capabilities.reservationsEnabled,
           roomFolioTransferEnabled: capabilities.roomFolioTransferEnabled,
@@ -119,7 +120,8 @@ function FixtureShell({ page, setPage, data, setData, capabilities, content, res
           onAnalyzeIdentity: async () => ({ ok: false, message: "fixture" }),
           onSaveReservation: async () => ({ ok: false, message: "fixture" }),
           folioEnabled: true,
-          menuEnabled: capabilities.menuEnabled
+          menuEnabled: capabilities.menuEnabled,
+          inventoryEnabled: capabilities.inventoryEnabled
         }}
       />
     </>}
