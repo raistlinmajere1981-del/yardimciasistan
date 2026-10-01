@@ -19,8 +19,14 @@
   --resource-card-min-width: 15rem;
   --resource-card-min-height: 18rem;
   --ui-scale: 1;
-  --motion-fast: 120ms;
-  --motion-normal: 180ms;
+  /* Interaction rhythm: hover -> press -> surface change -> result highlight. */
+  --motion-press: 80ms;
+  --motion-hover: 140ms;
+  --motion-surface: 180ms;
+  --motion-feedback: 560ms;
+  /* Compatibility aliases for existing surfaces during the v3 migration. */
+  --motion-fast: var(--motion-hover);
+  --motion-normal: var(--motion-surface);
   --motion-slow: 800ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
