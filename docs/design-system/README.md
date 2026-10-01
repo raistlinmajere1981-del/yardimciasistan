@@ -1,7 +1,16 @@
-# Desktop Design System
+# Desktop Design System v3
 
-Bu belge masaüstü uygulamanın güncel stil ve primitive sözleşmesidir. Tarihsel migration
-envanteri kaldırılmıştır; hedef yalnız yaşayan v2 sistemidir.
+Bu belge masaüstü uygulamanın yaşayan stil, primitive ve etkileşim sözleşmesidir.
+`docs/UI_RULES.md` ürün gramerini tanımlar; bu belge onun görsel uygulama katmanıdır.
+
+## Ana ilke
+
+Kullanıcı her etkileşimde şu zinciri anlayabilmelidir:
+
+> Buraya basabilirim → bastım → sistem işlemi aldı → sonuç bu.
+
+Yeni feature CSS kendi renk, radius, control yüksekliği, badge/chip veya button dili
+icat etmez. Önce token ve shared primitive kullanılır.
 
 ## Stil ağacı
 
@@ -11,57 +20,19 @@ Tek giriş noktası:
 apps/desktop-app/src/styles/index.css
 ```
 
-Güncel yapı:
+Katman yönü:
 
 ```text
-styles/
-  tokens/
-    primitives.css
-    semantic.css
-    typography.css
-    dimensions.css
-  appearance/
-    schemes.css
-    density.css
-    accents.css
-    fonts.css
-    motion.css
-  foundation/
-    reset.css
-    base.css
-    typography.css
-    focus.css
-  components/
-    badges.css
-    buttons.css
-    cards.css
-    data-list.css
-    dialogs.css
-    workspace.css
-    navigation.css
-    header.css
-    notifications.css
-    toolbars.css
-    status.css
-    disclosures.css
-    feedback.css
-    forms.css
-    metrics.css
-    motion.css
-    panels.css
-    resources.css
-  layout/
-    app-shell.css
-    page.css
-    responsive.css
-  pages/
-    ...
-  utilities.css
+primitive token
+  ↓
+semantic token
+  ↓
+shared component / primitive CSS
+  ↓
+feature layout / presentation
 ```
 
-## Appearance v2
-
-Tek appearance sistemi:
+Appearance sistemi tektir:
 
 - color scheme: system / light / dark
 - density: comfortable / compact
@@ -72,26 +43,99 @@ Tek appearance sistemi:
 
 Eski easy/pro, theme dosyaları veya `data-theme/data-mode` dalları kullanılmaz.
 
-## Token ilkesi
+## V3 visual inventory
 
-Feature code mümkün olduğunca semantic/component token kullanır.
+İlk turda Menü/QR Menü, Pansiyon, Restoran, Müşteri İşleri, Kasa/Finans, Ayarlar,
+Dashboard, Takvim, Mesajlar ve Market karşılaştırıldı.
 
-Token katmanı:
+Mevcut token/palette altyapısı büyük ölçüde sağlamdır. Ana borç renklerden çok
+etkileşim durumlarının yüzeylere göre farklı uygulanmasıdır. V3 bu yüzden önce
+shared interaction dilini tamamlar, sonra sayfaları migrate eder.
+
+## Üç ayrı semantik eksen
+
+### Surface role
+
+Panelin ne tür içerik taşıdığını sınıflandırır; durum veya eylem anlamı taşımaz.
+
+- `neutral`
+- `configuration`
+- `operation`
+- `finance`
+- `communication`
+- `integration`
+
+Role tintleri düşük doygunlukta kalır. Dark theme'de yüzeyi boyamak yerine yalnız
+sınıflandırmayı destekler. Warning/error bir surface role değildir.
+
+### Status tone
+
+Bir durumun anlamını taşır.
+
+- `neutral`
+- `info`
+- `success`
+- `warning`
+- `danger`
+- `muted`
+
+`StatusBadge` yalnız betimleyicidir. `StatusChip` aynı görsel ailedeki seçilebilir
+kontroldür ve `aria-pressed` kullanır. Durum yalnız renkle anlatılmaz; okunabilir metin
+veya eşdeğer erişilebilir isim gerekir.
+
+### Action variant
+
+Bir eylemin öncelik ve riskini taşır.
+
+- `primary`
+- `secondary`
+- `ghost`
+- `quiet`
+- `danger`
+
+Aynı karar alanında mümkün olduğunca tek dominant primary bulunur. Feature-specific
+eylem görünümü yeni genel action varyantı üretmek için tek başına yeterli gerekçe değildir.
+
+## Etkileşim zinciri
+
+Ortak kontrol ve tıklanabilir yüzeyler:
 
 ```text
-primitive → semantic → component/primitive CSS → feature layout
+default → hover → pressed → selected/active → busy → result
 ```
 
-Feature stylesheet içinde yeni raw palette, global radius/shadow sistemi veya paralel
-spacing scale yaratmayın.
+- hover alanın etkileşimli olduğunu gösterir
+- pressed kısa fiziksel geri bildirim verir
+- selected/active mouse uzaklaşınca da görünür kalır
+- busy işlemin alındığını gösterir ve çift tetiklemeyi engeller
+- result başarı veya hatayı mümkün olan en yakın seviyede gösterir
+- `focus-visible` hover kadar okunabilir olmalıdır
+- kart içindeki hızlı işlem kartın open davranışını tetiklemez
+- drag yalnız handle tarafından sahiplenilir
+- cursor dili ortak olmalıdır: pointer, grab/grabbing, disabled/progress
+
+## Motion ve geometri
+
+Feature CSS kendi motion süresini veya geometri ölçeğini üretmez.
+
+V3 motion tokenları:
+
+- `--motion-press`: 80ms
+- `--motion-hover`: 140ms
+- `--motion-surface`: 180ms
+- `--motion-feedback`: 560ms
+
+Radius, spacing, control yüksekliği, chip yüksekliği ve panel padding shared tokenlardan
+gelir. Reduced-motion tercihi dekoratif hareketleri azaltmaya devam eder.
 
 ## Shared primitives
 
-React/UI primitive'leri semantik role göre kullanılır:
+Güncel ortak sözlük:
 
 - `ActionButton`
 - `IconButton`
 - `StatusBadge`
+- `StatusChip`
 - `DataList`
 - `Panel`
 - `FormDialog`
@@ -100,25 +144,19 @@ React/UI primitive'leri semantik role göre kullanılır:
 - `WorkspaceTabs`
 - `PageHeader`
 - `AppShell`
+- `ResourceCard`
 
 Yeni component yalnız tekrar eden gerçek bir semantic contract varsa çıkarılır.
 
-## Workspace presentation
+## Formlar ve feedback
 
-Canonical entity editor için Workspace platformu kullanılır.
-
-Centered/full-canvas aynı entity state'inin iki presentation'ıdır. Feature kendi ikinci
-dialog/drawer editör familyasını üretmez.
-
-Nested modal yasaktır. Subflow mümkünse aynı Workspace içinde gösterilir.
-
-## Formlar
-
-- gerçek `label`/control ilişkisi
-- native control davranışını gereksiz custom widget ile değiştirmeme
-- açık field size sınıfları
-- validation field/section yakınında
-- dar viewportta tek kolon/taşmasız düzen
+- gerçek `label`/control ilişkisi korunur
+- native control davranışı gereksiz custom widget ile değiştirilmez
+- validation field/section yakınında gösterilir
+- mutation sonucu mümkün olan en yakın doğru yüzeyde görünür
+- global toast yerel feedback'in yerine geçmez
+- finans, stok ve satış mutasyonlarında backend onayı gelmeden başarı gösterilmez
+- dar viewportta tek kolon/taşmasız düzen korunur
 
 ## Layout ownership
 
@@ -127,19 +165,21 @@ Nested modal yasaktır. Subflow mümkünse aynı Workspace içinde gösterilir.
 Feature Page yalnız kendi toolbar/body düzenini; Workspace yalnız entity içeriğini
 sahiplenir. Feature CSS global sidebar/header/page padding tanımlamaz.
 
-## Renk ve durum
+Canonical entity editor için Workspace platformu kullanılır. Centered/full-canvas aynı
+state'in iki presentation'ıdır. Nested modal ve paralel editör familyası oluşturulmaz.
 
-Durum yalnız renkle anlatılmaz. Badge/icon yanında metin gerekir.
+## Migration sırası
 
-Danger, warning, success, info semantic tokenlarını kullanın. Feature'a özel ham durum
-paleti üretmeyin.
+1. Menü
+2. Pansiyon
+3. Restoran
+4. Müşteri İşleri
+5. Kasa / Finans
+6. Ayarlar
+7. kalan projection ve yardımcı yüzeyler
 
-## Motion ve focus
-
-Motion durum değişimini açıklamak için kullanılır ve reduced-motion'a uyar.
-
-Workspace/dialog açma-kapama focus restoration, focus trap ve close guard davranışları
-platform primitive'lerinin sorumluluğudur.
+Bir sayfa migrated sayılmadan önce light/dark, comfortable/compact, hover, pressed,
+focus, selected, busy/error, dar viewport ve mevcut smoke akışları birlikte doğrulanır.
 
 ## CSS audit
 
@@ -149,25 +189,24 @@ Strict audit yeni borcu engeller:
 npm run design:audit:strict
 ```
 
-Audit özellikle şunları kontrol eder:
+V3 ilerledikçe audit şu alanları da shared sözleşmeye bağlamalıdır:
 
-- raw color debt
-- `!important`
-- override tokenları
-- eski alias'lar
-- shell selector ownership
-- orphan stylesheet
-- duplicate/shared primitive ihlalleri
-
-Menü preview gibi bilinçli renderer istisnaları audit'te açıkça sınıflandırılır.
+- feature-owned button/badge/chip primitive görünümleri
+- izinsiz surface role
+- token dışı motion süresi
+- shared primitive dışında interaction state kopyaları
+- raw color/radius/shadow/font-size ve `!important`
+- duplicate selector ve legacy override kalıpları
 
 ## Yeni feature kontrol listesi
 
 1. AppShell/Page anatomy'yi tekrar yazma.
 2. Mevcut primitive'i kullan.
-3. Canonical Workspace varsa yeni editor yaratma.
-4. Feature CSS'i yalnız feature layout/presentation için kullan.
-5. Semantic token kullan.
-6. Responsive document overflow yaratma.
-7. Focus/keyboard davranışını koru.
-8. `design:audit:strict` ve ilgili behavior smoke'u çalıştır.
+3. Surface role, status tone ve action variant eksenlerini karıştırma.
+4. Canonical Workspace varsa yeni editor yaratma.
+5. Feature CSS'i yalnız feature layout/presentation için kullan.
+6. Semantic token kullan.
+7. Hover/pressed/focus/selected/busy/result zincirini düşün.
+8. Responsive document overflow yaratma.
+9. Reduced-motion ve keyboard davranışını koru.
+10. `design:audit:strict` ve ilgili behavior smoke'u çalıştır.
