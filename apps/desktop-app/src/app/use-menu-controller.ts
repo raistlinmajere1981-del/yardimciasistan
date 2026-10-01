@@ -30,11 +30,8 @@ const initialItemForm = toItemForm(defaultDashboardData.menu.items[0], initialCa
 export function useMenuController({
   dashboardData,
   setDashboardData,
-  loadDashboardData
 }: UseMenuControllerOptions) {
   const { confirm, confirmDialog } = useConfirmDialog();
-  const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
-  const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
   const [menuEditMessage, setMenuEditMessage] = useState("Düzenleme bekliyor.");
   const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
@@ -42,15 +39,6 @@ export function useMenuController({
   const [selectedItemId, setSelectedItemId] = useState(initialItemForm.id);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(initialCategoryForm);
   const [itemForm, setItemForm] = useState<ItemFormState>(initialItemForm);
-
-  useEffect(() => {
-    if (menuPublishState !== "success") return;
-    const timer = window.setTimeout(() => {
-      setMenuPublishState("idle");
-      setMenuStatusMessage("Menü yayına hazır.");
-    }, 5000);
-    return () => window.clearTimeout(timer);
-  }, [menuPublishState]);
 
   useEffect(() => {
     if (selectedCategoryId && !dashboardData.menu.categories.some((category) => category.id === selectedCategoryId)) {
@@ -73,29 +61,6 @@ export function useMenuController({
     () => buildMenuPreviewData(dashboardData.menu, categoryForm, itemForm),
     [categoryForm, dashboardData.menu, itemForm]
   );
-
-  async function publishMenu() {
-    setMenuPublishState("loading");
-    setMenuStatusMessage("Menü webde güncelleniyor...");
-
-    const bridge = window.yardimciDesktop;
-    if (!bridge) {
-      setMenuPublishState("error");
-      setMenuStatusMessage("Menü yayınlanamadı. Bağlantıyı kontrol edin.");
-      return;
-    }
-
-    const result = await bridge.pushMenu();
-    if (!result.ok) {
-      setMenuPublishState("error");
-      setMenuStatusMessage(result.message || "Menü yayınlanamadı. Bağlantıyı kontrol edin.");
-      return;
-    }
-
-    await loadDashboardData();
-    setMenuPublishState("success");
-    setMenuStatusMessage("Menü webde güncellendi.");
-  }
 
   async function openMenuPreview() {
     const bridge = window.yardimciDesktop;
@@ -187,7 +152,6 @@ export function useMenuController({
     setMenuEditState("success");
     setMenuEditMessage("");
     reportAppStatus("success", result.message);
-    markMenuDirty();
     return result;
   }
 
@@ -217,7 +181,6 @@ export function useMenuController({
     if (savedItem) {
       setItemForm(toItemForm(savedItem, result.dashboardData.menu.categories[0]?.id ?? ""));
     }
-    markMenuDirty();
     return result;
   }
 
@@ -259,7 +222,6 @@ export function useMenuController({
     setMenuEditState("success");
     setMenuEditMessage("");
     reportAppStatus("success", result.message);
-    markMenuDirty();
     return result;
   }
 
@@ -285,7 +247,6 @@ export function useMenuController({
     setMenuEditState("success");
     setMenuEditMessage("");
     reportAppStatus("success", result.message);
-    markMenuDirty();
     return result;
   }
 
@@ -317,7 +278,6 @@ export function useMenuController({
     setMenuEditState("success");
     setMenuEditMessage("");
     reportAppStatus("success", result.message);
-    markMenuDirty();
   }
 
   async function deleteCategory(confirmed = false) {
@@ -349,21 +309,13 @@ export function useMenuController({
     setDashboardData(result.dashboardData);
     setSelectedItemId(nextItem?.id ?? "");
     setItemForm(toItemForm(nextItem, selectedCategoryId || result.dashboardData.menu.categories[0]?.id || ""));
-    markMenuDirty();
     reportAppStatus("success", result.message);
     return result;
   }
 
 
-  function markMenuDirty() {
-    setMenuPublishState("idle");
-    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
-  }
-
   return {
     confirmDialog,
-    menuPublishState,
-    menuStatusMessage,
     menuEditState,
     menuEditMessage,
     menuPreviewOpen,
@@ -374,7 +326,6 @@ export function useMenuController({
     itemForm,
     setCategoryForm,
     setItemForm,
-    publishMenu,
     openMenuPreview,
     closeMenuPreview,
     selectCategory,
