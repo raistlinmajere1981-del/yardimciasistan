@@ -26,7 +26,7 @@ export function PensionPage({
 }: PensionPageProps) {
   return (
     <PensionPageContext.Provider value={controller}>
-      <FeatureWorkspacePage label="Pansiyon yönetimi" bodyLabel="Pansiyon operasyonları">
+      <FeatureWorkspacePage label="Pansiyon yönetimi" bodyLabel="Pansiyon operasyonları" layout="fill">
         <OperationsBoardLayout
           left={reservationsEnabled ? {
             title: "Rezervasyonlar",
