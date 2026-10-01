@@ -656,15 +656,16 @@ async function smoke(base, secret) {
   }
   console.log("Kok: 200, sync key config ile ayni, hardcoded yok.");
 
-  for (const path of ["/demo/", "/demo/odalar/", "/demo/odalar/oda/", "/demo/qr-menu/", "/demo/yorumlar/", "/demo/iletisim/", "/demo/restoran/", "/demo/restoran/masa/"]) {
+  for (const path of ["/odalar/", "/odalar/oda/", "/qr-menu/", "/yorumlar/", "/iletisim/", "/restoran/", "/restoran/masa/"]) {
     const page = await get(path);
-    if (page.response.status !== 200) fail(`Demo route HTTP smoke basarisiz: ${path} -> ${page.response.status}`);
+    if (page.response.status !== 200) fail(`Public-site route HTTP smoke basarisiz: ${path} -> ${page.response.status}`);
   }
-  console.log("Demo public-site route'lari: 200.");
+  console.log("Public-site root route'lari: 200.");
 
   const menu = await get("/yardimci-asistan/api/menu.php");
-  if (menu.response.status !== 200 || !menu.text.includes('"ok":true')) fail("menu.php saglik kontrolu basarisiz.");
-  console.log("menu.php: ok.");
+  if (![200, 404].includes(menu.response.status)) fail(`menu.php beklenmeyen HTTP durumu: ${menu.response.status}`);
+  if (menu.response.status === 200 && !menu.text.includes('"ok":true')) fail("menu.php 200 ama ok:true degil.");
+  console.log(`menu.php: ${menu.response.status === 200 ? "yayinda" : "gizli"}.`);
 
   const business = await get("/yardimci-asistan/api/business.php");
   if (business.response.status !== 200 || !business.text.includes('"ok":true')) fail("business.php saglik kontrolu basarisiz.");
