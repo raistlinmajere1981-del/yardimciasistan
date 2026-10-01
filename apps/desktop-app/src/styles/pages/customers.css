@@ -352,8 +352,7 @@
   gap: var(--space-4);
   min-width: 0;
 }
-.customer-workspace-profile,
-.customer-workspace-operations {
+:is(.customer-workspace-profile, .customer-workspace-operations) {
   min-width: 0;
 }
 .customer-workspace-profile {
@@ -380,8 +379,7 @@
   gap: var(--space-1);
   min-width: 0;
 }
-.customer-operation-card__heading h3,
-.customer-operation-card__heading small {
+:is(.customer-operation-card__heading h3, .customer-operation-card__heading small) {
   margin: 0;
 }
 .customer-operation-card__heading h3 {
