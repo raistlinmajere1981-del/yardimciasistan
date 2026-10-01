@@ -24,7 +24,7 @@ function stayTone(status: string): StatusTone {
 
 function reservationTone(status: string): StatusTone {
   if (status === "approved") return "success";
-  if (status === "pending") return "wait";
+  if (status === "pending") return "warning";
   if (status === "rejected" || status === "cancelled") return "danger";
   return "neutral";
 }
@@ -32,7 +32,7 @@ function reservationTone(status: string): StatusTone {
 function requestTone(status: string): StatusTone {
   if (["approved", "answered", "converted_to_reservation"].includes(status)) return "success";
   if (["rejected", "cancelled"].includes(status)) return "danger";
-  if (["new", "waiting_owner", "waiting_customer"].includes(status)) return "wait";
+  if (["new", "waiting_owner", "waiting_customer"].includes(status)) return "warning";
   return "neutral";
 }
 
