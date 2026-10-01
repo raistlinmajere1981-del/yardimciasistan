@@ -64,6 +64,9 @@ const androidFinanceSource = source("apps/android-app/src/main/java/com/yardimci
 const androidSyncClientSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/HostingSyncClient.java");
 const androidActivitySource = source("apps/android-app/src/main/java/com/yardimciasistan/android/MainActivity.java");
 const hostingSyncSource = source("firm-template/web-module/api/sync.php");
+const menuCssSource = source("apps/desktop-app/src/styles/pages/menu.css");
+const testSiteHeaderSource = source("test-site/landing/demo/inc/header.php");
+const testSiteQrMenuSource = source("test-site/landing/demo/assets/js/qr-menu.js");
 
 // A — service.whatsapp controls both renderer affordances and hard boundaries.
 assert.match(requestsSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
@@ -124,6 +127,21 @@ assert.match(
   "QR menu controls must disappear when the Settings QR module is disabled"
 );
 assertHandlerGuard(menuIpcSource, "menu:setWebPublication", "assertCapability(BUSINESS_CAPABILITIES.QR_MENU");
+assert.match(
+  menuCssSource,
+  /\.menu-qr-service \+ \.menu-management-grid\s*\{[\s\S]{0,120}margin-top:\s*var\(--space-3\)/,
+  "QR service panel must keep a visible gap above the menu management grid"
+);
+assert.match(
+  testSiteHeaderSource,
+  /demo_qr_menu_available\(\)[\s\S]{0,220}href="\/qr-menu\/"/,
+  "test-site navigation must omit QR menu when the web publication is disabled"
+);
+assert.match(
+  testSiteQrMenuSource,
+  /response\.status === 404[\s\S]{0,120}window\.location\.replace\("\/"\)/,
+  "an already-open QR menu page must leave the hidden publication instead of showing an error shell"
+);
 assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
 assert.match(menuItemFormFieldsSource, /showStock\s*=\s*inventoryEnabled\s*&&[\s\S]{0,160}mode === "stock"/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
