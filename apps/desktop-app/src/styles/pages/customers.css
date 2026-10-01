@@ -637,8 +637,17 @@
   font-weight: var(--weight-semibold);
   text-align: left;
   cursor: pointer;
+  transition:
+    color var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
 }
 .customer-record-row__open:hover { color: var(--color-accent); }
+.customer-record-row__open:active { transform: translateY(1px); }
+.customer-record-row__open:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
 .customer-record-row .list-row__meta > span {
   display: inline-flex;
   align-items: center;
