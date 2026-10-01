@@ -44,6 +44,42 @@
 
 .panel, .setup-section { padding: var(--panel-padding); }
 .panel-padding-compact { padding: var(--space-3); }
+
+.panel {
+  --surface-role-bg: var(--surface-neutral-bg);
+  --surface-role-border: var(--surface-neutral-border);
+  background: var(--surface-role-bg);
+  border-color: var(--surface-role-border);
+  transition:
+    background-color var(--motion-surface) var(--ease-standard),
+    border-color var(--motion-surface) var(--ease-standard);
+}
+
+.panel[data-surface-role="configuration"] {
+  --surface-role-bg: var(--surface-configuration-bg);
+  --surface-role-border: var(--surface-configuration-border);
+}
+
+.panel[data-surface-role="operation"] {
+  --surface-role-bg: var(--surface-operation-bg);
+  --surface-role-border: var(--surface-operation-border);
+}
+
+.panel[data-surface-role="finance"] {
+  --surface-role-bg: var(--surface-finance-bg);
+  --surface-role-border: var(--surface-finance-border);
+}
+
+.panel[data-surface-role="communication"] {
+  --surface-role-bg: var(--surface-communication-bg);
+  --surface-role-border: var(--surface-communication-border);
+}
+
+.panel[data-surface-role="integration"] {
+  --surface-role-bg: var(--surface-integration-bg);
+  --surface-role-border: var(--surface-integration-border);
+}
+
 .page-section__header {
   display: flex;
   flex-wrap: wrap;
