@@ -1,34 +1,83 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, Download, ExternalLink, Eye, QrCode, X } from "lucide-react";
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
-import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
 import { ModalSurface } from "../ui/ModalSurface";
 import { createQrSvg, resolveQrMenuPublicUrl } from "./qr-code";
 
-export function QrMenuPanel({ enabled, webModuleUrl, onPreview }: {
+export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }: {
   enabled: boolean;
   webModuleUrl: string;
   onPreview: () => void;
 }) {
-  const capability = useBusinessCapabilityRuntime();
+  const [webEnabled, setWebEnabled] = useState(true);
+  const [publicationLoading, setPublicationLoading] = useState(true);
+  const [publicationSaving, setPublicationSaving] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const url = useMemo(() => resolveQrMenuPublicUrl(webModuleUrl), [webModuleUrl]);
+  const visibleOnWeb = moduleEnabled && webEnabled;
   const svg = useMemo(() => {
-    if (!enabled || !url) return "";
+    if (!visibleOnWeb || !url) return "";
     try {
       return createQrSvg(url);
     } catch {
       return "";
     }
-  }, [enabled, url]);
-  const busy = capability.state === "loading";
+  }, [visibleOnWeb, url]);
+  const busy = publicationLoading || publicationSaving;
+
+  useEffect(() => {
+    let active = true;
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.getQrMenuWebPublication) {
+      setPublicationLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setPublicationLoading(true);
+    void bridge.getQrMenuWebPublication()
+      .then((state) => {
+        if (!active) return;
+        setWebEnabled(state.enabled !== false);
+      })
+      .catch(() => {
+        if (!active) return;
+        reportAppStatus("error", "QR Menü web görünürlüğü okunamadı.");
+      })
+      .finally(() => {
+        if (active) setPublicationLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [moduleEnabled]);
 
   async function toggle(next: boolean) {
-    const snapshot = await capability.setCapability(BUSINESS_CAPABILITIES.QR_MENU, next);
-    if (!snapshot) return;
-    if (!next) setToolsOpen(false);
+    if (!moduleEnabled || publicationSaving) return;
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.setQrMenuWebPublication) {
+      reportAppStatus("error", "QR Menü web görünürlüğü değiştirilemedi.");
+      return;
+    }
+
+    setPublicationSaving(true);
+    try {
+      const result = await bridge.setQrMenuWebPublication(next);
+      if (!result.ok) {
+        reportAppStatus("error", result.message || "QR Menü web görünürlüğü değiştirilemedi.");
+        return;
+      }
+      setWebEnabled(result.enabled);
+      if (!result.enabled) setToolsOpen(false);
+      reportAppStatus("success", result.message);
+    } catch {
+      reportAppStatus("error", "QR Menü web görünürlüğü değiştirilemedi.");
+    } finally {
+      setPublicationSaving(false);
+    }
   }
 
   async function copyUrl() {
@@ -53,30 +102,41 @@ export function QrMenuPanel({ enabled, webModuleUrl, onPreview }: {
     URL.revokeObjectURL(href);
   }
 
+  const statusText = !moduleEnabled
+    ? "QR Menü modülü Ayarlar'dan kapalı"
+    : visibleOnWeb
+      ? "Web QR menüsü görünür"
+      : "Web QR menüsü gizli · yerel menü açık";
+
   return <>
-    <section className={`menu-qr-service${enabled ? " is-enabled" : " is-disabled"}`} aria-label="QR Menü">
+    <section className={`menu-qr-service${visibleOnWeb ? " is-enabled" : " is-disabled"}`} aria-label="QR Menü">
       <div className="menu-qr-service__header">
         <div className="menu-qr-service__identity">
           <strong>QR Menü</strong>
-          <span>{enabled ? "Web QR menüsü etkin" : "Yalnız uygulama içi menü"}</span>
+          <span>{statusText}</span>
         </div>
         <div className="menu-qr-service__actions">
           <ActionButton variant="secondary" size="sm" onClick={onPreview}>
             <Eye size={16} aria-hidden="true" /> Önizle
           </ActionButton>
-          <ActionButton variant="secondary" size="sm" disabled={!enabled || !url} onClick={() => setToolsOpen(true)}>
+          <ActionButton variant="secondary" size="sm" disabled={!visibleOnWeb || !url} onClick={() => setToolsOpen(true)}>
             <QrCode size={16} aria-hidden="true" /> QR Kod
           </ActionButton>
         </div>
         <label className="menu-qr-service__toggle">
-          <input aria-label="QR Menü aktif" type="checkbox" checked={enabled} disabled={busy}
-            onChange={(event) => void toggle(event.target.checked)} />
-          <span>{enabled ? "Aktif" : "Pasif"}</span>
+          <input
+            aria-label="QR Menü webde aktif"
+            type="checkbox"
+            checked={visibleOnWeb}
+            disabled={!moduleEnabled || busy}
+            onChange={(event) => void toggle(event.target.checked)}
+          />
+          <span>{visibleOnWeb ? "Webde aktif" : "Webde pasif"}</span>
         </label>
       </div>
     </section>
 
-    {toolsOpen && enabled && <ModalSurface
+    {toolsOpen && visibleOnWeb && <ModalSurface
       labelledBy="qr-menu-tools-title"
       className="qr-menu-tools-modal"
       dismissOnBackdrop
