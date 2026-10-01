@@ -165,6 +165,26 @@ Yeni component yalnız tekrar eden gerçek bir semantic contract varsa çıkarı
 Feature Page yalnız kendi toolbar/body düzenini; Workspace yalnız entity içeriğini
 sahiplenir. Feature CSS global sidebar/header/page padding tanımlamaz.
 
+### Page height policy
+
+Sayfa canvas'ı kullanılabilir viewport'u doldurur; panel yüksekliği görev tipine göre
+iki moddan biriyle açıkça seçilir:
+
+- `flow`: kayıt, form, ayar ve rapor yüzeyleri içerik kadar büyür. Veri arttığında
+  sayfa body scroll eder. Müşteriler, Menü, Ayarlar ve rapor türü yüzeyler bu gruptadır.
+- `fill`: konumların sabit kalmasının önemli olduğu operasyon yüzeyleri kalan viewport'u
+  doldurur ve scroll'u doğru iç bölge sahiplenir. Pansiyon, Restoran, Talepler,
+  WhatsApp Web ve Takvim bu gruptadır.
+
+`FeatureWorkspacePage` kullanan sayfalarda bu seçim `layout="flow" | "fill"` ile
+yapılır. Feature CSS rastgele ekran yüksekliği üretmez.
+
+Sabit panel yüksekliği varsayılan çözüm değildir. `px`, `vh` veya `dvh` ile
+feature-specific yükseklik yalnız gerçek geometrik ihtiyaçlarda kullanılabilir:
+kontrol boyutu, medya/kamera viewport'u, modal sınırı veya açıkça tanımlanmış preview.
+Normal panel/list/workspace yüksekliği flex/grid, `min-height: 0` ve scroll ownership
+ile çözülür.
+
 Canonical entity editor için Workspace platformu kullanılır. Centered/full-canvas aynı
 state'in iki presentation'ıdır. Nested modal ve paralel editör familyası oluşturulmaz.
 
