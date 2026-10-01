@@ -263,8 +263,7 @@ export function MenuManager({
             <DataList className="menu-record-list menu-category-list">
               {sortedCategories.map((category) => {
                 const productCount = dashboardData.menu.items.filter((item) => item.category_id === category.id).length;
-                const editing = editingCategoryId === category.id && editingCategoryForm;
-                if (editing) {
+                if (editingCategoryId === category.id && editingCategoryForm) {
                   return <article className="menu-category-row menu-category-row--editing" key={category.id}>
                     <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />
                     <div className="menu-category-inline-fields">
