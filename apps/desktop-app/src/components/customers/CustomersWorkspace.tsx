@@ -5,6 +5,7 @@ import { formatCustomerSource } from "../../app/customer-model";
 import { formatShortDate } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListItem } from "../ui/DataList";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { CustomerCreateEditor } from "./CustomerCreateEditor";
@@ -106,18 +107,23 @@ export function CustomersWorkspace({
         <span>Ara</span>
         <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder={stays.length > 0 ? "Ad, telefon, kimlik, etiket veya oda" : "Ad, telefon, kimlik veya etiket"} />
       </label>
-      <div className="action-row customer-filter-row" role="group" aria-label="Müşteri filtresi">
-        {([
-          ["all", "Tümü"],
-          ["staying", "Konaklayanlar"],
-          ["reserved", "Rezervasyonu Olanlar"],
-          ...(kbsOverview.enabled ? [["kbs_pending", "Bildirim Bekleyen"], ["kbs_failed", "Bildirim Hatalı"]] : [])
-        ] as Array<[CustomerFilter, string]>).map(([id, label]) => (
-          <ActionButton key={id} size="sm" variant={filter === id ? "primary" : "secondary"} onClick={() => setFilter(id)}>
-            {label}
-          </ActionButton>
-        ))}
-      </div>
+      <ChoiceChips
+        className="customer-filter-row"
+        ariaLabel="Müşteri filtresi"
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { id: "all", label: "Tümü" },
+          { id: "staying", label: "Konaklayanlar" },
+          { id: "reserved", label: "Rezervasyonu Olanlar" },
+          ...(kbsOverview.enabled
+            ? [
+                { id: "kbs_pending" as const, label: "Bildirim Bekleyen" },
+                { id: "kbs_failed" as const, label: "Bildirim Hatalı" }
+              ]
+            : [])
+        ]}
+      />
     </div>
 
     <DataList className="customers-workspace__items">
@@ -199,5 +205,5 @@ function kbsLabel(state: string) {
 function kbsTone(state: string): StatusTone {
   if (state === "sent") return "success";
   if (state === "failed") return "danger";
-  return "wait";
+  return "warning";
 }
