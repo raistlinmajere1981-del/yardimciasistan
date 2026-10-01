@@ -203,6 +203,10 @@ function validateSource() {
   assert.ok(syncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "AI ayar yayını header güvenlik anahtarını doğrulamalı.");
   assert.ok(syncEndpoint.includes("enqueue_android_action"), "api/sync.php Android action kuyruğunu içermeli.");
   assert.ok(syncEndpoint.includes("acknowledge_requests"), "api/sync.php cursor onayını içermeli.");
+  assert.ok(syncEndpoint.includes("YA_AI_CONVERSATIONS_FILE") && syncEndpoint.includes("ai_conversations_reset_failed"),
+    "Web runtime reset AI konuşma geçmişini boşaltmalı.");
+  assert.ok(syncEndpoint.includes("ya_sync_prune_room_media([])") && syncEndpoint.includes("ya_sync_prune_table_media([])"),
+    "Web runtime reset oda ve masa medyasını birlikte temizlemeli.");
 
   const androidAuth = readFileSync(join(sourceRoot, "lib", "android-device-auth.php"), "utf8");
   assert.ok(androidAuth.includes("android_device_tokens"), "Android cihaz tokenları hosting SQLite içinde yönetilmeli.");
@@ -237,6 +241,9 @@ function validateSource() {
 
   const storageModule = readFileSync(join(sourceRoot, "lib", "storage.php"), "utf8");
   assert.ok(storageModule.includes("PDO_SQLITE") || storageModule.includes("pdo_sqlite"), "SQLite depolama PDO_SQLITE gereksinimini açıklamalı.");
+  for (const runtimeTable of ["android_device_tokens", "android_bootstrap_nonces", "public_request_guard_events"]) {
+    assert.ok(storageModule.includes(runtimeTable), `Runtime reset dinamik tabloyu temizlemeli: ${runtimeTable}`);
+  }
 
   const widget = readFileSync(join(sourceRoot, "widget.js"), "utf8");
   assert.ok(widget.includes("YardimciAsistanWidget"), "widget.js YardimciAsistanWidget globalini içermeli.");
