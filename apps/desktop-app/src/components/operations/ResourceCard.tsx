@@ -15,7 +15,14 @@ export function ResourceCard({ title, subtitle, icon, status, tone, children, ac
     if (target.closest("button, a, input, select, textarea, [role='button'], [role='option'], [role='combobox'], [role='group']")) return;
     onOpen();
   };
-  return <article className="resource-card" data-tone={tone} aria-labelledby={`${id}-title`} aria-busy={busy || undefined} onClick={openFromCardSurface}>
+  return <article
+    className="resource-card"
+    data-tone={tone}
+    data-feedback={error ? "error" : feedback ? "success" : undefined}
+    aria-labelledby={`${id}-title`}
+    aria-busy={busy || undefined}
+    onClick={openFromCardSurface}
+  >
     {imageSrc && <img className="resource-card__image" src={imageSrc} alt="" loading="lazy" decoding="async" width={1536} height={1024} />}
     <header className="resource-card__header">
       <button className="resource-card__open-hit-area" type="button" aria-label={openLabel} disabled={busy}
