@@ -1,46 +1,98 @@
 .status-badge,
+.status-chip,
 .password-status,
 .backup-kind,
 .backup-count {
+  --status-tone: var(--color-text-muted);
+  --status-soft: var(--color-bg-surface);
+  --status-border: var(--color-border);
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--status-border);
   border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-  background: var(--color-bg-surface);
+  color: var(--status-tone);
+  background: var(--status-soft);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   white-space: nowrap;
 }
 
+:is(.status-badge, .status-chip)[data-tone="info"],
+.status-badge.info,
+.status-badge.tone-info {
+  --status-tone: var(--color-info);
+  --status-soft: var(--color-info-soft);
+  --status-border: var(--color-info-border);
+}
+
+:is(.status-badge, .status-chip)[data-tone="success"],
 .status-badge.success,
 .status-badge.ok,
 .status-badge.tone-ok,
 .status-badge.is-success,
 .password-status.is-enabled,
 .backup-kind.is-manual {
-  color: var(--color-success);
-  background: var(--color-success-soft);
+  --status-tone: var(--color-success);
+  --status-soft: var(--color-success-soft);
+  --status-border: var(--color-success-border);
 }
 
+:is(.status-badge, .status-chip)[data-tone="warning"],
 .status-badge.warning,
 .status-badge.wait,
 .status-badge.tone-wait,
 .backup-kind.is-safety {
-  color: var(--color-warning);
-  background: var(--color-warning-soft);
+  --status-tone: var(--color-warning);
+  --status-soft: var(--color-warning-soft);
+  --status-border: var(--color-warning-border);
 }
 
+:is(.status-badge, .status-chip)[data-tone="danger"],
 .status-badge.danger,
 .status-badge.tone-error {
-  color: var(--color-danger);
-  background: var(--color-danger-soft);
+  --status-tone: var(--color-danger);
+  --status-soft: var(--color-danger-soft);
+  --status-border: var(--color-danger-border);
 }
 
-.status-badge.info,
-.status-badge.tone-info {
-  color: var(--color-info);
-  background: var(--color-info-soft);
+:is(.status-badge, .status-chip)[data-tone="muted"] {
+  --status-tone: var(--color-text-muted);
+  --status-soft: var(--color-muted-soft);
+  --status-border: var(--color-border);
+  opacity: .8;
+}
+
+/* StatusChip is interactive; StatusBadge remains descriptive only. */
+.status-chip {
+  min-height: var(--control-height-sm);
+  padding-inline: var(--space-3);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    color var(--motion-hover) var(--ease-standard),
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+.status-chip:hover:not(:disabled) {
+  border-color: var(--status-tone);
+}
+
+.status-chip:active:not(:disabled) {
+  transform: translateY(1px) scale(.99);
+}
+
+.status-chip[aria-pressed="true"] {
+  border-color: var(--status-tone);
+  font-weight: var(--weight-semibold);
+}
+
+.status-chip:disabled {
+  cursor: not-allowed;
+  opacity: .55;
 }
