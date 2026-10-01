@@ -4,7 +4,9 @@ declare(strict_types=1);
 const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 const YA_AI_SETTINGS_FILE = YA_BASE_DIR . '/data/ai-settings.local.php';
+const YA_AI_CONVERSATIONS_FILE = YA_BASE_DIR . '/data/ai-conversations.json';
 const YA_GOOGLE_REVIEWS_SETTINGS_FILE = YA_BASE_DIR . '/data/google-reviews.local.php';
+const YA_GOOGLE_REVIEWS_CACHE_FILE = YA_BASE_DIR . '/data/google-reviews-cache.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
@@ -166,10 +168,27 @@ function ya_sync_reset_runtime(): void
     if (is_file(YA_GOOGLE_REVIEWS_SETTINGS_FILE)) {
         @unlink(YA_GOOGLE_REVIEWS_SETTINGS_FILE);
     }
+    if (is_file(YA_GOOGLE_REVIEWS_CACHE_FILE)) {
+        @unlink(YA_GOOGLE_REVIEWS_CACHE_FILE);
+    }
 
-    // Room media belongs to the published room catalog. An empty catalog means
-    // there are no retained media files on a genuinely clean web runtime.
+    // AI conversations are runtime/customer data too. Keep the protected seed
+    // file itself, but return it to the canonical empty state.
+    if (file_put_contents(YA_AI_CONVERSATIONS_FILE, "[]\n", LOCK_EX) === false) {
+        throw new RuntimeException('ai_conversations_reset_failed');
+    }
+
+    // Catalog media belongs to runtime publications. A genuinely clean web
+    // runtime keeps neither room nor table media from the previous installation.
     ya_sync_prune_room_media([]);
+    ya_sync_prune_table_media([]);
+
+    // Remove one-time legacy JSON backups left by pre-SQLite installations.
+    foreach (glob(YA_BASE_DIR . '/data/*.legacy-backup-v1') ?: [] as $legacyFile) {
+        if (is_file($legacyFile)) {
+            @unlink($legacyFile);
+        }
+    }
 
     ya_sync_response(200, [
         'ok' => true,
