@@ -292,16 +292,37 @@ if (dryRun) {
     `${localAssets}/`,
     `${deployHost}:${remoteWww}/assets/`
   ]);
-  console.log("Demo site farklari (kaynak agaci birebir yonetilir):");
+  console.log("Public-site ortak asset farklari (root /assets altina ekleme/guncelleme):");
+  runLocal("rsync", [
+    "-azn",
+    "--itemize-changes",
+    "-e",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15",
+    `${localDemo}/assets/`,
+    `${deployHost}:${remoteWww}/assets/`
+  ]);
+  console.log("Public-site ortak PHP farklari (/inc):");
   runLocal("rsync", [
     "-azn",
     "--delete",
     "--itemize-changes",
     "-e",
     "ssh -o BatchMode=yes -o ConnectTimeout=15",
-    `${localDemo}/`,
-    `${deployHost}:${remoteWww}/demo/`
+    `${localDemo}/inc/`,
+    `${deployHost}:${remoteWww}/inc/`
   ]);
+  for (const route of publicRouteDirs) {
+    console.log(`Public route farklari: /${route}/`);
+    runLocal("rsync", [
+      "-azn",
+      "--delete",
+      "--itemize-changes",
+      "-e",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15",
+      `${localDemo}/${route}/`,
+      `${deployHost}:${remoteWww}/${route}/`
+    ]);
+  }
   if (withDownloads) {
     step("Dry-run: kurulum dosyalari");
     for (const artifact of downloadArtifacts) {
