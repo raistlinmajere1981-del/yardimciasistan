@@ -43,7 +43,7 @@ try {
   await expect(workspace).toBeVisible();
   await expect(workspace.getByRole('heading', { level: 2 })).toBeFocused();
   await expect(workspace.locator('.workspace-tabs')).toHaveCount(0);
-  await expect(workspace.getByRole('region', { name: 'Menü', exact: true })).toBeVisible();
+  await expect(workspace.getByRole('region', { name: 'Sipariş menüsü', exact: true })).toBeVisible();
   await expect(workspace.getByRole('region', { name: 'Hesap ve İlişkiler', exact: true })).toBeVisible();
   const tableSurface = workspace.locator('.operation-surface--table');
   const tablePanes = tableSurface.locator(':scope > section');
