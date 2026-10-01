@@ -29,7 +29,14 @@ try {
     ]);
 }
 $publication = is_array($menu['_publication'] ?? null) ? $menu['_publication'] : [];
-unset($menu['_publication']);
+$webEnabled = array_key_exists('enabled', $menu) ? (($menu['enabled'] ?? false) === true) : true;
+unset($menu['_publication'], $menu['enabled']);
+if ($publication !== [] && !$webEnabled) {
+    ya_menu_response(404, [
+        'ok' => false,
+        'message' => 'QR menü webde gizli.'
+    ]);
+}
 $serverRevision = (int) ($publication['server_revision'] ?? 0);
 $etag = '"ya-menu-' . $serverRevision . '"';
 header('ETag: ' . $etag);
