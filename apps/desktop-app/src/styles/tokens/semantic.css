@@ -33,6 +33,7 @@
   --color-selected: var(--color-accent);
   --color-selected-soft: var(--color-accent-soft);
   --color-selected-border: var(--color-accent-border);
+  --shadow-selected-ring: 0 0 0 1px var(--color-selected);
 
   /* Surface role is classification, not status. Tints stay deliberately quiet. */
   --color-role-neutral-bg: var(--color-bg-panel);
