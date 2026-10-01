@@ -187,8 +187,11 @@ try {
   await expect.poll(() => page.evaluate(() => window.fixtureState().folios[0].items.find(item => item.kind === 'discount')?.lineTotalMinor)).toBe(-1000);
   await expect(operations.locator('.room-folio-line-list').getByText('İndirim', { exact: true })).toHaveCount(0);
   await captureOperationWorkspace(page, 'room-occupied');
-  await chooseSearchSelect(operations, 'Ürün / hizmet', /Çay/);
-  await button('Ürünü Ekle').click();
+  const roomMenu = operations.getByRole('region', { name: 'Oda hesabı menüsü', exact: true });
+  await expect(roomMenu.getByLabel('Oda hesabı için ürün ara', { exact: true })).toBeVisible();
+  await expect(roomMenu.getByLabel('Menü kategorileri', { exact: true })).toBeVisible();
+  await expect(roomMenu.locator('.restaurant-order-product').filter({ hasText: 'Çay' })).toBeVisible();
+  await roomMenu.getByRole('button', { name: 'Çay ürününü oda hesabına ekle', exact: true }).click();
   await expect(operations.getByLabel('Odaya eklenenler')).toContainText('Çay');
   await expect(account.getByLabel('Odaya eklenenler')).toHaveCount(0);
   expect(await page.evaluate(() => window.fixtureState().menu[0].stockQuantity)).toBe(9);
@@ -330,7 +333,7 @@ try {
         expect(requests).toHaveLength(2);
         expect(requests[0]).toBe(requests[1]);
         await expect(workspace.getByRole('button', { name: 'Hesabı Aç', exact: true })).toHaveCount(0);
-        await expect(workspace.getByLabel('Ürün / hizmet')).toHaveCount(0);
+        await expect(workspace.getByLabel('Oda hesabı için ürün ara')).toHaveCount(0);
         await expect(workspace.getByRole('button', { name: 'Ödemeyi Kaydet' })).toBeEnabled();
       } else expect(await variantPage.evaluate(() => window.fixtureCalls.some(call => call.kind === 'open-account'))).toBe(false);
     }

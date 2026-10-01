@@ -1,53 +1,54 @@
 import { useState } from "react";
+import type { PublishedMenuItem, PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import type { DesktopRoomFolio } from "../../../electron/room-folio";
+import { MenuProductPicker } from "../menu/MenuProductPicker";
 import { ActionButton } from "../ui/ActionButton";
 import { MoneyInput } from "../ui/MoneyInput";
-import { SearchSelect } from "../ui/SearchSelect";
 import { minorMoney, parseMoneyToMinor } from "./folio-format";
 import type { RoomFolioController } from "./use-room-folio-controller";
 
-export function RoomAccountAdjustments({ folio, controller, menuEnabled, disabled, onDirty }: {
-  folio: DesktopRoomFolio; controller: RoomFolioController; menuEnabled: boolean; disabled: boolean;
+export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, menuEnabled, disabled, onDirty }: {
+  folio: DesktopRoomFolio; controller: RoomFolioController; menu: PublishedQrMenu; webModuleUrl: string;
+  menuEnabled: boolean; disabled: boolean;
   onDirty: (key: string, dirty: boolean) => void;
 }) {
-  const [itemId, setItemId] = useState("");
   const [amount, setAmount] = useState("");
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
-  const item = controller.data.menuItems.find(item => item.id === itemId);
   const visibleItems = folio.items.filter(item => item.kind !== "discount");
+
+  function roomMenuItem(item: PublishedMenuItem) {
+    return controller.data.menuItems.find(candidate => candidate.id === item.id);
+  }
+
+  function canAddMenuItem(item: PublishedMenuItem) {
+    const source = roomMenuItem(item);
+    return Boolean(source && (source.stockQuantity === null || source.stockQuantity >= source.stockConsumptionQuantity));
+  }
+
+  function addMenuItem(item: PublishedMenuItem) {
+    const source = roomMenuItem(item);
+    if (!source || !canAddMenuItem(item)) return;
+    const existing = folio.items.find(line => line.kind === "menu" && line.menuItemId === source.id && !line.note.trim());
+    return controller.mutate(() => existing
+      ? window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: existing.id, quantity: existing.quantity + 1 })
+      : window.yardimciDesktop!.addRoomFolioMenuItem({ folioId: folio.id, menuItemId: source.id, quantity: 1 }), "adjustments");
+  }
+
   return <section className="operation-section form-stack" aria-label="Hesaba ekle">
     <h4>Hesaba ekle · {folio.customerName}</h4>
-    {menuEnabled && <form className="form-stack" onSubmit={event => {
-      event.preventDefault();
-      if (!item || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)) return;
-      const existing = folio.items.find(line => line.kind === "menu" && line.menuItemId === item.id && !line.note.trim());
-      void controller.mutate(() => existing ? window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: existing.id, quantity: existing.quantity + 1 })
-        : window.yardimciDesktop!.addRoomFolioMenuItem({ folioId: folio.id, menuItemId: item.id, quantity: 1 }), "adjustments");
-    }}>
-      <fieldset className="form-stack" disabled={disabled}>
-        <div className="room-inline-action-row">
-          <div className="form-field form-field--fluid">
-            <span>Ürün / hizmet</span>
-            <SearchSelect
-              ariaLabel="Ürün / hizmet"
-              value={itemId}
-              onChange={setItemId}
-              placeholder="Ürün seçin"
-              searchPlaceholder="Ürün, kategori veya açıklama ara"
-              options={controller.data.menuItems.map(item => ({
-                id: item.id,
-                label: item.name,
-                description: `${item.categoryName || "Menü"} · ${minorMoney(item.priceMinor)}${item.stockQuantity === null ? "" : ` · Stok ${item.stockQuantity} ${item.stockUnit || ""}`}`,
-                keywords: `${item.categoryName} ${item.description}`,
-                disabled: item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity
-              }))}
-            />
-          </div>
-          <ActionButton variant="secondary" type="submit" disabled={!item || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)}>Ürünü Ekle</ActionButton>
-        </div>
-      </fieldset>
-    </form>}
+    <MenuProductPicker
+      menu={menu}
+      webModuleUrl={webModuleUrl}
+      enabled={menuEnabled}
+      busy={disabled}
+      panelAriaLabel="Oda hesabı menüsü"
+      searchAriaLabel="Oda hesabı için ürün ara"
+      addAriaLabel={item => `${item.name} ürününü oda hesabına ekle`}
+      canAddItem={canAddMenuItem}
+      onAddItem={addMenuItem}
+      className="room-folio-menu-panel"
+    />
     <form className="form-stack" onChange={() => onDirty("charge", true)} onSubmit={event => {
       event.preventDefault(); setError(""); const value = parseMoneyToMinor(amount);
       if (value === null || value <= 0) { setError("Geçerli bir tutar girin."); return; }

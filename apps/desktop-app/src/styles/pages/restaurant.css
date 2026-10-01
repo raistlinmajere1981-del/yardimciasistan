@@ -150,6 +150,12 @@ details.table-area-group > .resource-grid { margin-top: var(--space-3); }
   background: var(--color-bg-surface);
 }
 
+.room-folio-menu-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-surface);
+}
+
 .restaurant-order-ticket-panel {
   grid-template-rows: auto minmax(0, 1fr);
   background: var(--color-bg-panel);
