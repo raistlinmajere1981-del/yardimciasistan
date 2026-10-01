@@ -36,8 +36,8 @@ import { SearchSelect } from "../ui/SearchSelect";
 
 function getReservationStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) return "danger";
-  if (status === "pending") return "wait";
-  if (["approved", "completed"].includes(status)) return "ok";
+  if (status === "pending") return "warning";
+  if (["approved", "completed"].includes(status)) return "success";
   return "info";
 }
 
@@ -107,8 +107,8 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
     <section className="record-stack" aria-label="Günlük işler">
       <div className="page-toolbar">
         <div className="page-toolbar__start" aria-label="Günlük iş özeti">
-          <StatusBadge tone="wait">{tasks.filter((task) => task.status === "pending").length} bekleyen</StatusBadge>
-          <StatusBadge tone="ok">{tasks.filter((task) => task.status === "done").length} tamamlanan</StatusBadge>
+          <StatusBadge tone="warning">{tasks.filter((task) => task.status === "pending").length} bekleyen</StatusBadge>
+          <StatusBadge tone="success">{tasks.filter((task) => task.status === "done").length} tamamlanan</StatusBadge>
           <ActionButton
             size="sm"
             type="button"
@@ -158,7 +158,7 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
               className="task-record-row"
               key={task.id}
               leading={(
-                <StatusBadge tone={task.status === "done" ? "ok" : task.status === "pending" ? "wait" : "info"}>
+                <StatusBadge tone={task.status === "done" ? "success" : task.status === "pending" ? "warning" : "info"}>
                   {formatTaskStatus(task.status)}
                 </StatusBadge>
               )}
@@ -286,7 +286,7 @@ export function ReservationsWorkspace({
       <div className="page-toolbar">
         <div className="page-toolbar__start" aria-label="Rezervasyon özeti">
           <StatusBadge tone="info">{filteredReservations.length} görünen kayıt</StatusBadge>
-          <StatusBadge tone="wait">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
+          <StatusBadge tone="warning">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
           <ActionButton
             size="sm"
             type="button"
