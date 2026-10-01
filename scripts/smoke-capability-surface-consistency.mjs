@@ -126,6 +126,16 @@ assert.match(
   /qrMenuEnabled\s*&&\s*\([\s\S]{0,180}<QrMenuPanel enabled/,
   "QR menu controls must disappear when the Settings QR module is disabled"
 );
+assert.match(
+  menuManagerSource,
+  /menu-drag-handle-hitbox[\s\S]{0,220}draggable=\{!reorderBusy\}[\s\S]{0,220}onDragStart/,
+  "menu reordering must start from the drag handle instead of stealing normal row clicks"
+);
+assert.match(
+  menuManagerSource,
+  /menu-category-row__main menu-category-row__select[\s\S]{0,220}aria-label=\{category\.name\}[\s\S]{0,260}onSelectCategory\(category\)/,
+  "the category content surface must remain directly selectable"
+);
 assertHandlerGuard(menuIpcSource, "menu:setWebPublication", "assertCapability(BUSINESS_CAPABILITIES.QR_MENU");
 assert.match(
   menuCssSource,
