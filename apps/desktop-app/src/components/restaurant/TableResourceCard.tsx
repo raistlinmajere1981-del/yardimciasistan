@@ -157,7 +157,7 @@ export function TableResourceCard({ table, summary, capabilities, onDashboard, o
       onOpen={open}
       openLabel={`${table.name} masasını aç`}
       action={<><ActionButton variant="secondary" disabled={busy} onClick={open}>Detay Gör</ActionButton>
-        {quickAction && <ActionButton disabled={busy} onClick={() => void runQuickAction()}>{quickAction.label}</ActionButton>}</>}
+        {quickAction && <ActionButton busy={busy} busyLabel="İşleniyor…" onClick={() => void runQuickAction()}>{quickAction.label}</ActionButton>}</>}
     >
       {!summary ? <p className="resource-card__notice"><CircleAlert size={16} />Güncel adisyon bilgisi alınamadı.</p> : <>
         {order && <><div className="resource-card__fact"><span><ReceiptText size={16} />{order.itemCount > 0 ? `${order.itemCount} ürün` : "Sipariş alınıyor"}</span>
