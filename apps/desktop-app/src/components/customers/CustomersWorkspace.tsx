@@ -143,7 +143,7 @@ export function CustomersWorkspace({
             if (target.closest(".list-row__actions, .customer-record-row__open")) return;
             openCustomer();
           }}
-          leading={<span className={"status-dot " + (row.activeStay ? "tone-success" : row.activeReservations.length > 0 ? "tone-wait" : "tone-neutral")} aria-hidden="true" />}
+          leading={<span className={"status-dot " + (row.activeStay ? "tone-success" : row.activeReservations.length > 0 ? "tone-warning" : "tone-neutral")} aria-hidden="true" />}
           title={<button className="customer-record-row__open" type="button" onClick={openCustomer}>{customer.fullName}</button>}
           meta={<>
             {row.roomText && <span><BedDouble size={14} aria-hidden="true" />{row.roomText}</span>}
