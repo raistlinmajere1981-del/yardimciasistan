@@ -85,7 +85,7 @@ try {
       pensionBalances: [],
       categories: clone(defaultCategories)
     };
-    const roomData = {
+    let roomData = {
       generatedAt: now,
       rooms: [],
       activeStays: [],
@@ -142,7 +142,9 @@ try {
       saveCalls: 0,
       saveWaits: 0,
       deleteCalls: 0,
-      deleteWaits: 0
+      deleteWaits: 0,
+      paymentCalls: 0,
+      folioCloseCalls: 0
     };
     window.__financeDeferLoad = false;
     window.__financeDeferSave = false;
@@ -220,6 +222,56 @@ try {
         window.__financeStats.roomCalls += 1;
         if (window.__financeFailRoom) throw new Error("injected room projection failure");
         return clone(roomData);
+      },
+      addRoomFolioPayment: async (input) => {
+        window.__financeStats.paymentCalls += 1;
+        const folio = roomData.folios.find(item => item.id === input.folioId);
+        if (!folio || folio.status !== "open") return { ok: false, message: "Oda adisyonu kapalı." };
+        if (input.amountMinor <= 0 || input.amountMinor > folio.remainingMinor) return { ok: false, message: "Ödeme tutarı geçersiz." };
+        folio.paidTotalMinor += input.amountMinor;
+        folio.remainingMinor -= input.amountMinor;
+        folio.payments.push({
+          id: `payment-${window.__financeStats.paymentCalls}`,
+          folioId: folio.id,
+          amountMinor: input.amountMinor,
+          currency: folio.currency,
+          paymentMethod: input.paymentMethod,
+          paidAt: new Date().toISOString(),
+          note: "",
+          origin: "direct",
+          createdAt: new Date().toISOString()
+        });
+        financeData = {
+          ...financeData,
+          todayIncomeMinor: financeData.todayIncomeMinor + input.amountMinor,
+          todayNetMinor: financeData.todayNetMinor + input.amountMinor,
+          outstandingPensionMinor: Math.max(0, financeData.outstandingPensionMinor - input.amountMinor),
+          recentEntries: [{
+            id: `folio-payment-${window.__financeStats.paymentCalls}`,
+            direction: "income",
+            amountMinor: input.amountMinor,
+            currency: folio.currency,
+            paymentMethod: input.paymentMethod,
+            category: "pension",
+            description: "Oda tahsilatı",
+            occurredAt: new Date().toISOString(),
+            sourceType: "room_folio_payment",
+            sourceId: folio.id,
+            note: "",
+            createdAt: new Date().toISOString()
+          }, ...financeData.recentEntries]
+        };
+        return { ok: true, message: "Ödeme alındı ve kasaya işlendi.", data: clone(roomData), folioId: folio.id };
+      },
+      checkoutRoomFolio: async ({ folioId }) => {
+        window.__financeStats.folioCloseCalls += 1;
+        const folio = roomData.folios.find(item => item.id === folioId);
+        if (!folio || folio.status !== "open") return { ok: false, message: "Açık oda adisyonu bulunamadı." };
+        if (folio.remainingMinor === 0) {
+          folio.status = "closed";
+          folio.closedAt = new Date().toISOString();
+        }
+        return { ok: true, message: "Oda hesabı kapatıldı.", data: clone(roomData), folioId };
       },
       saveManualFinanceEntry: async (input) => {
         window.__financeStats.saveCalls += 1;
@@ -299,6 +351,20 @@ try {
   await expect(page.getByText("Otomatik restoran geliri", { exact: true })).toBeVisible();
   const automaticRow = page.locator(".finance-entry-item").filter({ hasText: "Otomatik restoran geliri" });
   await expect(automaticRow.getByRole("button", { name: "Kasa hareketini kaldır" })).toHaveCount(0);
+
+  // Outstanding room debt can be collected directly from Cash without reopening the room.
+  const outstanding = finance().getByRole("article").filter({ hasText: "Test Misafiri" });
+  await expect(outstanding.getByRole("button", { name: "Test Misafiri", exact: true })).toBeVisible();
+  await outstanding.getByRole("button", { name: "Tahsil Et", exact: true }).click();
+  const receivableDialog = page.getByRole("dialog", { name: "Tahsilat al", exact: true });
+  await expect(receivableDialog).toContainText("₺250,00");
+  await receivableDialog.getByLabel("Tahsilat ödeme yöntemi").selectOption("bank");
+  await receivableDialog.getByRole("button", { name: "Tahsilatı Kaydet", exact: true }).click();
+  await expect(receivableDialog).toHaveCount(0);
+  await expect(finance().getByText("Test Misafiri", { exact: true })).toHaveCount(0);
+  await expect(finance().getByText("Oda tahsilatı", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__financeStats.paymentCalls)).toBe(1);
+  expect(await page.evaluate(() => window.__financeStats.folioCloseCalls)).toBe(1);
 
   // Draft survives page unmount/remount.
   await finance().getByRole("button", { name: "Gelir Ekle", exact: true }).click();

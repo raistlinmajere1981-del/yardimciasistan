@@ -4,6 +4,8 @@ import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asista
 import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
 import { useFinanceController } from "../../apps/desktop-app/src/app/use-finance-controller";
 import { FinanceWorkspace } from "../../apps/desktop-app/src/components/finance/FinanceWorkspace";
+import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
+import { WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import "../../apps/desktop-app/src/styles/index.css";
 
 type HarnessPage = "finance" | "other";
@@ -51,11 +53,13 @@ function Harness() {
         <button type="button" onClick={() => setPage("finance")}>Kasa</button>
         <button type="button" onClick={() => setPage("other")}>Diğer</button>
       </nav>
-      {page === "finance"
-        ? controller.financeEnabled
-          ? <FinanceWorkspace controller={controller} />
-          : <section aria-label="Finance kapalı"><h1>Kasa kapalı</h1></section>
-        : <section aria-label="Diğer sayfa"><h1>Diğer</h1></section>}
+      <WorkspaceNavigationProvider page="reports" definitions={workspaceDefinitions}>
+        {page === "finance"
+          ? controller.financeEnabled
+            ? <FinanceWorkspace controller={controller} />
+            : <section aria-label="Finance kapalı"><h1>Kasa kapalı</h1></section>
+          : <section aria-label="Diğer sayfa"><h1>Diğer</h1></section>}
+      </WorkspaceNavigationProvider>
     </main>
   );
 }
