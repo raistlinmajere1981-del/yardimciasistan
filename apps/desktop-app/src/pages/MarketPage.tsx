@@ -125,6 +125,7 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
           categories={categories}
           session={quickSaleSession}
           barcodeEnabled={barcodeEnabled}
+          inventoryEnabled={inventoryEnabled}
           busy={dataState === "loading"}
           onSaleCompleted={handleSaleCompleted}
           onStateChange={handleStateChange}

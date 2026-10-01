@@ -11,6 +11,7 @@ import {
   type InventoryMovement,
   type InventoryMovementType
 } from "@yardimci-asistan/shared";
+import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 
 const COMMERCE_UNITS = new Set<CommerceUnit>([
   "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
@@ -744,7 +745,10 @@ export function createCommerceSaleInTransaction(
   }
 
   const saleId = createId("sale_");
-  const locationId = String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
+  const inventoryEnabled = isInventoryTrackingEnabled(database);
+  const locationId = inventoryEnabled
+    ? String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now)
+    : "";
   let currency = "";
   let subtotal = 0;
   const preparedItems: Array<{
@@ -805,7 +809,7 @@ export function createCommerceSaleInTransaction(
       now
     );
 
-    if (prepared.product.trackInventory) {
+    if (inventoryEnabled && prepared.product.trackInventory) {
       applyInventoryMovementInTransaction(database, businessId, {
         productId: prepared.product.id,
         locationId,

@@ -31,6 +31,7 @@ interface MarketQuickSaleWorkspaceProps {
   categories: CatalogCategory[];
   session: MarketQuickSaleSession;
   barcodeEnabled: boolean;
+  inventoryEnabled?: boolean;
   busy: boolean;
   onSaleCompleted: (sale: CommerceSale) => Promise<void> | void;
   onStateChange: (state: "success" | "error", message: string) => void;
@@ -120,6 +121,7 @@ export function MarketQuickSaleWorkspace({
   categories,
   session,
   barcodeEnabled,
+  inventoryEnabled = true,
   busy,
   onSaleCompleted,
   onStateChange,
@@ -560,7 +562,9 @@ export function MarketQuickSaleWorkspace({
           <div>
             <span>Sepet</span>
             <h2>Hızlı Satış</h2>
-            <p>{cartLines.length} kalem · fiyat ve stok satış kaydedilirken tekrar doğrulanır.</p>
+            <p>{cartLines.length} kalem · {inventoryEnabled
+              ? "fiyat ve stok satış kaydedilirken tekrar doğrulanır."
+              : "fiyat satış kaydedilirken tekrar doğrulanır."}</p>
           </div>
           {cartLines.length > 0 && (
             <button type="button" className="market-secondary-button" onClick={clearSale} disabled={disabled}>

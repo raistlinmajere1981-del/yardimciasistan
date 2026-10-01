@@ -98,6 +98,27 @@ try {
   assert.equal(sale.paymentMethod, "card");
   assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 0);
 
+  const movementsBeforeInventoryDisabledSale = listRuntimeInventoryMovements(databasePath, { productId: product.id }).length;
+  setBusinessCapability(databasePath, { capability: "commerce.inventory", enabled: false });
+  const saleWithoutInventory = createRuntimePaidSale(databasePath, {
+    paymentMethod: "cash",
+    source: "market-sale-no-inventory-smoke",
+    items: [{ productId: product.id, quantity: 3 }]
+  });
+  assert.equal(saleWithoutInventory.status, "paid");
+  assert.equal(saleWithoutInventory.total, 75);
+  setBusinessCapability(databasePath, { capability: "commerce.inventory", enabled: true });
+  assert.equal(
+    getRuntimeInventoryBalance(databasePath, product.id).quantity,
+    0,
+    "Disabling inventory must preserve the stored balance while allowing the sale."
+  );
+  assert.equal(
+    listRuntimeInventoryMovements(databasePath, { productId: product.id }).length,
+    movementsBeforeInventoryDisabledSale,
+    "Sales made while inventory is disabled must not create stock movements."
+  );
+
   setBusinessCapability(databasePath, { capability: "commerce.customer_credit", enabled: false });
   setBusinessCapability(databasePath, { capability: "commerce.sales", enabled: false });
   assert.throws(
