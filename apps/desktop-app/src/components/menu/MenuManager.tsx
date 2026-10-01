@@ -260,7 +260,7 @@ export function MenuManager({
           <QrMenuPanel enabled webModuleUrl={dashboardData.webModuleUrl} onPreview={onPreview} />
         )}
         <div className="menu-management-grid">
-          <section className="panel menu-category-panel">
+          <section className="panel menu-category-panel" data-surface-role="configuration">
             <div className="panel-heading menu-panel-heading">
               <h2>Kategoriler</h2>
               <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
@@ -302,7 +302,7 @@ export function MenuManager({
                         setEditingCategoryId("");
                         setEditingCategoryForm(null);
                       }}>Vazgeç</ActionButton>
-                      <ActionButton variant="primary" size="sm" disabled={menuEditState === "loading"} onClick={() => void saveCategoryEdit()}>
+                      <ActionButton variant="primary" size="sm" busy={menuEditState === "loading"} busyLabel="Kaydediliyor…" onClick={() => void saveCategoryEdit()}>
                         <Save size={15} aria-hidden="true" />
                         Kaydet
                       </ActionButton>
@@ -391,7 +391,7 @@ export function MenuManager({
             </form>
           </section>
 
-          <section className="panel menu-product-panel">
+          <section className="panel menu-product-panel" data-surface-role="configuration">
             <div className="panel-heading menu-panel-heading">
               <h2>Ürünler</h2>
               <div className="page-toolbar__actions">
@@ -478,9 +478,9 @@ export function MenuManager({
                 >
                   Vazgeç
                 </ActionButton>
-                <ActionButton type="submit" disabled={menuEditState === "loading"}>
+                <ActionButton type="submit" busy={menuEditState === "loading"} busyLabel="Kaydediliyor…">
                   <Save size={16} aria-hidden="true" />
-                  {menuEditState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
+                  Ürünü Kaydet
                 </ActionButton>
               </div>
             </>
