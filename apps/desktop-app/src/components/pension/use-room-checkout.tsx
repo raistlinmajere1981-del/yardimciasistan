@@ -125,6 +125,7 @@ function RoomCheckoutSettlementOptions({ roomLabel, stay, currentFolio, previous
   const [paymentMethod, setPaymentMethod] = useState<RoomFolioPaymentMethod>("cash");
   const currentRemaining = currentFolio?.remainingMinor ?? 0;
   const previousTotal = previousFolios.reduce((total, folio) => total + folio.remainingMinor, 0);
+  const previousCurrencies = new Set(previousFolios.map(folio => folio.currency));
   const currencies = new Set([
     ...(settleCurrent && currentFolio ? [currentFolio.currency] : []),
     ...(includePrevious ? previousFolios.map(folio => folio.currency) : [])
@@ -141,14 +142,14 @@ function RoomCheckoutSettlementOptions({ roomLabel, stay, currentFolio, previous
           setSettleCurrent(event.target.checked);
           onSettleCurrent(event.target.checked);
         }} />
-        <span>Mevcut hesabı tahsil et ve kapat · {minorMoney(currentRemaining, currentFolio?.currency)}</span>
+        <span>Mevcut hesabı tahsil et ve kapat · {minorMoney(currentRemaining, currentFolio?.currency ?? "TRY")}</span>
       </label>}
       {previousFolios.length > 0 && <label className="form-check">
         <input type="checkbox" checked={includePrevious} onChange={event => {
           setIncludePrevious(event.target.checked);
           onIncludePrevious(event.target.checked);
         }} />
-        <span>Bu müşterinin eski borçlarını da tahsil et · {previousFolios.length} hesap · {minorMoney(previousTotal, previousFolios[0]?.currency)}</span>
+        <span>Bu müşterinin eski borçlarını da tahsil et · {previousFolios.length} hesap{previousCurrencies.size === 1 ? ` · ${minorMoney(previousTotal, previousFolios[0]?.currency ?? "TRY")}` : ""}</span>
       </label>}
       {takingPayment && <label className="form-field">
         <span>Ödeme yöntemi</span>
