@@ -30,6 +30,7 @@ import {
   TABLE_ORDER_STATUSES
 } from "./database/stock-utils.js";
 import { nextMutationTimestamp } from "./database/android-utils.js";
+import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 
 export function openTableOrder(db: DatabaseSync, tableId: string): DesktopTableOrderResult {
   const normalizedTableId = tableId.trim();
@@ -184,37 +185,41 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
         db.exec("ROLLBACK");
         return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
       }
-      const stockResult = mutateStoredMenuStock(db, {
-        menuItemId,
-        type: "order_add",
-        quantityChange: -quantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: "",
-        note: `${productName} adisyona eklendi.`,
-        now
-      });
-      if (!stockResult.ok) {
-        db.exec("ROLLBACK");
-        return stockResult;
+      if (isInventoryTrackingEnabled(db)) {
+        const stockResult = mutateStoredMenuStock(db, {
+          menuItemId,
+          type: "order_add",
+          quantityChange: -quantity,
+          sourceType: "table_order",
+          sourceId: orderId,
+          actorDeviceId: "",
+          note: `${productName} adisyona eklendi.`,
+          now
+        });
+        if (!stockResult.ok) {
+          db.exec("ROLLBACK");
+          return stockResult;
+        }
       }
       db
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
         .run(nextQuantity, roundMoney(unitPrice * nextQuantity), now, itemId);
     } else {
-      const stockResult = mutateStoredMenuStock(db, {
-        menuItemId,
-        type: "order_add",
-        quantityChange: -quantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: "",
-        note: `${productName} adisyona eklendi.`,
-        now
-      });
-      if (!stockResult.ok) {
-        db.exec("ROLLBACK");
-        return stockResult;
+      if (isInventoryTrackingEnabled(db)) {
+        const stockResult = mutateStoredMenuStock(db, {
+          menuItemId,
+          type: "order_add",
+          quantityChange: -quantity,
+          sourceType: "table_order",
+          sourceId: orderId,
+          actorDeviceId: "",
+          note: `${productName} adisyona eklendi.`,
+          now
+        });
+        if (!stockResult.ok) {
+          db.exec("ROLLBACK");
+          return stockResult;
+        }
       }
       db
         .prepare(`
@@ -283,19 +288,21 @@ export function updateTableOrderItemQuantity(db: DatabaseSync, input: UpdateTabl
     orderId = String(item.order_id);
     const previousQuantity = Number(item.quantity ?? 0);
     if (quantity !== previousQuantity) {
-      const stockResult = mutateStoredMenuStock(db, {
-        menuItemId: String(item.menu_item_id ?? ""),
-        type: "order_update",
-        quantityChange: previousQuantity - quantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: "",
-        note: "Adisyon ürün adedi değiştirildi.",
-        now
-      });
-      if (!stockResult.ok) {
-        db.exec("ROLLBACK");
-        return stockResult;
+      if (isInventoryTrackingEnabled(db)) {
+        const stockResult = mutateStoredMenuStock(db, {
+          menuItemId: String(item.menu_item_id ?? ""),
+          type: "order_update",
+          quantityChange: previousQuantity - quantity,
+          sourceType: "table_order",
+          sourceId: orderId,
+          actorDeviceId: "",
+          note: "Adisyon ürün adedi değiştirildi.",
+          now
+        });
+        if (!stockResult.ok) {
+          db.exec("ROLLBACK");
+          return stockResult;
+        }
       }
     }
     const lineTotal = roundMoney(Number(item.unit_price ?? 0) * quantity);
@@ -363,19 +370,21 @@ export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string): Des
       return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
     }
     orderId = String(item.order_id);
-    const stockResult = mutateStoredMenuStock(db, {
-      menuItemId: String(item.menu_item_id ?? ""),
-      type: "order_remove",
-      quantityChange: Number(item.quantity ?? 0),
-      sourceType: "table_order",
-      sourceId: orderId,
-      actorDeviceId: "",
-      note: "Ürün adisyondan silindi.",
-      now
-    });
-    if (!stockResult.ok) {
-      db.exec("ROLLBACK");
-      return stockResult;
+    if (isInventoryTrackingEnabled(db)) {
+      const stockResult = mutateStoredMenuStock(db, {
+        menuItemId: String(item.menu_item_id ?? ""),
+        type: "order_remove",
+        quantityChange: Number(item.quantity ?? 0),
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: "",
+        note: "Ürün adisyondan silindi.",
+        now
+      });
+      if (!stockResult.ok) {
+        db.exec("ROLLBACK");
+        return stockResult;
+      }
     }
     const updatedAt = nextMutationTimestamp(item.updated_at, now);
     db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(updatedAt, normalizedItemId);
@@ -526,7 +535,7 @@ export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusI
       db.exec("ROLLBACK");
       return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
     }
-    if (status === "cancelled") {
+    if (status === "cancelled" && isInventoryTrackingEnabled(db)) {
       const stockRestore = restoreCancelledOrderStockInTransaction(db, orderId, "", now);
       if (!stockRestore.ok) {
         db.exec("ROLLBACK");
