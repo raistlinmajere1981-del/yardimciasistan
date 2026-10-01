@@ -103,7 +103,7 @@ export function RestaurantPage({
 
   return (
     <>
-      <FeatureWorkspacePage label="Restoran yönetimi" bodyLabel="Restoran operasyonları">
+      <FeatureWorkspacePage label="Restoran yönetimi" bodyLabel="Restoran operasyonları" layout="fill">
         <OperationsBoardLayout
           left={reservationsEnabled ? {
             title: "Rezervasyonlar",
