@@ -124,19 +124,16 @@ export function DesktopWorkspaceRouter({
     menuEditMessage,
     selectedCategoryId,
     selectedItemId,
-    categoryForm,
     itemForm,
-    setCategoryForm,
     setItemForm,
     selectCategory,
     selectItem,
-    startNewCategory,
     startNewItem,
-    saveCategory: handleSaveCategory,
+    saveCategoryForm: handleSaveCategoryForm,
     saveItem: handleSaveItem,
     reorderCategories: handleReorderMenuCategories,
     reorderItems: handleReorderMenuItems,
-    deleteCategory: handleDeleteMenuCategory
+    deleteCategoryById: handleDeleteMenuCategoryById
   } = menuController;
   const {
     setSelectedWhatsAppRequestId,
@@ -600,23 +597,20 @@ export function DesktopWorkspaceRouter({
           qrMenuEnabled={runtimeFeatures.qrMenu}
           inventoryEnabled={inventoryEnabled}
           stockImageImportEnabled={aiEnabled && inventoryEnabled}
-          categoryForm={categoryForm}
           itemForm={itemForm}
           selectedCategoryId={selectedCategoryId}
           selectedItemId={selectedItemId}
           menuEditState={menuEditState}
           menuEditMessage={menuEditMessage}
-          onCategoryFormChange={setCategoryForm}
           onItemFormChange={setItemForm}
           onSelectCategory={selectCategory}
           onSelectItem={selectItem}
-          onNewCategory={startNewCategory}
           onNewItem={startNewItem}
-          onSaveCategory={handleSaveCategory}
+          onSaveCategoryForm={handleSaveCategoryForm}
           onSaveItem={handleSaveItem}
           onReorderCategories={handleReorderMenuCategories}
           onReorderItems={handleReorderMenuItems}
-          onDeleteCategory={handleDeleteMenuCategory}
+          onDeleteCategoryById={handleDeleteMenuCategoryById}
           onDashboardDataChanged={setDashboardData}
         />
       ) : activePage === "reports" ? (

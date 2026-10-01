@@ -5,11 +5,14 @@ import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateRe
 import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
 import {
   compareMenuRecords,
+  emptyCategoryForm,
   findMenuCategoryName,
   formatCurrency,
   getMenuStockBadge,
   isQrHiddenByStock,
+  nextSortOrder,
   resolveMenuPreviewImageUrl,
+  toCategoryForm,
   type CategoryFormState,
   type ItemFormState
 } from "./menu-model";
@@ -29,23 +32,20 @@ interface MenuManagerProps {
   qrMenuEnabled: boolean;
   inventoryEnabled: boolean;
   stockImageImportEnabled: boolean;
-  categoryForm: CategoryFormState;
   itemForm: ItemFormState;
   selectedCategoryId: string;
   selectedItemId: string;
   menuEditState: SyncState;
   menuEditMessage: string;
-  onCategoryFormChange: (form: CategoryFormState) => void;
   onItemFormChange: (form: ItemFormState) => void;
   onSelectCategory: (category: PublishedMenuCategory) => void;
   onSelectItem: (item: PublishedMenuItem) => void;
-  onNewCategory: () => void;
   onNewItem: () => void;
-  onSaveCategory: () => void;
+  onSaveCategoryForm: (form: CategoryFormState, selectSaved?: boolean) => Promise<DesktopMenuSaveResult>;
   onSaveItem: () => Promise<DesktopMenuSaveResult | undefined>;
   onReorderCategories: (orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onReorderItems: (categoryId: string, orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
-  onDeleteCategory: (confirmed?: boolean) => void;
+  onDeleteCategoryById: (categoryId: string) => Promise<void>;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
 
@@ -54,27 +54,27 @@ export function MenuManager({
   qrMenuEnabled,
   inventoryEnabled,
   stockImageImportEnabled,
-  categoryForm,
   itemForm,
   selectedCategoryId,
   selectedItemId,
   menuEditState,
   menuEditMessage,
-  onCategoryFormChange,
   onItemFormChange,
   onSelectCategory,
   onSelectItem,
-  onNewCategory,
   onNewItem,
-  onSaveCategory,
+  onSaveCategoryForm,
   onSaveItem,
   onReorderCategories,
   onReorderItems,
-  onDeleteCategory,
+  onDeleteCategoryById,
   onDashboardDataChanged
 }: MenuManagerProps) {
   const navigation = useWorkspaceNavigation();
-  const [pendingCategoryDelete, setPendingCategoryDelete] = useState(false);
+  const [pendingCategoryDeleteId, setPendingCategoryDeleteId] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState("");
+  const [editingCategoryForm, setEditingCategoryForm] = useState<CategoryFormState | null>(null);
+  const [newCategoryForm, setNewCategoryForm] = useState<CategoryFormState>(() => emptyCategoryForm(nextSortOrder(dashboardData.menu.categories)));
   const [itemCreateOpen, setItemCreateOpen] = useState(false);
   const [pendingItemId, setPendingItemId] = useState("");
   const [dragging, setDragging] = useState<{ kind: "category" | "item"; id: string } | null>(null);
@@ -90,9 +90,7 @@ export function MenuManager({
     const items = dashboardData.menu.items
       .filter((item) => !selectedCategoryId || item.category_id === selectedCategoryId);
 
-    if (selectedCategoryId) {
-      return items.sort(compareMenuRecords);
-    }
+    if (selectedCategoryId) return items.sort(compareMenuRecords);
 
     const categoryOrder = new Map(sortedCategories.map((category, index) => [category.id, index]));
     return items.sort((left, right) => {
@@ -101,12 +99,18 @@ export function MenuManager({
       return categoryDifference || compareMenuRecords(left, right);
     });
   }, [dashboardData.menu.items, selectedCategoryId, sortedCategories]);
-  const selectedCategoryName = selectedCategoryId
-    ? findMenuCategoryName(selectedCategoryId, dashboardData.menu.categories)
-    : "Tüm kategoriler";
-  const relatedProductCount = categoryForm.id
-    ? dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length
+
+  const pendingCategoryDelete = dashboardData.menu.categories.find((category) => category.id === pendingCategoryDeleteId);
+  const pendingCategoryProductCount = pendingCategoryDelete
+    ? dashboardData.menu.items.filter((item) => item.category_id === pendingCategoryDelete.id).length
     : 0;
+
+  useEffect(() => {
+    if (editingCategoryId && !dashboardData.menu.categories.some((category) => category.id === editingCategoryId)) {
+      setEditingCategoryId("");
+      setEditingCategoryForm(null);
+    }
+  }, [dashboardData.menu.categories, editingCategoryId]);
 
   useEffect(() => {
     if (itemCreateOpen || !pendingItemId) return;
@@ -135,8 +139,32 @@ export function MenuManager({
     setItemCreateOpen(true);
   }
 
-  function handleDragStart(event: DragEvent<HTMLButtonElement>, kind: "category" | "item", id: string) {
-    if (reorderBusy) {
+  function startCategoryEdit(category: PublishedMenuCategory) {
+    setEditingCategoryId(category.id);
+    setEditingCategoryForm(toCategoryForm(category));
+  }
+
+  async function saveCategoryEdit() {
+    if (!editingCategoryForm) return;
+    const result = await onSaveCategoryForm(editingCategoryForm, false);
+    if (!result.ok) return;
+    setEditingCategoryId("");
+    setEditingCategoryForm(null);
+  }
+
+  async function createCategory() {
+    const form = {
+      ...newCategoryForm,
+      id: "",
+      sort_order: String(nextSortOrder(dashboardData.menu.categories))
+    };
+    const result = await onSaveCategoryForm(form, true);
+    if (!result.ok) return;
+    setNewCategoryForm(emptyCategoryForm(nextSortOrder(result.dashboardData.menu.categories)));
+  }
+
+  function handleDragStart(event: DragEvent<HTMLElement>, kind: "category" | "item", id: string) {
+    if (reorderBusy || (kind === "category" && editingCategoryId === id)) {
       event.preventDefault();
       return;
     }
@@ -147,7 +175,7 @@ export function MenuManager({
     setDropTarget(null);
   }
 
-  function handleDragOver(event: DragEvent<HTMLButtonElement>, id: string) {
+  function handleDragOver(event: DragEvent<HTMLElement>, id: string) {
     if (!dragging || dragging.id === id) return;
     if (dragging.kind === "item") {
       const sourceItem = dashboardData.menu.items.find((item) => item.id === dragging.id);
@@ -164,7 +192,7 @@ export function MenuManager({
     setDropTarget({ id, position });
   }
 
-  async function handleDrop(event: DragEvent<HTMLButtonElement>, kind: "category" | "item", targetId: string) {
+  async function handleDrop(event: DragEvent<HTMLElement>, kind: "category" | "item", targetId: string) {
     event.preventDefault();
     event.stopPropagation();
     if (!dragging || dragging.kind !== kind || dragging.id === targetId || reorderBusy) {
@@ -198,11 +226,8 @@ export function MenuManager({
 
     setReorderBusy(true);
     try {
-      if (kind === "category") {
-        await onReorderCategories(orderedIds);
-      } else if (sourceItem) {
-        await onReorderItems(sourceItem.category_id, orderedIds);
-      }
+      if (kind === "category") await onReorderCategories(orderedIds);
+      else if (sourceItem) await onReorderItems(sourceItem.category_id, orderedIds);
     } finally {
       setReorderBusy(false);
     }
@@ -222,126 +247,146 @@ export function MenuManager({
       <FeatureWorkspacePage
         label={qrMenuEnabled ? "QR menü yönetimi" : "Menü yönetimi"}
         bodyLabel="Menü kayıtları"
-        toolbar={(
-          <>
-            <div className="page-toolbar__start">
-              <StatusBadge tone="info">{selectedCategoryName}</StatusBadge>
-              <StatusBadge tone="neutral">{dashboardData.menu.items.length} ürün</StatusBadge>
-            </div>
-            <div className="page-toolbar__actions">
-              {stockImageImportEnabled && (
-                <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
-              )}
-              <ActionButton variant="primary" size="sm" onClick={startItemCreate}>
-                <Plus size={16} aria-hidden="true" />
-                Ürün ekle
-              </ActionButton>
-            </div>
-          </>
-        )}
+        toolbar={stockImageImportEnabled ? (
+          <div className="page-toolbar__actions">
+            <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
+          </div>
+        ) : undefined}
       >
         <div className="menu-management-grid">
           <section className="panel menu-category-panel">
             <div className="panel-heading menu-panel-heading">
-              <div>
-                <h2>Kategoriler</h2>
-                <p>Menüdeki ürün gruplarını yönetin. Sıralamak için kayıtları sürükleyin.</p>
-              </div>
-              <div className="page-toolbar__actions">
-                <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
-                <ActionButton variant="secondary" size="sm" onClick={onNewCategory}>
-                  <Plus size={16} aria-hidden="true" />
-                  Kategori ekle
-                </ActionButton>
-              </div>
+              <h2>Kategoriler</h2>
+              <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
             </div>
 
             <DataList className="menu-record-list menu-category-list">
-              {sortedCategories.map((category) => (
-                <DataListButton
-                  className={`menu-record menu-sortable-record${dragging?.kind === "category" && dragging.id === category.id ? " is-dragging" : ""}${dropTarget?.id === category.id ? ` is-drop-${dropTarget.position}` : ""}`}
+              {sortedCategories.map((category) => {
+                const productCount = dashboardData.menu.items.filter((item) => item.category_id === category.id).length;
+                const editing = editingCategoryId === category.id && editingCategoryForm;
+                if (editing) {
+                  return <article className="menu-category-row menu-category-row--editing" key={category.id}>
+                    <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />
+                    <div className="menu-category-inline-fields">
+                      <label className="form-field">
+                        Kategori adı
+                        <input
+                          value={editingCategoryForm.name}
+                          onChange={(event) => setEditingCategoryForm({ ...editingCategoryForm, name: event.target.value })}
+                        />
+                      </label>
+                      <label className="form-field">
+                        Açıklama
+                        <input
+                          value={editingCategoryForm.description}
+                          onChange={(event) => setEditingCategoryForm({ ...editingCategoryForm, description: event.target.value })}
+                          placeholder="Kısa kategori açıklaması"
+                        />
+                      </label>
+                    </div>
+                    <label className="form-check menu-category-row__publish">
+                      <input
+                        type="checkbox"
+                        checked={editingCategoryForm.is_active}
+                        onChange={(event) => setEditingCategoryForm({ ...editingCategoryForm, is_active: event.target.checked })}
+                      />
+                      {qrMenuEnabled ? "Yayında" : "Aktif"}
+                    </label>
+                    <div className="menu-category-row__actions">
+                      <ActionButton variant="secondary" size="sm" disabled={menuEditState === "loading"} onClick={() => {
+                        setEditingCategoryId("");
+                        setEditingCategoryForm(null);
+                      }}>Vazgeç</ActionButton>
+                      <ActionButton variant="primary" size="sm" disabled={menuEditState === "loading"} onClick={() => void saveCategoryEdit()}>
+                        <Save size={15} aria-hidden="true" />
+                        Kaydet
+                      </ActionButton>
+                    </div>
+                  </article>;
+                }
+
+                return <article
+                  className={`menu-category-row menu-sortable-record${selectedCategoryId === category.id ? " is-selected" : ""}${dragging?.kind === "category" && dragging.id === category.id ? " is-dragging" : ""}${dropTarget?.id === category.id ? ` is-drop-${dropTarget.position}` : ""}`}
                   key={category.id}
                   draggable={!reorderBusy}
                   onDragStart={(event) => handleDragStart(event, "category", category.id)}
                   onDragOver={(event) => handleDragOver(event, category.id)}
                   onDrop={(event) => void handleDrop(event, "category", category.id)}
                   onDragEnd={finishDrag}
-                  onClick={() => {
-                    if (!suppressRowClickRef.current) onSelectCategory(category);
-                  }}
-                  aria-pressed={selectedCategoryId === category.id}
-                  selected={selectedCategoryId === category.id}
-                  title={category.name}
-                  leading={<GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />}
-                  meta={dashboardData.menu.items.filter((item) => item.category_id === category.id).length + " ürün"}
-                  trailing={(
-                    <StatusBadge tone={category.is_active ? "success" : "neutral"}>
-                      {category.is_active
-                        ? (qrMenuEnabled ? "Yayında" : "Aktif")
-                        : (qrMenuEnabled ? "Gizli" : "Pasif")}
-                    </StatusBadge>
-                  )}
-                />
-              ))}
+                >
+                  <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />
+                  <div className="menu-category-row__main">
+                    <button className="menu-category-row__select" type="button" onClick={() => {
+                      if (!suppressRowClickRef.current) onSelectCategory(category);
+                    }}>
+                      <strong>{category.name}</strong>
+                    </button>
+                    <p className="menu-category-row__description">{category.description || "Açıklama yok."}</p>
+                    <span className="menu-category-row__meta">{productCount} ürün</span>
+                  </div>
+                  <StatusBadge tone={category.is_active ? "success" : "neutral"}>
+                    {category.is_active ? (qrMenuEnabled ? "Yayında" : "Aktif") : (qrMenuEnabled ? "Gizli" : "Pasif")}
+                  </StatusBadge>
+                  <div className="menu-category-row__actions">
+                    <ActionButton variant="secondary" size="sm" onClick={() => startCategoryEdit(category)}>Düzenle</ActionButton>
+                    <ActionButton variant="danger" size="sm" onClick={() => setPendingCategoryDeleteId(category.id)}>
+                      <Trash2 size={15} aria-hidden="true" />
+                      Sil
+                    </ActionButton>
+                  </div>
+                </article>;
+              })}
             </DataList>
 
-            <div className="form-stack menu-category-form">
-              <label className="form-field form-field--long">
-                Kategori adı
-                <input
-                  value={categoryForm.name}
-                  onChange={(event) => onCategoryFormChange({ ...categoryForm, name: event.target.value })}
-                  placeholder="Kahvaltı"
-                />
-              </label>
-              <label className="form-field form-field--fluid">
-                Açıklama
-                <textarea
-                  value={categoryForm.description}
-                  onChange={(event) => onCategoryFormChange({ ...categoryForm, description: event.target.value })}
-                  placeholder="Kısa kategori açıklaması"
-                />
-              </label>
-              <label className="form-check">
-                <input
-                  checked={categoryForm.is_active}
-                  onChange={(event) => onCategoryFormChange({ ...categoryForm, is_active: event.target.checked })}
-                  type="checkbox"
-                />
-                {qrMenuEnabled ? "Yayında göster" : "Menüde etkin"}
-              </label>
-              <div className="form-actions menu-form-actions">
-                {categoryForm.id && (
-                  <ActionButton
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setPendingCategoryDelete(true)}
-                    disabled={menuEditState === "loading"}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                    Kategoriyi Sil
-                  </ActionButton>
-                )}
-                <ActionButton
-                  variant="primary"
-                  size="sm"
-                  onClick={onSaveCategory}
-                  disabled={menuEditState === "loading"}
-                >
-                  <Save size={16} aria-hidden="true" />
-                  Kategoriyi Kaydet
+            <form className="menu-category-create-form" onSubmit={(event) => {
+              event.preventDefault();
+              void createCategory();
+            }}>
+              <div className="menu-category-create-fields">
+                <label className="form-field">
+                  Kategori adı
+                  <input
+                    value={newCategoryForm.name}
+                    onChange={(event) => setNewCategoryForm({ ...newCategoryForm, name: event.target.value })}
+                    placeholder="Kahvaltı"
+                  />
+                </label>
+                <label className="form-field">
+                  Açıklama
+                  <input
+                    value={newCategoryForm.description}
+                    onChange={(event) => setNewCategoryForm({ ...newCategoryForm, description: event.target.value })}
+                    placeholder="Kısa kategori açıklaması"
+                  />
+                </label>
+              </div>
+              <div className="menu-category-create-actions">
+                <label className="form-check">
+                  <input
+                    checked={newCategoryForm.is_active}
+                    onChange={(event) => setNewCategoryForm({ ...newCategoryForm, is_active: event.target.checked })}
+                    type="checkbox"
+                  />
+                  {qrMenuEnabled ? "Yayında göster" : "Menüde etkin"}
+                </label>
+                <ActionButton variant="primary" size="sm" type="submit" disabled={menuEditState === "loading" || !newCategoryForm.name.trim()}>
+                  <Plus size={16} aria-hidden="true" />
+                  Kategori ekle
                 </ActionButton>
               </div>
-            </div>
+            </form>
           </section>
 
           <section className="panel menu-product-panel">
             <div className="panel-heading menu-panel-heading">
-              <div className="menu-heading-copy">
-                <h2>Ürünler</h2>
-                <span>{selectedCategoryName}{selectedCategoryId ? " · Sıralamak için sürükleyin" : " · Ürünleri kendi kategorisi içinde sürükleyin"}</span>
+              <h2>Ürünler</h2>
+              <div className="page-toolbar__actions">
+                <StatusBadge tone="info">{visibleItems.length} kayıt</StatusBadge>
+                <ActionButton variant="primary" size="sm" onClick={startItemCreate}>
+                  <Plus size={16} aria-hidden="true" />
+                  Ürün ekle
+                </ActionButton>
               </div>
-              <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
             </div>
 
             <DataList className="menu-record-list menu-product-list">
@@ -435,15 +480,17 @@ export function MenuManager({
       )}
 
       {pendingCategoryDelete && <ConfirmDialog tone="danger" title="Kategoriyi sil"
-        description={`“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinecek.`}
+        description={`“${pendingCategoryDelete.name}” kategorisi ve bağlı ${pendingCategoryProductCount} ürün silinecek.`}
         details="Bu işlem geri alınamaz." confirmLabel="Kategoriyi sil" busy={menuEditState === "loading"}
-        onCancel={() => setPendingCategoryDelete(false)}
-        onConfirm={() => { setPendingCategoryDelete(false); onDeleteCategory(true); }} />}
-
+        onCancel={() => setPendingCategoryDeleteId("")}
+        onConfirm={() => {
+          const categoryId = pendingCategoryDelete.id;
+          setPendingCategoryDeleteId("");
+          void onDeleteCategoryById(categoryId);
+        }} />}
     </>
   );
 }
-
 
 function moveId(
   ids: string[],
@@ -461,7 +508,6 @@ function moveId(
   next.splice(Math.max(0, insertIndex), 0, sourceId);
   return next;
 }
-
 
 function MenuProductThumbnail({ item, webModuleUrl }: {
   item: PublishedMenuItem;

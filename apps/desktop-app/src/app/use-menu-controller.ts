@@ -147,44 +147,52 @@ export function useMenuController({
     setMenuEditMessage("");
   }
 
-  async function saveCategory() {
+  async function saveCategoryForm(form: CategoryFormState, selectSaved = false): Promise<DesktopMenuSaveResult> {
     setMenuEditState("loading");
     setMenuEditMessage("");
 
     const bridge = window.yardimciDesktop;
     if (!bridge) {
+      const result: DesktopMenuSaveResult = { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
       setMenuEditState("error");
-      reportAppStatus("error", "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
-      return;
+      reportAppStatus("error", result.message);
+      return result;
     }
 
     const result = await bridge.saveMenuCategory({
-      id: categoryForm.id || undefined,
-      name: categoryForm.name,
-      description: categoryForm.description,
-      is_active: categoryForm.is_active,
-      sort_order: Number(categoryForm.sort_order)
+      id: form.id || undefined,
+      name: form.name,
+      description: form.description,
+      is_active: form.is_active,
+      sort_order: Number(form.sort_order)
     });
 
     if (!result.ok) {
       setMenuEditState("error");
       reportAppStatus("error", result.message);
-      return;
+      return result;
     }
 
     const savedCategory = result.dashboardData.menu.categories.find((category) => category.id === result.savedId);
     setDashboardData(result.dashboardData);
-    setSelectedCategoryId(result.savedId);
-    if (savedCategory) {
+    if (selectSaved || selectedCategoryId === result.savedId) {
+      setSelectedCategoryId(result.savedId);
+      if (savedCategory) setCategoryForm(toCategoryForm(savedCategory));
+    } else if (categoryForm.id === result.savedId && savedCategory) {
       setCategoryForm(toCategoryForm(savedCategory));
     }
-    if (!itemForm.category_id) {
+    if (!itemForm.category_id && selectSaved) {
       setItemForm((current) => ({ ...current, category_id: result.savedId }));
     }
     setMenuEditState("success");
     setMenuEditMessage("");
     reportAppStatus("success", result.message);
     markMenuDirty();
+    return result;
+  }
+
+  async function saveCategory() {
+    return saveCategoryForm(categoryForm, true);
   }
 
   async function saveItemForm(form: ItemFormState): Promise<DesktopMenuSaveResult> {
@@ -281,31 +289,26 @@ export function useMenuController({
     return result;
   }
 
-  async function deleteCategory(confirmed = false) {
+  async function deleteCategoryById(categoryId: string) {
     const bridge = window.yardimciDesktop;
-    if (!categoryForm.id || !bridge) {
-      return;
-    }
-    if (!confirmed) {
-      const relatedProductCount = dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length;
-      if (!(await confirm({ title: "Silme onayı", description: `“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`, tone: "danger", confirmLabel: "Sil" }))) {
-        return;
-      }
-    }
+    if (!categoryId || !bridge) return;
 
     setMenuEditState("loading");
     setMenuEditMessage("");
-    const result = await bridge.deleteMenuCategory(categoryForm.id);
+    const result = await bridge.deleteMenuCategory(categoryId);
     if (!result.ok) {
       setMenuEditState("error");
       reportAppStatus("error", result.message);
       return;
     }
 
-    const nextCategory = [...result.dashboardData.menu.categories].sort(compareMenuRecords)[0];
-    const nextItem = [...result.dashboardData.menu.items]
+    const remainingSelectedCategory = result.dashboardData.menu.categories.find((category) => category.id === selectedCategoryId);
+    const nextCategory = remainingSelectedCategory ?? [...result.dashboardData.menu.categories].sort(compareMenuRecords)[0];
+    const remainingSelectedItem = result.dashboardData.menu.items.find((item) => item.id === selectedItemId);
+    const nextItem = remainingSelectedItem ?? [...result.dashboardData.menu.items]
       .filter((item) => !nextCategory || item.category_id === nextCategory.id)
       .sort(compareMenuRecords)[0];
+
     setDashboardData(result.dashboardData);
     setSelectedCategoryId(nextCategory?.id ?? "");
     setCategoryForm(toCategoryForm(nextCategory));
@@ -315,6 +318,17 @@ export function useMenuController({
     setMenuEditMessage("");
     reportAppStatus("success", result.message);
     markMenuDirty();
+  }
+
+  async function deleteCategory(confirmed = false) {
+    if (!categoryForm.id) return;
+    if (!confirmed) {
+      const relatedProductCount = dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length;
+      if (!(await confirm({ title: "Silme onayı", description: `“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`, tone: "danger", confirmLabel: "Sil" }))) {
+        return;
+      }
+    }
+    await deleteCategoryById(categoryForm.id);
   }
 
   async function deleteItemById(itemId: string): Promise<DesktopStatusUpdateResult> {
@@ -368,11 +382,13 @@ export function useMenuController({
     startNewCategory,
     startNewItem,
     saveCategory,
+    saveCategoryForm,
     saveItem,
     saveItemForm,
     reorderCategories,
     reorderItems,
     deleteCategory,
+    deleteCategoryById,
     deleteItemById
   };
 }
