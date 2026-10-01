@@ -983,7 +983,8 @@ function registerIpcHandlers() {
 
   registerTableOrderIpcHandlers({
     getDatabase,
-    assertCapability: assertDesktopCapability
+    assertCapability: assertDesktopCapability,
+    hasCapability: (capability) => hasBusinessCapability(enabledBusinessCapabilities(), capability)
   });
 
   registerReservationIpcHandlers({
