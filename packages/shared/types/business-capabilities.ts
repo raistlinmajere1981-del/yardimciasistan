@@ -123,8 +123,7 @@ const FOOD_SERVICE_REQUIRED_CAPABILITIES: BusinessCapability[] = [
 const FOOD_SERVICE_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
   C.FOOD_RESERVATIONS,
   C.QR_MENU,
-  C.INVENTORY,
-  C.CUSTOMER_CREDIT
+  C.INVENTORY
 ];
 
 const FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
@@ -274,6 +273,19 @@ export function normalizeBusinessType(value: string): BusinessType {
 
 export function getBusinessProfile(value: string): BusinessProfileDefinition {
   return BUSINESS_PROFILES[normalizeBusinessType(value)];
+}
+
+/**
+ * Most capabilities remain composable across profiles. Customer credit is the
+ * exception: it is a retail account model and must not overlap hospitality
+ * folios/table accounts.
+ */
+export function businessProfileSupportsCapability(
+  value: string,
+  capability: BusinessCapability
+): boolean {
+  if (capability === C.CUSTOMER_CREDIT) return normalizeBusinessType(value) === "market";
+  return true;
 }
 
 export function getBusinessProfileSelectionCapabilities(

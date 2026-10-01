@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
   CORE_BUSINESS_CAPABILITIES,
+  businessProfileSupportsCapability,
   getBusinessProfile,
   getEnabledBusinessCapabilityDependents,
   normalizeBusinessType,
@@ -110,7 +111,7 @@ export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCa
       const source: BusinessCapabilitySource = rawSource;
       return [{
         capability,
-        enabled: Number(row.is_enabled ?? 0) === 1,
+        enabled: Number(row.is_enabled ?? 0) === 1 && businessProfileSupportsCapability(profileId, capability),
         source,
         updatedAt: String(row.updated_at ?? "")
       }];
@@ -169,10 +170,11 @@ export function applyBusinessProfileCapabilities(
 
       for (const capability of KNOWN_CAPABILITIES) {
         const system = SYSTEM_CAPABILITIES.has(capability);
-        if (!system && preserveUserOverrides && existingSources.get(capability) === "user") {
+        const profileAllows = businessProfileSupportsCapability(profileId, capability);
+        if (!system && profileAllows && preserveUserOverrides && existingSources.get(capability) === "user") {
           continue;
         }
-        const enabled = system || profileDefaults.has(capability);
+        const enabled = system || (profileAllows && profileDefaults.has(capability));
         database.prepare(`
           INSERT INTO business_capabilities (
             business_id, capability_id, is_enabled, source, created_at, updated_at
@@ -225,6 +227,10 @@ export function setBusinessCapability(
     const business = readActiveBusiness(database);
     const businessId = String(business?.id ?? "");
     if (!businessId) throw new Error("Aktif işletme bulunamadı.");
+    const profileId = resolveProfileId(business);
+    if (input.enabled && !businessProfileSupportsCapability(profileId, input.capability)) {
+      throw new Error("Veresiye / Müşteri Hesabı yalnızca Market / Perakende işletmelerinde kullanılabilir.");
+    }
     const now = new Date().toISOString();
 
     const currentlyEnabled = readEnabledCapabilities(database, businessId);

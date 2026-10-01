@@ -8,6 +8,7 @@ import process from "node:process";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const {
+  applyBusinessProfileCapabilities,
   readBusinessCapabilitySnapshot,
   setBusinessCapability
 } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
@@ -57,6 +58,11 @@ try {
   assert.equal(initial.enabledCapabilities.includes(C.FOOD_TABLES), true);
   assert.equal(initial.enabledCapabilities.includes(C.QR_MENU), true);
   assert.equal(initial.enabledCapabilities.includes(C.RETAIL_BARCODE), false);
+  assert.equal(initial.enabledCapabilities.includes(C.CUSTOMER_CREDIT), false);
+  assert.throws(
+    () => setBusinessCapability(databasePath, { capability: C.CUSTOMER_CREDIT, enabled: true }),
+    /yalnızca Market/i
+  );
 
   // QR menu is a leaf capability, so it can be independently disabled without
   // invalidating food menu/catalog/inventory prerequisites.
@@ -86,6 +92,14 @@ try {
     () => setBusinessCapability(databasePath, { capability: C.FINANCE, enabled: false }),
     /Çekirdek işletme yeteneği kapatılamaz/
   );
+
+  applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
+  const marketCredit = setBusinessCapability(databasePath, { capability: C.CUSTOMER_CREDIT, enabled: true });
+  assert.equal(marketCredit.enabledCapabilities.includes(C.CUSTOMER_CREDIT), true);
+  applyBusinessProfileCapabilities(databasePath, "restaurant");
+  const restaurantAfterMarket = readBusinessCapabilitySnapshot(databasePath);
+  assert.equal(restaurantAfterMarket.enabledCapabilities.includes(C.CUSTOMER_CREDIT), false);
+  assert.equal(restaurantAfterMarket.capabilities.find((entry) => entry.capability === C.CUSTOMER_CREDIT)?.enabled, false);
 
   console.log("business-capabilities-smoke-ok");
 } finally {

@@ -60,6 +60,7 @@ try {
   assert.ok(getBusinessProfile("market").optionalCapabilities.includes(C.CUSTOMER_CREDIT));
   assert.ok(!getBusinessProfile("market").defaultCapabilities.includes(C.CUSTOMER_CREDIT));
   for (const profile of ["pension", "restaurant", "pension_restaurant"]) {
+    assert.ok(!getBusinessProfile(profile).optionalCapabilities.includes(C.CUSTOMER_CREDIT));
     assert.ok(!getBusinessProfile(profile).defaultCapabilities.includes(C.CUSTOMER_CREDIT));
   }
   applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
@@ -317,12 +318,18 @@ try {
   }
   assert.throws(() => setBusinessCapability(databasePath, { capability: C.SALES, enabled: false }), /customer_credit/);
   applyBusinessProfileCapabilities(databasePath, "restaurant", { preserveUserOverrides: false });
-  assert.throws(() => account(), /etkin değil/i);
+  assert.throws(() => account(), /yalnızca Market/i);
+  assert.throws(
+    () => setBusinessCapability(databasePath, { capability: C.CUSTOMER_CREDIT, enabled: true }),
+    /yalnızca Market/i
+  );
+  // Even a stale/raw enabled bit cannot revive customer credit outside Market.
+  raw.prepare("UPDATE business_capabilities SET is_enabled = 1, source = 'user' WHERE business_id = ? AND capability_id = ?")
+    .run(businessId, C.CUSTOMER_CREDIT);
+  assert.throws(() => account(), /yalnızca Market/i);
+  applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
   setBusinessCapability(databasePath, { capability: C.CUSTOMER_CREDIT, enabled: true });
-  adjustment(customerId, 1);
-  assert.equal(debt(), 10001, "Hybrid restaurant works through capability, without a profile gate.");
-  runtime.createCustomerCreditSale(databasePath, cart);
-  pay(1, { customerId });
+  assert.deepEqual(account().customer.id, customerId);
 
   // Execute actual compiled IPC handlers against a mocked Electron boundary.
   verifyIpc(databasePath, customerId, cart, account, raw);

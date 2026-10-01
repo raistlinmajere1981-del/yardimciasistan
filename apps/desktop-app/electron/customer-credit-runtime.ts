@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES as C,
+  businessProfileSupportsCapability,
   createId,
   expandBusinessCapabilities,
   moneyToMinor,
@@ -35,10 +36,13 @@ function withCreditDatabase<T>(
     db.exec(mutation ? "BEGIN IMMEDIATE" : "BEGIN");
     try {
       const business = db.prepare(`
-        SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1
+        SELECT id, profile_id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1
       `).get() as Row | undefined;
       const businessId = String(business?.id ?? "");
       if (!businessId) throw new Error("Aktif işletme bulunamadı.");
+      if (!businessProfileSupportsCapability(String(business?.profile_id ?? ""), C.CUSTOMER_CREDIT)) {
+        throw new Error("Veresiye / Müşteri Hesabı yalnızca Market / Perakende işletmelerinde kullanılabilir.");
+      }
       const enabled = new Set((db.prepare(`
         SELECT capability_id FROM business_capabilities WHERE business_id = ? AND is_enabled = 1
       `).all(businessId) as Row[]).map((row) => String(row.capability_id)));

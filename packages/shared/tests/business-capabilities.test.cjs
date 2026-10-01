@@ -3,6 +3,7 @@ const test = require("node:test");
 const {
   BUSINESS_CAPABILITIES: C,
   BUSINESS_PROFILES,
+  businessProfileSupportsCapability,
   getBusinessProfiles,
   getBusinessProfile,
   hasBusinessCapability,
@@ -27,6 +28,18 @@ test("market profile is available as retail foundation without accommodation cou
   assert.equal(market.defaultOptionalCapabilities.includes(C.REQUESTS), false);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.REQUESTS), false);
   assert.equal(getBusinessProfiles().some((profile) => profile.id === "market"), true);
+});
+
+test("customer credit is offered only by the Market profile", () => {
+  assert.equal(BUSINESS_PROFILES.market.optionalCapabilities.includes(C.CUSTOMER_CREDIT), true);
+  assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.CUSTOMER_CREDIT), false);
+  assert.equal(businessProfileSupportsCapability("market", C.CUSTOMER_CREDIT), true);
+  for (const profileId of ["pension_restaurant", "pension", "restaurant"]) {
+    const profile = BUSINESS_PROFILES[profileId];
+    assert.equal(profile.optionalCapabilities.includes(C.CUSTOMER_CREDIT), false);
+    assert.equal(profile.defaultCapabilities.includes(C.CUSTOMER_CREDIT), false);
+    assert.equal(businessProfileSupportsCapability(profileId, C.CUSTOMER_CREDIT), false);
+  }
 });
 
 test("customer requests are an optional default-on feature outside Market", () => {
