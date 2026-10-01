@@ -383,19 +383,40 @@ runLocal("rsync", [
   `${deployHost}:${remoteWww}/assets/`
 ]);
 
-step("Canli referans demo sitesi yayinlaniyor");
-sshRun(`mkdir -p '${remoteWww}/demo'`);
+step("Canli referans public-site root rotalarina yayinlaniyor");
+runLocal("rsync", [
+  "-az",
+  "--omit-dir-times",
+  "-e",
+  "ssh -o BatchMode=yes -o ConnectTimeout=15",
+  `${localDemo}/assets/`,
+  `${deployHost}:${remoteWww}/assets/`
+]);
+sshRun(`mkdir -p '${remoteWww}/inc'`);
 runLocal("rsync", [
   "-az",
   "--delete",
   "--omit-dir-times",
   "-e",
   "ssh -o BatchMode=yes -o ConnectTimeout=15",
-  `${localDemo}/`,
-  `${deployHost}:${remoteWww}/demo/`
+  `${localDemo}/inc/`,
+  `${deployHost}:${remoteWww}/inc/`
 ]);
-sshRun(`find '${remoteWww}/demo' -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`);
-
+for (const route of publicRouteDirs) {
+  sshRun(`mkdir -p '${remoteWww}/${route}'`);
+  runLocal("rsync", [
+    "-az",
+    "--delete",
+    "--omit-dir-times",
+    "-e",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15",
+    `${localDemo}/${route}/`,
+    `${deployHost}:${remoteWww}/${route}/`
+  ]);
+}
+const publicPhpRoots = ["inc", ...publicRouteDirs].map((route) => `'${remoteWww}/${route}'`).join(" ");
+sshRun(`find ${publicPhpRoots} -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`);
+sshRun(`rm -rf '${remoteWww}/demo'`);
 if (withDownloads) {
   step("Kurulum dosyalari atomik olarak yayinlaniyor");
   sshRun(`mkdir -p ${remoteDownloads}`);
