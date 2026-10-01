@@ -14,10 +14,7 @@ import {
 } from "./room-folio";
 import { transferTableOrderToRoomFolio } from "./room-folio-order-transfer";
 import { listRoomProfiles } from "./room-profile";
-import {
-  assertPersistedBusinessCapability,
-  hasPersistedBusinessCapability
-} from "./business-capability-runtime";
+import { hasPersistedBusinessCapability } from "./business-capability-runtime";
 
 type RoomFolioManualItemIpcInput = AddRoomFolioManualItemInput & {
   sourceTableOrderId?: string;
@@ -41,18 +38,18 @@ export function registerRoomFolioIpcHandlers(options: {
     options.assertUnlocked();
     options.assertCapability?.();
   };
-  const assertRoomAccess = () => {
-    options.assertUnlocked();
-    if (options.assertRoomCapability) {
-      options.assertRoomCapability();
-      return;
-    }
-    assertPersistedBusinessCapability(
-      options.databasePath(),
-      BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS,
-      "Oda yönetimi bu işletme profilinde etkin değil."
-    );
-  };
+  const hasRoomCapability = () => hasPersistedBusinessCapability(
+    options.databasePath(),
+    BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS
+  );
+  const unavailableRoomData = (): DesktopRoomFolioData => ({
+    generatedAt: new Date().toISOString(),
+    rooms: [],
+    activeStays: [],
+    folios: [],
+    menuCategories: [],
+    menuItems: []
+  });
   const roomProfileData = (): DesktopRoomFolioData => ({
     generatedAt: new Date().toISOString(),
     rooms: listRoomProfiles(options.databasePath()),
@@ -76,8 +73,10 @@ export function registerRoomFolioIpcHandlers(options: {
 
   ipcMain.handle("roomFolio:getData", (_event, roomId?: unknown): DesktopRoomFolioData => {
     options.assertUnlocked();
+    if (!hasRoomCapability()) {
+      return unavailableRoomData();
+    }
     if (!hasFolioCapability()) {
-      assertRoomAccess();
       return roomProfileData();
     }
     options.assertCapability?.();
