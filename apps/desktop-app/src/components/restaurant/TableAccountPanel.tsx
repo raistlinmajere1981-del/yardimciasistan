@@ -86,7 +86,7 @@ export function TableAccountPanel({ table, controller, disabled, onCloseOrder }:
         </div>
         <div className="operation-balance"><dt>Kalan / toplam</dt><dd>{formatMoney(order.total, getOrderCurrency(order))}</dd></div>
       </dl>
-      <ActionButton disabled={disabled} onClick={() => void requestPaidClose()}>Ödendi / Kapat</ActionButton>
+      <ActionButton disabled={disabled} busy={controller.busy} busyLabel="Hesap kapatılıyor…" onClick={() => void requestPaidClose()}>Ödendi / Kapat</ActionButton>
     </section>
     {confirmDialog}
   </>;
