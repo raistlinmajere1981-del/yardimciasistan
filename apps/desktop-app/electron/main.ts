@@ -1225,6 +1225,9 @@ function finalizeStockImageApply(result: DesktopStockImageApplyResult): DesktopS
     markLocalCompanionSnapshotDirty();
     notifyDesktopDashboardChanged(result.dashboardData);
     androidSnapshotPublishPending = true;
+    if (hasBusinessCapability(enabledBusinessCapabilities(), C.QR_MENU)) {
+      getDatabase().queueSyncJob("menu_publish");
+    }
     getSyncCoordinator().scheduleSoon();
   }
   return result;

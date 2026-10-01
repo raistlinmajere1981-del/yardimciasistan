@@ -10,6 +10,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     ]);
 }
 
+$runtimeCapabilities = ya_qr_menu_runtime_capabilities();
+if (is_array($runtimeCapabilities) && !in_array('channel.qr_menu', $runtimeCapabilities, true)) {
+    ya_menu_response(404, [
+        'ok' => false,
+        'message' => 'QR menü etkin değil.'
+    ]);
+}
+
 try {
     $menu = ya_read_menu();
 } catch (Throwable $error) {
@@ -94,4 +102,22 @@ function ya_menu_response(int $status, array $payload): void
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
+}
+
+
+function ya_qr_menu_runtime_capabilities(): ?array
+{
+    try {
+        $snapshot = ya_storage_get_publication('android_snapshot', []);
+    } catch (Throwable) {
+        return null;
+    }
+
+    $capabilities = $snapshot['business_capabilities'] ?? null;
+    if (!is_array($capabilities)) return null;
+
+    return array_values(array_unique(array_filter(array_map(
+        static fn (mixed $value): string => trim((string) $value),
+        $capabilities
+    ))));
 }
