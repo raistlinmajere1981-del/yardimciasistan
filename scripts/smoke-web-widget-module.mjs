@@ -49,7 +49,7 @@ try {
   expect(publicBusinessBeforeSyncResponse.status).toBe(200);
   const publicBusinessBeforeSync = await publicBusinessBeforeSyncResponse.json();
   expect(publicBusinessBeforeSync.business.profile_id).toBe("pension_restaurant");
-  expect(publicBusinessBeforeSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu", "directions"]);
+  expect(publicBusinessBeforeSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
 
   const capabilityPublication = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
@@ -81,7 +81,7 @@ try {
   const publicBusinessAfterSyncResponse = await fetch(`${baseUrl}/api/business.php`);
   expect(publicBusinessAfterSyncResponse.status).toBe(200);
   const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
-  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
+  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu"]);
   expect(publicBusinessAfterSync.business.ai_enabled).toBe(true);
   expect(publicBusinessAfterSync.business.whatsapp_enabled).toBe(true);
   expect(publicBusinessAfterSync.business.requests_enabled).toBe(true);
@@ -376,7 +376,7 @@ try {
   expect(requestsDisabledBusiness.business.requests_enabled).toBe(false);
   expect(requestsDisabledBusiness.business.ai_enabled).toBe(true);
   expect(requestsDisabledBusiness.business.whatsapp_enabled).toBe(true);
-  expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
+  expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu"]);
 
   const requestsDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await requestsDisabledPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
