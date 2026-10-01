@@ -7,12 +7,18 @@ export function seedOperationsCardScene({ kind, dense = false }) {
     const rooms = Array.from({ length: dense ? 18 : 6 }, (_, index) => ({ ...dashboard.rooms[0],
       id: `room-${101 + index}`, number: String(101 + index), name: `Oda ${101 + index}`, floor: index < 6 ? '1. kat' : '2. kat',
       status: ['cleaning', 'reserved', 'occupied', 'available', 'maintenance', 'available'][index % 6], sortOrder: index, capacity: 2, description: 'Bahçe manzaralı oda', bedInfo: '1 çift kişilik yatak' }));
-    const stay = (index, status, name, start = -1, end = 2) => ({ id: `stay-${index}`, roomId: rooms[index].id,
-      customerId: dashboard.customers[0].id, customerName: name, customerPhone: '', roomName: rooms[index].name,
+    const baseCustomerId = dashboard.customers[0].id;
+    const stay = (index, status, name, start = -1, end = 2, customerId = baseCustomerId) => ({ id: `stay-${index}`, roomId: rooms[index].id,
+      customerId, customerName: name, customerPhone: '', roomName: rooms[index].name,
       roomNumber: rooms[index].number, reservationId: '', checkInDate: date(start), checkOutDate: date(end),
       status, guestCount: 2, notes: '', createdAt: today, updatedAt: today, checkedInAt: '', checkedOutAt: '' });
-    const stays = [stay(1, 'planned', 'Deniz Kaya', 0, 2), stay(2, 'checked_in', 'Ece Yılmaz'), stay(3, 'checked_out', 'Ali Demir', -5, -2),
-      { ...stay(2, 'checked_out', 'Selin Aras', -8, -6), id: 'old-stay-2' }];
+    const stays = [
+      stay(1, 'planned', 'Deniz Kaya', 0, 2, `${baseCustomerId}-deniz`),
+      stay(2, 'checked_in', 'Ece Yılmaz'),
+      stay(3, 'checked_out', 'Ali Demir', -5, -2, `${baseCustomerId}-ali`),
+      { ...stay(4, 'checked_out', 'Ece Yılmaz', -8, -6), id: 'old-stay-2' },
+      { ...stay(2, 'checked_out', 'Selin Aras', -10, -9, `${baseCustomerId}-selin`), id: 'unrelated-old-stay-2' }
+    ];
     const reservations = [0, 2, 4].map(index => ({ ...dashboard.reservations[0], id: `booking-${index}`, title: 'Konaklama rezervasyonu',
       customerName: ['Aylin Aksoy', 'Bora Deniz', 'Zeynep Eren'][index / 2], guestCount: 2,
       startDate: date(3), endDate: date(5), status: 'approved', roomIds: [rooms[index].id], tableIds: [], time: '' }));
@@ -20,13 +26,19 @@ export function seedOperationsCardScene({ kind, dense = false }) {
       title: ['Oda 101 temizliği', 'Giriş hazırlığı · 102', 'Havlu kontrolü', 'Bakım takibi · 105'][index % 4], priority: index === 0 ? 'high' : 'normal',
       relatedId: rooms[index % rooms.length].id, status: 'pending', notes: 'Giriş öncesi kontrol'  }));
     window.fixturePatch({ rooms, customerRoomStays: stays, reservations, dailyTasks: tasks });
-    window.fixtureSetFolios(stays.filter(item => item.status !== 'planned').map((item, index) => ({
+    const folioAmounts = {
+      'stay-2': 360000,
+      'stay-3': 85000,
+      'old-stay-2': 125000,
+      'unrelated-old-stay-2': 95000
+    };
+    window.fixtureSetFolios(stays.filter(item => item.status !== 'planned').map(item => ({
       id: `folio-${item.id}`, stayId: item.id, roomId: item.roomId, roomNumber: item.roomNumber, roomName: item.roomName,
       customerId: item.customerId, customerName: item.customerName, reservationId: '', status: 'open', guestCount: 2,
       checkInDate: item.checkInDate, plannedCheckOutDate: item.checkOutDate, nights: 2, nightlyPriceMinor: 180000,
-      currency: 'TRY', lodgingTotalMinor: [360000, 85000, 125000][index], chargeTotalMinor: [360000, 85000, 125000][index],
-      remainingMinor: [360000, 85000, 125000][index], paidTotalMinor: 0, lodgingManualOverride: false, items: [], payments: [], openedAt: `${today}T09:00:00Z`
-    })).reverse()); // Old open account deliberately precedes current account.
+      currency: 'TRY', lodgingTotalMinor: folioAmounts[item.id], chargeTotalMinor: folioAmounts[item.id],
+      remainingMinor: folioAmounts[item.id], paidTotalMinor: 0, lodgingManualOverride: false, items: [], payments: [], openedAt: `${today}T09:00:00Z`
+    })).reverse()); // Same-customer and unrelated old debts deliberately precede the current account.
   } else {
     const tables = Array.from({ length: dense ? 18 : 6 }, (_, index) => ({ ...dashboard.tables[0], id: `table-${index}`, name: `Masa ${index + 1}`,
       area: 'Salon', sortOrder: index, status: ['available', 'occupied', 'bill_waiting', 'cleaning', 'reserved', 'occupied'][index % 6] }));

@@ -225,7 +225,20 @@ export class DesktopRoomFolioService {
         JOIN customers ON customers.id = folios.customer_id
         JOIN room_folio_totals AS totals ON totals.folio_id = folios.id
         WHERE folios.deleted_at = ''
-          AND (? = '' OR folios.room_id = ?)
+          AND (
+            ? = ''
+            OR folios.room_id = ?
+            OR (
+              folios.status = 'open'
+              AND folios.customer_id IN (
+                SELECT current_stay.customer_id
+                FROM customer_room_stays AS current_stay
+                WHERE current_stay.deleted_at = ''
+                  AND current_stay.room_id = ?
+                  AND current_stay.status = 'checked_in'
+              )
+            )
+          )
           AND (folios.status = 'open' OR folios.closed_at >= datetime('now', '-30 days'))
           ${roomId ? "" : `AND (
             folios.stay_id IN (SELECT id FROM customer_room_stays WHERE deleted_at = '' AND status IN ('planned', 'checked_in'))
@@ -240,7 +253,7 @@ export class DesktopRoomFolioService {
             )
           )`}
         ORDER BY CASE folios.status WHEN 'open' THEN 0 ELSE 1 END, folios.updated_at DESC
-      `).all(roomId ?? "", roomId ?? "") as Array<Record<string, unknown>>;
+      `).all(roomId ?? "", roomId ?? "", roomId ?? "") as Array<Record<string, unknown>>;
 
       const categoryRows = db.prepare(`
         SELECT id, name

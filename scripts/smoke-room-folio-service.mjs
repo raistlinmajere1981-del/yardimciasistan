@@ -43,6 +43,18 @@ try {
       priceNote: "",
       nightlyPriceMinor: 150000,
       currency: "TRY"
+    }, {
+      clientKey: "folio-smoke-prior-room",
+      name: "Önceki Konaklama Odası",
+      number: "102",
+      capacity: 2,
+      bedInfo: "2 tek kişilik yatak",
+      floor: "",
+      features: [],
+      description: "",
+      priceNote: "",
+      nightlyPriceMinor: 120000,
+      currency: "TRY"
     }]
   });
   assert.equal(layoutSeed.ok, true, layoutSeed.ok ? "" : layoutSeed.message);
@@ -74,10 +86,13 @@ try {
   const sqlite = new DatabaseSync(database.databasePath);
   sqlite.exec("PRAGMA foreign_keys = ON;");
 
-  const room = sqlite.prepare(`
-    SELECT id, name FROM rooms WHERE deleted_at = '' AND is_active = 1 ORDER BY sort_order, name LIMIT 1
-  `).get();
-  assert.ok(room?.id, "Smoke test needs at least one active room.");
+  const rooms = sqlite.prepare(`
+    SELECT id, name FROM rooms WHERE deleted_at = '' AND is_active = 1 ORDER BY sort_order, name
+  `).all();
+  const room = rooms.find((candidate) => candidate.name === "Smoke Test Oda");
+  const priorRoom = rooms.find((candidate) => candidate.name === "Önceki Konaklama Odası");
+  assert.ok(room?.id, "Smoke test needs the active room.");
+  assert.ok(priorRoom?.id, "Smoke test needs the prior-debt room.");
 
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
@@ -145,6 +160,46 @@ try {
   sqliteCheckIn.close();
   assert.equal(checkedIn.status, "checked_in");
   assert.equal(occupiedRoom.status, "occupied");
+
+  const debtDb = new DatabaseSync(database.databasePath);
+  debtDb.exec("PRAGMA foreign_keys = ON;");
+  debtDb.prepare(`
+    INSERT INTO customers (
+      id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+      created_at, updated_at, deleted_at, sync_status
+    ) VALUES (?, ?, ?, '', 'manual', '', '[]', '', ?, ?, '', 'local_only')
+  `).run("room_folio_other_customer", "Başka Borçlu Misafir", "+905000000002", now, now);
+  const priorCheckIn = shiftDate(today, -8);
+  const priorCheckOut = shiftDate(today, -6);
+  const oldStayInsert = debtDb.prepare(`
+    INSERT INTO customer_room_stays (
+      id, customer_id, room_id, reservation_id, status, check_in_date, check_out_date,
+      guest_count, notes, source, checked_in_at, checked_out_at, created_at, updated_at,
+      deleted_at, sync_status
+    ) VALUES (?, ?, ?, '', 'planned', ?, ?, 1, '', 'manual', '', '', ?, ?, '', 'local_only')
+  `);
+  oldStayInsert.run("room_folio_prior_same_customer", "room_folio_smoke_customer", priorRoom.id, priorCheckIn, priorCheckOut, now, now);
+  oldStayInsert.run("room_folio_prior_other_customer", "room_folio_other_customer", priorRoom.id, priorCheckIn, priorCheckOut, now, now);
+  debtDb.close();
+
+  const sameCustomerDebt = service.openFolio("room_folio_prior_same_customer");
+  const otherCustomerDebt = service.openFolio("room_folio_prior_other_customer");
+  assert.equal(sameCustomerDebt.ok, true, sameCustomerDebt.ok ? "" : sameCustomerDebt.message);
+  assert.equal(otherCustomerDebt.ok, true, otherCustomerDebt.ok ? "" : otherCustomerDebt.message);
+
+  const debtStatusDb = new DatabaseSync(database.databasePath);
+  debtStatusDb.prepare(`
+    UPDATE customer_room_stays
+    SET status = 'checked_out', checked_in_at = ?, checked_out_at = ?, updated_at = ?
+    WHERE id IN ('room_folio_prior_same_customer', 'room_folio_prior_other_customer')
+  `).run(`${priorCheckIn}T12:00:00.000Z`, `${priorCheckOut}T12:00:00.000Z`, now);
+  debtStatusDb.close();
+
+  const scopedRoomData = service.getData(room.id);
+  assert.ok(scopedRoomData.folios.some((item) => item.id === sameCustomerDebt.folioId),
+    "Room-scoped data must include an unpaid prior folio owned by the current customer, even from another room.");
+  assert.equal(scopedRoomData.folios.some((item) => item.id === otherCustomerDebt.folioId), false,
+    "Room-scoped data must not pull another customer's debt from an unrelated room.");
 
   const menuItem = opened.data.menuItems.find((item) => item.stockQuantity === null || item.stockQuantity >= item.stockConsumptionQuantity);
   assert.ok(menuItem, "Smoke test needs at least one sellable menu item.");

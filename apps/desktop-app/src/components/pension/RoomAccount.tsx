@@ -17,8 +17,16 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
   onDirty: (key: string, dirty: boolean) => void;
 }) {
   const current = controller.selected;
-  const previous = controller.folios.filter(item => item.stayId !== currentStayId && item.status === "open"
-    && !controller.data.activeStays.some(stay => stay.id === item.stayId && ["planned", "checked_in"].includes(stay.status)));
+  const currentCustomerId = current?.customerId
+    ?? controller.data.activeStays.find(stay => stay.id === currentStayId)?.customerId
+    ?? "";
+  const previous = currentCustomerId ? controller.allFolios.filter(item =>
+    item.stayId !== currentStayId
+    && item.customerId === currentCustomerId
+    && item.status === "open"
+    && item.remainingMinor > 0
+    && !controller.data.activeStays.some(stay => stay.id === item.stayId && ["planned", "checked_in"].includes(stay.status))
+  ) : [];
   const focusedPrevious = Boolean(focusFolioId && previous.some(folio => folio.id === focusFolioId));
   const [previousOpen, setPreviousOpen] = useState(focusedPrevious);
 
@@ -28,8 +36,8 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
 
   return <>
     {controller.loading && <p role="status">Hesap hazırlanıyor…</p>}
-    {previous.some(folio => folio.remainingMinor > 0) && <p className="operation-prior-debt">
-      Önceki borç · {minorMoney(previous.reduce((total, folio) => total + Math.max(0, folio.remainingMinor), 0))}
+    {previous.length > 0 && <p className="operation-prior-debt">
+      Bu müşterinin önceki borcu · {minorMoney(previous.reduce((total, folio) => total + folio.remainingMinor, 0))}
     </p>}
     <section aria-label="Mevcut konaklama hesabı" className="operation-section form-stack">
       <h4>Konaklama hesabı</h4>
@@ -59,7 +67,7 @@ export function RoomAccount({ controller, menuEnabled, currentStayId, focusFolio
           if (!focusedPrevious) setPreviousOpen(event.currentTarget.open);
         }}
       >
-        <summary>Önceki hesaplar ({previous.length})</summary>
+        <summary>Bu müşterinin önceki hesapları ({previous.length})</summary>
         <div className="form-stack">
           {previous.map(folio => <AccountRecord
             key={folio.id}

@@ -380,6 +380,9 @@ try {
   await expect(currentAccount.locator('[data-folio-id]')).toHaveAttribute('data-folio-id', 'folio-stay-2');
   await expect(currentAccount.locator('[data-stay-id]')).toHaveAttribute('data-stay-id', 'stay-2');
   await expect(priorAccounts.locator('[data-folio-id]')).toHaveAttribute('data-folio-id', 'folio-old-stay-2');
+  await expect(priorAccounts).toContainText('Ece Yılmaz');
+  await expect(priorAccounts).not.toContainText('Selin Aras');
+  await expect(safetyWorkspace.getByText('Bu müşterinin önceki borcu · ₺1.250,00', { exact: true })).toBeVisible();
   await expect(currentAccount).not.toContainText('Selin Aras');
   await captureOperationWorkspace(safety, 'room-occupied');
   await safety.evaluate(() => window.fixtureOpen('room-103', { mode: 'account', action: 'payment', folioId: 'folio-old-stay-2', stayId: 'old-stay-2' }));

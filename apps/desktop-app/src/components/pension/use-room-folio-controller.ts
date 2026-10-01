@@ -73,9 +73,10 @@ export function useRoomFolioController(roomId: string, enabled: boolean, refresh
       }
     }
   }
-  const folios = enabled ? data.folios.filter(folio => folio.roomId === roomId) : [];
+  const allFolios = enabled ? data.folios : [];
+  const folios = allFolios.filter(folio => folio.roomId === roomId);
   const selected = target.folioId ? folios.find(folio => folio.id === target.folioId && (!target.stayId || folio.stayId === target.stayId))
     : target.stayId ? folios.find(folio => folio.stayId === target.stayId) : undefined;
-  return { data, folios, selected, loading, busy, error, refresh, mutate };
+  return { data, allFolios, folios, selected, loading, busy, error, refresh, mutate };
 }
 export type RoomFolioController = ReturnType<typeof useRoomFolioController>;
