@@ -171,34 +171,40 @@ try {
   `).run("room_folio_other_customer", "Başka Borçlu Misafir", "+905000000002", now, now);
   const priorCheckIn = shiftDate(today, -8);
   const priorCheckOut = shiftDate(today, -6);
+  const priorCheckedInAt = `${priorCheckIn}T12:00:00.000Z`;
+  const priorCheckedOutAt = `${priorCheckOut}T12:00:00.000Z`;
   const oldStayInsert = debtDb.prepare(`
     INSERT INTO customer_room_stays (
       id, customer_id, room_id, reservation_id, status, check_in_date, check_out_date,
       guest_count, notes, source, checked_in_at, checked_out_at, created_at, updated_at,
       deleted_at, sync_status
-    ) VALUES (?, ?, ?, '', 'planned', ?, ?, 1, '', 'manual', '', '', ?, ?, '', 'local_only')
+    ) VALUES (?, ?, ?, '', 'checked_out', ?, ?, 1, '', 'manual', ?, ?, ?, ?, '', 'local_only')
   `);
-  oldStayInsert.run("room_folio_prior_same_customer", "room_folio_smoke_customer", priorRoom.id, priorCheckIn, priorCheckOut, now, now);
-  oldStayInsert.run("room_folio_prior_other_customer", "room_folio_other_customer", priorRoom.id, priorCheckIn, priorCheckOut, now, now);
+  oldStayInsert.run("room_folio_prior_same_customer", "room_folio_smoke_customer", priorRoom.id, priorCheckIn, priorCheckOut,
+    priorCheckedInAt, priorCheckedOutAt, now, now);
+  oldStayInsert.run("room_folio_prior_other_customer", "room_folio_other_customer", priorRoom.id, priorCheckIn, priorCheckOut,
+    priorCheckedInAt, priorCheckedOutAt, now, now);
+
+  const priorFolioInsert = debtDb.prepare(`
+    INSERT INTO room_folios (
+      id, stay_id, room_id, customer_id, reservation_id, status, guest_count,
+      check_in_date, planned_check_out_date, nightly_price_minor, currency,
+      lodging_total_minor, lodging_manual_override, opened_at, closed_at, note,
+      created_at, updated_at, deleted_at, sync_status
+    ) VALUES (?, ?, ?, ?, '', 'open', 1, ?, ?, 120000, 'TRY', 240000, 0, ?, '', '', ?, ?, '', 'local_only')
+  `);
+  const sameCustomerDebtFolioId = "room_folio_prior_same_customer_folio";
+  const otherCustomerDebtFolioId = "room_folio_prior_other_customer_folio";
+  priorFolioInsert.run(sameCustomerDebtFolioId, "room_folio_prior_same_customer", priorRoom.id, "room_folio_smoke_customer",
+    priorCheckIn, priorCheckOut, priorCheckedInAt, now, now);
+  priorFolioInsert.run(otherCustomerDebtFolioId, "room_folio_prior_other_customer", priorRoom.id, "room_folio_other_customer",
+    priorCheckIn, priorCheckOut, priorCheckedInAt, now, now);
   debtDb.close();
 
-  const sameCustomerDebt = service.openFolio("room_folio_prior_same_customer");
-  const otherCustomerDebt = service.openFolio("room_folio_prior_other_customer");
-  assert.equal(sameCustomerDebt.ok, true, sameCustomerDebt.ok ? "" : sameCustomerDebt.message);
-  assert.equal(otherCustomerDebt.ok, true, otherCustomerDebt.ok ? "" : otherCustomerDebt.message);
-
-  const debtStatusDb = new DatabaseSync(database.databasePath);
-  debtStatusDb.prepare(`
-    UPDATE customer_room_stays
-    SET status = 'checked_out', checked_in_at = ?, checked_out_at = ?, updated_at = ?
-    WHERE id IN ('room_folio_prior_same_customer', 'room_folio_prior_other_customer')
-  `).run(`${priorCheckIn}T12:00:00.000Z`, `${priorCheckOut}T12:00:00.000Z`, now);
-  debtStatusDb.close();
-
   const scopedRoomData = service.getData(room.id);
-  assert.ok(scopedRoomData.folios.some((item) => item.id === sameCustomerDebt.folioId),
+  assert.ok(scopedRoomData.folios.some((item) => item.id === sameCustomerDebtFolioId),
     "Room-scoped data must include an unpaid prior folio owned by the current customer, even from another room.");
-  assert.equal(scopedRoomData.folios.some((item) => item.id === otherCustomerDebt.folioId), false,
+  assert.equal(scopedRoomData.folios.some((item) => item.id === otherCustomerDebtFolioId), false,
     "Room-scoped data must not pull another customer's debt from an unrelated room.");
 
   const menuItem = opened.data.menuItems.find((item) => item.stockQuantity === null || item.stockQuantity >= item.stockConsumptionQuantity);
