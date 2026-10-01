@@ -1,6 +1,6 @@
 (() => {
   const ROOM_API = "/yardimci-asistan/api/rooms.php";
-  const DETAIL_PATH = "/demo/odalar/oda/";
+  const DETAIL_PATH = "/odalar/oda/";
   const FALLBACK_ROOM_IMAGE = "/assets/yardimci-asistan-logo.png";
 
   const featureCatalog = {
