@@ -9,6 +9,7 @@ import type {
   SaveManualRestaurantReservationInput
 } from "../../../electron/database";
 import { WorkspacePageFrame } from "../workspace/WorkspaceFrame";
+import { HistoryList, HistoryRecord } from "../history/HistoryRecord";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { OperationPanel } from "../workspace/OperationPanel";
 import type { TableWorkspaceIntent } from "../workspace/workspace-intent";
@@ -45,6 +46,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
   const surface = useRef<HTMLDivElement>(null);
   const historyRead = useRef(0);
   const [historyError, setHistoryError] = useState("");
+  const [historyFilter, setHistoryFilter] = useState<"all" | "paid" | "cancelled">("all");
   const [quickAction, setQuickAction] = useState<"customer" | "reservation" | null>(null);
   const [quickCustomerId, setQuickCustomerId] = useState("");
   const [returnRequested, setReturnRequested] = useState(false);
@@ -237,12 +239,49 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
       {ordersEnabled ? <TableOrderEditor menu={data.menu} webModuleUrl={data.webModuleUrl} menuEnabled={menuEnabled} inventoryEnabled={inventoryEnabled} canStartOrder={canStart} controller={controller} readOnly={transferCommitted} accountPanel={accountPanel} />
         : <><OperationPanel title="Masa İşlemleri"><p>Sipariş yönetimi etkin değil. Masa hazırlığını sağdaki panelden yönetebilirsiniz.</p></OperationPanel>{accountPanel}</>}
     </div>
-    {history && <section className="operation-history form-stack" aria-label="Masa geçmişi">
-      {historyError && <p role="alert">{historyError}</p>}<h3>Kapanan adisyonlar</h3><p>Bu masanın kayıtlı adisyonları gösterilir; tam işlem günlüğü değildir.</p>
-      {orders.filter(item => item.tableId === table.id && ["paid", "cancelled"].includes(item.status)).map(item => <article className="table-history-record" key={item.id}>
-        <StatusBadge tone={getOrderBadge(item.status).tone}>{getOrderBadge(item.status).label}</StatusBadge>{" "}
-        <span>{new Date(item.closedAt).toLocaleString("tr-TR")} · {formatMoney(item.total, getOrderCurrency(item))}</span>
-      </article>)}
-    </section>}
+    {history && (() => {
+      const closedOrders = orders
+        .filter(item => item.tableId === table.id && ["paid", "cancelled"].includes(item.status))
+        .sort((a, b) => (Date.parse(b.closedAt) || 0) - (Date.parse(a.closedAt) || 0));
+      const visibleOrders = historyFilter === "all" ? closedOrders : closedOrders.filter(item => item.status === historyFilter);
+      return <section className="operation-history history-surface" aria-label="Masa geçmişi">
+        {historyError && <p role="alert">{historyError}</p>}
+        <div className="history-toolbar">
+          <ChoiceChips ariaLabel="Masa geçmişi filtresi" value={historyFilter} onChange={setHistoryFilter} options={[
+            { id: "all", label: `Tümü (${closedOrders.length})` },
+            { id: "paid", label: `Ödendi (${closedOrders.filter(item => item.status === "paid").length})` },
+            { id: "cancelled", label: `İptal (${closedOrders.filter(item => item.status === "cancelled").length})` }
+          ]} />
+          <span className="history-toolbar__summary">{visibleOrders.length} adisyon</span>
+        </div>
+        <HistoryList empty="Bu filtrede kapanmış adisyon yok.">
+          {visibleOrders.map(item => {
+            const opened = Date.parse(item.openedAt);
+            const closed = Date.parse(item.closedAt);
+            const minutes = Number.isFinite(opened) && Number.isFinite(closed) ? Math.max(0, Math.round((closed - opened) / 60000)) : 0;
+            return <HistoryRecord
+              key={item.id}
+              kind="Adisyon"
+              title={new Date(item.closedAt).toLocaleString("tr-TR")}
+              status={<StatusBadge tone={getOrderBadge(item.status).tone}>{getOrderBadge(item.status).label}</StatusBadge>}
+              meta={<>
+                <span>{item.itemCount} ürün</span>
+                {minutes > 0 && <span>{minutes} dk</span>}
+                {item.discountTotal > 0 && <span>İndirim {formatMoney(item.discountTotal, getOrderCurrency(item))}</span>}
+              </>}
+              trailing={formatMoney(item.total, getOrderCurrency(item))}
+              description={item.note || undefined}
+            >
+              {item.items.length > 0 && <details className="history-record__details">
+                <summary>Adisyon ayrıntıları</summary>
+                <div className="history-record__detail-list">
+                  {item.items.map(line => <span key={line.id}>{line.quantity} × {line.productName} · {formatMoney(line.lineTotal, line.currency)}</span>)}
+                </div>
+              </details>}
+            </HistoryRecord>;
+          })}
+        </HistoryList>
+      </section>;
+    })()}
   </WorkspacePageFrame>;
 }
