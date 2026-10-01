@@ -409,10 +409,11 @@ done
 
 if command -v curl >/dev/null 2>&1; then
   printf 'Canlı web modülü sağlık kontrolü yapılıyor...\n'
-  if ! curl --fail --silent --show-error --max-time 20 \
-      "${public_url%/}/widget.js" >/dev/null \
+  menu_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \
+    "${public_url%/}/api/menu.php" || true)"
+  if [[ "$menu_status" != "200" && "$menu_status" != "404" ]] \
     || ! curl --fail --silent --show-error --max-time 20 \
-      "${public_url%/}/api/menu.php" >/dev/null \
+      "${public_url%/}/widget.js" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
       "${public_url%/}/api/business.php" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
