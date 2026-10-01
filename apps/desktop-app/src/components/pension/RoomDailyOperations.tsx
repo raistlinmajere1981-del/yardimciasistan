@@ -24,7 +24,14 @@ export function RoomCheckoutAction({ model, disabled, data, folioEnabled, onDash
   if (!model.room || !stay || stay.status !== "checked_in") return null;
 
   return <>
-    <ActionButton disabled={disabled || checkout.busy} onClick={() => void checkout.requestCheckout()}>Çıkışı Tamamla</ActionButton>
+    <ActionButton
+      disabled={disabled}
+      busy={checkout.busy}
+      busyLabel="Çıkış tamamlanıyor…"
+      onClick={() => void checkout.requestCheckout()}
+    >
+      Çıkışı Tamamla
+    </ActionButton>
     {checkout.checkoutDialog}
   </>;
 }
