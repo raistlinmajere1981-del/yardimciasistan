@@ -54,7 +54,16 @@ interface DesktopAppFrameProps {
 const OFFLINE_SYNC_MESSAGE = "İnternet bağlantısı yok. Yerel işlemler devam ediyor; eşitleme bağlantı gelince yapılacak.";
 
 export function DesktopAppFrame(props: DesktopAppFrameProps) {
-  return <WorkspaceNavigationProvider definitions={workspaceDefinitions} page={props.activePage} onReturnPage={props.requestPageChange}>
+  const capabilities = props.desktopSyncController.businessCapabilities;
+  return <WorkspaceNavigationProvider
+    definitions={workspaceDefinitions}
+    page={props.activePage}
+    onReturnPage={props.requestPageChange}
+    enabledHospitalityPages={{
+      pension: runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS),
+      restaurant: runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.FOOD_TABLES)
+    }}
+  >
     <DesktopAppFrameContent {...props} />
   </WorkspaceNavigationProvider>;
 }
