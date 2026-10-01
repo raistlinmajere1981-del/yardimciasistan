@@ -70,7 +70,8 @@ function FixtureShell({ page, setPage, data, setData, capabilities, pension, sav
         onSaveCustomer: async () => ({ ok: false, message: "fixture" }),
         onAnalyzeIdentity: async () => ({ ok: false, message: "fixture" }),
         folioEnabled: capabilities.folioEnabled,
-        menuEnabled: capabilities.menuEnabled
+        menuEnabled: capabilities.menuEnabled,
+        inventoryEnabled: capabilities.inventoryEnabled
       }}
     />}
     sidebar={<aside className="sidebar">

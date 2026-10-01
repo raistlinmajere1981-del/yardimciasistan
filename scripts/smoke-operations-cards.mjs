@@ -184,6 +184,34 @@ try {
   await expect(table(3)).toContainText('Servise hazır');
   await restaurant.close();
 
+  // Inventory is optional: persisted zero stock must not block hospitality menus when tracking is disabled.
+  const noInventoryRestaurant = await open('restaurant', 'no-inventory');
+  await noInventoryRestaurant.getByRole('article', { name: 'Masa 1', exact: true })
+    .getByRole('button', { name: 'Masa 1 masasını aç' }).click();
+  const noInventoryTableWorkspace = noInventoryRestaurant.locator('.workspace-page-frame');
+  const noInventoryMenu = noInventoryTableWorkspace.getByRole('region', { name: 'Sipariş menüsü', exact: true });
+  const exhaustedOrderButton = noInventoryMenu.getByRole('button', { name: 'Tükenen ürününü siparişe ekle', exact: true });
+  await expect(exhaustedOrderButton).toBeEnabled();
+  await expect(noInventoryMenu.getByText(/Stokta yok|Stok:/)).toHaveCount(0);
+  await exhaustedOrderButton.click();
+  await expect.poll(() => noInventoryRestaurant.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'add').length)).toBe(1);
+  expect((await noInventoryRestaurant.evaluate(() => window.fixtureState())).dashboard.menu.items.find(item => item.id === 'menu-b').stock_quantity).toBe(0);
+  await noInventoryRestaurant.close();
+
+  const noInventoryPension = await open('pension', 'no-inventory');
+  await noInventoryPension.evaluate(seedOperationsCardScene, { kind: 'pension' });
+  await noInventoryPension.getByRole('article', { name: 'Oda 103', exact: true })
+    .getByRole('button', { name: 'Oda 103 odasını aç' }).click();
+  const noInventoryRoomWorkspace = noInventoryPension.locator('.workspace-page-frame');
+  const noInventoryRoomMenu = noInventoryRoomWorkspace.getByRole('region', { name: 'Oda hesabı menüsü', exact: true });
+  const roomTeaButton = noInventoryRoomMenu.getByRole('button', { name: 'Çay ürününü oda hesabına ekle', exact: true });
+  await expect(roomTeaButton).toBeEnabled();
+  await expect(noInventoryRoomMenu.getByText(/Stokta yok|Stok:/)).toHaveCount(0);
+  await roomTeaButton.click();
+  await expect.poll(() => noInventoryPension.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'menu').length)).toBe(1);
+  expect((await noInventoryPension.evaluate(() => window.fixtureState())).menu[0].stockQuantity).toBe(0);
+  await noInventoryPension.close();
+
   for (const [kind, variant] of [['pension', 'rooms-only'], ['restaurant', 'tables-only']]) {
     const disabled = await open(kind, variant);
     await expect(disabled.getByRole('button', { name: /Misafir çıkışı|Sipariş aç|Hesabı kapat/ })).toHaveCount(0);
