@@ -4,6 +4,7 @@ import { BUSINESS_CAPABILITIES, parseMoneyToMajor, type CatalogProduct, type Com
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { MoneyInput } from "../ui/MoneyInput";
+import { ActionButton } from "../ui/ActionButton";
 
 interface SupplierFormState {
   id: string;
@@ -158,7 +159,7 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
         <section className="market-panel">
           <header className="market-panel-heading market-panel-heading-row">
             <div><span>Tedarik</span><h2>Tedarikçiler</h2><p>Alım kayıtlarında kullanılacak firma kartları.</p></div>
-            <button type="button" className="market-secondary-button" onClick={() => setSupplierForm(emptySupplierForm())}><Plus size={16} aria-hidden="true" /> Yeni</button>
+            <ActionButton size="sm" type="button" onClick={() => setSupplierForm(emptySupplierForm())}><Plus size={16} aria-hidden="true" /> Tedarikçi Ekle</ActionButton>
           </header>
           <div className="market-list compact">
             {suppliers.map((supplier) => (
