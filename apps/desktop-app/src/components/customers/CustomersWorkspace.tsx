@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { BedDouble, CalendarClock, IdCard, Plus, Trash2, Users } from "lucide-react";
 import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, SaveCustomerInput } from "../../../electron/database";
-import { formatCustomerSource } from "../../app/customer-model";
 import { formatShortDate } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListItem } from "../ui/DataList";
@@ -146,12 +145,18 @@ export function CustomersWorkspace({
           leading={<span className={"status-dot " + (row.activeStay ? "tone-success" : row.activeReservations.length > 0 ? "tone-warning" : "tone-neutral")} aria-hidden="true" />}
           title={<button className="customer-record-row__open" type="button" onClick={openCustomer}>{customer.fullName}</button>}
           meta={<>
+            <span className="customer-record-row__phone">{customer.phone || "Telefon yok"}</span>
             {row.roomText && <span><BedDouble size={14} aria-hidden="true" />{row.roomText}</span>}
             {row.activeReservations.length > 0 && <span><CalendarClock size={14} aria-hidden="true" />{row.activeReservations.length} aktif rezervasyon</span>}
             {kbsOverview.enabled && row.activeStay && <StatusBadge tone={kbsTone(row.kbsState)}>{kbsLabel(row.kbsState)}</StatusBadge>}
           </>}
-          description={(customer.phone || "Telefon yok") + " · " + formatCustomerSource(customer.source)}
           actions={<>
+            {formatShortDate(customer.lastContactAt || customer.updatedAt) && (
+              <span className="customer-record-row__date">
+                <small>{customer.lastContactAt ? "Son temas" : "Güncellendi"}</small>
+                <time dateTime={customer.lastContactAt || customer.updatedAt}>{formatShortDate(customer.lastContactAt || customer.updatedAt)}</time>
+              </span>
+            )}
             {kbsOverview.enabled && row.activeStay && row.kbsState !== "sent" && row.arrivalNotification && (
               <ActionButton
                 variant="secondary"
@@ -171,7 +176,6 @@ export function CustomersWorkspace({
             <ActionButton variant="danger" size="sm" type="button" onClick={() => { void onDelete(customer); }}>
               <Trash2 size={15} aria-hidden="true" />Sil
             </ActionButton>
-            {formatShortDate(customer.lastContactAt || customer.updatedAt) && <time className="customer-record-row__date" dateTime={customer.lastContactAt || customer.updatedAt}>{formatShortDate(customer.lastContactAt || customer.updatedAt)}</time>}
           </>}
         />;
       })}
