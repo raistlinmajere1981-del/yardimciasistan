@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
-import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
 import { QrMenuPanel } from "./QrMenuPanel";
 import {
   compareMenuRecords,
@@ -33,7 +32,6 @@ interface MenuManagerProps {
   dashboardData: DesktopDashboardData;
   qrMenuEnabled: boolean;
   inventoryEnabled: boolean;
-  stockImageImportEnabled: boolean;
   itemForm: ItemFormState;
   selectedCategoryId: string;
   selectedItemId: string;
@@ -48,7 +46,6 @@ interface MenuManagerProps {
   onReorderCategories: (orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onReorderItems: (categoryId: string, orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onDeleteCategoryById: (categoryId: string) => Promise<void>;
-  onDashboardDataChanged: (data: DesktopDashboardData) => void;
   onPreview: () => void;
 }
 
@@ -56,7 +53,6 @@ export function MenuManager({
   dashboardData,
   qrMenuEnabled,
   inventoryEnabled,
-  stockImageImportEnabled,
   itemForm,
   selectedCategoryId,
   selectedItemId,
@@ -71,7 +67,6 @@ export function MenuManager({
   onReorderCategories,
   onReorderItems,
   onDeleteCategoryById,
-  onDashboardDataChanged,
   onPreview
 }: MenuManagerProps) {
   const navigation = useWorkspaceNavigation();
@@ -252,11 +247,6 @@ export function MenuManager({
         label={qrMenuEnabled ? "QR menü yönetimi" : "Menü yönetimi"}
         bodyLabel="Menü kayıtları"
         layout="fill"
-        toolbar={stockImageImportEnabled ? (
-          <div className="page-toolbar__actions">
-            <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
-          </div>
-        ) : undefined}
       >
         <PageWorkSurface mode="fill" className="menu-page-surface">
           <div className={`menu-page-layout${qrMenuEnabled ? " has-qr" : ""}`}>
@@ -339,8 +329,10 @@ export function MenuManager({
                     }}
                   >
                     <strong>{category.name}</strong>
-                    <p className="menu-category-row__description">{category.description || "Açıklama yok."}</p>
-                    <span className="menu-category-row__meta">{productCount} ürün</span>
+                    <span className="menu-category-row__details">
+                      <span className="menu-category-row__description">{category.description || "Açıklama yok."}</span>
+                      <span className="menu-category-row__meta">{productCount} ürün</span>
+                    </span>
                   </button>
                   <StatusBadge tone={category.is_active ? "success" : "neutral"}>
                     {category.is_active ? (qrMenuEnabled ? "Yayında" : "Aktif") : (qrMenuEnabled ? "Gizli" : "Pasif")}
