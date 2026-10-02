@@ -170,13 +170,16 @@ sahiplenir. Feature CSS global sidebar/header/page padding tanımlamaz.
 
 Sayfa canvas'ı kullanılabilir viewport'u doldurur. Global başlığın altındaki kullanılabilir
 alan `PageWorkSurface` ile hafif bir çerçeveye alınır; iç paneller bu yüzeyin geometrisini
-paylaşır. Panel yüksekliği görev tipine göre iki moddan biriyle açıkça seçilir:
+paylaşır. Ana çalışma sayfalarında varsayılan model `fill`'dir: yüzey kalan viewport'u
+doldurur, veri arttığında scroll doğru iç panel/list tarafından sahiplenilir.
 
-- `flow`: kayıt, form, ayar ve rapor yüzeyleri içerik kadar büyür. Veri arttığında
-  sayfa body scroll eder. Müşteriler, Menü, Ayarlar ve rapor türü yüzeyler bu gruptadır.
-- `fill`: konumların sabit kalmasının önemli olduğu operasyon yüzeyleri kalan viewport'u
-  doldurur ve scroll'u doğru iç bölge sahiplenir. Pansiyon, Restoran, Talepler,
-  WhatsApp Web ve Takvim bu gruptadır.
+`fill` kullanan ana yüzeyler arasında Müşteri İşleri, Menü, Market, Raporlar, Pansiyon,
+Restoran, Talepler, WhatsApp Web ve Takvim bulunur. Takvim de `fill` kullanır; ancak
+gün/hafta/ay grid geometrisi nedeniyle normal panel akışından bilinçli bir istisnadır.
+
+`flow` yalnız gerçek içerik akışının sayfa yüksekliğini belirlemesi gereken yardımcı
+form, ayar veya uzun belge/çıktı yüzeylerinde kullanılır. Ana operasyon/list sayfalarında
+veri büyüdüğü için dış sayfayı uzatmak yerine mümkün olduğunca iç scroll tercih edilir.
 
 `FeatureWorkspacePage` kullanan sayfalarda bu seçim `layout="flow" | "fill"` ile
 yapılır. Feature CSS rastgele ekran yüksekliği üretmez.
