@@ -30,6 +30,7 @@
   transition:
     background-color var(--motion-hover) var(--ease-standard),
     border-color var(--motion-hover) var(--ease-standard),
+    box-shadow var(--motion-hover) var(--ease-standard),
     transform var(--motion-press) var(--ease-standard);
 }
 
@@ -69,7 +70,8 @@
 
 .list-row--button:hover:not(:disabled) {
   background: var(--color-bg-hover);
-  border-color: var(--color-border-strong);
+  border-color: var(--color-selected-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .list-row--button:active:not(:disabled) {
