@@ -37,7 +37,7 @@ export function RoomGuestSlots({
     const selected = currentIndex === selectedIndex;
     return <button
       type="button"
-      className={`room-guest-slot${guest ? " is-occupied" : " is-empty"}${selected ? " is-selected" : ""}`}
+      className={`room-guest-slot interactive-surface interactive-surface--record${guest ? " is-occupied" : " is-empty"}${selected ? " is-selected" : ""}`}
       disabled={disabled}
       aria-pressed={selected}
       aria-label={guest ? `${guest.name} misafir slotu` : `${currentIndex + 1}. boş misafir slotu`}
