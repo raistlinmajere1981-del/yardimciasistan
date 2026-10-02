@@ -3269,54 +3269,7 @@ public final class MainActivity extends ComponentActivity {
     configureFullDialog(formDialog.dialog());
   }
 
-  private EditText addCustomerFormInput(
-      LinearLayout form,
-      String label,
-      String hint,
-      String initialValue,
-      boolean multiline
-  ) {
-    TextView fieldLabel = UiKit.text(this, label, 11, UiKit.MUTED, Typeface.BOLD);
-    LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
-    labelParams.setMargins(0, UiKit.dp(this, 10), 0, UiKit.dp(this, 4));
-    fieldLabel.setLayoutParams(labelParams);
-    form.addView(fieldLabel);
-    EditText input = UiKit.input(this, hint);
-    if (multiline) {
-      input.setSingleLine(false);
-      input.setMinLines(3);
-      input.setGravity(Gravity.TOP);
-      input.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 10), UiKit.dp(this, 12), UiKit.dp(this, 10));
-      input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-    }
-    input.setText(initialValue == null ? "" : initialValue);
-    input.setLayoutParams(new LinearLayout.LayoutParams(-1, multiline ? UiKit.dp(this, 94) : UiKit.dp(this, 50)));
-    form.addView(input);
-    return input;
-  }
 
-  private Spinner addChoiceSpinner(
-      LinearLayout form,
-      String label,
-      ChoiceItem[] choices,
-      String selectedValue
-  ) {
-    TextView fieldLabel = UiKit.text(this, label, 11, UiKit.MUTED, Typeface.BOLD);
-    LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
-    labelParams.setMargins(0, UiKit.dp(this, 10), 0, UiKit.dp(this, 4));
-    fieldLabel.setLayoutParams(labelParams);
-    form.addView(fieldLabel);
-    Spinner spinner = new Spinner(this);
-    ArrayAdapter<ChoiceItem> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, choices);
-    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    spinner.setAdapter(adapter);
-    spinner.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 11));
-    spinner.setPadding(UiKit.dp(this, 8), 0, UiKit.dp(this, 8), 0);
-    spinner.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50)));
-    selectSpinnerValue(spinner, selectedValue);
-    form.addView(spinner);
-    return spinner;
-  }
 
   private void showRoomAssignmentDialog(
       OperationData.CustomerRecord preferredCustomer,
@@ -4757,54 +4710,9 @@ public final class MainActivity extends ComponentActivity {
     return count;
   }
 
-  private int countPensionDate(boolean checkIn) {
-    String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
-    int count = 0;
-    for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (!isPensionReservation(reservation)
-          || !AndroidUiRules.reservationAllowed(data, reservation)
-          || "cancelled".equals(reservation.status)) {
-        continue;
-      }
-      if (today.equals(checkIn ? reservation.startDate : reservation.endDate)) {
-        count += 1;
-      }
-    }
-    return count;
-  }
 
-  private int countRoomsByStatus(String status) {
-    int count = 0;
-    for (OperationData.RoomRecord room : data.rooms) {
-      if (status.equals(room.status)) {
-        count += 1;
-      }
-    }
-    return count;
-  }
 
-  private int countCustomerRoomStays(String status) {
-    int count = 0;
-    for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
-      if (status.equals(stay.status)) {
-        count += 1;
-      }
-    }
-    return count;
-  }
 
-  private int countPensionTasks(boolean completed) {
-    int count = 0;
-    for (OperationData.TaskRecord task : data.tasks) {
-      if (!AndroidUiRules.isPensionTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
-        continue;
-      }
-      if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
-        count += 1;
-      }
-    }
-    return count;
-  }
 
   private int countCoreTasks(boolean completed) {
     int count = 0;
