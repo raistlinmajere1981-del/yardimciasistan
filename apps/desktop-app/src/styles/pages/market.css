@@ -265,7 +265,13 @@
   scrollbar-gutter: stable;
 }
 
-.market-list-row,
+.market-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .market-history-row {
   display: flex;
   justify-content: space-between;
