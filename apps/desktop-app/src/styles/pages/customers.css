@@ -832,7 +832,7 @@
   height: 100%;
 }
 
-.customer-work-page-surface > :is(.customers-workspace, .requests-workspace, .kbs-automation-workspace, .message-workspace) {
+.customer-work-page-surface > :is(.customers-workspace, .requests-workspace, .kbs-automation-workspace, .customer-messages-workspace) {
   height: 100%;
   min-height: 0;
 }
