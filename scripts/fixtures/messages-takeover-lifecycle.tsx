@@ -16,7 +16,7 @@ function Harness() {
       safeMode={() => <div data-testid="safe-surface">safe</div>}
       webMode={() => <div data-testid="web-surface">web</div>}
       whatsappEnabled
-      prewarmWebview={false}
+      prewarmWebview
       active={active}
     />
   );
