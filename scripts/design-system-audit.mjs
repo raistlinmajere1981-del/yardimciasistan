@@ -179,7 +179,7 @@ const architectureViolations = desktopAudit.violations.filter(issue =>
 if (architectureViolations.length) {
   throw new Error(`Design-system ownership violations: ${JSON.stringify(architectureViolations)}`);
 }
-const auditedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup|lock|operation-workspace)|components\/(?:cards|data-list|forms|motion|operation-surface))\.css$/;
+const auditedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup|lock|operation-workspace)|components\/(?:buttons|badges|feedback|metrics|cards|data-list|forms|motion|resource-card|operation-surface))\.css$/;
 const auditViolations = desktopAudit.violations.filter(issue => auditedDesktop.test(issue.file));
 const targetInventory = desktopAudit.inventory.filter(item => auditedDesktop.test(item.file));
 const duplicateSelectorDebt = targetInventory
