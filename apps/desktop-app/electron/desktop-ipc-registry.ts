@@ -102,9 +102,13 @@ export type DesktopIpcRegistryDependencies = {
   evaluateBirthdayNow: () => void;
 };
 
+export type DesktopIpcRegistryHandle = {
+  clearMarketBarcodeFastPull: () => void;
+};
+
 export function registerDesktopIpcHandlers(
   dependencies: DesktopIpcRegistryDependencies
-) {
+): DesktopIpcRegistryHandle {
   const {
     getDatabase,
     getSyncCoordinator,
@@ -217,7 +221,7 @@ export function registerDesktopIpcHandlers(
       kbsInteractiveDriver.prepareLogin(credentials)
   });
 
-  registerMarketBarcodeFastPullHandler(
+  const marketBarcodeFastPull = registerMarketBarcodeFastPullHandler(
     getSyncCoordinator,
     assertUnlocked,
     assertCapability
@@ -361,6 +365,10 @@ export function registerDesktopIpcHandlers(
     getDatabase,
     assertCapability
   });
+
+  return {
+    clearMarketBarcodeFastPull: marketBarcodeFastPull.clear
+  };
 }
 
 function registerMarketBarcodeFastPullHandler(
@@ -412,4 +420,11 @@ function registerMarketBarcodeFastPullHandler(
       );
     }
   );
+
+  return {
+    clear: () => {
+      senders.clear();
+      getSyncCoordinator().setMarketBarcodeFastPullEnabled(false);
+    }
+  };
 }

@@ -79,7 +79,10 @@ import {
   prepareRuntimeDataForStartup,
   resolveRuntimeDataRoot
 } from "./desktop-startup-data";
-import { registerDesktopIpcHandlers } from "./desktop-ipc-registry";
+import {
+  registerDesktopIpcHandlers,
+  type DesktopIpcRegistryHandle
+} from "./desktop-ipc-registry";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -96,6 +99,7 @@ let maintenanceSyncSuspended = false;
 let androidSnapshotPublishPending = true;
 let appLockService: DesktopAppLockService | null = null;
 let birthdayScheduler: BirthdayScheduler | null = null;
+let desktopIpcRegistryHandle: DesktopIpcRegistryHandle | null = null;
 let localCompanionServer: LocalCompanionServer | null = null;
 let localCompanionPairingService: LocalCompanionPairingService | null = null;
 let localCompanionMdnsAdvertiser: LocalCompanionMdnsAdvertiser | null = null;
@@ -470,7 +474,7 @@ app.on("before-quit", () => {
 });
 
 function registerIpcHandlers() {
-  registerDesktopIpcHandlers({
+  desktopIpcRegistryHandle = registerDesktopIpcHandlers({
     getDatabase,
     getSyncCoordinator,
     getAppLockService,
@@ -580,7 +584,7 @@ export function scheduleAutomaticSyncSoon() {
 
 export async function suspendAutomaticSyncForMaintenance() {
   maintenanceSyncSuspended = true;
-  marketBarcodeFastPullSenders.clear();
+  desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
   await syncCoordinator?.suspendAndDrain();
   const androidPull = androidActionSyncInFlight;
   if (androidPull) {
