@@ -26,6 +26,72 @@
   min-height: 100%;
 }
 
+.market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory) {
+  overflow: hidden;
+}
+
+.market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory)
+  > :is(.market-two-column, .market-quick-sale-layout) {
+  height: 100%;
+  min-height: 0;
+}
+
+.market-workspace--quickSale :is(.market-sale-catalog, .market-sale-cart) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.market-workspace--quickSale .market-sale-product-grid,
+.market-workspace--quickSale .market-sale-cart-lines {
+  flex: 1 1 auto;
+}
+
+.market-workspace--products .market-two-column {
+  align-items: stretch;
+}
+
+.market-workspace--products .market-panel {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.market-workspace--products .market-panel:first-child {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.market-workspace--products .market-panel:last-child {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.market-workspace--products .market-category-layout--single {
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.market-workspace--inventory .market-two-column {
+  align-items: stretch;
+}
+
+.market-workspace--inventory .market-panel {
+  height: 100%;
+  min-height: 0;
+}
+
+.market-workspace--inventory .market-panel:first-child {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.market-workspace--inventory .market-panel:last-child {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
 .market-tabs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1154,6 +1220,28 @@ button.market-list-row:hover {
 }
 
 @media (max-width: 1180px) {
+  .market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory) {
+    overflow: auto;
+  }
+
+  .market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory)
+    > :is(.market-two-column, .market-quick-sale-layout) {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .market-workspace--quickSale :is(.market-sale-catalog, .market-sale-cart),
+  .market-workspace--products .market-panel,
+  .market-workspace--inventory .market-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .market-workspace--products .market-category-layout--single {
+    grid-template-rows: auto;
+    overflow: visible;
+  }
+
   .market-two-column,
   .market-category-layout,
   .market-companion-inbox,
