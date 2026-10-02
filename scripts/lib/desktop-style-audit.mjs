@@ -8,8 +8,7 @@ const sharedVisualProperty = /\b(?:background(?:-color)?|border(?:-(?:color|top-
 const outlineSuppression = /\boutline\s*:\s*(?:none|0)(?:\s*;|\s*$)/i;
 
 function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\const intentionalRenderer = /\/styles\/pages\/menu-preview\.css$/;
-');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function stripHasConditions(selector) {
