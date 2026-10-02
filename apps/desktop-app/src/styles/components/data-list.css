@@ -52,6 +52,11 @@
   transform: translateY(1px) scale(.995);
 }
 
+.interactive-surface:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 .interactive-surface:has(:is(button, a, input, select, textarea):active):active {
   transform: none;
 }
