@@ -46,7 +46,7 @@ const dashboardContribution = {
   pageId: "dashboard",
   icon: Home,
   order: 0,
-  contentScroll: "page",
+  contentScroll: "workspace",
   presentation: (capabilities) => {
     const topics = [
       runtimeHasCapability(capabilities, C.REQUESTS) ? "yeni talepler" : "",
