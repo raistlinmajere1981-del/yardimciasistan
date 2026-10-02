@@ -58,7 +58,7 @@ export function CustomerMessagesWorkspace({
     const request = bridge?.takeoverWhatsAppWebview;
     const sequence = ++takeoverSequence.current;
     setWebTakeoverState("pending");
-    setWebTakeoverMessage("WhatsApp Web kullanıcı kontrolüne hazırlanıyor...");
+    setWebTakeoverMessage("");
 
     if (!request) {
       setWebTakeoverState("error");
@@ -76,7 +76,7 @@ export function CustomerMessagesWorkspace({
         lastMessage = result.message;
         if (result.ok) {
           setWebTakeoverState("ready");
-          setWebTakeoverMessage(result.message);
+          setWebTakeoverMessage("");
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -105,8 +105,6 @@ export function CustomerMessagesWorkspace({
       setWebTakeoverAttempt((current) => current + 1);
     }
   };
-
-  const webReady = active && mode === "web" && webTakeoverState === "ready";
 
   return (
     <section className={`combined-page customer-messages-workspace${mode === "web" ? " customer-messages-workspace--web" : ""}`} aria-label="Hazır Mesajlar">
@@ -138,17 +136,15 @@ export function CustomerMessagesWorkspace({
       )}
       {whatsappEnabled && webModeActivated && (
         <>
-          {mode === "web" && !webReady && (
-            <div className="message-web-takeover status-message" role={webTakeoverState === "error" ? "alert" : "status"}>
-              <span>{webTakeoverMessage || "WhatsApp Web hazırlanıyor..."}</span>
-              {webTakeoverState === "error" && (
-                <ActionButton variant="secondary" size="sm" type="button" onClick={() => setWebTakeoverAttempt((current) => current + 1)}>
-                  Yeniden Dene
-                </ActionButton>
-              )}
+          {mode === "web" && webTakeoverState === "error" && (
+            <div className="message-web-takeover status-message status-message--danger" role="alert">
+              <span>{webTakeoverMessage || "WhatsApp Web kullanıcı kontrolüne alınamadı."}</span>
+              <ActionButton variant="secondary" size="sm" type="button" onClick={() => setWebTakeoverAttempt((current) => current + 1)}>
+                Yeniden Dene
+              </ActionButton>
             </div>
           )}
-          <div className={webReady ? "message-mode-content" : "message-mode-content is-hidden"}>
+          <div className={mode === "web" ? "message-mode-content" : "message-mode-content is-hidden"}>
             <MessageModeErrorBoundary onReturnToSafe={() => selectMode("safe")}>
               {webMode(() => selectMode("safe"))}
             </MessageModeErrorBoundary>
