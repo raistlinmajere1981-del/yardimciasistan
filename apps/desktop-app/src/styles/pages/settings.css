@@ -674,38 +674,7 @@
 }
 
 .room-media-kind-chips {
-  display: flex;
-  flex-wrap: wrap;
   gap: var(--space-1);
-}
-
-.room-media-kind-chip {
-  min-height: 1.75rem;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-field);
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--text-xs);
-  cursor: pointer;
-}
-
-.room-media-kind-chip:hover:not(:disabled) {
-  border-color: var(--color-accent-border);
-  color: var(--color-accent);
-}
-
-.room-media-kind-chip.is-selected {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  font-weight: var(--weight-semibold);
-}
-
-.room-media-kind-chip:disabled {
-  cursor: default;
-  opacity: .65;
 }
 
 @media (max-width: 1050px) {
