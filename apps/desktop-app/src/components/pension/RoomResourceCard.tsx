@@ -20,6 +20,8 @@ export function RoomResourceCard({ room, summary, data, capabilities, onDashboar
   imageSrc?: string;
 }) {
   const navigation = useWorkspaceNavigation();
+  const selected = navigation.hospitalitySessions.pension?.intent.entityType === "room"
+    && navigation.hospitalitySessions.pension.intent.entityId === room.id;
   const model = getRoomCardModel(room, summary, capabilities, roomToday());
   const [statusBusy, setStatusBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -78,6 +80,7 @@ export function RoomResourceCard({ room, summary, data, capabilities, onDashboar
       busy={busy}
       error={Boolean(feedback)}
       feedback={feedback}
+      selected={selected}
       onOpen={open}
       openLabel={`${room.name} odasını aç`}
       status={<>
