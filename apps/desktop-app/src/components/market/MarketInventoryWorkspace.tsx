@@ -2,6 +2,7 @@ import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { CatalogProduct, CommerceUnit, InventoryBalance, InventoryMovement } from "@yardimci-asistan/shared";
 import { StatusBadge } from "../ui/StatusBadge";
+import { ActionButton } from "../ui/ActionButton";
 
 interface MarketInventoryWorkspaceProps {
   products: CatalogProduct[];
@@ -142,7 +143,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
         )}
         <label className="market-field">Sayılan miktar<input type="number" min="0" step="0.0001" value={countedQuantity} onChange={(event) => setCountedQuantity(event.target.value)} /></label>
         <label className="market-field">Sayım notu<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="İsteğe bağlı" /></label>
-        <div className="market-form-actions"><button type="button" onClick={() => void saveCount()} disabled={!productId || busy}><Save size={16} aria-hidden="true" /> Sayımı kaydet</button></div>
+        <div className="market-form-actions"><ActionButton type="button" busy={busy} onClick={() => void saveCount()} disabled={!productId}><Save size={16} aria-hidden="true" /> Sayımı Kaydet</ActionButton></div>
       </section>
 
       <section className="market-panel">
