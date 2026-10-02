@@ -165,7 +165,7 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
             {suppliers.map((supplier) => (
               <button
                 type="button"
-                className="market-list-row interactive-surface"
+                className="market-list-row interactive-surface interactive-surface--record"
                 key={supplier.id}
                 aria-pressed={supplierForm.id === supplier.id}
                 onClick={() => editSupplier(supplier)}
