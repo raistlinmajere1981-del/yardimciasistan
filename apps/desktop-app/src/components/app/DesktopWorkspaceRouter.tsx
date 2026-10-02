@@ -567,7 +567,6 @@ export function DesktopWorkspaceRouter({
           ordersEnabled={foodOrdersEnabled}
           menuEnabled={foodMenuEnabled}
           tasksEnabled={tasksEnabled}
-          onDashboardDataChanged={setDashboardData}
           reservations={foodReservationsEnabled ? (
             <RestaurantReservationsWorkspace
               customersEnabled={customersEnabled}
@@ -597,7 +596,6 @@ export function DesktopWorkspaceRouter({
           dashboardData={surfaceData}
           qrMenuEnabled={runtimeFeatures.qrMenu}
           inventoryEnabled={inventoryEnabled}
-          stockImageImportEnabled={aiEnabled && inventoryEnabled}
           itemForm={itemForm}
           selectedCategoryId={selectedCategoryId}
           selectedItemId={selectedItemId}
