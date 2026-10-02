@@ -107,6 +107,7 @@ public final class MainActivity extends ComponentActivity {
   private ReportsWorkspace reportsWorkspace;
   private AndroidOperationCards operationCards;
   private AndroidWorkspaceCoordinator workspaceCoordinator;
+  private AndroidDetailDialogCoordinator detailDialogCoordinator;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private StockImageWorkflow stockImageWorkflow;
@@ -268,6 +269,25 @@ public final class MainActivity extends ComponentActivity {
           @Override public void render() { MainActivity.this.render(); }
           @Override public void copyText(String message) { MainActivity.this.copyText(message); }
           @Override public void showMessageDetail(OperationData.MessageRecord message) { MainActivity.this.showMessageDetail(message); }
+        }
+    );
+    detailDialogCoordinator = new AndroidDetailDialogCoordinator(
+        this,
+        new AndroidDetailDialogCoordinator.Listener() {
+          @Override public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) { addDetailHeaderActions(header, dialog, reopen); }
+          @Override public void configureFullDialog(Dialog dialog) { MainActivity.this.configureFullDialog(dialog); }
+          @Override public void openDialer(String phone) { MainActivity.this.openDialer(phone); }
+          @Override public void openWhatsApp(String phone, String message) { MainActivity.this.openWhatsApp(phone, message); }
+          @Override public void copyText(String message) { MainActivity.this.copyText(message); }
+          @Override public void showPreparedReply(String customerName, String message) { MainActivity.this.showPreparedReply(customerName, message); }
+          @Override public void sendAction(String type, JSONObject payload, String success) { MainActivity.this.sendAction(type, payload, success); }
+          @Override public void confirm(String title, String message, Runnable action) { MainActivity.this.confirm(title, message, action); }
+          @Override public void editReservation(ReservationEditorDialog.Kind kind, OperationData.ReservationRecord reservation) { MainActivity.this.showReservationEditor(kind, reservation); }
+          @Override public void sendReservationAction(OperationData.ReservationRecord reservation, String type, String success) { MainActivity.this.sendReservationAction(reservation, type, success); }
+          @Override public void showError(String message) { MainActivity.this.showError(message); }
+          @Override public void addOrderItem(OperationData.TableRecord table, OperationData.TableOrder order, OperationData.MenuItem item) { MainActivity.this.addOrderItem(table, order, item); }
+          @Override public void sendOrderStatus(OperationData.TableOrder order, String status) { MainActivity.this.sendOrderStatus(order, status); }
+          @Override public void closeOrder(OperationData.TableOrder order, String status) { MainActivity.this.closeOrder(order, status); }
         }
     );
     workspaceCoordinator = new AndroidWorkspaceCoordinator(
@@ -1763,171 +1783,15 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showRequestDetail(OperationData.RequestRecord request) {
-    CustomerRequestDetailDialog.show(
-        this,
-        data,
-        request,
-        new CustomerRequestDetailDialog.Listener() {
-          @Override
-          public void addHeaderActions(
-              LinearLayout header,
-              Dialog dialog,
-              Runnable reopen
-          ) {
-            addDetailHeaderActions(header, dialog, reopen);
-          }
-
-          @Override
-          public void openDialer(String phone) {
-            MainActivity.this.openDialer(phone);
-          }
-
-          @Override
-          public void openWhatsApp(String phone, String message) {
-            MainActivity.this.openWhatsApp(phone, message);
-          }
-
-          @Override
-          public void showPreparedReply(String customerName, String message) {
-            MainActivity.this.showPreparedReply(customerName, message);
-          }
-
-          @Override
-          public void sendAction(
-              String actionType,
-              JSONObject actionPayload,
-              String successMessage
-          ) {
-            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
-          }
-
-          @Override
-          public void confirm(String title, String message, Runnable action) {
-            MainActivity.this.confirm(title, message, action);
-          }
-
-          @Override
-          public void configureFullDialog(Dialog dialog) {
-            MainActivity.this.configureFullDialog(dialog);
-          }
-        }
-    );
+    detailDialogCoordinator.showRequestDetail(data, request);
   }
 
   private void showReservationDetail(OperationData.ReservationRecord reservation) {
-    ReservationDetailDialog.show(
-        this,
-        data,
-        reservation,
-        new ReservationDetailDialog.Listener() {
-          @Override
-          public void addHeaderActions(
-              LinearLayout header,
-              Dialog dialog,
-              Runnable reopen
-          ) {
-            addDetailHeaderActions(header, dialog, reopen);
-          }
-
-          @Override
-          public void openDialer(String phone) {
-            MainActivity.this.openDialer(phone);
-          }
-
-          @Override
-          public void openWhatsApp(String phone, String message) {
-            MainActivity.this.openWhatsApp(phone, message);
-          }
-
-          @Override
-          public void editReservation(
-              ReservationEditorDialog.Kind kind,
-              OperationData.ReservationRecord selected
-          ) {
-            showReservationEditor(kind, selected);
-          }
-
-          @Override
-          public void sendReservationAction(
-              OperationData.ReservationRecord selected,
-              String actionType,
-              String successMessage
-          ) {
-            MainActivity.this.sendReservationAction(
-                selected,
-                actionType,
-                successMessage
-            );
-          }
-
-          @Override
-          public void confirm(String title, String message, Runnable action) {
-            MainActivity.this.confirm(title, message, action);
-          }
-
-          @Override
-          public void configureFullDialog(Dialog dialog) {
-            MainActivity.this.configureFullDialog(dialog);
-          }
-
-          @Override
-          public void showError(String message) {
-            MainActivity.this.showError(message);
-          }
-        }
-    );
+    detailDialogCoordinator.showReservationDetail(data, reservation);
   }
 
   private void showMessageDetail(OperationData.MessageRecord message) {
-    MessageDetailDialog.show(
-        this,
-        data,
-        message,
-        new MessageDetailDialog.Listener() {
-          @Override
-          public void addHeaderActions(
-              LinearLayout header,
-              Dialog dialog,
-              Runnable reopen
-          ) {
-            addDetailHeaderActions(header, dialog, reopen);
-          }
-
-          @Override
-          public void copyText(String messageText) {
-            MainActivity.this.copyText(messageText);
-          }
-
-          @Override
-          public void openWhatsApp(String phone, String messageText) {
-            MainActivity.this.openWhatsApp(phone, messageText);
-          }
-
-          @Override
-          public void openDialer(String phone) {
-            MainActivity.this.openDialer(phone);
-          }
-
-          @Override
-          public void sendAction(
-              String actionType,
-              JSONObject actionPayload,
-              String successMessage
-          ) {
-            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
-          }
-
-          @Override
-          public void confirm(String title, String messageText, Runnable action) {
-            MainActivity.this.confirm(title, messageText, action);
-          }
-
-          @Override
-          public void configureFullDialog(Dialog dialog) {
-            MainActivity.this.configureFullDialog(dialog);
-          }
-        }
-    );
+    detailDialogCoordinator.showMessageDetail(data, message);
   }
 
 
@@ -1940,93 +1804,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showTableOrder(OperationData.TableRecord table) {
-    if (!data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)
-        || !data.hasPermission("table_order.view")) {
-      showError("Bu işletmede masa siparişi kullanılamıyor.");
-      return;
-    }
-
-    new TableOrderDialog(
-        this,
-        data,
-        table,
-        new TableOrderDialog.Listener() {
-          @Override
-          public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) {
-            addDetailHeaderActions(header, dialog, reopen);
-          }
-
-          @Override
-          public void configureFullDialog(Dialog dialog) {
-            MainActivity.this.configureFullDialog(dialog);
-          }
-
-          @Override
-          public void onOpenOrder(OperationData.TableRecord selectedTable) {
-            sendAction(
-                "table_order_open",
-                payload(
-                    "table_id",
-                    selectedTable.id,
-                    "expected_table_updated_at",
-                    selectedTable.updatedAt
-                ),
-                "Masa siparişi açılmak üzere gönderildi."
-            );
-          }
-
-          @Override
-          public void onAddItem(
-              OperationData.TableRecord selectedTable,
-              OperationData.TableOrder order,
-              OperationData.MenuItem item
-          ) {
-            addOrderItem(selectedTable, order, item);
-          }
-
-          @Override
-          public void onUpdateItemQuantity(OperationData.TableOrderItem item, int quantity) {
-            sendAction(
-                "table_order_update_item_quantity",
-                payload(
-                    "item_id",
-                    item.id,
-                    "quantity",
-                    quantity,
-                    "expected_item_updated_at",
-                    item.updatedAt
-                ),
-                quantity < item.quantity
-                    ? "Ürün adedi azaltılmak üzere gönderildi."
-                    : "Ürün adedi artırılmak üzere gönderildi."
-            );
-          }
-
-          @Override
-          public void onRemoveItem(OperationData.TableOrderItem item) {
-            sendAction(
-                "table_order_remove_item",
-                payload("item_id", item.id, "expected_item_updated_at", item.updatedAt),
-                "Ürün silinmek üzere gönderildi."
-            );
-          }
-
-          @Override
-          public void onSetOrderStatus(OperationData.TableOrder order, String status) {
-            sendOrderStatus(order, status);
-          }
-
-          @Override
-          public void onCloseOrder(OperationData.TableOrder order, String status) {
-            closeOrder(order, status);
-          }
-
-          @Override
-          public void onConfirm(String title, String message, Runnable action) {
-            confirm(title, message, action);
-          }
-        }
-    ).show();
+    detailDialogCoordinator.showTableOrder(data, table);
   }
 
   private void addOrderItem(OperationData.TableRecord table, OperationData.TableOrder order, OperationData.MenuItem item) {
