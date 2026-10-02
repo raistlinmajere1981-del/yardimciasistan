@@ -41,8 +41,20 @@ const channels = [
 ];
 
 for (const channel of channels) {
+  const escapedChannel = channel.replace(/[.*+?^${}()|[\]\\]/g, "\\for (const channel of channels) {
   assert.equal(
     ipcSource.split(`"${channel}"`).length - 1,
+    1,
+    `Commerce IPC handler must register ${channel} exactly once.`
+  );
+  assert.equal(
+    preloadSource.split(`"${channel}"`).length - 1,
+    1,
+    `Commerce preload bridge must invoke ${channel} exactly once.`
+  );
+}");
+  assert.equal(
+    [...ipcSource.matchAll(new RegExp(`ipcMain\\.handle\\("${escapedChannel}"`, "g"))].length,
     1,
     `Commerce IPC handler must register ${channel} exactly once.`
   );
