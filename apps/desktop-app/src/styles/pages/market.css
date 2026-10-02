@@ -464,74 +464,11 @@ button.market-list-row:hover {
   justify-content: flex-end;
 }
 
-.market-form-actions button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-accent-border);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  padding: 0 var(--space-3);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-}
-
-.market-secondary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg-surface);
-  color: var(--color-text);
-  padding: 0 var(--space-3);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-}
-
-.market-secondary-button:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-}
-
-.market-danger-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-danger-border);
-  border-radius: var(--radius-md);
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-}
-
-.market-danger-button:hover:not(:disabled) {
-  background: var(--color-danger-soft);
-  border-color: var(--color-danger);
-}
-
 .market-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
   width: var(--control-height-md);
-  border-radius: var(--radius-md);
+  min-width: var(--control-height-md);
   padding: 0;
   align-self: end;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-strong);
-  color: var(--color-text);
-  cursor: pointer;
 }
 
 .market-badge {
@@ -1160,25 +1097,6 @@ button.market-list-row:hover {
 
 .market-sale-grand-total strong {
   font-size: var(--text-xl);
-}
-
-.market-sale-complete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-lg);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: var(--weight-bold);
-  cursor: pointer;
-}
-
-.market-sale-complete:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .market-sale-receipt {
