@@ -166,6 +166,12 @@ if (args.has("--json")) {
 const sharedFiles = /\/styles\/(?:layout\/|components\/(?:navigation|header|notifications|panels|toolbars|status|dialogs)\.css$)/;
 const coreViolations = desktopAudit.violations.filter(issue => sharedFiles.test(issue.file));
 if (coreViolations.length) throw new Error(`Shared shell must have zero violations: ${coreViolations.length}`);
+const architectureViolations = desktopAudit.violations.filter(issue =>
+  issue.kind === "pageOwnsSharedVisualState" || issue.kind === "unsafeOutlineSuppression"
+);
+if (architectureViolations.length) {
+  throw new Error(`Design-system ownership violations: ${JSON.stringify(architectureViolations)}`);
+}
 const auditedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup|lock)|components\/(?:cards|data-list|forms|motion))\.css$/;
 const auditViolations = desktopAudit.violations.filter(issue => auditedDesktop.test(issue.file));
 const targetInventory = desktopAudit.inventory.filter(item => auditedDesktop.test(item.file));
