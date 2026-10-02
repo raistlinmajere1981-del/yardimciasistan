@@ -18,6 +18,7 @@ import type { DesktopCommerceBridge } from "../../../electron/commerce-ipc-contr
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 import { MoneyInput } from "../ui/MoneyInput";
+import { ActionButton } from "../ui/ActionButton";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
 import type { CartDraftQuickSaleRequest, MarketQuickSaleSession } from "../../app/use-market-quick-sale-session";
 import { useRequestGeneration } from "../workspace/use-request-generation";
@@ -506,9 +507,9 @@ export function MarketQuickSaleWorkspace({
                     placeholder="Test barkodu"
                     disabled={disabled || scanning}
                   />
-                  <button type="button" className="market-secondary-button" onClick={submitSimulatedBarcode} disabled={disabled || scanning || !simulatedBarcode.trim()}>
+                  <ActionButton variant="secondary" type="button" onClick={submitSimulatedBarcode} disabled={disabled || scanning || !simulatedBarcode.trim()}>
                     Barkodu Gönder
-                  </button>
+                  </ActionButton>
                 </div>
               )}
             </section>
@@ -567,9 +568,9 @@ export function MarketQuickSaleWorkspace({
               : "fiyat satış kaydedilirken tekrar doğrulanır."}</p>
           </div>
           {cartLines.length > 0 && (
-            <button type="button" className="market-secondary-button" onClick={clearSale} disabled={disabled}>
+            <ActionButton variant="secondary" type="button" onClick={clearSale} disabled={disabled}>
               <Trash2 size={16} aria-hidden="true" /> Temizle
-            </button>
+            </ActionButton>
           )}
         </header>
 
@@ -641,10 +642,18 @@ export function MarketQuickSaleWorkspace({
           <span className="market-sale-grand-total"><small>{isCredit ? "Veresiye tutarı" : "Ödenecek"}</small><strong>{money(previewTotal, currency)}</strong></span>
         </div>
 
-        <button type="button" className="market-sale-complete" onClick={() => void completeSale()} disabled={disabled || !discountValid || cartLines.length === 0 || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))}>
+        <ActionButton
+          size="lg"
+          fullWidth
+          busy={submitting}
+          busyLabel="Satış işleniyor…"
+          type="button"
+          onClick={() => void completeSale()}
+          disabled={disabled || !discountValid || cartLines.length === 0 || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))}
+        >
           <WalletCards size={18} aria-hidden="true" />
-          {submitting ? "Satış işleniyor…" : isCredit ? "Satışı Veresiye Kaydet" : "Ödemeyi Al ve Satışı Tamamla"}
-        </button>
+          {isCredit ? "Satışı Veresiye Kaydet" : "Ödemeyi Al ve Satışı Tamamla"}
+        </ActionButton>
 
         {lastSale && (
           <div className="market-sale-receipt" role="status">
@@ -663,9 +672,9 @@ export function MarketQuickSaleWorkspace({
               <strong>{lastSale?.status === "credit" ? "Veresiye satış kaydedildi ancak telefon sepeti kapatılamadı." : "Satış tamamlandı ancak telefon sepeti kapatılamadı."}</strong>
               <small>Satış kaydı korundu. Kaynak sepeti kapatmak için yeniden deneyebilirsiniz.</small>
             </span>
-            <button type="button" className="market-secondary-button" onClick={() => void closeRecoveryDraft()} disabled={disabled}>
+            <ActionButton variant="secondary" type="button" onClick={() => void closeRecoveryDraft()} disabled={disabled}>
               Taslağı Kapat
-            </button>
+            </ActionButton>
           </div>
         )}
       </section>
