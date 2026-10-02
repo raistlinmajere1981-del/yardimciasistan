@@ -1,6 +1,7 @@
 import { RefreshCw, ShoppingCart, Smartphone } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { CommerceSaleDraftDetail } from "@yardimci-asistan/shared";
+import { ActionButton } from "../ui/ActionButton";
 
 interface MarketCompanionInboxWorkspaceProps {
   cartDraftsEnabled: boolean;
@@ -73,9 +74,9 @@ export function MarketCompanionInboxWorkspace({
               Telefonda hazırlanan sepetler burada bekler. Ürünler Hızlı Satış'a yüklenirken güncel katalog ve güncel fiyatla çözülür.
             </p>
           </div>
-          <button type="button" className="market-secondary-button" onClick={() => void reload()} disabled={disabled}>
+          <ActionButton variant="secondary" type="button" onClick={() => void reload()} disabled={disabled}>
             <RefreshCw size={16} aria-hidden="true" /> Yenile
-          </button>
+          </ActionButton>
         </header>
       </section>
 
@@ -106,12 +107,12 @@ export function MarketCompanionInboxWorkspace({
                 </ul>
                 {detail.draft.note && <p className="market-draft-note"><strong>Telefon notu:</strong> {detail.draft.note}</p>}
                 <div className="market-draft-actions">
-                  <button type="button" onClick={() => onOpenCartDraft(detail)} disabled={disabled}>
+                  <ActionButton type="button" onClick={() => onOpenCartDraft(detail)} disabled={disabled}>
                     <ShoppingCart size={16} aria-hidden="true" /> Hızlı Satış'a Yükle
-                  </button>
-                  <button type="button" className="market-secondary-button" onClick={() => void closeCartDraft(detail.draft.id)} disabled={disabled}>
+                  </ActionButton>
+                  <ActionButton variant="secondary" type="button" onClick={() => void closeCartDraft(detail.draft.id)} disabled={disabled}>
                     Sepeti Kapat
-                  </button>
+                  </ActionButton>
                 </div>
               </article>
             ))}
