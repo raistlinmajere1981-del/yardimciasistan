@@ -9,8 +9,8 @@ import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.ArrayList;
 
 final class RestaurantWorkspace {
@@ -322,14 +322,23 @@ final class RestaurantWorkspace {
   }
 
   private int countPaymentWaitingTables() {
-    int count = 0;
+    int count = countOrdersByStatus("payment");
     for (OperationData.TableRecord table : data.tables) {
-      OperationData.TableOrder order = data.activeOrderForTable(table.id);
-      if ("bill_waiting".equals(table.status) || (order != null && "payment".equals(order.status))) {
+      if (("bill_waiting".equals(table.status) || "payment".equals(table.status))
+          && !hasPaymentOrderForTable(table.id)) {
         count += 1;
       }
     }
     return count;
+  }
+
+  private boolean hasPaymentOrderForTable(String tableId) {
+    for (OperationData.TableOrder order : data.tableOrders) {
+      if (tableId.equals(order.tableId) && "payment".equals(order.status) && order.isActive()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private int countActiveOrders() {
@@ -343,7 +352,7 @@ final class RestaurantWorkspace {
   private int countOrdersByStatus(String status) {
     int count = 0;
     for (OperationData.TableOrder order : data.tableOrders) {
-      if (status.equals(order.status)) count += 1;
+      if (status.equals(order.status) && order.isActive()) count += 1;
     }
     return count;
   }
@@ -351,8 +360,9 @@ final class RestaurantWorkspace {
   private int countRestaurantReservations(String status) {
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (AndroidUiRules.isRestaurantReservation(data, reservation)
-          && status.equals(reservation.status)) {
+      if (status.equals(reservation.status)
+          && AndroidUiRules.isRestaurantReservation(data, reservation)
+          && AndroidUiRules.reservationAllowed(data, reservation)) {
         count += 1;
       }
     }
@@ -360,11 +370,16 @@ final class RestaurantWorkspace {
   }
 
   private int countRestaurantReservationsToday() {
-    String today = LocalDate.now(ZoneId.systemDefault()).toString();
+    String today = new SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(new Date());
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (AndroidUiRules.isRestaurantReservation(data, reservation)
-          && today.equals(reservation.startDate)) {
+      if (!AndroidUiRules.isRestaurantReservation(data, reservation)
+          || !AndroidUiRules.reservationAllowed(data, reservation)
+          || "cancelled".equals(reservation.status)
+          || "rejected".equals(reservation.status)) {
+        continue;
+      }
+      if (today.equals(reservation.startDate)) {
         count += 1;
       }
     }
@@ -374,8 +389,10 @@ final class RestaurantWorkspace {
   private int countRestaurantTasks(boolean completed) {
     int count = 0;
     for (OperationData.TaskRecord task : data.tasks) {
-      if (AndroidUiRules.isRestaurantTask(data, task)
-          && (completed ? "done".equals(task.status) : !"done".equals(task.status) && !"cancelled".equals(task.status))) {
+      if (!AndroidUiRules.isRestaurantTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
+        continue;
+      }
+      if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
         count += 1;
       }
     }
