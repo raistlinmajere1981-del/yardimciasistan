@@ -56,6 +56,7 @@ import { PensionPage } from "../../pages/PensionPage";
 import { ReportsPage } from "../../pages/ReportsPage";
 import { RestaurantPage } from "../../pages/RestaurantPage";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
+import type { MarketView } from "../workspace/workspace-intent";
 
 interface DesktopWorkspaceRouterProps {
   activePage: DesktopPage;
@@ -222,6 +223,7 @@ export function DesktopWorkspaceRouter({
     return domain === "accommodation" || domain === "mixed" || domain === "generic";
   });
   const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
+  const [marketView, setMarketView] = useState<MarketView>("quickSale");
   const [kbsEgmSessionRequest, setKbsEgmSessionRequest] = useState(0);
   const [kbsSessionRetryNotificationId, setKbsSessionRetryNotificationId] = useState("");
   const kbsController = useKbsNotificationController({
@@ -633,7 +635,12 @@ export function DesktopWorkspaceRouter({
           inventoryEnabled={inventoryEnabled}
         />
       ) : activePage === "market" ? (
-        <MarketPage customers={dashboardData.customers} controller={marketController} />
+        <MarketPage
+          customers={dashboardData.customers}
+          controller={marketController}
+          activeView={marketView}
+          onViewChange={setMarketView}
+        />
       ) : (
         <SettingsWorkspace
           setupData={setupData}
