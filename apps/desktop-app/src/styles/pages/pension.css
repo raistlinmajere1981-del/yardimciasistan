@@ -91,7 +91,22 @@
   text-align: start;
 }
 
+.room-guest-slot.is-occupied {
+  --interactive-surface-bg: color-mix(in srgb, var(--color-success-soft) 72%, var(--color-bg-panel));
+  --interactive-surface-hover-bg: var(--color-success-soft);
+  --interactive-surface-hover-border: var(--color-success-border);
+}
+
+.room-guest-slot.is-occupied > svg {
+  color: var(--color-success);
+}
+
 .room-guest-slot.is-empty {
+  --interactive-surface-bg: var(--color-bg-field);
+  color: var(--color-text-muted);
+}
+
+.room-guest-slot.is-empty > svg {
   color: var(--color-text-muted);
 }
 
