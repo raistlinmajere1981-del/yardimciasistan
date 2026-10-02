@@ -78,8 +78,6 @@ public final class MainActivity extends ComponentActivity {
   private static final int LANDSCAPE_HEADER_HEIGHT_DP = 60;
   private static final int HEADER_ACTION_SIZE_DP = 44;
   private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 0x5941;
-  private static final String EXTRA_PROVISION_URL = "ya_provision_url";
-  private static final String EXTRA_PROVISION_TICKET = "ya_provision_ticket";
   private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
 
   private final HostingSyncClient syncClient = new HostingSyncClient();
@@ -127,6 +125,7 @@ public final class MainActivity extends ComponentActivity {
   private String renderedScreenKey = "";
   private String currentError = "";
   private AndroidImageCaptureController imageCaptureController;
+  private AndroidProvisioningController provisioningController;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private CustomerFormDialog activeCustomerFormDialog;
@@ -155,7 +154,42 @@ public final class MainActivity extends ComponentActivity {
     themeMode = AppTheme.load(preferences);
     setTheme(themeStyleResource(themeMode));
     super.onCreate(savedInstanceState);
-    captureProvisioningIntent(getIntent());
+    provisioningController = new AndroidProvisioningController(
+        this,
+        preferences,
+        executor,
+        syncClient,
+        new AndroidProvisioningController.Listener() {
+          @Override
+          public void onCaptureError(String message) {
+            showError(message);
+          }
+
+          @Override
+          public void onBootstrapStarted() {
+            loading = true;
+            connectionState = "Android kurulumu işletmeye bağlanıyor";
+            clearError();
+            render();
+          }
+
+          @Override
+          public void onBootstrapSucceeded() {
+            loading = false;
+            clearError();
+            syncOperations(false);
+          }
+
+          @Override
+          public void onBootstrapFailed(String message) {
+            loading = false;
+            connectionState = "Android kurulum bağlantısı tamamlanamadı";
+            showError(message);
+            render();
+          }
+        }
+    );
+    provisioningController.captureIntent(getIntent());
     getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
       @Override
       public void handleOnBackPressed() {
@@ -332,7 +366,7 @@ public final class MainActivity extends ComponentActivity {
   protected void onNewIntent(Intent intent) {
     super.onNewIntent(intent);
     setIntent(intent);
-    captureProvisioningIntent(intent);
+    provisioningController.captureIntent(intent);
     applyNotificationIntent(intent);
     if (ConnectionSettings.hasPendingBootstrap(preferences) && !loading) {
       bootstrapProvisioning();
@@ -349,58 +383,13 @@ public final class MainActivity extends ComponentActivity {
     }
   }
 
-  private void captureProvisioningIntent(Intent intent) {
-    if (intent == null) {
-      return;
-    }
-    String baseUrl = intent.getStringExtra(EXTRA_PROVISION_URL);
-    String ticket = intent.getStringExtra(EXTRA_PROVISION_TICKET);
-    if (baseUrl == null || ticket == null) {
-      return;
-    }
-    if (!ConnectionSettings.storeBootstrapProvisioning(preferences, baseUrl, ticket)) {
-      showError("Masaüstünden gelen Android kurulum bilgisi geçersiz.");
-      return;
-    }
-    intent.removeExtra(EXTRA_PROVISION_URL);
-    intent.removeExtra(EXTRA_PROVISION_TICKET);
-  }
+
 
   private void bootstrapProvisioning() {
-    if (loading || identity == null) {
+    if (loading || identity == null || provisioningController == null) {
       return;
     }
-    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
-    String ticket = ConnectionSettings.bootstrapTicket(preferences);
-    if (baseUrl.isEmpty() || ticket.isEmpty()) {
-      return;
-    }
-
-    loading = true;
-    connectionState = "Android kurulumu işletmeye bağlanıyor";
-    clearError();
-    render();
-    executor.execute(() -> {
-      try {
-        String token = syncClient.claimBootstrapDeviceToken(baseUrl, ticket, identity);
-        if (!ConnectionSettings.storeDeviceToken(preferences, token)) {
-          throw new HostingSyncClient.SyncException("Telefonun kişisel bağlantı anahtarı kaydedilemedi.");
-        }
-        ConnectionSettings.clearBootstrapTicket(preferences);
-        runOnUiThread(() -> {
-          loading = false;
-          clearError();
-          syncOperations(false);
-        });
-      } catch (HostingSyncClient.SyncException error) {
-        runOnUiThread(() -> {
-          loading = false;
-          connectionState = "Android kurulum bağlantısı tamamlanamadı";
-          showError(error.getMessage());
-          render();
-        });
-      }
-    });
+    provisioningController.bootstrap(identity);
   }
 
 
