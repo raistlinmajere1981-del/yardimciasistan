@@ -3998,252 +3998,88 @@ public final class MainActivity extends ComponentActivity {
       showError("Bu işletmede masa siparişi kullanılamıyor.");
       return;
     }
-    OperationData.TableOrder order = data.activeOrderForTable(table.id);
-    Dialog dialog = new Dialog(this);
-    LinearLayout shell = UiKit.column(this);
-    shell.setBackgroundColor(UiKit.BG);
-    shell.setPadding(UiKit.dp(this, 14), UiKit.dp(this, 12), UiKit.dp(this, 14), UiKit.dp(this, 16));
 
-    LinearLayout header = UiKit.row(this);
-    LinearLayout heading = UiKit.column(this);
-    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    heading.addView(UiKit.eyebrow(this, "MASA SİPARİŞİ"));
-    heading.addView(UiKit.title(this, table.name));
-    String orderSummary = order == null
-        ? "Adisyon yok · 0 ürün · " + money(0, "TRY")
-        : formatOrderStatus(order.status) + " · " + order.itemCount + " ürün · " + money(order.total, orderCurrency(order));
-    heading.addView(UiKit.text(this,
-        orderSummary,
-        12,
-        order == null ? UiKit.WARNING : orderTone(order.status),
-        Typeface.BOLD
-    ));
-    header.addView(heading);
-    addDetailHeaderActions(header, dialog, () -> showTableOrder(table));
-    shell.addView(header);
-
-    LinearLayout page = UiKit.column(this);
-    if (order == null) {
-      TextView hint = UiKit.text(this, "Ürün ekleyin veya alttaki Siparişi Kaydet aksiyonuyla boş adisyon açın.", 12, UiKit.MUTED, Typeface.NORMAL);
-      LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
-      hintParams.setMargins(0, UiKit.dp(this, 6), 0, UiKit.dp(this, 4));
-      hint.setLayoutParams(hintParams);
-      page.addView(hint);
-    }
-
-    if (data.hasPermission("menu.view")) {
-      page.addView(sectionLabel("Ürünler"));
-      final String[] category = {""};
-      final String[] query = {""};
-      EditText search = UiKit.input(this, "Ürün ara");
-      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
-      searchParams.setMargins(0, 0, 0, UiKit.dp(this, 7));
-      search.setLayoutParams(searchParams);
-      page.addView(search);
-
-      LinearLayout categoryRow = UiKit.row(this);
-      HorizontalScrollView categoryScroll = new HorizontalScrollView(this);
-      categoryScroll.setHorizontalScrollBarEnabled(false);
-      categoryScroll.addView(categoryRow);
-      page.addView(categoryScroll);
-
-      LinearLayout menuContainer = UiKit.column(this);
-      LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(-1, -2);
-      menuParams.setMargins(0, UiKit.dp(this, 7), 0, 0);
-      menuContainer.setLayoutParams(menuParams);
-      page.addView(menuContainer);
-      final Runnable[] refreshMenu = new Runnable[1];
-      refreshMenu[0] = () -> {
-        categoryRow.removeAllViews();
-        categoryRow.addView(UiKit.chip(this, "Tümü", category[0].isEmpty(), view -> {
-          category[0] = "";
-          refreshMenu[0].run();
-        }));
-        for (OperationData.MenuCategory menuCategory : data.categories) {
-          categoryRow.addView(UiKit.chip(this, menuCategory.name, menuCategory.id.equals(category[0]), view -> {
-            category[0] = menuCategory.id;
-            refreshMenu[0].run();
-          }));
-        }
-        renderOrderMenuItems(menuContainer, table, order, category[0], query[0]);
-      };
-      search.addTextChangedListener(new TextWatcher() {
-        @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
-        @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
-          query[0] = text == null ? "" : text.toString().trim();
-          renderOrderMenuItems(menuContainer, table, order, category[0], query[0]);
-        }
-        @Override public void afterTextChanged(Editable editable) {}
-      });
-      refreshMenu[0].run();
-    }
-
-    page.addView(sectionLabel("Aktif adisyon satırları"));
-    if (order == null || order.items.isEmpty()) {
-      page.addView(emptyCard("Henüz ürün yok", "Menüden Ekle'ye dokunarak siparişi başlatın."));
-    } else {
-      for (OperationData.TableOrderItem item : order.items) {
-        page.addView(orderItemCard(item));
-      }
-    }
-
-    LinearLayout total = UiKit.card(this);
-    total.addView(settingLine("Toplam", order == null ? money(0, "TRY") : money(order.total, orderCurrency(order)), UiKit.PRIMARY));
-    page.addView(total);
-
-    if (order != null && data.hasPermission("table_order.cancel")) {
-      Button cancel = UiKit.dangerButton(this, "Adisyonu İptal Et", view -> confirm("Adisyonu iptal et", "Adisyon iptal edilip masa boşaltılsın mı?", () -> {
-        closeOrder(order, "cancelled");
-        dialog.dismiss();
-      }));
-      LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      cancelParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      cancel.setLayoutParams(cancelParams);
-      page.addView(cancel);
-    }
-
-    ScrollView scroll = UiKit.scroll(this, page);
-    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    shell.addView(scroll);
-
-    ArrayList<Button> stickyActions = new ArrayList<>();
-    if (order == null && data.hasPermission("table_order.open")) {
-      stickyActions.add(UiKit.button(this, "Siparişi Kaydet", UiKit.PRIMARY, view ->
-          sendAction("table_order_open", payload("table_id", table.id, "expected_table_updated_at", table.updatedAt), "Masa siparişi açılmak üzere gönderildi.")));
-    }
-    if (order != null && data.hasPermission("table_order.set_preparing")) {
-      stickyActions.add(UiKit.outlineButton(this, "Hazırlanıyor", view -> sendOrderStatus(order, "preparing")));
-    }
-    if (order != null && data.hasPermission("table_order.set_served")) {
-      stickyActions.add(UiKit.outlineButton(this, "Servis Edildi", view -> sendOrderStatus(order, "served")));
-    }
-    if (order != null && data.hasPermission("table_order.set_payment_waiting")) {
-      stickyActions.add(UiKit.button(this, "Hesap Bekliyor", UiKit.ACCENT, view -> sendOrderStatus(order, "payment")));
-    }
-    if (order != null && data.hasPermission("table_order.close_paid")) {
-      stickyActions.add(UiKit.button(this, "Ödendi / Kapat", UiKit.PRIMARY, view -> confirm("Adisyonu kapat", "Adisyon ödendi olarak kapatılsın mı?", () -> {
-        closeOrder(order, "paid");
-        dialog.dismiss();
-      })));
-    }
-    if (!stickyActions.isEmpty()) {
-      shell.addView(orderActionBar(stickyActions));
-    }
-    dialog.setContentView(shell);
-    dialog.show();
-    configureFullDialog(dialog);
-  }
-
-  private View orderActionBar(List<Button> actions) {
-    LinearLayout bar = UiKit.column(this);
-    bar.setContentDescription("Adisyon aksiyonları");
-    bar.setPadding(0, UiKit.dp(this, 8), 0, 0);
-    bar.setBackground(UiKit.rounded(this, UiKit.BG, UiKit.BORDER, 0));
-    int firstRowEnd = actions.size() > 2 ? 2 : actions.size();
-    bar.addView(orderActionRow(actions, 0, firstRowEnd));
-    if (firstRowEnd < actions.size()) {
-      LinearLayout secondRow = orderActionRow(actions, firstRowEnd, actions.size());
-      LinearLayout.LayoutParams secondRowParams = new LinearLayout.LayoutParams(-1, -2);
-      secondRowParams.setMargins(0, UiKit.dp(this, 7), 0, 0);
-      secondRow.setLayoutParams(secondRowParams);
-      bar.addView(secondRow);
-    }
-    return bar;
-  }
-
-  private LinearLayout orderActionRow(List<Button> actions, int start, int end) {
-    LinearLayout row = UiKit.row(this);
-    row.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
-    for (int index = start; index < end; index += 1) {
-      UiKit.addAction(row, actions.get(index), this);
-    }
-    return row;
-  }
-
-  private void renderOrderMenuItems(
-      LinearLayout container,
-      OperationData.TableRecord table,
-      OperationData.TableOrder order,
-      String categoryId,
-      String search
-  ) {
-    container.removeAllViews();
-    String normalizedSearch = search.toLowerCase(new Locale("tr", "TR"));
-    int shown = 0;
-    for (OperationData.MenuItem item : data.menuItems) {
-      if (!item.available || (!categoryId.isEmpty() && !categoryId.equals(item.categoryId))) {
-        continue;
-      }
-      if (!normalizedSearch.isEmpty()
-          && !item.name.toLowerCase(new Locale("tr", "TR")).contains(normalizedSearch)
-          && !item.description.toLowerCase(new Locale("tr", "TR")).contains(normalizedSearch)) {
-        continue;
-      }
-      LinearLayout card = UiKit.card(this);
-      LinearLayout row = UiKit.row(this);
-      LinearLayout details = UiKit.column(this);
-      details.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-      details.addView(UiKit.text(this, item.name, 14, UiKit.TEXT, Typeface.BOLD));
-      details.addView(UiKit.text(this, data.categoryName(item.categoryId) + " · " + money(item.price, item.currency), 12, UiKit.MUTED, Typeface.NORMAL));
-      if (item.stockQuantity != null) {
-        details.addView(UiKit.text(this,
-            item.outOfStock() ? "Stokta yok" : "Mevcut stok: " + stockQuantity(item.stockQuantity, item.stockUnit),
-            12, item.outOfStock() ? UiKit.DANGER : UiKit.INFO, Typeface.BOLD));
-      }
-      row.addView(details);
-      boolean canAdd = data.hasPermission("table_order.add_item")
-          && (order != null || data.hasPermission("table_order.open"));
-      if (canAdd) {
-        Button add = UiKit.button(this, item.outOfStock() ? "Stok yok" : "Ekle", UiKit.PRIMARY, view -> addOrderItem(table, order, item));
-        add.setLayoutParams(new LinearLayout.LayoutParams(UiKit.dp(this, 82), UiKit.dp(this, 44)));
-        add.setEnabled(!item.outOfStock());
-        row.addView(add);
-      }
-      card.addView(row);
-      container.addView(card);
-      shown += 1;
-    }
-    if (shown == 0) {
-      container.addView(emptyCard("Ürün bulunamadı", "Arama veya kategori filtresini değiştirin."));
-    }
-  }
-
-  private View orderItemCard(OperationData.TableOrderItem item) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout details = UiKit.column(this);
-    details.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    details.addView(UiKit.text(this, item.productName, 14, UiKit.TEXT, Typeface.BOLD));
-    details.addView(UiKit.text(this, money(item.unitPrice, item.currency) + " · " + money(item.lineTotal, item.currency), 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(details);
-    TextView quantity = statusBadge(String.valueOf(item.quantity), UiKit.PRIMARY);
-    top.addView(quantity);
-    card.addView(top);
-
-    if (data.hasPermission("table_order.update_item") || data.hasPermission("table_order.remove_item")) {
-      LinearLayout actions = UiKit.row(this);
-      LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
-      actionParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      actions.setLayoutParams(actionParams);
-      if (data.hasPermission("table_order.update_item")) {
-        Button minus = UiKit.outlineButton(this, "−", view -> {
-          if (item.quantity > 1) {
-            sendAction("table_order_update_item_quantity", payload("item_id", item.id, "quantity", item.quantity - 1, "expected_item_updated_at", item.updatedAt), "Ürün adedi azaltılmak üzere gönderildi.");
+    new TableOrderDialog(
+        this,
+        data,
+        table,
+        new TableOrderDialog.Listener() {
+          @Override
+          public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) {
+            addDetailHeaderActions(header, dialog, reopen);
           }
-        });
-        minus.setEnabled(item.quantity > 1);
-        UiKit.addAction(actions, minus, this);
-        Button plus = UiKit.outlineButton(this, "+", view -> sendAction("table_order_update_item_quantity", payload("item_id", item.id, "quantity", item.quantity + 1, "expected_item_updated_at", item.updatedAt), "Ürün adedi artırılmak üzere gönderildi."));
-        OperationData.MenuItem currentMenuItem = data.menuItemById(item.menuItemId);
-        plus.setEnabled(currentMenuItem == null || !currentMenuItem.outOfStock());
-        UiKit.addAction(actions, plus, this);
-      }
-      if (data.hasPermission("table_order.remove_item")) {
-        UiKit.addAction(actions, UiKit.dangerButton(this, "Sil", view -> confirm("Ürünü sil", item.productName + " adisyondan kaldırılsın mı?", () -> sendAction("table_order_remove_item", payload("item_id", item.id, "expected_item_updated_at", item.updatedAt), "Ürün silinmek üzere gönderildi."))), this);
-      }
-      card.addView(actions);
-    }
-    return card;
+
+          @Override
+          public void configureFullDialog(Dialog dialog) {
+            MainActivity.this.configureFullDialog(dialog);
+          }
+
+          @Override
+          public void onOpenOrder(OperationData.TableRecord selectedTable) {
+            sendAction(
+                "table_order_open",
+                payload(
+                    "table_id",
+                    selectedTable.id,
+                    "expected_table_updated_at",
+                    selectedTable.updatedAt
+                ),
+                "Masa siparişi açılmak üzere gönderildi."
+            );
+          }
+
+          @Override
+          public void onAddItem(
+              OperationData.TableRecord selectedTable,
+              OperationData.TableOrder order,
+              OperationData.MenuItem item
+          ) {
+            addOrderItem(selectedTable, order, item);
+          }
+
+          @Override
+          public void onUpdateItemQuantity(OperationData.TableOrderItem item, int quantity) {
+            sendAction(
+                "table_order_update_item_quantity",
+                payload(
+                    "item_id",
+                    item.id,
+                    "quantity",
+                    quantity,
+                    "expected_item_updated_at",
+                    item.updatedAt
+                ),
+                quantity < item.quantity
+                    ? "Ürün adedi azaltılmak üzere gönderildi."
+                    : "Ürün adedi artırılmak üzere gönderildi."
+            );
+          }
+
+          @Override
+          public void onRemoveItem(OperationData.TableOrderItem item) {
+            sendAction(
+                "table_order_remove_item",
+                payload("item_id", item.id, "expected_item_updated_at", item.updatedAt),
+                "Ürün silinmek üzere gönderildi."
+            );
+          }
+
+          @Override
+          public void onSetOrderStatus(OperationData.TableOrder order, String status) {
+            sendOrderStatus(order, status);
+          }
+
+          @Override
+          public void onCloseOrder(OperationData.TableOrder order, String status) {
+            closeOrder(order, status);
+          }
+
+          @Override
+          public void onConfirm(String title, String message, Runnable action) {
+            confirm(title, message, action);
+          }
+        }
+    ).show();
   }
 
   private void addOrderItem(OperationData.TableRecord table, OperationData.TableOrder order, OperationData.MenuItem item) {
