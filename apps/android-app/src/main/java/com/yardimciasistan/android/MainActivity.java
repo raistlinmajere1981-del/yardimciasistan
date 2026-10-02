@@ -109,6 +109,7 @@ public final class MainActivity extends ComponentActivity {
   private AndroidConnectionController connectionController;
   private AndroidSettingsWorkspace settingsWorkspace;
   private ReportsWorkspace reportsWorkspace;
+  private AndroidOperationCards operationCards;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private StockImageWorkflow stockImageWorkflow;
@@ -243,6 +244,33 @@ public final class MainActivity extends ComponentActivity {
           @Override public void onRefreshRequested() { syncOperations(false); }
           @Override public void onRenderRequested() { render(); }
           @Override public void onError(String message) { showError(message); }
+        }
+    );
+    operationCards = new AndroidOperationCards(
+        this,
+        data,
+        new AndroidOperationCards.Listener() {
+          @Override public void showRequestDetail(OperationData.RequestRecord request) { MainActivity.this.showRequestDetail(request); }
+          @Override public void openDialer(String phone) { MainActivity.this.openDialer(phone); }
+          @Override public void openWhatsApp(String phone, String message) { MainActivity.this.openWhatsApp(phone, message); }
+          @Override public void showReservationDetail(OperationData.ReservationRecord reservation) { MainActivity.this.showReservationDetail(reservation); }
+          @Override public void assignCustomerToRoom(OperationData.RoomRecord room) { showRoomAssignmentDialog(null, room); }
+          @Override public void manageStay(OperationData.CustomerRoomStayRecord stay) { showCustomerRoomStayActions(stay); }
+          @Override public void showRoomStatus(OperationData.RoomRecord room) { showRoomStatusDialog(room); }
+          @Override public void showDailyTaskEditor(DailyTaskEditorDialog.Kind kind, OperationData.TaskRecord task) { MainActivity.this.showDailyTaskEditor(kind, task); }
+          @Override public void sendAction(String type, JSONObject payload, String success) { MainActivity.this.sendAction(type, payload, success); }
+          @Override public void showTableOrder(OperationData.TableRecord table) { MainActivity.this.showTableOrder(table); }
+          @Override public void showTableStatus(OperationData.TableRecord table) { showTableStatusDialog(table); }
+          @Override public void sendOrderStatus(OperationData.TableOrder order, String status) { MainActivity.this.sendOrderStatus(order, status); }
+          @Override public void confirm(String title, String message, Runnable action) { MainActivity.this.confirm(title, message, action); }
+          @Override public void closeOrder(OperationData.TableOrder order, String status) { MainActivity.this.closeOrder(order, status); }
+          @Override public void showStockActions(OperationData.TrackedStockItem item) { showStockActionsDialog(item); }
+          @Override public void launchStockCamera() { MainActivity.this.launchStockCamera(); }
+          @Override public void launchStockGallery() { MainActivity.this.launchStockGallery(); }
+          @Override public void openRoute(String route) { MainActivity.this.openRoute(route); }
+          @Override public void render() { MainActivity.this.render(); }
+          @Override public void copyText(String message) { MainActivity.this.copyText(message); }
+          @Override public void showMessageDetail(OperationData.MessageRecord message) { MainActivity.this.showMessageDetail(message); }
         }
     );
     stockImageWorkflow = new StockImageWorkflow(
@@ -1574,121 +1602,21 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View todayRequestCard(OperationData.RequestRecord request) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    TextView name = UiKit.text(this, request.customerName, 15, UiKit.TEXT, Typeface.BOLD);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(name);
-    top.addView(statusBadge(formatRequestStatus(request.status), requestTone(request.status)));
-    card.addView(top);
-    card.addView(UiKit.text(this, formatRequestType(request.type) + " · " + requestDate(request), 12, UiKit.MUTED, Typeface.NORMAL));
-    LinearLayout actions = UiKit.row(this);
-    UiKit.addAction(actions, UiKit.outlineButton(this, "Ara", view -> openDialer(request.customerPhone)), this);
-    UiKit.addAction(actions, UiKit.button(this, "Aç", UiKit.PRIMARY, view -> showRequestDetail(request)), this);
-    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
-    actionParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    actions.setLayoutParams(actionParams);
-    card.addView(actions);
-    return card;
+    return operationCards.todayRequestCard(request);
   }
 
   private View requestCard(OperationData.RequestRecord request) {
-    LinearLayout card = UiKit.card(this);
-    card.setOnClickListener(view -> showRequestDetail(request));
-    LinearLayout top = UiKit.row(this);
-    LinearLayout identity = UiKit.column(this);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(this, request.customerName, 16, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(this, formatRequestType(request.type), 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(identity);
-    top.addView(statusBadge(formatRequestStatus(request.status), requestTone(request.status)));
-    card.addView(top);
-
-    String meta = requestDate(request);
-    if (request.guestCount > 0) {
-      meta += " · " + request.guestCount + " kişi";
-    }
-    card.addView(UiKit.text(this, meta, 12, UiKit.MUTED, Typeface.NORMAL));
-    if (!request.message.isEmpty()) {
-      TextView note = UiKit.text(this, ellipsize(request.message, 150), 13, UiKit.TEXT, Typeface.NORMAL);
-      note.setMaxLines(2);
-      note.setEllipsize(android.text.TextUtils.TruncateAt.END);
-      LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
-      noteParams.setMargins(0, UiKit.dp(this, 8), 0, UiKit.dp(this, 10));
-      note.setLayoutParams(noteParams);
-      card.addView(note);
-    }
-    LinearLayout actions = UiKit.row(this);
-    UiKit.addAction(actions, UiKit.outlineButton(this, "Ara", view -> openDialer(request.customerPhone)), this);
-    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
-      UiKit.addAction(actions, UiKit.outlineButton(this, "WhatsApp", view -> openWhatsApp(request.customerPhone, request.readyMessage())), this);
-    }
-    UiKit.addAction(actions, UiKit.button(this, "Aç", UiKit.PRIMARY, view -> showRequestDetail(request)), this);
-    card.addView(actions);
-    return card;
+    return operationCards.requestCard(request);
   }
 
   private View waitingMessageCard(OperationData.RequestRecord request) {
-    OperationData.MessageRecord message = null;
-    for (OperationData.MessageRecord candidate : data.messages) {
-      if (request.id.equals(candidate.requestId)) {
-        message = candidate;
-        break;
-      }
-    }
-    if (message == null) {
-      message = new OperationData.MessageRecord();
-      message.id = "message_" + request.id;
-      message.requestId = request.id;
-      message.customerName = request.customerName;
-      message.customerPhone = request.customerPhone;
-      message.message = request.readyMessage();
-      message.updatedAt = request.updatedAt;
-    }
-    String preview = !message.message.isEmpty()
-        ? message.message
-        : (AndroidUiRules.canUseAi(data) && !request.aiSummary.isEmpty()
-            ? request.aiSummary
-            : request.message);
-    return messageCard(message, "Cevap bekliyor", UiKit.WARNING, preview);
+    return operationCards.waitingMessageCard(request);
   }
 
 
 
   private View reservationCard(OperationData.ReservationRecord reservation, boolean compact) {
-    if (!AndroidUiRules.reservationAllowed(data, reservation)) {
-      return new View(this);
-    }
-    LinearLayout card = UiKit.card(this);
-    card.setOnClickListener(view -> showReservationDetail(reservation));
-    LinearLayout top = UiKit.row(this);
-    TextView title = UiKit.text(this, reservation.customerName.isEmpty() ? reservation.title : reservation.customerName, 15, UiKit.TEXT, Typeface.BOLD);
-    title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(title);
-    top.addView(statusBadge(formatReservationStatus(reservation.status), reservationTone(reservation.status)));
-    card.addView(top);
-    String dates = joinDateRange(reservation.startDate, reservation.endDate);
-    if (!reservation.time.isEmpty()) {
-      dates += " · " + reservation.time;
-    }
-    if (reservation.guestCount > 0) {
-      dates += " · " + reservation.guestCount + " kişi";
-    }
-    card.addView(UiKit.text(this, dates, 12, UiKit.MUTED, Typeface.NORMAL));
-    if (!reservation.roomIds.isEmpty()) {
-      card.addView(UiKit.text(this, "Oda: " + namesForRooms(reservation.roomIds), 12, UiKit.MUTED, Typeface.NORMAL));
-    }
-    if (!reservation.tableIds.isEmpty()) {
-      card.addView(UiKit.text(this, "Masa: " + namesForTables(reservation.tableIds), 12, UiKit.MUTED, Typeface.NORMAL));
-    }
-    LinearLayout contact = UiKit.row(this);
-    LinearLayout.LayoutParams contactParams = new LinearLayout.LayoutParams(-1, -2);
-    contactParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    contact.setLayoutParams(contactParams);
-    UiKit.addAction(contact, UiKit.outlineButton(this, "Ara", view -> openDialer(reservation.customerPhone)), this);
-    UiKit.addAction(contact, UiKit.button(this, "Aç", UiKit.PRIMARY, view -> showReservationDetail(reservation)), this);
-    card.addView(contact);
-    return card;
+    return operationCards.reservationCard(reservation);
   }
 
   private View priorityReservationCard(OperationData.ReservationRecord reservation) {
@@ -1696,246 +1624,39 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View roomCard(OperationData.RoomRecord room) {
-    return PensionRoomCard.create(
-        this,
-        data,
-        room,
-        new PensionRoomCard.Listener() {
-          @Override
-          public void onAssignCustomer(OperationData.RoomRecord selectedRoom) {
-            showRoomAssignmentDialog(null, selectedRoom);
-          }
-
-          @Override
-          public void onManageStay(OperationData.CustomerRoomStayRecord stay) {
-            showCustomerRoomStayActions(stay);
-          }
-
-          @Override
-          public void onChangeStatus(OperationData.RoomRecord selectedRoom) {
-            showRoomStatusDialog(selectedRoom);
-          }
-        }
-    );
+    return operationCards.roomCard(room);
   }
 
   private View customerRoomStayCard(OperationData.CustomerRoomStayRecord stay) {
-    return PensionStayCard.create(
-        this,
-        data,
-        stay,
-        this::showCustomerRoomStayActions
-    );
+    return operationCards.customerRoomStayCard(stay);
   }
 
   private View taskCard(OperationData.TaskRecord task, boolean compact) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout details = UiKit.column(this);
-    details.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    details.addView(UiKit.text(this, task.title, 15, UiKit.TEXT, Typeface.BOLD));
-    String due = joinNonEmpty(" · ", task.dueDate, task.dueTime);
-    details.addView(UiKit.text(this, due.isEmpty() ? "Saat belirtilmemiş" : due, 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(details);
-    top.addView(statusBadge(formatTaskStatus(task.status), taskTone(task.status)));
-    card.addView(top);
-    if (!compact && !task.description.isEmpty()) {
-      card.addView(UiKit.text(this, ellipsize(task.description, 130), 12, UiKit.MUTED, Typeface.NORMAL));
-    }
-    boolean manualTask = AndroidUiRules.isManualTask(task);
-    boolean canEdit = manualTask && data.hasPermission("daily_task.update");
-    boolean canReopen = ("done".equals(task.status) || "cancelled".equals(task.status)) && data.hasPermission("daily_task.reopen");
-    boolean canComplete = !"done".equals(task.status) && !"cancelled".equals(task.status) && data.hasPermission("daily_task.complete");
-    if (canEdit || canReopen || canComplete) {
-      LinearLayout actions = UiKit.row(this);
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-      params.setMargins(0, UiKit.dp(this, 9), 0, 0);
-      actions.setLayoutParams(params);
-      if (canEdit) {
-        DailyTaskEditorDialog.Kind kind = AndroidUiRules.isRestaurantTask(data, task)
-            ? DailyTaskEditorDialog.Kind.RESTAURANT
-            : DailyTaskEditorDialog.Kind.PENSION;
-        UiKit.addAction(actions, UiKit.outlineButton(this, "Düzenle", view -> showDailyTaskEditor(kind, task)), this);
-      }
-      if (canReopen) {
-        UiKit.addAction(actions, UiKit.button(this, "Yeniden Aç", UiKit.PRIMARY, view -> sendAction("daily_task_reopen", payload("task_id", task.id, "task_type", task.type, "expected_updated_at", task.updatedAt), "Günlük iş yeniden açılmak üzere gönderildi.")), this);
-      } else if (canComplete) {
-        UiKit.addAction(actions, UiKit.button(this, "Tamamla", UiKit.PRIMARY, view -> sendAction("daily_task_complete", payload("task_id", task.id, "task_type", task.type, "expected_updated_at", task.updatedAt), "Günlük iş tamamlanmak üzere gönderildi.")), this);
-      }
-      card.addView(actions);
-    }
-    return card;
+    return operationCards.taskCard(task, compact);
   }
 
   private View tableCard(OperationData.TableRecord table) {
-    return RestaurantTableCard.create(
-        this,
-        data,
-        table,
-        new RestaurantTableCard.Listener() {
-          @Override
-          public void onOpenOrder(OperationData.TableRecord selectedTable) {
-            showTableOrder(selectedTable);
-          }
-
-          @Override
-          public void onChangeStatus(OperationData.TableRecord selectedTable) {
-            showTableStatusDialog(selectedTable);
-          }
-
-          @Override
-          public void onSetPaymentWaiting(OperationData.TableOrder order) {
-            sendOrderStatus(order, "payment");
-          }
-
-          @Override
-          public void onClosePaid(
-              OperationData.TableRecord selectedTable,
-              OperationData.TableOrder order
-          ) {
-            confirm(
-                "Adisyonu kapat",
-                selectedTable.name + " adisyonu ödendi olarak kapatılsın mı?",
-                () -> closeOrder(order, "paid")
-            );
-          }
-        }
-    );
+    return operationCards.tableCard(table);
   }
 
   private View stockCard(OperationData.TrackedStockItem item) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout identity = UiKit.column(this);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(this, item.name, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(this, item.category, 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(identity);
-    top.addView(statusBadge(formatStockStatus(item.stockStatus), stockTone(item.stockStatus)));
-    card.addView(top);
-    card.addView(UiKit.text(this,
-        "Stok: " + stockQuantity(item.stockQuantity, item.stockUnit)
-            + " · Minimum: " + (item.stockMinQuantity == null ? "—" : stockQuantity(item.stockMinQuantity, item.stockUnit)),
-        13, UiKit.TEXT, Typeface.BOLD));
-
-    if (data.hasPermission("menu.stock_update")) {
-      Button update = UiKit.outlineButton(this, "Stok Güncelle", view -> showStockActionsDialog(item));
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-      params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      update.setLayoutParams(params);
-      card.addView(update);
-    }
-    return card;
+    return operationCards.stockCard(item);
   }
 
   private View adminMenuCategoryCard(OperationData.MenuCategory category) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout identity = UiKit.column(this);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(this, category.name, 15, UiKit.TEXT, Typeface.BOLD));
-    int productCount = 0;
-    for (OperationData.MenuItem item : data.adminMenuItems) {
-      if (category.id.equals(item.categoryId)) {
-        productCount += 1;
-      }
-    }
-    identity.addView(UiKit.text(
-        this,
-        productCount + " ürün · " + (category.active ? "Aktif" : "Pasif"),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(identity);
-    top.addView(statusBadge(category.active ? "Aktif" : "Pasif", category.active ? UiKit.SUCCESS : UiKit.MUTED));
-    card.addView(top);
-
-    final int relatedProductCount = productCount;
-    Button delete = UiKit.dangerButton(this, "Kategoriyi Sil", view -> confirm(
-        "Menü kategorisini sil",
-        category.name + " ve bağlı " + relatedProductCount + " ürün kalıcı görünümden kaldırılsın mı?",
-        () -> sendAction(
-            "menu_category_delete",
-            payload("category_id", category.id, "expected_updated_at", category.updatedAt),
-            "Menü kategorisi silinmek üzere gönderildi."
-        )
-    ));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-    params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    delete.setLayoutParams(params);
-    card.addView(delete);
-    return card;
+    return operationCards.adminMenuCategoryCard(category);
   }
 
   private View adminMenuItemCard(OperationData.MenuItem item) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout identity = UiKit.column(this);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(this, item.name, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(
-        this,
-        data.adminCategoryName(item.categoryId) + " · " + money(item.price, item.currency),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(identity);
-    top.addView(statusBadge(item.available ? "Satışta" : "Pasif", item.available ? UiKit.SUCCESS : UiKit.MUTED));
-    card.addView(top);
-
-    Button delete = UiKit.dangerButton(this, "Ürünü Sil", view -> confirm(
-        "Menü ürününü sil",
-        item.name + " menüden silinsin mi?",
-        () -> sendAction(
-            "menu_item_delete",
-            payload("menu_item_id", item.id, "expected_updated_at", item.updatedAt),
-            "Menü ürünü silinmek üzere gönderildi."
-        )
-    ));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-    params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    delete.setLayoutParams(params);
-    card.addView(delete);
-    return card;
+    return operationCards.adminMenuItemCard(item);
   }
 
   private View stockImageImportCard() {
-    LinearLayout card = UiKit.card(this);
-    card.setBackground(UiKit.rounded(this, UiKit.PRIMARY_DARK, UiKit.PRIMARY, 14));
-    card.addView(UiKit.eyebrow(this, "AI DESTEKLİ STOK GİRİŞİ"));
-    card.addView(UiKit.text(this, "Fatura veya fiş görselini kontrol edilebilir bir stok taslağına dönüştürün.", 13, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(this, "Stoklar siz onaylamadan değişmez. Görsel analiz için yapılandırılmış AI hizmetine gönderilir ve kalıcı saklanmaz.", 12, UiKit.MUTED, Typeface.NORMAL));
-    LinearLayout actions = UiKit.row(this);
-    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
-    actionParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
-    actions.setLayoutParams(actionParams);
-    UiKit.addAction(actions, UiKit.button(this, "Kamera ile çek", UiKit.PRIMARY, view -> launchStockCamera()), this);
-    UiKit.addAction(actions, UiKit.outlineButton(this, "Galeriden seç", view -> launchStockGallery()), this);
-    card.addView(actions);
-    return card;
+    return operationCards.stockImageImportCard();
   }
 
   private View priorityStockCard(OperationData.TrackedStockItem item) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout identity = UiKit.column(this);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(this, item.name, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(this, item.category + " · Stok " + stockQuantity(item.stockQuantity, item.stockUnit), 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(identity);
-    top.addView(statusBadge(formatStockStatus(item.stockStatus), stockTone(item.stockStatus)));
-    card.addView(top);
-    Button open = UiKit.outlineButton(this, "Stoku Aç", view -> {
-      openRoute("restaurant:stock");
-      render();
-    });
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-    params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    open.setLayoutParams(params);
-    card.addView(open);
-    return card;
+    return operationCards.priorityStockCard(item);
   }
 
   private void showRoomStatusDialog(OperationData.RoomRecord room) {
@@ -2055,87 +1776,24 @@ public final class MainActivity extends ComponentActivity {
 
 
   private View activeOrderCard(OperationData.TableOrder order) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    TextView table = UiKit.text(this, order.tableName, 15, UiKit.TEXT, Typeface.BOLD);
-    table.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(table);
-    top.addView(statusBadge(formatOrderStatus(order.status), orderTone(order.status)));
-    card.addView(top);
-    card.addView(UiKit.text(this, order.itemCount + " ürün · " + money(order.total, orderCurrency(order)), 14, UiKit.TEXT, Typeface.BOLD));
-    OperationData.TableRecord tableRecord = tableById(order.tableId);
-    if (tableRecord == null && !order.tableId.isEmpty()) {
-      tableRecord = new OperationData.TableRecord();
-      tableRecord.id = order.tableId;
-      tableRecord.name = order.tableName;
-      tableRecord.status = "occupied";
-      tableRecord.updatedAt = order.updatedAt;
-    }
-    if (tableRecord != null && data.hasPermission("table_order.view")) {
-      OperationData.TableRecord selectedTable = tableRecord;
-      Button open = UiKit.button(this, "Adisyonu Aç", UiKit.PRIMARY, view -> showTableOrder(selectedTable));
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-      params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      open.setLayoutParams(params);
-      card.addView(open);
-    }
-    return card;
+    return operationCards.activeOrderCard(order);
   }
 
   private View messageCard(OperationData.MessageRecord message) {
-    return messageCard(message, "Hazır", UiKit.PRIMARY);
+    return operationCards.messageCard(message);
   }
 
-  private View messageCard(OperationData.MessageRecord message, String status, int tone) {
-    return messageCard(message, status, tone, message.message);
-  }
-
-  private View messageCard(OperationData.MessageRecord message, String status, int tone, String previewText) {
-    LinearLayout card = UiKit.card(this);
-    card.setOnClickListener(view -> showMessageDetail(message));
-    LinearLayout top = UiKit.row(this);
-    TextView name = UiKit.text(this, message.customerName, 15, UiKit.TEXT, Typeface.BOLD);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(name);
-    top.addView(statusBadge(status, tone));
-    card.addView(top);
-    String preview = previewText == null || previewText.trim().isEmpty()
-        ? "Hazır cevap bekleniyor"
-        : ellipsize(previewText, 120);
-    TextView body = UiKit.text(this, preview, 13, message.message.isEmpty() ? UiKit.MUTED : UiKit.TEXT, Typeface.NORMAL);
-    body.setMaxLines(2);
-    body.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    body.setPadding(0, UiKit.dp(this, 6), 0, UiKit.dp(this, 8));
-    card.addView(body);
-    LinearLayout actions = UiKit.row(this);
-    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
-      Button copy = UiKit.outlineButton(this, "Kopyala", view -> copyText(message.message));
-      copy.setEnabled(!message.message.isEmpty());
-      UiKit.addAction(actions, copy, this);
-      Button whatsapp = UiKit.outlineButton(this, "WhatsApp", view -> openWhatsApp(message.customerPhone, message.message));
-      whatsapp.setEnabled(!message.message.isEmpty());
-      UiKit.addAction(actions, whatsapp, this);
-    }
-    UiKit.addAction(actions, UiKit.button(this, "Aç", UiKit.PRIMARY, view -> showMessageDetail(message)), this);
-    card.addView(actions);
-    return card;
+  private View messageCard(
+      OperationData.MessageRecord message,
+      String status,
+      int tone,
+      String previewText
+  ) {
+    return operationCards.messageCard(message, status, tone, previewText);
   }
 
   private View actionCard(OperationData.ActionRecord action) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    TextView label = UiKit.text(this, formatActionType(action.type), 14, UiKit.TEXT, Typeface.BOLD);
-    label.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(label);
-    top.addView(statusBadge(formatActionStatus(action.status), actionTone(action.status)));
-    card.addView(top);
-    card.addView(UiKit.text(this, shortTimestamp(action.createdAt), 11, UiKit.MUTED, Typeface.NORMAL));
-    if (!action.errorMessage.isEmpty()) {
-      TextView error = UiKit.text(this, action.errorMessage, 12, UiKit.DANGER, Typeface.NORMAL);
-      error.setPadding(0, UiKit.dp(this, 6), 0, 0);
-      card.addView(error);
-    }
-    return card;
+    return operationCards.actionCard(action);
   }
 
   private View settingLine(String label, String value, int tone) {
@@ -3047,40 +2705,11 @@ public final class MainActivity extends ComponentActivity {
 
 
 
-  private String namesForRooms(List<String> roomIds) {
-    ArrayList<String> names = new ArrayList<>();
-    for (String roomId : roomIds) {
-      for (OperationData.RoomRecord room : data.rooms) {
-        if (roomId.equals(room.id)) {
-          names.add(room.name);
-          break;
-        }
-      }
-    }
-    return names.isEmpty() ? "Atama bekliyor" : joinNonEmpty(", ", names.toArray(new String[0]));
-  }
 
-  private String namesForTables(List<String> tableIds) {
-    ArrayList<String> names = new ArrayList<>();
-    for (String tableId : tableIds) {
-      for (OperationData.TableRecord table : data.tables) {
-        if (tableId.equals(table.id)) {
-          names.add(table.name);
-          break;
-        }
-      }
-    }
-    return names.isEmpty() ? "Atama bekliyor" : joinNonEmpty(", ", names.toArray(new String[0]));
-  }
 
-  private OperationData.TableRecord tableById(String tableId) {
-    for (OperationData.TableRecord table : data.tables) {
-      if (tableId.equals(table.id)) {
-        return table;
-      }
-    }
-    return null;
-  }
+
+
+
 
 
   private String compactDeviceId() {
