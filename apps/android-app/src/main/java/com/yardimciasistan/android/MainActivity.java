@@ -79,6 +79,9 @@ public final class MainActivity extends ComponentActivity {
 
   private AndroidShellController shell;
   private AndroidInteractionController interactionController;
+  private AndroidTodayCoordinator todayCoordinator;
+  private AndroidInactiveDeviceScreen inactiveDeviceScreen;
+  private AndroidMutationDialogCoordinator mutationDialogCoordinator;
   private String currentError = "";
   private AndroidImageCaptureController imageCaptureController;
   private AndroidProvisioningController provisioningController;
@@ -283,6 +286,56 @@ public final class MainActivity extends ComponentActivity {
           @Override public void render() { MainActivity.this.render(); }
           @Override public void copyText(String message) { MainActivity.this.copyText(message); }
           @Override public void showMessageDetail(OperationData.MessageRecord message) { MainActivity.this.showMessageDetail(message); }
+        }
+    );
+    todayCoordinator = new AndroidTodayCoordinator(
+        this,
+        operationCards,
+        new AndroidTodayCoordinator.Listener() {
+          @Override
+          public void openRoute(String route) {
+            MainActivity.this.openRoute(route);
+            render();
+          }
+
+          @Override
+          public int localPendingActionCount() {
+            return MainActivity.this.localPendingActionCount();
+          }
+        }
+    );
+    inactiveDeviceScreen = new AndroidInactiveDeviceScreen(
+        this,
+        preferences,
+        identity
+    );
+    mutationDialogCoordinator = new AndroidMutationDialogCoordinator(
+        this,
+        new AndroidMutationDialogCoordinator.Listener() {
+          @Override
+          public void updateRoom(OperationData.RoomRecord room, String status) {
+            MainActivity.this.updateRoom(room, status);
+          }
+
+          @Override
+          public void updateTable(OperationData.TableRecord table, String status) {
+            MainActivity.this.updateTable(table, status);
+          }
+
+          @Override
+          public void sendAction(String actionType, JSONObject payload, String successMessage) {
+            MainActivity.this.sendAction(actionType, payload, successMessage);
+          }
+
+          @Override
+          public void configureBottomDialog(Dialog dialog) {
+            MainActivity.this.configureBottomDialog(dialog);
+          }
+
+          @Override
+          public AlertDialog.Builder alertDialogBuilder() {
+            return MainActivity.this.alertDialogBuilder();
+          }
         }
     );
     detailDialogCoordinator = new AndroidDetailDialogCoordinator(
@@ -534,7 +587,7 @@ public final class MainActivity extends ComponentActivity {
 
           @Override
           public View actionCard(OperationData.ActionRecord action) {
-            return MainActivity.this.actionCard(action);
+            return operationCards.actionCard(action);
           }
         }
     );
@@ -916,103 +969,11 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View inactiveDeviceScreen() {
-    LinearLayout page = UiKit.column(this);
-    boolean androidEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID);
-    page.addView(androidEnabled
-        ? screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yerel ağ bağlantısı aynı ağda otomatik hazırlanır; işletme işlemleri için masaüstünden yeniden etkinleştirilmesi gerekir.", false)
-        : screenIntro("ERİŞİM DURUMU", "Android bağlantısı kapalı", "İşletmenin Android hizmeti kapatıldığı için telefondaki işletme verileri temizlendi.", false));
-
-    ConnectionSettings.LocalConnection inactiveLocal = ConnectionSettings.localConnection(preferences);
-    if (androidEnabled) {
-      LinearLayout localCard = UiKit.card(this);
-      localCard.addView(UiKit.text(this, "Yerel ağ", 14, UiKit.TEXT, Typeface.BOLD));
-      localCard.addView(UiKit.text(
-          this,
-          inactiveLocal.isComplete()
-              ? "Bu telefon masaüstüyle yerel ağ için otomatik bağlandı. İşletme işlemleri için cihazı masaüstünden etkinleştirin."
-              : "Masaüstü aynı ağda bulunursa yerel bağlantı otomatik hazırlanır.",
-          12,
-          UiKit.SECONDARY,
-          Typeface.NORMAL
-      ));
-      localCard.addView(UiKit.divider(this));
-      localCard.addView(settingLine(
-          "Yerel bağlantı",
-          inactiveLocal.isComplete() ? "Eşleşti" : (inactiveLocal.hasEndpoint() ? "Masaüstü bulundu" : "Bekliyor"),
-          inactiveLocal.isComplete() ? UiKit.SUCCESS : UiKit.MUTED
-      ));
-      page.addView(localCard);
-    }
-
-    LinearLayout card = UiKit.card(this);
-    card.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
-    card.addView(UiKit.divider(this));
-    card.addView(settingLine("Rol", data.deviceRoleLabel(), UiKit.WARNING));
-    if (inactiveLocal.hasEndpoint()) {
-      card.addView(UiKit.divider(this));
-      card.addView(settingLine("Yerel adres", inactiveLocal.baseUrl, UiKit.MUTED));
-    }
-    page.addView(card);
-    return UiKit.scroll(this, page);
+    return inactiveDeviceScreen.build(data);
   }
 
   private View todayScreen() {
-    return new TodayWorkspace(
-        this,
-        data,
-        new TodayWorkspace.Listener() {
-          @Override
-          public View requestCard(OperationData.RequestRecord request) {
-            return todayRequestCard(request);
-          }
-
-          @Override
-          public View reservationCard(OperationData.ReservationRecord reservation) {
-            return priorityReservationCard(reservation);
-          }
-
-          @Override
-          public View orderCard(OperationData.TableOrder order) {
-            return activeOrderCard(order);
-          }
-
-          @Override
-          public View tableCard(OperationData.TableRecord table) {
-            return MainActivity.this.tableCard(table);
-          }
-
-          @Override
-          public View taskCard(OperationData.TaskRecord task) {
-            return MainActivity.this.taskCard(task, true);
-          }
-
-          @Override
-          public View stockCard(OperationData.TrackedStockItem item) {
-            return priorityStockCard(item);
-          }
-
-          @Override
-          public View actionCard(OperationData.ActionRecord action) {
-            return MainActivity.this.actionCard(action);
-          }
-
-          @Override
-          public void openRoute(String route) {
-            MainActivity.this.openRoute(route);
-            render();
-          }
-
-          @Override
-          public ScrollView wrap(View page) {
-            return mainScreenScroll(page);
-          }
-
-          @Override
-          public int localPendingActionCount() {
-            return MainActivity.this.localPendingActionCount();
-          }
-        }
-    ).build();
+    return todayCoordinator.build(data, shell.contentBottomPaddingDp());
   }
 
   private View customerScreen() {
@@ -1056,292 +1017,16 @@ public final class MainActivity extends ComponentActivity {
 
 
 
-  private View screenIntro(String eyebrow, String title, String description, boolean includeRefresh) {
-    LinearLayout intro = UiKit.column(this);
-    intro.setPadding(0, UiKit.dp(this, 4), 0, UiKit.dp(this, 8));
-    intro.addView(UiKit.eyebrow(this, eyebrow));
-    LinearLayout titleRow = UiKit.row(this);
-    TextView titleView = UiKit.text(this, title, 18, UiKit.TEXT, Typeface.BOLD);
-    titleView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    titleRow.addView(titleView);
-    if (includeRefresh) {
-      Button refresh = UiKit.chip(this, loading ? "Bekleyin" : "Yenile", false, view -> syncOperations(false));
-      refresh.setEnabled(!loading);
-      titleRow.addView(refresh);
-    }
-    intro.addView(titleRow);
-    intro.addView(UiKit.text(this, description, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    return intro;
-  }
-
-  private View statusStrip(CounterValue... counters) {
-    HorizontalScrollView scroll = new HorizontalScrollView(this);
-    scroll.setHorizontalScrollBarEnabled(false);
-    scroll.setClipToPadding(false);
-    scroll.setContentDescription("Sayaçlar");
-    LinearLayout row = UiKit.row(this);
-    row.setPadding(0, UiKit.dp(this, 2), UiKit.dp(this, 4), UiKit.dp(this, 7));
-    for (CounterValue counter : counters) {
-      View.OnClickListener listener = counter.route.isEmpty()
-          ? null
-          : view -> {
-            openRoute(counter.route);
-            render();
-          };
-      row.addView(UiKit.counterChip(this, counter.label, counter.value, counter.tone, listener));
-    }
-    scroll.addView(row);
-    return scroll;
-  }
-
-  private ScrollView mainScreenScroll(View page) {
-    return UiKit.scroll(
-        this,
-        page,
-        shell.contentBottomPaddingDp()
-    );
-  }
-
-  private View sectionLabel(String value) {
-    TextView label = UiKit.text(this, value, 16, UiKit.TEXT, Typeface.BOLD);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.setMargins(0, UiKit.dp(this, 7), 0, UiKit.dp(this, 7));
-    label.setLayoutParams(params);
-    return label;
-  }
-
-  private View filterBar(String[][] options, String selected, FilterListener listener) {
-    HorizontalScrollView scroll = new HorizontalScrollView(this);
-    scroll.setHorizontalScrollBarEnabled(false);
-    LinearLayout row = UiKit.row(this);
-    row.setPadding(0, UiKit.dp(this, 3), 0, UiKit.dp(this, 6));
-    for (String[] option : options) {
-      row.addView(UiKit.chip(this, option[1], option[0].equals(selected), view -> listener.onSelect(option[0])));
-    }
-    scroll.addView(row);
-    return scroll;
-  }
-
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(this);
-    card.addView(UiKit.text(this, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(this, detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    return card;
-  }
-
-  private View permissionDeniedCard() {
-    return emptyCard("Bu cihazın bu alan için yetkisi yok", "Yetkiler masaüstü yöneticisi tarafından belirlenir.");
-  }
-
-  private View todayRequestCard(OperationData.RequestRecord request) {
-    return operationCards.todayRequestCard(request);
-  }
-
-  private View requestCard(OperationData.RequestRecord request) {
-    return operationCards.requestCard(request);
-  }
-
-  private View waitingMessageCard(OperationData.RequestRecord request) {
-    return operationCards.waitingMessageCard(request);
-  }
-
-
-
-  private View reservationCard(OperationData.ReservationRecord reservation, boolean compact) {
-    return operationCards.reservationCard(reservation);
-  }
-
-  private View priorityReservationCard(OperationData.ReservationRecord reservation) {
-    return reservationCard(reservation, true);
-  }
-
-  private View roomCard(OperationData.RoomRecord room) {
-    return operationCards.roomCard(room);
-  }
-
-  private View customerRoomStayCard(OperationData.CustomerRoomStayRecord stay) {
-    return operationCards.customerRoomStayCard(stay);
-  }
-
-  private View taskCard(OperationData.TaskRecord task, boolean compact) {
-    return operationCards.taskCard(task, compact);
-  }
-
-  private View tableCard(OperationData.TableRecord table) {
-    return operationCards.tableCard(table);
-  }
-
-  private View stockCard(OperationData.TrackedStockItem item) {
-    return operationCards.stockCard(item);
-  }
-
-  private View adminMenuCategoryCard(OperationData.MenuCategory category) {
-    return operationCards.adminMenuCategoryCard(category);
-  }
-
-  private View adminMenuItemCard(OperationData.MenuItem item) {
-    return operationCards.adminMenuItemCard(item);
-  }
-
-  private View stockImageImportCard() {
-    return operationCards.stockImageImportCard();
-  }
-
-  private View priorityStockCard(OperationData.TrackedStockItem item) {
-    return operationCards.priorityStockCard(item);
-  }
-
   private void showRoomStatusDialog(OperationData.RoomRecord room) {
-    OperationMutationDialogs.showRoomStatus(
-        this,
-        room,
-        new OperationMutationDialogs.Listener() {
-          @Override
-          public void updateRoom(OperationData.RoomRecord selected, String status) {
-            MainActivity.this.updateRoom(selected, status);
-          }
-
-          @Override
-          public void updateTable(OperationData.TableRecord selected, String status) {
-            MainActivity.this.updateTable(selected, status);
-          }
-
-          @Override
-          public void sendAction(
-              String actionType,
-              JSONObject actionPayload,
-              String successMessage
-          ) {
-            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
-          }
-
-          @Override
-          public void configureBottomDialog(Dialog dialog) {
-            MainActivity.this.configureBottomDialog(dialog);
-          }
-
-          @Override
-          public AlertDialog.Builder alertDialogBuilder() {
-            return MainActivity.this.alertDialogBuilder();
-          }
-        }
-    );
+    mutationDialogCoordinator.showRoomStatus(room);
   }
 
   private void showTableStatusDialog(OperationData.TableRecord table) {
-    OperationMutationDialogs.showTableStatus(
-        this,
-        data,
-        table,
-        new OperationMutationDialogs.Listener() {
-          @Override
-          public void updateRoom(OperationData.RoomRecord selected, String status) {
-            MainActivity.this.updateRoom(selected, status);
-          }
-
-          @Override
-          public void updateTable(OperationData.TableRecord selected, String status) {
-            MainActivity.this.updateTable(selected, status);
-          }
-
-          @Override
-          public void sendAction(
-              String actionType,
-              JSONObject actionPayload,
-              String successMessage
-          ) {
-            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
-          }
-
-          @Override
-          public void configureBottomDialog(Dialog dialog) {
-            MainActivity.this.configureBottomDialog(dialog);
-          }
-
-          @Override
-          public AlertDialog.Builder alertDialogBuilder() {
-            return MainActivity.this.alertDialogBuilder();
-          }
-        }
-    );
+    mutationDialogCoordinator.showTableStatus(data, table);
   }
-
-
 
   private void showStockActionsDialog(OperationData.TrackedStockItem item) {
-    OperationMutationDialogs.showStockActions(
-        this,
-        item,
-        new OperationMutationDialogs.Listener() {
-          @Override
-          public void updateRoom(OperationData.RoomRecord selected, String status) {
-            MainActivity.this.updateRoom(selected, status);
-          }
-
-          @Override
-          public void updateTable(OperationData.TableRecord selected, String status) {
-            MainActivity.this.updateTable(selected, status);
-          }
-
-          @Override
-          public void sendAction(
-              String actionType,
-              JSONObject actionPayload,
-              String successMessage
-          ) {
-            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
-          }
-
-          @Override
-          public void configureBottomDialog(Dialog dialog) {
-            MainActivity.this.configureBottomDialog(dialog);
-          }
-
-          @Override
-          public AlertDialog.Builder alertDialogBuilder() {
-            return MainActivity.this.alertDialogBuilder();
-          }
-        }
-    );
-  }
-
-
-
-  private View activeOrderCard(OperationData.TableOrder order) {
-    return operationCards.activeOrderCard(order);
-  }
-
-  private View messageCard(OperationData.MessageRecord message) {
-    return operationCards.messageCard(message);
-  }
-
-  private View messageCard(
-      OperationData.MessageRecord message,
-      String status,
-      int tone,
-      String previewText
-  ) {
-    return operationCards.messageCard(message, status, tone, previewText);
-  }
-
-  private View actionCard(OperationData.ActionRecord action) {
-    return operationCards.actionCard(action);
-  }
-
-  private View settingLine(String label, String value, int tone) {
-    LinearLayout row = UiKit.row(this);
-    TextView title = UiKit.text(this, label, 13, UiKit.MUTED, Typeface.BOLD);
-    title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    row.addView(title);
-    TextView detail = UiKit.text(this, value, 13, tone, Typeface.BOLD);
-    detail.setGravity(Gravity.END);
-    detail.setMaxWidth(UiKit.dp(this, 190));
-    row.addView(detail);
-    return row;
-  }
-
-  private TextView statusBadge(String label, int tone) {
-    return UiKit.badge(this, label, tone);
+    mutationDialogCoordinator.showStockActions(item);
   }
 
   private void showCustomerDetail(OperationData.CustomerRecord customer) {
