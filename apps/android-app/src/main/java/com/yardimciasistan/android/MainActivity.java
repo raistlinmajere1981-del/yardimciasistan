@@ -276,9 +276,12 @@ public final class MainActivity extends ComponentActivity {
         new AndroidDetailDialogCoordinator.Listener() {
           @Override public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) { addDetailHeaderActions(header, dialog, reopen); }
           @Override public void configureFullDialog(Dialog dialog) { MainActivity.this.configureFullDialog(dialog); }
+          @Override public void configureBottomDialog(Dialog dialog) { MainActivity.this.configureBottomDialog(dialog); }
           @Override public void openDialer(String phone) { MainActivity.this.openDialer(phone); }
           @Override public void openWhatsApp(String phone, String message) { MainActivity.this.openWhatsApp(phone, message); }
           @Override public void copyText(String message) { MainActivity.this.copyText(message); }
+          @Override public void showCustomerForm(OperationData.CustomerRecord customer) { MainActivity.this.showCustomerForm(customer); }
+          @Override public View createStayCard(OperationData.CustomerRoomStayRecord stay) { return operationCards.customerRoomStayCard(stay); }
           @Override public void showPreparedReply(String customerName, String message) { MainActivity.this.showPreparedReply(customerName, message); }
           @Override public void sendAction(String type, JSONObject payload, String success) { MainActivity.this.sendAction(type, payload, success); }
           @Override public void confirm(String title, String message, Runnable action) { MainActivity.this.confirm(title, message, action); }
@@ -1632,68 +1635,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showCustomerDetail(OperationData.CustomerRecord customer) {
-    new CustomerDetailDialog(
-        this,
-        data,
-        customer,
-        new CustomerDetailDialog.Listener() {
-          @Override
-          public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) {
-            addDetailHeaderActions(header, dialog, reopen);
-          }
-
-          @Override
-          public void configureFullDialog(Dialog dialog) {
-            MainActivity.this.configureFullDialog(dialog);
-          }
-
-          @Override
-          public void onDial(String phone) {
-            openDialer(phone);
-          }
-
-          @Override
-          public void onWhatsApp(String phone) {
-            openWhatsApp(phone, "");
-          }
-
-          @Override
-          public void onEditCustomer(OperationData.CustomerRecord selectedCustomer) {
-            showCustomerForm(selectedCustomer);
-          }
-
-          @Override
-          public void onAssignRoom(OperationData.CustomerRecord selectedCustomer) {
-            showRoomAssignmentDialog(selectedCustomer, null);
-          }
-
-          @Override
-          public View createStayCard(OperationData.CustomerRoomStayRecord stay) {
-            return customerRoomStayCard(stay);
-          }
-
-          @Override
-          public void onDeleteCustomer(OperationData.CustomerRecord selectedCustomer, Dialog dialog) {
-            confirm(
-                "Müşteriyi sil",
-                selectedCustomer.fullName + " müşteri listesinden silinsin mi? Eski talep ve rezervasyon kayıtları korunur.",
-                () -> {
-                  sendAction(
-                      "customer_delete",
-                      payload(
-                          "customer_id",
-                          selectedCustomer.id,
-                          "expected_updated_at",
-                          selectedCustomer.updatedAt
-                      ),
-                      "Müşteri silinmek üzere gönderildi."
-                  );
-                  dialog.dismiss();
-                }
-            );
-          }
-        }
-    ).show();
+    detailDialogCoordinator.showCustomerDetail(data, customer);
   }
 
   private void showCustomerForm(OperationData.CustomerRecord existing) {
@@ -1737,49 +1679,15 @@ public final class MainActivity extends ComponentActivity {
       OperationData.CustomerRecord preferredCustomer,
       OperationData.RoomRecord preferredRoom
   ) {
-    if (!canManageCustomerRoomStays()) {
-      showError("Müşteri-oda ataması yalnız yetkili yönetici cihazlarda kullanılabilir.");
-      return;
-    }
-    if (data.customers.isEmpty() || data.rooms.isEmpty()) {
-      showError(data.customers.isEmpty()
-          ? "Odaya atamak için önce bir müşteri kartı oluşturun."
-          : "Atama yapılabilecek oda kaydı bulunamadı.");
-      return;
-    }
-    RoomAssignmentDialog.show(this, data, preferredCustomer, preferredRoom, new RoomAssignmentDialog.Listener() {
-      @Override
-      public void onSubmit(JSONObject actionPayload) {
-        sendAction("customer_room_assign", actionPayload, "Müşteri-oda ataması gönderildi.");
-      }
-
-      @Override
-      public void configureFullDialog(Dialog dialog) {
-        MainActivity.this.configureFullDialog(dialog);
-      }
-    });
+    detailDialogCoordinator.showRoomAssignment(
+        data,
+        preferredCustomer,
+        preferredRoom
+    );
   }
 
   private void showCustomerRoomStayActions(OperationData.CustomerRoomStayRecord stay) {
-    if (!canManageCustomerRoomStays() || !canTransitionCustomerRoomStay(stay)) {
-      Toast.makeText(this, "Bu konaklama kaydında kullanılabilir durum işlemi yok.", Toast.LENGTH_SHORT).show();
-      return;
-    }
-    PensionStayActionsDialog.show(this, stay, new PensionStayActionsDialog.Listener() {
-      @Override
-      public void onStatusChange(String nextStatus) {
-        sendAction(
-            "customer_room_stay_status",
-            payload("stay_id", stay.id, "status", nextStatus, "expected_updated_at", stay.updatedAt),
-            "Konaklama durumu güncellenmek üzere gönderildi."
-        );
-      }
-
-      @Override
-      public void configureBottomDialog(Dialog dialog) {
-        MainActivity.this.configureBottomDialog(dialog);
-      }
-    });
+    detailDialogCoordinator.showStayActions(data, stay);
   }
 
   private void showRequestDetail(OperationData.RequestRecord request) {
@@ -1869,73 +1777,14 @@ public final class MainActivity extends ComponentActivity {
       ReservationEditorDialog.Kind kind,
       OperationData.ReservationRecord reservation
   ) {
-    boolean editing = reservation != null;
-    String requiredPermission = editing ? "reservation.update" : "reservation.create";
-    boolean capabilityAllowed = kind == ReservationEditorDialog.Kind.ROOM
-        ? data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS)
-        : data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
-    if (!capabilityAllowed || !data.hasPermission(requiredPermission)) {
-      showError(editing ? "Bu cihazın rezervasyon düzenleme yetkisi yok." : "Bu cihazın rezervasyon oluşturma yetkisi yok.");
-      return;
-    }
-    if (!editing && data.customers.isEmpty()) {
-      showError("Rezervasyon eklemeden önce Müşteri ekranından müşteri kaydı oluşturun.");
-      return;
-    }
-    ReservationEditorDialog.show(this, data, kind, reservation, actionPayload -> {
-      String actionType;
-      if (kind == ReservationEditorDialog.Kind.ROOM) {
-        actionType = editing ? "reservation_room_update" : "reservation_room_create";
-      } else {
-        actionType = editing ? "reservation_table_update" : "reservation_table_create";
-      }
-      sendAction(
-          actionType,
-          actionPayload,
-          editing ? "Rezervasyon güncellenmek üzere gönderildi." : "Rezervasyon oluşturulmak üzere gönderildi."
-      );
-    });
+    detailDialogCoordinator.showReservationEditor(data, kind, reservation);
   }
 
-  private void showDailyTaskEditor(DailyTaskEditorDialog.Kind kind, OperationData.TaskRecord task) {
-    boolean editing = task != null;
-    String requiredPermission = editing ? "daily_task.update" : "daily_task.create";
-    boolean capabilityAllowed = editing
-        ? AndroidUiRules.taskAllowed(data, task)
-        : (kind == DailyTaskEditorDialog.Kind.RESTAURANT
-            ? data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)
-            : data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS));
-    if (!capabilityAllowed || !data.hasPermission(requiredPermission)) {
-      showError(editing ? "Bu cihazın günlük iş düzenleme yetkisi yok." : "Bu cihazın günlük iş ekleme yetkisi yok.");
-      return;
-    }
-    if (editing && !AndroidUiRules.isManualTask(task)) {
-      showError("Otomatik oluşturulan günlük işler yalnız tamamla veya yeniden aç işlemiyle yönetilebilir.");
-      return;
-    }
-    boolean canDelete = editing && AndroidUiRules.canDelete(data, "daily_task.delete");
-    DailyTaskEditorDialog.show(this, kind, task, canDelete, new DailyTaskEditorDialog.Listener() {
-      @Override
-      public void onSave(JSONObject actionPayload) {
-        sendAction(
-            editing ? "daily_task_update" : "daily_task_create",
-            actionPayload,
-            editing ? "Günlük iş güncellenmek üzere gönderildi." : "Günlük iş eklenmek üzere gönderildi."
-        );
-      }
-
-      @Override
-      public void onDelete() {
-        if (!editing) {
-          return;
-        }
-        sendAction(
-            "daily_task_delete",
-            payload("task_id", task.id, "task_type", task.type, "expected_updated_at", task.updatedAt),
-            "Günlük iş silinmek üzere gönderildi."
-        );
-      }
-    });
+  private void showDailyTaskEditor(
+      DailyTaskEditorDialog.Kind kind,
+      OperationData.TaskRecord task
+  ) {
+    detailDialogCoordinator.showDailyTaskEditor(data, kind, task);
   }
 
   private void sendReservationAction(OperationData.ReservationRecord reservation, String actionType, String message) {
@@ -2254,11 +2103,7 @@ public final class MainActivity extends ComponentActivity {
 
 
 
-  private boolean canManageCustomerRoomStays() {
-    return data.isAdmin()
-        && data.hasPermission("customer.manage")
-        && data.hasPermission("room.assign_customer");
-  }
+
 
 
 
