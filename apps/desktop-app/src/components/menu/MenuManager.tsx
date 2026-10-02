@@ -3,6 +3,7 @@ import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
 import { QrMenuPanel } from "./QrMenuPanel";
+import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
 import {
   compareMenuRecords,
   emptyCategoryForm,
@@ -32,6 +33,7 @@ interface MenuManagerProps {
   dashboardData: DesktopDashboardData;
   qrMenuEnabled: boolean;
   inventoryEnabled: boolean;
+  stockImageImportEnabled: boolean;
   itemForm: ItemFormState;
   selectedCategoryId: string;
   selectedItemId: string;
@@ -46,6 +48,7 @@ interface MenuManagerProps {
   onReorderCategories: (orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onReorderItems: (categoryId: string, orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onDeleteCategoryById: (categoryId: string) => Promise<void>;
+  onDashboardDataChanged: (data: DesktopDashboardData) => void;
   onPreview: () => void;
 }
 
@@ -53,6 +56,7 @@ export function MenuManager({
   dashboardData,
   qrMenuEnabled,
   inventoryEnabled,
+  stockImageImportEnabled,
   itemForm,
   selectedCategoryId,
   selectedItemId,
@@ -67,6 +71,7 @@ export function MenuManager({
   onReorderCategories,
   onReorderItems,
   onDeleteCategoryById,
+  onDashboardDataChanged,
   onPreview
 }: MenuManagerProps) {
   const navigation = useWorkspaceNavigation();
@@ -251,7 +256,14 @@ export function MenuManager({
         <PageWorkSurface mode="fill" className="menu-page-surface">
           <div className={`menu-page-layout${qrMenuEnabled ? " has-qr" : ""}`}>
             {qrMenuEnabled && (
-              <QrMenuPanel enabled webModuleUrl={dashboardData.webModuleUrl} onPreview={onPreview} />
+              <QrMenuPanel
+                enabled
+                webModuleUrl={dashboardData.webModuleUrl}
+                onPreview={onPreview}
+                utilityAction={stockImageImportEnabled
+                  ? <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
+                  : undefined}
+              />
             )}
             <div className="menu-management-grid">
           <section className="panel menu-category-panel" data-surface-role="configuration">
