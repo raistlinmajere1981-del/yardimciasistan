@@ -108,7 +108,7 @@ public final class MainActivity extends ComponentActivity {
   private AndroidForegroundSyncController foregroundSyncController;
   private AndroidActionDispatcher actionDispatcher;
   private AndroidConnectionController connectionController;
-  private AndroidConnectionSettingsPanel connectionSettingsPanel;
+  private AndroidSettingsWorkspace settingsWorkspace;
   private ReportsWorkspace reportsWorkspace;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
@@ -418,6 +418,50 @@ public final class MainActivity extends ComponentActivity {
     );
     operationCache = new OperationCache(preferences, identity.deviceId);
     localNotifications = new LocalNotificationCenter(this, preferences);
+    settingsWorkspace = new AndroidSettingsWorkspace(
+        this,
+        preferences,
+        identity,
+        new AndroidSettingsWorkspace.Listener() {
+          @Override
+          public void openCash() {
+            settingsOpen = false;
+            activeTab = TAB_CASH;
+            clearError();
+            render();
+          }
+
+          @Override
+          public void openReports() {
+            settingsOpen = false;
+            activeTab = TAB_REPORTS;
+            clearError();
+            render();
+          }
+
+          @Override
+          public void onSyncRequested() {
+            syncOperations(true);
+          }
+
+          @Override
+          public void refreshNotifications(OperationData snapshot) {
+            if (localNotifications != null) {
+              localNotifications.refreshCurrentSnapshot(snapshot);
+            }
+          }
+
+          @Override
+          public int localPendingActionCount() {
+            return MainActivity.this.localPendingActionCount();
+          }
+
+          @Override
+          public View actionCard(OperationData.ActionRecord action) {
+            return MainActivity.this.actionCard(action);
+          }
+        }
+    );
     operationsSyncController = new AndroidOperationsSyncController(
         this,
         preferences,
@@ -521,18 +565,18 @@ public final class MainActivity extends ComponentActivity {
 
   @Override
   public void onConfigurationChanged(Configuration newConfig) {
-    String webModuleDraft = connectionSettingsPanel == null
+    String webModuleDraft = settingsWorkspace == null
         ? null
-        : connectionSettingsPanel.webModuleDraft();
-    String syncSecretDraft = connectionSettingsPanel == null
+        : settingsWorkspace.webModuleDraft();
+    String syncSecretDraft = settingsWorkspace == null
         ? null
-        : connectionSettingsPanel.syncSecretDraft();
+        : settingsWorkspace.syncSecretDraft();
     rememberCurrentScrollPosition();
     super.onConfigurationChanged(newConfig);
     buildShell();
     render();
-    if (connectionSettingsPanel != null) {
-      connectionSettingsPanel.restoreDrafts(webModuleDraft, syncSecretDraft);
+    if (settingsWorkspace != null) {
+      settingsWorkspace.restoreDrafts(webModuleDraft, syncSecretDraft);
     }
   }
 
@@ -1443,189 +1487,15 @@ public final class MainActivity extends ComponentActivity {
 
 
   private View settingsScreen() {
-    LinearLayout page = UiKit.column(this);
-    boolean canViewTechnicalSettings = !data.permissionsResolved || data.hasPermission("settings.view");
-    page.addView(sectionLabel("Görünüm"));
-    LinearLayout appearance = UiKit.card(this);
-    appearance.addView(settingLine("Tema", themeMode.label, UiKit.PRIMARY));
-    page.addView(appearance);
-    if (data.hasPermission("finance.view")) {
-      page.addView(sectionLabel("Kasa"));
-      LinearLayout cash = UiKit.card(this);
-      cash.addView(UiKit.text(this, "Mobil Kasa", 15, UiKit.TEXT, Typeface.BOLD));
-      cash.addView(UiKit.text(
-          this,
-          data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOLIO)
-              ? "Bugünkü gelir, gider, net durum, bekleyen oda alacağı ve son hareketleri hızlıca izleyin."
-              : "Bugünkü gelir, gider, net durum ve son hareketleri hızlıca izleyin.",
-          12,
-          UiKit.SECONDARY,
-          Typeface.NORMAL
-      ));
-      Button openCash = UiKit.button(this, "Kasa'yı Aç", UiKit.PRIMARY, view -> {
-        settingsOpen = false;
-        activeTab = TAB_CASH;
-        clearError();
-        render();
-      });
-      LinearLayout.LayoutParams cashButtonParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      cashButtonParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
-      openCash.setLayoutParams(cashButtonParams);
-      cash.addView(openCash);
-      page.addView(cash);
-    }
-    if (AndroidUiRules.canOpenTab(data, TAB_REPORTS)) {
-      page.addView(sectionLabel("Yönetici"));
-      LinearLayout reports = UiKit.card(this);
-      reports.addView(UiKit.text(this, "İşletme raporları", 15, UiKit.TEXT, Typeface.BOLD));
-      boolean reportOrdersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
-      boolean reportCustomersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS);
-      String reportDescription = reportOrdersEnabled && reportCustomersEnabled
-          ? "Satışları, müşteri taleplerini ve güncel dikkat listesini kısa dönemlerle izleyin."
-          : reportOrdersEnabled
-              ? "Satışları ve etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin."
-              : reportCustomersEnabled
-                  ? "Müşteri taleplerini ve etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin."
-                  : "Etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin.";
-      reports.addView(UiKit.text(
-          this,
-          reportDescription,
-          12,
-          UiKit.SECONDARY,
-          Typeface.NORMAL
-      ));
-      Button openReports = UiKit.button(this, "Raporları Aç", UiKit.PRIMARY, view -> {
-        settingsOpen = false;
-        activeTab = TAB_REPORTS;
-        clearError();
-        render();
-      });
-      LinearLayout.LayoutParams reportButtonParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      reportButtonParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
-      openReports.setLayoutParams(reportButtonParams);
-      reports.addView(openReports);
-      page.addView(reports);
-    }
-    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_NOTIFICATIONS)) {
-      page.addView(sectionLabel("Bildirim tercihleri"));
-      LinearLayout notificationPreferences = UiKit.card(this);
-      boolean hasNotificationPreference = false;
-    boolean customerNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS)
-        && (!data.permissionsResolved || data.hasPermission("customer.view"));
-    boolean reservationNotifications = data.hasAnyReservationCapability()
-        && (!data.permissionsResolved || data.hasPermission("reservation.view"));
-    if (customerNotifications || reservationNotifications) {
-      notificationPreferences.addView(notificationToggle(
-          customerNotifications && reservationNotifications
-              ? "Müşteri / Rezervasyon"
-              : (reservationNotifications ? "Rezervasyon" : "Müşteri Talepleri"),
-          customerNotifications && reservationNotifications
-              ? "Yeni talepler ve etkin alanlardaki onay bekleyen rezervasyonlar"
-              : (reservationNotifications ? "Etkin alanlardaki onay bekleyen rezervasyonlar" : "Yeni ve yanıt bekleyen müşteri talepleri"),
-          NotificationEvent.CATEGORY_CUSTOMER
-      ));
-      hasNotificationPreference = true;
-    }
-    boolean orderNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)
-        && (!data.permissionsResolved || data.hasPermission("table_order.view"));
-    if (orderNotifications) {
-      if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
-      notificationPreferences.addView(notificationToggle(
-          "Restoran / Sipariş",
-          "Masa siparişleri ve hesap bekleyen adisyonlar",
-          NotificationEvent.CATEGORY_RESTAURANT
-      ));
-      hasNotificationPreference = true;
-    }
-    boolean roomNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)
-        && (!data.permissionsResolved || data.hasPermission("room.view"));
-    boolean taskNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TASKS)
-        && (!data.permissionsResolved || data.hasPermission("daily_task.view"));
-    if (roomNotifications || taskNotifications) {
-      if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
-      notificationPreferences.addView(notificationToggle(
-          roomNotifications && taskNotifications ? "Oda / Günlük İş" : (roomNotifications ? "Oda" : "Günlük İşler"),
-          roomNotifications && taskNotifications
-              ? "Temizlik, bakım ve etkin alanlardaki bekleyen işler"
-              : (roomNotifications ? "Temizlik ve bakım bekleyen odalar" : "Bekleyen ve geciken günlük işler"),
-          NotificationEvent.CATEGORY_ROOMS
-      ));
-      hasNotificationPreference = true;
-    }
-    if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
-    notificationPreferences.addView(notificationToggle(
-        "İşlem hataları",
-        "Telefondan gönderilen işlemler uygulanamadığında",
-        NotificationEvent.CATEGORY_ACTION
-    ));
-    hasNotificationPreference = true;
-    if (canViewTechnicalSettings) {
-      notificationPreferences.addView(UiKit.divider(this));
-      notificationPreferences.addView(notificationToggle(
-          "Sync bağlantısı",
-          "Canlı veri uzun süredir yenilenemediğinde",
-          NotificationEvent.CATEGORY_SYNC
-      ));
-    }
-    notificationPreferences.addView(UiKit.text(
-        this,
-        "Bu anahtarlar cihaz yetkilerini genişletmez; masaüstünde kapalı olan görev alanları bildirim üretemez.",
-        11,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-      page.addView(notificationPreferences);
-    }
-
-    if (!canViewTechnicalSettings) {
-      return UiKit.scroll(this, page);
-    }
-
-    connectionSettingsPanel = new AndroidConnectionSettingsPanel(
-        this,
-        preferences,
+    return settingsWorkspace.build(
         data,
-        identity,
+        themeMode.label,
         connectionState,
-        loading,
-        localPendingActionCount(),
-        () -> syncOperations(true)
+        loading
     );
-    connectionSettingsPanel.appendTo(page);
-
-    page.addView(UiKit.sectionTitle(this, "Son telefon işlemleri"));
-    if (data.actions.isEmpty()) {
-      page.addView(emptyCard("Gönderilmiş işlem yok", "Telefondan yaptığınız değişiklikler burada bekliyor, uygulandı veya hata durumuyla görünür."));
-    }
-    for (OperationData.ActionRecord action : data.actions) {
-      page.addView(actionCard(action));
-    }
-    return UiKit.scroll(this, page);
   }
 
-  private View notificationToggle(String title, String detail, String category) {
-    LinearLayout row = UiKit.row(this);
-    row.setGravity(Gravity.CENTER_VERTICAL);
-    row.setPadding(0, UiKit.dp(this, 7), 0, UiKit.dp(this, 7));
-    LinearLayout copy = UiKit.column(this);
-    copy.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    copy.addView(UiKit.text(this, title, 14, UiKit.TEXT, Typeface.BOLD));
-    copy.addView(UiKit.text(this, detail, 11, UiKit.SECONDARY, Typeface.NORMAL));
-    row.addView(copy);
 
-    Switch toggle = new Switch(this);
-    UiKit.styleSwitch(toggle);
-    toggle.setChecked(NotificationPreferences.isEnabled(preferences, category));
-    toggle.setContentDescription(title + " bildirimleri");
-    toggle.setOnCheckedChangeListener((button, checked) -> {
-      NotificationPreferences.setEnabled(preferences, category, checked);
-      if (localNotifications != null) {
-        localNotifications.refreshCurrentSnapshot(data);
-      }
-    });
-    row.addView(toggle, new LinearLayout.LayoutParams(-2, UiKit.dp(this, 48)));
-    return row;
-  }
 
   private View screenIntro(String eyebrow, String title, String description, boolean includeRefresh) {
     LinearLayout intro = UiKit.column(this);
@@ -2851,11 +2721,11 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
 
-    String baseUrl = readSettingsInputs && connectionSettingsPanel != null
-        ? connectionSettingsPanel.webModuleValue()
+    String baseUrl = readSettingsInputs && settingsWorkspace != null
+        ? settingsWorkspace.webModuleValue()
         : ConnectionSettings.webModuleUrl(preferences);
-    String syncSecret = readSettingsInputs && connectionSettingsPanel != null
-        ? connectionSettingsPanel.syncSecretValue()
+    String syncSecret = readSettingsInputs && settingsWorkspace != null
+        ? settingsWorkspace.syncSecretValue()
         : ConnectionSettings.syncSecret(preferences);
 
     operationsSyncController.sync(baseUrl, syncSecret, data, new AndroidOperationsSyncController.Listener() {
