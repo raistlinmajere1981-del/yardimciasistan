@@ -132,7 +132,7 @@ public final class MainActivity extends ComponentActivity {
   private AndroidImageCaptureController imageCaptureController;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
-  private CustomerFormSession activeCustomerFormSession;
+  private CustomerFormDialog activeCustomerFormDialog;
   private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
   private final Runnable foregroundSyncRunnable = new Runnable() {
     @Override
@@ -429,13 +429,13 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void launchIdentityCamera() {
-    if (activeCustomerFormSession != null) {
+    if (activeCustomerFormDialog != null && activeCustomerFormDialog.isShowing()) {
       imageCaptureController.launchIdentityCamera();
     }
   }
 
   private void launchIdentityGallery() {
-    if (activeCustomerFormSession != null) {
+    if (activeCustomerFormDialog != null && activeCustomerFormDialog.isShowing()) {
       imageCaptureController.launchIdentityGallery();
     }
   }
@@ -470,14 +470,14 @@ public final class MainActivity extends ComponentActivity {
 
 
   private void analyzeIdentityImage(Uri sourceUri) {
-    CustomerFormSession session = activeCustomerFormSession;
-    if (session == null || !session.dialog.isShowing()) {
+    CustomerFormDialog formDialog = activeCustomerFormDialog;
+    if (formDialog == null || !formDialog.isShowing()) {
       deletePendingIdentityCameraFile();
       return;
     }
     if (!AndroidUiRules.canUseAi(data)) {
       deletePendingIdentityCameraFile();
-      session.setStatus("AI capability kapalı olduğu için kimlik analizi kullanılamıyor.", UiKit.DANGER);
+      formDialog.setStatus("AI capability kapalı olduğu için kimlik analizi kullanılamıyor.", UiKit.DANGER);
       return;
     }
 
@@ -485,12 +485,12 @@ public final class MainActivity extends ComponentActivity {
     String syncSecret = ConnectionSettings.syncSecret(preferences);
     if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
       deletePendingIdentityCameraFile();
-      session.setStatus("Kimlik analizi için bağlantı ayarlarını tamamlayın.", UiKit.DANGER);
+      formDialog.setStatus("Kimlik analizi için bağlantı ayarlarını tamamlayın.", UiKit.DANGER);
       return;
     }
 
-    session.setLoading(true);
-    session.setStatus("Kimlik görseli hazırlanıyor ve AI ile okunuyor…", UiKit.INFO);
+    formDialog.setLoading(true);
+    formDialog.setStatus("Kimlik görseli hazırlanıyor ve AI ile okunuyor…", UiKit.INFO);
     identityImageAnalysisController.analyze(
         sourceUri,
         baseUrl,
@@ -499,22 +499,22 @@ public final class MainActivity extends ComponentActivity {
         new IdentityImageAnalysisController.Listener() {
           @Override
           public void onSuccess(JSONObject analysis, String message) {
-            if (activeCustomerFormSession != session || !session.dialog.isShowing()) {
+            if (activeCustomerFormDialog != formDialog || !formDialog.isShowing()) {
               return;
             }
-            applyIdentityAnalysisToCustomerForm(session, analysis);
-            session.setLoading(false);
-            session.setStatus(message, UiKit.SUCCESS);
+            formDialog.applyIdentityAnalysis(analysis);
+            formDialog.setLoading(false);
+            formDialog.setStatus(message, UiKit.SUCCESS);
             Toast.makeText(MainActivity.this, "Okunan alanları kaydetmeden önce kontrol edin.", Toast.LENGTH_LONG).show();
           }
 
           @Override
           public void onError(String message) {
-            if (activeCustomerFormSession != session || !session.dialog.isShowing()) {
+            if (activeCustomerFormDialog != formDialog || !formDialog.isShowing()) {
               return;
             }
-            session.setLoading(false);
-            session.setStatus(message, UiKit.DANGER);
+            formDialog.setLoading(false);
+            formDialog.setStatus(message, UiKit.DANGER);
           }
 
           @Override
@@ -525,32 +525,9 @@ public final class MainActivity extends ComponentActivity {
     );
   }
 
-  private void applyIdentityAnalysisToCustomerForm(CustomerFormSession session, JSONObject analysis) {
-    JSONObject fields = analysis.optJSONObject("fields");
-    if (fields == null) {
-      return;
-    }
-    fillIfPresent(session.fullName, fields.optString("full_name", ""));
-    fillIfPresent(session.identityNumber, fields.optString("identity_number", ""));
-    fillIfPresent(session.nationality, fields.optString("nationality", ""));
-    fillIfPresent(session.birthDate, fields.optString("birth_date", ""));
-    fillIfPresent(session.documentSerialNumber, fields.optString("document_serial_number", ""));
-    fillIfPresent(session.documentExpiryDate, fields.optString("document_expiry_date", ""));
-    fillIfPresent(session.birthPlace, fields.optString("birth_place", ""));
-    fillIfPresent(session.motherName, fields.optString("mother_name", ""));
-    fillIfPresent(session.fatherName, fields.optString("father_name", ""));
-    fillIfPresent(session.issuingAuthority, fields.optString("issuing_authority", ""));
-    fillIfPresent(session.address, fields.optString("address", ""));
-    selectSpinnerValue(session.identityType, fields.optString("identity_type", ""));
-    selectSpinnerValue(session.gender, fields.optString("gender", ""));
-  }
 
-  private void fillIfPresent(EditText field, String value) {
-    String normalized = value == null ? "" : value.trim();
-    if (!normalized.isEmpty()) {
-      field.setText(normalized);
-    }
-  }
+
+
 
   private void selectSpinnerValue(Spinner spinner, String value) {
     if (value == null || value.trim().isEmpty() || spinner.getAdapter() == null) {
@@ -3619,152 +3596,33 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
 
-    Dialog dialog = new Dialog(this);
-    LinearLayout shell = UiKit.column(this);
-    shell.setBackgroundColor(UiKit.BG);
-    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
+    CustomerFormDialog formDialog = new CustomerFormDialog(
+        this,
+        existing,
+        AndroidUiRules.canUseAi(data),
+        new CustomerFormDialog.Listener() {
+          @Override
+          public void onIdentityImageRequested() {
+            showIdentityImageSourceDialog();
+          }
 
-    LinearLayout header = UiKit.row(this);
-    LinearLayout heading = UiKit.column(this);
-    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    heading.addView(UiKit.eyebrow(this, existing == null ? "YENİ MÜŞTERİ" : "MÜŞTERİ KARTI"));
-    heading.addView(UiKit.title(this, existing == null ? "Müşteri oluştur" : existing.fullName));
-    header.addView(heading);
-    Button close = UiKit.iconButton(this, "×", "Müşteri formunu kapat", false, view -> dialog.dismiss());
-    header.addView(close, new LinearLayout.LayoutParams(UiKit.dp(this, 44), UiKit.dp(this, 44)));
-    shell.addView(header);
+          @Override
+          public void onSubmit(String actionType, JSONObject actionPayload, String successMessage) {
+            sendAction(actionType, actionPayload, successMessage);
+          }
 
-    LinearLayout form = UiKit.column(this);
-    if (AndroidUiRules.canUseAi(data)) {
-      form.addView(UiKit.text(
-          this,
-          "Kimlik görseli yalnız alanları önermek için işlenir; görsel müşteri kartında saklanmaz.",
-          12,
-          UiKit.MUTED,
-          Typeface.NORMAL
-      ));
-    }
-
-    CustomerFormSession session = new CustomerFormSession(dialog);
-    session.fullName = addCustomerFormInput(form, "Ad soyad *", "Örn. Ayşe Yılmaz", value(existing, "fullName"), false);
-    session.fullName.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-    session.phone = addCustomerFormInput(form, "Telefon", "+90 5xx… / +44…", value(existing, "phone"), false);
-    session.phone.setInputType(InputType.TYPE_CLASS_PHONE);
-    session.email = addCustomerFormInput(form, "E-posta", "ornek@eposta.com", value(existing, "email"), false);
-    session.email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-    session.tags = addCustomerFormInput(form, "Etiketler", "VIP, kurumsal, düzenli misafir", existing == null ? "" : String.join(", ", existing.tags), false);
-    session.notes = addCustomerFormInput(form, "Müşteri notları", "Tercihler ve işletme notları", value(existing, "notes"), true);
-
-    form.addView(sectionLabel("Kimlik kartı / pasaport"));
-    session.identityType = addChoiceSpinner(
-        form,
-        "Belge türü",
-        new ChoiceItem[] {
-            new ChoiceItem("", "Belirtilmedi"),
-            new ChoiceItem("tc_identity_card", "T.C. kimlik kartı"),
-            new ChoiceItem("passport", "Pasaport"),
-            new ChoiceItem("other", "Diğer kimlik belgesi")
-        },
-        value(existing, "identityType")
-    );
-    session.identityNumber = addCustomerFormInput(form, "Kimlik / pasaport no", "Belge numarası", value(existing, "identityNumber"), false);
-    session.nationality = addCustomerFormInput(form, "Uyruk", "Örn. T.C.", value(existing, "nationality"), false);
-    session.birthDate = addCustomerFormInput(form, "Doğum tarihi", "YYYY-AA-GG", value(existing, "birthDate"), false);
-    session.gender = addChoiceSpinner(
-        form,
-        "Cinsiyet",
-        new ChoiceItem[] {
-            new ChoiceItem("", "Belirtilmedi"),
-            new ChoiceItem("female", "Kadın"),
-            new ChoiceItem("male", "Erkek"),
-            new ChoiceItem("unspecified", "Belirtmek istemiyor")
-        },
-        value(existing, "gender")
-    );
-    session.documentSerialNumber = addCustomerFormInput(form, "Belge seri no", "Seri numarası", value(existing, "documentSerialNumber"), false);
-    session.documentExpiryDate = addCustomerFormInput(form, "Son geçerlilik tarihi", "YYYY-AA-GG", value(existing, "documentExpiryDate"), false);
-    session.birthPlace = addCustomerFormInput(form, "Doğum yeri", "Şehir / ülke", value(existing, "birthPlace"), false);
-    session.motherName = addCustomerFormInput(form, "Anne adı", "Kimlikte yer alıyorsa", value(existing, "motherName"), false);
-    session.fatherName = addCustomerFormInput(form, "Baba adı", "Kimlikte yer alıyorsa", value(existing, "fatherName"), false);
-    session.issuingAuthority = addCustomerFormInput(form, "Düzenleyen makam", "Belgeyi düzenleyen makam", value(existing, "issuingAuthority"), false);
-    session.address = addCustomerFormInput(form, "Adres", "Kimlikte yer alıyorsa", value(existing, "address"), true);
-
-    if (AndroidUiRules.canUseAi(data)) {
-      session.imageButton = UiKit.outlineButton(this, "Kimlik Görselinden AI ile Doldur", view -> showIdentityImageSourceDialog());
-      LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48));
-      imageParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
-      session.imageButton.setLayoutParams(imageParams);
-      form.addView(session.imageButton);
-    }
-
-    session.status = UiKit.text(this, "", 12, UiKit.MUTED, Typeface.BOLD);
-    LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
-    statusParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    session.status.setLayoutParams(statusParams);
-    session.status.setVisibility(View.GONE);
-    form.addView(session.status);
-
-    session.saveButton = UiKit.button(this, existing == null ? "Müşteriyi Oluştur" : "Değişiklikleri Kaydet", UiKit.PRIMARY, view -> {
-      String fullName = textValue(session.fullName);
-      if (fullName.length() < 2) {
-        session.setStatus("Müşteri adı en az 2 karakter olmalı.", UiKit.DANGER);
-        session.fullName.requestFocus();
-        return;
-      }
-      JSONArray tags = parseCustomerTags(textValue(session.tags));
-      JSONObject actionPayload = payload(
-          "full_name", fullName,
-          "phone", textValue(session.phone),
-          "email", textValue(session.email),
-          "notes", textValue(session.notes),
-          "tags", tags,
-          "identity_type", selectedChoiceValue(session.identityType),
-          "identity_number", textValue(session.identityNumber),
-          "nationality", textValue(session.nationality),
-          "birth_date", textValue(session.birthDate),
-          "gender", selectedChoiceValue(session.gender),
-          "document_serial_number", textValue(session.documentSerialNumber),
-          "document_expiry_date", textValue(session.documentExpiryDate),
-          "birth_place", textValue(session.birthPlace),
-          "mother_name", textValue(session.motherName),
-          "father_name", textValue(session.fatherName),
-          "issuing_authority", textValue(session.issuingAuthority),
-          "address", textValue(session.address)
-      );
-      if (existing != null) {
-        try {
-          actionPayload.put("customer_id", existing.id);
-          actionPayload.put("expected_updated_at", existing.updatedAt);
-        } catch (Exception ignored) {
-          session.setStatus("Müşteri güncelleme isteği hazırlanamadı.", UiKit.DANGER);
-          return;
+          @Override
+          public void onDismiss(CustomerFormDialog closedDialog) {
+            if (activeCustomerFormDialog == closedDialog) {
+              activeCustomerFormDialog = null;
+            }
+            deletePendingIdentityCameraFile();
+          }
         }
-      }
-      dialog.dismiss();
-      sendAction(
-          existing == null ? "customer_create" : "customer_update",
-          actionPayload,
-          existing == null ? "Müşteri kartı oluşturulmak üzere gönderildi." : "Müşteri kartı güncellenmek üzere gönderildi."
-      );
-    });
-    LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
-    saveParams.setMargins(0, UiKit.dp(this, 12), 0, UiKit.dp(this, 20));
-    session.saveButton.setLayoutParams(saveParams);
-    form.addView(session.saveButton);
-
-    ScrollView scroll = UiKit.scroll(this, form);
-    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    shell.addView(scroll);
-    dialog.setContentView(shell);
-    dialog.setOnDismissListener(value -> {
-      if (activeCustomerFormSession == session) {
-        activeCustomerFormSession = null;
-      }
-      deletePendingIdentityCameraFile();
-    });
-    activeCustomerFormSession = session;
-    dialog.show();
-    configureFullDialog(dialog);
+    );
+    activeCustomerFormDialog = formDialog;
+    formDialog.show();
+    configureFullDialog(formDialog.dialog());
   }
 
   private EditText addCustomerFormInput(
@@ -5784,30 +5642,7 @@ public final class MainActivity extends ComponentActivity {
     card.addView(detailLine(label, value.trim()));
   }
 
-  private String value(OperationData.CustomerRecord customer, String field) {
-    if (customer == null) {
-      return "";
-    }
-    switch (field) {
-      case "fullName": return customer.fullName;
-      case "phone": return customer.phone;
-      case "email": return customer.email;
-      case "notes": return customer.notes;
-      case "identityType": return customer.identityType;
-      case "identityNumber": return customer.identityNumber;
-      case "nationality": return customer.nationality;
-      case "birthDate": return customer.birthDate;
-      case "gender": return customer.gender;
-      case "documentSerialNumber": return customer.documentSerialNumber;
-      case "documentExpiryDate": return customer.documentExpiryDate;
-      case "birthPlace": return customer.birthPlace;
-      case "motherName": return customer.motherName;
-      case "fatherName": return customer.fatherName;
-      case "issuingAuthority": return customer.issuingAuthority;
-      case "address": return customer.address;
-      default: return "";
-    }
-  }
+
 
   private String textValue(EditText input) {
     return input == null ? "" : input.getText().toString().trim();
@@ -5972,52 +5807,7 @@ public final class MainActivity extends ComponentActivity {
     }
   }
 
-  private static final class CustomerFormSession {
-    final Dialog dialog;
-    EditText fullName;
-    EditText phone;
-    EditText email;
-    EditText tags;
-    EditText notes;
-    Spinner identityType;
-    EditText identityNumber;
-    EditText nationality;
-    EditText birthDate;
-    Spinner gender;
-    EditText documentSerialNumber;
-    EditText documentExpiryDate;
-    EditText birthPlace;
-    EditText motherName;
-    EditText fatherName;
-    EditText issuingAuthority;
-    EditText address;
-    TextView status;
-    Button imageButton;
-    Button saveButton;
 
-    CustomerFormSession(Dialog dialog) {
-      this.dialog = dialog;
-    }
-
-    void setLoading(boolean loading) {
-      if (imageButton != null) {
-        imageButton.setEnabled(!loading);
-        imageButton.setText(loading ? "Kimlik okunuyor…" : "Kimlik Görselinden AI ile Doldur");
-      }
-      if (saveButton != null) {
-        saveButton.setEnabled(!loading);
-      }
-    }
-
-    void setStatus(String message, int tone) {
-      if (status == null) {
-        return;
-      }
-      status.setText(message == null ? "" : message);
-      status.setTextColor(tone);
-      status.setVisibility(message == null || message.trim().isEmpty() ? View.GONE : View.VISIBLE);
-    }
-  }
 
   private static final class StockImageReviewLine {
     final String rawText;
