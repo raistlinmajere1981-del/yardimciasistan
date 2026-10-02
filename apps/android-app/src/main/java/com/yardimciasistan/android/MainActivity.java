@@ -112,8 +112,6 @@ public final class MainActivity extends ComponentActivity {
   private Button refreshButton;
   private ImageButton themeButton;
   private Button settingsButton;
-  private EditText webModuleInput;
-  private EditText syncSecretInput;
   private boolean landscapeLayout;
   private final Map<String, Integer> screenScrollPositions = new HashMap<>();
   private String renderedScreenKey = "";
@@ -124,6 +122,7 @@ public final class MainActivity extends ComponentActivity {
   private AndroidForegroundSyncController foregroundSyncController;
   private AndroidActionDispatcher actionDispatcher;
   private AndroidConnectionController connectionController;
+  private AndroidConnectionSettingsPanel connectionSettingsPanel;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private CustomerFormDialog activeCustomerFormDialog;
@@ -475,14 +474,19 @@ public final class MainActivity extends ComponentActivity {
 
   @Override
   public void onConfigurationChanged(Configuration newConfig) {
-    String webModuleDraft = webModuleInput == null ? null : webModuleInput.getText().toString();
-    String syncSecretDraft = syncSecretInput == null ? null : syncSecretInput.getText().toString();
+    String webModuleDraft = connectionSettingsPanel == null
+        ? null
+        : connectionSettingsPanel.webModuleDraft();
+    String syncSecretDraft = connectionSettingsPanel == null
+        ? null
+        : connectionSettingsPanel.syncSecretDraft();
     rememberCurrentScrollPosition();
     super.onConfigurationChanged(newConfig);
     buildShell();
     render();
-    restoreSettingsDraft(webModuleInput, webModuleDraft);
-    restoreSettingsDraft(syncSecretInput, syncSecretDraft);
+    if (connectionSettingsPanel != null) {
+      connectionSettingsPanel.restoreDrafts(webModuleDraft, syncSecretDraft);
+    }
   }
 
   @Override
@@ -1341,13 +1345,6 @@ public final class MainActivity extends ComponentActivity {
     updateErrorBanner();
   }
 
-  private void restoreSettingsDraft(EditText input, String draft) {
-    if (input == null || draft == null) {
-      return;
-    }
-    input.setText(draft);
-    input.setSelection(draft.length());
-  }
 
   private ImageButton createThemeButton(Runnable afterApplied) {
     int icon = themeMode == AppTheme.Mode.NIGHT ? R.drawable.ic_theme_day : R.drawable.ic_theme_night;
@@ -2435,87 +2432,17 @@ public final class MainActivity extends ComponentActivity {
       return UiKit.scroll(this, page);
     }
 
-    webModuleInput = null;
-    syncSecretInput = null;
-    boolean embeddedConnectionLocked = ConnectionSettings.isEmbeddedConnectionLocked();
-    boolean canEditSettings = !embeddedConnectionLocked
-        && (!data.permissionsResolved || data.hasPermission("settings.edit"));
-    if (canEditSettings) {
-      LinearLayout connection = UiKit.card(this);
-      connection.addView(UiKit.text(this, "Web modül adresi", 12, UiKit.MUTED, Typeface.BOLD));
-      webModuleInput = UiKit.input(this, "https://firma.example/yardimci-asistan");
-      webModuleInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-      webModuleInput.setText(ConnectionSettings.webModuleUrl(preferences));
-      LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
-      inputParams.setMargins(0, UiKit.dp(this, 6), 0, UiKit.dp(this, 12));
-      webModuleInput.setLayoutParams(inputParams);
-      connection.addView(webModuleInput);
-
-      connection.addView(UiKit.text(this, "Güvenlik anahtarı", 12, UiKit.MUTED, Typeface.BOLD));
-      syncSecretInput = UiKit.input(this, "Uzun güvenlik anahtarı");
-      syncSecretInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-      syncSecretInput.setText(ConnectionSettings.syncSecret(preferences));
-      LinearLayout.LayoutParams secretParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
-      secretParams.setMargins(0, UiKit.dp(this, 6), 0, UiKit.dp(this, 12));
-      syncSecretInput.setLayoutParams(secretParams);
-      connection.addView(syncSecretInput);
-
-      Button refresh = UiKit.button(this, loading ? "Bağlanıyor..." : "Canlı Veriyi Çek", UiKit.PRIMARY, view -> syncOperations(true));
-      refresh.setEnabled(!loading);
-      refresh.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48)));
-      connection.addView(refresh);
-      page.addView(connection);
-    } else {
-      LinearLayout readOnly = UiKit.card(this);
-      readOnly.addView(UiKit.text(this, embeddedConnectionLocked ? "Bağlantı bilgileri APK içinde hazır" : "Bağlantı ayarları salt okunur", 14, UiKit.TEXT, Typeface.BOLD));
-      readOnly.addView(UiKit.text(this, embeddedConnectionLocked
-          ? "Tasarım süresince web bağlantısı bu APK'ya sabitlendi ve uygulama güncellendiğinde otomatik olarak korunur."
-          : "Web modül adresi ve güvenlik anahtarı yalnız ayar düzenleme yetkisi olan cihazlarda değiştirilebilir.", 12, UiKit.SECONDARY, Typeface.NORMAL));
-      page.addView(readOnly);
-    }
-
-    ConnectionSettings.LocalConnection localConnection = ConnectionSettings.localConnection(preferences);
-    LinearLayout localConnectionCard = UiKit.card(this);
-    localConnectionCard.addView(UiKit.text(this, "Yerel ağ", 14, UiKit.TEXT, Typeface.BOLD));
-    localConnectionCard.addView(UiKit.text(
+    connectionSettingsPanel = new AndroidConnectionSettingsPanel(
         this,
-        localConnection.isComplete()
-            ? "Aynı ağda masaüstü bulunduğunda yerel bağlantı otomatik kullanılır; ulaşılamazsa web bağlantısına geçilir."
-            : "Yerel bağlantı kullanıcı işlemi gerektirmez. Masaüstü aynı ağda bulunduğunda otomatik hazırlanır.",
-        12,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    ));
-    page.addView(localConnectionCard);
-
-    page.addView(UiKit.sectionTitle(this, "Bağlantı özeti"));
-    LinearLayout state = UiKit.card(this);
-    state.addView(settingLine("Bağlantı durumu", connectionState, connectionTone()));
-    state.addView(UiKit.divider(this));
-    ConnectionSettings.LocalConnection localSummary = ConnectionSettings.localConnection(preferences);
-    state.addView(settingLine(
-        "Yerel masaüstü",
-        localSummary.isComplete()
-            ? (localSummary.hasEndpoint() ? "Eşleşti · ağda bulundu" : "Eşleşti · ağda aranıyor")
-            : (localSummary.hasEndpoint() ? "Bulundu · eşleştirme bekliyor" : "Henüz bulunmadı"),
-        localSummary.isComplete() && localSummary.hasEndpoint() ? UiKit.SUCCESS : UiKit.MUTED
-    ));
-    if (localSummary.hasEndpoint()) {
-      state.addView(UiKit.divider(this));
-      state.addView(settingLine("Yerel adres", localSummary.baseUrl, UiKit.MUTED));
-    }
-    state.addView(UiKit.divider(this));
-    state.addView(settingLine("Son senkron", data.pulledAt.isEmpty() ? "Henüz yok" : shortTimestamp(data.pulledAt), UiKit.INFO));
-    state.addView(UiKit.divider(this));
-    int visiblePendingActions = data.pendingActions + localPendingActionCount();
-    state.addView(settingLine("Bekleyen işlem", String.valueOf(visiblePendingActions), visiblePendingActions > 0 ? UiKit.WARNING : UiKit.SUCCESS));
-    state.addView(UiKit.divider(this));
-    state.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
-    state.addView(UiKit.divider(this));
-    state.addView(settingLine("Cihaz adı", identity.deviceName, UiKit.MUTED));
-    state.addView(UiKit.divider(this));
-    state.addView(settingLine("Yetki profili", data.deviceRoleLabel(), data.deviceActive ? UiKit.SUCCESS : UiKit.DANGER));
-    page.addView(state);
+        preferences,
+        data,
+        identity,
+        connectionState,
+        loading,
+        localPendingActionCount(),
+        () -> syncOperations(true)
+    );
+    connectionSettingsPanel.appendTo(page);
 
     page.addView(UiKit.sectionTitle(this, "Son telefon işlemleri"));
     if (data.actions.isEmpty()) {
@@ -3995,11 +3922,11 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
 
-    String baseUrl = readSettingsInputs && webModuleInput != null
-        ? webModuleInput.getText().toString().trim()
+    String baseUrl = readSettingsInputs && connectionSettingsPanel != null
+        ? connectionSettingsPanel.webModuleValue()
         : ConnectionSettings.webModuleUrl(preferences);
-    String syncSecret = readSettingsInputs && syncSecretInput != null
-        ? syncSecretInput.getText().toString().trim()
+    String syncSecret = readSettingsInputs && connectionSettingsPanel != null
+        ? connectionSettingsPanel.syncSecretValue()
         : ConnectionSettings.syncSecret(preferences);
 
     operationsSyncController.sync(baseUrl, syncSecret, data, new AndroidOperationsSyncController.Listener() {
@@ -4417,18 +4344,6 @@ public final class MainActivity extends ComponentActivity {
 
 
 
-  private int connectionTone() {
-    if ("Bağlantı hazır".equals(connectionState)
-        || "Yerel ağ bağlı".equals(connectionState)
-        || "Web bağlantısı hazır".equals(connectionState)
-        || connectionState.contains("eşleştirme tamamlandı")) {
-      return UiKit.SUCCESS;
-    }
-    if (connectionState.contains("çekiliyor") || connectionState.contains("eşleştiriliyor")) {
-      return UiKit.INFO;
-    }
-    return "Henüz bağlanmadı".equals(connectionState) ? UiKit.MUTED : UiKit.DANGER;
-  }
 
 
 
