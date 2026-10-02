@@ -310,7 +310,7 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
     message: automaticReason,
     detail: [
       "Temiz Başlat seçilirse mevcut yerel veriler, görseller, bakım kayıtları ve eski yedekler silinmek yerine kurtarma amacıyla legacy-data klasörüne taşınır.",
-      "Oturumlar ve geçici güncelleme dosyaları temizlenir; tanılama logları korunur. Yeni sürüm sıfır veritabanıyla açılır.",
+      "Oturumlar ve geçici güncelleme dosyaları güvenli biçimde temizlenmeye çalışılır; tanılama logları korunur. Yeni sürüm sıfır veritabanıyla açılır.",
       "",
       `Tanılama: ${compatibility.reason}`
     ].join("\n"),
