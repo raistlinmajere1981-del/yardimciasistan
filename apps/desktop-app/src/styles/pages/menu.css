@@ -43,9 +43,7 @@
   overflow: hidden;
 }
 
-.menu-category-panel,
-.menu-product-panel,
-.menu-item-editor {
+:is(.menu-category-panel, .menu-product-panel, .menu-item-editor) {
   display: grid;
   gap: var(--space-4);
   min-height: 0;
