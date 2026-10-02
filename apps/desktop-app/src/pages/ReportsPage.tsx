@@ -371,12 +371,12 @@ export function ReportsPage({
 
       <section aria-label="İşletme özeti">
         <div className="report-summary-metrics">
-          {foodOrdersEnabled && <MetricCard compact title="Restoran cirosu" value={money(report.summary.restaurantRevenue)} detail="Yalnız ödenmiş adisyonlar" tone="ok" icon={Banknote} />}
+          {foodOrdersEnabled && <MetricCard compact title="Restoran cirosu" value={money(report.summary.restaurantRevenue)} detail="Yalnız ödenmiş adisyonlar" tone="success" icon={Banknote} />}
           {foodOrdersEnabled && <MetricCard compact title="Kapatılan adisyon" value={count(report.summary.closedOrders)} detail="Ödendi olarak kapatılan" tone="info" icon={ReceiptText} />}
           {foodOrdersEnabled && <MetricCard compact title="Ortalama hesap" value={report.summary.closedOrders > 0 ? money(report.summary.averageOrder) : "Veri yok"} detail="Ciro / ödenmiş adisyon" tone="neutral" icon={Calculator} />}
           {reservationsEnabled && <MetricCard compact title="Onaylanan rezervasyon" value={count(report.summary.approvedReservations)} detail="Etkin alanlardaki onaylı veya tamamlanmış kayıtlar" tone="info" icon={CalendarCheck} />}
           {requestsEnabled && <MetricCard compact title="Yeni müşteri talebi" value={count(report.summary.newRequests)} detail="Dönemde alınan talepler" tone="info" icon={Inbox} />}
-          {tasksEnabled && <MetricCard compact title="Tamamlanmayan günlük iş" value={count(report.summary.pendingTasks)} detail="Döneme bağlı açık işler" tone={report.summary.pendingTasks > 0 ? "wait" : "ok"} icon={ClipboardList} />}
+          {tasksEnabled && <MetricCard compact title="Tamamlanmayan günlük iş" value={count(report.summary.pendingTasks)} detail="Döneme bağlı açık işler" tone={report.summary.pendingTasks > 0 ? "warning" : "success"} icon={ClipboardList} />}
         </div>
       </section>
 
