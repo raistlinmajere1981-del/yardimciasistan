@@ -14,7 +14,7 @@ interface SystemHealthPanelProps {
   aiEnabled: boolean;
 }
 
-type HealthTone = "ok" | "warn" | "danger" | "info" | "muted";
+type HealthTone = "success" | "warning" | "danger" | "info" | "muted";
 
 interface HealthItem {
   key: string;
@@ -47,7 +47,7 @@ export function SystemHealthPanel({
         detail: pendingDevices > 0
           ? "Yeni telefon masaüstünden onaylanmadan işletme verisini göremez."
           : activeDevices > 0 ? "Telefon yetkileri masaüstünden yönetiliyor." : "Henüz onaylanmış telefon yok.",
-        tone: pendingDevices > 0 ? "warn" : activeDevices > 0 ? "ok" : "muted",
+        tone: pendingDevices > 0 ? "warning" : activeDevices > 0 ? "success" : "muted",
         icon: Smartphone
       });
     }
@@ -59,7 +59,7 @@ export function SystemHealthPanel({
         detail: setup.aiApiKeyConfigured
           ? `${setup.aiService || "AI"} · ${setup.aiModel || "model seçili"}`
           : "AI açık ancak servis anahtarı henüz tamamlanmamış.",
-        tone: setup?.aiApiKeyConfigured ? "ok" : "warn",
+        tone: setup?.aiApiKeyConfigured ? "success" : "warning",
         icon: Bot
       });
     }
@@ -71,7 +71,7 @@ export function SystemHealthPanel({
         detail: setup.appPasswordConfigured
           ? "Masaüstü uygulaması parola ile korunuyor."
           : "Pilot kullanımda ortak bilgisayar için uygulama parolası önerilir.",
-        tone: setup.appPasswordConfigured ? "ok" : "warn",
+        tone: setup.appPasswordConfigured ? "success" : "warning",
         icon: LockKeyhole
       },
       {
@@ -79,7 +79,7 @@ export function SystemHealthPanel({
         label: "Yerel yedek",
         value: data.backupPath ? "Klasör hazır" : "Kontrol gerekli",
         detail: data.backupPath ? compactPath(data.backupPath) : "Yedek klasörü bilgisi alınamadı.",
-        tone: data.backupPath ? "ok" : "warn",
+        tone: data.backupPath ? "success" : "warning",
         icon: DatabaseBackup
       }
     );
@@ -120,7 +120,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
       label: "Web bağlantısı",
       value: "Bağlantı yok",
       detail: "Web modülü adresi Ayarlar bölümünden tamamlanmalı.",
-      tone: "warn",
+      tone: "warning",
       icon: Wifi
     };
   }
@@ -130,7 +130,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
       label: "Web bağlantısı",
       value: "Otomatik eşitleme kapalı",
       detail: compactUrl(webUrl),
-      tone: "warn",
+      tone: "warning",
       icon: Wifi
     };
   }
@@ -140,7 +140,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
       label: "Web bağlantısı",
       value: status.phase === "offline" ? "Çevrimdışı" : "Hata",
       detail: status.message || compactUrl(webUrl),
-      tone: status.phase === "offline" ? "warn" : "danger",
+      tone: status.phase === "offline" ? "warning" : "danger",
       icon: Wifi
     };
   }
@@ -149,7 +149,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
     label: "Web bağlantısı",
     value: "Hazır",
     detail: "Otomatik eşitleme etkin.",
-    tone: "ok",
+    tone: "success",
     icon: Wifi
   };
 }
