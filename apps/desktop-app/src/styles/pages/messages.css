@@ -429,9 +429,6 @@
 
   .whatsapp-view-web {
     flex-direction: column;
-  }
-
-  .whatsapp-view-web {
     overflow-y: auto;
   }
 
