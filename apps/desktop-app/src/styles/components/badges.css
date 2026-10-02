@@ -85,6 +85,7 @@
 
 .status-chip:hover:not(:disabled) {
   border-color: var(--status-tone);
+  background: var(--color-bg-hover);
 }
 
 .status-chip:active:not(:disabled) {
@@ -93,6 +94,8 @@
 
 .status-chip[aria-pressed="true"] {
   border-color: var(--status-tone);
+  background: var(--status-soft);
+  color: var(--status-tone);
   font-weight: var(--weight-semibold);
 }
 
