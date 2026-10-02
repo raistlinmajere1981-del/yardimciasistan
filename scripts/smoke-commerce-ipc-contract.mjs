@@ -119,4 +119,45 @@ assert.match(
   "Commerce IPC must delegate to the capability-guarded commerce runtime."
 );
 
+assert.match(
+  contractSource,
+  /CommerceIpcMutationResult<T>/,
+  "Expected commerce mutation outcomes must have a typed IPC envelope."
+);
+assert.match(
+  ipcSource,
+  /commerce\.domain\.rejected/,
+  "Expected commerce domain rejections must have a stable structured log event."
+);
+assert.match(
+  ipcSource,
+  /code:\s*"insufficient_stock"[\s\S]*?\^Yetersiz stok\\\./,
+  "Insufficient stock must be classified as an expected commerce rejection."
+);
+assert.match(
+  ipcSource,
+  /mutateForIpc\("commerce:sale:createPaid"/,
+  "Paid sale must use the expected-domain IPC mutation wrapper."
+);
+assert.match(
+  preloadSource,
+  /async function invokeCommerceMutation<T>/,
+  "Preload must unwrap expected commerce mutation outcomes."
+);
+assert.match(
+  preloadSource,
+  /error\.name = "CommerceDomainError"/,
+  "Expected domain rejections must become renderer-side user errors without failing the main IPC handler."
+);
+assert.match(
+  preloadSource,
+  /createPaidSale:\s*\(input\) => invokeCommerceMutation<CommerceSale>\("commerce:sale:createPaid"/,
+  "Paid sale bridge must use the commerce mutation unwrap path."
+);
+assert.doesNotMatch(
+  ipcSource,
+  /code:\s*"invalid_category"[\s\S]{0,500}\(\?:Kategori \|/,
+  "Category classification must not broadly downgrade technical category consistency failures."
+);
+
 console.log("commerce-ipc-contract-smoke-ok");
