@@ -32,7 +32,17 @@ interface MarketTabDefinition {
   enabled: boolean;
 }
 
-export function MarketPage({ customers, controller }: { customers: DesktopCustomer[]; controller: MarketController }) {
+export function MarketPage({
+  customers,
+  controller,
+  activeView,
+  onViewChange
+}: {
+  customers: DesktopCustomer[];
+  controller: MarketController;
+  activeView: MarketView;
+  onViewChange: (view: MarketView) => void;
+}) {
   const { snapshot } = useBusinessCapabilityRuntime();
   const C = BUSINESS_CAPABILITIES;
   const catalogEnabled = runtimeHasCapability(snapshot, C.CATALOG);
@@ -63,15 +73,17 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
     { id: "labels", label: "Etiketler", description: "Ürün ve raf etiketi hazırlama", icon: Tags, enabled: labelsEnabled }
   ], [catalogEnabled, inventoryEnabled, labelsEnabled, purchasingEnabled, salesEnabled, suppliersEnabled]);
   const availableTabs = tabs.filter((tab) => tab.enabled);
-  const [activeTab, setActiveTab] = useState<MarketView>(() => availableTabs[0]?.id ?? "products");
+  const activeTab = availableTabs.some((tab) => tab.id === activeView)
+    ? activeView
+    : (availableTabs[0]?.id ?? "products");
   const [productLookupRequest, setProductLookupRequest] = useState<ProductLookupFormRequest | null>(null);
   const productHandoffRequestId = useRef(0);
 
   useEffect(() => {
-    if (!availableTabs.some((tab) => tab.id === activeTab)) {
-      setActiveTab(availableTabs[0]?.id ?? "products");
+    if (activeTab !== activeView) {
+      onViewChange(activeTab);
     }
-  }, [activeTab, availableTabs]);
+  }, [activeTab, activeView, onViewChange]);
 
   async function handleSaleCompleted(sale: CommerceSale) {
     await reloadCatalog();
@@ -87,16 +99,16 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
     const request = quickSaleSession.requestCartDraft(detail.draft.id);
     if (!request) {
       handleStateChange("error", "Önce devam eden satışı veya kapanamayan telefon sepetini tamamlayın.");
-      setActiveTab("quickSale");
+      onViewChange("quickSale");
       return;
     }
-    setActiveTab("quickSale");
+    onViewChange("quickSale");
   }
 
   const openExternalProduct = useCallback((product: ProductLookupCandidate) => {
     productHandoffRequestId.current += 1;
     setProductLookupRequest({ requestId: productHandoffRequestId.current, product });
-    setActiveTab("products");
+    onViewChange("products");
   }, []);
 
   const clearProductLookupRequest = useCallback((requestId: number) => {
@@ -111,7 +123,7 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
           if (!tab.enabled) return null;
           const Icon = tab.icon;
           return (
-            <button key={tab.id} type="button" className={activeTab === tab.id ? "is-active" : ""} onClick={() => setActiveTab(tab.id)}>
+            <button key={tab.id} type="button" className={activeTab === tab.id ? "is-active" : ""} onClick={() => onViewChange(tab.id)}>
               <Icon size={17} aria-hidden="true" />
               <span><strong>{tab.label}</strong><small>{tab.description}</small></span>
             </button>
