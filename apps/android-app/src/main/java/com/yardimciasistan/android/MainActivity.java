@@ -130,6 +130,7 @@ public final class MainActivity extends ComponentActivity {
   private String renderedScreenKey = "";
   private String currentError = "";
   private AndroidImageCaptureController imageCaptureController;
+  private IdentityImageAnalysisController identityImageAnalysisController;
   private CustomerFormSession activeCustomerFormSession;
   private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
   private final Runnable foregroundSyncRunnable = new Runnable() {
@@ -194,6 +195,7 @@ public final class MainActivity extends ComponentActivity {
         showError(message);
       }
     });
+    identityImageAnalysisController = new IdentityImageAnalysisController(this, executor, syncClient);
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
@@ -476,6 +478,7 @@ public final class MainActivity extends ComponentActivity {
       session.setStatus("AI capability kapalı olduğu için kimlik analizi kullanılamıyor.", UiKit.DANGER);
       return;
     }
+
     String baseUrl = ConnectionSettings.webModuleUrl(preferences);
     String syncSecret = ConnectionSettings.syncSecret(preferences);
     if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
@@ -483,44 +486,41 @@ public final class MainActivity extends ComponentActivity {
       session.setStatus("Kimlik analizi için bağlantı ayarlarını tamamlayın.", UiKit.DANGER);
       return;
     }
+
     session.setLoading(true);
     session.setStatus("Kimlik görseli hazırlanıyor ve AI ile okunuyor…", UiKit.INFO);
-    executor.execute(() -> {
-      StockImageFile.PreparedImage prepared = null;
-      try {
-        prepared = StockImageFile.prepare(this, sourceUri);
-        deletePendingIdentityCameraFile();
-        HostingSyncClient.IdentityImageAnalysisResult result = syncClient.analyzeIdentityImage(
-            baseUrl,
-            syncSecret,
-            identity,
-            prepared
-        );
-        runOnUiThread(() -> {
-          CustomerFormSession current = activeCustomerFormSession;
-          if (current != session || !session.dialog.isShowing()) {
-            return;
+    identityImageAnalysisController.analyze(
+        sourceUri,
+        baseUrl,
+        syncSecret,
+        identity,
+        new IdentityImageAnalysisController.Listener() {
+          @Override
+          public void onSuccess(JSONObject analysis, String message) {
+            if (activeCustomerFormSession != session || !session.dialog.isShowing()) {
+              return;
+            }
+            applyIdentityAnalysisToCustomerForm(session, analysis);
+            session.setLoading(false);
+            session.setStatus(message, UiKit.SUCCESS);
+            Toast.makeText(MainActivity.this, "Okunan alanları kaydetmeden önce kontrol edin.", Toast.LENGTH_LONG).show();
           }
-          applyIdentityAnalysisToCustomerForm(session, result.analysis);
-          session.setLoading(false);
-          session.setStatus(result.message, UiKit.SUCCESS);
-          Toast.makeText(this, "Okunan alanları kaydetmeden önce kontrol edin.", Toast.LENGTH_LONG).show();
-        });
-      } catch (HostingSyncClient.SyncException | StockImageFile.StockImageException error) {
-        runOnUiThread(() -> {
-          if (activeCustomerFormSession != session || !session.dialog.isShowing()) {
-            return;
+
+          @Override
+          public void onError(String message) {
+            if (activeCustomerFormSession != session || !session.dialog.isShowing()) {
+              return;
+            }
+            session.setLoading(false);
+            session.setStatus(message, UiKit.DANGER);
           }
-          session.setLoading(false);
-          session.setStatus(error.getMessage(), UiKit.DANGER);
-        });
-      } finally {
-        deletePendingIdentityCameraFile();
-        if (prepared != null) {
-          prepared.release();
+
+          @Override
+          public void onFinished() {
+            deletePendingIdentityCameraFile();
+          }
         }
-      }
-    });
+    );
   }
 
   private void applyIdentityAnalysisToCustomerForm(CustomerFormSession session, JSONObject analysis) {
