@@ -56,6 +56,10 @@ export class WhatsAppWebviewDriver {
       return { ok: false, message: "WhatsApp Web henüz hazır değil. Biraz sonra tekrar deneyin." };
     }
     try {
+      const currentUrl = guest.getURL();
+      if (currentUrl.startsWith(WHATSAPP_WEB_HOME_URL)) {
+        return { ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." };
+      }
       await guest.loadURL(WHATSAPP_WEB_HOME_URL);
       if (guest.isDestroyed() || !guest.getURL().startsWith(WHATSAPP_WEB_HOME_URL)) {
         return { ok: false, message: "WhatsApp Web güvenli kullanıcı ekranına alınamadı." };
