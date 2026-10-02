@@ -135,7 +135,7 @@ export function CustomersWorkspace({
           returnContext: { page: "customerWork", entityId: customer.id }
         });
         return <DataListItem
-          className="customer-record-row"
+          className="customer-record-row interactive-surface"
           key={customer.id}
           onClick={(event) => {
             const target = event.target as HTMLElement;
