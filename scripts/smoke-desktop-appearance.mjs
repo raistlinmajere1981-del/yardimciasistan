@@ -272,7 +272,7 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
     expect(await page.locator(".page-content").evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingTop))).toBeGreaterThanOrEqual(24);
-    await expect(page.locator(".system-health-item.tone-ok").first()).toBeVisible();
+    await expect(page.locator(".system-health-item.tone-success").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();

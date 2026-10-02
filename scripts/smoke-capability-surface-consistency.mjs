@@ -124,7 +124,7 @@ assert.match(qrMenuPanelSource, /setQrMenuWebPublication/);
 assert.match(qrMenuPanelSource, /disabled=\{!moduleEnabled \|\| busy\}/);
 assert.match(
   menuManagerSource,
-  /qrMenuEnabled\s*&&\s*\([\s\S]{0,180}<QrMenuPanel enabled/,
+  /qrMenuEnabled\s*&&\s*\([\s\S]{0,180}<QrMenuPanel\s+enabled/,
   "QR menu controls must disappear when the Settings QR module is disabled"
 );
 assert.match(
@@ -165,7 +165,7 @@ assert.match(
 assertHandlerGuard(menuIpcSource, "menu:setWebPublication", "assertCapability(BUSINESS_CAPABILITIES.QR_MENU");
 assert.match(
   menuCssSource,
-  /\.menu-qr-service \+ \.menu-management-grid\s*\{[\s\S]{0,120}margin-top:\s*var\(--space-3\)/,
+  /\.menu-page-layout\s*\{[\s\S]{0,200}gap:\s*var\(--space-3\)/,
   "QR service panel must keep a visible gap above the menu management grid"
 );
 assert.match(

@@ -24,6 +24,7 @@ function Harness() {
   const [dashboardData, setDashboardData] = useState(control.__m82Initial.dashboard);
   const [snapshot, setSnapshot] = useState(control.__m82Initial.snapshot);
   const [page, setPage] = useState("market");
+  const [marketView, setMarketView] = useState<"quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels">("quickSale");
   const [syncState, setSyncState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestId] = useState("");
@@ -49,7 +50,7 @@ function Harness() {
         <button type="button" onClick={() => setPage("customers")}>Müşteriler</button>
       </nav>
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
-      {page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} /> : <div className="customer-work-page">
+      {page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} activeView={marketView} onViewChange={setMarketView} /> : <div className="customer-work-page">
         <div className="customer-work-content is-customers">
           <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
           <CustomersWorkspace

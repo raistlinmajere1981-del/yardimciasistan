@@ -227,7 +227,7 @@ try {
     await customerViews.getByRole('button', { name: 'Talepler', exact: true }).click();
     await expect(page.locator('.request-filter-tabs').getByRole('tab')).toHaveCount(2);
     await capture('requests');
-    await page.getByRole('button', { name: 'Elle Talep Ekle', exact: true }).click();
+    await page.getByRole('button', { name: 'Talimat Ekle', exact: true }).click();
     await capture('request-editor');
     await closeDialog();
     await customerViews.getByRole('button', { name: 'Müşteriler', exact: true }).click();
@@ -306,6 +306,7 @@ try {
     await closeDialog();
     const reservationRow = page.getByLabel('Rezervasyon listesi', { exact: true }).getByRole('article').first();
     await expect(reservationRow.locator('summary')).toHaveCount(0);
+    await reservationRow.scrollIntoViewIfNeeded();
     await reservationRow.getByRole('button', { name: 'Düzenle', exact: true }).click();
     await capture('reservation-edit');
     await expect(page.getByRole('dialog').getByLabel('Giriş tarihi', { exact: true })).toBeDisabled();

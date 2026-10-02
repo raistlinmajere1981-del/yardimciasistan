@@ -26,6 +26,7 @@ function Harness() {
   const [dashboardData, setDashboardData] = useState(control.__m83Initial.dashboard);
   const [snapshot, setSnapshot] = useState(control.__m83Initial.snapshot);
   const [page, setPage] = useState("customers");
+  const [marketView, setMarketView] = useState<"quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels">("quickSale");
   const [syncState, setSyncState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const whatsappEnabled = snapshot.enabledCapabilities.includes(C.WHATSAPP);
@@ -89,7 +90,7 @@ function Harness() {
           onDelete: customers.handleDeleteCustomer
         }} />
         </WorkspaceNavigationProvider>
-      </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} />
+      </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} activeView={marketView} onViewChange={setMarketView} />
         : <CustomerMessagesWorkspace safeMode={(onOpenWeb) => workspace("safe", undefined, onOpenWeb)} webMode={(onReturn) => workspace("web", onReturn)}
           whatsappEnabled={whatsappEnabled} prewarmWebview={false} active={page === "prepared"} />}
     </main>

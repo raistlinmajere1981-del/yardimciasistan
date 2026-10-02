@@ -224,4 +224,16 @@
     overflow: auto;
     overscroll-behavior: contain;
   }
+
+  .operations-board__pane--left .record-stack,
+  .operations-board__pane--right .record-stack,
+  .operations-board__pane--left .restaurant-reservations-workspace {
+    height: auto;
+  }
+
+  .operations-board__pane--left .data-records,
+  .operations-board__pane--right .data-records,
+  .operations-board__pane--left .restaurant-reservation-list {
+    overflow: visible;
+  }
 }

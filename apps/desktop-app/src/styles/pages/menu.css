@@ -1032,6 +1032,22 @@
   .menu-management-grid {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   }
+
+  .menu-category-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    height: auto;
+  }
+
+  .menu-category-row__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .menu-category-inline-fields,
+  .menu-category-create-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 900px) {

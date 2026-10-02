@@ -184,8 +184,8 @@ try {
       };
       if (name === 'Müşteri İşleri') {
         await page.getByRole('navigation', { name: 'Müşteri işleri görünümü' }).getByRole('button', { name: 'Talepler', exact: true }).click();
-        await page.getByRole('button', { name: 'Elle Talep Ekle', exact: true }).click();
-        const dialog = page.getByRole('dialog', { name: 'Yeni talep ekle', exact: true });
+        await page.getByRole('button', { name: 'Talimat Ekle', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: 'Yeni talimat', exact: true });
         await checkOverlay(dialog, 'request-drawer');
         await dialog.getByRole('button', { name: 'Formu kapat', exact: true }).click();
         await expect(dialog).toHaveCount(0);

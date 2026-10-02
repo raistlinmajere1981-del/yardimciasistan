@@ -45,6 +45,7 @@ const customer = {
 
 function Harness() {
   const [snapshot, setSnapshot] = useState(control.__m8bInitial.snapshot);
+  const [marketView, setMarketView] = useState<"quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels">("quickSale");
   const controller = useMarketController({
     businessCapabilities: snapshot,
     active: true
@@ -67,7 +68,7 @@ function Harness() {
     clearOverride: async () => undefined
   }}>
     <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="market">
-      <MarketPage customers={[customer]} controller={controller} />
+      <MarketPage customers={[customer]} controller={controller} activeView={marketView} onViewChange={setMarketView} />
     </WorkspaceNavigationProvider>
   </BusinessCapabilityRuntimeProvider>;
 }

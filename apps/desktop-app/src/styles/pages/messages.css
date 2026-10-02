@@ -7,12 +7,16 @@
 }
 
 .persistent-customer-messages-page.is-active {
-  display: block;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .persistent-customer-messages-page > .feature-workspace-page {
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
+  height: auto;
 }
 
 .customer-messages-workspace {

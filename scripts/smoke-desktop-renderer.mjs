@@ -802,9 +802,9 @@ try {
   await expect(customerWorkViews.getByRole("button")).toHaveText(["Müşteriler", "Talepler", "Hazır Mesajlar"]);
   await customerWorkViews.getByRole("button", { name: "Hazır Mesajlar" }).click();
   await expect(page.getByText("İletişim", { exact: true })).toHaveCount(0);
-  await expect(page.locator(".whatsapp-request-panel .panel-heading")).toContainText("Hazır Mesajlar");
-  await expect(page.locator(".whatsapp-request-panel .panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
-  await expect(page.locator(".whatsapp-request-panel .panel-heading p")).toHaveCount(0);
+  await expect(page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-panel .panel-heading")).toContainText("Hazır Mesajlar");
+  await expect(page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-panel .panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
+  await expect(page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-panel .panel-heading p")).toHaveCount(0);
   await expect(page.locator(".whatsapp-copy-panel").getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
   await expect(page.locator(".whatsapp-copy-panel .message-detail-category-label")).toHaveText("Hazır yanıt");
   await expect(page.locator(".whatsapp-copy-panel .panel-heading p")).toHaveCount(0);
@@ -813,7 +813,7 @@ try {
   await expect(page.getByRole("button", { name: "AI Cevap Hazırla", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Daha Kısa", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Yeniden hazırla", exact: true })).toHaveCount(0);
-  await expect(page.locator(".whatsapp-webview-frame")).toHaveCount(0);
+  await expect(page.locator(".message-mode-content:not(.is-hidden) .whatsapp-webview-frame")).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Hazır Mesaj" })).toHaveAttribute("aria-selected", "true");
   expect(await page.getByLabel("Hazır WhatsApp mesajı").evaluate((field) => getComputedStyle(field).overflowY)).toBe("auto");
   await page.screenshot({ path: "artifacts/screenshots/desktop-messages-safe-mode.png", fullPage: true });
@@ -842,12 +842,11 @@ try {
   await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   await page.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(customerWorkViews.getByRole("button", { name: "Müşteriler", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".whatsapp-webview")).toHaveCount(0);
+  await expect(page.locator(".whatsapp-webview")).toBeHidden();
   await customerWorkViews.getByRole("button", { name: "Hazır Mesajlar", exact: true }).click();
-  await expect(page.getByRole("tab", { name: "Hazır Mesaj" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("tab", { name: "WhatsApp", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "WhatsApp" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".whatsapp-webview")).toBeVisible();
-  await expect(page.locator(".whatsapp-webview")).not.toHaveAttribute("data-persistence-marker", "webview-kept-alive");
+  await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
 
   expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
   await expectWhatsAppToFillWorkspace(page);
@@ -1389,9 +1388,9 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
-  await expect(conversionPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
-  await conversionPage.getByRole("button", { name: "Elle Talep Ekle" }).click();
-  const manualRequestDrawer = conversionPage.getByRole("dialog", { name: "Yeni talep ekle" });
+  await expect(conversionPage.getByRole("dialog", { name: "Yeni talimat" })).toHaveCount(0);
+  await conversionPage.getByRole("button", { name: "Talimat Ekle" }).click();
+  const manualRequestDrawer = conversionPage.getByRole("dialog", { name: "Yeni talimat" });
   await expect(manualRequestDrawer).toBeVisible();
   await manualRequestDrawer.getByLabel("Ad soyad").fill("Manuel Smoke");
   await manualRequestDrawer.getByLabel("Telefon").fill("0555 333 44 66");
@@ -1402,7 +1401,7 @@ try {
   await expect(manualRequestDrawer.getByText("Telefonla veya yüz yüze gelen talebi kaydedin.", { exact: true })).toHaveCount(0);
   await chooseDate(manualRequestDrawer, "Giriş tarihi", "2026-07-18");
   await chooseTime(manualRequestDrawer, "Saat", "21:00");
-  await manualRequestDrawer.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
+  await manualRequestDrawer.getByRole("button", { name: "Talimatı Kaydet" }).click();
   await manualRequestDrawer.getByRole("button", { name: "Formu kapat" }).click();
   await expect(manualRequestDrawer).toHaveCount(0);
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
@@ -1929,7 +1928,7 @@ try {
   await expect(compactPage.getByRole("button", { name: "Talebi Sil" })).toBeVisible();
   await expect(compactPage.locator(".request-more-actions")).toHaveCount(0);
   await expect(compactPage.locator(".request-detail-header-actions")).toBeVisible();
-  await expect(compactPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
+  await expect(compactPage.getByRole("dialog", { name: "Yeni talimat" })).toHaveCount(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
 
   await compactPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
@@ -2127,7 +2126,7 @@ try {
 
   await compactPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await compactPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Hazır Mesajlar" }).click();
-  const compactMessageRows = compactPage.locator(".whatsapp-request-list button.message-request-row");
+  const compactMessageRows = compactPage.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-list button.message-request-row");
   await expect(compactMessageRows).toHaveCount(5);
   await expect(compactPage.locator(".whatsapp-copy-panel").getByRole("heading", { name: "Kompakt Misafir 1" })).toBeVisible();
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-messages-1366x768.png" });
@@ -2624,11 +2623,13 @@ async function expectWhatsAppToFillWorkspace(page) {
   const geometry = await page.locator(".whatsapp-webview").evaluate((webview) => {
     const frame = webview.parentElement;
     const panel = webview.closest(".whatsapp-live-panel");
+    const surface = webview.closest(".page-work-surface");
     const content = webview.closest(".page-content");
     const shell = webview.closest(".content");
+    const surfaceContent = surface ?? content;
     return {
       panelBottom: panel.getBoundingClientRect().bottom,
-      contentBottom: content.getBoundingClientRect().bottom - parseFloat(getComputedStyle(content).paddingBottom),
+      contentBottom: surfaceContent.getBoundingClientRect().bottom - parseFloat(getComputedStyle(surfaceContent).paddingBottom) - parseFloat(getComputedStyle(surfaceContent).borderBottomWidth || "0"),
       webviewHeight: webview.getBoundingClientRect().height,
       frameHeight: frame.clientHeight,
       webviewWidth: webview.getBoundingClientRect().width,
