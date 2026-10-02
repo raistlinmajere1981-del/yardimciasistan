@@ -722,7 +722,7 @@ export class DesktopDatabase {
     }
     const result = runStoredDesktopDeletion(
       this.db,
-      () => this.deleteCustomerInTransaction(customerId, new Date().toISOString()),
+      () => deleteStoredCustomerInTransaction(this.db, customerId, new Date().toISOString()),
       "Müşteri silindi; talep ve rezervasyon geçmişi korundu."
     );
     if (!result.ok) {
@@ -1757,7 +1757,14 @@ export class DesktopDatabase {
       case "customer_update":
         return applyStoredAndroidCustomerSave(this.db, action, now, true);
       case "customer_delete":
-        return this.deleteCustomerInTransaction(androidPayloadString(action.payload, "customer_id"), now, action);
+        return deleteStoredCustomerInTransaction(
+          this.db,
+          androidPayloadString(action.payload, "customer_id"),
+          now,
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
+        );
       case "customer_room_assign":
         return applyStoredAndroidCustomerRoomAssignment(this.db, action, now);
       case "customer_room_stay_status":
@@ -1888,86 +1895,6 @@ export class DesktopDatabase {
     }
   }
 
-  private deleteCustomerInTransaction(
-    customerId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!customerId) {
-      return { ok: false, message: "Silinecek müşteri seçilmemiş." };
-    }
-    const customer = this.db
-      .prepare("SELECT full_name, updated_at FROM customers WHERE id = ? AND deleted_at = ''")
-      .get(customerId) as { full_name?: string; updated_at?: string } | undefined;
-    if (!customer) {
-      return { ok: false, message: "Müşteri masaüstü kayıtlarında bulunamadı." };
-    }
-    const creditDebt = this.db.prepare(`
-      SELECT 1 FROM customer_credit_balances
-      WHERE customer_id = ? AND amount_minor > 0 LIMIT 1
-    `).get(customerId);
-    if (creditDebt) {
-      return { ok: false, message: "Bu müşterinin açık veresiye borcu var." };
-    }
-    if (this.db.prepare("SELECT 1 FROM room_folios WHERE customer_id = ? AND deleted_at = '' AND status = 'open'").get(customerId)) {
-      return { ok: false, message: "Bu müşterinin açık konaklama hesabı var; önce hesabı sonuçlandırın." };
-    }
-    if (this.db.prepare("SELECT 1 FROM reservations WHERE customer_id = ? AND status IN ('pending', 'approved') AND deleted_at = '' LIMIT 1").get(customerId)) {
-      return { ok: false, message: "Bu müşterinin aktif rezervasyonu var; önce rezervasyonu tamamlayın veya iptal edin." };
-    }
-    const activeStay = this.db
-      .prepare(`
-        SELECT customer_room_stays.id, rooms.name AS room_name
-        FROM customer_room_stays
-        JOIN rooms ON rooms.id = customer_room_stays.room_id
-        WHERE EXISTS (SELECT 1 FROM stay_guests g WHERE g.stay_id = customer_room_stays.id AND g.customer_id = ? AND g.status IN ('planned', 'checked_in'))
-          AND customer_room_stays.status IN ('planned', 'checked_in')
-          AND customer_room_stays.deleted_at = ''
-        LIMIT 1
-      `)
-      .get(customerId) as { id?: string; room_name?: string } | undefined;
-    if (activeStay) {
-      return {
-        ok: false,
-        message: `${String(activeStay.room_name ?? "Oda")} için aktif konaklama kaydı var. Önce çıkış veya iptal işlemini tamamlayın.`
-      };
-    }
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", customer.updated_at, "Müşteri")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(customer.updated_at, now);
-    const requestResult = this.db
-      .prepare("UPDATE requests SET customer_id = '', updated_at = ?, sync_status = 'local_only' WHERE customer_id = ? AND deleted_at = ''")
-      .run(updatedAt, customerId);
-    const reservationResult = this.db
-      .prepare("UPDATE reservations SET customer_id = '', updated_at = ?, sync_status = 'local_only' WHERE customer_id = ? AND deleted_at = ''")
-      .run(updatedAt, customerId);
-    this.db
-      .prepare("UPDATE whatsapp_messages SET customer_id = '', updated_at = ?, sync_status = 'local_only' WHERE customer_id = ? AND deleted_at = ''")
-      .run(updatedAt, customerId);
-    this.db
-      .prepare("UPDATE notifications SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE related_type = 'customer' AND related_id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, customerId);
-    this.db
-      .prepare("UPDATE customers SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, customerId);
-    insertStoredDeletionEvent(this.db, androidAction, (sinkAction, type, entityType, entityId, payload, eventNow) =>
-      this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow), "customer.deleted", "customer", customerId, {
-      full_name: String(customer.full_name ?? ""),
-      preserved_request_count: Number(requestResult.changes ?? 0),
-      preserved_reservation_count: Number(reservationResult.changes ?? 0)
-    }, now);
-    return {
-      ok: true,
-      message: androidAction
-        ? "Müşteri telefondan silindi; talep ve rezervasyon geçmişi korundu."
-        : "Müşteri silindi; talep ve rezervasyon geçmişi korundu."
-    };
-  }
 
   private applyAndroidTableStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
     const tableId = androidPayloadString(action.payload, "table_id");
@@ -2247,6 +2174,7 @@ import {
   runDesktopDeletion as runStoredDesktopDeletion,
   insertDeletionEvent as insertStoredDeletionEvent,
 } from "./database/deletion-store.js";
+import { deleteCustomerInTransaction as deleteStoredCustomerInTransaction } from "./database/customer-deletion-service.js";
 
 import {
   getCustomers as getStoredCustomers,
