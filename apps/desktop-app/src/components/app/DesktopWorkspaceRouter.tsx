@@ -7,7 +7,7 @@ import {
 } from "@yardimci-asistan/shared";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
-import { runtimeHasCapability } from "../../app/capabilities";
+import { projectDesktopWorkspaceFeatures } from "../../app/desktop-workspace-features";
 import { useDashboardAi } from "../../app/use-dashboard-ai";
 import { useKbsNotificationController } from "../../app/use-kbs-notification-controller";
 import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
@@ -199,22 +199,23 @@ export function DesktopWorkspaceRouter({
   const workspaceNavigation = useWorkspaceNavigation();
   const C = BUSINESS_CAPABILITIES;
   const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
-  const customersEnabled = runtimeHasCapability(businessCapabilities, C.CUSTOMERS);
-  const requestsEnabled = runtimeHasCapability(businessCapabilities, C.REQUESTS);
-  const tasksEnabled = runtimeHasCapability(businessCapabilities, C.TASKS);
-  const aiEnabled = runtimeHasCapability(businessCapabilities, C.AI);
-  const whatsappEnabled = runtimeHasCapability(businessCapabilities, C.WHATSAPP);
+  const features = projectDesktopWorkspaceFeatures(businessCapabilities);
+  const customersEnabled = features.customers;
+  const requestsEnabled = features.requests;
+  const tasksEnabled = features.tasks;
+  const aiEnabled = features.ai;
+  const whatsappEnabled = features.whatsapp;
+  const roomsEnabled = features.accommodation.rooms;
+  const accommodationReservationsEnabled = features.accommodation.reservations;
+  const accommodationStaysEnabled = features.accommodation.stays;
+  const accommodationFolioEnabled = features.accommodation.folio;
+  const tablesEnabled = features.food.tables;
+  const foodReservationsEnabled = features.food.reservations;
+  const foodOrdersEnabled = features.food.orders;
+  const foodMenuEnabled = features.food.menu;
+  const inventoryEnabled = features.inventory;
+  const customerMessagingEnabled = features.customerMessaging;
   const dashboardAi = useDashboardAi(aiEnabled);
-  const roomsEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_ROOMS);
-  const accommodationReservationsEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_RESERVATIONS);
-  const accommodationStaysEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_STAYS);
-  const accommodationFolioEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_FOLIO);
-  const tablesEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_TABLES);
-  const foodReservationsEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_RESERVATIONS);
-  const foodOrdersEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_ORDERS);
-  const foodMenuEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_MENU);
-  const inventoryEnabled = runtimeHasCapability(businessCapabilities, C.INVENTORY);
-  const customerMessagingEnabled = customersEnabled && whatsappEnabled;
   const pensionReservations = surfaceData.reservations.filter((reservation) => {
     const domain = getReservationDomain(reservation.reservationType, {
       roomIds: reservation.roomIds,
@@ -237,9 +238,9 @@ export function DesktopWorkspaceRouter({
   const runtimeFeatures = {
     rooms: roomsEnabled,
     tables: tablesEnabled,
-    qrMenu: runtimeHasCapability(businessCapabilities, C.QR_MENU),
+    qrMenu: features.qrMenu,
     whatsapp: whatsappEnabled,
-    android: runtimeHasCapability(businessCapabilities, C.ANDROID)
+    android: features.android
   };
 
   function openDashboardCustomerWork(request?: SyncedCustomerRequest) {
@@ -383,7 +384,7 @@ export function DesktopWorkspaceRouter({
           customersEnabled={customersEnabled}
           requestsEnabled={requestsEnabled}
           tasksEnabled={tasksEnabled}
-          calendarEnabled={runtimeHasCapability(businessCapabilities, C.CALENDAR)}
+          calendarEnabled={features.calendar}
           reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
           availableRoomCount={surfaceData.rooms.filter((room) => getRoomDisplayInfo(room, surfaceData.reservations, surfaceData.customerRoomStays).status === "available").length}
           onReplyRequest={openDashboardReply}
@@ -582,9 +583,9 @@ export function DesktopWorkspaceRouter({
       ) : activePage === "reports" ? (
         <ReportsPage
           aiEnabled={aiEnabled}
-          financeEnabled={runtimeHasCapability(businessCapabilities, C.FINANCE)}
+          financeEnabled={features.finance}
           financeController={financeController}
-          reportsEnabled={runtimeHasCapability(businessCapabilities, C.REPORTS)}
+          reportsEnabled={features.reports}
           requestsEnabled={requestsEnabled}
           tasksEnabled={tasksEnabled}
           accommodationEnabled={roomsEnabled || accommodationReservationsEnabled || accommodationStaysEnabled || accommodationFolioEnabled}
