@@ -1,3 +1,7 @@
+.calendar-page-surface {
+  height: 100%;
+}
+
 .operation-calendar-page {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
