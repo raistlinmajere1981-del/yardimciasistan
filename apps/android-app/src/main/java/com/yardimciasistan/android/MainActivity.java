@@ -20,8 +20,6 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -68,8 +66,6 @@ public final class MainActivity extends ComponentActivity {
   private static final String TAB_MESSAGES = AndroidUiRules.TAB_MESSAGES;
   private static final String TAB_CASH = AndroidUiRules.TAB_CASH;
   private static final String TAB_REPORTS = AndroidUiRules.TAB_REPORTS;
-  private static final long FOREGROUND_SYNC_INTERVAL_MS = 15_000L;
-  private static final long LOCAL_DISCOVERY_RETRY_INTERVAL_MS = 45_000L;
   private static final int BOTTOM_NAV_HEIGHT_DP = 70;
   private static final int MAIN_CONTENT_BOTTOM_PADDING_DP = BOTTOM_NAV_HEIGHT_DP + 24;
   private static final int LANDSCAPE_CONTENT_BOTTOM_PADDING_DP = 18;
@@ -105,8 +101,6 @@ public final class MainActivity extends ComponentActivity {
   private int reportAiRequestVersion;
   private boolean settingsOpen;
   private boolean loading;
-  private boolean foregroundActive;
-  private long lastLocalDiscoveryStartedAt;
   private String connectionState = "Henüz bağlanmadı";
 
   private LinearLayout root;
@@ -127,27 +121,10 @@ public final class MainActivity extends ComponentActivity {
   private AndroidImageCaptureController imageCaptureController;
   private AndroidProvisioningController provisioningController;
   private AndroidOperationsSyncController operationsSyncController;
+  private AndroidForegroundSyncController foregroundSyncController;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private CustomerFormDialog activeCustomerFormDialog;
-  private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
-  private final Runnable foregroundSyncRunnable = new Runnable() {
-    @Override
-    public void run() {
-      if (!foregroundActive) {
-        return;
-      }
-      if (!loading) {
-        if (ConnectionSettings.hasPendingBootstrap(preferences)) {
-          bootstrapProvisioning();
-        } else if (hasConnectionSettings()) {
-          syncOperations(false);
-        }
-      }
-      foregroundSyncHandler.postDelayed(this, FOREGROUND_SYNC_INTERVAL_MS);
-    }
-  };
-
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
@@ -236,6 +213,35 @@ public final class MainActivity extends ComponentActivity {
     ConnectionSettings.ensureDefaults(preferences);
     operationsTransport = new CompanionOperationsRouter(preferences);
     localCompanionDiscovery = new LocalCompanionDiscovery(this, preferences);
+    foregroundSyncController = new AndroidForegroundSyncController(
+        localCompanionDiscovery,
+        new AndroidForegroundSyncController.Listener() {
+          @Override
+          public boolean isBusy() {
+            return loading;
+          }
+
+          @Override
+          public boolean hasPendingBootstrap() {
+            return ConnectionSettings.hasPendingBootstrap(preferences);
+          }
+
+          @Override
+          public boolean hasConnectionSettings() {
+            return MainActivity.this.hasConnectionSettings();
+          }
+
+          @Override
+          public void onBootstrapDue() {
+            bootstrapProvisioning();
+          }
+
+          @Override
+          public void onSyncDue() {
+            syncOperations(false);
+          }
+        }
+    );
     identity = DeviceIdentity.loadOrCreate(this, preferences);
     actionOutbox = new ActionOutbox(preferences);
     operationCache = new OperationCache(preferences, identity.deviceId);
@@ -332,19 +338,12 @@ public final class MainActivity extends ComponentActivity {
   @Override
   protected void onResume() {
     super.onResume();
-    foregroundActive = true;
-    foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
-    foregroundSyncHandler.postDelayed(foregroundSyncRunnable, FOREGROUND_SYNC_INTERVAL_MS);
-    startLocalDiscoveryIfDue(true);
+    foregroundSyncController.resume();
   }
 
   @Override
   protected void onPause() {
-    foregroundActive = false;
-    foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
-    if (localCompanionDiscovery != null) {
-      localCompanionDiscovery.stop();
-    }
+    foregroundSyncController.pause();
     super.onPause();
   }
 
@@ -362,10 +361,7 @@ public final class MainActivity extends ComponentActivity {
 
   @Override
   protected void onDestroy() {
-    foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
-    if (localCompanionDiscovery != null) {
-      localCompanionDiscovery.stop();
-    }
+    foregroundSyncController.destroy();
     executor.shutdownNow();
     if (imageCaptureController != null) {
       imageCaptureController.destroy();
@@ -1157,18 +1153,6 @@ public final class MainActivity extends ComponentActivity {
     }
     preferences.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true).apply();
     requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, NOTIFICATION_PERMISSION_REQUEST_CODE);
-  }
-
-  private void startLocalDiscoveryIfDue(boolean force) {
-    if (!foregroundActive || localCompanionDiscovery == null) {
-      return;
-    }
-    long now = System.currentTimeMillis();
-    if (!force && now - lastLocalDiscoveryStartedAt < LOCAL_DISCOVERY_RETRY_INTERVAL_MS) {
-      return;
-    }
-    lastLocalDiscoveryStartedAt = now;
-    localCompanionDiscovery.start();
   }
 
   private void buildShell() {
@@ -3940,7 +3924,7 @@ public final class MainActivity extends ComponentActivity {
       public void onSuccess(AndroidOperationsSyncController.SyncResult result) {
         if (!result.usedLocalTransport) {
           if (result.webAllowsLocalNetwork) {
-            startLocalDiscoveryIfDue(false);
+            foregroundSyncController.requestLocalDiscovery(false);
           } else {
             ConnectionSettings.clearLocalEndpoint(preferences);
           }
