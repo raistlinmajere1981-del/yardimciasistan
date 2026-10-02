@@ -454,7 +454,6 @@ button.market-list-row {
 .market-field textarea:focus,
 .market-search-field:focus-within {
   border-color: var(--color-focus);
-  outline: none;
 }
 
 .market-form-actions {
@@ -625,21 +624,6 @@ button.market-list-row {
   gap: var(--space-2);
 }
 
-.market-draft-actions > button:first-child {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-}
-
 .market-draft-reference em {
   color: var(--color-danger);
   font-size: var(--text-sm);
@@ -713,26 +697,6 @@ button.market-list-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
-}
-
-.market-label-actions button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-}
-
-.market-label-actions button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .market-label-adapters {
@@ -919,11 +883,6 @@ button.market-list-row {
   display: grid;
   gap: var(--space-3);
   min-height: calc(var(--control-height-lg) + var(--space-6));
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  color: var(--color-text);
   text-align: left;
 }
 
@@ -1014,19 +973,6 @@ button.market-list-row {
   grid-template-columns: var(--control-height-md) 72px var(--control-height-md);
   gap: var(--space-1);
   align-items: center;
-}
-
-.market-sale-quantity button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--control-height-md);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-field);
-  color: var(--color-text);
-  padding: 0;
-  cursor: pointer;
 }
 
 .market-sale-quantity input {
