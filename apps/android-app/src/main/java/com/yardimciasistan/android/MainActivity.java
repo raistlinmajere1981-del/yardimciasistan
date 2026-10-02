@@ -4105,30 +4105,17 @@ public final class MainActivity extends ComponentActivity {
       Toast.makeText(this, "Devam eden bağlantı işleminin bitmesini bekleyin.", Toast.LENGTH_SHORT).show();
       return false;
     }
-    if (data.permissionsResolved && !data.deviceActive) {
-      showError("Cihaz masaüstünde pasifleştirilmiş.");
-      return false;
-    }
     for (ActionSpec action : actions) {
-      if (isAdminOnlyAction(action.type) && !data.isAdmin()) {
-        String message = "Bu işlem yalnız yönetici cihazlarda kullanılabilir.";
-        showError(message);
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        return false;
-      }
-      if (!actionAllowedByCapabilities(action)) {
-        String message = "Bu işlem işletmenin etkin özellikleri dışında.";
-        showError(message);
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        return false;
-      }
-      String requiredPermission = requiredPermissionForAction(action.type, action.payload);
-      if (requiredPermission == null || !data.hasPermission(requiredPermission)) {
-        String message = "table_order.close_paid".equals(requiredPermission)
-            ? "Bu cihazın hesap kapatma yetkisi yok."
-            : "Bu cihazın bu işlem için yetkisi yok.";
-        showError(message);
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+      String validationError = AndroidActionPolicy.validationError(
+          data,
+          action.type,
+          action.payload
+      );
+      if (!validationError.isEmpty()) {
+        showError(validationError);
+        if (!"Cihaz masaüstünde pasifleştirilmiş.".equals(validationError)) {
+          Toast.makeText(this, validationError, Toast.LENGTH_SHORT).show();
+        }
         return false;
       }
     }
@@ -4283,188 +4270,8 @@ public final class MainActivity extends ComponentActivity {
     return null;
   }
 
-  private boolean actionAllowedByCapabilities(ActionSpec action) {
-    if (action == null || !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID)) {
-      return false;
-    }
-    String marketPermission = MarketUiRules.requiredPermissionForAction(action.type);
-    if (marketPermission != null) {
-      return data.hasPermission(marketPermission);
-    }
-    if ("customer_request_convert_to_reservation".equals(action.type)) {
-      OperationData.RequestRecord request = data.requestById(action.payload.optString("request_id", ""));
-      return AndroidUiRules.canConvertRequest(data, request);
-    }
-    if (action.type.startsWith("reservation_room_")) {
-      return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
-    }
-    if (action.type.startsWith("reservation_table_")) {
-      return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
-    }
-    if ("reservation_approve".equals(action.type)
-        || "reservation_reject".equals(action.type)
-        || "reservation_cancel".equals(action.type)) {
-      OperationData.ReservationRecord reservation = data.reservationById(
-          action.payload.optString("reservation_id", "")
-      );
-      return AndroidUiRules.reservationAllowed(data, reservation);
-    }
-    if (action.type.startsWith("daily_task_")) {
-      String taskType = action.payload.optString("task_type", "");
-      String relatedType = action.payload.optString("related_type", "");
-      OperationData.TaskRecord task = "daily_task_create".equals(action.type)
-          ? null
-          : data.taskById(action.payload.optString("task_id", ""));
-      if (task != null) {
-        return AndroidUiRules.taskAllowed(data, task);
-      }
-      OperationData.ReservationRecord reservation = "reservation".equals(relatedType)
-          ? data.reservationById(action.payload.optString("related_id", ""))
-          : null;
-      return AndroidUiRules.taskTypeAllowed(
-          data,
-          taskType,
-          relatedType,
-          reservation == null ? "" : reservation.type
-      );
-    }
-    if ("room_status_update".equals(action.type)
-        && "reserved".equals(action.payload.optString("status", ""))) {
-      return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)
-          && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
-    }
-    if ("table_status_update".equals(action.type)) {
-      String status = action.payload.optString("status", "");
-      if ("reserved".equals(status)) {
-        return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)
-            && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
-      }
-      if ("bill_waiting".equals(status)
-          || "waiting_bill".equals(status)
-          || "checkout".equals(status)
-          || "payment".equals(status)) {
-        return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)
-            && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
-      }
-    }
-    if ("menu_stock_image_import_apply".equals(action.type)) {
-      return AndroidUiRules.canUseAi(data);
-    }
-    if ("message_delete".equals(action.type)) {
-      return AndroidUiRules.canUseWhatsApp(data);
-    }
-    return true;
-  }
 
-  private String requiredPermissionForAction(String actionType, JSONObject actionPayload) {
-    switch (actionType) {
-      case "customer_create":
-      case "customer_update":
-        return "customer.manage";
-      case "customer_room_assign":
-      case "customer_room_stay_status":
-        return "room.assign_customer";
-      case "customer_request_delete":
-        return "request.delete";
-      case "customer_delete":
-        return "customer.delete";
-      case "menu_category_delete":
-      case "menu_item_delete":
-        return "menu.delete";
-      case "message_delete":
-        return "message.delete";
-      case "customer_request_approve":
-      case "customer_request_reopen":
-        return "customer.respond";
-      case "customer_request_mark_answered":
-        return "customer.mark_answered";
-      case "customer_request_reject":
-        return "customer.reject";
-      case "customer_request_convert_to_reservation":
-        return "customer.convert_to_reservation";
-      case "reservation_room_create":
-      case "reservation_table_create":
-        return "reservation.create";
-      case "reservation_room_update":
-      case "reservation_table_update":
-        return "reservation.update";
-      case "reservation_approve":
-        return "reservation.approve";
-      case "reservation_reject":
-        return "reservation.reject";
-      case "reservation_cancel":
-        return "reservation.cancel";
-      case "room_status_update":
-        return "room.update_status";
-      case "daily_task_create":
-        return "daily_task.create";
-      case "daily_task_update":
-      case "daily_task_cancel":
-        return "daily_task.update";
-      case "daily_task_delete":
-        return "daily_task.delete";
-      case "daily_task_complete":
-        return "daily_task.complete";
-      case "daily_task_reopen":
-        return "daily_task.reopen";
-      case "finance_manual_create":
-        return "finance.create";
-      case "room_folio_payment_add":
-        return "room_folio.payment";
-      case "room_folio_checkout":
-        return "room_folio.checkout";
-      case "table_status_update":
-        return "table.update_status";
-      case "table_order_open":
-        return "table_order.open";
-      case "table_order_add_item":
-        return "table_order.add_item";
-      case "table_order_update_item_quantity":
-        return "table_order.update_item";
-      case "table_order_remove_item":
-        return "table_order.remove_item";
-      case "table_order_set_preparing":
-        return "table_order.set_preparing";
-      case "table_order_set_served":
-        return "table_order.set_served";
-      case "table_order_set_payment_waiting":
-        return "table_order.set_payment_waiting";
-      case "table_order_close_paid":
-        return "table_order.close_paid";
-      case "table_order_cancel":
-        return "table_order.cancel";
-      case "menu_stock_add":
-      case "menu_stock_set":
-      case "menu_stock_adjust":
-      case "menu_stock_image_import_apply":
-        return "menu.stock_update";
-      case MarketUiRules.ACTION_STOCK_COUNT:
-        return MarketUiRules.PERMISSION_STOCK_COUNT;
-      case MarketUiRules.ACTION_PURCHASE_RECEIVE:
-        return MarketUiRules.PERMISSION_RECEIVING;
-      case MarketUiRules.ACTION_PRODUCT_CREATE:
-        return MarketUiRules.PERMISSION_PRODUCT_CREATE;
-      case MarketUiRules.ACTION_CART_DRAFT_CREATE:
-        return MarketUiRules.PERMISSION_CART_DRAFT;
-      case MarketUiRules.ACTION_BARCODE_SCAN:
-        return MarketUiRules.PERMISSION_SCAN_TO_DESKTOP;
-      default:
-        return null;
-    }
-  }
 
-  private boolean isAdminOnlyAction(String actionType) {
-    return "customer_request_delete".equals(actionType)
-        || "customer_delete".equals(actionType)
-        || "customer_create".equals(actionType)
-        || "customer_update".equals(actionType)
-        || "customer_room_assign".equals(actionType)
-        || "customer_room_stay_status".equals(actionType)
-        || "daily_task_delete".equals(actionType)
-        || "menu_category_delete".equals(actionType)
-        || "menu_item_delete".equals(actionType)
-        || "message_delete".equals(actionType);
-  }
 
   private void confirm(String title, String message, Runnable action) {
     AlertDialog dialog = alertDialogBuilder()
