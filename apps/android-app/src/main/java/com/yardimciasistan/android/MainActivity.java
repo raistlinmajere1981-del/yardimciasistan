@@ -80,10 +80,6 @@ public final class MainActivity extends ComponentActivity {
   private OperationData data = new OperationData();
   private DeviceIdentity identity;
   private String activeTab = TAB_TODAY;
-  private String customerFilter = AndroidUiRules.CUSTOMER_NEW;
-  private String pensionMode = AndroidUiRules.PENSION_RESERVATIONS;
-  private String restaurantMode = AndroidUiRules.RESTAURANT_TABLES;
-  private String messageMode = AndroidUiRules.MESSAGES_PREPARED;
   private boolean settingsOpen;
   private boolean loading;
   private String connectionState = "Henüz bağlanmadı";
@@ -110,6 +106,7 @@ public final class MainActivity extends ComponentActivity {
   private AndroidSettingsWorkspace settingsWorkspace;
   private ReportsWorkspace reportsWorkspace;
   private AndroidOperationCards operationCards;
+  private AndroidWorkspaceCoordinator workspaceCoordinator;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private StockImageWorkflow stockImageWorkflow;
@@ -271,6 +268,21 @@ public final class MainActivity extends ComponentActivity {
           @Override public void render() { MainActivity.this.render(); }
           @Override public void copyText(String message) { MainActivity.this.copyText(message); }
           @Override public void showMessageDetail(OperationData.MessageRecord message) { MainActivity.this.showMessageDetail(message); }
+        }
+    );
+    workspaceCoordinator = new AndroidWorkspaceCoordinator(
+        this,
+        operationCards,
+        new AndroidWorkspaceCoordinator.Listener() {
+          @Override public void render() { MainActivity.this.render(); }
+          @Override public void showCustomerForm(OperationData.CustomerRecord customer) { MainActivity.this.showCustomerForm(customer); }
+          @Override public void showCustomerDetail(OperationData.CustomerRecord customer) { MainActivity.this.showCustomerDetail(customer); }
+          @Override public void openDialer(String phone) { MainActivity.this.openDialer(phone); }
+          @Override public void openWhatsApp(String phone, String message) { MainActivity.this.openWhatsApp(phone, message); }
+          @Override public void showReservationEditor(ReservationEditorDialog.Kind kind, OperationData.ReservationRecord reservation) { MainActivity.this.showReservationEditor(kind, reservation); }
+          @Override public void showRoomAssignment() { showRoomAssignmentDialog(null, null); }
+          @Override public void showDailyTaskEditor(DailyTaskEditorDialog.Kind kind, OperationData.TaskRecord task) { MainActivity.this.showDailyTaskEditor(kind, task); }
+          @Override public void sendAction(String actionType, JSONObject actionPayload, String successMessage) { MainActivity.this.sendAction(actionType, actionPayload, successMessage); }
         }
     );
     stockImageWorkflow = new StockImageWorkflow(
@@ -814,20 +826,8 @@ public final class MainActivity extends ComponentActivity {
       showError("Bu cihazın raporlara erişim yetkisi yok.");
       return;
     }
-    if (TAB_CUSTOMERS.equals(destination.tab)) {
-      customerFilter = destination.mode;
-    } else if (TAB_PENSION.equals(destination.tab)) {
-      String visibleMode = AndroidUiRules.visiblePensionMode(data, destination.mode);
-      if (visibleMode != null) {
-        pensionMode = visibleMode;
-      }
-    } else if (TAB_RESTAURANT.equals(destination.tab)) {
-      String visibleMode = AndroidUiRules.visibleRestaurantMode(data, destination.mode);
-      if (visibleMode != null) {
-        restaurantMode = visibleMode;
-      }
-    } else if (TAB_MESSAGES.equals(destination.tab)) {
-      messageMode = destination.mode;
+    if (workspaceCoordinator != null) {
+      workspaceCoordinator.applyDestination(data, destination);
     }
     activeTab = canOpenTab(destination.tab) ? destination.tab : TAB_TODAY;
   }
@@ -1009,13 +1009,8 @@ public final class MainActivity extends ComponentActivity {
     if (!canOpenTab(activeTab)) {
       activeTab = TAB_TODAY;
     }
-    String visiblePensionMode = AndroidUiRules.visiblePensionMode(data, pensionMode);
-    if (visiblePensionMode != null) {
-      pensionMode = visiblePensionMode;
-    }
-    String visibleRestaurantMode = AndroidUiRules.visibleRestaurantMode(data, restaurantMode);
-    if (visibleRestaurantMode != null) {
-      restaurantMode = visibleRestaurantMode;
+    if (workspaceCoordinator != null) {
+      workspaceCoordinator.normalize(data);
     }
     boolean inactiveDevice = data.permissionsResolved && !data.deviceActive;
     if (inactiveDevice) {
@@ -1098,20 +1093,20 @@ public final class MainActivity extends ComponentActivity {
     if (settingsOpen) {
       return "settings";
     }
-    if (TAB_CUSTOMERS.equals(activeTab)) {
-      return TAB_CUSTOMERS + ":" + customerFilter;
-    }
-    if (TAB_PENSION.equals(activeTab)) {
-      return TAB_PENSION + ":" + pensionMode;
-    }
-    if (TAB_RESTAURANT.equals(activeTab)) {
-      return TAB_RESTAURANT + ":" + restaurantMode;
+    if (TAB_CUSTOMERS.equals(activeTab)
+        || TAB_PENSION.equals(activeTab)
+        || TAB_RESTAURANT.equals(activeTab)) {
+      return workspaceCoordinator == null
+          ? activeTab
+          : workspaceCoordinator.screenKey(activeTab);
     }
     if (TAB_MARKET.equals(activeTab)) {
       return TAB_MARKET + ":" + (marketWorkspace == null ? "home" : marketWorkspace.screenKey());
     }
     if (TAB_MESSAGES.equals(activeTab)) {
-      return TAB_MESSAGES + ":" + messageMode;
+      return workspaceCoordinator == null
+          ? TAB_MESSAGES
+          : workspaceCoordinator.screenKey(TAB_MESSAGES);
     }
     if (TAB_CASH.equals(activeTab)) {
       return TAB_CASH;
@@ -1288,218 +1283,19 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View customerScreen() {
-    CustomerWorkspace workspace = new CustomerWorkspace(
-        this,
-        data,
-        new CustomerWorkspace.Listener() {
-          @Override
-          public void onFilterNormalized(String filter) {
-            customerFilter = filter;
-          }
-
-          @Override
-          public void onFilterChanged(String filter) {
-            customerFilter = filter;
-            render();
-          }
-
-          @Override
-          public void onCreateCustomer() {
-            showCustomerForm(null);
-          }
-
-          @Override
-          public void onOpenCustomer(OperationData.CustomerRecord customer) {
-            showCustomerDetail(customer);
-          }
-
-          @Override
-          public View createRequestCard(OperationData.RequestRecord request) {
-            return requestCard(request);
-          }
-
-          @Override
-          public void onDial(String phone) {
-            openDialer(phone);
-          }
-
-          @Override
-          public void onWhatsApp(String phone) {
-            openWhatsApp(phone, "");
-          }
-        },
-        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
-    );
-    return workspace.render(customerFilter);
+    return workspaceCoordinator.customer(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
   }
 
   private View pensionScreen() {
-    PensionWorkspace workspace = new PensionWorkspace(
-        this,
-        data,
-        new PensionWorkspace.Listener() {
-          @Override
-          public void onModeChanged(String mode) {
-            pensionMode = mode;
-            render();
-          }
-
-          @Override
-          public void onCreateRoomReservation() {
-            showReservationEditor(ReservationEditorDialog.Kind.ROOM, null);
-          }
-
-          @Override
-          public void onAssignCustomerToRoom() {
-            showRoomAssignmentDialog(null, null);
-          }
-
-          @Override
-          public void onCreateTask() {
-            showDailyTaskEditor(DailyTaskEditorDialog.Kind.PENSION, null);
-          }
-
-          @Override
-          public View createReservationCard(OperationData.ReservationRecord reservation) {
-            return reservationCard(reservation, false);
-          }
-
-          @Override
-          public View createRoomCard(OperationData.RoomRecord room) {
-            return roomCard(room);
-          }
-
-          @Override
-          public View createStayCard(OperationData.CustomerRoomStayRecord stay) {
-            return customerRoomStayCard(stay);
-          }
-
-          @Override
-          public View createTaskCard(OperationData.TaskRecord task) {
-            return taskCard(task, false);
-          }
-
-          @Override
-          public void onFolioAction(String actionType, JSONObject actionPayload, String successMessage) {
-            sendAction(actionType, actionPayload, successMessage);
-          }
-        },
-        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
-    );
-    return workspace.render(pensionMode);
+    return workspaceCoordinator.pension(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
   }
 
   private View restaurantScreen() {
-    RestaurantWorkspace workspace = new RestaurantWorkspace(
-        this,
-        data,
-        new RestaurantWorkspace.Listener() {
-          @Override
-          public void onModeChanged(String mode) {
-            restaurantMode = mode;
-            render();
-          }
-
-          @Override
-          public void onRoute(String route) {
-            openRoute(route);
-            render();
-          }
-
-          @Override
-          public void onCreateTableReservation() {
-            showReservationEditor(ReservationEditorDialog.Kind.TABLE, null);
-          }
-
-          @Override
-          public void onCreateTask() {
-            showDailyTaskEditor(DailyTaskEditorDialog.Kind.RESTAURANT, null);
-          }
-
-          @Override
-          public View createTableCard(OperationData.TableRecord table) {
-            return tableCard(table);
-          }
-
-          @Override
-          public View createReservationCard(OperationData.ReservationRecord reservation) {
-            return reservationCard(reservation, false);
-          }
-
-          @Override
-          public View createOrderCard(OperationData.TableOrder order) {
-            return activeOrderCard(order);
-          }
-
-          @Override
-          public View createTaskCard(OperationData.TaskRecord task) {
-            return taskCard(task, false);
-          }
-
-          @Override
-          public View createStockImageImportCard() {
-            return stockImageImportCard();
-          }
-
-          @Override
-          public View createStockCard(OperationData.TrackedStockItem item) {
-            return stockCard(item);
-          }
-
-          @Override
-          public View createAdminCategoryCard(OperationData.MenuCategory category) {
-            return adminMenuCategoryCard(category);
-          }
-
-          @Override
-          public View createAdminMenuItemCard(OperationData.MenuItem item) {
-            return adminMenuItemCard(item);
-          }
-        },
-        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
-    );
-    return workspace.render(restaurantMode);
+    return workspaceCoordinator.restaurant(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
   }
 
   private View messagesScreen() {
-    LinearLayout page = UiKit.column(this);
-    if (!AndroidUiRules.canUseWhatsApp(data) || !data.hasPermission("customer.view")) {
-      page.addView(permissionDeniedCard());
-      return mainScreenScroll(page);
-    }
-    boolean requestsEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS);
-    ArrayList<String[]> messageOptions = new ArrayList<>();
-    messageOptions.add(new String[] {AndroidUiRules.MESSAGES_PREPARED, "Hazır Mesajlar"});
-    if (requestsEnabled) {
-      messageOptions.add(new String[] {AndroidUiRules.MESSAGES_WAITING, "Cevap Bekleyenler"});
-    } else if (AndroidUiRules.MESSAGES_WAITING.equals(messageMode)) {
-      messageMode = AndroidUiRules.MESSAGES_PREPARED;
-    }
-    page.addView(filterBar(messageOptions.toArray(new String[0][]), messageMode, value -> {
-      messageMode = value;
-      render();
-    }));
-    if (AndroidUiRules.MESSAGES_PREPARED.equals(messageMode)) {
-      if (data.messages.isEmpty()) {
-        page.addView(emptyCard("Hazır mesaj yok", "Masaüstünde hazırlanan cevaplar burada görünür."));
-      }
-      for (OperationData.MessageRecord message : data.messages) {
-        page.addView(messageCard(message));
-      }
-    } else {
-      int shown = 0;
-      for (OperationData.RequestRecord request : data.requests) {
-        if (!request.waitingForResponse()) {
-          continue;
-        }
-        page.addView(waitingMessageCard(request));
-        shown += 1;
-      }
-      if (shown == 0) {
-        page.addView(emptyCard("Cevap bekleyen müşteri yok", "Yanıt gerektiren talepler burada görünür."));
-      }
-    }
-    return mainScreenScroll(page);
+    return workspaceCoordinator.messages(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
   }
 
   private View reportsScreen() {
