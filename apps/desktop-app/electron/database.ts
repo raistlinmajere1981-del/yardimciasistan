@@ -17,13 +17,6 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   BUSINESS_CAPABILITIES,
-  CORE_BUSINESS_CAPABILITIES,
-  createId,
-  expandBusinessCapabilities,
-  getBusinessProfile,
-  normalizeBirthdaySettings,
-  normalizeBusinessType,
-  validateBirthdaySettings,
   type BusinessCapability,
   type StockImageAnalysis,
   type StockImageMenuCandidate
@@ -206,68 +199,6 @@ export type {
   ApplyAndroidActionResult,
 } from "./database-types.js";
 
-interface ReplaceStoredBusinessCapabilitiesInput {
-  businessId: string;
-  profileId: string;
-  selectedOptionalCapabilities: BusinessCapability[];
-  whatsappEnabled: boolean;
-  androidEnabled: boolean;
-  aiEnabled: boolean;
-  now: string;
-}
-
-function replaceStoredBusinessCapabilities(
-  db: DatabaseSync,
-  input: ReplaceStoredBusinessCapabilitiesInput
-) {
-  const profile = getBusinessProfile(input.profileId);
-  const allowedOptional = new Set(profile.optionalCapabilities);
-  const selectedOptional = [...new Set(input.selectedOptionalCapabilities)]
-    .filter((capability) => allowedOptional.has(capability));
-  const serviceCapabilities: BusinessCapability[] = [
-    ...(input.whatsappEnabled ? [BUSINESS_CAPABILITIES.WHATSAPP] : []),
-    ...(input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),
-    ...(input.aiEnabled ? [BUSINESS_CAPABILITIES.AI] : [])
-  ];
-  const enabled = new Set(expandBusinessCapabilities([
-    ...CORE_BUSINESS_CAPABILITIES,
-    ...profile.requiredCapabilities,
-    ...selectedOptional,
-    ...serviceCapabilities
-  ]));
-  const systemCapabilities = new Set(CORE_BUSINESS_CAPABILITIES);
-  const userCapabilities = new Set<BusinessCapability>([
-    ...selectedOptional,
-    ...serviceCapabilities
-  ]);
-
-  const statement = db.prepare(`
-    INSERT INTO business_capabilities (
-      business_id, capability_id, is_enabled, source, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(business_id, capability_id) DO UPDATE SET
-      is_enabled = excluded.is_enabled,
-      source = excluded.source,
-      updated_at = excluded.updated_at
-  `);
-
-  for (const capability of Object.values(BUSINESS_CAPABILITIES)) {
-    const source = systemCapabilities.has(capability)
-      ? "system"
-      : userCapabilities.has(capability)
-        ? "user"
-        : "profile";
-    statement.run(
-      input.businessId,
-      capability,
-      enabled.has(capability) ? 1 : 0,
-      source,
-      input.now,
-      input.now
-    );
-  }
-}
-
 // Main and short-lived service facades publish into the same renderer stream.
 let dashboardRevision = 0;
 
@@ -341,18 +272,7 @@ export class DesktopDatabase {
   }
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
-    const knownCapabilities = new Set<BusinessCapability>(Object.values(BUSINESS_CAPABILITIES));
-    const rows = this.db.prepare(`
-      SELECT business_capabilities.capability_id
-      FROM business_capabilities
-      INNER JOIN business ON business.id = business_capabilities.business_id
-      WHERE business.deleted_at = '' AND business_capabilities.is_enabled = 1
-      ORDER BY business_capabilities.capability_id ASC
-    `).all() as Array<{ capability_id?: unknown }>;
-
-    return rows
-      .map((row) => String(row.capability_id ?? "") as BusinessCapability)
-      .filter((capability) => knownCapabilities.has(capability));
+    return readEnabledBusinessCapabilities(this.db);
   }
 
   getDashboardData(): DesktopDashboardData {
@@ -1142,405 +1062,15 @@ export class DesktopDatabase {
     aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
     aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {}
   ): DesktopSetupSaveResult {
-    const businessName = input.businessName.trim();
-    const syncSecret = input.syncSecret.trim();
-    const webModuleUrl = normalizeUrl(input.webModuleUrl);
-    const aiProvider = input.aiProvider.trim() || "openai_compatible";
-    const aiService = normalizeAiService(input.aiService);
-    const aiProjectName = String(input.aiProjectName ?? "").trim();
-    const aiModel = input.aiModel.trim();
-    const aiBaseUrl = normalizeAiBaseUrl(input.aiBaseUrl);
-    const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
-    const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
-    const existingSettings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
-    const productDataSettings = {
-      enabled: input.productData?.enabled ?? Number(existingSettings?.product_data_enabled ?? 0) === 1,
-      provider: "open_food_facts" as const,
-      autoSearchUnknownBarcode: input.productData?.autoSearchUnknownBarcode
-        ?? Number(existingSettings?.product_data_auto_search ?? 1) === 1,
-      includeImages: input.productData?.includeImages
-        ?? Number(existingSettings?.product_data_include_images ?? 1) === 1
-    };
-    const birthdaySettings = normalizeBirthdaySettings(input.birthdaySettings ?? {
-      enabled: normalizeBoolean(existingSettings?.birthday_enabled, true),
-      mode: existingSettings?.birthday_mode === "automatic" ? "automatic" : "manual",
-      sendTime: String(existingSettings?.birthday_send_time ?? "10:00"),
-      messageTemplate: String(existingSettings?.birthday_message_template ?? "")
-    });
-    const profileService = aiService ?? normalizeStoredAiService(existingSettings?.ai_service);
-    const existingAiProfile = this.db
-      .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
-      .get(profileService) as Record<string, unknown> | undefined;
-    const existingEncryptedAiApiKey = String(existingAiProfile?.api_key_encrypted ?? "").trim();
-    const aiApiKeyResolution = resolveEncryptedAiApiKey({
-      rawKeyProvided: rawAiApiKeyProvided,
-      clearRequested: Boolean(input.clearAiApiKey),
-      write: aiApiKeyWrite,
-      existingEncryptedValue: existingEncryptedAiApiKey
-    });
-
-    if (!businessName) {
-      return {
-        ok: false,
-        message: "Firma adı gerekli."
-      };
-    }
-
-    if (input.birthdaySettings) {
-      const birthdaySettingsError = validateBirthdaySettings(input.birthdaySettings);
-      if (birthdaySettingsError) {
-        return { ok: false, message: birthdaySettingsError };
-      }
-    }
-
-    if (input.servicePreferences.whatsapp && !input.whatsapp.trim()) {
-      return {
-        ok: false,
-        message: "WhatsApp servisi açıkken WhatsApp numarası gerekli."
-      };
-    }
-
-    if (!webModuleUrl) {
-      return {
-        ok: false,
-        message: "Web modül adresi http veya https ile başlamalı."
-      };
-    }
-
-    if (syncSecret.length < 12 || syncSecret === "change-this-secret") {
-      return {
-        ok: false,
-        message: "Web güvenlik anahtarı en az 12 karakter olmalı ve varsayılan değer olmamalı."
-      };
-    }
-
-    if (!aiApiKeyResolution.ok) {
-      return aiApiKeyResolution;
-    }
-
-    if (input.aiEnabled && aiProvider !== "openai_compatible") {
-      return {
-        ok: false,
-        message: "AI servis sağlayıcı ayarı geçerli değil."
-      };
-    }
-
-    if (input.aiEnabled && !aiService) {
-      return {
-        ok: false,
-        message: "AI servisi desteklenmiyor."
-      };
-    }
-
-    if (aiProjectName.length > 120 || /[\x00-\x1F\x7F]/.test(aiProjectName)) {
-      return {
-        ok: false,
-        message: "Google AI Studio proje adı geçersiz."
-      };
-    }
-
-    if (input.aiEnabled && !aiBaseUrl) {
-      return {
-        ok: false,
-        message: "AI bağlantı adresi http veya https ile başlamalı ve kullanıcı bilgisi içermemeli."
-      };
-    }
-
-    if (input.aiEnabled && aiService === "gemini" && aiBaseUrl !== GOOGLE_AI_STUDIO_BASE_URL) {
-      return {
-        ok: false,
-        message: "Google AI Studio için resmi Gemini bağlantı adresi kullanılmalı."
-      };
-    }
-
-    if (input.aiEnabled && !aiModel) {
-      return {
-        ok: false,
-        message: "AI model adı gerekli."
-      };
-    }
-
-    if (input.aiEnabled && !aiApiKeyResolution.encryptedValue) {
-      return {
-        ok: false,
-        message: "AI güvenlik anahtarı gerekli."
-      };
-    }
-
-    if (input.aiEnabled && aiTimeoutSeconds === null) {
-      return {
-        ok: false,
-        message: "AI zaman aşımı 5 ile 120 saniye arasında olmalı."
-      };
-    }
-
-    const additionalAiProfiles: Array<{
-      service: DesktopAiService;
-      projectName: string;
-      baseUrl: string;
-      model: string;
-      modelOptions: DesktopAiModelOption[];
-      timeoutSeconds: number;
-      encryptedApiKey: string;
-      createdAt: string;
-    }> = [];
-    const seenProfileServices = new Set<DesktopAiService>();
-    for (const profileInput of Array.isArray(input.aiProfiles) ? input.aiProfiles : []) {
-      const service = normalizeAiService(profileInput?.service);
-      if (!service) {
-        return { ok: false, message: "Kaydedilecek AI servis profillerinden biri geçersiz." };
-      }
-      if (seenProfileServices.has(service)) {
-        return { ok: false, message: "Aynı AI servis profili birden fazla kez gönderilemez." };
-      }
-      seenProfileServices.add(service);
-      if (service === profileService) {
-        continue;
-      }
-
-      const existingProfile = this.db
-        .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
-        .get(service) as Record<string, unknown> | undefined;
-      const projectName = String(profileInput.projectName ?? "").trim();
-      const model = String(profileInput.model ?? "").trim();
-      const normalizedBaseUrl = normalizeAiBaseUrl(profileInput.baseUrl);
-      const baseUrl = normalizedBaseUrl || AI_SERVICE_DEFAULT_BASE_URLS[service];
-      const timeoutSeconds = normalizeAiTimeout(profileInput.timeoutSeconds);
-      const rawKeyProvided = Boolean(String(profileInput.apiKey ?? "").trim());
-      const keyResolution = resolveEncryptedAiApiKey({
-        rawKeyProvided,
-        clearRequested: Boolean(profileInput.clearApiKey),
-        write: aiProfileApiKeyWrites[service] ?? { mode: "keep" },
-        existingEncryptedValue: String(existingProfile?.api_key_encrypted ?? "").trim()
-      });
-
-      if (!keyResolution.ok) {
-        return keyResolution;
-      }
-      if (projectName.length > 120 || /[\x00-\x1F\x7F]/.test(projectName)) {
-        return { ok: false, message: `${getAiServiceDisplayName(service)} profil adı geçersiz.` };
-      }
-      if (!timeoutSeconds) {
-        return { ok: false, message: `${getAiServiceDisplayName(service)} zaman aşımı 5 ile 120 saniye arasında olmalı.` };
-      }
-      if (service === "gemini" && baseUrl !== GOOGLE_AI_STUDIO_BASE_URL) {
-        return { ok: false, message: "Google AI Studio profili için resmi Gemini bağlantı adresi kullanılmalı." };
-      }
-      if (!baseUrl && (model || keyResolution.encryptedValue)) {
-        return { ok: false, message: `${getAiServiceDisplayName(service)} bağlantı adresi gerekli.` };
-      }
-
-      additionalAiProfiles.push({
-        service,
-        projectName,
-        baseUrl,
-        model,
-        modelOptions: normalizeAiModelOptions(
-          profileInput.modelOptions === undefined ? existingProfile?.model_options_json : profileInput.modelOptions,
-          model
-        ),
-        timeoutSeconds,
-        encryptedApiKey: keyResolution.encryptedValue,
-        createdAt: String(existingProfile?.created_at ?? "")
-      });
-    }
-
-    const now = new Date().toISOString();
-    const existingBusiness = this.db.prepare("SELECT id, created_at FROM business WHERE deleted_at = '' LIMIT 1").get() as { id?: string; created_at?: string } | undefined;
-    const businessId = existingBusiness?.id || createId("business_");
-    const settingsId = String(existingSettings?.id ?? "") || "settings_primary";
-    const createdAt = existingBusiness?.created_at || now;
-    const settingsCreatedAt = String(existingSettings?.created_at ?? "") || now;
-    const storedAiProvider = aiProvider === "openai_compatible" ? aiProvider : "openai_compatible";
-    const storedAiService = aiService ?? "openai";
-    const storedAiBaseUrl = aiBaseUrl || DEFAULT_AI_BASE_URL;
-    const storedAiTimeoutSeconds = aiTimeoutSeconds ?? DEFAULT_AI_TIMEOUT_SECONDS;
-    const storedEncryptedAiApiKey = aiApiKeyResolution.encryptedValue;
-    const storedAiModelOptions = normalizeAiModelOptions(
-      input.aiModelOptions === undefined ? existingAiProfile?.model_options_json : input.aiModelOptions,
-      aiModel
+    const result = saveStoredSetupData(
+      this.db,
+      input,
+      aiApiKeyWrite,
+      aiProfileApiKeyWrites
     );
-    const aiWasEnabled = this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.AI);
-    const aiSettingsChanged =
-      !existingSettings ||
-      !existingAiProfile ||
-      aiWasEnabled !== input.aiEnabled ||
-      String(existingSettings.ai_provider ?? "") !== storedAiProvider ||
-      String(existingSettings.ai_service ?? "") !== storedAiService ||
-      String(existingAiProfile.project_name ?? "").trim() !== aiProjectName ||
-      String(existingAiProfile.model ?? "").trim() !== aiModel ||
-      (normalizeAiBaseUrl(existingAiProfile.base_url) || AI_SERVICE_DEFAULT_BASE_URLS[storedAiService]) !== storedAiBaseUrl ||
-      normalizeStoredAiTimeout(existingAiProfile.timeout_seconds) !== storedAiTimeoutSeconds ||
-      existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
-    const aiLastPublishedAt = aiSettingsChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
-    this.db.exec("BEGIN");
-    try {
-      this.db
-        .prepare(`
-          INSERT INTO business (
-            id,
-            name,
-            display_name,
-            profile_id,
-            phone,
-            whatsapp,
-            email,
-            address,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
-          ON CONFLICT(id) DO UPDATE SET
-            name = excluded.name,
-            display_name = excluded.display_name,
-            profile_id = excluded.profile_id,
-            phone = excluded.phone,
-            whatsapp = excluded.whatsapp,
-            email = excluded.email,
-            address = excluded.address,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          businessId,
-          slugifyBusinessName(businessName),
-          businessName,
-          normalizeBusinessType(input.profileId),
-          input.phone.trim(),
-          input.whatsapp.trim(),
-          input.email.trim(),
-          input.address.trim(),
-          createdAt,
-          now
-        );
-
-      this.db
-        .prepare(`
-          INSERT INTO settings (
-            id,
-            business_id,
-            web_module_url,
-            sync_secret,
-            auto_sync_enabled,
-            ai_provider,
-            ai_service,
-            ai_last_published_at,
-            whatsapp_mode,
-            birthday_enabled,
-            birthday_mode,
-            birthday_send_time,
-            birthday_message_template,
-            product_data_enabled,
-            product_data_provider,
-            product_data_auto_search,
-            product_data_include_images,
-            setup_completed,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'local_only')
-          ON CONFLICT(id) DO UPDATE SET
-            business_id = excluded.business_id,
-            web_module_url = excluded.web_module_url,
-            sync_secret = excluded.sync_secret,
-            auto_sync_enabled = excluded.auto_sync_enabled,
-            ai_provider = excluded.ai_provider,
-            ai_service = excluded.ai_service,
-            ai_last_published_at = excluded.ai_last_published_at,
-            birthday_enabled = excluded.birthday_enabled,
-            birthday_mode = excluded.birthday_mode,
-            birthday_send_time = excluded.birthday_send_time,
-            birthday_message_template = excluded.birthday_message_template,
-            product_data_enabled = excluded.product_data_enabled,
-            product_data_provider = excluded.product_data_provider,
-            product_data_auto_search = excluded.product_data_auto_search,
-            product_data_include_images = excluded.product_data_include_images,
-            setup_completed = 1,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          settingsId,
-          businessId,
-          webModuleUrl,
-          syncSecret,
-          input.autoSyncEnabled === false ? 0 : 1,
-          storedAiProvider,
-          storedAiService,
-          aiLastPublishedAt,
-          birthdaySettings.enabled ? 1 : 0,
-          birthdaySettings.mode,
-          birthdaySettings.sendTime,
-          birthdaySettings.messageTemplate,
-          productDataSettings.enabled ? 1 : 0,
-          productDataSettings.provider,
-          productDataSettings.autoSearchUnknownBarcode ? 1 : 0,
-          productDataSettings.includeImages ? 1 : 0,
-          settingsCreatedAt,
-          now
-        );
-
-      this.db.prepare(
-        "UPDATE settings SET local_network_enabled = ?, updated_at = ? WHERE id = ?"
-      ).run(input.localNetworkEnabled === false ? 0 : 1, now, settingsId);
-
-      upsertStoredAiServiceProfileInTransaction(this.db, {
-        service: storedAiService,
-        projectName: aiProjectName,
-        baseUrl: storedAiBaseUrl,
-        model: aiModel,
-        modelOptionsJson: JSON.stringify(storedAiModelOptions),
-        timeoutSeconds: storedAiTimeoutSeconds,
-        apiKeyEncrypted: storedEncryptedAiApiKey,
-        createdAt: String(existingAiProfile?.created_at ?? "") || now,
-        now
-      });
-
-      for (const profile of additionalAiProfiles) {
-        upsertStoredAiServiceProfileInTransaction(this.db, {
-          service: profile.service,
-          projectName: profile.projectName,
-          baseUrl: profile.baseUrl,
-          model: profile.model,
-          modelOptionsJson: JSON.stringify(profile.modelOptions),
-          timeoutSeconds: profile.timeoutSeconds,
-          apiKeyEncrypted: profile.encryptedApiKey,
-          createdAt: profile.createdAt || now,
-          now
-        });
-      }
-
-      replaceStoredBusinessCapabilities(this.db, {
-        businessId,
-        profileId: input.profileId,
-        selectedOptionalCapabilities: input.profileOptions
-          ?? getBusinessProfile(input.profileId).defaultOptionalCapabilities,
-        whatsappEnabled: input.servicePreferences.whatsapp,
-        androidEnabled: input.servicePreferences.android,
-        aiEnabled: input.aiEnabled,
-        now
-      });
-
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
-    if (enabledCapabilities.has(BUSINESS_CAPABILITIES.QR_MENU)) {
-      this.queueSyncJob("menu_publish", now);
-    }
-    // This publication is also the persisted capability manifest consumed by
-    // hosted service endpoints. Publish a tombstone even when Android is off.
-    this.queueSyncJob("android_snapshot", now);
-
+    if (!result.ok) return result;
     return {
-      ok: true,
-      message: "İlk kurulum ayarları kaydedildi.",
-      setupData: getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities())),
+      ...result,
       dashboardData: this.getDashboardData()
     };
   }
@@ -1734,27 +1264,8 @@ export class DesktopDatabase {
 }
 
 import {
-  DEFAULT_AI_BASE_URL,
-  GOOGLE_AI_STUDIO_BASE_URL,
-  DEFAULT_AI_TIMEOUT_SECONDS,
-  AI_SERVICE_DEFAULT_BASE_URLS,
-  normalizeAiService,
-  normalizeStoredAiService,
-  getAiServiceDisplayName,
-  normalizeAiModelOptions,
-  normalizeAiBaseUrl,
-  normalizeAiTimeout,
-  normalizeStoredAiTimeout,
-  normalizeStoredTimestamp,
-  resolveEncryptedAiApiKey,
-} from "./database/ai-settings-utils.js";
-
-import {
   normalizeInteger,
-  normalizeBoolean,
   normalizeStatus,
-  normalizeUrl,
-  slugifyBusinessName,
 } from "./database/request-utils.js";
 
 import {
@@ -1879,7 +1390,6 @@ import {
   getAiServiceProfiles as getStoredAiServiceProfiles,
   getEncryptedAiApiKey as getStoredEncryptedAiApiKey,
   markAiSettingsPublished as markStoredAiSettingsPublished,
-  upsertAiServiceProfileInTransaction as upsertStoredAiServiceProfileInTransaction,
 } from "./database/ai-profile-store.js";
 
 import {
@@ -1915,7 +1425,9 @@ import {
 
 import {
   getSetupData as getStoredSetupData,
+  saveSetupData as saveStoredSetupData,
 } from "./setup-service.js";
+import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
 
 import {
   getTrackedStockCandidates as getStoredTrackedStockCandidates,

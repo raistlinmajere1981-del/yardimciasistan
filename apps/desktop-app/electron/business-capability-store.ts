@@ -5,6 +5,7 @@ import {
   businessProfileSupportsCapability,
   getBusinessProfile,
   getEnabledBusinessCapabilityDependents,
+  expandBusinessCapabilities,
   normalizeBusinessType,
   validateBusinessCapabilitySet,
   type BusinessCapability
@@ -69,6 +70,79 @@ function readEnabledCapabilities(database: DatabaseSync, businessId: string) {
       .map((row) => String(row.capability_id ?? "") as BusinessCapability)
       .filter((capability) => KNOWN_CAPABILITIES.has(capability))
   );
+}
+
+
+export function readEnabledBusinessCapabilities(database: DatabaseSync): BusinessCapability[] {
+  const business = readActiveBusiness(database);
+  const businessId = String(business?.id ?? "");
+  if (!businessId) return [];
+  return [...readEnabledCapabilities(database, businessId)].sort();
+}
+
+export interface ReplaceBusinessCapabilitiesInput {
+  businessId: string;
+  profileId: string;
+  selectedOptionalCapabilities: BusinessCapability[];
+  whatsappEnabled: boolean;
+  androidEnabled: boolean;
+  aiEnabled: boolean;
+  now: string;
+}
+
+export function replaceBusinessCapabilitiesInTransaction(
+  database: DatabaseSync,
+  input: ReplaceBusinessCapabilitiesInput
+): BusinessCapability[] {
+  const profile = getBusinessProfile(input.profileId);
+  const allowedOptional = new Set(profile.optionalCapabilities);
+  const selectedOptional = [...new Set(input.selectedOptionalCapabilities)]
+    .filter((capability) => allowedOptional.has(capability));
+  const serviceCapabilities: BusinessCapability[] = [
+    ...(input.whatsappEnabled ? [BUSINESS_CAPABILITIES.WHATSAPP] : []),
+    ...(input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),
+    ...(input.aiEnabled ? [BUSINESS_CAPABILITIES.AI] : [])
+  ];
+  const resolved = new Set<BusinessCapability>(expandBusinessCapabilities([
+    ...CORE_BUSINESS_CAPABILITIES,
+    ...profile.requiredCapabilities,
+    ...selectedOptional,
+    ...serviceCapabilities
+  ]));
+  const systemCapabilities = new Set<BusinessCapability>(CORE_BUSINESS_CAPABILITIES);
+  const userCapabilities = new Set<BusinessCapability>([
+    ...selectedOptional,
+    ...serviceCapabilities
+  ]);
+
+  const statement = database.prepare(`
+    INSERT INTO business_capabilities (
+      business_id, capability_id, is_enabled, source, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(business_id, capability_id) DO UPDATE SET
+      is_enabled = excluded.is_enabled,
+      source = excluded.source,
+      updated_at = excluded.updated_at
+  `);
+
+  for (const capability of KNOWN_CAPABILITIES) {
+    const source = systemCapabilities.has(capability)
+      ? "system"
+      : userCapabilities.has(capability)
+        ? "user"
+        : "profile";
+    statement.run(
+      input.businessId,
+      capability,
+      resolved.has(capability) ? 1 : 0,
+      source,
+      input.now,
+      input.now
+    );
+  }
+
+  assertValidCapabilityState(database, input.businessId);
+  return [...resolved].sort();
 }
 
 function formatCapabilityList(capabilities: Iterable<BusinessCapability>) {
