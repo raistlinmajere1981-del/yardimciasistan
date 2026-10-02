@@ -38,6 +38,7 @@ const SMOKE_FILES = [
   "scripts/smoke-desktop-lock.mjs",
   "scripts/smoke-desktop-logging-contract.mjs",
   "scripts/smoke-desktop-menu-db.mjs",
+  "scripts/smoke-menu-reorder-contract.mjs",
   "scripts/smoke-desktop-package.mjs",
   "scripts/smoke-desktop-renderer.mjs",
   "scripts/smoke-desktop-shell.mjs",
