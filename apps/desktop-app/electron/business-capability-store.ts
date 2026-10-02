@@ -141,7 +141,6 @@ export function replaceBusinessCapabilitiesInTransaction(
     );
   }
 
-  assertValidCapabilityState(database, input.businessId);
   return [...resolved].sort();
 }
 
