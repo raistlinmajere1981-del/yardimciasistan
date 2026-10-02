@@ -191,7 +191,7 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
                 <label className="market-field">Ürün<select value={line.productId} onChange={(event) => updatePurchaseLine(line.key, { productId: event.target.value })}><option value="">Ürün seçin</option>{products.filter((product) => product.trackInventory && product.isActive).map((product) => <option value={product.id} key={product.id}>{product.name}</option>)}</select></label>
                 <label className="market-field">Miktar<input type="number" min="0" step="0.0001" value={line.quantity} onChange={(event) => updatePurchaseLine(line.key, { quantity: event.target.value })} /></label>
                 <label className="market-field">Birim maliyet<MoneyInput value={line.unitCost} onChange={(unitCost) => updatePurchaseLine(line.key, { unitCost })} /></label>
-                {purchaseLines.length > 1 && <ActionButton variant="secondary" size="sm" type="button" className="market-icon-button" aria-label={`${index + 1}. satırı kaldır`} onClick={() => setPurchaseLines((current) => current.filter((item) => item.key !== line.key))}>×</ActionButton>}
+                {purchaseLines.length > 1 && <ActionButton variant="secondary" type="button" className="market-icon-button" aria-label={`${index + 1}. satırı kaldır`} onClick={() => setPurchaseLines((current) => current.filter((item) => item.key !== line.key))}>×</ActionButton>}
               </div>
             ))}
           </div>
