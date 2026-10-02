@@ -3401,130 +3401,68 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showCustomerDetail(OperationData.CustomerRecord customer) {
-    Dialog dialog = new Dialog(this);
-    LinearLayout shell = UiKit.column(this);
-    shell.setBackgroundColor(UiKit.BG);
-    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
-
-    LinearLayout header = UiKit.row(this);
-    LinearLayout heading = UiKit.column(this);
-    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    heading.addView(UiKit.eyebrow(this, "MÜŞTERİ DETAYI"));
-    heading.addView(UiKit.title(this, customer.fullName));
-    header.addView(heading);
-    addDetailHeaderActions(header, dialog, () -> showCustomerDetail(customer));
-    shell.addView(header);
-
-    LinearLayout page = UiKit.column(this);
-    LinearLayout summary = UiKit.card(this);
-    summary.addView(detailLine(
-        "Kayıtlar",
-        customerRecordSummary(customer)
-    ));
-    if (!customer.phone.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(detailLine("Telefon", customer.phone));
-    }
-    if (!customer.email.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(detailLine("E-posta", customer.email));
-    }
-    if (!customer.tags.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(detailLine("Etiketler", String.join(", ", customer.tags)));
-    }
-    page.addView(summary);
-
-    if (hasCustomerIdentityDetails(customer)) {
-      page.addView(sectionLabel("Kimlik bilgileri"));
-      LinearLayout identityDetails = UiKit.card(this);
-      addOptionalDetail(identityDetails, "Belge", formatIdentityType(customer.identityType));
-      addOptionalDetail(identityDetails, "Kimlik / pasaport no", customer.identityNumber);
-      addOptionalDetail(identityDetails, "Seri no", customer.documentSerialNumber);
-      addOptionalDetail(identityDetails, "Uyruk", customer.nationality);
-      addOptionalDetail(identityDetails, "Doğum tarihi", customer.birthDate);
-      addOptionalDetail(identityDetails, "Doğum yeri", customer.birthPlace);
-      addOptionalDetail(identityDetails, "Cinsiyet", formatCustomerGender(customer.gender));
-      addOptionalDetail(identityDetails, "Anne adı", customer.motherName);
-      addOptionalDetail(identityDetails, "Baba adı", customer.fatherName);
-      addOptionalDetail(identityDetails, "Son geçerlilik", customer.documentExpiryDate);
-      addOptionalDetail(identityDetails, "Düzenleyen makam", customer.issuingAuthority);
-      addOptionalDetail(identityDetails, "Adres", customer.address);
-      page.addView(identityDetails);
-    }
-
-    if (!customer.notes.isEmpty()) {
-      page.addView(sectionLabel("Notlar"));
-      LinearLayout notes = UiKit.card(this);
-      notes.addView(UiKit.text(this, customer.notes, 14, UiKit.TEXT, Typeface.NORMAL));
-      page.addView(notes);
-    }
-
-    if (!customer.phone.isEmpty()) {
-      LinearLayout contact = UiKit.row(this);
-      UiKit.addAction(contact, UiKit.outlineButton(this, "Ara", view -> openDialer(customer.phone)), this);
-      if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
-        UiKit.addAction(contact, UiKit.button(this, "WhatsApp", UiKit.PRIMARY, view -> openWhatsApp(customer.phone, "")), this);
-      }
-      page.addView(contact);
-    }
-
-    if (AndroidUiRules.canManageCustomers(data)) {
-      page.addView(sectionLabel("Müşteri işlemleri"));
-      LinearLayout customerActions = UiKit.row(this);
-      UiKit.addAction(
-          customerActions,
-          UiKit.outlineButton(this, "Kartı Düzenle", view -> {
-            dialog.dismiss();
-            showCustomerForm(customer);
-          }),
-          this
-      );
-      if (canManageCustomerRoomStays()) {
-        UiKit.addAction(
-            customerActions,
-            UiKit.button(this, "Odaya Ata", UiKit.PRIMARY, view -> {
-              dialog.dismiss();
-              showRoomAssignmentDialog(customer, null);
-            }),
-            this
-        );
-      }
-      page.addView(customerActions);
-    }
-
-    List<OperationData.CustomerRoomStayRecord> customerStays = data.staysForCustomer(customer.id);
-    if (!customerStays.isEmpty()) {
-      page.addView(sectionLabel("Konaklama arşivi"));
-      for (OperationData.CustomerRoomStayRecord stay : customerStays) {
-        page.addView(customerRoomStayCard(stay));
-      }
-    }
-
-    if (AndroidUiRules.canDelete(data, "customer.delete")) {
-      page.addView(sectionLabel("Yönetici işlemi"));
-      Button delete = UiKit.dangerButton(this, "Müşteriyi Sil", view -> confirm(
-          "Müşteriyi sil",
-          customer.fullName + " müşteri listesinden silinsin mi? Eski talep ve rezervasyon kayıtları korunur.",
-          () -> {
-            sendAction(
-                "customer_delete",
-                payload("customer_id", customer.id, "expected_updated_at", customer.updatedAt),
-                "Müşteri silinmek üzere gönderildi."
-            );
-            dialog.dismiss();
+    new CustomerDetailDialog(
+        this,
+        data,
+        customer,
+        new CustomerDetailDialog.Listener() {
+          @Override
+          public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) {
+            addDetailHeaderActions(header, dialog, reopen);
           }
-      ));
-      delete.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
-      page.addView(delete);
-    }
 
-    ScrollView scroll = UiKit.scroll(this, page);
-    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    shell.addView(scroll);
-    dialog.setContentView(shell);
-    dialog.show();
-    configureFullDialog(dialog);
+          @Override
+          public void configureFullDialog(Dialog dialog) {
+            MainActivity.this.configureFullDialog(dialog);
+          }
+
+          @Override
+          public void onDial(String phone) {
+            openDialer(phone);
+          }
+
+          @Override
+          public void onWhatsApp(String phone) {
+            openWhatsApp(phone, "");
+          }
+
+          @Override
+          public void onEditCustomer(OperationData.CustomerRecord selectedCustomer) {
+            showCustomerForm(selectedCustomer);
+          }
+
+          @Override
+          public void onAssignRoom(OperationData.CustomerRecord selectedCustomer) {
+            showRoomAssignmentDialog(selectedCustomer, null);
+          }
+
+          @Override
+          public View createStayCard(OperationData.CustomerRoomStayRecord stay) {
+            return customerRoomStayCard(stay);
+          }
+
+          @Override
+          public void onDeleteCustomer(OperationData.CustomerRecord selectedCustomer, Dialog dialog) {
+            confirm(
+                "Müşteriyi sil",
+                selectedCustomer.fullName + " müşteri listesinden silinsin mi? Eski talep ve rezervasyon kayıtları korunur.",
+                () -> {
+                  sendAction(
+                      "customer_delete",
+                      payload(
+                          "customer_id",
+                          selectedCustomer.id,
+                          "expected_updated_at",
+                          selectedCustomer.updatedAt
+                      ),
+                      "Müşteri silinmek üzere gönderildi."
+                  );
+                  dialog.dismiss();
+                }
+            );
+          }
+        }
+    ).show();
   }
 
   private void showCustomerForm(OperationData.CustomerRecord existing) {
@@ -5545,32 +5483,14 @@ public final class MainActivity extends ComponentActivity {
         && data.hasPermission("room.assign_customer");
   }
 
-  private String customerRecordSummary(OperationData.CustomerRecord customer) {
-    ArrayList<String> parts = new ArrayList<>();
-    parts.add(customer.requestCount + " talep");
-    if (data.hasAnyReservationCapability()) {
-      parts.add(customer.reservationCount + " rezervasyon");
-    }
-    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_STAYS)) {
-      parts.add(customer.stayCount + " konaklama");
-    }
-    return String.join(" · ", parts);
-  }
 
 
 
 
 
 
-  private void addOptionalDetail(LinearLayout card, String label, String value) {
-    if (value == null || value.trim().isEmpty()) {
-      return;
-    }
-    if (card.getChildCount() > 0) {
-      card.addView(UiKit.divider(this));
-    }
-    card.addView(detailLine(label, value.trim()));
-  }
+
+
 
 
 
