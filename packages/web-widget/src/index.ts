@@ -756,7 +756,6 @@ function bindEvents(root: HTMLElement) {
   bindWhatsAppControls(root);
   bindDirectionsControls(root);
 
-  root.querySelector<HTMLFormElement>("[data-ya-form]")?.addEventListener("submit", handleFormSubmit);
   root.querySelector<HTMLFormElement>("[data-ya-ai-form]")?.addEventListener("submit", handleAiSubmit);
   root.querySelector<HTMLFormElement>("[data-ya-whatsapp-form]")?.addEventListener("submit", handleDirectWhatsAppSubmit);
 
@@ -1231,107 +1230,6 @@ function bindWhatsAppControls(root: HTMLElement) {
       textarea.focus();
     });
   });
-}
-
-function handleFormSubmit(event: Event) {
-  event.preventDefault();
-  const form = event.currentTarget as HTMLFormElement;
-  if (!isRequestTypeEnabled(state.requestType)) {
-    setStatus("Bu işlem işletmenin etkin web seçeneklerinde kullanılamıyor.");
-    return;
-  }
-  const formData = new FormData(form);
-  const customerPhone = String(formData.get("customer_phone") ?? "");
-  const normalizedPhone = normalizeInternationalPhone(customerPhone);
-
-  if (!normalizedPhone.ok) {
-    setStatus(normalizedPhone.error);
-    form.querySelector<HTMLInputElement>('input[name="customer_phone"]')?.focus();
-    return;
-  }
-
-  const payload: RequestPayload = {
-    request_type: String(formData.get("request_type") ?? state.requestType) as RequestType,
-    customer_name: String(formData.get("customer_name") ?? "").trim(),
-    customer_phone: customerPhone.trim(),
-    date_text: String(formData.get("date_text") ?? "").trim(),
-    start_date: String(formData.get("start_date") ?? "").trim(),
-    end_date: String(formData.get("end_date") ?? "").trim(),
-    time: String(formData.get("time") ?? "").trim(),
-    guest_count: Number(formData.get("guest_count") ?? 1),
-    message: contextualRequestMessage(
-      String(formData.get("message") ?? "").trim(),
-      String(formData.get("context_resource_type") ?? "").trim(),
-      String(formData.get("context_resource_name") ?? "").trim()
-    ),
-    source: "web_form",
-    whatsapp_message: "",
-    context: {
-      resourceType: String(formData.get("context_resource_type") ?? "").trim(),
-      resourceId: String(formData.get("context_resource_id") ?? "").trim(),
-      resourceName: String(formData.get("context_resource_name") ?? "").trim(),
-      sourcePath: String(formData.get("context_source_path") ?? "").trim()
-    }
-  };
-
-  const scheduleError = validateRequestSchedule(payload);
-  if (!payload.customer_name || scheduleError || !Number.isFinite(payload.guest_count) || payload.guest_count < 1) {
-    setStatus(scheduleError || "Lütfen gerekli alanları kontrol edin.");
-    return;
-  }
-
-  payload.whatsapp_message = buildWhatsAppMessage(payload);
-  void saveRequest(payload);
-  window.open(createWhatsAppLink(config.whatsappPhone, payload.whatsapp_message), "_blank", "noopener,noreferrer");
-  setStatus("WhatsApp mesajı hazırlandı. Bilgileri kontrol edip gönder tuşuna basın.");
-}
-
-function contextualRequestMessage(note: string, resourceType: string, resourceName: string): string {
-  if (!resourceName) return note;
-  const label = resourceType === "room" ? "İlgili oda" : resourceType === "table" ? "İlgili masa" : resourceType === "product" ? "İlgili ürün" : "İlgili kayıt";
-  return [`${label}: ${resourceName}`, note].filter(Boolean).join("\n");
-}
-
-function validateRequestSchedule(payload: RequestPayload): string {
-  if (payload.request_type === "pension_reservation") {
-    if (!payload.start_date || !payload.end_date) {
-      return "Lütfen giriş ve çıkış tarihlerini seçin.";
-    }
-    if (payload.end_date <= payload.start_date) {
-      return "Çıkış tarihi giriş tarihinden sonra olmalı.";
-    }
-    return "";
-  }
-
-  if (payload.request_type === "restaurant_reservation") {
-    if (!payload.start_date) return "Lütfen rezervasyon tarihini seçin.";
-    if (!payload.time) return "Lütfen rezervasyon saatini seçin.";
-  }
-  return "";
-}
-
-async function saveRequest(payload: RequestPayload) {
-  if (!config.apiBaseUrl) {
-    return;
-  }
-
-  try {
-    const endpoint = `${config.apiBaseUrl.replace(/\/$/, "")}/api/request.php`;
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload),
-      keepalive: true
-    });
-
-    if (!response.ok) {
-      throw new Error("request_failed");
-    }
-  } catch {
-    setStatus("Talep kaydı sırasında sorun oldu. WhatsApp mesajınız yine de hazırlandı.");
-  }
 }
 
 async function handleAiSubmit(event: Event) {
