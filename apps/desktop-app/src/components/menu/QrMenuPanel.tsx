@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Copy, Download, ExternalLink, Eye, QrCode, X } from "lucide-react";
 import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
 import { ModalSurface } from "../ui/ModalSurface";
 import { createQrSvg, resolveQrMenuPublicUrl } from "./qr-code";
 
-export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }: {
+export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, utilityAction }: {
   enabled: boolean;
   webModuleUrl: string;
   onPreview: () => void;
+  utilityAction?: ReactNode;
 }) {
   const [webEnabled, setWebEnabled] = useState(true);
   const [publicationLoading, setPublicationLoading] = useState(true);
@@ -136,6 +137,7 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview }:
           <span role={publicationError ? "alert" : "status"}>{statusText}</span>
         </div>
         <div className="menu-qr-service__actions">
+          {utilityAction}
           <ActionButton variant="secondary" size="sm" onClick={onPreview}>
             <Eye size={16} aria-hidden="true" /> Önizle
           </ActionButton>
