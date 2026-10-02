@@ -10,8 +10,10 @@ const {
   inspectDesktopDatabaseCompatibility
 } = require("../apps/desktop-app/dist-electron/desktop-database-compatibility.js");
 const {
+  CLEAN_START_SESSION_CLEAR_TIMEOUT_MS,
   archiveLocalDataForCleanStart,
-  cleanupTransientStateForCleanStart
+  cleanupTransientStateForCleanStart,
+  settleCleanStartOperation
 } = require("../apps/desktop-app/dist-electron/clean-start.js");
 
 function createCurrentSchemaFixture(filePath) {
@@ -73,6 +75,7 @@ try {
   writeFileSync(join(dataRoot, "updates", "downloads", "old-installer.exe"), "installer");
 
   const transientCleanup = cleanupTransientStateForCleanStart(dataRoot);
+  assert.deepEqual(transientCleanup.failedEntries, []);
   assert.deepEqual(
     [...transientCleanup.removedEntries].sort(),
     ["updates/downloads", "updates/installing.json", "updates/pending.json"].sort()
@@ -83,6 +86,25 @@ try {
   assert.equal(existsSync(join(dataRoot, "updates", "downloads")), false);
   assert.equal(existsSync(join(dataRoot, "logs", "sessions", "kept-session", "session.json")), true);
   assert.equal(existsSync(join(dataRoot, "legacy-data", "older-clean", "archive.json")), true);
+
+  assert.ok(CLEAN_START_SESSION_CLEAR_TIMEOUT_MS >= 1_000);
+  assert.deepEqual(
+    await settleCleanStartOperation("completed", Promise.resolve(), 50),
+    { name: "completed", status: "completed", message: "" }
+  );
+  const failedOperation = await settleCleanStartOperation(
+    "failed",
+    Promise.reject(new Error("fixture failure")),
+    50
+  );
+  assert.equal(failedOperation.status, "failed");
+  assert.match(failedOperation.message, /fixture failure/);
+  const timedOutOperation = await settleCleanStartOperation(
+    "timeout",
+    new Promise(() => undefined),
+    15
+  );
+  assert.equal(timedOutOperation.status, "timed-out");
 
   const archived = archiveLocalDataForCleanStart(
     dataRoot,
@@ -117,6 +139,8 @@ try {
   assert.match(mainSource, /process\.argv\.includes\("--clean-start"\)/);
   assert.match(mainSource, /startup\.clean-start\.required/);
   assert.match(mainSource, /startup\.clean-start\.completed/);
+  assert.match(mainSource, /startup\.clean-start\.transient-cleanup\.incomplete/);
+  assert.match(mainSource, /CLEAN_START_SESSION_CLEAR_TIMEOUT_MS/);
   assert.match(mainSource, /clearStorageData\(\)/);
   assert.match(mainSource, /clearCache\(\)/);
   assert.match(mainSource, /Temiz Başlat/);
