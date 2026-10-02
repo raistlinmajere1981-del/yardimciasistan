@@ -42,6 +42,7 @@ import {
   resolveDatabasePath
 } from "./data-paths.js";
 import { assertCurrentDesktopSchema } from "./desktop-database-compatibility.js";
+import { routeAndroidActionInTransaction } from "./android-action-router.js";
 import {
   claimAutomaticBirthdayDelivery,
   getAutomaticBirthdayCandidates,
