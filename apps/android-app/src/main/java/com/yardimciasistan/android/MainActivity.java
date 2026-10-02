@@ -911,6 +911,10 @@ public final class MainActivity extends ComponentActivity {
     return activeTab;
   }
 
+  private boolean canOpenTab(String tab) {
+    return AndroidUiRules.canOpenTab(data, tab);
+  }
+
   private View inactiveDeviceScreen() {
     LinearLayout page = UiKit.column(this);
     boolean androidEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID);
