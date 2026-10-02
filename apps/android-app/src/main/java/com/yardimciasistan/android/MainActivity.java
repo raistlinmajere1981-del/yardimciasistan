@@ -2833,351 +2833,174 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showRequestDetail(OperationData.RequestRecord request) {
-    Dialog dialog = new Dialog(this);
-    LinearLayout shell = UiKit.column(this);
-    shell.setBackgroundColor(UiKit.BG);
-    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
-
-    LinearLayout header = UiKit.row(this);
-    LinearLayout heading = UiKit.column(this);
-    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    heading.addView(UiKit.eyebrow(this, "TALEP DETAYI"));
-    heading.addView(UiKit.title(this, request.customerName));
-    header.addView(heading);
-    addDetailHeaderActions(header, dialog, () -> showRequestDetail(request));
-    shell.addView(header);
-
-    LinearLayout page = UiKit.column(this);
-    LinearLayout summary = UiKit.card(this);
-    summary.addView(detailLine("Talep", formatRequestType(request.type)));
-    summary.addView(UiKit.divider(this));
-    summary.addView(detailLine("Tarih / kişi", requestDate(request) + (request.guestCount > 0 ? " · " + request.guestCount + " kişi" : "")));
-    summary.addView(UiKit.divider(this));
-    summary.addView(detailLine("Durum", formatRequestStatus(request.status)));
-    if (!request.message.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(UiKit.text(this, request.message, 14, UiKit.TEXT, Typeface.NORMAL));
-    }
-    if (AndroidUiRules.canUseAi(data) && !request.aiSummary.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(UiKit.text(this, "Kısa özet", 12, UiKit.PRIMARY, Typeface.BOLD));
-      summary.addView(UiKit.text(this, request.aiSummary, 13, UiKit.TEXT, Typeface.NORMAL));
-    }
-    page.addView(summary);
-
-    page.addView(UiKit.sectionTitle(this, "İletişim"));
-    LinearLayout contact = UiKit.row(this);
-    UiKit.addAction(contact, UiKit.outlineButton(this, "Ara", view -> openDialer(request.customerPhone)), this);
-    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
-      UiKit.addAction(contact, UiKit.button(this, "WhatsApp", UiKit.PRIMARY, view -> openWhatsApp(request.customerPhone, request.readyMessage())), this);
-    }
-    page.addView(contact);
-
-    String readyMessage = request.readyMessage();
-    if (!readyMessage.isEmpty()
-        && AndroidUiRules.canUseWhatsApp(data)
-        && data.hasPermission("customer.respond")) {
-      Button ready = UiKit.outlineButton(this, "Hazır Cevabı Göster", view -> showPreparedReply(request.customerName, readyMessage));
-      LinearLayout.LayoutParams readyParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      readyParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      ready.setLayoutParams(readyParams);
-      page.addView(ready);
-    }
-
-    boolean canConvert = AndroidUiRules.canConvertRequest(data, request);
-    boolean canRespond = data.hasPermission("customer.respond");
-    boolean canReject = data.hasPermission("customer.reject");
-    boolean canMarkAnswered = data.hasPermission("customer.mark_answered");
-    if (canConvert || canRespond || canReject || canMarkAnswered) {
-      page.addView(UiKit.sectionTitle(this, "Hızlı karar"));
-    }
-    if (canConvert) {
-      Button convert = UiKit.button(this, "Rezervasyona Çevir", UiKit.PRIMARY, view -> {
-        sendAction("customer_request_convert_to_reservation", payload("request_id", request.id, "expected_updated_at", request.updatedAt), "Talep rezervasyona çevrilmek üzere gönderildi.");
-        dialog.dismiss();
-      });
-      convert.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
-      page.addView(convert);
-    }
-
-    if (canRespond || canReject) {
-      LinearLayout decisions = UiKit.row(this);
-      LinearLayout.LayoutParams decisionParams = new LinearLayout.LayoutParams(-1, -2);
-      decisionParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      decisions.setLayoutParams(decisionParams);
-      if (canRespond) {
-        UiKit.addAction(decisions, UiKit.outlineButton(this, "Onayla", view -> {
-          sendAction("customer_request_approve", payload("request_id", request.id, "expected_updated_at", request.updatedAt), "Talep onayı gönderildi.");
-          dialog.dismiss();
-        }), this);
-      }
-      if (canReject) {
-        UiKit.addAction(decisions, UiKit.dangerButton(this, "Reddet", view -> confirm("Talebi reddet", request.customerName + " talebi reddedilsin mi?", () -> {
-          sendAction("customer_request_reject", payload("request_id", request.id, "expected_updated_at", request.updatedAt), "Talep reddi gönderildi.");
-          dialog.dismiss();
-        })), this);
-      }
-      page.addView(decisions);
-    }
-
-    if (canMarkAnswered || canRespond) {
-      LinearLayout response = UiKit.row(this);
-      LinearLayout.LayoutParams responseParams = new LinearLayout.LayoutParams(-1, -2);
-      responseParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      response.setLayoutParams(responseParams);
-      if (canMarkAnswered) {
-        UiKit.addAction(response, UiKit.button(this, "Cevaplandı", UiKit.ACCENT, view -> {
-          sendAction("customer_request_mark_answered", payload("request_id", request.id, "expected_updated_at", request.updatedAt), "Talep cevaplandı olarak gönderildi.");
-          dialog.dismiss();
-        }), this);
-      }
-      if (canRespond) {
-        UiKit.addAction(response, UiKit.outlineButton(this, "Yeniden Aç", view -> {
-          sendAction("customer_request_reopen", payload("request_id", request.id, "expected_updated_at", request.updatedAt), "Talep yeniden açılmak üzere gönderildi.");
-          dialog.dismiss();
-        }), this);
-      }
-      page.addView(response);
-    }
-
-    if (AndroidUiRules.canDelete(data, "request.delete")) {
-      page.addView(sectionLabel("Yönetici işlemi"));
-      Button delete = UiKit.dangerButton(this, "Talebi Sil", view -> confirm(
-          "Talebi sil",
-          request.customerName + " talebi ve bu talebe bağlı hazır mesaj silinsin mi?",
-          () -> {
-            sendAction(
-                "customer_request_delete",
-                payload("request_id", request.id, "expected_updated_at", request.updatedAt),
-                "Talep silinmek üzere gönderildi."
-            );
-            dialog.dismiss();
+    CustomerRequestDetailDialog.show(
+        this,
+        data,
+        request,
+        new CustomerRequestDetailDialog.Listener() {
+          @Override
+          public void addHeaderActions(
+              LinearLayout header,
+              Dialog dialog,
+              Runnable reopen
+          ) {
+            addDetailHeaderActions(header, dialog, reopen);
           }
-      ));
-      delete.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
-      page.addView(delete);
-    }
 
-    ScrollView scroll = UiKit.scroll(this, page);
-    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    shell.addView(scroll);
-    dialog.setContentView(shell);
-    dialog.show();
-    configureFullDialog(dialog);
+          @Override
+          public void openDialer(String phone) {
+            MainActivity.this.openDialer(phone);
+          }
+
+          @Override
+          public void openWhatsApp(String phone, String message) {
+            MainActivity.this.openWhatsApp(phone, message);
+          }
+
+          @Override
+          public void showPreparedReply(String customerName, String message) {
+            MainActivity.this.showPreparedReply(customerName, message);
+          }
+
+          @Override
+          public void sendAction(
+              String actionType,
+              JSONObject actionPayload,
+              String successMessage
+          ) {
+            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
+          }
+
+          @Override
+          public void confirm(String title, String message, Runnable action) {
+            MainActivity.this.confirm(title, message, action);
+          }
+
+          @Override
+          public void configureFullDialog(Dialog dialog) {
+            MainActivity.this.configureFullDialog(dialog);
+          }
+        }
+    );
   }
 
   private void showReservationDetail(OperationData.ReservationRecord reservation) {
-    if (!AndroidUiRules.reservationAllowed(data, reservation)
-        || !data.hasPermission("reservation.view")) {
-      showError("Bu rezervasyon alanı işletmede etkin değil.");
-      return;
-    }
-    Dialog dialog = new Dialog(this);
-    LinearLayout shell = UiKit.column(this);
-    shell.setBackgroundColor(UiKit.BG);
-    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
-
-    LinearLayout header = UiKit.row(this);
-    LinearLayout heading = UiKit.column(this);
-    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    heading.addView(UiKit.eyebrow(this, "REZERVASYON DETAYI"));
-    heading.addView(UiKit.title(this, reservation.customerName.isEmpty() ? reservation.title : reservation.customerName));
-    header.addView(heading);
-    addDetailHeaderActions(header, dialog, () -> showReservationDetail(reservation));
-    shell.addView(header);
-
-    LinearLayout page = UiKit.column(this);
-    LinearLayout summary = UiKit.card(this);
-    summary.addView(detailLine("Durum", formatReservationStatus(reservation.status)));
-    summary.addView(UiKit.divider(this));
-    summary.addView(detailLine("Tarih", joinDateRange(reservation.startDate, reservation.endDate)));
-    if (!reservation.time.isEmpty() || reservation.guestCount > 0) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(detailLine("Saat / kişi", joinNonEmpty(" · ", reservation.time,
-          reservation.guestCount > 0 ? reservation.guestCount + " kişi" : "")));
-    }
-    if (!reservation.roomIds.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(detailLine("Oda", namesForRooms(reservation.roomIds)));
-    }
-    if (!reservation.tableIds.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(detailLine("Masa", namesForTables(reservation.tableIds)));
-    }
-    if (!reservation.notes.isEmpty()) {
-      summary.addView(UiKit.divider(this));
-      summary.addView(UiKit.text(this, reservation.notes, 13, UiKit.TEXT, Typeface.NORMAL));
-    }
-    page.addView(summary);
-
-    page.addView(sectionLabel("İletişim"));
-    LinearLayout contact = UiKit.row(this);
-    UiKit.addAction(contact, UiKit.outlineButton(this, "Ara", view -> openDialer(reservation.customerPhone)), this);
-    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
-      UiKit.addAction(contact, UiKit.button(this, "WhatsApp", UiKit.PRIMARY,
-          view -> openWhatsApp(reservation.customerPhone, reservationMessage(reservation))), this);
-    }
-    page.addView(contact);
-
-    ReservationEditorDialog.Kind editKind = reservationEditorKind(reservation);
-    if (editKind != null
-        && data.hasPermission("reservation.update")
-        && ("pending".equals(reservation.status) || "approved".equals(reservation.status))) {
-      page.addView(sectionLabel("Düzenleme"));
-      Button edit = UiKit.outlineButton(this, "Rezervasyonu Düzenle", view -> {
-        dialog.dismiss();
-        showReservationEditor(editKind, reservation);
-      });
-      edit.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
-      page.addView(edit);
-    }
-
-    if ("pending".equals(reservation.status)
-        && (data.hasPermission("reservation.approve") || data.hasPermission("reservation.reject"))) {
-      page.addView(sectionLabel("Karar"));
-      LinearLayout decisions = UiKit.row(this);
-      if (data.hasPermission("reservation.approve")) {
-        UiKit.addAction(decisions, UiKit.button(this, "Onayla", UiKit.PRIMARY, view -> {
-          sendReservationAction(reservation, "reservation_approve", "Rezervasyon onayı gönderildi.");
-          dialog.dismiss();
-        }), this);
-      }
-      if (data.hasPermission("reservation.reject")) {
-        UiKit.addAction(decisions, UiKit.dangerButton(this, "Reddet", view -> confirm(
-            "Rezervasyonu reddet",
-            reservation.customerName + " rezervasyonu reddedilsin mi?",
-            () -> {
-              sendReservationAction(reservation, "reservation_reject", "Rezervasyon reddi gönderildi.");
-              dialog.dismiss();
-            }
-        )), this);
-      }
-      page.addView(decisions);
-    } else if ("approved".equals(reservation.status) && data.hasPermission("reservation.cancel")) {
-      page.addView(sectionLabel("Rezervasyon işlemi"));
-      Button cancel = UiKit.dangerButton(this, "Rezervasyonu İptal Et", view -> confirm(
-          "Rezervasyonu iptal et",
-          "Bu rezervasyon iptal edilsin mi?",
-          () -> {
-            sendReservationAction(reservation, "reservation_cancel", "Rezervasyon iptali gönderildi.");
-            dialog.dismiss();
+    ReservationDetailDialog.show(
+        this,
+        data,
+        reservation,
+        new ReservationDetailDialog.Listener() {
+          @Override
+          public void addHeaderActions(
+              LinearLayout header,
+              Dialog dialog,
+              Runnable reopen
+          ) {
+            addDetailHeaderActions(header, dialog, reopen);
           }
-      ));
-      cancel.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
-      page.addView(cancel);
-    }
 
-    ScrollView scroll = UiKit.scroll(this, page);
-    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    shell.addView(scroll);
-    dialog.setContentView(shell);
-    dialog.show();
-    configureFullDialog(dialog);
+          @Override
+          public void openDialer(String phone) {
+            MainActivity.this.openDialer(phone);
+          }
+
+          @Override
+          public void openWhatsApp(String phone, String message) {
+            MainActivity.this.openWhatsApp(phone, message);
+          }
+
+          @Override
+          public void editReservation(
+              ReservationEditorDialog.Kind kind,
+              OperationData.ReservationRecord selected
+          ) {
+            showReservationEditor(kind, selected);
+          }
+
+          @Override
+          public void sendReservationAction(
+              OperationData.ReservationRecord selected,
+              String actionType,
+              String successMessage
+          ) {
+            MainActivity.this.sendReservationAction(
+                selected,
+                actionType,
+                successMessage
+            );
+          }
+
+          @Override
+          public void confirm(String title, String message, Runnable action) {
+            MainActivity.this.confirm(title, message, action);
+          }
+
+          @Override
+          public void configureFullDialog(Dialog dialog) {
+            MainActivity.this.configureFullDialog(dialog);
+          }
+
+          @Override
+          public void showError(String message) {
+            MainActivity.this.showError(message);
+          }
+        }
+    );
   }
 
   private void showMessageDetail(OperationData.MessageRecord message) {
-    Dialog dialog = new Dialog(this);
-    LinearLayout shell = UiKit.column(this);
-    shell.setBackgroundColor(UiKit.BG);
-    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
-
-    LinearLayout header = UiKit.row(this);
-    LinearLayout heading = UiKit.column(this);
-    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    heading.addView(UiKit.eyebrow(this, "MESAJ DETAYI"));
-    heading.addView(UiKit.title(this, message.customerName));
-    header.addView(heading);
-    addDetailHeaderActions(header, dialog, () -> showMessageDetail(message));
-    shell.addView(header);
-
-    LinearLayout page = UiKit.column(this);
-    LinearLayout messageCard = UiKit.card(this);
-    messageCard.addView(statusBadge(message.message.isEmpty() ? "Cevap bekleniyor" : "Hazır", message.message.isEmpty() ? UiKit.WARNING : UiKit.PRIMARY));
-    TextView body = UiKit.text(this,
-        message.message.isEmpty() ? "Bu talep için henüz hazır mesaj bulunmuyor." : message.message,
-        14,
-        message.message.isEmpty() ? UiKit.MUTED : UiKit.TEXT,
-        Typeface.NORMAL
-    );
-    LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(-1, -2);
-    bodyParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
-    body.setLayoutParams(bodyParams);
-    messageCard.addView(body);
-    page.addView(messageCard);
-
-    if (AndroidUiRules.canUseWhatsApp(data)
-        && data.hasPermission("customer.respond")
-        && !message.message.isEmpty()) {
-      LinearLayout responseActions = UiKit.row(this);
-      UiKit.addAction(responseActions, UiKit.outlineButton(this, "Kopyala", view -> copyText(message.message)), this);
-      UiKit.addAction(responseActions, UiKit.button(this, "WhatsApp'ta Aç", UiKit.PRIMARY,
-          view -> openWhatsApp(message.customerPhone, message.message)), this);
-      page.addView(responseActions);
-    }
-    if (!message.customerPhone.isEmpty() || (!message.requestId.isEmpty() && data.hasPermission("customer.mark_answered"))) {
-      LinearLayout followUp = UiKit.row(this);
-      LinearLayout.LayoutParams followUpParams = new LinearLayout.LayoutParams(-1, -2);
-      followUpParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      followUp.setLayoutParams(followUpParams);
-      if (!message.customerPhone.isEmpty()) {
-        UiKit.addAction(followUp, UiKit.outlineButton(this, "Ara", view -> openDialer(message.customerPhone)), this);
-      }
-      if (!message.requestId.isEmpty() && data.hasPermission("customer.mark_answered")) {
-        OperationData.RequestRecord request = data.requestById(message.requestId);
-        String expectedUpdatedAt = request == null ? "" : request.updatedAt;
-        UiKit.addAction(followUp, UiKit.button(this, "Cevaplandı", UiKit.ACCENT, view -> {
-          sendAction("customer_request_mark_answered", payload(
-              "request_id", message.requestId,
-              "message_id", message.id,
-              "expected_updated_at", expectedUpdatedAt
-          ), "Talep cevaplandı olarak gönderildi.");
-          dialog.dismiss();
-        }), this);
-      }
-      page.addView(followUp);
-    }
-
-    if (AndroidUiRules.canDelete(data, "message.delete")) {
-      page.addView(sectionLabel("Yönetici işlemi"));
-      Button delete = UiKit.dangerButton(this, "Mesajı Sil", view -> confirm(
-          "Hazır mesajı sil",
-          "Bu hazır mesaj silinsin mi? Talep kaydı korunur.",
-          () -> {
-            sendAction(
-                "message_delete",
-                payload(
-                    "message_id", message.id,
-                    "request_id", message.requestId,
-                    "expected_updated_at", message.updatedAt
-                ),
-                "Hazır mesaj silinmek üzere gönderildi."
-            );
-            dialog.dismiss();
+    MessageDetailDialog.show(
+        this,
+        data,
+        message,
+        new MessageDetailDialog.Listener() {
+          @Override
+          public void addHeaderActions(
+              LinearLayout header,
+              Dialog dialog,
+              Runnable reopen
+          ) {
+            addDetailHeaderActions(header, dialog, reopen);
           }
-      ));
-      delete.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
-      page.addView(delete);
-    }
 
-    ScrollView scroll = UiKit.scroll(this, page);
-    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    shell.addView(scroll);
-    dialog.setContentView(shell);
-    dialog.show();
-    configureFullDialog(dialog);
+          @Override
+          public void copyText(String messageText) {
+            MainActivity.this.copyText(messageText);
+          }
+
+          @Override
+          public void openWhatsApp(String phone, String messageText) {
+            MainActivity.this.openWhatsApp(phone, messageText);
+          }
+
+          @Override
+          public void openDialer(String phone) {
+            MainActivity.this.openDialer(phone);
+          }
+
+          @Override
+          public void sendAction(
+              String actionType,
+              JSONObject actionPayload,
+              String successMessage
+          ) {
+            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
+          }
+
+          @Override
+          public void confirm(String title, String messageText, Runnable action) {
+            MainActivity.this.confirm(title, messageText, action);
+          }
+
+          @Override
+          public void configureFullDialog(Dialog dialog) {
+            MainActivity.this.configureFullDialog(dialog);
+          }
+        }
+    );
   }
 
-  private View detailLine(String label, String value) {
-    LinearLayout row = UiKit.row(this);
-    TextView labelView = UiKit.text(this, label, 12, UiKit.MUTED, Typeface.BOLD);
-    labelView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 0.38f));
-    row.addView(labelView);
-    TextView valueView = UiKit.text(this, value, 13, UiKit.TEXT, Typeface.BOLD);
-    valueView.setGravity(Gravity.END);
-    valueView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 0.62f));
-    row.addView(valueView);
-    return row;
-  }
+
 
   private void showPreparedReply(String customerName, String message) {
     OperationData.MessageRecord prepared = new OperationData.MessageRecord();
@@ -3328,17 +3151,10 @@ public final class MainActivity extends ComponentActivity {
     sendAction("table_status_update", payload("table_id", table.id, "status", status, "expected_updated_at", table.updatedAt), table.name + " durumu güncellenmek üzere gönderildi.");
   }
 
-  private ReservationEditorDialog.Kind reservationEditorKind(OperationData.ReservationRecord reservation) {
-    if (reservation == null) {
-      return null;
-    }
-    if ("room".equals(reservation.type)) {
-      return ReservationEditorDialog.Kind.ROOM;
-    }
-    if (AndroidUiRules.isRestaurantOnlyReservation(reservation)) {
-      return ReservationEditorDialog.Kind.TABLE;
-    }
-    return null;
+  private ReservationEditorDialog.Kind reservationEditorKind(
+      OperationData.ReservationRecord reservation
+  ) {
+    return ReservationDetailDialog.editorKind(reservation);
   }
 
   private void showReservationEditor(
