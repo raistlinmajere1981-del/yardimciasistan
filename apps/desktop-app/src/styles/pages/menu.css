@@ -158,10 +158,12 @@
 }
 
 .menu-sortable-record.is-drop-before {
+  --menu-drop-indicator-top: calc(var(--space-3) * -1);
   margin-block-start: var(--space-4);
 }
 
 .menu-sortable-record.is-drop-after {
+  --menu-drop-indicator-bottom: calc(var(--space-3) * -1);
   margin-block-end: var(--space-4);
 }
 
@@ -169,7 +171,9 @@
 .menu-sortable-record.is-drop-after::after {
   position: absolute;
   z-index: 3;
+  top: var(--menu-drop-indicator-top, auto);
   right: var(--space-2);
+  bottom: var(--menu-drop-indicator-bottom, auto);
   left: var(--space-2);
   height: var(--space-1);
   content: "";
@@ -177,14 +181,6 @@
   background: var(--color-accent);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-selected-ring);
-}
-
-.menu-sortable-record.is-drop-before::before {
-  top: calc(var(--space-3) * -1);
-}
-
-.menu-sortable-record.is-drop-after::after {
-  bottom: calc(var(--space-3) * -1);
 }
 
 .menu-product-heading-status {
