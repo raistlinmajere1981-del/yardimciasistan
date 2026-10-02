@@ -281,11 +281,6 @@ button.market-list-row {
   width: 100%;
   color: var(--color-text);
   text-align: left;
-  cursor: pointer;
-}
-
-button.market-list-row:hover {
-  border-color: var(--color-accent-border);
 }
 
 .market-list-row > span:first-child,
@@ -925,12 +920,6 @@ button.market-list-row:hover {
   background: var(--color-bg-surface);
   color: var(--color-text);
   text-align: left;
-  cursor: pointer;
-}
-
-.market-sale-product:hover:not(:disabled) {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent-soft);
 }
 
 .market-sale-product-thumb {
