@@ -16,6 +16,7 @@ import { calendarLocalDateKey, type useCalendarPageController } from "../compone
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
 import { DatePicker } from "../components/ui/DateTimePicker";
 import { PageWorkSurface } from "../components/layout/PageWorkSurface";
+import { ChoiceChips } from "../components/ui/ChoiceChips";
 
 type ReservationRecord = DesktopDashboardData["reservations"][number];
 type DailyTaskRecord = DesktopDashboardData["dailyTasks"][number];
@@ -119,32 +120,17 @@ export function OperationCalendarPage({
         </div>
 
         <div className="operation-calendar-controls">
-          <div className="operation-calendar-view-switch" aria-label="Takvim görünümü">
-            <button
-              className={viewMode === "day" ? "is-active" : ""}
-              type="button"
-              aria-pressed={viewMode === "day"}
-              onClick={() => setViewMode("day")}
-            >
-              Gün
-            </button>
-            <button
-              className={viewMode === "week" ? "is-active" : ""}
-              type="button"
-              aria-pressed={viewMode === "week"}
-              onClick={() => setViewMode("week")}
-            >
-              Hafta
-            </button>
-            <button
-              className={viewMode === "month" ? "is-active" : ""}
-              type="button"
-              aria-pressed={viewMode === "month"}
-              onClick={() => setViewMode("month")}
-            >
-              Ay
-            </button>
-          </div>
+          <ChoiceChips
+            className="operation-calendar-view-switch"
+            ariaLabel="Takvim görünümü"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { id: "day", label: "Gün" },
+              { id: "week", label: "Hafta" },
+              { id: "month", label: "Ay" }
+            ]}
+          />
           <div className="operation-calendar-range-controls">
             <ActionButton variant="secondary" size="sm" type="button" aria-label="Önceki dönem" onClick={() => moveRange(-1)}>
               <ChevronLeft size={16} aria-hidden="true" />
