@@ -5,10 +5,6 @@ import static com.yardimciasistan.android.AndroidPresentation.*;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.content.ActivityNotFoundException;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -24,13 +20,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,11 +30,8 @@ import androidx.activity.OnBackPressedCallback;
 
 import org.json.JSONObject;
 
-import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -1381,121 +1369,9 @@ public final class MainActivity extends ComponentActivity {
 
 
 
-  private int countCoreTasks(boolean completed) {
-    int count = 0;
-    for (OperationData.TaskRecord task : data.tasks) {
-      if (!"core".equals(AndroidUiRules.taskDomain(data, task)) || !AndroidUiRules.taskAllowed(data, task)) {
-        continue;
-      }
-      if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-  private int countOrdersByStatus(String status) {
-    int count = 0;
-    for (OperationData.TableOrder order : data.tableOrders) {
-      if (status.equals(order.status) && order.isActive()) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-
-
-
-
-
   private boolean hasConnectionSettings() {
     return connectionController != null && connectionController.hasConnectionSettings();
   }
-
-  private boolean isPensionReservation(OperationData.ReservationRecord reservation) {
-    return AndroidUiRules.isPensionReservation(data, reservation);
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  private String textValue(EditText input) {
-    return input == null ? "" : input.getText().toString().trim();
-  }
-
-  private String selectedChoiceValue(Spinner spinner) {
-    Object selected = spinner == null ? null : spinner.getSelectedItem();
-    return selected instanceof ChoiceItem ? ((ChoiceItem) selected).value : "";
-  }
-
-
-
-
-
-
-
-
-
-
-  private String compactDeviceId() {
-    return identity.deviceId.length() <= 20 ? identity.deviceId : identity.deviceId.substring(0, 12) + "…" + identity.deviceId.substring(identity.deviceId.length() - 5);
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  private OperationData.TrackedStockItem trackedStockItem(String menuItemId) {
-    for (OperationData.TrackedStockItem item : data.trackedStockItems) {
-      if (item.menuItemId.equals(menuItemId)) {
-        return item;
-      }
-    }
-    return null;
-  }
-
-
 
   private JSONObject payload(Object... values) {
     JSONObject payload = new JSONObject();
@@ -1508,43 +1384,6 @@ public final class MainActivity extends ComponentActivity {
     }
     return payload;
   }
-
-  private interface FilterListener {
-    void onSelect(String value);
-  }
-
-  private static final class CounterValue {
-    final String label;
-    final int value;
-    final int tone;
-    final String route;
-
-    CounterValue(String label, int value, int tone, String route) {
-      this.label = label;
-      this.value = value;
-      this.tone = tone;
-      this.route = route == null ? "" : route;
-    }
-  }
-
-
-
-  private static final class ChoiceItem {
-    final String value;
-    final String label;
-
-    ChoiceItem(String value, String label) {
-      this.value = value == null ? "" : value;
-      this.label = label == null ? "" : label;
-    }
-
-    @Override
-    public String toString() {
-      return label;
-    }
-  }
-
-
 
 
 }
