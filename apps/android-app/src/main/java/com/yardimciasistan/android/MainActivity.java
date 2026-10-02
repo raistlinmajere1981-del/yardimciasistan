@@ -56,13 +56,6 @@ public final class MainActivity extends ComponentActivity {
   private static final String TAB_MESSAGES = AndroidUiRules.TAB_MESSAGES;
   private static final String TAB_CASH = AndroidUiRules.TAB_CASH;
   private static final String TAB_REPORTS = AndroidUiRules.TAB_REPORTS;
-  private static final int BOTTOM_NAV_HEIGHT_DP = 70;
-  private static final int MAIN_CONTENT_BOTTOM_PADDING_DP = BOTTOM_NAV_HEIGHT_DP + 24;
-  private static final int LANDSCAPE_CONTENT_BOTTOM_PADDING_DP = 18;
-  private static final int LANDSCAPE_SIDE_NAV_WIDTH_DP = 112;
-  private static final int PORTRAIT_HEADER_HEIGHT_DP = 72;
-  private static final int LANDSCAPE_HEADER_HEIGHT_DP = 60;
-  private static final int HEADER_ACTION_SIZE_DP = 44;
   private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 0x5941;
   private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
 
@@ -84,18 +77,7 @@ public final class MainActivity extends ComponentActivity {
   private boolean loading;
   private String connectionState = "Henüz bağlanmadı";
 
-  private LinearLayout root;
-  private FrameLayout content;
-  private LinearLayout bottomNavigation;
-  private TextView headerTitle;
-  private TextView headerMeta;
-  private TextView errorBanner;
-  private Button refreshButton;
-  private ImageButton themeButton;
-  private Button settingsButton;
-  private boolean landscapeLayout;
-  private final Map<String, Integer> screenScrollPositions = new HashMap<>();
-  private String renderedScreenKey = "";
+  private AndroidShellController shell;
   private String currentError = "";
   private AndroidImageCaptureController imageCaptureController;
   private AndroidProvisioningController provisioningController;
@@ -197,6 +179,24 @@ public final class MainActivity extends ComponentActivity {
     stockImageAnalysisController = new StockImageAnalysisController(this, executor, syncClient);
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
+    shell = new AndroidShellController(
+        this,
+        new AndroidShellController.Listener() {
+          @Override public void onRefresh() { syncOperations(false); }
+          @Override public void onThemeToggle() { switchTheme(); }
+          @Override public void onSettingsToggle() {
+            settingsOpen = !settingsOpen;
+            render();
+          }
+          @Override public void onTabSelected(String tab) {
+            activeTab = tab;
+            settingsOpen = false;
+            render();
+          }
+          @Override public boolean canOpenTab(String tab) { return MainActivity.this.canOpenTab(tab); }
+          @Override public AppTheme.Mode themeMode() { return themeMode; }
+        }
+    );
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, connectionController.isDebugConnectionOverrideRequested(getIntent()));
     ConnectionSettings.ensureDefaults(preferences);
     operationsTransport = new CompanionOperationsRouter(preferences);
@@ -274,7 +274,7 @@ public final class MainActivity extends ComponentActivity {
     detailDialogCoordinator = new AndroidDetailDialogCoordinator(
         this,
         new AndroidDetailDialogCoordinator.Listener() {
-          @Override public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) { addDetailHeaderActions(header, dialog, reopen); }
+          @Override public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) { shell.addDetailHeaderActions(header, dialog, reopen); }
           @Override public void configureFullDialog(Dialog dialog) { MainActivity.this.configureFullDialog(dialog); }
           @Override public void configureBottomDialog(Dialog dialog) { MainActivity.this.configureBottomDialog(dialog); }
           @Override public void openDialer(String phone) { MainActivity.this.openDialer(phone); }
@@ -601,7 +601,7 @@ public final class MainActivity extends ComponentActivity {
     applyConnectionExtras();
     SyncJobService.schedule(this);
     applyNotificationIntent(getIntent());
-    buildShell();
+    shell.build();
     render();
     requestNotificationPermissionIfNeeded();
     if (ConnectionSettings.hasPendingBootstrap(preferences)) {
@@ -633,9 +633,9 @@ public final class MainActivity extends ComponentActivity {
     String syncSecretDraft = settingsWorkspace == null
         ? null
         : settingsWorkspace.syncSecretDraft();
-    rememberCurrentScrollPosition();
+    shell.rememberCurrentScrollPosition();
     super.onConfigurationChanged(newConfig);
-    buildShell();
+    shell.build();
     render();
     if (settingsWorkspace != null) {
       settingsWorkspace.restoreDrafts(webModuleDraft, syncSecretDraft);
@@ -865,163 +865,8 @@ public final class MainActivity extends ComponentActivity {
     requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, NOTIFICATION_PERMISSION_REQUEST_CODE);
   }
 
-  private void buildShell() {
-    landscapeLayout = getResources().getConfiguration().orientation
-        == Configuration.ORIENTATION_LANDSCAPE;
-    root = UiKit.column(this);
-    root.setBackgroundColor(UiKit.BG);
-
-    LinearLayout header = UiKit.row(this);
-    int headerVerticalPadding = landscapeLayout ? 4 : 8;
-    header.setPadding(
-        UiKit.dp(this, 14),
-        UiKit.dp(this, headerVerticalPadding),
-        UiKit.dp(this, 10),
-        UiKit.dp(this, headerVerticalPadding)
-    );
-    header.setBackgroundColor(UiKit.BG);
-    header.setLayoutParams(new LinearLayout.LayoutParams(
-        -1,
-        UiKit.dp(this, landscapeLayout ? LANDSCAPE_HEADER_HEIGHT_DP : PORTRAIT_HEADER_HEIGHT_DP)
-    ));
-
-    LinearLayout titleGroup = UiKit.column(this);
-    titleGroup.setGravity(Gravity.CENTER_VERTICAL);
-    headerTitle = UiKit.text(this, "Bugün", 20, UiKit.TEXT, Typeface.BOLD);
-    titleGroup.addView(headerTitle);
-    headerMeta = UiKit.text(this, "Personel · Henüz sync yok", 11, UiKit.MUTED, Typeface.NORMAL);
-    titleGroup.addView(headerMeta);
-    titleGroup.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    header.addView(titleGroup);
-
-    LinearLayout headerActions = UiKit.row(this);
-    refreshButton = UiKit.iconButton(this, "↻", "Yenile", false, view -> syncOperations(false));
-    headerActions.addView(refreshButton, headerActionParams(false));
-
-    themeButton = createThemeButton(null);
-    headerActions.addView(themeButton, headerActionParams(true));
-
-    settingsButton = UiKit.iconButton(this, "⚙", "Ayarlar", false, view -> {
-      settingsOpen = !settingsOpen;
-      render();
-    });
-    headerActions.addView(settingsButton, headerActionParams(true));
-    header.addView(headerActions);
-    root.addView(header);
-
-    errorBanner = UiKit.text(this, "", 12, UiKit.TEXT, Typeface.BOLD);
-    errorBanner.setPadding(UiKit.dp(this, 14), UiKit.dp(this, 9), UiKit.dp(this, 14), UiKit.dp(this, 9));
-    errorBanner.setVisibility(View.GONE);
-    LinearLayout.LayoutParams bannerParams = new LinearLayout.LayoutParams(-1, -2);
-    bannerParams.setMargins(UiKit.dp(this, 14), 0, UiKit.dp(this, 14), UiKit.dp(this, 8));
-    errorBanner.setLayoutParams(bannerParams);
-    root.addView(errorBanner);
-
-    content = new FrameLayout(this);
-    bottomNavigation = landscapeLayout ? UiKit.column(this) : UiKit.row(this);
-    bottomNavigation.setBackground(UiKit.rounded(this, UiKit.BOTTOM_NAV_BACKGROUND, UiKit.BORDER, 0));
-    if (landscapeLayout) {
-      LinearLayout body = UiKit.row(this);
-      body.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-      bottomNavigation.setPadding(
-          UiKit.dp(this, 6),
-          UiKit.dp(this, 5),
-          UiKit.dp(this, 6),
-          UiKit.dp(this, 5)
-      );
-      bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(
-          UiKit.dp(this, LANDSCAPE_SIDE_NAV_WIDTH_DP),
-          -1
-      ));
-      content.setLayoutParams(new LinearLayout.LayoutParams(0, -1, 1f));
-      body.addView(bottomNavigation);
-      body.addView(content);
-      root.addView(body);
-    } else {
-      content.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-      root.addView(content);
-      bottomNavigation.setPadding(
-          UiKit.dp(this, 5),
-          UiKit.dp(this, 6),
-          UiKit.dp(this, 5),
-          UiKit.dp(this, 7)
-      );
-      bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(
-          -1,
-          UiKit.dp(this, BOTTOM_NAV_HEIGHT_DP)
-      ));
-      root.addView(bottomNavigation);
-    }
-    setContentView(root);
-    updateErrorBanner();
-  }
-
-
-  private ImageButton createThemeButton(Runnable afterApplied) {
-    int icon = themeMode == AppTheme.Mode.NIGHT ? R.drawable.ic_theme_day : R.drawable.ic_theme_night;
-    return UiKit.themeIconButton(this, icon, themeMode.switchDescription, view -> {
-      switchTheme();
-      if (afterApplied != null) {
-        afterApplied.run();
-      }
-    });
-  }
-
-  private void addDetailHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) {
-    ImageButton quickTheme = createThemeButton(() -> {
-      dialog.dismiss();
-      reopen.run();
-    });
-    header.addView(quickTheme, headerActionParams(true));
-    Button close = UiKit.outlineButton(this, "Kapat", view -> dialog.dismiss());
-    LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, UiKit.dp(this, 44));
-    closeParams.setMargins(UiKit.dp(this, 6), 0, 0, 0);
-    close.setLayoutParams(closeParams);
-    header.addView(close);
-  }
-
-  private void switchTheme() {
-    rememberCurrentScrollPosition();
-    AppTheme.Mode nextMode = themeMode.toggled();
-    boolean persisted = AppTheme.save(preferences, nextMode);
-    themeMode = nextMode;
-    setTheme(themeStyleResource(themeMode));
-    UiKit.applyTheme(AppTheme.tokens(themeMode));
-    applyWindowTheme();
-    buildShell();
-    render();
-    if (!persisted) {
-      Toast.makeText(this, "Tema seçimi kalıcı olarak kaydedilemedi.", Toast.LENGTH_SHORT).show();
-    }
-  }
-
-  private int themeStyleResource(AppTheme.Mode mode) {
-    return mode == AppTheme.Mode.DAY ? R.style.AppTheme_Day : R.style.AppTheme_Night;
-  }
-
-  private void applyWindowTheme() {
-    getWindow().setStatusBarColor(UiKit.BG);
-    getWindow().setNavigationBarColor(UiKit.BG);
-    getWindow().setBackgroundDrawable(new ColorDrawable(UiKit.BG));
-    int flags = themeMode == AppTheme.Mode.DAY
-        ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        : 0;
-    getWindow().getDecorView().setSystemUiVisibility(flags);
-  }
-
-  private LinearLayout.LayoutParams headerActionParams(boolean withMargin) {
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-        UiKit.dp(this, HEADER_ACTION_SIZE_DP),
-        UiKit.dp(this, HEADER_ACTION_SIZE_DP)
-    );
-    if (withMargin) {
-      params.setMargins(UiKit.dp(this, 6), 0, 0, 0);
-    }
-    return params;
-  }
-
   private void render() {
-    rememberCurrentScrollPosition();
+    shell.rememberCurrentScrollPosition();
     if (operationCards != null) {
       operationCards.setData(data);
     }
@@ -1039,74 +884,53 @@ public final class MainActivity extends ComponentActivity {
     if (inactiveDevice) {
       settingsOpen = false;
     }
+
     String screenKey = currentScreenKey(inactiveDevice);
-    refreshButton.setVisibility(inactiveDevice ? View.GONE : View.VISIBLE);
-    refreshButton.setEnabled(!loading && hasConnectionSettings());
-    refreshButton.setContentDescription(loading ? "Yenileniyor" : "Yenile");
-    settingsButton.setVisibility(canOpenSettings ? View.VISIBLE : View.GONE);
-    styleHeaderAction(settingsButton, settingsOpen);
-    bottomNavigation.setVisibility(
-        settingsOpen || inactiveDevice || TAB_REPORTS.equals(activeTab) || TAB_CASH.equals(activeTab) ? View.GONE : View.VISIBLE
+    shell.updateChrome(
+        activeTab,
+        settingsOpen,
+        inactiveDevice,
+        canOpenSettings,
+        loading,
+        hasConnectionSettings()
     );
-    renderBottomNavigation();
-    content.removeAllViews();
+
     View screen;
+    String title;
     if (inactiveDevice) {
-      headerTitle.setText(data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID) ? "Cihaz Pasif" : "Android Kapalı");
+      title = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID) ? "Cihaz Pasif" : "Android Kapalı";
       screen = inactiveDeviceScreen();
     } else if (settingsOpen) {
-      headerTitle.setText("Ayarlar");
+      title = "Ayarlar";
       screen = settingsScreen();
     } else if (TAB_CUSTOMERS.equals(activeTab)) {
-      headerTitle.setText("Müşteri");
+      title = "Müşteri";
       screen = customerScreen();
     } else if (TAB_PENSION.equals(activeTab)) {
-      headerTitle.setText("Pansiyon");
+      title = "Pansiyon";
       screen = pensionScreen();
     } else if (TAB_RESTAURANT.equals(activeTab)) {
-      headerTitle.setText("Restoran");
+      title = "Restoran";
       screen = restaurantScreen();
     } else if (TAB_MARKET.equals(activeTab)) {
-      headerTitle.setText("Market");
+      title = "Market";
       screen = marketWorkspace.create(data, localPendingActionCount(), loading);
     } else if (TAB_MESSAGES.equals(activeTab)) {
-      headerTitle.setText("Mesajlar");
+      title = "Mesajlar";
       screen = messagesScreen();
     } else if (TAB_CASH.equals(activeTab)) {
-      headerTitle.setText("Kasa");
+      title = "Kasa";
       screen = FinanceWorkspace.create(this, data, actionPayload ->
           sendAction("finance_manual_create", actionPayload, "Kasa hareketi gönderildi."));
     } else if (TAB_REPORTS.equals(activeTab)) {
-      headerTitle.setText("Raporlar");
+      title = "Raporlar";
       screen = reportsScreen();
     } else {
-      headerTitle.setText("Bugün");
+      title = "Bugün";
       screen = todayScreen();
     }
-    headerMeta.setText(headerMetaText());
-    content.addView(screen);
-    renderedScreenKey = screenKey;
-    restoreScrollPosition(screen, screenKey);
-  }
 
-  private void styleHeaderAction(Button button, boolean selected) {
-    button.setTextColor(selected ? UiKit.PRIMARY : UiKit.TEXT);
-    button.setBackground(UiKit.rounded(
-        this,
-        selected ? UiKit.PRIMARY_DARK : UiKit.SURFACE_ALT,
-        selected ? UiKit.PRIMARY : UiKit.BORDER,
-        11
-    ));
-  }
-
-  private void rememberCurrentScrollPosition() {
-    if (renderedScreenKey.isEmpty() || content == null || content.getChildCount() == 0) {
-      return;
-    }
-    View currentScreen = content.getChildAt(0);
-    if (currentScreen instanceof ScrollView) {
-      screenScrollPositions.put(renderedScreenKey, ((ScrollView) currentScreen).getScrollY());
-    }
+    shell.showScreen(title, headerMetaText(), screen, screenKey);
   }
 
   private String currentScreenKey(boolean inactiveDevice) {
@@ -1138,45 +962,6 @@ public final class MainActivity extends ComponentActivity {
       return TAB_REPORTS + ":" + (reportsWorkspace == null ? AndroidUiRules.REPORT_LAST_7 : reportsWorkspace.screenKey());
     }
     return activeTab;
-  }
-
-  private void restoreScrollPosition(View screen, String screenKey) {
-    if (!(screen instanceof ScrollView)) {
-      return;
-    }
-    ScrollView scrollView = (ScrollView) screen;
-    int scrollY = Math.max(0, screenScrollPositions.getOrDefault(screenKey, 0));
-    scrollView.post(() -> {
-      if (screenKey.equals(renderedScreenKey)
-          && content.getChildCount() > 0
-          && content.getChildAt(0) == scrollView) {
-        scrollView.scrollTo(0, scrollY);
-      }
-    });
-  }
-
-  private void renderBottomNavigation() {
-    bottomNavigation.removeAllViews();
-    addNavButton("Bugün", TAB_TODAY);
-    if (canOpenTab(TAB_CUSTOMERS)) {
-      addNavButton("Müşteri", TAB_CUSTOMERS);
-    }
-    if (canOpenTab(TAB_PENSION)) {
-      addNavButton("Pansiyon", TAB_PENSION);
-    }
-    if (canOpenTab(TAB_RESTAURANT)) {
-      addNavButton("Restoran", TAB_RESTAURANT);
-    }
-    if (canOpenTab(TAB_MARKET)) {
-      addNavButton("Market", TAB_MARKET);
-    }
-    if (canOpenTab(TAB_MESSAGES)) {
-      addNavButton("Mesajlar", TAB_MESSAGES);
-    }
-  }
-
-  private boolean canOpenTab(String tab) {
-    return AndroidUiRules.canOpenTab(data, tab);
   }
 
   private View inactiveDeviceScreen() {
@@ -1218,32 +1003,6 @@ public final class MainActivity extends ComponentActivity {
     }
     page.addView(card);
     return UiKit.scroll(this, page);
-  }
-
-  private void addNavButton(String label, String tab) {
-    boolean selected = tab.equals(activeTab) && !settingsOpen;
-    Button button = new Button(this);
-    button.setText(label);
-    button.setTextSize(11);
-    button.setTextColor(selected ? UiKit.BOTTOM_NAV_ACTIVE : UiKit.BOTTOM_NAV_INACTIVE);
-    button.setTypeface(Typeface.create("sans", selected ? Typeface.BOLD : Typeface.NORMAL));
-    button.setAllCaps(false);
-    button.setGravity(Gravity.CENTER);
-    button.setPadding(1, 0, 1, 0);
-    button.setMinWidth(0);
-    button.setMinimumWidth(0);
-    button.setMinHeight(0);
-    button.setMinimumHeight(0);
-    button.setBackground(UiKit.rounded(this, selected ? UiKit.SURFACE_ALT : Color.TRANSPARENT, Color.TRANSPARENT, 11));
-    button.setOnClickListener(view -> {
-      activeTab = tab;
-      settingsOpen = false;
-      render();
-    });
-    button.setLayoutParams(landscapeLayout
-        ? new LinearLayout.LayoutParams(-1, 0, 1f)
-        : new LinearLayout.LayoutParams(0, -1, 1f));
-    bottomNavigation.addView(button);
   }
 
   private View todayScreen() {
@@ -1306,19 +1065,19 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View customerScreen() {
-    return workspaceCoordinator.customer(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
+    return workspaceCoordinator.customer(data, shell.contentBottomPaddingDp());
   }
 
   private View pensionScreen() {
-    return workspaceCoordinator.pension(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
+    return workspaceCoordinator.pension(data, shell.contentBottomPaddingDp());
   }
 
   private View restaurantScreen() {
-    return workspaceCoordinator.restaurant(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
+    return workspaceCoordinator.restaurant(data, shell.contentBottomPaddingDp());
   }
 
   private View messagesScreen() {
-    return workspaceCoordinator.messages(data, landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP);
+    return workspaceCoordinator.messages(data, shell.contentBottomPaddingDp());
   }
 
   private View reportsScreen() {
@@ -1388,7 +1147,7 @@ public final class MainActivity extends ComponentActivity {
     return UiKit.scroll(
         this,
         page,
-        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
+        shell.contentBottomPaddingDp()
     );
   }
 
@@ -1914,27 +1673,12 @@ public final class MainActivity extends ComponentActivity {
 
   private void showError(String message) {
     currentError = message == null ? "" : message;
-    updateErrorBanner();
+    shell.updateError(currentError);
   }
 
   private void clearError() {
     currentError = "";
-    updateErrorBanner();
-  }
-
-  private void updateErrorBanner() {
-    if (errorBanner == null) {
-      return;
-    }
-    errorBanner.setText(currentError);
-    errorBanner.setTextColor(UiKit.DANGER);
-    errorBanner.setBackground(UiKit.rounded(
-        this,
-        UiKit.withAlpha(UiKit.DANGER, 26),
-        UiKit.withAlpha(UiKit.DANGER, 100),
-        11
-    ));
-    errorBanner.setVisibility(currentError.isEmpty() ? View.GONE : View.VISIBLE);
+    shell.updateError(currentError);
   }
 
   private int localPendingActionCount() {
