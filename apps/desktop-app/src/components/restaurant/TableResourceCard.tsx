@@ -20,6 +20,8 @@ export function TableResourceCard({ table, summary, capabilities, onDashboard, o
   imageSrc?: string;
 }) {
   const navigation = useWorkspaceNavigation();
+  const selected = navigation.hospitalitySessions.restaurant?.intent.entityType === "table"
+    && navigation.hospitalitySessions.restaurant.intent.entityId === table.id;
   const { order, upcoming, blocked, conflict, quickAction } = getTableCardModel(table, summary, capabilities, new Date().toLocaleDateString("sv-SE"));
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -125,6 +127,7 @@ export function TableResourceCard({ table, summary, capabilities, onDashboard, o
       busy={busy}
       error={Boolean(feedback)}
       feedback={feedback}
+      selected={selected}
       status={!summary ? <span>Durum doğrulanamadı</span> : !table.isActive ? <span>Etkin değil</span> : order
         ? <ChoiceChips
             ariaLabel={`${table.name} sipariş durumu`}
