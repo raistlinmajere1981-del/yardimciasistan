@@ -1911,186 +1911,75 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View restaurantScreen() {
-    LinearLayout page = UiKit.column(this);
-    ArrayList<String[]> options = new ArrayList<>();
-    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TABLES)) {
-      options.add(new String[] {AndroidUiRules.RESTAURANT_TABLES, "Masalar"});
-    }
-    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS)) {
-      options.add(new String[] {AndroidUiRules.RESTAURANT_RESERVATIONS, "Rezervasyonlar"});
-    }
-    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_ORDERS)) {
-      options.add(new String[] {AndroidUiRules.RESTAURANT_ORDERS, "Açık Adisyon"});
-    }
-    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TASKS)) {
-      options.add(new String[] {AndroidUiRules.RESTAURANT_TASKS, "İşler"});
-    }
-    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_STOCK)) {
-      options.add(new String[] {AndroidUiRules.RESTAURANT_STOCK, "Stok"});
-    }
-    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_MENU)) {
-      options.add(new String[] {AndroidUiRules.RESTAURANT_MENU, "Menü"});
-    }
-    if (options.isEmpty()) {
-      page.addView(permissionDeniedCard());
-      return mainScreenScroll(page);
-    }
-    page.addView(filterBar(options.toArray(new String[0][]), restaurantMode, value -> {
-      restaurantMode = value;
-      render();
-    }));
+    RestaurantWorkspace workspace = new RestaurantWorkspace(
+        this,
+        data,
+        new RestaurantWorkspace.Listener() {
+          @Override
+          public void onModeChanged(String mode) {
+            restaurantMode = mode;
+            render();
+          }
 
-    if (AndroidUiRules.RESTAURANT_TABLES.equals(restaurantMode)) {
-      ArrayList<CounterValue> tableCounters = new ArrayList<>();
-      tableCounters.add(new CounterValue("Boş", countTablesByStatus("available"), UiKit.SUCCESS, ""));
-      tableCounters.add(new CounterValue("Dolu", countTablesByStatus("occupied"), UiKit.INFO, ""));
-      if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)) {
-        tableCounters.add(new CounterValue("Hesap", countPaymentWaitingTables(), UiKit.WARNING, ""));
-        tableCounters.add(new CounterValue("Açık", countActiveOrders(), UiKit.ACCENT, "restaurant:orders"));
-      }
-      page.addView(statusStrip(tableCounters.toArray(new CounterValue[0])));
-      if (data.tables.isEmpty()) {
-        page.addView(emptyCard("Masa verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
-      }
-      for (OperationData.TableRecord table : data.tables) {
-        page.addView(tableCard(table));
-      }
-    } else if (AndroidUiRules.RESTAURANT_RESERVATIONS.equals(restaurantMode)) {
-      if (AndroidUiRules.canCreateTableReservation(data)) {
-        Button createReservation = UiKit.button(this, "+ Yeni Rezervasyon", UiKit.PRIMARY,
-            view -> showReservationEditor(ReservationEditorDialog.Kind.TABLE, null));
-        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
-        createReservation.setLayoutParams(createParams);
-        createReservation.setEnabled(!data.customers.isEmpty());
-        page.addView(createReservation);
-      }
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Bekleyen", countRestaurantReservations("pending"), UiKit.WARNING, ""),
-          new CounterValue("Onaylı", countRestaurantReservations("approved"), UiKit.SUCCESS, ""),
-          new CounterValue("Bugün", countRestaurantReservationsToday(), UiKit.INFO, "")
-      }));
-      int reservationCount = 0;
-      for (OperationData.ReservationRecord reservation : data.reservations) {
-        if (!AndroidUiRules.isRestaurantReservation(data, reservation)
-            || !AndroidUiRules.reservationAllowed(data, reservation)) {
-          continue;
-        }
-        page.addView(reservationCard(reservation, false));
-        reservationCount += 1;
-      }
-      if (reservationCount == 0) {
-        page.addView(emptyCard(
-            "Restoran rezervasyonu yok",
-            "Masa ve kahvaltı rezervasyonları geldiğinde burada görünür."
-        ));
-      }
-    } else if (AndroidUiRules.RESTAURANT_ORDERS.equals(restaurantMode)) {
-      int activeOrders = countActiveOrders();
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Açık", countOrdersByStatus("open"), UiKit.INFO, ""),
-          new CounterValue("Hazırl.", countOrdersByStatus("preparing"), UiKit.ACCENT, ""),
-          new CounterValue("Servis", countOrdersByStatus("served"), UiKit.SUCCESS, ""),
-          new CounterValue("Hesap", countOrdersByStatus("payment"), UiKit.WARNING, "")
-      }));
-      if (activeOrders == 0) {
-        page.addView(emptyCard("Aktif adisyon yok", "Sipariş açılan masalar burada ayrıca görünür."));
-      }
-      for (OperationData.TableOrder order : data.tableOrders) {
-        if (order.isActive()) {
-          page.addView(activeOrderCard(order));
-        }
-      }
-    } else if (AndroidUiRules.RESTAURANT_TASKS.equals(restaurantMode)) {
-      if (data.hasPermission("daily_task.create")
-          && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)) {
-        Button createTask = UiKit.button(this, "+ Yeni İş", UiKit.PRIMARY,
-            view -> showDailyTaskEditor(DailyTaskEditorDialog.Kind.RESTAURANT, null));
-        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
-        createTask.setLayoutParams(createParams);
-        page.addView(createTask);
-      }
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Bekleyen", countRestaurantTasks(false), UiKit.WARNING, ""),
-          new CounterValue("Tamam", countRestaurantTasks(true), UiKit.SUCCESS, "")
-      }));
-      int taskCount = 0;
-      for (OperationData.TaskRecord task : data.tasks) {
-        if (!AndroidUiRules.isRestaurantTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
-          continue;
-        }
-        page.addView(taskCard(task, false));
-        taskCount += 1;
-      }
-      if (taskCount == 0) {
-        page.addView(emptyCard("Restoran işi yok", "Günlük restoran işleri sakin görünüyor."));
-      }
-    } else if (AndroidUiRules.RESTAURANT_STOCK.equals(restaurantMode)) {
-      if (data.hasPermission("menu.stock_update") && AndroidUiRules.canUseAi(data)) {
-        page.addView(stockImageImportCard());
-      }
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Stok yok", countStockByStatus("out_of_stock"), UiKit.DANGER, ""),
-          new CounterValue("Az stok", countStockByStatus("low_stock"), UiKit.WARNING, ""),
-          new CounterValue("Takip", data.trackedStockItems.size(), UiKit.INFO, "")
-      }));
-      page.addView(sectionLabel("Stokta yok"));
-      int outOfStockCount = 0;
-      for (OperationData.TrackedStockItem item : data.trackedStockItems) {
-        if ("out_of_stock".equals(item.stockStatus)) {
-          page.addView(stockCard(item));
-          outOfStockCount += 1;
-        }
-      }
-      if (outOfStockCount == 0) {
-        page.addView(emptyCard("Stokta olmayan ürün yok", "Takip edilen ürünlerde tükenen stok bulunmuyor."));
-      }
+          @Override
+          public void onRoute(String route) {
+            openRoute(route);
+            render();
+          }
 
-      page.addView(sectionLabel("Az stok"));
-      int lowStockCount = 0;
-      for (OperationData.TrackedStockItem item : data.trackedStockItems) {
-        if ("low_stock".equals(item.stockStatus)) {
-          page.addView(stockCard(item));
-          lowStockCount += 1;
-        }
-      }
-      if (lowStockCount == 0) {
-        page.addView(emptyCard("Azalan stok yok", "Minimum stok seviyesine yaklaşan ürün bulunmuyor."));
-      }
+          @Override
+          public void onCreateTableReservation() {
+            showReservationEditor(ReservationEditorDialog.Kind.TABLE, null);
+          }
 
-      page.addView(sectionLabel("Tüm takip edilen ürünler"));
-      if (data.trackedStockItems.isEmpty()) {
-        page.addView(emptyCard("Stok takibi yapılmıyor", "Masaüstünde stok adedi girilen ürünler burada görünür."));
-      }
-      for (OperationData.TrackedStockItem item : data.trackedStockItems) {
-        page.addView(stockCard(item));
-      }
-    } else {
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Kategori", data.adminCategories.size(), UiKit.INFO, ""),
-          new CounterValue("Ürün", data.adminMenuItems.size(), UiKit.ACCENT, "")
-      }));
-      page.addView(emptyCard(
-          "Yönetici silme alanı",
-          "Kategori silmek o kategoriye bağlı tüm ürünleri de siler. Her işlem ayrıca onay ister."
-      ));
-      page.addView(sectionLabel("Kategoriler"));
-      if (data.adminCategories.isEmpty()) {
-        page.addView(emptyCard("Kategori yok", "Silinebilecek menü kategorisi bulunmuyor."));
-      }
-      for (OperationData.MenuCategory category : data.adminCategories) {
-        page.addView(adminMenuCategoryCard(category));
-      }
-      page.addView(sectionLabel("Ürünler"));
-      if (data.adminMenuItems.isEmpty()) {
-        page.addView(emptyCard("Ürün yok", "Silinebilecek menü ürünü bulunmuyor."));
-      }
-      for (OperationData.MenuItem item : data.adminMenuItems) {
-        page.addView(adminMenuItemCard(item));
-      }
-    }
-    return mainScreenScroll(page);
+          @Override
+          public void onCreateTask() {
+            showDailyTaskEditor(DailyTaskEditorDialog.Kind.RESTAURANT, null);
+          }
+
+          @Override
+          public View createTableCard(OperationData.TableRecord table) {
+            return tableCard(table);
+          }
+
+          @Override
+          public View createReservationCard(OperationData.ReservationRecord reservation) {
+            return reservationCard(reservation, false);
+          }
+
+          @Override
+          public View createOrderCard(OperationData.TableOrder order) {
+            return activeOrderCard(order);
+          }
+
+          @Override
+          public View createTaskCard(OperationData.TaskRecord task) {
+            return taskCard(task, false);
+          }
+
+          @Override
+          public View createStockImageImportCard() {
+            return stockImageImportCard();
+          }
+
+          @Override
+          public View createStockCard(OperationData.TrackedStockItem item) {
+            return stockCard(item);
+          }
+
+          @Override
+          public View createAdminCategoryCard(OperationData.MenuCategory category) {
+            return adminMenuCategoryCard(category);
+          }
+
+          @Override
+          public View createAdminMenuItemCard(OperationData.MenuItem item) {
+            return adminMenuItemCard(item);
+          }
+        },
+        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
+    );
+    return workspace.render(restaurantMode);
   }
 
   private View messagesScreen() {
