@@ -122,6 +122,7 @@ public final class MainActivity extends ComponentActivity {
   private AndroidProvisioningController provisioningController;
   private AndroidOperationsSyncController operationsSyncController;
   private AndroidForegroundSyncController foregroundSyncController;
+  private AndroidActionDispatcher actionDispatcher;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private CustomerFormDialog activeCustomerFormDialog;
@@ -244,6 +245,129 @@ public final class MainActivity extends ComponentActivity {
     );
     identity = DeviceIdentity.loadOrCreate(this, preferences);
     actionOutbox = new ActionOutbox(preferences);
+    actionDispatcher = new AndroidActionDispatcher(
+        this,
+        preferences,
+        executor,
+        operationsTransport,
+        identity,
+        actionOutbox,
+        new AndroidActionDispatcher.Listener() {
+          @Override
+          public boolean isBusy() {
+            return loading;
+          }
+
+          @Override
+          public void onError(String message) {
+            showError(message);
+          }
+
+          @Override
+          public void onClearError() {
+            clearError();
+          }
+
+          @Override
+          public void onToast(String message) {
+            Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+          }
+
+          @Override
+          public void onSyncRequired() {
+            syncOperations(false);
+          }
+
+          @Override
+          public void onDispatchStarted() {
+            loading = true;
+            clearError();
+          }
+
+          @Override
+          public void onActionsAccepted(
+              List<OperationData.ActionRecord> accepted,
+              String feedbackActionType,
+              String successMessage,
+              boolean marketFeedback
+          ) {
+            loading = false;
+            for (int index = accepted.size() - 1; index >= 0; index -= 1) {
+              data.actions.add(0, accepted.get(index));
+            }
+            data.pendingActions += pendingActionCount(accepted);
+            clearError();
+            if (marketFeedback && marketWorkspace != null) {
+              marketWorkspace.onSubmissionAccepted(feedbackActionType, successMessage);
+              Toast.makeText(MainActivity.this, successMessage, Toast.LENGTH_SHORT).show();
+            }
+            render();
+          }
+
+          @Override
+          public void onActionsFailed(
+              List<OperationData.ActionRecord> accepted,
+              String feedbackActionType,
+              String marketQueuedMessage,
+              String errorMessage,
+              boolean actionRemainsQueued
+          ) {
+            loading = false;
+            if (!accepted.isEmpty()) {
+              for (int index = accepted.size() - 1; index >= 0; index -= 1) {
+                data.actions.add(0, accepted.get(index));
+              }
+              data.pendingActions += pendingActionCount(accepted);
+            }
+            if (actionRemainsQueued && marketWorkspace != null) {
+              connectionState = errorMessage;
+              clearError();
+              marketWorkspace.onSubmissionQueued(feedbackActionType, marketQueuedMessage);
+              Toast.makeText(MainActivity.this, marketQueuedMessage, Toast.LENGTH_SHORT).show();
+            } else {
+              showError(
+                  accepted.isEmpty()
+                      ? "İşlem gönderilemedi. " + errorMessage
+                      : "İşlemin bir bölümü gönderildi; kalan bölüm gönderilemedi. " + errorMessage
+              );
+            }
+            render();
+          }
+
+          @Override
+          public void onBarcodeAccepted(
+              String barcode,
+              OperationData.ActionRecord accepted
+          ) {
+            data.actions.add(0, accepted);
+            if ("pending".equals(accepted.status)) {
+              data.pendingActions += 1;
+            }
+            if (marketWorkspace != null) {
+              marketWorkspace.onBarcodeScanAccepted(barcode, "Gönderildi");
+            }
+          }
+
+          @Override
+          public void onBarcodeQueued(
+              String barcode,
+              boolean rejected,
+              String errorMessage
+          ) {
+            if (marketWorkspace != null) {
+              marketWorkspace.onBarcodeScanQueued(
+                  barcode,
+                  rejected
+                      ? "Gönderilemedi"
+                      : "Gönderim bekliyor; eski taramalar masaüstünde zaman aşımına uğrar"
+              );
+            }
+            if (rejected) {
+              showError(errorMessage);
+            }
+          }
+        }
+    );
     operationCache = new OperationCache(preferences, identity.deviceId);
     localNotifications = new LocalNotificationCenter(this, preferences);
     operationsSyncController = new AndroidOperationsSyncController(
@@ -3753,13 +3877,13 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
     if (order == null) {
-      ArrayList<ActionSpec> actions = new ArrayList<>();
-      ActionSpec openAction = new ActionSpec("table_order_open", payload(
+      ArrayList<AndroidActionDispatcher.Command> actions = new ArrayList<>();
+      AndroidActionDispatcher.Command openAction = new AndroidActionDispatcher.Command("table_order_open", payload(
           "table_id", table.id,
           "expected_table_updated_at", table.updatedAt
       ));
       actions.add(openAction);
-      actions.add(new ActionSpec("table_order_add_item", payload(
+      actions.add(new AndroidActionDispatcher.Command("table_order_add_item", payload(
           "table_id", table.id,
           "menu_item_id", item.id,
           "quantity", 1,
@@ -3981,13 +4105,16 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void sendAction(String actionType, JSONObject actionPayload, String successMessage) {
-    ArrayList<ActionSpec> actions = new ArrayList<>();
-    actions.add(new ActionSpec(actionType, actionPayload));
+    ArrayList<AndroidActionDispatcher.Command> actions = new ArrayList<>();
+    actions.add(new AndroidActionDispatcher.Command(actionType, actionPayload));
     sendActions(actions, successMessage);
   }
 
-  private void sendActions(List<ActionSpec> actions, String successMessage) {
-    sendActionsInternal(actions, successMessage, null);
+  private void sendActions(
+      List<AndroidActionDispatcher.Command> actions,
+      String successMessage
+  ) {
+    actionDispatcher.send(actions, successMessage, null, data);
   }
 
   private boolean sendMarketAction(
@@ -3996,233 +4123,13 @@ public final class MainActivity extends ComponentActivity {
       String acceptedMessage,
       String queuedMessage
   ) {
-    ArrayList<ActionSpec> actions = new ArrayList<>();
-    actions.add(new ActionSpec(actionType, actionPayload));
-    return sendActionsInternal(actions, acceptedMessage, queuedMessage);
+    ArrayList<AndroidActionDispatcher.Command> actions = new ArrayList<>();
+    actions.add(new AndroidActionDispatcher.Command(actionType, actionPayload));
+    return actionDispatcher.send(actions, acceptedMessage, queuedMessage, data);
   }
 
-  /**
-   * Persists and dispatches one ephemeral scanner observation without the normal
-   * one-operation-at-a-time UI gate. The desktop TTL remains the authority that
-   * prevents a delayed outbox replay from reaching a later customer's cart.
-   */
   private boolean sendMarketBarcodeScan(String barcode, JSONObject actionPayload) {
-    if (!MarketUiRules.canScanToDesktop(data)) {
-      showError("Bu cihazın masaüstüne barkod gönderme yetkisi yok.");
-      return false;
-    }
-    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
-    String syncSecret = ConnectionSettings.syncSecret(preferences);
-    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
-      showError("Barkod gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
-      return false;
-    }
-    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
-    if (actionTargetKey.isEmpty()) {
-      showError("Barkod gönderim hedefi doğrulanamadı.");
-      return false;
-    }
-
-    try {
-      for (ActionOutbox.PendingAction existing : actionOutbox.load()) {
-        if (!existing.matchesTarget(actionTargetKey)) {
-          showError("Telefonda önceki bağlantıya ait bekleyen işlem var.");
-          return false;
-        }
-      }
-    } catch (ActionOutbox.OutboxException error) {
-      showError(error.getMessage());
-      return false;
-    }
-
-    final ActionOutbox.PendingAction pending;
-    try {
-      pending = ActionOutbox.PendingAction.create(
-          ActionOutbox.createActionId(),
-          MarketUiRules.ACTION_BARCODE_SCAN,
-          actionPayload,
-          actionTargetKey
-      );
-      ArrayList<ActionOutbox.PendingAction> additions = new ArrayList<>();
-      additions.add(pending);
-      actionOutbox.appendAll(additions);
-    } catch (ActionOutbox.OutboxException error) {
-      showError(error.getMessage());
-      return false;
-    }
-
-    clearError();
-    executor.execute(() -> {
-      try {
-        OperationData.ActionRecord accepted = operationsTransport.enqueueAction(
-            baseUrl,
-            syncSecret,
-            identity,
-            pending.id,
-            pending.type,
-            pending.payload
-        );
-        actionOutbox.remove(pending.id);
-        runOnUiThread(() -> {
-          data.actions.add(0, accepted);
-          if ("pending".equals(accepted.status)) {
-            data.pendingActions += 1;
-          }
-          if (marketWorkspace != null) marketWorkspace.onBarcodeScanAccepted(barcode, "Gönderildi");
-        });
-      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException error) {
-        boolean rejected = error instanceof AndroidOperationsTransport.TransportException
-            && ((AndroidOperationsTransport.TransportException) error).invalidatesPendingAction();
-        if (rejected) {
-          try {
-            actionOutbox.remove(pending.id);
-          } catch (ActionOutbox.OutboxException ignored) {
-            // The action id remains safe to replay because desktop receipts are idempotent.
-          }
-        }
-        runOnUiThread(() -> {
-          if (marketWorkspace != null) {
-            marketWorkspace.onBarcodeScanQueued(
-                barcode,
-                rejected
-                    ? "Gönderilemedi"
-                    : "Gönderim bekliyor; eski taramalar masaüstünde zaman aşımına uğrar"
-            );
-          }
-          if (rejected) showError(error.getMessage());
-        });
-      }
-    });
-    return true;
-  }
-
-  private boolean sendActionsInternal(
-      List<ActionSpec> actions,
-      String successMessage,
-      String marketQueuedMessage
-  ) {
-    if (loading) {
-      Toast.makeText(this, "Devam eden bağlantı işleminin bitmesini bekleyin.", Toast.LENGTH_SHORT).show();
-      return false;
-    }
-    for (ActionSpec action : actions) {
-      String validationError = AndroidActionPolicy.validationError(
-          data,
-          action.type,
-          action.payload
-      );
-      if (!validationError.isEmpty()) {
-        showError(validationError);
-        if (!"Cihaz masaüstünde pasifleştirilmiş.".equals(validationError)) {
-          Toast.makeText(this, validationError, Toast.LENGTH_SHORT).show();
-        }
-        return false;
-      }
-    }
-    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
-    String syncSecret = ConnectionSettings.syncSecret(preferences);
-    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
-      showError("İşlem gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
-      return false;
-    }
-    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
-    if (actionTargetKey.isEmpty()) {
-      showError("İşlem hedefi doğrulanamadı.");
-      return false;
-    }
-
-    try {
-      if (!actionOutbox.load().isEmpty()) {
-        Toast.makeText(this, "Önce telefonda bekleyen işlem yeniden gönderiliyor.", Toast.LENGTH_SHORT).show();
-        syncOperations(false);
-        return false;
-      }
-    } catch (ActionOutbox.OutboxException error) {
-      showError(error.getMessage());
-      return false;
-    }
-    if (data.pendingActions > 0) {
-      showError("Önce masaüstünü bekleyen işlemleri uygulayın ve canlı veriyi yenileyin.");
-      Toast.makeText(this, "Güncel sonuç alınmadan yeni işlem gönderilemez.", Toast.LENGTH_SHORT).show();
-      return false;
-    }
-
-    ArrayList<ActionOutbox.PendingAction> pendingActions = new ArrayList<>();
-    try {
-      for (ActionSpec action : actions) {
-        pendingActions.add(ActionOutbox.PendingAction.create(
-            action.id,
-            action.type,
-            action.payload,
-            actionTargetKey
-        ));
-      }
-      actionOutbox.appendAll(pendingActions);
-    } catch (ActionOutbox.OutboxException error) {
-      showError(error.getMessage());
-      return false;
-    }
-
-    final String feedbackActionType = actions.size() == 1 ? actions.get(0).type : "";
-    loading = true;
-    clearError();
-    executor.execute(() -> {
-      ArrayList<OperationData.ActionRecord> queued = new ArrayList<>();
-      try {
-        for (ActionOutbox.PendingAction action : pendingActions) {
-          OperationData.ActionRecord accepted = operationsTransport.enqueueAction(baseUrl, syncSecret, identity, action.id, action.type, action.payload);
-          actionOutbox.remove(action.id);
-          queued.add(accepted);
-        }
-        runOnUiThread(() -> {
-          loading = false;
-          for (int index = queued.size() - 1; index >= 0; index -= 1) {
-            data.actions.add(0, queued.get(index));
-          }
-          data.pendingActions += pendingActionCount(queued);
-          clearError();
-          if (marketQueuedMessage != null && marketWorkspace != null) {
-            marketWorkspace.onSubmissionAccepted(feedbackActionType, successMessage);
-            Toast.makeText(this, successMessage, Toast.LENGTH_SHORT).show();
-          }
-          render();
-        });
-      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException error) {
-        boolean rejected = error instanceof AndroidOperationsTransport.TransportException
-            && ((AndroidOperationsTransport.TransportException) error).invalidatesPendingAction();
-        if (rejected) {
-          for (ActionOutbox.PendingAction pending : pendingActions) {
-            try {
-              actionOutbox.remove(pending.id);
-            } catch (ActionOutbox.OutboxException ignored) {
-              // The visible error remains actionable and the next sync retries cleanup.
-            }
-          }
-        }
-        final boolean actionRemainsQueued = !rejected && marketQueuedMessage != null;
-        runOnUiThread(() -> {
-          loading = false;
-          if (!queued.isEmpty()) {
-            for (int index = queued.size() - 1; index >= 0; index -= 1) {
-              data.actions.add(0, queued.get(index));
-            }
-            data.pendingActions += pendingActionCount(queued);
-          }
-          if (actionRemainsQueued && marketWorkspace != null) {
-            connectionState = error.getMessage();
-            clearError();
-            marketWorkspace.onSubmissionQueued(feedbackActionType, marketQueuedMessage);
-            Toast.makeText(this, marketQueuedMessage, Toast.LENGTH_SHORT).show();
-          } else {
-            showError(queued.isEmpty()
-                ? "İşlem gönderilemedi. " + error.getMessage()
-                : "İşlemin bir bölümü gönderildi; kalan bölüm gönderilemedi. " + error.getMessage());
-          }
-          render();
-        });
-      }
-    });
-    return true;
+    return actionDispatcher.sendBarcodeScan(barcode, actionPayload, data);
   }
 
   private void showError(String message) {
@@ -4620,17 +4527,7 @@ public final class MainActivity extends ComponentActivity {
     }
   }
 
-  private static final class ActionSpec {
-    final String id;
-    final String type;
-    final JSONObject payload;
 
-    ActionSpec(String type, JSONObject payload) {
-      this.id = ActionOutbox.createActionId();
-      this.type = type;
-      this.payload = payload;
-    }
-  }
 
   private static final class ChoiceItem {
     final String value;
