@@ -8,13 +8,11 @@ import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -48,14 +46,10 @@ import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.core.content.FileProvider;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.File;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -135,14 +129,7 @@ public final class MainActivity extends ComponentActivity {
   private final Map<String, Integer> screenScrollPositions = new HashMap<>();
   private String renderedScreenKey = "";
   private String currentError = "";
-  private ActivityResultLauncher<Uri> stockCameraLauncher;
-  private ActivityResultLauncher<String[]> stockGalleryLauncher;
-  private ActivityResultLauncher<Uri> identityCameraLauncher;
-  private ActivityResultLauncher<String[]> identityGalleryLauncher;
-  private Uri pendingStockCameraUri;
-  private File pendingStockCameraFile;
-  private Uri pendingIdentityCameraUri;
-  private File pendingIdentityCameraFile;
+  private AndroidImageCaptureController imageCaptureController;
   private CustomerFormSession activeCustomerFormSession;
   private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
   private final Runnable foregroundSyncRunnable = new Runnable() {
@@ -191,8 +178,22 @@ public final class MainActivity extends ComponentActivity {
         getOnBackPressedDispatcher().onBackPressed();
       }
     });
-    registerStockImageLaunchers();
-    registerIdentityImageLaunchers();
+    imageCaptureController = new AndroidImageCaptureController(this, new AndroidImageCaptureController.Listener() {
+      @Override
+      public void onStockImageSelected(Uri uri) {
+        showStockImagePreviewDialog(uri);
+      }
+
+      @Override
+      public void onIdentityImageSelected(Uri uri) {
+        analyzeIdentityImage(uri);
+      }
+
+      @Override
+      public void onError(String message) {
+        showError(message);
+      }
+    });
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
@@ -320,8 +321,9 @@ public final class MainActivity extends ComponentActivity {
       localCompanionDiscovery.stop();
     }
     executor.shutdownNow();
-    deletePendingStockCameraFile();
-    deletePendingIdentityCameraFile();
+    if (imageCaptureController != null) {
+      imageCaptureController.destroy();
+    }
     super.onDestroy();
   }
 
@@ -400,86 +402,18 @@ public final class MainActivity extends ComponentActivity {
     });
   }
 
-  private void registerStockImageLaunchers() {
-    stockCameraLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture() {
-      @Override
-      public Intent createIntent(Context context, Uri input) {
-        Intent intent = super.createIntent(context, input);
-        PackageManager packageManager = context.getPackageManager();
-        if (intent.resolveActivity(packageManager) != null) {
-          return intent;
-        }
 
-        // Android 11+ may restrict an implicit capture intent to preinstalled
-        // camera apps. Some privacy-focused ROMs ship without one even though
-        // the user has installed a compatible camera. Keep TakePicture's URI
-        // grants, but explicitly select the first visible, enabled handler.
-        for (ApplicationInfo application : packageManager.getInstalledApplications(PackageManager.MATCH_ALL)) {
-          Intent packageIntent = new Intent(intent).setPackage(application.packageName);
-          List<ResolveInfo> handlers = packageManager.queryIntentActivities(
-              packageIntent,
-              PackageManager.MATCH_DEFAULT_ONLY
-          );
-          if (handlers.isEmpty()) {
-            continue;
-          }
-          ResolveInfo handler = handlers.get(0);
-          if (handler.activityInfo == null || !handler.activityInfo.enabled || !handler.activityInfo.exported) {
-            continue;
-          }
-          intent.setComponent(new ComponentName(handler.activityInfo.packageName, handler.activityInfo.name));
-          return intent;
-        }
-        return intent;
-      }
-    }, success -> {
-      Uri resultUri = pendingStockCameraUri;
-      if (Boolean.TRUE.equals(success) && resultUri != null) {
-        showStockImagePreviewDialog(resultUri);
-      } else {
-        deletePendingStockCameraFile();
-        Toast.makeText(this, "Fotoğraf çekimi tamamlanmadı.", Toast.LENGTH_SHORT).show();
-      }
-      pendingStockCameraUri = null;
-    });
-    stockGalleryLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
-      if (uri == null) {
-        return;
-      }
-      try {
-        getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-      } catch (SecurityException ignored) {
-        // The picker grant remains valid for the immediate analysis flow.
-      }
-      showStockImagePreviewDialog(uri);
-    });
-  }
+
+
+
+
 
   private void launchStockCamera() {
     if (!data.hasPermission("menu.stock_update") || !AndroidUiRules.canUseAi(data)) {
       showError("Bu cihazda AI destekli stok girişi kullanılamıyor.");
       return;
     }
-    try {
-      deletePendingStockCameraFile();
-      File directory = new File(getCacheDir(), "stock-images");
-      if ((!directory.isDirectory() && !directory.mkdirs()) || !directory.isDirectory()) {
-        throw new IllegalStateException("cache_missing");
-      }
-      pendingStockCameraFile = File.createTempFile("camera-", ".jpg", directory);
-      pendingStockCameraUri = FileProvider.getUriForFile(
-          this,
-          getPackageName() + ".fileprovider",
-          pendingStockCameraFile
-      );
-      stockCameraLauncher.launch(pendingStockCameraUri);
-    } catch (ActivityNotFoundException error) {
-      deletePendingStockCameraFile();
-      showError("Sistem kamera uygulaması bulunamadı. Galeriden görsel seçebilirsiniz.");
-    } catch (Exception error) {
-      deletePendingStockCameraFile();
-      showError("Kamera için güvenli geçici dosya hazırlanamadı.");
-    }
+    imageCaptureController.launchStockCamera();
   }
 
   private void launchStockGallery() {
@@ -487,38 +421,31 @@ public final class MainActivity extends ComponentActivity {
       showError("Bu cihazda AI destekli stok girişi kullanılamıyor.");
       return;
     }
-    try {
-      stockGalleryLauncher.launch(new String[] {"image/jpeg", "image/png", "image/webp"});
-    } catch (ActivityNotFoundException error) {
-      showError("Sistem fotoğraf seçicisi açılamadı.");
+    imageCaptureController.launchStockGallery();
+  }
+
+  private void launchIdentityCamera() {
+    if (activeCustomerFormSession != null) {
+      imageCaptureController.launchIdentityCamera();
+    }
+  }
+
+  private void launchIdentityGallery() {
+    if (activeCustomerFormSession != null) {
+      imageCaptureController.launchIdentityGallery();
     }
   }
 
   private void deletePendingStockCameraFile() {
-    if (pendingStockCameraFile != null && pendingStockCameraFile.isFile()) {
-      pendingStockCameraFile.delete();
+    if (imageCaptureController != null) {
+      imageCaptureController.cleanupStockCameraFile();
     }
-    pendingStockCameraFile = null;
   }
 
-  private void registerIdentityImageLaunchers() {
-    identityCameraLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
-      Uri resultUri = pendingIdentityCameraUri;
-      if (Boolean.TRUE.equals(success) && resultUri != null) {
-        analyzeIdentityImage(resultUri);
-      } else {
-        deletePendingIdentityCameraFile();
-        Toast.makeText(this, "Kimlik fotoğrafı çekimi tamamlanmadı.", Toast.LENGTH_SHORT).show();
-      }
-      pendingIdentityCameraUri = null;
-    });
-    identityGalleryLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
-      if (uri == null) {
-        return;
-      }
-      // Kimlik görseli yalnız bu analiz sırasında okunur; kalıcı URI izni tutulmaz.
-      analyzeIdentityImage(uri);
-    });
+  private void deletePendingIdentityCameraFile() {
+    if (imageCaptureController != null) {
+      imageCaptureController.cleanupIdentityCameraFile();
+    }
   }
 
   private void showIdentityImageSourceDialog() {
@@ -535,49 +462,8 @@ public final class MainActivity extends ComponentActivity {
         .show();
   }
 
-  private void launchIdentityCamera() {
-    if (activeCustomerFormSession == null) {
-      return;
-    }
-    try {
-      deletePendingIdentityCameraFile();
-      File directory = new File(getCacheDir(), "stock-images");
-      if ((!directory.isDirectory() && !directory.mkdirs()) || !directory.isDirectory()) {
-        throw new IllegalStateException("cache_missing");
-      }
-      pendingIdentityCameraFile = File.createTempFile("identity-camera-", ".jpg", directory);
-      pendingIdentityCameraUri = FileProvider.getUriForFile(
-          this,
-          getPackageName() + ".fileprovider",
-          pendingIdentityCameraFile
-      );
-      identityCameraLauncher.launch(pendingIdentityCameraUri);
-    } catch (ActivityNotFoundException error) {
-      deletePendingIdentityCameraFile();
-      showError("Sistem kamera uygulaması bulunamadı. Galeriden görsel seçebilirsiniz.");
-    } catch (Exception error) {
-      deletePendingIdentityCameraFile();
-      showError("Kimlik kamerası için güvenli geçici dosya hazırlanamadı.");
-    }
-  }
 
-  private void launchIdentityGallery() {
-    if (activeCustomerFormSession == null) {
-      return;
-    }
-    try {
-      identityGalleryLauncher.launch(new String[] {"image/jpeg", "image/png", "image/webp"});
-    } catch (ActivityNotFoundException error) {
-      showError("Sistem fotoğraf seçicisi açılamadı.");
-    }
-  }
 
-  private void deletePendingIdentityCameraFile() {
-    if (pendingIdentityCameraFile != null && pendingIdentityCameraFile.isFile()) {
-      pendingIdentityCameraFile.delete();
-    }
-    pendingIdentityCameraFile = null;
-  }
 
   private void analyzeIdentityImage(Uri sourceUri) {
     CustomerFormSession session = activeCustomerFormSession;
@@ -3879,7 +3765,6 @@ public final class MainActivity extends ComponentActivity {
         activeCustomerFormSession = null;
       }
       deletePendingIdentityCameraFile();
-      pendingIdentityCameraUri = null;
     });
     activeCustomerFormSession = session;
     dialog.show();
