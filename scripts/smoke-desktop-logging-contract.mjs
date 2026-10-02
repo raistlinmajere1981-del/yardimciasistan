@@ -89,6 +89,9 @@ assert.match(commerceIpc, /commerce:product:previewExternalImage/);
 // Runtime diagnostics must use the structured API with stable events.
 assert.match(commerceIpc, /product-data\.image-preview\.failed/);
 assert.match(commerceIpc, /product-data\.image-archive\.failed/);
+assert.match(commerceIpc, /commerce\.domain\.rejected/);
+assert.match(commerceIpc, /desktopLog\.warn\(\{[\s\S]*?event:\s*"commerce\.domain\.rejected"/);
+assert.match(commerceIpc, /mutateForIpc\("commerce:sale:createPaid"/);
 assert.match(syncCoordinator, /product-data\.image-archive\.failed/);
 assert.match(dataMaintenance, /restore\.pending\.apply\.failed/);
 assert.match(dataMaintenance, /reset\.preferences\.clear\.failed/);
