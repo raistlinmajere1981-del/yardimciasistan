@@ -1016,7 +1016,34 @@ export class DesktopDatabase {
       entityType: "menu",
       entityId: "qr_menu",
       payload: {
+        category_count: this.getScalarCount("SELECT COUNT(*) as count FROM menu_categories WHERE deleted_at = ''"),
+        item_count: this.getScalarCount("SELECT COUNT(*) as count FROM menu_items WHERE deleted_at = ''")
+      },
+      now
+    });
+  }
 
+  recordSyncEvent(input: RecordSyncEventInput) {
+    const now = new Date().toISOString();
+    insertDatabaseEvent(this.db, {
+      type: input.ok ? "sync.completed" : "sync.failed",
+      entityType: "sync",
+      entityId: `${input.direction}:${input.entityType}`,
+      payload: input.ok
+        ? {
+            direction: input.direction,
+            entity_type: input.entityType,
+            record_count: input.recordCount ?? 0
+          }
+        : {
+            direction: input.direction,
+            entity_type: input.entityType,
+            error_message: input.message ?? "Senkronizasyon başarısız oldu.",
+            status: input.status ?? 0
+          },
+      now
+    });
+  }
 
   recordAndroidActionResult(action: AndroidSyncAction, result: ApplyAndroidActionResult) {
     recordStoredAndroidActionResult(this.db, action, result);
