@@ -155,10 +155,10 @@ export function FinanceWorkspace({
   return (
     <section className="finance-workspace" aria-label="Kasa">
       <div className="finance-summary-grid">
-        <MetricCard compact title="Bugün Gelen" value={formatMinorCurrency(data.todayIncomeMinor)} detail="Kasaya giren" tone="ok" icon={Banknote} />
-        <MetricCard compact title="Bugün Çıkan" value={formatMinorCurrency(data.todayExpenseMinor)} detail="Kaydedilen gider" tone="wait" icon={WalletCards} />
-        <MetricCard compact title="Bugünkü Fark" value={formatMinorCurrency(data.todayNetMinor)} detail="Gelen - çıkan" tone={data.todayNetMinor >= 0 ? "info" : "wait"} icon={CreditCard} />
-        {accommodationFolioEnabled && <MetricCard compact title="Bekleyen Alacak" value={formatMinorCurrency(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "wait" : "ok"} icon={Landmark} />}
+        <MetricCard compact title="Bugün Gelen" value={formatMinorCurrency(data.todayIncomeMinor)} detail="Kasaya giren" tone="success" icon={Banknote} />
+        <MetricCard compact title="Bugün Çıkan" value={formatMinorCurrency(data.todayExpenseMinor)} detail="Kaydedilen gider" tone="warning" icon={WalletCards} />
+        <MetricCard compact title="Bugünkü Fark" value={formatMinorCurrency(data.todayNetMinor)} detail="Gelen - çıkan" tone={data.todayNetMinor >= 0 ? "info" : "warning"} icon={CreditCard} />
+        {accommodationFolioEnabled && <MetricCard compact title="Bekleyen Alacak" value={formatMinorCurrency(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "warning" : "success"} icon={Landmark} />}
       </div>
 
       {topPanel && <div className="finance-top-panel">{topPanel}</div>}
