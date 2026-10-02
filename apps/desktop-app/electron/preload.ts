@@ -155,8 +155,7 @@ import type {
   SaveBusinessLayoutInput
 } from "./business-layout";
 import type { BusinessLocationGeocodeResponse } from "./business-location-geocode";
-import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
-import type { MarketBarcodeFastPullState } from "./commerce-ipc-contract";
+import type { CommerceIpcMutationResult, DesktopCommerceBridge, MarketBarcodeFastPullState } from "./commerce-ipc-contract";
 import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
 import type { CommerceStoreSnapshot } from "./commerce-store";
 import type { InventoryCountResult } from "./commerce-runtime";
@@ -374,6 +373,17 @@ async function invokeWhenUnlocked<T>(channel: string, ...args: unknown[]): Promi
   return ipcRenderer.invoke(channel, ...args) as Promise<T>;
 }
 
+async function invokeCommerceMutation<T>(channel: string, ...args: unknown[]): Promise<T> {
+  const result = await invokeWhenUnlocked<CommerceIpcMutationResult<T>>(channel, ...args);
+  if (result?.ok === true) return result.value;
+  if (result?.ok === false && result.expected === true) {
+    const error = new Error(result.message);
+    error.name = "CommerceDomainError";
+    throw error;
+  }
+  throw new Error("Market işlemi beklenmeyen bir IPC yanıtı döndürdü.");
+}
+
 const bridge: DesktopBridge = {
   setUiScale: (scale: number) => webFrame.setZoomFactor(scale),
   getAppLockStatus: () => ipcRenderer.invoke("appLock:getStatus"),
@@ -471,37 +481,37 @@ const bridge: DesktopBridge = {
     getSnapshot: () => invokeWhenUnlocked<CommerceStoreSnapshot>("commerce:getSnapshot"),
     listCategories: (options) => invokeWhenUnlocked<CatalogCategory[]>("commerce:category:list", options),
     getCategory: (categoryId) => invokeWhenUnlocked<CatalogCategory | null>("commerce:category:get", categoryId),
-    saveCategory: (input) => invokeWhenUnlocked<CatalogCategory>("commerce:category:save", input),
-    deleteCategory: (categoryId) => invokeWhenUnlocked<DeleteCatalogCategoryResult>("commerce:category:delete", categoryId),
+    saveCategory: (input) => invokeCommerceMutation<CatalogCategory>("commerce:category:save", input),
+    deleteCategory: (categoryId) => invokeCommerceMutation<DeleteCatalogCategoryResult>("commerce:category:delete", categoryId),
     listProducts: (options) => invokeWhenUnlocked<CatalogProduct[]>("commerce:product:list", options),
-    saveProduct: (input) => invokeWhenUnlocked<CatalogProduct>("commerce:product:save", input),
+    saveProduct: (input) => invokeCommerceMutation<CatalogProduct>("commerce:product:save", input),
     findProductByBarcode: (barcode) => invokeWhenUnlocked<CatalogProduct | null>("commerce:product:findByBarcode", barcode),
     lookupExternalProductByBarcode: (barcode, mode = "manual") => invokeWhenUnlocked<ProductLookupResponse>("commerce:product:lookupExternal", barcode, mode),
     previewExternalProductImage: (provider, imageUrl) => invokeWhenUnlocked<string>("commerce:product:previewExternalImage", provider, imageUrl),
     getProductImageDataUrl: (productId) => invokeWhenUnlocked<string>("commerce:product:imageDataUrl", productId),
     getInventoryBalance: (productId, locationId) => invokeWhenUnlocked<InventoryBalance>("commerce:inventory:getBalance", productId, locationId),
     listInventoryMovements: (options) => invokeWhenUnlocked<InventoryMovement[]>("commerce:inventory:listMovements", options),
-    applyInventoryMovement: (input) => invokeWhenUnlocked<InventoryMovement>("commerce:inventory:applyMovement", input),
-    setInventoryCount: (input) => invokeWhenUnlocked<InventoryCountResult>("commerce:inventory:setCount", input),
-    createPaidSale: (input) => invokeWhenUnlocked<CommerceSale>("commerce:sale:createPaid", input),
+    applyInventoryMovement: (input) => invokeCommerceMutation<InventoryMovement>("commerce:inventory:applyMovement", input),
+    setInventoryCount: (input) => invokeCommerceMutation<InventoryCountResult>("commerce:inventory:setCount", input),
+    createPaidSale: (input) => invokeCommerceMutation<CommerceSale>("commerce:sale:createPaid", input),
     listCustomerCreditAccounts: (input) => invokeWhenUnlocked("commerce:customerCredit:list", input),
     getCustomerCreditAccount: (customerId) => invokeWhenUnlocked("commerce:customerCredit:get", customerId),
     prepareCustomerCreditWhatsApp: (input) => invokeWhenUnlocked("commerce:customerCredit:prepareWhatsApp", input),
     listCustomerCreditEntries: (customerId, input) => invokeWhenUnlocked("commerce:customerCredit:entries", customerId, input),
-    createCustomerCreditSale: (input) => invokeWhenUnlocked("commerce:customerCredit:sale", input),
-    recordCustomerCreditPayment: (input) => invokeWhenUnlocked("commerce:customerCredit:payment", input),
-    addCustomerCreditAdjustment: (input) => invokeWhenUnlocked("commerce:customerCredit:adjustment", input),
+    createCustomerCreditSale: (input) => invokeCommerceMutation("commerce:customerCredit:sale", input),
+    recordCustomerCreditPayment: (input) => invokeCommerceMutation("commerce:customerCredit:payment", input),
+    addCustomerCreditAdjustment: (input) => invokeCommerceMutation("commerce:customerCredit:adjustment", input),
     listCartDrafts: (options) => invokeWhenUnlocked<CommerceSaleDraftDetail[]>("commerce:cartDraft:list", options),
     getCartDraft: (draftId) => invokeWhenUnlocked<CommerceSaleDraftDetail | null>("commerce:cartDraft:get", draftId),
     loadCartDraftForQuickSale: (draftId) => invokeWhenUnlocked<MarketCartDraftLoadResult>("commerce:cartDraft:loadForQuickSale", draftId),
-    markCartDraftReviewed: (draftId) => invokeWhenUnlocked<CommerceSaleDraft>("commerce:cartDraft:markReviewed", draftId),
+    markCartDraftReviewed: (draftId) => invokeCommerceMutation<CommerceSaleDraft>("commerce:cartDraft:markReviewed", draftId),
     consumePendingBarcodeScans: (options) => invokeWhenUnlocked<MarketBarcodeScanEvent[]>("commerce:barcodeScan:consumePending", options),
     setBarcodeScanMode: (active) => invokeWhenUnlocked<MarketBarcodeFastPullState>("sync:setMarketBarcodeFastPull", active),
     listSuppliers: (options) => invokeWhenUnlocked<CommerceSupplier[]>("commerce:supplier:list", options),
-    saveSupplier: (input) => invokeWhenUnlocked<CommerceSupplier>("commerce:supplier:save", input),
+    saveSupplier: (input) => invokeCommerceMutation<CommerceSupplier>("commerce:supplier:save", input),
     listPurchaseOrders: (options) => invokeWhenUnlocked<CommercePurchaseOrder[]>("commerce:purchase:list", options),
     getPurchaseOrder: (purchaseOrderId) => invokeWhenUnlocked<CommercePurchaseOrderDetail | null>("commerce:purchase:get", purchaseOrderId),
-    receivePurchase: (input) => invokeWhenUnlocked<CommercePurchaseOrderDetail>("commerce:purchase:receive", input)
+    receivePurchase: (input) => invokeCommerceMutation<CommercePurchaseOrderDetail>("commerce:purchase:receive", input)
   },
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
   setAndroidDevicePermissionGroupsBatch: (updates: DesktopAndroidPermissionGroupsUpdate[]) => ipcRenderer.invoke("androidDevice:setPermissionGroupsBatch", updates),
