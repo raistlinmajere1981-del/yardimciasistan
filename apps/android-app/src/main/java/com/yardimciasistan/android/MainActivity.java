@@ -123,13 +123,15 @@ public final class MainActivity extends ComponentActivity {
   private AndroidOperationsSyncController operationsSyncController;
   private AndroidForegroundSyncController foregroundSyncController;
   private AndroidActionDispatcher actionDispatcher;
+  private AndroidConnectionController connectionController;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private CustomerFormDialog activeCustomerFormDialog;
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
-    resetDebugAppStateIfRequested();
+    connectionController = new AndroidConnectionController(this, preferences);
+    connectionController.resetDebugAppStateIfRequested(getIntent());
     themeMode = AppTheme.load(preferences);
     setTheme(themeStyleResource(themeMode));
     super.onCreate(savedInstanceState);
@@ -210,7 +212,7 @@ public final class MainActivity extends ComponentActivity {
     stockImageAnalysisController = new StockImageAnalysisController(this, executor, syncClient);
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
-    ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
+    ConnectionSettings.setDebugConnectionOverrideActive(preferences, connectionController.isDebugConnectionOverrideRequested(getIntent()));
     ConnectionSettings.ensureDefaults(preferences);
     operationsTransport = new CompanionOperationsRouter(preferences);
     localCompanionDiscovery = new LocalCompanionDiscovery(this, preferences);
@@ -1182,49 +1184,18 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void applyConnectionExtras() {
-    String extraUrl = getIntent().getStringExtra("ya_web_module_url");
-    String extraSecret = getIntent().getStringExtra("ya_sync_secret");
-    boolean debugOverride = isDebugConnectionOverrideRequested();
-    if (ConnectionSettings.isEmbeddedConnectionLocked() && !debugOverride) {
-      return;
-    }
-    if (data.permissionsResolved && !data.hasPermission("settings.edit") && !debugOverride) {
-      return;
-    }
-    if (extraUrl != null && extraSecret != null
-        && !extraUrl.trim().isEmpty() && !extraSecret.trim().isEmpty()) {
-      try {
-        for (ActionOutbox.PendingAction pending : actionOutbox.load()) {
-          if (!pending.matchesTarget(CompanionConnectionIdentity.actionTargetKey(extraUrl.trim()))) {
-            connectionState = "Önceki bağlantıya ait bekleyen işlem korunuyor";
-            return;
-          }
-        }
-      } catch (ActionOutbox.OutboxException error) {
-        connectionState = error.getMessage();
-        return;
-      }
-      preferences.edit()
-          .putString(ConnectionSettings.KEY_WEB_MODULE_URL, extraUrl.trim())
-          .putString(ConnectionSettings.KEY_SYNC_SECRET, extraSecret.trim())
-          .apply();
+    AndroidConnectionController.ApplyResult result =
+        connectionController.applyIntentConnection(getIntent(), data, actionOutbox);
+    if (!result.connectionState.isEmpty()) {
+      connectionState = result.connectionState;
     }
   }
 
-  private boolean isDebugConnectionOverrideRequested() {
-    return isDebuggable()
-        && getIntent().getBooleanExtra("ya_allow_debug_connection_override", false);
-  }
 
-  private void resetDebugAppStateIfRequested() {
-    if (isDebuggable() && getIntent().getBooleanExtra("ya_reset_debug_app_state", false)) {
-      DeviceIdentity.clearAppStateKeepingIdentity(preferences);
-    }
-  }
 
-  private boolean isDebuggable() {
-    return (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-  }
+
+
+
 
   private void applyNotificationIntent(Intent intent) {
     if (intent == null) {
@@ -4361,7 +4332,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private boolean hasConnectionSettings() {
-    return ConnectionSettings.isComplete(preferences);
+    return connectionController != null && connectionController.hasConnectionSettings();
   }
 
   private boolean isPensionReservation(OperationData.ReservationRecord reservation) {
