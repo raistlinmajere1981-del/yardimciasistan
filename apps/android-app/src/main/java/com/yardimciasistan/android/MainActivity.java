@@ -126,6 +126,7 @@ public final class MainActivity extends ComponentActivity {
   private String currentError = "";
   private AndroidImageCaptureController imageCaptureController;
   private AndroidProvisioningController provisioningController;
+  private AndroidOperationsSyncController operationsSyncController;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private CustomerFormDialog activeCustomerFormDialog;
@@ -239,6 +240,16 @@ public final class MainActivity extends ComponentActivity {
     actionOutbox = new ActionOutbox(preferences);
     operationCache = new OperationCache(preferences, identity.deviceId);
     localNotifications = new LocalNotificationCenter(this, preferences);
+    operationsSyncController = new AndroidOperationsSyncController(
+        this,
+        preferences,
+        executor,
+        operationsTransport,
+        identity,
+        actionOutbox,
+        operationCache,
+        localNotifications
+    );
     marketWorkspace = new MarketWorkspace(this, new MarketWorkspace.Listener() {
       @Override
       public boolean onSubmit(
@@ -3904,177 +3915,85 @@ public final class MainActivity extends ComponentActivity {
       showError("Bu cihazın bağlantı ayarlarını değiştirme yetkisi yok.");
       return;
     }
+
     String baseUrl = readSettingsInputs && webModuleInput != null
         ? webModuleInput.getText().toString().trim()
         : ConnectionSettings.webModuleUrl(preferences);
     String syncSecret = readSettingsInputs && syncSecretInput != null
         ? syncSecretInput.getText().toString().trim()
         : ConnectionSettings.syncSecret(preferences);
-    if (baseUrl.isEmpty()) {
-      showError("Web modül adresi gerekli.");
-      return;
-    }
-    if (syncSecret.isEmpty()) {
-      showError("Güvenlik anahtarı gerekli.");
-      return;
-    }
 
-    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
-    final String preferredSourceKey = operationsTransport.preferredSourceKey(baseUrl, syncSecret);
-    if (actionTargetKey.isEmpty() || preferredSourceKey.isEmpty()) {
-      showError("Bağlantı hedefi doğrulanamadı.");
-      return;
-    }
+    operationsSyncController.sync(baseUrl, syncSecret, data, new AndroidOperationsSyncController.Listener() {
+      @Override
+      public void onRejected(String message) {
+        showError(message);
+      }
 
-    final List<ActionOutbox.PendingAction> pendingToRetry;
-    try {
-      pendingToRetry = actionOutbox.load();
-      for (ActionOutbox.PendingAction pending : pendingToRetry) {
-        if (!pending.matchesTarget(actionTargetKey)) {
-          showError("Telefonda önceki bağlantıya ait bekleyen işlem var. Önce eski bağlantı bilgileriyle işlemi gönderin.");
-          return;
+      @Override
+      public void onStarted(String nextConnectionState) {
+        loading = true;
+        connectionState = nextConnectionState;
+        clearError();
+      }
+
+      @Override
+      public void onSuccess(AndroidOperationsSyncController.SyncResult result) {
+        if (!result.usedLocalTransport) {
+          if (result.webAllowsLocalNetwork) {
+            startLocalDiscoveryIfDue(false);
+          } else {
+            ConnectionSettings.clearLocalEndpoint(preferences);
+          }
+        }
+
+        data = result.data;
+        loading = false;
+        connectionState = result.connectionState;
+        if (result.discardedActionCount > 0) {
+          showError(result.discardedActionCount + " bekleyen telefon işlemi yeni yetki veya capability sınırı nedeniyle iptal edildi.");
+        } else {
+          clearError();
+          if (result.retryingOnlyMarketActions && marketWorkspace != null) {
+            marketWorkspace.onSubmissionAccepted(
+                result.retriedMarketActionType,
+                "Bekleyen Market işlemi masaüstüne gönderildi."
+            );
+          }
+        }
+        if (result.shouldRender) {
+          render();
         }
       }
-    } catch (ActionOutbox.OutboxException error) {
-      showError(error.getMessage());
-      return;
-    }
-    final boolean retryingOnlyMarketActions = containsOnlyMarketActions(pendingToRetry);
-    final String retriedMarketActionType = retryingOnlyMarketActions && !pendingToRetry.isEmpty()
-        ? pendingToRetry.get(pendingToRetry.size() - 1).type
-        : "";
 
-    preferences.edit()
-        .putString(ConnectionSettings.KEY_WEB_MODULE_URL, baseUrl)
-        .putString(ConnectionSettings.KEY_SYNC_SECRET, syncSecret)
-        .apply();
-    loading = true;
-    connectionState = pendingToRetry.isEmpty() ? "Canlı veri çekiliyor" : "Bekleyen işlemler yeniden gönderiliyor";
-    clearError();
-    final OperationData previousData = operationCache.load();
-    final OperationData fallbackData = data;
-    executor.execute(() -> {
-      try {
-        int invalidatedPendingActions = 0;
-        for (ActionOutbox.PendingAction pending : pendingToRetry) {
-          try {
-            operationsTransport.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
-            actionOutbox.remove(pending.id);
-          } catch (AndroidOperationsTransport.TransportException error) {
-            if (!error.invalidatesPendingAction()) {
-              throw error;
-            }
-            actionOutbox.remove(pending.id);
-            invalidatedPendingActions += 1;
-            if (error.disablesAndroidService()) {
-              actionOutbox.clear();
-              throw error;
-            }
-          }
-        }
-        AndroidOperationsTransport.FetchResult fetched = operationsTransport.fetchOperations(
-            baseUrl,
-            syncSecret,
-            identity,
-            operationCache.revision(preferredSourceKey)
-        );
-        final String fetchedSourceKey = fetched.sourceKey.isEmpty()
-            ? preferredSourceKey
-            : fetched.sourceKey;
-        final OperationData nextData;
-        if (!fetched.notModified && fetched.data != null) {
-          operationCache.save(fetched.payload, fetchedSourceKey, fetched.serverRevision);
-          OperationData cachedData = operationCache.load();
-          nextData = cachedData == null ? fetched.data : cachedData;
+      @Override
+      public void onAndroidDisabled(OperationData disabledData, String message) {
+        data = disabledData;
+        loading = false;
+        connectionState = message;
+        showError(message);
+        render();
+      }
+
+      @Override
+      public void onFailure(
+          String message,
+          boolean retryingOnlyMarketActions,
+          String retriedMarketActionType
+      ) {
+        loading = false;
+        connectionState = message;
+        if (retryingOnlyMarketActions && marketWorkspace != null) {
+          clearError();
+          marketWorkspace.onSubmissionQueued(
+              retriedMarketActionType,
+              "Gönderim bekliyor. Bağlantı gelince yeniden gönderilecek."
+          );
+          render();
         } else {
-          nextData = previousData == null ? fallbackData : previousData;
-          nextData.pulledAt = fetched.payload.optString("pulled_at", nextData.pulledAt);
-          nextData.pendingActions = Math.max(0, fetched.payload.optInt("pending_action_count", nextData.pendingActions));
+          showError(message);
         }
-        if (!fetched.notModified) {
-          localNotifications.processSnapshot(previousData, nextData);
-        }
-        localNotifications.recordSyncSuccess();
-        final int discardedActionCount = invalidatedPendingActions;
-        final boolean usedLocalTransport = fetchedSourceKey.startsWith("local:");
-        final boolean webAllowsLocalNetwork = fetched.payload.optBoolean("local_network_enabled", true);
-        final String successfulConnectionState = usedLocalTransport
-            ? "Yerel ağ bağlı"
-            : "Web bağlantısı hazır";
-        runOnUiThread(() -> {
-          if (!usedLocalTransport) {
-            if (webAllowsLocalNetwork) {
-              startLocalDiscoveryIfDue(false);
-            } else {
-              ConnectionSettings.clearLocalEndpoint(preferences);
-            }
-          }
-          data = nextData;
-          loading = false;
-          connectionState = successfulConnectionState;
-          if (discardedActionCount > 0) {
-            showError(discardedActionCount + " bekleyen telefon işlemi yeni yetki veya capability sınırı nedeniyle iptal edildi.");
-          } else {
-            clearError();
-            if (retryingOnlyMarketActions && marketWorkspace != null) {
-              marketWorkspace.onSubmissionAccepted(
-                  retriedMarketActionType,
-                  "Bekleyen Market işlemi masaüstüne gönderildi."
-              );
-            }
-          }
-          if (!fetched.notModified || !pendingToRetry.isEmpty()) {
-            render();
-          }
-        });
-      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
-        if (error instanceof AndroidOperationsTransport.TransportException
-            && ((AndroidOperationsTransport.TransportException) error).disablesAndroidService()) {
-          OperationData disabledData = OperationData.androidCapabilityDisabled();
-          String disabledMessage = error.getMessage();
-          try {
-            operationCache.clear();
-            actionOutbox.clear();
-          } catch (OperationCache.CacheException | ActionOutbox.OutboxException cleanupError) {
-            disabledMessage += " " + cleanupError.getMessage();
-          }
-          localNotifications.processSnapshot(previousData, disabledData);
-          localNotifications.recordSyncSuccess();
-          final String visibleDisabledMessage = disabledMessage;
-          runOnUiThread(() -> {
-            data = disabledData;
-            loading = false;
-            connectionState = visibleDisabledMessage;
-            showError(visibleDisabledMessage);
-            render();
-          });
-          return;
-        }
-        localNotifications.recordSyncFailure(previousData, error.getMessage());
-        runOnUiThread(() -> {
-          loading = false;
-          connectionState = error.getMessage();
-          if (retryingOnlyMarketActions && marketWorkspace != null) {
-            clearError();
-            marketWorkspace.onSubmissionQueued(
-                retriedMarketActionType,
-                "Gönderim bekliyor. Bağlantı gelince yeniden gönderilecek."
-            );
-            render();
-          } else {
-            showError(error.getMessage());
-          }
-        });
       }
     });
-  }
-
-  private boolean containsOnlyMarketActions(List<ActionOutbox.PendingAction> pendingActions) {
-    if (pendingActions == null || pendingActions.isEmpty()) return false;
-    for (ActionOutbox.PendingAction pending : pendingActions) {
-      if (MarketUiRules.requiredPermissionForAction(pending.type) == null) return false;
-    }
-    return true;
   }
 
   private void sendAction(String actionType, JSONObject actionPayload, String successMessage) {
