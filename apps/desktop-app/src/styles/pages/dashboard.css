@@ -239,11 +239,11 @@
   -webkit-line-clamp: 2;
 }
 
-.system-health-item.tone-ok {
+.system-health-item.tone-success {
   color: var(--color-success);
 }
 
-.system-health-item.tone-warn {
+.system-health-item.tone-warning {
   color: var(--color-warning);
 }
 
