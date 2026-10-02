@@ -871,5 +871,10 @@
 .dashboard-attention-button {
   font: inherit;
   text-align: left;
-  cursor: pointer;
+}
+
+.dashboard-attention-button:hover:not(:disabled) {
+  background: var(--color-interactive-hover);
+  border-color: var(--color-selected-border);
+  box-shadow: var(--shadow-md);
 }
