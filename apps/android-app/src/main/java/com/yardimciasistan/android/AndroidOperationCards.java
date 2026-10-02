@@ -44,7 +44,7 @@ final class AndroidOperationCards {
   }
 
   private final ComponentActivity activity;
-  private final OperationData data;
+  private OperationData data;
   private final Listener listener;
 
   AndroidOperationCards(
@@ -55,6 +55,10 @@ final class AndroidOperationCards {
     this.activity = activity;
     this.data = data;
     this.listener = listener;
+  }
+
+  void setData(OperationData data) {
+    this.data = data;
   }
 
   View todayRequestCard(OperationData.RequestRecord request) {

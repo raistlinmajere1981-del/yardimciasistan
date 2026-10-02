@@ -999,6 +999,9 @@ public final class MainActivity extends ComponentActivity {
 
   private void render() {
     rememberCurrentScrollPosition();
+    if (operationCards != null) {
+      operationCards.setData(data);
+    }
     boolean canOpenSettings = !data.permissionsResolved || data.deviceActive;
     if (settingsOpen && !canOpenSettings) {
       settingsOpen = false;
