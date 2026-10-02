@@ -28,6 +28,7 @@ import { GlobalMessageBar, type GlobalMessageTone } from "../layout/GlobalMessag
 import { SyncStatusIndicator } from "../layout/SyncStatusIndicator";
 import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
+import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
 import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
@@ -226,6 +227,12 @@ function DesktopAppFrameContent({
           ) : undefined}
           action={(
             <div className="page-header-tools">
+              {activePage === "menu" && aiEnabled && inventoryEnabled && (
+                <StockImageImportWorkspace
+                  menu={surfaceData.menu}
+                  onApplied={desktopSyncController.setDashboardData}
+                />
+              )}
               <SyncStatusIndicator
                 automaticSyncStatus={automaticSyncStatus}
                 onSync={() => void handlePullRequests()}
