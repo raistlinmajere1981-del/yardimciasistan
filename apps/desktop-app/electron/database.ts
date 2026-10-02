@@ -1,5 +1,4 @@
 import { DatabaseSync } from "node:sqlite";
-import { getHospitalityOperations } from "./database/hospitality-operations-store.js";
 import {
   getHospitalityNotifications,
   getKbsOverview,
@@ -9,6 +8,7 @@ import {
 import { DesktopRoomFolioService } from "./room-folio.js";
 import { KbsDeliveryService } from "./kbs-delivery-service.js";
 import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
+import { createDesktopDashboardData } from "./desktop-dashboard-service.js";
 import type { KbsProviderAdapter } from "./kbs-provider-adapter.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
 import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
@@ -201,7 +201,6 @@ export type {
 } from "./database-types.js";
 
 // Main and short-lived service facades publish into the same renderer stream.
-let dashboardRevision = 0;
 
 export class DesktopDatabase {
   private readonly db: DatabaseSync;
@@ -273,60 +272,12 @@ export class DesktopDatabase {
   }
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
-    return readEnabledBusinessCapabilities(this.db);
-  }
-
   getDashboardData(): DesktopDashboardData {
-    const settings = this.db.prepare("SELECT web_module_url FROM settings LIMIT 1").get() as { web_module_url?: string } | undefined;
-    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
-    const requests = getRequests(this.db);
-    const preparedWhatsAppMessages = getStoredPreparedWhatsAppMessages(this.db, requests);
-    const rooms = getStoredRooms(this.db, getStoredActiveResourceReservationTitles(this.db, "room"));
-    const tables = getStoredTables(this.db, getStoredActiveResourceReservationTitles(this.db, "table"));
-
-    return {
-      revision: ++dashboardRevision,
-      ...getHospitalityOperations(this.db, rooms, tables, enabledCapabilities),
-      databasePath: this.databasePath,
-      backupPath: this.backupPath,
-      webModuleUrl: settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
-      requests,
-      preparedWhatsAppMessages,
-      rooms,
-      tables,
-      reservations: getStoredReservations(this.db),
-      dailyTasks: getStoredDailyTasks(this.db),
-      customers: getStoredCustomers(this.db),
-      customerRoomStays: getStoredCustomerRoomStays(this.db),
-      hospitalityNotifications: getHospitalityNotifications(this.db),
-      kbsOverview: getKbsOverview(this.db),
-      androidDevices: this.getAndroidDevices(),
-      paymentWaitingTableOrders: listPaymentWaitingTableOrders(this.db),
-      androidActionFailures: this.getAndroidActionFailures(),
-      attention: getOperationalAttention(this.db, enabledCapabilities),
-      birthdayOverview: readBirthdayOverview(this.db),
-      summary: {
-        newRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status = 'new' AND deleted_at = ''"),
-        waitingRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND deleted_at = ''"),
-        pendingDailyTasks: this.getScalarCount("SELECT COUNT(*) as count FROM daily_tasks WHERE status = 'pending' AND deleted_at = ''"),
-        availableRooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE status = 'available' AND is_active = 1 AND deleted_at = ''"),
-        totalRooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE is_active = 1 AND deleted_at = ''"),
-        availableTables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE status = 'available' AND is_active = 1 AND deleted_at = ''"),
-        pendingReservations: this.getScalarCount("SELECT COUNT(*) as count FROM reservations WHERE status = 'pending' AND deleted_at = ''"),
-        preparedWhatsAppMessages: preparedWhatsAppMessages.length,
-        activeMenuCategories: this.getScalarCount("SELECT COUNT(*) as count FROM menu_categories WHERE is_active = 1 AND deleted_at = ''"),
-        availableMenuItems: this.getScalarCount(`
-          SELECT COUNT(*) as count
-          FROM menu_items
-          INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
-          WHERE menu_items.is_available = 1
-            AND menu_items.deleted_at = ''
-            AND menu_categories.is_active = 1
-            AND menu_categories.deleted_at = ''
-        `)
-      },
-      menu: this.getPublishedMenu()
-    };
+    return createDesktopDashboardData(
+      this.db,
+      this.databasePath,
+      this.backupPath
+    );
   }
 
   getBirthdayOverview(now = new Date()): DesktopBirthdayOverview {
@@ -1063,34 +1014,7 @@ export class DesktopDatabase {
       entityType: "menu",
       entityId: "qr_menu",
       payload: {
-        category_count: this.getScalarCount("SELECT COUNT(*) as count FROM menu_categories WHERE deleted_at = ''"),
-        item_count: this.getScalarCount("SELECT COUNT(*) as count FROM menu_items WHERE deleted_at = ''")
-      },
-      now
-    });
-  }
 
-  recordSyncEvent(input: RecordSyncEventInput) {
-    const now = new Date().toISOString();
-    insertDatabaseEvent(this.db, {
-      type: input.ok ? "sync.completed" : "sync.failed",
-      entityType: "sync",
-      entityId: `${input.direction}:${input.entityType}`,
-      payload: input.ok
-        ? {
-            direction: input.direction,
-            entity_type: input.entityType,
-            record_count: input.recordCount ?? 0
-          }
-        : {
-            direction: input.direction,
-            entity_type: input.entityType,
-            error_message: input.message ?? "Senkronizasyon başarısız oldu.",
-            status: input.status ?? 0
-          },
-      now
-    });
-  }
 
   recordAndroidActionResult(action: AndroidSyncAction, result: ApplyAndroidActionResult) {
     recordStoredAndroidActionResult(this.db, action, result);
@@ -1169,7 +1093,6 @@ import {
   getAndroidReportPresets as getStoredAndroidReportPresets,
 } from "./database/report-store.js";
 
-import { getOperationalAttention } from "./database/operational-attention.js";
 
 import {
   getAndroidDevices as getStoredAndroidDevices,
@@ -1209,7 +1132,6 @@ import {
   listTableOrders as listStoredTableOrders,
   getActiveTableOrder as getStoredActiveTableOrder,
   recalculateTableOrderTotal as recalculateStoredTableOrderTotal,
-  listPaymentWaitingTableOrders,
 } from "./database/table-order-store.js";
 
 import {
