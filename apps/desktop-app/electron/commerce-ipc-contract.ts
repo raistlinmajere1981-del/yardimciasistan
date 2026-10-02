@@ -50,6 +50,10 @@ import type {
   ListMarketCartDraftsOptions
 } from "./market-companion-runtime";
 
+export type CommerceIpcMutationResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; expected: true; code: string; message: string };
+
 export interface MarketBarcodeFastPullState {
   active: boolean;
   intervalMs: number;
