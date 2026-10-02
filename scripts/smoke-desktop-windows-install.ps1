@@ -128,6 +128,35 @@ try {
   else { $env:ELECTRON_ENABLE_LOGGING = $previousLogging }
 }
 
+$updatesRoot = Join-Path $dataDir "updates"
+$downloadsRoot = Join-Path $updatesRoot "downloads"
+$lockedInstaller = Join-Path $downloadsRoot "locked-installer.exe"
+New-Item -ItemType Directory -Path $downloadsRoot -Force | Out-Null
+Set-Content -Path (Join-Path $updatesRoot "pending.json") -Value '{"version":1}' -Encoding utf8
+Set-Content -Path (Join-Path $updatesRoot "installing.json") -Value '{"version":1}' -Encoding utf8
+[System.IO.File]::WriteAllText($lockedInstaller, "locked-installer")
+
+Write-Host "Testing clean-start with Windows FileShare.None installer lock"
+$lockHandle = [System.IO.File]::Open(
+  $lockedInstaller,
+  [System.IO.FileMode]::Open,
+  [System.IO.FileAccess]::Read,
+  [System.IO.FileShare]::None
+)
+try {
+  & node (Join-Path $repoRoot "scripts\smoke-desktop-windows-data.mjs") $dataDir "--locked-cleanup"
+  if ($LASTEXITCODE -ne 0) {
+    throw "Windows kilitli clean-start transient smoke testi başarısız."
+  }
+} finally {
+  $lockHandle.Dispose()
+}
+
+& node (Join-Path $repoRoot "scripts\smoke-desktop-windows-data.mjs") $dataDir "--cleanup-after-unlock"
+if ($LASTEXITCODE -ne 0) {
+  throw "Windows kilit bırakıldıktan sonraki clean-start cleanup testi başarısız."
+}
+
 $uninstaller = Get-ChildItem -Path $installDir -Filter "*.exe" -File |
   Where-Object { $_.Name -match "(?i)uninstall|unins" } |
   Select-Object -First 1
