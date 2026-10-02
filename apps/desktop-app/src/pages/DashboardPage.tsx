@@ -29,6 +29,7 @@ import {
 import { SystemHealthPanel } from "../components/dashboard/SystemHealthPanel";
 import { ActionButton } from "../components/ui/ActionButton";
 import { Panel } from "../components/ui/Panel";
+import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
 
 type DashboardRequest = DesktopDashboardData["requests"][number];
@@ -194,7 +195,7 @@ export function DashboardPage({
   );
 
   return (
-    <div className="dashboard-page page-section">
+    <PageWorkSurface className="dashboard-page page-section">
       <section className="dashboard-briefing" aria-labelledby="dashboard-briefing-title">
         <div className="dashboard-day-card">
           <p className="dashboard-date"><Clock3 size={15} aria-hidden="true" />{formatLongTurkishDate(dashboard.today)}</p>
@@ -423,7 +424,7 @@ export function DashboardPage({
           </Panel>}
         </aside>}
       </section>
-    </div>
+    </PageWorkSurface>
   );
 }
 
