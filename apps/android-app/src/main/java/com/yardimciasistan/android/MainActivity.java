@@ -865,6 +865,35 @@ public final class MainActivity extends ComponentActivity {
     requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, NOTIFICATION_PERMISSION_REQUEST_CODE);
   }
 
+  private void switchTheme() {
+    shell.rememberCurrentScrollPosition();
+    AppTheme.Mode nextMode = themeMode.toggled();
+    boolean persisted = AppTheme.save(preferences, nextMode);
+    themeMode = nextMode;
+    setTheme(themeStyleResource(themeMode));
+    UiKit.applyTheme(AppTheme.tokens(themeMode));
+    applyWindowTheme();
+    shell.build();
+    render();
+    if (!persisted) {
+      Toast.makeText(this, "Tema seçimi kalıcı olarak kaydedilemedi.", Toast.LENGTH_SHORT).show();
+    }
+  }
+
+  private int themeStyleResource(AppTheme.Mode mode) {
+    return mode == AppTheme.Mode.DAY ? R.style.AppTheme_Day : R.style.AppTheme_Night;
+  }
+
+  private void applyWindowTheme() {
+    getWindow().setStatusBarColor(UiKit.BG);
+    getWindow().setNavigationBarColor(UiKit.BG);
+    getWindow().setBackgroundDrawable(new ColorDrawable(UiKit.BG));
+    int flags = themeMode == AppTheme.Mode.DAY
+        ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        : 0;
+    getWindow().getDecorView().setSystemUiVisibility(flags);
+  }
+
   private void render() {
     shell.rememberCurrentScrollPosition();
     if (operationCards != null) {
