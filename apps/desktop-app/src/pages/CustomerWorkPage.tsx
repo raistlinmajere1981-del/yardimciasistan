@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import type { CustomerWorkTab } from "../app/navigation";
 import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
 import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
+import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 
 interface CustomerWorkPageProps {
   requestsEnabled: boolean;
@@ -71,12 +72,14 @@ export function CustomerWorkPage({
       ? "Hazır mesajlar görünümü"
       : "Müşteri yönetimi görünümü";
 
-  const layout = normalizedTab === "customers" ? "flow" : "fill";
-
   return <FeatureWorkspacePage
     label="Müşteri işleri"
     bodyLabel={bodyLabel}
-    layout={layout}
+    layout="fill"
     toolbar={<FeatureViewSelector items={views} value={normalizedTab} onChange={onTabChange} label="Müşteri işleri görünümü" />}
-  >{content}</FeatureWorkspacePage>;
+  >
+    <PageWorkSurface mode="fill" className="customer-work-page-surface">
+      {content}
+    </PageWorkSurface>
+  </FeatureWorkspacePage>;
 }
