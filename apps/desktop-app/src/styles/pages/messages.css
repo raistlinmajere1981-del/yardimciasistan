@@ -431,10 +431,12 @@
     flex-direction: column;
   }
 
+  .whatsapp-view-web {
+    overflow-y: auto;
+  }
+
   .whatsapp-view-web .whatsapp-request-panel {
     flex: none;
-    height: 17.5rem;
-    max-height: 30%;
   }
 }
 
