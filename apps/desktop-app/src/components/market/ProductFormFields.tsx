@@ -12,6 +12,7 @@ import {
   type ProductFormState
 } from "../../app/product-model";
 import { MoneyInput } from "../ui/MoneyInput";
+import { ActionButton } from "../ui/ActionButton";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
 export interface ProductLookupSeed {
@@ -131,9 +132,16 @@ export function ProductFormFields({
         Barkod
         <span className="market-inline-field">
           <input disabled={disabled} value={form.barcode} onChange={(event) => onChange({ ...form, barcode: normalizeBarcodeIdentity(event.target.value, 80) })} />
-          {productDataEnabled && <button type="button" className="market-secondary-button" onClick={() => void lookupProductInfo()} disabled={disabled || lookupBusy || !form.barcode.trim()}>
-            <Sparkles size={15} aria-hidden="true" /> {lookupBusy ? "Aranıyor…" : "Ürün Bilgilerini Ara"}
-          </button>}
+          {productDataEnabled && <ActionButton
+            variant="secondary"
+            type="button"
+            busy={lookupBusy}
+            busyLabel="Aranıyor…"
+            onClick={() => void lookupProductInfo()}
+            disabled={disabled || !form.barcode.trim()}
+          >
+            <Sparkles size={15} aria-hidden="true" /> Ürün Bilgilerini Ara
+          </ActionButton>}
         </span>
       </label>
       <label className="market-field">Kategori<select disabled={disabled} value={form.categoryId} onChange={(event) => onChange({ ...form, categoryId: event.target.value })}><option value="">Kategorisiz</option>{categories.filter((category) => category.isActive).map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
