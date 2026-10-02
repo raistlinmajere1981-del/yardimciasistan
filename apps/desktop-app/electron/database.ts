@@ -1,6 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
 import {
-  getHospitalityNotifications,
   getKbsOverview,
   markHospitalityNotificationSentExternally,
   retryHospitalityNotification
@@ -1167,15 +1166,12 @@ import {
 } from "./database/prepared-message-store.js";
 
 import {
-  getDailyTasks as getStoredDailyTasks,
   saveDailyTask as saveStoredDailyTask,
   deleteDailyTask as deleteStoredDailyTask,
   updateDailyTaskStatus as updateStoredDailyTaskStatus,
 } from "./database/daily-task-store.js";
 
 import {
-  getReservations as getStoredReservations,
-  getActiveResourceReservationTitles as getStoredActiveResourceReservationTitles,
   saveManualRestaurantReservation as saveStoredManualRestaurantReservation,
 } from "./database/reservation-store.js";
 
@@ -1185,13 +1181,8 @@ import {
 import { deleteCustomerInTransaction as deleteStoredCustomerInTransaction } from "./database/customer-deletion-service.js";
 
 import {
-  getCustomers as getStoredCustomers,
   saveCustomer as saveStoredCustomer,
 } from "./database/customer-store.js";
-
-import {
-  getCustomerRoomStays as getStoredCustomerRoomStays,
-} from "./database/customer-room-stay-store.js";
 
 import {
   getAiServiceProfiles as getStoredAiServiceProfiles,
@@ -1200,11 +1191,6 @@ import {
 } from "./database/ai-profile-store.js";
 
 import {
-  getRooms as getStoredRooms,
-} from "./database/room-store.js";
-
-import {
-  getTables as getStoredTables,
   updateTableStatus as updateStoredTableStatus,
   assignTableCustomer as assignStoredTableCustomer,
 } from "./database/table-store.js";
