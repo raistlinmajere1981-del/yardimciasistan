@@ -419,7 +419,7 @@ export function DesktopWorkspaceRouter({
           onOpenReservation={openDashboardReservation}
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
         />
-      ) : activePage === "customerWork" ? (
+      ) : activePage === "customerWork" && (!customerMessagingEnabled || customerWorkTab !== "prepared") ? (
         <CustomerWorkPage
           requestsEnabled={requestsEnabled}
           whatsappEnabled={customerMessagingEnabled}
@@ -439,7 +439,7 @@ export function DesktopWorkspaceRouter({
               aiMessage={aiMessage}
               manualRequestForm={manualRequestForm}
               manualRequestState={manualRequestState}
-                  onSelectRequest={setSelectedRequestId}
+              onSelectRequest={setSelectedRequestId}
               onManualRequestFormChange={setManualRequestForm}
               onCreateManualRequest={handleCreateManualRequest}
               onWhatsApp={openWhatsApp}
@@ -475,47 +475,9 @@ export function DesktopWorkspaceRouter({
               onSessionRetryConsumed={() => setKbsSessionRetryNotificationId("")}
             />
           )}
-          messages={(
-            <CustomerMessagesWorkspace
-              whatsappEnabled={customerMessagingEnabled}
-              prewarmWebview={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
-              active={activePage === "customerWork" && customerWorkTab === "prepared"}
-              safeMode={(onOpenWeb) => (
-                <WhatsAppWorkspace
-                  view="safe"
-                  preparedMessage={messagingController.preparedWhatsAppMessage}
-                  requests={readyWhatsAppRequests}
-                  selectedRequest={selectedWhatsAppRequest}
-                  selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-                  selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
-                  getRequestStatusTone={getRequestStatusTone}
-                  onSelectRequest={setSelectedWhatsAppRequestId}
-                  onOpenExternal={openSelectedWhatsAppExternal}
-                  onOpenWeb={onOpenWeb}
-                  onMessageSent={handleWhatsAppMessageSent}
-                  onDeleteMessage={handleDeleteWhatsAppMessage}
-                />
-              )}
-              webMode={(onReturnToSafe) => (
-                <WhatsAppWorkspace
-                  view="web"
-                  preparedMessage={messagingController.preparedWhatsAppMessage}
-                  requests={readyWhatsAppRequests}
-                  selectedRequest={selectedWhatsAppRequest}
-                  selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-                  selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
-                  getRequestStatusTone={getRequestStatusTone}
-                  onSelectRequest={setSelectedWhatsAppRequestId}
-                  onOpenExternal={openSelectedWhatsAppExternal}
-                  onReturnToSafe={onReturnToSafe}
-                  onMessageSent={handleWhatsAppMessageSent}
-                  onDeleteMessage={handleDeleteWhatsAppMessage}
-                />
-              )}
-            />
-          )}
+          messages={null}
         />
-      ) : activePage === "pension" ? (
+      ) : activePage === "customerWork" ? null : activePage === "pension" ? (
         <PensionPage
           controller={pensionController}
           reservationsEnabled={accommodationReservationsEnabled}
@@ -662,6 +624,62 @@ export function DesktopWorkspaceRouter({
           onDashboardRefresh={onDashboardRefresh}
           registerPageLeaveGuard={registerPageLeaveGuard}
         />
+      )}
+      {customerMessagingEnabled && (
+        <div
+          className={`persistent-customer-messages-page${activePage === "customerWork" && customerWorkTab === "prepared" ? " is-active" : ""}`}
+          aria-hidden={activePage === "customerWork" && customerWorkTab === "prepared" ? undefined : true}
+        >
+          <CustomerWorkPage
+            requestsEnabled={requestsEnabled}
+            whatsappEnabled
+            kbsEnabled={surfaceData.kbsOverview.enabled}
+            activeTab="prepared"
+            onTabChange={setCustomerWorkTab}
+            requests={null}
+            customers={null}
+            kbs={null}
+            messages={(
+              <CustomerMessagesWorkspace
+                whatsappEnabled
+                prewarmWebview
+                active={activePage === "customerWork" && customerWorkTab === "prepared"}
+                safeMode={(onOpenWeb) => (
+                  <WhatsAppWorkspace
+                    view="safe"
+                    preparedMessage={messagingController.preparedWhatsAppMessage}
+                    requests={readyWhatsAppRequests}
+                    selectedRequest={selectedWhatsAppRequest}
+                    selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+                    selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
+                    getRequestStatusTone={getRequestStatusTone}
+                    onSelectRequest={setSelectedWhatsAppRequestId}
+                    onOpenExternal={openSelectedWhatsAppExternal}
+                    onOpenWeb={onOpenWeb}
+                    onMessageSent={handleWhatsAppMessageSent}
+                    onDeleteMessage={handleDeleteWhatsAppMessage}
+                  />
+                )}
+                webMode={(onReturnToSafe) => (
+                  <WhatsAppWorkspace
+                    view="web"
+                    preparedMessage={messagingController.preparedWhatsAppMessage}
+                    requests={readyWhatsAppRequests}
+                    selectedRequest={selectedWhatsAppRequest}
+                    selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+                    selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
+                    getRequestStatusTone={getRequestStatusTone}
+                    onSelectRequest={setSelectedWhatsAppRequestId}
+                    onOpenExternal={openSelectedWhatsAppExternal}
+                    onReturnToSafe={onReturnToSafe}
+                    onMessageSent={handleWhatsAppMessageSent}
+                    onDeleteMessage={handleDeleteWhatsAppMessage}
+                  />
+                )}
+              />
+            )}
+          />
+        </div>
       )}
     </>
   );
