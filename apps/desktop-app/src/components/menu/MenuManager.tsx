@@ -24,6 +24,7 @@ import { FormDialog } from "../ui/FormDialog";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FeatureWorkspacePage } from "../workspace/FeatureWorkspacePage";
+import { PageWorkSurface } from "../layout/PageWorkSurface";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
 type SyncState = "idle" | "loading" | "success" | "error";
@@ -250,16 +251,19 @@ export function MenuManager({
       <FeatureWorkspacePage
         label={qrMenuEnabled ? "QR menü yönetimi" : "Menü yönetimi"}
         bodyLabel="Menü kayıtları"
+        layout="fill"
         toolbar={stockImageImportEnabled ? (
           <div className="page-toolbar__actions">
             <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
           </div>
         ) : undefined}
       >
-        {qrMenuEnabled && (
-          <QrMenuPanel enabled webModuleUrl={dashboardData.webModuleUrl} onPreview={onPreview} />
-        )}
-        <div className="menu-management-grid">
+        <PageWorkSurface mode="fill" className="menu-page-surface">
+          <div className={`menu-page-layout${qrMenuEnabled ? " has-qr" : ""}`}>
+            {qrMenuEnabled && (
+              <QrMenuPanel enabled webModuleUrl={dashboardData.webModuleUrl} onPreview={onPreview} />
+            )}
+            <div className="menu-management-grid">
           <section className="panel menu-category-panel" data-surface-role="configuration">
             <div className="panel-heading menu-panel-heading">
               <h2>Kategoriler</h2>
@@ -446,7 +450,9 @@ export function MenuManager({
               })}
             </DataList>
           </section>
-        </div>
+            </div>
+          </div>
+        </PageWorkSurface>
       </FeatureWorkspacePage>
 
       {itemCreateOpen && (
