@@ -78,6 +78,7 @@ public final class MainActivity extends ComponentActivity {
   private String connectionState = "Henüz bağlanmadı";
 
   private AndroidShellController shell;
+  private AndroidInteractionController interactionController;
   private String currentError = "";
   private AndroidImageCaptureController imageCaptureController;
   private AndroidProvisioningController provisioningController;
@@ -198,6 +199,7 @@ public final class MainActivity extends ComponentActivity {
           @Override public AppTheme.Mode themeMode() { return themeMode; }
         }
     );
+    interactionController = new AndroidInteractionController(this);
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, connectionController.isDebugConnectionOverrideRequested(getIntent()));
     ConnectionSettings.ensureDefaults(preferences);
     operationsTransport = new CompanionOperationsRouter(preferences);
@@ -1640,88 +1642,31 @@ public final class MainActivity extends ComponentActivity {
 
 
   private void confirm(String title, String message, Runnable action) {
-    AlertDialog dialog = alertDialogBuilder()
-        .setTitle(title)
-        .setMessage(message)
-        .setNegativeButton("Vazgeç", null)
-        .setPositiveButton("Devam Et", (value, which) -> action.run())
-        .create();
-    dialog.setOnShowListener(value -> {
-      dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiKit.PRIMARY);
-      dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiKit.MUTED);
-    });
-    dialog.show();
+    interactionController.confirm(themeMode, title, message, action);
   }
 
   private AlertDialog.Builder alertDialogBuilder() {
-    int dialogTheme = themeMode == AppTheme.Mode.DAY
-        ? android.R.style.Theme_Material_Light_Dialog_Alert
-        : android.R.style.Theme_Material_Dialog_Alert;
-    return new AlertDialog.Builder(this, dialogTheme);
+    return interactionController.alertDialogBuilder(themeMode);
   }
 
   private void configureFullDialog(Dialog dialog) {
-    Window window = dialog.getWindow();
-    if (window != null) {
-      window.setBackgroundDrawable(new ColorDrawable(UiKit.BG));
-      window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-    }
+    interactionController.configureFullDialog(dialog);
   }
 
   private void configureBottomDialog(Dialog dialog) {
-    Window window = dialog.getWindow();
-    if (window != null) {
-      window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-      window.setGravity(Gravity.BOTTOM);
-      window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    }
+    interactionController.configureBottomDialog(dialog);
   }
 
   private void openDialer(String phone) {
-    if (phone == null || phone.trim().isEmpty()) {
-      Toast.makeText(this, "Telefon numarası bulunamadı.", Toast.LENGTH_SHORT).show();
-      return;
-    }
-    openIntent(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(phone.trim()))), "Arama uygulaması açılamadı.");
+    interactionController.openDialer(phone);
   }
 
   private void openWhatsApp(String phone, String message) {
-    if (!AndroidUiRules.canUseWhatsApp(data) || !data.hasPermission("customer.respond")) {
-      Toast.makeText(this, "WhatsApp bu işletmede etkin değil.", Toast.LENGTH_SHORT).show();
-      return;
-    }
-    String normalizedPhone = AndroidPhoneRules.normalizeWhatsAppPhone(phone);
-    if (normalizedPhone.isEmpty()) {
-      Toast.makeText(this, "WhatsApp için telefon numarası bulunamadı.", Toast.LENGTH_SHORT).show();
-      return;
-    }
-    try {
-      String url = "https://wa.me/" + normalizedPhone;
-      if (message != null && !message.trim().isEmpty()) {
-        url += "?text=" + URLEncoder.encode(message.trim(), "UTF-8");
-      }
-      openIntent(new Intent(Intent.ACTION_VIEW, Uri.parse(url)), "WhatsApp bağlantısı açılamadı.");
-    } catch (Exception error) {
-      Toast.makeText(this, "WhatsApp mesajı hazırlanamadı.", Toast.LENGTH_SHORT).show();
-    }
-  }
-
-  private void openIntent(Intent intent, String fallback) {
-    try {
-      startActivity(intent);
-    } catch (ActivityNotFoundException error) {
-      Toast.makeText(this, fallback, Toast.LENGTH_SHORT).show();
-    }
+    interactionController.openWhatsApp(data, phone, message);
   }
 
   private void copyText(String value) {
-    ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-    if (clipboard == null) {
-      Toast.makeText(this, "Kopyalama kullanılamıyor.", Toast.LENGTH_SHORT).show();
-      return;
-    }
-    clipboard.setPrimaryClip(ClipData.newPlainText("Yardımcı Asistan hazır mesaj", value));
-    Toast.makeText(this, "Hazır mesaj kopyalandı.", Toast.LENGTH_SHORT).show();
+    interactionController.copyText(value);
   }
 
   private String headerMetaText() {
