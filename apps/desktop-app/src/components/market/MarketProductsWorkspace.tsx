@@ -251,7 +251,7 @@ export function MarketProductsWorkspace({
               {categories.map((category) => (
                 <button
                   type="button"
-                  className="market-list-row interactive-surface"
+                  className="market-list-row interactive-surface interactive-surface--record"
                   key={category.id}
                   aria-pressed={categoryForm.id === category.id}
                   onClick={() => editCategory(category)}
