@@ -1,6 +1,7 @@
 interface ChoiceChipOption<T extends string> {
   id: T;
   label: string;
+  title?: string;
   disabled?: boolean;
 }
 
@@ -31,6 +32,7 @@ export function ChoiceChips<T extends string>({
             type="button"
             className={active ? "is-active" : ""}
             aria-pressed={active}
+            title={option.title}
             disabled={disabled || option.disabled}
             onClick={() => onChange(option.id)}
           >
