@@ -659,23 +659,7 @@
   height: calc(var(--control-height-lg) + var(--space-5));
   align-items: center;
   flex-wrap: nowrap;
-  cursor: pointer;
   overflow: hidden;
-  transition:
-    background-color var(--motion-hover) var(--ease-standard),
-    border-color var(--motion-hover) var(--ease-standard),
-    box-shadow var(--motion-hover) var(--ease-standard),
-    transform var(--motion-press) var(--ease-standard);
-}
-
-.customer-record-row:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-selected-border);
-  box-shadow: var(--shadow-sm);
-}
-
-.customer-record-row:active {
-  transform: translateY(1px) scale(.997);
 }
 
 .customer-record-row .list-row__main {
