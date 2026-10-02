@@ -28,26 +28,16 @@ import {
   toLocalIsoDate,
   type DatePreset
 } from "./widget-date-utils";
+import {
+  buildMapSearchUrl,
+  normalizeWidgetIntent,
+  resolveWidgetOpenOptions,
+  type WidgetContext,
+  type WidgetOpenOptions,
+  type WidgetView
+} from "./widget-navigation";
 
 type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
-type WidgetView = "home" | "form" | "info" | "whatsapp" | "directions";
-type WidgetIntent = "home" | "accommodation.reserve" | "accommodation.info" | "food.reserve" | "contact.whatsapp" | "info" | "directions";
-
-interface WidgetContext {
-  resourceType?: string;
-  resourceId?: string;
-  resourceName?: string;
-  imageUrl?: string;
-  sourcePath?: string;
-  question?: string;
-  address?: string;
-  mapUrl?: string;
-}
-
-interface WidgetOpenOptions {
-  intent?: WidgetIntent;
-  context?: WidgetContext;
-}
 interface RequestPayload {
   request_type: RequestType;
   customer_name: string;
@@ -186,7 +176,7 @@ export function open(options: WidgetOpenOptions = {}) {
   }
   state = {
     ...state,
-    ...resolveOpenOptions(options),
+    ...resolveWidgetOpenOptions(options, config),
     isOpen: true,
     status: "",
     aiLoading: false,
@@ -1443,49 +1433,6 @@ async function hydrateBusinessContext(loadId: number) {
   }
 }
 
-function resolveOpenOptions(options: WidgetOpenOptions): Partial<WidgetState> {
-  const intent = options.intent ?? "home";
-  const context = normalizeWidgetContext(options.context);
-  if (intent === "accommodation.reserve") {
-    return isRequestTypeEnabled("pension_reservation")
-      ? { view: "form", requestType: "pension_reservation", context, questionDraft: "" }
-      : { view: "home", context: null, questionDraft: "" };
-  }
-  if (intent === "food.reserve") {
-    return isRequestTypeEnabled("restaurant_reservation")
-      ? { view: "form", requestType: "restaurant_reservation", context, questionDraft: "" }
-      : { view: "home", context: null, questionDraft: "" };
-  }
-  if (intent === "contact.whatsapp") {
-    return isWhatsAppEnabled()
-      ? { view: "whatsapp", context, questionDraft: "" }
-      : { view: "home", context: null, questionDraft: "" };
-  }
-  if (intent === "directions") return { view: "directions", context, questionDraft: context?.question ?? "" };
-  if (intent === "accommodation.info" || intent === "info") {
-    if (!config.aiEnabled) return { view: "home", context: null, questionDraft: "" };
-    const name = String(context?.resourceName ?? "").trim();
-    const question = String(context?.question ?? "").trim() || (name ? `${name} hakkında bilgi almak istiyorum.` : "");
-    return { view: "info", context, questionDraft: question };
-  }
-  return { view: "home", context, questionDraft: "" };
-}
-
-function normalizeWidgetContext(value: WidgetContext | undefined): WidgetContext | null {
-  if (!value) return null;
-  const normalized: WidgetContext = {
-    resourceType: String(value.resourceType ?? "").trim(),
-    resourceId: String(value.resourceId ?? "").trim(),
-    resourceName: String(value.resourceName ?? "").trim(),
-    imageUrl: String(value.imageUrl ?? "").trim(),
-    sourcePath: String(value.sourcePath ?? "").trim() || window.location.pathname,
-    question: String(value.question ?? "").trim(),
-    address: String(value.address ?? "").trim(),
-    mapUrl: String(value.mapUrl ?? "").trim()
-  };
-  return Object.values(normalized).some(Boolean) ? normalized : null;
-}
-
 function ensureExternalActionBinding() {
   if (externalActionBound) return;
   externalActionBound = true;
@@ -1509,15 +1456,6 @@ function ensureExternalActionBinding() {
       }
     });
   });
-}
-
-function normalizeWidgetIntent(value: unknown): WidgetIntent | null {
-  const intent = String(value ?? "").trim();
-  return ["home", "accommodation.reserve", "accommodation.info", "food.reserve", "contact.whatsapp", "info", "directions"].includes(intent) ? intent as WidgetIntent : null;
-}
-
-function buildMapSearchUrl(address: string): string {
-  return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "";
 }
 
 function focusWidgetElement(selector: string) {
