@@ -1,12 +1,13 @@
 import { useId, type MouseEvent, type ReactNode } from "react";
 
 /** Presentation only. Resource identity, facts and operations belong to the feature. */
-export function ResourceCard({ title, subtitle, icon, status, tone, children, action, onOpen, openLabel, busy, feedback, error, imageSrc }: {
+export function ResourceCard({ title, subtitle, icon, status, tone, children, action, onOpen, openLabel, busy, feedback, error, imageSrc, selected }: {
   title: string; subtitle?: string; icon: ReactNode; status: ReactNode;
   tone: "neutral" | "success" | "info" | "warning" | "danger";
   children: ReactNode; action?: ReactNode; onOpen: () => void; openLabel: string;
   busy?: boolean; feedback?: string; error?: boolean;
   imageSrc?: string;
+  selected?: boolean;
 }) {
   const id = useId();
   const openFromCardSurface = (event: MouseEvent<HTMLElement>) => {
@@ -19,6 +20,8 @@ export function ResourceCard({ title, subtitle, icon, status, tone, children, ac
     className="resource-card"
     data-tone={tone}
     data-feedback={error ? "error" : feedback ? "success" : undefined}
+    data-selected={selected || undefined}
+    aria-current={selected ? "true" : undefined}
     aria-labelledby={`${id}-title`}
     aria-busy={busy || undefined}
     onClick={openFromCardSurface}
