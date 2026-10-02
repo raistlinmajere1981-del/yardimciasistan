@@ -251,7 +251,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           <div className="customer-operation-card__heading"><div><h3>Hızlı işlemler</h3><small>Müşteri kaydı</small></div></div>
           <div className="action-row customer-workspace-quick-actions">
             {whatsappEnabled && <ActionButton
-              variant="whatsapp"
+              
               size="sm"
               type="button"
               onClick={() => leaveFor(() => onWhatsApp(customer))}
