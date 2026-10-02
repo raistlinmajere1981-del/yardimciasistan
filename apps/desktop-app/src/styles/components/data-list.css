@@ -44,7 +44,7 @@
 }
 
 .interactive-surface:hover:not(:disabled) {
-  background: var(--color-bg-hover);
+  background: var(--color-interactive-hover);
   border-color: var(--color-selected-border);
   box-shadow: var(--shadow-sm);
 }
@@ -69,7 +69,7 @@
 }
 
 .list-row--button:hover:not(:disabled) {
-  background: var(--color-bg-hover);
+  background: var(--color-interactive-hover);
   border-color: var(--color-selected-border);
   box-shadow: var(--shadow-sm);
 }
