@@ -1,0 +1,250 @@
+/* Hospitality workspace composition. Shared operation primitives live in components/operation-surface.css. */
+.operations-workspace.workspace-frame--centered {
+  width: calc(100vw / var(--ui-scale) - var(--space-8));
+  height: calc(100dvh / var(--ui-scale) - var(--space-8));
+}
+
+.operations-workspace :is(button, input, select, summary, .form-check) {
+  min-height: var(--control-height-lg);
+}
+
+.operations-workspace :is(.icon-button, .restaurant-quantity-control button) {
+  min-width: var(--control-height-lg);
+}
+
+.operation-surface--table {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.9fr);
+}
+
+.operation-surface--room {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr) minmax(0, 0.8fr);
+}
+
+.operation-surface--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.operation-surface--table > .operation-panel {
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.room-account-record + .room-account-record {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.operations-workspace .restaurant-order-ticket-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.operations-workspace .restaurant-order-line-list {
+  flex: 1;
+}
+
+.operations-workspace .restaurant-order-line {
+  grid-template-columns:
+    minmax(0, 1fr)
+    calc((var(--control-height-lg) * 2) + var(--space-6))
+    6.5rem
+    var(--control-height-lg);
+}
+
+.operations-workspace .restaurant-order-line__remove {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.operations-workspace .restaurant-quantity-control {
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: var(--control-height-lg) var(--space-6) var(--control-height-lg);
+  width: calc((var(--control-height-lg) * 2) + var(--space-6));
+  justify-self: stretch;
+}
+
+.operations-workspace .restaurant-order-line__total {
+  grid-column: 3;
+  grid-row: 1;
+  width: 6.5rem;
+  text-align: end;
+}
+
+.operations-workspace .restaurant-order-line__note,
+.operations-workspace .restaurant-order-line__note-toggle {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.restaurant-ticket-total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Room/table summaries live inside the workspace header. */
+.operations-workspace .workspace-frame__identity--summary .resource-workspace-summary {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.operations-workspace .workspace-frame__identity--summary .resource-workspace-summary__detail {
+  margin-inline-start: auto;
+}
+
+.operations-workspace .workspace-status-chips {
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.operations-workspace .workspace-status-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.operations-workspace .workspace-status-chips button {
+  min-height: var(--control-height-sm);
+  flex: 0 0 auto;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.operation-surface--sections {
+  padding: var(--space-3);
+  gap: var(--space-3);
+}
+
+.operation-surface--sections > .restaurant-order-menu-panel,
+.operation-surface--sections > .restaurant-order-ticket-panel {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+}
+
+.operation-surface--sections > .operation-panel {
+  border: 0;
+}
+
+.operation-surface--sections .operation-panel__heading {
+  padding: var(--space-2) var(--space-1);
+}
+
+.operation-surface--sections .operation-panel__body {
+  padding: var(--space-3) 0;
+  gap: var(--space-3);
+}
+
+.operation-surface--sections .operation-panel__body > * {
+  flex-shrink: 0;
+}
+
+.operation-surface--sections .stay-secondary-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-sm)), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.stay-secondary-controls > * {
+  min-width: 0;
+}
+
+.operation-surface--sections .operation-section {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.operation-surface--sections .operation-section .operation-section {
+  padding: var(--space-3) 0 0;
+  border-width: 1px 0 0;
+  border-radius: 0;
+}
+
+@media (max-width: 1100px) {
+  .operation-surface {
+    overflow: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    align-content: start;
+  }
+
+  .operation-panel {
+    display: block;
+    overflow: visible;
+  }
+
+  .operation-panel__body {
+    overflow: visible;
+  }
+
+  .operation-panel + .operation-panel,
+  .operation-surface--table > .operation-panel {
+    border-inline-start: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .operations-workspace .restaurant-order-product-list {
+    max-height: 36dvh;
+  }
+
+  .operations-workspace .restaurant-order-line-list {
+    overflow: visible;
+    flex: none;
+  }
+
+  .operations-workspace .restaurant-order-menu-panel {
+    border-inline-end: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .operations-workspace .restaurant-order-line {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .operations-workspace .restaurant-order-line__main {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .operations-workspace .restaurant-quantity-control {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .operations-workspace .restaurant-order-line__total {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .operations-workspace .restaurant-order-line__remove {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .operations-workspace .restaurant-order-line__note,
+  .operations-workspace .restaurant-order-line__note-toggle {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+}
+
+@media (max-width: 480px) {
+  .operation-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .operation-surface--sections .stay-secondary-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resource-workspace-summary__image {
+    width: var(--control-height-lg);
+    height: var(--control-height-lg);
+  }
+}
