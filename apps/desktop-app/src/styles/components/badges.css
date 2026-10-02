@@ -69,7 +69,7 @@
 }
 
 /* StatusChip is interactive; StatusBadge remains descriptive only. */
-.status-chip {
+button.status-chip {
   min-height: var(--control-height-sm);
   padding-inline: var(--space-3);
   font: inherit;
