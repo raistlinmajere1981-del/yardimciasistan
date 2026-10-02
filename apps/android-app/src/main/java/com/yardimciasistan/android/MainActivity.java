@@ -85,11 +85,6 @@ public final class MainActivity extends ComponentActivity {
   private String pensionMode = AndroidUiRules.PENSION_RESERVATIONS;
   private String restaurantMode = AndroidUiRules.RESTAURANT_TABLES;
   private String messageMode = AndroidUiRules.MESSAGES_PREPARED;
-  private String reportPreset = AndroidUiRules.REPORT_LAST_7;
-  private String reportAiAnswer = "";
-  private String reportAiMessage = "";
-  private boolean reportAiLoading;
-  private int reportAiRequestVersion;
   private boolean settingsOpen;
   private boolean loading;
   private String connectionState = "Henüz bağlanmadı";
@@ -114,6 +109,7 @@ public final class MainActivity extends ComponentActivity {
   private AndroidActionDispatcher actionDispatcher;
   private AndroidConnectionController connectionController;
   private AndroidConnectionSettingsPanel connectionSettingsPanel;
+  private ReportsWorkspace reportsWorkspace;
   private IdentityImageAnalysisController identityImageAnalysisController;
   private StockImageAnalysisController stockImageAnalysisController;
   private StockImageWorkflow stockImageWorkflow;
@@ -237,6 +233,19 @@ public final class MainActivity extends ComponentActivity {
         }
     );
     identity = DeviceIdentity.loadOrCreate(this, preferences);
+    reportsWorkspace = new ReportsWorkspace(
+        this,
+        preferences,
+        executor,
+        syncClient,
+        identity,
+        new ReportsWorkspace.Listener() {
+          @Override public boolean isBusy() { return loading; }
+          @Override public void onRefreshRequested() { syncOperations(false); }
+          @Override public void onRenderRequested() { render(); }
+          @Override public void onError(String message) { showError(message); }
+        }
+    );
     stockImageWorkflow = new StockImageWorkflow(
         this,
         preferences,
@@ -1034,7 +1043,7 @@ public final class MainActivity extends ComponentActivity {
       return TAB_CASH;
     }
     if (TAB_REPORTS.equals(activeTab)) {
-      return TAB_REPORTS + ":" + reportPreset;
+      return TAB_REPORTS + ":" + (reportsWorkspace == null ? AndroidUiRules.REPORT_LAST_7 : reportsWorkspace.screenKey());
     }
     return activeTab;
   }
@@ -1420,263 +1429,18 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View reportsScreen() {
-    LinearLayout page = UiKit.column(this);
-    if (!data.isAdmin()) {
-      page.addView(emptyCard(
-          "Bu cihazın raporlara erişim yetkisi yok",
-          "Raporlar yalnız masaüstünde aktif yönetici olarak atanmış telefonlarda açılır."
-      ));
-      return UiKit.scroll(this, page);
-    }
-
-    page.addView(screenIntro(
-        "YÖNETİCİ RAPORU",
-        "İşletmenin kısa görünümü",
-        AndroidUiRules.canUseAi(data)
-            ? "Tutarlar ve adetler masaüstündeki SQLite verisinden hazırlanır. AI yalnız bu hazır özeti açıklar."
-            : "Tutarlar ve adetler masaüstündeki SQLite verisinden hazırlanır.",
-        true
-    ));
-    page.addView(filterBar(new String[][] {
-        {AndroidUiRules.REPORT_TODAY, "Bugün"},
-        {AndroidUiRules.REPORT_YESTERDAY, "Dün"},
-        {AndroidUiRules.REPORT_LAST_7, "Son 7 Gün"},
-        {AndroidUiRules.REPORT_LAST_30, "Son 30 Gün"}
-    }, reportPreset, value -> {
-      reportPreset = AndroidUiRules.normalizeReportPreset(value);
-      reportAiRequestVersion += 1;
-      reportAiLoading = false;
-      reportAiAnswer = "";
-      reportAiMessage = "";
-      render();
-    }));
-
-    OperationData.ReportSnapshot report = data.report(reportPreset);
-    if (report == null) {
-      page.addView(emptyCard(
-          "Rapor verisi henüz hazır değil",
-          "Masaüstünde otomatik senkronu çalıştırın, ardından bu ekrandaki Yenile düğmesine dokunun."
-      ));
-      return UiKit.scroll(this, page);
-    }
-    boolean ordersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
-    boolean customersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS);
-    boolean requestsEnabled = customersEnabled && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS);
-    boolean reservationsEnabled = data.hasAnyReservationCapability();
-    boolean tasksEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TASKS);
-    boolean stockEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_MENU)
-        && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_INVENTORY);
-
-    LinearLayout period = UiKit.card(this);
-    period.addView(settingLine("Dönem", report.label.isEmpty() ? reportPresetLabel(reportPreset) : report.label, UiKit.PRIMARY));
-    period.addView(UiKit.divider(this));
-    period.addView(settingLine("Tarih", formatReportPeriod(report.startDate, report.endDate), UiKit.TEXT));
-    page.addView(period);
-
-    page.addView(sectionLabel("Genel özet"));
-    LinearLayout summary = UiKit.card(this);
-    if (ordersEnabled) {
-      addReportMetric(summary, "Restoran cirosu", money(report.restaurantRevenue, "TRY"), UiKit.SUCCESS);
-      addReportMetric(summary, "Kapanan hesap", String.valueOf(report.closedOrders), UiKit.INFO);
-      addReportMetric(summary, "Ortalama hesap", money(report.averageOrder, "TRY"), UiKit.ACCENT);
-    }
-    if (reservationsEnabled) {
-      addReportMetric(summary, "Onaylanan rezervasyon", String.valueOf(report.approvedReservations), UiKit.PRIMARY);
-    }
-    if (requestsEnabled) {
-      addReportMetric(summary, "Yeni talep", String.valueOf(report.newRequests), UiKit.WARNING);
-    }
-    addReportMetric(summary, "Dikkat gerektiren", String.valueOf(report.attentionCount), report.attentionCount > 0 ? UiKit.DANGER : UiKit.SUCCESS);
-    page.addView(summary);
-
-    if (ordersEnabled) {
-      page.addView(sectionLabel("Restoran"));
-      LinearLayout restaurant = UiKit.card(this);
-      addReportMetric(restaurant, "Satılan ürün", String.valueOf(report.soldItemCount), UiKit.INFO);
-      addReportMetric(restaurant, "İptal edilen hesap", String.valueOf(report.cancelledOrders), report.cancelledOrders > 0 ? UiKit.WARNING : UiKit.SUCCESS);
-      page.addView(restaurant);
-
-      page.addView(sectionLabel("En çok satılan 3 ürün"));
-      if (report.topItems.isEmpty()) {
-        page.addView(emptyCard("Satış satırı yok", "Seçili dönemde kapanmış hesaplara bağlı ürün satışı bulunmuyor."));
-      } else {
-        int rank = 1;
-        for (OperationData.ReportTopItem item : report.topItems) {
-          page.addView(reportTopItemCard(item, rank));
-          rank += 1;
-        }
-      }
-    }
-
-    page.addView(sectionLabel("Şu an dikkat gerektirenler"));
-    LinearLayout attentionSummary = UiKit.card(this);
-    if (requestsEnabled) {
-      addReportMetric(attentionSummary, "Bekleyen müşteri talebi", String.valueOf(report.pendingRequests), UiKit.WARNING);
-    }
-    if (reservationsEnabled) {
-      addReportMetric(attentionSummary, "Bekleyen rezervasyon", String.valueOf(report.pendingReservations), UiKit.WARNING);
-    }
-    if (ordersEnabled) {
-      addReportMetric(attentionSummary, "Hesap bekleyen masa", String.valueOf(report.paymentWaitingTables), UiKit.DANGER);
-    }
-    if (tasksEnabled) {
-      addReportMetric(attentionSummary, "Geciken / tamamlanmayan iş", report.overdueTasks + " / " + report.incompleteTasks, UiKit.ACCENT);
-    }
-    if (stockEnabled) {
-      addReportMetric(attentionSummary, "Tükenen / az stok", report.outOfStockItems + " / " + report.lowStockItems, UiKit.DANGER);
-    }
-    page.addView(attentionSummary);
-    if (report.attentionItems.isEmpty()) {
-      page.addView(emptyCard("Acil başlık yok", "Şu anda ayrıca listelenecek dikkat başlığı bulunmuyor."));
-    } else {
-      for (OperationData.ReportAttentionItem item : report.attentionItems) {
-        page.addView(reportAttentionCard(item));
-      }
-    }
-
-    if (AndroidUiRules.canUseAi(data)) {
-      page.addView(sectionLabel("AI yorumu (isteğe bağlı)"));
-      page.addView(UiKit.text(
-          this,
-          "AI yeni hesap yapmaz; yalnız yukarıdaki hazır JSON özetini kısa ve sade biçimde açıklar.",
-          12,
-          UiKit.SECONDARY,
-          Typeface.NORMAL
-      ));
-      page.addView(reportAiButton("Bu dönemi özetle", "summary"));
-      page.addView(reportAiButton("Dikkat edilmesi gerekenler", "attention"));
-      if (ordersEnabled) {
-        page.addView(reportAiButton("Satışları yorumla", "sales"));
-      }
-      page.addView(reportAiButton("3 kısa öneri ver", "recommendations"));
-      if (reportAiLoading) {
-        page.addView(emptyCard("AI yorumu hazırlanıyor", "Hazır rapor güvenli sunucu bağlantısı üzerinden yorumlanıyor."));
-      } else if (!reportAiAnswer.isEmpty()) {
-        LinearLayout answer = UiKit.card(this);
-        answer.setBackground(UiKit.rounded(this, UiKit.PRIMARY_DARK, UiKit.PRIMARY, 14));
-        answer.addView(UiKit.text(this, reportAiAnswer, 13, UiKit.TEXT, Typeface.NORMAL));
-        page.addView(answer);
-      } else if (!reportAiMessage.isEmpty()) {
-        LinearLayout message = UiKit.card(this);
-        message.addView(UiKit.text(this, reportAiMessage, 13, UiKit.WARNING, Typeface.BOLD));
-        page.addView(message);
-      }
-    }
-    return UiKit.scroll(this, page);
+    return reportsWorkspace.build(data);
   }
 
-  private void addReportMetric(LinearLayout card, String label, String value, int tone) {
-    if (card.getChildCount() > 0) {
-      card.addView(UiKit.divider(this));
-    }
-    card.addView(settingLine(label, value, tone));
-  }
 
-  private View reportTopItemCard(OperationData.ReportTopItem item, int rank) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    TextView name = UiKit.text(this, rank + ". " + item.name, 14, UiKit.TEXT, Typeface.BOLD);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(name);
-    top.addView(statusBadge(money(item.revenue, "TRY"), UiKit.SUCCESS));
-    card.addView(top);
-    card.addView(UiKit.text(
-        this,
-        "Satılan miktar: " + stockNumber(item.quantity),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    return card;
-  }
 
-  private View reportAttentionCard(OperationData.ReportAttentionItem item) {
-    LinearLayout card = UiKit.card(this);
-    card.addView(UiKit.text(this, item.title, 14, UiKit.TEXT, Typeface.BOLD));
-    if (!item.detail.isEmpty()) {
-      card.addView(UiKit.text(this, item.detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    }
-    return card;
-  }
 
-  private View reportAiButton(String label, String mode) {
-    Button button = UiKit.outlineButton(this, label, view -> requestReportAi(mode));
-    button.setEnabled(!reportAiLoading);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-    params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    button.setLayoutParams(params);
-    return button;
-  }
 
-  private void requestReportAi(String mode) {
-    if (!data.isAdmin() || !AndroidUiRules.canUseAi(data)) {
-      reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.";
-      showError(reportAiMessage);
-      render();
-      return;
-    }
-    if ("sales".equals(mode) && !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)) {
-      reportAiMessage = "Restoran sipariş capability'si kapalı olduğu için satış yorumu kullanılamıyor.";
-      render();
-      return;
-    }
-    if (data.report(reportPreset) == null) {
-      reportAiMessage = "Rapor verisi henüz hazır değil. Masaüstünde senkronu yenileyin.";
-      render();
-      return;
-    }
-    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
-    String syncSecret = ConnectionSettings.syncSecret(preferences);
-    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
-      reportAiMessage = "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.";
-      render();
-      return;
-    }
 
-    final String requestedPreset = reportPreset;
-    final int requestVersion = ++reportAiRequestVersion;
-    reportAiLoading = true;
-    reportAiAnswer = "";
-    reportAiMessage = "";
-    render();
-    executor.execute(() -> {
-      try {
-        String answer = syncClient.generateReportComment(
-            baseUrl,
-            syncSecret,
-            identity,
-            mode,
-            requestedPreset
-        );
-        runOnUiThread(() -> {
-          if (requestVersion != reportAiRequestVersion || !requestedPreset.equals(reportPreset)) {
-            return;
-          }
-          reportAiLoading = false;
-          if (!data.isAdmin() || !AndroidUiRules.canUseAi(data)) {
-            reportAiAnswer = "";
-            reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.";
-          } else {
-            reportAiAnswer = answer;
-            reportAiMessage = "";
-          }
-          render();
-        });
-      } catch (HostingSyncClient.SyncException error) {
-        runOnUiThread(() -> {
-          if (requestVersion != reportAiRequestVersion || !requestedPreset.equals(reportPreset)) {
-            return;
-          }
-          reportAiLoading = false;
-          reportAiAnswer = "";
-          reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.".equals(error.getMessage())
-              ? error.getMessage()
-              : "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.";
-          render();
-        });
-      }
-    });
-  }
+
+
+
+
 
   private View settingsScreen() {
     LinearLayout page = UiKit.column(this);
