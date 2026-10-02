@@ -567,6 +567,7 @@ export function DesktopWorkspaceRouter({
           ordersEnabled={foodOrdersEnabled}
           menuEnabled={foodMenuEnabled}
           tasksEnabled={tasksEnabled}
+          onDashboardDataChanged={setDashboardData}
           reservations={foodReservationsEnabled ? (
             <RestaurantReservationsWorkspace
               customersEnabled={customersEnabled}
@@ -610,7 +611,6 @@ export function DesktopWorkspaceRouter({
           onReorderCategories={handleReorderMenuCategories}
           onReorderItems={handleReorderMenuItems}
           onDeleteCategoryById={handleDeleteMenuCategoryById}
-          onDashboardDataChanged={setDashboardData}
           onPreview={openMenuPreview}
         />
       ) : activePage === "reports" ? (
