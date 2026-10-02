@@ -216,9 +216,9 @@ export function MarketProductsWorkspace({
         <section className="market-panel">
           <header className="market-panel-heading market-panel-heading-row">
             <div><span>Katalog</span><h2>Ürünler</h2><p>Ürün kartları satış ve stok tarafından ortak kullanılır.</p></div>
-            <button type="button" className="market-secondary-button" onClick={openCreate}>
-              <Plus size={16} aria-hidden="true" /> Yeni ürün
-            </button>
+            <ActionButton size="sm" type="button" onClick={openCreate}>
+              <Plus size={16} aria-hidden="true" /> Ürün Ekle
+            </ActionButton>
           </header>
           <label className="market-search-field">
             <Search size={16} aria-hidden="true" />
@@ -242,7 +242,7 @@ export function MarketProductsWorkspace({
         <section className="market-panel">
           <header className="market-panel-heading market-panel-heading-row">
             <div><span>Katalog</span><h2>Kategoriler</h2><p>Ürün gruplarını hiyerarşik olarak düzenleyin.</p></div>
-            <button type="button" className="market-secondary-button" onClick={() => setCategoryForm(emptyCategoryForm())}><Plus size={16} aria-hidden="true" /> Yeni kategori</button>
+            <ActionButton size="sm" type="button" onClick={() => setCategoryForm(emptyCategoryForm())}><Plus size={16} aria-hidden="true" /> Kategori Ekle</ActionButton>
           </header>
           <div className="market-category-layout market-category-layout--single">
             <div className="market-list compact">
