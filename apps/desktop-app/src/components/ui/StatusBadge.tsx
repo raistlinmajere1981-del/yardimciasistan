@@ -7,7 +7,7 @@ interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: StatusTone;
 }
 
-function normalizeStatusTone(tone: StatusTone): CanonicalStatusTone {
+export function normalizeStatusTone(tone: StatusTone): CanonicalStatusTone {
   if (tone === "wait") return "warning";
   if (tone === "ok") return "success";
   return tone;
