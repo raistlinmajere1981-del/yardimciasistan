@@ -655,15 +655,87 @@
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+.customer-record-row {
+  height: calc(var(--control-height-lg) + var(--space-5));
+  align-items: center;
+  flex-wrap: nowrap;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard),
+    box-shadow var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+.customer-record-row:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-selected-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.customer-record-row:active {
+  transform: translateY(1px) scale(.997);
+}
+
+.customer-record-row .list-row__main {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.customer-record-row .list-row__heading {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.customer-record-row .list-row__meta {
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .customer-record-row .list-row__meta > span {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-1);
 }
+
+.customer-record-row__phone {
+  max-width: var(--field-width-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.customer-record-row .list-row__actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
 .customer-record-row__date {
+  display: grid;
+  gap: 1px;
   min-width: max-content;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+  line-height: 1.15;
+  text-align: right;
+}
+
+.customer-record-row__date small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.customer-record-row__date time {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
 }
 .kbs-automation-workspace {
   display: grid;
@@ -760,10 +832,7 @@
   height: 100%;
 }
 
-.customer-work-page-surface > .customers-workspace,
-.customer-work-page-surface > .requests-workspace,
-.customer-work-page-surface > .kbs-automation-workspace,
-.customer-work-page-surface > .message-workspace {
+.customer-work-page-surface > :is(.customers-workspace, .requests-workspace, .kbs-automation-workspace, .message-workspace) {
   height: 100%;
   min-height: 0;
 }
@@ -772,8 +841,7 @@
   align-items: stretch;
 }
 
-.customer-work-page-surface .record-workspace__list,
-.customer-work-page-surface .record-workspace__detail {
+.customer-work-page-surface :is(.record-workspace__list, .record-workspace__detail) {
   min-height: 0;
   overflow: hidden;
 }
