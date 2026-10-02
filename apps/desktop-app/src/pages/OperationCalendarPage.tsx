@@ -15,6 +15,7 @@ import { ActionButton } from "../components/ui/ActionButton";
 import { calendarLocalDateKey, type useCalendarPageController } from "../components/calendar/calendar-page-state";
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
 import { DatePicker } from "../components/ui/DateTimePicker";
+import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 
 type ReservationRecord = DesktopDashboardData["reservations"][number];
 type DailyTaskRecord = DesktopDashboardData["dailyTasks"][number];
@@ -100,7 +101,8 @@ export function OperationCalendarPage({
   };
 
   return (
-    <section className="operation-calendar-page" aria-label="Operasyon takvimi">
+    <PageWorkSurface mode="fill" className="calendar-page-surface">
+      <section className="operation-calendar-page" aria-label="Operasyon takvimi">
       <div className="operation-calendar-toolbar page-toolbar panel">
         <div className="operation-calendar-title-block">
           <div className="operation-calendar-title-icon" aria-hidden="true">
@@ -232,7 +234,7 @@ export function OperationCalendarPage({
                     <span>{formatWeekday(date)}</span>
                     <strong>{formatCalendarDate(date)}</strong>
                   </div>
-                  <StatusBadge tone={isToday ? "ok" : "neutral"}>{isToday ? "Bugün" : `${items.length} kayıt`}</StatusBadge>
+                  <StatusBadge tone={isToday ? "success" : "neutral"}>{isToday ? "Bugün" : `${items.length} kayıt`}</StatusBadge>
                 </header>
 
                 <div className="operation-calendar-day-body">
@@ -256,7 +258,8 @@ export function OperationCalendarPage({
           })}
         </div>
       )}
-    </section>
+      </section>
+    </PageWorkSurface>
   );
 }
 
