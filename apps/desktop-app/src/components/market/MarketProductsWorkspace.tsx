@@ -15,6 +15,7 @@ import {
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { ActionButton } from "../ui/ActionButton";
+import { DataListButton } from "../ui/DataList";
 import { FormDialog } from "../ui/FormDialog";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
@@ -226,14 +227,15 @@ export function MarketProductsWorkspace({
           </label>
           <div className="market-list">
             {filteredProducts.map((product) => (
-              <button type="button" className="market-list-row interactive-surface" key={product.id} onClick={() => openProduct(product)}>
-                <MarketProductThumbnail product={product} className="market-list-product-thumb" />
-                <span className="market-list-product-info">
-                  <strong>{product.name}</strong>
-                  <small>{product.brand ? `${product.brand} · ` : ""}{product.sku || "SKU yok"} · {product.barcode || "Barkod yok"}</small>
-                </span>
-                <span className="market-list-value">{money(product.salePrice, product.currency)}</span>
-              </button>
+              <DataListButton
+                className="market-list-row"
+                key={product.id}
+                onClick={() => openProduct(product)}
+                leading={<MarketProductThumbnail product={product} className="market-list-product-thumb" />}
+                title={product.name}
+                meta={<span>{product.brand ? `${product.brand} · ` : ""}{product.sku || "SKU yok"} · {product.barcode || "Barkod yok"}</span>}
+                trailing={<span className="market-list-value">{money(product.salePrice, product.currency)}</span>}
+              />
             ))}
             {filteredProducts.length === 0 && <p className="market-muted">Eşleşen ürün yok.</p>}
           </div>
