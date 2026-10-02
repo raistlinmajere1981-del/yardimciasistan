@@ -5,7 +5,6 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
@@ -16,6 +15,7 @@ import static com.yardimciasistan.android.AndroidPresentation.*;
 
 final class CustomerWorkspace {
   interface Listener {
+    void onFilterNormalized(String filter);
     void onFilterChanged(String filter);
     void onCreateCustomer();
     void onOpenCustomer(OperationData.CustomerRecord customer);
@@ -80,7 +80,7 @@ final class CustomerWorkspace {
 
     String visibleFilter = normalizeFilter(currentFilter, canManageCustomers, canViewRequests);
     if (!visibleFilter.equals(currentFilter)) {
-      listener.onFilterChanged(visibleFilter);
+      listener.onFilterNormalized(visibleFilter);
     }
     page.addView(filterBar(options.toArray(new String[0][]), visibleFilter));
 
