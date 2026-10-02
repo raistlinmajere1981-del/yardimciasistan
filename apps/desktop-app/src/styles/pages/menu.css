@@ -78,6 +78,34 @@
 
 .menu-record {
   align-items: center;
+  height: calc(var(--control-height-lg) + var(--space-5));
+  overflow: hidden;
+}
+
+.menu-record .list-row__main {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.menu-record .list-row__heading,
+.menu-record .list-row__meta {
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.menu-record .list-row__title,
+.menu-record .list-row__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-record .list-row__trailing {
+  flex: 0 0 auto;
 }
 
 .menu-sortable-record {
@@ -177,7 +205,9 @@
   align-items: center;
   gap: var(--space-2) var(--space-3);
   min-width: 0;
+  height: calc(var(--control-height-lg) + var(--space-5));
   padding: var(--space-3);
+  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-bg-surface);
@@ -203,8 +233,10 @@
 
 .menu-category-row__main {
   display: grid;
+  grid-template-rows: auto auto;
   gap: var(--space-1);
   min-width: 0;
+  overflow: hidden;
 }
 
 .menu-category-row__select {
@@ -224,17 +256,31 @@
   color: var(--color-accent);
 }
 
-:is(.menu-category-row__select strong, .menu-category-row__description) {
-  overflow-wrap: anywhere;
+.menu-category-row__select strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-category-row__details {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .menu-category-row__description {
-  margin: 0;
+  min-width: 0;
+  overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  text-overflow: ellipsis;
 }
 
 .menu-category-row__meta {
+  flex: 0 0 auto;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
@@ -248,6 +294,8 @@
 
 .menu-category-row--editing {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
+  height: auto;
+  overflow: visible;
 }
 
 .menu-category-inline-fields {
