@@ -337,11 +337,6 @@
   min-height: var(--control-height-sm);
 }
 
-.dashboard-page .action-button-secondary,
-.dashboard-page .action-button-ghost {
-  border-color: var(--color-border-strong);
-}
-
 .dashboard-priority-list {
   flex: 1 1 auto;
   min-height: 0;
