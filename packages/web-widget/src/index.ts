@@ -5,10 +5,19 @@ import {
 } from "@yardimci-asistan/whatsapp-bridge";
 import { widgetStyles } from "./widget-styles";
 import { iconTemplate, type IconName } from "./widget-icons";
+import {
+  addLocalDays,
+  formatDateForRequest,
+  formatTurkishCalendarDate,
+  formatTurkishMonth,
+  parseLocalIsoDate,
+  readGuestCount,
+  toLocalIsoDate,
+  type DatePreset
+} from "./widget-date-utils";
 
 type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
 type WidgetView = "home" | "form" | "info" | "whatsapp" | "directions";
-type DatePreset = "today" | "tomorrow" | "custom";
 type WidgetIntent = "home" | "accommodation.reserve" | "accommodation.info" | "food.reserve" | "contact.whatsapp" | "info" | "directions";
 
 interface WidgetContext {
@@ -1629,65 +1638,6 @@ function focusWidgetElement(selector: string) {
   window.requestAnimationFrame(() => {
     document.querySelector<HTMLElement>(`#${ROOT_ID} ${selector}`)?.focus();
   });
-}
-
-function readGuestCount(value: string) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 1 ? Math.min(30, Math.floor(parsed)) : 1;
-}
-
-function addLocalDays(date: Date, amount: number) {
-  const nextDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  nextDate.setDate(nextDate.getDate() + amount);
-  return nextDate;
-}
-
-function toLocalIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseLocalIsoDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) {
-    return null;
-  }
-
-  const date = new Date(year, month - 1, day);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatTurkishMonth(value: Date) {
-  return new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" })
-    .format(value)
-    .replace(/^./u, (letter) => letter.toLocaleUpperCase("tr-TR"));
-}
-
-function formatTurkishCalendarDate(value: string) {
-  const date = parseLocalIsoDate(value);
-  if (!date) {
-    return "Tarih seç";
-  }
-
-  const includeYear = date.getFullYear() !== new Date().getFullYear();
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "numeric",
-    month: "long",
-    ...(includeYear ? { year: "numeric" as const } : {})
-  }).format(date);
-}
-
-function formatDateForRequest(value: string, preset: DatePreset) {
-  const calendarDate = formatTurkishCalendarDate(value);
-  if (preset === "today") {
-    return `Bugün, ${calendarDate}`;
-  }
-  if (preset === "tomorrow") {
-    return `Yarın, ${calendarDate}`;
-  }
-  return calendarDate;
 }
 
 function escapeHtml(value: string) {
