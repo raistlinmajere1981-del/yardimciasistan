@@ -2853,58 +2853,39 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View tableCard(OperationData.TableRecord table) {
-    boolean ordersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
-    OperationData.TableOrder order = ordersEnabled ? data.activeOrderForTable(table.id) : null;
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout identity = UiKit.column(this);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(this, table.name, 16, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(this,
-        ordersEnabled
-            ? formatTableStatus(table.status) + " · " + (order == null ? "Adisyon yok" : formatOrderStatus(order.status))
-            : formatTableStatus(table.status),
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
-    top.addView(identity);
-    top.addView(statusBadge(formatTableStatus(table.status), resourceTone(table.status)));
-    card.addView(top);
+    return RestaurantTableCard.create(
+        this,
+        data,
+        table,
+        new RestaurantTableCard.Listener() {
+          @Override
+          public void onOpenOrder(OperationData.TableRecord selectedTable) {
+            showTableOrder(selectedTable);
+          }
 
-    if (order != null) {
-      TextView total = UiKit.text(this, order.itemCount + " ürün · " + money(order.total, orderCurrency(order)), 14, UiKit.TEXT, Typeface.BOLD);
-      LinearLayout.LayoutParams totalParams = new LinearLayout.LayoutParams(-1, -2);
-      totalParams.setMargins(0, UiKit.dp(this, 5), 0, 0);
-      total.setLayoutParams(totalParams);
-      card.addView(total);
-    } else if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS)
-        && !table.activeReservation.isEmpty()) {
-      card.addView(UiKit.text(this, table.activeReservation, 12, UiKit.INFO, Typeface.BOLD));
-    }
+          @Override
+          public void onChangeStatus(OperationData.TableRecord selectedTable) {
+            showTableStatusDialog(selectedTable);
+          }
 
-    LinearLayout primaryActions = UiKit.row(this);
-    LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(-1, -2);
-    primaryParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
-    primaryActions.setLayoutParams(primaryParams);
-    if (data.hasPermission("table_order.view")
-        && (order != null || data.hasPermission("table_order.open"))) {
-      UiKit.addAction(primaryActions, UiKit.button(this, order == null ? "Sipariş Aç" : "Siparişi Aç", UiKit.PRIMARY, view -> showTableOrder(table)), this);
-    }
-    if (order == null && data.hasPermission("table.update_status")) {
-      UiKit.addAction(primaryActions, UiKit.outlineButton(this, "Masa Durumu", view -> showTableStatusDialog(table)), this);
-    } else if (order != null && "payment".equals(order.status) && data.hasPermission("table_order.close_paid")) {
-      UiKit.addAction(primaryActions, UiKit.button(this, "Ödendi / Kapat", UiKit.ACCENT, view -> confirm("Adisyonu kapat", table.name + " adisyonu ödendi olarak kapatılsın mı?", () -> closeOrder(order, "paid"))), this);
-    } else if (order != null && data.hasPermission("table_order.set_payment_waiting")) {
-      UiKit.addAction(primaryActions, UiKit.outlineButton(this, "Hesap Bekliyor", view -> sendOrderStatus(order, "payment")), this);
-    } else if (order != null && data.hasPermission("table_order.close_paid")) {
-      UiKit.addAction(primaryActions, UiKit.button(this, "Ödendi / Kapat", UiKit.ACCENT, view -> confirm("Adisyonu kapat", table.name + " adisyonu ödendi olarak kapatılsın mı?", () -> closeOrder(order, "paid"))), this);
-    }
-    if (primaryActions.getChildCount() > 0) {
-      card.addView(primaryActions);
-    }
+          @Override
+          public void onSetPaymentWaiting(OperationData.TableOrder order) {
+            sendOrderStatus(order, "payment");
+          }
 
-    return card;
+          @Override
+          public void onClosePaid(
+              OperationData.TableRecord selectedTable,
+              OperationData.TableOrder order
+          ) {
+            confirm(
+                "Adisyonu kapat",
+                selectedTable.name + " adisyonu ödendi olarak kapatılsın mı?",
+                () -> closeOrder(order, "paid")
+            );
+          }
+        }
+    );
   }
 
   private View stockCard(OperationData.TrackedStockItem item) {
