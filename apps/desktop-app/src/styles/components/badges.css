@@ -31,8 +31,6 @@
 .status-badge[data-tone="success"],
 .status-chip[aria-pressed="true"][data-tone="success"],
 .status-badge.success,
-.status-badge.ok,
-.status-badge.tone-ok,
 .status-badge.is-success,
 .password-status.is-enabled,
 .backup-kind.is-manual {
@@ -44,8 +42,6 @@
 .status-badge[data-tone="warning"],
 .status-chip[aria-pressed="true"][data-tone="warning"],
 .status-badge.warning,
-.status-badge.wait,
-.status-badge.tone-wait,
 .backup-kind.is-safety {
   --status-tone: var(--color-warning);
   --status-soft: var(--color-warning-soft);
