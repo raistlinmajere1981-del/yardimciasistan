@@ -46,10 +46,10 @@ const EXPECTED_COMMERCE_REJECTIONS: Array<{ code: string; pattern: RegExp }> = [
   { code: "invalid_inventory_operation", pattern: /^(?:Stok işlemi için ürün bulunamadı\.|Bu ürün stok takibine kapalı\.|Stok konumu bulunamadı\.|Geçersiz stok hareketi:|Stok hareketi sıfırdan farklı olmalı\.|Sayım miktarı )/ },
   { code: "invalid_sale", pattern: /^(?:Satış için en az bir ürün gerekli\.|Satış adedi sıfırdan büyük olmalı\.|Satış ürünlerinden biri aktif değil veya bulunamadı\.|Tek satışta birden fazla para birimi kullanılamaz\.)/ },
   { code: "invalid_credit", pattern: /^(?:Veresiye \/ Müşteri Hesabı|Veresiye için |Tutar mevcut veresiye borcunu aşamaz\.|Tahsilat |Düzeltme |Para birimi geçersiz\.|Tutar pozitif tam sayı)/ },
-  { code: "invalid_category", pattern: /^(?:Kategori |Alt kategorisi bulunan kategori |Ürün bağlı olan kategori |Üst kategori bulunamadı\.)/ },
-  { code: "invalid_product", pattern: /^(?:Barkod boş olamaz\.|Ürün adı |Düzenlenecek ürün bulunamadı\.|Bu barkod başka bir üründe kullanılıyor\.|Bu stok kodu başka bir üründe kullanılıyor\.)/ },
+  { code: "invalid_category", pattern: /^(?:Kategori kendi üst kategorisi olamaz\.|Kategori hiyerarşisinde döngü oluşturulamaz\.|Kategori kimliği boş olamaz\.|Kategori adı gerekli\.|Kategori adı en fazla 160 karakter olabilir\.|Düzenlenecek kategori bulunamadı\.|Silinecek kategori bulunamadı\.|Alt kategorisi bulunan kategori silinemez\.|Ürün bağlı olan kategori silinemez\.|Üst kategori bulunamadı\.)/ },
+  { code: "invalid_product", pattern: /^(?:Barkod boş olamaz\.|Ürün adı gerekli\.|Ürün adı en fazla 180 karakter olabilir\.|Düzenlenecek ürün bulunamadı\.|Seçilen ürün kategorisi bulunamadı\.|Bu barkod başka bir üründe kullanılıyor\.|Bu stok kodu başka bir üründe kullanılıyor\.)/ },
   { code: "invalid_supplier", pattern: /^(?:Tedarikçi adı gerekli\.|Düzenlenecek tedarikçi bulunamadı\.)/ },
-  { code: "invalid_purchase", pattern: /^(?:Satın alma |Seçilen tedarikçi |Aynı ürün satın alma |Tek satın alma kaydında )/ }
+  { code: "invalid_purchase", pattern: /^(?:Satın alma |Seçilen tedarikçi |Aynı ürün satın alma |Tek satın alma kaydında |Sipariş tarihi geçersiz\.)/ }
 ];
 
 export function classifyExpectedCommerceRejection(error: unknown): { code: string; message: string } | null {
