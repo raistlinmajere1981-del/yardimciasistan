@@ -12,6 +12,7 @@ import type {
   PublicResourceMediaKind
 } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
+import { ChoiceChips } from "../ui/ChoiceChips";
 import { reportAppStatus } from "../../app/runtime-state";
 
 const MEDIA_KIND_OPTIONS: Array<{ id: PublicResourceMediaKind; label: string; chip: string }> = [
@@ -288,21 +289,18 @@ export function PublicResourceMediaPanel({
                   </ActionButton>
                 </div>
 
-                <div className="room-media-kind-chips" aria-label="Medya kullanım türü">
-                  {mediaKindOptionsForAsset(item).map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`room-media-kind-chip${item.kind === option.id ? " is-selected" : ""}`}
-                      disabled={!mediaEnabled || busy}
-                      aria-pressed={item.kind === option.id}
-                      title={option.label}
-                      onClick={() => void updateKind(item, option.id)}
-                    >
-                      {option.chip}
-                    </button>
-                  ))}
-                </div>
+                <ChoiceChips
+                  className="room-media-kind-chips"
+                  ariaLabel="Medya kullanım türü"
+                  value={item.kind}
+                  disabled={!mediaEnabled || busy}
+                  onChange={(kind) => void updateKind(item, kind)}
+                  options={mediaKindOptionsForAsset(item).map((option) => ({
+                    id: option.id,
+                    label: option.chip,
+                    title: option.label
+                  }))}
+                />
               </article>
             ))}
           </div>
