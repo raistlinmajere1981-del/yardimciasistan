@@ -34,6 +34,7 @@
   --color-selected-soft: var(--color-accent-soft);
   --color-selected-border: var(--color-accent-border);
   --shadow-selected-ring: 0 0 0 1px var(--color-selected);
+  --shadow-status-ring: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
 
   /* Surface role is classification, not status. Tints stay deliberately quiet. */
   --color-role-neutral-bg: var(--color-bg-panel);
