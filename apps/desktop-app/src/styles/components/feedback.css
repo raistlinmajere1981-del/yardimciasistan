@@ -1,12 +1,12 @@
 .info-list {
   display: grid;
-  gap: 13px;
+  gap: var(--space-3);
   margin: 0;
 }
 
 .info-list dt {
   color: var(--color-text);
-  font-weight: 800;
+  font-weight: var(--weight-extrabold);
 }
 
 .info-list dd {
@@ -17,13 +17,13 @@
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: var(--space-2);
+  height: var(--space-2);
   flex: 0 0 auto;
   border-radius: var(--radius-pill);
   color: var(--color-text-muted);
   background: var(--color-text-muted);
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+  box-shadow: var(--shadow-status-ring);
 }
 
 .status-dot.tone-info {
