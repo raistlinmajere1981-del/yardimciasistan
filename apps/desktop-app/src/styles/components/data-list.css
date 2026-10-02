@@ -52,8 +52,8 @@
 }
 
 .interactive-surface:hover:not(:disabled) {
-  background: var(--color-interactive-hover);
-  border-color: var(--color-selected-border);
+  background: var(--interactive-surface-hover-bg, var(--color-interactive-hover));
+  border-color: var(--interactive-surface-hover-border, var(--color-selected-border));
   box-shadow: var(--shadow-sm);
 }
 
@@ -71,8 +71,8 @@
 }
 
 .interactive-surface:is(.is-selected, [aria-pressed="true"], [aria-current="true"]) {
-  background: var(--color-selected-soft);
-  border-color: var(--color-selected-border);
+  background: var(--interactive-surface-selected-bg, var(--color-selected-soft));
+  border-color: var(--interactive-surface-selected-border, var(--color-selected-border));
   box-shadow: var(--shadow-selected-ring);
 }
 
