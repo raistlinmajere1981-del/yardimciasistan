@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-type MetricTone = "info" | "success" | "warning" | "neutral" | "ok" | "wait";
+type MetricTone = "info" | "success" | "warning" | "neutral";
 
 export interface MetricCardProps {
   title: string;
@@ -12,9 +12,8 @@ export interface MetricCardProps {
 }
 
 export function MetricCard({ title, value, detail, tone, icon: Icon, compact = false }: MetricCardProps) {
-  const normalizedTone = tone === "ok" ? "success" : tone === "wait" ? "warning" : tone;
   return (
-    <article className={`surface metric-card tone-${normalizedTone}${compact ? " metric-card-compact" : ""}`}>
+    <article className={`surface metric-card tone-${tone}${compact ? " metric-card-compact" : ""}`}>
       <div className="metric-icon">
         <Icon size={19} aria-hidden="true" />
       </div>
