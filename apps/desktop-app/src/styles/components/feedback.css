@@ -31,14 +31,12 @@
   background: var(--color-info);
 }
 
-.status-dot.tone-warning,
-.status-dot.tone-wait {
+.status-dot.tone-warning {
   color: var(--color-warning);
   background: var(--color-warning);
 }
 
-.status-dot.tone-success,
-.status-dot.tone-ok {
+.status-dot.tone-success {
   color: var(--color-success);
   background: var(--color-success);
 }
