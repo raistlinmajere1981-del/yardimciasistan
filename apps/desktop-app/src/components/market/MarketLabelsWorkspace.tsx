@@ -1,6 +1,7 @@
 import { Download, FileImage, FileText, Printer, Tags } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CatalogCategory, CatalogProduct } from "@yardimci-asistan/shared";
+import { ActionButton } from "../ui/ActionButton";
 import {
   LABEL_PRINTER_CATALOG,
   LABEL_SIZE_PRESETS,
@@ -185,14 +186,26 @@ export function MarketLabelsWorkspace({
         )}
 
         <div className="market-label-actions">
-          <button type="button" onClick={() => void exportLabel("png")} disabled={disabled || !job}>
-            <FileImage size={17} aria-hidden="true" />
-            {exporting === "png" ? "PNG hazırlanıyor…" : "PNG İndir"}
-          </button>
-          <button type="button" onClick={() => void exportLabel("pdf")} disabled={disabled || !job}>
-            <FileText size={17} aria-hidden="true" />
-            {exporting === "pdf" ? "PDF hazırlanıyor…" : "PDF İndir"}
-          </button>
+          <ActionButton
+            fullWidth
+            type="button"
+            busy={exporting === "png"}
+            busyLabel="PNG hazırlanıyor…"
+            onClick={() => void exportLabel("png")}
+            disabled={disabled || !job}
+          >
+            <FileImage size={17} aria-hidden="true" /> PNG İndir
+          </ActionButton>
+          <ActionButton
+            fullWidth
+            type="button"
+            busy={exporting === "pdf"}
+            busyLabel="PDF hazırlanıyor…"
+            onClick={() => void exportLabel("pdf")}
+            disabled={disabled || !job}
+          >
+            <FileText size={17} aria-hidden="true" /> PDF İndir
+          </ActionButton>
         </div>
 
         <section className="market-label-adapters" aria-label="Etiket çıktı seçenekleri">
