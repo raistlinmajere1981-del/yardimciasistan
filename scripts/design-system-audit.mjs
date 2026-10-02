@@ -115,6 +115,13 @@ function assertTokenContract() {
   const index = fs.readFileSync(path.join(ROOT, STYLE_ROOT, "index.css"), "utf8");
   if (!index.includes("@layer reset, tokens, foundation, components, layout, pages, utilities;")) throw new Error("Explicit cascade contract is missing.");
   if (/^@import[^;]+(?<!\))\s*;/m.test(index)) throw new Error("Every stylesheet import must declare its layer.");
+  const layeredImports = [...index.matchAll(/@import\s+"([^"]+)"\s+layer\(([^)]+)\);/g)];
+  const misplacedComponentImports = layeredImports
+    .filter(([, file, layer]) => file.startsWith("./components/") && !layer.startsWith("components"))
+    .map(([, file, layer]) => `${file} -> ${layer}`);
+  if (misplacedComponentImports.length) {
+    throw new Error(`Component styles must stay in component layers: ${misplacedComponentImports.join(", ")}`);
+  }
   const missing = requiredTokens.filter((token) => !text.includes(`${token}:`));
   if (missing.length > 0) {
     throw new Error(`Tasarım token sözleşmesi eksik: ${missing.join(", ")}`);
@@ -163,7 +170,7 @@ if (args.has("--json")) {
   fs.mkdirSync("artifacts/design-system/audit", { recursive: true });
   fs.writeFileSync("artifacts/design-system/audit/audit.json", JSON.stringify(desktopAudit, null, 2) + "\n");
 }
-const sharedFiles = /\/styles\/(?:layout\/|components\/(?:navigation|header|notifications|panels|toolbars|status|dialogs)\.css$)/;
+const sharedFiles = /\/styles\/(?:layout\/|components\/(?:navigation|header|notifications|panels|toolbars|status|dialogs|operation-surface)\.css$)/;
 const coreViolations = desktopAudit.violations.filter(issue => sharedFiles.test(issue.file));
 if (coreViolations.length) throw new Error(`Shared shell must have zero violations: ${coreViolations.length}`);
 const architectureViolations = desktopAudit.violations.filter(issue =>
@@ -172,7 +179,7 @@ const architectureViolations = desktopAudit.violations.filter(issue =>
 if (architectureViolations.length) {
   throw new Error(`Design-system ownership violations: ${JSON.stringify(architectureViolations)}`);
 }
-const auditedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup|lock)|components\/(?:cards|data-list|forms|motion))\.css$/;
+const auditedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup|lock|operation-workspace)|components\/(?:cards|data-list|forms|motion|operation-surface))\.css$/;
 const auditViolations = desktopAudit.violations.filter(issue => auditedDesktop.test(issue.file));
 const targetInventory = desktopAudit.inventory.filter(item => auditedDesktop.test(item.file));
 const duplicateSelectorDebt = targetInventory
