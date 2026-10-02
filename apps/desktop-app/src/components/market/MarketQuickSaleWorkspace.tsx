@@ -539,7 +539,7 @@ export function MarketQuickSaleWorkspace({
           {filteredProducts.map((product) => (
             <button
               type="button"
-              className="market-sale-product interactive-surface"
+              className="market-sale-product interactive-surface interactive-surface--record"
               key={product.id}
               onClick={() => addProduct(product)}
               disabled={disabled}
@@ -595,13 +595,13 @@ export function MarketQuickSaleWorkspace({
                 </span>
               </div>
               <div className="market-sale-quantity">
-                <button type="button" aria-label={`${line.product.name} miktarını azalt`} onClick={() => setQuantity(line.product.id, line.quantity - 1)} disabled={disabled}>
+                <ActionButton variant="secondary" fullWidth type="button" aria-label={`${line.product.name} miktarını azalt`} onClick={() => setQuantity(line.product.id, line.quantity - 1)} disabled={disabled}>
                   <Minus size={15} aria-hidden="true" />
-                </button>
+                </ActionButton>
                 <input type="number" min="0.0001" step="0.0001" aria-label={`${line.product.name} miktarı`} value={line.quantity} onChange={(event) => setQuantity(line.product.id, Number(event.target.value))} disabled={disabled} />
-                <button type="button" aria-label={`${line.product.name} miktarını artır`} onClick={() => setQuantity(line.product.id, line.quantity + 1)} disabled={disabled}>
+                <ActionButton variant="secondary" fullWidth type="button" aria-label={`${line.product.name} miktarını artır`} onClick={() => setQuantity(line.product.id, line.quantity + 1)} disabled={disabled}>
                   <Plus size={15} aria-hidden="true" />
-                </button>
+                </ActionButton>
               </div>
               <strong>{money(line.product.salePrice * line.quantity, line.product.currency)}</strong>
             </div>
