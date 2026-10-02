@@ -57,6 +57,13 @@
 
 .action-button[aria-busy="true"] {
   cursor: progress;
+  opacity: .82;
+}
+
+.action-button[aria-pressed="true"] {
+  border-color: var(--color-selected-border);
+  background: var(--color-selected-soft);
+  color: var(--color-selected);
 }
 
 .action-button[data-result="success"] {
@@ -88,6 +95,12 @@
 .action-button-quiet:hover:not(:disabled) {
   background: var(--color-bg-hover);
   color: var(--color-text);
+}
+
+.action-button-secondary:active:not(:disabled),
+.action-button-ghost:active:not(:disabled),
+.action-button-quiet:active:not(:disabled) {
+  background: var(--color-bg-pressed);
 }
 
 .action-button-danger {
