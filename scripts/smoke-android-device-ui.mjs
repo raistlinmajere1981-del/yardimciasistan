@@ -13,6 +13,18 @@ const syncSecret = String(businessConfig.sync_secret ?? "").trim();
 const androidSnapshotFixtureFile = join(repoRoot, "scripts", "fixtures", "android-operations-snapshot.json");
 const stockGalleryFixture = join(repoRoot, "firm-template", "web-module", "assets", "yardimci-asistan-symbol.png");
 const stockGalleryDeviceFile = "/sdcard/Download/yardimci-stock-image-smoke.png";
+const NOTIFICATION_ROW_IDS = new Set([
+  "com.android.systemui:id/expandableNotificationRow",
+  "com.android.systemui:id/expandable_notification_row",
+  "com.android.systemui:id/notification_main_column",
+  "com.android.systemui:id/notification_content"
+]);
+const NOTIFICATION_EXPAND_IDS = new Set([
+  "android:id/expand_button",
+  "com.android.systemui:id/expand_button",
+  "com.android.systemui:id/expand",
+  "com.android.systemui:id/notification_expand_button"
+]);
 const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "connection", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
 const serviceOrderPermissions = [
   "table.view",
@@ -432,23 +444,23 @@ async function main() {
   );
   await waitForCachedSnapshotText(notificationClickSnapshotAt, 45000);
   await waitForNotificationText(notificationClickCustomer, 12000);
-  adb(["shell", "cmd", "statusbar", "expand-notifications"]);
-  await delay(800);
-  let notificationShadeXml = dumpUi("notification-shade.xml");
   const notificationClickMessage = `${notificationClickCustomer} · Yerel bildirim izin ve spam testi.`;
-  assertContains(notificationShadeXml, [notificationClickMessage]);
-  const notificationGroupExpandBounds = findNotificationGroupExpandBounds(notificationShadeXml, notificationClickMessage);
+  let notificationShadeXml = await waitForNotificationShadeMessage(notificationClickMessage, 15000);
+  const notificationGroupExpandBounds = findNotificationGroupExpandBounds(
+    notificationShadeXml,
+    notificationClickMessage,
+    notificationClickCustomer
+  );
   if (notificationGroupExpandBounds) {
     tap(centerOf(notificationGroupExpandBounds));
     await delay(600);
-    notificationShadeXml = dumpUi("notification-shade-expanded.xml");
-    assertContains(notificationShadeXml, [notificationClickMessage]);
+    notificationShadeXml = await waitForNotificationShadeMessage(notificationClickMessage, 10000);
+    writeFileSync(join(artifactDir, "notification-shade-expanded.xml"), notificationShadeXml);
   }
-  tap(centerOf(findNotificationClickBounds(notificationShadeXml, notificationClickMessage)));
-  await waitForUiCondition(
-    (xml) => xml.includes('text="Müşteri"') && xml.includes("Yeni Talepler") && xml.includes(notificationClickCustomer),
-    12000,
-    "Müşteri bildirimine dokununca Yeni Talepler modu açılmadı."
+  await tapNotificationAndWaitForCustomerRequests(
+    notificationShadeXml,
+    notificationClickMessage,
+    notificationClickCustomer
   );
 
   await publishDeviceRole(baseUrl, deviceId, "staff", {
@@ -1301,8 +1313,20 @@ async function runStockImageOnly(baseUrl) {
     "Odaklı stok görseli testi için yönetici profili uygulanmadı."
   );
   tap(centerOf(findClickableBoundsByText(topXml, "Restoran")));
+  await waitForUiCondition(
+    (xml) => xml.includes("Masalar") && xml.includes("Açık Adisyon"),
+    8000,
+    "Odaklı stok görseli testi restoran ekranını açamadı."
+  );
+  await delay(300);
+  let restaurantModesXml = dumpUi("stock-only-restaurant.xml");
+  for (let index = 0; index < 4 && !restaurantModesXml.includes('text="Stok"'); index += 1) {
+    swipe(650, 245, 180, 245, 320);
+    await delay(300);
+    restaurantModesXml = dumpUi("stock-only-restaurant-modes.xml");
+  }
   const restaurantXml = await waitForUiCondition(
-    (xml) => xml.includes("Masalar") && xml.includes("Açık Adisyon") && xml.includes('text="Stok"'),
+    (xml) => xml.includes('text="Stok"'),
     8000,
     "Odaklı stok görseli testi restoran ekranını açamadı."
   );
@@ -1657,7 +1681,16 @@ async function restoreEmbeddedConnectionAfterTest() {
     return;
   }
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
-  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`]);
+  adb([
+    "shell",
+    "am",
+    "start",
+    "-n",
+    `${packageName}/${activityName}`,
+    "--ez",
+    "ya_reset_debug_app_state",
+    "true"
+  ]);
   const startedAt = Date.now();
   let restoredUrl = "";
   while (Date.now() - startedAt < 8000) {
@@ -1871,6 +1904,9 @@ function shiftLocalDate(value, days) {
 
 async function publishSnapshot(baseUrl, snapshot, label) {
   snapshot.updated_at = new Date().toISOString();
+  // Üretim varsayılanında açık olan istek yeteneği fixture'da yok; olmadan
+  // müşteri çalışma alanı fail-closed kalır ve bildirim hedefi çizilemez.
+  snapshot.business_capabilities = [...new Set([...(snapshot.business_capabilities ?? []), "customer.requests"])];
   snapshotRevision += 1;
   const response = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
@@ -1923,6 +1959,62 @@ async function waitForNotificationAbsence(text, timeoutMs) {
     await delay(500);
   }
   throw new Error(`Çözülen Android bildirimi aktif listeden kalkmadı: ${text}`);
+}
+
+async function waitForNotificationShadeMessage(text, timeoutMs) {
+  const startedAt = Date.now();
+  let xml = "";
+  while (Date.now() - startedAt < timeoutMs) {
+    adb(["shell", "cmd", "statusbar", "expand-notifications"], { allowFailure: true });
+    await delay(800);
+    xml = dumpUi("notification-shade.xml");
+    if (xml.includes(text)) {
+      return xml;
+    }
+    await delay(500);
+  }
+  assertContains(xml, [text]);
+  return xml;
+}
+
+async function tapNotificationAndWaitForCustomerRequests(shadeXml, message, customerName) {
+  const isCustomerRequests = (xml) =>
+    xml.includes('text="Müşteri"') && xml.includes("Yeni Talepler") && xml.includes(customerName);
+  let currentShadeXml = shadeXml;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    // Perde animasyonu oturmadan alınan sınırlar ıskalar; her denemede taze döküm.
+    await delay(1200);
+    currentShadeXml = dumpUi("notification-shade-tap.xml");
+    if (!currentShadeXml.includes(message)) {
+      currentShadeXml = await waitForNotificationShadeMessage(message, 8000);
+    }
+    tap(centerOf(findNotificationClickBounds(currentShadeXml, message, customerName)));
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 8000) {
+      const xml = dumpUi("wait-condition.xml");
+      if (isCustomerRequests(xml)) {
+        return;
+      }
+      if (xml.includes(message)) {
+        break;
+      }
+      await delay(500);
+    }
+    const confirmXml = dumpUi("wait-condition.xml");
+    if (isCustomerRequests(confirmXml)) {
+      return;
+    }
+    try {
+      currentShadeXml = await waitForNotificationShadeMessage(message, 8000);
+    } catch {
+      break;
+    }
+  }
+  await waitForUiCondition(
+    (xml) => xml.includes('text="Müşteri"') && xml.includes("Yeni Talepler") && xml.includes(customerName),
+    12000,
+    "Müşteri bildirimine dokununca Yeni Talepler modu açılmadı."
+  );
 }
 
 async function waitForCachedSnapshotText(text, timeoutMs) {
@@ -2022,50 +2114,100 @@ function findBoundsByResourceId(xml, resourceId) {
   return node.bounds;
 }
 
-function findNotificationGroupExpandBounds(xml, text) {
-  const target = findUiNodeByText(xml, text);
+function findNotificationGroupExpandBounds(xml, text, anchor = "") {
+  const nodes = flattenUiNodes(parseUiNodes(xml));
+  const target = nodes.find((node) => node.text === text || (node.text && node.text.includes(text)))
+    ?? (anchor
+      ? nodes.find((node) => (node.text && node.text.includes(anchor))
+        || (node.contentDesc && node.contentDesc.includes(anchor)))
+      : null);
   if (!target) {
     return null;
   }
+  // Genişletme düğmesi çocuğun değil grubun üzerinde olur; kapsamı hedefi
+  // içeren EN DIŞ bildirim satırına kadar genişlet (gerçek cihazda doğrulandı).
+  let scope = target;
   let ancestor = target.parent;
-  while (ancestor) {
-    if (ancestor.resourceId === "com.android.systemui:id/expandableNotificationRow") {
-      const expandButton = findUiDescendant(
-        ancestor,
-        (node) => node.resourceId === "android:id/expand_button" && node.clickable
-      );
-      if (expandButton?.bounds) {
-        return expandButton.bounds;
-      }
+  let depth = 0;
+  while (ancestor && depth < 10) {
+    if (isNotificationRow(ancestor)) {
+      scope = ancestor;
     }
     ancestor = ancestor.parent;
+    depth += 1;
   }
-  return null;
+  const expandButton = findUiDescendant(
+    scope,
+    (node) => node.clickable && node.bounds && isExpandAffordance(node)
+  );
+  if (!expandButton || isCollapseAffordance(expandButton)) {
+    return null;
+  }
+  return expandButton.bounds;
 }
 
-function findNotificationClickBounds(xml, text) {
-  const target = findUiNodeByText(xml, text);
-  if (!target) {
+function findNotificationClickBounds(xml, text, anchor = "") {
+  const nodes = flattenUiNodes(parseUiNodes(xml));
+  const exact = nodes.filter((node) => node.text === text);
+  const candidates = exact.length > 0
+    ? exact
+    : (anchor
+      ? nodes.filter((node) => (node.text && node.text.includes(anchor))
+        || (node.contentDesc && node.contentDesc.includes(anchor)))
+      : []);
+  if (candidates.length === 0) {
     throw new Error(`Bildirim UI node'u bulunamadı: ${text}`);
   }
-  let ancestor = target.parent;
-  while (ancestor) {
-    if (ancestor.resourceId === "com.android.systemui:id/expandableNotificationRow") {
-      if (ancestor.clickable && ancestor.bounds) {
-        return ancestor.bounds;
-      }
-      break;
+  // Bildirim metninin kendisine dokunulur: grup satırının merkezi başlık/chévron
+  // alanına düşebilir ve içerik niyetini tetiklemez (gerçek cihazda doğrulandı).
+  let best = null;
+  let bestArea = -1;
+  for (const candidate of candidates) {
+    const bounds = candidate.bounds ?? nearestClickableAncestor(candidate)?.bounds;
+    if (!bounds) {
+      continue;
     }
-    ancestor = ancestor.parent;
+    const area = (bounds.right - bounds.left) * (bounds.bottom - bounds.top);
+    if (area > bestArea) {
+      bestArea = area;
+      best = bounds;
+    }
   }
-  if (target.bounds) {
-    return target.bounds;
+  if (!best) {
+    throw new Error(`Bildirim tıklama sınırı bulunamadı: ${text}`);
   }
-  throw new Error(`Bildirim tıklama sınırı bulunamadı: ${text}`);
+  return best;
 }
 
-function findUiNodeByText(xml, text) {
-  return flattenUiNodes(parseUiNodes(xml)).find((node) => node.text === text) ?? null;
+function isNotificationRow(node) {
+  return !!node && NOTIFICATION_ROW_IDS.has(node.resourceId);
+}
+
+function isExpandAffordance(node) {
+  if (!node) {
+    return false;
+  }
+  if (NOTIFICATION_EXPAND_IDS.has(node.resourceId)) {
+    return true;
+  }
+  const description = (node.contentDesc ?? "").toLowerCase();
+  return description.includes("expand") || description.includes("genişlet");
+}
+
+function isCollapseAffordance(node) {
+  const description = (node?.contentDesc ?? "").toLowerCase();
+  return description.includes("collapse") || description.includes("daralt");
+}
+
+function nearestClickableAncestor(node) {
+  let current = node.parent;
+  while (current) {
+    if (current.clickable && current.bounds && !isExpandAffordance(current)) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return null;
 }
 
 function findUiDescendant(node, predicate) {
@@ -2100,6 +2242,7 @@ function parseUiNodes(xml) {
     }
     const node = {
       text: readXmlAttribute(token, "text"),
+      contentDesc: readXmlAttribute(token, "content-desc"),
       resourceId: readXmlAttribute(token, "resource-id"),
       clickable: readXmlAttribute(token, "clickable") === "true",
       bounds: readBounds(token),
