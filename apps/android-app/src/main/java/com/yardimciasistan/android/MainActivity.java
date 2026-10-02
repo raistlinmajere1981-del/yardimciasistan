@@ -2675,80 +2675,36 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View roomCard(OperationData.RoomRecord room) {
-    LinearLayout card = UiKit.card(this);
-    OperationData.CustomerRoomStayRecord activeStay = data.activeStayForRoom(room.id);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout name = UiKit.column(this);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    name.addView(UiKit.text(this, room.name, 15, UiKit.TEXT, Typeface.BOLD));
-    name.addView(UiKit.text(this, (room.number.isEmpty() ? "" : room.number + " · ") + room.capacity + " kişi", 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(name);
-    top.addView(statusBadge(formatRoomStatus(room.status), resourceTone(room.status)));
-    card.addView(top);
-    if (activeStay != null) {
-      String staySummary = activeStay.customerName + " · " + joinDateRange(activeStay.checkInDate, activeStay.checkOutDate);
-      card.addView(UiKit.text(this, staySummary, 12, UiKit.INFO, Typeface.BOLD));
-    } else if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS)
-        && !room.activeReservation.isEmpty()) {
-      card.addView(UiKit.text(this, room.activeReservation, 12, UiKit.INFO, Typeface.BOLD));
-    }
-    if (canManageCustomerRoomStays()) {
-      Button assignment = UiKit.button(
-          this,
-          activeStay == null ? "Müşteri Ata" : "Konaklamayı Yönet",
-          UiKit.PRIMARY,
-          view -> {
-            if (activeStay == null) {
-              showRoomAssignmentDialog(null, room);
-            } else {
-              showCustomerRoomStayActions(activeStay);
-            }
+    return PensionRoomCard.create(
+        this,
+        data,
+        room,
+        new PensionRoomCard.Listener() {
+          @Override
+          public void onAssignCustomer(OperationData.RoomRecord selectedRoom) {
+            showRoomAssignmentDialog(null, selectedRoom);
           }
-      );
-      LinearLayout.LayoutParams assignmentParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-      assignmentParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      assignment.setLayoutParams(assignmentParams);
-      assignment.setEnabled(activeStay != null || !data.customers.isEmpty());
-      card.addView(assignment);
-    }
-    if (data.hasPermission("room.update_status") && activeStay == null) {
-      Button status = UiKit.outlineButton(this, "Durumu Değiştir", view -> showRoomStatusDialog(room));
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-      params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      status.setLayoutParams(params);
-      card.addView(status);
-    }
-    return card;
+
+          @Override
+          public void onManageStay(OperationData.CustomerRoomStayRecord stay) {
+            showCustomerRoomStayActions(stay);
+          }
+
+          @Override
+          public void onChangeStatus(OperationData.RoomRecord selectedRoom) {
+            showRoomStatusDialog(selectedRoom);
+          }
+        }
+    );
   }
 
   private View customerRoomStayCard(OperationData.CustomerRoomStayRecord stay) {
-    LinearLayout card = UiKit.card(this);
-    LinearLayout top = UiKit.row(this);
-    LinearLayout identity = UiKit.column(this);
-    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    identity.addView(UiKit.text(this, stay.customerName, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(this, stay.roomName + (stay.roomNumber.isEmpty() ? "" : " · " + stay.roomNumber), 12, UiKit.MUTED, Typeface.NORMAL));
-    top.addView(identity);
-    top.addView(statusBadge(formatCustomerRoomStayStatus(stay.status), customerRoomStayTone(stay.status)));
-    card.addView(top);
-    card.addView(UiKit.text(
+    return PensionStayCard.create(
         this,
-        joinDateRange(stay.checkInDate, stay.checkOutDate) + " · " + stay.guestCount + " kişi",
-        12,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    ));
-    if (!stay.notes.isEmpty()) {
-      card.addView(UiKit.text(this, ellipsize(stay.notes, 140), 12, UiKit.MUTED, Typeface.NORMAL));
-    }
-    if (canManageCustomerRoomStays() && canTransitionCustomerRoomStay(stay)) {
-      Button manage = UiKit.outlineButton(this, "Durumu Yönet", view -> showCustomerRoomStayActions(stay));
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
-      params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      manage.setLayoutParams(params);
-      card.addView(manage);
-    }
-    return card;
+        data,
+        stay,
+        this::showCustomerRoomStayActions
+    );
   }
 
   private View taskCard(OperationData.TaskRecord task, boolean compact) {
