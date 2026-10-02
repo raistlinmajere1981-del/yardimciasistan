@@ -201,7 +201,7 @@ export function RequestsWorkspace({
               <p>
                 {requestFilter === "waiting"
                   ? "Yanıt gerektiren yeni veya açık talepler burada görünür."
-                  : <>Web{aiEnabled ? ", AI" : ""} ve manuel kayıtlar burada listelenir.</>}
+                  : <>Web{aiEnabled ? ", AI" : ""} ve eklenen kayıtlar burada listelenir.</>}
               </p>
             </div>
           ) : (
