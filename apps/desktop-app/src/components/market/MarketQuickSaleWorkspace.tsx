@@ -539,7 +539,7 @@ export function MarketQuickSaleWorkspace({
           {filteredProducts.map((product) => (
             <button
               type="button"
-              className="market-sale-product"
+              className="market-sale-product interactive-surface"
               key={product.id}
               onClick={() => addProduct(product)}
               disabled={disabled}
