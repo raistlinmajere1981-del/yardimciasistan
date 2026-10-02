@@ -1752,6 +1752,11 @@ public final class MainActivity extends ComponentActivity {
         data,
         new CustomerWorkspace.Listener() {
           @Override
+          public void onFilterNormalized(String filter) {
+            customerFilter = filter;
+          }
+
+          @Override
           public void onFilterChanged(String filter) {
             customerFilter = filter;
             render();
