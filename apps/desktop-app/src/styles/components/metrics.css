@@ -56,14 +56,12 @@
   background: var(--color-info-soft);
 }
 
-.tone-success .metric-icon,
-.tone-ok .metric-icon {
+.tone-success .metric-icon {
   color: var(--color-success);
   background: var(--color-success-soft);
 }
 
-.tone-warning .metric-icon,
-.tone-wait .metric-icon {
+.tone-warning .metric-icon {
   color: var(--color-warning);
   background: var(--color-warning-soft);
 }
