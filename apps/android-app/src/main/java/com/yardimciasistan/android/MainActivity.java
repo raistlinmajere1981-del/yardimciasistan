@@ -2430,156 +2430,120 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showRoomStatusDialog(OperationData.RoomRecord room) {
-    showStatusSelectionDialog("Oda durumunu değiştir", room.status, new String[][] {
-        {"available", "Boş"},
-        {"occupied", "Dolu"},
-        {"cleaning", "Temizlik"},
-        {"maintenance", "Bakım"}
-    }, status -> updateRoom(room, status));
-  }
+    OperationMutationDialogs.showRoomStatus(
+        this,
+        room,
+        new OperationMutationDialogs.Listener() {
+          @Override
+          public void updateRoom(OperationData.RoomRecord selected, String status) {
+            MainActivity.this.updateRoom(selected, status);
+          }
 
-  private void showTableStatusDialog(OperationData.TableRecord table) {
-    ArrayList<String[]> options = new ArrayList<>();
-    options.add(new String[] {"available", "Boş"});
-    options.add(new String[] {"occupied", "Dolu"});
-    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS)) {
-      options.add(new String[] {"reserved", "Rezerve"});
-    }
-    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)) {
-      options.add(new String[] {"bill_waiting", "Hesap"});
-    }
-    showStatusSelectionDialog(
-        "Masa durumunu değiştir",
-        table.status,
-        options.toArray(new String[0][]),
-        status -> updateTable(table, status)
+          @Override
+          public void updateTable(OperationData.TableRecord selected, String status) {
+            MainActivity.this.updateTable(selected, status);
+          }
+
+          @Override
+          public void sendAction(
+              String actionType,
+              JSONObject actionPayload,
+              String successMessage
+          ) {
+            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
+          }
+
+          @Override
+          public void configureBottomDialog(Dialog dialog) {
+            MainActivity.this.configureBottomDialog(dialog);
+          }
+
+          @Override
+          public AlertDialog.Builder alertDialogBuilder() {
+            return MainActivity.this.alertDialogBuilder();
+          }
+        }
     );
   }
 
-  private void showStatusSelectionDialog(String title, String current, String[][] options, StatusSelection listener) {
-    Dialog dialog = new Dialog(this);
-    LinearLayout sheet = UiKit.column(this);
-    sheet.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 16), UiKit.dp(this, 18), UiKit.dp(this, 18));
-    sheet.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 18));
-    sheet.addView(UiKit.eyebrow(this, "DURUM"));
-    sheet.addView(UiKit.title(this, title));
-    for (String[] option : options) {
-      boolean selected = option[0].equals(current);
-      Button choice = selected
-          ? UiKit.button(this, option[1] + " · Seçili", UiKit.PRIMARY, view -> dialog.dismiss())
-          : UiKit.outlineButton(this, option[1], view -> {
-            listener.onSelect(option[0]);
-            dialog.dismiss();
-          });
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      params.setMargins(0, UiKit.dp(this, 8), 0, 0);
-      choice.setLayoutParams(params);
-      sheet.addView(choice);
-    }
-    dialog.setContentView(sheet);
-    dialog.show();
-    configureBottomDialog(dialog);
+  private void showTableStatusDialog(OperationData.TableRecord table) {
+    OperationMutationDialogs.showTableStatus(
+        this,
+        data,
+        table,
+        new OperationMutationDialogs.Listener() {
+          @Override
+          public void updateRoom(OperationData.RoomRecord selected, String status) {
+            MainActivity.this.updateRoom(selected, status);
+          }
+
+          @Override
+          public void updateTable(OperationData.TableRecord selected, String status) {
+            MainActivity.this.updateTable(selected, status);
+          }
+
+          @Override
+          public void sendAction(
+              String actionType,
+              JSONObject actionPayload,
+              String successMessage
+          ) {
+            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
+          }
+
+          @Override
+          public void configureBottomDialog(Dialog dialog) {
+            MainActivity.this.configureBottomDialog(dialog);
+          }
+
+          @Override
+          public AlertDialog.Builder alertDialogBuilder() {
+            return MainActivity.this.alertDialogBuilder();
+          }
+        }
+    );
   }
+
+
 
   private void showStockActionsDialog(OperationData.TrackedStockItem item) {
-    Dialog dialog = new Dialog(this);
-    LinearLayout sheet = UiKit.column(this);
-    sheet.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 16), UiKit.dp(this, 18), UiKit.dp(this, 18));
-    sheet.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 18));
-    sheet.addView(UiKit.eyebrow(this, "STOK GÜNCELLE"));
-    sheet.addView(UiKit.title(this, item.name));
-    sheet.addView(UiKit.text(this, "Mevcut stok: " + stockQuantity(item.stockQuantity, item.stockUnit), 13, UiKit.MUTED, Typeface.NORMAL));
+    OperationMutationDialogs.showStockActions(
+        this,
+        item,
+        new OperationMutationDialogs.Listener() {
+          @Override
+          public void updateRoom(OperationData.RoomRecord selected, String status) {
+            MainActivity.this.updateRoom(selected, status);
+          }
 
-    int quickAddQuantity = "gram".equals(item.stockUnit) ? 1000 : 1;
-    Button add = UiKit.button(this, "+" + stockQuantity(quickAddQuantity, item.stockUnit) + " Ekle", UiKit.PRIMARY, view -> {
-      sendAction(
-          "menu_stock_add",
-          payload("menu_item_id", item.menuItemId, "quantity", quickAddQuantity, "note", "Android hızlı stok ekleme"),
-          item.name + " stok ekleme işlemi gönderildi."
-      );
-      dialog.dismiss();
-    });
-    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-    actionParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
-    add.setLayoutParams(actionParams);
-    sheet.addView(add);
+          @Override
+          public void updateTable(OperationData.TableRecord selected, String status) {
+            MainActivity.this.updateTable(selected, status);
+          }
 
-    Button set = UiKit.outlineButton(this, "Miktarı Ayarla", view -> {
-      dialog.dismiss();
-      showStockMutationDialog(item, "set");
-    });
-    LinearLayout.LayoutParams setParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-    setParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    set.setLayoutParams(setParams);
-    sheet.addView(set);
+          @Override
+          public void sendAction(
+              String actionType,
+              JSONObject actionPayload,
+              String successMessage
+          ) {
+            MainActivity.this.sendAction(actionType, actionPayload, successMessage);
+          }
 
-    Button adjust = UiKit.outlineButton(this, "Fark Gir", view -> {
-      dialog.dismiss();
-      showStockMutationDialog(item, "adjust");
-    });
-    LinearLayout.LayoutParams adjustParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-    adjustParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    adjust.setLayoutParams(adjustParams);
-    sheet.addView(adjust);
+          @Override
+          public void configureBottomDialog(Dialog dialog) {
+            MainActivity.this.configureBottomDialog(dialog);
+          }
 
-    dialog.setContentView(sheet);
-    dialog.show();
-    configureBottomDialog(dialog);
+          @Override
+          public AlertDialog.Builder alertDialogBuilder() {
+            return MainActivity.this.alertDialogBuilder();
+          }
+        }
+    );
   }
 
-  private void showStockMutationDialog(OperationData.TrackedStockItem item, String mode) {
-    LinearLayout form = UiKit.column(this);
-    int horizontal = UiKit.dp(this, 20);
-    form.setPadding(horizontal, 0, horizontal, 0);
-    EditText quantity = UiKit.input(this, "set".equals(mode)
-        ? "Yeni stok miktarı (" + stockUnitLabel(item.stockUnit) + ")"
-        : "Stok farkı (" + stockUnitLabel(item.stockUnit) + ")");
-    quantity.setInputType(InputType.TYPE_CLASS_NUMBER
-        | InputType.TYPE_NUMBER_FLAG_DECIMAL
-        | ("adjust".equals(mode) ? InputType.TYPE_NUMBER_FLAG_SIGNED : 0));
-    if ("set".equals(mode)) {
-      quantity.setText(stockNumber(item.stockQuantity));
-    }
-    EditText note = UiKit.input(this, "Not (isteğe bağlı)");
-    LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
-    noteParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
-    note.setLayoutParams(noteParams);
-    form.addView(quantity);
-    form.addView(note);
 
-    AlertDialog dialog = alertDialogBuilder()
-        .setTitle("set".equals(mode) ? "Stok miktarını ayarla" : "Stok farkı gir")
-        .setView(form)
-        .setNegativeButton("Vazgeç", null)
-        .setPositiveButton("Kaydet", null)
-        .create();
-    dialog.setOnShowListener(value -> {
-      dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiKit.MUTED);
-      dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiKit.PRIMARY);
-      dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-        double parsed;
-        try {
-          parsed = Double.parseDouble(quantity.getText().toString().trim().replace(',', '.'));
-        } catch (NumberFormatException error) {
-          Toast.makeText(this, "Geçerli bir stok değeri girin.", Toast.LENGTH_SHORT).show();
-          return;
-        }
-        if (("set".equals(mode) && parsed < 0) || ("adjust".equals(mode) && parsed == 0)) {
-          Toast.makeText(this, "Stok değeri geçersiz.", Toast.LENGTH_SHORT).show();
-          return;
-        }
-        String actionType = "set".equals(mode) ? "menu_stock_set" : "menu_stock_adjust";
-        String quantityKey = "set".equals(mode) ? "quantity" : "quantity_change";
-        sendAction(actionType, payload(
-            "menu_item_id", item.menuItemId,
-            quantityKey, parsed,
-            "note", note.getText().toString().trim()
-        ), item.name + " stok güncellemesi gönderildi.");
-        dialog.dismiss();
-      });
-    });
-    dialog.show();
-  }
 
   private View activeOrderCard(OperationData.TableOrder order) {
     LinearLayout card = UiKit.card(this);
@@ -3717,10 +3681,6 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private interface FilterListener {
-    void onSelect(String value);
-  }
-
-  private interface StatusSelection {
     void onSelect(String value);
   }
 
