@@ -44,7 +44,12 @@ try {
   });
 
   await page.goto(`${baseUrl}messages-takeover-lifecycle-test`);
+  await expect(page.getByTestId("web-surface")).toHaveCount(1);
+  await expect(page.getByTestId("web-surface")).toBeHidden();
+
   await page.getByRole("tab", { name: "WhatsApp", exact: true }).click();
+  await expect(page.getByTestId("web-surface")).toBeVisible();
+  await expect(page.getByText("WhatsApp Web kullanıcı kontrolüne hazırlanıyor...", { exact: true })).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__m8eTakeoverCalls)).toBe(1);
 
   // Leave while the failed takeover is sleeping before retry. A stale loop must not call main again.
@@ -54,14 +59,15 @@ try {
   expect(await page.evaluate(() => window.__m8eActivity.at(-1))).toBe(false);
   await expect(page.getByTestId("web-surface")).toBeHidden();
 
-  // A fresh Web entry may start a new takeover and only then reveal the user surface.
+  // A fresh Web entry is visible immediately; takeover remains background coordination only.
   await page.getByRole("tab", { name: "WhatsApp", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__m8eTakeoverCalls)).toBe(2);
   await expect(page.getByTestId("web-surface")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__m8eTakeoverCalls)).toBe(2);
 
-  // Navigation away invalidates the current UI ownership and releases userBusy.
+  // Navigation away releases userBusy without unmounting the warmed web surface.
   await page.evaluate(() => window.__m8eTakeoverSetActive(false));
-  await expect(page.getByTestId("web-surface")).toBeHidden();
+  await expect(page.getByTestId("web-surface")).toHaveCount(1);
+  await expect(page.getByTestId("web-surface")).toBeVisible();
   expect(await page.evaluate(() => window.__m8eActivity.at(-1))).toBe(false);
 
   expect(pageErrors).toEqual([]);
