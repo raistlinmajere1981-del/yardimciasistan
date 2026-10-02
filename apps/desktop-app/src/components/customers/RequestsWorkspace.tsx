@@ -207,7 +207,7 @@ export function RequestsWorkspace({
         </DataList>
 
         <ActionButton
-          variant="ghost"
+          size="sm"
           type="button"
           aria-expanded={manualFormOpen}
           onClick={() => {
@@ -218,7 +218,7 @@ export function RequestsWorkspace({
           }}
         >
           <Plus size={17} aria-hidden="true" />
-          Elle Talep Ekle
+          Talimat Ekle
         </ActionButton>
       </aside>
 
