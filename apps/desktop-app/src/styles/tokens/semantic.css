@@ -29,6 +29,7 @@
   --color-info-soft: color-mix(in srgb, var(--color-info) 9%, var(--color-bg-panel));
   --color-info-border: color-mix(in srgb, var(--color-info) 30%, var(--color-border));
   --color-muted-soft: color-mix(in srgb, var(--color-text-muted) 7%, var(--color-bg-panel));
+  --color-interactive-hover: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-surface));
   --color-bg-pressed: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-hover));
   --color-selected: var(--color-accent);
   --color-selected-soft: var(--color-accent-soft);
