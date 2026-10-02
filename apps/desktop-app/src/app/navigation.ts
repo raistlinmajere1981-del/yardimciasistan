@@ -89,7 +89,7 @@ const calendarContribution = {
   icon: CalendarDays,
   order: 75,
   condition: { allOf: [C.CALENDAR] },
-  contentScroll: "page",
+  contentScroll: "workspace",
   presentation: (capabilities) => {
     const reservationsEnabled = runtimeHasCapability(capabilities, C.ACCOMMODATION_RESERVATIONS)
       || runtimeHasCapability(capabilities, C.FOOD_RESERVATIONS);
