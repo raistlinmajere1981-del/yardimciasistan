@@ -27,7 +27,6 @@ import type {
 import {
   DesktopDatabase,
   type DesktopDashboardData,
-  type DesktopSetupData,
   type DesktopSetupSaveResult,
   type SaveInitialSetupInput,
   type SaveMenuItemInput,
