@@ -114,16 +114,6 @@
   border-color: var(--color-danger);
 }
 
-.action-button-whatsapp {
-  background: var(--color-success-soft);
-  color: var(--color-success);
-}
-
-.action-button-whatsapp:hover:not(:disabled) {
-  background: var(--color-success-soft);
-  border-color: var(--color-success);
-}
-
 .action-button-sm {
   min-height: var(--control-height-sm);
   padding-inline: var(--space-2);
