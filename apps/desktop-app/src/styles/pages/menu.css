@@ -962,8 +962,29 @@
 }
 
 @media (max-width: 900px) {
+  .menu-page-surface {
+    overflow: auto;
+  }
+
+  .menu-page-layout {
+    height: auto;
+    min-height: 100%;
+  }
+
   .menu-management-grid {
     grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    overflow: visible;
+  }
+
+  .menu-category-panel,
+  .menu-product-panel {
+    grid-template-rows: auto;
+    overflow: visible;
+  }
+
+  .menu-record-list {
+    overflow: visible;
   }
 
   .stock-image-table {
