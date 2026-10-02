@@ -8,6 +8,7 @@ import {
 } from "./database/hospitality-notification-store.js";
 import { DesktopRoomFolioService } from "./room-folio.js";
 import { KbsDeliveryService } from "./kbs-delivery-service.js";
+import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
 import type { KbsProviderAdapter } from "./kbs-provider-adapter.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
 import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
@@ -35,7 +36,7 @@ import {
   resolveDatabasePath
 } from "./data-paths.js";
 import { assertCurrentDesktopSchema } from "./desktop-database-compatibility.js";
-import { routeAndroidActionInTransaction } from "./android-action-router.js";
+import { applyAndroidActionTransaction } from "./android-action-application-service.js";
 import {
   claimAutomaticBirthdayDelivery,
   getAutomaticBirthdayCandidates,
@@ -441,85 +442,11 @@ export class DesktopDatabase {
   }
 
   applyAndroidAction(action: AndroidSyncAction): ApplyAndroidActionResult {
-    const actionId = String(action.id ?? "").trim();
-    const actionType = String(action.action_type ?? "").trim();
-    const deviceId = String(action.device_id ?? "").trim();
-    if (!actionId || !actionType || !deviceId || !action.payload || typeof action.payload !== "object" || Array.isArray(action.payload)) {
-      return { ok: false, message: "Telefon işlemi eksik veya geçersiz." };
-    }
-
-    try {
-      this.upsertAndroidDeviceSightings([{
-        device_id: deviceId,
-        device_name: String(action.device_name ?? ""),
-        app_version: String(action.app_version ?? ""),
-        first_seen_at: action.created_at,
-        last_seen_at: action.last_seen_at || new Date().toISOString()
-      }]);
-    } catch {
-      return { ok: false, message: "Telefon kaydı masaüstünde hazırlanamadı." };
-    }
-
-    const existingReceipt = this.db.prepare("SELECT id FROM android_action_receipts WHERE id = ?").get(actionId);
-    if (existingReceipt) {
-      return {
-        ok: true,
-        message: "Telefon işlemi daha önce uygulanmış.",
-        alreadyApplied: true
-      };
-    }
-
-    const now = new Date().toISOString();
-    let transactionStarted = false;
-    try {
-      this.db.exec("BEGIN IMMEDIATE");
-      transactionStarted = true;
-      const concurrentReceipt = this.db.prepare("SELECT id FROM android_action_receipts WHERE id = ?").get(actionId);
-      if (concurrentReceipt) {
-        this.db.exec("COMMIT");
-        transactionStarted = false;
-        return {
-          ok: true,
-          message: "Telefon işlemi daha önce uygulanmış.",
-          alreadyApplied: true
-        };
-      }
-
-      const result = routeAndroidActionInTransaction(
-        this.db,
-        action,
-        now,
-        this.getEnabledBusinessCapabilities()
-      );
-      if (!result.ok) {
-        this.db.exec("ROLLBACK");
-        transactionStarted = false;
-        return result;
-      }
-
-      this.db
-        .prepare("INSERT INTO android_action_receipts (id, action_type, device_id, applied_at) VALUES (?, ?, ?, ?)")
-        .run(actionId, actionType, deviceId, now);
-      this.db.exec("COMMIT");
-      transactionStarted = false;
-      return {
-        ok: true,
-        message: result.message,
-        alreadyApplied: false
-      };
-    } catch {
-      if (transactionStarted) {
-        try {
-          this.db.exec("ROLLBACK");
-        } catch {
-          // Preserve the action failure result even if SQLite already ended the transaction.
-        }
-      }
-      return {
-        ok: false,
-        message: "Telefon işlemi yerel kayıtlara uygulanamadı. Masaüstünde kayıtları kontrol edip tekrar deneyin."
-      };
-    }
+    return applyAndroidActionTransaction(
+      this.db,
+      action,
+      this.getEnabledBusinessCapabilities()
+    );
   }
 
   saveDailyTask(input: SaveDailyTaskInput): DesktopStatusUpdateResult {
@@ -783,51 +710,12 @@ export class DesktopDatabase {
   }
 
   updateRoomStatus(input: UpdateRoomStatusInput): DesktopStatusUpdateResult {
-    const roomId = input.roomId.trim();
-    const status = normalizeStatus(input.status, ["available", "reserved", "occupied", "cleaning", "maintenance"]);
-    if (!roomId || !status) {
-      return {
-        ok: false,
-        message: "Oda durumu için geçerli kayıt ve durum seçilmeli."
-      };
+    const result = updateRoomStatusWithStayGuard(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const room = this.db.prepare("SELECT status FROM rooms WHERE id = ? AND deleted_at = ''").get(roomId) as { status?: string } | undefined;
-    if (!room) {
-      return {
-        ok: false,
-        message: "Oda bulunamadı."
-      };
-    }
-    const activeStay = this.db
-      .prepare(`
-        SELECT status
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND status IN ('checked_in', 'planned')
-          AND deleted_at = ''
-        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END
-        LIMIT 1
-      `)
-      .get(roomId) as { status?: string } | undefined;
-    const expectedStatus = activeStay?.status === "checked_in"
-      ? "occupied"
-      : activeStay?.status === "planned"
-        ? "reserved"
-        : "";
-    if (expectedStatus && status !== expectedStatus) {
-      return {
-        ok: false,
-        message: "Odanın aktif müşteri kaydı var. Durumu konaklama kartındaki giriş, çıkış veya iptal işlemiyle değiştirin."
-      };
-    }
-
-    const now = new Date().toISOString();
-    updateStoredRoomStatus(this.db, roomId, status, String(room.status ?? ""), now);
-
     return {
-      ok: true,
-      message: "Oda durumu güncellendi.",
+      ...result,
       dashboardData: this.getDashboardData()
     };
   }
@@ -1264,10 +1152,6 @@ export class DesktopDatabase {
 }
 
 import {
-  normalizeStatus,
-} from "./database/request-utils.js";
-
-import {
   setAutoSyncEnabled as setStoredAutoSyncEnabled,
   getSyncRuntimeStatus as getStoredSyncRuntimeStatus,
   getPendingSyncJobs as getStoredPendingSyncJobs,
@@ -1392,7 +1276,6 @@ import {
 
 import {
   getRooms as getStoredRooms,
-  updateRoomStatus as updateStoredRoomStatus,
 } from "./database/room-store.js";
 
 import {
