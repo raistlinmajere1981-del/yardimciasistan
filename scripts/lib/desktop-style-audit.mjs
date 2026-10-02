@@ -3,6 +3,27 @@ import fs from 'node:fs';
 const sharedNames = new Set(['.desktop-shell', '.content', '.sidebar', '.page-header', '.page-content', '.page-toolbar', '.page-toolbar__actions', '.panel', '.surface', '.empty-state', '.status-message', '.dialog', '.drawer', '.nav-item', '.page-header__title', '.card', '.card__header', '.card__actions', '.data-records', '.data-list', '.list-row', '.list-row__actions', '.form-grid', '.form-row', '.form-field', '.record-workspace']);
 const legacyImport = /(?:friendly[^/]*|[^/]+-ux|styles|setup-capabilities|segmented-control)\.css$/;
 const intentionalRenderer = /\/styles\/pages\/menu-preview\.css$/;
+const sharedVisualSelector = /\.(?:action-button(?:-[\w-]+)?|status-badge|status-chip|interactive-surface(?:--[\w-]+)?|list-row(?:--[\w-]+)?|resource-card(?:__[\w-]+)?|choice-chips|data-records)(?![\w-])/;
+const sharedVisualProperty = /\b(?:background(?:-color)?|border(?:-(?:color|top-color|right-color|bottom-color|left-color|inline-color|block-color))?|color|box-shadow|opacity)\s*:/g;
+const outlineSuppression = /\boutline\s*:\s*(?:none|0)(?:\s*;|\s*$)/i;
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\const intentionalRenderer = /\/styles\/pages\/menu-preview\.css$/;
+');
+}
+
+function stripHasConditions(selector) {
+  return selector.replace(/:has\([^)]*\)/g, '');
+}
+
+function delegatesVisibleFocus(selector, source) {
+  const owner = selector.match(/^\s*(\.[\w-]+)\s+/)?.[1];
+  if (!owner) return false;
+  return new RegExp(
+    escapeRegex(owner) + ':focus-within\\s*\\{[^}]*\\b(?:outline|box-shadow|border-color)\\s*:',
+    'm'
+  ).test(source);
+}
 
 // Walk CSS blocks, preserving media/layer scope. Strings and comments do not open blocks.
 export function cssRules(source) {
@@ -70,6 +91,20 @@ export function desktopStyleAudit(files) {
         if (!file.includes('/styles/layout/') && file.endsWith('/components/navigation.css') && /^\.(?:desktop-shell|content|sidebar)(?:\.is-collapsed)?$/.test(selector)) add('shellOutsideLayout', file, selector, rule.line);
         if (/\/pages\/|\/components\/(?!navigation|header|notifications)/.test(file) && !file.includes('/styles/layout/') && /\.(?:sidebar(?:-[\w-]+)?|nav-item|topbar|page-header(?:__[\w-]+|-[\w-]+)?)(?![\w-])/.test(selector)) add('featureShellSelector', file, selector, rule.line);
         if (/\[data-(?:theme|mode)(?:[=\]])/i.test(selector)) add('legacyAppearanceSelector', file, selector, rule.line);
+        if (file.includes('/styles/pages/')) {
+          const visualTarget = stripHasConditions(selector);
+          const visualProperties = [...rule.body.matchAll(sharedVisualProperty)].map(match => match[0].split(':')[0].trim());
+          if (sharedVisualSelector.test(visualTarget) && visualProperties.length) {
+            add('pageOwnsSharedVisualState', file, selector + ': ' + [...new Set(visualProperties)].join(', '), rule.line);
+          }
+          if (
+            !file.endsWith('/styles/pages/lock.css')
+            && outlineSuppression.test(rule.body)
+            && !delegatesVisibleFocus(selector, clean)
+          ) {
+            add('unsafeOutlineSuppression', file, selector, rule.line);
+          }
+        }
         if (sharedNames.has(selector)) {
           const properties = [...rule.body.matchAll(/(?:^|;)\s*([\w-]+)\s*:/g)].map(match => match[1]);
           const previous = shared.get(key);
