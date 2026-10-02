@@ -167,7 +167,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                   const selected = mediaTable?.key === table.key;
                   return (
                     <div
-                      className={`table-public-resource-row${selected ? " is-media-selected" : ""}`}
+                      className={`table-public-resource-row interactive-surface interactive-surface--record${selected ? " is-media-selected is-selected" : ""}`}
                       key={table.key}
                       onClick={() => setMediaTableKey(table.key)}
                     >
