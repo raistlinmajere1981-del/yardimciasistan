@@ -802,13 +802,11 @@
 
   .dashboard-priority-panel,
   .dashboard-timeline-panel {
-    min-height: 280px;
     height: auto;
   }
 
   .dashboard-priority-list {
     flex: 0 1 auto;
-    max-height: 420px;
   }
 
   .dashboard-side {
@@ -820,7 +818,6 @@
 
   .dashboard-timeline-list {
     flex: 0 1 auto;
-    max-height: 320px;
   }
 
   .system-health-grid {
