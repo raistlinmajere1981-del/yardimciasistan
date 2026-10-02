@@ -194,13 +194,13 @@ final class CustomerDetailDialog {
 
   private View detailLine(String label, String value) {
     LinearLayout row = UiKit.row(activity);
-    TextView title = UiKit.text(activity, label, 13, UiKit.MUTED, Typeface.BOLD);
-    title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    row.addView(title);
-    TextView detail = UiKit.text(activity, value, 13, UiKit.TEXT, Typeface.BOLD);
-    detail.setGravity(Gravity.END);
-    detail.setMaxWidth(UiKit.dp(activity, 190));
-    row.addView(detail);
+    TextView labelView = UiKit.text(activity, label, 12, UiKit.MUTED, Typeface.BOLD);
+    labelView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 0.38f));
+    row.addView(labelView);
+    TextView valueView = UiKit.text(activity, value, 13, UiKit.TEXT, Typeface.BOLD);
+    valueView.setGravity(Gravity.END);
+    valueView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 0.62f));
+    row.addView(valueView);
     return row;
   }
 
