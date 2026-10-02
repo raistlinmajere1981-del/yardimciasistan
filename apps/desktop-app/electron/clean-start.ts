@@ -127,9 +127,56 @@ export function archiveLocalDataForCleanStart(
   }
 }
 
+export const CLEAN_START_SESSION_CLEAR_TIMEOUT_MS = 8_000;
+
+export type CleanStartOperationStatus = "completed" | "failed" | "timed-out";
+
+export interface CleanStartOperationResult {
+  name: string;
+  status: CleanStartOperationStatus;
+  message: string;
+}
+
+function cleanStartErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error ?? "Bilinmeyen hata");
+}
+
+export async function settleCleanStartOperation(
+  name: string,
+  operation: Promise<void>,
+  timeoutMs = CLEAN_START_SESSION_CLEAR_TIMEOUT_MS
+): Promise<CleanStartOperationResult> {
+  let timer: NodeJS.Timeout | null = null;
+  const completion: Promise<CleanStartOperationResult> = operation.then(
+    () => ({ name, status: "completed", message: "" }),
+    (error) => ({ name, status: "failed", message: cleanStartErrorMessage(error) })
+  );
+  const timeout = new Promise<CleanStartOperationResult>((resolve) => {
+    timer = setTimeout(() => {
+      resolve({
+        name,
+        status: "timed-out",
+        message: `İşlem ${timeoutMs} ms içinde tamamlanmadı.`
+      });
+    }, Math.max(1, timeoutMs));
+  });
+
+  const result = await Promise.race([completion, timeout]);
+  if (timer) clearTimeout(timer);
+  return result;
+}
+
+export interface CleanStartTransientCleanupFailure {
+  name: string;
+  code: string;
+  message: string;
+}
+
 export interface CleanStartTransientCleanupResult {
   removedEntries: string[];
   preservedEntries: string[];
+  failedEntries: CleanStartTransientCleanupFailure[];
 }
 
 export function cleanupTransientStateForCleanStart(dataRoot: string): CleanStartTransientCleanupResult {
@@ -141,10 +188,25 @@ export function cleanupTransientStateForCleanStart(dataRoot: string): CleanStart
   ];
 
   const removedEntries: string[] = [];
+  const failedEntries: CleanStartTransientCleanupFailure[] = [];
   for (const entry of transientEntries) {
     if (!fs.existsSync(entry.path)) continue;
-    fs.rmSync(entry.path, { recursive: true, force: true });
-    removedEntries.push(entry.name);
+    try {
+      fs.rmSync(entry.path, {
+        recursive: true,
+        force: true,
+        maxRetries: 8,
+        retryDelay: 250
+      });
+      removedEntries.push(entry.name);
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      failedEntries.push({
+        name: entry.name,
+        code: String(nodeError.code ?? "UNKNOWN"),
+        message: cleanStartErrorMessage(error)
+      });
+    }
   }
 
   const preservedEntries = [
@@ -153,5 +215,5 @@ export function cleanupTransientStateForCleanStart(dataRoot: string): CleanStart
     "updates/settings.json"
   ].filter((entry) => fs.existsSync(path.join(dataRoot, entry)));
 
-  return { removedEntries, preservedEntries };
+  return { removedEntries, preservedEntries, failedEntries };
 }
