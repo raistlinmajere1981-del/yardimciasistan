@@ -1,12 +1,9 @@
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, ExternalLink, MessageCircle, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, MessageCircle, ShieldCheck, Trash2 } from "lucide-react";
 import {
-  createWhatsAppInspectionScript,
-  createWhatsAppSendScript,
   prepareWhatsAppAction,
-  WHATSAPP_WEB_HOME_URL,
-  type WhatsAppDomResult
+  WHATSAPP_WEB_HOME_URL
 } from "@yardimci-asistan/whatsapp-bridge";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import { formatCustomerSource } from "../../app/customer-model";
@@ -39,34 +36,12 @@ type WhatsAppWebViewElement = HTMLElement & {
   reload?: () => void;
   loadURL?: (url: string) => Promise<void>;
   getURL?: () => string;
-  getWebContentsId?: () => number;
-  executeJavaScript?: (code: string, userGesture?: boolean) => Promise<unknown>;
 };
-
-function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
-  if (!value || typeof value !== "object") {
-    return {
-      ok: false,
-      code: "invalid_result",
-      message: "WhatsApp Web beklenen doğrulama sonucunu döndürmedi."
-    };
-  }
-
-  const result = value as Partial<WhatsAppDomResult>;
-  return {
-    ok: result.ok === true,
-    code: String(result.code ?? "unknown"),
-    message: String(result.message ?? "WhatsApp Web işlemi tamamlanamadı."),
-    chatTitle: typeof result.chatTitle === "string" ? result.chatTitle : "",
-    composerText: typeof result.composerText === "string" ? result.composerText : ""
-  };
-}
 
 export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, getRequestStatusTone, onSelectRequest, onOpenExternal, onOpenWeb, onReturnToSafe, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
   const { confirm, confirmDialog } = useConfirmDialog();
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
-  const registeredGuestIdRef = useRef<number | null>(null);
-  const [sendState, setSendState] = useState<SyncState>("idle");
+  const [markState, setMarkState] = useState<SyncState>("idle");
   const [copyFeedback, setCopyFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
   const [webViewError, setWebViewError] = useState("");
@@ -93,37 +68,6 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
     const webView = webViewRef.current;
     if (!webView) return;
 
-    const readGuestId = (): number | null => {
-      try {
-        const id = webView.getWebContentsId?.();
-        return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
-      } catch {
-        return null;
-      }
-    };
-    const unregisterRegisteredWebview = () => {
-      const id = registeredGuestIdRef.current;
-      if (id === null) return;
-      try {
-        window.yardimciDesktop?.unregisterWhatsAppWebview?.(id);
-      } catch {
-        // Ignore bridge failures during teardown.
-      } finally {
-        if (registeredGuestIdRef.current === id) registeredGuestIdRef.current = null;
-      }
-    };
-    const registerWebview = () => {
-      const id = readGuestId();
-      if (id === null || registeredGuestIdRef.current === id) return;
-      unregisterRegisteredWebview();
-      try {
-        window.yardimciDesktop?.registerWhatsAppWebview?.(id);
-        registeredGuestIdRef.current = id;
-      } catch {
-        // Registration is best-effort automation wiring; the visible page
-        // must keep working even if the bridge call fails.
-      }
-    };
     const handleLoad = () => {
       setWebViewError("");
     };
@@ -140,41 +84,33 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
       setWebViewError("WhatsApp Web beklenmedik şekilde kapandı. Yeniden yükleyip tekrar deneyin.");
     };
 
-    webView.addEventListener("did-attach", registerWebview);
-    webView.addEventListener("dom-ready", registerWebview);
-    webView.addEventListener("did-detach", unregisterRegisteredWebview);
     webView.addEventListener("did-finish-load", handleLoad);
     webView.addEventListener("did-fail-load", handleFail);
     webView.addEventListener("crashed", handleCrash);
     webView.addEventListener("unresponsive", handleCrash);
-    registerWebview();
     return () => {
-      webView.removeEventListener("did-attach", registerWebview);
-      webView.removeEventListener("dom-ready", registerWebview);
-      webView.removeEventListener("did-detach", unregisterRegisteredWebview);
       webView.removeEventListener("did-finish-load", handleLoad);
       webView.removeEventListener("did-fail-load", handleFail);
       webView.removeEventListener("crashed", handleCrash);
       webView.removeEventListener("unresponsive", handleCrash);
-      unregisterRegisteredWebview();
     };
   }, [view]);
 
   useEffect(() => {
     setCopyFeedback(null);
     if (!selectedRequest && !preparedMessage) {
-      setSendState("idle");
+      setMarkState("idle");
       setWebViewUrl(WHATSAPP_WEB_HOME_URL);
       return;
     }
 
     if (!webViewPayload) {
-      setSendState("idle");
+      setMarkState("idle");
       setWebViewUrl(WHATSAPP_WEB_HOME_URL);
       return;
     }
 
-    setSendState("idle");
+    setMarkState("idle");
     setWebViewUrl(webViewPayload.homeUrl);
   }, [selectedRequest, webViewAction, webViewPayload, preparedMessage]);
 
@@ -198,7 +134,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   function goToCustomerNumber() {
     if (!webViewPayload) return;
 
-    setSendState("idle");
+    setMarkState("idle");
     setWebViewError("");
     setWebViewUrl(webViewPayload.url);
 
@@ -223,80 +159,37 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
     }
   }
 
-  async function approveAndSendMessage() {
-    // Generic credit shares are prepared only; the operator sends in WhatsApp itself.
-    if (preparedMessage) return;
-    const webView = webViewRef.current;
-    if (!selectedRequest || !selectedMessage.trim() || !webView?.executeJavaScript) {
-      setSendState("error");
-      reportAppStatus("error", "Onaylı gönderim yalnızca masaüstü uygulamasındaki hazır WhatsApp Web ekranında kullanılabilir.");
+  async function markMessageSentManually() {
+    if (preparedMessage || !selectedRequest || !selectedMessage.trim()) {
       return;
     }
 
-    const currentUrl = (() => {
-      try {
-        return webView.getURL?.() || webViewUrl;
-      } catch {
-        return webViewUrl;
-      }
-    })();
-    if (!currentUrl.startsWith(WHATSAPP_WEB_HOME_URL)) {
-      setSendState("error");
-      reportAppStatus("error", "Güvenlik kontrolü: açık sayfa WhatsApp Web olmadığı için gönderim durduruldu.");
-      return;
-    }
+    const approved = await confirm({
+      title: "Mesajı gönderildi olarak işaretle",
+      tone: "warning",
+      confirmLabel: "Gönderildi",
+      description: [
+        "Bu işlem WhatsApp'a mesaj göndermez.",
+        "Mesajı WhatsApp içinde gönderdikten sonra yalnızca yerel kaydı tamamlandı olarak işaretler.",
+        "",
+        `${selectedRequest.customer_name} · ${selectedRequest.customer_phone}`
+      ].join("\n")
+    });
+    if (!approved) return;
 
-    setSendState("loading");
-    reportAppStatus("loading", "WhatsApp sohbeti ve mesaj metni doğrulanıyor.");
-
+    setMarkState("loading");
     try {
-      const inspection = asWhatsAppDomResult(await webView.executeJavaScript(createWhatsAppInspectionScript(selectedMessage), true));
-      if (!inspection.ok) {
-        setSendState("error");
-        reportAppStatus("error", inspection.message);
-        return;
-      }
-
-      const approved = await confirm({ title: "WhatsApp mesajını gönder", tone: "warning", confirmLabel: "Gönder", description:
-        [
-          "WhatsApp Web üzerinden mesaj gönderilecek.",
-          "",
-          `Açık sohbet: ${inspection.chatTitle || "Bilinmeyen sohbet"}`,
-          `Talep sahibi: ${selectedRequest.customer_name} (${selectedRequest.customer_phone})`,
-          "",
-          "Gönderilecek mesaj:",
-          selectedMessage,
-          "",
-          "Bu mesajı göndermeyi onaylıyor musunuz?"
-        ].join("\n")
-      });
-
-      if (!approved) {
-        setSendState("idle");
-        return;
-      }
-
-      reportAppStatus("loading", "WhatsApp Web üzerinden mesaj gönderiliyor.");
-      const sendResult = asWhatsAppDomResult(
-        await webView.executeJavaScript(createWhatsAppSendScript(selectedMessage, inspection.chatTitle || ""), true)
-      );
-      if (!sendResult.ok) {
-        setSendState("error");
-        reportAppStatus("error", sendResult.message);
-        return;
-      }
-
       const recordResult = await onMessageSent(selectedRequest.id, selectedMessage);
-      setSendState(recordResult.ok ? "success" : "error");
+      setMarkState(recordResult.ok ? "success" : "error");
       reportAppStatus(
         recordResult.ok ? "success" : "error",
         recordResult.ok
-          ? "Mesaj kullanıcı onayıyla WhatsApp Web üzerinden gönderildi."
-          : `Mesaj WhatsApp Web'e gönderildi; yerel kayıt güncellenemedi: ${recordResult.message}`
+          ? "Mesaj gönderildi olarak işaretlendi."
+          : recordResult.message
       );
     } catch {
-      setSendState("error");
-      reportAppStatus("error", "WhatsApp Web güvenlik kontrolü tamamlanamadı. Sohbeti yeniden açıp tekrar deneyin.");
+      setMarkState("error");
+      reportAppStatus("error", "Mesaj kaydı güncellenemedi.");
     }
   }
 
@@ -386,16 +279,16 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               Güvenli Moda Dön
             </ActionButton>
             {!preparedMessage && <ActionButton
-              className="whatsapp-approved-send"
+              variant="secondary"
               size="sm"
               type="button"
-              onClick={approveAndSendMessage}
-              disabled={!webViewPayload}
-              busy={sendState === "loading"}
-              busyLabel="Doğrulanıyor…"
+              onClick={markMessageSentManually}
+              disabled={!selectedRequest || !selectedMessage}
+              busy={markState === "loading"}
+              busyLabel="Kaydediliyor…"
             >
-              <Send size={15} aria-hidden="true" />
-              Onayla ve Gönder
+              <ShieldCheck size={15} aria-hidden="true" />
+              Gönderildi Olarak İşaretle
             </ActionButton>}
           </div>
           {copyFeedback && <p className={`whatsapp-copy-status ${copyFeedback.tone === "error" ? "sync-error" : "sync-success"}`} role={copyFeedback.tone === "error" ? "alert" : "status"}>
