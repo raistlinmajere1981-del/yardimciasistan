@@ -41,10 +41,25 @@
 .resource-card[data-tone="info"] { --resource-tone: var(--color-info); }
 .resource-card[data-tone="warning"] { --resource-tone: var(--color-warning); }
 .resource-card[data-tone="danger"] { --resource-tone: var(--color-danger); }
-.resource-card:hover, .resource-card:focus-within {
+.resource-card:hover,
+.resource-card:focus-within {
+  background: var(--color-interactive-hover);
   box-shadow: var(--shadow-md);
-  border-inline-color: var(--color-border-strong);
+  border-inline-color: var(--color-selected-border);
 }
+
+.resource-card[data-selected="true"] {
+  background: var(--color-selected-soft);
+  border-inline-color: var(--color-selected-border);
+  box-shadow: var(--shadow-selected-ring), var(--shadow-sm);
+}
+
+.resource-card[data-selected="true"]:hover,
+.resource-card[data-selected="true"]:focus-within {
+  background: var(--color-selected-soft);
+  box-shadow: var(--shadow-selected-ring), var(--shadow-md);
+}
+
 .resource-card:has(.resource-card__open-hit-area:active:not(:disabled)) {
   transform: translateY(1px) scale(.995);
 }
