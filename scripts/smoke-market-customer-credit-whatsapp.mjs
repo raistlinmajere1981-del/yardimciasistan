@@ -138,9 +138,19 @@ try {
       return [];
     }
     assert.ok(channels[method], `Unexpected bridge method: ${method}`);
-    const result = invoke(channels[method], ...args);
+    const rawResult = invoke(channels[method], ...args);
     if (method === "prepareCustomerCreditWhatsApp" && holdPreparation) await new Promise((resolve) => { releasePreparation = resolve; });
-    return result;
+    // Mirror preload invokeCommerceMutation: mutation IPC returns an ok/value
+    // envelope that production unwraps before reaching the UI.
+    if (rawResult && typeof rawResult === "object" && "ok" in rawResult) {
+      if (rawResult.ok === true && "value" in rawResult) return rawResult.value;
+      if (rawResult.ok === false) {
+        const error = new Error(rawResult.message ?? "Market işlemi başarısız.");
+        error.name = "CommerceDomainError";
+        throw error;
+      }
+    }
+    return rawResult;
   });
   await page.addInitScript(({ dashboard, snapshot, methods }) => {
     window.__m83Initial = { dashboard, snapshot };
