@@ -336,12 +336,19 @@
 
 /* Stage 8A: page is a launcher/projection; one customer is owned by Customer Workspace. */
 .customers-workspace {
-  min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: var(--space-3);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
-.customers-workspace__items { min-height: 0; overflow: auto; }
+.customers-workspace__items {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .customer-workspace-frame.workspace-frame--centered {
   width: min(78rem, calc(100vw / var(--ui-scale) - var(--space-6)));
 }
@@ -745,4 +752,55 @@
 
 .customer-room-receivable-payment__fields {
   gap: var(--space-2);
+}
+
+
+/* Full-height Customer Work frame: fixed panel chrome, scroll only in owned bodies. */
+.customer-work-page-surface {
+  height: 100%;
+}
+
+.customer-work-page-surface > .customers-workspace,
+.customer-work-page-surface > .requests-workspace,
+.customer-work-page-surface > .kbs-automation-workspace,
+.customer-work-page-surface > .message-workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+.customer-work-page-surface > .requests-workspace {
+  align-items: stretch;
+}
+
+.customer-work-page-surface .record-workspace__list,
+.customer-work-page-surface .record-workspace__detail {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.customer-work-page-surface .record-workspace__list {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.customer-work-page-surface .record-workspace__items {
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.customer-work-page-surface .request-detail-panel {
+  display: block;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.customer-work-page-surface .request-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: var(--space-2);
+  background: var(--color-role-communication-bg);
 }
