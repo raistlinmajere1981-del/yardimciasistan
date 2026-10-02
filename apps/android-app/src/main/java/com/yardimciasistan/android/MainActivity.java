@@ -1747,63 +1747,44 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View customerScreen() {
-    LinearLayout page = UiKit.column(this);
-    boolean canManageCustomers = AndroidUiRules.canManageCustomers(data);
-    boolean canViewRequests = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS)
-        && data.hasPermission("customer.view");
-    if (!canManageCustomers && !canViewRequests) {
-      page.addView(permissionDeniedCard());
-      return mainScreenScroll(page);
-    }
-    if (canManageCustomers) {
-      Button createCustomer = UiKit.button(this, "+ Yeni Müşteri", UiKit.PRIMARY, view -> showCustomerForm(null));
-      LinearLayout.LayoutParams createCustomerParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      createCustomerParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
-      createCustomer.setLayoutParams(createCustomerParams);
-      page.addView(createCustomer);
-    }
-    ArrayList<String[]> customerOptions = new ArrayList<>();
-    if (canViewRequests) {
-      customerOptions.add(new String[] {AndroidUiRules.CUSTOMER_NEW, "Yeni Talepler"});
-    }
-    if (canManageCustomers) {
-      customerOptions.add(new String[] {AndroidUiRules.CUSTOMER_LIST, "Müşteriler"});
-    }
-    if (canViewRequests) {
-      customerOptions.add(new String[] {AndroidUiRules.CUSTOMER_WAITING, "Cevap Bekleyenler"});
-    }
-    if ((!canManageCustomers && AndroidUiRules.CUSTOMER_LIST.equals(customerFilter))
-        || (!canViewRequests && !AndroidUiRules.CUSTOMER_LIST.equals(customerFilter))) {
-      customerFilter = canManageCustomers ? AndroidUiRules.CUSTOMER_LIST : AndroidUiRules.CUSTOMER_NEW;
-    }
-    page.addView(filterBar(customerOptions.toArray(new String[0][]), customerFilter, value -> {
-      customerFilter = value;
-      render();
-    }));
+    CustomerWorkspace workspace = new CustomerWorkspace(
+        this,
+        data,
+        new CustomerWorkspace.Listener() {
+          @Override
+          public void onFilterChanged(String filter) {
+            customerFilter = filter;
+            render();
+          }
 
-    if (AndroidUiRules.CUSTOMER_LIST.equals(customerFilter)) {
-      if (data.customers.isEmpty()) {
-        page.addView(emptyCard("Müşteri listesi boş", "Masaüstü güncel snapshot yayınladığında müşteriler burada görünür."));
-      }
-      for (OperationData.CustomerRecord customer : data.customers) {
-        page.addView(customerCard(customer));
-      }
-    } else {
-      boolean waitingOnly = AndroidUiRules.CUSTOMER_WAITING.equals(customerFilter);
-      int shown = 0;
-      for (OperationData.RequestRecord request : data.requests) {
-        boolean visible = waitingOnly ? request.waitingForResponse() : "new".equals(request.status);
-        if (!visible) {
-          continue;
-        }
-        page.addView(requestCard(request));
-        shown += 1;
-      }
-      if (shown == 0) {
-        page.addView(emptyCard(waitingOnly ? "Cevap bekleyen müşteri yok" : "Açık talep yok", "Yeni talepler geldiğinde bu liste güncellenir."));
-      }
-    }
-    return mainScreenScroll(page);
+          @Override
+          public void onCreateCustomer() {
+            showCustomerForm(null);
+          }
+
+          @Override
+          public void onOpenCustomer(OperationData.CustomerRecord customer) {
+            showCustomerDetail(customer);
+          }
+
+          @Override
+          public View createRequestCard(OperationData.RequestRecord request) {
+            return requestCard(request);
+          }
+
+          @Override
+          public void onDial(String phone) {
+            openDialer(phone);
+          }
+
+          @Override
+          public void onWhatsApp(String phone) {
+            openWhatsApp(phone, "");
+          }
+        },
+        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
+    );
+    return workspace.render(customerFilter);
   }
 
   private View pensionScreen() {
@@ -2819,51 +2800,7 @@ public final class MainActivity extends ComponentActivity {
     return messageCard(message, "Cevap bekliyor", UiKit.WARNING, preview);
   }
 
-  private View customerCard(OperationData.CustomerRecord customer) {
-    LinearLayout card = UiKit.card(this);
-    card.setOnClickListener(view -> showCustomerDetail(customer));
-    LinearLayout top = UiKit.row(this);
-    TextView name = UiKit.text(this, customer.fullName, 16, UiKit.TEXT, Typeface.BOLD);
-    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    top.addView(name);
-    OperationData.CustomerRoomStayRecord activeStay = activeStayForCustomer(customer.id);
-    if (activeStay != null) {
-      top.addView(statusBadge("Konaklıyor", UiKit.INFO));
-    }
-    card.addView(top);
-    String counts = customerRecordSummary(customer);
-    card.addView(UiKit.text(this, counts, 12, UiKit.MUTED, Typeface.NORMAL));
-    String identitySummary = customerIdentitySummary(customer);
-    if (!identitySummary.isEmpty()) {
-      card.addView(UiKit.text(this, identitySummary, 12, UiKit.SECONDARY, Typeface.BOLD));
-    }
-    if (activeStay != null) {
-      card.addView(UiKit.text(
-          this,
-          "Aktif oda: " + activeStay.roomName + " · " + joinDateRange(activeStay.checkInDate, activeStay.checkOutDate),
-          12,
-          UiKit.INFO,
-          Typeface.BOLD
-      ));
-    }
-    if (!customer.notes.isEmpty()) {
-      TextView note = UiKit.text(this, ellipsize(customer.notes, 130), 13, UiKit.TEXT, Typeface.NORMAL);
-      note.setMaxLines(3);
-      note.setEllipsize(android.text.TextUtils.TruncateAt.END);
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-      params.setMargins(0, UiKit.dp(this, 7), 0, UiKit.dp(this, 9));
-      note.setLayoutParams(params);
-      card.addView(note);
-    }
-    LinearLayout actions = UiKit.row(this);
-    UiKit.addAction(actions, UiKit.outlineButton(this, "Ara", view -> openDialer(customer.phone)), this);
-    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
-      UiKit.addAction(actions, UiKit.outlineButton(this, "WhatsApp", view -> openWhatsApp(customer.phone, "")), this);
-    }
-    UiKit.addAction(actions, UiKit.button(this, "Aç", UiKit.PRIMARY, view -> showCustomerDetail(customer)), this);
-    card.addView(actions);
-    return card;
-  }
+
 
   private View reservationCard(OperationData.ReservationRecord reservation, boolean compact) {
     if (!AndroidUiRules.reservationAllowed(data, reservation)) {
@@ -5621,14 +5558,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
 
-  private OperationData.CustomerRoomStayRecord activeStayForCustomer(String customerId) {
-    for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
-      if (customerId.equals(stay.customerId) && stay.isActive()) {
-        return stay;
-      }
-    }
-    return null;
-  }
+
 
 
 
