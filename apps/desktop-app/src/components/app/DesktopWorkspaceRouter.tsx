@@ -1,7 +1,6 @@
 import { RoomCategoryControl, RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
 import { useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
-  BUSINESS_CAPABILITIES,
   getReservationDomain,
   isReservationTypeAvailable
 } from "@yardimci-asistan/shared";
@@ -168,7 +167,6 @@ export function DesktopWorkspaceRouter({
   const restaurantController = useRestaurantPageController();
   const calendarController = useCalendarPageController();
   const workspaceNavigation = useWorkspaceNavigation();
-  const C = BUSINESS_CAPABILITIES;
   const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
   const features = projectDesktopWorkspaceFeatures(businessCapabilities);
   const customersEnabled = features.customers;
