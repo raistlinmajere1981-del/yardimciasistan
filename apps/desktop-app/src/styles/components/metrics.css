@@ -1,16 +1,16 @@
 .metric-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 82px;
-  padding: 10px var(--space-3);
+  gap: var(--space-2);
+  min-height: calc(var(--control-height-lg) + var(--space-10));
+  padding: var(--space-3);
   overflow: hidden;
 }
 
 .metric-card-compact {
   gap: var(--space-2);
-  min-height: 68px;
-  padding: var(--space-2) 10px;
+  min-height: calc(var(--control-height-md) + var(--space-8));
+  padding: var(--space-2) var(--space-3);
 }
 
 .metric-card.metric-card-compact > div:not(.metric-icon) {
@@ -22,8 +22,8 @@
 }
 
 .metric-card-compact .metric-icon {
-  width: 30px;
-  height: 30px;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
 }
 
 .metric-card.metric-card-compact strong {
@@ -45,8 +45,8 @@
 .metric-icon {
   display: grid;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: var(--control-height-md);
+  height: var(--control-height-md);
   place-items: center;
   border-radius: var(--radius-md);
 }
@@ -103,7 +103,7 @@
 
 @media (max-width: 1400px) {
   .metric-card {
-    min-height: 80px;
-    padding: var(--space-2) 10px;
+    min-height: calc(var(--space-10) + var(--space-10));
+    padding: var(--space-2) var(--space-3);
   }
 }
