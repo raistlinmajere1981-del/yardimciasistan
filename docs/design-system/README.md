@@ -132,6 +132,7 @@ gelir. Reduced-motion tercihi dekoratif hareketleri azaltmaya devam eder.
 
 Güncel ortak sözlük:
 
+- `PageWorkSurface`
 - `ActionButton`
 - `IconButton`
 - `StatusBadge`
@@ -167,8 +168,9 @@ sahiplenir. Feature CSS global sidebar/header/page padding tanımlamaz.
 
 ### Page height policy
 
-Sayfa canvas'ı kullanılabilir viewport'u doldurur; panel yüksekliği görev tipine göre
-iki moddan biriyle açıkça seçilir:
+Sayfa canvas'ı kullanılabilir viewport'u doldurur. Global başlığın altındaki kullanılabilir
+alan `PageWorkSurface` ile hafif bir çerçeveye alınır; iç paneller bu yüzeyin geometrisini
+paylaşır. Panel yüksekliği görev tipine göre iki moddan biriyle açıkça seçilir:
 
 - `flow`: kayıt, form, ayar ve rapor yüzeyleri içerik kadar büyür. Veri arttığında
   sayfa body scroll eder. Müşteriler, Menü, Ayarlar ve rapor türü yüzeyler bu gruptadır.
