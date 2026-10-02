@@ -22,6 +22,7 @@ import type { FinanceController } from "../app/controller-types";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Panel } from "../components/ui/Panel";
 import { DatePicker } from "../components/ui/DateTimePicker";
+import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 
 interface ReportsPageProps {
   aiEnabled: boolean;
@@ -253,7 +254,8 @@ export function ReportsPage({
   ) : null;
 
   return (
-    <section className="reports-page" aria-label={financeEnabled && reportsEnabled ? "Kasa ve işletme raporları" : financeEnabled ? "Kasa" : "İşletme raporları"}>
+    <PageWorkSurface mode="fill" className="reports-page-surface">
+      <section className="reports-page" aria-label={financeEnabled && reportsEnabled ? "Kasa ve işletme raporları" : financeEnabled ? "Kasa" : "İşletme raporları"}>
       {financeEnabled && reportsEnabled && (
         <div className="reports-view-tabs" role="tablist" aria-label="Kasa görünümü">
           <button
@@ -506,7 +508,8 @@ export function ReportsPage({
       </Panel>}
 
       </div>}
-    </section>
+      </section>
+    </PageWorkSurface>
   );
 }
 
