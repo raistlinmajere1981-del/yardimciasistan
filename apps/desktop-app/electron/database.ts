@@ -1556,11 +1556,7 @@ export class DesktopDatabase {
   }
 
   getDeletedRequestIds(): string[] {
-    return (this.db
-      .prepare("SELECT id FROM requests WHERE deleted_at != '' ORDER BY deleted_at ASC, id ASC")
-      .all() as Array<{ id?: string }>)
-      .map((row) => String(row.id ?? "").trim())
-      .filter(Boolean);
+    return getStoredDeletedRequestIds(this.db);
   }
 
   getQrMenuPublication(): PublishedQrMenu & { enabled: boolean } {
@@ -1611,125 +1607,11 @@ export class DesktopDatabase {
   }
 
   upsertRequests(requests: SyncedCustomerRequest[], nextCursor?: number) {
-    if (requests.length === 0 && nextCursor === undefined) {
-      return;
-    }
-
-    const statement = this.db.prepare(`
-      INSERT INTO requests (
-        id,
-        customer_id,
-        source,
-        request_type,
-        status,
-        customer_name,
-        customer_phone,
-        date_text,
-        start_date,
-        end_date,
-        time,
-        guest_count,
-        adult_count,
-        child_count,
-        message,
-        ai_summary,
-        ai_suggested_reply,
-        whatsapp_message,
-        assigned_to,
-        priority,
-        created_at,
-        updated_at,
-        sync_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        customer_id = excluded.customer_id,
-        source = excluded.source,
-        request_type = excluded.request_type,
-        status = excluded.status,
-        customer_name = excluded.customer_name,
-        customer_phone = excluded.customer_phone,
-        date_text = excluded.date_text,
-        start_date = excluded.start_date,
-        end_date = excluded.end_date,
-        time = excluded.time,
-        guest_count = excluded.guest_count,
-        adult_count = excluded.adult_count,
-        child_count = excluded.child_count,
-        message = excluded.message,
-        ai_summary = excluded.ai_summary,
-        ai_suggested_reply = excluded.ai_suggested_reply,
-        whatsapp_message = excluded.whatsapp_message,
-        assigned_to = excluded.assigned_to,
-        priority = excluded.priority,
-        updated_at = excluded.updated_at,
-        sync_status = excluded.sync_status
-    `);
-
-    this.db.exec("BEGIN");
-    try {
-      for (const request of requests) {
-        const customerId = ensureStoredCustomerForRequest(this.db, request as unknown as Record<string, unknown>, new Date().toISOString());
-        statement.run(
-          request.id,
-          customerId,
-          request.source,
-          request.request_type,
-          request.status,
-          request.customer_name,
-          request.customer_phone,
-          request.date_text,
-          request.start_date,
-          request.end_date,
-          request.time,
-          request.guest_count,
-          request.adult_count,
-          request.child_count,
-          request.message,
-          request.ai_summary,
-          request.ai_suggested_reply,
-          request.whatsapp_message,
-          request.assigned_to,
-          request.priority,
-          request.created_at,
-          request.updated_at,
-          "synced"
-        );
-      }
-      if (nextCursor !== undefined) {
-        const now = new Date().toISOString();
-        this.db
-          .prepare(`
-            UPDATE sync_runtime
-            SET request_cursor = MAX(request_cursor, ?), updated_at = ?
-            WHERE id = 'primary'
-          `)
-          .run(Math.max(0, Math.trunc(nextCursor)), now);
-      }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    upsertSyncedRequests(this.db, requests, nextCursor);
   }
 
   markLocalRequestsSynced(requestIds: string[]) {
-    if (requestIds.length === 0) {
-      return;
-    }
-
-    const statement = this.db.prepare("UPDATE requests SET sync_status = 'synced', updated_at = ? WHERE id = ?");
-    const now = new Date().toISOString();
-
-    this.db.exec("BEGIN");
-    try {
-      for (const id of requestIds) {
-        statement.run(now, id);
-      }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    markStoredLocalRequestsSynced(this.db, requestIds);
   }
 
   createManualRequest(input: CreateManualRequestInput): CreateManualRequestResult {
@@ -2338,6 +2220,8 @@ import {
   updateRequestStatus as updateStoredRequestStatus,
   saveRequestAiSuggestion as saveStoredRequestAiSuggestion,
   deleteRequestInTransaction as deleteStoredRequestInTransaction,
+  markLocalRequestsSynced as markStoredLocalRequestsSynced,
+  getDeletedRequestIds as getStoredDeletedRequestIds,
 } from "./database/request-store.js";
 
 import {
@@ -2419,6 +2303,7 @@ import {
   ensureCustomerForRequest as ensureStoredCustomerForRequest,
   createManualRequest as createStoredManualRequest,
   convertRequestToReservation as convertStoredRequestToReservation,
+  upsertSyncedRequests,
 } from "./request-intake-service.js";
 
 import {

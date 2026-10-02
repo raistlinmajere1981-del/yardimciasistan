@@ -330,3 +330,32 @@ export function deleteRequestInTransaction(
   }, now);
   return { ok: true, message: androidAction ? "Talep telefondan silindi." : "Talep silindi." };
 }
+
+
+export function markLocalRequestsSynced(db: DatabaseSync, requestIds: string[]) {
+  if (requestIds.length === 0) {
+    return;
+  }
+
+  const statement = db.prepare("UPDATE requests SET sync_status = 'synced', updated_at = ? WHERE id = ?");
+  const now = new Date().toISOString();
+
+  db.exec("BEGIN");
+  try {
+    for (const id of requestIds) {
+      statement.run(now, id);
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+export function getDeletedRequestIds(db: DatabaseSync): string[] {
+  return (db
+    .prepare("SELECT id FROM requests WHERE deleted_at != '' ORDER BY deleted_at ASC, id ASC")
+    .all() as Array<{ id?: string }>)
+    .map((row) => String(row.id ?? "").trim())
+    .filter(Boolean);
+}

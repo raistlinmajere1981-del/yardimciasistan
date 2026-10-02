@@ -424,3 +424,110 @@ export function convertRequestToReservation(
     reservationId
   };
 }
+
+
+export function upsertSyncedRequests(
+  db: DatabaseSync,
+  requests: SyncedCustomerRequest[],
+  nextCursor?: number
+) {
+  if (requests.length === 0 && nextCursor === undefined) {
+    return;
+  }
+
+  const statement = db.prepare(`
+    INSERT INTO requests (
+      id,
+      customer_id,
+      source,
+      request_type,
+      status,
+      customer_name,
+      customer_phone,
+      date_text,
+      start_date,
+      end_date,
+      time,
+      guest_count,
+      adult_count,
+      child_count,
+      message,
+      ai_summary,
+      ai_suggested_reply,
+      whatsapp_message,
+      assigned_to,
+      priority,
+      created_at,
+      updated_at,
+      sync_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      customer_id = excluded.customer_id,
+      source = excluded.source,
+      request_type = excluded.request_type,
+      status = excluded.status,
+      customer_name = excluded.customer_name,
+      customer_phone = excluded.customer_phone,
+      date_text = excluded.date_text,
+      start_date = excluded.start_date,
+      end_date = excluded.end_date,
+      time = excluded.time,
+      guest_count = excluded.guest_count,
+      adult_count = excluded.adult_count,
+      child_count = excluded.child_count,
+      message = excluded.message,
+      ai_summary = excluded.ai_summary,
+      ai_suggested_reply = excluded.ai_suggested_reply,
+      whatsapp_message = excluded.whatsapp_message,
+      assigned_to = excluded.assigned_to,
+      priority = excluded.priority,
+      updated_at = excluded.updated_at,
+      sync_status = excluded.sync_status
+  `);
+
+  db.exec("BEGIN");
+  try {
+    for (const request of requests) {
+      const customerId = ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
+      statement.run(
+        request.id,
+        customerId,
+        request.source,
+        request.request_type,
+        request.status,
+        request.customer_name,
+        request.customer_phone,
+        request.date_text,
+        request.start_date,
+        request.end_date,
+        request.time,
+        request.guest_count,
+        request.adult_count,
+        request.child_count,
+        request.message,
+        request.ai_summary,
+        request.ai_suggested_reply,
+        request.whatsapp_message,
+        request.assigned_to,
+        request.priority,
+        request.created_at,
+        request.updated_at,
+        "synced"
+      );
+    }
+    if (nextCursor !== undefined) {
+      const now = new Date().toISOString();
+      db
+        .prepare(`
+          UPDATE sync_runtime
+          SET request_cursor = MAX(request_cursor, ?), updated_at = ?
+          WHERE id = 'primary'
+        `)
+        .run(Math.max(0, Math.trunc(nextCursor)), now);
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
