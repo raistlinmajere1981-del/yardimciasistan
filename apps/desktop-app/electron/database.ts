@@ -42,11 +42,6 @@ import {
   resolveDatabasePath
 } from "./data-paths.js";
 import { assertCurrentDesktopSchema } from "./desktop-database-compatibility.js";
-import { applyAndroidReservationAction } from "./android-reservation-actions.js";
-import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
-import { applyAndroidFinanceAction } from "./android-finance-actions.js";
-import { applyAndroidRoomFolioAction } from "./android-room-folio-actions.js";
-import { applyMarketAndroidAction } from "./market-android-actions.js";
 import {
   claimAutomaticBirthdayDelivery,
   getAutomaticBirthdayCandidates,
@@ -569,14 +564,12 @@ export class DesktopDatabase {
         };
       }
 
-      const authorization = this.authorizeAndroidActionInTransaction(action);
-      if (!authorization.ok) {
-        this.db.exec("ROLLBACK");
-        transactionStarted = false;
-        return authorization;
-      }
-
-      const result = this.applyAndroidActionInTransaction(action, now);
+      const result = routeAndroidActionInTransaction(
+        this.db,
+        action,
+        now,
+        this.getEnabledBusinessCapabilities()
+      );
       if (!result.ok) {
         this.db.exec("ROLLBACK");
         transactionStarted = false;
@@ -1727,284 +1720,6 @@ export class DesktopDatabase {
     return Number(row?.count ?? 0);
   }
 
-  private authorizeAndroidActionInTransaction(action: AndroidSyncAction): AndroidActionMutationResult {
-    return authorizeStoredAndroidAction(this.db, action, this.getEnabledBusinessCapabilities());
-  }
-
-  private applyAndroidActionInTransaction(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    switch (action.action_type) {
-      case "customer_request_mark_answered":
-        return applyStoredAndroidRequestStatus(this.db, action, "answered", now, this.getEnabledBusinessCapabilities());
-      case "customer_request_reopen":
-        return applyStoredAndroidRequestStatus(this.db, action, "new", now, this.getEnabledBusinessCapabilities());
-      case "customer_request_approve":
-        return applyStoredAndroidRequestStatus(this.db, action, "approved", now, this.getEnabledBusinessCapabilities());
-      case "customer_request_reject":
-        return applyStoredAndroidRequestStatus(this.db, action, "rejected", now, this.getEnabledBusinessCapabilities());
-      case "customer_request_convert_to_reservation":
-        return applyStoredAndroidRequestConversion(this.db, action, now, this.getEnabledBusinessCapabilities());
-      case "customer_request_delete":
-        return deleteStoredRequestInTransaction(
-          this.db,
-          androidPayloadString(action.payload, "request_id"),
-          now,
-          action,
-          (sinkAction, type, entityType, entityId, payload, eventNow) =>
-            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
-        );
-      case "customer_create":
-        return applyStoredAndroidCustomerSave(this.db, action, now, false);
-      case "customer_update":
-        return applyStoredAndroidCustomerSave(this.db, action, now, true);
-      case "customer_delete":
-        return deleteStoredCustomerInTransaction(
-          this.db,
-          androidPayloadString(action.payload, "customer_id"),
-          now,
-          action,
-          (sinkAction, type, entityType, entityId, payload, eventNow) =>
-            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
-        );
-      case "customer_room_assign":
-        return applyStoredAndroidCustomerRoomAssignment(this.db, action, now);
-      case "customer_room_stay_status":
-        return applyStoredAndroidCustomerRoomStayStatus(this.db, action, now);
-      case "reservation_room_create":
-      case "reservation_room_update":
-      case "reservation_table_create":
-      case "reservation_table_update":
-        return applyAndroidReservationAction({
-          db: this.db,
-          action,
-          now,
-          insertEvent: (type, entityId, payload) =>
-            this.insertAndroidActionEvent(action, type, "reservation", entityId, payload, now)
-        });
-      case "reservation_approve":
-        return applyStoredAndroidReservationStatus(this.db, action, "approved", now);
-      case "reservation_reject":
-        return applyStoredAndroidReservationStatus(this.db, action, "rejected", now);
-      case "reservation_cancel":
-        return applyStoredAndroidReservationStatus(this.db, action, "cancelled", now);
-      case "room_status_update":
-        return applyStoredAndroidRoomStatus(this.db, action, now);
-      case "daily_task_create":
-      case "daily_task_update":
-      case "daily_task_delete":
-        return applyAndroidDailyTaskAction({
-          db: this.db,
-          action,
-          now,
-          insertEvent: (type, entityId, payload) =>
-            this.insertAndroidActionEvent(action, type, "daily_task", entityId, payload, now)
-        });
-      case "daily_task_complete":
-        return applyStoredAndroidDailyTaskStatus(this.db, action, "done", now);
-      case "daily_task_reopen":
-        return applyStoredAndroidDailyTaskStatus(this.db, action, "pending", now);
-      case "daily_task_cancel":
-        return applyStoredAndroidDailyTaskStatus(this.db, action, "cancelled", now);
-      case "finance_manual_create":
-        return applyAndroidFinanceAction({
-          db: this.db,
-          action,
-          now,
-          insertEvent: (type, entityId, payload) =>
-            this.insertAndroidActionEvent(action, type, "finance_entry", entityId, payload, now)
-        });
-      case "room_folio_payment_add":
-      case "room_folio_checkout":
-        return applyAndroidRoomFolioAction({
-          db: this.db,
-          action,
-          now,
-          insertEvent: (type, entityId, payload) =>
-            this.insertAndroidActionEvent(action, type, "room_folio", entityId, payload, now)
-        });
-      case "table_status_update":
-        return this.applyAndroidTableStatus(action, now);
-      case "table_order_open":
-        return applyStoredAndroidTableOrderOpen(this.db, action, now);
-      case "table_order_add_item":
-        return applyStoredAndroidTableOrderAddItem(this.db, action, now);
-      case "table_order_update_item_quantity":
-        return applyStoredAndroidTableOrderItemQuantity(this.db, action, now);
-      case "table_order_remove_item":
-        return applyStoredAndroidTableOrderRemoveItem(this.db, action, now);
-      case "table_order_set_preparing":
-        return applyStoredAndroidTableOrderStatus(this.db, action, now, "preparing");
-      case "table_order_set_served":
-        return applyStoredAndroidTableOrderStatus(this.db, action, now, "served");
-      case "table_order_set_payment_waiting":
-        return applyStoredAndroidTableOrderStatus(this.db, action, now, "payment");
-      case "table_order_close_paid":
-        return applyStoredAndroidTableOrderClose(this.db, action, now, "paid");
-      case "table_order_cancel":
-        return applyStoredAndroidTableOrderClose(this.db, action, now, "cancelled");
-      case "menu_category_delete":
-        return deleteStoredMenuCategoryInTransaction(
-          this.db,
-          androidPayloadString(action.payload, "category_id"),
-          now,
-          action,
-          (sinkAction, type, entityType, entityId, payload, eventNow) =>
-            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
-        );
-      case "menu_item_delete":
-        return deleteStoredMenuItemInTransaction(
-          this.db,
-          androidPayloadString(action.payload, "menu_item_id"),
-          now,
-          action,
-          (sinkAction, type, entityType, entityId, payload, eventNow) =>
-            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
-        );
-      case "message_delete":
-        return deleteStoredMessageInTransaction(
-          this.db,
-          androidPayloadString(action.payload, "message_id"),
-          androidPayloadString(action.payload, "request_id"),
-          now,
-          action,
-          (sinkAction, type, entityType, entityId, payload, eventNow) =>
-            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
-        );
-      case "menu_stock_add":
-        return applyStoredAndroidMenuStockAction(this.db, action, "add", now);
-      case "menu_stock_set":
-        return applyStoredAndroidMenuStockAction(this.db, action, "set", now);
-      case "menu_stock_adjust":
-        return applyStoredAndroidMenuStockAction(this.db, action, "adjust", now);
-      case "menu_stock_image_import_apply":
-        return this.applyAndroidStockImageImport(action, now);
-      case "market_stock_count":
-      case "market_purchase_receive":
-      case "market_product_create":
-      case "market_cart_draft_create":
-      case "market_barcode_scan":
-        return applyMarketAndroidAction({
-          db: this.db,
-          action,
-          now,
-          insertEvent: (type, entityType, entityId, payload) =>
-            this.insertAndroidActionEvent(action, type, entityType, entityId, payload, now),
-          queueSnapshot: () => this.queueSyncJob("android_snapshot", now)
-        });
-      default:
-        return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
-    }
-  }
-
-
-  private applyAndroidTableStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const tableId = androidPayloadString(action.payload, "table_id");
-    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["available", "reserved", "occupied", "bill_waiting", "cleaning"]);
-    if (!tableId || !status) {
-      return { ok: false, message: "Masa veya yeni masa durumu geçersiz." };
-    }
-    const table = this.db
-      .prepare("SELECT status, updated_at FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-      .get(tableId) as { status?: string; updated_at?: string } | undefined;
-    if (!table) {
-      return { ok: false, message: "Masa masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", table.updated_at, "Masa");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const activeOrder = this.db
-      .prepare("SELECT id, status FROM table_orders WHERE table_id = ? AND status IN ('open', 'preparing', 'served', 'payment') LIMIT 1")
-      .get(tableId) as { id?: string; status?: string } | undefined;
-    if (activeOrder) {
-      return { ok: false, message: "Aktif adisyonu olan masanın durumu adisyon üzerinden değiştirilmelidir." };
-    }
-    const updatedAt = nextMutationTimestamp(table.updated_at, now);
-    this.db
-      .prepare("UPDATE tables SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(status, updatedAt, tableId);
-    this.insertAndroidActionEvent(action, "table.status_changed", "table", tableId, {
-      old_status: String(table.status ?? ""),
-      new_status: status
-    }, now);
-    return { ok: true, message: "Masa durumu telefondan güncellendi." };
-  }
-
-  private applyAndroidStockImageImport(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const importId = normalizeStockImageImportId(androidPayloadString(action.payload, "import_id"));
-    const imageHash = androidPayloadString(action.payload, "image_hash").toLowerCase();
-    const lines = normalizeStockImageApplyLines(action.payload.lines);
-    if (!importId || !isSha256Hex(imageHash) || !lines) {
-      return { ok: false, message: "Görsel stok taslağı eksik veya geçersiz." };
-    }
-    const existing = this.db
-      .prepare("SELECT status FROM stock_image_imports WHERE import_id = ?")
-      .get(importId) as { status?: string } | undefined;
-    if (existing) {
-      return {
-        ok: false,
-        message: existing.status === "applied"
-          ? "Bu içe aktarma daha önce uygulanmış."
-          : "Bu içe aktarma kimliği daha önce kullanılmış."
-      };
-    }
-    const created = createStoredStockImageImport(this.db, {
-      importId,
-      source: "android",
-      deviceId: action.device_id,
-      imageHash
-    });
-    if (!created.ok) {
-      return created;
-    }
-    this.db
-      .prepare("UPDATE stock_image_imports SET status = 'review', raw_analysis_json = ? WHERE import_id = ?")
-      .run(JSON.stringify({ lines }), importId);
-    const device = this.db
-      .prepare("SELECT role FROM android_devices WHERE device_id = ? LIMIT 1")
-      .get(action.device_id) as { role?: string } | undefined;
-    const result = applyStoredStockImageImportInTransaction(this.db, {
-      importId,
-      imageHash,
-      lines,
-      source: "android",
-      actorDeviceId: action.device_id,
-      duplicateWarningAcknowledged: action.payload.duplicate_warning_acknowledged === true,
-      canOverrideDuplicate: normalizeAndroidDeviceRole(device?.role) === "admin",
-      now
-    });
-    if (!result.ok) {
-      return result;
-    }
-    this.insertAndroidActionEvent(action, "menu.stock_image_import_applied", "stock_image_import", importId, {
-      image_hash: imageHash,
-      applied_line_count: result.appliedLineCount,
-      total_quantity: result.totalQuantity
-    }, now);
-    return { ok: true, message: "Görsel stok girişi telefondan uygulandı." };
-  }
-
-  private insertAndroidActionEvent(
-    action: AndroidSyncAction,
-    type: string,
-    entityType: string,
-    entityId: string,
-    payload: Record<string, unknown>,
-    now: string
-  ) {
-    insertStoredAndroidActionEvent(this.db, action, type, entityType, entityId, payload, now);
-  }
-
-
-
-
-
-
-
-
-
-
-
-
   private ensureSyncClientId() {
     this.db
       .prepare(`
@@ -2032,23 +1747,6 @@ import {
   normalizeStoredTimestamp,
   resolveEncryptedAiApiKey,
 } from "./database/ai-settings-utils.js";
-
-import {
-  normalizeStockImageImportId,
-  isSha256Hex,
-  normalizeStockImageApplyLines,
-} from "./database/stock-utils.js";
-
-import {
-  normalizeAndroidDeviceRole,
-  androidPayloadString,
-  getAndroidVersionConflict,
-  nextMutationTimestamp,
-} from "./database/android-utils.js";
-
-import type {
-  AndroidActionMutationResult,
-} from "./database/android-utils.js";
 
 import {
   normalizeInteger,
@@ -2130,15 +1828,6 @@ import {
   closeTableOrder as closeStoredTableOrder,
 } from "./table-order-service.js";
 
-import {
-  applyAndroidTableOrderOpen as applyStoredAndroidTableOrderOpen,
-  applyAndroidTableOrderAddItem as applyStoredAndroidTableOrderAddItem,
-  applyAndroidTableOrderItemQuantity as applyStoredAndroidTableOrderItemQuantity,
-  applyAndroidTableOrderRemoveItem as applyStoredAndroidTableOrderRemoveItem,
-  applyAndroidTableOrderStatus as applyStoredAndroidTableOrderStatus,
-  applyAndroidTableOrderClose as applyStoredAndroidTableOrderClose,
-} from "./android-table-order-actions.js";
-
 import { insertDatabaseEvent } from "./database/event-store.js";
 
 import {
@@ -2212,19 +1901,8 @@ import {
 } from "./stay-reservation-service.js";
 
 import {
-  authorizeAndroidAction as authorizeStoredAndroidAction,
   recordAndroidActionResult as recordStoredAndroidActionResult,
   getAndroidActionFailures as getStoredAndroidActionFailures,
-  applyAndroidRequestStatus as applyStoredAndroidRequestStatus,
-  applyAndroidCustomerSave as applyStoredAndroidCustomerSave,
-  applyAndroidDailyTaskStatus as applyStoredAndroidDailyTaskStatus,
-  applyAndroidMenuStockAction as applyStoredAndroidMenuStockAction,
-  applyAndroidCustomerRoomAssignment as applyStoredAndroidCustomerRoomAssignment,
-  applyAndroidCustomerRoomStayStatus as applyStoredAndroidCustomerRoomStayStatus,
-  applyAndroidReservationStatus as applyStoredAndroidReservationStatus,
-  applyAndroidRoomStatus as applyStoredAndroidRoomStatus,
-  applyAndroidRequestConversion as applyStoredAndroidRequestConversion,
-  insertAndroidActionEvent as insertStoredAndroidActionEvent,
 } from "./android-action-service.js";
 
 import {
@@ -2245,5 +1923,4 @@ import {
   completeStockImageAnalysis as completeStoredStockImageAnalysis,
   failStockImageImport as failStoredStockImageImport,
   applyStockImageImport as applyStoredStockImageImport,
-  applyStockImageImportInTransaction as applyStoredStockImageImportInTransaction,
 } from "./database/stock-image-store.js";
