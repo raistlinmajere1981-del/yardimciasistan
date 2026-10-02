@@ -90,16 +90,14 @@
   overflow: hidden;
 }
 
-.menu-record .list-row__heading,
-.menu-record .list-row__meta {
+.menu-record :is(.list-row__heading, .list-row__meta) {
   flex-wrap: nowrap;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
 
-.menu-record .list-row__title,
-.menu-record .list-row__meta {
+.menu-record :is(.list-row__title, .list-row__meta) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
