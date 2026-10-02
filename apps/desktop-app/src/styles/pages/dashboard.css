@@ -1,9 +1,8 @@
 .dashboard-page {
+  display: grid;
   width: 100%;
-  max-width: 1600px;
   min-height: 0;
   height: 100%;
-  margin: 0 auto;
   grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
 }
@@ -134,7 +133,7 @@
 }
 
 .system-health-panel {
-  margin-top: var(--space-4);
+  margin-top: 0;
 }
 
 .system-health-heading {
