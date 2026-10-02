@@ -114,7 +114,7 @@ const marketContribution = {
   icon: Store,
   order: 50,
   condition: { anyOf: [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS] },
-  contentScroll: "page",
+  contentScroll: "workspace",
   presentation: (capabilities) => {
     const topics = [
       runtimeHasCapability(capabilities, C.CATALOG) ? "ürünleri" : "",
