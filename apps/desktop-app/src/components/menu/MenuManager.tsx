@@ -82,7 +82,8 @@ export function MenuManager({
   const [itemCreateOpen, setItemCreateOpen] = useState(false);
   const [pendingItemId, setPendingItemId] = useState("");
   const [dragging, setDragging] = useState<{ kind: "category" | "item"; id: string } | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
+  const draggingRef = useRef<{ kind: "category" | "item"; id: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ kind: "category" | "item"; id: string; position: "before" | "after" } | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
   const suppressRowClickRef = useRef(false);
 
@@ -168,45 +169,74 @@ export function MenuManager({
   }
 
   function handleDragStart(event: DragEvent<HTMLElement>, kind: "category" | "item", id: string) {
-    if (reorderBusy || (kind === "category" && editingCategoryId === id)) {
+    if (
+      reorderBusy
+      || (kind === "category" && editingCategoryId === id)
+      || (kind === "item" && !selectedCategoryId)
+    ) {
       event.preventDefault();
       return;
     }
+
+    const nextDragging = { kind, id } as const;
+    draggingRef.current = nextDragging;
     event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-yardimci-menu-sort", JSON.stringify(nextDragging));
     event.dataTransfer.setData("text/plain", id);
+
+    const record = event.currentTarget.closest(".menu-sortable-record") as HTMLElement | null;
+    if (record) {
+      const rect = record.getBoundingClientRect();
+      event.dataTransfer.setDragImage(
+        record,
+        Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
+        Math.max(0, Math.min(rect.height, event.clientY - rect.top))
+      );
+    }
+
     suppressRowClickRef.current = false;
-    setDragging({ kind, id });
+    setDragging(nextDragging);
     setDropTarget(null);
   }
 
-  function handleDragOver(event: DragEvent<HTMLElement>, id: string) {
-    if (!dragging || dragging.id === id) return;
-    if (dragging.kind === "item") {
-      const sourceItem = dashboardData.menu.items.find((item) => item.id === dragging.id);
+  function handleDragOver(event: DragEvent<HTMLElement>, kind: "category" | "item", id: string) {
+    const activeDrag = draggingRef.current ?? dragging;
+    if (!activeDrag || activeDrag.kind !== kind || activeDrag.id === id) return;
+
+    if (kind === "item") {
+      const sourceItem = dashboardData.menu.items.find((item) => item.id === activeDrag.id);
       const targetItem = dashboardData.menu.items.find((item) => item.id === id);
       if (!sourceItem || !targetItem || sourceItem.category_id !== targetItem.category_id) {
         setDropTarget(null);
         return;
       }
     }
+
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     const rect = event.currentTarget.getBoundingClientRect();
     const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
-    setDropTarget({ id, position });
+    setDropTarget((current) => (
+      current?.kind === kind && current.id === id && current.position === position
+        ? current
+        : { kind, id, position }
+    ));
   }
 
   async function handleDrop(event: DragEvent<HTMLElement>, kind: "category" | "item", targetId: string) {
     event.preventDefault();
     event.stopPropagation();
-    if (!dragging || dragging.kind !== kind || dragging.id === targetId || reorderBusy) {
+
+    const activeDrag = draggingRef.current ?? dragging;
+    draggingRef.current = null;
+    if (!activeDrag || activeDrag.kind !== kind || activeDrag.id === targetId || reorderBusy) {
       setDragging(null);
       setDropTarget(null);
       return;
     }
 
     const sourceItem = kind === "item"
-      ? dashboardData.menu.items.find((item) => item.id === dragging.id)
+      ? dashboardData.menu.items.find((item) => item.id === activeDrag.id)
       : undefined;
     const targetItem = kind === "item"
       ? dashboardData.menu.items.find((item) => item.id === targetId)
@@ -223,7 +253,9 @@ export function MenuManager({
         .filter((record) => record.category_id === sourceItem?.category_id)
         .sort(compareMenuRecords)
         .map((record) => record.id);
-    const orderedIds = moveId(sourceIds, dragging.id, targetId, dropTarget?.id === targetId ? dropTarget.position : "before");
+    const position = dropTarget?.kind === kind && dropTarget.id === targetId ? dropTarget.position : "before";
+    const orderedIds = moveId(sourceIds, activeDrag.id, targetId, position);
+
     setDragging(null);
     setDropTarget(null);
     if (!orderedIds || orderedIds.every((id, index) => id === sourceIds[index])) return;
@@ -238,6 +270,7 @@ export function MenuManager({
   }
 
   function finishDrag() {
+    draggingRef.current = null;
     suppressRowClickRef.current = true;
     setDragging(null);
     setDropTarget(null);
@@ -317,9 +350,9 @@ export function MenuManager({
                 }
 
                 return <article
-                  className={`menu-category-row menu-sortable-record${selectedCategoryId === category.id ? " is-selected" : ""}${dragging?.kind === "category" && dragging.id === category.id ? " is-dragging" : ""}${dropTarget?.id === category.id ? ` is-drop-${dropTarget.position}` : ""}`}
+                  className={`menu-category-row menu-sortable-record${selectedCategoryId === category.id ? " is-selected" : ""}${dragging?.kind === "category" && dragging.id === category.id ? " is-dragging" : ""}${dropTarget?.kind === "category" && dropTarget.id === category.id ? ` is-drop-${dropTarget.position}` : ""}`}
                   key={category.id}
-                  onDragOver={(event) => handleDragOver(event, category.id)}
+                  onDragOver={(event) => handleDragOver(event, "category", category.id)}
                   onDrop={(event) => void handleDrop(event, "category", category.id)}
                 >
                   <span
@@ -403,7 +436,10 @@ export function MenuManager({
             <div className="panel-heading menu-panel-heading">
               <h2>Ürünler</h2>
               <div className="page-toolbar__actions">
+                <div className="menu-product-heading-status">
+                {!selectedCategoryId && <span className="menu-sort-hint">Sıralamak için kategori seçin</span>}
                 <StatusBadge tone="info">{visibleItems.length} kayıt</StatusBadge>
+              </div>
                 <ActionButton variant="primary" size="sm" onClick={startItemCreate}>
                   <Plus size={16} aria-hidden="true" />
                   Ürün ekle
@@ -417,9 +453,9 @@ export function MenuManager({
                 const stockBadge = getMenuStockBadge(item);
                 return (
                   <DataListButton
-                    className={`menu-record menu-sortable-record${dragging?.kind === "item" && dragging.id === item.id ? " is-dragging" : ""}${dropTarget?.id === item.id ? ` is-drop-${dropTarget.position}` : ""}`}
+                    className={`menu-record menu-sortable-record${dragging?.kind === "item" && dragging.id === item.id ? " is-dragging" : ""}${dropTarget?.kind === "item" && dropTarget.id === item.id ? ` is-drop-${dropTarget.position}` : ""}`}
                     key={item.id}
-                    onDragOver={(event) => handleDragOver(event, item.id)}
+                    onDragOver={(event) => handleDragOver(event, "item", item.id)}
                     onDrop={(event) => void handleDrop(event, "item", item.id)}
                     onClick={() => {
                       if (!suppressRowClickRef.current) openItem(item);
@@ -429,11 +465,12 @@ export function MenuManager({
                     title={item.name}
                     leading={<span className="menu-product-row__leading">
                       <span
-                        className="menu-drag-handle-hitbox"
-                        draggable={!reorderBusy}
+                        className={`menu-drag-handle-hitbox${!selectedCategoryId ? " is-disabled" : ""}`}
+                        draggable={!reorderBusy && Boolean(selectedCategoryId)}
                         onDragStart={(event) => handleDragStart(event, "item", item.id)}
                         onDragEnd={finishDrag}
                         onClick={(event) => event.stopPropagation()}
+                        title={selectedCategoryId ? "Sürükleyerek sırala" : "Ürün sıralamak için önce bir kategori seçin"}
                         aria-hidden="true"
                       >
                         <GripVertical className="menu-drag-handle" size={16} />
