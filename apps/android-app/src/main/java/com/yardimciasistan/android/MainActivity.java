@@ -90,10 +90,9 @@ public final class MainActivity extends ComponentActivity {
   private AndroidOperationCards operationCards;
   private AndroidWorkspaceCoordinator workspaceCoordinator;
   private AndroidDetailDialogCoordinator detailDialogCoordinator;
-  private IdentityImageAnalysisController identityImageAnalysisController;
+  private IdentityImageWorkflow identityImageWorkflow;
   private StockImageAnalysisController stockImageAnalysisController;
   private StockImageWorkflow stockImageWorkflow;
-  private CustomerFormDialog activeCustomerFormDialog;
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
@@ -167,7 +166,9 @@ public final class MainActivity extends ComponentActivity {
 
       @Override
       public void onIdentityImageSelected(Uri uri) {
-        analyzeIdentityImage(uri);
+        if (identityImageWorkflow != null) {
+          identityImageWorkflow.onImageSelected(uri);
+        }
       }
 
       @Override
@@ -175,7 +176,7 @@ public final class MainActivity extends ComponentActivity {
         showError(message);
       }
     });
-    identityImageAnalysisController = new IdentityImageAnalysisController(this, executor, syncClient);
+    IdentityImageAnalysisController identityImageAnalysisController = new IdentityImageAnalysisController(this, executor, syncClient);
     stockImageAnalysisController = new StockImageAnalysisController(this, executor, syncClient);
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
@@ -231,6 +232,17 @@ public final class MainActivity extends ComponentActivity {
         }
     );
     identity = DeviceIdentity.loadOrCreate(this, preferences);
+    identityImageWorkflow = new IdentityImageWorkflow(
+        this,
+        preferences,
+        identity,
+        imageCaptureController,
+        identityImageAnalysisController,
+        new IdentityImageWorkflow.Listener() {
+          @Override public OperationData currentData() { return data; }
+          @Override public void showError(String message) { MainActivity.this.showError(message); }
+        }
+    );
     reportsWorkspace = new ReportsWorkspace(
         this,
         preferences,
@@ -704,107 +716,11 @@ public final class MainActivity extends ComponentActivity {
     imageCaptureController.launchStockGallery();
   }
 
-  private void launchIdentityCamera() {
-    if (activeCustomerFormDialog != null && activeCustomerFormDialog.isShowing()) {
-      imageCaptureController.launchIdentityCamera();
-    }
-  }
-
-  private void launchIdentityGallery() {
-    if (activeCustomerFormDialog != null && activeCustomerFormDialog.isShowing()) {
-      imageCaptureController.launchIdentityGallery();
-    }
-  }
-
   private void deletePendingStockCameraFile() {
     if (imageCaptureController != null) {
       imageCaptureController.cleanupStockCameraFile();
     }
   }
-
-  private void deletePendingIdentityCameraFile() {
-    if (imageCaptureController != null) {
-      imageCaptureController.cleanupIdentityCameraFile();
-    }
-  }
-
-  private void showIdentityImageSourceDialog() {
-    if (!data.isAdmin() || !data.hasPermission("customer.manage") || !AndroidUiRules.canUseAi(data)) {
-      showError("Kimlik görseli analizi yalnız yönetici cihazlarda kullanılabilir.");
-      return;
-    }
-    new AlertDialog.Builder(this)
-        .setTitle("Kimlik görselinden doldur")
-        .setMessage("Kimliğin ön veya arka yüzünü çekebilir ya da galeriden seçebilirsiniz. Görsel kalıcı saklanmaz.")
-        .setNegativeButton("Vazgeç", null)
-        .setNeutralButton("Galeriden Seç", (dialog, which) -> launchIdentityGallery())
-        .setPositiveButton("Fotoğraf Çek", (dialog, which) -> launchIdentityCamera())
-        .show();
-  }
-
-
-
-
-  private void analyzeIdentityImage(Uri sourceUri) {
-    CustomerFormDialog formDialog = activeCustomerFormDialog;
-    if (formDialog == null || !formDialog.isShowing()) {
-      deletePendingIdentityCameraFile();
-      return;
-    }
-    if (!AndroidUiRules.canUseAi(data)) {
-      deletePendingIdentityCameraFile();
-      formDialog.setStatus("AI capability kapalı olduğu için kimlik analizi kullanılamıyor.", UiKit.DANGER);
-      return;
-    }
-
-    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
-    String syncSecret = ConnectionSettings.syncSecret(preferences);
-    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
-      deletePendingIdentityCameraFile();
-      formDialog.setStatus("Kimlik analizi için bağlantı ayarlarını tamamlayın.", UiKit.DANGER);
-      return;
-    }
-
-    formDialog.setLoading(true);
-    formDialog.setStatus("Kimlik görseli hazırlanıyor ve AI ile okunuyor…", UiKit.INFO);
-    identityImageAnalysisController.analyze(
-        sourceUri,
-        baseUrl,
-        syncSecret,
-        identity,
-        new IdentityImageAnalysisController.Listener() {
-          @Override
-          public void onSuccess(JSONObject analysis, String message) {
-            if (activeCustomerFormDialog != formDialog || !formDialog.isShowing()) {
-              return;
-            }
-            formDialog.applyIdentityAnalysis(analysis);
-            formDialog.setLoading(false);
-            formDialog.setStatus(message, UiKit.SUCCESS);
-            Toast.makeText(MainActivity.this, "Okunan alanları kaydetmeden önce kontrol edin.", Toast.LENGTH_LONG).show();
-          }
-
-          @Override
-          public void onError(String message) {
-            if (activeCustomerFormDialog != formDialog || !formDialog.isShowing()) {
-              return;
-            }
-            formDialog.setLoading(false);
-            formDialog.setStatus(message, UiKit.DANGER);
-          }
-
-          @Override
-          public void onFinished() {
-            deletePendingIdentityCameraFile();
-          }
-        }
-    );
-  }
-
-
-
-
-
 
   private void showStockImagePreviewDialog(Uri sourceUri) {
     stockImageWorkflow.showPreview(sourceUri);
@@ -1439,7 +1355,7 @@ public final class MainActivity extends ComponentActivity {
         new CustomerFormDialog.Listener() {
           @Override
           public void onIdentityImageRequested() {
-            showIdentityImageSourceDialog();
+            identityImageWorkflow.showSourceDialog();
           }
 
           @Override
@@ -1449,14 +1365,11 @@ public final class MainActivity extends ComponentActivity {
 
           @Override
           public void onDismiss(CustomerFormDialog closedDialog) {
-            if (activeCustomerFormDialog == closedDialog) {
-              activeCustomerFormDialog = null;
-            }
-            deletePendingIdentityCameraFile();
+            identityImageWorkflow.onFormDismiss(closedDialog);
           }
         }
     );
-    activeCustomerFormDialog = formDialog;
+    identityImageWorkflow.attachForm(formDialog);
     formDialog.show();
     configureFullDialog(formDialog.dialog());
   }
