@@ -127,7 +127,7 @@ export function RestaurantReservationsWorkspace({
                   )}
                   {whatsappEnabled && (
                     <ActionButton
-                      variant="whatsapp"
+                      variant="secondary"
                       size="sm"
                       type="button"
                       onClick={() => onOpenWhatsApp(reservation)}
