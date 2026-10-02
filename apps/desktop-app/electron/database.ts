@@ -272,6 +272,9 @@ export class DesktopDatabase {
   }
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
+    return readEnabledBusinessCapabilities(this.db);
+  }
+
   getDashboardData(): DesktopDashboardData {
     return createDesktopDashboardData(
       this.db,
