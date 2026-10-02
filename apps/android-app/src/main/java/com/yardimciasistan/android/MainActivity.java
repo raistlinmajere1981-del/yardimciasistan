@@ -3332,122 +3332,17 @@ public final class MainActivity extends ComponentActivity {
           : "Atama yapılabilecek oda kaydı bulunamadı.");
       return;
     }
+    RoomAssignmentDialog.show(this, data, preferredCustomer, preferredRoom, new RoomAssignmentDialog.Listener() {
+      @Override
+      public void onSubmit(JSONObject actionPayload) {
+        sendAction("customer_room_assign", actionPayload, "Müşteri-oda ataması gönderildi.");
+      }
 
-    Dialog dialog = new Dialog(this);
-    LinearLayout shell = UiKit.column(this);
-    shell.setBackgroundColor(UiKit.BG);
-    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
-    LinearLayout header = UiKit.row(this);
-    LinearLayout heading = UiKit.column(this);
-    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    heading.addView(UiKit.eyebrow(this, "MÜŞTERİ · ODA"));
-    heading.addView(UiKit.title(this, "Konaklama oluştur"));
-    header.addView(heading);
-    Button close = UiKit.iconButton(this, "×", "Oda atama formunu kapat", false, view -> dialog.dismiss());
-    header.addView(close, new LinearLayout.LayoutParams(UiKit.dp(this, 44), UiKit.dp(this, 44)));
-    shell.addView(header);
-
-    LinearLayout form = UiKit.column(this);
-    ChoiceItem[] customerChoices = new ChoiceItem[data.customers.size()];
-    for (int index = 0; index < data.customers.size(); index += 1) {
-      OperationData.CustomerRecord customer = data.customers.get(index);
-      customerChoices[index] = new ChoiceItem(
-          customer.id,
-          customer.fullName + (customer.phone.isEmpty() ? "" : " · " + customer.phone)
-      );
-    }
-    ChoiceItem[] roomChoices = new ChoiceItem[data.rooms.size()];
-    for (int index = 0; index < data.rooms.size(); index += 1) {
-      OperationData.RoomRecord room = data.rooms.get(index);
-      OperationData.CustomerRoomStayRecord activeStay = data.activeStayForRoom(room.id);
-      roomChoices[index] = new ChoiceItem(
-          room.id,
-          room.name + (room.number.isEmpty() ? "" : " · " + room.number)
-              + " · " + formatRoomStatus(room.status)
-              + (activeStay == null ? "" : " · " + activeStay.customerName)
-      );
-    }
-    Spinner customer = addChoiceSpinner(
-        form,
-        "Müşteri *",
-        customerChoices,
-        preferredCustomer == null ? customerChoices[0].value : preferredCustomer.id
-    );
-    Spinner room = addChoiceSpinner(
-        form,
-        "Oda *",
-        roomChoices,
-        preferredRoom == null ? roomChoices[0].value : preferredRoom.id
-    );
-    String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
-    EditText checkInDate = addCustomerFormInput(form, "Giriş tarihi *", "YYYY-AA-GG", today, false);
-    EditText checkOutDate = addCustomerFormInput(form, "Çıkış tarihi", "YYYY-AA-GG", "", false);
-    EditText guestCount = addCustomerFormInput(form, "Kişi sayısı *", "1", "1", false);
-    guestCount.setInputType(InputType.TYPE_CLASS_NUMBER);
-    Spinner status = addChoiceSpinner(
-        form,
-        "Başlangıç durumu",
-        new ChoiceItem[] {
-            new ChoiceItem("planned", "Planlı / rezerve"),
-            new ChoiceItem("checked_in", "Giriş yapıldı")
-        },
-        "planned"
-    );
-    EditText notes = addCustomerFormInput(form, "Konaklama notu", "Odaya özel notlar", "", true);
-    TextView statusMessage = UiKit.text(this, "", 12, UiKit.DANGER, Typeface.BOLD);
-    statusMessage.setVisibility(View.GONE);
-    form.addView(statusMessage);
-
-    Button save = UiKit.button(this, "Müşteriyi Odaya Ata", UiKit.PRIMARY, view -> {
-      String start = textValue(checkInDate);
-      String end = textValue(checkOutDate);
-      int guests;
-      try {
-        guests = Integer.parseInt(textValue(guestCount));
-      } catch (Exception ignored) {
-        guests = 0;
+      @Override
+      public void configureFullDialog(Dialog dialog) {
+        MainActivity.this.configureFullDialog(dialog);
       }
-      if (!isIsoDate(start) || (!end.isEmpty() && !isIsoDate(end))) {
-        statusMessage.setText("Tarihleri YYYY-AA-GG biçiminde girin.");
-        statusMessage.setVisibility(View.VISIBLE);
-        return;
-      }
-      if (!end.isEmpty() && end.compareTo(start) < 0) {
-        statusMessage.setText("Çıkış tarihi giriş tarihinden önce olamaz.");
-        statusMessage.setVisibility(View.VISIBLE);
-        return;
-      }
-      if (guests < 1 || guests > 50) {
-        statusMessage.setText("Kişi sayısı 1 ile 50 arasında olmalı.");
-        statusMessage.setVisibility(View.VISIBLE);
-        return;
-      }
-      dialog.dismiss();
-      sendAction(
-          "customer_room_assign",
-          payload(
-              "customer_id", selectedChoiceValue(customer),
-              "room_id", selectedChoiceValue(room),
-              "check_in_date", start,
-              "check_out_date", end,
-              "guest_count", guests,
-              "status", selectedChoiceValue(status),
-              "notes", textValue(notes)
-          ),
-          "Müşteri-oda ataması gönderildi."
-      );
     });
-    LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
-    saveParams.setMargins(0, UiKit.dp(this, 12), 0, UiKit.dp(this, 20));
-    save.setLayoutParams(saveParams);
-    form.addView(save);
-
-    ScrollView scroll = UiKit.scroll(this, form);
-    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    shell.addView(scroll);
-    dialog.setContentView(shell);
-    dialog.show();
-    configureFullDialog(dialog);
   }
 
   private void showCustomerRoomStayActions(OperationData.CustomerRoomStayRecord stay) {
@@ -3455,62 +3350,21 @@ public final class MainActivity extends ComponentActivity {
       Toast.makeText(this, "Bu konaklama kaydında kullanılabilir durum işlemi yok.", Toast.LENGTH_SHORT).show();
       return;
     }
-    Dialog dialog = new Dialog(this);
-    LinearLayout sheet = UiKit.column(this);
-    sheet.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 16), UiKit.dp(this, 18), UiKit.dp(this, 18));
-    sheet.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 18));
-    sheet.addView(UiKit.eyebrow(this, "KONAKLAMA DURUMU"));
-    sheet.addView(UiKit.title(this, stay.customerName + " · " + stay.roomName));
-    sheet.addView(UiKit.text(
-        this,
-        joinDateRange(stay.checkInDate, stay.checkOutDate) + " · " + formatCustomerRoomStayStatus(stay.status),
-        13,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
+    PensionStayActionsDialog.show(this, stay, new PensionStayActionsDialog.Listener() {
+      @Override
+      public void onStatusChange(String nextStatus) {
+        sendAction(
+            "customer_room_stay_status",
+            payload("stay_id", stay.id, "status", nextStatus, "expected_updated_at", stay.updatedAt),
+            "Konaklama durumu güncellenmek üzere gönderildi."
+        );
+      }
 
-    if ("planned".equals(stay.status)) {
-      addStayStatusAction(sheet, dialog, stay, "Girişi Tamamla", "checked_in", UiKit.PRIMARY);
-      addStayStatusAction(sheet, dialog, stay, "Planı İptal Et", "cancelled", UiKit.DANGER_BACKGROUND);
-    } else if ("checked_in".equals(stay.status)) {
-      addStayStatusAction(sheet, dialog, stay, "Çıkışı Tamamla", "checked_out", UiKit.PRIMARY);
-      addStayStatusAction(sheet, dialog, stay, "Konaklamayı İptal Et", "cancelled", UiKit.DANGER_BACKGROUND);
-    } else if ("cancelled".equals(stay.status)) {
-      addStayStatusAction(sheet, dialog, stay, "Yeniden Planla", "planned", UiKit.PRIMARY);
-    }
-    dialog.setContentView(sheet);
-    dialog.show();
-    configureBottomDialog(dialog);
-  }
-
-  private void addStayStatusAction(
-      LinearLayout sheet,
-      Dialog dialog,
-      OperationData.CustomerRoomStayRecord stay,
-      String label,
-      String nextStatus,
-      int tone
-  ) {
-    Button action = "cancelled".equals(nextStatus)
-        ? UiKit.dangerButton(this, label, view -> submitCustomerRoomStayStatus(dialog, stay, nextStatus))
-        : UiKit.button(this, label, tone, view -> submitCustomerRoomStayStatus(dialog, stay, nextStatus));
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-    params.setMargins(0, UiKit.dp(this, 9), 0, 0);
-    action.setLayoutParams(params);
-    sheet.addView(action);
-  }
-
-  private void submitCustomerRoomStayStatus(
-      Dialog dialog,
-      OperationData.CustomerRoomStayRecord stay,
-      String nextStatus
-  ) {
-    dialog.dismiss();
-    sendAction(
-        "customer_room_stay_status",
-        payload("stay_id", stay.id, "status", nextStatus, "expected_updated_at", stay.updatedAt),
-        "Konaklama durumu güncellenmek üzere gönderildi."
-    );
+      @Override
+      public void configureBottomDialog(Dialog dialog) {
+        MainActivity.this.configureBottomDialog(dialog);
+      }
+    });
   }
 
   private void showRequestDetail(OperationData.RequestRecord request) {
