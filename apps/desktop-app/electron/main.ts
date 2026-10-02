@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import { desktopLog } from "./desktop-logger";
+import { resolveProjectBackupPath } from "./data-maintenance";
 import { LocalCompanionServer } from "./local-companion-server";
 import { LocalCompanionPairingService } from "./local-companion-pairing-service";
 import { projectLocalAndroidSnapshotForDevice } from "./local-android-device-projection";
@@ -29,6 +30,7 @@ import type {
 } from "@yardimci-asistan/sync-core";
 import {
   DesktopDatabase,
+  type DesktopDashboardData,
   type DesktopSetupData,
   type DesktopSetupSaveResult,
   type SaveInitialSetupInput,
