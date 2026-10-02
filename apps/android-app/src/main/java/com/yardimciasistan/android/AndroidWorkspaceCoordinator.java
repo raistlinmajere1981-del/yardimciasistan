@@ -4,8 +4,6 @@ import android.graphics.Typeface;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
