@@ -597,6 +597,7 @@ export function DesktopWorkspaceRouter({
           dashboardData={surfaceData}
           qrMenuEnabled={runtimeFeatures.qrMenu}
           inventoryEnabled={inventoryEnabled}
+          stockImageImportEnabled={aiEnabled && inventoryEnabled}
           itemForm={itemForm}
           selectedCategoryId={selectedCategoryId}
           selectedItemId={selectedItemId}
@@ -611,6 +612,7 @@ export function DesktopWorkspaceRouter({
           onReorderCategories={handleReorderMenuCategories}
           onReorderItems={handleReorderMenuItems}
           onDeleteCategoryById={handleDeleteMenuCategoryById}
+          onDashboardDataChanged={setDashboardData}
           onPreview={openMenuPreview}
         />
       ) : activePage === "reports" ? (
