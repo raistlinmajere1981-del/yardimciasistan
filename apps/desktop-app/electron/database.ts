@@ -1264,7 +1264,6 @@ export class DesktopDatabase {
 }
 
 import {
-  normalizeInteger,
   normalizeStatus,
 } from "./database/request-utils.js";
 
@@ -1373,7 +1372,6 @@ import {
 
 import {
   runDesktopDeletion as runStoredDesktopDeletion,
-  insertDeletionEvent as insertStoredDeletionEvent,
 } from "./database/deletion-store.js";
 import { deleteCustomerInTransaction as deleteStoredCustomerInTransaction } from "./database/customer-deletion-service.js";
 
@@ -1417,7 +1415,6 @@ import {
 } from "./android-action-service.js";
 
 import {
-  ensureCustomerForRequest as ensureStoredCustomerForRequest,
   createManualRequest as createStoredManualRequest,
   convertRequestToReservation as convertStoredRequestToReservation,
   upsertSyncedRequests,
