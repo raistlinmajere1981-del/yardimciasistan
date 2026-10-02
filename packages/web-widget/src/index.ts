@@ -6,6 +6,19 @@ import {
 import { widgetStyles } from "./widget-styles";
 import { iconTemplate, type IconName } from "./widget-icons";
 import {
+  buildInfoSuggestions,
+  buildWhatsAppTopics,
+  isRequestTypeAvailable,
+  isWhatsAppAvailable,
+  normalizeBusinessProfileId,
+  normalizePublicSurfaces,
+  readScriptConfig as getScriptConfig,
+  resolvePublicSurfaces,
+  type BusinessProfileId,
+  type PublicSurface,
+  type WidgetConfig
+} from "./widget-config";
+import {
   addLocalDays,
   formatDateForRequest,
   formatTurkishCalendarDate,
@@ -35,25 +48,6 @@ interface WidgetOpenOptions {
   intent?: WidgetIntent;
   context?: WidgetContext;
 }
-type BusinessProfileId = "pension_restaurant" | "pension" | "restaurant" | "market";
-type PublicSurface = "accommodation" | "food_service" | "menu" | "qr_menu" | "catalog" | "directions";
-
-interface WidgetConfig {
-  businessName: string;
-  whatsappPhone: string;
-  apiBaseUrl: string;
-  logoUrl: string;
-  primaryColor: string;
-  accentColor: string;
-  profileId: BusinessProfileId | "";
-  publicSurfaces: PublicSurface[];
-  aiEnabled: boolean;
-  whatsappEnabled: boolean;
-  requestsEnabled: boolean;
-  address: string;
-  mapUrl: string;
-}
-
 interface RequestPayload {
   request_type: RequestType;
   customer_name: string;
@@ -1385,132 +1379,24 @@ function injectStyles(widgetConfig: WidgetConfig) {
 }
 
 
-function getScriptConfig(): Partial<WidgetConfig> {
-  const script = document.currentScript as HTMLScriptElement | null;
-  const dataset = script?.dataset ?? {};
-  const scriptConfig = removeEmptyValues({
-    businessName: dataset.businessName,
-    whatsappPhone: dataset.whatsappPhone,
-    apiBaseUrl: dataset.apiBaseUrl,
-    logoUrl: dataset.logoUrl,
-    primaryColor: dataset.primaryColor,
-    accentColor: dataset.accentColor,
-    address: dataset.address,
-    mapUrl: dataset.mapUrl
-  });
-  const profileId = normalizeBusinessProfileId(dataset.profileId);
-  if (profileId) {
-    scriptConfig.profileId = profileId;
-  }
-  if (dataset.aiEnabled === "true" || dataset.aiEnabled === "false") {
-    scriptConfig.aiEnabled = dataset.aiEnabled === "true";
-  }
-  if (dataset.whatsappEnabled === "true" || dataset.whatsappEnabled === "false") {
-    scriptConfig.whatsappEnabled = dataset.whatsappEnabled === "true";
-  }
-  return scriptConfig;
-}
-
-function removeEmptyValues(values: Partial<WidgetConfig>): Partial<WidgetConfig> {
-  return Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === "string" && value.length > 0)) as Partial<WidgetConfig>;
-}
-
-function normalizeBusinessProfileId(value: unknown): BusinessProfileId | "" {
-  const profileId = String(value ?? "").trim();
-  return ["pension_restaurant", "pension", "restaurant", "market"].includes(profileId)
-    ? profileId as BusinessProfileId
-    : "";
-}
-
-function normalizePublicSurfaces(value: unknown): PublicSurface[] {
-  if (!Array.isArray(value)) return [];
-  const allowed = new Set<PublicSurface>(["accommodation", "food_service", "menu", "qr_menu", "catalog", "directions"]);
-  return [...new Set(
-    value
-      .map((item) => String(item ?? "").trim() as PublicSurface)
-      .filter((item) => allowed.has(item))
-  )];
-}
-
-function profilePublicSurfaces(profileId: BusinessProfileId | ""): PublicSurface[] {
-  if (profileId === "pension_restaurant") return ["accommodation", "food_service", "menu", "qr_menu", "directions"];
-  if (profileId === "pension") return ["accommodation", "directions"];
-  if (profileId === "restaurant") return ["food_service", "menu", "qr_menu", "directions"];
-  if (profileId === "market") return ["catalog", "directions"];
-  return [];
-}
-
 function currentPublicSurfaces(): ReadonlySet<PublicSurface> {
-  const configured = normalizePublicSurfaces(config.publicSurfaces);
-  return new Set(configured.length > 0 ? configured : profilePublicSurfaces(config.profileId));
+  return resolvePublicSurfaces(config);
 }
 
 function isWhatsAppEnabled(): boolean {
-  return config.whatsappEnabled && config.whatsappPhone.trim() !== "";
+  return isWhatsAppAvailable(config);
 }
 
 function isRequestTypeEnabled(requestType: RequestType): boolean {
-  if (!config.requestsEnabled) return false;
-  const surfaces = currentPublicSurfaces();
-  if (requestType === "pension_reservation") return surfaces.has("accommodation");
-  if (requestType === "restaurant_reservation") return surfaces.has("food_service");
-  return true;
+  return isRequestTypeAvailable(config, requestType);
 }
 
 function getInfoSuggestions(): string[] {
-  const surfaces = currentPublicSurfaces();
-  const suggestions: string[] = [];
-  if (surfaces.has("accommodation")) {
-    suggestions.push("Oda fiyatları", "Oda müsaitliği", "Kahvaltı saatleri");
-  }
-  if (surfaces.has("food_service")) {
-    suggestions.push("Masa var mı?", "Menü hakkında bilgi", "Çocuklar için uygun mu?");
-  }
-  if (surfaces.has("catalog")) {
-    suggestions.push("Ürün stokta mı?", "Ürün fiyatı", "Çalışma saatleri");
-  }
-  if (surfaces.has("directions")) {
-    suggestions.push("Konum ve yol tarifi");
-  }
-  if (suggestions.length === 0) {
-    suggestions.push("Çalışma saatleri", "İletişim", "Konum");
-  }
-  return [...new Set(suggestions)].slice(0, 6);
+  return buildInfoSuggestions(config);
 }
 
 function getWhatsAppTopics() {
-  const surfaces = currentPublicSurfaces();
-  const topics: Array<{ key: string; label: string; message: string }> = [];
-  if (surfaces.has("accommodation")) {
-    topics.push({
-      key: "reservation",
-      label: "Rezervasyon soracağım",
-      message: `Merhaba, ${config.businessName} için oda müsaitliği ve rezervasyon hakkında bilgi almak istiyorum.`
-    });
-  }
-  if (surfaces.has("food_service")) {
-    topics.push({
-      key: "table",
-      label: "Masa soracağım",
-      message: `Merhaba, ${config.businessName} için masa müsaitliği hakkında bilgi almak istiyorum.`
-    });
-  }
-  if (surfaces.has("menu")) {
-    topics.push({
-      key: "menu",
-      label: "Menü hakkında soracağım",
-      message: `Merhaba, ${config.businessName} menüsü hakkında bilgi almak istiyorum.`
-    });
-  }
-  if (surfaces.has("catalog")) {
-    topics.push({
-      key: "product",
-      label: "Ürün / stok soracağım",
-      message: `Merhaba, ${config.businessName} için ürün ve stok bilgisi almak istiyorum.`
-    });
-  }
-  topics.push({ key: "custom", label: "Kendi mesajımı yazacağım", message: "" });
-  return topics;
+  return buildWhatsAppTopics(config);
 }
 
 async function hydrateBusinessContext(loadId: number) {
