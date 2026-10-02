@@ -4996,18 +4996,6 @@ public final class MainActivity extends ComponentActivity {
     return count;
   }
 
-  private int countRestaurantReservations(String status) {
-    int count = 0;
-    for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (status.equals(reservation.status)
-          && AndroidUiRules.isRestaurantReservation(data, reservation)
-          && AndroidUiRules.reservationAllowed(data, reservation)) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
   private int countRestaurantOnlyReservations(String status) {
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
@@ -5015,23 +5003,6 @@ public final class MainActivity extends ComponentActivity {
           && AndroidUiRules.isRestaurantReservation(data, reservation)
           && !AndroidUiRules.isPensionReservation(data, reservation)
           && AndroidUiRules.reservationAllowed(data, reservation)) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-  private int countRestaurantReservationsToday() {
-    String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
-    int count = 0;
-    for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (!AndroidUiRules.isRestaurantReservation(data, reservation)
-          || !AndroidUiRules.reservationAllowed(data, reservation)
-          || "cancelled".equals(reservation.status)
-          || "rejected".equals(reservation.status)) {
-        continue;
-      }
-      if (today.equals(reservation.startDate)) {
         count += 1;
       }
     }
@@ -5087,19 +5058,6 @@ public final class MainActivity extends ComponentActivity {
     return count;
   }
 
-  private int countRestaurantTasks(boolean completed) {
-    int count = 0;
-    for (OperationData.TaskRecord task : data.tasks) {
-      if (!AndroidUiRules.isRestaurantTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
-        continue;
-      }
-      if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
   private int countCoreTasks(boolean completed) {
     int count = 0;
     for (OperationData.TaskRecord task : data.tasks) {
@@ -5113,41 +5071,10 @@ public final class MainActivity extends ComponentActivity {
     return count;
   }
 
-  private int countTablesByStatus(String status) {
-    int count = 0;
-    for (OperationData.TableRecord table : data.tables) {
-      if (status.equals(table.status)) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-  private int countActiveOrders() {
-    int count = 0;
-    for (OperationData.TableOrder order : data.tableOrders) {
-      if (order.isActive()) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
   private int countOrdersByStatus(String status) {
     int count = 0;
     for (OperationData.TableOrder order : data.tableOrders) {
       if (status.equals(order.status) && order.isActive()) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-  private int countPaymentWaitingTables() {
-    int count = countOrdersByStatus("payment");
-    for (OperationData.TableRecord table : data.tables) {
-      if (("bill_waiting".equals(table.status) || "payment".equals(table.status))
-          && !hasPaymentOrderForTable(table.id)) {
         count += 1;
       }
     }
