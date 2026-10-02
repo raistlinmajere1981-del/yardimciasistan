@@ -119,7 +119,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
                   const selected = mediaRoom?.key === room.key;
                   return (
                     <div
-                      className={`room-management-row${selected ? " is-media-selected" : ""}`}
+                      className={`room-management-row interactive-surface interactive-surface--record${selected ? " is-media-selected is-selected" : ""}`}
                       key={room.key}
                       onClick={() => setMediaRoomKey(room.key)}
                     >
