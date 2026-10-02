@@ -18,14 +18,10 @@ import {
 } from "@yardimci-asistan/shared";
 import {
   LOCAL_COMPANION_PROTOCOL_VERSION,
-  LOCAL_COMPANION_SERVICE_TYPE,
-  markAndroidActionResult,
-  pullAndroidActions,
-  pushAndroidSnapshot
+  LOCAL_COMPANION_SERVICE_TYPE
 } from "@yardimci-asistan/sync-core";
 import type {
   PushAiSettingsResult,
-  PushAndroidSnapshotResult,
   PushBusinessContextResult
 } from "@yardimci-asistan/sync-core";
 import {
@@ -70,6 +66,7 @@ import { getWebSyncConfig } from "./sync-config";
 import { DesktopAppLockService } from "./app-lock-service";
 import { isWhatsAppUrl } from "./ipc/app-ipc";
 import { createAndroidOperationsSnapshot } from "./android-operations-snapshot";
+import { AndroidActionSyncService } from "./android-action-sync-service";
 import {
   configureDesktopSessionRuntime,
   createDesktopMainWindow,
@@ -94,9 +91,8 @@ const isTrustedDesktopRendererUrl = createTrustedDesktopRendererUrlPredicate(
 const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
 let desktopDatabase: DesktopDatabase | null = null;
 let syncCoordinator: SyncCoordinator | null = null;
-let androidActionSyncInFlight: Promise<AndroidActionProcessSummary> | null = null;
+let androidActionSyncService: AndroidActionSyncService | null = null;
 let maintenanceSyncSuspended = false;
-let androidSnapshotPublishPending = true;
 let appLockService: DesktopAppLockService | null = null;
 let birthdayScheduler: BirthdayScheduler | null = null;
 let desktopIpcRegistryHandle: DesktopIpcRegistryHandle | null = null;
@@ -228,12 +224,6 @@ function assertDesktopTaskScope(
   }
 }
 
-interface AndroidActionProcessSummary {
-  pulled: number;
-  applied: number;
-  failed: number;
-}
-
 if (process.env.YA_DESKTOP_DATA_DIR) {
   app.setPath("userData", path.resolve(process.env.YA_DESKTOP_DATA_DIR));
 }
@@ -312,6 +302,16 @@ if (!hasSingleInstanceLock) {
       backupPath: resolveProjectBackupPath(runtimeDataRoot)
     });
     desktopDatabase.initialize();
+    androidActionSyncService = new AndroidActionSyncService({
+      database: desktopDatabase,
+      isSuspended: () => maintenanceSyncSuspended,
+      markLocalSnapshotDirty: () => {
+        markLocalCompanionSnapshotDirty();
+      },
+      notifyDashboardChanged: (dashboardData) => {
+        notifyDesktopDashboardChanged(dashboardData);
+      }
+    });
     appLockService = new DesktopAppLockService({
       database: desktopDatabase,
       getSyncStatus: () => syncCoordinator?.getStatus(),
@@ -398,7 +398,7 @@ if (!hasSingleInstanceLock) {
         });
         if (result.ok) {
           notifyDesktopDashboardChanged(getDatabase().getDashboardData());
-          androidSnapshotPublishPending = true;
+          getAndroidActionSyncService().markSnapshotPublishPending();
           getSyncCoordinator().scheduleSoon();
         }
         return result;
@@ -407,7 +407,7 @@ if (!hasSingleInstanceLock) {
         const result = getDatabase().applyAndroidAction(action);
         getDatabase().recordAndroidActionResult(action, result);
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
-        androidSnapshotPublishPending = true;
+        getAndroidActionSyncService().markSnapshotPublishPending();
         getSyncCoordinator().scheduleSoon();
         return result;
       }
@@ -536,7 +536,7 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   }
 
   markLocalCompanionSnapshotDirty();
-  androidSnapshotPublishPending = true;
+  getAndroidActionSyncService().markSnapshotPublishPending();
   reconcileLocalCompanionAdvertisement();
   getSyncCoordinator().scheduleSoon();
 
@@ -586,7 +586,7 @@ export async function suspendAutomaticSyncForMaintenance() {
   maintenanceSyncSuspended = true;
   desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
   await syncCoordinator?.suspendAndDrain();
-  const androidPull = androidActionSyncInFlight;
+  const androidPull = getAndroidActionSyncService().currentInFlight();
   if (androidPull) {
     try {
       await androidPull;
@@ -606,7 +606,7 @@ export function resumeAutomaticSyncAfterMaintenanceAbort() {
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    androidSnapshotPublishPending = true;
+    getAndroidActionSyncService().markSnapshotPublishPending();
     notifyDesktopDashboardChanged(getDatabase().getDashboardData());
     getSyncCoordinator().scheduleSoon();
   }
@@ -616,7 +616,7 @@ function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResul
 function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    androidSnapshotPublishPending = true;
+    getAndroidActionSyncService().markSnapshotPublishPending();
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
@@ -626,7 +626,7 @@ function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): De
 function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    androidSnapshotPublishPending = true;
+    getAndroidActionSyncService().markSnapshotPublishPending();
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
@@ -636,7 +636,7 @@ function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): Deskt
 function finalizeDesktopMenuMutation<T extends DesktopMenuSaveResult | DesktopStatusUpdateResult>(result: T): T {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    androidSnapshotPublishPending = true;
+    getAndroidActionSyncService().markSnapshotPublishPending();
     notifyDesktopDashboardChanged(result.dashboardData);
     if (hasBusinessCapability(enabledBusinessCapabilities(), C.QR_MENU)) {
       getDatabase().queueSyncJob("menu_publish");
@@ -649,7 +649,7 @@ function finalizeDesktopMenuMutation<T extends DesktopMenuSaveResult | DesktopSt
 function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult): DesktopCustomerMutationResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    androidSnapshotPublishPending = true;
+    getAndroidActionSyncService().markSnapshotPublishPending();
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
@@ -718,7 +718,7 @@ function finalizeStockImageApply(result: DesktopStockImageApplyResult): DesktopS
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
     notifyDesktopDashboardChanged(result.dashboardData);
-    androidSnapshotPublishPending = true;
+    getAndroidActionSyncService().markSnapshotPublishPending();
     if (hasBusinessCapability(enabledBusinessCapabilities(), C.QR_MENU)) {
       getDatabase().queueSyncJob("menu_publish");
     }
@@ -744,6 +744,13 @@ function getAppLockService(): DesktopAppLockService {
 
 export function assertAppSessionUnlocked() {
   getAppLockService().assertUnlocked();
+}
+
+function getAndroidActionSyncService() {
+  if (!androidActionSyncService) {
+    throw new Error("Android action sync service is not initialized.");
+  }
+  return androidActionSyncService;
 }
 
 function getSyncCoordinator() {
@@ -783,94 +790,10 @@ function reconcileLocalCompanionAdvertisement() {
   localCompanionMdnsAdvertiser.start(serverAddress.port);
 }
 
-function canUseAndroidSync(setup: DesktopSetupData, allowPlaceholderSecret: boolean) {
-  const { baseUrl, syncSecret } = getWebSyncConfig(setup);
-  return hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)
-    && Boolean(baseUrl.trim())
-    && Boolean(syncSecret.trim())
-    && (allowPlaceholderSecret || syncSecret.trim() !== "change-this-secret");
-}
-
-function processAndroidActionQueue(allowPlaceholderSecret: boolean): Promise<AndroidActionProcessSummary> {
-  if (maintenanceSyncSuspended) {
-    return Promise.resolve({ pulled: 0, applied: 0, failed: 0 });
-  }
-  if (androidActionSyncInFlight) {
-    return androidActionSyncInFlight;
-  }
-
-  androidActionSyncInFlight = processAndroidActionQueueOnce(allowPlaceholderSecret)
-    .finally(() => {
-      androidActionSyncInFlight = null;
-    });
-  return androidActionSyncInFlight;
-}
-
-async function processAndroidActionQueueOnce(allowPlaceholderSecret: boolean): Promise<AndroidActionProcessSummary> {
-  const summary: AndroidActionProcessSummary = { pulled: 0, applied: 0, failed: 0 };
-  const setup = getDatabase().getSetupData();
-  if (!canUseAndroidSync(setup, allowPlaceholderSecret)) {
-    return summary;
-  }
-
-  const syncConfig = getWebSyncConfig(setup);
-  const pullResult = await pullAndroidActions({ ...syncConfig, limit: 100 });
-  if (!pullResult.ok) {
-    getDatabase().recordSyncEvent({
-      direction: "pull",
-      entityType: "android_action",
-      ok: false,
-      message: pullResult.message,
-      status: pullResult.status
-    });
-    return summary;
-  }
-
-  const androidDevicesChanged = getDatabase().upsertAndroidDeviceSightings(pullResult.devices ?? []);
-  summary.pulled = pullResult.count;
-  for (const action of pullResult.actions) {
-    const applyResult = getDatabase().applyAndroidAction(action);
-    getDatabase().recordAndroidActionResult(action, applyResult);
-    const actionStatus = applyResult.ok ? "applied" : "failed";
-    const markResult = await markAndroidActionResult({
-      ...syncConfig,
-      actionId: action.id,
-      status: actionStatus,
-      errorMessage: applyResult.ok ? "" : applyResult.message
-    });
-
-    if (applyResult.ok) {
-      summary.applied += 1;
-    } else {
-      summary.failed += 1;
-    }
-    if (!markResult.ok) {
-      getDatabase().recordSyncEvent({
-        direction: "push",
-        entityType: "android_action_result",
-        ok: false,
-        message: markResult.message,
-        status: markResult.status
-      });
-    }
-  }
-
-  getDatabase().recordSyncEvent({
-    direction: "pull",
-    entityType: "android_action",
-    ok: true,
-    recordCount: summary.pulled,
-    message: `${summary.applied} telefon işlemi uygulandı, ${summary.failed} işlem uygulanamadı.`
-  });
-  if (summary.applied > 0 || summary.failed > 0 || androidDevicesChanged > 0) {
-    markLocalCompanionSnapshotDirty();
-    notifyDesktopDashboardChanged(getDatabase().getDashboardData());
-    androidSnapshotPublishPending = true;
-  }
-  if (androidSnapshotPublishPending) {
-    await publishCurrentAndroidSnapshot();
-  }
-  return summary;
+function processAndroidActionQueue(
+  allowPlaceholderSecret: boolean
+) {
+  return getAndroidActionSyncService().processQueue(allowPlaceholderSecret);
 }
 
 function notifyDesktopDashboardChanged(dashboardData: DesktopDashboardData) {
@@ -889,25 +812,8 @@ function notifySyncStatusChanged(status: AutomaticSyncStatus) {
   }
 }
 
-async function publishCurrentAndroidSnapshot(): Promise<PushAndroidSnapshotResult> {
-  const setup = getDatabase().getSetupData();
-  const snapshot = createAndroidOperationsSnapshot(getDatabase(), getDatabase().getDashboardData());
-  const result = await pushAndroidSnapshot({
-    ...getWebSyncConfig(setup),
-    clientId: getDatabase().getSyncRuntimeStatus().clientId,
-    snapshot
-  });
-
-  getDatabase().recordSyncEvent({
-    direction: "push",
-    entityType: "android_snapshot",
-    ok: result.ok,
-    recordCount: result.ok ? result.task_count + snapshot.requests.length + snapshot.rooms.length + snapshot.tables.length : 0,
-    message: result.message,
-    status: result.ok ? undefined : result.status
-  });
-  androidSnapshotPublishPending = !result.ok;
-  return result;
+function publishCurrentAndroidSnapshot() {
+  return getAndroidActionSyncService().publishSnapshot();
 }
 
 async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {
