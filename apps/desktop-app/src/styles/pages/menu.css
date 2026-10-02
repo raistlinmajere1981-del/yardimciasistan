@@ -109,8 +109,10 @@
 .menu-sortable-record {
   position: relative;
   transition:
+    margin var(--motion-surface) var(--ease-standard),
     border-color var(--motion-hover) var(--ease-standard),
     background-color var(--motion-hover) var(--ease-standard),
+    box-shadow var(--motion-hover) var(--ease-standard),
     opacity var(--motion-hover) var(--ease-standard),
     transform var(--motion-press) var(--ease-standard);
 }
@@ -129,42 +131,73 @@
   cursor: grabbing;
 }
 
+.menu-drag-handle-hitbox.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .menu-drag-handle {
   flex: 0 0 auto;
   color: var(--color-text-muted);
   pointer-events: none;
 }
 
-.menu-drag-handle-hitbox:hover .menu-drag-handle {
+.menu-drag-handle-hitbox:not(.is-disabled):hover .menu-drag-handle {
   color: var(--color-accent);
 }
 
 .menu-sortable-record.is-dragging {
-  opacity: 0.48;
+  opacity: 0.32;
+  transform: scale(0.985);
+}
+
+.menu-sortable-record:is(.is-drop-before, .is-drop-after) {
+  overflow: visible;
+  border-color: var(--color-accent-border);
+  box-shadow: var(--shadow-selected-ring);
+}
+
+.menu-sortable-record.is-drop-before {
+  margin-block-start: var(--space-4);
+}
+
+.menu-sortable-record.is-drop-after {
+  margin-block-end: var(--space-4);
+}
+
+.menu-sortable-record.is-drop-before::before,
+.menu-sortable-record.is-drop-after::after {
+  position: absolute;
+  z-index: 3;
+  right: var(--space-2);
+  left: var(--space-2);
+  height: var(--space-1);
+  content: "";
+  pointer-events: none;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-selected-ring);
 }
 
 .menu-sortable-record.is-drop-before::before {
-  position: absolute;
-  right: var(--space-2);
-  left: var(--space-2);
-  height: 2px;
-  content: "";
-  pointer-events: none;
-  background: var(--color-accent);
-  border-radius: var(--radius-pill);
-  top: calc(var(--space-1) * -1);
+  top: calc(var(--space-3) * -1);
 }
 
 .menu-sortable-record.is-drop-after::after {
-  position: absolute;
-  right: var(--space-2);
-  left: var(--space-2);
-  height: 2px;
-  content: "";
-  pointer-events: none;
-  background: var(--color-accent);
-  border-radius: var(--radius-pill);
-  bottom: calc(var(--space-1) * -1);
+  bottom: calc(var(--space-3) * -1);
+}
+
+.menu-product-heading-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.menu-sort-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
 }
 
 .menu-product-row__leading {
