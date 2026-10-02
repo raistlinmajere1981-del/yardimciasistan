@@ -154,7 +154,7 @@
 }
 
 .record-workspace__items {
-  max-height: 65dvh;
+  min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable;
 }
@@ -207,10 +207,6 @@
 
   .record-workspace {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .record-workspace__items {
-    max-height: 40dvh;
   }
 
   .list-row__actions {
