@@ -1,22 +1,14 @@
-/* Room and Table share the shell, panel geometry and interaction targets. */
-.operations-workspace.workspace-frame--centered {
-  width: calc(100vw / var(--ui-scale) - var(--space-8));
-  height: calc(100dvh / var(--ui-scale) - var(--space-8));
-}
-.operations-workspace :is(button, input, select, summary, .form-check) {
-  min-height: var(--control-height-lg);
-}
-.operations-workspace :is(.icon-button, .restaurant-quantity-control button) { min-width: var(--control-height-lg); }
+/* Shared operation surface primitives. Feature/page composition belongs in pages/operation-workspace.css. */
 .operation-surface {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.12fr);
   min-height: 0;
   overflow: hidden;
 }
-.operation-surface[hidden] { display: none; }
-.operation-surface--table { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.9fr); }
-.operation-surface--room { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr) minmax(0, 0.8fr); }
-.operation-surface--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.operation-surface[hidden] {
+  display: none;
+}
+
 .operation-panel {
   --operation-panel-bg: var(--color-role-operation-bg);
   --operation-panel-border: var(--color-role-operation-border);
@@ -30,81 +22,177 @@
     background-color var(--motion-surface) var(--ease-standard),
     border-color var(--motion-surface) var(--ease-standard);
 }
+
 .operation-panel[data-surface-role="finance"] {
   --operation-panel-bg: var(--color-role-finance-bg);
   --operation-panel-border: var(--color-role-finance-border);
 }
+
 .operation-panel[data-surface-role="configuration"] {
   --operation-panel-bg: var(--color-role-configuration-bg);
   --operation-panel-border: var(--color-role-configuration-border);
 }
+
 .operation-panel[data-surface-role="communication"] {
   --operation-panel-bg: var(--color-role-communication-bg);
   --operation-panel-border: var(--color-role-communication-border);
 }
+
 .operation-panel[data-surface-role="integration"] {
   --operation-panel-bg: var(--color-role-integration-bg);
   --operation-panel-border: var(--color-role-integration-border);
 }
-.operation-panel + .operation-panel, .operation-surface--table > .operation-panel { border-inline-start: 1px solid var(--color-border); }
+
+.operation-panel + .operation-panel {
+  border-inline-start: 1px solid var(--color-border);
+}
+
 .operation-panel__heading {
   padding: var(--space-4);
   border-bottom: 1px solid var(--operation-panel-border);
   background: color-mix(in srgb, var(--operation-panel-bg) 82%, var(--color-bg-surface));
 }
-.operation-panel__heading h3 { margin: 0; font-size: var(--text-md); }
-.operation-panel__body { padding: var(--space-4); overflow: auto; overscroll-behavior: contain; min-height: 0; display: flex; flex-direction: column; gap: var(--space-4); }
-.operation-panel :is(h4, p) { margin: 0; }
-.operation-panel h4 { font-size: var(--text-sm); }
-.operation-panel p { color: var(--color-text-muted); font-size: var(--text-sm); line-height: var(--leading-normal); }
-.operation-panel [role="alert"] { color: var(--color-danger); }
-.operation-panel :is(input, select, textarea, fieldset, .form-field) { min-width: 0; max-width: 100%; }
-.operation-panel .form-field { width: 100%; gap: var(--space-1); }
-.operation-panel .form-field :is(input, select, textarea) { width: 100%; max-width: 100%; }
-.operation-panel textarea { min-height: calc(var(--control-height-lg) + var(--space-4)); }
-.operation-panel fieldset { padding: 0; border: 0; margin: 0; }
-.operation-panel .form-stack { gap: var(--space-3); }
-.operation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
-.operation-facts { display: grid; gap: var(--space-2); margin: 0; font-size: var(--text-sm); }
-.operation-facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
-.operation-facts dt { color: var(--color-text-muted); }
-.operation-facts dd { margin: 0; text-align: end; font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
-.operation-facts .operation-balance { padding: var(--space-3); background: var(--color-accent-soft); border-radius: var(--radius-control); }
-.operation-balance dd { font-size: var(--text-xl); color: var(--color-accent); }
-.operation-section { border-top: 1px solid var(--color-border); padding-top: var(--space-4); display: grid; gap: var(--space-2); }
-.operation-section:first-child { border-top: 0; padding-top: 0; }
-.operation-confirmation { padding: var(--space-3); border: 1px solid var(--color-warning-border); border-radius: var(--radius-control); background: var(--color-warning-soft); }
-.operation-panel .operation-prior-debt { padding: var(--space-2) var(--space-3); color: var(--color-warning); background: var(--color-warning-soft); border-radius: var(--radius-control); }
-.operation-empty { padding-block: var(--space-2); }
-.operation-history { min-height: 0; overflow: auto; padding: var(--space-4); }
-.room-account-record + .room-account-record { border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
-.operations-workspace .restaurant-order-ticket-panel { display: flex; flex-direction: column; }
-.operations-workspace .restaurant-order-line-list { flex: 1; }
-.operations-workspace .restaurant-order-line {
-  grid-template-columns:
-    minmax(0, 1fr)
-    calc((var(--control-height-lg) * 2) + var(--space-6))
-    6.5rem
-    var(--control-height-lg);
+
+.operation-panel__heading h3 {
+  margin: 0;
+  font-size: var(--text-md);
 }
-.operations-workspace .restaurant-order-line__remove { grid-column: 4; grid-row: 1; }
-.operations-workspace .restaurant-quantity-control {
-  grid-column: 2;
-  grid-row: 1;
-  grid-template-columns: var(--control-height-lg) var(--space-6) var(--control-height-lg);
-  width: calc((var(--control-height-lg) * 2) + var(--space-6));
-  justify-self: stretch;
+
+.operation-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
-.operations-workspace .restaurant-order-line__total {
-  grid-column: 3;
-  grid-row: 1;
-  width: 6.5rem;
+
+.operation-panel :is(h4, p) {
+  margin: 0;
+}
+
+.operation-panel h4 {
+  font-size: var(--text-sm);
+}
+
+.operation-panel p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.operation-panel [role="alert"] {
+  color: var(--color-danger);
+}
+
+.operation-panel :is(input, select, textarea, fieldset, .form-field) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.operation-panel .form-field {
+  width: 100%;
+  gap: var(--space-1);
+}
+
+.operation-panel .form-field :is(input, select, textarea) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.operation-panel textarea {
+  min-height: calc(var(--control-height-lg) + var(--space-4));
+}
+
+.operation-panel fieldset {
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+
+.operation-panel .form-stack {
+  gap: var(--space-3);
+}
+
+.operation-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.operation-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.operation-facts > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.operation-facts dt {
+  color: var(--color-text-muted);
+}
+
+.operation-facts dd {
+  margin: 0;
   text-align: end;
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
 }
-.operations-workspace .restaurant-order-line__note,
-.operations-workspace .restaurant-order-line__note-toggle { grid-column: 1 / -1; grid-row: 2; }
-.restaurant-ticket-total { display: flex; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
-/* Hospitality sections share geometry; appearance continues to come from app tokens. */
+
+.operation-facts .operation-balance {
+  padding: var(--space-3);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-control);
+}
+
+.operation-balance dd {
+  color: var(--color-accent);
+  font-size: var(--text-xl);
+}
+
+.operation-section {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.operation-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.operation-confirmation {
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-control);
+  background: var(--color-warning-soft);
+}
+
+.operation-panel .operation-prior-debt {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-radius: var(--radius-control);
+}
+
+.operation-empty {
+  padding-block: var(--space-2);
+}
+
+.operation-history {
+  min-height: 0;
+  padding: var(--space-4);
+  overflow: auto;
+}
+
 .resource-workspace-summary {
   display: flex;
   flex-wrap: wrap;
@@ -114,6 +202,7 @@
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
+
 .resource-workspace-summary__facts,
 .resource-workspace-summary__status {
   display: flex;
@@ -123,6 +212,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
 .resource-workspace-summary__image {
   width: calc(var(--control-height-lg) * 2);
   height: calc(var(--control-height-lg) + var(--space-4));
@@ -130,95 +220,16 @@
   border-radius: var(--radius-control);
   flex: none;
 }
-.resource-workspace-summary__identity { flex: 1 1 10rem; min-width: 0; display: grid; gap: var(--space-2); }
-.resource-workspace-summary__detail { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 
-/* Room/table summaries live inside the workspace header now. Remove the old
-   navigation-strip chrome here (same cascade layer as the generic summary rule). */
-.operations-workspace .workspace-frame__identity--summary .resource-workspace-summary {
-  padding: 0;
-  border-bottom: 0;
-}
-.operations-workspace .workspace-frame__identity--summary .resource-workspace-summary__detail {
-  margin-inline-start: auto;
-}
-.operations-workspace .workspace-status-chips {
-  flex-wrap: nowrap;
-  gap: var(--space-1);
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.operations-workspace .workspace-status-chips::-webkit-scrollbar { display: none; }
-.operations-workspace .workspace-status-chips button {
-  min-height: var(--control-height-sm);
-  flex: 0 0 auto;
-  padding: 0 var(--space-2);
-  font-size: var(--text-xs);
-}
-.operation-surface--sections { padding: var(--space-3); gap: var(--space-3); }
-.operation-surface--sections > .restaurant-order-menu-panel,
-.operation-surface--sections > .restaurant-order-ticket-panel {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
+.resource-workspace-summary__identity {
+  flex: 1 1 10rem;
   min-width: 0;
-}
-.operation-surface--sections > .operation-panel { border: 0; }
-.operation-surface--sections .operation-panel__heading {
-  padding: var(--space-2) var(--space-1);
-}
-.operation-surface--sections .operation-panel__body { padding: var(--space-3) 0; gap: var(--space-3); }
-.operation-surface--sections .operation-panel__body > * { flex-shrink: 0; }
-.operation-surface--sections .stay-secondary-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-sm)), 1fr)); gap: var(--space-3); align-items: start; }
-.stay-secondary-controls > * { min-width: 0; }
-.operation-surface--sections .operation-section {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-}
-.operation-surface--sections .operation-section .operation-section {
-  padding: var(--space-3) 0 0;
-  border-width: 1px 0 0;
-  border-radius: 0;
-}
-@media (max-width: 1100px) {
-  .operation-surface { overflow: auto; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; }
-  .operation-panel { display: block; overflow: visible; }
-  .operation-panel__body { overflow: visible; }
-  .operation-panel + .operation-panel, .operation-surface--table > .operation-panel { border-inline-start: 0; border-top: 1px solid var(--color-border); }
-  .operations-workspace .restaurant-order-product-list { max-height: 36dvh; }
-  .operations-workspace .restaurant-order-line-list { overflow: visible; flex: none; }
-  .operations-workspace .restaurant-order-menu-panel { border-inline-end: 0; }
-}
-@media (max-width: 760px) {
-  .operations-workspace .restaurant-order-line {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-  .operations-workspace .restaurant-order-line__main {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-  .operations-workspace .restaurant-quantity-control {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .operations-workspace .restaurant-order-line__total {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .operations-workspace .restaurant-order-line__remove {
-    grid-column: 3;
-    grid-row: 2;
-  }
-  .operations-workspace .restaurant-order-line__note,
-  .operations-workspace .restaurant-order-line__note-toggle {
-    grid-column: 1 / -1;
-    grid-row: 3;
-  }
+  display: grid;
+  gap: var(--space-2);
 }
 
-@media (max-width: 480px) {
-  .operation-fields { grid-template-columns: minmax(0, 1fr); }
-  .operation-surface--sections .stay-secondary-controls { grid-template-columns: minmax(0, 1fr); }
-  .resource-workspace-summary__image { width: var(--control-height-lg); height: var(--control-height-lg); }
+.resource-workspace-summary__detail {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
