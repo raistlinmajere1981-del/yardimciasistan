@@ -207,19 +207,19 @@ export function DashboardPage({
 
         <div className="dashboard-attention-grid" aria-label="İlgi bekleyen konular">
           {requestsEnabled && <AttentionCard tone="info" icon={MessageCircle} value={waitingRequestCount} label="müşteri yanıt bekliyor" />}
-          {tasksEnabled && <AttentionCard tone="wait" icon={ClipboardCheck} value={openTaskCount} label="açık iş bulunuyor" />}
-          {reservationsEnabled && <AttentionCard tone="wait" icon={CalendarCheck2} value={pendingReservationCount} label="rezervasyon onay bekliyor" />}
+          {tasksEnabled && <AttentionCard tone="warning" icon={ClipboardCheck} value={openTaskCount} label="açık iş bulunuyor" />}
+          {reservationsEnabled && <AttentionCard tone="warning" icon={CalendarCheck2} value={pendingReservationCount} label="rezervasyon onay bekliyor" />}
           {customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0 && (
             <AttentionCard tone="info" icon={Cake} value={birthdayOverview.candidates.length} label="müşterinin doğum günü var" />
           )}
           {paymentWaitingCount > 0 && (
-            <AttentionCard tone="wait" icon={ReceiptText} value={paymentWaitingCount} label="masa hesap bekliyor" />
+            <AttentionCard tone="warning" icon={ReceiptText} value={paymentWaitingCount} label="masa hesap bekliyor" />
           )}
           {stockAttentionCount > 0 && (
-            <AttentionCard tone={operationalAttention.outOfStockItems > 0 ? "danger" : "wait"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
+            <AttentionCard tone={operationalAttention.outOfStockItems > 0 ? "danger" : "warning"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
           )}
           {data.kbsOverview.enabled && data.kbsOverview.activeUnsentCount > 0 && (
-            <button className={"dashboard-attention-card dashboard-attention-button tone-" + (data.kbsOverview.failedCount > 0 ? "danger" : "wait")} type="button" onClick={onOpenKbs}>
+            <button className={"dashboard-attention-card dashboard-attention-button tone-" + (data.kbsOverview.failedCount > 0 ? "danger" : "warning")} type="button" onClick={onOpenKbs}>
               <span className="dashboard-attention-icon" aria-hidden="true"><IdCard size={19} /></span>
               <div>
                 <strong>{data.kbsOverview.activeUnsentCount}</strong>
@@ -451,10 +451,10 @@ function PriorityBadge({
   }
 
   if (item.kind === "reservation") {
-    return <StatusBadge tone={item.urgency === "overdue" ? "danger" : "wait"}>{item.urgency === "overdue" ? "Tarihi geçti" : "Onay bekliyor"}</StatusBadge>;
+    return <StatusBadge tone={item.urgency === "overdue" ? "danger" : "warning"}>{item.urgency === "overdue" ? "Tarihi geçti" : "Onay bekliyor"}</StatusBadge>;
   }
 
-  const tone: StatusTone = item.urgency === "overdue" ? "danger" : item.urgency === "today" ? "wait" : "neutral";
+  const tone: StatusTone = item.urgency === "overdue" ? "danger" : item.urgency === "today" ? "warning" : "neutral";
   return <StatusBadge tone={tone}>{formatUrgency(item.urgency)}</StatusBadge>;
 }
 
@@ -539,6 +539,6 @@ function birthdayStatusTone(status: string): StatusTone {
   if (status === "prepared") return "info";
   if (status === "invalid_phone") return "danger";
   if (status === "failed") return "danger";
-  if (status === "waiting") return "wait";
-  return "wait";
+  if (status === "waiting") return "warning";
+  return "warning";
 }
