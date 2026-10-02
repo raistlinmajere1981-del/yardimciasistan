@@ -106,6 +106,7 @@ import { getWebSyncConfig } from "./sync-config";
 import { registerSyncIpcHandlers } from "./ipc/sync-ipc";
 import { DesktopAppLockService } from "./app-lock-service";
 import { registerAppLockIpcHandlers } from "./ipc/app-lock-ipc";
+import { isWhatsAppUrl, registerAppIpcHandlers } from "./ipc/app-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -244,15 +245,6 @@ function assertDesktopTaskScope(
       throw new Error("Restoran işi bu işletmenin etkin yeteneklerinde kullanılamıyor.");
     }
     throw new Error("Günlük işler bu işletmenin etkin yeteneklerinde kullanılamıyor.");
-  }
-}
-
-function isWhatsAppUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return ["wa.me", "www.wa.me", "web.whatsapp.com", "api.whatsapp.com"].includes(url.hostname.toLowerCase());
-  } catch {
-    return false;
   }
 }
 
@@ -436,20 +428,6 @@ if (process.platform === "linux" && process.env.XDG_SESSION_TYPE?.toLowerCase() 
   );
   disabledFeatures.add("WaylandWpColorManagerV1");
   app.commandLine.appendSwitch("disable-features", [...disabledFeatures].join(","));
-}
-
-interface DesktopBootstrapData {
-  appName: string;
-  version: string;
-  platform: NodeJS.Platform;
-  syncSettings: {
-    webModuleUrl: string;
-    hasSyncSecret: boolean;
-  };
-  databasePath: string;
-  userDataPath: string;
-  backupPath: string;
-  setup: DesktopSetupData;
 }
 
 function createMainWindow() {
@@ -794,9 +772,10 @@ app.on("before-quit", () => {
 function registerIpcHandlers() {
   registerAppLockIpcHandlers(getAppLockService());
 
-  ipcMain.handle("app:getBootstrapData", (): DesktopBootstrapData => {
-    assertAppSessionUnlocked();
-    return {
+  registerAppIpcHandlers({
+    assertUnlocked: assertAppSessionUnlocked,
+    assertCapability: assertDesktopCapability,
+    getBootstrapData: () => ({
       appName: "Yardımcı Asistan",
       version: app.getVersion(),
       platform: process.platform,
@@ -808,7 +787,8 @@ function registerIpcHandlers() {
       userDataPath: getDatabase().userDataPath,
       backupPath: getDatabase().backupPath,
       setup: getDatabase().getSetupData()
-    };
+    }),
+    getDashboardData: () => getDatabase().getDashboardData()
   });
 
   registerSyncIpcHandlers({
@@ -1030,22 +1010,7 @@ function registerIpcHandlers() {
     assertCapability: assertDesktopCapability
   });
 
-  ipcMain.handle("shell:openExternal", async (_event, url: string) => {
-    if (!/^https?:\/\//.test(url) && !/^tel:/.test(url)) {
-      return false;
-    }
-    if (isWhatsAppUrl(url)) {
-      assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
-    }
 
-    await shell.openExternal(url);
-    return true;
-  });
-
-  ipcMain.handle("dashboard:getData", (): DesktopDashboardData => {
-    assertAppSessionUnlocked();
-    return getDatabase().getDashboardData();
-  });
 }
 
 async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> {
