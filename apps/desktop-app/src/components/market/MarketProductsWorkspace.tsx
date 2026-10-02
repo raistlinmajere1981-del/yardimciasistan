@@ -260,8 +260,8 @@ export function MarketProductsWorkspace({
               <label className="market-field">Sıra<input type="number" value={categoryForm.sortOrder} onChange={(event) => setCategoryForm((current) => ({ ...current, sortOrder: event.target.value }))} /></label>
               <label className="market-check"><input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif kategori</label>
               <div className="market-form-actions market-field-wide">
-                <button type="button" onClick={() => void saveCategory()} disabled={busy}><Save size={16} aria-hidden="true" /> Kaydet</button>
-                {categoryForm.id && <button type="button" className="market-danger-button" onClick={() => void deleteCategory(categoryForm.id)}>Kategoriyi kaldır</button>}
+                <ActionButton type="button" busy={busy} onClick={() => void saveCategory()}><Save size={16} aria-hidden="true" /> Kategoriyi Kaydet</ActionButton>
+                {categoryForm.id && <ActionButton variant="danger" type="button" onClick={() => void deleteCategory(categoryForm.id)}>Kategoriyi Kaldır</ActionButton>}
               </div>
             </div>
           </div>
