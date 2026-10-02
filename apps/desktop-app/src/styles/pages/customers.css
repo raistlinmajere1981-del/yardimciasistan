@@ -847,7 +847,7 @@
 }
 
 .customer-work-page-surface .record-workspace__list {
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .customer-work-page-surface .record-workspace__items {
