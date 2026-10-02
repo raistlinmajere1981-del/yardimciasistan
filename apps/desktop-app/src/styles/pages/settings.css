@@ -425,6 +425,7 @@
 
 .room-management-row {
   position: relative;
+  cursor: pointer;
 }
 
 .room-management-row input {
@@ -506,10 +507,6 @@
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-}
-
-.room-management-row {
-  cursor: pointer;
 }
 
 .room-management-row.is-media-selected::before {
@@ -1219,6 +1216,8 @@
 }
 
 .table-public-resource-row {
+  position: relative;
+  cursor: pointer;
   font-size: var(--text-sm);
 }
 
@@ -1538,11 +1537,6 @@
 
 .table-management-fields {
   min-width: 0;
-}
-
-.table-public-resource-row {
-  position: relative;
-  cursor: pointer;
 }
 
 .table-public-resource-row.is-media-selected::before {
