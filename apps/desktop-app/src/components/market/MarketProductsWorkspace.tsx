@@ -226,7 +226,7 @@ export function MarketProductsWorkspace({
           </label>
           <div className="market-list">
             {filteredProducts.map((product) => (
-              <button type="button" className="market-list-row" key={product.id} onClick={() => openProduct(product)}>
+              <button type="button" className="market-list-row interactive-surface" key={product.id} onClick={() => openProduct(product)}>
                 <MarketProductThumbnail product={product} className="market-list-product-thumb" />
                 <span className="market-list-product-info">
                   <strong>{product.name}</strong>
@@ -247,7 +247,13 @@ export function MarketProductsWorkspace({
           <div className="market-category-layout market-category-layout--single">
             <div className="market-list compact">
               {categories.map((category) => (
-                <button type="button" className="market-list-row" key={category.id} onClick={() => editCategory(category)}>
+                <button
+                  type="button"
+                  className="market-list-row interactive-surface"
+                  key={category.id}
+                  aria-pressed={categoryForm.id === category.id}
+                  onClick={() => editCategory(category)}
+                >
                   <span><strong>{category.name}</strong><small>{category.code || "Kod yok"}{category.parentId ? " · alt kategori" : " · ana kategori"}</small></span>
                   <StatusBadge tone={category.isActive ? "success" : "neutral"}>{category.isActive ? "Aktif" : "Pasif"}</StatusBadge>
                 </button>
