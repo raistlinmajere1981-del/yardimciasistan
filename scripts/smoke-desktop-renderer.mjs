@@ -1,31 +1,19 @@
 import { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture, createBusinessCapabilitySnapshotFixture } from "./lib/desktop-renderer-fixtures.mjs";
 import { chromium, expect } from "@playwright/test";
-import { spawn } from "node:child_process";
-import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { chooseDate, chooseTime } from "./test-helpers/date-time-picker.mjs";
 import { chooseSearchSelect } from "./test-helpers/search-select.mjs";
+import { startDesktopRendererServer } from "./test-helpers/desktop-renderer-server.mjs";
+import { expectWhatsAppToFillWorkspace } from "./test-helpers/whatsapp-workspace-layout.mjs";
 import { readFileSync } from "node:fs";
-import http from "node:http";
 
-const port = await getFreePort();
-const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn(getLocalViteExecutable(), ["--config", "vite.renderer.config.ts", "--host", "127.0.0.1", "--port", String(port)], {
-  cwd: "apps/desktop-app",
-  stdio: ["ignore", "pipe", "pipe"]
-});
-
-let serverOutput = "";
-server.stdout.on("data", (chunk) => {
-  serverOutput += chunk.toString();
-});
-server.stderr.on("data", (chunk) => {
-  serverOutput += chunk.toString();
-});
+const {
+  baseUrl,
+  server,
+  output: serverOutput
+} = await startDesktopRendererServer();
 
 try {
-  await waitForUrl(baseUrl);
-
   const browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
@@ -2611,70 +2599,10 @@ try {
   await browser.close();
   console.log(`desktop-renderer-ok: ${baseUrl}`);
 } catch (error) {
-  if (serverOutput.trim()) {
-    console.error(serverOutput.trim());
+  if (serverOutput().trim()) {
+    console.error(serverOutput().trim());
   }
   throw error;
 } finally {
   server.kill();
-}
-
-async function expectWhatsAppToFillWorkspace(page) {
-  const geometry = await page.locator(".whatsapp-webview").evaluate((webview) => {
-    const frame = webview.parentElement;
-    const panel = webview.closest(".whatsapp-live-panel");
-    const surface = webview.closest(".page-work-surface");
-    const content = webview.closest(".page-content");
-    const shell = webview.closest(".content");
-    const surfaceContent = surface ?? content;
-    return {
-      panelBottom: panel.getBoundingClientRect().bottom,
-      contentBottom: surfaceContent.getBoundingClientRect().bottom - parseFloat(getComputedStyle(surfaceContent).paddingBottom) - parseFloat(getComputedStyle(surfaceContent).borderBottomWidth || "0"),
-      webviewHeight: webview.getBoundingClientRect().height,
-      frameHeight: frame.clientHeight,
-      webviewWidth: webview.getBoundingClientRect().width,
-      frameWidth: frame.clientWidth,
-      outerOverflow: shell.scrollHeight - shell.clientHeight
-    };
-  });
-  expect(Math.abs(geometry.panelBottom - geometry.contentBottom)).toBeLessThanOrEqual(1);
-  expect(geometry.webviewHeight).toBeGreaterThan(0);
-  expect(Math.abs(geometry.webviewHeight - geometry.frameHeight)).toBeLessThanOrEqual(1);
-  expect(Math.abs(geometry.webviewWidth - geometry.frameWidth)).toBeLessThanOrEqual(1);
-  expect(geometry.outerOverflow).toBeLessThanOrEqual(1);
-}
-
-function getFreePort() {
-  return new Promise((resolve, reject) => {
-    const probe = http.createServer();
-    probe.on("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      const freePort = typeof address === "object" && address ? address.port : 0;
-      probe.close(() => resolve(freePort));
-    });
-  });
-}
-
-async function waitForUrl(url) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        return;
-      }
-    } catch {
-      // Renderer server is still starting.
-    }
-
-    await delay(100);
-  }
-
-  throw new Error(`Desktop renderer did not become ready: ${url}`);
-}
-
-function delay(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
