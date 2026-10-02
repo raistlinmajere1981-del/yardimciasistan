@@ -341,7 +341,7 @@ export function RequestsWorkspace({
             )}
             <div className="action-row request-primary-actions">
               {whatsappEnabled && (
-                <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
+                <ActionButton variant="secondary" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
                   <MessageCircle size={16} aria-hidden="true" />
                   WhatsApp'tan Yaz
                 </ActionButton>
