@@ -1793,121 +1793,59 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View pensionScreen() {
-    LinearLayout page = UiKit.column(this);
-    ArrayList<String[]> options = new ArrayList<>();
-    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_RESERVATIONS)) {
-      options.add(new String[] {AndroidUiRules.PENSION_RESERVATIONS, "Rezervasyonlar"});
-    }
-    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_ROOMS)) {
-      options.add(new String[] {AndroidUiRules.PENSION_ROOMS, "Odalar"});
-    }
-    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_STAYS)) {
-      options.add(new String[] {AndroidUiRules.PENSION_STAYS, "Konaklamalar"});
-    }
-    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_FOLIOS)) {
-      options.add(new String[] {AndroidUiRules.PENSION_FOLIOS, "Hesaplar"});
-    }
-    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_TASKS)) {
-      options.add(new String[] {AndroidUiRules.PENSION_TASKS, "İşler"});
-    }
-    if (options.isEmpty()) {
-      page.addView(permissionDeniedCard());
-      return mainScreenScroll(page);
-    }
-    page.addView(filterBar(options.toArray(new String[0][]), pensionMode, value -> {
-      pensionMode = value;
-      render();
-    }));
+    PensionWorkspace workspace = new PensionWorkspace(
+        this,
+        data,
+        new PensionWorkspace.Listener() {
+          @Override
+          public void onModeChanged(String mode) {
+            pensionMode = mode;
+            render();
+          }
 
-    if (AndroidUiRules.PENSION_RESERVATIONS.equals(pensionMode)) {
-      if (AndroidUiRules.canCreateRoomReservation(data)) {
-        Button createReservation = UiKit.button(this, "+ Yeni Rezervasyon", UiKit.PRIMARY,
-            view -> showReservationEditor(ReservationEditorDialog.Kind.ROOM, null));
-        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
-        createReservation.setLayoutParams(createParams);
-        createReservation.setEnabled(!data.customers.isEmpty());
-        page.addView(createReservation);
-      }
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Bekleyen", countPensionReservations("pending"), UiKit.WARNING, ""),
-          new CounterValue("Giriş", countPensionDate(true), UiKit.INFO, ""),
-          new CounterValue("Çıkış", countPensionDate(false), UiKit.ACCENT, "")
-      }));
-      int reservationCount = 0;
-      for (OperationData.ReservationRecord reservation : data.reservations) {
-        if (!isPensionReservation(reservation) || !AndroidUiRules.reservationAllowed(data, reservation)) {
-          continue;
-        }
-        page.addView(reservationCard(reservation, false));
-        reservationCount += 1;
-      }
-      if (reservationCount == 0) {
-        page.addView(emptyCard("Konaklama rezervasyonu yok", "Yeni rezervasyonlar burada listelenir."));
-      }
-    } else if (AndroidUiRules.PENSION_ROOMS.equals(pensionMode)) {
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Boş", countRoomsByStatus("available"), UiKit.SUCCESS, ""),
-          new CounterValue("Dolu", countRoomsByStatus("occupied"), UiKit.INFO, ""),
-          new CounterValue("Rezerve", countRoomsByStatus("reserved"), UiKit.WARNING, ""),
-          new CounterValue("Temizlik", countRoomsByStatus("cleaning"), UiKit.WARNING, ""),
-          new CounterValue("Bakım", countRoomsByStatus("maintenance"), UiKit.DANGER, "")
-      }));
-      if (data.rooms.isEmpty()) {
-        page.addView(emptyCard("Oda verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
-      }
-      for (OperationData.RoomRecord room : data.rooms) {
-        page.addView(roomCard(room));
-      }
-    } else if (AndroidUiRules.PENSION_STAYS.equals(pensionMode)) {
-      Button assign = UiKit.button(this, "+ Müşteriyi Odaya Ata", UiKit.PRIMARY, view -> showRoomAssignmentDialog(null, null));
-      LinearLayout.LayoutParams assignParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      assignParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
-      assign.setLayoutParams(assignParams);
-      assign.setEnabled(!data.customers.isEmpty() && !data.rooms.isEmpty());
-      page.addView(assign);
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Planlı", countCustomerRoomStays("planned"), UiKit.WARNING, ""),
-          new CounterValue("Konaklıyor", countCustomerRoomStays("checked_in"), UiKit.INFO, ""),
-          new CounterValue("Tamamlandı", countCustomerRoomStays("checked_out"), UiKit.SUCCESS, ""),
-          new CounterValue("İptal", countCustomerRoomStays("cancelled"), UiKit.MUTED, "")
-      }));
-      if (data.customerRoomStays.isEmpty()) {
-        page.addView(emptyCard("Konaklama arşivi boş", "Müşteri-oda atamaları oluşturulduğunda burada saklanır."));
-      }
-      for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
-        page.addView(customerRoomStayCard(stay));
-      }
-    } else if (AndroidUiRules.PENSION_FOLIOS.equals(pensionMode)) {
-      RoomFolioWorkspace.append(this, page, data, (actionType, actionPayload, successMessage) ->
-          sendAction(actionType, actionPayload, successMessage));
-    } else {
-      if (data.hasPermission("daily_task.create")
-          && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)) {
-        Button createTask = UiKit.button(this, "+ Yeni İş", UiKit.PRIMARY,
-            view -> showDailyTaskEditor(DailyTaskEditorDialog.Kind.PENSION, null));
-        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
-        createTask.setLayoutParams(createParams);
-        page.addView(createTask);
-      }
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Bekleyen", countPensionTasks(false), UiKit.WARNING, ""),
-          new CounterValue("Tamam", countPensionTasks(true), UiKit.SUCCESS, "")
-      }));
-      int taskCount = 0;
-      for (OperationData.TaskRecord task : data.tasks) {
-        if (!AndroidUiRules.isPensionTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
-          continue;
-        }
-        page.addView(taskCard(task, false));
-        taskCount += 1;
-      }
-      if (taskCount == 0) {
-        page.addView(emptyCard("Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
-      }
-    }
-    return mainScreenScroll(page);
+          @Override
+          public void onCreateRoomReservation() {
+            showReservationEditor(ReservationEditorDialog.Kind.ROOM, null);
+          }
+
+          @Override
+          public void onAssignCustomerToRoom() {
+            showRoomAssignmentDialog(null, null);
+          }
+
+          @Override
+          public void onCreateTask() {
+            showDailyTaskEditor(DailyTaskEditorDialog.Kind.PENSION, null);
+          }
+
+          @Override
+          public View createReservationCard(OperationData.ReservationRecord reservation) {
+            return reservationCard(reservation, false);
+          }
+
+          @Override
+          public View createRoomCard(OperationData.RoomRecord room) {
+            return roomCard(room);
+          }
+
+          @Override
+          public View createStayCard(OperationData.CustomerRoomStayRecord stay) {
+            return customerRoomStayCard(stay);
+          }
+
+          @Override
+          public View createTaskCard(OperationData.TaskRecord task) {
+            return taskCard(task, false);
+          }
+
+          @Override
+          public void onFolioAction(String actionType, JSONObject actionPayload, String successMessage) {
+            sendAction(actionType, actionPayload, successMessage);
+          }
+        },
+        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
+    );
+    return workspace.render(pensionMode);
   }
 
   private View restaurantScreen() {
