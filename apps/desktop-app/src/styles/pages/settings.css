@@ -1321,20 +1321,6 @@
   gap: var(--space-1);
 }
 
-.room-management-details-button.action-button {
-  min-height: 2rem;
-  padding-inline: var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-}
-
-.room-management-details-button.action-button:hover:not(:disabled) {
-  border-color: var(--color-accent);
-}
-
 .room-media-selected-resource {
   display: grid;
   gap: .15rem;
