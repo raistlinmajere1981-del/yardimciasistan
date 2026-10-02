@@ -32,11 +32,7 @@ import type {
   SetupController
 } from "../../app/controller-types";
 import type { UiPreferences } from "../../ui-preferences";
-import { CustomerMessagesWorkspace } from "../customers/CustomerMessagesWorkspace";
-import { CustomersWorkspace } from "../customers/CustomersWorkspace";
-import { KbsAutomationWorkspace } from "../customers/KbsAutomationWorkspace";
-import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
-import { WhatsAppWorkspace } from "../messages/MessageWorkspaces";
+import { getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
 import { MenuManager } from "../menu/MenuManager";
 import { RestaurantReservationsWorkspace } from "../operations/RestaurantReservationsWorkspace";
 import {
@@ -45,7 +41,6 @@ import {
   formatTaskDue
 } from "../operations/OperationWorkspaces";
 import { SettingsWorkspace } from "../settings/SettingsWorkspace";
-import { CustomerWorkPage } from "../../pages/CustomerWorkPage";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
@@ -57,6 +52,7 @@ import { ReportsPage } from "../../pages/ReportsPage";
 import { RestaurantPage } from "../../pages/RestaurantPage";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import type { MarketView } from "../workspace/workspace-intent";
+import { CustomerWorkRoute } from "./routes/CustomerWorkRoute";
 
 interface DesktopWorkspaceRouterProps {
   activePage: DesktopPage;
@@ -138,38 +134,13 @@ export function DesktopWorkspaceRouter({
     openMenuPreview
   } = menuController;
   const {
-    setSelectedWhatsAppRequestId,
-    readyWhatsAppRequests,
-    selectedWhatsAppRequest,
-    selectedWhatsAppMessage,
-    selectedWhatsAppUrl,
-    suggestingRequestId,
-    aiState,
-    aiMessage,
-    openWhatsApp,
     openReservationWhatsApp,
     prepareBirthdayWhatsApp,
-    birthdayPreparingId,
-    openSelectedWhatsAppExternal,
-    handleWhatsAppMessageSent,
-    handleDeleteWhatsAppMessage,
-    handleCreateOwnerReplySuggestion,
-    handleRewriteRequestReply,
+    birthdayPreparingId
   } = messagingController;
   const {
-    manualRequestForm,
-    setManualRequestForm,
-    manualRequestState,
     setSelectedRequestId,
-    selectedRequest,
-    convertingRequestId,
-    handleCreateManualRequest,
-    handleConvertRequestToReservation,
-    handleUpdateRequestStatus,
-    handleDeleteRequest,
-    handleDeleteCustomer,
-    handleSaveCustomer,
-    handleAnalyzeIdentityImage
+    handleSaveCustomer
   } = customerController;
   const {
     handleSaveManualReservation,
@@ -233,8 +204,6 @@ export function DesktopWorkspaceRouter({
     setStatusMessage
   });
 
-  const surfaceSelectedRequest = surfaceData.requests.find((request) => request.id === selectedRequest?.id)
-    ?? surfaceData.requests[0];
   const runtimeFeatures = {
     rooms: roomsEnabled,
     tables: tablesEnabled,
@@ -420,64 +389,6 @@ export function DesktopWorkspaceRouter({
           onOpenReservation={openDashboardReservation}
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
         />
-      ) : activePage === "customerWork" && (!customerMessagingEnabled || customerWorkTab !== "prepared") ? (
-        <CustomerWorkPage
-          requestsEnabled={requestsEnabled}
-          whatsappEnabled={customerMessagingEnabled}
-          kbsEnabled={surfaceData.kbsOverview.enabled}
-          activeTab={customerWorkTab}
-          onTabChange={setCustomerWorkTab}
-          requests={(
-            <RequestsWorkspace
-              requests={surfaceData.requests}
-              selectedRequest={surfaceSelectedRequest}
-              aiEnabled={aiEnabled}
-              whatsappEnabled={whatsappEnabled}
-              enabledCapabilities={enabledCapabilities}
-              convertingRequestId={convertingRequestId}
-              suggestingRequestId={suggestingRequestId}
-              aiState={aiState}
-              aiMessage={aiMessage}
-              manualRequestForm={manualRequestForm}
-              manualRequestState={manualRequestState}
-              onSelectRequest={setSelectedRequestId}
-              onManualRequestFormChange={setManualRequestForm}
-              onCreateManualRequest={handleCreateManualRequest}
-              onWhatsApp={openWhatsApp}
-              onConvert={handleConvertRequestToReservation}
-              onSuggest={handleCreateOwnerReplySuggestion}
-              onRewrite={handleRewriteRequestReply}
-              onUpdateStatus={handleUpdateRequestStatus}
-              onOpenReservation={openRequestReservation}
-              onDelete={handleDeleteRequest}
-            />
-          )}
-          customers={(
-            <CustomersWorkspace
-              customers={surfaceData.customers}
-              stays={surfaceData.customerRoomStays}
-              reservations={surfaceData.reservations}
-              notifications={surfaceData.hospitalityNotifications}
-              kbsOverview={surfaceData.kbsOverview}
-              aiEnabled={aiEnabled}
-              onSave={handleSaveCustomer}
-              onAnalyzeIdentity={handleAnalyzeIdentityImage}
-              onDelete={handleDeleteCustomer}
-              onSendKbs={handleCustomerRowKbs}
-            />
-          )}
-          kbs={(
-            <KbsAutomationWorkspace
-              data={surfaceData}
-              selectedCustomerId={selectedKbsCustomerId}
-              controller={kbsController}
-              egmSessionRequest={kbsEgmSessionRequest}
-              sessionRetryNotificationId={kbsSessionRetryNotificationId}
-              onSessionRetryConsumed={() => setKbsSessionRetryNotificationId("")}
-            />
-          )}
-          messages={null}
-        />
       ) : activePage === "customerWork" ? null : activePage === "pension" ? (
         <PensionPage
           controller={pensionController}
@@ -626,62 +537,23 @@ export function DesktopWorkspaceRouter({
           registerPageLeaveGuard={registerPageLeaveGuard}
         />
       )}
-      {customerMessagingEnabled && (
-        <div
-          className={`persistent-customer-messages-page${activePage === "customerWork" && customerWorkTab === "prepared" ? " is-active" : ""}`}
-          aria-hidden={activePage === "customerWork" && customerWorkTab === "prepared" ? undefined : true}
-        >
-          <CustomerWorkPage
-            requestsEnabled={requestsEnabled}
-            whatsappEnabled
-            kbsEnabled={surfaceData.kbsOverview.enabled}
-            activeTab="prepared"
-            onTabChange={setCustomerWorkTab}
-            requests={null}
-            customers={null}
-            kbs={null}
-            messages={(
-              <CustomerMessagesWorkspace
-                whatsappEnabled
-                prewarmWebview
-                active={activePage === "customerWork" && customerWorkTab === "prepared"}
-                safeMode={(onOpenWeb) => (
-                  <WhatsAppWorkspace
-                    view="safe"
-                    preparedMessage={messagingController.preparedWhatsAppMessage}
-                    requests={readyWhatsAppRequests}
-                    selectedRequest={selectedWhatsAppRequest}
-                    selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-                    selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
-                    getRequestStatusTone={getRequestStatusTone}
-                    onSelectRequest={setSelectedWhatsAppRequestId}
-                    onOpenExternal={openSelectedWhatsAppExternal}
-                    onOpenWeb={onOpenWeb}
-                    onMessageSent={handleWhatsAppMessageSent}
-                    onDeleteMessage={handleDeleteWhatsAppMessage}
-                  />
-                )}
-                webMode={(onReturnToSafe) => (
-                  <WhatsAppWorkspace
-                    view="web"
-                    preparedMessage={messagingController.preparedWhatsAppMessage}
-                    requests={readyWhatsAppRequests}
-                    selectedRequest={selectedWhatsAppRequest}
-                    selectedMessage={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
-                    selectedUrl={selectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
-                    getRequestStatusTone={getRequestStatusTone}
-                    onSelectRequest={setSelectedWhatsAppRequestId}
-                    onOpenExternal={openSelectedWhatsAppExternal}
-                    onReturnToSafe={onReturnToSafe}
-                    onMessageSent={handleWhatsAppMessageSent}
-                    onDeleteMessage={handleDeleteWhatsAppMessage}
-                  />
-                )}
-              />
-            )}
-          />
-        </div>
-      )}
+      <CustomerWorkRoute
+        activePage={activePage}
+        activeTab={customerWorkTab}
+        onTabChange={setCustomerWorkTab}
+        surfaceData={surfaceData}
+        enabledCapabilities={enabledCapabilities}
+        features={features}
+        customerController={customerController}
+        messagingController={messagingController}
+        selectedKbsCustomerId={selectedKbsCustomerId}
+        kbsEgmSessionRequest={kbsEgmSessionRequest}
+        kbsSessionRetryNotificationId={kbsSessionRetryNotificationId}
+        onSessionRetryConsumed={() => setKbsSessionRetryNotificationId("")}
+        kbsController={kbsController}
+        onSendKbs={handleCustomerRowKbs}
+        onOpenRequestReservation={openRequestReservation}
+      />
     </>
   );
 }
