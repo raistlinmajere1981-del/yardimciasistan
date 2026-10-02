@@ -131,6 +131,7 @@ public final class MainActivity extends ComponentActivity {
   private String currentError = "";
   private AndroidImageCaptureController imageCaptureController;
   private IdentityImageAnalysisController identityImageAnalysisController;
+  private StockImageAnalysisController stockImageAnalysisController;
   private CustomerFormSession activeCustomerFormSession;
   private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
   private final Runnable foregroundSyncRunnable = new Runnable() {
@@ -196,6 +197,7 @@ public final class MainActivity extends ComponentActivity {
       }
     });
     identityImageAnalysisController = new IdentityImageAnalysisController(this, executor, syncClient);
+    stockImageAnalysisController = new StockImageAnalysisController(this, executor, syncClient);
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
@@ -666,47 +668,42 @@ public final class MainActivity extends ComponentActivity {
       status.setTextColor(UiKit.INFO);
       String importId = "stock_import_android_" + UUID.randomUUID().toString().replace("-", "");
       StockImageFile.PreparedImage baseImage = prepared[0];
-      executor.execute(() -> {
-        StockImageFile.PreparedImage upload = null;
-        try {
-          upload = StockImageFile.rotatedCopy(this, baseImage, rotation[0]);
-          HostingSyncClient.StockImageAnalysisResult result = syncClient.analyzeStockImage(
-              baseUrl,
-              syncSecret,
-              identity,
-              importId,
-              upload,
-              candidates
-          );
-          boolean duplicate = data.appliedStockImageHashes.contains(result.imageHash);
-          runOnUiThread(() -> {
-            if (!dialog.isShowing()) {
-              return;
+      stockImageAnalysisController.analyze(
+          baseImage,
+          rotation[0],
+          baseUrl,
+          syncSecret,
+          identity,
+          importId,
+          candidates,
+          new StockImageAnalysisController.AnalysisListener() {
+            @Override
+            public void onSuccess(HostingSyncClient.StockImageAnalysisResult result) {
+              if (!dialog.isShowing()) {
+                return;
+              }
+              boolean duplicate = data.appliedStockImageHashes.contains(result.imageHash);
+              dialog.dismiss();
+              showStockImageReviewDialog(result, duplicate);
             }
-            dialog.dismiss();
-            showStockImageReviewDialog(result, duplicate);
-          });
-        } catch (HostingSyncClient.SyncException | StockImageFile.StockImageException error) {
-          runOnUiThread(() -> {
-            if (!dialog.isShowing()) {
-              return;
+
+            @Override
+            public void onError(String message) {
+              if (!dialog.isShowing()) {
+                return;
+              }
+              analyzing[0] = false;
+              dialog.setCancelable(true);
+              close.setEnabled(true);
+              analyze[0].setEnabled(true);
+              retake.setEnabled(true);
+              reselect.setEnabled(true);
+              rotate.setEnabled(true);
+              status.setText(message);
+              status.setTextColor(UiKit.DANGER);
             }
-            analyzing[0] = false;
-            dialog.setCancelable(true);
-            close.setEnabled(true);
-            analyze[0].setEnabled(true);
-            retake.setEnabled(true);
-            reselect.setEnabled(true);
-            rotate.setEnabled(true);
-            status.setText(error.getMessage());
-            status.setTextColor(UiKit.DANGER);
-          });
-        } finally {
-          if (upload != null && upload != baseImage) {
-            upload.release();
           }
-        }
-      });
+      );
     });
     analyze[0].setEnabled(false);
     root.addView(analyze[0], new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48)));
@@ -722,35 +719,34 @@ public final class MainActivity extends ComponentActivity {
     dialog.show();
     configureFullDialog(dialog);
 
-    executor.execute(() -> {
-      try {
-        StockImageFile.PreparedImage ready = StockImageFile.prepare(this, sourceUri);
+    stockImageAnalysisController.prepare(sourceUri, new StockImageAnalysisController.PrepareListener() {
+      @Override
+      public void onReady(StockImageFile.PreparedImage ready) {
         deletePendingStockCameraFile();
-        runOnUiThread(() -> {
-          if (!dialog.isShowing()) {
-            ready.release();
-            return;
-          }
-          prepared[0] = ready;
-          preview.setImageBitmap(ready.preview);
-          status.setText("Görsel hazır. Gerekirse döndürüp analizi başlatın.");
-          status.setTextColor(UiKit.SUCCESS);
-          analyze[0].setEnabled(true);
-          retake.setEnabled(true);
-          reselect.setEnabled(true);
-          rotate.setEnabled(true);
-        });
-      } catch (StockImageFile.StockImageException error) {
+        if (!dialog.isShowing()) {
+          ready.release();
+          return;
+        }
+        prepared[0] = ready;
+        preview.setImageBitmap(ready.preview);
+        status.setText("Görsel hazır. Gerekirse döndürüp analizi başlatın.");
+        status.setTextColor(UiKit.SUCCESS);
+        analyze[0].setEnabled(true);
+        retake.setEnabled(true);
+        reselect.setEnabled(true);
+        rotate.setEnabled(true);
+      }
+
+      @Override
+      public void onError(String message) {
         deletePendingStockCameraFile();
-        runOnUiThread(() -> {
-          if (!dialog.isShowing()) {
-            return;
-          }
-          status.setText(error.getMessage());
-          status.setTextColor(UiKit.DANGER);
-          retake.setEnabled(true);
-          reselect.setEnabled(true);
-        });
+        if (!dialog.isShowing()) {
+          return;
+        }
+        status.setText(message);
+        status.setTextColor(UiKit.DANGER);
+        retake.setEnabled(true);
+        reselect.setEnabled(true);
       }
     });
   }
