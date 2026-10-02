@@ -144,46 +144,14 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
       icon: Wifi
     };
   }
-  if (status?.phase === "syncing") {
-    return {
-      key: "web",
-      label: "Web bağlantısı",
-      value: "Eşitleniyor",
-      detail: status.pendingJobs > 0 ? `${status.pendingJobs} değişiklik sırada.` : compactUrl(webUrl),
-      tone: "info",
-      icon: Wifi
-    };
-  }
-  if (status?.pendingJobs && status.pendingJobs > 0) {
-    return {
-      key: "web",
-      label: "Web bağlantısı",
-      value: `${status.pendingJobs} değişiklik bekliyor`,
-      detail: status.lastSuccessAt ? `Son başarılı: ${formatRelativeTime(status.lastSuccessAt)}` : compactUrl(webUrl),
-      tone: "info",
-      icon: Wifi
-    };
-  }
   return {
     key: "web",
     label: "Web bağlantısı",
     value: "Hazır",
-    detail: status?.lastSuccessAt ? `Son başarılı: ${formatRelativeTime(status.lastSuccessAt)}` : compactUrl(webUrl),
+    detail: "Otomatik eşitleme etkin.",
     tone: "ok",
     icon: Wifi
   };
-}
-
-function formatRelativeTime(value: string) {
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return "zaman bilgisi yok";
-  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
-  if (seconds < 60) return `${seconds} sn önce`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} dk önce`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} sa önce`;
-  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp));
 }
 
 function compactPath(value: string) {
