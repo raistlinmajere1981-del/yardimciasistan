@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import { existsSync, statSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 
 const dataDir = resolve(process.argv[2] || "");
 assert.ok(process.argv[2], "Kullanım: node scripts/smoke-desktop-windows-data.mjs <data-dir>");
+const mode = process.argv[3] || "";
+const require = createRequire(import.meta.url);
+const { cleanupTransientStateForCleanStart } = require("../apps/desktop-app/dist-electron/clean-start.js");
 
 const databasePath = join(dataDir, "yardimci-asistan.sqlite");
 const backupPath = join(dataDir, "backups");
@@ -44,6 +48,23 @@ try {
   assert.equal(roomTransferGuard, 1, "Restoran→oda transfer bütünlük trigger'ı Windows kurulumunda yok.");
 } finally {
   database.close();
+}
+
+if (mode === "--locked-cleanup") {
+  const cleanup = cleanupTransientStateForCleanStart(dataDir);
+  assert.ok(cleanup.removedEntries.includes("updates/pending.json"));
+  assert.ok(cleanup.removedEntries.includes("updates/installing.json"));
+  assert.ok(
+    cleanup.failedEntries.some((entry) => entry.name === "updates/downloads"),
+    "Windows dosya kilidinde updates/downloads best-effort failure olarak raporlanmalı."
+  );
+  assert.ok(existsSync(join(dataDir, "updates", "downloads")), "Kilitli downloads klasörü erken silinmemeli.");
+  console.log("windows-clean-start-locked-transient-ok");
+} else if (mode === "--cleanup-after-unlock") {
+  const cleanup = cleanupTransientStateForCleanStart(dataDir);
+  assert.deepEqual(cleanup.failedEntries, []);
+  assert.equal(existsSync(join(dataDir, "updates", "downloads")), false);
+  console.log("windows-clean-start-unlocked-transient-ok");
 }
 
 console.log(`windows-first-run-data-ok: ${databasePath}`);
