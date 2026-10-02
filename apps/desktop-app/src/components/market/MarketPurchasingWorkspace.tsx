@@ -163,7 +163,13 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
           </header>
           <div className="market-list compact">
             {suppliers.map((supplier) => (
-              <button type="button" className="market-list-row" key={supplier.id} onClick={() => editSupplier(supplier)}>
+              <button
+                type="button"
+                className="market-list-row interactive-surface"
+                key={supplier.id}
+                aria-pressed={supplierForm.id === supplier.id}
+                onClick={() => editSupplier(supplier)}
+              >
                 <span><strong>{supplier.name}</strong><small>{supplier.phone || supplier.email || "İletişim bilgisi yok"}</small></span>
                 <span className={supplier.isActive ? "market-badge" : "market-badge is-muted"}>{supplier.isActive ? "Aktif" : "Pasif"}</span>
               </button>
