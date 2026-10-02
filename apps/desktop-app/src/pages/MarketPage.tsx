@@ -22,6 +22,7 @@ import { MarketPurchasingWorkspace } from "../components/market/MarketPurchasing
 import {
   MarketQuickSaleWorkspace
 } from "../components/market/MarketQuickSaleWorkspace";
+import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 
 interface MarketTabDefinition {
   id: MarketView;
@@ -103,7 +104,8 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
   }, []);
 
   return (
-    <section className="market-page" aria-label="Market yönetimi">
+    <PageWorkSurface mode="fill" className="market-page-surface">
+      <section className="market-page" aria-label="Market yönetimi">
       <nav className="market-tabs" aria-label="Market çalışma alanları">
         {tabs.map((tab) => {
           if (!tab.enabled) return null;
@@ -117,6 +119,7 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
         })}
       </nav>
 
+      <div className={`market-workspace market-workspace--${activeTab}`}>
       {activeTab === "quickSale" ? (
         <MarketQuickSaleWorkspace
           customers={customers}
@@ -173,6 +176,8 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
           onStateChange={handleStateChange}
         />
       )}
-    </section>
+      </div>
+      </section>
+    </PageWorkSurface>
   );
 }
