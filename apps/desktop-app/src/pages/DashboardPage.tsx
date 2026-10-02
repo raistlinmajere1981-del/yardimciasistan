@@ -219,7 +219,7 @@ export function DashboardPage({
             <AttentionCard tone={operationalAttention.outOfStockItems > 0 ? "danger" : "warning"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
           )}
           {data.kbsOverview.enabled && data.kbsOverview.activeUnsentCount > 0 && (
-            <button className={"dashboard-attention-card dashboard-attention-button tone-" + (data.kbsOverview.failedCount > 0 ? "danger" : "warning")} type="button" onClick={onOpenKbs}>
+            <button className={"dashboard-attention-card dashboard-attention-button interactive-surface tone-" + (data.kbsOverview.failedCount > 0 ? "danger" : "warning")} type="button" onClick={onOpenKbs}>
               <span className="dashboard-attention-icon" aria-hidden="true"><IdCard size={19} /></span>
               <div>
                 <strong>{data.kbsOverview.activeUnsentCount}</strong>
