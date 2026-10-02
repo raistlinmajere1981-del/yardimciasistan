@@ -33,6 +33,35 @@
     transform var(--motion-press) var(--ease-standard);
 }
 
+.interactive-surface {
+  cursor: pointer;
+  transition:
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard),
+    box-shadow var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+.interactive-surface:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-selected-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.interactive-surface:active:not(:disabled) {
+  transform: translateY(1px) scale(.995);
+}
+
+.interactive-surface:has(:is(button, a, input, select, textarea):active):active {
+  transform: none;
+}
+
+.interactive-surface:is(.is-selected, [aria-pressed="true"], [aria-current="true"]) {
+  background: var(--color-selected-soft);
+  border-color: var(--color-selected-border);
+  box-shadow: var(--shadow-selected-ring);
+}
+
 .list-row--button:hover:not(:disabled) {
   background: var(--color-bg-hover);
   border-color: var(--color-border-strong);
