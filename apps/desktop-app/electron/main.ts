@@ -45,7 +45,12 @@ import {
 } from "./database";
 import { DesktopFinanceService } from "./finance";
 import { resolveProjectBackupPath } from "./data-maintenance";
-import { archiveLocalDataForCleanStart, cleanupTransientStateForCleanStart } from "./clean-start.js";
+import {
+  CLEAN_START_SESSION_CLEAR_TIMEOUT_MS,
+  archiveLocalDataForCleanStart,
+  cleanupTransientStateForCleanStart,
+  settleCleanStartOperation
+} from "./clean-start.js";
 import { inspectDesktopDatabaseCompatibility } from "./desktop-database-compatibility.js";
 import { resolveDataRoot, resolveDatabasePath } from "./data-paths.js";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
@@ -327,27 +332,45 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
 
   try {
     const transientCleanup = cleanupTransientStateForCleanStart(dataRoot);
+    if (transientCleanup.failedEntries.length > 0) {
+      desktopLog.warn({
+        scope: "startup",
+        event: "startup.clean-start.transient-cleanup.incomplete",
+        message: "Bazı geçici güncelleme dosyaları Windows dosya kilidi veya izin nedeniyle temizlenemedi; temiz başlangıç devam ediyor.",
+        meta: { failedEntries: transientCleanup.failedEntries }
+      });
+    }
+
     const archived = archiveLocalDataForCleanStart(
       dataRoot,
       new Date(),
       resolveCleanStartBackupRoot(dataRoot)
     );
-    try {
-      const sessions = [
-        session.defaultSession,
-        session.fromPartition(WHATSAPP_WEB_PARTITION),
-        session.fromPartition(EGM_KBS_PARTITION)
-      ];
-      await Promise.all(sessions.flatMap((persistentSession) => [
-        persistentSession.clearStorageData(),
-        persistentSession.clearCache()
-      ]));
-    } catch (error) {
+
+    const cleanStartSessions = [
+      { name: "default", persistentSession: session.defaultSession },
+      { name: "whatsapp", persistentSession: session.fromPartition(WHATSAPP_WEB_PARTITION) },
+      { name: "kbs", persistentSession: session.fromPartition(EGM_KBS_PARTITION) }
+    ];
+    const sessionCleanupOperations = cleanStartSessions.flatMap(({ name, persistentSession }) => [
+      { name: `${name}.storage`, operation: persistentSession.clearStorageData() },
+      { name: `${name}.cache`, operation: persistentSession.clearCache() }
+    ]);
+    const sessionCleanupResults = await Promise.all(
+      sessionCleanupOperations.map(({ name, operation }) =>
+        settleCleanStartOperation(name, operation, CLEAN_START_SESSION_CLEAR_TIMEOUT_MS)
+      )
+    );
+    const incompleteSessionCleanup = sessionCleanupResults.filter((result) => result.status !== "completed");
+    if (incompleteSessionCleanup.length > 0) {
       desktopLog.warn({
         scope: "startup",
         event: "startup.clean-start.session-data-clear.failed",
-        message: "Temiz başlangıç sırasında kalıcı oturum veya önbellek verilerinin bir bölümü temizlenemedi.",
-        error
+        message: "Kalıcı oturum veya önbellek temizliğinin bir bölümü hata verdi ya da zaman aşımına uğradı; temiz başlangıç devam ediyor.",
+        meta: {
+          timeoutMs: CLEAN_START_SESSION_CLEAR_TIMEOUT_MS,
+          operations: incompleteSessionCleanup
+        }
       });
     }
 
@@ -362,7 +385,9 @@ async function prepareRuntimeDataForStartup(dataRoot: string): Promise<boolean> 
         archiveDirectory: archived.archiveDirectory,
         movedEntries: archived.movedEntries,
         removedTransientEntries: transientCleanup.removedEntries,
-        preservedEntries: transientCleanup.preservedEntries
+        failedTransientEntries: transientCleanup.failedEntries,
+        preservedEntries: transientCleanup.preservedEntries,
+        sessionCleanupResults
       }
     });
     return true;
