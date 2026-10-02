@@ -389,7 +389,7 @@ export function RequestsWorkspace({
 
       {manualFormOpen && (
         <FormDialog
-          title="Yeni talep ekle"
+          title="Yeni talimat"
           onClose={() => {
             if (manualRequestState !== "loading") setManualFormOpen(false);
           }}
@@ -407,7 +407,7 @@ export function RequestsWorkspace({
                 </ActionButton>
                 <ActionButton type="submit" busy={manualRequestState === "loading"} busyLabel="Kaydediliyor…">
                   <Save size={16} aria-hidden="true" />
-                  Manuel Talep Kaydet
+                  Talimatı Kaydet
                 </ActionButton>
               </div>
             </>
