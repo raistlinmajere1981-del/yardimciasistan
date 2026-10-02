@@ -425,8 +425,6 @@
 
 .room-management-row {
   position: relative;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
 }
 
 .room-management-row input {
@@ -512,16 +510,6 @@
 
 .room-management-row {
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
-}
-
-.room-management-row:hover {
-  border-color: var(--color-border-strong);
-}
-
-.room-management-row.is-media-selected {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent-soft);
 }
 
 .room-management-row.is-media-selected::before {
@@ -1065,11 +1053,24 @@
   border-radius: var(--radius-control);
   font: inherit;
   cursor: pointer;
+  transition:
+    background-color var(--motion-hover) var(--ease-standard),
+    border-color var(--motion-hover) var(--ease-standard),
+    color var(--motion-hover) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+.settings-category-tabs [role="tab"]:hover {
+  color: var(--color-text);
+  background: var(--color-interactive-hover);
+  border-color: var(--color-selected-border);
+}
+.settings-category-tabs [role="tab"]:active {
+  transform: translateY(1px) scale(.995);
 }
 .settings-category-tabs [aria-selected="true"] {
   color: var(--color-accent);
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent-border);
+  background: var(--color-selected-soft);
+  border-color: var(--color-selected-border);
 }
 .settings-dirty-indicator { font-size: var(--text-xs); }
 .settings-category-workspace {
@@ -1218,9 +1219,6 @@
 }
 
 .table-public-resource-row {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-bg-field);
   font-size: var(--text-sm);
 }
 
@@ -1545,16 +1543,6 @@
 .table-public-resource-row {
   position: relative;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
-}
-
-.table-public-resource-row:hover {
-  border-color: var(--color-border-strong);
-}
-
-.table-public-resource-row.is-media-selected {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent-soft);
 }
 
 .table-public-resource-row.is-media-selected::before {
