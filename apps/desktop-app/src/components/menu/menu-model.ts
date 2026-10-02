@@ -179,9 +179,9 @@ export function getMenuStockBadge(item: PublishedMenuItem): { label: string; ton
     return { label: "Stokta yok", tone: "danger" };
   }
   if (item.stock_min_quantity !== null && item.stock_quantity <= item.stock_min_quantity) {
-    return { label: `Az stok · ${formatStockQuantity(item.stock_quantity, item.stock_unit)}`, tone: "wait" };
+    return { label: `Az stok · ${formatStockQuantity(item.stock_quantity, item.stock_unit)}`, tone: "warning" };
   }
-  return { label: formatStockQuantity(item.stock_quantity, item.stock_unit), tone: "ok" };
+  return { label: formatStockQuantity(item.stock_quantity, item.stock_unit), tone: "success" };
 }
 
 function formatStockQuantity(quantity: number, unit: "piece" | "gram"): string {
