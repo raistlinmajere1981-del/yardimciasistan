@@ -158,6 +158,12 @@ export function RequestsWorkspace({
     onManualRequestFormChange({ ...manualRequestForm, [key]: value });
   };
 
+  function openManualRequestForm() {
+    if (!isRequestTypeAvailable(enabledCapabilities, manualRequestForm.requestType)) {
+      onManualRequestFormChange({ ...manualRequestForm, requestType: "general_info" });
+    }
+    setManualFormOpen(true);
+  }
 
   return (
     <section className="record-workspace requests-workspace" aria-label="Talep yönetimi">
@@ -167,6 +173,15 @@ export function RequestsWorkspace({
             <p>Talepler</p>
             <h2>{visibleRequests.length} kayıt</h2>
           </div>
+          <ActionButton
+            size="sm"
+            type="button"
+            aria-expanded={manualFormOpen}
+            onClick={openManualRequestForm}
+          >
+            <Plus size={15} aria-hidden="true" />
+            Talimat Ekle
+          </ActionButton>
         </div>
         <SegmentedControl
           className="request-filter-tabs"
@@ -206,20 +221,6 @@ export function RequestsWorkspace({
           )}
         </DataList>
 
-        <ActionButton
-          size="sm"
-          type="button"
-          aria-expanded={manualFormOpen}
-          onClick={() => {
-            if (!isRequestTypeAvailable(enabledCapabilities, manualRequestForm.requestType)) {
-              onManualRequestFormChange({ ...manualRequestForm, requestType: "general_info" });
-            }
-            setManualFormOpen(true);
-          }}
-        >
-          <Plus size={17} aria-hidden="true" />
-          Talimat Ekle
-        </ActionButton>
       </aside>
 
       <section className="panel record-workspace__detail request-detail-panel" data-surface-role="communication">
