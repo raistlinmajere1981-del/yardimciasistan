@@ -373,7 +373,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               <Copy size={15} aria-hidden="true" />
               Hazır Mesajı Kopyala
             </ActionButton>
-            <ActionButton variant="whatsapp" size="sm" type="button" onClick={goToCustomerNumber} disabled={!webViewPayload}>
+            <ActionButton size="sm" type="button" onClick={goToCustomerNumber} disabled={!webViewPayload}>
               <MessageCircle size={15} aria-hidden="true" />
               Müşteri Numarasına Git
             </ActionButton>
@@ -472,11 +472,11 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           <textarea className="prepared-whatsapp-message" readOnly value={selectedMessage} aria-label="Hazır WhatsApp mesajı" />
         </label>
         <div className="message-primary-actions">
-          <ActionButton size="sm" type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
+          <ActionButton variant="secondary" size="sm" type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
             <Copy size={16} aria-hidden="true" />
             Hazır Mesajı Kopyala
           </ActionButton>
-          <ActionButton variant="whatsapp" size="sm" type="button" onClick={onOpenWeb} disabled={!selectedUrl || !onOpenWeb}>
+          <ActionButton size="sm" type="button" onClick={onOpenWeb} disabled={!selectedUrl || !onOpenWeb}>
             <MessageCircle size={16} aria-hidden="true" />
             WhatsApp'a Geç
           </ActionButton>
