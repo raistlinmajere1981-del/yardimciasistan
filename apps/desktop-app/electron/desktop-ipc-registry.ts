@@ -1,0 +1,415 @@
+import { app, ipcMain } from "electron";
+import {
+  BUSINESS_CAPABILITIES,
+  hasBusinessCapability,
+  type BusinessCapability
+} from "@yardimci-asistan/shared";
+import type { DesktopDatabase } from "./database";
+import type { SyncCoordinator } from "./sync-coordinator";
+import type { DesktopAppLockService } from "./app-lock-service";
+import { AndroidInstallationService } from "./android-installation-service";
+import type { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver";
+import type { EgmKbsBackgroundSession } from "./egm-kbs-background-session";
+import type { WhatsAppWebviewDriver } from "./whatsapp-webview-driver";
+import type {
+  WhatsAppDeliveryAdapter,
+  WhatsAppDeliveryLock
+} from "./whatsapp-delivery-adapter";
+import { getKbsSettings } from "./kbs-settings";
+import { getWebSyncConfig } from "./sync-config";
+import { registerAppLockIpcHandlers } from "./ipc/app-lock-ipc";
+import { registerAppIpcHandlers } from "./ipc/app-ipc";
+import { registerSyncIpcHandlers } from "./ipc/sync-ipc";
+import { registerReportIpcHandlers } from "./ipc/report-ipc";
+import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
+import { registerGoogleReviewsSettingsIpcHandlers } from "./google-reviews-settings-ipc";
+import { registerKbsSettingsIpcHandlers } from "./kbs-settings-ipc";
+import { registerKbsWebviewIpcEvents } from "./kbs-webview-ipc";
+import { registerMenuIpcHandlers } from "./ipc/menu-ipc";
+import { registerImageAnalysisIpcHandlers } from "./ipc/image-analysis-ipc";
+import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
+import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
+import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
+import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
+import { registerRequestIpcHandlers } from "./ipc/request-ipc";
+import {
+  registerWhatsAppIpcHandlers,
+  registerWhatsAppWebviewIpcEvents
+} from "./ipc/whatsapp-ipc";
+import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
+import { registerRoomMediaIpcHandlers } from "./room-media-ipc";
+import { registerTableMediaIpcHandlers } from "./table-media-ipc";
+import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
+import { registerReservationIpcHandlers } from "./ipc/reservation-ipc";
+import { registerDailyTaskIpcHandlers } from "./ipc/daily-task-ipc";
+import { registerBusinessAiIpcHandlers } from "./ipc/business-ai-ipc";
+import { registerCustomerIpcHandlers } from "./ipc/customer-ipc";
+
+type MenuIpcOptions = Parameters<typeof registerMenuIpcHandlers>[0];
+type ImageAnalysisIpcOptions = Parameters<typeof registerImageAnalysisIpcHandlers>[0];
+type SetupIpcOptions = Parameters<typeof registerSetupIpcHandlers>[0];
+type AndroidDeviceIpcOptions = Parameters<typeof registerAndroidDeviceIpcHandlers>[0];
+type RequestIpcOptions = Parameters<typeof registerRequestIpcHandlers>[0];
+type CustomerIpcOptions = Parameters<typeof registerCustomerIpcHandlers>[0];
+type ReservationIpcOptions = Parameters<typeof registerReservationIpcHandlers>[0];
+type DailyTaskIpcOptions = Parameters<typeof registerDailyTaskIpcHandlers>[0];
+type KbsSettingsIpcOptions = Parameters<typeof registerKbsSettingsIpcHandlers>[0];
+type SyncIpcOptions = Parameters<typeof registerSyncIpcHandlers>[0];
+
+export type DesktopIpcRegistryDependencies = {
+  getDatabase: () => DesktopDatabase;
+  getSyncCoordinator: () => SyncCoordinator;
+  getAppLockService: () => DesktopAppLockService;
+  assertUnlocked: () => void;
+  assertCapability: (capability: BusinessCapability, message?: string) => void;
+  enabledBusinessCapabilities: () => BusinessCapability[];
+  afterSuccessfulPull: SyncIpcOptions["afterSuccessfulPull"];
+  publishAndroidSnapshot: SyncIpcOptions["publishAndroidSnapshot"];
+  publishAiSettings: SyncIpcOptions["publishAiSettings"];
+  publishBusinessAiContext: () => void;
+  deliverKbsNotification: KbsSettingsIpcOptions["deliverNotification"];
+  onKbsSettingsSaved: () => void;
+  isTrustedRendererUrl: (url: string) => boolean;
+  kbsInteractiveDriver: EgmKbsWebviewDriver;
+  kbsBackgroundSession: EgmKbsBackgroundSession;
+  assertMenuItemSubfeatureMutation:
+    MenuIpcOptions["assertMenuItemSubfeatureMutation"];
+  finalizeMenuMutation: MenuIpcOptions["finalizeMutation"];
+  finalizeStockImageApply:
+    ImageAnalysisIpcOptions["finalizeStockImageApply"];
+  saveInitial: SetupIpcOptions["saveInitial"];
+  finalizeDeviceMutation:
+    AndroidDeviceIpcOptions["finalizeDeviceMutation"];
+  assertRequestType: RequestIpcOptions["assertRequestType"];
+  finalizeRecordDeletion:
+    RequestIpcOptions["finalizeRecordDeletion"];
+  finalizeCustomerMutation:
+    CustomerIpcOptions["finalizeCustomerMutation"];
+  finalizeCheckInMutation:
+    CustomerIpcOptions["finalizeCheckInMutation"];
+  finalizeCheckoutMutation:
+    CustomerIpcOptions["finalizeCheckoutMutation"];
+  finalizeRoomChangeMutation:
+    CustomerIpcOptions["finalizeRoomChangeMutation"];
+  assertReservationType:
+    ReservationIpcOptions["assertReservationType"];
+  finalizeOperationMutation:
+    ReservationIpcOptions["finalizeOperationMutation"];
+  assertTaskScope: DailyTaskIpcOptions["assertTaskScope"];
+  birthdayWebviewDriver: WhatsAppWebviewDriver;
+  whatsappDeliveryLock: WhatsAppDeliveryLock;
+  birthdayDeliveryAdapter: WhatsAppDeliveryAdapter;
+  evaluateBirthdayNow: () => void;
+};
+
+export function registerDesktopIpcHandlers(
+  dependencies: DesktopIpcRegistryDependencies
+) {
+  const {
+    getDatabase,
+    getSyncCoordinator,
+    getAppLockService,
+    assertUnlocked,
+    assertCapability,
+    enabledBusinessCapabilities,
+    afterSuccessfulPull,
+    publishAndroidSnapshot,
+    publishAiSettings,
+    publishBusinessAiContext,
+    deliverKbsNotification,
+    onKbsSettingsSaved,
+    isTrustedRendererUrl,
+    kbsInteractiveDriver,
+    kbsBackgroundSession,
+    assertMenuItemSubfeatureMutation,
+    finalizeMenuMutation,
+    finalizeStockImageApply,
+    saveInitial,
+    finalizeDeviceMutation,
+    assertRequestType,
+    finalizeRecordDeletion,
+    finalizeCustomerMutation,
+    finalizeCheckInMutation,
+    finalizeCheckoutMutation,
+    finalizeRoomChangeMutation,
+    assertReservationType,
+    finalizeOperationMutation,
+    assertTaskScope,
+    birthdayWebviewDriver,
+    whatsappDeliveryLock,
+    birthdayDeliveryAdapter,
+    evaluateBirthdayNow
+  } = dependencies;
+
+  registerAppLockIpcHandlers(getAppLockService());
+
+  registerAppIpcHandlers({
+    assertUnlocked,
+    assertCapability,
+    getBootstrapData: () => ({
+      appName: "Yardımcı Asistan",
+      version: app.getVersion(),
+      platform: process.platform,
+      syncSettings: {
+        webModuleUrl: getDatabase().getSetupData().webModuleUrl,
+        hasSyncSecret: Boolean(getDatabase().getSetupData().syncSecret)
+      },
+      databasePath: getDatabase().databasePath,
+      userDataPath: getDatabase().userDataPath,
+      backupPath: getDatabase().backupPath,
+      setup: getDatabase().getSetupData()
+    }),
+    getDashboardData: () => getDatabase().getDashboardData()
+  });
+
+  registerSyncIpcHandlers({
+    getDatabase,
+    getCoordinator: getSyncCoordinator,
+    assertCapability,
+    afterSuccessfulPull,
+    publishAndroidSnapshot,
+    publishAiSettings
+  });
+
+  registerReportIpcHandlers({
+    getDatabase,
+    assertUnlocked,
+    assertCapability
+  });
+
+  registerBusinessPublicProfileIpcHandlers({
+    databasePath: () => getDatabase().databasePath,
+    assertUnlocked,
+    onMutation: publishBusinessAiContext
+  });
+
+  registerGoogleReviewsSettingsIpcHandlers({
+    getDatabase,
+    assertUnlocked
+  });
+
+  registerKbsSettingsIpcHandlers({
+    getDatabase,
+    assertUnlocked,
+    assertCapability,
+    deliverNotification: deliverKbsNotification,
+    onSettingsSaved: onKbsSettingsSaved
+  });
+
+  registerKbsWebviewIpcEvents({
+    getDatabase,
+    assertUnlocked,
+    assertCapability,
+    isTrustedRendererUrl,
+    attachWebview: (id) => kbsInteractiveDriver.attach(id),
+    detachWebview: (id) => kbsInteractiveDriver.detach(id),
+    inspect: async () => {
+      const result = await kbsInteractiveDriver.inspect();
+      if (result.state === "authenticated") {
+        const settings = getKbsSettings(getDatabase().databasePath);
+        if (settings.enabled && settings.provider === "egm") {
+          await kbsBackgroundSession.refresh();
+        }
+      }
+      return result;
+    },
+    prepareLogin: (credentials) =>
+      kbsInteractiveDriver.prepareLogin(credentials)
+  });
+
+  registerMarketBarcodeFastPullHandler(
+    getSyncCoordinator,
+    assertUnlocked,
+    assertCapability
+  );
+
+  registerMenuIpcHandlers({
+    getDatabase,
+    assertCapability,
+    assertMenuItemSubfeatureMutation,
+    finalizeMutation: finalizeMenuMutation,
+    scheduleSync: () => getSyncCoordinator().scheduleSoon()
+  });
+
+  registerImageAnalysisIpcHandlers({
+    getDatabase,
+    assertCapability,
+    finalizeStockImageApply
+  });
+
+  registerSetupIpcHandlers({
+    assertUnlocked,
+    getSetupData: () => getDatabase().getSetupData(),
+    saveInitial
+  });
+
+  registerAiSecretIpcHandlers({
+    getDatabase,
+    assertUnlocked
+  });
+
+  const androidInstallationService = new AndroidInstallationService({
+    getConnection: () => getWebSyncConfig(getDatabase().getSetupData()),
+    getDesktopId: () => getDatabase().getSyncRuntimeStatus().clientId
+  });
+
+  registerAndroidDeviceIpcHandlers({
+    getDatabase,
+    assertCapability,
+    finalizeDeviceMutation,
+    listInstallDevices: () => androidInstallationService.listDevices(),
+    installOnDevice: async (serial) => {
+      const publication = await publishAndroidSnapshot();
+      if (!publication.ok) {
+        return {
+          ok: false,
+          message:
+            `Android kurulumu için web bağlantısı hazırlanamadı. ${publication.message}`
+        };
+      }
+      return androidInstallationService.install(serial);
+    },
+    provisionOnDevice: async (serial) => {
+      const publication = await publishAndroidSnapshot();
+      if (!publication.ok) {
+        return {
+          ok: false,
+          message:
+            `Android bağlantısı için web yayını hazırlanamadı. ${publication.message}`
+        };
+      }
+      return androidInstallationService.provision(serial);
+    }
+  });
+
+  registerAiConnectionIpcHandlers({ getDatabase });
+
+  registerRequestIpcHandlers({
+    getDatabase,
+    assertCapability,
+    assertRequestType,
+    finalizeRecordDeletion
+  });
+
+  registerCustomerIpcHandlers({
+    getDatabase,
+    assertUnlocked,
+    assertCapability,
+    finalizeRecordDeletion,
+    finalizeCustomerMutation,
+    finalizeCheckInMutation,
+    finalizeCheckoutMutation,
+    finalizeRoomChangeMutation
+  });
+
+  registerWhatsAppWebviewIpcEvents({
+    isTrustedRendererUrl,
+    attachWebview: (id) => birthdayWebviewDriver.attach(id),
+    detachWebview: (id) => birthdayWebviewDriver.detach(id),
+    setUserBusy: (busy) => whatsappDeliveryLock.setUserBusy(busy),
+    takeoverWebview: () => birthdayDeliveryAdapter.takeoverUserControl(),
+    evaluateBirthdayNow
+  });
+
+  registerWhatsAppIpcHandlers({
+    getDatabase,
+    assertCapability,
+    finalizeRecordDeletion
+  });
+
+  registerRoomTableIpcHandlers({
+    getDatabase,
+    assertUnlocked,
+    assertCapability
+  });
+
+  registerRoomMediaIpcHandlers({
+    userDataPath: () => getDatabase().userDataPath,
+    assertUnlocked,
+    assertCapability,
+    onCommit: () => getSyncCoordinator().scheduleSoon()
+  });
+
+  registerTableMediaIpcHandlers({
+    userDataPath: () => getDatabase().userDataPath,
+    assertUnlocked,
+    assertCapability,
+    onCommit: () => getSyncCoordinator().scheduleSoon()
+  });
+
+  registerTableOrderIpcHandlers({
+    getDatabase,
+    assertCapability,
+    hasCapability: (capability) =>
+      hasBusinessCapability(enabledBusinessCapabilities(), capability)
+  });
+
+  registerReservationIpcHandlers({
+    getDatabase,
+    assertCapability,
+    assertReservationType,
+    finalizeOperationMutation
+  });
+
+  registerDailyTaskIpcHandlers({
+    getDatabase,
+    assertTaskScope,
+    finalizeOperationMutation
+  });
+
+  registerBusinessAiIpcHandlers({
+    getDatabase,
+    assertCapability
+  });
+}
+
+function registerMarketBarcodeFastPullHandler(
+  getSyncCoordinator: () => SyncCoordinator,
+  assertUnlocked: () => void,
+  assertCapability: (
+    capability: BusinessCapability,
+    message?: string
+  ) => void
+) {
+  const senders = new Set<number>();
+
+  ipcMain.handle(
+    "sync:setMarketBarcodeFastPull",
+    (event, enabled: unknown) => {
+      assertUnlocked();
+      const shouldEnable = enabled === true;
+      const senderId = event.sender.id;
+
+      if (shouldEnable) {
+        assertCapability(
+          BUSINESS_CAPABILITIES.CATALOG,
+          "Telefon barkod modu için ürün kataloğu etkin olmalı."
+        );
+        assertCapability(
+          BUSINESS_CAPABILITIES.SALES,
+          "Telefon barkod modu için satış yeteneği etkin olmalı."
+        );
+        assertCapability(
+          BUSINESS_CAPABILITIES.RETAIL_BARCODE,
+          "Telefon barkod modu için barkod yeteneği etkin olmalı."
+        );
+
+        if (!senders.has(senderId)) {
+          senders.add(senderId);
+          event.sender.once("destroyed", () => {
+            senders.delete(senderId);
+            getSyncCoordinator().setMarketBarcodeFastPullEnabled(
+              senders.size > 0
+            );
+          });
+        }
+      } else {
+        senders.delete(senderId);
+      }
+
+      return getSyncCoordinator().setMarketBarcodeFastPullEnabled(
+        senders.size > 0
+      );
+    }
+  );
+}
