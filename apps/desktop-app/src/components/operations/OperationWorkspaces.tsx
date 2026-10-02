@@ -399,7 +399,7 @@ export function ReservationsWorkspace({
                     </ActionButton>
                   )}
                   {whatsappEnabled && (
-                    <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
                       <MessageCircle size={15} aria-hidden="true" />
                       WhatsApp'a Hazırla
                     </ActionButton>
