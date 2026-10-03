@@ -7,6 +7,7 @@ import type {
   InstallationSnapshot,
   OverviewSnapshot,
   ProductSnapshot,
+  ReleaseChannelSnapshot,
   RepoSnapshot,
   StatusKind
 } from "../../shared/contracts";
@@ -16,6 +17,10 @@ type DeployRecord = {
   host?: string;
   remoteRoot?: string;
   storageRoot?: string;
+};
+
+type ReleaseRecord = {
+  desktopManifests?: Record<string, string>;
 };
 
 type InstallationRecord = {
@@ -28,6 +33,7 @@ type InstallationRecord = {
   versionEndpoint?: string;
   credentialRef?: string;
   deploy?: DeployRecord;
+  release?: ReleaseRecord;
 };
 
 type InstallationRegistry = {
@@ -336,9 +342,9 @@ function deriveInstallationStatus(
 
 async function getInstallations(
   repoRoot: string,
-  product: ProductSnapshot
+  product: ProductSnapshot,
+  registry: InstallationRegistry
 ): Promise<InstallationSnapshot[]> {
-  const registry = readJson<InstallationRegistry>(join(repoRoot, "config", "installations.json"));
   const entries = Object.entries(registry.installations ?? {});
 
   return Promise.all(entries.map(async ([key, record]) => {
@@ -380,15 +386,125 @@ async function getInstallations(
   }));
 }
 
+function releaseLabel(id: string) {
+  if (id === "winX64") return "Windows x64";
+  if (id === "winX86") return "Windows x86";
+  return id;
+}
+
+async function getReleaseChannel(
+  id: string,
+  manifestUrl: string,
+  expectedVersion: string
+): Promise<ReleaseChannelSnapshot> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4500);
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch(manifestUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    const durationMs = Date.now() - startedAt;
+
+    if (!response.ok) {
+      return {
+        id,
+        label: releaseLabel(id),
+        manifestUrl,
+        liveVersion: null,
+        status: "error",
+        detail: `Manifest HTTP ${response.status}`,
+        durationMs
+      };
+    }
+
+    const payload = await response.json() as { appVersion?: string };
+    const liveVersion = String(payload.appVersion ?? "").trim() || null;
+
+    if (!liveVersion) {
+      return {
+        id,
+        label: releaseLabel(id),
+        manifestUrl,
+        liveVersion: null,
+        status: "error",
+        detail: "Manifest içinde appVersion bulunamadı.",
+        durationMs
+      };
+    }
+
+    if (liveVersion !== expectedVersion) {
+      return {
+        id,
+        label: releaseLabel(id),
+        manifestUrl,
+        liveVersion,
+        status: "warning",
+        detail: `Yayında ${liveVersion} · kaynak ${expectedVersion}`,
+        durationMs
+      };
+    }
+
+    return {
+      id,
+      label: releaseLabel(id),
+      manifestUrl,
+      liveVersion,
+      status: "ready",
+      detail: `v${liveVersion} yayında`,
+      durationMs
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      id,
+      label: releaseLabel(id),
+      manifestUrl,
+      liveVersion: null,
+      status: "error",
+      detail: `Manifest okunamadı: ${reason}`,
+      durationMs: Date.now() - startedAt
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function getDesktopRelease(
+  registry: InstallationRegistry,
+  expectedVersion: string
+): Promise<ReleaseChannelSnapshot[]> {
+  const landing = registry.installations?.landing;
+  const manifests = landing?.release?.desktopManifests ?? {};
+  const entries = Object.entries(manifests)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0);
+
+  return Promise.all(entries.map(([id, url]) => getReleaseChannel(id, url.trim(), expectedVersion)));
+}
+
 export async function getOverviewSnapshot(repoRoot: string): Promise<OverviewSnapshot> {
   const product = getProductSnapshot(repoRoot);
-  const installations = await getInstallations(repoRoot, product);
+  const registry = readJson<InstallationRegistry>(join(repoRoot, "config", "installations.json"));
+
+  const [installations, desktopRelease] = await Promise.all([
+    getInstallations(repoRoot, product, registry),
+    getDesktopRelease(registry, product.version)
+  ]);
 
   return {
     generatedAt: new Date().toISOString(),
     repo: getRepoSnapshot(repoRoot),
     product,
     installations,
+    release: {
+      expectedVersion: product.version,
+      desktop: desktopRelease
+    },
     counts: {
       installations: installations.length,
       healthy: installations.filter((item) => item.status === "ready").length,
