@@ -125,10 +125,10 @@ const marketContribution = {
       runtimeHasCapability(capabilities, C.RETAIL_LABELS) ? "etiketleri" : ""
     ].filter(Boolean);
     return {
-      label: "Market",
-      eyebrow: "Perakende operasyonu",
-      title: "Market",
-      description: topics.length > 0 ? `${topics.join(", ")} tek çalışma alanında yönetin.` : "Etkin perakende araçlarını tek çalışma alanında yönetin."
+      label: "Satış",
+      eyebrow: "Satış operasyonu",
+      title: "Satış",
+      description: topics.length > 0 ? `${topics.join(", ")} tek çalışma alanında yönetin.` : "Etkin satış ve perakende araçlarını tek çalışma alanında yönetin."
     };
   }
 } satisfies NavigationContribution;
