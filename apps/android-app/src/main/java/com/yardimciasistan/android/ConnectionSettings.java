@@ -101,6 +101,12 @@ final class ConnectionSettings {
         .putString(KEY_WEB_MODULE_URL, normalizedUrl)
         .putString(KEY_BOOTSTRAP_TICKET, normalizedTicket)
         .remove(KEY_SYNC_SECRET)
+        .remove(KEY_LOCAL_DESKTOP_ID)
+        .remove(KEY_LOCAL_BASE_URL)
+        .remove(KEY_LOCAL_TOKEN)
+        .remove(KEY_LOCAL_TARGET_KEY)
+        .remove(KEY_LOCAL_LAST_SEEN_AT)
+        .remove(KEY_HOSTING_ACTION_BARRIER_TARGET)
         .commit();
   }
 
