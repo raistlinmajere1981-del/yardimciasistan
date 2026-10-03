@@ -244,6 +244,8 @@ function assertCurrentDatabase(database, options = {}) {
   }
   for (const column of [
     "brand",
+    "dealer_price_a",
+    "dealer_price_b",
     "image_asset_path",
     "image_source_url",
     "data_source",
@@ -298,6 +300,7 @@ function assertCurrentDatabase(database, options = {}) {
     "tax_number",
     "authorized_person",
     "dealer_status",
+    "price_group",
     "payment_term_days",
     "notes"
   ]) {
