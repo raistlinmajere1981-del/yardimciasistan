@@ -80,7 +80,7 @@ export function MarketOrdersWorkspace({
     () => customers.filter((customer) => customer.commercialProfile?.dealerStatus === "active"),
     [customers]
   );
-  const activeProducts = useMemo(() => products.filter((product) => product.isActive), [products]);
+  const orderProducts = useMemo(() => products.filter((product) => product.isActive !== false), [products]);
   const [customerId, setCustomerId] = useState("");
   const [search, setSearch] = useState("");
   const [note, setNote] = useState("");
@@ -94,12 +94,12 @@ export function MarketOrdersWorkspace({
   const selectedCustomer = activeDealers.find((customer) => customer.id === customerId);
   const filteredProducts = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
-    if (!needle) return activeProducts;
-    return activeProducts.filter((product) =>
+    if (!needle) return orderProducts;
+    return orderProducts.filter((product) =>
       [product.name, product.brand, product.sku, product.barcode]
         .some((value) => String(value ?? "").toLocaleLowerCase("tr-TR").includes(needle))
     );
-  }, [activeProducts, search]);
+  }, [orderProducts, search]);
 
   const currency = lines[0]?.pricing.currency ?? "TRY";
   const subtotal = lines.reduce((sum, line) => sum + line.pricing.unitPrice * line.quantity, 0);
@@ -287,8 +287,8 @@ export function MarketOrdersWorkspace({
           {filteredProducts.length === 0 && (
             <div className="market-order-product-empty">
               <ShoppingCart size={24} aria-hidden="true" />
-              <strong>{search.trim() ? "Aramaya uygun ürün yok." : "Aktif ürün yok."}</strong>
-              <span>{search.trim() ? "Arama metnini değiştirin veya temizleyin." : "Önce Ürünler sekmesinden aktif bir ürün ekleyin."}</span>
+              <strong>{search.trim() ? "Aramaya uygun ürün yok." : "Siparişe eklenebilir ürün yok."}</strong>
+              <span>{search.trim() ? "Arama metnini değiştirin veya temizleyin." : "Ürünler sekmesinden aktif bir ürün ekleyin."}</span>
             </div>
           )}
         </div>
