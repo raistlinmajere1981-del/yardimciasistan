@@ -127,6 +127,7 @@ try {
 
   raw = new DatabaseSync(database.databasePath);
   const calls = [];
+  let loseFirstCreateOrderResponse = true;
 
   server = await createServer({
     root: appPath,
@@ -180,8 +181,18 @@ try {
     calls.push({ method, args: structuredClone(args) });
     if (method === "listOrders") return listRuntimeOrders(database.databasePath, args[0] ?? {});
     if (method === "getOrder") return getRuntimeOrder(database.databasePath, args[0]);
-    if (method === "resolveProductPrice") return resolveRuntimeProductPrice(database.databasePath, args[0]);
-    if (method === "createOrder") return createRuntimeOrder(database.databasePath, args[0]);
+    if (method === "resolveProductPrice") {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return resolveRuntimeProductPrice(database.databasePath, args[0]);
+    }
+    if (method === "createOrder") {
+      const created = createRuntimeOrder(database.databasePath, args[0]);
+      if (loseFirstCreateOrderResponse) {
+        loseFirstCreateOrderResponse = false;
+        throw new Error("Simulated lost createOrder response");
+      }
+      return created;
+    }
     if (method === "updateOrderStatus") return updateRuntimeOrderStatus(database.databasePath, args[0]);
     throw new Error(`Unexpected wholesale orders bridge call: ${method}`);
   });
@@ -206,6 +217,8 @@ try {
   await expect(productButton).toBeVisible();
   await expect(productButton).toContainText("₺80");
   await productButton.click();
+  await expect(dealerSelect).toBeDisabled();
+  await expect(dealerSelect).toBeEnabled();
 
   const draftLines = page.locator(".market-order-lines");
   await expect(draftLines).toContainText("Bayi Ürünü");
@@ -221,7 +234,17 @@ try {
   const orderTotal = page.locator(".market-sale-grand-total").filter({ hasText: "Sipariş toplamı" });
   await expect(orderTotal).toContainText("₺160");
 
-  await page.getByRole("button", { name: "Siparişi Kaydet", exact: true }).click();
+  const saveButton = page.getByRole("button", { name: "Siparişi Kaydet", exact: true });
+  await saveButton.click();
+
+  await expect(page.locator("body")).toHaveAttribute("data-last-state", "error");
+  assert.equal(
+    Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders WHERE source = 'desktop-wholesale'").get().count),
+    1,
+    "The first call committed even though its response was lost."
+  );
+
+  await saveButton.click();
 
   await expect(page.locator(".market-order-card")).toHaveCount(1);
   const detail = page.locator(".market-order-detail");
@@ -267,9 +290,21 @@ try {
   assert.equal(resolveCalls[0].args[0].productId, product.id);
 
   const createCalls = calls.filter((call) => call.method === "createOrder");
-  assert.equal(createCalls.length, 1);
+  assert.equal(createCalls.length, 2);
   assert.equal(createCalls[0].args[0].source, "desktop-wholesale");
+  assert.match(createCalls[0].args[0].sourceReference, /^desktop-wholesale:/);
+  assert.equal(
+    createCalls[1].args[0].sourceReference,
+    createCalls[0].args[0].sourceReference,
+    "Retrying the unchanged draft must reuse the same idempotency reference."
+  );
   assert.deepEqual(createCalls[0].args[0].items, [{ productId: product.id, quantity: 2 }]);
+  assert.deepEqual(createCalls[1].args[0].items, [{ productId: product.id, quantity: 2 }]);
+  assert.equal(
+    Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders WHERE source = 'desktop-wholesale'").get().count),
+    1,
+    "Retry must return the existing order instead of creating a duplicate."
+  );
 
   await detail.getByRole("button", { name: "Siparişi Onayla", exact: true }).click();
   await expect(detail.getByText("Onaylandı", { exact: true })).toBeVisible();
