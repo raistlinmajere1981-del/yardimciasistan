@@ -41,10 +41,6 @@ import {
   SyncCoordinator,
   type AutomaticSyncStatus
 } from "./sync-coordinator";
-import { BirthdayDeliveryService } from "./birthday-delivery-service.js";
-import { BirthdayScheduler } from "./birthday-scheduler.js";
-import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
-import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
 import { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
 import { EgmKbsBackgroundSession } from "./egm-kbs-background-session.js";
 import { EgmKbsProviderAdapter, JandarmaKbsProviderAdapter } from "./kbs-provider-adapters.js";
@@ -93,20 +89,16 @@ let syncCoordinator: SyncCoordinator | null = null;
 let androidActionSyncService: AndroidActionSyncService | null = null;
 let maintenanceSyncSuspended = false;
 let appLockService: DesktopAppLockService | null = null;
-let birthdayScheduler: BirthdayScheduler | null = null;
 let desktopIpcRegistryHandle: DesktopIpcRegistryHandle | null = null;
 let localCompanionServer: LocalCompanionServer | null = null;
 let localCompanionPairingService: LocalCompanionPairingService | null = null;
 let localCompanionMdnsAdvertiser: LocalCompanionMdnsAdvertiser | null = null;
-const birthdayWebviewDriver = new WhatsAppWebviewDriver();
 const egmKbsInteractiveDriver = new EgmKbsWebviewDriver();
 const egmKbsBackgroundDriver = new EgmKbsWebviewDriver();
 const egmKbsBackgroundSession = new EgmKbsBackgroundSession(egmKbsBackgroundDriver);
 const egmKbsProviderAdapter = new EgmKbsProviderAdapter(egmKbsBackgroundSession);
 const jandarmaKbsProviderAdapter = new JandarmaKbsProviderAdapter();
 const kbsDeliveryInFlight = new Map<string, Promise<DesktopKbsDeliveryMutationResult>>();
-const whatsappDeliveryLock = new WhatsAppDeliveryLock();
-const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
 const C = BUSINESS_CAPABILITIES;
 
 function enabledBusinessCapabilities(): BusinessCapability[] {
@@ -412,21 +404,9 @@ if (!hasSingleInstanceLock) {
       }
     });
 
-    const birthdayDeliveryService = new BirthdayDeliveryService(desktopDatabase, birthdayDeliveryAdapter);
-    birthdayScheduler = new BirthdayScheduler({
-      database: desktopDatabase,
-      deliveryService: birthdayDeliveryService,
-      isWhatsAppEnabled: () => {
-        if (getAppLockService().isLocked()) return false;
-        const capabilities = enabledBusinessCapabilities();
-        return hasBusinessCapability(capabilities, C.CUSTOMERS) && hasBusinessCapability(capabilities, C.WHATSAPP);
-      },
-      onDashboardChanged: () => notifyDesktopDashboardChanged(getDatabase().getDashboardData())
-    });
     registerIpcHandlers();
     createMainWindow();
     syncCoordinator.start();
-    birthdayScheduler.start();
     if (!desktopDatabase.getSetupData().setupRequired) {
       void publishBusinessAiContextFromMain();
       if (getGoogleReviewsSettings(desktopDatabase.databasePath).publicationPending) {
@@ -457,7 +437,6 @@ if (!hasSingleInstanceLock) {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     syncCoordinator?.stop();
-    birthdayScheduler?.stop();
     localCompanionMdnsAdvertiser?.stop();
     void localCompanionServer?.stop();
     desktopDatabase?.close();
@@ -467,7 +446,6 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   syncCoordinator?.stop();
-  birthdayScheduler?.stop();
   localCompanionMdnsAdvertiser?.stop();
   void localCompanionServer?.stop();
 });
@@ -504,13 +482,7 @@ function registerIpcHandlers() {
     finalizeRoomChangeMutation: finalizeDesktopRoomChangeMutation,
     assertReservationType: assertDesktopReservationType,
     finalizeOperationMutation: finalizeDesktopOperationMutation,
-    assertTaskScope: assertDesktopTaskScope,
-    birthdayWebviewDriver,
-    whatsappDeliveryLock,
-    birthdayDeliveryAdapter,
-    evaluateBirthdayNow: () => {
-      void birthdayScheduler?.evaluateNow();
-    }
+    assertTaskScope: assertDesktopTaskScope
   });
 }
 
