@@ -10,11 +10,6 @@ import type { DesktopAppLockService } from "./app-lock-service";
 import { AndroidInstallationService } from "./android-installation-service";
 import type { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver";
 import type { EgmKbsBackgroundSession } from "./egm-kbs-background-session";
-import type { WhatsAppWebviewDriver } from "./whatsapp-webview-driver";
-import type {
-  WhatsAppDeliveryAdapter,
-  WhatsAppDeliveryLock
-} from "./whatsapp-delivery-adapter";
 import { getKbsSettings } from "./kbs-settings";
 import { getWebSyncConfig } from "./sync-config";
 import { registerAppLockIpcHandlers } from "./ipc/app-lock-ipc";
@@ -32,10 +27,7 @@ import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
 import { registerRequestIpcHandlers } from "./ipc/request-ipc";
-import {
-  registerWhatsAppIpcHandlers,
-  registerWhatsAppWebviewIpcEvents
-} from "./ipc/whatsapp-ipc";
+import { registerWhatsAppIpcHandlers } from "./ipc/whatsapp-ipc";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
 import { registerRoomMediaIpcHandlers } from "./room-media-ipc";
 import { registerTableMediaIpcHandlers } from "./table-media-ipc";
@@ -96,10 +88,6 @@ export type DesktopIpcRegistryDependencies = {
   finalizeOperationMutation:
     ReservationIpcOptions["finalizeOperationMutation"];
   assertTaskScope: DailyTaskIpcOptions["assertTaskScope"];
-  birthdayWebviewDriver: WhatsAppWebviewDriver;
-  whatsappDeliveryLock: WhatsAppDeliveryLock;
-  birthdayDeliveryAdapter: WhatsAppDeliveryAdapter;
-  evaluateBirthdayNow: () => void;
 };
 
 export type DesktopIpcRegistryHandle = {
@@ -138,11 +126,7 @@ export function registerDesktopIpcHandlers(
     finalizeRoomChangeMutation,
     assertReservationType,
     finalizeOperationMutation,
-    assertTaskScope,
-    birthdayWebviewDriver,
-    whatsappDeliveryLock,
-    birthdayDeliveryAdapter,
-    evaluateBirthdayNow
+    assertTaskScope
   } = dependencies;
 
   registerAppLockIpcHandlers(getAppLockService());
@@ -306,14 +290,6 @@ export function registerDesktopIpcHandlers(
     finalizeRoomChangeMutation
   });
 
-  registerWhatsAppWebviewIpcEvents({
-    isTrustedRendererUrl,
-    attachWebview: (id) => birthdayWebviewDriver.attach(id),
-    detachWebview: (id) => birthdayWebviewDriver.detach(id),
-    setUserBusy: (busy) => whatsappDeliveryLock.setUserBusy(busy),
-    takeoverWebview: () => birthdayDeliveryAdapter.takeoverUserControl(),
-    evaluateBirthdayNow
-  });
 
   registerWhatsAppIpcHandlers({
     getDatabase,
