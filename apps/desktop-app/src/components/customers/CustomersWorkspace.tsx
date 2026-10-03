@@ -18,6 +18,7 @@ interface CustomersWorkspaceProps {
   notifications: DesktopDashboardData["hospitalityNotifications"];
   kbsOverview: DesktopDashboardData["kbsOverview"];
   aiEnabled: boolean;
+  wholesaleEnabled: boolean;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => void | Promise<unknown>;
@@ -31,6 +32,7 @@ export function CustomersWorkspace({
   notifications,
   kbsOverview,
   aiEnabled,
+  wholesaleEnabled,
   onSave,
   onAnalyzeIdentity,
   onDelete,
@@ -74,6 +76,12 @@ export function CustomersWorkspace({
       customer.email,
       customer.identityNumber,
       customer.tags.join(" "),
+      ...(wholesaleEnabled && customer.commercialProfile ? [
+        customer.commercialProfile.companyName,
+        customer.commercialProfile.taxOffice,
+        customer.commercialProfile.taxNumber,
+        customer.commercialProfile.authorizedPerson
+      ] : []),
       ...customerStays.map((stay) => stay.roomName + " " + stay.roomNumber)
     ].join(" ").toLocaleLowerCase("tr-TR");
 
@@ -86,7 +94,7 @@ export function CustomersWorkspace({
     if (filter === "kbs_pending") return row.kbsState === "pending";
     if (filter === "kbs_failed") return row.kbsState === "failed";
     return true;
-  }), [customers, filter, kbsOverview.enabled, notifications, reservations, searchText, stays]);
+  }), [customers, filter, kbsOverview.enabled, notifications, reservations, searchText, stays, wholesaleEnabled]);
 
   useEffect(() => {
     if (createOpen || !pendingCustomerId) return;
@@ -104,7 +112,15 @@ export function CustomersWorkspace({
     <div className="customer-list-controls">
       <label className="customer-search form-field form-field--medium">
         <span>Ara</span>
-        <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder={stays.length > 0 ? "Ad, telefon, kimlik, etiket veya oda" : "Ad, telefon, kimlik veya etiket"} />
+        <input
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          placeholder={wholesaleEnabled
+            ? "Ad, telefon, firma, vergi no veya etiket"
+            : stays.length > 0
+              ? "Ad, telefon, kimlik, etiket veya oda"
+              : "Ad, telefon, kimlik veya etiket"}
+        />
       </label>
       <ChoiceChips
         className="customer-filter-row"
@@ -148,6 +164,12 @@ export function CustomersWorkspace({
             <span className="customer-record-row__phone">{customer.phone || "Telefon yok"}</span>
             {row.roomText && <span><BedDouble size={14} aria-hidden="true" />{row.roomText}</span>}
             {row.activeReservations.length > 0 && <span><CalendarClock size={14} aria-hidden="true" />{row.activeReservations.length} aktif rezervasyon</span>}
+            {wholesaleEnabled && customer.commercialProfile && <>
+              <span>{customer.commercialProfile.companyName}</span>
+              <StatusBadge tone={dealerTone(customer.commercialProfile.dealerStatus)}>
+                {dealerLabel(customer.commercialProfile.dealerStatus)}
+              </StatusBadge>
+            </>}
             {kbsOverview.enabled && row.activeStay && <StatusBadge tone={kbsTone(row.kbsState)}>{kbsLabel(row.kbsState)}</StatusBadge>}
           </>}
           actions={<>
@@ -184,6 +206,7 @@ export function CustomersWorkspace({
     <CustomerCreateEditor
       open={createOpen}
       aiEnabled={aiEnabled}
+      wholesaleEnabled={wholesaleEnabled}
       onClose={() => setCreateOpen(false)}
       onSave={onSave}
       onAnalyzeIdentity={onAnalyzeIdentity}
@@ -209,5 +232,18 @@ function kbsLabel(state: string) {
 function kbsTone(state: string): StatusTone {
   if (state === "sent") return "success";
   if (state === "failed") return "danger";
+  return "warning";
+}
+
+
+function dealerLabel(status: string) {
+  if (status === "active") return "Aktif bayi";
+  if (status === "inactive") return "Pasif bayi";
+  return "Bayi adayı";
+}
+
+function dealerTone(status: string): StatusTone {
+  if (status === "active") return "success";
+  if (status === "inactive") return "neutral";
   return "warning";
 }
