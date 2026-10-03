@@ -16,8 +16,7 @@ export function CustomerMessagesWorkspace({
   safeMode,
   webMode,
   whatsappEnabled,
-  prewarmWebview = false,
-  active
+  prewarmWebview = false
 }: CustomerMessagesWorkspaceProps) {
   const [mode, setMode] = useState<MessageMode>("safe");
   const [webModeActivated, setWebModeActivated] = useState(prewarmWebview);
