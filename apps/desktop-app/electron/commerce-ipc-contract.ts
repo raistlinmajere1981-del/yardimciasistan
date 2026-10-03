@@ -11,6 +11,8 @@ import type {
   RecordCustomerCreditPaymentInput,
   CatalogCategory,
   CatalogProduct,
+  CommerceOrder,
+  CommerceOrderDetail,
   CommercePurchaseOrder,
   CommercePurchaseOrderDetail,
   CommerceSale,
@@ -44,7 +46,12 @@ import type {
   SaveCommerceSupplierInput,
   SetInventoryCountInput
 } from "./commerce-store";
-import type { InventoryCountResult } from "./commerce-runtime";
+import type {
+  CreateCommerceOrderInput,
+  InventoryCountResult,
+  ListCommerceOrdersOptions,
+  UpdateCommerceOrderStatusInput
+} from "./commerce-runtime";
 import type {
   ConsumePendingMarketBarcodeScansOptions,
   ListMarketCartDraftsOptions
@@ -85,6 +92,11 @@ export interface DesktopCommerceBridge {
   setInventoryCount: (input: SetInventoryCountInput) => Promise<InventoryCountResult>;
 
   createPaidSale: (input: CreateCommerceSaleInput) => Promise<CommerceSale>;
+
+  listOrders: (options?: ListCommerceOrdersOptions) => Promise<CommerceOrder[]>;
+  getOrder: (orderId: string) => Promise<CommerceOrderDetail | null>;
+  createOrder: (input: CreateCommerceOrderInput) => Promise<CommerceOrderDetail>;
+  updateOrderStatus: (input: UpdateCommerceOrderStatusInput) => Promise<CommerceOrderDetail>;
   listCustomerCreditAccounts: (options?: ListCustomerCreditAccountsOptions) => Promise<CustomerCreditAccountSummary[]>;
   getCustomerCreditAccount: (customerId: string) => Promise<CustomerCreditAccountDetail>;
   prepareCustomerCreditWhatsApp: (input: PrepareCustomerCreditWhatsAppInput) => Promise<CustomerCreditWhatsAppPreparation>;
