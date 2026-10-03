@@ -215,6 +215,20 @@ Stok ve kimlik görseli sözleşmeleri birlikte şu testte doğrulanır:
 npm run smoke:stock-image-analysis
 ```
 
+## Sürüm Endpoint'i
+
+Canlı web modülünün sürümü public ve salt-okunur endpoint'ten alınabilir:
+
+```text
+api/version.php
+```
+
+Cevap `product_version` ve bağımsız `web_module_version` alanlarını döndürür.
+Canonical kaynak repo kökündeki `product-version.json` dosyasıdır; `npm run version:sync`
+`config/version.json` dosyasını günceller. Web modülü tek başına ilerletilecekse
+`npm run version:web:bump -- patch` veya `npm run version:web:set -- <x.y.z>`
+kullanılır. Endpoint secret veya installation credential bilgisi döndürmez.
+
 ## Sync Endpoint
 
 PC uygulaması web taleplerini dışarıdan port açmadan şu endpoint üzerinden çeker:
