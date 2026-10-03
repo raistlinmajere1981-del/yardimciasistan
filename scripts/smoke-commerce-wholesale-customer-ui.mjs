@@ -112,7 +112,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/wholesale-customer-ui-smoke`, { timeout: 60000 });
 
   await expect(page.getByTestId("wholesale-state")).toHaveText("wholesale-on");
-  await expect(page.getByRole("button", { name: "Bayiler", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bayiler", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Yeni Müşteri", exact: true }).click();
   const createDialog = page.getByRole("dialog", { name: "Yeni müşteri ekle", exact: true });
@@ -189,6 +189,7 @@ try {
   const customerRow = customerList.locator(".customer-record-row").filter({ hasText: "Ada Bayi" });
   await expect(customerRow).toContainText("Ada Gıda Ltd. Şti.");
   await expect(customerRow).toContainText("Aktif bayi");
+  await expect(page.getByRole("button", { name: "Bayiler", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Bayiler", exact: true }).click();
   await expect(customerList.locator(".customer-record-row")).toHaveCount(1);
