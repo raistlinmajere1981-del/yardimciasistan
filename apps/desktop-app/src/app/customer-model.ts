@@ -20,6 +20,14 @@ export interface CustomerFormState {
   fatherName: string;
   issuingAuthority: string;
   address: string;
+  commercialProfileEnabled: boolean;
+  commercialCompanyName: string;
+  commercialTaxOffice: string;
+  commercialTaxNumber: string;
+  commercialAuthorizedPerson: string;
+  commercialDealerStatus: "candidate" | "active" | "inactive";
+  commercialPaymentTermDays: string;
+  commercialNotes: string;
 }
 
 export interface RoomAssignmentFormState {
@@ -55,11 +63,19 @@ export function toCustomerForm(customer: CustomerRecord | null): CustomerFormSta
     motherName: customer?.motherName ?? "",
     fatherName: customer?.fatherName ?? "",
     issuingAuthority: customer?.issuingAuthority ?? "",
-    address: customer?.address ?? ""
+    address: customer?.address ?? "",
+    commercialProfileEnabled: Boolean(customer?.commercialProfile),
+    commercialCompanyName: customer?.commercialProfile?.companyName ?? "",
+    commercialTaxOffice: customer?.commercialProfile?.taxOffice ?? "",
+    commercialTaxNumber: customer?.commercialProfile?.taxNumber ?? "",
+    commercialAuthorizedPerson: customer?.commercialProfile?.authorizedPerson ?? "",
+    commercialDealerStatus: customer?.commercialProfile?.dealerStatus ?? "candidate",
+    commercialPaymentTermDays: String(customer?.commercialProfile?.paymentTermDays ?? 0),
+    commercialNotes: customer?.commercialProfile?.notes ?? ""
   };
 }
 
-export function customerFormToInput(form: CustomerFormState): SaveCustomerInput {
+export function customerFormToInput(form: CustomerFormState, wholesaleEnabled = false): SaveCustomerInput {
   return {
     ...(form.id ? { id: form.id } : {}),
     fullName: form.fullName,
@@ -79,7 +95,18 @@ export function customerFormToInput(form: CustomerFormState): SaveCustomerInput 
     motherName: form.motherName,
     fatherName: form.fatherName,
     issuingAuthority: form.issuingAuthority,
-    address: form.address
+    address: form.address,
+    ...(wholesaleEnabled ? {
+      commercialProfile: form.commercialProfileEnabled ? {
+        companyName: form.commercialCompanyName,
+        taxOffice: form.commercialTaxOffice,
+        taxNumber: form.commercialTaxNumber,
+        authorizedPerson: form.commercialAuthorizedPerson,
+        dealerStatus: form.commercialDealerStatus,
+        paymentTermDays: Number(form.commercialPaymentTermDays),
+        notes: form.commercialNotes
+      } : null
+    } : {})
   };
 }
 
