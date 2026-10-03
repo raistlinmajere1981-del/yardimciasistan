@@ -81,6 +81,8 @@ export function MarketProductsWorkspace({
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [createOpen, setCreateOpen] = useState(false);
   const [productForm, setProductForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
+  const [imageDraftMode, setImageDraftMode] = useState<"keep" | "manual" | "clear" | "external">("keep");
+  const [manualImageDataUrl, setManualImageDataUrl] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "loading" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
   const [pendingProductId, setPendingProductId] = useState("");
@@ -96,6 +98,8 @@ export function MarketProductsWorkspace({
   useEffect(() => {
     if (!productLookupRequest) return;
     setProductForm(emptyProductForm(inventoryEnabled));
+    setImageDraftMode("keep");
+    setManualImageDataUrl("");
     setSaveState("idle");
     setSaveMessage("Bulunan ürün bilgilerini kontrol edip kaydedin.");
     setCreateOpen(true);
@@ -115,6 +119,8 @@ export function MarketProductsWorkspace({
 
   function openCreate() {
     setProductForm(emptyProductForm(inventoryEnabled));
+    setImageDraftMode("keep");
+    setManualImageDataUrl("");
     setSaveState("idle");
     setSaveMessage("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
     setCreateOpen(true);
@@ -186,7 +192,11 @@ export function MarketProductsWorkspace({
     setSaveMessage("");
     let saved: CatalogProduct;
     try {
-      saved = await bridge.saveProduct(productFormToSaveInput(productForm));
+      saved = await bridge.saveProduct({
+        ...productFormToSaveInput(productForm),
+        ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
+        ...(imageDraftMode === "clear" ? { clearImage: true } : {})
+      });
       if (!isCurrent()) return;
     } catch (error) {
       if (!isCurrent()) return;
@@ -209,6 +219,8 @@ export function MarketProductsWorkspace({
     const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
     onStateChange("success", message);
     setPendingProductId(saved.id);
+    setImageDraftMode("keep");
+    setManualImageDataUrl("");
     setCreateOpen(false);
   }
 
@@ -300,8 +312,21 @@ export function MarketProductsWorkspace({
             wholesaleEnabled={wholesaleEnabled}
             disabled={busy || saveState === "loading"}
             mode="all"
+            localImageDataUrl={imageDraftMode === "manual" ? manualImageDataUrl : ""}
             lookupSeed={productLookupRequest}
             onLookupSeedLoaded={onProductLookupLoaded}
+            onManualImageSelected={(dataUrl) => {
+              setManualImageDataUrl(dataUrl);
+              setImageDraftMode("manual");
+            }}
+            onImageClear={() => {
+              setManualImageDataUrl("");
+              setImageDraftMode("clear");
+            }}
+            onExternalImageSelected={() => {
+              setManualImageDataUrl("");
+              setImageDraftMode("external");
+            }}
             onChange={setProductForm}
             onStateChange={onStateChange}
           />
