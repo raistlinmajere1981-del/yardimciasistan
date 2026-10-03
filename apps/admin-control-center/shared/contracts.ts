@@ -16,6 +16,14 @@ export type ProductSnapshot = {
 
 export type CredentialStatus = "configured" | "unconfigured" | "unreadable";
 
+export type HealthCheckSnapshot = {
+  id: string;
+  label: string;
+  status: StatusKind;
+  detail: string;
+  durationMs: number | null;
+};
+
 export type InstallationSnapshot = {
   id: string;
   title: string;
@@ -27,8 +35,12 @@ export type InstallationSnapshot = {
   credentialStatus: CredentialStatus;
   expectedWebVersion: string | null;
   liveWebVersion: string | null;
+  deployType: string | null;
+  deployHost: string | null;
+  deployTarget: string | null;
   status: StatusKind;
   statusNote: string;
+  healthChecks: HealthCheckSnapshot[];
 };
 
 export type OverviewSnapshot = {
