@@ -13,6 +13,7 @@ import type {
   CatalogProduct,
   CommerceOrder,
   CommerceOrderDetail,
+  CommerceResolvedUnitPrice,
   CommercePurchaseOrder,
   CommercePurchaseOrderDetail,
   CommerceSale,
@@ -50,6 +51,7 @@ import type {
   CreateCommerceOrderInput,
   InventoryCountResult,
   ListCommerceOrdersOptions,
+  ResolveCommerceProductPriceInput,
   UpdateCommerceOrderStatusInput
 } from "./commerce-runtime";
 import type {
@@ -92,6 +94,7 @@ export interface DesktopCommerceBridge {
   setInventoryCount: (input: SetInventoryCountInput) => Promise<InventoryCountResult>;
 
   createPaidSale: (input: CreateCommerceSaleInput) => Promise<CommerceSale>;
+  resolveProductPrice: (input: ResolveCommerceProductPriceInput) => Promise<CommerceResolvedUnitPrice>;
 
   listOrders: (options?: ListCommerceOrdersOptions) => Promise<CommerceOrder[]>;
   getOrder: (orderId: string) => Promise<CommerceOrderDetail | null>;
