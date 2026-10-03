@@ -45,6 +45,7 @@ assert.match(createSource, /customerFormToInput\(form, wholesaleEnabled\)/);
 assert.match(listSource, /customer\.commercialProfile\.companyName/);
 assert.match(listSource, /Aktif bayi/);
 assert.match(listSource, /label:\s*"Bayiler"/);
+assert.match(listSource, /!wholesaleEnabled\s*&&\s*filter === "dealers"[\s\S]*setFilter\("all"\)/);
 assert.match(routeSource, /wholesaleEnabled=\{features\.wholesale\}/);
 assert.match(
   frameSource,
