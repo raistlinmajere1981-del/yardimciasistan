@@ -4,6 +4,8 @@ import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerc
 import { desktopLog } from "./desktop-logger";
 import {
   archiveExternalProductImage,
+  archiveManualProductImage,
+  clearProductImage,
   previewExternalProductImage
 } from "./product-data-service";
 import {
@@ -133,7 +135,33 @@ export function registerCommerceIpcHandlers(options: {
     const mutation = mutateForIpc("commerce:product:save", () => saveRuntimeCatalogProduct(databasePath(), input));
     if (!mutation.ok) return mutation;
     let saved = mutation.value;
-    if (saved.imageSourceUrl && !saved.imageAssetPath && input.imageSourceUrl !== undefined) {
+    if (input.clearImage) {
+      try {
+        clearProductImage(databasePath(), saved.id);
+        saved = { ...saved, imageAssetPath: "", imageSourceUrl: "", imageLicense: "" };
+      } catch (error) {
+        desktopLog.warn({
+          scope: "product-data",
+          event: "product-data.image-clear.failed",
+          message: "Ürün görseli temizlenemedi.",
+          meta: { productId: saved.id },
+          error
+        });
+      }
+    } else if (input.manualImageDataUrl) {
+      try {
+        const imageAssetPath = archiveManualProductImage(databasePath(), saved.id, input.manualImageDataUrl);
+        saved = { ...saved, imageAssetPath, imageSourceUrl: "", imageLicense: "" };
+      } catch (error) {
+        desktopLog.warn({
+          scope: "product-data",
+          event: "product-data.manual-image-archive.failed",
+          message: "Manuel ürün görseli arşivlenemedi.",
+          meta: { productId: saved.id },
+          error
+        });
+      }
+    } else if (saved.imageSourceUrl && !saved.imageAssetPath && input.imageSourceUrl !== undefined) {
       try {
         const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.dataSource, saved.imageSourceUrl);
         if (imageAssetPath) saved = { ...saved, imageAssetPath };
