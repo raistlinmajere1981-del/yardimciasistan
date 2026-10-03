@@ -281,6 +281,30 @@ ticari alt kayıt da kaldırılır, böylece vergi numarası hayalet kayıt olar
 Bu aşama **fiyat grubu, özel fiyat, sipariş ekranı veya web bayi girişi içermez**.
 Fiyatlandırma ayrı bir sonraki dilimdir; bu profil onun kimlik/ilişki temelidir.
 
+### Bayi / Toptan C1 — Manuel bayi siparişi
+
+Satış çalışma alanındaki **Siparişler** sekmesi, yalnız `commerce.wholesale +
+commerce.orders` etkin olduğunda görünür. Kullanıcı yalnız aktif bayi profillerinden birini
+seçerek manuel sipariş hazırlar.
+
+Ürün kartındaki görünen fiyat yardımcı önizlemedir; renderer ürünü sepete eklerken
+`resolveProductPrice` typed IPC okumasıyla merkezi fiyat çözümleyiciden gerçek birim
+fiyatı alır. Sipariş kaydedilirken backend aynı çözümleyiciyi **yeniden** çalıştırır ve
+`commerce_order_items.unit_price` snapshot'ına o fiyatı yazar. Böylece renderer fiyatı
+otorite değildir.
+
+Bu dilimde sipariş yalnız `placed → confirmed/cancelled` yaşam döngüsünü kullanır.
+Sipariş oluşturmak veya onaylamak:
+
+- stok düşmez,
+- `commerce_sales` kaydı oluşturmaz,
+- ödeme/finans hareketi üretmez,
+- kargo/gönderi başlatmaz.
+
+`fulfilled` hâlâ gelecekteki order→sale/fulfillment operation'ına ayrılmıştır. Sipariş
+listesi ortak `commerce.orders` kaynağını gösterir; bugün manuel bayi, ileride online
+satış ve WhatsApp Business aynı listeye kaynak etiketiyle düşebilir.
+
 ### Stok sayımı kararı
 
 `count` bir UI delta girişi değildir. Kullanıcı gerçek fiziksel miktarı girer.
