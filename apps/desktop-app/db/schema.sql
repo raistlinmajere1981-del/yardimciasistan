@@ -203,6 +203,48 @@ CREATE TABLE commerce_sales (
   deleted_at TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE commerce_orders (
+  id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES business(id),
+  customer_id TEXT NULL,
+  customer_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'placed'
+    CHECK (status IN ('placed', 'confirmed', 'fulfilled', 'cancelled')),
+  source TEXT NOT NULL DEFAULT 'desktop',
+  source_reference TEXT NOT NULL DEFAULT '',
+  subtotal REAL NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
+  discount_total REAL NOT NULL DEFAULT 0 CHECK (discount_total >= 0),
+  total REAL NOT NULL DEFAULT 0 CHECK (total >= 0),
+  currency TEXT NOT NULL DEFAULT 'TRY'
+    CHECK (length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+  note TEXT NOT NULL DEFAULT '',
+  placed_at TEXT NOT NULL,
+  confirmed_at TEXT NOT NULL DEFAULT '',
+  fulfilled_at TEXT NOT NULL DEFAULT '',
+  cancelled_at TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT NOT NULL DEFAULT '',
+  FOREIGN KEY (business_id, customer_id) REFERENCES customers(business_id, id),
+  CHECK (discount_total <= subtotal),
+  CHECK (total = subtotal - discount_total)
+);
+
+CREATE TABLE commerce_order_items (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES commerce_orders(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  sku TEXT NOT NULL DEFAULT '',
+  barcode TEXT NOT NULL DEFAULT '',
+  unit TEXT NOT NULL DEFAULT 'piece',
+  unit_price REAL NOT NULL CHECK (unit_price >= 0),
+  quantity REAL NOT NULL CHECK (quantity > 0),
+  line_total REAL NOT NULL CHECK (line_total >= 0),
+  tax_rate REAL NOT NULL DEFAULT 0 CHECK (tax_rate >= 0),
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE commerce_suppliers (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
@@ -942,6 +984,20 @@ CREATE INDEX idx_commerce_sales_business
   ON commerce_sales (business_id, status, opened_at DESC);
 
 CREATE UNIQUE INDEX idx_commerce_sales_business_id ON commerce_sales(business_id, id);
+
+CREATE INDEX idx_commerce_order_items_order
+  ON commerce_order_items (order_id, created_at, id);
+
+CREATE INDEX idx_commerce_orders_business_status
+  ON commerce_orders (business_id, status, placed_at DESC, id DESC);
+
+CREATE INDEX idx_commerce_orders_customer
+  ON commerce_orders (business_id, customer_id, placed_at DESC)
+  WHERE customer_id IS NOT NULL AND deleted_at = '';
+
+CREATE UNIQUE INDEX idx_commerce_orders_source_reference
+  ON commerce_orders (business_id, source, source_reference)
+  WHERE source_reference != '' AND deleted_at = '';
 
 CREATE INDEX idx_commerce_suppliers_business
   ON commerce_suppliers (business_id, is_active, name);
