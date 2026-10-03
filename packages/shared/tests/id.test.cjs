@@ -20,5 +20,6 @@ test("isSupportedIdPrefix allows documented prefixes", () => {
   assert.equal(isSupportedIdPrefix("commerce_cart_draft_"), true);
   assert.equal(isSupportedIdPrefix("commerce_order_"), true);
   assert.equal(isSupportedIdPrefix("commerce_order_item_"), true);
+  assert.equal(isSupportedIdPrefix("commerce_order_fulfillment_"), true);
   assert.equal(isSupportedIdPrefix("unknown_"), false);
 });
