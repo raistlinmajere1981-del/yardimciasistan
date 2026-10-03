@@ -81,6 +81,7 @@ try {
       taxNumber: "1234567890",
       authorizedPerson: "Ticari Müşteri",
       dealerStatus: "candidate",
+      priceGroup: "retail",
       paymentTermDays: 15,
       notes: "İlk görüşme tamamlandı."
     }
@@ -94,6 +95,7 @@ try {
   assert.equal(firstCustomer.commercialProfile?.taxOffice, "Cide");
   assert.equal(firstCustomer.commercialProfile?.taxNumber, "1234567890");
   assert.equal(firstCustomer.commercialProfile?.dealerStatus, "candidate");
+  assert.equal(firstCustomer.commercialProfile?.priceGroup, "retail");
   assert.equal(firstCustomer.commercialProfile?.paymentTermDays, 15);
 
   const raw = new DatabaseSync(database.databasePath);
@@ -119,6 +121,7 @@ try {
         taxNumber: "1234567890",
         authorizedPerson: "Ticari Müşteri Güncel",
         dealerStatus: "active",
+        priceGroup: "dealer_a",
         paymentTermDays: 30,
         notes: "Bayi sözleşmesi hazır."
       }
@@ -126,12 +129,13 @@ try {
     assert.equal(updated.ok, true, updated.ok ? "" : updated.message);
 
     const updatedStored = raw.prepare(`
-      SELECT company_name, dealer_status, payment_term_days, created_at
+      SELECT company_name, dealer_status, price_group, payment_term_days, created_at
       FROM customer_commercial_profiles
       WHERE customer_id = ?
     `).get(firstId);
     assert.equal(updatedStored.company_name, "Karadeniz Gıda Ticaret");
     assert.equal(updatedStored.dealer_status, "active");
+    assert.equal(updatedStored.price_group, "dealer_a");
     assert.equal(Number(updatedStored.payment_term_days), 30);
     assert.equal(String(updatedStored.created_at), createdAt, "Profile update must preserve created_at.");
   } finally {
@@ -166,6 +170,7 @@ try {
       taxNumber: "2222222222",
       authorizedPerson: "İkinci Yetkili",
       dealerStatus: "candidate",
+      priceGroup: "retail",
       paymentTermDays: 0,
       notes: ""
     }
@@ -183,6 +188,7 @@ try {
       taxNumber: "1234567890",
       authorizedPerson: "İkinci Yetkili",
       dealerStatus: "active",
+      priceGroup: "dealer_b",
       paymentTermDays: 10,
       notes: ""
     }
@@ -215,6 +221,7 @@ try {
       taxNumber: "1234567890",
       authorizedPerson: "Ticari Müşteri Güncel",
       dealerStatus: "active",
+      priceGroup: "dealer_a",
       paymentTermDays: 30,
       notes: ""
     }
@@ -247,6 +254,7 @@ try {
       taxNumber: "1234567890",
       authorizedPerson: "Yeni Yetkili",
       dealerStatus: "candidate",
+      priceGroup: "dealer_b",
       paymentTermDays: 7,
       notes: ""
     }
