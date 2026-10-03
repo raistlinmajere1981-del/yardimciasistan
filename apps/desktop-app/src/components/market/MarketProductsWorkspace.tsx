@@ -76,6 +76,7 @@ export function MarketProductsWorkspace({
   const navigation = useWorkspaceNavigation();
   const { snapshot } = useBusinessCapabilityRuntime();
   const inventoryEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.INVENTORY);
+  const wholesaleEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.WHOLESALE);
   const [search, setSearch] = useState("");
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [createOpen, setCreateOpen] = useState(false);
@@ -296,6 +297,7 @@ export function MarketProductsWorkspace({
             categories={categories}
             inventoryEnabled={inventoryEnabled}
             productDataEnabled={productDataEnabled}
+            wholesaleEnabled={wholesaleEnabled}
             disabled={busy || saveState === "loading"}
             mode="all"
             lookupSeed={productLookupRequest}
