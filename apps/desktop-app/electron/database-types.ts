@@ -9,8 +9,8 @@ import type {
   StockImageImportSource,
   ProductDataProviderId,
   BusinessCapability,
-  type CustomerCommercialProfile,
-  type SaveCustomerCommercialProfileInput
+  CustomerCommercialProfile,
+  SaveCustomerCommercialProfileInput
 } from "@yardimci-asistan/shared";
 import type {
   AndroidDeviceRole,
