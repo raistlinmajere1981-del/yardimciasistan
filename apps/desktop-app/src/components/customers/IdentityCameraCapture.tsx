@@ -9,6 +9,10 @@ import {
   type IdentityFrameQuality
 } from "../../app/identity-camera-quality";
 import { announceIdentityCamera } from "../../app/identity-camera-feedback";
+import {
+  serializeRendererError,
+  writeRendererDiagnostic
+} from "../../app/diagnostics-client";
 import { ActionButton } from "../ui/ActionButton";
 import { WorkspaceSubflowOverlay } from "../workspace/WorkspaceSubflowOverlay";
 
@@ -107,7 +111,14 @@ export function IdentityCameraCapture({
     try {
       const file = await captureVideoFrame(videoRef.current, side);
       await finishSide(file);
-    } catch {
+    } catch (error) {
+      writeRendererDiagnostic({
+        level: "ERROR",
+        scope: "identity-camera",
+        event: "identity-camera.capture.failed",
+        message: "Kimlik kamerasından manuel fotoğraf alınamadı.",
+        error: serializeRendererError(error)
+      });
       setStatus("Fotoğraf alınamadı. Kamerayı sabit tutup yeniden deneyin.");
     } finally {
       captureBusyRef.current = false;
@@ -119,10 +130,29 @@ export function IdentityCameraCapture({
 
     async function startCamera() {
       if (!navigator.mediaDevices?.getUserMedia) {
+        writeRendererDiagnostic({
+          level: "WARN",
+          scope: "identity-camera",
+          event: "identity-camera.api.unavailable",
+          message: "Renderer ortamında getUserMedia kamera API'si kullanılamıyor.",
+          meta: {
+            secureContext: window.isSecureContext
+          }
+        });
         setPhase("error");
         setStatus("Bu sistemde kamera erişimi kullanılamıyor. Dosyadan kimlik görseli seçebilirsiniz.");
         return;
       }
+
+      writeRendererDiagnostic({
+        level: "INFO",
+        scope: "identity-camera",
+        event: "identity-camera.start.requested",
+        message: "Kimlik kamerası başlatılıyor.",
+        meta: {
+          secureContext: window.isSecureContext
+        }
+      });
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -144,15 +174,47 @@ export function IdentityCameraCapture({
         await video.play();
         if (cancelled) return;
 
+        const videoTrack = stream.getVideoTracks()[0];
+        const trackSettings = videoTrack?.getSettings();
+        writeRendererDiagnostic({
+          level: "INFO",
+          scope: "identity-camera",
+          event: "identity-camera.started",
+          message: "Kimlik kamerası başarıyla başlatıldı.",
+          meta: {
+            trackLabel: videoTrack?.label ?? "",
+            width: trackSettings?.width ?? 0,
+            height: trackSettings?.height ?? 0,
+            frameRate: trackSettings?.frameRate ?? 0,
+            facingMode: trackSettings?.facingMode ?? ""
+          }
+        });
+
         setPhase("capturing");
         setStatus("Kimliği kameraya gösterin.");
         announceIdentityCamera("Kimliği kameraya gösterin.", "prompt");
       } catch (error) {
         setPhase("error");
+        writeRendererDiagnostic({
+          level: "ERROR",
+          scope: "identity-camera",
+          event: "identity-camera.start.failed",
+          message: "Kimlik kamerası başlatılamadı.",
+          meta: {
+            secureContext: window.isSecureContext
+          },
+          error: serializeRendererError(error)
+        });
+        void writeCameraDeviceSnapshot();
+
         if (error instanceof DOMException && error.name === "NotAllowedError") {
-          setStatus("Kamera izni verilmedi. Kamerayı kullanmak için sistem iznini etkinleştirin veya dosyadan görsel seçin.");
+          setStatus("Kamera izni verilmedi. Windows kamera gizliliği ve masaüstü uygulama iznini kontrol edin veya dosyadan görsel seçin.");
         } else if (error instanceof DOMException && error.name === "NotFoundError") {
           setStatus("Kullanılabilir bir kamera bulunamadı. Dosyadan kimlik görseli seçebilirsiniz.");
+        } else if (error instanceof DOMException && error.name === "NotReadableError") {
+          setStatus("Kamera işletim sistemi tarafından açılamadı. Kamerayı kullanan başka bir uygulama varsa kapatıp yeniden deneyin.");
+        } else if (error instanceof DOMException && error.name === "SecurityError") {
+          setStatus("Kamera erişimi güvenlik ayarları tarafından engellendi. Sistem kamera izinlerini kontrol edin.");
         } else {
           setStatus("Kamera başlatılamadı. Dosyadan kimlik görseli seçebilirsiniz.");
         }
@@ -310,6 +372,32 @@ export function IdentityCameraCapture({
       <canvas ref={analysisCanvasRef} className="identity-camera__analysis-canvas" aria-hidden="true" />
     </div>
   </WorkspaceSubflowOverlay>;
+}
+
+async function writeCameraDeviceSnapshot() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter((device) => device.kind === "videoinput");
+    writeRendererDiagnostic({
+      level: "INFO",
+      scope: "identity-camera",
+      event: "identity-camera.devices.snapshot",
+      message: "Kamera başlatma hatası sonrası medya aygıtları sayıldı.",
+      meta: {
+        videoInputCount: videoInputs.length,
+        labeledVideoInputCount: videoInputs.filter((device) => Boolean(device.label)).length
+      }
+    });
+  } catch (error) {
+    writeRendererDiagnostic({
+      level: "WARN",
+      scope: "identity-camera",
+      event: "identity-camera.devices.inspect.failed",
+      message: "Kamera hatası sonrası medya aygıtları listelenemedi.",
+      error: serializeRendererError(error)
+    });
+  }
 }
 
 async function captureVideoFrame(video: HTMLVideoElement, side: CaptureSide): Promise<File> {
