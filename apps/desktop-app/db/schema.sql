@@ -134,6 +134,8 @@ CREATE TABLE catalog_products (
   barcode TEXT NOT NULL DEFAULT '',
   description TEXT NOT NULL DEFAULT '',
   sale_price REAL NOT NULL DEFAULT 0,
+  dealer_price_a REAL NULL CHECK (dealer_price_a IS NULL OR dealer_price_a >= 0),
+  dealer_price_b REAL NULL CHECK (dealer_price_b IS NULL OR dealer_price_b >= 0),
   purchase_price REAL NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'TRY',
   unit TEXT NOT NULL DEFAULT 'piece',
@@ -335,6 +337,8 @@ CREATE TABLE customer_commercial_profiles (
   authorized_person TEXT NOT NULL DEFAULT '',
   dealer_status TEXT NOT NULL DEFAULT 'candidate'
     CHECK (dealer_status IN ('candidate', 'active', 'inactive')),
+  price_group TEXT NOT NULL DEFAULT 'retail'
+    CHECK (price_group IN ('retail', 'dealer_a', 'dealer_b')),
   payment_term_days INTEGER NOT NULL DEFAULT 0
     CHECK (payment_term_days BETWEEN 0 AND 3650),
   notes TEXT NOT NULL DEFAULT '',
