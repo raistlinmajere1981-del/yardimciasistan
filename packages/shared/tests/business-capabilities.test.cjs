@@ -24,6 +24,8 @@ test("market profile is available as retail foundation without accommodation cou
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.RETAIL_BARCODE), true);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.INVENTORY), true);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.ACCOMMODATION_ROOMS), false);
+  assert.equal(hasBusinessCapability(market.defaultCapabilities, C.ORDERS), false);
+  assert.equal(market.optionalCapabilities.includes(C.ORDERS), false);
   assert.equal(market.optionalCapabilities.includes(C.REQUESTS), true);
   assert.equal(market.defaultOptionalCapabilities.includes(C.REQUESTS), false);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.REQUESTS), false);
