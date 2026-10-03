@@ -822,6 +822,23 @@ button.market-list-row {
   color: var(--color-text-muted);
 }
 
+.market-order-product-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  min-height: 112px;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.market-order-product-empty strong {
+  color: var(--color-text);
+}
+
 .market-order-draft {
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
