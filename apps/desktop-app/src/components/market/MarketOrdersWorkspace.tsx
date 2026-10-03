@@ -73,7 +73,7 @@ export function MarketOrdersWorkspace({
   customers: DesktopCustomer[];
   products: CatalogProduct[];
   busy: boolean;
-  onStateChange: (state: "idle" | "loading" | "success" | "error", message?: string) => void;
+  onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
   const bridge = window.yardimciDesktop?.commerce;
   const activeDealers = useMemo(
