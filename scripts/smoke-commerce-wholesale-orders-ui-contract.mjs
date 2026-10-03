@@ -30,7 +30,11 @@ assert.match(
   /product\.isActive !== false/,
   "Orders UI must only exclude products that are explicitly inactive."
 );
-assert.match(workspace, /resolveProductPrice\(\{ productId: product\.id, customerId \}\)/);
+assert.match(
+  workspace,
+  /resolveProductPrice\(\{ productId: product\.id, customerId: requestedCustomerId \}\)/,
+  "Price preview must resolve against the customer captured when the request starts."
+);
 assert.match(workspace, /source:\s*"desktop-wholesale"/);
 assert.match(workspace, /sourceReference:\s*draftReferenceRef\.current/);
 assert.match(workspace, /customerIdRef\.current !== requestedCustomerId/);
