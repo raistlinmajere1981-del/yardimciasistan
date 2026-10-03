@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import process from "node:process";
+import { readProductVersion } from "./product-version.mjs";
 
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, "firm-template", "web-module");
@@ -18,6 +19,7 @@ const requiredFiles = [
   "widget.js",
   "api/request.php",
   "api/sync.php",
+  "api/version.php",
   "api/business.php",
   "api/menu.php",
   "api/rooms.php",
@@ -49,6 +51,7 @@ const requiredFiles = [
   "config/.htaccess",
   "config/ai.php",
   "config/business.json",
+  "config/version.json",
   "data/.htaccess",
   "data/ai-conversations.json",
   "media/.htaccess",
@@ -104,8 +107,12 @@ const packageFiles = listFiles(packageRoot);
 const businessConfig = JSON.parse(readFileSync(join(packageRoot, "config", "business.json"), "utf8"));
 validateBusinessConfig(businessConfig, "paket config/business.json");
 const archives = createArchives();
+const canonicalVersion = readProductVersion(repoRoot);
+const versionMetadata = JSON.parse(readFileSync(join(packageRoot, "config", "version.json"), "utf8"));
 const manifest = {
   package_name: "yardimci-asistan",
+  product_version: canonicalVersion.version,
+  web_module_version: canonicalVersion.webModuleVersion,
   source: relative(repoRoot, sourceRoot),
   output: relative(repoRoot, packageRoot),
   generated_at: new Date().toISOString(),
@@ -144,7 +151,13 @@ function validateSource() {
   }
 
   assertJsonObject("config/business.json");
+  assertJsonObject("config/version.json");
   assertJsonArray("data/ai-conversations.json");
+
+  const canonicalVersion = readProductVersion(repoRoot);
+  const versionMetadata = JSON.parse(readFileSync(join(sourceRoot, "config", "version.json"), "utf8"));
+  assert.equal(versionMetadata.product_version, canonicalVersion.version, "Web modülü product_version canonical ürün sürümüyle eşleşmeli.");
+  assert.equal(versionMetadata.web_module_version, canonicalVersion.webModuleVersion, "Web modülü sürümü canonical webModuleVersion ile eşleşmeli.");
 
   const business = JSON.parse(readFileSync(join(sourceRoot, "config", "business.json"), "utf8"));
   validateBusinessConfig(business, "kaynak config/business.json");
@@ -292,6 +305,10 @@ function applyPackageOverrides() {
 
 function validatePackage(manifest, businessConfig) {
   const manifestFiles = new Set(manifest.files.map((file) => file.path));
+  assert.equal(manifest.product_version, canonicalVersion.version, "Paket product_version canonical sürümle eşleşmeli.");
+  assert.equal(manifest.web_module_version, canonicalVersion.webModuleVersion, "Paket web_module_version canonical sürümle eşleşmeli.");
+  assert.equal(versionMetadata.product_version, canonicalVersion.version, "Paket config/version.json product_version uyuşmalı.");
+  assert.equal(versionMetadata.web_module_version, canonicalVersion.webModuleVersion, "Paket config/version.json web_module_version uyuşmalı.");
   for (const file of requiredFiles) {
     assert.ok(manifestFiles.has(file), `Paket manifestinde eksik dosya: ${file}`);
   }
