@@ -14,11 +14,13 @@ export type MarketAsyncState = "idle" | "loading" | "success" | "error";
 export function useMarketController({
   businessCapabilities,
   active,
-  enabled = true
+  enabled = true,
+  productDataEnabled = false
 }: {
   businessCapabilities: BusinessCapabilitySnapshot | null;
   active: boolean;
   enabled?: boolean;
+  productDataEnabled?: boolean;
 }) {
   const bridge = window.yardimciDesktop?.commerce;
   const catalogEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CATALOG);
@@ -27,7 +29,6 @@ export function useMarketController({
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<MarketAsyncState>("idle");
-  const [productDataEnabled, setProductDataEnabled] = useState(false);
   const enabledRef = useRef(enabled);
   const reloadGeneration = useRef(0);
   const pinnedProducts = useRef(new Map<string, CatalogProduct>());
@@ -69,28 +70,6 @@ export function useMarketController({
     setProducts([...nextProducts, ...retainedProducts]);
     setCategories(nextCategories);
   }, [bridge, catalogEnabled]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    let disposed = false;
-    const setupRequest = window.yardimciDesktop?.getSetupData?.();
-    if (!setupRequest) {
-      setProductDataEnabled(false);
-      return () => {
-        disposed = true;
-      };
-    }
-    void setupRequest
-      .then((setup) => {
-        if (!disposed) setProductDataEnabled(setup.productData.enabled);
-      })
-      .catch(() => {
-        if (!disposed) setProductDataEnabled(false);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) {
