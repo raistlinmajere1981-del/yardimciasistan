@@ -384,3 +384,28 @@ Manual dealer orders use the shared `commerce.orders` aggregate with source
 `desktop-wholesale`. Confirmation does not create a Sale, inventory movement, payment or
 shipment. Those side effects remain deferred to an explicit fulfillment/application slice.
 
+## D-025 — Fulfillment owns Order → Sale atomically
+
+**Status:** ACCEPTED (2026-10-03)
+
+Only a confirmed Commerce Order may be fulfilled. Fulfillment is a single application
+operation and transaction: authoritative Order item snapshots create the Sale, current
+catalog data is consulted only for inventory tracking/cost metadata, optional customer
+credit debt is recorded, an explicit fulfillment link is persisted and the Order becomes
+fulfilled.
+
+Settlement is explicit. Positive totals require either paid (cash/card/bank/other) or
+credit; commercial payment terms never imply credit automatically. Zero-total Orders use
+no_payment and produce a closed paid Sale with payment_method=none so no cash receipt is
+implied.
+
+A stable operation key makes retries idempotent. Reusing the same key with different
+settlement/location/order input is rejected. A separate commerce_order_fulfillments link
+table is used instead of embedding sale_id into commerce_orders.
+
+Fulfillment deliberately does not add a new finance entry for paid Commerce Sales because
+the existing Market Quick Sale path does not currently project paid commerce_sales into
+finance_entries. Customer-credit finance income remains tied to later actual collection.
+Finance standardization, if desired, is a separate domain decision and must apply to both
+sales paths consistently.
+
