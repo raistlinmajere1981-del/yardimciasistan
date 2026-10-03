@@ -43,11 +43,27 @@ export type InstallationSnapshot = {
   healthChecks: HealthCheckSnapshot[];
 };
 
+export type ReleaseChannelSnapshot = {
+  id: string;
+  label: string;
+  manifestUrl: string;
+  liveVersion: string | null;
+  status: StatusKind;
+  detail: string;
+  durationMs: number | null;
+};
+
+export type ReleaseSnapshot = {
+  expectedVersion: string;
+  desktop: ReleaseChannelSnapshot[];
+};
+
 export type OverviewSnapshot = {
   generatedAt: string;
   repo: RepoSnapshot;
   product: ProductSnapshot;
   installations: InstallationSnapshot[];
+  release: ReleaseSnapshot;
   counts: {
     installations: number;
     healthy: number;
