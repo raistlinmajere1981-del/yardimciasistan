@@ -17,6 +17,7 @@ export type IdPrefix =
   | "sale_item_"
   | "commerce_order_"
   | "commerce_order_item_"
+  | "commerce_order_fulfillment_"
   | "credit_entry_"
   | "catalog_product_draft_"
   | "supplier_"
@@ -55,6 +56,7 @@ export const ID_PREFIXES: readonly IdPrefix[] = [
   "sale_item_",
   "commerce_order_",
   "commerce_order_item_",
+  "commerce_order_fulfillment_",
   "credit_entry_",
   "catalog_product_draft_",
   "supplier_",
