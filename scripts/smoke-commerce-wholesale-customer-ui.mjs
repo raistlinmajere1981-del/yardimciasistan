@@ -132,6 +132,7 @@ try {
   await createDialog.getByLabel("Vergi dairesi", { exact: true }).fill("Cide");
   await createDialog.getByLabel("Vergi no", { exact: true }).fill("9876543210");
   await createDialog.getByLabel("Bayi durumu", { exact: true }).selectOption("active");
+  await createDialog.getByLabel("Fiyat grubu", { exact: true }).selectOption("dealer_a");
   await createDialog.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("30");
   await createDialog.getByLabel("Ticari not", { exact: true }).fill("İlk bayi profili.");
   await createDialog.getByRole("button", { name: "Kaydet", exact: true }).click();
@@ -144,6 +145,7 @@ try {
   await expect(workspace.getByLabel("Firma / unvan", { exact: true })).toHaveValue("Ada Gıda Ltd. Şti.");
   await expect(workspace.getByLabel("Vergi no", { exact: true })).toHaveValue("9876543210");
   await expect(workspace.getByLabel("Bayi durumu", { exact: true })).toHaveValue("active");
+  await expect(workspace.getByLabel("Fiyat grubu", { exact: true })).toHaveValue("dealer_a");
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("30");
 
   const firstSave = calls.find((call) => call.method === "saveCustomer");
@@ -154,12 +156,13 @@ try {
     taxNumber: "9876543210",
     authorizedPerson: "Ada Bayi",
     dealerStatus: "active",
+    priceGroup: "dealer_a",
     paymentTermDays: 30,
     notes: "İlk bayi profili."
   });
 
   const createdRow = raw.prepare(`
-    SELECT customer_id, company_name, dealer_status, payment_term_days, tax_number
+    SELECT customer_id, company_name, dealer_status, price_group, payment_term_days, tax_number
     FROM customer_commercial_profiles
     WHERE tax_number = '9876543210'
   `).get();
@@ -167,6 +170,7 @@ try {
   const customerId = createdRow.customer_id;
   assert.equal(createdRow.company_name, "Ada Gıda Ltd. Şti.");
   assert.equal(createdRow.dealer_status, "active");
+  assert.equal(createdRow.price_group, "dealer_a");
   assert.equal(Number(createdRow.payment_term_days), 30);
 
   await workspace.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("45");
