@@ -1,4 +1,4 @@
-import { Archive, Boxes, ShoppingBasket, Smartphone, Tags, Truck, type LucideIcon } from "lucide-react";
+import { Archive, Boxes, ClipboardList, ShoppingBasket, Smartphone, Tags, Truck, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
@@ -19,6 +19,7 @@ import {
   type ProductLookupFormRequest
 } from "../components/market/MarketProductsWorkspace";
 import { MarketPurchasingWorkspace } from "../components/market/MarketPurchasingWorkspace";
+import { MarketOrdersWorkspace } from "../components/market/MarketOrdersWorkspace";
 import {
   MarketQuickSaleWorkspace
 } from "../components/market/MarketQuickSaleWorkspace";
@@ -49,6 +50,8 @@ export function MarketPage({
   const inventoryEnabled = runtimeHasCapability(snapshot, C.INVENTORY);
   const salesEnabled = runtimeHasCapability(snapshot, C.SALES);
   const customerCreditEnabled = runtimeHasCapability(snapshot, C.CUSTOMER_CREDIT);
+  const ordersEnabled = runtimeHasCapability(snapshot, C.ORDERS);
+  const wholesaleEnabled = runtimeHasCapability(snapshot, C.WHOLESALE);
   const barcodeEnabled = runtimeHasCapability(snapshot, C.RETAIL_BARCODE);
   const purchasingEnabled = runtimeHasCapability(snapshot, C.RETAIL_PURCHASING);
   const suppliersEnabled = runtimeHasCapability(snapshot, C.RETAIL_SUPPLIERS);
@@ -67,11 +70,12 @@ export function MarketPage({
   const tabs = useMemo<MarketTabDefinition[]>(() => [
     { id: "quickSale", label: "Hızlı Satış", description: "Kasada hızlı ürün ekleme ve ödeme", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
     { id: "products", label: "Ürünler", description: "Ürün ve kategori yönetimi", icon: Archive, enabled: catalogEnabled },
+    { id: "orders", label: "Siparişler", description: "Bayi ve kanal siparişleri", icon: ClipboardList, enabled: ordersEnabled && wholesaleEnabled },
     { id: "phoneCarts", label: "Telefon Sepetleri", description: "Telefonda hazırlanan satış sepetleri", icon: Smartphone, enabled: catalogEnabled && salesEnabled },
     { id: "inventory", label: "Stok", description: "Fiziksel sayım ve hareket geçmişi", icon: Boxes, enabled: inventoryEnabled },
     { id: "purchasing", label: "Tedarikçiler / Alım", description: "Tedarikçi ve stok girişi", icon: Truck, enabled: suppliersEnabled || purchasingEnabled },
     { id: "labels", label: "Etiketler", description: "Ürün ve raf etiketi hazırlama", icon: Tags, enabled: labelsEnabled }
-  ], [catalogEnabled, inventoryEnabled, labelsEnabled, purchasingEnabled, salesEnabled, suppliersEnabled]);
+  ], [catalogEnabled, inventoryEnabled, labelsEnabled, ordersEnabled, purchasingEnabled, salesEnabled, suppliersEnabled, wholesaleEnabled]);
   const availableTabs = tabs.filter((tab) => tab.enabled);
   const activeTab = availableTabs.some((tab) => tab.id === activeView)
     ? activeView
@@ -160,6 +164,13 @@ export function MarketPage({
           onStateChange={handleStateChange}
           productLookupRequest={productLookupRequest}
           onProductLookupLoaded={clearProductLookupRequest}
+        />
+      ) : activeTab === "orders" ? (
+        <MarketOrdersWorkspace
+          customers={customers}
+          products={products}
+          busy={dataState === "loading"}
+          onStateChange={handleStateChange}
         />
       ) : activeTab === "phoneCarts" ? (
         <MarketCompanionInboxWorkspace
