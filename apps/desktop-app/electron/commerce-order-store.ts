@@ -155,6 +155,14 @@ function getOrderDetailInDatabase(
   return { order: mapOrder(row), items };
 }
 
+export function getCommerceOrderDetailInTransaction(
+  database: DatabaseSync,
+  businessId: string,
+  orderId: string
+): CommerceOrderDetail | null {
+  return getOrderDetailInDatabase(database, businessId, orderId);
+}
+
 export function listCommerceOrders(
   databasePath: string,
   options: ListCommerceOrdersOptions = {}
