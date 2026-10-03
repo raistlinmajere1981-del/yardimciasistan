@@ -533,3 +533,363 @@ nav {
     grid-template-columns: 1fr;
   }
 }
+
+
+.installations-layout {
+  display: grid;
+  grid-template-columns: minmax(270px, 0.72fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.installation-picker {
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(188, 213, 237, 0.72);
+  box-shadow: 0 16px 48px rgba(47, 90, 133, 0.075);
+}
+
+.picker-heading {
+  padding: 8px 8px 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e9f0f7;
+}
+
+.picker-heading strong,
+.picker-heading span {
+  display: block;
+}
+
+.picker-heading strong {
+  font-size: 15px;
+}
+
+.picker-heading span {
+  color: #7890aa;
+  font-size: 10px;
+}
+
+.picker-list {
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.picker-item {
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  color: #17345d;
+  text-align: left;
+  cursor: pointer;
+  transition: 140ms ease;
+}
+
+.picker-item:hover {
+  background: #f3f9ff;
+  border-color: #e4eff9;
+}
+
+.picker-item:active {
+  transform: translateY(1px);
+}
+
+.picker-item--active {
+  background: #eaf5ff;
+  border-color: #d3e9ff;
+  box-shadow: inset 3px 0 0 #1676dc;
+}
+
+.picker-copy {
+  min-width: 0;
+}
+
+.picker-copy strong,
+.picker-copy small {
+  display: block;
+}
+
+.picker-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.picker-copy small {
+  margin-top: 4px;
+  color: #8da0b5;
+  font-size: 9px;
+}
+
+.installation-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.installation-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.installation-hero-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.installation-hero-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: #1473d0;
+  background: #eaf5ff;
+}
+
+.installation-hero-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.installation-hero-title h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.installation-hero-main p {
+  margin: 7px 0 0;
+  color: #7890aa;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.installation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.installation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  min-height: 108px;
+  padding: 16px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(188, 213, 237, 0.72);
+  box-shadow: 0 12px 32px rgba(47, 90, 133, 0.055);
+}
+
+.summary-card span,
+.summary-card strong,
+.summary-card small {
+  display: block;
+}
+
+.summary-card span {
+  color: #7b91a9;
+  font-size: 10px;
+}
+
+.summary-card strong {
+  margin: 8px 0 6px;
+  font-size: 16px;
+}
+
+.summary-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8da0b5;
+  font-size: 9px;
+}
+
+.health-list {
+  display: grid;
+}
+
+.health-row {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.health-row:last-child {
+  border-bottom: 0;
+}
+
+.health-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #96a9bd;
+  box-shadow: 0 0 0 5px rgba(150, 169, 189, 0.12);
+}
+
+.health-dot[data-status="ready"] {
+  background: #27bc78;
+  box-shadow: 0 0 0 5px rgba(39, 188, 120, 0.12);
+}
+
+.health-dot[data-status="warning"] {
+  background: #e8aa33;
+  box-shadow: 0 0 0 5px rgba(232, 170, 51, 0.12);
+}
+
+.health-dot[data-status="error"] {
+  background: #e45f67;
+  box-shadow: 0 0 0 5px rgba(228, 95, 103, 0.12);
+}
+
+.health-copy strong,
+.health-copy small,
+.health-tail small {
+  display: block;
+}
+
+.health-copy strong {
+  font-size: 12px;
+}
+
+.health-copy small {
+  margin-top: 4px;
+  color: #8499b0;
+  font-size: 10px;
+}
+
+.health-tail {
+  min-width: 110px;
+  text-align: right;
+}
+
+.health-tail .status {
+  margin-left: auto;
+}
+
+.health-tail small {
+  margin-top: 5px;
+  color: #9babbc;
+  font-size: 9px;
+}
+
+.installation-metadata {
+  padding-bottom: 16px;
+}
+
+.metadata-grid {
+  padding-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+}
+
+.metadata-grid div {
+  min-width: 0;
+  padding: 12px 13px;
+  border-radius: 11px;
+  background: #f7fbff;
+  border: 1px solid #e7eff7;
+}
+
+.metadata-grid span,
+.metadata-grid strong {
+  display: block;
+}
+
+.metadata-grid span {
+  margin-bottom: 5px;
+  color: #8aa0b7;
+  font-size: 9px;
+}
+
+.metadata-grid strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.security-note {
+  margin-top: 14px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: #f1f8ff;
+  border: 1px solid #deecf9;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #5d7895;
+  font-size: 10px;
+}
+
+@media (max-width: 1120px) {
+  .installations-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .picker-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .app-shell {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+
+  .brand > div:last-child,
+  .nav-item {
+    font-size: 0;
+  }
+
+  .nav-item {
+    justify-content: center;
+  }
+
+  .sidebar-status {
+    display: none;
+  }
+
+  .installation-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .installation-actions {
+    justify-content: flex-start;
+  }
+
+  .installation-summary-grid,
+  .metadata-grid,
+  .picker-list {
+    grid-template-columns: 1fr;
+  }
+}
