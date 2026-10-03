@@ -3,6 +3,8 @@ import {
   type BusinessCapability,
   type CatalogCategory,
   type CatalogProduct,
+  type CommerceOrder,
+  type CommerceOrderDetail,
   type CommercePurchaseOrder,
   type CommercePurchaseOrderDetail,
   type CommerceSale,
@@ -30,6 +32,15 @@ import {
   lookupExternalProductByBarcode
 } from "./product-data-service";
 
+import {
+  createCommerceOrder,
+  getCommerceOrder,
+  listCommerceOrders,
+  updateCommerceOrderStatus,
+  type CreateCommerceOrderInput,
+  type ListCommerceOrdersOptions,
+  type UpdateCommerceOrderStatusInput
+} from "./commerce-order-store";
 import {
   getCommercePurchaseOrder,
   listCommercePurchaseOrders,
@@ -60,7 +71,13 @@ import {
   type SetInventoryCountInput
 } from "./commerce-store";
 
-export type { ReceiveCommercePurchaseInput, SetInventoryCountInput };
+export type {
+  CreateCommerceOrderInput,
+  ListCommerceOrdersOptions,
+  ReceiveCommercePurchaseInput,
+  SetInventoryCountInput,
+  UpdateCommerceOrderStatusInput
+};
 export {
   addCustomerCreditAdjustment,
   createCustomerCreditSale,
@@ -289,6 +306,54 @@ export function createRuntimePaidSale(
     "Satış işlemleri bu işletmede etkin değil."
   );
   return createPaidCommerceSale(databasePath, input);
+}
+
+export function listRuntimeOrders(
+  databasePath: string,
+  options: ListCommerceOrdersOptions = {}
+): CommerceOrder[] {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.ORDERS,
+    "Sipariş yönetimi bu işletmede etkin değil."
+  );
+  return listCommerceOrders(databasePath, options);
+}
+
+export function getRuntimeOrder(
+  databasePath: string,
+  orderId: string
+): CommerceOrderDetail | null {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.ORDERS,
+    "Sipariş yönetimi bu işletmede etkin değil."
+  );
+  return getCommerceOrder(databasePath, orderId);
+}
+
+export function createRuntimeOrder(
+  databasePath: string,
+  input: CreateCommerceOrderInput
+): CommerceOrderDetail {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.ORDERS,
+    "Sipariş yönetimi bu işletmede etkin değil."
+  );
+  return createCommerceOrder(databasePath, input);
+}
+
+export function updateRuntimeOrderStatus(
+  databasePath: string,
+  input: UpdateCommerceOrderStatusInput
+): CommerceOrderDetail {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.ORDERS,
+    "Sipariş yönetimi bu işletmede etkin değil."
+  );
+  return updateCommerceOrderStatus(databasePath, input);
 }
 
 export function listRuntimeSuppliers(
