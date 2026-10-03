@@ -150,6 +150,53 @@ export interface CommerceSaleItem {
   createdAt: string;
 }
 
+export type CommerceOrderStatus =
+  | "placed"
+  | "confirmed"
+  | "fulfilled"
+  | "cancelled";
+
+export interface CommerceOrder {
+  id: string;
+  businessId: string;
+  customerId: string;
+  customerName: string;
+  status: CommerceOrderStatus;
+  source: string;
+  sourceReference: string;
+  subtotal: number;
+  discountTotal: number;
+  total: number;
+  currency: string;
+  note: string;
+  placedAt: string;
+  confirmedAt: string;
+  fulfilledAt: string;
+  cancelledAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommerceOrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  barcode: string;
+  unit: CommerceUnit;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+  taxRate: number;
+  createdAt: string;
+}
+
+export interface CommerceOrderDetail {
+  order: CommerceOrder;
+  items: CommerceOrderItem[];
+}
+
 export interface CommerceSupplier {
   id: string;
   businessId: string;
