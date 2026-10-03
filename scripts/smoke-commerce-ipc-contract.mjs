@@ -28,6 +28,10 @@ const channels = [
   "commerce:inventory:applyMovement",
   "commerce:inventory:setCount",
   "commerce:sale:createPaid",
+  "commerce:order:list",
+  "commerce:order:get",
+  "commerce:order:create",
+  "commerce:order:updateStatus",
   "commerce:cartDraft:list",
   "commerce:cartDraft:get",
   "commerce:cartDraft:loadForQuickSale",
@@ -71,6 +75,10 @@ const contractMethods = [
   "applyInventoryMovement",
   "setInventoryCount",
   "createPaidSale",
+  "listOrders",
+  "getOrder",
+  "createOrder",
+  "updateOrderStatus",
   "listCartDrafts",
   "getCartDraft",
   "loadCartDraftForQuickSale",
@@ -141,6 +149,21 @@ assert.match(
   "Paid sale must use the expected-domain IPC mutation wrapper."
 );
 assert.match(
+  ipcSource,
+  /mutateForIpc\("commerce:order:create"/,
+  "Order creation must use the expected-domain IPC mutation wrapper."
+);
+assert.match(
+  ipcSource,
+  /mutateForIpc\("commerce:order:updateStatus"/,
+  "Order status mutation must use the expected-domain IPC mutation wrapper."
+);
+assert.match(
+  ipcSource,
+  /code:\s*"invalid_order"/,
+  "Order domain rejections must have a stable expected error classification."
+);
+assert.match(
   preloadSource,
   /async function invokeCommerceMutation<T>/,
   "Preload must unwrap expected commerce mutation outcomes."
@@ -154,6 +177,16 @@ assert.match(
   preloadSource,
   /createPaidSale:\s*\(input\) => invokeCommerceMutation<CommerceSale>\("commerce:sale:createPaid"/,
   "Paid sale bridge must use the commerce mutation unwrap path."
+);
+assert.match(
+  preloadSource,
+  /createOrder:\s*\(input\) => invokeCommerceMutation<CommerceOrderDetail>\("commerce:order:create"/,
+  "Order creation bridge must use the commerce mutation unwrap path."
+);
+assert.match(
+  preloadSource,
+  /updateOrderStatus:\s*\(input\) => invokeCommerceMutation<CommerceOrderDetail>\("commerce:order:updateStatus"/,
+  "Order status bridge must use the commerce mutation unwrap path."
 );
 assert.doesNotMatch(
   ipcSource,
