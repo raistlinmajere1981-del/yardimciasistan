@@ -43,6 +43,9 @@ export function CustomersWorkspace({
   const [filter, setFilter] = useState<CustomerFilter>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [pendingCustomerId, setPendingCustomerId] = useState("");
+  const hasDealerCustomers = wholesaleEnabled && customers.some((customer) => Boolean(customer.commercialProfile));
+  const hasStayCustomers = stays.length > 0;
+  const hasReservationCustomers = reservations.length > 0;
 
   const rows = useMemo(() => customers.map((customer) => {
     const customerStays = stays.filter((stay) => stayHasCustomer(stay, customer.id));
@@ -98,8 +101,10 @@ export function CustomersWorkspace({
   }), [customers, filter, kbsOverview.enabled, notifications, reservations, searchText, stays, wholesaleEnabled]);
 
   useEffect(() => {
-    if (!wholesaleEnabled && filter === "dealers") setFilter("all");
-  }, [filter, wholesaleEnabled]);
+    if (filter === "dealers" && !hasDealerCustomers) setFilter("all");
+    if (filter === "staying" && !hasStayCustomers) setFilter("all");
+    if (filter === "reserved" && !hasReservationCustomers) setFilter("all");
+  }, [filter, hasDealerCustomers, hasReservationCustomers, hasStayCustomers]);
 
   useEffect(() => {
     if (createOpen || !pendingCustomerId) return;
@@ -134,9 +139,9 @@ export function CustomersWorkspace({
         onChange={setFilter}
         options={[
           { id: "all", label: "Tümü" },
-          ...(wholesaleEnabled ? [{ id: "dealers" as const, label: "Bayiler" }] : []),
-          { id: "staying", label: "Konaklayanlar" },
-          { id: "reserved", label: "Rezervasyonu Olanlar" },
+          ...(hasDealerCustomers ? [{ id: "dealers" as const, label: "Bayiler" }] : []),
+          ...(hasStayCustomers ? [{ id: "staying" as const, label: "Konaklayanlar" }] : []),
+          ...(hasReservationCustomers ? [{ id: "reserved" as const, label: "Rezervasyonu Olanlar" }] : []),
           ...(kbsOverview.enabled
             ? [
                 { id: "kbs_pending" as const, label: "Bildirim Bekleyen" },
