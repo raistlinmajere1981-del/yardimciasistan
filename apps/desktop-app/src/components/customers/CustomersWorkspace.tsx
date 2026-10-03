@@ -98,6 +98,10 @@ export function CustomersWorkspace({
   }), [customers, filter, kbsOverview.enabled, notifications, reservations, searchText, stays, wholesaleEnabled]);
 
   useEffect(() => {
+    if (!wholesaleEnabled && filter === "dealers") setFilter("all");
+  }, [filter, wholesaleEnabled]);
+
+  useEffect(() => {
     if (createOpen || !pendingCustomerId) return;
     if (navigation.openWorkspace({ entityType: "customer", entityId: pendingCustomerId, mode: "main", returnContext: { page: "customerWork", entityId: pendingCustomerId } })) {
       setPendingCustomerId("");
