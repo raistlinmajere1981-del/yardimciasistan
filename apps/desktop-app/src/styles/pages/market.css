@@ -1241,6 +1241,7 @@ button.market-list-row {
 
   .market-workspace--quickSale :is(.market-sale-catalog, .market-sale-cart),
   .market-workspace--products .market-panel,
+  .market-workspace--orders :is(.market-order-compose, .market-order-history),
   .market-workspace--inventory .market-panel {
     height: auto;
     overflow: visible;
