@@ -1,9 +1,12 @@
 import {
   Activity,
   CloudUpload,
+  ExternalLink,
   FlaskConical,
   GitBranch,
+  Globe2,
   Home,
+  KeyRound,
   LifeBuoy,
   PackageCheck,
   RefreshCw,
@@ -14,7 +17,12 @@ import {
   TriangleAlert
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { InstallationSnapshot, OverviewSnapshot, StatusKind } from "../shared/contracts";
+import type {
+  HealthCheckSnapshot,
+  InstallationSnapshot,
+  OverviewSnapshot,
+  StatusKind
+} from "../shared/contracts";
 
 type Section = "overview" | "installations" | "release" | "tests" | "deploy" | "support" | "system";
 
@@ -30,7 +38,7 @@ const NAV_ITEMS: Array<{ id: Section; label: string; icon: typeof Home }> = [
 
 function statusLabel(status: StatusKind) {
   if (status === "ready") return "Sağlıklı";
-  if (status === "warning") return "Sürüm farkı";
+  if (status === "warning") return "Dikkat";
   if (status === "error") return "Hata";
   if (status === "unconfigured") return "Yapılandırılmamış";
   return "Bilinmiyor";
@@ -98,7 +106,7 @@ function Overview({
           <div>
             <span>Canlı kurulumlar</span>
             <strong>{healthyText}</strong>
-            <small>{data.counts.drift ? `${data.counts.drift} sürüm farkı` : "Drift görünmüyor"}</small>
+            <small>{data.counts.drift ? `${data.counts.drift} dikkat` : "Drift görünmüyor"}</small>
           </div>
         </article>
 
@@ -190,6 +198,193 @@ function Overview({
   );
 }
 
+function HealthRow({ check }: { check: HealthCheckSnapshot }) {
+  return (
+    <div className="health-row">
+      <span className="health-dot" data-status={check.status} />
+      <div className="health-copy">
+        <strong>{check.label}</strong>
+        <small>{check.detail}</small>
+      </div>
+      <div className="health-tail">
+        <span className={statusClass(check.status)}>{statusLabel(check.status)}</span>
+        {check.durationMs !== null ? <small>{check.durationMs} ms</small> : null}
+      </div>
+    </div>
+  );
+}
+
+function Installations({
+  data,
+  refreshing,
+  onRefresh
+}: {
+  data: OverviewSnapshot;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState(data.installations[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!data.installations.some((item) => item.id === selectedId)) {
+      setSelectedId(data.installations[0]?.id ?? "");
+    }
+  }, [data.installations, selectedId]);
+
+  const selected = data.installations.find((item) => item.id === selectedId) ?? data.installations[0];
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">CANLI SİSTEMLER</p>
+          <h1>Kurulumlar</h1>
+          <p className="page-subtitle">
+            Kurulum kayıtları, canlı health kontrolleri ve sürüm durumları tek yerde.
+          </p>
+        </div>
+        <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
+          <RefreshCw size={17} className={refreshing ? "spin" : ""} />
+          {refreshing ? "Kontrol ediliyor" : "Tümünü Kontrol Et"}
+        </button>
+      </header>
+
+      <section className="installations-layout">
+        <aside className="installation-picker">
+          <div className="picker-heading">
+            <div>
+              <p className="panel-kicker">KAYITLAR</p>
+              <strong>{data.installations.length} kurulum</strong>
+            </div>
+            <span>{data.counts.healthy} sağlıklı</span>
+          </div>
+
+          <div className="picker-list">
+            {data.installations.map((installation) => (
+              <button
+                key={installation.id}
+                className={installation.id === selected?.id ? "picker-item picker-item--active" : "picker-item"}
+                onClick={() => setSelectedId(installation.id)}
+              >
+                <span className="installation-dot" data-status={installation.status} />
+                <span className="picker-copy">
+                  <strong>{installation.title}</strong>
+                  <small>{installation.kind}</small>
+                </span>
+                <span className={statusClass(installation.status)}>{statusLabel(installation.status)}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        {selected ? (
+          <div className="installation-detail">
+            <section className="panel installation-hero">
+              <div className="installation-hero-main">
+                <div className="installation-hero-icon"><Server size={24} /></div>
+                <div>
+                  <div className="installation-hero-title">
+                    <h2>{selected.title}</h2>
+                    <span className={statusClass(selected.status)}>{statusLabel(selected.status)}</span>
+                  </div>
+                  <p>{selected.statusNote}</p>
+                </div>
+              </div>
+
+              <div className="installation-actions">
+                <button
+                  className="button button--secondary"
+                  disabled={!selected.siteUrl}
+                  onClick={() => selected.siteUrl && window.adminControlCenter.openExternal(selected.siteUrl)}
+                >
+                  <Globe2 size={16} />
+                  Siteyi Aç
+                </button>
+                <button
+                  className="button button--secondary"
+                  disabled={!selected.webModuleUrl}
+                  onClick={() => selected.webModuleUrl && window.adminControlCenter.openExternal(selected.webModuleUrl)}
+                >
+                  <ExternalLink size={16} />
+                  Web Modülü
+                </button>
+              </div>
+            </section>
+
+            <section className="installation-summary-grid">
+              <article className="summary-card">
+                <span>Canlı web</span>
+                <strong>{selected.liveWebVersion ? `v${selected.liveWebVersion}` : "—"}</strong>
+                <small>Beklenen {selected.expectedWebVersion ? `v${selected.expectedWebVersion}` : "tanımlı değil"}</small>
+              </article>
+              <article className="summary-card">
+                <span>Credential</span>
+                <strong>{credentialLabel(selected.credentialStatus)}</strong>
+                <small>{selected.credentialRef ?? "Referans yok"}</small>
+              </article>
+              <article className="summary-card">
+                <span>Deploy tipi</span>
+                <strong>{selected.deployType ?? "—"}</strong>
+                <small>{selected.deployHost ?? "Harici/yerel adapter"}</small>
+              </article>
+            </section>
+
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">READ-ONLY HEALTH</p>
+                  <h2>Bağlantı ve sürüm kontrolleri</h2>
+                </div>
+                <span className="quiet">
+                  {new Date(data.generatedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+              </div>
+              <div className="health-list">
+                {selected.healthChecks.map((check) => <HealthRow key={check.id} check={check} />)}
+              </div>
+            </section>
+
+            <section className="panel installation-metadata">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">CANONICAL METADATA</p>
+                  <h2>Kurulum bilgileri</h2>
+                </div>
+              </div>
+
+              <div className="metadata-grid">
+                <div>
+                  <span>Site</span>
+                  <strong>{selected.siteUrl ?? "—"}</strong>
+                </div>
+                <div>
+                  <span>Web modülü</span>
+                  <strong>{selected.webModuleUrl ?? "—"}</strong>
+                </div>
+                <div>
+                  <span>Sürüm endpoint'i</span>
+                  <strong>{selected.versionEndpoint ?? "—"}</strong>
+                </div>
+                <div>
+                  <span>Deploy hedefi</span>
+                  <strong>{selected.deployTarget ?? "—"}</strong>
+                </div>
+              </div>
+
+              <div className="security-note">
+                <KeyRound size={17} />
+                <span>Bu ekranda yalnız credential referansı ve kayıt durumu gösterilir; secret değeri renderer'a taşınmaz.</span>
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="loading-card">Kurulum kaydı bulunamadı.</div>
+        )}
+      </section>
+    </>
+  );
+}
+
 function Placeholder({ section }: { section: Section }) {
   const label = NAV_ITEMS.find((item) => item.id === section)?.label ?? section;
 
@@ -199,7 +394,7 @@ function Placeholder({ section }: { section: Section }) {
       <p className="eyebrow">SONRAKİ DİLİM</p>
       <h1>{label}</h1>
       <p>
-        Bu yüzey henüz bağlanmadı. Önce Genel Bakış gerçek veri hattını sabitliyoruz;
+        Bu yüzey henüz bağlanmadı. Genel Bakış ve Kurulumlar gerçek veri hattı üzerinde;
         sonraki ekranlar aynı güvenli IPC sınırı üzerinden eklenecek.
       </p>
     </section>
@@ -231,7 +426,7 @@ export default function App() {
   const statusText = useMemo(() => {
     if (!data) return "Veri bekleniyor";
     if (data.counts.errors > 0) return `${data.counts.errors} hata`;
-    if (data.counts.drift > 0) return `${data.counts.drift} drift`;
+    if (data.counts.drift > 0) return `${data.counts.drift} dikkat`;
     return "Sistemler stabil";
   }, [data]);
 
@@ -282,7 +477,9 @@ export default function App() {
 
         {section === "overview" && data ? (
           <Overview data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
-        ) : section === "overview" ? (
+        ) : section === "installations" && data ? (
+          <Installations data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
+        ) : section === "overview" || section === "installations" ? (
           <div className="loading-card">
             <RefreshCw className="spin" size={22} />
             Gerçek sistem durumu okunuyor…
