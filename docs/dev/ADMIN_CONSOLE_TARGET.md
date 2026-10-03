@@ -46,6 +46,7 @@ Admin geliştirmesi aşağıdaki kaynakları yeniden tanımlamamalıdır:
 - `config/credentials.local.json` — opsiyonel lokal credential backend; Git tarafından yok sayılır. Şema örneği `config/credentials.local.example.json`.
 - `product-version.json` — ürün, Android versionCode ve web modülü sürümünün canonical kaynağı.
 - `firm-template/web-module/api/version.php` — canlı kurulumdan public/salt-okunur ürün + web modülü sürümü.
+- `config/installations.json -> landing.release.desktopManifests` — webde yayınlanan Desktop sürümünün canonical update manifest adresleri; manifest içindeki `appVersion` canlı Desktop release sürümüdür.
 - `scripts/installation-config.mjs` — installation registry için stabil CLI okuyucu.
 
 Gerçek sync secret, API key, parola, token veya FTP/SSH credential değeri
