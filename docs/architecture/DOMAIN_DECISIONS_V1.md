@@ -334,3 +334,18 @@ delivery records must not be rewritten by later customer edits. No provider conn
 MERNİS verification, automatic sender or delivery acknowledgement is fabricated.
 The UI explicitly states that notification must still be completed in the official system.
 This is an integration foundation, not a claim of certified regulatory compliance.
+
+## D-022 — Commerce Order is intent, not sale or inventory movement
+
+**Status:** ACCEPTED (2026-10-03)
+
+A Commerce Order records channel-independent purchase intent and immutable customer/product
+pricing snapshots. Creating or confirming an order does not reduce inventory, create finance
+entries or create a Commerce Sale. Those side effects belong to an explicit later fulfillment
+operation.
+
+`commerce.orders` depends only on `commerce.catalog`. External sources use the
+`source + sourceReference` pair as an idempotency key so retries cannot duplicate the
+order. The `fulfilled` state is reserved for the future order-to-sale application
+operation; generic status mutation cannot set it directly.
+
