@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -20,6 +21,7 @@ export interface DesktopAndroidInstallDevice {
   serial: string;
   state: string;
   model: string;
+  deviceId: string;
   appInstalled: boolean;
   installedVersionName: string;
   installedVersionCode: number;
@@ -280,10 +282,14 @@ export class AndroidInstallationService {
   ): DesktopAndroidInstallDevice {
     const bundledVersionName = androidPackage?.versionName ?? "";
     const bundledVersionCode = androidPackage?.versionCode ?? 0;
+    const deviceId = device.state === "device"
+      ? this.resolveInstalledDeviceId(adb, device.serial)
+      : "";
 
     if (device.state === "unauthorized") {
       return {
         ...device,
+        deviceId,
         appInstalled: false,
         installedVersionName: "",
         installedVersionCode: 0,
@@ -296,6 +302,7 @@ export class AndroidInstallationService {
     if (device.state !== "device") {
       return {
         ...device,
+        deviceId,
         appInstalled: false,
         installedVersionName: "",
         installedVersionCode: 0,
@@ -310,6 +317,7 @@ export class AndroidInstallationService {
     if (!installed.installed) {
       return {
         ...device,
+        deviceId,
         appInstalled: false,
         installedVersionName: "",
         installedVersionCode: 0,
@@ -336,6 +344,7 @@ export class AndroidInstallationService {
 
     return {
       ...device,
+      deviceId,
       appInstalled: true,
       installedVersionName: installed.versionName,
       installedVersionCode: installed.versionCode,
@@ -363,6 +372,36 @@ export class AndroidInstallationService {
       versionName,
       versionCode: Number.isFinite(versionCode) ? versionCode : 0
     };
+  }
+
+  private resolveInstalledDeviceId(adb: string, serial: string): string {
+    const prefs = this.runAdb(
+      adb,
+      ["-s", serial, "shell", "run-as", PACKAGE_NAME, "cat", "shared_prefs/yardimci_asistan_android.xml"],
+      true
+    );
+    const stored = prefs.status === 0
+      ? prefs.stdout.match(/<string name="device_id">([^<]+)<\/string>/)?.[1]?.trim() ?? ""
+      : "";
+    if (/^[A-Za-z0-9._:-]{6,120}$/.test(stored)) {
+      return stored;
+    }
+
+    const androidIdResult = this.runAdb(
+      adb,
+      ["-s", serial, "shell", "settings", "get", "secure", "android_id"],
+      true
+    );
+    const androidId = androidIdResult.status === 0
+      ? androidIdResult.stdout.trim().toLowerCase()
+      : "";
+    if (!/^[a-f0-9]{8,64}$/.test(androidId) || androidId === "9774d56d682e549c") {
+      return "";
+    }
+    const digest = createHash("sha256")
+      .update(`yardimci-asistan/android-device/v1\n${PACKAGE_NAME}\n${androidId}`, "utf8")
+      .digest("hex");
+    return `android-device-${digest.slice(0, 32)}`;
   }
 
   private isPackageInstalled(adb: string, serial: string) {
