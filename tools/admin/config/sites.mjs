@@ -67,7 +67,7 @@ export function getSiteProfiles() {
       credentialRef: landing.credentialRef,
       host: "Alwaysdata (test-site/landing)",
       cwd: "repo",
-      available: existsSync(join(process.cwd(), "package.json")),
+      available: existsSync(join(REPO_ROOT, "package.json")),
       availabilityNote: "",
       deployReady: true,
       deployReadyNote: "LANDING_DEPLOY_* ortam değişkenleri yoksa varsayılan hedef kullanılır.",
