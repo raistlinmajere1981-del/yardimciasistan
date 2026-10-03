@@ -1,5 +1,6 @@
 import {
   Activity,
+  CheckCircle2,
   CloudUpload,
   ExternalLink,
   FlaskConical,
@@ -14,7 +15,9 @@ import {
   Server,
   Settings,
   ShieldCheck,
-  TriangleAlert
+  Timer,
+  TriangleAlert,
+  XCircle
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
@@ -530,6 +533,200 @@ function Release({
   );
 }
 
+function formatAge(ageMs: number | null) {
+  if (ageMs === null) return "—";
+  const minutes = Math.floor(ageMs / 60000);
+  if (minutes < 1) return "az önce";
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} sa önce`;
+  return `${Math.floor(hours / 24)} gün önce`;
+}
+
+function Tests({
+  data,
+  refreshing,
+  onRefresh
+}: {
+  data: OverviewSnapshot;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const verification = data.verification;
+  const defaultPreset = verification.presets.includes("full") ? "full" : verification.presets[0] ?? "";
+  const [preset, setPreset] = useState(defaultPreset);
+  const [domain, setDomain] = useState("all");
+
+  useEffect(() => {
+    if (preset && !verification.presets.includes(preset)) {
+      setPreset(verification.presets[0] ?? "");
+    }
+  }, [preset, verification.presets]);
+
+  const planIds = new Set(verification.plans[preset] ?? []);
+  const visibleChecks = verification.checks.filter((check) =>
+    planIds.has(check.id) && (domain === "all" || check.domains.includes(domain))
+  );
+
+  const latestTone: StatusKind = verification.latest.result === "passed"
+    ? "ready"
+    : verification.latest.result === "failed"
+      ? "error"
+      : verification.latest.result === "running"
+        ? "warning"
+        : "unknown";
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">DOĞRULAMA MERKEZİ</p>
+          <h1>Testler</h1>
+          <p className="page-subtitle">
+            Canonical verification registry ve son yerel doğrulama raporu doğrudan okunuyor.
+          </p>
+        </div>
+        <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
+          <RefreshCw size={17} className={refreshing ? "spin" : ""} />
+          {refreshing ? "Yenileniyor" : "Durumu Yenile"}
+        </button>
+      </header>
+
+      <section className="verification-summary">
+        <article className="verification-latest">
+          <div className="verification-result-icon" data-status={latestTone}>
+            {verification.latest.result === "passed"
+              ? <CheckCircle2 size={25} />
+              : verification.latest.result === "failed"
+                ? <XCircle size={25} />
+                : <Timer size={25} />}
+          </div>
+          <div className="verification-latest-copy">
+            <span>Son doğrulama</span>
+            <strong>
+              {verification.latest.available
+                ? verification.latest.result === "passed"
+                  ? "Temiz"
+                  : verification.latest.result === "failed"
+                    ? "Başarısız"
+                    : verification.latest.result === "running"
+                      ? "Çalışıyor"
+                      : "Bilinmiyor"
+                : "Henüz rapor yok"}
+            </strong>
+            <small>
+              {verification.latest.available
+                ? `${verification.latest.selectionLabel} · ${formatAge(verification.latest.ageMs)}`
+                : "artifacts/verify/latest.json bulunamadı"}
+            </small>
+          </div>
+
+          {verification.latest.available ? (
+            <div className="verification-counts">
+              <div><strong>{verification.latest.passed}</strong><span>geçen</span></div>
+              <div><strong>{verification.latest.failed}</strong><span>kalan</span></div>
+              <div><strong>{verification.latest.skipped}</strong><span>atlanan</span></div>
+            </div>
+          ) : null}
+        </article>
+
+        <div className="preset-grid">
+          {verification.presets.map((item) => (
+            <button
+              className={preset === item ? "preset-card preset-card--active" : "preset-card"}
+              key={item}
+              onClick={() => setPreset(item)}
+            >
+              <span>{item}</span>
+              <strong>{verification.planCounts[item] ?? 0}</strong>
+              <small>benzersiz kontrol</small>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel verification-panel">
+        <div className="panel-header verification-toolbar">
+          <div>
+            <p className="panel-kicker">CANONICAL PLAN</p>
+            <h2>{preset || "Plan"} kontrolleri</h2>
+          </div>
+          <div className="domain-filter">
+            <button
+              className={domain === "all" ? "filter-chip filter-chip--active" : "filter-chip"}
+              onClick={() => setDomain("all")}
+            >
+              Tümü
+            </button>
+            {verification.domains.map((item) => (
+              <button
+                key={item}
+                className={domain === item ? "filter-chip filter-chip--active" : "filter-chip"}
+                onClick={() => setDomain(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="verification-list">
+          {visibleChecks.map((check, index) => {
+            const result = verification.latest.checks.find((item) => item.id === check.id);
+            const resultStatus: StatusKind = result?.status === "passed"
+              ? "ready"
+              : result?.status === "failed"
+                ? "error"
+                : result?.status === "skipped"
+                  ? "warning"
+                  : "unknown";
+
+            return (
+              <div className="verification-row" key={check.id}>
+                <span className="verification-index">{String(index + 1).padStart(2, "0")}</span>
+                <div className="verification-check-copy">
+                  <strong>{check.label}</strong>
+                  <small>
+                    {check.id} · {check.domains.join(", ")}
+                    {check.manual ? " · manuel" : ""}
+                  </small>
+                </div>
+                <div className="verification-deps">
+                  {check.requires.length ? `${check.requires.length} önkoşul` : "bağımsız"}
+                </div>
+                <div className="verification-last-status">
+                  <span className={statusClass(resultStatus)}>
+                    {result
+                      ? result.status === "passed"
+                        ? "Geçti"
+                        : result.status === "failed"
+                          ? "Kaldı"
+                          : "Atlandı"
+                      : "Sonuç yok"}
+                  </span>
+                  {result ? <small>{result.durationMs} ms</small> : null}
+                </div>
+              </div>
+            );
+          })}
+          {!visibleChecks.length ? <div className="empty-row">Bu filtre için kontrol bulunamadı.</div> : null}
+        </div>
+      </section>
+
+      <section className="panel verification-note">
+        <FlaskConical size={20} />
+        <div>
+          <strong>Çalıştırma butonlarını bir sonraki dilimde bağlayacağım.</strong>
+          <p>
+            Şu an ekran registry'yi ve mevcut raporu salt-okunur gösteriyor. Sonraki adımda preset/domain/check
+            çalıştırma, canlı ilerleme, iptal ve Admin'e özel doğrulama geçmişi gelecek.
+          </p>
+        </div>
+      </section>
+    </>
+  );
+}
+
 function Placeholder({ section }: { section: Section }) {
   const label = NAV_ITEMS.find((item) => item.id === section)?.label ?? section;
 
@@ -539,7 +736,7 @@ function Placeholder({ section }: { section: Section }) {
       <p className="eyebrow">SONRAKİ DİLİM</p>
       <h1>{label}</h1>
       <p>
-        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar ve Release gerçek veri hattı üzerinde;
+        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar, Release ve Testler gerçek veri hattı üzerinde;
         sonraki ekranlar aynı güvenli IPC sınırı üzerinden eklenecek.
       </p>
     </section>
@@ -626,7 +823,9 @@ export default function App() {
           <Installations data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "release" && data ? (
           <Release data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
-        ) : section === "overview" || section === "installations" || section === "release" ? (
+        ) : section === "tests" && data ? (
+          <Tests data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
+        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" ? (
           <div className="loading-card">
             <RefreshCw className="spin" size={22} />
             Gerçek sistem durumu okunuyor…
