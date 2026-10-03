@@ -7,7 +7,6 @@ import { AndroidDevicesSection } from "./AndroidDevicesSection";
 type SyncState = "idle" | "loading" | "success" | "error";
 import { AiSettingsSection } from "./AiSettingsSection";
 import { WebSettingsSection } from "./WebSettingsSection";
-import { TimePicker } from "../ui/DateTimePicker";
 export interface ServicesSettingsProps {
   form: SetupFormState;
   enabledCapabilities: BusinessCapability[];
@@ -93,36 +92,9 @@ export function ServicesSettingsSection({
               Doğum günü mesajlarını kullan
             </label>
             <div className="form-grid">
-              <fieldset className="form-stack birthday-mode-fieldset">
-                <legend>Gönderim:</legend>
-                <label className="form-check">
-                  <input
-                    checked={form.birthdaySettings.mode === "manual"}
-                    onChange={() => updateBirthday("mode", "manual")}
-                    name="birthday-mode"
-                    type="radio"
-                  />
-                  Manuel
-                </label>
-                <label className="form-check">
-                  <input
-                    checked={form.birthdaySettings.mode === "automatic"}
-                    onChange={() => updateBirthday("mode", "automatic")}
-                    name="birthday-mode"
-                    type="radio"
-                  />
-                  Otomatik
-                </label>
-              </fieldset>
-              <div className="form-field form-field--short">
-                <span>Gönderim saati</span>
-                <TimePicker
-                  ariaLabel="Gönderim saati"
-                  value={form.birthdaySettings.sendTime}
-                  onChange={(value) => updateBirthday("sendTime", value)}
-                  disabled={!form.birthdaySettings.enabled}
-                  clearable={false}
-                />
+              <div className="settings-service-note form-field--span">
+                Mesaj uygulamada hazırlanır; gönderme işlemini WhatsApp içinde siz tamamlarsınız.
+                Otomatik gönderim yalnız WhatsApp Business desteği eklendiğinde açılacak.
               </div>
               <label className="form-field form-field--span form-field--fluid">
                 Mesaj
