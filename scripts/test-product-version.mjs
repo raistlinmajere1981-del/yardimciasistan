@@ -8,6 +8,8 @@ import {
   checkProductVersion,
   readProductVersion,
   setProductVersion,
+  setWebModuleVersion,
+  bumpWebModuleVersion,
   syncProductVersion
 } from "./product-version.mjs";
 
@@ -15,7 +17,7 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), "yardimci-version-"));
   mkdirSync(join(root, "apps", "desktop-app"), { recursive: true });
   mkdirSync(join(root, "apps", "android-app"), { recursive: true });
-  writeJson(join(root, "product-version.json"), { version: "0.1.7", androidVersionCode: 4 });
+  writeJson(join(root, "product-version.json"), { version: "0.1.7", androidVersionCode: 4, webModuleVersion: "0.1.5" });
   writeJson(join(root, "apps", "desktop-app", "package.json"), { name: "desktop", version: "0.1.0" });
   writeJson(join(root, "apps", "android-app", "package.json"), { name: "android", version: "0.1.0" });
   writeJson(join(root, "package-lock.json"), {
@@ -23,6 +25,11 @@ function fixture() {
       "apps/desktop-app": { version: "0.1.0" },
       "apps/android-app": { version: "0.1.0" }
     }
+  });
+  mkdirSync(join(root, "firm-template", "web-module", "config"), { recursive: true });
+  writeJson(join(root, "firm-template", "web-module", "config", "version.json"), {
+    product_version: "0.1.0",
+    web_module_version: "0.1.0"
   });
   mkdirSync(join(root, "test-site", "landing", "assets"), { recursive: true });
   writeFileSync(
@@ -40,11 +47,15 @@ test("sync canonical sürümü desktop/android metadata'ya yazar", () => {
   const root = fixture();
   try {
     const product = syncProductVersion(root);
-    assert.deepEqual(product, { version: "0.1.7", androidVersionCode: 4 });
+    assert.deepEqual(product, { version: "0.1.7", androidVersionCode: 4, webModuleVersion: "0.1.5" });
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "desktop-app", "package.json"))).version, "0.1.7");
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "android-app", "package.json"))).version, "0.1.7");
     const landing = readFileSync(join(root, "test-site", "landing", "assets", "index-fixture.js"), "utf8");
     assert.equal((landing.match(/"0\.1\.7"\.trim\(\)\|\|"0\.1\.7"/g) ?? []).length, 2);
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(root, "firm-template", "web-module", "config", "version.json"), "utf8")),
+      { product_version: "0.1.7", web_module_version: "0.1.5" }
+    );
     assert.deepEqual(checkProductVersion(root), product);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -71,10 +82,27 @@ test("set yeni ürün sürümünde Android versionCode'u bir artırır", () => {
   const root = fixture();
   try {
     const product = setProductVersion("0.1.8", root);
-    assert.deepEqual(product, { version: "0.1.8", androidVersionCode: 5 });
+    assert.deepEqual(product, { version: "0.1.8", androidVersionCode: 5, webModuleVersion: "0.1.5" });
     assert.deepEqual(readProductVersion(root), product);
     assert.deepEqual(checkProductVersion(root), product);
     assert.throws(() => setProductVersion("0.1.7", root), /Sürüm geriye alınamaz/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("web modülü sürümü ürün sürümünden bağımsız ilerler", () => {
+  const root = fixture();
+  try {
+    syncProductVersion(root);
+    let product = setWebModuleVersion("0.1.6", root);
+    assert.equal(product.version, "0.1.7");
+    assert.equal(product.androidVersionCode, 4);
+    assert.equal(product.webModuleVersion, "0.1.6");
+    product = bumpWebModuleVersion("patch", root);
+    assert.equal(product.webModuleVersion, "0.1.7");
+    assert.deepEqual(checkProductVersion(root), product);
+    assert.throws(() => setWebModuleVersion("0.1.6", root), /Web modülü sürümü geriye alınamaz/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
