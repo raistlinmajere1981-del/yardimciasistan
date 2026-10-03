@@ -255,7 +255,9 @@ export function registerDesktopIpcHandlers(
             `Android kurulumu için web bağlantısı hazırlanamadı. ${publication.message}`
         };
       }
-      return androidInstallationService.install(serial);
+      const result = await androidInstallationService.install(serial);
+      if (result.ok) getSyncCoordinator().scheduleSoon(2_500);
+      return result;
     },
     provisionOnDevice: async (serial) => {
       const publication = await publishAndroidSnapshot();
@@ -266,7 +268,9 @@ export function registerDesktopIpcHandlers(
             `Android bağlantısı için web yayını hazırlanamadı. ${publication.message}`
         };
       }
-      return androidInstallationService.provision(serial);
+      const result = await androidInstallationService.provision(serial);
+      if (result.ok) getSyncCoordinator().scheduleSoon(2_500);
+      return result;
     }
   });
 
