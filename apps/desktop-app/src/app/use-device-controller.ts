@@ -88,7 +88,7 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
       return;
     }
     setAndroidInstallState("loading");
-    setAndroidInstallMessage("Telefon mevcut işletmeye bağlanıyor...");
+    setAndroidInstallMessage("Telefon kurulumu tamamlanıyor...");
     try {
       const result = await window.yardimciDesktop.provisionAndroidApp(serial);
       setAndroidInstallState(result.ok ? "success" : "error");
@@ -99,7 +99,7 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     } catch {
       setAndroidInstallState("error");
       setAndroidInstallMessage("");
-      reportAppStatus("error", "Telefon işletmeye bağlanamadı.");
+      reportAppStatus("error", "Telefon kurulumu tamamlanamadı.");
     }
   }
 
