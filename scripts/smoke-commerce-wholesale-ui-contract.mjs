@@ -36,6 +36,8 @@ for (const label of [
 ]) {
   assert.match(commercialFieldsSource, new RegExp(label));
 }
+assert.match(commercialFieldsSource, /aria-label="Bayi durumu"/);
+assert.match(commercialFieldsSource, /aria-label="Ödeme vadesi \(gün\)"/);
 
 assert.match(modelSource, /commercialProfileEnabled:\s*boolean/);
 assert.match(modelSource, /customerFormToInput\(form: CustomerFormState, wholesaleEnabled = false\)/);
