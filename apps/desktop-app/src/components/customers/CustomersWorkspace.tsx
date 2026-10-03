@@ -9,7 +9,7 @@ import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { CustomerCreateEditor } from "./CustomerCreateEditor";
 
-type CustomerFilter = "all" | "staying" | "reserved" | "kbs_pending" | "kbs_failed";
+type CustomerFilter = "all" | "dealers" | "staying" | "reserved" | "kbs_pending" | "kbs_failed";
 
 interface CustomersWorkspaceProps {
   customers: DesktopDashboardData["customers"];
@@ -89,6 +89,7 @@ export function CustomersWorkspace({
   }).filter((row) => {
     const searchOk = row.haystack.includes(searchText.trim().toLocaleLowerCase("tr-TR"));
     if (!searchOk) return false;
+    if (filter === "dealers") return Boolean(row.customer.commercialProfile);
     if (filter === "staying") return Boolean(row.activeStay);
     if (filter === "reserved") return row.activeReservations.length > 0 || Boolean(row.plannedStay);
     if (filter === "kbs_pending") return row.kbsState === "pending";
@@ -129,6 +130,7 @@ export function CustomersWorkspace({
         onChange={setFilter}
         options={[
           { id: "all", label: "Tümü" },
+          ...(wholesaleEnabled ? [{ id: "dealers" as const, label: "Bayiler" }] : []),
           { id: "staying", label: "Konaklayanlar" },
           { id: "reserved", label: "Rezervasyonu Olanlar" },
           ...(kbsOverview.enabled
