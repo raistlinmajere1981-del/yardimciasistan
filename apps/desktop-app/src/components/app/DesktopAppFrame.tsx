@@ -307,6 +307,7 @@ function DesktopAppFrameContent({
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
             accommodationFolioEnabled,
             customerCreditEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),
+            wholesaleEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHOLESALE),
             onPreparedCreditWhatsApp: messagingController.openPreparedCreditWhatsApp,
             onWhatsApp: messagingController.openCustomerWhatsApp,
             onSave: customerController.handleSaveCustomer,
