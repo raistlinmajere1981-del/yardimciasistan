@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "installations": {
+    "ya": {
+      "id": "ya",
+      "title": "Yardımcı Asistan web modülü",
+      "kind": "web-module",
+      "siteUrl": "https://yardimciasistan.alwaysdata.net",
+      "webModuleUrl": "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
+      "versionEndpoint": "https://yardimciasistan.alwaysdata.net/yardimci-asistan/api/version.php",
+      "credentialRef": "alwaysdata-main",
+      "deploy": {
+        "type": "ssh-rsync",
+        "host": "yardimciasistan@ssh-yardimciasistan.alwaysdata.net",
+        "remoteRoot": "/home/yardimciasistan/www/yardimci-asistan",
+        "backupDir": "/home/yardimciasistan/backups",
+        "stageParent": "/home/yardimciasistan"
+      }
+    },
+    "support": {
+      "id": "support",
+      "title": "Merkezi Destek",
+      "kind": "support",
+      "siteUrl": "https://yardimciasistan.alwaysdata.net",
+      "publicUrl": "https://yardimciasistan.alwaysdata.net/support/report.php",
+      "credentialRef": "alwaysdata-main",
+      "deploy": {
+        "type": "ssh-rsync",
+        "host": "yardimciasistan@ssh-yardimciasistan.alwaysdata.net",
+        "remoteRoot": "/home/yardimciasistan/www/support",
+        "storageRoot": "/home/yardimciasistan/support-reports"
+      }
+    },
+    "landing": {
+      "id": "landing",
+      "title": "Yardımcı Asistan landing",
+      "kind": "landing",
+      "siteUrl": "https://yardimciasistan.alwaysdata.net",
+      "credentialRef": "alwaysdata-main",
+      "deploy": {
+        "type": "ssh-rsync",
+        "host": "yardimciasistan@ssh-yardimciasistan.alwaysdata.net",
+        "remoteRoot": "/home/yardimciasistan/www",
+        "backupDir": "/home/yardimciasistan/backups"
+      }
+    },
+    "blacksea": {
+      "id": "blacksea",
+      "title": "BlackSea Pansiyon",
+      "kind": "customer-site",
+      "siteUrl": "https://blackseapansiyon.com",
+      "webModuleUrl": "https://blackseapansiyon.com/yardimci-asistan",
+      "versionEndpoint": "https://blackseapansiyon.com/yardimci-asistan/api/version.php",
+      "credentialRef": "blacksea-natro",
+      "externalRepo": {
+        "env": "BLACKSEA_REPO",
+        "defaultSibling": "blacksea_web"
+      },
+      "deploy": {
+        "type": "external-repo"
+      }
+    }
+  }
+}
