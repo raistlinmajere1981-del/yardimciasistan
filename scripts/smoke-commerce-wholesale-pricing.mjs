@@ -9,6 +9,9 @@ const require = createRequire(import.meta.url);
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const {
+  setBusinessCapability
+} = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const {
   saveRuntimeCatalogProduct
 } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 const {
@@ -219,6 +222,36 @@ try {
   assert.equal(explicitRetail.unitPrice, 100);
   assert.equal(explicitRetail.fallbackToRetail, false);
   assert.equal(explicitRetail.dealerEligible, true);
+
+  const dealerAgain = database.saveCustomer(customerInput({
+    id: customerId,
+    commercialProfile: {
+      companyName: "Fiyat Test Bayi Ltd.",
+      taxOffice: "Cide",
+      taxNumber: "3333333333",
+      authorizedPerson: "Bayi Fiyat Testi",
+      dealerStatus: "active",
+      priceGroup: "dealer_a",
+      paymentTermDays: 30,
+      notes: ""
+    }
+  }));
+  assert.equal(dealerAgain.ok, true, dealerAgain.ok ? "" : dealerAgain.message);
+
+  setBusinessCapability(database.databasePath, {
+    capability: C.WHOLESALE,
+    enabled: false
+  });
+
+  const capabilityOffRetail = resolveCommerceProductPrice(database.databasePath, {
+    productId: product.id,
+    customerId
+  });
+  assert.equal(capabilityOffRetail.requestedGroup, "dealer_a");
+  assert.equal(capabilityOffRetail.appliedGroup, "retail");
+  assert.equal(capabilityOffRetail.unitPrice, 100);
+  assert.equal(capabilityOffRetail.fallbackToRetail, true);
+  assert.equal(capabilityOffRetail.dealerEligible, false);
 
   console.log("commerce-wholesale-pricing-smoke-ok");
 } finally {
