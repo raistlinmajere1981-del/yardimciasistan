@@ -28,6 +28,7 @@ const channels = [
   "commerce:inventory:applyMovement",
   "commerce:inventory:setCount",
   "commerce:sale:createPaid",
+  "commerce:price:resolve",
   "commerce:order:list",
   "commerce:order:get",
   "commerce:order:create",
@@ -75,6 +76,7 @@ const contractMethods = [
   "applyInventoryMovement",
   "setInventoryCount",
   "createPaidSale",
+  "resolveProductPrice",
   "listOrders",
   "getOrder",
   "createOrder",
@@ -177,6 +179,11 @@ assert.match(
   preloadSource,
   /createPaidSale:\s*\(input\) => invokeCommerceMutation<CommerceSale>\("commerce:sale:createPaid"/,
   "Paid sale bridge must use the commerce mutation unwrap path."
+);
+assert.match(
+  preloadSource,
+  /resolveProductPrice:\s*\(input\) => invokeWhenUnlocked<CommerceResolvedUnitPrice>\("commerce:price:resolve"/,
+  "Product price resolution must stay a read-only typed bridge operation."
 );
 assert.match(
   preloadSource,
