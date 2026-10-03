@@ -11,6 +11,7 @@ import type {
   RepoSnapshot,
   StatusKind,
   VerificationReportSnapshot,
+  VerificationResultSnapshot,
   VerificationSnapshot
 } from "../../shared/contracts";
 
@@ -580,7 +581,7 @@ function getVerificationSnapshot(repoRoot: string): VerificationSnapshot {
     try {
       const report = readJson<VerificationReportFile>(latestPath);
       const checks = Array.isArray(report.checks) ? report.checks : [];
-      const normalizedChecks = checks.map((item) => ({
+      const normalizedChecks: VerificationResultSnapshot[] = checks.map((item) => ({
         id: String(item.id ?? ""),
         label: String(item.label ?? item.id ?? "Kontrol"),
         status: item.status === "passed" || item.status === "failed" || item.status === "skipped"
@@ -637,7 +638,8 @@ function getVerificationSnapshot(repoRoot: string): VerificationSnapshot {
       requires: Array.isArray(item.requires) ? item.requires.map(String) : [],
       manual: item.manual === true,
       platforms: Array.isArray(item.platforms) ? item.platforms.map(String) : null
-    }))
+    })),
+    latest
   };
 }
 
