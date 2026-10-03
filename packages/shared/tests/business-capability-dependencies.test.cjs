@@ -15,6 +15,14 @@ test("folio expands to its structural prerequisites", () => {
   assert.equal(expanded.has(C.FINANCE), true);
 });
 
+test("commerce orders depend only on the catalog foundation", () => {
+  const expanded = new Set(expandBusinessCapabilities([C.ORDERS]));
+  assert.equal(expanded.has(C.ORDERS), true);
+  assert.equal(expanded.has(C.CATALOG), true);
+  assert.equal(expanded.has(C.SALES), false);
+  assert.equal(expanded.has(C.INVENTORY), false);
+});
+
 test("invalid capability sets report missing prerequisites", () => {
   const violations = validateBusinessCapabilitySet([
     C.CATALOG,
