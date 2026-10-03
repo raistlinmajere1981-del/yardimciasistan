@@ -209,19 +209,22 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
     return { ok: false, message: "Bu telefon numarasıyla kayıtlı bir müşteri zaten var." };
   }
 
-  const businessId = activeBusinessId(db);
-  if (!businessId) {
-    return { ok: false, message: "Aktif işletme bulunamadı." };
-  }
-  if (commercial.profile?.taxNumber) {
-    const duplicateTaxNumber = db.prepare(`
-      SELECT customer_id
-      FROM customer_commercial_profiles
-      WHERE business_id = ? AND tax_number = ? AND customer_id != ?
-      LIMIT 1
-    `).get(businessId, commercial.profile.taxNumber, requestedId);
-    if (duplicateTaxNumber) {
-      return { ok: false, message: "Bu vergi numarası başka bir ticari müşteri profilinde kayıtlı." };
+  let businessId = "";
+  if (commercial.profile !== undefined && commercial.profile !== null) {
+    businessId = activeBusinessId(db);
+    if (!businessId) {
+      return { ok: false, message: "Aktif işletme bulunamadı." };
+    }
+    if (commercial.profile.taxNumber) {
+      const duplicateTaxNumber = db.prepare(`
+        SELECT customer_id
+        FROM customer_commercial_profiles
+        WHERE business_id = ? AND tax_number = ? AND customer_id != ?
+        LIMIT 1
+      `).get(businessId, commercial.profile.taxNumber, requestedId);
+      if (duplicateTaxNumber) {
+        return { ok: false, message: "Bu vergi numarası başka bir ticari müşteri profilinde kayıtlı." };
+      }
     }
   }
 
