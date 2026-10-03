@@ -349,3 +349,21 @@ operation.
 order. The `fulfilled` state is reserved for the future order-to-sale application
 operation; generic status mutation cannot set it directly.
 
+## D-023 — Wholesale is a capability attached to the canonical Customer
+
+**Status:** ACCEPTED (2026-10-03)
+
+Wholesale does not create a new sector-specific Customer entity. `commerce.wholesale`
+is an optional capability that depends on canonical Customers and shared Commerce Orders.
+A customer may own at most one commercial profile containing company/tax identity, dealer
+lifecycle state, payment term and notes.
+
+Commercial profile existence marks a customer as commercial/dealer-capable; ordinary
+customer identity and contact fields remain canonical. Saving customer + commercial
+profile is atomic. When wholesale is disabled, normal customer edits do not delete or
+rewrite the hidden commercial profile.
+
+Price groups, customer-specific prices and wholesale order UX are intentionally deferred
+to later slices. They must reference this profile/customer identity rather than expanding
+the profile into a pricing engine.
+
