@@ -38,3 +38,6 @@ firm-template/web-module/data/*.legacy-backup-v1
 # Generated desktop Android installer resources
 apps/desktop-app/resources/android/*
 !apps/desktop-app/resources/android/.gitkeep
+
+# Local admin/deploy credential backend (never commit secrets)
+config/credentials.local.json
