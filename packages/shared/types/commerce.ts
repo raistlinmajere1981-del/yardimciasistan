@@ -68,6 +68,8 @@ export interface CatalogProduct {
   barcode: string;
   description: string;
   salePrice: number;
+  dealerPriceA: number | null;
+  dealerPriceB: number | null;
   purchasePrice: number;
   currency: string;
   unit: CommerceUnit;
