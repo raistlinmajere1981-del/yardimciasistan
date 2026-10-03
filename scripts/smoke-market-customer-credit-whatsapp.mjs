@@ -157,8 +157,7 @@ try {
     const invoke = (method) => (...args) => window.__m83Call(method, args);
     window.yardimciDesktop = {
       commerce: Object.fromEntries(methods.map((method) => [method, invoke(method)])),
-      openExternal: invoke("openExternal"),
-      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." })
+      openExternal: invoke("openExternal")
     };
   }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path), methods: [...Object.keys(channels), ...scannerMethods] });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/m83-smoke`, { timeout: 60000 });
@@ -233,16 +232,16 @@ try {
   await expect(page.getByRole("button", { name: "Mesajı Sil", exact: true })).toHaveCount(0);
   await page.getByRole("tab", { name: "WhatsApp", exact: true }).click();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
-  await expect(page.getByRole("button", { name: "Onayla ve Gönder", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Gönderildi Olarak İşaretle", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Müşteri Numarasına Git" }).click();
   const target = new URL(await page.locator(".whatsapp-webview").getAttribute("src"));
   assert.equal(target.searchParams.get("phone"), "905321234567");
   assert.equal(target.searchParams.get("text"), edited);
   assert.equal(financialState(), beforeShare);
 
-  // Existing prepared request source remains selectable; request send control stays available.
+  // Existing prepared request source remains selectable; manual sent bookkeeping stays available.
   await page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-list button.message-request-row").first().click();
-  await expect(page.getByRole("button", { name: "Onayla ve Gönder", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Gönderildi Olarak İşaretle", exact: true })).toHaveCount(1);
   await navigate("Müşteriler"); await openAccount();
   await share(); await editor.fill("Kullanıcı düzenledi.");
   pay(10000);
