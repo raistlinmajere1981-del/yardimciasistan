@@ -129,6 +129,7 @@ export function CustomerWorkRoute({
               notifications={surfaceData.hospitalityNotifications}
               kbsOverview={surfaceData.kbsOverview}
               aiEnabled={features.ai}
+              wholesaleEnabled={features.wholesale}
               onSave={handleSaveCustomer}
               onAnalyzeIdentity={handleAnalyzeIdentityImage}
               onDelete={handleDeleteCustomer}
