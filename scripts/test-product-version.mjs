@@ -24,6 +24,11 @@ function fixture() {
       "apps/android-app": { version: "0.1.0" }
     }
   });
+  mkdirSync(join(root, "test-site", "landing", "assets"), { recursive: true });
+  writeFileSync(
+    join(root, "test-site", "landing", "assets", "index-fixture.js"),
+    'kr="0.1.0".trim()||"0.1.0",Xr=""||\`/downloads/YardimciAsistan-Setup-\${kr}.exe\`,wr="0.1.0".trim()||"0.1.0",Jy=""||\`/downloads/YardimciAsistan-Android-\${wr}.apk\`;'
+  );
   return root;
 }
 
@@ -38,6 +43,8 @@ test("sync canonical sürümü desktop/android metadata'ya yazar", () => {
     assert.deepEqual(product, { version: "0.1.7", androidVersionCode: 4 });
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "desktop-app", "package.json"))).version, "0.1.7");
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "android-app", "package.json"))).version, "0.1.7");
+    const landing = readFileSync(join(root, "test-site", "landing", "assets", "index-fixture.js"), "utf8");
+    assert.equal((landing.match(/"0\.1\.7"\.trim\(\)\|\|"0\.1\.7"/g) ?? []).length, 2);
     assert.deepEqual(checkProductVersion(root), product);
   } finally {
     rmSync(root, { recursive: true, force: true });
