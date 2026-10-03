@@ -116,13 +116,38 @@ export function configureDesktopSessionRuntime(
     .setUserAgent(userAgent, acceptLanguage);
 
   session.defaultSession.setPermissionCheckHandler(
-    (webContents, permission, _origin) => {
+    (webContents, permission, _origin, details) => {
       const trustedRenderer = webContents?.getType() === "window"
         && options.isTrustedRendererUrl(webContents.getURL());
+
+      if (permission === "media") {
+        // mediaType can be omitted or reported as "unknown". Reject explicit
+        // microphone checks, while allowing camera checks from our trusted
+        // local renderer to proceed across Chromium/Windows variations.
+        const mediaType = details.mediaType;
+        const granted = Boolean(
+          trustedRenderer && mediaType !== "audio"
+        );
+        const log = granted ? desktopLog.info : desktopLog.warn;
+        log({
+          scope: "camera",
+          event: granted
+            ? "camera.permission.check.granted"
+            : "camera.permission.check.denied",
+          message: granted
+            ? "Kamera medya izin denetimi geçti."
+            : "Kamera medya izin denetimi reddedildi.",
+          meta: {
+            trustedRenderer,
+            mediaType: mediaType ?? "",
+            rendererType: webContents?.getType() ?? "none"
+          }
+        });
+        return granted;
+      }
+
       return Boolean(
-        trustedRenderer
-          && (permission === "media"
-            || permission === "clipboard-sanitized-write")
+        trustedRenderer && permission === "clipboard-sanitized-write"
       );
     }
   );
