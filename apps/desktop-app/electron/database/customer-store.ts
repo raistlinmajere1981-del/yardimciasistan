@@ -1,6 +1,10 @@
 import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
-import { createId, type CustomerDealerStatus } from "@yardimci-asistan/shared";
+import {
+  createId,
+  type CommercePriceGroup,
+  type CustomerDealerStatus
+} from "@yardimci-asistan/shared";
 import type {
   DesktopCustomer,
   SaveCustomerInput
@@ -46,6 +50,7 @@ export function getCustomers(db: DatabaseSync): DesktopCustomer[] {
           commercial.tax_number AS commercial_tax_number,
           commercial.authorized_person AS commercial_authorized_person,
           commercial.dealer_status AS commercial_dealer_status,
+          commercial.price_group AS commercial_price_group,
           commercial.payment_term_days AS commercial_payment_term_days,
           commercial.notes AS commercial_notes,
           commercial.created_at AS commercial_created_at,
@@ -102,6 +107,7 @@ function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
       taxNumber: String(row.commercial_tax_number ?? ""),
       authorizedPerson: String(row.commercial_authorized_person ?? ""),
       dealerStatus: String(row.commercial_dealer_status ?? "candidate") as CustomerDealerStatus,
+      priceGroup: String(row.commercial_price_group ?? "retail") as CommercePriceGroup,
       paymentTermDays: Number(row.commercial_payment_term_days ?? 0),
       notes: String(row.commercial_notes ?? ""),
       createdAt: String(row.commercial_created_at ?? ""),
@@ -115,6 +121,7 @@ function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
 }
 
 const DEALER_STATUSES = new Set<CustomerDealerStatus>(["candidate", "active", "inactive"]);
+const PRICE_GROUPS = new Set<CommercePriceGroup>(["retail", "dealer_a", "dealer_b"]);
 
 function activeBusinessId(db: DatabaseSync): string {
   const row = db.prepare(`
@@ -137,6 +144,7 @@ function normalizeCommercialProfile(input: SaveCustomerInput["commercialProfile"
   const taxNumber = String(input.taxNumber ?? "").trim().replace(/\s+/g, "");
   const authorizedPerson = String(input.authorizedPerson ?? "").trim().replace(/\s+/g, " ");
   const dealerStatus = String(input.dealerStatus ?? "candidate") as CustomerDealerStatus;
+  const priceGroup = String(input.priceGroup ?? "retail") as CommercePriceGroup;
   const paymentTermDays = Number(input.paymentTermDays ?? 0);
   const notes = String(input.notes ?? "").trim();
 
@@ -146,6 +154,7 @@ function normalizeCommercialProfile(input: SaveCustomerInput["commercialProfile"
   if (taxNumber.length > 32) return { ok: false as const, message: "Vergi numarası en fazla 32 karakter olabilir." };
   if (authorizedPerson.length > 160) return { ok: false as const, message: "Yetkili kişi en fazla 160 karakter olabilir." };
   if (!DEALER_STATUSES.has(dealerStatus)) return { ok: false as const, message: "Bayi durumu geçersiz." };
+  if (!PRICE_GROUPS.has(priceGroup)) return { ok: false as const, message: "Fiyat grubu geçersiz." };
   if (!Number.isInteger(paymentTermDays) || paymentTermDays < 0 || paymentTermDays > 3650) {
     return { ok: false as const, message: "Ödeme vadesi 0 ile 3650 gün arasında olmalı." };
   }
@@ -159,6 +168,7 @@ function normalizeCommercialProfile(input: SaveCustomerInput["commercialProfile"
       taxNumber,
       authorizedPerson,
       dealerStatus,
+      priceGroup,
       paymentTermDays,
       notes
     }
@@ -300,9 +310,9 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
       db.prepare(`
         INSERT INTO customer_commercial_profiles (
           customer_id, business_id, company_name, tax_office, tax_number,
-          authorized_person, dealer_status, payment_term_days, notes,
+          authorized_person, dealer_status, price_group, payment_term_days, notes,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(customer_id) DO UPDATE SET
           business_id = excluded.business_id,
           company_name = excluded.company_name,
@@ -310,6 +320,7 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
           tax_number = excluded.tax_number,
           authorized_person = excluded.authorized_person,
           dealer_status = excluded.dealer_status,
+          price_group = excluded.price_group,
           payment_term_days = excluded.payment_term_days,
           notes = excluded.notes,
           updated_at = excluded.updated_at
@@ -321,6 +332,7 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
         commercial.profile.taxNumber,
         commercial.profile.authorizedPerson,
         commercial.profile.dealerStatus,
+        commercial.profile.priceGroup,
         commercial.profile.paymentTermDays,
         commercial.profile.notes,
         commercialCreatedAt,
