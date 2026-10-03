@@ -204,9 +204,6 @@ export function AndroidDevicesSection({
       <div className="android-devices-heading">
         <div>
           <h3>Telefonlar</h3>
-          <p className="settings-service-note">
-            USB bağlıysa kurulum, güncelleme ve bağlantı aynı karttan yönetilir.
-          </p>
         </div>
         <div className="android-devices-heading-actions">
           <span>{availableDevices.length} kayıtlı</span>
