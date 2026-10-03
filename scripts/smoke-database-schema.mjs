@@ -183,6 +183,7 @@ function assertCurrentSchema(database, options = {}) {
     assert.equal([...enabled].some((capability) => capability.startsWith("food_service.")), false);
     assert.ok(enabled.has("commerce.catalog"));
     assert.ok(enabled.has("commerce.sales"));
+    assert.equal(enabled.has("commerce.orders"), false);
     assert.ok(enabled.has("retail.barcode"));
     assert.equal(setupData.productData.enabled, true);
     assert.equal(setupData.productData.provider, "open_food_facts");
@@ -216,6 +217,8 @@ function assertCurrentDatabase(database, options = {}) {
   const businessColumns = tableColumns(database, "business");
   const settingsColumns = tableColumns(database, "settings");
   const productColumns = tableColumns(database, "catalog_products");
+  const orderColumns = tableColumns(database, "commerce_orders");
+  const orderItemColumns = tableColumns(database, "commerce_order_items");
   const localCredentialColumns = tableColumns(database, "android_local_credentials");
   assert.ok(settingsColumns.has("local_network_enabled"));
   assert.ok(localCredentialColumns.has("device_id"));
@@ -250,6 +253,42 @@ function assertCurrentDatabase(database, options = {}) {
   ]) {
     assert.equal(productColumns.has(column), true, `catalog_products missing ${column}`);
   }
+  for (const column of [
+    "business_id",
+    "customer_id",
+    "customer_name",
+    "status",
+    "source",
+    "source_reference",
+    "subtotal",
+    "discount_total",
+    "total",
+    "currency",
+    "placed_at",
+    "confirmed_at",
+    "fulfilled_at",
+    "cancelled_at"
+  ]) {
+    assert.equal(orderColumns.has(column), true, `commerce_orders missing ${column}`);
+  }
+  for (const column of [
+    "order_id",
+    "product_id",
+    "product_name",
+    "sku",
+    "barcode",
+    "unit",
+    "unit_price",
+    "quantity",
+    "line_total",
+    "tax_rate"
+  ]) {
+    assert.equal(orderItemColumns.has(column), true, `commerce_order_items missing ${column}`);
+  }
+  assert.ok(
+    database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_commerce_orders_source_reference'").get(),
+    "commerce order source reference idempotency index missing"
+  );
 
   if (options.market) {
     const business = database.prepare("SELECT profile_id FROM business WHERE deleted_at = '' LIMIT 1").get();
