@@ -6,6 +6,7 @@ import { primeIdentityCameraFeedback } from "../../app/identity-camera-feedback"
 import type { CustomerFormState } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 import { DatePicker } from "../ui/DateTimePicker";
+import { CustomerCommercialProfileFields } from "./CustomerCommercialProfileFields";
 import { IdentityCameraCapture } from "./IdentityCameraCapture";
 
 type AnalysisState = "idle" | "loading" | "success" | "error";
@@ -13,11 +14,18 @@ type AnalysisState = "idle" | "loading" | "success" | "error";
 interface CustomerFormFieldsProps {
   form: CustomerFormState;
   aiEnabled: boolean;
+  wholesaleEnabled?: boolean;
   onChange: (form: CustomerFormState) => void;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
 }
 
-export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentity }: CustomerFormFieldsProps) {
+export function CustomerFormFields({
+  form,
+  aiEnabled,
+  wholesaleEnabled = false,
+  onChange,
+  onAnalyzeIdentity
+}: CustomerFormFieldsProps) {
   const identityFileRef = useRef<HTMLInputElement>(null);
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [analysisMessage, setAnalysisMessage] = useState("");
@@ -128,6 +136,10 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           <label className="form-field form-field--fluid customer-address-field">Adres<textarea aria-label="Adres" rows={2} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
         </div>
       </section>
+
+      {wholesaleEnabled && (
+        <CustomerCommercialProfileFields form={form} onChange={onChange} />
+      )}
 
       <section className="panel form-stack identity-form-section">
         <div className="page-toolbar">
