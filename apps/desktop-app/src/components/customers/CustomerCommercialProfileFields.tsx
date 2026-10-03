@@ -47,6 +47,7 @@ export function CustomerCommercialProfileFields({
           <label className="form-field form-field--medium">
             Firma / unvan
             <input
+              aria-label="Firma / unvan"
               required
               maxLength={180}
               value={form.commercialCompanyName}
@@ -56,6 +57,7 @@ export function CustomerCommercialProfileFields({
           <label className="form-field form-field--medium">
             Yetkili kişi
             <input
+              aria-label="Yetkili kişi"
               maxLength={160}
               value={form.commercialAuthorizedPerson}
               onChange={(event) => update("commercialAuthorizedPerson", event.target.value)}
@@ -64,6 +66,7 @@ export function CustomerCommercialProfileFields({
           <label className="form-field form-field--medium">
             Vergi dairesi
             <input
+              aria-label="Vergi dairesi"
               maxLength={120}
               value={form.commercialTaxOffice}
               onChange={(event) => update("commercialTaxOffice", event.target.value)}
@@ -72,6 +75,7 @@ export function CustomerCommercialProfileFields({
           <label className="form-field form-field--medium">
             Vergi no
             <input
+              aria-label="Vergi no"
               maxLength={32}
               value={form.commercialTaxNumber}
               onChange={(event) => update("commercialTaxNumber", event.target.value)}
@@ -80,6 +84,7 @@ export function CustomerCommercialProfileFields({
           <label className="form-field form-field--medium">
             Bayi durumu
             <select
+              aria-label="Bayi durumu"
               value={form.commercialDealerStatus}
               onChange={(event) => update(
                 "commercialDealerStatus",
@@ -94,6 +99,7 @@ export function CustomerCommercialProfileFields({
           <label className="form-field form-field--short">
             Ödeme vadesi (gün)
             <input
+              aria-label="Ödeme vadesi (gün)"
               type="number"
               min={0}
               max={3650}
@@ -106,6 +112,7 @@ export function CustomerCommercialProfileFields({
           <label className="form-field form-field--fluid">
             Ticari not
             <textarea
+              aria-label="Ticari not"
               rows={2}
               maxLength={2000}
               value={form.commercialNotes}
