@@ -14,12 +14,14 @@ import {
   listCustomerCreditEntries,
   recordCustomerCreditPayment,
   applyRuntimeInventoryMovement,
+  createRuntimeOrder,
   createRuntimePaidSale,
   consumePendingMarketBarcodeScans,
   deleteRuntimeCatalogCategory,
   findRuntimeProductByBarcode,
   getCommerceRuntimeSnapshot,
   getRuntimeCatalogCategory,
+  getRuntimeOrder,
   getRuntimeProductImageDataUrl,
   lookupRuntimeExternalProductByBarcode,
   getRuntimeInventoryBalance,
@@ -29,6 +31,7 @@ import {
   listRuntimeCatalogCategories,
   listRuntimeCatalogProducts,
   listRuntimeInventoryMovements,
+  listRuntimeOrders,
   listRuntimePurchaseOrders,
   listRuntimeSuppliers,
   listMarketCartDrafts,
@@ -37,7 +40,8 @@ import {
   saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct,
   saveRuntimeSupplier,
-  setRuntimeInventoryCount
+  setRuntimeInventoryCount,
+  updateRuntimeOrderStatus
 } from "./commerce-runtime";
 
 const EXPECTED_COMMERCE_REJECTIONS: Array<{ code: string; pattern: RegExp }> = [
@@ -45,6 +49,7 @@ const EXPECTED_COMMERCE_REJECTIONS: Array<{ code: string; pattern: RegExp }> = [
   { code: "inventory_conflict", pattern: /^Stok bu sayımdan sonra değişti\./ },
   { code: "invalid_inventory_operation", pattern: /^(?:Stok işlemi için ürün bulunamadı\.|Bu ürün stok takibine kapalı\.|Stok konumu bulunamadı\.|Geçersiz stok hareketi:|Stok hareketi sıfırdan farklı olmalı\.|Sayım miktarı )/ },
   { code: "invalid_sale", pattern: /^(?:Satış için en az bir ürün gerekli\.|Satış adedi sıfırdan büyük olmalı\.|Satış ürünlerinden biri aktif değil veya bulunamadı\.|Tek satışta birden fazla para birimi kullanılamaz\.)/ },
+  { code: "invalid_order", pattern: /^(?:Sipariş yönetimi |Sipariş için |Sipariş müşterisi |Sipariş ürün|Sipariş adedi |Tek siparişte |Sipariş indirimi |Sipariş kimliği |Sipariş bulunamadı\.|Sipariş kaynak kaydı |Oluşturulan sipariş |Güncellenen sipariş |Tamamlanmış veya iptal edilmiş sipariş |Yalnız yeni sipariş |Geçersiz sipariş durumu\.)/ },
   { code: "invalid_credit", pattern: /^(?:Veresiye \/ Müşteri Hesabı|Veresiye için |Tutar mevcut veresiye borcunu aşamaz\.|Tahsilat |Düzeltme |Para birimi geçersiz\.|Tutar pozitif tam sayı)/ },
   { code: "invalid_category", pattern: /^(?:Kategori kendi üst kategorisi olamaz\.|Kategori hiyerarşisinde döngü oluşturulamaz\.|Kategori kimliği boş olamaz\.|Kategori adı gerekli\.|Kategori adı en fazla 160 karakter olabilir\.|Düzenlenecek kategori bulunamadı\.|Silinecek kategori bulunamadı\.|Alt kategorisi bulunan kategori silinemez\.|Ürün bağlı olan kategori silinemez\.|Üst kategori bulunamadı\.)/ },
   { code: "invalid_product", pattern: /^(?:Barkod boş olamaz\.|Ürün adı gerekli\.|Ürün adı en fazla 180 karakter olabilir\.|Düzenlenecek ürün bulunamadı\.|Seçilen ürün kategorisi bulunamadı\.|Bu barkod başka bir üründe kullanılıyor\.|Bu stok kodu başka bir üründe kullanılıyor\.)/ },
@@ -184,6 +189,19 @@ export function registerCommerceIpcHandlers(options: {
 
   ipcMain.handle("commerce:sale:createPaid", (_event, input: Parameters<DesktopCommerceBridge["createPaidSale"]>[0]) =>
     mutateForIpc("commerce:sale:createPaid", () => createRuntimePaidSale(databasePath(), input))
+  );
+
+  ipcMain.handle("commerce:order:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listOrders"]>[0]) =>
+    read(() => listRuntimeOrders(databasePath(), optionsArg))
+  );
+  ipcMain.handle("commerce:order:get", (_event, orderId: string) =>
+    read(() => getRuntimeOrder(databasePath(), orderId))
+  );
+  ipcMain.handle("commerce:order:create", (_event, input: Parameters<DesktopCommerceBridge["createOrder"]>[0]) =>
+    mutateForIpc("commerce:order:create", () => createRuntimeOrder(databasePath(), input))
+  );
+  ipcMain.handle("commerce:order:updateStatus", (_event, input: Parameters<DesktopCommerceBridge["updateOrderStatus"]>[0]) =>
+    mutateForIpc("commerce:order:updateStatus", () => updateRuntimeOrderStatus(databasePath(), input))
   );
 
   ipcMain.handle("commerce:customerCredit:list", (_event, input: Parameters<DesktopCommerceBridge["listCustomerCreditAccounts"]>[0]) =>
