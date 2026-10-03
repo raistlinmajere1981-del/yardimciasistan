@@ -135,15 +135,18 @@ try {
     ["assets", "backups", "maintenance", "yardimci-asistan.sqlite", "yardimci-asistan.sqlite-shm", "yardimci-asistan.sqlite-wal"].sort()
   );
 
+  const startupSource = readFileSync("apps/desktop-app/electron/desktop-startup-data.ts", "utf8");
+  assert.match(startupSource, /process\.argv\.includes\("--clean-start"\)/);
+  assert.match(startupSource, /startup\.clean-start\.required/);
+  assert.match(startupSource, /startup\.clean-start\.completed/);
+  assert.match(startupSource, /startup\.clean-start\.transient-cleanup\.incomplete/);
+  assert.match(startupSource, /CLEAN_START_SESSION_CLEAR_TIMEOUT_MS/);
+  assert.match(startupSource, /clearStorageData\(\)/);
+  assert.match(startupSource, /clearCache\(\)/);
+  assert.match(startupSource, /Temiz Başlat/);
   const mainSource = readFileSync("apps/desktop-app/electron/main.ts", "utf8");
-  assert.match(mainSource, /process\.argv\.includes\("--clean-start"\)/);
-  assert.match(mainSource, /startup\.clean-start\.required/);
-  assert.match(mainSource, /startup\.clean-start\.completed/);
-  assert.match(mainSource, /startup\.clean-start\.transient-cleanup\.incomplete/);
-  assert.match(mainSource, /CLEAN_START_SESSION_CLEAR_TIMEOUT_MS/);
-  assert.match(mainSource, /clearStorageData\(\)/);
-  assert.match(mainSource, /clearCache\(\)/);
-  assert.match(mainSource, /Temiz Başlat/);
+  assert.match(mainSource, /prepareRuntimeDataForStartup/);
+  assert.match(mainSource, /resolveRuntimeDataRoot/);
 
   const mainEntrySource = readFileSync("apps/desktop-app/electron/main-entry.ts", "utf8");
   assert.match(mainEntrySource, /shouldDeferPendingMaintenanceToCleanStart/);

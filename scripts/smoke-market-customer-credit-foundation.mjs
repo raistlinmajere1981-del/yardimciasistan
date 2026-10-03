@@ -443,8 +443,8 @@ function verifyIpc(databasePath, customerId, cart, account, raw) {
   });
   const mainEntry = readFileSync(join(appPath, "electron/main-entry.ts"), "utf8");
   assert.ok(/registerCommerceIpcHandlers\(\{\s*databasePath,[\s\S]*?assertUnlocked: assertAppSessionUnlocked/.test(mainEntry));
-  const main = readFileSync(join(appPath, "dist-electron/main.js"), "utf8");
-  assert.ok(/registerAppLockIpcHandlers.{0,10}\(getAppLockService\(\)\)/.test(main));
+  const registry = readFileSync(join(appPath, "dist-electron/desktop-ipc-registry.js"), "utf8");
+  assert.ok(/registerAppLockIpcHandlers.{0,10}\(getAppLockService\(\)\)/.test(registry));
   const lockServiceExports = {};
   runInNewContext(readFileSync(join(appPath, "dist-electron/app-lock-service.js"), "utf8"), {
     exports: lockServiceExports,

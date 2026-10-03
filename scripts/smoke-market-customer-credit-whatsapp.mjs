@@ -360,8 +360,13 @@ try {
   assert.doesNotMatch(shareSource, /role="alert"|setNotice\(|setError\(/);
   const preload = readFileSync(join(appPath, "electron/preload.ts"), "utf8");
   assert.match(preload, /prepareCustomerCreditWhatsApp:.*invokeWhenUnlocked\("commerce:customerCredit:prepareWhatsApp"/);
+  const appIpc = readFileSync(join(appPath, "electron/ipc/app-ipc.ts"), "utf8");
+  assert.match(appIpc, /ipcMain\.handle\("shell:openExternal"[\s\S]*?isWhatsAppUrl\(url\)[\s\S]*?assertCapability\(.*WHATSAPP/);
+  const registry = readFileSync(join(appPath, "electron/desktop-ipc-registry.ts"), "utf8");
+  assert.match(registry, /registerAppIpcHandlers\(\{[\s\S]*?assertCapability/);
   const main = readFileSync(join(appPath, "electron/main.ts"), "utf8");
-  assert.match(main, /ipcMain.handle\("shell:openExternal"[\s\S]*?isWhatsAppUrl\(url\)[\s\S]*?assertDesktopCapability\(C.WHATSAPP/);
+  assert.match(main, /assertCapability: assertDesktopCapability/);
+  assert.match(main, /isWhatsAppUrl\(url\)/);
   console.log("market-customer-credit-whatsapp-smoke-ok: fresh balances, zero race, editable handoff, topbar-only notices, existing modes, offline copy, capability/lock guards and read-only sharing");
 } catch (error) {
   if (page) console.error("UI at failure:", await page.locator("body").innerText());

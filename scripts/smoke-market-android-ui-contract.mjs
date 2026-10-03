@@ -7,20 +7,23 @@ const root = process.cwd();
 const read = (relativePath) => readFileSync(join(root, relativePath), "utf8");
 
 const main = read("apps/android-app/src/main/java/com/yardimciasistan/android/MainActivity.java");
+const shell = read("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidShellController.java");
 const navigation = read("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidUiRules.java");
 const rules = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketUiRules.java");
 const workspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
 const cameraScanner = read("apps/android-app/src/main/java/com/yardimciasistan/android/BarcodeCameraScanner.java");
+const syncController = read("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidOperationsSyncController.java");
 const productLookup = read("apps/android-app/src/main/java/com/yardimciasistan/android/ProductDataLookupClient.java");
 const tests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketUiTest.java");
 const foundationTests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketFoundationTest.java");
 const gradle = read("apps/android-app/build.gradle");
 const manifest = read("apps/android-app/AndroidManifest.xml");
-const uiSources = `${workspace}\n${rules}\n${main}`;
+const uiSources = `${workspace}\n${rules}\n${main}\n${shell}`;
 
 assert.match(navigation, /TAB_MARKET\s*=\s*"market"/);
 assert.match(navigation, /MarketUiRules\.canOpenMarket\(data\)/);
-assert.match(main, /addNavButton\("Market", TAB_MARKET\)/);
+assert.match(shell, /addNavButton\("Market", AndroidUiRules\.TAB_MARKET/);
+assert.match(shell, /canOpenTab\(AndroidUiRules\.TAB_MARKET\)/);
 assert.match(main, /marketWorkspace\.create\(data, localPendingActionCount\(\), loading\)/);
 assert.match(main, /marketWorkspace\.handleBack\(\)/);
 
@@ -87,7 +90,8 @@ assert.match(workspace, /data\.market\.recentPurchases/);
 assert.match(workspace, /summary\.recentStockAdjustments/);
 assert.match(workspace, /submissionBlocked\(\)/);
 assert.match(main, /onSubmissionQueued/);
-assert.match(main, /containsOnlyMarketActions/);
+assert.match(syncController, /containsOnlyMarketActions/);
+assert.match(main, /retryingOnlyMarketActions/);
 assert.match(main, /sendMarketBarcodeScan/);
 assert.match(main, /onProductImageRequested/);
 assert.match(workspace, /BarcodeCameraScanner\.show/);

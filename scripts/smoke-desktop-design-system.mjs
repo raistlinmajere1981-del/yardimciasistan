@@ -2,7 +2,6 @@ import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
-import { chooseTime } from './test-helpers/date-time-picker.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createSetupFixture, createDashboardFixture } from './lib/desktop-renderer-fixtures.mjs';
@@ -241,9 +240,7 @@ try {
   const birthdaySettings = page.locator('.setup-birthday-settings');
   await expect(birthdaySettings.getByRole('heading', { name: 'Doğum Günü Mesajları', exact: true })).toBeVisible();
   await expect(birthdaySettings.getByLabel('Doğum günü mesajlarını kullan')).toBeChecked();
-  await expect(birthdaySettings.getByRole('button', { name: 'Gönderim saati', exact: true })).toHaveAttribute('data-picker-value', '10:00');
-  await expect(birthdaySettings.getByLabel('Manuel')).toBeChecked();
-  await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
+  await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer tutucuları desteklenir.' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
 
   await page.getByRole("tab", { name: "İşletme", exact: true }).click();
   const sectorType = page.getByLabel('Sektör tipi');
@@ -328,11 +325,10 @@ try {
   expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
 
   await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
-  await chooseTime(birthdaySettings, 'Gönderim saati', '09:30');
-  await birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' }).fill('İyi ki doğdun {ad}! {işletme}');
+  await birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer tutucuları desteklenir.' }).fill('İyi ki doğdun {ad}! {işletme}');
   await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'setup').at(-1).input.birthdaySettings)).toEqual({
-    enabled: true, mode: 'manual', sendTime: '09:30', messageTemplate: 'İyi ki doğdun {ad}! {işletme}'
+    enabled: true, mode: 'manual', sendTime: '10:00', messageTemplate: 'İyi ki doğdun {ad}! {işletme}'
   });
 
   await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();

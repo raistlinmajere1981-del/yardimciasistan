@@ -35,7 +35,9 @@ const androidCore = [C.ANDROID, C.CUSTOMERS, C.REQUESTS, C.TASKS, C.FINANCE, C.R
 const requestsSource = source("apps/desktop-app/src/components/customers/RequestsWorkspace.tsx");
 const customerWorkspaceSource = source("apps/desktop-app/src/components/customers/CustomerWorkspace.tsx");
 const routerSource = source("apps/desktop-app/src/components/app/DesktopWorkspaceRouter.tsx");
+const customerWorkRouteSource = source("apps/desktop-app/src/components/app/routes/CustomerWorkRoute.tsx");
 const mainSource = source("apps/desktop-app/electron/main.ts");
+const appIpcSource = source("apps/desktop-app/electron/ipc/app-ipc.ts");
 const settingsSource = source("apps/desktop-app/src/components/settings/AndroidDevicesSection.tsx");
 const navigationSource = source("apps/desktop-app/src/app/navigation.ts");
 const frameSource = source("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
@@ -61,6 +63,8 @@ const messagingControllerSource = source("apps/desktop-app/src/app/use-messaging
 const dashboardSource = source("apps/desktop-app/src/pages/DashboardPage.tsx");
 const systemHealthSource = source("apps/desktop-app/src/components/dashboard/SystemHealthPanel.tsx");
 const androidMainSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/MainActivity.java");
+const androidUiRulesSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidUiRules.java");
+const androidSyncControllerSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidOperationsSyncController.java");
 const androidFinanceSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/FinanceWorkspace.java");
 const androidSyncClientSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/HostingSyncClient.java");
 const androidActivitySource = source("apps/android-app/src/main/java/com/yardimciasistan/android/MainActivity.java");
@@ -84,7 +88,11 @@ assert.match(
   /assertCapability\(BUSINESS_CAPABILITIES\.CUSTOMERS[\s\S]*assertCapability\(BUSINESS_CAPABILITIES\.ACCOMMODATION_STAYS/,
   "direct stay mutations must require both customer and stay capabilities"
 );
-assert.match(mainSource, /if \(isWhatsAppUrl\(url\)\)[\s\S]{0,180}assertDesktopCapability\(C\.WHATSAPP/);
+assert.match(
+  appIpcSource,
+  /ipcMain\.handle\("shell:openExternal"[\s\S]{0,300}isWhatsAppUrl\(url\)[\s\S]{0,300}assertCapability\(.*WHATSAPP/
+);
+assert.match(mainSource, /assertCapability: assertDesktopCapability/);
 assert.equal(androidActionAllowedByCapabilities("message_delete", androidCore), false);
 assert.match(
   desktopProjectionSource,
@@ -222,9 +230,14 @@ assert.match(financeWorkspaceSource, /accommodationFolioEnabled\s*&&\s*<MetricCa
 assert.match(financeWorkspaceSource, /if \(category\.id === "pension"\) return accommodationEnabled/);
 assert.match(financeWorkspaceSource, /if \(category\.id === "restaurant"\) return foodServiceEnabled/);
 assert.match(androidFinanceSource, /hasBusinessCapability\(AndroidUiRules\.CAPABILITY_FOLIO\)[\s\S]{0,180}Bekleyen oda alacağı/);
-assert.match(androidMainSource, /data\.hasAnyReservationCapability\(\)[\s\S]{0,120}!data\.permissionsResolved \|\| data\.hasPermission\("reservation\.view"\)/);
+assert.match(
+  androidUiRulesSource,
+  /CAPABILITY_ACCOMMODATION_RESERVATIONS\)[\s\S]{0,120}hasPermission\("reservation\.view"\)/
+);
+assert.match(androidMainSource, /canOpenTab\(destination\.tab\)/);
 assert.match(androidSyncClientSource, /android_capability_disabled[\s\S]{0,300}invalidatesPendingAction/);
-assert.match(androidActivitySource, /operationCache\.clear\(\)[\s\S]{0,120}actionOutbox\.clear\(\)/);
+assert.match(androidSyncControllerSource, /operationCache\.clear\(\)[\s\S]{0,120}actionOutbox\.clear\(\)/);
+assert.match(androidActivitySource, /provisioningController\.bootstrap\(identity\)/);
 assert.match(hostingSyncSource, /ya_sync_android_action_permission\([\s\S]{0,300}android_action_permission_denied/);
 assert.match(
   hostingSyncSource,
@@ -467,7 +480,7 @@ assert.match(
 assert.match(desktopProjectionSource, /newRequests: requestsEnabled \? source\.summary\.newRequests : 0/);
 assert.match(desktopProjectionSource, /waitingRequests: requestsEnabled \? source\.summary\.waitingRequests : 0/);
 assert.match(
-  routerSource,
+  customerWorkRouteSource,
   /<WhatsAppWorkspace[\s\S]{0,180}requests=\{readyWhatsAppRequests\}/,
   "outbox surfaces must consume the controller-owned prepared-message queue"
 );
