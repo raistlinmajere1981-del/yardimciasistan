@@ -39,6 +39,7 @@ import {
   listMarketCartDrafts,
   markMarketCartDraftReviewed,
   receiveRuntimePurchase,
+  resolveRuntimeProductPrice,
   saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct,
   saveRuntimeSupplier,
@@ -217,6 +218,10 @@ export function registerCommerceIpcHandlers(options: {
 
   ipcMain.handle("commerce:sale:createPaid", (_event, input: Parameters<DesktopCommerceBridge["createPaidSale"]>[0]) =>
     mutateForIpc("commerce:sale:createPaid", () => createRuntimePaidSale(databasePath(), input))
+  );
+
+  ipcMain.handle("commerce:price:resolve", (_event, input: Parameters<DesktopCommerceBridge["resolveProductPrice"]>[0]) =>
+    read(() => resolveRuntimeProductPrice(databasePath(), input))
   );
 
   ipcMain.handle("commerce:order:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listOrders"]>[0]) =>
