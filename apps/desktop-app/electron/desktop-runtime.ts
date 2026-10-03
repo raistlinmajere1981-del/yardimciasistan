@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell } from "electron";
+import { app, BrowserWindow, session, shell, systemPreferences } from "electron";
 import path from "node:path";
 import { installDesktopContextMenu } from "./desktop-context-menu";
 import { desktopLog } from "./desktop-logger";
@@ -140,7 +140,8 @@ export function configureDesktopSessionRuntime(
           meta: {
             trustedRenderer,
             mediaType: mediaType ?? "",
-            rendererType: webContents?.getType() ?? "none"
+            rendererType: webContents?.getType() ?? "none",
+            osCameraAccessStatus: getCameraMediaAccessStatus()
           }
         });
         return granted;
@@ -191,7 +192,8 @@ export function configureDesktopSessionRuntime(
             trustedRenderer,
             mediaTypes: mediaTypes ?? [],
             mediaTypesMissing,
-            rendererType: webContents.getType()
+            rendererType: webContents.getType(),
+            osCameraAccessStatus: getCameraMediaAccessStatus()
           }
         });
 
@@ -222,6 +224,17 @@ export function createTrustedDesktopRendererUrlPredicate(
       return false;
     }
   };
+}
+
+function getCameraMediaAccessStatus(): string {
+  if (process.platform !== "win32" && process.platform !== "darwin") {
+    return "unsupported";
+  }
+  try {
+    return systemPreferences.getMediaAccessStatus("camera");
+  } catch {
+    return "unknown";
+  }
 }
 
 function createChromeUserAgent() {
