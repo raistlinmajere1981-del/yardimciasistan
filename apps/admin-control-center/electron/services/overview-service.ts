@@ -615,6 +615,12 @@ function getVerificationSnapshot(repoRoot: string): VerificationSnapshot {
     planCounts: Object.fromEntries(
       Object.entries(plans).map(([preset, checks]) => [preset, Array.isArray(checks) ? checks.length : 0])
     ),
+    plans: Object.fromEntries(
+      Object.entries(plans).map(([preset, checks]) => [
+        preset,
+        Array.isArray(checks) ? checks.map(String) : []
+      ])
+    ),
     checks: (Array.isArray(adapter.checks) ? adapter.checks : []).map((item) => ({
       id: String(item.id ?? ""),
       label: String(item.label ?? item.id ?? "Kontrol"),
