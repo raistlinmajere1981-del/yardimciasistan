@@ -113,13 +113,14 @@ const marketContribution = {
   pageId: "market",
   icon: Store,
   order: 50,
-  condition: { anyOf: [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS] },
+  condition: { anyOf: [C.CATALOG, C.SALES, C.ORDERS, C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS] },
   contentScroll: "workspace",
   presentation: (capabilities) => {
     const topics = [
       runtimeHasCapability(capabilities, C.CATALOG) ? "ürünleri" : "",
       runtimeHasCapability(capabilities, C.INVENTORY) ? "stokları" : "",
       runtimeHasCapability(capabilities, C.SALES) ? "satışları" : "",
+      runtimeHasCapability(capabilities, C.ORDERS) ? "siparişleri" : "",
       runtimeHasCapability(capabilities, C.RETAIL_PURCHASING)
         || runtimeHasCapability(capabilities, C.RETAIL_SUPPLIERS) ? "tedariki" : "",
       runtimeHasCapability(capabilities, C.RETAIL_LABELS) ? "etiketleri" : ""
