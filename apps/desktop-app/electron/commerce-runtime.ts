@@ -5,7 +5,9 @@ import {
   type CatalogProduct,
   type CommerceOrder,
   type CommerceOrderDetail,
+  type CommerceOrderFulfillmentResult,
   type CommerceResolvedUnitPrice,
+  type FulfillCommerceOrderInput,
   type CommercePurchaseOrder,
   type CommercePurchaseOrderDetail,
   type CommerceSale,
@@ -33,6 +35,7 @@ import {
   lookupExternalProductByBarcode
 } from "./product-data-service";
 
+import { fulfillCommerceOrder } from "./commerce-order-fulfillment-service";
 import {
   createCommerceOrder,
   getCommerceOrder,
@@ -369,6 +372,30 @@ export function resolveRuntimeProductPrice(
     );
   }
   return resolveCommerceProductPrice(databasePath, input);
+}
+
+export function fulfillRuntimeOrder(
+  databasePath: string,
+  input: FulfillCommerceOrderInput
+): CommerceOrderFulfillmentResult {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.ORDERS,
+    "Sipariş yönetimi bu işletmede etkin değil."
+  );
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.SALES,
+    "Satış yönetimi bu işletmede etkin değil."
+  );
+  if (input.settlement?.type === "credit") {
+    requireCapability(
+      databasePath,
+      BUSINESS_CAPABILITIES.CUSTOMER_CREDIT,
+      "Veresiye / Müşteri Hesabı bu işletmede etkin değil."
+    );
+  }
+  return fulfillCommerceOrder(databasePath, input);
 }
 
 export function updateRuntimeOrderStatus(
