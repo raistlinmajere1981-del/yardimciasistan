@@ -111,7 +111,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,
     productDataIncludeImages: setupData.productData.includeImages,
-    birthdaySettings: normalizeBirthdaySettings(setupData.birthdaySettings)
+    birthdaySettings: { ...normalizeBirthdaySettings(setupData.birthdaySettings), mode: "manual" }
   };
 }
 
