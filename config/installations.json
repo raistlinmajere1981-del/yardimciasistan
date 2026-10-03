@@ -42,6 +42,14 @@
         "host": "yardimciasistan@ssh-yardimciasistan.alwaysdata.net",
         "remoteRoot": "/home/yardimciasistan/www",
         "backupDir": "/home/yardimciasistan/backups"
+      },
+      "release": {
+        "downloadsBaseUrl": "https://yardimciasistan.alwaysdata.net/downloads",
+        "desktopUpdateBaseUrl": "https://yardimciasistan.alwaysdata.net/updates/stable",
+        "desktopManifests": {
+          "winX64": "https://yardimciasistan.alwaysdata.net/updates/stable/win-x64/release.json",
+          "winX86": "https://yardimciasistan.alwaysdata.net/updates/stable/win-x86/release.json"
+        }
       }
     },
     "blacksea": {
