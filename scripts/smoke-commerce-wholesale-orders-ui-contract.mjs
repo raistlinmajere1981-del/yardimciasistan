@@ -10,6 +10,7 @@ const intent = read("apps/desktop-app/src/components/workspace/workspace-intent.
 const navigation = read("apps/desktop-app/src/app/navigation.ts");
 const page = read("apps/desktop-app/src/pages/MarketPage.tsx");
 const workspace = read("apps/desktop-app/src/components/market/MarketOrdersWorkspace.tsx");
+const marketCss = read("apps/desktop-app/src/styles/pages/market.css");
 const runtime = read("apps/desktop-app/electron/commerce-runtime.ts");
 const orderStore = read("apps/desktop-app/electron/commerce-order-store.ts");
 const ipc = read("apps/desktop-app/electron/commerce-ipc.ts");
@@ -33,6 +34,11 @@ assert.match(workspace, /source:\s*"desktop-wholesale"/);
 assert.match(workspace, /createOrder\(/);
 assert.match(workspace, /Siparişi Onayla/);
 assert.match(workspace, /Siparişi İptal Et/);
+assert.match(
+  marketCss,
+  /\.market-order-product-grid\s*\{[\s\S]*min-height:\s*112px/,
+  "Order product grid must keep a visible minimum height."
+);
 assert.doesNotMatch(workspace, /createPaidSale/);
 assert.doesNotMatch(workspace, /applyInventoryMovement/);
 
