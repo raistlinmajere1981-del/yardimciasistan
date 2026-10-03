@@ -28,6 +28,7 @@ export interface CustomerWorkspaceProps {
   staysEnabled: boolean;
   accommodationFolioEnabled?: boolean;
   customerCreditEnabled: boolean;
+  wholesaleEnabled: boolean;
   onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
@@ -45,6 +46,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     staysEnabled,
     accommodationFolioEnabled = false,
     customerCreditEnabled,
+    wholesaleEnabled,
     onPreparedCreditWhatsApp,
     onWhatsApp,
     onSave,
@@ -110,7 +112,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
 
   async function saveCustomer() {
     setSaveState("loading");
-    const result = await onSave(customerFormToInput(form));
+    const result = await onSave(customerFormToInput(form, wholesaleEnabled));
     if (!result.ok) {
       setSaveState("error");
       return;
@@ -171,7 +173,13 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   >
     {!history ? <div className="customer-workspace-main">
       <form className="customer-workspace-profile" onSubmit={(event) => { event.preventDefault(); void saveCustomer(); }}>
-        <CustomerFormFields form={form} aiEnabled={aiEnabled} onChange={setForm} onAnalyzeIdentity={onAnalyzeIdentity} />
+        <CustomerFormFields
+          form={form}
+          aiEnabled={aiEnabled}
+          wholesaleEnabled={wholesaleEnabled}
+          onChange={setForm}
+          onAnalyzeIdentity={onAnalyzeIdentity}
+        />
       </form>
 
       <aside className="customer-workspace-operations" aria-label="Müşteri işlemleri">
