@@ -307,7 +307,6 @@ if (!hasSingleInstanceLock) {
       database: desktopDatabase,
       getSyncStatus: () => syncCoordinator?.getStatus(),
       onUnlocked: () => {
-        void birthdayScheduler?.evaluateNow();
         reconcileEgmKbsBackgroundSession();
       },
       onLocked: () => {
@@ -516,7 +515,6 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     publishBusinessAiContextFromMain()
   ]);
   getSyncCoordinator().restart();
-  void birthdayScheduler?.evaluateNow();
   const setupData = getDatabase().getSetupData();
   const dashboardData = getDatabase().getDashboardData();
 
