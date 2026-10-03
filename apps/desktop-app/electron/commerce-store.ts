@@ -51,6 +51,10 @@ export interface SaveCatalogProductInput {
   dataLicense?: string;
   imageLicense?: string;
   sourceFetchedAt?: string;
+  /** Renderer-only image draft. Store ignores it; IPC archives after product identity exists. */
+  manualImageDataUrl?: string;
+  /** Renderer-only image mutation. Store ignores it; IPC removes durable asset after save. */
+  clearImage?: boolean;
 }
 
 export interface ApplyInventoryMovementInput {
