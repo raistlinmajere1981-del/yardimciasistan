@@ -1,4 +1,5 @@
 {
   "version": "2.0.2",
-  "androidVersionCode": 6
+  "androidVersionCode": 6,
+  "webModuleVersion": "2.0.2"
 }
