@@ -118,7 +118,11 @@
     "deploy:support": "bash scripts/deploy-support.sh",
     "smoke:support-endpoint": "node scripts/smoke-support-endpoint.mjs",
     "smoke:clean-start": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-clean-start.mjs",
-    "pack:desktop:all": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app && npm run pack:win32 -w @yardimci-asistan/desktop-app && node scripts/prepare-desktop-android-resources.mjs --platform linux && npm run pack:linux -w @yardimci-asistan/desktop-app"
+    "pack:desktop:all": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app && npm run pack:win32 -w @yardimci-asistan/desktop-app && node scripts/prepare-desktop-android-resources.mjs --platform linux && npm run pack:linux -w @yardimci-asistan/desktop-app",
+    "installations:show": "node scripts/installation-config.mjs show",
+    "installations:check": "node scripts/installation-config.mjs check",
+    "version:web:set": "node scripts/product-version.mjs web-set",
+    "version:web:bump": "node scripts/product-version.mjs web-bump"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",
