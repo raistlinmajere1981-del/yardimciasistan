@@ -22,6 +22,7 @@ const SMOKE_FILES = [
   "scripts/smoke-capability-surface-consistency.mjs",
   "scripts/smoke-clean-start.mjs",
   "scripts/smoke-commerce-foundation.mjs",
+  "scripts/smoke-commerce-orders.mjs",
   "scripts/smoke-commerce-ipc-contract.mjs",
   "scripts/smoke-commerce-runtime.mjs",
   "scripts/smoke-customer-room-management-db.mjs",
