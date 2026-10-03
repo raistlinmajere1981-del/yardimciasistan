@@ -40,7 +40,7 @@ remote_web_root="${YARDIMCI_ASISTAN_SUPPORT_WEB_ROOT:-$(registry_get support dep
 storage_root="${YARDIMCI_ASISTAN_SUPPORT_STORAGE_ROOT:-$(registry_get support deploy.storageRoot)}"
 public_url="${YARDIMCI_ASISTAN_SUPPORT_PUBLIC_URL:-$(registry_get support publicUrl)}"
 
-for command_name in ssh rsync php curl; do
+for command_name in node ssh rsync php curl; do
   command -v "$command_name" >/dev/null 2>&1 || { printf 'Eksik komut: %s\n' "$command_name" >&2; exit 1; }
 done
 
