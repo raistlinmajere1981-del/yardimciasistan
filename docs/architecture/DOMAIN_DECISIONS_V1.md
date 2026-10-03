@@ -367,3 +367,20 @@ Price groups, customer-specific prices and wholesale order UX are intentionally 
 to later slices. They must reference this profile/customer identity rather than expanding
 the profile into a pricing engine.
 
+## D-024 — Order pricing is resolved twice; renderer is not authority
+
+**Status:** ACCEPTED (2026-10-03)
+
+Manual wholesale order UX may preview the customer's current price group, but the renderer
+does not own pricing. Adding a product asks the centralized commerce pricing service for a
+typed resolved price. Creating the order resolves the price again inside the database
+transaction and snapshots that backend result into the order item.
+
+This deliberately tolerates a product/customer price change between draft composition and
+save: the persisted order reflects the authoritative price at save time. The created order
+response is therefore the final total.
+
+Manual dealer orders use the shared `commerce.orders` aggregate with source
+`desktop-wholesale`. Confirmation does not create a Sale, inventory movement, payment or
+shipment. Those side effects remain deferred to an explicit fulfillment/application slice.
+
