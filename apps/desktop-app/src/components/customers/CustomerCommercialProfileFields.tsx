@@ -96,6 +96,21 @@ export function CustomerCommercialProfileFields({
               <option value="inactive">Pasif</option>
             </select>
           </label>
+          <label className="form-field form-field--medium">
+            Fiyat grubu
+            <select
+              aria-label="Fiyat grubu"
+              value={form.commercialPriceGroup}
+              onChange={(event) => update(
+                "commercialPriceGroup",
+                event.target.value as CustomerFormState["commercialPriceGroup"]
+              )}
+            >
+              <option value="retail">Perakende</option>
+              <option value="dealer_a">Bayi A</option>
+              <option value="dealer_b">Bayi B</option>
+            </select>
+          </label>
           <label className="form-field form-field--short">
             Ödeme vadesi (gün)
             <input
