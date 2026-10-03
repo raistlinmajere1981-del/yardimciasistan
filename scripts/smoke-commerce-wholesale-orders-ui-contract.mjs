@@ -16,6 +16,7 @@ const orderStore = read("apps/desktop-app/electron/commerce-order-store.ts");
 const ipc = read("apps/desktop-app/electron/commerce-ipc.ts");
 const contract = read("apps/desktop-app/electron/commerce-ipc-contract.ts");
 const preload = read("apps/desktop-app/electron/preload.ts");
+const integratedSmoke = read("scripts/smoke-commerce-wholesale-orders-ui.mjs");
 
 assert.match(intent, /"orders"/);
 assert.match(navigation, /condition:\s*\{ anyOf: \[C\.CATALOG, C\.SALES, C\.ORDERS/);
@@ -54,5 +55,9 @@ assert.doesNotMatch(
 assert.match(contract, /resolveProductPrice:/);
 assert.match(ipc, /commerce:price:resolve/);
 assert.match(preload, /resolveProductPrice:\s*\(input\) => invokeWhenUnlocked<CommerceResolvedUnitPrice>\("commerce:price:resolve"/);
+assert.match(integratedSmoke, /Siparişi Kaydet/);
+assert.match(integratedSmoke, /Siparişi Onayla/);
+assert.match(integratedSmoke, /unit_price/);
+assert.match(integratedSmoke, /commerce_sales/);
 
 console.log("commerce-wholesale-orders-ui-contract-smoke-ok");
