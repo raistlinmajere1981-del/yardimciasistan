@@ -42,12 +42,13 @@ test("kategoriler ve site/cwd tutarlılığı", () => {
 });
 
 test("temel preset ve akışlar mevcut", () => {
-  for (const id of ["verify-dev", "verify-domain", "verify-full", "verify-pre-main", "verify-release", "android-release-flow", "bs-deploy-flow", "release-desktop-linux", "product-version-show", "product-version-set", "fresh-full"]) {
+  for (const id of ["verify-dev", "verify-domain", "verify-full", "verify-pre-main", "verify-release", "android-release-flow", "bs-deploy-flow", "release-desktop-linux", "release-desktop-all", "pack-desktop-all", "landing-deploy-downloads", "product-version-show", "product-version-set", "fresh-full"]) {
     assert.ok(getTask(id), id);
   }
   assert.equal(getTask("verify-full").kind, "task");
   assert.equal(getTask("verify-pre-main").kind, "task");
   assert.equal(getTask("release-desktop-linux").stopOnError, true);
+  assert.equal(getTask("release-desktop-all").stopOnError, true);
 });
 
 test("tehlikeli işlemlerde confirm/impact açıklaması var", () => {
@@ -61,10 +62,20 @@ test("tehlikeli işlemlerde confirm/impact açıklaması var", () => {
 });
 
 
-test("Build / Release menüsü ürün sürümü işlemlerini gösterir", () => {
+test("Build / Release menüsü sürüm ve birleşik paketleme işlemlerini gösterir", () => {
   const visible = new Set(SECTIONS.build.groups.flatMap(([, ids]) => ids));
   assert.ok(visible.has("product-version-show"));
   assert.ok(visible.has("product-version-set"));
+  assert.ok(visible.has("pack-desktop-all"));
+  assert.ok(visible.has("release-desktop-all"));
+});
+
+test("Landing deploy seçenekleri güncel kurulum dosyalarını yayınlayabilir", () => {
+  const dry = getTask("landing-deploy-downloads-dry");
+  const deploy = getTask("landing-deploy-downloads");
+  assert.deepEqual(dry.args.slice(-2), ["--dry-run", "--with-downloads"]);
+  assert.deepEqual(deploy.args.slice(-2), ["--yes", "--with-downloads"]);
+  assert.ok(deploy.confirm);
 });
 
 
