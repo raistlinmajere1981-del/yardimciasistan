@@ -58,12 +58,55 @@ export type ReleaseSnapshot = {
   desktop: ReleaseChannelSnapshot[];
 };
 
+export type VerificationCheckSnapshot = {
+  id: string;
+  label: string;
+  phase: number;
+  presets: string[];
+  domains: string[];
+  requires: string[];
+  manual: boolean;
+  platforms: string[] | null;
+};
+
+export type VerificationResultSnapshot = {
+  id: string;
+  label: string;
+  status: "passed" | "failed" | "skipped";
+  durationMs: number;
+  exitCode: number | null;
+  reason: string;
+};
+
+export type VerificationReportSnapshot = {
+  available: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: "passed" | "failed" | "running" | "unknown";
+  selectionLabel: string;
+  passed: number;
+  failed: number;
+  skipped: number;
+  total: number;
+  ageMs: number | null;
+  checks: VerificationResultSnapshot[];
+};
+
+export type VerificationSnapshot = {
+  presets: string[];
+  domains: string[];
+  planCounts: Record<string, number>;
+  checks: VerificationCheckSnapshot[];
+  latest: VerificationReportSnapshot;
+};
+
 export type OverviewSnapshot = {
   generatedAt: string;
   repo: RepoSnapshot;
   product: ProductSnapshot;
   installations: InstallationSnapshot[];
   release: ReleaseSnapshot;
+  verification: VerificationSnapshot;
   counts: {
     installations: number;
     healthy: number;
