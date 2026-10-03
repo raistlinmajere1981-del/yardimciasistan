@@ -1130,3 +1130,73 @@ test("pushTableCatalog publishes only customer-facing table data", async () => {
   assert.equal("notes" in calls[0].table_catalog.tables[0], false);
 });
 
+
+test("web orders use dedicated actions and do not alter request cursor payloads", async () => {
+  const calls = [];
+  const transport = new PhpHostingSyncTransport({
+    baseUrl: "https://example.test/module",
+    syncSecret: "web-orders-secret",
+    clientId: "desktop-test-orders",
+    fetchImpl: async (_url, init) => {
+      assert.equal(init.headers["X-YA-Sync-Secret"], "web-orders-secret");
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ ok: true, orders: [], count: 0, next_cursor: 7, has_more: false }), { status: 200 });
+    }
+  });
+  assert.equal((await transport.pullWebOrders({ afterSeq: 7, limit: 12 })).ok, true);
+  await transport.acknowledgeWebOrders({ throughSeq: 9 });
+  await transport.pullRequests({ afterSeq: 3, limit: 5 });
+  await transport.acknowledgeRequests({ throughSeq: 4 });
+  assert.deepEqual(calls, [
+    { action: "pull_web_orders", client_id: "desktop-test-orders", after_seq: 7, limit: 12 },
+    { action: "acknowledge_web_orders", client_id: "desktop-test-orders", through_seq: 9 },
+    { action: "pull_requests", limit: 5, include_synced: false, after_seq: 3, client_id: "desktop-test-orders" },
+    { action: "acknowledge_requests", client_id: "desktop-test-orders", through_seq: 4 }
+  ]);
+});
+
+
+test("web order transport rejects invalid page cursors and ordering before import", async () => {
+  const { pullWebOrders } = require("../dist");
+  for (const payload of [
+    { orders: [{ syncSeq: 2 }, { syncSeq: 1 }], next_cursor: 2, count: 2, has_more: false },
+    { orders: [{ syncSeq: 1 }], next_cursor: 2, count: 1, has_more: false },
+    { orders: [], next_cursor: 1, count: 0, has_more: false },
+    { orders: [], next_cursor: 0, count: 0, has_more: true },
+    { orders: [{ syncSeq: 1 }], next_cursor: 1, count: 2, has_more: false }
+  ]) {
+    const result = await pullWebOrders({
+      baseUrl: "https://example.test", syncSecret: "test-secret", clientId: "desktop-test", afterSeq: 0,
+      fetchImpl: async () => Response.json({ ok: true, ...payload })
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "invalid_web_order_page");
+  }
+});
+
+test("online catalog publication uses the versioned transport and a public field allowlist", async () => {
+  const calls = [];
+  const transport = new PhpHostingSyncTransport({
+    baseUrl: "https://example.test/module", syncSecret: "online-catalog-secret", clientId: "desktop-catalog",
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return Response.json({ ok: true, product_count: 1, source_revision: 4, server_revision: 9, deduplicated: false });
+    }
+  });
+  await transport.publishOnlineCatalog({ sourceRevision: 4, idempotencyKey: "desktop-catalog:online_catalog:4", value: {
+    version: 1, enabled: true, updatedAt: "2026-10-04T00:00:00Z", products: [{
+      productId: "p1", name: "Public product", description: "Public description", sku: "SKU-1", unit: "piece",
+      price: 25, currency: "TRY", taxRate: 20, imageUrl: "", availability: "available", sortOrder: 0,
+      purchasePrice: 10, dealerPriceA: 15, barcode: "private-barcode", internalNotes: "private"
+    }]
+  }});
+  assert.deepEqual(calls[0], {
+    action: "publish_online_catalog", client_id: "desktop-catalog", source_revision: 4,
+    idempotency_key: "desktop-catalog:online_catalog:4", online_catalog: {
+      version: 1, enabled: true, updated_at: "2026-10-04T00:00:00Z", products: [{
+        product_id: "p1", name: "Public product", description: "Public description", sku: "SKU-1", unit: "piece",
+        price: 25, currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0
+      }]
+    }
+  });
+});

@@ -1,3 +1,8 @@
+import { createCommerceOnlineCatalog } from "./commerce-online-catalog-publication";
+import { getCommerceProductPublication, listCommerceProductPublications, saveCommerceProductPublication, deleteCommerceProductPublication } from "./commerce-product-publication-store";
+import { hasBusinessCapability, type SaveCommerceProductPublicationInput } from "@yardimci-asistan/shared";
+import { createRuntimeOrder } from "./commerce-runtime";
+import type { CreateCommerceOrderInput } from "./commerce-order-store";
 import { DatabaseSync } from "node:sqlite";
 import {
   getKbsOverview,
@@ -885,6 +890,44 @@ export class DesktopDatabase {
     recordStoredAutomaticSyncFailure(this.db, message, timestamp);
   }
 
+  private assertProductPublicationCapability() {
+    if (!hasBusinessCapability(this.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+      throw new Error("Online satış bu işletmede etkin değil.");
+    }
+  }
+
+  getCommerceProductPublication(productId: string) {
+    this.assertProductPublicationCapability();
+    return getCommerceProductPublication(this.db, productId);
+  }
+
+  listCommerceProductPublications() {
+    this.assertProductPublicationCapability();
+    return listCommerceProductPublications(this.db);
+  }
+
+  saveCommerceProductPublication(input: SaveCommerceProductPublicationInput) {
+    this.assertProductPublicationCapability();
+    return saveCommerceProductPublication(this.db, input);
+  }
+
+  deleteCommerceProductPublication(productId: string) {
+    this.assertProductPublicationCapability();
+    deleteCommerceProductPublication(this.db, productId);
+  }
+
+  createCommerceOnlineCatalog() {
+    return createCommerceOnlineCatalog(this.db, this.getEnabledBusinessCapabilities());
+  }
+
+  createCommerceOrder(input: CreateCommerceOrderInput) {
+    return createRuntimeOrder(this.databasePath, input);
+  }
+
+  recordWebOrderCursor(cursor: number, acknowledged = false) {
+    recordStoredWebOrderCursor(this.db, cursor, acknowledged);
+  }
+
   acknowledgeRequestCursor(cursor: number, timestamp = new Date().toISOString()) {
     acknowledgeStoredRequestCursor(this.db, cursor, timestamp);
   }
@@ -1114,6 +1157,7 @@ import {
   recordSyncAttempt as recordStoredSyncAttempt,
   recordAutomaticSyncSuccess as recordStoredAutomaticSyncSuccess,
   recordAutomaticSyncFailure as recordStoredAutomaticSyncFailure,
+  recordWebOrderCursor as recordStoredWebOrderCursor,
   acknowledgeRequestCursor as acknowledgeStoredRequestCursor,
 } from "./database/sync-runtime-store.js";
 

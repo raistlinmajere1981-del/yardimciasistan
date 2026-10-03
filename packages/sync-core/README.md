@@ -127,6 +127,13 @@ Otomatik koordinatör `protocol_version >= 2` ve `storage === "sqlite"` bekler.
 `pullRequests()` çağrısındaki `afterSeq` kalıcı cursor'u, `acknowledgeRequests()` ise
 başarılı yerel import sonrasındaki onayı temsil eder.
 
+`publishOnlineCatalog()` mevcut `VersionedPublication` sözleşmesiyle
+`publish_online_catalog` aksiyonunu çağırır. `online_catalog_v1` feature'ı bu protokolü
+bildirir. Kalıcı `online_catalog` outbox revision'ı tamamlanan yayınlardan sonra da
+monoton artar; aynı revision/idempotency key ile retry tekrar yayın üretmez.
+`channel.online_sales` kapalıyken builder disabled/empty projection hazırlar. Hosting
+public `GET /api/catalog.php` yalnız bu public-safe projection'ı okur; submission yapmaz.
+
 `pushAiSettings()` masaüstünde kaydedilen AI bağlantısını `publish_ai_settings` aksiyonuna yollar. Uzak hedeflerde HTTPS zorunludur; HTTP yalnız loopback geliştirme adreslerinde kabul edilir. API anahtarı istekten sonra sonuç nesnesine veya hata mesajına geri taşınmaz.
 
 ## Komutlar

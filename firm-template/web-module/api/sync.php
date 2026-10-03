@@ -9,6 +9,7 @@ const YA_GOOGLE_REVIEWS_SETTINGS_FILE = YA_BASE_DIR . '/data/google-reviews.loca
 const YA_GOOGLE_REVIEWS_CACHE_FILE = YA_BASE_DIR . '/data/google-reviews-cache.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/online-catalog.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/google-reviews.php';
 
@@ -23,7 +24,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
+if (in_array($action, ['publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -48,6 +49,14 @@ try {
 
     if ($action === 'reset_runtime') {
         ya_sync_reset_runtime();
+    }
+
+    if ($action === 'pull_web_orders') {
+        ya_sync_pull_web_orders($payload);
+    }
+
+    if ($action === 'acknowledge_web_orders') {
+        ya_sync_acknowledge_web_orders($payload);
     }
 
     if ($action === 'pull_requests') {
@@ -108,6 +117,10 @@ try {
 
     if ($action === 'publish_business_context') {
         ya_sync_publish_business_context($payload);
+    }
+
+    if ($action === 'publish_online_catalog') {
+        ya_sync_publish_online_catalog($payload);
     }
 
     if ($action === 'publish_room_catalog') {
@@ -553,6 +566,42 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'reports' => $reportsAllowed ? $androidSnapshot['reports'] : [],
         'market' => ya_sync_android_market_for_permissions($androidSnapshot['market'], $permissionList),
         'actions' => $actions,
+        'server_revision' => ya_storage_server_revision()
+    ]);
+}
+
+function ya_sync_pull_web_orders(array $payload): void
+{
+    ya_sync_require_client_id($payload);
+    $afterSeq = ya_sync_int($payload['after_seq'] ?? -1, -1);
+    if ($afterSeq < 0) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Sipariş cursor bilgisi geçersiz.']);
+    }
+    $pulled = ya_storage_pull_web_orders(ya_sync_int($payload['limit'] ?? 50, 50), $afterSeq);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Web siparişleri alındı.',
+        ...$pulled,
+        'count' => count($pulled['orders']),
+        'pulled_at' => date(DATE_ATOM),
+        'server_revision' => ya_storage_server_revision()
+    ]);
+}
+
+function ya_sync_acknowledge_web_orders(array $payload): void
+{
+    $clientId = ya_sync_require_client_id($payload);
+    $throughSeq = ya_sync_int($payload['through_seq'] ?? -1, -1);
+    if ($throughSeq < 0) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Sipariş onay cursor bilgisi geçersiz.']);
+    }
+    $now = date(DATE_ATOM);
+    $result = ya_storage_acknowledge_web_orders($clientId, $throughSeq, $now);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Web sipariş cursor bilgisi onaylandı.',
+        ...$result,
+        'acknowledged_at' => $now,
         'server_revision' => ya_storage_server_revision()
     ]);
 }
@@ -1037,6 +1086,32 @@ function ya_sync_publish_ai_catalog(array $payload): void
     ]);
 }
 
+
+function ya_sync_publish_online_catalog(array $payload): void
+{
+    $candidate = $payload['online_catalog'] ?? null;
+    $revision = $payload['source_revision'] ?? null;
+    $key = ya_sync_string($payload['idempotency_key'] ?? '');
+    if (!is_array($candidate) || !is_int($revision) || $revision < 1 || $key === '' || strlen($key) > 240) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Ürün kataloğu yayın bilgisi geçersiz.']);
+    }
+    try {
+        $catalog = ya_online_catalog_projection($candidate);
+    } catch (InvalidArgumentException $error) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Ürün kataloğu taşıma verisi geçersiz.']);
+    }
+    $clientId = ya_sync_require_client_id($payload);
+    $now = date(DATE_ATOM);
+    $publication = ya_storage_publish('online_catalog', $catalog, $clientId, $revision, $key, $now);
+    ya_sync_response(200, [
+        'ok' => true, 'message' => 'Online ürün kataloğu yayınlandı.',
+        'published_at' => $publication['published_at'],
+        'product_count' => count($catalog['products']),
+        'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'],
+        'deduplicated' => $publication['deduplicated']
+    ]);
+}
 
 function ya_sync_publish_room_catalog(array $payload): void
 {

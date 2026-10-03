@@ -32,6 +32,7 @@ export const BUSINESS_CAPABILITIES = {
   INVENTORY: "commerce.inventory",
   SALES: "commerce.sales",
   ORDERS: "commerce.orders",
+  ONLINE_SALES: "channel.online_sales",
   WHOLESALE: "commerce.wholesale",
   CUSTOMER_CREDIT: "commerce.customer_credit",
 
@@ -79,6 +80,7 @@ export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability
   [C.INVENTORY]: [C.CATALOG],
   [C.SALES]: [C.CATALOG],
   [C.ORDERS]: [C.CATALOG],
+  [C.ONLINE_SALES]: [C.ORDERS],
   [C.WHOLESALE]: [C.CUSTOMERS, C.ORDERS],
   [C.CUSTOMER_CREDIT]: [C.CUSTOMERS, C.SALES, C.FINANCE],
   [C.RETAIL_BARCODE]: [C.CATALOG],
@@ -148,7 +150,8 @@ const RETAIL_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
   C.RETAIL_SUPPLIERS,
   C.RETAIL_LABELS,
   C.CUSTOMER_CREDIT,
-  C.WHOLESALE
+  C.WHOLESALE,
+  C.ONLINE_SALES
 ];
 
 const RETAIL_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [

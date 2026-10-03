@@ -30,6 +30,7 @@ export function ProductWorkspace({
   inventoryEnabled,
   productDataEnabled,
   wholesaleEnabled = false,
+  onlineSalesEnabled = false,
   busy,
   onReload,
   onProductSaved,
@@ -41,6 +42,7 @@ export function ProductWorkspace({
   inventoryEnabled: boolean;
   productDataEnabled: boolean;
   wholesaleEnabled?: boolean;
+  onlineSalesEnabled?: boolean;
   busy: boolean;
   onReload: () => Promise<void>;
   onProductSaved: (product: CatalogProduct) => void;
@@ -60,6 +62,11 @@ export function ProductWorkspace({
   const [resourceState, setResourceState] = useState<WorkspaceState>("idle");
   const [saveState, setSaveState] = useState<WorkspaceState>("idle");
   const [saveMessage, setSaveMessage] = useState("Değişiklikler yalnız bu ürün kartına kaydedilir.");
+  const [isPublished, setIsPublished] = useState(false);
+  const [publicationBusy, setPublicationBusy] = useState(false);
+  const [publicationLoaded, setPublicationLoaded] = useState(false);
+  const [publicationMessage, setPublicationMessage] = useState("");
+  const beginPublicationRequest = useRequestGeneration();
   const beginResourceRequest = useRequestGeneration();
   const beginSaveRequest = useRequestGeneration();
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep";
@@ -69,9 +76,43 @@ export function ProductWorkspace({
       ? localImageDataUrl
       : "";
   const closeBlocked = useWorkspaceCloseGuard({
-    busy: busy || resourceState === "loading" || saveState === "loading",
+    busy: busy || publicationBusy || resourceState === "loading" || saveState === "loading",
     dirty
   });
+
+  useEffect(() => {
+    const isCurrent = beginPublicationRequest();
+    setPublicationLoaded(false);
+    setIsPublished(false);
+    setPublicationMessage("");
+    if (!onlineSalesEnabled || !product || !bridge) {
+      setPublicationBusy(false);
+      return;
+    }
+    setPublicationBusy(true);
+    void bridge.getProductPublication(product.id).then((publication) => {
+      if (!isCurrent()) return;
+      setIsPublished(publication?.isPublished ?? false);
+      setPublicationLoaded(true);
+    }).catch(() => {
+      if (isCurrent()) setPublicationMessage("Web yayın tercihi okunamadı. Ürün kartını yeniden açıp deneyin.");
+    }).finally(() => { if (isCurrent()) setPublicationBusy(false); });
+  }, [beginPublicationRequest, bridge, onlineSalesEnabled, product?.id]);
+
+  async function savePublication(published: boolean) {
+    if (!bridge || !product || !onlineSalesEnabled || publicationBusy || !publicationLoaded) return;
+    const isCurrent = beginPublicationRequest();
+    setPublicationBusy(true);
+    setPublicationMessage("");
+    try {
+      const saved = await bridge.saveProductPublication({ productId: product.id, isPublished: published });
+      if (!isCurrent()) return;
+      setIsPublished(saved.isPublished);
+      setPublicationMessage("Web yayın tercihi kaydedildi.");
+    } catch {
+      if (isCurrent()) setPublicationMessage("Web yayın tercihi kaydedilemedi. Tekrar deneyin.");
+    } finally { if (isCurrent()) setPublicationBusy(false); }
+  }
 
   const loadProductResources = useCallback(async () => {
     if (!product || !bridge) return;
@@ -132,7 +173,7 @@ export function ProductWorkspace({
   }, [loadProductResources, loadedProductId, product]);
 
   async function saveProduct() {
-    if (!bridge || !product || busy || resourceState === "loading" || saveState === "loading") return;
+    if (!bridge || !product || busy || publicationBusy || resourceState === "loading" || saveState === "loading") return;
     const priceError = validateProductFormPrices(form);
     if (priceError) {
       setSaveState("error");
@@ -253,14 +294,14 @@ export function ProductWorkspace({
       footer={<>
         <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
         <div className="action-row">
-          <ActionButton variant="secondary" type="button" disabled={busy || saveState === "loading" || !dirty} onClick={() => {
+          <ActionButton variant="secondary" type="button" disabled={busy || publicationBusy || saveState === "loading" || !dirty} onClick={() => {
             setForm(baseline);
             setImageDraftMode("keep");
             setManualImageDataUrl("");
             setSaveState("idle");
             setSaveMessage("Değişiklikler yalnız bu ürün kartına kaydedilir.");
           }}>Değişiklikleri Geri Al</ActionButton>
-          <ActionButton type="button" disabled={busy || saveState === "loading" || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
+          <ActionButton type="button" disabled={busy || publicationBusy || saveState === "loading" || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
             <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
           </ActionButton>
         </div>
@@ -292,6 +333,16 @@ export function ProductWorkspace({
             onChange={setForm}
             onStateChange={onStateChange}
           />}
+        {onlineSalesEnabled && <section className="form-stack">
+          <label className="market-check">
+            <input type="checkbox" checked={isPublished}
+              disabled={busy || publicationBusy || !publicationLoaded || saveState === "loading"}
+              onChange={(event) => void savePublication(event.target.checked)} />
+            <span>Web satışında yayınla</span>
+          </label>
+          <p className="market-muted">Yayın tercihi hemen kaydedilir. Web kataloğunda yalnız aktif ürünler görünür.</p>
+          {publicationMessage && <p role="status">{publicationMessage}</p>}
+        </section>}
       </WorkspaceTabPanel>
 
       {inventoryEnabled && <WorkspaceTabPanel value="stock">

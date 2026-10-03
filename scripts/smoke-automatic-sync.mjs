@@ -239,7 +239,7 @@ try {
   assert.equal(firstCycle.pulledActions, 1);
   assert.equal(firstCycle.appliedActions, 1);
   assert.equal(firstCycle.failedActions, 0);
-  assert.equal(firstCycle.publishedJobs, 2);
+  assert.equal(firstCycle.publishedJobs, 3);
   assert.ok(dashboardChangeCount >= 1);
   assert.ok(statusEvents.some((status) => status.phase === "syncing"));
   assert.equal(statusEvents.at(-1)?.phase, "success");

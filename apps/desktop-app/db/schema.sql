@@ -436,6 +436,22 @@ CREATE TABLE inventory_balances (
   PRIMARY KEY (product_id, location_id)
 );
 
+-- Web channel settings reference the canonical product; visibility defaults OFF.
+CREATE TABLE commerce_product_publications (
+  product_id TEXT NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
+  business_id TEXT NOT NULL REFERENCES business(id),
+  channel TEXT NOT NULL DEFAULT 'online_sales' CHECK (channel = 'online_sales'),
+  is_published INTEGER NOT NULL DEFAULT 0 CHECK (is_published IN (0, 1)),
+  title_override TEXT NOT NULL DEFAULT '',
+  description_override TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (product_id, channel)
+);
+CREATE INDEX idx_commerce_product_publications_business
+  ON commerce_product_publications(business_id, channel, is_published, sort_order);
+
 CREATE TABLE inventory_locations (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
@@ -826,7 +842,7 @@ CREATE TABLE stock_image_imports (
 
 CREATE TABLE sync_outbox (
   job_key TEXT PRIMARY KEY,
-  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot')),
+  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish')),
   source_revision INTEGER NOT NULL DEFAULT 1,
   attempt_count INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TEXT NOT NULL DEFAULT '',
@@ -858,6 +874,8 @@ CREATE TABLE sync_records (
 CREATE TABLE sync_runtime (
   id TEXT PRIMARY KEY,
   request_cursor INTEGER NOT NULL DEFAULT 0,
+  web_order_cursor INTEGER NOT NULL DEFAULT 0,
+  web_order_acknowledged_cursor INTEGER NOT NULL DEFAULT 0,
   acknowledged_cursor INTEGER NOT NULL DEFAULT 0,
   last_attempt_at TEXT NOT NULL DEFAULT '',
   last_success_at TEXT NOT NULL DEFAULT '',
@@ -975,11 +993,13 @@ INSERT INTO sync_outbox (
   last_error, created_at, updated_at
 ) VALUES
   ('menu', 'menu_publish', 1, 0, '', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  ('android_snapshot', 'android_snapshot', 1, 0, '', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+  ('android_snapshot', 'android_snapshot', 1, 0, '', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  ('online_catalog', 'online_catalog_publish', 1, 0, '', '', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 INSERT INTO sync_outbox_revisions (job_key, source_revision, updated_at)
 VALUES
   ('menu', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  ('android_snapshot', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+  ('android_snapshot', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  ('online_catalog', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 
 -- INDEXS
 
@@ -2262,3 +2282,75 @@ BEGIN
   WHERE status != 'sent' AND guest_id IN (SELECT id FROM stay_guests WHERE customer_id = NEW.id);
 END;
 -- END HOSPITALITY GUEST SCHEMA
+
+CREATE TRIGGER trg_online_catalog_commerce_product_publications_insert
+AFTER INSERT ON commerce_product_publications
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_online_catalog_commerce_product_publications_update
+AFTER UPDATE ON commerce_product_publications
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_online_catalog_commerce_product_publications_delete
+AFTER DELETE ON commerce_product_publications
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_online_catalog_catalog_products_update
+AFTER UPDATE ON catalog_products WHEN EXISTS (SELECT 1 FROM commerce_product_publications WHERE product_id = OLD.id AND is_published = 1)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_online_catalog_catalog_products_delete
+AFTER DELETE ON catalog_products WHEN EXISTS (SELECT 1 FROM commerce_product_publications WHERE product_id = OLD.id AND is_published = 1)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_online_catalog_business_capabilities_insert
+AFTER INSERT ON business_capabilities WHEN NEW.capability_id = 'channel.online_sales'
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_online_catalog_business_capabilities_update
+AFTER UPDATE ON business_capabilities WHEN NEW.capability_id = 'channel.online_sales'
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_online_catalog_business_capabilities_delete
+AFTER DELETE ON business_capabilities WHEN OLD.capability_id = 'channel.online_sales'
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('online_catalog', 'online_catalog_publish', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;

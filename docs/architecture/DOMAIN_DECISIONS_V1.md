@@ -409,3 +409,48 @@ finance_entries. Customer-credit finance income remains tied to later actual col
 Finance standardization, if desired, is a separate domain decision and must apply to both
 sales paths consistently.
 
+
+## D-026 — Online Sales ingress imports an inbox into canonical Commerce Orders
+
+**Status:** ACCEPTED (2026-10-04)
+
+`channel.online_sales` is optional, defaults OFF for Market/retail, and depends on
+`commerce.orders`. A Web Order is a transport/inbox record, not a canonical business
+entity. Canonical orders belong exclusively to `commerce.orders`.
+
+Desktop imports anonymous orders through canonical `createCommerceOrder()` using
+source `web-online-sales` and the Web Order id as `sourceReference`. The
+`source + sourceReference` pair is the idempotency boundary. Desktop resolves pricing;
+web payload prices are never authoritative. The web side creates no Sale, inventory
+movement, payment or fulfillment.
+
+`SyncCoordinator` only orchestrates capability gates, pull, ingress and ack. A focused
+Online Order Ingress Service validates envelopes and delegates canonical creation.
+`web_orders` has its own cursor/ack line, independent of customer requests. Only the
+successfully imported prefix may be acknowledged; failed records remain retryable.
+
+Public checkout/order submission is deferred to the later Product Publication / Web
+Catalog slice. Checkout identity, shipping and automatic customer creation are outside
+this foundation. Only the current schema is supported; no historical migration chain.
+
+## D-027 — Product Publication projects canonical products into the web channel
+
+**Status:** ACCEPTED (2026-10-04)
+
+Product Publication is not a second canonical Product. A publication references
+`catalog_products` by `productId` and owns only channel settings. Web visibility is
+explicit opt-in, default OFF, with one publication per product/channel (`online_sales`).
+
+Desktop is authoritative. Only active, non-deleted products with an enabled publication
+enter the public projection. `channel.online_sales` OFF publishes a disabled empty
+catalog through the existing versioned publication/outbox lifecycle. Web reads the
+sanitized projection and does not generate product, price or stock business rules.
+
+Desktop prepares prices using canonical resolved retail pricing, without a customer.
+Dealer/wholesale web pricing is deferred. The public contract excludes purchase/cost,
+dealer prices, suppliers, internal notes, barcode and private metadata. Local image
+archive paths are never public; only safe public image URLs may be projected.
+
+Publication visibility is an immediate preference in the canonical Product Workspace;
+it does not create another Product editor or mutate the product's local active state.
+Checkout, cart, public order submission and customer identity capture remain deferred.

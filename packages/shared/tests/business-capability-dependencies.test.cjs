@@ -56,3 +56,13 @@ test("enabled dependents include transitive consumers", () => {
   assert.equal(catalogDependents.includes(C.INVENTORY), true);
   assert.equal(catalogDependents.includes(C.RETAIL_PURCHASING), true);
 });
+
+test("online sales is an optional retail channel with canonical order dependencies", () => {
+  const { BUSINESS_PROFILES } = require("../dist");
+  const expanded = new Set(expandBusinessCapabilities([C.ONLINE_SALES]));
+  assert.equal(expanded.has(C.ORDERS), true);
+  assert.equal(expanded.has(C.CATALOG), true);
+  assert.equal(expanded.has(C.CUSTOMERS), false);
+  assert.equal(BUSINESS_PROFILES.market.optionalCapabilities.includes(C.ONLINE_SALES), true);
+  assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.ONLINE_SALES), false);
+});

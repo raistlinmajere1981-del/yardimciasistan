@@ -1057,7 +1057,7 @@ export interface RecordSyncEventInput {
   status?: number;
 }
 
-export type DesktopSyncJobType = "menu_publish" | "android_snapshot";
+export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish";
 
 export interface DesktopSyncJob {
   jobKey: string;
@@ -1073,6 +1073,8 @@ export interface DesktopSyncRuntimeStatus {
   enabled: boolean;
   clientId: string;
   requestCursor: number;
+  webOrderCursor: number;
+  webOrderAcknowledgedCursor: number;
   acknowledgedCursor: number;
   lastAttemptAt: string;
   lastSuccessAt: string;

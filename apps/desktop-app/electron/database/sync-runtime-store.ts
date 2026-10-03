@@ -30,6 +30,8 @@ export function getSyncRuntimeStatus(db: DatabaseSync): DesktopSyncRuntimeStatus
     enabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
     clientId: String(identity?.client_id ?? ""),
     requestCursor: Number(runtime?.request_cursor ?? 0),
+    webOrderCursor: Number(runtime?.web_order_cursor ?? 0),
+    webOrderAcknowledgedCursor: Number(runtime?.web_order_acknowledged_cursor ?? 0),
     acknowledgedCursor: Number(runtime?.acknowledged_cursor ?? 0),
     lastAttemptAt: String(runtime?.last_attempt_at ?? ""),
     lastSuccessAt: String(runtime?.last_success_at ?? ""),
@@ -61,7 +63,8 @@ export function getPendingSyncJobs(db: DatabaseSync, now = new Date().toISOStrin
 }
 
 export function queueSyncJob(db: DatabaseSync, jobType: DesktopSyncJobType, timestamp = new Date().toISOString()) {
-  const jobKey = jobType === "menu_publish" ? "menu" : "android_snapshot";
+  const jobKey = jobType === "menu_publish" ? "menu"
+    : jobType === "online_catalog_publish" ? "online_catalog" : "android_snapshot";
   db
     .prepare(`
         INSERT INTO sync_outbox (
@@ -131,4 +134,15 @@ export function acknowledgeRequestCursor(db: DatabaseSync, cursor: number, times
         WHERE id = 'primary'
       `)
     .run(Math.max(0, Math.trunc(cursor)), timestamp);
+}
+
+export function recordWebOrderCursor(db: DatabaseSync, cursor: number, acknowledged: boolean) {
+  if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error("Geçersiz web sipariş cursor değeri.");
+  db.prepare(`
+    UPDATE sync_runtime
+    SET web_order_cursor = MAX(web_order_cursor, ?),
+        web_order_acknowledged_cursor = MAX(web_order_acknowledged_cursor, ?),
+        updated_at = ?
+    WHERE id = 'primary'
+  `).run(cursor, acknowledged ? cursor : 0, new Date().toISOString());
 }

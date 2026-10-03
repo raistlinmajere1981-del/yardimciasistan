@@ -2,6 +2,7 @@ import {
   type BusinessAiCatalog,
   type BusinessAiContext,
   type BusinessCapability,
+  type CommerceOnlineCatalog,
   type CustomerRequest,
   type ISODateTimeString,
   type MenuStockUnit,
@@ -28,6 +29,48 @@ export interface PullRequestsOptions extends SyncCoreConfig {
   clientId?: string;
 }
 
+/** Hosting inbox record; canonical business ownership remains in commerce.orders. */
+export interface WebOrderEnvelope {
+  id: string;
+  items: Array<{ productId: string; quantity: number }>;
+  createdAt: ISODateTimeString;
+  syncSeq: number;
+}
+
+export interface PullWebOrdersOptions extends SyncCoreConfig {
+  clientId: string;
+  afterSeq: number;
+  limit?: number;
+}
+
+export interface AcknowledgeWebOrdersOptions extends SyncCoreConfig {
+  clientId: string;
+  throughSeq: number;
+}
+
+export interface PullWebOrdersSuccess {
+  ok: true;
+  message: string;
+  orders: WebOrderEnvelope[];
+  count: number;
+  next_cursor: number;
+  has_more: boolean;
+  pulled_at: ISODateTimeString;
+  server_revision: number;
+}
+
+export interface AcknowledgeWebOrdersSuccess {
+  ok: true;
+  message: string;
+  updated_count: number;
+  acknowledged_cursor: number;
+  acknowledged_at: ISODateTimeString;
+  server_revision: number;
+}
+
+export type PullWebOrdersResult = PullWebOrdersSuccess | SyncFailure;
+export type AcknowledgeWebOrdersResult = AcknowledgeWebOrdersSuccess | SyncFailure;
+
 export interface MarkRequestsSyncedOptions extends SyncCoreConfig {
   requestIds: string[];
 }
@@ -36,6 +79,25 @@ export interface AcknowledgeRequestsOptions extends SyncCoreConfig {
   clientId: string;
   throughSeq: number;
 }
+
+export interface PushOnlineCatalogOptions extends SyncCoreConfig {
+  clientId: string;
+  catalog: CommerceOnlineCatalog;
+  sourceRevision: number;
+  idempotencyKey: string;
+}
+
+export interface PushOnlineCatalogSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  product_count: number;
+  source_revision: number;
+  server_revision: number;
+  deduplicated: boolean;
+}
+
+export type PushOnlineCatalogResult = PushOnlineCatalogSuccess | SyncFailure;
 
 export interface PushMenuOptions extends SyncCoreConfig {
   menu: PublishedQrMenu;
@@ -799,6 +861,10 @@ export interface PullCursorInput {
   limit?: number;
 }
 
+export interface WebOrderAcknowledgement {
+  throughSeq: number;
+}
+
 export interface RequestAcknowledgement {
   throughSeq: number;
 }
@@ -851,10 +917,13 @@ export function createCompanionSourceKey(kind: CompanionTransportKind, sourceId:
 
 export interface SyncTransport {
   getCapabilities(): Promise<SyncCapabilitiesResult>;
+  pullWebOrders(input: PullCursorInput): Promise<PullWebOrdersResult>;
+  acknowledgeWebOrders(input: WebOrderAcknowledgement): Promise<AcknowledgeWebOrdersResult>;
   pullRequests(input: PullCursorInput): Promise<PullRequestsResult>;
   acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult>;
   pullAndroidActions(input?: PullActionsInput): Promise<PullAndroidActionsResult>;
   completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult>;
+  publishOnlineCatalog(input: VersionedPublication<CommerceOnlineCatalog>): Promise<PushOnlineCatalogResult>;
   publishMenu(input: VersionedPublication<PublishedQrMenu>): Promise<PushMenuResult>;
   publishAndroidSnapshot(input: VersionedPublication<AndroidOperationsSnapshot>): Promise<PushAndroidSnapshotResult>;
 }
@@ -866,6 +935,8 @@ export interface PhpHostingSyncTransportConfig extends SyncCoreConfig {
 export {
   PhpHostingSyncTransport,
   acknowledgeRequests,
+  acknowledgeWebOrders,
+  pullWebOrders,
   createSyncEndpointUrl,
   getSyncCapabilities,
   markAndroidActionResult,
@@ -877,6 +948,7 @@ export {
   pushAndroidSnapshot,
   pushBusinessContext,
   pushMenu,
+  pushOnlineCatalog,
   pushRoomCatalog,
   pushTableCatalog,
   resetHostingRuntime

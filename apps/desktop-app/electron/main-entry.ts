@@ -200,6 +200,7 @@ function prepareRestoredStateForFullRepublish() {
     // The projected snapshot is also the hosted capability manifest; when
     // Android is disabled it deliberately publishes data/permission tombstones.
     database.queueSyncJob("android_snapshot", now);
+    database.queueSyncJob("online_catalog_publish", now);
   } finally {
     database.close();
   }

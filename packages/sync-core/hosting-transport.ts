@@ -1,7 +1,11 @@
+import type { CommerceOnlineCatalog } from "@yardimci-asistan/shared";
 import type {
   AcknowledgeRequestsOptions,
   AcknowledgeRequestsResult,
   AcknowledgeRequestsSuccess,
+  AcknowledgeWebOrdersOptions,
+  AcknowledgeWebOrdersResult,
+  AcknowledgeWebOrdersSuccess,
   ActionCompletion,
   AndroidOperationsSnapshot,
   MarkAndroidActionResultOptions,
@@ -20,6 +24,9 @@ import type {
   PullRequestsOptions,
   PullRequestsResult,
   PullRequestsSuccess,
+  PullWebOrdersOptions,
+  PullWebOrdersResult,
+  PullWebOrdersSuccess,
   PushAiCatalogOptions,
   PushAiCatalogResult,
   PushAiCatalogSuccess,
@@ -35,6 +42,9 @@ import type {
   PushMenuOptions,
   PushMenuResult,
   PushMenuSuccess,
+  PushOnlineCatalogOptions,
+  PushOnlineCatalogResult,
+  PushOnlineCatalogSuccess,
   PushRoomCatalogOptions,
   PushRoomCatalogResult,
   PushRoomCatalogSuccess,
@@ -51,7 +61,8 @@ import type {
   SyncCoreConfig,
   SyncFailure,
   SyncTransport,
-  VersionedPublication
+  VersionedPublication,
+  WebOrderAcknowledgement
 } from "./index";
 
 export function createSyncEndpointUrl(baseUrl: string): string {
@@ -81,6 +92,44 @@ export async function pullRequests(options: PullRequestsOptions): Promise<PullRe
   });
 }
 
+export async function pullWebOrders(options: PullWebOrdersOptions): Promise<PullWebOrdersResult> {
+  const result = await syncRequest<PullWebOrdersSuccess>(options, {
+    action: "pull_web_orders",
+    client_id: options.clientId,
+    after_seq: Math.max(0, Math.trunc(options.afterSeq)),
+    limit: options.limit ?? 50
+  });
+  if (!result.ok) return result;
+  // Check the whole page before exposing it to an importer. An out-of-order
+  // page must never let a caller acknowledge past an unprocessed record.
+  let cursor = Math.max(0, Math.trunc(options.afterSeq));
+  let valid = Array.isArray(result.orders) && typeof result.has_more === "boolean"
+    && result.count === result.orders.length;
+  if (valid) {
+    for (const envelope of result.orders) {
+      if (!Number.isSafeInteger(envelope?.syncSeq) || envelope.syncSeq <= cursor) {
+        valid = false;
+        break;
+      }
+      cursor = envelope.syncSeq;
+    }
+    valid &&= result.next_cursor === cursor && !(result.orders.length === 0 && result.has_more);
+  }
+  return valid ? result : {
+    ok: false,
+    message: "Web sipariş kuyruğu yanıtı geçersiz.",
+    error: "invalid_web_order_page"
+  };
+}
+
+export async function acknowledgeWebOrders(options: AcknowledgeWebOrdersOptions): Promise<AcknowledgeWebOrdersResult> {
+  return syncRequest<AcknowledgeWebOrdersSuccess>(options, {
+    action: "acknowledge_web_orders",
+    client_id: options.clientId,
+    through_seq: Math.max(0, Math.trunc(options.throughSeq))
+  });
+}
+
 export async function markRequestsSynced(options: MarkRequestsSyncedOptions): Promise<MarkRequestsSyncedResult> {
   return syncRequest<MarkRequestsSyncedSuccess>(options, {
     action: "mark_requests_synced",
@@ -93,6 +142,26 @@ export async function acknowledgeRequests(options: AcknowledgeRequestsOptions): 
     action: "acknowledge_requests",
     client_id: options.clientId,
     through_seq: Math.max(0, Math.trunc(options.throughSeq))
+  });
+}
+
+export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Promise<PushOnlineCatalogResult> {
+  return syncRequest<PushOnlineCatalogSuccess>(options, {
+    action: "publish_online_catalog",
+    client_id: options.clientId,
+    source_revision: options.sourceRevision,
+    idempotency_key: options.idempotencyKey,
+    online_catalog: {
+      version: options.catalog.version,
+      enabled: options.catalog.enabled,
+      updated_at: options.catalog.updatedAt,
+      products: options.catalog.products.map((product) => ({
+        product_id: product.productId, name: product.name, description: product.description,
+        sku: product.sku, unit: product.unit, price: product.price, currency: product.currency,
+        tax_rate: product.taxRate, image_url: product.imageUrl,
+        availability: product.availability, sort_order: product.sortOrder
+      }))
+    }
   });
 }
 
@@ -332,6 +401,14 @@ export class PhpHostingSyncTransport implements SyncTransport {
     });
   }
 
+  pullWebOrders(input: PullCursorInput): Promise<PullWebOrdersResult> {
+    return pullWebOrders({ ...this.config, ...input });
+  }
+
+  acknowledgeWebOrders(input: WebOrderAcknowledgement): Promise<AcknowledgeWebOrdersResult> {
+    return acknowledgeWebOrders({ ...this.config, ...input });
+  }
+
   pullAndroidActions(input: PullActionsInput = {}): Promise<PullAndroidActionsResult> {
     return pullAndroidActions({ ...this.config, limit: input.limit });
   }
@@ -342,6 +419,13 @@ export class PhpHostingSyncTransport implements SyncTransport {
       actionId: input.actionId,
       status: input.status,
       errorMessage: input.errorMessage
+    });
+  }
+
+  publishOnlineCatalog(input: VersionedPublication<CommerceOnlineCatalog>): Promise<PushOnlineCatalogResult> {
+    return pushOnlineCatalog({
+      ...this.config, catalog: input.value,
+      sourceRevision: input.sourceRevision, idempotencyKey: input.idempotencyKey
     });
   }
 

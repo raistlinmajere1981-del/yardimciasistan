@@ -322,6 +322,7 @@ function DesktopAppFrameContent({
             onDelete: menuController.deleteItemById
           }} />
           <WorkspaceHost definition={productWorkspaceDefinition} context={{
+            onlineSalesEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES),
             products: marketController.products,
             categories: marketController.categories,
             inventoryEnabled,
