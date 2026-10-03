@@ -26,6 +26,7 @@ export interface CustomerFormState {
   commercialTaxNumber: string;
   commercialAuthorizedPerson: string;
   commercialDealerStatus: "candidate" | "active" | "inactive";
+  commercialPriceGroup: "retail" | "dealer_a" | "dealer_b";
   commercialPaymentTermDays: string;
   commercialNotes: string;
 }
@@ -70,6 +71,7 @@ export function toCustomerForm(customer: CustomerRecord | null): CustomerFormSta
     commercialTaxNumber: customer?.commercialProfile?.taxNumber ?? "",
     commercialAuthorizedPerson: customer?.commercialProfile?.authorizedPerson ?? "",
     commercialDealerStatus: customer?.commercialProfile?.dealerStatus ?? "candidate",
+    commercialPriceGroup: customer?.commercialProfile?.priceGroup ?? "retail",
     commercialPaymentTermDays: String(customer?.commercialProfile?.paymentTermDays ?? 0),
     commercialNotes: customer?.commercialProfile?.notes ?? ""
   };
@@ -103,6 +105,7 @@ export function customerFormToInput(form: CustomerFormState, wholesaleEnabled = 
         taxNumber: form.commercialTaxNumber,
         authorizedPerson: form.commercialAuthorizedPerson,
         dealerStatus: form.commercialDealerStatus,
+        priceGroup: form.commercialPriceGroup,
         paymentTermDays: Number(form.commercialPaymentTermDays),
         notes: form.commercialNotes
       } : null
