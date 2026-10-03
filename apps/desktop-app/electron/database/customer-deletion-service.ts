@@ -86,6 +86,9 @@ export function deleteCustomerInTransaction(
     .prepare("UPDATE notifications SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE related_type = 'customer' AND related_id = ? AND deleted_at = ''")
     .run(updatedAt, updatedAt, customerId);
   db
+    .prepare("DELETE FROM customer_commercial_profiles WHERE customer_id = ?")
+    .run(customerId);
+  db
     .prepare("UPDATE customers SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
     .run(updatedAt, updatedAt, customerId);
 
