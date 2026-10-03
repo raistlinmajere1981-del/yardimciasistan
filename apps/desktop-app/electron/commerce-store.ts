@@ -36,6 +36,8 @@ export interface SaveCatalogProductInput {
   barcode?: string;
   description?: string;
   salePrice?: number;
+  dealerPriceA?: number | null;
+  dealerPriceB?: number | null;
   purchasePrice?: number;
   currency?: string;
   unit?: CommerceUnit;
@@ -174,6 +176,8 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
     barcode: String(row.barcode ?? ""),
     description: String(row.description ?? ""),
     salePrice: roundMoney(Number(row.sale_price ?? 0)),
+    dealerPriceA: row.dealer_price_a == null ? null : roundMoney(Number(row.dealer_price_a)),
+    dealerPriceB: row.dealer_price_b == null ? null : roundMoney(Number(row.dealer_price_b)),
     purchasePrice: roundMoney(Number(row.purchase_price ?? 0)),
     currency: normalizeCurrency(row.currency),
     unit: normalizeUnit(row.unit),
@@ -477,6 +481,18 @@ export function saveCatalogProductInTransaction(
     ? String(existing?.source_fetched_at ?? "").trim().slice(0, 80)
     : String(input.sourceFetchedAt ?? "").trim().slice(0, 80);
   const salePrice = Math.max(0, roundMoney(Number(input.salePrice ?? 0)));
+  const dealerPriceA = input.dealerPriceA == null
+    ? null
+    : roundMoney(Number(input.dealerPriceA));
+  const dealerPriceB = input.dealerPriceB == null
+    ? null
+    : roundMoney(Number(input.dealerPriceB));
+  if (dealerPriceA !== null && (!Number.isFinite(dealerPriceA) || dealerPriceA < 0)) {
+    throw new Error("Bayi A fiyatı geçersiz.");
+  }
+  if (dealerPriceB !== null && (!Number.isFinite(dealerPriceB) || dealerPriceB < 0)) {
+    throw new Error("Bayi B fiyatı geçersiz.");
+  }
   const purchasePrice = Math.max(0, roundMoney(Number(input.purchasePrice ?? 0)));
   const currency = normalizeCurrency(input.currency);
   const unit = normalizeUnit(input.unit);
@@ -489,11 +505,11 @@ export function saveCatalogProductInTransaction(
     database.prepare(`
       INSERT INTO catalog_products (
         id, business_id, category_id, name, brand, sku, barcode, description,
-        sale_price, purchase_price, currency, unit, tax_rate,
+        sale_price, dealer_price_a, dealer_price_b, purchase_price, currency, unit, tax_rate,
         track_inventory, is_active, image_asset_path, image_source_url,
         data_source, source_product_url, data_license, image_license, source_fetched_at,
         created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
       ON CONFLICT(id) DO UPDATE SET
         category_id = excluded.category_id,
         name = excluded.name,
@@ -502,6 +518,8 @@ export function saveCatalogProductInTransaction(
         barcode = excluded.barcode,
         description = excluded.description,
         sale_price = excluded.sale_price,
+        dealer_price_a = excluded.dealer_price_a,
+        dealer_price_b = excluded.dealer_price_b,
         purchase_price = excluded.purchase_price,
         currency = excluded.currency,
         unit = excluded.unit,
@@ -519,7 +537,7 @@ export function saveCatalogProductInTransaction(
         deleted_at = ''
     `).run(
       id, businessId, categoryId, name, brand, sku, barcode, description,
-      salePrice, purchasePrice, currency, unit, taxRate,
+      salePrice, dealerPriceA, dealerPriceB, purchasePrice, currency, unit, taxRate,
       trackInventory ? 1 : 0, isActive ? 1 : 0,
       imageAssetPath, imageSourceUrl, dataSource, sourceProductUrl,
       dataLicense, imageLicense, sourceFetchedAt,
