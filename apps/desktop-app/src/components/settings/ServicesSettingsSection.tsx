@@ -92,10 +92,6 @@ export function ServicesSettingsSection({
               Doğum günü mesajlarını kullan
             </label>
             <div className="form-grid">
-              <div className="settings-service-note form-field--span">
-                Mesaj uygulamada hazırlanır; gönderme işlemini WhatsApp içinde siz tamamlarsınız.
-                Otomatik gönderim yalnız WhatsApp Business desteği eklendiğinde açılacak.
-              </div>
               <label className="form-field form-field--span form-field--fluid">
                 Mesaj
                 <textarea
@@ -133,9 +129,6 @@ export function ServicesSettingsSection({
                     />
                     Yerel ağ bağlantısı
                   </label>
-                  <small>
-                    Aynı ağda masaüstü bulunursa Android doğrudan bağlanır; ulaşılamazsa web bağlantısı otomatik kullanılır.
-                  </small>
                 </div>
                 {setupData.setupRequired || !setupData.servicePreferences.android ? (
                   <p className="settings-service-empty">
