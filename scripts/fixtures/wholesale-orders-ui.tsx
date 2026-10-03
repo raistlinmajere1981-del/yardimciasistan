@@ -35,9 +35,10 @@ const commerceBridge = {
     control.__woCall("resolveProductPrice", [input]) as Promise<CommerceResolvedUnitPrice>
 };
 
-(window as typeof window & { yardimciDesktop?: unknown }).yardimciDesktop = {
-  commerce: commerceBridge
-};
+Object.defineProperty(window, "yardimciDesktop", {
+  configurable: true,
+  value: { commerce: commerceBridge }
+});
 
 function Harness() {
   return (
