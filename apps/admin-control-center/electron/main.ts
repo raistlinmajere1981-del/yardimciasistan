@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join, resolve } from "node:path";
+import { checkDependencyUpdates } from "./services/dependency-update-service";
 import { getOverviewSnapshot } from "./services/overview-service";
 
 const APP_ROOT = resolve(__dirname, "../..");
@@ -16,6 +17,7 @@ function createWindow() {
     backgroundColor: "#eef6ff",
     title: "Yardımcı Asistan Admin",
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -25,6 +27,10 @@ function createWindow() {
   });
 
   window.setMenuBarVisibility(false);
+  window.once("ready-to-show", () => {
+    window.maximize();
+    window.show();
+  });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://") || url.startsWith("http://")) void shell.openExternal(url);
@@ -37,6 +43,7 @@ function createWindow() {
 }
 
 ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));
+ipcMain.handle("admin:check-dependency-updates", () => checkDependencyUpdates(REPO_ROOT));
 ipcMain.handle("admin:open-external", async (_event, value: unknown) => {
   const url = typeof value === "string" ? value.trim() : "";
   if (!/^https?:\/\//i.test(url)) return false;
