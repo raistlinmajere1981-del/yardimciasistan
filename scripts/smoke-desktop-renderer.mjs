@@ -361,6 +361,7 @@ try {
           serial: "SMOKE-USB-1",
           state: "device",
           model: "Smoke USB Telefonu",
+          deviceId: "",
           appInstalled: true,
           installedVersionName: "0.1.1-debug",
           installedVersionCode: 2,
@@ -376,11 +377,12 @@ try {
         window.__androidProvisionCalls.push(serial);
         return {
           ok: true,
-          message: "Telefon mevcut işletmeye yeniden bağlanıyor.",
+          message: "Telefon kurulumu tamamlanıyor.",
           device: {
             serial,
             state: "device",
             model: "Smoke USB Telefonu",
+            deviceId: "",
             appInstalled: true,
             installedVersionName: "0.1.1-debug",
             installedVersionCode: 2,
@@ -391,8 +393,7 @@ try {
           }
         };
       },
-      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
-      markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
+      markWhatsAppMessageSent: async () => ({ ok: true, message: "Mesaj gönderildi olarak işaretlendi." }),
       openExternal: async (url) => {
         window.__openedExternalUrls.push(url);
         return true;
@@ -464,16 +465,12 @@ try {
   await expect(tableCategoryList.locator(".table-category-row")).toHaveCount(2);
   await sectionNav.getByRole("tab", { name: "Servisler", exact: true }).click();
   const androidDeviceSection = page.locator(".settings-android-devices-section");
-  await expect(androidDeviceSection.getByRole("heading", { name: "Telefon Kurulumu" })).toBeVisible();
-  await expect(androidDeviceSection.getByRole("button", { name: "USB Cihazları Yenile" })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("heading", { name: "Telefonlar" })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("button", { name: "Yenile", exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke USB Telefonu", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByRole("button", { name: "İşletmeye Bağla", exact: true })).toBeEnabled();
-  await androidDeviceSection.getByRole("button", { name: "İşletmeye Bağla", exact: true }).click();
-  const androidProvisionDialog = page.getByRole("dialog", { name: "Telefonu işletmeye bağla" });
-  await expect(androidProvisionDialog).toBeVisible();
-  await androidProvisionDialog.getByRole("button", { name: "Bağla", exact: true }).click();
+  await expect(androidDeviceSection.getByRole("button", { name: "Kurulumu Tamamla", exact: true })).toBeEnabled();
+  await androidDeviceSection.getByRole("button", { name: "Kurulumu Tamamla", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__androidProvisionCalls)).toEqual(["SMOKE-USB-1"]);
-  await expect(androidDeviceSection.getByRole("heading", { name: "Cihazlar ve Yetkiler" })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Servis + Oda işleri", { exact: true })).toBeVisible();
@@ -815,7 +812,7 @@ try {
   await expect(webControlBar.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
   await expect(webControlBar.getByRole("button", { name: "Dışarıda Aç" })).toBeVisible();
   await expect(webControlBar.getByRole("button", { name: "Güvenli Moda Dön" })).toBeVisible();
-  await expect(webControlBar.getByRole("button", { name: "Onayla ve Gönder" })).toBeVisible();
+  await expect(webControlBar.getByRole("button", { name: "Gönderildi Olarak İşaretle" })).toBeVisible();
   await expect(page.locator(".whatsapp-webview-frame")).toBeVisible();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("partition", "persist:yardimci-whatsapp");
@@ -844,45 +841,11 @@ try {
     "src",
     /^https:\/\/web\.whatsapp\.com\/send\?phone=905321234567&text=/
   );
-  await page.locator(".whatsapp-webview").evaluate((element) => {
-    let executionCount = 0;
-    Object.defineProperty(element, "getURL", {
-      configurable: true,
-      value: () => element.getAttribute("src") || ""
-    });
-    Object.defineProperty(element, "executeJavaScript", {
-      configurable: true,
-      value: async (code) => {
-        executionCount += 1;
-        if (executionCount === 1) {
-          if (!code.includes("message_mismatch") || !code.includes("location.origin")) {
-            throw new Error("WhatsApp DOM inspection guards are missing");
-          }
-          return {
-            ok: true,
-            code: "ready",
-            message: "Sohbet ve mesaj doğrulandı.",
-            chatTitle: "Demo Misafir",
-            composerText: "Hazır mesaj"
-          };
-        }
-        if (!code.includes("approval_changed") || !code.includes("sendControl.click()")) {
-          throw new Error("WhatsApp approved send guards are missing");
-        }
-        return {
-          ok: true,
-          code: "sent",
-          message: "Gönderim tamamlandı.",
-          chatTitle: "Demo Misafir"
-        };
-      }
-    });
-  });
-  await page.getByRole("button", { name: "Onayla ve Gönder" }).click();
-  await expect(page.locator(".confirm-dialog")).toContainText("WhatsApp Web üzerinden mesaj gönderilecek");
-  await expect(page.locator(".confirm-dialog")).toContainText("Açık sohbet: Demo Misafir");
-  await page.locator(".confirm-dialog").getByRole("button", { name: "Gönder", exact: true }).click();
-  await expect(page.getByRole("alert").first()).toContainText("Mesaj WhatsApp Web'e gönderildi");
+  await page.getByRole("button", { name: "Gönderildi Olarak İşaretle" }).click();
+  await expect(page.locator(".confirm-dialog")).toContainText("Bu işlem WhatsApp'a mesaj göndermez.");
+  await expect(page.locator(".confirm-dialog")).toContainText("yalnızca yerel kaydı tamamlandı olarak işaretler");
+  await page.locator(".confirm-dialog").getByRole("button", { name: "Gönderildi", exact: true }).click();
+
 
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await conversionPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
@@ -1324,7 +1287,6 @@ try {
       }),
       saveMenuCategory: async () => ({ ok: false, message: "smoke" }),
       saveMenuItem: async () => ({ ok: false, message: "smoke" }),
-      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
       openExternal: async () => true
     };
   }, {
@@ -1341,8 +1303,8 @@ try {
   await expect(conversionPage.locator(".settings-data-maintenance-section .backup-row")).toHaveCount(1);
   await expect(conversionPage.locator(".settings-data-maintenance-section").getByText("yardimci-asistan-smoke", { exact: true })).toHaveCount(0);
   await conversionPage.getByRole("tab", { name: "Servisler", exact: true }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Telefon Kurulumu" })).toBeVisible();
-  await expect(conversionPage.getByRole("button", { name: "USB Cihazları Yenile" })).toBeVisible();
+  await expect(conversionPage.getByRole("heading", { name: "Telefonlar" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Yenile", exact: true })).toBeVisible();
   await expect(conversionPage.getByRole("button", { name: "Android'e Yayınla" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
@@ -1780,7 +1742,6 @@ try {
           "available"
         );
       },
-      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
       markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
       openExternal: async () => true
     };
