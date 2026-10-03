@@ -110,6 +110,7 @@ channel.qr_menu             → food_service.menu
 
 commerce.inventory         → commerce.catalog
 commerce.sales             → commerce.catalog
+commerce.orders            → commerce.catalog
 commerce.customer_credit   → core.customers + commerce.sales + core.finance
 retail.barcode              → commerce.catalog
 retail.purchasing           → commerce.catalog + commerce.inventory
@@ -191,6 +192,8 @@ purchase_orders
 purchase_order_items
 commerce_sales
 commerce_sale_items
+commerce_orders
+commerce_order_items
 ```
 
 Bu tablolar restoranın mevcut `menu_items`, `tables`, `table_orders` yapısından bağımsızdır. Amaç food-service ve retail domain'lerinin commerce kavramlarını paylaşabilmesi, birbirine sıkı bağlanmamasıdır.
@@ -200,6 +203,7 @@ Store/runtime sınırları:
 - `apps/desktop-app/electron/commerce-store.ts`
 - `apps/desktop-app/electron/commerce-category-store.ts`
 - `apps/desktop-app/electron/commerce-purchase-store.ts`
+- `apps/desktop-app/electron/commerce-order-store.ts`
 - `apps/desktop-app/electron/commerce-runtime.ts`
 - `apps/desktop-app/electron/commerce-ipc.ts`
 - `apps/desktop-app/electron/commerce-ipc-contract.ts`
@@ -224,11 +228,31 @@ Runtime kuralları:
 commerce.catalog    → katalog işlemleri
 commerce.inventory  → stok işlemleri
 commerce.sales      → satış işlemleri
+commerce.orders     → kanal bağımsız sipariş çekirdeği
 retail.barcode      → barkod lookup
 retail.purchasing   → satın alma / stock-in
 retail.suppliers    → tedarikçi yönetimi
 retail.labels       → etiket workspace görünürlüğü
 ```
+
+### Sipariş çekirdeği kararı
+
+`commerce.orders` bağımsız ve opt-in bir commerce capability'sidir; yapısal olarak
+yalnız `commerce.catalog` gerektirir. Market profilinde UI'si tamamlanana kadar
+varsayılan veya kullanıcı seçilebilir özellik olarak açılmaz.
+
+`commerce_orders` + `commerce_order_items` sipariş anındaki müşteri adı, ürün adı,
+SKU/barkod/birim, fiyat ve vergi oranı snapshot'larını saklar. Katalog veya müşteri daha
+sonra değişse de geçmiş sipariş değişmez.
+
+Sipariş oluşturmak stok, finans veya `commerce_sales` üzerinde yan etki üretmez.
+`placed → confirmed/cancelled` geçişleri order store'a aittir. `fulfilled` durumuna
+yalnız ileride eklenecek sipariş→satış application operation'ı geçirecektir.
+
+Dış kanallar `source + source_reference` çiftini idempotency anahtarı olarak kullanır.
+Aynı çiftin yeniden gönderimi yeni sipariş oluşturmak yerine mevcut siparişi döndürür.
+Bu sınır gelecekte bayi, online satış ve WhatsApp Business kaynaklarının aynı order
+çekirdeğine güvenli biçimde bağlanması içindir.
 
 ### Stok sayımı kararı
 
