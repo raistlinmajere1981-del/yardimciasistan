@@ -234,20 +234,26 @@ export function AndroidDevicesSection({
       ) : (
         <div className="android-device-list">
           {usbRows.map(({ usbDevice, registeredDevice }) => {
-            const canInstall = Boolean(
-              installSnapshot?.apkAvailable
-              && (usbDevice.action === "install" || usbDevice.action === "update")
-            );
+            const installAction = usbDevice.action === "install" || usbDevice.action === "update";
+            const canInstall = Boolean(installSnapshot?.apkAvailable && installAction);
             const canCompleteSetup = usbDevice.appInstalled
               && usbDevice.state === "device"
               && !registeredDevice;
-            const primaryLabel = usbDevice.action === "install"
-              ? "Uygulamayı Kur"
-              : usbDevice.action === "update"
-                ? "Güncelle"
+            const primaryLabel = installAction && !installSnapshot?.apkAvailable
+              ? "APK Hazır Değil"
+              : usbDevice.action === "install"
+                ? "Uygulamayı Kur"
+                : usbDevice.action === "update"
+                  ? "Güncelle"
+                  : canCompleteSetup
+                    ? "Kurulumu Tamamla"
+                    : "";
+            const primaryDisabled = installBusy
+              || (installAction
+                ? !canInstall || !onInstallApp
                 : canCompleteSetup
-                  ? "Kurulumu Tamamla"
-                  : "";
+                  ? !onProvisionApp
+                  : true);
             return (
               <article
                 className={`android-device-card${registeredDevice && !registeredDevice.isActive ? " is-inactive" : ""}`}
@@ -313,7 +319,7 @@ export function AndroidDevicesSection({
                           onProvisionApp?.(usbDevice.serial);
                         }
                       }}
-                      disabled={installBusy || (canInstall ? !onInstallApp : !onProvisionApp)}
+                      disabled={primaryDisabled}
                     >
                       {primaryLabel}
                     </ActionButton>
