@@ -169,6 +169,7 @@ export function MarketPage({
         <MarketOrdersWorkspace
           customers={customers}
           products={products}
+          customerCreditEnabled={customerCreditEnabled}
           busy={dataState === "loading"}
           onStateChange={handleStateChange}
         />
