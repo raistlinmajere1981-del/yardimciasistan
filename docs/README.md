@@ -51,6 +51,7 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `PILOT_FIELD_TEST.md`
 - `WINDOWS_HOSTING_FIELD_TEST.md`
 - `dev/LOCAL_COMPANION_NETWORK.md`
+- `dev/ADMIN_CONSOLE_TARGET.md` — geliştirici/yönetici konsolunun installation registry, secret sınırı, health, drift ve deploy hedef sözleşmesi.
 
 ## Operasyonel geliştirme notları
 
