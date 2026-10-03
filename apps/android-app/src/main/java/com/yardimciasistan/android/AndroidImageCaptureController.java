@@ -1,5 +1,6 @@
 package com.yardimciasistan.android;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -12,6 +13,7 @@ import android.widget.Toast;
 import androidx.activity.ComponentActivity;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
@@ -32,11 +34,13 @@ final class AndroidImageCaptureController {
   private final ActivityResultLauncher<String[]> stockGalleryLauncher;
   private final ActivityResultLauncher<Uri> identityCameraLauncher;
   private final ActivityResultLauncher<String[]> identityGalleryLauncher;
+  private final ActivityResultLauncher<String> cameraPermissionLauncher;
 
   private Uri pendingStockCameraUri;
   private File pendingStockCameraFile;
   private Uri pendingIdentityCameraUri;
   private File pendingIdentityCameraFile;
+  private String pendingCameraAction = "";
 
   AndroidImageCaptureController(ComponentActivity activity, Listener listener) {
     this.activity = activity;
@@ -77,9 +81,31 @@ final class AndroidImageCaptureController {
     identityGalleryLauncher = activity.registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
       if (uri != null) listener.onIdentityImageSelected(uri);
     });
+
+    cameraPermissionLauncher = activity.registerForActivityResult(
+        new ActivityResultContracts.RequestPermission(),
+        granted -> {
+          String action = pendingCameraAction;
+          pendingCameraAction = "";
+          if (!Boolean.TRUE.equals(granted)) {
+            listener.onError("Kamera izni verilmedi. Galeriden görsel seçebilirsiniz.");
+            return;
+          }
+          if ("stock".equals(action)) {
+            launchStockCameraGranted();
+          } else if ("identity".equals(action)) {
+            launchIdentityCameraGranted();
+          }
+        }
+    );
   }
 
   void launchStockCamera() {
+    if (!ensureCameraPermission("stock")) return;
+    launchStockCameraGranted();
+  }
+
+  private void launchStockCameraGranted() {
     try {
       cleanupStockCameraFile();
       pendingStockCameraFile = createCameraFile("camera-");
@@ -103,6 +129,11 @@ final class AndroidImageCaptureController {
   }
 
   void launchIdentityCamera() {
+    if (!ensureCameraPermission("identity")) return;
+    launchIdentityCameraGranted();
+  }
+
+  private void launchIdentityCameraGranted() {
     try {
       cleanupIdentityCameraFile();
       pendingIdentityCameraFile = createCameraFile("identity-camera-");
@@ -125,6 +156,16 @@ final class AndroidImageCaptureController {
     }
   }
 
+  private boolean ensureCameraPermission(String action) {
+    if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
+        == PackageManager.PERMISSION_GRANTED) {
+      return true;
+    }
+    pendingCameraAction = action;
+    cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+    return false;
+  }
+
   void cleanupStockCameraFile() {
     if (pendingStockCameraFile != null && pendingStockCameraFile.isFile()) {
       pendingStockCameraFile.delete();
@@ -144,6 +185,7 @@ final class AndroidImageCaptureController {
     cleanupIdentityCameraFile();
     pendingStockCameraUri = null;
     pendingIdentityCameraUri = null;
+    pendingCameraAction = "";
   }
 
   private File createCameraFile(String prefix) throws Exception {
