@@ -247,22 +247,7 @@ async function fetchNormalizedProductImage(
       throw new Error("Ürün görseli boş veya izin verilen boyuttan büyük.");
     }
 
-    const decoded = nativeImage.createFromBuffer(bytes);
-    if (decoded.isEmpty()) {
-      throw new Error("Ürün görseli çözümlenemedi.");
-    }
-    const size = decoded.getSize();
-    const scale = Math.min(1, IMAGE_MAX_DIMENSION / Math.max(size.width, size.height, 1));
-    const width = Math.max(1, Math.round(size.width * scale));
-    const height = Math.max(1, Math.round(size.height * scale));
-    const normalized = scale < 1
-      ? decoded.resize({ width, height, quality: "good" })
-      : decoded;
-    const encoded = normalized.toJPEG(86);
-    if (!encoded.length) {
-      throw new Error("Ürün görseli standart formata dönüştürülemedi.");
-    }
-    return encoded;
+    return normalizeProductImageBytes(bytes);
   } catch (error) {
     if (controller.signal.aborted) {
       throw new Error("Ürün görseli alınırken zaman aşımı oluştu.", { cause: error });
@@ -271,6 +256,57 @@ async function fetchNormalizedProductImage(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function normalizeProductImageBytes(bytes: Buffer): Buffer {
+  if (bytes.length === 0 || bytes.length > IMAGE_MAX_BYTES) {
+    throw new Error("Ürün görseli boş veya izin verilen boyuttan büyük.");
+  }
+  const decoded = nativeImage.createFromBuffer(bytes);
+  if (decoded.isEmpty()) {
+    throw new Error("Ürün görseli çözümlenemedi.");
+  }
+  const size = decoded.getSize();
+  const scale = Math.min(1, IMAGE_MAX_DIMENSION / Math.max(size.width, size.height, 1));
+  const width = Math.max(1, Math.round(size.width * scale));
+  const height = Math.max(1, Math.round(size.height * scale));
+  const normalized = scale < 1
+    ? decoded.resize({ width, height, quality: "good" })
+    : decoded;
+  const encoded = normalized.toJPEG(86);
+  if (!encoded.length) {
+    throw new Error("Ürün görseli standart formata dönüştürülemedi.");
+  }
+  return encoded;
+}
+
+function normalizedManualProductImage(dataUrlInput: string): Buffer {
+  const dataUrl = String(dataUrlInput ?? "").trim();
+  const match = /^data:image\/(?:jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(dataUrl);
+  if (!match) {
+    throw new Error("Manuel ürün görseli JPEG, PNG veya WEBP olmalı.");
+  }
+  const bytes = Buffer.from(match[1] ?? "", "base64");
+  return normalizeProductImageBytes(bytes);
+}
+
+function writeProductImageAsset(databasePath: string, productId: string, encoded: Buffer): string {
+  const dataRoot = path.dirname(databasePath);
+  const absolutePath = resolveProductAssetAbsolutePath(dataRoot, productId, "front.jpg");
+  const relativePath = resolveProductAssetRelativePath(productId, "front.jpg");
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  const tempPath = `${absolutePath}.tmp-${process.pid}`;
+  try {
+    fs.writeFileSync(tempPath, encoded);
+    fs.copyFileSync(tempPath, absolutePath);
+  } finally {
+    try {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    } catch {
+      // Temp cleanup is best effort.
+    }
+  }
+  return relativePath;
 }
 
 export async function previewExternalProductImage(
@@ -294,21 +330,7 @@ export async function archiveExternalProductImage(
   if (!provider || !imageUrl || !provider.isImageUrlAllowed(imageUrl)) return "";
 
   const encoded = await fetchNormalizedProductImage(providerId, imageUrl);
-  const dataRoot = path.dirname(databasePath);
-  const absolutePath = resolveProductAssetAbsolutePath(dataRoot, productId, "front.jpg");
-  const relativePath = resolveProductAssetRelativePath(productId, "front.jpg");
-  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-  const tempPath = `${absolutePath}.tmp-${process.pid}`;
-  try {
-    fs.writeFileSync(tempPath, encoded);
-    fs.copyFileSync(tempPath, absolutePath);
-  } finally {
-    try {
-      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    } catch {
-      // Temp cleanup is best effort; the product file has already been written or the caller gets the original error.
-    }
-  }
+  const relativePath = writeProductImageAsset(databasePath, productId, encoded);
 
   const database = openDatabase(databasePath);
   try {
@@ -321,6 +343,63 @@ export async function archiveExternalProductImage(
     database.close();
   }
   return relativePath;
+}
+
+export function archiveManualProductImage(
+  databasePath: string,
+  productId: string,
+  dataUrl: string
+): string {
+  const encoded = normalizedManualProductImage(dataUrl);
+  const relativePath = writeProductImageAsset(databasePath, productId, encoded);
+  const database = openDatabase(databasePath);
+  try {
+    database.prepare(`
+      UPDATE catalog_products
+      SET image_asset_path = ?,
+          image_source_url = '',
+          image_license = '',
+          updated_at = ?
+      WHERE id = ? AND deleted_at = ''
+    `).run(relativePath, new Date().toISOString(), productId);
+  } finally {
+    database.close();
+  }
+  return relativePath;
+}
+
+export function clearProductImage(databasePath: string, productId: string): void {
+  const database = openDatabase(databasePath);
+  let relativePath = "";
+  try {
+    const row = database.prepare(`
+      SELECT image_asset_path
+      FROM catalog_products
+      WHERE id = ? AND deleted_at = ''
+      LIMIT 1
+    `).get(productId) as { image_asset_path?: unknown } | undefined;
+    relativePath = text(row?.image_asset_path, 500);
+    database.prepare(`
+      UPDATE catalog_products
+      SET image_asset_path = '',
+          image_source_url = '',
+          image_license = '',
+          updated_at = ?
+      WHERE id = ? AND deleted_at = ''
+    `).run(new Date().toISOString(), productId);
+  } finally {
+    database.close();
+  }
+
+  if (!relativePath) return;
+  try {
+    const absolutePath = resolveProductAssetAbsoluteFromRelative(path.dirname(databasePath), relativePath);
+    if (fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
+      fs.unlinkSync(absolutePath);
+    }
+  } catch {
+    // The database reference is already cleared. Orphan cleanup is maintenance work.
+  }
 }
 
 export function getProductImageDataUrl(databasePath: string, productId: string): string {
