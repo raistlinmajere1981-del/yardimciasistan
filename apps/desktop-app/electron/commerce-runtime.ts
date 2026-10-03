@@ -81,6 +81,7 @@ import {
 
 export type {
   CreateCommerceOrderInput,
+  FulfillCommerceOrderInput,
   ListCommerceOrdersOptions,
   ResolveCommerceProductPriceInput,
   ReceiveCommercePurchaseInput,
