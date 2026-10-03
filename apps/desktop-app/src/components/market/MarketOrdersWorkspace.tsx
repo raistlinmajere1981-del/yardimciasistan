@@ -1,5 +1,5 @@
 import { CheckCircle2, ClipboardList, Minus, Plus, Search, ShoppingCart, Trash2, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CatalogProduct,
   CommerceOrder,
@@ -14,6 +14,13 @@ interface DraftLine {
   product: CatalogProduct;
   pricing: CommerceResolvedUnitPrice;
   quantity: number;
+}
+
+function createManualOrderReference() {
+  const randomId = typeof crypto?.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `desktop-wholesale:${randomId}`;
 }
 
 function money(value: number, currency = "TRY") {
@@ -90,6 +97,12 @@ export function MarketOrdersWorkspace({
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [resolvingProductId, setResolvingProductId] = useState("");
+  const customerIdRef = useRef("");
+  const draftReferenceRef = useRef(createManualOrderReference());
+
+  const resetDraftReference = useCallback(() => {
+    draftReferenceRef.current = createManualOrderReference();
+  }, []);
 
   const selectedCustomer = activeDealers.find((customer) => customer.id === customerId);
   const filteredProducts = useMemo(() => {
@@ -122,27 +135,34 @@ export function MarketOrdersWorkspace({
   }, [reloadOrders]);
 
   function changeCustomer(nextCustomerId: string) {
+    customerIdRef.current = nextCustomerId;
     setCustomerId(nextCustomerId);
     setLines([]);
+    resetDraftReference();
   }
 
   async function addProduct(product: CatalogProduct) {
     if (!bridge || !customerId || resolvingProductId || disabled) return;
     const existing = lines.find((line) => line.product.id === product.id);
     if (existing) {
+      resetDraftReference();
       setLines((current) => current.map((line) =>
         line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line
       ));
       return;
     }
 
+    const requestedCustomerId = customerId;
+    customerIdRef.current = customerId;
     setResolvingProductId(product.id);
     try {
-      const pricing = await bridge.resolveProductPrice({ productId: product.id, customerId });
+      const pricing = await bridge.resolveProductPrice({ productId: product.id, customerId: requestedCustomerId });
+      if (customerIdRef.current !== requestedCustomerId) return;
       if (lines.length > 0 && pricing.currency !== currency) {
         onStateChange("error", "Tek siparişte birden fazla para birimi kullanılamaz.");
         return;
       }
+      resetDraftReference();
       setLines((current) => [...current, { product, pricing, quantity: 1 }]);
     } catch (error) {
       onStateChange("error", error instanceof Error ? error.message : "Ürün fiyatı çözümlenemedi.");
@@ -152,6 +172,7 @@ export function MarketOrdersWorkspace({
   }
 
   function setQuantity(productId: string, quantity: number) {
+    resetDraftReference();
     if (!Number.isFinite(quantity) || quantity <= 0) {
       setLines((current) => current.filter((line) => line.product.id !== productId));
       return;
@@ -170,6 +191,7 @@ export function MarketOrdersWorkspace({
       const created = await bridge.createOrder({
         customerId: selectedCustomer.id,
         source: "desktop-wholesale",
+        sourceReference: draftReferenceRef.current,
         note,
         items: lines.map((line) => ({
           productId: line.product.id,
@@ -179,6 +201,7 @@ export function MarketOrdersWorkspace({
       setSelectedOrder(created);
       setLines([]);
       setNote("");
+      resetDraftReference();
       await reloadOrders();
       onStateChange("success", `Sipariş kaydedildi: ${money(created.order.total, created.order.currency)}.`);
     } catch (error) {
@@ -232,7 +255,7 @@ export function MarketOrdersWorkspace({
               aria-label="Sipariş müşterisi"
               value={customerId}
               onChange={(event) => changeCustomer(event.target.value)}
-              disabled={disabled}
+              disabled={disabled || Boolean(resolvingProductId)}
             >
               <option value="">Bayi seçin</option>
               {activeDealers.map((customer) => (
@@ -301,7 +324,10 @@ export function MarketOrdersWorkspace({
               <p>{lines.length} kalem · fiyatlar kayıtta yeniden doğrulanır.</p>
             </div>
             {lines.length > 0 && (
-              <ActionButton variant="secondary" size="sm" onClick={() => setLines([])} disabled={disabled}>
+              <ActionButton variant="secondary" size="sm" onClick={() => {
+                setLines([]);
+                resetDraftReference();
+              }} disabled={disabled}>
                 <Trash2 size={15} aria-hidden="true" /> Temizle
               </ActionButton>
             )}
@@ -352,7 +378,10 @@ export function MarketOrdersWorkspace({
             <textarea
               rows={2}
               value={note}
-              onChange={(event) => setNote(event.target.value)}
+              onChange={(event) => {
+                setNote(event.target.value);
+                resetDraftReference();
+              }}
               maxLength={4000}
               disabled={disabled}
             />
