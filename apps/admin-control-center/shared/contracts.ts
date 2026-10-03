@@ -101,6 +101,29 @@ export type VerificationSnapshot = {
   latest: VerificationReportSnapshot;
 };
 
+export type DependencyUpdateItem = {
+  name: string;
+  current: string;
+  wanted: string;
+  latest: string;
+  dependent: string;
+  location: string;
+  type: string;
+  homepage: string | null;
+  majorUpdate: boolean;
+};
+
+export type DependencyUpdateReport = {
+  checkedAt: string;
+  status: "current" | "updates" | "error";
+  nodeVersion: string;
+  packageManager: string;
+  count: number;
+  majorCount: number;
+  message: string;
+  items: DependencyUpdateItem[];
+};
+
 export type OverviewSnapshot = {
   generatedAt: string;
   repo: RepoSnapshot;
@@ -118,5 +141,6 @@ export type OverviewSnapshot = {
 
 export type AdminBridge = {
   getOverview(): Promise<OverviewSnapshot>;
+  checkDependencyUpdates(): Promise<DependencyUpdateReport>;
   openExternal(url: string): Promise<boolean>;
 };
