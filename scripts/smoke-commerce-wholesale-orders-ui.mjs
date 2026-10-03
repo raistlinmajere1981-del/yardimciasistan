@@ -128,6 +128,7 @@ try {
 
   raw = new DatabaseSync(database.databasePath);
   const calls = [];
+  let displayFixtures = [];
   let loseFirstCreateOrderResponse = true;
   let loseFirstFulfillResponse = true;
 
@@ -181,8 +182,8 @@ try {
 
   await page.exposeFunction("__woCall", async (method, args) => {
     calls.push({ method, args: structuredClone(args) });
-    if (method === "listOrders") return listRuntimeOrders(database.databasePath, args[0] ?? {});
-    if (method === "getOrder") return getRuntimeOrder(database.databasePath, args[0]);
+    if (method === "listOrders") return [...displayFixtures.map((detail) => detail.order), ...listRuntimeOrders(database.databasePath, args[0] ?? {})];
+    if (method === "getOrder") return displayFixtures.find((detail) => detail.order.id === args[0]) ?? getRuntimeOrder(database.databasePath, args[0]);
     if (method === "resolveProductPrice") {
       await new Promise((resolve) => setTimeout(resolve, 150));
       return resolveRuntimeProductPrice(database.databasePath, args[0]);
@@ -404,6 +405,59 @@ try {
     1
   );
   assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, 8);
+
+  // Read-only presentation fixtures: exercise existing buyerSnapshot fields
+  // without creating new backend/domain test cases or changing persistence.
+  const existingDetail = getRuntimeOrder(database.databasePath, orderRow.id);
+  const guest = { name: "Web Guest", phone: "+44 7911 123456", email: "guest@example.test" };
+  const fixture = (id, overrides) => ({ ...existingDetail, order: {
+    ...existingDetail.order, id, customerId: "", customerName: "", source: "web-online-sales",
+    buyerSnapshot: guest, note: "Guest order note", ...overrides
+  } });
+  displayFixtures = [
+    fixture("ui-guest", {}),
+    fixture("ui-no-email", { buyerSnapshot: { name: "Guest without email", phone: "+1 (202) 555-0100" } }),
+    fixture("ui-customer-priority", { customerId: customer.savedId, customerName: "Canonical Customer", buyerSnapshot: { ...guest, name: "Contact Snapshot" } }),
+    fixture("ui-no-buyer", { buyerSnapshot: null, source: "online_sales" }),
+    fixture("ui-empty-contact", { buyerSnapshot: { name: "Only name", phone: "", email: "" }, source: "custom-source" })
+  ];
+  await page.getByRole("button", { name: "Yenile", exact: true }).click();
+  await expect(page.locator(".market-order-card")).toHaveCount(6);
+  const card = (name) => page.locator(".market-order-card").filter({ has: page.getByText(name, { exact: true }) });
+  await expect(card(guest.name)).toContainText("Web siparişi");
+  await card(guest.name).click();
+  await expect(detail.getByRole("heading", { name: guest.name, exact: true })).toBeVisible();
+  const buyer = detail.getByRole("region", { name: "Sipariş veren", exact: true });
+  await expect(buyer).toBeVisible();
+  await expect(buyer.locator("dt")).toHaveText(["Ad", "Telefon", "E-posta"]);
+  await expect(buyer.locator("dd")).toHaveText([guest.name, guest.phone, guest.email]);
+  await expect(buyer.locator("input, textarea, select")).toHaveCount(0);
+  await expect(detail.locator(".market-order-note")).toHaveText("Guest order note");
+
+  await card("Guest without email").click();
+  await expect(buyer.locator("dt")).toHaveText(["Ad", "Telefon"]);
+  await expect(buyer.locator("dd")).toHaveText(["Guest without email", "+1 (202) 555-0100"]);
+  await expect(buyer.getByText("E-posta", { exact: true })).toHaveCount(0);
+
+  await card("Canonical Customer").click();
+  await expect(detail.getByRole("heading", { name: "Canonical Customer", exact: true })).toBeVisible();
+  await expect(buyer).toContainText("Contact Snapshot");
+  await expect(page.locator(".market-order-card").filter({ hasText: "Contact Snapshot" })).toHaveCount(0);
+
+  await expect(card("Müşterisiz sipariş")).toContainText("Online satış");
+  await card("Müşterisiz sipariş").click();
+  await expect(detail.getByRole("heading", { name: "Sipariş", exact: true })).toBeVisible();
+  await expect(buyer).toHaveCount(0);
+
+  await expect(card("Only name")).toContainText("custom-source");
+  await card("Only name").click();
+  await expect(buyer.locator("dt")).toHaveText(["Ad"]);
+  await expect(buyer.locator("dd")).toHaveText(["Only name"]);
+
+  await card("Bayi Sipariş Testi").click();
+  await expect(detail.getByRole("heading", { name: "Bayi Sipariş Testi", exact: true })).toBeVisible();
+  await expect(buyer).toHaveCount(0);
+  await expect(card("Bayi Sipariş Testi")).toContainText("Manuel bayi");
 
   assert.deepEqual(pageErrors, []);
   console.log("commerce-wholesale-orders-ui-smoke-ok");

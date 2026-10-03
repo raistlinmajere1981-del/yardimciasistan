@@ -59,6 +59,7 @@ function orderStatusTone(status: string): StatusTone {
 
 function sourceLabel(source: string) {
   if (source === "desktop-wholesale") return "Manuel bayi";
+  if (source === "web-online-sales") return "Web siparişi";
   if (source === "online_sales") return "Online satış";
   return source || "Sipariş";
 }
@@ -474,7 +475,7 @@ export function MarketOrdersWorkspace({
               onClick={() => void openOrder(order.id)}
             >
               <span>
-                <strong>{order.customerName || "Müşterisiz sipariş"}</strong>
+                <strong>{order.customerName || order.buyerSnapshot?.name || "Müşterisiz sipariş"}</strong>
                 <small>{new Date(order.placedAt).toLocaleString("tr-TR")} · {sourceLabel(order.source)}</small>
               </span>
               <span className="market-order-card-meta">
@@ -491,11 +492,26 @@ export function MarketOrdersWorkspace({
             <header className="market-panel-heading-row">
               <div>
                 <span>Detay</span>
-                <h2>{selectedOrder.order.customerName || "Sipariş"}</h2>
+                <h2>{selectedOrder.order.customerName || selectedOrder.order.buyerSnapshot?.name || "Sipariş"}</h2>
                 <p>{sourceLabel(selectedOrder.order.source)} · {new Date(selectedOrder.order.placedAt).toLocaleString("tr-TR")}</p>
               </div>
               <StatusBadge tone={orderStatusTone(selectedOrder.order.status)}>{orderStatusLabel(selectedOrder.order.status)}</StatusBadge>
             </header>
+
+            {selectedOrder.order.buyerSnapshot && (
+              <section className="market-order-buyer" aria-label="Sipariş veren">
+                <strong>Sipariş veren</strong>
+                <dl>
+                  <dt>Ad</dt><dd>{selectedOrder.order.buyerSnapshot.name}</dd>
+                  {selectedOrder.order.buyerSnapshot.phone.trim() && (
+                    <><dt>Telefon</dt><dd>{selectedOrder.order.buyerSnapshot.phone}</dd></>
+                  )}
+                  {selectedOrder.order.buyerSnapshot.email?.trim() && (
+                    <><dt>E-posta</dt><dd>{selectedOrder.order.buyerSnapshot.email}</dd></>
+                  )}
+                </dl>
+              </section>
+            )}
 
             <div className="market-order-detail-lines">
               {selectedOrder.items.map((item) => (
