@@ -324,15 +324,22 @@ function deriveInstallationStatus(
   siteCheck: HealthCheckSnapshot,
   versionCheck: HealthCheckSnapshot
 ): { status: StatusKind; note: string } {
-  const operational = [siteCheck, versionCheck].filter((check) => check.status !== "unconfigured");
+  if (siteCheck.status === "error") {
+    return { status: "error", note: `${siteCheck.label}: ${siteCheck.detail}` };
+  }
 
-  const error = operational.find((check) => check.status === "error");
-  if (error) return { status: "error", note: `${error.label}: ${error.detail}` };
+  if (versionCheck.status === "error") {
+    return {
+      status: siteCheck.status === "ready" ? "warning" : "error",
+      note: `${versionCheck.label}: ${versionCheck.detail}`
+    };
+  }
 
-  const warning = operational.find((check) => check.status === "warning");
-  if (warning) return { status: "warning", note: `${warning.label}: ${warning.detail}` };
+  if (versionCheck.status === "warning") {
+    return { status: "warning", note: `${versionCheck.label}: ${versionCheck.detail}` };
+  }
 
-  if (operational.some((check) => check.status === "ready")) {
+  if (siteCheck.status === "ready" || versionCheck.status === "ready") {
     return { status: "ready", note: "Temel canlı kontroller sağlıklı." };
   }
 
