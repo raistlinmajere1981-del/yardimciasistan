@@ -15,7 +15,7 @@ header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-sr
 </head>
 <body>
   <a class="skip-link" href="#products">Ürünlere geç</a>
-  <header class="shell store-header"><div><p class="eyebrow">Online sipariş</p><h1>Mağaza</h1><p>Ürünleri seçin, siparişinizi bize iletin.</p></div><a class="button secondary" href="#cart">Sepetim <span id="cart-count">0</span></a></header>
+  <header class="shell store-header"><div><p class="eyebrow">Online sipariş</p><h1>Mağaza</h1><p>Ürünleri seçin, siparişinizi bize iletin.</p></div><a class="button secondary cart-access" href="#cart">Sepetim <span id="cart-count">0</span></a></header>
   <main class="shell">
     <section id="success" class="state" hidden tabindex="-1" aria-labelledby="success-title">
       <p class="eyebrow">Teşekkür ederiz</p><h2 id="success-title">Siparişiniz alındı</h2>
@@ -24,7 +24,7 @@ header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-sr
     </section>
     <div id="store-layout" class="store-layout">
       <section aria-labelledby="products-title" id="products" tabindex="-1">
-        <div class="section-heading"><h2 id="products-title">Ürünler</h2><button id="refresh" class="secondary" type="button">Ürünleri yenile</button></div>
+        <div class="section-heading"><h2 id="products-title">Ürünler</h2><button id="refresh" class="quiet" type="button">Ürünleri yenile</button></div>
         <div id="catalog-state" class="state" role="status" aria-live="polite">Ürünler yükleniyor…</div>
         <div id="product-grid" class="product-grid" aria-busy="true"></div>
       </section>

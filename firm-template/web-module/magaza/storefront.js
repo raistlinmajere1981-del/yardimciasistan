@@ -246,7 +246,7 @@
   }
   $('refresh').addEventListener('click', loadCatalog);
   $('clear-cart').addEventListener('click', () => { if (pending || busy) return; cart = []; persistCart(); renderCart(); });
-  $('open-checkout').addEventListener('click', () => { $('checkout').hidden = false; $('buyer-name').focus(); });
+  $('open-checkout').addEventListener('click', () => { if ($('open-checkout').disabled) return; $('checkout').hidden = false; $('buyer-name').focus(); });
   $('checkout-form').addEventListener('submit', submit);
   $('new-order').addEventListener('click', () => { $('success').hidden = true; $('store-layout').hidden = false; loadCatalog(); $('products').focus(); });
   window.addEventListener('beforeunload', (event) => { if (pending) { event.preventDefault(); event.returnValue = ''; } });

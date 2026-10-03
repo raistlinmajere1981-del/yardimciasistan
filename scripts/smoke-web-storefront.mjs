@@ -66,6 +66,68 @@ try {
   const html = await fetch(`${base}/magaza/`);
   assert.equal(html.status, 200); assert.match(html.headers.get('content-security-policy'), /script-src 'self'/);
   browser = await launchChromiumForSmoke(chromium);
+  // Visual contract: a single product stays compact and its purchase controls
+  // fit the initial viewport; empty-cart checkout cannot open by pointer/keyboard.
+  const compactProduct = { ...product, name: 'UzunÜrünAdı'.repeat(18).slice(0, 180), description: 'Uzun açıklama '.repeat(90), image_url: '' };
+  for (const viewport of [{ width: 1280, height: 768 }, { width: 375, height: 812 }, { width: 320, height: 780 }]) {
+    await publish(true, [compactProduct]);
+    const layoutPage = await freshPage(viewport);
+    await layoutPage.goto(`${base}/magaza/`);
+    const card = layoutPage.getByRole('article');
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole('heading', { name: compactProduct.name, exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(card.locator('.price')).toBeInViewport({ ratio: 1 });
+    await expect(card.getByRole('button', { name: 'Sepete ekle' })).toBeInViewport({ ratio: 1 });
+    assert.ok((await card.locator('.product-media').boundingBox()).height <= 160, 'bounded image/placeholder height');
+    if (viewport.width >= 960) {
+      assert.ok((await card.boundingBox()).width <= 320, 'single product must not fill catalog width');
+      await expect(layoutPage.locator('.cart-access')).toBeHidden();
+      await expect(layoutPage.locator('#cart')).toBeInViewport({ ratio: 1 });
+    } else {
+      await expect(layoutPage.locator('.cart-access')).toBeVisible();
+    }
+    const checkoutButton = layoutPage.locator('#open-checkout');
+    await expect(checkoutButton).toBeDisabled();
+    const disabledAppearance = await checkoutButton.evaluate((node) => ({ background: getComputedStyle(node).backgroundColor, cursor: getComputedStyle(node).cursor }));
+    assert.notEqual(disabledAppearance.background, await add(layoutPage, compactProduct.name).evaluate((node) => getComputedStyle(node).backgroundColor));
+    assert.equal(disabledAppearance.cursor, 'not-allowed');
+    // Real pointer click on disabled button, followed by keyboard and synthetic
+    // events to protect the small handler guard as well as native disabled markup.
+    await checkoutButton.scrollIntoViewIfNeeded();
+    const box = await checkoutButton.boundingBox();
+    await layoutPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await layoutPage.keyboard.press('Enter');
+    await checkoutButton.dispatchEvent('click');
+    await expect(layoutPage.locator('#checkout')).toBeHidden();
+    await layoutPage.locator('.cart-access').evaluate((node) => { if (getComputedStyle(node).display !== 'none') node.click(); });
+    if (viewport.width < 960) await expect(layoutPage.locator('#cart')).toBeInViewport({ ratio: 1 });
+    await layoutPage.evaluate(() => window.scrollTo(0, 0));
+    await layoutPage.screenshot({ path: join(screenshotRoot, `compact-${viewport.width}.png`), fullPage: true });
+    assert.equal(await layoutPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `compact layout overflow ${viewport.width}`);
+    await layoutPage.context().close();
+  }
+  // Multiple products occupy separate desktop columns; real images crop inside
+  // the same bounded media surface and catalog reload keeps working.
+  await publish();
+  const gridPage = await freshPage({ width: 1280, height: 768 });
+  await ready(gridPage);
+  const cards = gridPage.getByRole('article');
+  const first = await cards.nth(0).boundingBox(), second = await cards.nth(1).boundingBox();
+  assert.equal(first.y, second.y); assert.ok(second.x > first.x + first.width);
+  await expect(cards.nth(0).getByRole('button', { name: 'Sepete ekle' })).toBeInViewport({ ratio: 1 });
+  await expect(cards.nth(1).getByRole('button', { name: 'Sepete ekle' })).toBeInViewport({ ratio: 1 });
+  await gridPage.route('https://images.example.com/photo.svg', (route) => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#0e7490"/></svg>' }));
+  await publish(true, [{ ...product, image_url: 'https://images.example.com/photo.svg' }, weighted]);
+  const refreshButton = gridPage.getByRole('button', { name: 'Ürünleri yenile' });
+  assert.equal(await refreshButton.evaluate((node) => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+  await refreshButton.click();
+  const image = gridPage.getByRole('img', { name: product.name });
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate((node) => node.naturalWidth)).toBe(800);
+  assert.equal(await image.evaluate((node) => getComputedStyle(node).objectFit), 'cover');
+  assert.ok((await image.boundingBox()).height <= 160);
+  await gridPage.context().close();
+  await publish(false);
   const page = await freshPage();
   await page.goto(`${base}/magaza/`);
   await expect(page.getByRole('status').filter({ hasText: 'online sipariş almıyor' })).toBeVisible();
