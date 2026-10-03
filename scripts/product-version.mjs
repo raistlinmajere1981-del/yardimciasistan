@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +24,7 @@ export function syncProductVersion(root = repoRoot) {
     lock.packages[key].version = product.version;
   }
   writeJson(lockFile, lock);
+  syncLandingDownloadVersion(root, product.version);
   return product;
 }
 
@@ -34,11 +35,13 @@ export function checkProductVersion(root = repoRoot) {
   const lock = JSON.parse(readFileSync(resolve(root, "package-lock.json"), "utf8"));
   const lockDesktop = lock.packages?.["apps/desktop-app"]?.version;
   const lockAndroid = lock.packages?.["apps/android-app"]?.version;
+  const landingVersions = readLandingDownloadVersions(root);
   const mismatches = [
     ["desktop package", desktop],
     ["android package", android],
     ["desktop lock", lockDesktop],
-    ["android lock", lockAndroid]
+    ["android lock", lockAndroid],
+    ...landingVersions.map((value, index) => [`landing download ${index + 1}`, value])
   ].filter(([, value]) => value !== product.version);
   if (mismatches.length) {
     throw new Error(
@@ -84,6 +87,53 @@ export function bumpProductVersion(part, root = repoRoot) {
   return setProductVersion(next, root);
 }
 
+export function syncLandingDownloadVersion(root = repoRoot, version = readProductVersion(root).version) {
+  const bundle = findLandingDownloadBundle(root);
+  if (!bundle) return false;
+
+  const source = readFileSync(bundle, "utf8");
+  const marker = /"\d+\.\d+\.\d+"\.trim\(\)\|\|"\d+\.\d+\.\d+"/g;
+  const matches = source.match(marker) ?? [];
+  if (matches.length !== 2) {
+    throw new Error(
+      `Landing download bundle içinde 2 sürüm işareti bekleniyordu, ${matches.length} bulundu: ${bundle}`
+    );
+  }
+  const replacement = `"${version}".trim()||"${version}"`;
+  writeFileSync(bundle, source.replace(marker, replacement));
+  return true;
+}
+
+export function readLandingDownloadVersions(root = repoRoot) {
+  const bundle = findLandingDownloadBundle(root);
+  if (!bundle) return [];
+  const source = readFileSync(bundle, "utf8");
+  const matches = [...source.matchAll(/"(\d+\.\d+\.\d+)"\.trim\(\)\|\|"\1"/g)];
+  if (matches.length !== 2) {
+    throw new Error(
+      `Landing download bundle içinde 2 sürüm işareti bekleniyordu, ${matches.length} bulundu: ${bundle}`
+    );
+  }
+  return matches.map((match) => match[1]);
+}
+
+function findLandingDownloadBundle(root) {
+  const assetsDir = resolve(root, "test-site", "landing", "assets");
+  if (!existsSync(assetsDir)) return "";
+  const candidates = readdirSync(assetsDir)
+    .filter((name) => /^index-.*\.js$/.test(name))
+    .map((name) => resolve(assetsDir, name))
+    .filter((path) => {
+      const source = readFileSync(path, "utf8");
+      return source.includes("/downloads/YardimciAsistan-Setup-${")
+        && source.includes("/downloads/YardimciAsistan-Android-${");
+    });
+  if (candidates.length > 1) {
+    throw new Error(`Birden fazla landing download bundle bulundu: ${candidates.join(", ")}`);
+  }
+  return candidates[0] ?? "";
+}
+
 function validateVersion(version) {
   if (!/^\d+\.\d+\.\d+$/.test(String(version ?? ""))) {
     throw new Error("Ürün sürümü x.y.z biçiminde olmalı (ör. 0.1.8).");
@@ -127,13 +177,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       const product = syncProductVersion();
       if (!rest.includes("--quiet") && value !== "--quiet") {
         print(product);
-        console.log("Desktop/Android package metadata'sı senkronlandı.");
+        console.log("Desktop/Android metadata ve landing download sürümü senkronlandı.");
       }
     } else if (command === "set") {
       if (!value) throw new Error("Yeni sürüm gerekli. Örnek: npm run version:set -- 0.1.8");
       const product = setProductVersion(value, repoRoot, { force: rest.includes("--force") });
       print(product);
-      console.log("Desktop ve Android aynı ürün sürümüne güncellendi.");
+      console.log("Desktop, Android ve landing download sürümü güncellendi.");
     } else if (command === "bump") {
       if (!value) throw new Error("Bump türü gerekli: major, minor veya patch.");
       const product = bumpProductVersion(value);
