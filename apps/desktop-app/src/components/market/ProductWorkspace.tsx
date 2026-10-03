@@ -52,6 +52,8 @@ export function ProductWorkspace({
   const [form, setForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
   const [baseline, setBaseline] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
   const [localImageDataUrl, setLocalImageDataUrl] = useState("");
+  const [imageDraftMode, setImageDraftMode] = useState<"keep" | "manual" | "clear" | "external">("keep");
+  const [manualImageDataUrl, setManualImageDataUrl] = useState("");
   const [balance, setBalance] = useState<InventoryBalance | null>(null);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [loadedProductId, setLoadedProductId] = useState("");
@@ -60,7 +62,12 @@ export function ProductWorkspace({
   const [saveMessage, setSaveMessage] = useState("Değişiklikler yalnız bu ürün kartına kaydedilir.");
   const beginResourceRequest = useRequestGeneration();
   const beginSaveRequest = useRequestGeneration();
-  const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep";
+  const effectiveImageDataUrl = imageDraftMode === "manual"
+    ? manualImageDataUrl
+    : imageDraftMode === "keep"
+      ? localImageDataUrl
+      : "";
   const closeBlocked = useWorkspaceCloseGuard({
     busy: busy || resourceState === "loading" || saveState === "loading",
     dirty
@@ -111,6 +118,8 @@ export function ProductWorkspace({
     setBalance(nextBalance);
     setMovements(nextMovements);
     setLocalImageDataUrl(nextImage);
+    setImageDraftMode("keep");
+    setManualImageDataUrl("");
     setLoadedProductId(product.id);
     setResourceState("success");
     setSaveState("idle");
@@ -135,7 +144,11 @@ export function ProductWorkspace({
     setSaveMessage("");
     let saved: CatalogProduct;
     try {
-      saved = await bridge.saveProduct(productFormToSaveInput(form));
+      saved = await bridge.saveProduct({
+        ...productFormToSaveInput(form),
+        ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
+        ...(imageDraftMode === "clear" ? { clearImage: true } : {})
+      });
       if (!isCurrent()) return;
     } catch (error) {
       if (!isCurrent()) return;
@@ -169,6 +182,8 @@ export function ProductWorkspace({
     setForm(nextForm);
     setBaseline(nextForm);
     setLocalImageDataUrl(nextImage);
+    setImageDraftMode("keep");
+    setManualImageDataUrl("");
 
     if (inventoryEnabled && saved.trackInventory) {
       try {
@@ -240,6 +255,8 @@ export function ProductWorkspace({
         <div className="action-row">
           <ActionButton variant="secondary" type="button" disabled={busy || saveState === "loading" || !dirty} onClick={() => {
             setForm(baseline);
+            setImageDraftMode("keep");
+            setManualImageDataUrl("");
             setSaveState("idle");
             setSaveMessage("Değişiklikler yalnız bu ürün kartına kaydedilir.");
           }}>Değişiklikleri Geri Al</ActionButton>
@@ -259,7 +276,19 @@ export function ProductWorkspace({
             wholesaleEnabled={wholesaleEnabled}
             disabled={busy || resourceState !== "success" || saveState === "loading"}
             mode="details"
-            localImageDataUrl={localImageDataUrl}
+            localImageDataUrl={effectiveImageDataUrl}
+            onManualImageSelected={(dataUrl) => {
+              setManualImageDataUrl(dataUrl);
+              setImageDraftMode("manual");
+            }}
+            onImageClear={() => {
+              setManualImageDataUrl("");
+              setImageDraftMode("clear");
+            }}
+            onExternalImageSelected={() => {
+              setManualImageDataUrl("");
+              setImageDraftMode("external");
+            }}
             onChange={setForm}
             onStateChange={onStateChange}
           />}
@@ -295,7 +324,19 @@ export function ProductWorkspace({
           productDataEnabled={productDataEnabled}
           disabled={busy || resourceState !== "success" || saveState === "loading"}
           mode="media"
-          localImageDataUrl={localImageDataUrl}
+          localImageDataUrl={effectiveImageDataUrl}
+          onManualImageSelected={(dataUrl) => {
+            setManualImageDataUrl(dataUrl);
+            setImageDraftMode("manual");
+          }}
+          onImageClear={() => {
+            setManualImageDataUrl("");
+            setImageDraftMode("clear");
+          }}
+          onExternalImageSelected={() => {
+            setManualImageDataUrl("");
+            setImageDraftMode("external");
+          }}
           onChange={setForm}
           onStateChange={onStateChange}
         />
