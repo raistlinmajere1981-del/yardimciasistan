@@ -5,6 +5,7 @@ import {
   type CatalogProduct,
   type CommerceOrder,
   type CommerceOrderDetail,
+  type CommerceResolvedUnitPrice,
   type CommercePurchaseOrder,
   type CommercePurchaseOrderDetail,
   type CommerceSale,
@@ -42,6 +43,10 @@ import {
   type UpdateCommerceOrderStatusInput
 } from "./commerce-order-store";
 import {
+  resolveCommerceProductPrice,
+  type ResolveCommerceProductPriceInput
+} from "./commerce-pricing-service";
+import {
   getCommercePurchaseOrder,
   listCommercePurchaseOrders,
   receiveCommercePurchase,
@@ -74,6 +79,7 @@ import {
 export type {
   CreateCommerceOrderInput,
   ListCommerceOrdersOptions,
+  ResolveCommerceProductPriceInput,
   ReceiveCommercePurchaseInput,
   SetInventoryCountInput,
   UpdateCommerceOrderStatusInput
@@ -341,7 +347,28 @@ export function createRuntimeOrder(
     BUSINESS_CAPABILITIES.ORDERS,
     "Sipariş yönetimi bu işletmede etkin değil."
   );
-  return createCommerceOrder(databasePath, input);
+  return createCommerceOrder(databasePath, input, {
+    wholesaleEnabled: hasPersistedBusinessCapability(databasePath, BUSINESS_CAPABILITIES.WHOLESALE)
+  });
+}
+
+export function resolveRuntimeProductPrice(
+  databasePath: string,
+  input: ResolveCommerceProductPriceInput
+): CommerceResolvedUnitPrice {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  if (String(input.customerId ?? "").trim()) {
+    requireCapability(
+      databasePath,
+      BUSINESS_CAPABILITIES.CUSTOMERS,
+      "Müşteri yönetimi bu işletmede etkin değil."
+    );
+  }
+  return resolveCommerceProductPrice(databasePath, input);
 }
 
 export function updateRuntimeOrderStatus(
