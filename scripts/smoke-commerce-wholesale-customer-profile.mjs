@@ -142,6 +142,20 @@ try {
   assert.equal(firstCustomer?.commercialProfile?.dealerStatus, "active");
   assert.equal(firstCustomer?.fullName, "Ticari Müşteri Güncel");
 
+  const basicOnlyUpdate = database.saveCustomer(baseCustomer({
+    id: firstId,
+    fullName: "Ticari Müşteri Temel Güncelleme"
+  }));
+  assert.equal(basicOnlyUpdate.ok, true, basicOnlyUpdate.ok ? "" : basicOnlyUpdate.message);
+  firstCustomer = database.getDashboardData().customers.find((customer) => customer.id === firstId);
+  assert.equal(firstCustomer?.commercialProfile?.dealerStatus, "active");
+  assert.equal(firstCustomer?.commercialProfile?.taxNumber, "1234567890");
+  assert.equal(
+    firstCustomer?.commercialProfile?.companyName,
+    "Karadeniz Gıda Ticaret",
+    "Commercial profile must survive customer edits that do not own wholesale fields."
+  );
+
   const second = database.saveCustomer(baseCustomer({
     fullName: "İkinci Ticari Müşteri",
     phone: "05550001002",
@@ -183,7 +197,7 @@ try {
 
   const removed = database.saveCustomer(baseCustomer({
     id: firstId,
-    fullName: "Ticari Müşteri Güncel",
+    fullName: "Ticari Müşteri Temel Güncelleme",
     commercialProfile: null
   }));
   assert.equal(removed.ok, true, removed.ok ? "" : removed.message);
@@ -194,7 +208,7 @@ try {
 
   const restored = database.saveCustomer(baseCustomer({
     id: firstId,
-    fullName: "Ticari Müşteri Güncel",
+    fullName: "Ticari Müşteri Temel Güncelleme",
     commercialProfile: {
       companyName: "Karadeniz Gıda Ticaret",
       taxOffice: "Cide",
