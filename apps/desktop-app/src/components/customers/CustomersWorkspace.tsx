@@ -18,7 +18,7 @@ interface CustomersWorkspaceProps {
   notifications: DesktopDashboardData["hospitalityNotifications"];
   kbsOverview: DesktopDashboardData["kbsOverview"];
   aiEnabled: boolean;
-  wholesaleEnabled: boolean;
+  wholesaleEnabled?: boolean;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => void | Promise<unknown>;
@@ -32,7 +32,7 @@ export function CustomersWorkspace({
   notifications,
   kbsOverview,
   aiEnabled,
-  wholesaleEnabled,
+  wholesaleEnabled = false,
   onSave,
   onAnalyzeIdentity,
   onDelete,
