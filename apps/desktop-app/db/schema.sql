@@ -227,7 +227,7 @@ CREATE TABLE commerce_orders (
   deleted_at TEXT NOT NULL DEFAULT '',
   FOREIGN KEY (business_id, customer_id) REFERENCES customers(business_id, id),
   CHECK (discount_total <= subtotal),
-  CHECK (total = subtotal - discount_total)
+  CHECK (total <= subtotal)
 );
 
 CREATE TABLE commerce_order_items (
