@@ -1,317 +1,251 @@
-# Yönetim Konsolu Hedef Sözleşmesi
+# Yardımcı Asistan Admin Control Center
 
-Bu belge Yardımcı Asistan geliştirici/yönetici konsolunun büyüme yönünü tanımlar.
-Mevcut terminal konsolu korunur; hedef yeni bir deploy/test sistemi yazmak değil,
-mevcut repo araçlarını ve gerçek kurulumları tek bir güvenli yönetim yüzeyinde
-toplamaktır.
+Bu belge yeni özel yönetim uygulamasının hedefini tanımlar.
 
-Bu sözleşme gelecekteki admin geliştirme branch'i için otoritatif başlangıç noktasıdır.
-Mevcut çalışan davranış bu belgeye uymuyor diye ana dalda acele refactor yapılmaz.
+Yeni admin uygulaması mevcut terminal konsolunun görsel sürümü değildir. Sıfırdan,
+yalnız gerçek operasyon ihtiyaçlarına göre tasarlanır. Mevcut `tools/admin` geçici
+bir araçtır; işe yarayan script ve registry'ler yeniden kullanılabilir ancak TUI
+mimarisi, menü yapısı veya ekran modeli korunmak zorunda değildir. Yeni uygulama
+yeterli kapsama ulaştığında eski terminal admin tamamen kaldırılabilir.
 
-## Amaç
+## Ürün sınırı
 
-Yönetici şunları ezberlemek zorunda kalmamalıdır:
+Admin Control Center yalnız geliştirici/yönetici kullanımı içindir.
 
-- müşteri/site web adresleri ve endpoint'leri,
-- hangi secret'ın hangi kuruluma ait olduğu,
-- hangi repo/ref/sürümün nerede canlı olduğu,
-- hangi paketlerin üretildiği veya yayınlandığı,
-- hangi deploy komutunun hangi parametrelerle çalıştığı,
-- hangi kurulumda hangi servislerin etkin olduğu,
-- destek raporlarının ve tanılama verilerinin nerede bulunduğu.
+- müşteri kurulum paketlerine girmez,
+- Desktop/Android ürün runtime'ının parçası değildir,
+- normal release artifact'larına dahil edilmez,
+- merkezi SaaS değildir,
+- kullanıcı verisini merkezi sisteme taşımayı amaçlamaz,
+- genel amaçlı shell arayüzü sağlamaz.
 
-Konsolun görevi "komut listesi" olmaktan çıkıp Yardımcı Asistan kurulumlarının
-operasyonel kayıt, durum ve orkestrasyon merkezi olmaktır.
-
-## Mevcut temel
-
-Bugünkü konsol çöpe atılmayacaktır. Özellikle şu yüzeyler hedef mimarinin başlangıcıdır:
-
-- `tools/admin/index.mjs` — CLI/TUI giriş noktası.
-- `tools/admin/config/tasks.mjs` — mevcut task/workflow kataloğu.
-- `tools/admin/config/sites.mjs` — ilk site/deploy profilleri.
-- `tools/admin/ui/menu.mjs` — mevcut terminal arayüzü.
-- `tools/admin/ui/status.mjs` — hızlı lokal durum özeti.
-- `tools/admin/support-reports.mjs` — private destek raporu erişimi.
-- `scripts/verification-registry.mjs` ve `scripts/verify.mjs` — tek canonical doğrulama sistemi.
-
-Admin konsolu doğrulama, build, deploy veya support mantığını ikinci kez
-uygulamamalıdır. Var olan scriptleri ve registry'leri orkestre eder.
-
-### Güncel canonical operasyon kaynakları
-
-Admin geliştirmesi aşağıdaki kaynakları yeniden tanımlamamalıdır:
-
-- `config/installations.json` — committed installation metadata; URL/host/path ve yalnız credential referansı.
-- `config/credentials.local.json` — opsiyonel lokal credential backend; Git tarafından yok sayılır. Şema örneği `config/credentials.local.example.json`.
-- `product-version.json` — ürün, Android versionCode ve web modülü sürümünün canonical kaynağı.
-- `firm-template/web-module/api/version.php` — canlı kurulumdan public/salt-okunur ürün + web modülü sürümü.
-- `config/installations.json -> landing.release.desktopManifests` — webde yayınlanan Desktop sürümünün canonical update manifest adresleri; manifest içindeki `appVersion` canlı Desktop release sürümüdür.
-- `scripts/installation-config.mjs` — installation registry için stabil CLI okuyucu.
-
-Gerçek sync secret, API key, parola, token veya FTP/SSH credential değeri
-`config/installations.json` içine yazılmaz. Installation kaydı yalnız `credentialRef`
-taşır; credential backend bu referansı çözer.
-
-## Hedef mimari
-
-UI ile iş mantığı ayrılmalıdır:
+Tercih edilen yerleşim ayrı bir yan uygulamadır:
 
 ```text
-admin-core
-  ├── installations
-  ├── credentials
-  ├── health
-  ├── tasks
-  ├── deployments
-  ├── releases
-  ├── diagnostics
-  └── history
-
-admin-tui
-  └── admin-core kullanan terminal arayüzü
+apps/admin-control-center/
+  electron/
+  src/
+  services/
+  ui/
 ```
 
-İlk ürün yüzeyi TUI kalabilir. Core terminale bağımlı olmamalıdır; ileride GUI
-gerekirse aynı servisler yeniden kullanılabilmelidir.
+Kendi `package.json` dosyası `private: true` olur. Root release/build scriptleri
+bu uygulamayı paketlemez. Geliştirme komutu ayrı tutulur.
 
-### 1. Installation registry
+## Tasarım ilkesi
 
-BlackSea, Alwaysdata ve gelecekteki her müşteri/kurulum ayrı bir installation
-kaydıdır. Registry yalnız secret olmayan operasyonel metadata tutar.
+Önceki admin konsolunu katman katman büyütmek yerine, operasyon modelini doğrudan
+ekranlara yansıtan temiz bir masaüstü uygulaması tasarlanır.
 
-Asgari alanlar:
+UI bir "komut listesi" değildir. Kullanıcı şu soruların cevabını doğrudan görmelidir:
 
-- kalıcı installation id,
-- görünen işletme/site adı,
-- site URL ve Yardımcı Asistan web endpoint'i,
-- hosting/deploy tipi,
-- ilgili repo ve çalışma dizini,
-- aktif servis/capability bilgisi,
-- beklenen ürün/web sürümü,
-- son başarılı deploy ve son health-check zamanı,
-- credential referansları.
+- Hangi kurulumlar var ve hangileri sağlıklı?
+- Hangi sürüm nerede canlı?
+- Repo, paket, web ve mobil sürümler arasında drift var mı?
+- Son doğrulama gerçekten mevcut HEAD için mi?
+- Hangi deploy hedefi hazır?
+- Hangi destek talepleri açık?
+- Hangi secret/credential kayıtlı, eksik veya doğrulanamadı?
+- Bir release/deploy yaparsam hangi sistemler etkilenecek?
 
-BlackSea özel-case kodu zamanla registry tabanlı profile dönüşmelidir; ancak mevcut
-çalışan akış kırılarak tek seferde genelleştirme yapılmaz.
+## Canonical kaynaklar
 
-### 2. Credential/secrets sınırı
+Yeni uygulama operasyon bilgisini ikinci kez tanımlamaz. Uygun olduğunda mevcut
+canonical kaynakları okur ve orkestre eder:
 
-Registry gerçek secret değeri tutmaz. Yalnız `credentialRef` benzeri referans tutar.
+- `config/installations.json`
+- `config/credentials.local.json` veya gelecekteki credential backend
+- `product-version.json`
+- canlı `api/version.php` endpoint'leri
+- Desktop update manifestleri
+- `scripts/verification-registry.mjs` ve `scripts/verify.mjs`
+- mevcut build/deploy/live-check scriptleri
+- support inbox altyapısı
 
-Kurallar:
+Bu kaynakların arayüz için yetersiz kaldığı yerde admin uygulamasına özel yeni model
+ve servisler eklenebilir. Eski TUI'nin soyutlamaları korunmak zorunda değildir.
 
-- sync secret, API key, parola, token ve SSH/FTP credential repoya commit edilmez,
-- admin history/log/diagnostic çıktısına secret yazılmaz,
-- UI varsayılan olarak yalnız "kayıtlı / eksik / doğrulanamadı" durumunu gösterir,
-- gerekirse kopyalama/gösterme açık kullanıcı eylemi ve mümkün olan en dar kapsamla yapılır,
-- credential backend değiştirilebilir olmalıdır; TUI doğrudan dosya biçimine bağımlı olmamalıdır.
+## Uygulama mimarisi
 
-İlk gerçek backend mevcut güvenli lokal env/dosya yaklaşımını sarabilir. Daha sonra OS
-credential store veya başka güvenli backend'e geçiş core sözleşmesini değiştirmemelidir.
+İlk hedef Electron + React + Vite tabanlı ayrı bir masaüstü uygulamasıdır. Bunun
+nedeni Git, filesystem, SSH/rsync, ADB, process çalıştırma, credential erişimi ve
+lokal dosya açma gibi işletim sistemi yeteneklerinin doğal gereksinim olmasıdır.
 
-### 3. Durum modeli
+Renderer doğrudan shell, filesystem veya credential erişimi yapmaz. Electron
+main/preload sınırı açık tutulur.
 
-Her kontrol yalnız PASS/FAIL olmamalıdır. En az şu semantik durumlar desteklenmelidir:
+Önerilen domain servisleri:
 
-- `ready` — yapılandırılmış ve sağlıklı,
-- `warning` — çalışıyor ancak dikkat/öneri var,
-- `error` — yapılandırılmış özellik çalışmıyor,
-- `unconfigured` — henüz yapılandırılmamış,
-- `disabled` — bilinçli olarak kullanılmıyor,
-- `unknown` — güvenilir sonuç alınamadı.
+```text
+repository
+installations
+credentials
+health
+versions
+verification
+releases
+deployments
+support
+history
+devices
+```
 
-Özellikle temiz kurulumda web URL veya sync secret girilmemiş olması hata değildir;
-`unconfigured` durumudur. Yalnız yapılandırılmış bir bağlantının testte başarısız
-olması hata sayılır.
+Bunlar eski terminal admin için ortak bir framework olmak zorunda değildir. Öncelik
+yeni uygulamanın temiz ve anlaşılır olmasıdır.
 
-### 4. Health ve bağlantı kontrolleri
+## Ana ürün yüzeyleri
 
-Konsol installation bazında en az şunları okuyabilmelidir:
+### Genel Bakış
 
-- site ve web API erişilebilirliği,
-- sync credential varlığı ve güvenli doğrulama sonucu,
-- canlı web sürümü,
-- desktop/Android/release sürümleriyle drift,
-- deploy hedefinin hazır olup olmadığı,
-- gerekli repo/çalışma dizininin mevcut ve beklenen ref'te olup olmadığı,
-- destek endpoint'i ve private support inbox erişimi,
-- ilgili servis etkinse servis-spesifik smoke sonucu.
+Tek bakışta:
 
-Health probe'ları mümkün olduğunca salt-okunur olmalıdır. Bir kontrolün yan etkisi varsa
-açıkça task/workflow olarak modellenmelidir.
+- repo branch / HEAD / temiz-kirli durumu,
+- ürün sürümü,
+- son başarılı Full Verify ve hangi commit için olduğu,
+- kurulum sağlık özeti,
+- sürüm drift sayısı,
+- açık destek talebi sayısı,
+- bağlı Android cihazı,
+- son deploy/release özeti.
 
-### 5. Version drift
+### Kurulumlar
 
-Konsol beklenen ve canlı sürümleri yan yana gösterebilmelidir. En az şu yüzeyler
-karşılaştırılabilir olmalıdır:
+Her gerçek kurulum tek kayıt olarak görünür. İlk örnekler Yardımcı Asistan web
+modülü, landing, merkezi destek ve BlackSea'dir.
 
-- repo ürün sürümü,
-- Desktop artifact sürümü,
-- Android artifact sürümü,
-- web module sürümü,
-- landing/download manifest sürümü,
-- installation bazında canlı web sürümü.
+Kurulum detayı:
 
-"Eski" kararı tek bir serbest metin karşılaştırmasına değil, ortak version snapshot
-modeline dayanmalıdır. Bilgi alınamıyorsa `unknown`, ilgili servis yoksa
-`disabled/unconfigured` gösterilir.
+- site ve web modülü adresleri,
+- canlı ve beklenen sürüm,
+- credential durumu,
+- health sonuçları,
+- son kontrol,
+- son deploy,
+- etkin yetenekler,
+- kurulumla ilişkili destek kayıtları,
+- güvenli operasyon aksiyonları.
 
-### 6. Task ve workflow orkestrasyonu
+### Release
 
-Admin-core mevcut task ve scriptleri yeniden yazmaz.
+Kaynak koddan yayına kadar gerçek release durumunu gösterir:
 
-Kurallar:
+```text
+Kaynak
+→ Doğrulama
+→ Paketler
+→ Yayın
+→ Canlı doğrulama
+```
 
-- repository verification için tek kaynak `scripts/verification-registry.mjs` +
-  `scripts/verify.mjs` olmaya devam eder,
-- admin registry aynı leaf check'leri yeniden tanımlayan ikinci aggregate runner'a dönüşmez,
-- build/deploy scriptlerinin iş mantığı TUI içine taşınmaz,
-- workflow adımları preflight, impact, confirmation ve post-check bilgisi taşıyabilir,
-- tehlikeli işlem varsayılan olarak kullanıcı onayı ister,
-- task sonucu commit/ref, installation id, süre ve exit sonucu ile history'ye yazılır,
-- mümkün olan işlemlerde dry-run ve salt-okunur preflight önce gelir.
+Adımlar yeni build sistemi yazmaz; mevcut canonical scriptleri çalıştırır ve
+sonuçlarını anlaşılır bir modele dönüştürür.
 
-### 7. Deploy yaşam döngüsü
+### Testler
 
-Bir deploy akışı mümkün olduğunda şu modeli izlemelidir:
+Verification registry'nin görsel yüzüdür. Full Verify ve alt kontroller görülebilir,
+çalıştırılabilir ve geçmiş sonuçları mevcut HEAD ile ilişkilendirilebilir.
+
+### Deploy
+
+Deploy işlemi tek "çalıştır" düğmesi değildir:
 
 ```text
 preflight
-  → hedef/credential hazır mı
-  → repo/ref ve sürüm özeti
-  → gerekli doğrulama
-  → kullanıcı onayı
-  → deploy
-  → canlı health/smoke
-  → version snapshot güncelle
-  → history kaydı
+→ hedef ve etki özeti
+→ gerekiyorsa doğrulama
+→ açık kullanıcı onayı
+→ deploy
+→ canlı kontrol
+→ sonuç/history
 ```
 
-"Deploy everything" gibi kapsamı belirsiz tek tuşlu işlemler yerine hedefi ve etkisi
-açık workflow'lar tercih edilir.
+### Destek
 
-### 8. Destek ve diagnostics
+Mevcut support inbox'ın tam görsel yüzeyi:
 
-Mevcut support inbox admin konsolunun kalıcı parçasıdır. İleride masaüstü
-"Sistem ve Tanılama" ekranı diagnostic snapshot gönderebildiğinde admin konsolu aynı
-rapor içinde en az şunları gösterebilmelidir:
-
+- yeni / inceleniyor / çözüldü,
+- screenshot,
 - uygulama/platform/sürüm,
-- ilgili installation kimliği varsa eşleme,
-- son WARN/ERROR özeti,
-- diagnostic check sonuçları,
-- screenshot varlığı,
-- rapor durumu: new / reviewing / resolved.
+- WARN/ERROR özeti,
+- diagnostic snapshot,
+- ilgili installation eşlemesi,
+- çözüm notu ve çözüldüğü sürüm.
 
-Secret, token ve gereksiz müşteri PII'si support/diagnostic snapshot'a eklenmez.
+### Sistem
 
-### 9. Ana ekran ve installation ekranı
+Geliştirici ortamı ve altyapı durumu:
 
-Ana ekranın amacı ayrıntı değil, unutulan işi görünür kılmaktır.
+- credential referansları,
+- repo yolları,
+- gerekli araçlar,
+- Android/ADB,
+- local history/cache,
+- admin uygulamasının kendi ayarları.
 
-Örnek özet:
+Secret değerleri normal görünümde gösterilmez.
 
-```text
-Yardımcı Asistan Yönetim Konsolu
+## Görsel yön
 
-Repo             main · temiz
-Ürün sürümü      2.x.x
-Kurulumlar       3
-Drift            1 kurulum
-Destek           2 yeni rapor
-Android          1 cihaz bağlı
-```
+Hedef yoğun bir "dev tool" ekranı değil, sakin ve okunabilir bir kontrol merkezidir.
 
-Installation detayı şu bilgileri tek yerde toplamalıdır:
+- solda kalıcı ana navigasyon,
+- üstte bağlama göre kısa durum/aksiyon alanı,
+- ana içerikte az sayıda güçlü panel,
+- durumlar metin + ikon + renk ile birlikte,
+- hover/press/click geri bildirimi belirgin,
+- gereksiz modal zincirleri yok,
+- uzun log/teknik detaylar ikincil yüzeylerde,
+- Nexa karakteri yardımcı durum/öneri alanlarında kullanılabilir fakat ürün
+  mimarisinin merkezi değildir.
 
-```text
-BlackSea Pansiyon
+Referans görsel bir tasarım yönüdür; piksel kopyası değildir.
 
-Site              https://...
-Web API           hazır
-Credential        kayıtlı · doğrulandı
-Canlı web         2.x.x
-Beklenen web      2.x.x
-Drift             yok
-Son deploy        ...
-Son kontrol       ...
+## Güvenlik
 
-[Bağlantıları Test Et]
-[Canlı Doğrulama]
-[Web'i Güncelle]
-[Credential Yönet]
-[Destek Raporları]
-```
+- Secret, token, parola ve sync key Git'e yazılmaz.
+- Renderer'a gereksiz secret gönderilmez.
+- Credential değerleri log/history'ye düşmez.
+- Destructive remote işlemler hedef + etki + açık onay ister.
+- Shell string birleştirme yerine argv tabanlı process çağrıları tercih edilir.
+- Health kontrolleri mümkün olduğunca salt okunurdur.
+- Admin uygulaması firewall/Defender/OS güvenliklerini sessizce değiştirmez.
 
-Gerçek secret normal görünümde yazdırılmaz.
+## Ana uygulamadan izolasyon
 
-## Güvenlik ilkeleri
+Bu branch'teki admin geliştirmesi mümkün olduğunca şu alanlara dokunmaz:
 
-- Admin paneli Defender/firewall/OS güvenliklerini sessizce gevşetmez.
-- SSH/FTP/API credential değerleri komut satırı argümanında veya history kaydında
-  taşınmamalıdır.
-- Remote destructive işlemler açık hedef, etki açıklaması ve onay gerektirir.
-- Local cache/report dosyaları hassas veri içeriyorsa kullanıcıya özel izinlerle
-  tutulmalıdır.
-- Shell string birleştirme yerine mümkün olduğunca argv tabanlı process çağrısı
-  kullanılmalıdır.
-- Installation metadata ile secret storage birbirinden ayrıdır.
+- `apps/desktop-app`
+- Android runtime
+- işletme/business modülleri
+- müşteri installer/paketleme akışları
 
-## Modülerlik ilkeleri
+Admin için yeni veri gerekiyorsa önce mevcut canonical metadata veya salt-okunur
+adapter kullanılır. Ürün runtime'ında gerçek yeni capability gerekiyorsa bu ayrı bir
+ana uygulama değişikliği olarak ele alınır.
 
-- TUI, installation registry dosya formatını veya credential backend'ini doğrudan
-  bilmemelidir.
-- Health probe'ları UI'dan bağımsız fonksiyonlardır.
-- Deployment adapters hosting tipine göre ayrılabilir; installation kimliğiyle
-  hard-code edilmez.
-- Yeni site eklemek mümkün olduğunca yeni bir profile/registry girdisi olmalı, ana
-  menüye yeni özel-case dalları eklememelidir.
-- Ortak admin-core genel bir service-locator veya uygulamanın business runtime'ına
-  dönüşmemelidir; yalnız geliştirici/operasyon yönetimini sahiplenir.
+## Geliştirme sırası
 
-## İlk geliştirme dilimi
+1. Ayrı Admin Control Center uygulama iskeleti.
+2. Typed Electron IPC ve güvenli process/FS sınırı.
+3. Gerçek verili Genel Bakış.
+4. Kurulumlar + health + version drift.
+5. Testler + verification geçmişi.
+6. Release görünümü.
+7. Deploy workflow'ları.
+8. Destek merkezi.
+9. Sistem/credential yönetimi.
+10. Yeni uygulama eski terminal admin'in tüm gerekli işlerini karşıladığında
+    `tools/admin` ve ona özel kodların kaldırılması.
 
-Ayrı admin geliştirme branch'inde ilk hedef tam GUI veya kapsamlı refactor değildir.
-Önerilen ilk dilim:
+## İlk kabul noktası
 
-1. Mevcut TUI davranışlarını testlerle sabitle.
-2. Installation registry modelini oluştur ve mevcut YA/Support/BlackSea/Landing
-   profillerini buna taşı.
-3. Credential referansı ile metadata'yı ayır.
-4. Ortak status/health snapshot modelini ekle.
-5. Version drift görünümünü ekle.
-6. Mevcut deploy task/workflow'larını installation-aware hale getir.
-7. Support inbox'ı installation/diagnostic snapshot ile ilişkilendirecek seam'i ekle.
-8. TUI'yi bu core üzerinden çalıştır; mevcut komutları koru.
+İlk anlamlı sürüm şu durumda hazır sayılır:
 
-Her adımda mevcut scriptlerin canonical ownership'i korunmalıdır.
+- uygulama ayrı açılıyor ve hiçbir müşteri paketine girmiyor,
+- Genel Bakış mock veri kullanmadan gerçek repo/sürüm/kurulum durumunu gösteriyor,
+- BlackSea ve Yardımcı Asistan kurulumlarının health + version drift'i görülebiliyor,
+- Full Verify mevcut HEAD ile ilişkilendirilebiliyor,
+- hiçbir secret normal UI/log/history içinde açığa çıkmıyor.
 
-## V1 kabul kriterleri
-
-İlk büyütülmüş admin konsolu şu durumda yeterli kabul edilir:
-
-- yeni bir kurulum URL/secret/script ezberlemeden registry üzerinden bulunabiliyor,
-- secret değerleri repo ve normal admin loglarından tamamen ayrı,
-- bir installation için "hazır / yapılandırılmamış / hata" ayrımı doğru yapılabiliyor,
-- repo/artifact/web sürüm drift'i tek ekranda görülebiliyor,
-- mevcut verification registry ikinci kez modellenmiyor,
-- BlackSea deploy ve live verify panelden güvenli workflow olarak yürütülebiliyor,
-- destek raporları panelden görülebiliyor,
-- UI değişse bile installation/health/deploy core yeniden kullanılabiliyor,
-- destructive işlemler açık etki + onay olmadan çalışmıyor.
-
-## Kapsam dışı
-
-İlk geliştirme diliminde şunlar hedef değildir:
-
-- merkezi SaaS kontrol paneli,
-- uzaktan müşteri bilgisayarını yönetmek,
-- müşteri verisini merkezi sunucuya taşımak,
-- runtime plugin sistemi,
-- admin panelinden genel amaçlı shell çalıştırmak,
-- mevcut verify/build/deploy scriptlerini yeniden yazmak,
-- terminal UI'yı sırf görsel nedenlerle Electron uygulamasına dönüştürmek.
-
-GUI ihtiyacı gerçek kullanım baskısıyla ortaya çıkarsa admin-core üzerine ayrı bir yüzey
-olarak eklenebilir.
+Bu noktadan sonra ekranlar gerçek kullanım baskısına göre genişletilir; eski terminal
+admin'in yapısı yeni tasarım için kısıt kabul edilmez.
