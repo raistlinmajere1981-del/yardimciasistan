@@ -8,6 +8,7 @@ import {
   type CommerceOrderStatus,
   type CommerceUnit
 } from "@yardimci-asistan/shared";
+import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service";
 
 const ORDER_STATUSES = new Set<CommerceOrderStatus>([
   "placed",
@@ -210,7 +211,8 @@ export function getCommerceOrder(
 
 export function createCommerceOrder(
   databasePath: string,
-  input: CreateCommerceOrderInput
+  input: CreateCommerceOrderInput,
+  options: { wholesaleEnabled?: boolean } = {}
 ): CommerceOrderDetail {
   const database = openDatabase(databasePath);
   try {
@@ -283,20 +285,26 @@ export function createCommerceOrder(
         }
 
         const row = database.prepare(`
-          SELECT id, name, sku, barcode, unit, sale_price, currency, tax_rate
+          SELECT id, name, sku, barcode, unit, currency, tax_rate
           FROM catalog_products
           WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
           LIMIT 1
         `).get(productId, businessId) as Record<string, unknown> | undefined;
         if (!row) throw new Error("Sipariş ürünlerinden biri aktif değil veya bulunamadı.");
 
-        const itemCurrency = normalizeCurrency(row.currency);
+        const resolvedPrice = resolveCommerceProductPriceInDatabase(
+          database,
+          businessId,
+          { productId, customerId: storedCustomerId ?? "" },
+          options.wholesaleEnabled === true
+        );
+        const itemCurrency = normalizeCurrency(resolvedPrice.currency || row.currency);
         if (currency && itemCurrency !== currency) {
           throw new Error("Tek siparişte birden fazla para birimi kullanılamaz.");
         }
         currency = itemCurrency;
 
-        const unitPrice = roundMoney(Number(row.sale_price ?? 0));
+        const unitPrice = roundMoney(resolvedPrice.unitPrice);
         moneyToMinor(unitPrice);
         const lineTotal = roundMoney(unitPrice * quantity);
         moneyToMinor(lineTotal);
