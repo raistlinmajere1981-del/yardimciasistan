@@ -23,6 +23,11 @@ assert.match(page, /enabled:\s*ordersEnabled && wholesaleEnabled/);
 assert.match(page, /<MarketOrdersWorkspace/);
 
 assert.match(workspace, /Aktif bayi/);
+assert.match(
+  workspace,
+  /product\.isActive !== false/,
+  "Orders UI must only exclude products that are explicitly inactive."
+);
 assert.match(workspace, /resolveProductPrice\(\{ productId: product\.id, customerId \}\)/);
 assert.match(workspace, /source:\s*"desktop-wholesale"/);
 assert.match(workspace, /createOrder\(/);
