@@ -282,14 +282,11 @@ export class AndroidInstallationService {
   ): DesktopAndroidInstallDevice {
     const bundledVersionName = androidPackage?.versionName ?? "";
     const bundledVersionCode = androidPackage?.versionCode ?? 0;
-    const deviceId = device.state === "device"
-      ? this.resolveInstalledDeviceId(adb, device.serial)
-      : "";
 
     if (device.state === "unauthorized") {
       return {
         ...device,
-        deviceId,
+        deviceId: "",
         appInstalled: false,
         installedVersionName: "",
         installedVersionCode: 0,
@@ -302,7 +299,7 @@ export class AndroidInstallationService {
     if (device.state !== "device") {
       return {
         ...device,
-        deviceId,
+        deviceId: "",
         appInstalled: false,
         installedVersionName: "",
         installedVersionCode: 0,
@@ -317,7 +314,7 @@ export class AndroidInstallationService {
     if (!installed.installed) {
       return {
         ...device,
-        deviceId,
+        deviceId: "",
         appInstalled: false,
         installedVersionName: "",
         installedVersionCode: 0,
@@ -328,6 +325,7 @@ export class AndroidInstallationService {
       };
     }
 
+    const deviceId = this.resolveInstalledDeviceId(adb, device.serial);
     let action: DesktopAndroidInstallAction = "current";
     let message = `Yardımcı Asistan ${installed.versionName || "sürümü bilinmiyor"} kurulu.`;
     if (bundledVersionCode > 0 && installed.versionCode > 0) {
