@@ -218,7 +218,8 @@ try {
   await expect(quantityInput).toHaveValue("2");
 
   await page.getByLabel("Sipariş notu", { exact: true }).fill("UI smoke bayi siparişi");
-  await expect(page.getByText("₺160", { exact: false })).toBeVisible();
+  const orderTotal = page.locator(".market-sale-grand-total").filter({ hasText: "Sipariş toplamı" });
+  await expect(orderTotal).toContainText("₺160");
 
   await page.getByRole("button", { name: "Siparişi Kaydet", exact: true }).click();
 
