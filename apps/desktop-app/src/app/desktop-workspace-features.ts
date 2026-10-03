@@ -14,6 +14,7 @@ export interface DesktopWorkspaceFeatures {
   reports: boolean;
   qrMenu: boolean;
   inventory: boolean;
+  wholesale: boolean;
   customerMessaging: boolean;
   accommodation: {
     rooms: boolean;
@@ -57,6 +58,7 @@ export function projectDesktopWorkspaceFeatures(
     reports: runtimeHasCapability(snapshot, C.REPORTS),
     qrMenu: runtimeHasCapability(snapshot, C.QR_MENU),
     inventory: runtimeHasCapability(snapshot, C.INVENTORY),
+    wholesale: runtimeHasCapability(snapshot, C.WHOLESALE),
     customerMessaging: customers && whatsapp,
     accommodation: {
       rooms,
