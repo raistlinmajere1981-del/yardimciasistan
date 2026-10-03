@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  DependencyUpdateReport,
   HealthCheckSnapshot,
   InstallationSnapshot,
   OverviewSnapshot,
@@ -727,6 +728,185 @@ function Tests({
   );
 }
 
+function System({ data }: { data: OverviewSnapshot }) {
+  const [checking, setChecking] = useState(false);
+  const [report, setReport] = useState<DependencyUpdateReport | null>(null);
+  const [checkError, setCheckError] = useState("");
+
+  const runDependencyCheck = useCallback(async () => {
+    setChecking(true);
+    setCheckError("");
+
+    try {
+      const result = await window.adminControlCenter.checkDependencyUpdates();
+      setReport(result);
+      if (result.status === "error") setCheckError(result.message);
+    } catch (value) {
+      setCheckError(value instanceof Error ? value.message : String(value));
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  const reportTone: StatusKind = !report
+    ? "unknown"
+    : report.status === "current"
+      ? "ready"
+      : report.status === "updates"
+        ? "warning"
+        : "error";
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">YEREL YÖNETİM</p>
+          <h1>Sistem</h1>
+          <p className="page-subtitle">
+            Admin çalışma ortamı ve Yardımcı Asistan workspace bağımlılıklarının manuel kontrolü.
+          </p>
+        </div>
+      </header>
+
+      <section className="system-summary-grid">
+        <article className="summary-card">
+          <span>Repo</span>
+          <strong>{data.repo.branch}</strong>
+          <small>HEAD {data.repo.head}</small>
+        </article>
+        <article className="summary-card">
+          <span>Ürün sürümü</span>
+          <strong>v{data.product.version}</strong>
+          <small>Web v{data.product.webModuleVersion} · Android #{data.product.androidVersionCode}</small>
+        </article>
+        <article className="summary-card">
+          <span>Kütüphane durumu</span>
+          <strong>
+            {!report
+              ? "Kontrol edilmedi"
+              : report.status === "current"
+                ? "Güncel"
+                : report.status === "updates"
+                  ? `${report.count} güncelleme`
+                  : "Kontrol hatası"}
+          </strong>
+          <small>
+            {report
+              ? `${report.packageManager} · ${report.nodeVersion}`
+              : "Yalnız isteğe bağlı olarak npm registry kontrol edilir."}
+          </small>
+        </article>
+      </section>
+
+      <section className="panel dependency-panel">
+        <div className="panel-header dependency-panel-header">
+          <div>
+            <p className="panel-kicker">MANUEL KÜTÜPHANE KONTROLÜ</p>
+            <h2>Workspace bağımlılıkları</h2>
+            <p className="dependency-description">
+              Root ve tüm npm workspace'leri için kurulu sürüm, semver içinde önerilen sürüm ve en son yayın karşılaştırılır.
+            </p>
+          </div>
+          <button
+            className="button button--secondary"
+            onClick={() => void runDependencyCheck()}
+            disabled={checking}
+          >
+            <RefreshCw size={17} className={checking ? "spin" : ""} />
+            {checking ? "Kontrol ediliyor" : report ? "Tekrar Kontrol Et" : "Güncellemeleri Kontrol Et"}
+          </button>
+        </div>
+
+        {checkError ? (
+          <div className="dependency-state dependency-state--error">
+            <TriangleAlert size={18} />
+            <div>
+              <strong>Kontrol tamamlanamadı.</strong>
+              <small>{checkError}</small>
+            </div>
+          </div>
+        ) : !report ? (
+          <div className="dependency-state">
+            <PackageCheck size={20} />
+            <div>
+              <strong>Otomatik kontrol yapılmıyor.</strong>
+              <small>Butona bastığında npm registry'ye bağlanılır; hiçbir paket değiştirilmez veya kurulmaz.</small>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="dependency-result">
+              <div className="dependency-result-main">
+                <span className={statusClass(reportTone)}>
+                  {report.status === "current" ? "Güncel" : report.status === "updates" ? "Güncelleme var" : "Hata"}
+                </span>
+                <strong>{report.message}</strong>
+                <small>
+                  {new Date(report.checkedAt).toLocaleString("tr-TR")} · {report.packageManager} · {report.nodeVersion}
+                </small>
+              </div>
+              <div className="dependency-result-counts">
+                <div><strong>{report.count}</strong><span>toplam</span></div>
+                <div><strong>{report.majorCount}</strong><span>major</span></div>
+              </div>
+            </div>
+
+            {report.items.length ? (
+              <div className="dependency-list">
+                <div className="dependency-row dependency-row--head">
+                  <span>Paket</span>
+                  <span>Mevcut</span>
+                  <span>Wanted</span>
+                  <span>Latest</span>
+                  <span>Kaynak</span>
+                  <span />
+                </div>
+                {report.items.map((item) => (
+                  <div className="dependency-row" key={`${item.name}:${item.dependent}:${item.location}`}>
+                    <div className="dependency-name">
+                      <strong>{item.name}</strong>
+                      <small>{item.type || "dependency"}</small>
+                    </div>
+                    <code>{item.current}</code>
+                    <code>{item.wanted}</code>
+                    <code>{item.latest}</code>
+                    <div className="dependency-source">
+                      <span>{item.dependent || "workspace"}</span>
+                      {item.majorUpdate ? <small className="dependency-major">major</small> : null}
+                    </div>
+                    <button
+                      className="text-button"
+                      disabled={!item.homepage}
+                      onClick={() => item.homepage && window.adminControlCenter.openExternal(item.homepage)}
+                    >
+                      Detay
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="dependency-state dependency-state--ready">
+                <CheckCircle2 size={20} />
+                <div>
+                  <strong>Güncelleme görünmüyor.</strong>
+                  <small>npm outdated tüm workspace'ler için boş sonuç döndürdü.</small>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="panel security-note system-note">
+        <ShieldCheck size={18} />
+        <span>
+          Bu kontrol yalnız sürüm bilgisi okur. Paket güncelleme, package-lock değişikliği veya npm install işlemi yapmaz.
+        </span>
+      </section>
+    </>
+  );
+}
+
 function Placeholder({ section }: { section: Section }) {
   const label = NAV_ITEMS.find((item) => item.id === section)?.label ?? section;
 
@@ -736,7 +916,7 @@ function Placeholder({ section }: { section: Section }) {
       <p className="eyebrow">SONRAKİ DİLİM</p>
       <h1>{label}</h1>
       <p>
-        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar, Release ve Testler gerçek veri hattı üzerinde;
+        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar, Release, Testler ve Sistem gerçek veri hattı üzerinde;
         sonraki ekranlar aynı güvenli IPC sınırı üzerinden eklenecek.
       </p>
     </section>
@@ -825,7 +1005,9 @@ export default function App() {
           <Release data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "tests" && data ? (
           <Tests data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
-        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" ? (
+        ) : section === "system" && data ? (
+          <System data={data} />
+        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" || section === "system" ? (
           <div className="loading-card">
             <RefreshCw className="spin" size={22} />
             Gerçek sistem durumu okunuyor…
