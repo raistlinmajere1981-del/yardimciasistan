@@ -54,6 +54,38 @@ public final class AndroidDeviceCredentialSmoke {
   }
 
   @Test
+  public void reprovisioningClearsStaleLocalDesktopPairing() {
+    InMemoryPreferences preferences = new InMemoryPreferences();
+    preferences.edit()
+        .putString(ConnectionSettings.KEY_WEB_MODULE_URL, "https://old.example")
+        .putString(ConnectionSettings.KEY_SYNC_SECRET, CREDENTIAL)
+        .putString(ConnectionSettings.KEY_LOCAL_DESKTOP_ID, "desktop-old-12345678")
+        .putString(ConnectionSettings.KEY_LOCAL_BASE_URL, "http://192.168.1.10:47321")
+        .putString(ConnectionSettings.KEY_LOCAL_TOKEN, "yal_" + "b".repeat(64))
+        .putString(ConnectionSettings.KEY_LOCAL_TARGET_KEY, "companion:https://old.example")
+        .putString(ConnectionSettings.KEY_LOCAL_LAST_SEEN_AT, "2026-10-03T00:00:00Z")
+        .putString(ConnectionSettings.KEY_HOSTING_ACTION_BARRIER_TARGET, "companion:https://old.example")
+        .commit();
+
+    String ticket = "yab1.payload." + "a".repeat(64);
+    assertTrue(ConnectionSettings.storeBootstrapProvisioning(
+        preferences,
+        "https://new.example",
+        ticket
+    ));
+
+    assertEquals("https://new.example", preferences.getString(ConnectionSettings.KEY_WEB_MODULE_URL, ""));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_SYNC_SECRET, ""));
+    assertEquals(ticket, ConnectionSettings.bootstrapTicket(preferences));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_LOCAL_DESKTOP_ID, ""));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_LOCAL_BASE_URL, ""));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_LOCAL_TOKEN, ""));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_LOCAL_TARGET_KEY, ""));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_LOCAL_LAST_SEEN_AT, ""));
+    assertEquals("", preferences.getString(ConnectionSettings.KEY_HOSTING_ACTION_BARRIER_TARGET, ""));
+  }
+
+  @Test
   public void embeddedDefaultsPreservePendingDesktopProvisioning() {
     assumeTrue(ConnectionSettings.isEmbeddedConnectionLocked());
     InMemoryPreferences preferences = new InMemoryPreferences();
