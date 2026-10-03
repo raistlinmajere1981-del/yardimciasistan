@@ -247,6 +247,25 @@ CREATE TABLE commerce_order_items (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE commerce_order_fulfillments (
+  id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES business(id),
+  order_id TEXT NOT NULL REFERENCES commerce_orders(id),
+  sale_id TEXT NOT NULL REFERENCES commerce_sales(id),
+  operation_key TEXT NOT NULL,
+  request_fingerprint TEXT NOT NULL,
+  settlement_type TEXT NOT NULL
+    CHECK (settlement_type IN ('paid', 'credit', 'no_payment')),
+  payment_method TEXT NOT NULL DEFAULT '',
+  inventory_location_id TEXT NULL REFERENCES inventory_locations(id),
+  created_at TEXT NOT NULL,
+  CHECK (
+    (settlement_type = 'paid' AND payment_method IN ('cash', 'card', 'bank', 'other'))
+    OR (settlement_type = 'credit' AND payment_method = '')
+    OR (settlement_type = 'no_payment' AND payment_method = 'none')
+  )
+);
+
 CREATE TABLE commerce_suppliers (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
@@ -1020,6 +1039,15 @@ CREATE INDEX idx_commerce_orders_customer
 CREATE UNIQUE INDEX idx_commerce_orders_source_reference
   ON commerce_orders (business_id, source, source_reference)
   WHERE source_reference != '' AND deleted_at = '';
+
+CREATE UNIQUE INDEX idx_commerce_order_fulfillment_order
+  ON commerce_order_fulfillments (business_id, order_id);
+
+CREATE UNIQUE INDEX idx_commerce_order_fulfillment_sale
+  ON commerce_order_fulfillments (business_id, sale_id);
+
+CREATE UNIQUE INDEX idx_commerce_order_fulfillment_operation
+  ON commerce_order_fulfillments (business_id, operation_key);
 
 CREATE INDEX idx_commerce_suppliers_business
   ON commerce_suppliers (business_id, is_active, name);
