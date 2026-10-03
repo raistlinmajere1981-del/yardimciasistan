@@ -623,7 +623,7 @@ try {
   await settingsLeaveGuard.getByRole("button", { name: "Değişiklikleri geri al ve geç", exact: true }).click();
   await expect(settingsLeaveGuard).toHaveCount(0);
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.locator(".nav-item")).toHaveCount(8);
+  await expect(page.locator(".nav-item")).toHaveCount(9);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
   await expect(page.getByText("Web eşitleme adresi")).toHaveCount(0);
   await expect(page.getByText("Yerel kayıt dosyası")).toHaveCount(0);
@@ -2094,7 +2094,7 @@ try {
   await expect(compactPage.getByRole("tab", { name: "Hazır Mesaj" })).toHaveAttribute("aria-selected", "true");
 
   await compactPage.reload({ waitUntil: "domcontentloaded" });
-  await expect(compactPage.locator(".nav-item")).toHaveCount(8);
+  await expect(compactPage.locator(".nav-item")).toHaveCount(9);
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Ayarlar", exact: true })).toHaveAttribute("aria-current", "page");
   expect(await compactPage.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);

@@ -42,7 +42,7 @@ test("market AI context keeps general business facts and drops hospitality-only 
   });
 
   assert.equal(context.profileId, "market");
-  assert.equal(context.profileLabel, "Market / Perakende");
+  assert.equal(context.profileLabel, "Market / Perakende / Toptan");
   assert.equal(context.directionsNote, "Ana caddeden ikinci sokak.");
   assert.equal(context.paymentNote, "Nakit ve kart kabul edilir.");
   assert.deepEqual(context.languages, ["Türkçe", "English"]);

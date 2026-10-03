@@ -150,7 +150,7 @@ try {
   }, { setup: { ...createSetupFixture(), setupRequired: false }, dashboard: createCompactUiFixture(), report: createReportFixture(), allCapabilities: Object.values(BUSINESS_CAPABILITIES) });
   await page.goto(baseUrl);
   const observations = [];
-  const screens = [['Ana Ekran','Bugün ne var?'],['Müşteri İşleri','Müşteri İşleri'],['Takvim','Takvim'],['Pansiyon','Pansiyon'],['Restoran','Restoran'],['Menü','Menü'],['Kasa','Kasa'],['Market','Market'],['Ayarlar','Ayarlar']];
+  const screens = [['Ana Ekran','Bugün ne var?'],['Müşteri İşleri','Müşteri İşleri'],['Takvim','Takvim'],['Pansiyon','Pansiyon'],['Restoran','Restoran'],['Menü','Menü'],['Kasa','Kasa'],['Satış','Satış'],['Ayarlar','Ayarlar']];
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768]]) {
     await page.setViewportSize({ width, height });
     for (const [index, [name, title]] of screens.entries()) {
