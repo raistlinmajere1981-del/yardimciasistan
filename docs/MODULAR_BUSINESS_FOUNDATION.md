@@ -305,6 +305,12 @@ Sipariş oluşturmak veya onaylamak:
 listesi ortak `commerce.orders` kaynağını gösterir; bugün manuel bayi, ileride online
 satış ve WhatsApp Business aynı listeye kaynak etiketiyle düşebilir.
 
+Manuel desktop taslağı her değişmez save denemesi için kararlı bir
+`source_reference` üretir. Yanıt kaybolursa aynı taslak aynı anahtarla yeniden denenir ve
+mevcut sipariş döner; müşteri/ürün/adet/not değişirse yeni taslak anahtarı üretilir.
+Fiyat çözümü sürerken müşteri seçimi kilitlenir ve sonuç ayrıca istek yapılan müşteri
+kimliğiyle karşılaştırılır; eski müşterinin async sonucu yeni taslağa eklenemez.
+
 ### Stok sayımı kararı
 
 `count` bir UI delta girişi değildir. Kullanıcı gerçek fiziksel miktarı girer.
