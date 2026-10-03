@@ -23,6 +23,7 @@ const requiredFiles = [
   "api/business.php",
   "api/menu.php",
   "api/catalog.php",
+  "api/order.php",
   "api/rooms.php",
   "api/room-media.php",
   "api/tables.php",
@@ -41,6 +42,7 @@ const requiredFiles = [
   "api/android-identity-image-analysis.php",
   "lib/storage.php",
   "lib/online-catalog.php",
+  "lib/online-order.php",
   "lib/google-reviews.php",
   "lib/public-request-guard.php",
   "lib/public-room-availability.php",
@@ -204,6 +206,11 @@ function validateSource() {
     "Public ürün kataloğu endpoint'i ortak public projection kütüphanesini kullanmalı.");
   assert.ok(catalogEndpoint.includes("ya_storage_get_publication('online_catalog'"),
     "Public ürün kataloğu endpoint'i online_catalog publication kaynağını okumalı.");
+
+  const orderEndpoint = readFileSync(join(sourceRoot, "api", "order.php"), "utf8");
+  assert.ok(orderEndpoint.includes("online-order.php") && orderEndpoint.includes("ya_online_order_submit")
+    && orderEndpoint.includes("ya_public_guard_enforce('order')"),
+    "Public sipariş endpoint'i submission servisini ve ortak public guard'ı kullanmalı.");
 
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");

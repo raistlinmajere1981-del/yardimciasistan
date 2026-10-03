@@ -3,6 +3,7 @@ import {
   type BusinessAiContext,
   type BusinessCapability,
   type CommerceOnlineCatalog,
+  type CommerceOrderBuyerSnapshot,
   type CustomerRequest,
   type ISODateTimeString,
   type MenuStockUnit,
@@ -33,6 +34,8 @@ export interface PullRequestsOptions extends SyncCoreConfig {
 export interface WebOrderEnvelope {
   id: string;
   items: Array<{ productId: string; quantity: number }>;
+  buyer: CommerceOrderBuyerSnapshot;
+  note?: string;
   createdAt: ISODateTimeString;
   syncSeq: number;
 }

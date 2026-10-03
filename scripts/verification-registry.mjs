@@ -1,4 +1,5 @@
 const SMOKE_FILES = [
+  "scripts/smoke-web-order-submission.mjs",
   "scripts/smoke-commerce-online-catalog.mjs",
   "scripts/smoke-commerce-online-catalog-ui.mjs",
   "scripts/smoke-web-orders-storage.php",
@@ -427,6 +428,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-web-order-submission.mjs") return ["php-lint"];
   if (file === "scripts/smoke-support-endpoint.mjs" || file === "scripts/smoke-web-version.mjs") return [];
   if (file === "scripts/smoke-desktop-package.mjs") return ["package-desktop-dir"];
   if (file === "scripts/smoke-android-device-ui.mjs") {

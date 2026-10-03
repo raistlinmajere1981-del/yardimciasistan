@@ -163,6 +163,8 @@ export interface CommerceOrder {
   businessId: string;
   customerId: string;
   customerName: string;
+  /** Contact at submission time; independent of canonical Customer identity. */
+  buyerSnapshot: CommerceOrderBuyerSnapshot | null;
   status: CommerceOrderStatus;
   source: string;
   sourceReference: string;
@@ -177,6 +179,12 @@ export interface CommerceOrder {
   cancelledAt: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CommerceOrderBuyerSnapshot {
+  name: string;
+  phone: string;
+  email?: string;
 }
 
 export interface CommerceOrderItem {

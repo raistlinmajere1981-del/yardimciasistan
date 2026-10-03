@@ -11,7 +11,7 @@ const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.
 const { OnlineOrderIngressService } = require("../apps/desktop-app/dist-electron/online-order-ingress-service.js");
 const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
 const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
-const { saveRuntimeCatalogProduct } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { saveRuntimeCatalogProduct, getRuntimeOrder } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 const root = mkdtempSync(join(tmpdir(), "ya-online-order-"));
 const hosting = join(root, "web-module");
 cpSync(join(process.cwd(), "firm-template/web-module"), hosting, { recursive: true });
@@ -98,7 +98,7 @@ try {
     name: "Order product", salePrice: 25, purchasePrice: 10, unit: "piece", currency: "TRY", taxRate: 20,
     trackInventory: true, isActive: true
   });
-  const envelope = { id: "web-1", items: [{ productId: product.id, quantity: 2, unitPrice: 0.01 }], createdAt: new Date().toISOString() };
+  const envelope = { id: "web-1", items: [{ productId: product.id, quantity: 2, unitPrice: 0.01 }], buyer: { name: "Guest contact", phone: "+44 7911 123456", email: "guest@example.test" }, note: "Guest order note", createdAt: new Date().toISOString() };
   const first = enqueue(envelope);
   assert.equal(syncApi({ action: "pull_web_orders", client_id: "desktop-test", after_seq: 0 }, false).status, 401);
   assert.equal(syncApi({ action: "acknowledge_web_orders", client_id: "desktop-test", through_seq: 1 }, false).status, 401);
@@ -119,18 +119,34 @@ try {
   assert.equal(created.order.source, "web-online-sales");
   assert.equal(created.order.sourceReference, "web-1");
   assert.equal(created.order.customerId, "");
+  assert.deepEqual(created.order.buyerSnapshot, envelope.buyer);
+  assert.equal(created.order.note, envelope.note);
+  assert.deepEqual(getRuntimeOrder(database.databasePath, created.order.id).order.buyerSnapshot, envelope.buyer);
   assert.equal(created.items[0].unitPrice, 25, "canonical price ignores payload unitPrice");
+  assert.equal(created.items[0].taxRate, 20);
+  assert.equal(created.order.discountTotal, 0);
   assert.equal(created.order.total, 50);
   assert.equal(ingress.importOrder(first).order.id, created.order.id);
   const normalized = ingress.importOrder({ ...first, id: "normalized", items: [{ productId: ` ${product.id} `, quantity: "1.23456" }] });
   assert.equal(normalized.items[0].quantity, 1.2346);
   for (const bad of [null, { ...first, id: "" }, { ...first, createdAt: "invalid" }, { ...first, syncSeq: 0 },
+    { ...first, buyer: undefined }, { ...first, buyer: { name: "Guest", phone: "123" } }, { ...first, note: "x".repeat(2001) },
     { ...first, items: [] }, { ...first, items: [{ productId: product.id, quantity: true }] },
     { ...first, items: [{ productId: product.id, quantity: 0 }] }]) {
     assert.throws(() => ingress.importOrder(bad), /geçersiz/);
   }
   assert.throws(() => ingress.importOrder(first, first.syncSeq), /geçersiz/);
-  const broken = enqueue({ ...envelope, id: "web-broken", items: [{ productId: "missing-product", quantity: 1 }] });
+  const unavailable = saveRuntimeCatalogProduct(database.databasePath, {
+    name: "Product active when published", salePrice: 30, purchasePrice: 10, unit: "piece", currency: "TRY", taxRate: 20,
+    trackInventory: true, isActive: true
+  });
+  database.saveCommerceProductPublication({ productId: unavailable.id, isPublished: true });
+  assert.ok(database.createCommerceOnlineCatalog().products.some((entry) => entry.productId === unavailable.id));
+  const fixtureDb = new DatabaseSync(database.databasePath);
+  fixtureDb.prepare("UPDATE catalog_products SET is_active = 0 WHERE id = ?").run(unavailable.id);
+  fixtureDb.close();
+  assert.throws(() => ingress.importOrder({ ...first, id: "inactive", items: [{ productId: unavailable.id, quantity: 1 }] }), /aktif değil/);
+  const broken = enqueue({ ...envelope, id: "web-broken", items: [{ productId: unavailable.id, quantity: 1 }] });
   const later = enqueue({ ...envelope, id: "web-later" });
   let result = await coordinator().runNow();
   assert.equal(result.ok, false);
@@ -185,6 +201,7 @@ try {
   database = new DesktopDatabase({ appPath: join(process.cwd(), "apps/desktop-app"), userDataPath: join(root, "desktop") });
   database.initialize();
   assert.equal(database.getSyncRuntimeStatus().webOrderCursor, later.syncSeq, "cursor survives restart");
+  assert.deepEqual(getRuntimeOrder(database.databasePath, created.order.id).order.buyerSnapshot, envelope.buyer, "buyer survives ack and restart");
   console.log("commerce-online-order-ingress-smoke-ok");
 } finally {
   globalThis.fetch = originalFetch;

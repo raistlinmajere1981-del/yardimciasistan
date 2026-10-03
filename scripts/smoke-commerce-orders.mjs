@@ -134,6 +134,7 @@ try {
   assert.equal(created.order.status, "placed");
   assert.equal(created.order.customerId, customerId);
   assert.equal(created.order.customerName, "Bayi Adayı Müşteri");
+  assert.equal(created.order.buyerSnapshot, null, "manual orders need no guest snapshot");
   assert.equal(created.order.source, "wholesale-smoke");
   assert.equal(created.order.sourceReference, "dealer-order-1001");
   assert.equal(created.order.subtotal, 50);

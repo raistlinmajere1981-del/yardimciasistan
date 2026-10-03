@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 const YA_PUBLIC_GUARD_MAX_BODY_BYTES = 65536;
 const YA_PUBLIC_GUARD_RETENTION_SECONDS = 86400;
+const YA_PUBLIC_ORDER_MAX_BODY_BYTES = 16384;
 
 /**
  * Applies a lightweight, privacy-preserving abuse guard to public endpoints.
@@ -17,6 +18,19 @@ const YA_PUBLIC_GUARD_RETENTION_SECONDS = 86400;
  */
 function ya_public_guard_enforce(string $bucket): void
 {
+    if ($bucket === 'order') {
+        ya_public_guard_apply_cors();
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            header('Allow: POST');
+            ya_public_guard_reject(405, 'Sipariş göndermek için POST isteği gerekli.', 0, 'method_not_allowed');
+        }
+        if (strtolower(trim(explode(';', (string)($_SERVER['CONTENT_TYPE'] ?? ''))[0])) !== 'application/json') {
+            ya_public_guard_reject(415, 'Sipariş bilgileri JSON biçiminde gönderilmeli.', 0, 'unsupported_content_type');
+        }
+        if ((int)($_SERVER['CONTENT_LENGTH'] ?? 0) > YA_PUBLIC_ORDER_MAX_BODY_BYTES) {
+            ya_public_guard_reject(413, 'Gönderilen sipariş verisi çok büyük.', 0);
+        }
+    }
     if (PHP_SAPI === 'cli') {
         return;
     }
@@ -125,7 +139,7 @@ function ya_public_guard_policy(string $bucket): ?array
         ];
     }
 
-    if ($bucket === 'request') {
+    if ($bucket === 'request' || $bucket === 'order') {
         return [
             'subject_windows' => [
                 ['seconds' => 600, 'limit' => 8, 'retry_after' => 120],
@@ -265,7 +279,7 @@ function ya_public_guard_apply_cors(): void
     header('Vary: Origin');
 }
 
-function ya_public_guard_reject(int $status, string $message, int $retryAfter): void
+function ya_public_guard_reject(int $status, string $message, int $retryAfter, ?string $code = null): void
 {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
@@ -276,7 +290,7 @@ function ya_public_guard_reject(int $status, string $message, int $retryAfter): 
     echo json_encode([
         'ok' => false,
         'message' => $message,
-        'code' => $status === 429 ? 'rate_limited' : 'payload_too_large',
+        'code' => $code ?? ($status === 429 ? 'rate_limited' : 'payload_too_large'),
         'retry_after_seconds' => $retryAfter > 0 ? $retryAfter : null
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;

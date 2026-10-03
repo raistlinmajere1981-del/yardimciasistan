@@ -145,7 +145,9 @@ required_package_files=(
   api/chat.php
   api/menu.php
   api/catalog.php
+  api/order.php
   lib/online-catalog.php
+  lib/online-order.php
   api/rooms.php
   api/room-media.php
   api/tables.php

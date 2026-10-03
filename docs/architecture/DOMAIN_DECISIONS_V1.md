@@ -454,3 +454,39 @@ archive paths are never public; only safe public image URLs may be projected.
 Publication visibility is an immediate preference in the canonical Product Workspace;
 it does not create another Product editor or mutate the product's local active state.
 Checkout, cart, public order submission and customer identity capture remain deferred.
+
+
+## D-028 — Public guest submission carries an order contact snapshot
+
+**Status:** ACCEPTED (2026-10-04)
+
+Public checkout never creates a Customer. A guest order carries a buyer/contact snapshot
+(name, phone, optional email) and optional note, persisted on canonical `commerce.orders`.
+The snapshot records contact at submission time, not canonical Customer identity;
+`customerId` may remain empty. Linking a Customer later is a separate operation.
+
+Public submission accepts published online catalog `productId + quantity` only, with
+bounded guest contact data. Client price, tax, discount, stock, Sale, payment and fulfillment
+fields have no authority and are excluded from the semantic request and queue payload.
+Hosting verifies current enabled publication and product membership as a security/UX
+filter. Desktop ingress and canonical `createCommerceOrder()` revalidate active products
+and resolve current retail prices. Desktop remains business authority.
+
+Only an enabled `online_sales` catalog accepts new submissions. Explicit client
+`idempotencyKey` (16–128 ASCII letters/digits/underscore/hyphen; clients should generate a
+random key per intent) identifies retries. The same key and normalized semantic request
+replay the same acceptance; a changed request conflicts. Replays create no new submission,
+including after publication is disabled. Queue insertion and a focused hashed receipt are
+atomic. Receipts contain no raw key, IP or buyer PII; request fingerprints are keyed with
+a private server-generated secret. Runtime reset clears queue, receipts and that secret.
+
+The existing public request guard owns method, JSON content type, body limits and rate
+limits. A request has at most 50 distinct product rows, quantity > 0 and <= 1000 per row,
+at most four decimal places and total quantity <= 10000. Duplicate product rows are
+rejected; sorted rows make row order irrelevant to idempotency. Body is bounded to 16 KiB,
+buyer name to 160 characters, phone to 40 (7–15 digits, international formatting allowed),
+email to 254 and note to 2000. PII is never included in diagnostics.
+
+Creating a guest order does not reserve stock or create a Sale, payment or fulfillment.
+Shipping, address, delivery method, customer/dealer login and checkout UI remain deferred.
+Only the current transport/database contract is supported; no historical compatibility.
