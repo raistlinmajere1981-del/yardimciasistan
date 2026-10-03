@@ -1,3 +1,4 @@
+import { OnlineOrderIngressService } from "./online-order-ingress-service";
 import {
   PhpHostingSyncTransport,
   pushAiCatalog,
@@ -65,6 +66,7 @@ export interface AutomaticSyncCycleResult {
 
 export interface SyncCoordinatorOptions {
   database: DesktopDatabase;
+  onlineOrderIngress?: OnlineOrderIngressService;
   getSyncConfig: () => { baseUrl: string; syncSecret: string };
   createAndroidSnapshot: () => AndroidOperationsSnapshot;
   createAiCatalog?: () => BusinessAiCatalog;
@@ -97,6 +99,7 @@ export class SyncCoordinator {
   private phase: AutomaticSyncPhase = "idle";
   private message = "Otomatik senkron hazır.";
   private capabilitiesTarget = "";
+  private webOrdersSupported = false;
   private nextPassiveRunAt = 0;
   private marketBarcodeFastPullActive = false;
   private availabilityHeartbeatSupported: boolean | null = null;
@@ -394,6 +397,7 @@ export class SyncCoordinator {
         }
         return this.result(false, message, counts);
       }
+      this.webOrdersSupported = capabilities.features.includes("web_orders_v1");
       this.capabilitiesTarget = targetKey;
     }
 
@@ -405,6 +409,13 @@ export class SyncCoordinator {
       if (requestResult.error) {
         errors.push(requestResult.error);
       }
+    }
+
+    if (this.webOrdersSupported
+        && hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+      const orderResult = await this.pullWebOrderPages(transport);
+      dashboardChanged ||= orderResult.count > 0;
+      if (orderResult.error) errors.push(orderResult.error);
     }
 
     const actionResult = await this.processAndroidActions(transport);
@@ -489,6 +500,65 @@ export class SyncCoordinator {
       }
     });
     return this.result(false, this.message, counts);
+  }
+
+  private async pullWebOrderPages(transport: SyncTransport): Promise<{ count: number; error: string }> {
+    const ingress = this.options.onlineOrderIngress ?? new OnlineOrderIngressService(this.options.database);
+    let cursor = this.options.database.getSyncRuntimeStatus().webOrderCursor;
+    let count = 0;
+    let errorMessage = "";
+    try {
+      for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
+        const result = await transport.pullWebOrders({ afterSeq: cursor, limit: 100 });
+        if (!result.ok) {
+          this.logSyncFailure("web-orders-pull", result, { page, cursor });
+          errorMessage = result.message;
+          break;
+        }
+        for (const envelope of result.orders) {
+          ingress.importOrder(envelope, cursor);
+          cursor = envelope.syncSeq;
+          this.options.database.recordWebOrderCursor(cursor);
+          count += 1;
+        }
+        if (!result.has_more) break;
+      }
+    } catch (error) {
+      errorMessage = "Web siparişi içe aktarılamadı. Yeniden denenecek.";
+      desktopLog.error({
+        scope: "online-order-ingress",
+        event: "online-order-ingress.import.failed",
+        message: errorMessage,
+        operationId: this.activeOperationId,
+        meta: { cursor, importedCount: count },
+        error
+      });
+    }
+    // Even on failure, acknowledge only the persisted successful prefix. Ack failure
+    // leaves its own local cursor pending, so a later cycle retries the acknowledgement.
+    const runtime = this.options.database.getSyncRuntimeStatus();
+    if (runtime.webOrderCursor > runtime.webOrderAcknowledgedCursor) {
+      const ack = await transport.acknowledgeWebOrders({ throughSeq: runtime.webOrderCursor });
+      if (!ack.ok) {
+        this.logSyncFailure("web-orders-ack", ack, { cursor: runtime.webOrderCursor });
+        errorMessage ||= ack.message;
+      } else if (ack.acknowledged_cursor !== runtime.webOrderCursor) {
+        errorMessage ||= "Web sipariş onay cursor değeri geçersiz.";
+        this.logSyncFailure("web-orders-ack", { message: errorMessage, error: "invalid_response" });
+      } else {
+        this.options.database.recordWebOrderCursor(ack.acknowledged_cursor, true);
+      }
+    }
+    if (count > 0) {
+      desktopLog.info({
+        scope: "online-order-ingress",
+        event: "online-order-ingress.import.completed",
+        message: "Web siparişleri canonical siparişlere aktarıldı.",
+        operationId: this.activeOperationId,
+        meta: { importedCount: count, cursor }
+      });
+    }
+    return { count, error: errorMessage };
   }
 
   private async pullRequestPages(transport: SyncTransport): Promise<{ count: number; error: string }> {

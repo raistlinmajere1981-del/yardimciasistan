@@ -2,6 +2,9 @@ import type {
   AcknowledgeRequestsOptions,
   AcknowledgeRequestsResult,
   AcknowledgeRequestsSuccess,
+  AcknowledgeWebOrdersOptions,
+  AcknowledgeWebOrdersResult,
+  AcknowledgeWebOrdersSuccess,
   ActionCompletion,
   AndroidOperationsSnapshot,
   MarkAndroidActionResultOptions,
@@ -20,6 +23,9 @@ import type {
   PullRequestsOptions,
   PullRequestsResult,
   PullRequestsSuccess,
+  PullWebOrdersOptions,
+  PullWebOrdersResult,
+  PullWebOrdersSuccess,
   PushAiCatalogOptions,
   PushAiCatalogResult,
   PushAiCatalogSuccess,
@@ -51,7 +57,8 @@ import type {
   SyncCoreConfig,
   SyncFailure,
   SyncTransport,
-  VersionedPublication
+  VersionedPublication,
+  WebOrderAcknowledgement
 } from "./index";
 
 export function createSyncEndpointUrl(baseUrl: string): string {
@@ -78,6 +85,44 @@ export async function pullRequests(options: PullRequestsOptions): Promise<PullRe
     include_synced: options.includeSynced ?? false,
     ...(options.afterSeq === undefined ? {} : { after_seq: Math.max(0, Math.trunc(options.afterSeq)) }),
     ...(options.clientId ? { client_id: options.clientId } : {})
+  });
+}
+
+export async function pullWebOrders(options: PullWebOrdersOptions): Promise<PullWebOrdersResult> {
+  const result = await syncRequest<PullWebOrdersSuccess>(options, {
+    action: "pull_web_orders",
+    client_id: options.clientId,
+    after_seq: Math.max(0, Math.trunc(options.afterSeq)),
+    limit: options.limit ?? 50
+  });
+  if (!result.ok) return result;
+  // Check the whole page before exposing it to an importer. An out-of-order
+  // page must never let a caller acknowledge past an unprocessed record.
+  let cursor = Math.max(0, Math.trunc(options.afterSeq));
+  let valid = Array.isArray(result.orders) && typeof result.has_more === "boolean"
+    && result.count === result.orders.length;
+  if (valid) {
+    for (const envelope of result.orders) {
+      if (!Number.isSafeInteger(envelope?.syncSeq) || envelope.syncSeq <= cursor) {
+        valid = false;
+        break;
+      }
+      cursor = envelope.syncSeq;
+    }
+    valid &&= result.next_cursor === cursor && !(result.orders.length === 0 && result.has_more);
+  }
+  return valid ? result : {
+    ok: false,
+    message: "Web sipariş kuyruğu yanıtı geçersiz.",
+    error: "invalid_web_order_page"
+  };
+}
+
+export async function acknowledgeWebOrders(options: AcknowledgeWebOrdersOptions): Promise<AcknowledgeWebOrdersResult> {
+  return syncRequest<AcknowledgeWebOrdersSuccess>(options, {
+    action: "acknowledge_web_orders",
+    client_id: options.clientId,
+    through_seq: Math.max(0, Math.trunc(options.throughSeq))
   });
 }
 
@@ -330,6 +375,14 @@ export class PhpHostingSyncTransport implements SyncTransport {
       clientId: this.config.clientId,
       throughSeq: input.throughSeq
     });
+  }
+
+  pullWebOrders(input: PullCursorInput): Promise<PullWebOrdersResult> {
+    return pullWebOrders({ ...this.config, ...input });
+  }
+
+  acknowledgeWebOrders(input: WebOrderAcknowledgement): Promise<AcknowledgeWebOrdersResult> {
+    return acknowledgeWebOrders({ ...this.config, ...input });
   }
 
   pullAndroidActions(input: PullActionsInput = {}): Promise<PullAndroidActionsResult> {

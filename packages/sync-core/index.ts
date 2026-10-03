@@ -28,6 +28,48 @@ export interface PullRequestsOptions extends SyncCoreConfig {
   clientId?: string;
 }
 
+/** Hosting inbox record; canonical business ownership remains in commerce.orders. */
+export interface WebOrderEnvelope {
+  id: string;
+  items: Array<{ productId: string; quantity: number }>;
+  createdAt: ISODateTimeString;
+  syncSeq: number;
+}
+
+export interface PullWebOrdersOptions extends SyncCoreConfig {
+  clientId: string;
+  afterSeq: number;
+  limit?: number;
+}
+
+export interface AcknowledgeWebOrdersOptions extends SyncCoreConfig {
+  clientId: string;
+  throughSeq: number;
+}
+
+export interface PullWebOrdersSuccess {
+  ok: true;
+  message: string;
+  orders: WebOrderEnvelope[];
+  count: number;
+  next_cursor: number;
+  has_more: boolean;
+  pulled_at: ISODateTimeString;
+  server_revision: number;
+}
+
+export interface AcknowledgeWebOrdersSuccess {
+  ok: true;
+  message: string;
+  updated_count: number;
+  acknowledged_cursor: number;
+  acknowledged_at: ISODateTimeString;
+  server_revision: number;
+}
+
+export type PullWebOrdersResult = PullWebOrdersSuccess | SyncFailure;
+export type AcknowledgeWebOrdersResult = AcknowledgeWebOrdersSuccess | SyncFailure;
+
 export interface MarkRequestsSyncedOptions extends SyncCoreConfig {
   requestIds: string[];
 }
@@ -799,6 +841,10 @@ export interface PullCursorInput {
   limit?: number;
 }
 
+export interface WebOrderAcknowledgement {
+  throughSeq: number;
+}
+
 export interface RequestAcknowledgement {
   throughSeq: number;
 }
@@ -851,6 +897,8 @@ export function createCompanionSourceKey(kind: CompanionTransportKind, sourceId:
 
 export interface SyncTransport {
   getCapabilities(): Promise<SyncCapabilitiesResult>;
+  pullWebOrders(input: PullCursorInput): Promise<PullWebOrdersResult>;
+  acknowledgeWebOrders(input: WebOrderAcknowledgement): Promise<AcknowledgeWebOrdersResult>;
   pullRequests(input: PullCursorInput): Promise<PullRequestsResult>;
   acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult>;
   pullAndroidActions(input?: PullActionsInput): Promise<PullAndroidActionsResult>;
@@ -866,6 +914,8 @@ export interface PhpHostingSyncTransportConfig extends SyncCoreConfig {
 export {
   PhpHostingSyncTransport,
   acknowledgeRequests,
+  acknowledgeWebOrders,
+  pullWebOrders,
   createSyncEndpointUrl,
   getSyncCapabilities,
   markAndroidActionResult,

@@ -13,6 +13,7 @@ const CAPABILITY_LABELS: Partial<Record<BusinessCapability, string>> = {
   [C.QR_MENU]: "QR Menü",
   [C.INVENTORY]: "Stok takibi",
   [C.CUSTOMER_CREDIT]: "Veresiye / Müşteri Hesabı",
+  [C.ONLINE_SALES]: "Online Satış",
   [C.WHOLESALE]: "Bayi / Toptan Satış",
   [C.RETAIL_PURCHASING]: "Satın alma",
   [C.RETAIL_SUPPLIERS]: "Tedarikçiler",

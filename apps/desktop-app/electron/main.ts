@@ -1,3 +1,4 @@
+import { OnlineOrderIngressService } from "./online-order-ingress-service";
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
@@ -315,6 +316,7 @@ if (!hasSingleInstanceLock) {
     });
     reconcileEgmKbsBackgroundSession();
     syncCoordinator = new SyncCoordinator({
+      onlineOrderIngress: new OnlineOrderIngressService(desktopDatabase),
       database: desktopDatabase,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
       createAndroidSnapshot: () => createAndroidOperationsSnapshot(getDatabase(), getDatabase().getDashboardData()),

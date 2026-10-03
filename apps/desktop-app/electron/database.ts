@@ -1,3 +1,5 @@
+import { createRuntimeOrder } from "./commerce-runtime";
+import type { CreateCommerceOrderInput } from "./commerce-order-store";
 import { DatabaseSync } from "node:sqlite";
 import {
   getKbsOverview,
@@ -885,6 +887,14 @@ export class DesktopDatabase {
     recordStoredAutomaticSyncFailure(this.db, message, timestamp);
   }
 
+  createCommerceOrder(input: CreateCommerceOrderInput) {
+    return createRuntimeOrder(this.databasePath, input);
+  }
+
+  recordWebOrderCursor(cursor: number, acknowledged = false) {
+    recordStoredWebOrderCursor(this.db, cursor, acknowledged);
+  }
+
   acknowledgeRequestCursor(cursor: number, timestamp = new Date().toISOString()) {
     acknowledgeStoredRequestCursor(this.db, cursor, timestamp);
   }
@@ -1114,6 +1124,7 @@ import {
   recordSyncAttempt as recordStoredSyncAttempt,
   recordAutomaticSyncSuccess as recordStoredAutomaticSyncSuccess,
   recordAutomaticSyncFailure as recordStoredAutomaticSyncFailure,
+  recordWebOrderCursor as recordStoredWebOrderCursor,
   acknowledgeRequestCursor as acknowledgeStoredRequestCursor,
 } from "./database/sync-runtime-store.js";
 

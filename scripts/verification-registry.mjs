@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-web-orders-storage.php",
+  "scripts/smoke-commerce-online-order-ingress.mjs",
   "scripts/smoke-android-connection-preflight.mjs",
   "scripts/smoke-android-daily-task-actions.mjs",
   "scripts/smoke-android-device-approval-hosting.mjs",
@@ -128,6 +130,7 @@ const RELEASE_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const PACKAGE_ONLY_SMOKE_FILES = new Set([
+  "scripts/smoke-web-orders-storage.php",
   "scripts/smoke-android-connection-preflight.mjs",
   "scripts/smoke-android-device-approval-hosting.mjs",
   "scripts/smoke-android-device-token.mjs",

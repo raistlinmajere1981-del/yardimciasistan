@@ -409,3 +409,26 @@ finance_entries. Customer-credit finance income remains tied to later actual col
 Finance standardization, if desired, is a separate domain decision and must apply to both
 sales paths consistently.
 
+
+## D-026 — Online Sales ingress imports an inbox into canonical Commerce Orders
+
+**Status:** ACCEPTED (2026-10-04)
+
+`channel.online_sales` is optional, defaults OFF for Market/retail, and depends on
+`commerce.orders`. A Web Order is a transport/inbox record, not a canonical business
+entity. Canonical orders belong exclusively to `commerce.orders`.
+
+Desktop imports anonymous orders through canonical `createCommerceOrder()` using
+source `web-online-sales` and the Web Order id as `sourceReference`. The
+`source + sourceReference` pair is the idempotency boundary. Desktop resolves pricing;
+web payload prices are never authoritative. The web side creates no Sale, inventory
+movement, payment or fulfillment.
+
+`SyncCoordinator` only orchestrates capability gates, pull, ingress and ack. A focused
+Online Order Ingress Service validates envelopes and delegates canonical creation.
+`web_orders` has its own cursor/ack line, independent of customer requests. Only the
+successfully imported prefix may be acknowledged; failed records remain retryable.
+
+Public checkout/order submission is deferred to the later Product Publication / Web
+Catalog slice. Checkout identity, shipping and automatic customer creation are outside
+this foundation. Only the current schema is supported; no historical migration chain.

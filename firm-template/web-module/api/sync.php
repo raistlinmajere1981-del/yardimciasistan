@@ -50,6 +50,14 @@ try {
         ya_sync_reset_runtime();
     }
 
+    if ($action === 'pull_web_orders') {
+        ya_sync_pull_web_orders($payload);
+    }
+
+    if ($action === 'acknowledge_web_orders') {
+        ya_sync_acknowledge_web_orders($payload);
+    }
+
     if ($action === 'pull_requests') {
         ya_sync_pull_requests($payload);
     }
@@ -553,6 +561,42 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'reports' => $reportsAllowed ? $androidSnapshot['reports'] : [],
         'market' => ya_sync_android_market_for_permissions($androidSnapshot['market'], $permissionList),
         'actions' => $actions,
+        'server_revision' => ya_storage_server_revision()
+    ]);
+}
+
+function ya_sync_pull_web_orders(array $payload): void
+{
+    ya_sync_require_client_id($payload);
+    $afterSeq = ya_sync_int($payload['after_seq'] ?? -1, -1);
+    if ($afterSeq < 0) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Sipariş cursor bilgisi geçersiz.']);
+    }
+    $pulled = ya_storage_pull_web_orders(ya_sync_int($payload['limit'] ?? 50, 50), $afterSeq);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Web siparişleri alındı.',
+        ...$pulled,
+        'count' => count($pulled['orders']),
+        'pulled_at' => date(DATE_ATOM),
+        'server_revision' => ya_storage_server_revision()
+    ]);
+}
+
+function ya_sync_acknowledge_web_orders(array $payload): void
+{
+    $clientId = ya_sync_require_client_id($payload);
+    $throughSeq = ya_sync_int($payload['through_seq'] ?? -1, -1);
+    if ($throughSeq < 0) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Sipariş onay cursor bilgisi geçersiz.']);
+    }
+    $now = date(DATE_ATOM);
+    $result = ya_storage_acknowledge_web_orders($clientId, $throughSeq, $now);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Web sipariş cursor bilgisi onaylandı.',
+        ...$result,
+        'acknowledged_at' => $now,
         'server_revision' => ya_storage_server_revision()
     ]);
 }

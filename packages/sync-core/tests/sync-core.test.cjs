@@ -1130,3 +1130,46 @@ test("pushTableCatalog publishes only customer-facing table data", async () => {
   assert.equal("notes" in calls[0].table_catalog.tables[0], false);
 });
 
+
+test("web orders use dedicated actions and do not alter request cursor payloads", async () => {
+  const calls = [];
+  const transport = new PhpHostingSyncTransport({
+    baseUrl: "https://example.test/module",
+    syncSecret: "web-orders-secret",
+    clientId: "desktop-test-orders",
+    fetchImpl: async (_url, init) => {
+      assert.equal(init.headers["X-YA-Sync-Secret"], "web-orders-secret");
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ ok: true, orders: [], count: 0, next_cursor: 7, has_more: false }), { status: 200 });
+    }
+  });
+  assert.equal((await transport.pullWebOrders({ afterSeq: 7, limit: 12 })).ok, true);
+  await transport.acknowledgeWebOrders({ throughSeq: 9 });
+  await transport.pullRequests({ afterSeq: 3, limit: 5 });
+  await transport.acknowledgeRequests({ throughSeq: 4 });
+  assert.deepEqual(calls, [
+    { action: "pull_web_orders", client_id: "desktop-test-orders", after_seq: 7, limit: 12 },
+    { action: "acknowledge_web_orders", client_id: "desktop-test-orders", through_seq: 9 },
+    { action: "pull_requests", limit: 5, include_synced: false, after_seq: 3, client_id: "desktop-test-orders" },
+    { action: "acknowledge_requests", client_id: "desktop-test-orders", through_seq: 4 }
+  ]);
+});
+
+
+test("web order transport rejects invalid page cursors and ordering before import", async () => {
+  const { pullWebOrders } = require("../dist");
+  for (const payload of [
+    { orders: [{ syncSeq: 2 }, { syncSeq: 1 }], next_cursor: 2, count: 2, has_more: false },
+    { orders: [{ syncSeq: 1 }], next_cursor: 2, count: 1, has_more: false },
+    { orders: [], next_cursor: 1, count: 0, has_more: false },
+    { orders: [], next_cursor: 0, count: 0, has_more: true },
+    { orders: [{ syncSeq: 1 }], next_cursor: 1, count: 2, has_more: false }
+  ]) {
+    const result = await pullWebOrders({
+      baseUrl: "https://example.test", syncSecret: "test-secret", clientId: "desktop-test", afterSeq: 0,
+      fetchImpl: async () => Response.json({ ok: true, ...payload })
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "invalid_web_order_page");
+  }
+});

@@ -1073,6 +1073,8 @@ export interface DesktopSyncRuntimeStatus {
   enabled: boolean;
   clientId: string;
   requestCursor: number;
+  webOrderCursor: number;
+  webOrderAcknowledgedCursor: number;
   acknowledgedCursor: number;
   lastAttemptAt: string;
   lastSuccessAt: string;

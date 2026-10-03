@@ -16,6 +16,8 @@ export const defaultAutomaticSyncStatus: AutomaticSyncStatus = {
   enabled: true,
   clientId: "",
   requestCursor: 0,
+  webOrderCursor: 0,
+  webOrderAcknowledgedCursor: 0,
   acknowledgedCursor: 0,
   lastAttemptAt: "",
   lastSuccessAt: "",

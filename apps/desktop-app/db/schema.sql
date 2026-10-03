@@ -858,6 +858,8 @@ CREATE TABLE sync_records (
 CREATE TABLE sync_runtime (
   id TEXT PRIMARY KEY,
   request_cursor INTEGER NOT NULL DEFAULT 0,
+  web_order_cursor INTEGER NOT NULL DEFAULT 0,
+  web_order_acknowledged_cursor INTEGER NOT NULL DEFAULT 0,
   acknowledged_cursor INTEGER NOT NULL DEFAULT 0,
   last_attempt_at TEXT NOT NULL DEFAULT '',
   last_success_at TEXT NOT NULL DEFAULT '',

@@ -60,6 +60,7 @@ function ya_storage_capabilities(): array
         'protocol_version' => 2,
         'storage' => 'sqlite',
         'features' => [
+            'web_orders_v1',
             'request_cursor',
             'request_acknowledgement',
             'android_action_queue',
@@ -78,6 +79,7 @@ function ya_storage_reset_runtime(): array
     $database = ya_storage_open();
     $tables = [
         'web_requests',
+        'web_orders',
         'android_actions',
         'android_device_sightings',
         'publications',
@@ -110,7 +112,7 @@ function ya_storage_reset_runtime(): array
         }
         // A clean runtime starts sequence-backed inbound queues/rate-limit ids from the beginning.
         $database->exec(
-            "DELETE FROM sqlite_sequence WHERE name IN ('web_requests', 'android_actions', 'public_request_guard_events')"
+            "DELETE FROM sqlite_sequence WHERE name IN ('web_orders', 'web_requests', 'android_actions', 'public_request_guard_events')"
         );
         $database->commit();
     } catch (Throwable $error) {
@@ -214,6 +216,102 @@ function ya_storage_pull_requests(int $limit, bool $includeSynced, ?int $afterSe
         'next_cursor' => $nextCursor,
         'has_more' => $hasMore
     ];
+}
+
+/** Internal inbox API only; no public submission route exists in A1. */
+function ya_storage_enqueue_web_order(array $order): array
+{
+    $id = ya_storage_string($order['id'] ?? '');
+    $createdAt = ya_storage_string($order['createdAt'] ?? '');
+    if ($id === '' || strlen($id) > 180 || $createdAt === '' || !is_array($order['items'] ?? null)) {
+        throw new InvalidArgumentException('invalid_web_order_envelope');
+    }
+    // Store only transport fields. Pricing and checkout data have no authority here.
+    $items = array_map(static fn ($item) => is_array($item)
+        ? ['productId' => $item['productId'] ?? null, 'quantity' => $item['quantity'] ?? null]
+        : null, $order['items']);
+    $payload = ['id' => $id, 'items' => $items, 'createdAt' => $createdAt];
+    $database = ya_storage_open();
+    $statement = $database->prepare(<<<'SQL'
+        INSERT INTO web_orders (id, payload_json, created_at)
+        VALUES (:id, :payload_json, :created_at)
+        ON CONFLICT(id) DO NOTHING
+    SQL);
+    $statement->execute([
+        ':id' => $id,
+        ':payload_json' => ya_storage_encode($payload),
+        ':created_at' => $createdAt
+    ]);
+    if ($statement->rowCount() > 0) {
+        ya_storage_bump_revision($database, 'server_revision');
+    }
+    $stored = $database->prepare('SELECT seq, payload_json FROM web_orders WHERE id = :id');
+    $stored->execute([':id' => $id]);
+    return ya_storage_web_order_from_row($stored->fetch());
+}
+
+function ya_storage_web_order_from_row(mixed $row): array
+{
+    $payload = is_array($row) ? json_decode($row['payload_json'], true) : null;
+    if (!is_array($payload)) {
+        // Never silently skip an unreadable queue record and advance past it.
+        throw new RuntimeException('web_order_payload_invalid');
+    }
+    $payload['syncSeq'] = (int) $row['seq'];
+    return $payload;
+}
+
+function ya_storage_pull_web_orders(int $limit, int $afterSeq): array
+{
+    $limit = max(1, min($limit, 200));
+    $statement = ya_storage_open()->prepare(
+        'SELECT seq, payload_json FROM web_orders WHERE seq > :after_seq ORDER BY seq ASC LIMIT :limit'
+    );
+    $statement->bindValue(':after_seq', max(0, $afterSeq), PDO::PARAM_INT);
+    $statement->bindValue(':limit', $limit + 1, PDO::PARAM_INT);
+    $statement->execute();
+    $rows = $statement->fetchAll();
+    $hasMore = count($rows) > $limit;
+    $orders = array_map('ya_storage_web_order_from_row', array_slice($rows, 0, $limit));
+    return [
+        'orders' => $orders,
+        'next_cursor' => $orders === [] ? max(0, $afterSeq) : $orders[count($orders) - 1]['syncSeq'],
+        'has_more' => $hasMore
+    ];
+}
+
+function ya_storage_acknowledge_web_orders(string $clientId, int $throughSeq, string $now): array
+{
+    $database = ya_storage_open();
+    $database->exec('BEGIN IMMEDIATE');
+    try {
+        $throughSeq = max(0, min($throughSeq, (int) $database->query('SELECT COALESCE(MAX(seq), 0) FROM web_orders')->fetchColumn()));
+        $statement = $database->prepare(
+            "UPDATE web_orders SET imported_at = :now WHERE seq <= :seq AND imported_at = ''"
+        );
+        $statement->execute([':now' => $now, ':seq' => $throughSeq]);
+        $updated = $statement->rowCount();
+        $client = $database->prepare(<<<'SQL'
+            INSERT INTO sync_clients (client_id, client_type, web_order_ack_seq, last_seen_at)
+            VALUES (:client_id, 'desktop', :seq, :now)
+            ON CONFLICT(client_id) DO UPDATE SET
+              web_order_ack_seq = MAX(sync_clients.web_order_ack_seq, excluded.web_order_ack_seq),
+              last_seen_at = excluded.last_seen_at
+        SQL);
+        $clientId = ya_storage_normalize_client_id($clientId);
+        $client->execute([':client_id' => $clientId, ':seq' => $throughSeq, ':now' => $now]);
+        $cursor = $database->prepare('SELECT web_order_ack_seq FROM sync_clients WHERE client_id = :id');
+        $cursor->execute([':id' => $clientId]);
+        $acknowledged = (int) $cursor->fetchColumn();
+        if ($updated > 0) {
+            ya_storage_bump_revision($database, 'server_revision');
+        }
+        $database->exec('COMMIT');
+        return ['updated_count' => $updated, 'acknowledged_cursor' => $acknowledged];
+    } catch (Throwable $error) {
+        $database->exec('ROLLBACK');
+        throw $error;
+    }
 }
 
 function ya_storage_mark_requests_synced(array $requestIds, string $now): int
@@ -622,6 +720,14 @@ function ya_storage_create_schema(PDO $database): void
         );
         CREATE INDEX IF NOT EXISTS idx_web_requests_sync_seq ON web_requests(sync_status, seq);
 
+        CREATE TABLE IF NOT EXISTS web_orders (
+          seq INTEGER PRIMARY KEY AUTOINCREMENT,
+          id TEXT NOT NULL UNIQUE,
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          imported_at TEXT NOT NULL DEFAULT ''
+        );
+
         CREATE TABLE IF NOT EXISTS android_actions (
           seq INTEGER PRIMARY KEY AUTOINCREMENT,
           id TEXT NOT NULL UNIQUE,
@@ -667,6 +773,7 @@ function ya_storage_create_schema(PDO $database): void
           client_id TEXT PRIMARY KEY,
           client_type TEXT NOT NULL,
           request_ack_seq INTEGER NOT NULL DEFAULT 0,
+          web_order_ack_seq INTEGER NOT NULL DEFAULT 0,
           last_seen_at TEXT NOT NULL
         );
     SQL);
