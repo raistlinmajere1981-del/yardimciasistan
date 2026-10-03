@@ -96,6 +96,7 @@ export type VerificationSnapshot = {
   presets: string[];
   domains: string[];
   planCounts: Record<string, number>;
+  plans: Record<string, string[]>;
   checks: VerificationCheckSnapshot[];
   latest: VerificationReportSnapshot;
 };
