@@ -23,6 +23,16 @@ test("commerce orders depend only on the catalog foundation", () => {
   assert.equal(expanded.has(C.INVENTORY), false);
 });
 
+test("wholesale expands to customers and shared commerce orders", () => {
+  const expanded = new Set(expandBusinessCapabilities([C.WHOLESALE]));
+  assert.equal(expanded.has(C.WHOLESALE), true);
+  assert.equal(expanded.has(C.CUSTOMERS), true);
+  assert.equal(expanded.has(C.ORDERS), true);
+  assert.equal(expanded.has(C.CATALOG), true);
+  assert.equal(expanded.has(C.SALES), false);
+  assert.equal(expanded.has(C.INVENTORY), false);
+});
+
 test("invalid capability sets report missing prerequisites", () => {
   const violations = validateBusinessCapabilitySet([
     C.CATALOG,
