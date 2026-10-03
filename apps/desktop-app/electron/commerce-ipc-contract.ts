@@ -13,6 +13,7 @@ import type {
   CatalogProduct,
   CommerceOrder,
   CommerceOrderDetail,
+  CommerceOrderFulfillmentResult,
   CommerceResolvedUnitPrice,
   CommercePurchaseOrder,
   CommercePurchaseOrderDetail,
@@ -50,6 +51,7 @@ import type {
 import type {
   CreateCommerceOrderInput,
   InventoryCountResult,
+  FulfillCommerceOrderInput,
   ListCommerceOrdersOptions,
   ResolveCommerceProductPriceInput,
   UpdateCommerceOrderStatusInput
@@ -100,6 +102,7 @@ export interface DesktopCommerceBridge {
   getOrder: (orderId: string) => Promise<CommerceOrderDetail | null>;
   createOrder: (input: CreateCommerceOrderInput) => Promise<CommerceOrderDetail>;
   updateOrderStatus: (input: UpdateCommerceOrderStatusInput) => Promise<CommerceOrderDetail>;
+  fulfillOrder: (input: FulfillCommerceOrderInput) => Promise<CommerceOrderFulfillmentResult>;
   listCustomerCreditAccounts: (options?: ListCustomerCreditAccountsOptions) => Promise<CustomerCreditAccountSummary[]>;
   getCustomerCreditAccount: (customerId: string) => Promise<CustomerCreditAccountDetail>;
   prepareCustomerCreditWhatsApp: (input: PrepareCustomerCreditWhatsAppInput) => Promise<CustomerCreditWhatsAppPreparation>;
