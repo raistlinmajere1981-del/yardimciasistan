@@ -1,0 +1,299 @@
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import process from "node:process";
+import { chromium, expect } from "@playwright/test";
+import { createServer } from "vite";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
+
+const require = createRequire(import.meta.url);
+const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
+const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const {
+  applyRuntimeInventoryMovement,
+  createRuntimeOrder,
+  getRuntimeInventoryBalance,
+  getRuntimeOrder,
+  listRuntimeOrders,
+  resolveRuntimeProductPrice,
+  saveRuntimeCatalogProduct,
+  updateRuntimeOrderStatus
+} = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+
+const appPath = join(process.cwd(), "apps", "desktop-app");
+const dataDir = mkdtempSync(join(tmpdir(), "yardimci-wholesale-orders-ui-"));
+const database = new DesktopDatabase({ appPath, userDataPath: dataDir });
+
+let raw;
+let server;
+let browser;
+let page;
+
+const customerInput = {
+  fullName: "Bayi Sipariş Testi",
+  phone: "05550005001",
+  email: "",
+  notes: "",
+  tags: [],
+  identityType: "",
+  identityNumber: "",
+  nationality: "",
+  birthDate: "",
+  birthdayMessageEnabled: true,
+  gender: "",
+  documentSerialNumber: "",
+  documentExpiryDate: "",
+  birthPlace: "",
+  motherName: "",
+  fatherName: "",
+  issuingAuthority: "",
+  address: "",
+  commercialProfile: {
+    companyName: "Bayi Sipariş Test Ltd.",
+    taxOffice: "Cide",
+    taxNumber: "5555555555",
+    authorizedPerson: "Bayi Sipariş Testi",
+    dealerStatus: "active",
+    priceGroup: "dealer_a",
+    paymentTermDays: 30,
+    notes: ""
+  }
+};
+
+try {
+  database.initialize();
+  const setup = database.saveInitialSetup({
+    businessName: "Wholesale Orders UI Smoke",
+    profileId: "market",
+    profileOptions: [C.WHOLESALE],
+    phone: "",
+    whatsapp: "",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "wholesale-orders-ui-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: false },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setup.ok, true, setup.ok ? "" : setup.message);
+
+  const customer = database.saveCustomer(customerInput);
+  assert.equal(customer.ok, true, customer.ok ? "" : customer.message);
+
+  const product = saveRuntimeCatalogProduct(database.databasePath, {
+    name: "Bayi Ürünü",
+    sku: "BAYI-001",
+    barcode: "8690000050001",
+    salePrice: 100,
+    dealerPriceA: 80,
+    dealerPriceB: 70,
+    purchasePrice: 50,
+    currency: "TRY",
+    unit: "piece",
+    taxRate: 20,
+    trackInventory: true,
+    isActive: true
+  });
+
+  applyRuntimeInventoryMovement(database.databasePath, {
+    productId: product.id,
+    type: "purchase",
+    quantityDelta: 10,
+    unitCost: 50,
+    referenceType: "wholesale_orders_ui_smoke",
+    referenceId: "seed"
+  });
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, 10);
+
+  const dashboard = database.getDashboardData();
+  const savedCustomer = dashboard.customers.find((entry) => entry.id === customer.savedId);
+  assert.ok(savedCustomer?.commercialProfile);
+  assert.equal(savedCustomer.commercialProfile.priceGroup, "dealer_a");
+
+  raw = new DatabaseSync(database.databasePath);
+  const calls = [];
+
+  server = await createServer({
+    root: appPath,
+    configFile: join(appPath, "vite.renderer.config.ts"),
+    logLevel: "error",
+    server: { port: 0, host: "127.0.0.1", strictPort: false },
+    plugins: [{
+      name: "wholesale-orders-ui-smoke",
+      configureServer(instance) {
+        instance.middlewares.use("/wholesale-orders-ui-smoke", async (_request, response) => {
+          response.setHeader("Content-Type", "text/html");
+          response.end(await instance.transformIndexHtml(
+            "/wholesale-orders-ui-smoke",
+            `<!doctype html>
+              <html lang="tr" data-color-scheme="light" data-density="compact" data-accent="coral" data-font="plex" data-motion="system">
+                <head>
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <title>Wholesale orders UI smoke</title>
+                  <style>
+                    body { margin: 0; }
+                    .smoke-shell { height: 980px; padding: 20px; }
+                  </style>
+                </head>
+                <body>
+                  <div id="root"></div>
+                  <script type="module" src="/@fs/${join(process.cwd(), "scripts/fixtures/wholesale-orders-ui.tsx")}"></script>
+                </body>
+              </html>`
+          ));
+        });
+      }
+    }]
+  });
+  await server.listen();
+
+  browser = await launchChromiumForSmoke(chromium);
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1040 },
+    locale: "tr-TR"
+  });
+  page = await context.newPage();
+  page.setDefaultTimeout(10000);
+
+  const pageErrors = [];
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+    console.error(error.message);
+  });
+
+  await page.exposeFunction("__woCall", async (method, args) => {
+    calls.push({ method, args: structuredClone(args) });
+    if (method === "listOrders") return listRuntimeOrders(database.databasePath, args[0] ?? {});
+    if (method === "getOrder") return getRuntimeOrder(database.databasePath, args[0]);
+    if (method === "resolveProductPrice") return resolveRuntimeProductPrice(database.databasePath, args[0]);
+    if (method === "createOrder") return createRuntimeOrder(database.databasePath, args[0]);
+    if (method === "updateOrderStatus") return updateRuntimeOrderStatus(database.databasePath, args[0]);
+    throw new Error(`Unexpected wholesale orders bridge call: ${method}`);
+  });
+
+  await page.addInitScript((initial) => {
+    window.__woInitial = initial;
+  }, {
+    customers: [savedCustomer],
+    products: [product]
+  });
+
+  const port = server.httpServer.address().port;
+  await page.goto(`http://127.0.0.1:${port}/wholesale-orders-ui-smoke`, { timeout: 60000 });
+
+  const dealerSelect = page.getByLabel("Sipariş müşterisi", { exact: true });
+  await expect(dealerSelect).toBeVisible();
+  await dealerSelect.selectOption(customer.savedId);
+
+  await expect(page.getByText("Aktif bayi · Bayi A", { exact: true })).toBeVisible();
+
+  const productButton = page.getByRole("button", { name: /Bayi Ürünü/ });
+  await expect(productButton).toBeVisible();
+  await expect(productButton).toContainText("₺80");
+  await productButton.click();
+
+  const draftLines = page.locator(".market-order-lines");
+  await expect(draftLines).toContainText("Bayi Ürünü");
+  await expect(draftLines).toContainText("Bayi A");
+  await expect(draftLines).toContainText("₺80");
+
+  const quantityInput = page.getByLabel("Bayi Ürünü miktarı", { exact: true });
+  await expect(quantityInput).toHaveValue("1");
+  await page.getByRole("button", { name: "Bayi Ürünü miktarını artır", exact: true }).click();
+  await expect(quantityInput).toHaveValue("2");
+
+  await page.getByLabel("Sipariş notu", { exact: true }).fill("UI smoke bayi siparişi");
+  await expect(page.getByText("₺160", { exact: false })).toBeVisible();
+
+  await page.getByRole("button", { name: "Siparişi Kaydet", exact: true }).click();
+
+  await expect(page.locator(".market-order-card")).toHaveCount(1);
+  const detail = page.locator(".market-order-detail");
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText("Bayi Sipariş Testi");
+  await expect(detail).toContainText("Bayi Ürünü");
+  await expect(detail).toContainText("UI smoke bayi siparişi");
+  await expect(detail.getByText("Yeni", { exact: true })).toBeVisible();
+
+  const orderRow = raw.prepare(`
+    SELECT id, customer_id, status, source, subtotal, total
+    FROM commerce_orders
+    WHERE source = 'desktop-wholesale'
+    LIMIT 1
+  `).get();
+  assert.ok(orderRow?.id);
+  assert.equal(orderRow.customer_id, customer.savedId);
+  assert.equal(orderRow.status, "placed");
+  assert.equal(orderRow.source, "desktop-wholesale");
+  assert.equal(Number(orderRow.subtotal), 160);
+  assert.equal(Number(orderRow.total), 160);
+
+  const itemRow = raw.prepare(`
+    SELECT product_id, quantity, unit_price, line_total
+    FROM commerce_order_items
+    WHERE order_id = ?
+    LIMIT 1
+  `).get(orderRow.id);
+  assert.equal(itemRow.product_id, product.id);
+  assert.equal(Number(itemRow.quantity), 2);
+  assert.equal(Number(itemRow.unit_price), 80);
+  assert.equal(Number(itemRow.line_total), 160);
+
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, 10);
+  assert.equal(
+    Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_sales WHERE deleted_at = ''").get().count),
+    0
+  );
+
+  const resolveCalls = calls.filter((call) => call.method === "resolveProductPrice");
+  assert.equal(resolveCalls.length, 1);
+  assert.equal(resolveCalls[0].args[0].customerId, customer.savedId);
+  assert.equal(resolveCalls[0].args[0].productId, product.id);
+
+  const createCalls = calls.filter((call) => call.method === "createOrder");
+  assert.equal(createCalls.length, 1);
+  assert.equal(createCalls[0].args[0].source, "desktop-wholesale");
+  assert.deepEqual(createCalls[0].args[0].items, [{ productId: product.id, quantity: 2 }]);
+
+  await detail.getByRole("button", { name: "Siparişi Onayla", exact: true }).click();
+  await expect(detail.getByText("Onaylandı", { exact: true })).toBeVisible();
+
+  const confirmed = raw.prepare("SELECT status FROM commerce_orders WHERE id = ?").get(orderRow.id);
+  assert.equal(confirmed.status, "confirmed");
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, 10);
+  assert.equal(
+    Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_sales WHERE deleted_at = ''").get().count),
+    0
+  );
+
+  assert.deepEqual(pageErrors, []);
+  console.log("commerce-wholesale-orders-ui-smoke-ok");
+} catch (error) {
+  if (page) {
+    try {
+      console.error("UI at failure:", await page.locator("body").innerText());
+    } catch {}
+  }
+  throw error;
+} finally {
+  await browser?.close();
+  await server?.close();
+  raw?.close();
+  database.close();
+  rmSync(dataDir, { recursive: true, force: true });
+}
