@@ -391,14 +391,16 @@ export function clearProductImage(databasePath: string, productId: string): void
     database.close();
   }
 
-  if (!relativePath) return;
   try {
-    const absolutePath = resolveProductAssetAbsoluteFromRelative(path.dirname(databasePath), relativePath);
+    const dataRoot = path.dirname(databasePath);
+    const absolutePath = relativePath
+      ? resolveProductAssetAbsoluteFromRelative(dataRoot, relativePath)
+      : resolveProductAssetAbsolutePath(dataRoot, productId, "front.jpg");
     if (fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
       fs.unlinkSync(absolutePath);
     }
   } catch {
-    // The database reference is already cleared. Orphan cleanup is maintenance work.
+    // The database reference is already cleared; filesystem cleanup is best effort.
   }
 }
 
