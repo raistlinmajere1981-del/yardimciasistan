@@ -311,6 +311,46 @@ mevcut sipariş döner; müşteri/ürün/adet/not değişirse yeni taslak anahta
 Fiyat çözümü sürerken müşteri seçimi kilitlenir ve sonuç ayrıca istek yapılan müşteri
 kimliğiyle karşılaştırılır; eski müşterinin async sonucu yeni taslağa eklenemez.
 
+### C2a — Order fulfillment application service
+
+`fulfillCommerceOrder` shared `commerce.orders` aggregate'ı için kanal-bağımsız application
+operation'dır. Yalnız `confirmed` sipariş kabul eder. Renderer fiyat, satış toplamı veya
+sale item snapshot göndermez; servis `commerce_order_items` snapshot'ını otorite kabul eder.
+
+Tek `BEGIN IMMEDIATE` transaction içinde:
+
+1. idempotency / mevcut fulfillment kontrolü,
+2. order snapshot'tan `commerce_sales + commerce_sale_items`,
+3. etkinse aynı sale üzerinden stok hareketleri,
+4. settlement `credit` ise aynı transaction'da customer-credit debit entry,
+5. `commerce_order_fulfillments` bağlantı kaydı,
+6. order `fulfilled` geçişi
+
+yapılır. Herhangi biri hata verirse tamamı rollback olur.
+
+Settlement açık seçilir:
+
+- `paid` → cash/card/bank/other,
+- `credit` → yalnız `commerce.customer_credit` etkin ve order müşteriliyse,
+- `no_payment` → yalnız order toplamı tam olarak 0 ise.
+
+Ticari müşteri `paymentTermDays` alanı **otomatik veresiye kararı değildir**. Pozitif
+siparişte kullanıcı/kanal açıkça paid veya credit seçmelidir.
+
+Stok konumu input'ta opsiyoneldir; verilmezse mevcut commerce davranışı olan primary
+location kullanılır. İlk fulfillment UI'si location seçimi açmak zorunda değildir.
+
+`commerce_order_fulfillments` order, sale ve kararlı `operation_key` arasında ayrı
+ledger/link kaydıdır. Bugün bir order yalnız bir kez full-fulfill edilir; bağlantının ayrı
+tabloda olması ileride partial fulfillment ihtiyacında `commerce_orders` şemasına sale
+alanları gömmememizi sağlar.
+
+Mevcut Market/Hızlı Satış `paid` commerce sale oluştururken ayrıca `finance_entries`
+üretmediği için fulfillment da paid sale için yeni bir finance projection üretmez. Credit
+sale borcu customer-credit ledger'a gider; finance income ancak mevcut sistemde olduğu gibi
+gerçek tahsilat kaydı girildiğinde oluşur. Bu davranış ayrı bir finance standardizasyon
+işinden önce wholesale'a özel olarak değiştirilmemelidir.
+
 ### Stok sayımı kararı
 
 `count` bir UI delta girişi değildir. Kullanıcı gerçek fiziksel miktarı girer.
