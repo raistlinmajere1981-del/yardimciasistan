@@ -31,6 +31,7 @@ export const BUSINESS_CAPABILITIES = {
   CATALOG: "commerce.catalog",
   INVENTORY: "commerce.inventory",
   SALES: "commerce.sales",
+  ORDERS: "commerce.orders",
   CUSTOMER_CREDIT: "commerce.customer_credit",
 
   RETAIL_BARCODE: "retail.barcode",
@@ -76,6 +77,7 @@ export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability
 
   [C.INVENTORY]: [C.CATALOG],
   [C.SALES]: [C.CATALOG],
+  [C.ORDERS]: [C.CATALOG],
   [C.CUSTOMER_CREDIT]: [C.CUSTOMERS, C.SALES, C.FINANCE],
   [C.RETAIL_BARCODE]: [C.CATALOG],
   [C.RETAIL_PURCHASING]: [C.CATALOG, C.INVENTORY],
