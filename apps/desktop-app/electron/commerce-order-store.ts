@@ -335,7 +335,7 @@ export function createCommerceOrder(
 
       const note = String(input.note ?? "").trim().slice(0, 4000);
       const now = new Date().toISOString();
-      const orderId = createId("order_");
+      const orderId = createId("commerce_order_");
 
       database.prepare(`
         INSERT INTO commerce_orders (
@@ -368,7 +368,7 @@ export function createCommerceOrder(
       `);
       for (const item of preparedItems) {
         insertItem.run(
-          createId("order_item_"),
+          createId("commerce_order_item_"),
           orderId,
           item.productId,
           item.productName,
