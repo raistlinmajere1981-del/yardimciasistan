@@ -32,6 +32,7 @@ export const BUSINESS_CAPABILITIES = {
   INVENTORY: "commerce.inventory",
   SALES: "commerce.sales",
   ORDERS: "commerce.orders",
+  WHOLESALE: "commerce.wholesale",
   CUSTOMER_CREDIT: "commerce.customer_credit",
 
   RETAIL_BARCODE: "retail.barcode",
@@ -78,6 +79,7 @@ export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability
   [C.INVENTORY]: [C.CATALOG],
   [C.SALES]: [C.CATALOG],
   [C.ORDERS]: [C.CATALOG],
+  [C.WHOLESALE]: [C.CUSTOMERS, C.ORDERS],
   [C.CUSTOMER_CREDIT]: [C.CUSTOMERS, C.SALES, C.FINANCE],
   [C.RETAIL_BARCODE]: [C.CATALOG],
   [C.RETAIL_PURCHASING]: [C.CATALOG, C.INVENTORY],
@@ -145,7 +147,8 @@ const RETAIL_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
   C.RETAIL_PURCHASING,
   C.RETAIL_SUPPLIERS,
   C.RETAIL_LABELS,
-  C.CUSTOMER_CREDIT
+  C.CUSTOMER_CREDIT,
+  C.WHOLESALE
 ];
 
 const RETAIL_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
@@ -259,8 +262,8 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
   ),
   market: createBusinessProfile(
     "market",
-    "Market / Perakende",
-    "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için hazır profil.",
+    "Market / Perakende / Toptan",
+    "Ürün, barkod, stok, hızlı satış, tedarikçi, etiket ve opsiyonel bayi/toptan operasyonları için hazır profil.",
     RETAIL_REQUIRED_CAPABILITIES,
     uniqueCapabilities(COMMON_OPTIONAL_CAPABILITIES, RETAIL_OPTIONAL_CAPABILITIES),
     RETAIL_DEFAULT_OPTIONAL_CAPABILITIES
