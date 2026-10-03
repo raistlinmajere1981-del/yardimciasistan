@@ -8,7 +8,9 @@ import type {
   StockImageApplyLine,
   StockImageImportSource,
   ProductDataProviderId,
-  BusinessCapability
+  BusinessCapability,
+  type CustomerCommercialProfile,
+  type SaveCustomerCommercialProfileInput
 } from "@yardimci-asistan/shared";
 import type {
   AndroidDeviceRole,
@@ -136,6 +138,7 @@ export interface DesktopCustomer {
   fatherName: string;
   issuingAuthority: string;
   address: string;
+  commercialProfile: CustomerCommercialProfile | null;
   requestCount: number;
   reservationCount: number;
   stayCount: number;
@@ -739,6 +742,11 @@ export interface SaveCustomerInput {
   fatherName: string;
   issuingAuthority: string;
   address: string;
+  /**
+   * undefined = ticari profile dokunma; null = profili kaldır;
+   * object = aynı customer transaction'ında oluştur/güncelle.
+   */
+  commercialProfile?: SaveCustomerCommercialProfileInput | null;
 }
 
 export interface CreateStayFromReservationInput {
