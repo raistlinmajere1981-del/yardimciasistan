@@ -765,11 +765,11 @@ export default function App() {
     void loadOverview();
   }, [loadOverview]);
 
-  const statusText = useMemo(() => {
-    if (!data) return "Veri bekleniyor";
-    if (data.counts.errors > 0) return `${data.counts.errors} hata`;
-    if (data.counts.drift > 0) return `${data.counts.drift} dikkat`;
-    return "Sistemler stabil";
+  const sidebarState = useMemo(() => {
+    if (!data) return { text: "Veri bekleniyor", tone: "unknown" as StatusKind };
+    if (data.counts.errors > 0) return { text: `${data.counts.errors} hata`, tone: "error" as StatusKind };
+    if (data.counts.drift > 0) return { text: `${data.counts.drift} dikkat`, tone: "warning" as StatusKind };
+    return { text: "Sistemler stabil", tone: "ready" as StatusKind };
   }, [data]);
 
   return (
@@ -800,9 +800,9 @@ export default function App() {
         </nav>
 
         <div className="sidebar-status">
-          <span className="pulse-dot" />
+          <span className="pulse-dot" data-status={sidebarState.tone} />
           <div>
-            <strong>{statusText}</strong>
+            <strong>{sidebarState.text}</strong>
             <small>{data ? `${data.repo.branch} · ${data.repo.head}` : "Yerel durum okunuyor"}</small>
           </div>
         </div>
