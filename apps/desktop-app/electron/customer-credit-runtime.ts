@@ -230,15 +230,39 @@ function entryBase(businessId: string, customerId: string, now: string, note?: s
   };
 }
 
+export function recordCustomerCreditSaleInTransaction(
+  db: DatabaseSync,
+  businessId: string,
+  input: {
+    customerId: string;
+    sale: CommerceSale;
+    now: string;
+    note?: string;
+    source?: string;
+  }
+): CustomerCreditEntry {
+  const customer = requireCustomer(db, businessId, input.customerId);
+  return insertEntry(db, {
+    ...entryBase(businessId, customer.id, input.now, input.note, input.source),
+    direction: "debit",
+    entryType: "credit_sale",
+    saleId: input.sale.id,
+    amountMinor: moneyToMinor(input.sale.total),
+    currency: currencyCode(input.sale.currency)
+  });
+}
+
 export function createCustomerCreditSale(databasePath: string, input: CreateCustomerCreditSaleInput): CommerceSale {
   return withCreditDatabase(databasePath, true, (db, businessId) => {
     const customer = requireCustomer(db, businessId, input.customerId);
     const now = new Date().toISOString();
     const sale = createCommerceSaleInTransaction(db, input, "credit", now);
-    insertEntry(db, {
-      ...entryBase(businessId, customer.id, now, input.note, input.source),
-      direction: "debit", entryType: "credit_sale", saleId: sale.id,
-      amountMinor: moneyToMinor(sale.total), currency: currencyCode(sale.currency)
+    recordCustomerCreditSaleInTransaction(db, businessId, {
+      customerId: customer.id,
+      sale,
+      now,
+      note: input.note,
+      source: input.source
     });
     return sale;
   });
