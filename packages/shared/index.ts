@@ -26,6 +26,7 @@ export * from "./types/stock-image";
 export * from "./types/sync";
 export * from "./types/table";
 export * from "./types/whatsapp";
+export * from "./types/wholesale";
 export * from "./utils/date";
 export * from "./utils/birthday";
 export * from "./utils/barcode";
