@@ -38,6 +38,20 @@ Bugünkü konsol çöpe atılmayacaktır. Özellikle şu yüzeyler hedef mimarin
 Admin konsolu doğrulama, build, deploy veya support mantığını ikinci kez
 uygulamamalıdır. Var olan scriptleri ve registry'leri orkestre eder.
 
+### Güncel canonical operasyon kaynakları
+
+Admin geliştirmesi aşağıdaki kaynakları yeniden tanımlamamalıdır:
+
+- `config/installations.json` — committed installation metadata; URL/host/path ve yalnız credential referansı.
+- `config/credentials.local.json` — opsiyonel lokal credential backend; Git tarafından yok sayılır. Şema örneği `config/credentials.local.example.json`.
+- `product-version.json` — ürün, Android versionCode ve web modülü sürümünün canonical kaynağı.
+- `firm-template/web-module/api/version.php` — canlı kurulumdan public/salt-okunur ürün + web modülü sürümü.
+- `scripts/installation-config.mjs` — installation registry için stabil CLI okuyucu.
+
+Gerçek sync secret, API key, parola, token veya FTP/SSH credential değeri
+`config/installations.json` içine yazılmaz. Installation kaydı yalnız `credentialRef`
+taşır; credential backend bu referansı çözer.
+
 ## Hedef mimari
 
 UI ile iş mantığı ayrılmalıdır:
