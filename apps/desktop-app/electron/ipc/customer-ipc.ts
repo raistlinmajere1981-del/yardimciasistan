@@ -62,6 +62,9 @@ export function registerCustomerIpcHandlers(options: {
 
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    if (input.commercialProfile !== undefined) {
+      assertCapability(BUSINESS_CAPABILITIES.WHOLESALE, "Bayi / Toptan Satış bu işletmede etkin değil.");
+    }
     return finalizeCustomerMutation(getDatabase().saveCustomer(input));
   });
 
