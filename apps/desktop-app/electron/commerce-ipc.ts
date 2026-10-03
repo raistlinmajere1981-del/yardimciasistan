@@ -21,6 +21,7 @@ import {
   consumePendingMarketBarcodeScans,
   deleteRuntimeCatalogCategory,
   findRuntimeProductByBarcode,
+  fulfillRuntimeOrder,
   getCommerceRuntimeSnapshot,
   getRuntimeCatalogCategory,
   getRuntimeOrder,
