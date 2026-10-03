@@ -32,6 +32,9 @@ assert.match(
 );
 assert.match(workspace, /resolveProductPrice\(\{ productId: product\.id, customerId \}\)/);
 assert.match(workspace, /source:\s*"desktop-wholesale"/);
+assert.match(workspace, /sourceReference:\s*draftReferenceRef\.current/);
+assert.match(workspace, /customerIdRef\.current !== requestedCustomerId/);
+assert.match(workspace, /disabled=\{disabled \|\| Boolean\(resolvingProductId\)\}/);
 assert.match(workspace, /createOrder\(/);
 assert.match(workspace, /Siparişi Onayla/);
 assert.match(workspace, /Siparişi İptal Et/);
@@ -58,6 +61,8 @@ assert.match(preload, /resolveProductPrice:\s*\(input\) => invokeWhenUnlocked<Co
 assert.match(integratedSmoke, /Siparişi Kaydet/);
 assert.match(integratedSmoke, /Siparişi Onayla/);
 assert.match(integratedSmoke, /unit_price/);
+assert.match(integratedSmoke, /Simulated lost createOrder response/);
+assert.match(integratedSmoke, /Retrying the unchanged draft must reuse the same idempotency reference/);
 assert.match(integratedSmoke, /commerce_sales/);
 
 console.log("commerce-wholesale-orders-ui-contract-smoke-ok");
