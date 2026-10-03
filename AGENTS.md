@@ -37,6 +37,24 @@ Rules:
 
 See the current architecture documents and feature guide for details.
 
+## Admin console
+
+Before changing or extending `tools/admin/`, read:
+
+- `docs/dev/ADMIN_CONSOLE_TARGET.md`
+
+Rules:
+
+- Treat the existing TUI as a working surface to evolve, not disposable prototype code.
+- Keep admin UI separate from installation, credential, health, release and deployment logic so a future UI can reuse the same core.
+- Do not create a second verification system. Repository checks remain owned by `scripts/verification-registry.mjs` and `scripts/verify.mjs`; admin only orchestrates them.
+- Do not move build/deploy business logic into menu code when an existing script already owns it.
+- Installation metadata and secret values are separate concerns. Registry/config committed to Git must never contain sync secrets, API keys, passwords or tokens.
+- Model absent configuration as `unconfigured`/disabled where appropriate; do not report a clean installation as broken merely because optional web/service credentials are not set yet.
+- Preserve explicit preflight, impact and confirmation semantics for destructive or remote-changing tasks.
+- Prefer installation/profile-driven behavior over adding new customer/site-specific branches to the main menu.
+- The planned admin-console expansion is broad enough to develop on a focused branch when implementation begins; documentation-only maintenance may remain on the normal mainline.
+
 ## Architecture
 
 ### Electron main process
