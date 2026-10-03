@@ -17,6 +17,8 @@ export interface ProductFormState {
   barcode: string;
   description: string;
   salePrice: string;
+  dealerPriceA: string;
+  dealerPriceB: string;
   purchasePrice: string;
   currency: string;
   unit: CommerceUnit;
@@ -54,6 +56,8 @@ export function emptyProductForm(inventoryEnabled = true): ProductFormState {
     barcode: "",
     description: "",
     salePrice: "",
+    dealerPriceA: "",
+    dealerPriceB: "",
     purchasePrice: "",
     currency: "TRY",
     unit: "piece",
@@ -85,6 +89,8 @@ export function toProductForm(
     barcode: product.barcode,
     description: product.description,
     salePrice: formatMajorToInput(product.salePrice),
+    dealerPriceA: product.dealerPriceA == null ? "" : formatMajorToInput(product.dealerPriceA),
+    dealerPriceB: product.dealerPriceB == null ? "" : formatMajorToInput(product.dealerPriceB),
     purchasePrice: formatMajorToInput(product.purchasePrice),
     currency: product.currency,
     unit: product.unit,
@@ -105,6 +111,11 @@ export function toProductForm(
 export function validateProductFormPrices(form: ProductFormState): string | null {
   const salePrice = parseMoneyToMajor(form.salePrice);
   if (salePrice === null || salePrice < 0) return "Satış fiyatı için geçerli bir tutar girin (örn. 125,50).";
+  for (const [label, value] of [["Bayi A", form.dealerPriceA], ["Bayi B", form.dealerPriceB]] as const) {
+    if (!value.trim()) continue;
+    const dealerPrice = parseMoneyToMajor(value);
+    if (dealerPrice === null || dealerPrice < 0) return `${label} fiyatı için geçerli bir tutar girin veya alanı boş bırakın.`;
+  }
   const purchasePrice = parseMoneyToMajor(form.purchasePrice);
   if (purchasePrice === null || purchasePrice < 0) return "Alış fiyatı için geçerli bir tutar girin (örn. 125,50).";
   return null;
@@ -120,6 +131,8 @@ export function productFormToSaveInput(form: ProductFormState) {
     barcode: normalizeBarcodeIdentity(form.barcode, 80),
     description: form.description,
     salePrice: parseMoneyToMajor(form.salePrice) ?? 0,
+    dealerPriceA: form.dealerPriceA.trim() ? parseMoneyToMajor(form.dealerPriceA) : null,
+    dealerPriceB: form.dealerPriceB.trim() ? parseMoneyToMajor(form.dealerPriceB) : null,
     purchasePrice: parseMoneyToMajor(form.purchasePrice) ?? 0,
     currency: form.currency,
     unit: form.unit,
