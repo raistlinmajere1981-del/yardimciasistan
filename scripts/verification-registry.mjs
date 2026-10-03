@@ -30,6 +30,7 @@ const SMOKE_FILES = [
   "scripts/smoke-commerce-wholesale-pricing-ui-contract.mjs",
   "scripts/smoke-commerce-wholesale-order-flow.mjs",
   "scripts/smoke-commerce-wholesale-orders-ui-contract.mjs",
+  "scripts/smoke-commerce-wholesale-orders-ui.mjs",
   "scripts/smoke-commerce-ipc-contract.mjs",
   "scripts/smoke-commerce-runtime.mjs",
   "scripts/smoke-customer-room-management-db.mjs",
