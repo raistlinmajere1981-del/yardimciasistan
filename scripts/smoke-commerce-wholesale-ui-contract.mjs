@@ -31,7 +31,7 @@ for (const label of [
   "Vergi dairesi",
   "Vergi no",
   "Bayi durumu",
-  "Ödeme vadesi \(gün\)",
+  "Ödeme vadesi \\(gün\\)",
   "Ticari not"
 ]) {
   assert.match(commercialFieldsSource, new RegExp(label));
