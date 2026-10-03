@@ -1,8 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
-import type {
-  CommercePriceGroup,
-  CommerceResolvedUnitPrice
+import {
+  BUSINESS_CAPABILITIES,
+  type CommercePriceGroup,
+  type CommerceResolvedUnitPrice
 } from "@yardimci-asistan/shared";
+import { readBusinessCapabilitySnapshot } from "./business-capability-store.js";
 
 export interface ResolveCommerceProductPriceInput {
   productId: string;
@@ -40,7 +42,9 @@ export function resolveCommerceProductPrice(
   const database = openDatabase(databasePath);
   try {
     const businessId = activeBusinessId(database);
-    return resolveCommerceProductPriceInDatabase(database, businessId, input);
+    const wholesaleEnabled = readBusinessCapabilitySnapshot(databasePath)
+      .enabledCapabilities.includes(BUSINESS_CAPABILITIES.WHOLESALE);
+    return resolveCommerceProductPriceInDatabase(database, businessId, input, wholesaleEnabled);
   } finally {
     database.close();
   }
@@ -49,7 +53,8 @@ export function resolveCommerceProductPrice(
 export function resolveCommerceProductPriceInDatabase(
   database: DatabaseSync,
   businessId: string,
-  input: ResolveCommerceProductPriceInput
+  input: ResolveCommerceProductPriceInput,
+  wholesaleEnabled = true
 ): CommerceResolvedUnitPrice {
   const productId = String(input.productId ?? "").trim();
   if (!productId) throw new Error("Fiyat çözümleme için ürün gerekli.");
@@ -87,7 +92,7 @@ export function resolveCommerceProductPriceInDatabase(
     requestedGroup = storedGroup === "dealer_a" || storedGroup === "dealer_b"
       ? storedGroup
       : "retail";
-    dealerEligible = String(customer.dealer_status ?? "") === "active";
+    dealerEligible = wholesaleEnabled && String(customer.dealer_status ?? "") === "active";
   }
 
   const salePrice = roundMoney(Number(product.sale_price ?? 0));
