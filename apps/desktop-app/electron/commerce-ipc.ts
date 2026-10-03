@@ -236,6 +236,9 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:order:updateStatus", (_event, input: Parameters<DesktopCommerceBridge["updateOrderStatus"]>[0]) =>
     mutateForIpc("commerce:order:updateStatus", () => updateRuntimeOrderStatus(databasePath(), input))
   );
+  ipcMain.handle("commerce:order:fulfill", (_event, input: Parameters<DesktopCommerceBridge["fulfillOrder"]>[0]) =>
+    mutateForIpc("commerce:order:fulfill", () => fulfillRuntimeOrder(databasePath(), input))
+  );
 
   ipcMain.handle("commerce:customerCredit:list", (_event, input: Parameters<DesktopCommerceBridge["listCustomerCreditAccounts"]>[0]) =>
     read(() => listCustomerCreditAccounts(databasePath(), input))
