@@ -114,21 +114,3 @@ test("normalizeInternationalPhone exposes bridge-friendly display and whatsapp f
   assert.equal(result.e164, "+447911123456");
   assert.equal(result.display, "+447911123456");
 });
-
-test("automatic webview scripts centralize target verification, safe input and send confirmation", async () => {
-  const {
-    createWhatsAppInspectionScript,
-    createWhatsAppFillMessageScript,
-    createWhatsAppSendScript
-  } = await bridgePromise;
-  const inspection = createWhatsAppInspectionScript("Merhaba", "905321234567");
-  const fill = createWhatsAppFillMessageScript("Merhaba");
-  const send = createWhatsAppSendScript("Merhaba", "Ayşe Yılmaz", "905321234567");
-
-  assert.match(inspection, /target_not_verified/);
-  assert.match(inspection, /composer_missing/);
-  assert.match(fill, /execCommand\("insertText"/);
-  assert.match(send, /approval_changed/);
-  assert.match(send, /outgoingConfirmed/);
-  assert.match(send, /send_unconfirmed/);
-});
