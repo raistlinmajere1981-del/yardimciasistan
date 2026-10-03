@@ -3,12 +3,20 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import type {
   CredentialStatus,
+  HealthCheckSnapshot,
   InstallationSnapshot,
   OverviewSnapshot,
   ProductSnapshot,
   RepoSnapshot,
   StatusKind
 } from "../../shared/contracts";
+
+type DeployRecord = {
+  type?: string;
+  host?: string;
+  remoteRoot?: string;
+  storageRoot?: string;
+};
 
 type InstallationRecord = {
   id?: string;
@@ -19,6 +27,7 @@ type InstallationRecord = {
   webModuleUrl?: string;
   versionEndpoint?: string;
   credentialRef?: string;
+  deploy?: DeployRecord;
 };
 
 type InstallationRegistry = {
@@ -97,20 +106,86 @@ function getCredentialStatus(repoRoot: string, credentialRef: string | null): Cr
   }
 }
 
-async function getLiveWebVersion(
-  endpoint: string | null,
-  expectedVersion: string | null
-): Promise<{ version: string | null; status: StatusKind; note: string }> {
-  if (!endpoint) {
+async function probeUrl(url: string | null): Promise<HealthCheckSnapshot> {
+  if (!url) {
     return {
-      version: null,
-      status: "unknown",
-      note: "Bu kurulum için sürüm endpoint'i tanımlı değil."
+      id: "site",
+      label: "Site erişimi",
+      status: "unconfigured",
+      detail: "Site adresi tanımlı değil.",
+      durationMs: null
     };
   }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4500);
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "text/html,application/json;q=0.9,*/*;q=0.8" },
+      redirect: "follow",
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    const durationMs = Date.now() - startedAt;
+
+    if (!response.ok) {
+      return {
+        id: "site",
+        label: "Site erişimi",
+        status: "error",
+        detail: `HTTP ${response.status}`,
+        durationMs
+      };
+    }
+
+    return {
+      id: "site",
+      label: "Site erişimi",
+      status: "ready",
+      detail: `HTTP ${response.status}`,
+      durationMs
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      id: "site",
+      label: "Site erişimi",
+      status: "error",
+      detail: `Erişilemedi: ${reason}`,
+      durationMs: Date.now() - startedAt
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function getLiveWebVersion(
+  endpoint: string | null,
+  expectedVersion: string | null
+): Promise<{
+  version: string | null;
+  check: HealthCheckSnapshot;
+}> {
+  if (!endpoint) {
+    return {
+      version: null,
+      check: {
+        id: "version",
+        label: "Canlı web sürümü",
+        status: "unconfigured",
+        detail: "Bu kurulum tipi için sürüm endpoint'i tanımlı değil.",
+        durationMs: null
+      }
+    };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4500);
+  const startedAt = Date.now();
 
   try {
     const response = await fetch(endpoint, {
@@ -120,11 +195,18 @@ async function getLiveWebVersion(
       signal: controller.signal
     });
 
+    const durationMs = Date.now() - startedAt;
+
     if (!response.ok) {
       return {
         version: null,
-        status: "error",
-        note: `Sürüm endpoint'i HTTP ${response.status} döndürdü.`
+        check: {
+          id: "version",
+          label: "Canlı web sürümü",
+          status: "error",
+          detail: `HTTP ${response.status}`,
+          durationMs
+        }
       };
     }
 
@@ -139,35 +221,117 @@ async function getLiveWebVersion(
     if (!version) {
       return {
         version: null,
-        status: "error",
-        note: "Canlı sürüm yanıtı geçerli değil."
+        check: {
+          id: "version",
+          label: "Canlı web sürümü",
+          status: "error",
+          detail: "Sürüm yanıtı geçerli değil.",
+          durationMs
+        }
       };
     }
 
     if (expectedVersion && version !== expectedVersion) {
       return {
         version,
-        status: "warning",
-        note: `Canlı web ${version}; beklenen ${expectedVersion}.`
+        check: {
+          id: "version",
+          label: "Canlı web sürümü",
+          status: "warning",
+          detail: `Canlı ${version} · beklenen ${expectedVersion}`,
+          durationMs
+        }
       };
     }
 
     return {
       version,
-      status: "ready",
-      note: "Canlı web sürümü beklenen sürümle uyumlu."
+      check: {
+        id: "version",
+        label: "Canlı web sürümü",
+        status: "ready",
+        detail: expectedVersion ? `v${version} · beklenen sürümle uyumlu` : `v${version}`,
+        durationMs
+      }
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
 
     return {
       version: null,
-      status: "error",
-      note: `Canlı sürüm okunamadı: ${reason}`
+      check: {
+        id: "version",
+        label: "Canlı web sürümü",
+        status: "error",
+        detail: `Okunamadı: ${reason}`,
+        durationMs: Date.now() - startedAt
+      }
     };
   } finally {
     clearTimeout(timer);
   }
+}
+
+function credentialCheck(status: CredentialStatus, credentialRef: string | null): HealthCheckSnapshot {
+  if (!credentialRef) {
+    return {
+      id: "credential",
+      label: "Credential kaydı",
+      status: "unconfigured",
+      detail: "Credential referansı yok.",
+      durationMs: null
+    };
+  }
+
+  if (status === "configured") {
+    return {
+      id: "credential",
+      label: "Credential kaydı",
+      status: "ready",
+      detail: `${credentialRef} · lokal kayıt mevcut`,
+      durationMs: null
+    };
+  }
+
+  if (status === "unreadable") {
+    return {
+      id: "credential",
+      label: "Credential kaydı",
+      status: "error",
+      detail: `${credentialRef} · lokal kayıt okunamadı`,
+      durationMs: null
+    };
+  }
+
+  return {
+    id: "credential",
+    label: "Credential kaydı",
+    status: "unconfigured",
+    detail: `${credentialRef} · lokal kayıt yok`,
+    durationMs: null
+  };
+}
+
+function deriveInstallationStatus(
+  siteCheck: HealthCheckSnapshot,
+  versionCheck: HealthCheckSnapshot
+): { status: StatusKind; note: string } {
+  const operational = [siteCheck, versionCheck].filter((check) => check.status !== "unconfigured");
+
+  const error = operational.find((check) => check.status === "error");
+  if (error) return { status: "error", note: `${error.label}: ${error.detail}` };
+
+  const warning = operational.find((check) => check.status === "warning");
+  if (warning) return { status: "warning", note: `${warning.label}: ${warning.detail}` };
+
+  if (operational.some((check) => check.status === "ready")) {
+    return { status: "ready", note: "Temel canlı kontroller sağlıklı." };
+  }
+
+  return {
+    status: "unconfigured",
+    note: "Bu kurulum için henüz canlı health kontrolü yapılandırılmamış."
+  };
 }
 
 async function getInstallations(
@@ -179,23 +343,39 @@ async function getInstallations(
 
   return Promise.all(entries.map(async ([key, record]) => {
     const credentialRef = record.credentialRef?.trim() || null;
+    const credentialStatus = getCredentialStatus(repoRoot, credentialRef);
     const endpoint = record.versionEndpoint?.trim() || null;
+    const siteUrl = record.siteUrl?.trim() || record.publicUrl?.trim() || null;
     const expectedWebVersion = endpoint ? product.webModuleVersion : null;
-    const live = await getLiveWebVersion(endpoint, expectedWebVersion);
+
+    const [siteCheck, live] = await Promise.all([
+      probeUrl(siteUrl),
+      getLiveWebVersion(endpoint, expectedWebVersion)
+    ]);
+
+    const state = deriveInstallationStatus(siteCheck, live.check);
 
     return {
       id: record.id?.trim() || key,
       title: record.title?.trim() || key,
       kind: record.kind?.trim() || "unknown",
-      siteUrl: record.siteUrl?.trim() || record.publicUrl?.trim() || null,
+      siteUrl,
       webModuleUrl: record.webModuleUrl?.trim() || null,
       versionEndpoint: endpoint,
       credentialRef,
-      credentialStatus: getCredentialStatus(repoRoot, credentialRef),
+      credentialStatus,
       expectedWebVersion,
       liveWebVersion: live.version,
-      status: live.status,
-      statusNote: live.note
+      deployType: record.deploy?.type?.trim() || null,
+      deployHost: record.deploy?.host?.trim() || null,
+      deployTarget: record.deploy?.remoteRoot?.trim() || record.deploy?.storageRoot?.trim() || null,
+      status: state.status,
+      statusNote: state.note,
+      healthChecks: [
+        siteCheck,
+        live.check,
+        credentialCheck(credentialStatus, credentialRef)
+      ]
     };
   }));
 }
