@@ -1,4 +1,4 @@
-import { Image as ImageIcon, Sparkles } from "lucide-react";
+import { Image as ImageIcon, Sparkles, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   normalizeBarcodeIdentity,
@@ -31,6 +31,9 @@ export function ProductFormFields({
   localImageDataUrl = "",
   lookupSeed = null,
   onLookupSeedLoaded,
+  onManualImageSelected,
+  onImageClear,
+  onExternalImageSelected,
   onChange,
   onStateChange
 }: {
@@ -44,6 +47,9 @@ export function ProductFormFields({
   localImageDataUrl?: string;
   lookupSeed?: ProductLookupSeed | null;
   onLookupSeedLoaded?: (requestId: number) => void;
+  onManualImageSelected?: (dataUrl: string) => void;
+  onImageClear?: () => void;
+  onExternalImageSelected?: () => void;
   onChange: (form: ProductFormState) => void;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
@@ -52,6 +58,7 @@ export function ProductFormFields({
   const [previewDataUrl, setPreviewDataUrl] = useState(localImageDataUrl);
   const [previewLoading, setPreviewLoading] = useState(false);
   const loadedSeedId = useRef<number | null>(null);
+  const manualImageInputRef = useRef<HTMLInputElement | null>(null);
   const beginPreviewRequest = useRequestGeneration();
   const beginLookupRequest = useRequestGeneration();
   const showDetails = mode === "all" || mode === "details";
@@ -83,13 +90,61 @@ export function ProductFormFields({
     if (!lookupSeed || loadedSeedId.current === lookupSeed.requestId) return;
     loadedSeedId.current = lookupSeed.requestId;
     onChange(applyProductLookupCandidate(form, lookupSeed.product, categories));
+    if (lookupSeed.product.imageUrl) onExternalImageSelected?.();
     void previewExternal(lookupSeed.product);
     onLookupSeedLoaded?.(lookupSeed.requestId);
     onStateChange(
       "success",
       `${lookupSeed.product.name} bilgileri Open Food Facts'tan bulundu. Satış fiyatı ve diğer yerel alanları kontrol edip kaydedin.`
     );
-  }, [categories, form, lookupSeed, onChange, onLookupSeedLoaded, onStateChange, previewExternal]);
+  }, [categories, form, lookupSeed, onChange, onExternalImageSelected, onLookupSeedLoaded, onStateChange, previewExternal]);
+
+  async function readManualImage(file: File) {
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!allowedTypes.has(file.type)) {
+      onStateChange("error", "Ürün görseli JPEG, PNG veya WEBP olmalı.");
+      return;
+    }
+    if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
+      onStateChange("error", "Ürün görseli en fazla 5 MB olabilir.");
+      return;
+    }
+
+    const isCurrent = beginPreviewRequest();
+    setPreviewLoading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Ürün görseli okunamadı."));
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.readAsDataURL(file);
+      });
+      if (!isCurrent()) return;
+      if (!dataUrl.startsWith("data:image/")) {
+        onStateChange("error", "Ürün görseli okunamadı.");
+        return;
+      }
+      setPreviewDataUrl(dataUrl);
+      onManualImageSelected?.(dataUrl);
+      onChange({ ...form, imageSourceUrl: "", imageLicense: "" });
+      onStateChange("success", "Manuel ürün görseli seçildi. Kaydettiğinizde ürün kartına eklenecek.");
+    } catch (error) {
+      if (isCurrent()) {
+        onStateChange("error", error instanceof Error ? error.message : "Ürün görseli okunamadı.");
+      }
+    } finally {
+      if (isCurrent()) setPreviewLoading(false);
+    }
+  }
+
+  function clearImage() {
+    beginPreviewRequest();
+    setPreviewLoading(false);
+    setPreviewDataUrl("");
+    onImageClear?.();
+    onChange({ ...form, imageSourceUrl: "", imageLicense: "" });
+    onStateChange("success", "Ürün görseli temizlendi. Kaydettiğinizde değişiklik uygulanacak.");
+  }
 
   async function lookupProductInfo() {
     if (!bridge || !form.barcode.trim() || lookupBusy) return;
@@ -116,6 +171,7 @@ export function ProductFormFields({
         return;
       }
       onChange(applyProductLookupCandidate(nextBase, result.product, categories));
+      if (result.product.imageUrl) onExternalImageSelected?.();
       await previewExternal(result.product);
       if (isCurrent()) onStateChange("success", `${result.product.name} bilgileri bulundu.`);
     } catch (error) {
@@ -168,6 +224,35 @@ export function ProductFormFields({
           <ImageIcon size={28} aria-hidden="true" />
           <span>{previewLoading ? "Ürün görseli yükleniyor…" : form.imageSourceUrl ? "Görsel önizlenemedi; ürün kaydedildiğinde yeniden arşivleme denenecek." : "Ürün görseli yok"}</span>
         </div>}
+      </div>
+      <div className="action-row market-product-image-actions">
+        <input
+          ref={manualImageInputRef}
+          hidden
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void readManualImage(file);
+          }}
+        />
+        <ActionButton
+          variant="secondary"
+          type="button"
+          disabled={disabled || previewLoading}
+          onClick={() => manualImageInputRef.current?.click()}
+        >
+          <Upload size={15} aria-hidden="true" /> Görsel Ekle / Değiştir
+        </ActionButton>
+        <ActionButton
+          variant="secondary"
+          type="button"
+          disabled={disabled || previewLoading || (!previewDataUrl && !form.imageSourceUrl && !localImageDataUrl)}
+          onClick={clearImage}
+        >
+          <Trash2 size={15} aria-hidden="true" /> Görseli Temizle
+        </ActionButton>
       </div>
       {form.dataSource && <aside className="market-product-source">
         <strong>Ürün verisi: {productProviderLabel(form.dataSource)}</strong>
