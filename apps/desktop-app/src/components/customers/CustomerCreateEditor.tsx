@@ -17,6 +17,7 @@ type SaveMode = "close" | "continue";
 interface CustomerCreateEditorProps {
   open: boolean;
   aiEnabled: boolean;
+  wholesaleEnabled?: boolean;
   withinWorkspace?: boolean;
   onClose: () => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
@@ -27,6 +28,7 @@ interface CustomerCreateEditorProps {
 export function CustomerCreateEditor({
   open,
   aiEnabled,
+  wholesaleEnabled = false,
   withinWorkspace = false,
   onClose,
   onSave,
@@ -57,7 +59,7 @@ export function CustomerCreateEditor({
 
   async function saveCustomer(mode: SaveMode) {
     setSaveState("loading");
-    const result = await onSave(customerFormToInput(form));
+    const result = await onSave(customerFormToInput(form, wholesaleEnabled));
     if (!result.ok) {
       setSaveState("error");
       return;
@@ -79,6 +81,7 @@ export function CustomerCreateEditor({
       key={formRevision}
       form={form}
       aiEnabled={aiEnabled}
+      wholesaleEnabled={wholesaleEnabled}
       onChange={setForm}
       onAnalyzeIdentity={onAnalyzeIdentity}
     />
