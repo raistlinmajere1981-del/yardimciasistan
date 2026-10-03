@@ -326,6 +326,24 @@ CREATE TABLE customers (
   CHECK (identity_type IN ('', 'tc_identity_card', 'passport', 'other')), identity_number TEXT NOT NULL DEFAULT '', nationality TEXT NOT NULL DEFAULT '', birth_date TEXT NOT NULL DEFAULT '', gender TEXT NOT NULL DEFAULT ''
   CHECK (gender IN ('', 'female', 'male', 'unspecified')), document_serial_number TEXT NOT NULL DEFAULT '', document_expiry_date TEXT NOT NULL DEFAULT '', birth_place TEXT NOT NULL DEFAULT '', mother_name TEXT NOT NULL DEFAULT '', father_name TEXT NOT NULL DEFAULT '', issuing_authority TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', business_id TEXT REFERENCES business(id));
 
+CREATE TABLE customer_commercial_profiles (
+  customer_id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL,
+  company_name TEXT NOT NULL,
+  tax_office TEXT NOT NULL DEFAULT '',
+  tax_number TEXT NOT NULL DEFAULT '',
+  authorized_person TEXT NOT NULL DEFAULT '',
+  dealer_status TEXT NOT NULL DEFAULT 'candidate'
+    CHECK (dealer_status IN ('candidate', 'active', 'inactive')),
+  payment_term_days INTEGER NOT NULL DEFAULT 0
+    CHECK (payment_term_days BETWEEN 0 AND 3650),
+  notes TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+  FOREIGN KEY (business_id) REFERENCES business(id) ON DELETE CASCADE
+);
+
 CREATE TABLE daily_tasks (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -1014,6 +1032,13 @@ CREATE INDEX idx_customer_credit_last_payment
 
 CREATE UNIQUE INDEX idx_customer_credit_sale_unique
   ON customer_credit_entries(business_id, sale_id) WHERE entry_type = 'credit_sale';
+
+CREATE INDEX idx_customer_commercial_profiles_status
+  ON customer_commercial_profiles (business_id, dealer_status, company_name);
+
+CREATE UNIQUE INDEX idx_customer_commercial_profiles_tax_number
+  ON customer_commercial_profiles (business_id, tax_number)
+  WHERE tax_number != '';
 
 CREATE INDEX idx_customer_room_stays_customer
   ON customer_room_stays(customer_id, check_in_date DESC, created_at DESC);
