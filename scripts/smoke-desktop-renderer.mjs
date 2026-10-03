@@ -500,10 +500,10 @@ try {
   await androidDeviceSection.getByRole("button", { name: "Kaldır" }).click();
   await expect(page.locator(".confirm-dialog")).toContainText("android-smok…ce-001");
   await page.locator(".confirm-dialog").getByRole("button", { name: "Sil", exact: true }).click();
-  const managedAndroidDeviceList = androidDeviceSection.locator(".android-device-list:not(.android-install-device-list)");
-  await expect(managedAndroidDeviceList).toHaveCount(0);
-  await expect(androidDeviceSection.locator(".android-install-device-list")).toHaveCount(1);
-  await expect(androidDeviceSection.getByText("0 cihaz", { exact: true })).toBeVisible();
+  const androidDeviceList = androidDeviceSection.locator(".android-device-list");
+  await expect(androidDeviceList.locator(".android-device-card")).toHaveCount(1);
+  await expect(androidDeviceList.getByText("Smoke Personel Telefonu", { exact: true })).toHaveCount(0);
+  await expect(androidDeviceSection.getByText("0 kayıtlı", { exact: true })).toBeVisible();
   const removedDevices = androidDeviceSection.locator(".android-removed-devices");
   await expect(removedDevices.getByText("Kaldırılan cihazlar", { exact: true })).toBeVisible();
   await removedDevices.locator("summary").click();
@@ -513,10 +513,10 @@ try {
   await expect(page.locator(".confirm-dialog")).toContainText("android-smok…ce-001");
   await expect(page.locator(".confirm-dialog")).toContainText("Yönetici rolü");
   await page.locator(".confirm-dialog").getByRole("button", { name: "Geri Yükle", exact: true }).click();
-  await expect(managedAndroidDeviceList.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
-  await expect(managedAndroidDeviceList.getByText("Yönetici", { exact: true })).toBeVisible();
+  await expect(androidDeviceList.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
+  await expect(androidDeviceList.getByText("Yönetici", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Etkin yeteneklerde tüm izinler", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText("1 cihaz", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText("1 kayıtlı", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-removed-devices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Kaydet", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Güncelleme Ayarlarını Kaydet", exact: true })).toHaveCount(0);
