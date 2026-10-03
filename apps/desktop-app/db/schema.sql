@@ -1329,6 +1329,30 @@ BEGIN
   ) WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER trg_customer_commercial_profile_insert_guard
+BEFORE INSERT ON customer_commercial_profiles
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM customers
+    WHERE id = NEW.customer_id
+      AND business_id = NEW.business_id
+      AND deleted_at = ''
+  ) THEN RAISE(ABORT, 'Ticari profil aktif müşteri ve işletmeyle eşleşmiyor.') END;
+END;
+
+CREATE TRIGGER trg_customer_commercial_profile_update_guard
+BEFORE UPDATE OF customer_id, business_id ON customer_commercial_profiles
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM customers
+    WHERE id = NEW.customer_id
+      AND business_id = NEW.business_id
+      AND deleted_at = ''
+  ) THEN RAISE(ABORT, 'Ticari profil aktif müşteri ve işletmeyle eşleşmiyor.') END;
+END;
+
 CREATE TRIGGER trg_customer_credit_customer_deletion
 BEFORE UPDATE OF deleted_at ON customers
 WHEN NEW.deleted_at != '' AND EXISTS (
