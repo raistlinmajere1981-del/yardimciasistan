@@ -27,7 +27,7 @@ function fixture() {
   mkdirSync(join(root, "test-site", "landing", "assets"), { recursive: true });
   writeFileSync(
     join(root, "test-site", "landing", "assets", "index-fixture.js"),
-    'kr="0.1.0".trim()||"0.1.0",Xr=""||\`/downloads/YardimciAsistan-Setup-\${kr}.exe\`,wr="0.1.0".trim()||"0.1.0",Jy=""||\`/downloads/YardimciAsistan-Android-\${wr}.apk\`;'
+    'kr="0.1.0".trim()||"0.1.0",Xr=""||`/downloads/YardimciAsistan-Setup-${kr}.exe`,wr="0.1.0".trim()||"0.1.0",Jy=""||`/downloads/YardimciAsistan-Android-${wr}.apk`;'
   );
   return root;
 }
