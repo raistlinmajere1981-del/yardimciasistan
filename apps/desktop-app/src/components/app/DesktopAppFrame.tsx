@@ -325,6 +325,7 @@ function DesktopAppFrameContent({
             products: marketController.products,
             categories: marketController.categories,
             inventoryEnabled,
+            wholesaleEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHOLESALE),
             productDataEnabled: marketController.productDataEnabled,
             busy: marketController.dataState === "loading",
             onReload: marketController.reloadCatalog,
