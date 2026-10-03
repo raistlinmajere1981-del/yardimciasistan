@@ -25,6 +25,7 @@ export function ProductFormFields({
   categories,
   inventoryEnabled,
   productDataEnabled,
+  wholesaleEnabled = false,
   disabled = false,
   mode = "all",
   localImageDataUrl = "",
@@ -37,6 +38,7 @@ export function ProductFormFields({
   categories: CatalogCategory[];
   inventoryEnabled: boolean;
   productDataEnabled: boolean;
+  wholesaleEnabled?: boolean;
   disabled?: boolean;
   mode?: "all" | "details" | "media";
   localImageDataUrl?: string;
@@ -146,8 +148,12 @@ export function ProductFormFields({
       </label>
       <label className="market-field">Kategori<select disabled={disabled} value={form.categoryId} onChange={(event) => onChange({ ...form, categoryId: event.target.value })}><option value="">Kategorisiz</option>{categories.filter((category) => category.isActive).map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
       <label className="market-field">Birim<select disabled={disabled} value={form.unit} onChange={(event) => onChange({ ...form, unit: event.target.value as ProductFormState["unit"] })}>{Object.entries(PRODUCT_UNIT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-      <label className="market-field">Satış fiyatı<MoneyInput disabled={disabled} value={form.salePrice} onChange={(salePrice) => onChange({ ...form, salePrice })} /></label>
-      <label className="market-field">Alış fiyatı<MoneyInput disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>
+      <label className="market-field">{wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"}<MoneyInput aria-label={wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"} disabled={disabled} value={form.salePrice} onChange={(salePrice) => onChange({ ...form, salePrice })} /></label>
+      {wholesaleEnabled && <>
+        <label className="market-field">Bayi A fiyatı<MoneyInput aria-label="Bayi A fiyatı" disabled={disabled} value={form.dealerPriceA} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceA) => onChange({ ...form, dealerPriceA })} /></label>
+        <label className="market-field">Bayi B fiyatı<MoneyInput aria-label="Bayi B fiyatı" disabled={disabled} value={form.dealerPriceB} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceB) => onChange({ ...form, dealerPriceB })} /></label>
+      </>}
+      <label className="market-field">Alış fiyatı<MoneyInput aria-label="Alış fiyatı" disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>
       <label className="market-field">Para birimi<input disabled={disabled} value={form.currency} maxLength={3} onChange={(event) => onChange({ ...form, currency: event.target.value.toUpperCase() })} /></label>
       <label className="market-field">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value })} /></label>
       {inventoryEnabled && form.trackInventory && <label className="market-field">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>}
