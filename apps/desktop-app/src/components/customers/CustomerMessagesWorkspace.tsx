@@ -1,12 +1,9 @@
 import { MessageCircle, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { MessageModeErrorBoundary } from "../messages/MessageModeErrorBoundary";
-import { ActionButton } from "../ui/ActionButton";
 import { SegmentedControl } from "../ui/SegmentedControl";
 
 type MessageMode = "safe" | "web";
-type WebTakeoverState = "idle" | "pending" | "ready" | "error";
-
 interface CustomerMessagesWorkspaceProps {
   safeMode: (onOpenWeb: () => void) => ReactNode;
   webMode: (onReturnToSafe: () => void) => ReactNode;
@@ -24,10 +21,6 @@ export function CustomerMessagesWorkspace({
 }: CustomerMessagesWorkspaceProps) {
   const [mode, setMode] = useState<MessageMode>("safe");
   const [webModeActivated, setWebModeActivated] = useState(prewarmWebview);
-  const [webTakeoverState, setWebTakeoverState] = useState<WebTakeoverState>("idle");
-  const [webTakeoverMessage, setWebTakeoverMessage] = useState("");
-  const [webTakeoverAttempt, setWebTakeoverAttempt] = useState(0);
-  const takeoverSequence = useRef(0);
 
   useEffect(() => {
     if (prewarmWebview) setWebModeActivated(true);
@@ -35,74 +28,13 @@ export function CustomerMessagesWorkspace({
 
   useEffect(() => {
     if (whatsappEnabled) return;
-    takeoverSequence.current += 1;
     setMode("safe");
-    setWebTakeoverState("idle");
-    setWebTakeoverMessage("");
   }, [whatsappEnabled]);
-
-  useEffect(() => {
-    window.yardimciDesktop?.setWhatsAppUserActivity?.(active && mode === "web");
-    return () => window.yardimciDesktop?.setWhatsAppUserActivity?.(false);
-  }, [active, mode]);
-
-  useEffect(() => {
-    if (!active || !whatsappEnabled || mode !== "web" || !webModeActivated) {
-      takeoverSequence.current += 1;
-      setWebTakeoverState("idle");
-      setWebTakeoverMessage("");
-      return;
-    }
-
-    const bridge = window.yardimciDesktop;
-    const request = bridge?.takeoverWhatsAppWebview;
-    const sequence = ++takeoverSequence.current;
-    setWebTakeoverState("pending");
-    setWebTakeoverMessage("");
-
-    if (!request) {
-      setWebTakeoverState("error");
-      setWebTakeoverMessage("WhatsApp Web devralma köprüsü hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    let disposed = false;
-    void (async () => {
-      let lastMessage = "WhatsApp Web henüz hazır değil.";
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        if (disposed || takeoverSequence.current !== sequence) return;
-        const result = await request();
-        if (disposed || takeoverSequence.current !== sequence) return;
-        lastMessage = result.message;
-        if (result.ok) {
-          setWebTakeoverState("ready");
-          setWebTakeoverMessage("");
-          return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        if (disposed || takeoverSequence.current !== sequence) return;
-      }
-      if (!disposed && takeoverSequence.current === sequence) {
-        setWebTakeoverState("error");
-        setWebTakeoverMessage(lastMessage);
-      }
-    })().catch(() => {
-      if (!disposed && takeoverSequence.current === sequence) {
-        setWebTakeoverState("error");
-        setWebTakeoverMessage("WhatsApp Web kullanıcı kontrolüne hazırlanamadı. Yeniden deneyin.");
-      }
-    });
-
-    return () => {
-      disposed = true;
-    };
-  }, [active, mode, webModeActivated, webTakeoverAttempt, whatsappEnabled]);
 
   const selectMode = (nextMode: MessageMode) => {
     setMode(nextMode);
     if (nextMode === "web") {
       setWebModeActivated(true);
-      setWebTakeoverAttempt((current) => current + 1);
     }
   };
 
@@ -136,14 +68,6 @@ export function CustomerMessagesWorkspace({
       )}
       {whatsappEnabled && webModeActivated && (
         <>
-          {mode === "web" && webTakeoverState === "error" && (
-            <div className="message-web-takeover status-message status-message--danger" role="alert">
-              <span>{webTakeoverMessage || "WhatsApp Web kullanıcı kontrolüne alınamadı."}</span>
-              <ActionButton variant="secondary" size="sm" type="button" onClick={() => setWebTakeoverAttempt((current) => current + 1)}>
-                Yeniden Dene
-              </ActionButton>
-            </div>
-          )}
           <div className={mode === "web" ? "message-mode-content" : "message-mode-content is-hidden"}>
             <MessageModeErrorBoundary onReturnToSafe={() => selectMode("safe")}>
               {webMode(() => selectMode("safe"))}
