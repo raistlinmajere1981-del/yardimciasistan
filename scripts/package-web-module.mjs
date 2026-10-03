@@ -16,6 +16,9 @@ const tarballPath = join(outputRoot, "yardimci-asistan.tar.gz");
 const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
   "README.md",
+  "magaza/index.php",
+  "magaza/storefront.js",
+  "magaza/storefront.css",
   "widget.js",
   "api/request.php",
   "api/sync.php",

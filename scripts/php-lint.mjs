@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 
 const phpFiles = [
+  "firm-template/web-module/magaza/index.php",
   "firm-template/web-module/api/request.php",
   "firm-template/web-module/api/order.php",
   "firm-template/web-module/api/catalog.php",

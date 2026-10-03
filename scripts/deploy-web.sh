@@ -140,6 +140,9 @@ if [[ "$skip_pack" == false ]]; then
 fi
 
 required_package_files=(
+  magaza/index.php
+  magaza/storefront.js
+  magaza/storefront.css
   widget.js
   api/business.php
   api/chat.php
@@ -441,6 +444,15 @@ if command -v curl >/dev/null 2>&1; then
     || ! curl --fail --silent --show-error --max-time 20 \
       -X OPTIONS "${public_url%/}/api/chat.php" >/dev/null; then
     printf 'Yayın uygulandı ancak canlı HTTP kontrolü başarısız oldu.\n' >&2
+    printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
+    exit 1
+  fi
+  storefront_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \
+    "${public_url%/}/magaza/" || true)"
+  order_get_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \
+    "${public_url%/}/api/order.php" || true)"
+  if [[ "$storefront_status" != "200" || "$order_get_status" != "405" ]]; then
+    printf 'Yayın uygulandı ancak mağaza/order GET sağlık kontrolü başarısız oldu: mağaza=%s order=%s\n' "$storefront_status" "$order_get_status" >&2
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
     exit 1
   fi

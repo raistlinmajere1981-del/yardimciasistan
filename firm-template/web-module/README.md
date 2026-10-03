@@ -425,3 +425,35 @@ Ayrıntılı canlı kurulum adımları için:
 ```text
 docs/WEB_MODULE_INSTALLATION.md
 ```
+
+## Online mağaza (A4)
+
+Reusable public yüzey: web modülünün köküne göre `magaza/` (standart kurulumda
+`/yardimci-asistan/magaza/`). PHP sayfası, bağımlılıksız browser JS/CSS ile
+`api/catalog.php` ve guest `api/order.php` sözleşmelerini kullanır. Referans
+sitenin menüsünde mağaza bağlantısı bulunur. Yeni backend sipariş modeli yoktur.
+
+Sepet bir browser taslağıdır. Görüntüleme snapshot'ı ve miktarlar, kurulum path'i
+ile namespace edilmiş `ya:storefront:<path>:cart:v1` localStorage kaydında tutulur.
+Katalog yenilendiğinde fiyat/birim snapshot'ı güncellenir; yayınından kaldırılan
+ürün açıkça işaretlenir ve yeni checkout engellenir. Adet/paket/kutu tam sayı,
+diğer birimler dört ondalığa kadar kabul eder. Farklı para birimleri ayrı ara
+toplamlar gösterir. POST yalnız ürün kimliği, miktar, guest iletişim bilgileri,
+isteğe bağlı not ve idempotency key taşır; fiyat ve toplam göndermez.
+
+Belirsiz ağ/5xx sonucunda gönderilmiş payload bellekte sabitlenir; sepet ve
+iletişim alanları kilitlenir, aynı key/payload ile tekrar denenir. Sekmeye özel
+sessionStorage yalnız version/key taşır; ad, telefon, e-posta ve not hiçbir
+browser storage'a yazılmaz. Sayfa yenilenirse aynı iletişim bilgileri yeniden
+girilerek aynı key denenir; farklı içerik 409 ile güvenli biçimde durur. Belirsiz
+sipariş için otomatik yeni key üretme/iptal yolu yoktur. Kullanıcı sonucu
+netleştirmek için aynı gönderimi tekrar denemeli veya işletmeyle iletişime
+geçmelidir. Başarı sepeti, formu ve key'i temizler. Kesin validation/publication
+reddi taslağı düzenlemeye açar. 429 Retry-After süresi boyunca tekrar gönderim
+engellenir. Katalog kapalı olsa bile belirsiz gönderimin receipt replay'i
+mevcut API üzerinden yapılabilir.
+
+`npm run verify:check -- web-storefront` izole PHP kurulumunda gerçek API akışını,
+browser davranışlarını ve desktop/dar viewport'u kontrol eder. Paketleme mağaza
+PHP/JS/CSS dosyalarını zorunlu sayar; deploy sağlık kontrolü mağaza için 200,
+katalog JSON sözleşmesi ve order GET için 405 bekler.
