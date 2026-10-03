@@ -215,7 +215,7 @@ export class AndroidInstallationService {
 
     return {
       ok: true,
-      message: "Telefon mevcut işletmeye yeniden bağlanıyor. Birkaç saniye içinde cihaz yönetiminde görünmelidir.",
+      message: "Telefon kurulumu tamamlanıyor. Birkaç saniye içinde aynı kartta bağlantı durumu görünecektir.",
       device: this.inspectDevice(adb, device, this.resolveAndroidPackage())
     };
   }
@@ -271,7 +271,7 @@ export class AndroidInstallationService {
 
     return {
       ok: true,
-      message: "İşletme bağlantısı telefona gönderildi."
+      message: "Kurulum bilgileri telefona gönderildi."
     };
   }
 
