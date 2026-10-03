@@ -21,17 +21,17 @@
   scrollbar-gutter: stable;
 }
 
-.market-workspace > :is(.market-two-column, .market-quick-sale-layout, .market-companion-inbox, .market-label-layout) {
+.market-workspace > :is(.market-two-column, .market-quick-sale-layout, .market-order-layout, .market-companion-inbox, .market-label-layout) {
   min-width: 0;
   min-height: 100%;
 }
 
-.market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory) {
+.market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--orders, .market-workspace--inventory) {
   overflow: hidden;
 }
 
-.market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory)
-  > :is(.market-two-column, .market-quick-sale-layout) {
+.market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--orders, .market-workspace--inventory)
+  > :is(.market-two-column, .market-quick-sale-layout, .market-order-layout) {
   height: 100%;
   min-height: 0;
 }
@@ -761,6 +761,157 @@ button.market-list-row {
   color: var(--color-accent);
 }
 
+.market-order-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  align-items: stretch;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 0;
+}
+
+.market-workspace--orders .market-order-layout {
+  height: 100%;
+}
+
+.market-order-compose,
+.market-order-history {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.market-order-customer,
+.market-order-customer-summary,
+.market-order-draft,
+.market-order-detail {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.market-order-customer-summary {
+  padding: var(--space-3);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+}
+
+.market-order-customer-summary > span {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.market-order-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  align-content: start;
+  gap: var(--space-2);
+  max-height: 280px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.market-order-product-grid .market-sale-product {
+  min-height: 112px;
+}
+
+.market-order-product-grid .market-sale-product > small {
+  color: var(--color-text-muted);
+}
+
+.market-order-draft {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.market-order-lines,
+.market-order-list,
+.market-order-detail-lines {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+.market-order-lines {
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.market-order-list {
+  max-height: 330px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.market-order-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.market-order-card.is-selected {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
+.market-order-card > span:first-child,
+.market-order-card-meta {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.market-order-card small,
+.market-order-detail-lines small {
+  color: var(--color-text-muted);
+}
+
+.market-order-card-meta {
+  justify-items: end;
+  flex: 0 0 auto;
+}
+
+.market-order-detail {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.market-order-detail-lines > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.market-order-detail-lines > div > span {
+  display: grid;
+  gap: 2px;
+}
+
+.market-order-note {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  white-space: pre-wrap;
+}
+
+.market-order-actions {
+  justify-content: flex-end;
+}
+
 .market-quick-sale-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
@@ -1078,12 +1229,12 @@ button.market-list-row {
 }
 
 @media (max-width: 1180px) {
-  .market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory) {
+  .market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--orders, .market-workspace--inventory) {
     overflow: auto;
   }
 
-  .market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--inventory)
-    > :is(.market-two-column, .market-quick-sale-layout) {
+  .market-workspace:is(.market-workspace--quickSale, .market-workspace--products, .market-workspace--orders, .market-workspace--inventory)
+    > :is(.market-two-column, .market-quick-sale-layout, .market-order-layout) {
     height: auto;
     min-height: 100%;
   }
@@ -1104,7 +1255,8 @@ button.market-list-row {
   .market-category-layout,
   .market-companion-inbox,
   .market-label-layout,
-  .market-quick-sale-layout {
+  .market-quick-sale-layout,
+  .market-order-layout {
     grid-template-columns: 1fr;
   }
 
