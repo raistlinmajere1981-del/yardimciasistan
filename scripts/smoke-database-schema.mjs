@@ -219,6 +219,7 @@ function assertCurrentDatabase(database, options = {}) {
   const productColumns = tableColumns(database, "catalog_products");
   const orderColumns = tableColumns(database, "commerce_orders");
   const orderItemColumns = tableColumns(database, "commerce_order_items");
+  const fulfillmentColumns = tableColumns(database, "commerce_order_fulfillments");
   const commercialProfileColumns = tableColumns(database, "customer_commercial_profiles");
   const localCredentialColumns = tableColumns(database, "android_local_credentials");
   assert.ok(settingsColumns.has("local_network_enabled"));
@@ -292,6 +293,33 @@ function assertCurrentDatabase(database, options = {}) {
     database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_commerce_orders_source_reference'").get(),
     "commerce order source reference idempotency index missing"
   );
+  for (const column of [
+    "business_id",
+    "order_id",
+    "sale_id",
+    "operation_key",
+    "request_fingerprint",
+    "settlement_type",
+    "payment_method",
+    "inventory_location_id",
+    "created_at"
+  ]) {
+    assert.equal(
+      fulfillmentColumns.has(column),
+      true,
+      `commerce_order_fulfillments missing ${column}`
+    );
+  }
+  for (const indexName of [
+    "idx_commerce_order_fulfillment_order",
+    "idx_commerce_order_fulfillment_sale",
+    "idx_commerce_order_fulfillment_operation"
+  ]) {
+    assert.ok(
+      database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(indexName),
+      `commerce order fulfillment index missing: ${indexName}`
+    );
+  }
   for (const column of [
     "customer_id",
     "business_id",
