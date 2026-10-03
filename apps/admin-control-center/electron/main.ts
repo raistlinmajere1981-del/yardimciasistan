@@ -1,0 +1,53 @@
+import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { join, resolve } from "node:path";
+import { getOverviewSnapshot } from "./services/overview-service";
+
+const APP_ROOT = resolve(__dirname, "../..");
+const REPO_ROOT = process.env.YARDIMCI_REPO_ROOT
+  ? resolve(process.env.YARDIMCI_REPO_ROOT)
+  : resolve(APP_ROOT, "../..");
+
+function createWindow() {
+  const window = new BrowserWindow({
+    width: 1480,
+    height: 920,
+    minWidth: 1180,
+    minHeight: 720,
+    backgroundColor: "#eef6ff",
+    title: "Yardımcı Asistan Admin",
+    webPreferences: {
+      preload: join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://") || url.startsWith("http://")) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  const devServer = process.env.VITE_DEV_SERVER_URL;
+  if (devServer) void window.loadURL(devServer);
+  else void window.loadFile(join(APP_ROOT, "dist-renderer", "index.html"));
+}
+
+ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));
+ipcMain.handle("admin:open-external", async (_event, value: unknown) => {
+  const url = typeof value === "string" ? value.trim() : "";
+  if (!/^https?:\/\//i.test(url)) return false;
+  await shell.openExternal(url);
+  return true;
+});
+
+app.whenReady().then(() => {
+  createWindow();
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
