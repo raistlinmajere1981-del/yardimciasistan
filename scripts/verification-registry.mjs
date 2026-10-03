@@ -149,6 +149,9 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  check("installation-registry-tests", "Installation registry sözleşmesi", "node", ["--test", "scripts/test-installation-registry.mjs"], {
+    phase: 5, presets: ["dev", "full"], domains: ["platform"]
+  }),
   check("version-contract-tests", "Ürün sürüm sözleşmesi testleri", "node", ["--test", "scripts/test-product-version.mjs"], {
     phase: 5, presets: ["full"], domains: ["platform"]
   }),
