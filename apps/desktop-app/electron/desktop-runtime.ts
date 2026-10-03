@@ -129,7 +129,9 @@ export function configureDesktopSessionRuntime(
 
   session.defaultSession.setPermissionRequestHandler(
     (webContents, permission, callback, details) => {
-      const mediaTypes = "mediaTypes" in details ? details.mediaTypes : undefined;
+      const mediaTypes = "mediaTypes" in details && Array.isArray(details.mediaTypes)
+        ? details.mediaTypes
+        : undefined;
       const trustedRenderer = webContents.getType() === "window"
         && options.isTrustedRendererUrl(webContents.getURL());
 
@@ -138,13 +140,41 @@ export function configureDesktopSessionRuntime(
         return;
       }
 
-      callback(
-        trustedRenderer
-          && permission === "media"
-          && Array.isArray(mediaTypes)
-          && mediaTypes.includes("video")
-          && !mediaTypes.includes("audio")
-      );
+      if (permission === "media") {
+        // Electron documents mediaTypes as optional. A trusted local renderer
+        // must not lose camera access merely because Chromium omitted that field.
+        // When Chromium does provide the requested types, keep the existing
+        // video-only rule so the renderer cannot silently acquire microphone audio.
+        const mediaTypesMissing = !mediaTypes || mediaTypes.length === 0;
+        const videoOnlyRequest = Boolean(
+          mediaTypes?.includes("video") && !mediaTypes.includes("audio")
+        );
+        const granted = Boolean(
+          trustedRenderer && (mediaTypesMissing || videoOnlyRequest)
+        );
+
+        const log = granted ? desktopLog.info : desktopLog.warn;
+        log({
+          scope: "camera",
+          event: granted
+            ? "camera.permission.granted"
+            : "camera.permission.denied",
+          message: granted
+            ? "Kamera medya izni yerel renderer için verildi."
+            : "Kamera medya izni reddedildi.",
+          meta: {
+            trustedRenderer,
+            mediaTypes: mediaTypes ?? [],
+            mediaTypesMissing,
+            rendererType: webContents.getType()
+          }
+        });
+
+        callback(granted);
+        return;
+      }
+
+      callback(false);
     }
   );
 }
