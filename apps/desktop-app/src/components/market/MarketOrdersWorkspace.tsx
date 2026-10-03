@@ -1,4 +1,4 @@
-import { CheckCircle2, ClipboardList, Minus, Plus, Search, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardList, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CatalogProduct,
@@ -14,6 +14,12 @@ interface DraftLine {
   product: CatalogProduct;
   pricing: CommerceResolvedUnitPrice;
   quantity: number;
+}
+
+type FulfillmentPaymentChoice = "cash" | "card" | "bank" | "other" | "credit";
+
+function fulfillmentOperationKey(orderId: string, paymentChoice: FulfillmentPaymentChoice | "no_payment") {
+  return `desktop-order-fulfillment:${orderId}:${paymentChoice}`;
 }
 
 function createManualOrderReference() {
@@ -74,11 +80,13 @@ function catalogPreviewPrice(product: CatalogProduct, customer: DesktopCustomer 
 export function MarketOrdersWorkspace({
   customers,
   products,
+  customerCreditEnabled = false,
   busy,
   onStateChange
 }: {
   customers: DesktopCustomer[];
   products: CatalogProduct[];
+  customerCreditEnabled?: boolean;
   busy: boolean;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
@@ -96,6 +104,7 @@ export function MarketOrdersWorkspace({
   const [selectedOrder, setSelectedOrder] = useState<CommerceOrderDetail | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [fulfillmentPayment, setFulfillmentPayment] = useState<FulfillmentPaymentChoice>("cash");
   const [resolvingProductId, setResolvingProductId] = useState("");
   const customerIdRef = useRef("");
   const draftReferenceRef = useRef(createManualOrderReference());
@@ -216,6 +225,7 @@ export function MarketOrdersWorkspace({
     try {
       const detail = await bridge.getOrder(orderId);
       setSelectedOrder(detail);
+      setFulfillmentPayment("cash");
     } catch (error) {
       onStateChange("error", error instanceof Error ? error.message : "Sipariş detayı yüklenemedi.");
     }
@@ -234,6 +244,43 @@ export function MarketOrdersWorkspace({
       onStateChange("success", status === "confirmed" ? "Sipariş onaylandı." : "Sipariş iptal edildi.");
     } catch (error) {
       onStateChange("error", error instanceof Error ? error.message : "Sipariş durumu güncellenemedi.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function fulfillSelectedOrder() {
+    if (!bridge || !selectedOrder || selectedOrder.order.status !== "confirmed" || submitting) return;
+    const zeroTotal = selectedOrder.order.total === 0;
+    const paymentChoice = zeroTotal ? "no_payment" : fulfillmentPayment;
+    if (paymentChoice === "credit" && (!customerCreditEnabled || !selectedOrder.order.customerId)) {
+      onStateChange("error", "Veresiye için Müşteri Hesabı etkin ve siparişte müşteri olmalı.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await bridge.fulfillOrder({
+        orderId: selectedOrder.order.id,
+        operationKey: fulfillmentOperationKey(selectedOrder.order.id, paymentChoice),
+        settlement: paymentChoice === "no_payment"
+          ? { type: "no_payment" }
+          : paymentChoice === "credit"
+            ? { type: "credit" }
+            : { type: "paid", paymentMethod: paymentChoice }
+      });
+      setSelectedOrder(result.order);
+      await reloadOrders();
+      onStateChange(
+        "success",
+        paymentChoice === "credit"
+          ? "Sipariş tamamlandı ve müşteri hesabına borç işlendi."
+          : zeroTotal
+            ? "Bedelsiz sipariş tamamlandı."
+            : `Sipariş tamamlandı: ${money(result.sale.total, result.sale.currency)}.`
+      );
+    } catch (error) {
+      onStateChange("error", error instanceof Error ? error.message : "Sipariş tamamlanamadı.");
     } finally {
       setSubmitting(false);
     }
@@ -465,16 +512,53 @@ export function MarketOrdersWorkspace({
               <span className="market-sale-grand-total"><small>Toplam</small><strong>{money(selectedOrder.order.total, selectedOrder.order.currency)}</strong></span>
             </div>
 
-            {(selectedOrder.order.status === "placed" || selectedOrder.order.status === "confirmed") && (
+            {selectedOrder.order.status === "placed" && (
               <div className="action-row market-order-actions">
-                {selectedOrder.order.status === "placed" && (
-                  <ActionButton onClick={() => void updateStatus("confirmed")} disabled={disabled}>
-                    <CheckCircle2 size={16} aria-hidden="true" /> Siparişi Onayla
-                  </ActionButton>
-                )}
+                <ActionButton onClick={() => void updateStatus("confirmed")} disabled={disabled}>
+                  <CheckCircle2 size={16} aria-hidden="true" /> Siparişi Onayla
+                </ActionButton>
                 <ActionButton variant="danger" onClick={() => void updateStatus("cancelled")} disabled={disabled}>
                   <XCircle size={16} aria-hidden="true" /> Siparişi İptal Et
                 </ActionButton>
+              </div>
+            )}
+
+            {selectedOrder.order.status === "confirmed" && (
+              <div className="market-order-fulfillment">
+                <header>
+                  <span>Tamamla</span>
+                  <strong>{selectedOrder.order.total === 0 ? "Tahsilat gerekmiyor" : "Tahsilat tercihi"}</strong>
+                </header>
+                {selectedOrder.order.total > 0 && (
+                  <label className="market-field">
+                    Ödeme
+                    <select
+                      aria-label="Sipariş ödeme tercihi"
+                      value={fulfillmentPayment}
+                      onChange={(event) => setFulfillmentPayment(event.target.value as FulfillmentPaymentChoice)}
+                      disabled={disabled}
+                    >
+                      <option value="cash">Nakit</option>
+                      <option value="card">Kart</option>
+                      <option value="bank">Banka</option>
+                      <option value="other">Diğer</option>
+                      {customerCreditEnabled && selectedOrder.order.customerId && <option value="credit">Veresiye</option>}
+                    </select>
+                  </label>
+                )}
+                <div className="action-row market-order-actions">
+                  <ActionButton
+                    onClick={() => void fulfillSelectedOrder()}
+                    busy={submitting}
+                    busyLabel="Sipariş tamamlanıyor…"
+                    disabled={disabled}
+                  >
+                    <WalletCards size={16} aria-hidden="true" /> Siparişi Tamamla
+                  </ActionButton>
+                  <ActionButton variant="danger" onClick={() => void updateStatus("cancelled")} disabled={disabled}>
+                    <XCircle size={16} aria-hidden="true" /> Siparişi İptal Et
+                  </ActionButton>
+                </div>
               </div>
             )}
           </div>
