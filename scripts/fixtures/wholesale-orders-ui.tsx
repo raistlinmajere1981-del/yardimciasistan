@@ -4,6 +4,7 @@ import type {
   CatalogProduct,
   CommerceOrder,
   CommerceOrderDetail,
+  CommerceOrderFulfillmentResult,
   CommerceResolvedUnitPrice
 } from "../../packages/shared/index";
 import type { DesktopCustomer } from "../../apps/desktop-app/electron/database";
@@ -31,6 +32,8 @@ const commerceBridge = {
     control.__woCall("createOrder", [input]) as Promise<CommerceOrderDetail>,
   updateOrderStatus: (input: unknown) =>
     control.__woCall("updateOrderStatus", [input]) as Promise<CommerceOrderDetail>,
+  fulfillOrder: (input: unknown) =>
+    control.__woCall("fulfillOrder", [input]) as Promise<CommerceOrderFulfillmentResult>,
   resolveProductPrice: (input: unknown) =>
     control.__woCall("resolveProductPrice", [input]) as Promise<CommerceResolvedUnitPrice>
 };
