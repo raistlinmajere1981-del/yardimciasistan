@@ -199,6 +199,36 @@ export interface CommerceOrderDetail {
   items: CommerceOrderItem[];
 }
 
+export type CommerceOrderFulfillmentSettlement =
+  | { type: "paid"; paymentMethod: "cash" | "card" | "bank" | "other" }
+  | { type: "credit" }
+  | { type: "no_payment" };
+
+export interface FulfillCommerceOrderInput {
+  orderId: string;
+  operationKey: string;
+  settlement: CommerceOrderFulfillmentSettlement;
+  locationId?: string;
+}
+
+export interface CommerceOrderFulfillment {
+  id: string;
+  businessId: string;
+  orderId: string;
+  saleId: string;
+  operationKey: string;
+  settlementType: CommerceOrderFulfillmentSettlement["type"];
+  paymentMethod: string;
+  inventoryLocationId: string;
+  createdAt: string;
+}
+
+export interface CommerceOrderFulfillmentResult {
+  fulfillment: CommerceOrderFulfillment;
+  order: CommerceOrderDetail;
+  sale: CommerceSale;
+}
+
 export interface CommerceSupplier {
   id: string;
   businessId: string;
