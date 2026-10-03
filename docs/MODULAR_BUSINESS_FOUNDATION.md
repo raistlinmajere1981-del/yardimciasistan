@@ -351,6 +351,13 @@ sale borcu customer-credit ledger'a gider; finance income ancak mevcut sistemde 
 gerçek tahsilat kaydı girildiğinde oluşur. Bu davranış ayrı bir finance standardizasyon
 işinden önce wholesale'a özel olarak değiştirilmemelidir.
 
+**C2b UI:** Onaylanmış sipariş detayında renderer yalnız settlement tercihini toplar.
+Pozitif toplamda Nakit/Kart/Banka/Diğer ve capability açıksa Veresiye sunulur; sıfır
+toplamda seçim gösterilmeden `no_payment` gönderilir. Renderer sale item, fiyat, toplam
+veya stok hareketi üretmez; yalnız `fulfillOrder` typed operation'ını çağırır. Desktop
+operation key order + settlement'tan deterministik üretilir, böylece yanıt kaybında aynı
+UI işlemi aynı fulfillment'ı güvenle yeniden okuyabilir.
+
 ### Stok sayımı kararı
 
 `count` bir UI delta girişi değildir. Kullanıcı gerçek fiziksel miktarı girer.
