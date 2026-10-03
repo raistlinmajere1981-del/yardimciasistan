@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TASK_CATEGORIES, TASKS, getTask, validateRegistry } from "../config/tasks.mjs";
+import { getSiteProfiles } from "../config/sites.mjs";
 import { SECTIONS } from "../ui/menu.mjs";
+
+test("site profilleri canonical installation metadata'sını kullanır", () => {
+  const sites = new Map(getSiteProfiles().map((site) => [site.id, site]));
+
+  assert.equal(sites.get("ya")?.publicUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
+  assert.equal(sites.get("ya")?.credentialRef, "alwaysdata-main");
+  assert.match(sites.get("ya")?.versionEndpoint ?? "", /\/api\/version\.php$/);
+
+  assert.equal(sites.get("landing")?.publicUrl, "https://yardimciasistan.alwaysdata.net");
+  assert.equal(sites.get("support")?.credentialRef, "alwaysdata-main");
+
+  assert.equal(sites.get("blacksea")?.webModuleUrl, "https://blackseapansiyon.com/yardimci-asistan");
+  assert.equal(sites.get("blacksea")?.credentialRef, "blacksea-natro");
+});
 
 test("registry geçerli: hata yok, id'ler benzersiz", () => {
   assert.deepEqual(validateRegistry(), []);
