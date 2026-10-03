@@ -188,7 +188,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       if (!value) throw new Error("Bump türü gerekli: major, minor veya patch.");
       const product = bumpProductVersion(value);
       print(product);
-      console.log("Desktop ve Android aynı ürün sürümüne güncellendi.");
+      console.log("Desktop, Android ve landing download sürümü güncellendi.");
     } else {
       throw new Error("Komut: show | check | sync | set <x.y.z> | bump <major|minor|patch>");
     }
