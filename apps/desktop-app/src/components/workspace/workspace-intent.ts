@@ -60,7 +60,7 @@ export type WorkspaceModeUpdate = {
 
 type PensionView = "rooms" | "reservations" | "daily-tasks";
 type RestaurantView = "floor" | "reservations" | "daily-tasks";
-export type MarketView = "quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels";
+export type MarketView = "quickSale" | "products" | "orders" | "phoneCarts" | "inventory" | "purchasing" | "labels";
 
 /** View names belong to their originating page, independently of the entity opened. */
 export type WorkspaceReturnContext = (
