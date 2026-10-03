@@ -24,6 +24,10 @@ assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.RETAIL_PURC
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.RETAIL_SUPPLIERS), true);
 assert.equal(BUSINESS_PROFILES.market.optionalCapabilities.includes(C.CUSTOMER_CREDIT), true);
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.CUSTOMER_CREDIT), false);
+assert.equal(BUSINESS_PROFILES.market.optionalCapabilities.includes(C.WHOLESALE), true);
+assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.WHOLESALE), false);
+assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.ORDERS), false);
+assert.equal(BUSINESS_PROFILES.market.label, "Market / Perakende / Toptan");
 for (const profileId of ["pension_restaurant", "pension", "restaurant"]) {
   assert.equal(BUSINESS_PROFILES[profileId].optionalCapabilities.includes(C.CUSTOMER_CREDIT), false);
 }
@@ -38,7 +42,7 @@ assert.match(setupForm, /value=\{form\.profileId\}/);
 // (optionalCapabilities), not a hardcoded per-sector title.
 assert.match(capabilitySettings, /optionalCapabilities/);
 assert.match(capabilitySettings, /Ek özellikler/);
-for (const capability of ["RETAIL_PURCHASING", "RETAIL_SUPPLIERS", "RETAIL_LABELS"]) {
+for (const capability of ["RETAIL_PURCHASING", "RETAIL_SUPPLIERS", "RETAIL_LABELS", "WHOLESALE"]) {
   assert.match(capabilitySettings, new RegExp(`C\\.${capability}`));
 }
 
