@@ -16,6 +16,8 @@ const products = read("apps/desktop-app/src/components/market/MarketProductsWork
 const productFields = read("apps/desktop-app/src/components/market/ProductFormFields.tsx");
 const productWorkspace = read("apps/desktop-app/src/components/market/ProductWorkspace.tsx");
 const productModel = read("apps/desktop-app/src/app/product-model.ts");
+const marketController = read("apps/desktop-app/src/app/use-market-controller.ts");
+const desktopAppView = read("apps/desktop-app/src/components/app/DesktopAppView.tsx");
 const productThumbnail = read("apps/desktop-app/src/components/market/MarketProductThumbnail.tsx");
 const maintenance = read("apps/desktop-app/electron/data-maintenance.ts");
 const dataPaths = read("apps/desktop-app/electron/data-paths.ts");
@@ -68,6 +70,17 @@ assert.match(productThumbnail, /getProductImageDataUrl/);
 assert.match(productModel, /normalizeBarcodeIdentity\(form\.barcode/);
 assert.match(productFields, /lookupExternalProductByBarcode\(normalizedBarcode, "manual"\)/);
 assert.match(productFields, /Ürün Bilgilerini Ara/);
+assert.match(marketController, /productDataEnabled\?: boolean/);
+assert.doesNotMatch(
+  marketController,
+  /getSetupData/,
+  "Market controller must not cache Ürün Verisi state from a one-time setup read."
+);
+assert.match(
+  desktopAppView,
+  /productDataEnabled:\s*setupController\.setupData\.productData\.enabled/,
+  "Saved Ürün Verisi state must flow directly from canonical setup into Market."
+);
 assert.match(productFields, /Ürün verisi:/);
 assert.match(productFields, /previewExternalProductImage/);
 assert.match(productWorkspace, /getProductImageDataUrl/);
