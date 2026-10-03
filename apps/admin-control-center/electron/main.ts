@@ -15,6 +15,7 @@ function createWindow() {
     minHeight: 720,
     backgroundColor: "#eef6ff",
     title: "Yardımcı Asistan Admin",
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -22,6 +23,8 @@ function createWindow() {
       sandbox: true
     }
   });
+
+  window.setMenuBarVisibility(false);
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://") || url.startsWith("http://")) void shell.openExternal(url);
