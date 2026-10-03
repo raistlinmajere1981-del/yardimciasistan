@@ -2,6 +2,7 @@ import {
   type BusinessAiCatalog,
   type BusinessAiContext,
   type BusinessCapability,
+  type CommerceOnlineCatalog,
   type CustomerRequest,
   type ISODateTimeString,
   type MenuStockUnit,
@@ -78,6 +79,25 @@ export interface AcknowledgeRequestsOptions extends SyncCoreConfig {
   clientId: string;
   throughSeq: number;
 }
+
+export interface PushOnlineCatalogOptions extends SyncCoreConfig {
+  clientId: string;
+  catalog: CommerceOnlineCatalog;
+  sourceRevision: number;
+  idempotencyKey: string;
+}
+
+export interface PushOnlineCatalogSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  product_count: number;
+  source_revision: number;
+  server_revision: number;
+  deduplicated: boolean;
+}
+
+export type PushOnlineCatalogResult = PushOnlineCatalogSuccess | SyncFailure;
 
 export interface PushMenuOptions extends SyncCoreConfig {
   menu: PublishedQrMenu;
@@ -903,6 +923,7 @@ export interface SyncTransport {
   acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult>;
   pullAndroidActions(input?: PullActionsInput): Promise<PullAndroidActionsResult>;
   completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult>;
+  publishOnlineCatalog(input: VersionedPublication<CommerceOnlineCatalog>): Promise<PushOnlineCatalogResult>;
   publishMenu(input: VersionedPublication<PublishedQrMenu>): Promise<PushMenuResult>;
   publishAndroidSnapshot(input: VersionedPublication<AndroidOperationsSnapshot>): Promise<PushAndroidSnapshotResult>;
 }
@@ -927,6 +948,7 @@ export {
   pushAndroidSnapshot,
   pushBusinessContext,
   pushMenu,
+  pushOnlineCatalog,
   pushRoomCatalog,
   pushTableCatalog,
   resetHostingRuntime

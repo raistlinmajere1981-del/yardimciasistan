@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-commerce-online-catalog.mjs",
+  "scripts/smoke-commerce-online-catalog-ui.mjs",
   "scripts/smoke-web-orders-storage.php",
   "scripts/smoke-commerce-online-order-ingress.mjs",
   "scripts/smoke-android-connection-preflight.mjs",

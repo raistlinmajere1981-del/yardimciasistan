@@ -1057,7 +1057,7 @@ export interface RecordSyncEventInput {
   status?: number;
 }
 
-export type DesktopSyncJobType = "menu_publish" | "android_snapshot";
+export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish";
 
 export interface DesktopSyncJob {
   jobKey: string;

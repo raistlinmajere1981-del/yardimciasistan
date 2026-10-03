@@ -63,7 +63,8 @@ export function getPendingSyncJobs(db: DatabaseSync, now = new Date().toISOStrin
 }
 
 export function queueSyncJob(db: DatabaseSync, jobType: DesktopSyncJobType, timestamp = new Date().toISOString()) {
-  const jobKey = jobType === "menu_publish" ? "menu" : "android_snapshot";
+  const jobKey = jobType === "menu_publish" ? "menu"
+    : jobType === "online_catalog_publish" ? "online_catalog" : "android_snapshot";
   db
     .prepare(`
         INSERT INTO sync_outbox (

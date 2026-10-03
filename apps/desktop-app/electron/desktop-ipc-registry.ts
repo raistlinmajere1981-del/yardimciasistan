@@ -1,3 +1,4 @@
+import { registerCommerceProductPublicationIpcHandlers } from "./ipc/commerce-product-publication-ipc";
 import { app, ipcMain } from "electron";
 import {
   BUSINESS_CAPABILITIES,
@@ -157,6 +158,10 @@ export function registerDesktopIpcHandlers(
     afterSuccessfulPull,
     publishAndroidSnapshot,
     publishAiSettings
+  });
+
+  registerCommerceProductPublicationIpcHandlers({
+    getDatabase, assertUnlocked, onCommit: () => getSyncCoordinator().scheduleSoon()
   });
 
   registerReportIpcHandlers({

@@ -1173,3 +1173,30 @@ test("web order transport rejects invalid page cursors and ordering before impor
     assert.equal(result.error, "invalid_web_order_page");
   }
 });
+
+test("online catalog publication uses the versioned transport and a public field allowlist", async () => {
+  const calls = [];
+  const transport = new PhpHostingSyncTransport({
+    baseUrl: "https://example.test/module", syncSecret: "online-catalog-secret", clientId: "desktop-catalog",
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return Response.json({ ok: true, product_count: 1, source_revision: 4, server_revision: 9, deduplicated: false });
+    }
+  });
+  await transport.publishOnlineCatalog({ sourceRevision: 4, idempotencyKey: "desktop-catalog:online_catalog:4", value: {
+    version: 1, enabled: true, updatedAt: "2026-10-04T00:00:00Z", products: [{
+      productId: "p1", name: "Public product", description: "Public description", sku: "SKU-1", unit: "piece",
+      price: 25, currency: "TRY", taxRate: 20, imageUrl: "", availability: "available", sortOrder: 0,
+      purchasePrice: 10, dealerPriceA: 15, barcode: "private-barcode", internalNotes: "private"
+    }]
+  }});
+  assert.deepEqual(calls[0], {
+    action: "publish_online_catalog", client_id: "desktop-catalog", source_revision: 4,
+    idempotency_key: "desktop-catalog:online_catalog:4", online_catalog: {
+      version: 1, enabled: true, updated_at: "2026-10-04T00:00:00Z", products: [{
+        product_id: "p1", name: "Public product", description: "Public description", sku: "SKU-1", unit: "piece",
+        price: 25, currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0
+      }]
+    }
+  });
+});

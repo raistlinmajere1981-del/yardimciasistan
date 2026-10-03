@@ -1,3 +1,4 @@
+import type { CommerceOnlineCatalog } from "@yardimci-asistan/shared";
 import type {
   AcknowledgeRequestsOptions,
   AcknowledgeRequestsResult,
@@ -41,6 +42,9 @@ import type {
   PushMenuOptions,
   PushMenuResult,
   PushMenuSuccess,
+  PushOnlineCatalogOptions,
+  PushOnlineCatalogResult,
+  PushOnlineCatalogSuccess,
   PushRoomCatalogOptions,
   PushRoomCatalogResult,
   PushRoomCatalogSuccess,
@@ -138,6 +142,26 @@ export async function acknowledgeRequests(options: AcknowledgeRequestsOptions): 
     action: "acknowledge_requests",
     client_id: options.clientId,
     through_seq: Math.max(0, Math.trunc(options.throughSeq))
+  });
+}
+
+export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Promise<PushOnlineCatalogResult> {
+  return syncRequest<PushOnlineCatalogSuccess>(options, {
+    action: "publish_online_catalog",
+    client_id: options.clientId,
+    source_revision: options.sourceRevision,
+    idempotency_key: options.idempotencyKey,
+    online_catalog: {
+      version: options.catalog.version,
+      enabled: options.catalog.enabled,
+      updated_at: options.catalog.updatedAt,
+      products: options.catalog.products.map((product) => ({
+        product_id: product.productId, name: product.name, description: product.description,
+        sku: product.sku, unit: product.unit, price: product.price, currency: product.currency,
+        tax_rate: product.taxRate, image_url: product.imageUrl,
+        availability: product.availability, sort_order: product.sortOrder
+      }))
+    }
   });
 }
 
@@ -395,6 +419,13 @@ export class PhpHostingSyncTransport implements SyncTransport {
       actionId: input.actionId,
       status: input.status,
       errorMessage: input.errorMessage
+    });
+  }
+
+  publishOnlineCatalog(input: VersionedPublication<CommerceOnlineCatalog>): Promise<PushOnlineCatalogResult> {
+    return pushOnlineCatalog({
+      ...this.config, catalog: input.value,
+      sourceRevision: input.sourceRevision, idempotencyKey: input.idempotencyKey
     });
   }
 

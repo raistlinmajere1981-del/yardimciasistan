@@ -11,6 +11,8 @@ import type {
   RecordCustomerCreditPaymentInput,
   CatalogCategory,
   CatalogProduct,
+  CommerceProductPublication,
+  SaveCommerceProductPublicationInput,
   CommerceOrder,
   CommerceOrderDetail,
   CommerceOrderFulfillmentResult,
@@ -84,6 +86,8 @@ export interface DesktopCommerceBridge {
   deleteCategory: (categoryId: string) => Promise<DeleteCatalogCategoryResult>;
 
   listProducts: (options?: ListCatalogProductsOptions) => Promise<CatalogProduct[]>;
+  getProductPublication: (productId: string) => Promise<CommerceProductPublication | null>;
+  saveProductPublication: (input: SaveCommerceProductPublicationInput) => Promise<CommerceProductPublication>;
   saveProduct: (input: SaveCatalogProductInput) => Promise<CatalogProduct>;
   findProductByBarcode: (barcode: string) => Promise<CatalogProduct | null>;
   lookupExternalProductByBarcode: (barcode: string, mode?: ProductLookupMode) => Promise<ProductLookupResponse>;

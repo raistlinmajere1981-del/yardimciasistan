@@ -1023,12 +1023,23 @@ Temel tablolar:
 ```text
 sync_meta
 web_requests
+web_orders
 android_actions
 android_device_sightings
 publications
 publication_receipts
 sync_clients
 ```
+
+`web_orders.seq` sipariş inbox cursor'udur; `sync_clients.web_order_ack_seq`
+request acknowledgement state'inden bağımsızdır. `publications.online_catalog` Desktop'ın
+hazırladığı aktif/opt-in ürün projection'ını saklar; public endpoint canonical ürün veya
+fiyat hesaplamaz.
+
+Desktop `commerce_product_publications`, canonical `catalog_products` kaydına bağlı
+ürün/kanal başına tek kayıt tutar. `is_published` varsayılan OFF'tur; kanal kapatılınca
+ayarlar korunur, web'e disabled projection gönderilir. Katalog, yayın tercihi ve kanal
+capability değişimleri mevcut `online_catalog` outbox job/revision hattını invalid eder.
 
 `web_requests.seq` talep cursor'udur. `publications` menü ve Android snapshot için
 kaynak istemci/revision ile sunucu revision'ını tutar. `publication_receipts`

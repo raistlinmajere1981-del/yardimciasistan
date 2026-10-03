@@ -343,3 +343,48 @@ export interface MarketBarcodeScanEvent {
   consumedAt: string;
   status: MarketBarcodeScanEventStatus;
 }
+
+/** Channel settings attached to a canonical Catalog Product; never a second Product. */
+export interface CommerceProductPublication {
+  productId: string;
+  businessId: string;
+  channel: "online_sales";
+  isPublished: boolean;
+  titleOverride: string;
+  descriptionOverride: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveCommerceProductPublicationInput {
+  productId: string;
+  channel?: "online_sales";
+  isPublished: boolean;
+  titleOverride?: string;
+  descriptionOverride?: string;
+  sortOrder?: number;
+}
+
+/** Public allowlist: no barcode, cost, dealer price or private product metadata. */
+export interface PublishedCommerceProduct {
+  productId: string;
+  name: string;
+  description: string;
+  sku: string;
+  unit: CommerceUnit;
+  price: number;
+  currency: string;
+  taxRate: number;
+  imageUrl: string;
+  /** Listing eligibility only; does not promise stock or reserve inventory. */
+  availability: "available";
+  sortOrder: number;
+}
+
+export interface CommerceOnlineCatalog {
+  version: 1;
+  enabled: boolean;
+  updatedAt: string;
+  products: PublishedCommerceProduct[];
+}

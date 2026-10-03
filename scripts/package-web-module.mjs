@@ -22,6 +22,7 @@ const requiredFiles = [
   "api/version.php",
   "api/business.php",
   "api/menu.php",
+  "api/catalog.php",
   "api/rooms.php",
   "api/room-media.php",
   "api/tables.php",
@@ -39,6 +40,7 @@ const requiredFiles = [
   "api/android-stock-image-analysis.php",
   "api/android-identity-image-analysis.php",
   "lib/storage.php",
+  "lib/online-catalog.php",
   "lib/google-reviews.php",
   "lib/public-request-guard.php",
   "lib/public-room-availability.php",
@@ -197,11 +199,19 @@ function validateSource() {
   assert.ok(tablesEndpoint.includes("table_catalog"), "Public masa endpoint'i yalnız table_catalog publication kaynağını okumalı.");
   assert.ok(tablesEndpoint.includes("'enabled'"), "Public masa endpoint'i yayın görünürlüğünü taşımalı.");
 
+  const catalogEndpoint = readFileSync(join(sourceRoot, "api", "catalog.php"), "utf8");
+  assert.ok(catalogEndpoint.includes("online-catalog.php") && catalogEndpoint.includes("ya_online_catalog_projection"),
+    "Public ürün kataloğu endpoint'i ortak public projection kütüphanesini kullanmalı.");
+  assert.ok(catalogEndpoint.includes("ya_storage_get_publication('online_catalog'"),
+    "Public ürün kataloğu endpoint'i online_catalog publication kaynağını okumalı.");
+
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_business_context"), "api/sync.php güncel işletme AI bağlamı yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_room_catalog"), "api/sync.php public oda kataloğu yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_table_catalog"), "api/sync.php public masa kataloğu yayın aksiyonunu içermeli.");
+  assert.ok(syncEndpoint.includes("publish_online_catalog") && syncEndpoint.includes("online-catalog.php"),
+    "api/sync.php online katalog yayını için ortak projection kütüphanesini kullanmalı.");
   assert.ok(syncEndpoint.includes("publish_ai_catalog"), "api/sync.php güncel AI ürün kaynağı yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("publish_google_reviews_settings"), "api/sync.php Google yorumları özel ayar yayın aksiyonunu içermeli.");
   const googleReviewsEndpoint = readFileSync(join(sourceRoot, "api", "google-reviews.php"), "utf8");

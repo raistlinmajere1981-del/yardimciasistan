@@ -61,6 +61,7 @@ function ya_storage_capabilities(): array
         'storage' => 'sqlite',
         'features' => [
             'web_orders_v1',
+            'online_catalog_v1',
             'request_cursor',
             'request_acknowledgement',
             'android_action_queue',

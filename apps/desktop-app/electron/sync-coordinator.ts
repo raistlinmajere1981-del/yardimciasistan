@@ -100,6 +100,7 @@ export class SyncCoordinator {
   private message = "Otomatik senkron hazır.";
   private capabilitiesTarget = "";
   private webOrdersSupported = false;
+  private onlineCatalogSupported = false;
   private nextPassiveRunAt = 0;
   private marketBarcodeFastPullActive = false;
   private availabilityHeartbeatSupported: boolean | null = null;
@@ -398,6 +399,7 @@ export class SyncCoordinator {
         return this.result(false, message, counts);
       }
       this.webOrdersSupported = capabilities.features.includes("web_orders_v1");
+      this.onlineCatalogSupported = capabilities.features.includes("online_catalog_v1");
       this.capabilitiesTarget = targetKey;
     }
 
@@ -958,6 +960,12 @@ export class SyncCoordinator {
         this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
         continue;
       }
+      if (job.jobType === "online_catalog_publish" && !this.onlineCatalogSupported) {
+        // Retain the durable invalidation without turning the outbox scan into a hot loop.
+        this.options.database.failSyncJob(job.jobKey, job.sourceRevision,
+          "Web modülü online ürün kataloğunu desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
+        continue;
+      }
       const idempotencyKey = `${clientId}:${job.jobKey}:${job.sourceRevision}`;
       const result = job.jobType === "menu_publish"
         ? await transport.publishMenu({
@@ -965,6 +973,12 @@ export class SyncCoordinator {
             idempotencyKey,
             value: this.options.database.getQrMenuPublication()
           })
+        : job.jobType === "online_catalog_publish"
+          ? await transport.publishOnlineCatalog({
+              sourceRevision: job.sourceRevision,
+              idempotencyKey,
+              value: this.options.database.createCommerceOnlineCatalog()
+            })
         : await transport.publishAndroidSnapshot({
             sourceRevision: job.sourceRevision,
             idempotencyKey,
@@ -977,7 +991,8 @@ export class SyncCoordinator {
         }
         this.options.database.recordSyncEvent({
           direction: "push",
-          entityType: job.jobType === "menu_publish" ? "menu" : "android_snapshot",
+          entityType: job.jobType === "menu_publish" ? "menu"
+            : job.jobType === "online_catalog_publish" ? "online_catalog" : "android_snapshot",
           ok: true
         });
         published += 1;
@@ -992,7 +1007,8 @@ export class SyncCoordinator {
       this.options.database.failSyncJob(job.jobKey, job.sourceRevision, result.message, nextAttemptAt);
       this.options.database.recordSyncEvent({
         direction: "push",
-        entityType: job.jobType === "menu_publish" ? "menu" : "android_snapshot",
+        entityType: job.jobType === "menu_publish" ? "menu"
+            : job.jobType === "online_catalog_publish" ? "online_catalog" : "android_snapshot",
         ok: false,
         message: result.message,
         status: result.status

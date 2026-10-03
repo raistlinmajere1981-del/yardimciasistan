@@ -432,3 +432,25 @@ successfully imported prefix may be acknowledged; failed records remain retryabl
 Public checkout/order submission is deferred to the later Product Publication / Web
 Catalog slice. Checkout identity, shipping and automatic customer creation are outside
 this foundation. Only the current schema is supported; no historical migration chain.
+
+## D-027 — Product Publication projects canonical products into the web channel
+
+**Status:** ACCEPTED (2026-10-04)
+
+Product Publication is not a second canonical Product. A publication references
+`catalog_products` by `productId` and owns only channel settings. Web visibility is
+explicit opt-in, default OFF, with one publication per product/channel (`online_sales`).
+
+Desktop is authoritative. Only active, non-deleted products with an enabled publication
+enter the public projection. `channel.online_sales` OFF publishes a disabled empty
+catalog through the existing versioned publication/outbox lifecycle. Web reads the
+sanitized projection and does not generate product, price or stock business rules.
+
+Desktop prepares prices using canonical resolved retail pricing, without a customer.
+Dealer/wholesale web pricing is deferred. The public contract excludes purchase/cost,
+dealer prices, suppliers, internal notes, barcode and private metadata. Local image
+archive paths are never public; only safe public image URLs may be projected.
+
+Publication visibility is an immediate preference in the canonical Product Workspace;
+it does not create another Product editor or mutate the product's local active state.
+Checkout, cart, public order submission and customer identity capture remain deferred.

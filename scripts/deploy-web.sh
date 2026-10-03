@@ -144,6 +144,8 @@ required_package_files=(
   api/business.php
   api/chat.php
   api/menu.php
+  api/catalog.php
+  lib/online-catalog.php
   api/rooms.php
   api/room-media.php
   api/tables.php
@@ -437,6 +439,20 @@ if command -v curl >/dev/null 2>&1; then
     || ! curl --fail --silent --show-error --max-time 20 \
       -X OPTIONS "${public_url%/}/api/chat.php" >/dev/null; then
     printf 'Yayın uygulandı ancak canlı HTTP kontrolü başarısız oldu.\n' >&2
+    printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
+    exit 1
+  fi
+  if ! catalog_json="$(curl --fail --silent --show-error --max-time 20 \
+    "${public_url%/}/api/catalog.php")" \
+    || ! php -r '
+      $catalog = json_decode($argv[1] ?? "", true);
+      exit(json_last_error() === JSON_ERROR_NONE
+        && is_array($catalog)
+        && ($catalog["ok"] ?? false) === true
+        && is_bool($catalog["enabled"] ?? null)
+        && is_array($catalog["products"] ?? null) ? 0 : 1);
+    ' "$catalog_json"; then
+    printf 'Yayın uygulandı ancak public ürün kataloğu HTTP/JSON kontrolü başarısız oldu.\n' >&2
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
     exit 1
   fi
