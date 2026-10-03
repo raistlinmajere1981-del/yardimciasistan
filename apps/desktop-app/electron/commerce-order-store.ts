@@ -217,8 +217,11 @@ export function createCommerceOrder(
     database.exec("BEGIN IMMEDIATE");
     try {
       const businessId = activeBusinessId(database);
-      const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
-      const sourceReference = String(input.sourceReference ?? "").trim().slice(0, 180);
+      const sourceRaw = String(input.source ?? "desktop").trim() || "desktop";
+      const sourceReference = String(input.sourceReference ?? "").trim();
+      if (sourceRaw.length > 80) throw new Error("Sipariş kaynağı en fazla 80 karakter olabilir.");
+      if (sourceReference.length > 180) throw new Error("Sipariş kaynak kimliği en fazla 180 karakter olabilir.");
+      const source = sourceRaw;
 
       if (sourceReference) {
         const existing = database.prepare(`
@@ -309,11 +312,20 @@ export function createCommerceOrder(
           unitPrice,
           quantity,
           lineTotal,
-          taxRate: Math.max(0, Number(row.tax_rate ?? 0))
+          taxRate: (() => {
+            const taxRate = Number(row.tax_rate ?? 0);
+            if (!Number.isFinite(taxRate) || taxRate < 0) {
+              throw new Error("Sipariş ürününün vergi oranı geçersiz.");
+            }
+            return taxRate;
+          })()
         });
       }
 
       const discountTotal = roundMoney(Number(input.discountTotal ?? 0));
+      if (!Number.isFinite(discountTotal) || discountTotal < 0) {
+        throw new Error("Sipariş indirimi geçersiz.");
+      }
       moneyToMinor(discountTotal);
       if (discountTotal > subtotal) {
         throw new Error("Sipariş indirimi ara toplamı aşamaz.");
@@ -397,7 +409,10 @@ export function updateCommerceOrderStatus(
       if (!row) throw new Error("Sipariş bulunamadı.");
 
       const current = String(row.status ?? "") as CommerceOrderStatus;
-      const target = input.status;
+      const target = String(input.status ?? "");
+      if (target !== "confirmed" && target !== "cancelled") {
+        throw new Error("Geçersiz sipariş durumu.");
+      }
       if (current === target) {
         const existing = getOrderDetailInDatabase(database, businessId, String(row.id));
         if (!existing) throw new Error("Sipariş okunamadı.");
