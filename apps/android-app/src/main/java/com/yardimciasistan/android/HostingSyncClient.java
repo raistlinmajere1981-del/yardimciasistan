@@ -165,7 +165,15 @@ final class HostingSyncClient {
             : "Görsel analiz hizmeti geçerli bir yanıt vermedi.", error);
       }
       if (status == 401) {
-        throw new SyncException("Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.");
+        String message = response.optString("message", "").trim();
+        String code = response.optString("code", "").trim();
+        throw new SyncException(
+            message.isEmpty()
+                ? "Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin."
+                : message,
+            code,
+            status
+        );
       }
       if (status == 403) {
         throw new SyncException("Bu cihazın stok güncelleme yetkisi yok.");
