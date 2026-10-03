@@ -51,6 +51,22 @@ test("sync canonical sürümü desktop/android metadata'ya yazar", () => {
   }
 });
 
+test("check landing download sürümü geride kalırsa hata verir", () => {
+  const root = fixture();
+  try {
+    syncProductVersion(root);
+    const landingPath = join(root, "test-site", "landing", "assets", "index-fixture.js");
+    const landing = readFileSync(landingPath, "utf8").replace(
+      '"0.1.7".trim()||"0.1.7"',
+      '"0.1.6".trim()||"0.1.6"'
+    );
+    writeFileSync(landingPath, landing);
+    assert.throws(() => checkProductVersion(root), /landing download 1=0\.1\.6/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("set yeni ürün sürümünde Android versionCode'u bir artırır", () => {
   const root = fixture();
   try {
