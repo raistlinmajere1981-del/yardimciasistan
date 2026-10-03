@@ -23,6 +23,7 @@ assert.match(navigation, /condition:\s*\{ anyOf: \[C\.CATALOG, C\.SALES, C\.ORDE
 assert.match(page, /id:\s*"orders"[\s\S]*label:\s*"Siparişler"/);
 assert.match(page, /enabled:\s*ordersEnabled && wholesaleEnabled/);
 assert.match(page, /<MarketOrdersWorkspace/);
+assert.match(page, /customerCreditEnabled=\{customerCreditEnabled\}/);
 
 assert.match(workspace, /Aktif bayi/);
 assert.match(
@@ -42,6 +43,14 @@ assert.match(workspace, /disabled=\{disabled \|\| Boolean\(resolvingProductId\)\
 assert.match(workspace, /createOrder\(/);
 assert.match(workspace, /Siparişi Onayla/);
 assert.match(workspace, /Siparişi İptal Et/);
+assert.match(workspace, /Siparişi Tamamla/);
+assert.match(workspace, /aria-label="Sipariş ödeme tercihi"/);
+assert.match(workspace, /customerCreditEnabled && selectedOrder\.order\.customerId/);
+assert.match(workspace, /bridge\.fulfillOrder\(/);
+assert.match(workspace, /desktop-order-fulfillment:\$\{orderId\}:\$\{paymentChoice\}/);
+assert.match(workspace, /type:\s*"no_payment"/);
+assert.match(workspace, /type:\s*"credit"/);
+assert.match(workspace, /type:\s*"paid"/);
 assert.match(
   marketCss,
   /\.market-order-product-grid\s*\{[\s\S]*min-height:\s*112px/,
@@ -49,6 +58,7 @@ assert.match(
 );
 assert.doesNotMatch(workspace, /createPaidSale/);
 assert.doesNotMatch(workspace, /applyInventoryMovement/);
+assert.doesNotMatch(workspace, /createCustomerCreditSale/);
 
 assert.match(runtime, /resolveRuntimeProductPrice/);
 assert.match(runtime, /wholesaleEnabled:\s*hasPersistedBusinessCapability\(databasePath, BUSINESS_CAPABILITIES\.WHOLESALE\)/);
@@ -60,10 +70,15 @@ assert.doesNotMatch(
 );
 
 assert.match(contract, /resolveProductPrice:/);
+assert.match(contract, /fulfillOrder:/);
 assert.match(ipc, /commerce:price:resolve/);
+assert.match(ipc, /commerce:order:fulfill/);
 assert.match(preload, /resolveProductPrice:\s*\(input\) => invokeWhenUnlocked<CommerceResolvedUnitPrice>\("commerce:price:resolve"/);
 assert.match(integratedSmoke, /Siparişi Kaydet/);
 assert.match(integratedSmoke, /Siparişi Onayla/);
+assert.match(integratedSmoke, /Siparişi Tamamla/);
+assert.match(integratedSmoke, /commerce_order_fulfillments/);
+assert.match(integratedSmoke, /settlement\.paymentMethod/);
 assert.match(integratedSmoke, /unit_price/);
 assert.match(integratedSmoke, /Simulated lost createOrder response/);
 assert.match(integratedSmoke, /Retrying the unchanged draft must reuse the same idempotency reference/);
