@@ -33,6 +33,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
+import { getInstallation } from "../../../scripts/lib/installation-registry.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const monorepoRoot = join(repoRoot, "..", "..");
@@ -62,11 +63,15 @@ Ortam degiskenleri:
 const dryRun = args.has("--dry-run");
 const assumeYes = args.has("--yes");
 const withDownloads = args.has("--with-downloads");
+const landingInstallation = getInstallation("landing", monorepoRoot);
+const yaInstallation = getInstallation("ya", monorepoRoot);
 
-const deployHost = process.env.LANDING_DEPLOY_HOST ?? "yardimciasistan@ssh-yardimciasistan.alwaysdata.net";
-const remoteWww = (process.env.LANDING_DEPLOY_WWW ?? "/home/yardimciasistan/www").replace(/\/+$/, "");
-const backupParent = (process.env.LANDING_DEPLOY_BACKUP_PARENT ?? "/home/yardimciasistan/backups").replace(/\/+$/, "");
-const publicUrl = (process.env.LANDING_PUBLIC_URL ?? "https://yardimciasistan.alwaysdata.net").replace(/\/+$/, "");
+const deployHost = process.env.LANDING_DEPLOY_HOST ?? landingInstallation.deploy.host;
+const remoteWww = (process.env.LANDING_DEPLOY_WWW ?? landingInstallation.deploy.remoteRoot).replace(/\/+$/, "");
+const backupParent = (process.env.LANDING_DEPLOY_BACKUP_PARENT ?? landingInstallation.deploy.backupDir).replace(/\/+$/, "");
+const publicUrl = (process.env.LANDING_PUBLIC_URL ?? landingInstallation.siteUrl).replace(/\/+$/, "");
+const remoteWebModule = (process.env.YARDIMCI_ASISTAN_DEPLOY_ROOT ?? yaInstallation.deploy.remoteRoot).replace(/\/+$/, "");
+const webModulePublicUrl = (process.env.YARDIMCI_ASISTAN_PUBLIC_URL ?? yaInstallation.webModuleUrl).replace(/\/+$/, "");
 
 if (!/^[A-Za-z0-9._@-]+$/.test(deployHost)) {
   fail(`Guvenli olmayan SSH hedefi: ${deployHost}`);
@@ -252,7 +257,7 @@ if (hardcodedHits.length > 0) {
 console.log("Kaynakta hardcoded deger yok.");
 
 step("Canli sync_secret okunuyor (yalniz uzunluk loglanir)");
-const liveSecret = sshCapture(`php -r '$c=json_decode(file_get_contents("${remoteWww}/yardimci-asistan/config/business.json"), true); echo trim((string)($c["sync_secret"] ?? ""));'`);
+const liveSecret = sshCapture(`php -r '$c=json_decode(file_get_contents("${remoteWebModule}/config/business.json"), true); echo trim((string)($c["sync_secret"] ?? ""));'`);
 if (!liveSecret) fail("Canli sync_secret okunamadi; deploy durduruldu.");
 console.log(`Canli sync_secret uzunlugu: ${liveSecret.length}`);
 
@@ -458,7 +463,7 @@ if (!remoteGrep.includes("CLEAN") && remoteGrep.trim() !== "0") {
 console.log("Sunucuda hardcoded yok.");
 
 step("HTTP smoke");
-await smoke(publicUrl, liveSecret);
+await smoke(publicUrl, liveSecret, webModulePublicUrl);
 if (withDownloads) {
   await smokeDownloads(publicUrl, downloadArtifacts, updateManifests);
 
@@ -631,13 +636,14 @@ async function smokeDownloads(base, artifacts, manifests) {
     }
   }
 }
-async function smoke(base, secret) {
+async function smoke(base, secret, webModuleBase) {
   const expectedHash = sha256Hex(secret);
   const get = async (path, init) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch(`${base}${path}`, { ...init, signal: controller.signal });
+      const target = /^https?:\/\//.test(path) ? path : `${base}${path}`;
+      const response = await fetch(target, { ...init, signal: controller.signal });
       const text = await response.text();
       return { response, text };
     } finally {
@@ -662,16 +668,16 @@ async function smoke(base, secret) {
   }
   console.log("Public-site root route'lari: 200.");
 
-  const menu = await get("/yardimci-asistan/api/menu.php");
+  const menu = await get(`${webModuleBase}/api/menu.php`);
   if (![200, 404].includes(menu.response.status)) fail(`menu.php beklenmeyen HTTP durumu: ${menu.response.status}`);
   if (menu.response.status === 200 && !menu.text.includes('"ok":true')) fail("menu.php 200 ama ok:true degil.");
   console.log(`menu.php: ${menu.response.status === 200 ? "yayinda" : "gizli"}.`);
 
-  const business = await get("/yardimci-asistan/api/business.php");
+  const business = await get(`${webModuleBase}/api/business.php`);
   if (business.response.status !== 200 || !business.text.includes('"ok":true')) fail("business.php saglik kontrolu basarisiz.");
   console.log("business.php: ok.");
 
-  const sync = await get("/yardimci-asistan/api/sync.php", {
+  const sync = await get(`${webModuleBase}/api/sync.php`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": secret },
     body: JSON.stringify({ action: "capabilities", sync_secret: secret })
@@ -679,13 +685,13 @@ async function smoke(base, secret) {
   if (sync.response.status !== 200 || !sync.text.includes('"protocol_version"')) fail("sync capabilities basarisiz.");
   console.log("sync capabilities: ok.");
 
-  const operations = await get("/yardimci-asistan/api/operations.php", {
+  const operations = await get(`${webModuleBase}/api/operations.php`, {
     headers: { "X-YA-Sync-Secret": secret }
   });
   if (operations.response.status !== 200 || !operations.text.includes('"ok":true')) fail("operations (gercek secret) basarisiz.");
   console.log("operations (gercek secret): ok:true.");
 
-  const wrong = await get("/yardimci-asistan/api/operations.php", {
+  const wrong = await get(`${webModuleBase}/api/operations.php`, {
     headers: { "X-YA-Sync-Secret": "definitely-wrong-secret-0000" }
   });
   if (wrong.response.status !== 401) fail(`operations (yanlis secret) beklenen 401 degil: ${wrong.response.status}`);
