@@ -49,16 +49,20 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd -- "$script_dir/.." && pwd)"
 package_dir="$project_root/artifacts/web-module-deploy/yardimci-asistan"
 
-deploy_host="${YARDIMCI_ASISTAN_DEPLOY_HOST:-yardimciasistan@ssh-yardimciasistan.alwaysdata.net}"
-remote_root="${YARDIMCI_ASISTAN_DEPLOY_ROOT:-/home/yardimciasistan/www/yardimci-asistan}"
+registry_get() {
+  node "$project_root/scripts/installation-config.mjs" get "$1" "$2"
+}
+
+deploy_host="${YARDIMCI_ASISTAN_DEPLOY_HOST:-$(registry_get ya deploy.host)}"
+remote_root="${YARDIMCI_ASISTAN_DEPLOY_ROOT:-$(registry_get ya deploy.remoteRoot)}"
 remote_root="${remote_root%/}"
 remote_parent="${remote_root%/*}"
-backup_dir="${YARDIMCI_ASISTAN_DEPLOY_BACKUP_DIR:-/home/yardimciasistan/backups}"
+backup_dir="${YARDIMCI_ASISTAN_DEPLOY_BACKUP_DIR:-$(registry_get ya deploy.backupDir)}"
 backup_dir="${backup_dir%/}"
 backup_parent="${backup_dir%/*}"
-stage_parent="${YARDIMCI_ASISTAN_DEPLOY_STAGE_PARENT:-$backup_parent}"
+stage_parent="${YARDIMCI_ASISTAN_DEPLOY_STAGE_PARENT:-$(registry_get ya deploy.stageParent)}"
 stage_parent="${stage_parent%/}"
-public_url="${YARDIMCI_ASISTAN_PUBLIC_URL:-https://yardimciasistan.alwaysdata.net/yardimci-asistan}"
+public_url="${YARDIMCI_ASISTAN_PUBLIC_URL:-$(registry_get ya webModuleUrl)}"
 
 if [[ ! "$deploy_host" =~ ^[A-Za-z0-9._@-]+$ ]]; then
   printf 'Geçersiz SSH hedefi: %s\n' "$deploy_host" >&2
@@ -145,7 +149,9 @@ required_package_files=(
   api/tables.php
   api/table-media.php
   api/sync.php
+  api/version.php
   config/business.json
+  config/version.json
   data/.htaccess
   knowledge/.htaccess
 )
@@ -409,6 +415,14 @@ done
 
 if command -v curl >/dev/null 2>&1; then
   printf 'Canlı web modülü sağlık kontrolü yapılıyor...\n'
+  expected_web_version="$(node -e 'const fs=require("fs"); const value=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); process.stdout.write(String(value.webModuleVersion ?? ""));' "$project_root/product-version.json")"
+  version_json="$(curl --fail --silent --show-error --max-time 20 "${public_url%/}/api/version.php" || true)"
+  live_web_version="$(php -r '$v=json_decode($argv[1] ?? "", true); echo trim((string)($v["web_module_version"] ?? ""));' "$version_json")"
+  if [[ -z "$expected_web_version" || "$live_web_version" != "$expected_web_version" ]]; then
+    printf 'Canlı web modülü sürümü uyuşmuyor: beklenen=%s canlı=%s\n' "$expected_web_version" "${live_web_version:-yok}" >&2
+    printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
+    exit 1
+  fi
   menu_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \
     "${public_url%/}/api/menu.php" || true)"
   if [[ "$menu_status" != "200" && "$menu_status" != "404" ]] \
