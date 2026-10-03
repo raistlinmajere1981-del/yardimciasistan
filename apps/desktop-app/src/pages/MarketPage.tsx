@@ -117,8 +117,8 @@ export function MarketPage({
 
   return (
     <PageWorkSurface mode="fill" className="market-page-surface">
-      <section className="market-page" aria-label="Market yönetimi">
-      <nav className="market-tabs" aria-label="Market çalışma alanları">
+      <section className="market-page" aria-label="Satış yönetimi">
+      <nav className="market-tabs" aria-label="Satış çalışma alanları">
         {tabs.map((tab) => {
           if (!tab.enabled) return null;
           const Icon = tab.icon;
