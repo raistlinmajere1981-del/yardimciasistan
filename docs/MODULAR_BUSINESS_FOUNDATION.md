@@ -111,6 +111,7 @@ channel.qr_menu             → food_service.menu
 commerce.inventory         → commerce.catalog
 commerce.sales             → commerce.catalog
 commerce.orders            → commerce.catalog
+commerce.wholesale         → core.customers + commerce.orders
 commerce.customer_credit   → core.customers + commerce.sales + core.finance
 retail.barcode              → commerce.catalog
 retail.purchasing           → commerce.catalog + commerce.inventory
@@ -194,6 +195,7 @@ commerce_sales
 commerce_sale_items
 commerce_orders
 commerce_order_items
+customer_commercial_profiles
 ```
 
 Bu tablolar restoranın mevcut `menu_items`, `tables`, `table_orders` yapısından bağımsızdır. Amaç food-service ve retail domain'lerinin commerce kavramlarını paylaşabilmesi, birbirine sıkı bağlanmamasıdır.
@@ -253,6 +255,31 @@ Dış kanallar `source + source_reference` çiftini idempotency anahtarı olarak
 Aynı çiftin yeniden gönderimi yeni sipariş oluşturmak yerine mevcut siparişi döndürür.
 Bu sınır gelecekte bayi, online satış ve WhatsApp Business kaynaklarının aynı order
 çekirdeğine güvenli biçimde bağlanması içindir.
+
+### Bayi / Toptan A — Ticari müşteri profili
+
+`commerce.wholesale` ilk kullanıcıya görünen toptan/bayi capability'sidir. Market
+profilinde **Bayi / Toptan Satış** adıyla opsiyonel açılır; profil kimliğine runtime
+gate olarak bağlanmaz. Yapısal bağımlılıkları `core.customers + commerce.orders`dır;
+dolayısıyla ortak katalog sipariş zinciri otomatik gelir.
+
+Müşteri ayrı bir "bayi müşteri" tablosuna kopyalanmaz. Canonical `customers` kaydına
+1:1 `customer_commercial_profiles` alt kaydı bağlanır. Profilin ilk dilimdeki alanları:
+
+- firma / unvan
+- yetkili kişi
+- vergi dairesi / vergi no
+- bayi durumu: aday / aktif / pasif
+- ödeme vadesi (gün)
+- ticari not
+
+Ticari profil müşteriyle aynı save transaction'ında oluşturulur/güncellenir/kaldırılır.
+Capability kapalıyken normal müşteri düzenlemeleri mevcut ticari profili silmez; alanlar
+UI'de gizlenir ve payload sahipliği wholesale katmanında kalır. Müşteri silindiğinde
+ticari alt kayıt da kaldırılır, böylece vergi numarası hayalet kayıt olarak kilitlenmez.
+
+Bu aşama **fiyat grubu, özel fiyat, sipariş ekranı veya web bayi girişi içermez**.
+Fiyatlandırma ayrı bir sonraki dilimdir; bu profil onun kimlik/ilişki temelidir.
 
 ### Stok sayımı kararı
 
