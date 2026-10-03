@@ -12,6 +12,14 @@ test("installation registry canonical hedefleri ve credential referanslarını i
 
   const landing = getInstallation("landing");
   assert.equal(landing.deploy.remoteRoot, "/home/yardimciasistan/www");
+  assert.equal(
+    landing.release.desktopManifests.winX64,
+    "https://yardimciasistan.alwaysdata.net/updates/stable/win-x64/release.json"
+  );
+  assert.equal(
+    landing.release.desktopManifests.winX86,
+    "https://yardimciasistan.alwaysdata.net/updates/stable/win-x86/release.json"
+  );
 
   const support = getInstallation("support");
   assert.match(support.publicUrl, /\/support\/report\.php$/);
