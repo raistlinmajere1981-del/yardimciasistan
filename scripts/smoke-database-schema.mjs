@@ -219,6 +219,7 @@ function assertCurrentDatabase(database, options = {}) {
   const productColumns = tableColumns(database, "catalog_products");
   const orderColumns = tableColumns(database, "commerce_orders");
   const orderItemColumns = tableColumns(database, "commerce_order_items");
+  const commercialProfileColumns = tableColumns(database, "customer_commercial_profiles");
   const localCredentialColumns = tableColumns(database, "android_local_credentials");
   assert.ok(settingsColumns.has("local_network_enabled"));
   assert.ok(localCredentialColumns.has("device_id"));
@@ -288,6 +289,27 @@ function assertCurrentDatabase(database, options = {}) {
   assert.ok(
     database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_commerce_orders_source_reference'").get(),
     "commerce order source reference idempotency index missing"
+  );
+  for (const column of [
+    "customer_id",
+    "business_id",
+    "company_name",
+    "tax_office",
+    "tax_number",
+    "authorized_person",
+    "dealer_status",
+    "payment_term_days",
+    "notes"
+  ]) {
+    assert.equal(
+      commercialProfileColumns.has(column),
+      true,
+      `customer_commercial_profiles missing ${column}`
+    );
+  }
+  assert.ok(
+    database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_customer_commercial_profiles_tax_number'").get(),
+    "commercial profile tax number unique index missing"
   );
 
   if (options.market) {
