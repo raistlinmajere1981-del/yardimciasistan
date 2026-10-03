@@ -284,7 +284,13 @@ export function MarketOrdersWorkspace({
               </button>
             );
           })}
-          {filteredProducts.length === 0 && <p className="market-muted">Bu aramaya uygun aktif ürün yok.</p>}
+          {filteredProducts.length === 0 && (
+            <div className="market-order-product-empty">
+              <ShoppingCart size={24} aria-hidden="true" />
+              <strong>{search.trim() ? "Aramaya uygun ürün yok." : "Aktif ürün yok."}</strong>
+              <span>{search.trim() ? "Arama metnini değiştirin veya temizleyin." : "Önce Ürünler sekmesinden aktif bir ürün ekleyin."}</span>
+            </div>
+          )}
         </div>
 
         <div className="market-order-draft">
