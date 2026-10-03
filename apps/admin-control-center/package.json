@@ -1,0 +1,26 @@
+{
+  "name": "@yardimci-asistan/admin-control-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Yardımcı Asistan geliştirici/yönetici kontrol merkezi.",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "dev": "node scripts/start-dev.mjs",
+    "build": "tsc -p tsconfig.electron.json && vite build --config vite.renderer.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "^5.2.8",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "43.1.1",
+    "vite": "^7.0.0"
+  }
+}
