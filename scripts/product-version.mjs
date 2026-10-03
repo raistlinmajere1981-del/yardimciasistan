@@ -6,10 +6,15 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export function readProductVersion(root = repoRoot) {
   const value = JSON.parse(readFileSync(resolve(root, "product-version.json"), "utf8"));
   validateVersion(value.version);
+  validateVersion(value.webModuleVersion);
   if (!Number.isInteger(value.androidVersionCode) || value.androidVersionCode <= 0) {
     throw new Error("androidVersionCode pozitif bir tam sayı olmalı.");
   }
-  return { version: value.version, androidVersionCode: value.androidVersionCode };
+  return {
+    version: value.version,
+    androidVersionCode: value.androidVersionCode,
+    webModuleVersion: value.webModuleVersion
+  };
 }
 
 export function syncProductVersion(root = repoRoot) {
@@ -25,6 +30,7 @@ export function syncProductVersion(root = repoRoot) {
   }
   writeJson(lockFile, lock);
   syncLandingDownloadVersion(root, product.version);
+  syncWebModuleVersionMetadata(root, product);
   return product;
 }
 
@@ -36,6 +42,7 @@ export function checkProductVersion(root = repoRoot) {
   const lockDesktop = lock.packages?.["apps/desktop-app"]?.version;
   const lockAndroid = lock.packages?.["apps/android-app"]?.version;
   const landingVersions = readLandingDownloadVersions(root);
+  const webModuleMetadata = readWebModuleVersionMetadata(root);
   const mismatches = [
     ["desktop package", desktop],
     ["android package", android],
@@ -43,6 +50,12 @@ export function checkProductVersion(root = repoRoot) {
     ["android lock", lockAndroid],
     ...landingVersions.map((value, index) => [`landing download ${index + 1}`, value])
   ].filter(([, value]) => value !== product.version);
+  if (webModuleMetadata.productVersion !== product.version) {
+    mismatches.push(["web module product version", webModuleMetadata.productVersion]);
+  }
+  if (webModuleMetadata.webModuleVersion !== product.webModuleVersion) {
+    mismatches.push(["web module version", webModuleMetadata.webModuleVersion]);
+  }
   if (mismatches.length) {
     throw new Error(
       `Ürün sürümü senkron değil (${product.version}): ` +
@@ -66,11 +79,39 @@ export function setProductVersion(nextVersion, root = repoRoot, { force = false 
   }
   const next = {
     version: nextVersion,
-    androidVersionCode: current.androidVersionCode + 1
+    androidVersionCode: current.androidVersionCode + 1,
+    webModuleVersion: current.webModuleVersion
   };
   writeJson(resolve(root, "product-version.json"), next);
   syncProductVersion(root);
   return next;
+}
+
+export function setWebModuleVersion(nextVersion, root = repoRoot, { force = false } = {}) {
+  validateVersion(nextVersion);
+  const current = readProductVersion(root);
+  const comparison = compareVersions(nextVersion, current.webModuleVersion);
+  if (comparison < 0 && !force) {
+    throw new Error(`Web modülü sürümü geriye alınamaz: ${current.webModuleVersion} → ${nextVersion}. Gerekirse --force kullanın.`);
+  }
+  const next = { ...current, webModuleVersion: nextVersion };
+  writeJson(resolve(root, "product-version.json"), next);
+  syncProductVersion(root);
+  return next;
+}
+
+export function bumpWebModuleVersion(part, root = repoRoot) {
+  if (!["major", "minor", "patch"].includes(part)) {
+    throw new Error("Web modülü bump türü major, minor veya patch olmalı.");
+  }
+  const current = readProductVersion(root);
+  const [major, minor, patch] = current.webModuleVersion.split(".").map(Number);
+  const next = part === "major"
+    ? `${major + 1}.0.0`
+    : part === "minor"
+      ? `${major}.${minor + 1}.0`
+      : `${major}.${minor}.${patch + 1}`;
+  return setWebModuleVersion(next, root);
 }
 
 export function bumpProductVersion(part, root = repoRoot) {
@@ -102,6 +143,28 @@ export function syncLandingDownloadVersion(root = repoRoot, version = readProduc
   const replacement = `"${version}".trim()||"${version}"`;
   writeFileSync(bundle, source.replace(marker, replacement));
   return true;
+}
+
+export function syncWebModuleVersionMetadata(root = repoRoot, product = readProductVersion(root)) {
+  const path = resolve(root, "firm-template", "web-module", "config", "version.json");
+  if (!existsSync(dirname(path))) return false;
+  writeJson(path, {
+    product_version: product.version,
+    web_module_version: product.webModuleVersion
+  });
+  return true;
+}
+
+export function readWebModuleVersionMetadata(root = repoRoot) {
+  const path = resolve(root, "firm-template", "web-module", "config", "version.json");
+  if (!existsSync(path)) {
+    return { productVersion: "", webModuleVersion: "" };
+  }
+  const value = JSON.parse(readFileSync(path, "utf8"));
+  return {
+    productVersion: String(value.product_version ?? ""),
+    webModuleVersion: String(value.web_module_version ?? "")
+  };
 }
 
 export function readLandingDownloadVersions(root = repoRoot) {
@@ -162,13 +225,19 @@ function writeJson(path, value) {
 function print(product) {
   console.log(`Ürün sürümü: ${product.version}`);
   console.log(`Android versionCode: ${product.androidVersionCode}`);
+  console.log(`Web modülü sürümü: ${product.webModuleVersion}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [command = "show", value, ...rest] = process.argv.slice(2);
   try {
     if (command === "show") {
-      print(readProductVersion());
+      const product = readProductVersion();
+      if (value === "--json" || rest.includes("--json")) {
+        console.log(JSON.stringify(product));
+      } else {
+        print(product);
+      }
     } else if (command === "check") {
       const product = checkProductVersion();
       print(product);
@@ -189,8 +258,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       const product = bumpProductVersion(value);
       print(product);
       console.log("Desktop, Android ve landing download sürümü güncellendi.");
+    } else if (command === "web-set") {
+      if (!value) throw new Error("Yeni web modülü sürümü gerekli. Örnek: npm run version:web:set -- 2.0.3");
+      const product = setWebModuleVersion(value, repoRoot, { force: rest.includes("--force") });
+      print(product);
+      console.log("Web modülü sürümü güncellendi.");
+    } else if (command === "web-bump") {
+      if (!value) throw new Error("Web modülü bump türü gerekli: major, minor veya patch.");
+      const product = bumpWebModuleVersion(value);
+      print(product);
+      console.log("Web modülü sürümü güncellendi.");
     } else {
-      throw new Error("Komut: show | check | sync | set <x.y.z> | bump <major|minor|patch>");
+      throw new Error("Komut: show [--json] | check | sync | set <x.y.z> | bump <major|minor|patch> | web-set <x.y.z> | web-bump <major|minor|patch>");
     }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
