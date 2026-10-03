@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { BLACKSEA_ROOT, REPO_ROOT } from "../lib/paths.mjs";
+import { getInstallation } from "../../../scripts/lib/installation-registry.mjs";
 
 /**
  * Ana ekran durum başlığı. Her şey hızlı ve yereldir; ekranı yavaşlatmaz.
@@ -56,20 +57,25 @@ export function getGitStatus() {
   };
 }
 
-function secretPresence(path) {
+function localCredentialStatus(credentialRef) {
+  const path = join(REPO_ROOT, "config", "credentials.local.json");
+  if (!existsSync(path)) return "yapılandırılmamış";
   try {
     const cfg = JSON.parse(readFileSync(path, "utf8"));
-    return String(cfg.sync_secret ?? "").trim() ? "mevcut" : "yok";
+    const record = cfg.credentials?.[credentialRef];
+    if (!record || typeof record !== "object") return "yapılandırılmamış";
+    return Object.values(record).some((value) => String(value ?? "").trim()) ? "kayıtlı" : "yapılandırılmamış";
   } catch {
     return "okunamadı";
   }
 }
 
 export function getEnvStatus() {
-  const yaSecret = secretPresence(join(REPO_ROOT, "firm-template", "web-module", "config", "business.json"));
+  const ya = getInstallation("ya", REPO_ROOT);
+  const yaCredential = localCredentialStatus(ya.credentialRef);
   const natroEnv = existsSync(join(BLACKSEA_ROOT, ".deploy", "natro.env")) ? "mevcut" : "yok";
   const blacksea = existsSync(join(BLACKSEA_ROOT, "scripts", "check.sh")) ? "bağlı" : "bağlı değil";
-  return { yaSecret, natroEnv, blacksea };
+  return { yaCredential, yaCredentialRef: ya.credentialRef, natroEnv, blacksea };
 }
 
 export function renderStatusBar() {
@@ -84,6 +90,6 @@ export function renderStatusBar() {
   return [
     `branch: ${g.branch}  HEAD: ${g.head}  tree: ${tree}  ${sync}`,
     `android: ${adbLine}`,
-    `YA secret: ${env.yaSecret} · natro.env: ${env.natroEnv} · blacksea: ${env.blacksea} · node ${process.version}`,
+    `YA credential[${env.yaCredentialRef}]: ${env.yaCredential} · natro.env: ${env.natroEnv} · blacksea: ${env.blacksea} · node ${process.version}`,
   ].join("\n");
 }
