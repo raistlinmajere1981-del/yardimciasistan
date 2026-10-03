@@ -30,10 +30,15 @@ done
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd -- "$script_dir/.." && pwd)"
 source_dir="$project_root/infrastructure/support"
-deploy_host="${YARDIMCI_ASISTAN_DEPLOY_HOST:-yardimciasistan@ssh-yardimciasistan.alwaysdata.net}"
-remote_web_root="${YARDIMCI_ASISTAN_SUPPORT_WEB_ROOT:-/home/yardimciasistan/www/support}"
-storage_root="${YARDIMCI_ASISTAN_SUPPORT_STORAGE_ROOT:-/home/yardimciasistan/support-reports}"
-public_url="${YARDIMCI_ASISTAN_SUPPORT_PUBLIC_URL:-https://yardimciasistan.alwaysdata.net/support/report.php}"
+
+registry_get() {
+  node "$project_root/scripts/installation-config.mjs" get "$1" "$2"
+}
+
+deploy_host="${YARDIMCI_ASISTAN_DEPLOY_HOST:-$(registry_get support deploy.host)}"
+remote_web_root="${YARDIMCI_ASISTAN_SUPPORT_WEB_ROOT:-$(registry_get support deploy.remoteRoot)}"
+storage_root="${YARDIMCI_ASISTAN_SUPPORT_STORAGE_ROOT:-$(registry_get support deploy.storageRoot)}"
+public_url="${YARDIMCI_ASISTAN_SUPPORT_PUBLIC_URL:-$(registry_get support publicUrl)}"
 
 for command_name in ssh rsync php curl; do
   command -v "$command_name" >/dev/null 2>&1 || { printf 'Eksik komut: %s\n' "$command_name" >&2; exit 1; }
