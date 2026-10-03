@@ -23,6 +23,7 @@ const SMOKE_FILES = [
   "scripts/smoke-clean-start.mjs",
   "scripts/smoke-commerce-foundation.mjs",
   "scripts/smoke-commerce-orders.mjs",
+  "scripts/smoke-commerce-order-fulfillment.mjs",
   "scripts/smoke-commerce-wholesale-customer-profile.mjs",
   "scripts/smoke-commerce-wholesale-ui-contract.mjs",
   "scripts/smoke-commerce-wholesale-customer-ui.mjs",
