@@ -104,6 +104,7 @@ const SMOKE_FILES = [
   "scripts/smoke-web-connection-test.mjs",
   "scripts/smoke-web-form-api.mjs",
   "scripts/smoke-web-module-menu.mjs",
+  "scripts/smoke-web-version.mjs",
   "scripts/smoke-web-widget-branding.mjs",
   "scripts/smoke-web-widget-module.mjs",
   "scripts/smoke-workspace-platform.mjs"
@@ -418,7 +419,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
-  if (file === "scripts/smoke-support-endpoint.mjs") return [];
+  if (file === "scripts/smoke-support-endpoint.mjs" || file === "scripts/smoke-web-version.mjs") return [];
   if (file === "scripts/smoke-desktop-package.mjs") return ["package-desktop-dir"];
   if (file === "scripts/smoke-android-device-ui.mjs") {
     return ["build-packages", "build-desktop", "build-android-debug"];
