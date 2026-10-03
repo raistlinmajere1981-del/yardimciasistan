@@ -929,6 +929,28 @@ button.market-list-row {
   justify-content: flex-end;
 }
 
+.market-order-fulfillment {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+}
+
+.market-order-fulfillment > header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.market-order-fulfillment > header > span {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .market-quick-sale-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
