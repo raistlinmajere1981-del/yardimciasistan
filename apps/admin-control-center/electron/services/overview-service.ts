@@ -9,7 +9,9 @@ import type {
   ProductSnapshot,
   ReleaseChannelSnapshot,
   RepoSnapshot,
-  StatusKind
+  StatusKind,
+  VerificationReportSnapshot,
+  VerificationSnapshot
 } from "../../shared/contracts";
 
 type DeployRecord = {
@@ -487,6 +489,145 @@ async function getDesktopRelease(
   return Promise.all(entries.map(([id, url]) => getReleaseChannel(id, url.trim(), expectedVersion)));
 }
 
+type VerificationRegistryAdapter = {
+  presets?: string[];
+  domains?: string[];
+  plans?: Record<string, string[]>;
+  checks?: Array<{
+    id?: string;
+    label?: string;
+    phase?: number;
+    presets?: string[];
+    domains?: string[];
+    requires?: string[];
+    manual?: boolean;
+    platforms?: string[] | null;
+  }>;
+};
+
+type VerificationReportFile = {
+  started_at?: string;
+  finished_at?: string;
+  result?: string;
+  selection?: {
+    preset?: string | null;
+    domain?: string | null;
+    check_id?: string | null;
+    include_manual?: boolean;
+  };
+  checks?: Array<{
+    id?: string;
+    label?: string;
+    status?: string;
+    duration_ms?: number;
+    exit_code?: number | null;
+    reason?: string;
+  }>;
+};
+
+function verificationSelectionLabel(report: VerificationReportFile) {
+  if (report.selection?.preset) return `preset=${report.selection.preset}`;
+  if (report.selection?.domain) return `domain=${report.selection.domain}`;
+  if (report.selection?.check_id) return `check=${report.selection.check_id}`;
+  return "Bilinmiyor";
+}
+
+function emptyVerificationReport(): VerificationReportSnapshot {
+  return {
+    available: false,
+    startedAt: null,
+    finishedAt: null,
+    result: "unknown",
+    selectionLabel: "Henüz rapor yok",
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    total: 0,
+    ageMs: null,
+    checks: []
+  };
+}
+
+function getVerificationSnapshot(repoRoot: string): VerificationSnapshot {
+  const adapterPath = join(repoRoot, "apps", "admin-control-center", "scripts", "read-verification-registry.mjs");
+  const out = spawnSync(process.execPath, [adapterPath], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 5000,
+    shell: false
+  });
+
+  let adapter: VerificationRegistryAdapter = {};
+  if (out.status === 0 && String(out.stdout ?? "").trim()) {
+    try {
+      adapter = JSON.parse(String(out.stdout)) as VerificationRegistryAdapter;
+    } catch {
+      adapter = {};
+    }
+  }
+
+  let latest = emptyVerificationReport();
+  const latestPath = join(repoRoot, "artifacts", "verify", "latest.json");
+
+  if (existsSync(latestPath)) {
+    try {
+      const report = readJson<VerificationReportFile>(latestPath);
+      const checks = Array.isArray(report.checks) ? report.checks : [];
+      const normalizedChecks = checks.map((item) => ({
+        id: String(item.id ?? ""),
+        label: String(item.label ?? item.id ?? "Kontrol"),
+        status: item.status === "passed" || item.status === "failed" || item.status === "skipped"
+          ? item.status
+          : "skipped",
+        durationMs: Number(item.duration_ms ?? 0),
+        exitCode: typeof item.exit_code === "number" ? item.exit_code : null,
+        reason: String(item.reason ?? "")
+      }));
+
+      const startedAt = typeof report.started_at === "string" ? report.started_at : null;
+      const startedTimestamp = startedAt ? Date.parse(startedAt) : NaN;
+
+      latest = {
+        available: true,
+        startedAt,
+        finishedAt: typeof report.finished_at === "string" && report.finished_at ? report.finished_at : null,
+        result: report.result === "passed" || report.result === "failed" || report.result === "running"
+          ? report.result
+          : "unknown",
+        selectionLabel: verificationSelectionLabel(report),
+        passed: normalizedChecks.filter((item) => item.status === "passed").length,
+        failed: normalizedChecks.filter((item) => item.status === "failed").length,
+        skipped: normalizedChecks.filter((item) => item.status === "skipped").length,
+        total: normalizedChecks.length,
+        ageMs: Number.isFinite(startedTimestamp) ? Math.max(0, Date.now() - startedTimestamp) : null,
+        checks: normalizedChecks
+      };
+    } catch {
+      latest = emptyVerificationReport();
+    }
+  }
+
+  const plans = adapter.plans ?? {};
+
+  return {
+    presets: Array.isArray(adapter.presets) ? adapter.presets : [],
+    domains: Array.isArray(adapter.domains) ? adapter.domains : [],
+    planCounts: Object.fromEntries(
+      Object.entries(plans).map(([preset, checks]) => [preset, Array.isArray(checks) ? checks.length : 0])
+    ),
+    checks: (Array.isArray(adapter.checks) ? adapter.checks : []).map((item) => ({
+      id: String(item.id ?? ""),
+      label: String(item.label ?? item.id ?? "Kontrol"),
+      phase: Number(item.phase ?? 0),
+      presets: Array.isArray(item.presets) ? item.presets.map(String) : [],
+      domains: Array.isArray(item.domains) ? item.domains.map(String) : [],
+      requires: Array.isArray(item.requires) ? item.requires.map(String) : [],
+      manual: item.manual === true,
+      platforms: Array.isArray(item.platforms) ? item.platforms.map(String) : null
+    }))
+  };
+}
+
 export async function getOverviewSnapshot(repoRoot: string): Promise<OverviewSnapshot> {
   const product = getProductSnapshot(repoRoot);
   const registry = readJson<InstallationRegistry>(join(repoRoot, "config", "installations.json"));
@@ -495,6 +636,7 @@ export async function getOverviewSnapshot(repoRoot: string): Promise<OverviewSna
     getInstallations(repoRoot, product, registry),
     getDesktopRelease(registry, product.version)
   ]);
+  const verification = getVerificationSnapshot(repoRoot);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -505,6 +647,7 @@ export async function getOverviewSnapshot(repoRoot: string): Promise<OverviewSna
       expectedVersion: product.version,
       desktop: desktopRelease
     },
+    verification,
     counts: {
       installations: installations.length,
       healthy: installations.filter((item) => item.status === "ready").length,
