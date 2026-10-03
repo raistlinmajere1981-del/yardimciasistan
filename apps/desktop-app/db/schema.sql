@@ -210,6 +210,7 @@ CREATE TABLE commerce_orders (
   business_id TEXT NOT NULL REFERENCES business(id),
   customer_id TEXT NULL,
   customer_name TEXT NOT NULL DEFAULT '',
+  buyer_snapshot_json TEXT NOT NULL DEFAULT 'null' CHECK (json_valid(buyer_snapshot_json)),
   status TEXT NOT NULL DEFAULT 'placed'
     CHECK (status IN ('placed', 'confirmed', 'fulfilled', 'cancelled')),
   source TEXT NOT NULL DEFAULT 'desktop',

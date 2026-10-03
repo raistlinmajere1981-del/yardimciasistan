@@ -1132,6 +1132,9 @@ test("pushTableCatalog publishes only customer-facing table data", async () => {
 
 
 test("web orders use dedicated actions and do not alter request cursor payloads", async () => {
+  const envelope = { id: "web-order-guest", items: [{ productId: "product-1", quantity: 2 }],
+    buyer: { name: "Guest", phone: "+1 202 555 0100", email: "guest@example.test" }, note: "Guest note",
+    createdAt: "2026-10-04T00:00:00Z", syncSeq: 9 };
   const calls = [];
   const transport = new PhpHostingSyncTransport({
     baseUrl: "https://example.test/module",
@@ -1140,10 +1143,12 @@ test("web orders use dedicated actions and do not alter request cursor payloads"
     fetchImpl: async (_url, init) => {
       assert.equal(init.headers["X-YA-Sync-Secret"], "web-orders-secret");
       calls.push(JSON.parse(init.body));
-      return new Response(JSON.stringify({ ok: true, orders: [], count: 0, next_cursor: 7, has_more: false }), { status: 200 });
+      return new Response(JSON.stringify({ ok: true, orders: [envelope], count: 1, next_cursor: 9, has_more: false }), { status: 200 });
     }
   });
-  assert.equal((await transport.pullWebOrders({ afterSeq: 7, limit: 12 })).ok, true);
+  const pulled = await transport.pullWebOrders({ afterSeq: 7, limit: 12 });
+  assert.equal(pulled.ok, true);
+  assert.deepEqual(pulled.orders, [envelope], "typed transport preserves guest contact and note");
   await transport.acknowledgeWebOrders({ throughSeq: 9 });
   await transport.pullRequests({ afterSeq: 3, limit: 5 });
   await transport.acknowledgeRequests({ throughSeq: 4 });

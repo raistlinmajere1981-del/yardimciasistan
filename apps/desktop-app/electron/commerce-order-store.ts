@@ -2,6 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 import {
   createId,
   moneyToMinor,
+  normalizeCommerceOrderBuyerSnapshot,
+  type CommerceOrderBuyerSnapshot,
   type CommerceOrder,
   type CommerceOrderDetail,
   type CommerceOrderItem,
@@ -22,6 +24,7 @@ const COMMERCE_UNITS = new Set<CommerceUnit>([
 
 export interface CreateCommerceOrderInput {
   customerId?: string;
+  buyerSnapshot?: CommerceOrderBuyerSnapshot;
   source?: string;
   sourceReference?: string;
   discountTotal?: number;
@@ -94,6 +97,7 @@ function mapOrder(row: Record<string, unknown>): CommerceOrder {
     businessId: String(row.business_id ?? ""),
     customerId: String(row.customer_id ?? ""),
     customerName: String(row.customer_name ?? ""),
+    buyerSnapshot: JSON.parse(String(row.buyer_snapshot_json ?? "null")) as CommerceOrderBuyerSnapshot | null,
     status: String(row.status ?? "placed") as CommerceOrderStatus,
     source: String(row.source ?? ""),
     sourceReference: String(row.source_reference ?? ""),
@@ -350,20 +354,23 @@ export function createCommerceOrder(
       moneyToMinor(total);
 
       const note = String(input.note ?? "").trim().slice(0, 4000);
+      const buyerSnapshot = input.buyerSnapshot === undefined ? null
+        : normalizeCommerceOrderBuyerSnapshot(input.buyerSnapshot);
       const now = new Date().toISOString();
       const orderId = createId("commerce_order_");
 
       database.prepare(`
         INSERT INTO commerce_orders (
-          id, business_id, customer_id, customer_name, status, source, source_reference,
+          id, business_id, customer_id, customer_name, buyer_snapshot_json, status, source, source_reference,
           subtotal, discount_total, total, currency, note, placed_at,
           confirmed_at, fulfilled_at, cancelled_at, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, '')
+        ) VALUES (?, ?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, '')
       `).run(
         orderId,
         businessId,
         storedCustomerId,
         customerName,
+        JSON.stringify(buyerSnapshot),
         source,
         sourceReference,
         subtotal,

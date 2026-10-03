@@ -25,6 +25,24 @@ Android companion sadece gerekli özetleri ve işlem bilgilerini gösterecektir.
 Android'den gelen değişiklikler doğrudan PC verisine yazılmaz. Hosting action queue
 üzerinden masaüstüne taşınır; masaüstü aynı action kimliğini yalnız bir kez uygular.
 
+## Online Guest Order / Contact Snapshot
+
+Canonical sipariş `commerce_orders` tablosundadır. `buyer_snapshot_json` yalnız sipariş
+anındaki `{name, phone, email?}` iletişim snapshot'ını taşır; manual siparişlerde `null`
+olabilir. `note` sipariş notunu saklar. Guest siparişte `customer_id` NULL kalır;
+snapshot bir Customer kaydı değildir ve otomatik Customer oluşturmaz.
+
+Hosting `web_orders.payload_json` alanı `{id, items, buyer, note?, createdAt}` taşıma
+kaydıdır. `syncSeq` pull sırasında eklenir. Desktop `source=web-online-sales` ve
+`source_reference=web order id` ile idempotent canonical import yapar. Fiyat Desktop'ta
+çözülür; web price/tax/discount alanları kabul edilmiş kayda girmez.
+
+`web_order_submission_receipts` yalnız hashed client key, private-server-keyed semantic
+request digest, public acceptance cevabı ve zamanı saklar. Raw key/IP/contact snapshot
+bu receipt'e kopyalanmaz. Receipt ve queue insertion atomiktir. Runtime reset ikisini de
+silerek bağımsız order cursor/ack hattını temizler. D-028 sınır ve validation kararlarını
+tanımlar.
+
 ## Android Action Queue Modeli
 
 ```json

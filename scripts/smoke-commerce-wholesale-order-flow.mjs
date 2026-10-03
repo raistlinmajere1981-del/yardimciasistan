@@ -138,6 +138,7 @@ try {
   assert.equal(created.order.source, "desktop-wholesale");
   assert.equal(created.order.customerId, customerId);
   assert.equal(created.order.customerName, "Sipariş Bayisi");
+  assert.equal(created.order.buyerSnapshot, null, "wholesale Customer identity remains independent of guest contacts");
   assert.equal(created.order.subtotal, 160);
   assert.equal(created.order.total, 160);
   assert.equal(created.items.length, 1);

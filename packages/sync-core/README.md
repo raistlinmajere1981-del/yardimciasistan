@@ -132,7 +132,19 @@ başarılı yerel import sonrasındaki onayı temsil eder.
 bildirir. Kalıcı `online_catalog` outbox revision'ı tamamlanan yayınlardan sonra da
 monoton artar; aynı revision/idempotency key ile retry tekrar yayın üretmez.
 `channel.online_sales` kapalıyken builder disabled/empty projection hazırlar. Hosting
-public `GET /api/catalog.php` yalnız bu public-safe projection'ı okur; submission yapmaz.
+public `GET /api/catalog.php` yalnız bu public-safe projection'ı okur.
+
+Public `POST /api/order.php` JSON body içinde `idempotencyKey`, `items` (`productId`,
+`quantity`), `buyer` (`name`, `phone`, opsiyonel `email`) ve opsiyonel `note` kabul eder.
+Yeni sipariş yalnız enabled katalogdaki ürünlerden oluşturulabilir. Fiyat ve diğer
+contract dışı alanlar kullanılmaz. Aynı anahtar/normalize içerik aynı acceptance cevabını
+verir; farklı içerik 409 döndürür. Yanıt yalnız `ok`, `order_id`, `accepted_at`, `message`
+taşır. POST submission hiçbir canonical Customer/Sale/ödeme yaratmaz.
+
+`pullWebOrders()` buyer snapshot ve notu bağımsız `web_orders` cursor hattında taşır;
+Desktop ingress canonical order üzerinde saklar ve güncel retail fiyatı tekrar çözer.
+`acknowledgeWebOrders()` yalnız başarıyla import edilmiş prefix'i onaylar. Customer
+requests cursor/ack state'i bu işlemlerden bağımsızdır.
 
 `pushAiSettings()` masaüstünde kaydedilen AI bağlantısını `publish_ai_settings` aksiyonuna yollar. Uzak hedeflerde HTTPS zorunludur; HTTP yalnız loopback geliştirme adreslerinde kabul edilir. API anahtarı istekten sonra sonuç nesnesine veya hata mesajına geri taşınmaz.
 

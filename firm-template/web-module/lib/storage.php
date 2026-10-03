@@ -81,6 +81,7 @@ function ya_storage_reset_runtime(): array
     $tables = [
         'web_requests',
         'web_orders',
+        'web_order_submission_receipts',
         'android_actions',
         'android_device_sightings',
         'publications',
@@ -219,19 +220,23 @@ function ya_storage_pull_requests(int $limit, bool $includeSynced, ?int $afterSe
     ];
 }
 
-/** Internal inbox API only; no public submission route exists in A1. */
+/** Inbox API; the public submission service owns guest and catalog validation. */
 function ya_storage_enqueue_web_order(array $order): array
 {
     $id = ya_storage_string($order['id'] ?? '');
     $createdAt = ya_storage_string($order['createdAt'] ?? '');
-    if ($id === '' || strlen($id) > 180 || $createdAt === '' || !is_array($order['items'] ?? null)) {
+    if ($id === '' || strlen($id) > 180 || $createdAt === '' || !is_array($order['items'] ?? null)
+        || !is_array($order['buyer'] ?? null)) {
         throw new InvalidArgumentException('invalid_web_order_envelope');
     }
-    // Store only transport fields. Pricing and checkout data have no authority here.
+    // Store only transport fields, never client pricing or canonical Customer identity.
     $items = array_map(static fn ($item) => is_array($item)
         ? ['productId' => $item['productId'] ?? null, 'quantity' => $item['quantity'] ?? null]
         : null, $order['items']);
-    $payload = ['id' => $id, 'items' => $items, 'createdAt' => $createdAt];
+    $buyer = ['name' => $order['buyer']['name'] ?? null, 'phone' => $order['buyer']['phone'] ?? null];
+    if (isset($order['buyer']['email'])) $buyer['email'] = $order['buyer']['email'];
+    $payload = ['id' => $id, 'items' => $items, 'buyer' => $buyer, 'createdAt' => $createdAt];
+    if (isset($order['note'])) $payload['note'] = $order['note'];
     $database = ya_storage_open();
     $statement = $database->prepare(<<<'SQL'
         INSERT INTO web_orders (id, payload_json, created_at)
@@ -249,6 +254,33 @@ function ya_storage_enqueue_web_order(array $order): array
     $stored = $database->prepare('SELECT seq, payload_json FROM web_orders WHERE id = :id');
     $stored->execute([':id' => $id]);
     return ya_storage_web_order_from_row($stored->fetch());
+}
+
+function ya_storage_get_web_order_submission_receipt(string $keyHash): ?array
+{
+    $statement = ya_storage_open()->prepare('SELECT request_hash, response_json FROM web_order_submission_receipts WHERE key_hash = ?');
+    $statement->execute([$keyHash]);
+    $row = $statement->fetch();
+    return is_array($row) ? ['request_hash' => $row['request_hash'], 'response' => ya_storage_decode($row['response_json'], [])] : null;
+}
+
+/** Private keyed request fingerprint; called under the submission write transaction. */
+function ya_storage_web_order_submission_fingerprint(array $request): string
+{
+    $database = ya_storage_open();
+    $secret = $database->query("SELECT value FROM sync_meta WHERE key = 'web_order_receipt_secret'")->fetchColumn();
+    if (!is_string($secret) || $secret === '') {
+        $secret = bin2hex(random_bytes(32));
+        $database->prepare("INSERT INTO sync_meta (key, value) VALUES ('web_order_receipt_secret', ?)")->execute([$secret]);
+    }
+    return hash_hmac('sha256', ya_storage_encode($request), $secret);
+}
+
+/** Called inside the submission transaction, atomically with enqueue. No PII or raw key. */
+function ya_storage_insert_web_order_submission_receipt(string $keyHash, string $requestHash, array $response): void
+{
+    ya_storage_open()->prepare('INSERT INTO web_order_submission_receipts (key_hash, request_hash, response_json, created_at) VALUES (?, ?, ?, ?)')
+        ->execute([$keyHash, $requestHash, ya_storage_encode($response), $response['accepted_at']]);
 }
 
 function ya_storage_web_order_from_row(mixed $row): array
@@ -727,6 +759,13 @@ function ya_storage_create_schema(PDO $database): void
           payload_json TEXT NOT NULL,
           created_at TEXT NOT NULL,
           imported_at TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS web_order_submission_receipts (
+          key_hash TEXT PRIMARY KEY,
+          request_hash TEXT NOT NULL,
+          response_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS android_actions (

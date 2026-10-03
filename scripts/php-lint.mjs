@@ -3,6 +3,8 @@ import process from "node:process";
 
 const phpFiles = [
   "firm-template/web-module/api/request.php",
+  "firm-template/web-module/api/order.php",
+  "firm-template/web-module/api/catalog.php",
   "firm-template/web-module/api/sync.php",
   "firm-template/web-module/api/menu.php",
   "firm-template/web-module/api/chat.php",
@@ -11,6 +13,8 @@ const phpFiles = [
   "firm-template/web-module/api/stock-image-analysis.php",
   "firm-template/web-module/api/identity-image-analysis.php",
   "firm-template/web-module/lib/storage.php",
+  "firm-template/web-module/lib/online-order.php",
+  "firm-template/web-module/lib/online-catalog.php",
   "firm-template/web-module/lib/public-request-guard.php",
   "firm-template/web-module/lib/public-room-availability.php",
   "firm-template/web-module/lib/public-room-availability-intent.php",
