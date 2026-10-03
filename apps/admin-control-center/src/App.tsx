@@ -385,6 +385,151 @@ function Installations({
   );
 }
 
+function Release({
+  data,
+  refreshing,
+  onRefresh
+}: {
+  data: OverviewSnapshot;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const webInstallations = data.installations.filter((item) => item.versionEndpoint);
+  const publishedDesktop = data.release.desktop.filter((item) => item.status === "ready").length;
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">SÜRÜM AKIŞI</p>
+          <h1>Release</h1>
+          <p className="page-subtitle">
+            Kaynak sürümü, yayın manifestleri ve canlı web modülleri aynı snapshot içinde karşılaştırılır.
+          </p>
+        </div>
+        <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
+          <RefreshCw size={17} className={refreshing ? "spin" : ""} />
+          {refreshing ? "Kontrol ediliyor" : "Yayını Kontrol Et"}
+        </button>
+      </header>
+
+      <section className="release-flow">
+        <article className="release-stage release-stage--source">
+          <span>1</span>
+          <div>
+            <small>KAYNAK</small>
+            <strong>v{data.product.version}</strong>
+            <p>{data.repo.branch} · {data.repo.head}</p>
+          </div>
+        </article>
+        <div className="release-connector" />
+        <article className="release-stage">
+          <span>2</span>
+          <div>
+            <small>DESKTOP YAYINI</small>
+            <strong>{publishedDesktop} / {data.release.desktop.length}</strong>
+            <p>Manifest güncel</p>
+          </div>
+        </article>
+        <div className="release-connector" />
+        <article className="release-stage">
+          <span>3</span>
+          <div>
+            <small>WEB MODÜLLERİ</small>
+            <strong>{webInstallations.filter((item) => item.status === "ready").length} / {webInstallations.length}</strong>
+            <p>Canlı sürüm uyumlu</p>
+          </div>
+        </article>
+      </section>
+
+      <section className="release-grid">
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">DESKTOP UPDATE FEED</p>
+              <h2>Yayın manifestleri</h2>
+            </div>
+            <span className="status status--ready">Beklenen v{data.release.expectedVersion}</span>
+          </div>
+
+          <div className="release-list">
+            {data.release.desktop.length ? data.release.desktop.map((channel) => (
+              <div className="release-row" key={channel.id}>
+                <div className="release-row-title">
+                  <PackageCheck size={18} />
+                  <div>
+                    <strong>{channel.label}</strong>
+                    <small>{channel.detail}</small>
+                  </div>
+                </div>
+                <div className="release-row-version">
+                  <span className={statusClass(channel.status)}>{statusLabel(channel.status)}</span>
+                  <strong>{channel.liveVersion ? `v${channel.liveVersion}` : "—"}</strong>
+                  {channel.durationMs !== null ? <small>{channel.durationMs} ms</small> : null}
+                </div>
+                <button
+                  className="text-button"
+                  onClick={() => window.adminControlCenter.openExternal(channel.manifestUrl)}
+                >
+                  Manifest
+                </button>
+              </div>
+            )) : (
+              <div className="empty-row">Desktop release manifesti tanımlı değil.</div>
+            )}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">CANLI WEB</p>
+              <h2>Kurulum sürümleri</h2>
+            </div>
+            <span className="quiet">Beklenen web v{data.product.webModuleVersion}</span>
+          </div>
+
+          <div className="release-list">
+            {webInstallations.map((installation) => (
+              <div className="release-row release-row--web" key={installation.id}>
+                <div className="release-row-title">
+                  <Globe2 size={18} />
+                  <div>
+                    <strong>{installation.title}</strong>
+                    <small>{installation.statusNote}</small>
+                  </div>
+                </div>
+                <div className="release-row-version">
+                  <span className={statusClass(installation.status)}>{statusLabel(installation.status)}</span>
+                  <strong>{installation.liveWebVersion ? `v${installation.liveWebVersion}` : "—"}</strong>
+                </div>
+                <button
+                  className="text-button"
+                  disabled={!installation.versionEndpoint}
+                  onClick={() => installation.versionEndpoint && window.adminControlCenter.openExternal(installation.versionEndpoint)}
+                >
+                  Endpoint
+                </button>
+              </div>
+            ))}
+          </div>
+        </article>
+      </section>
+
+      <section className="panel release-note">
+        <Rocket size={20} />
+        <div>
+          <strong>Bu ekran henüz yayın işlemi yapmıyor.</strong>
+          <p>
+            Şimdilik canonical kaynaklarla canlı durumu salt-okunur doğruluyoruz. Build, doğrulama ve yayın
+            workflow'larını sonraki dilimde bu snapshot'ın üzerine bağlayacağız.
+          </p>
+        </div>
+      </section>
+    </>
+  );
+}
+
 function Placeholder({ section }: { section: Section }) {
   const label = NAV_ITEMS.find((item) => item.id === section)?.label ?? section;
 
@@ -394,7 +539,7 @@ function Placeholder({ section }: { section: Section }) {
       <p className="eyebrow">SONRAKİ DİLİM</p>
       <h1>{label}</h1>
       <p>
-        Bu yüzey henüz bağlanmadı. Genel Bakış ve Kurulumlar gerçek veri hattı üzerinde;
+        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar ve Release gerçek veri hattı üzerinde;
         sonraki ekranlar aynı güvenli IPC sınırı üzerinden eklenecek.
       </p>
     </section>
@@ -479,7 +624,9 @@ export default function App() {
           <Overview data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "installations" && data ? (
           <Installations data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
-        ) : section === "overview" || section === "installations" ? (
+        ) : section === "release" && data ? (
+          <Release data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
+        ) : section === "overview" || section === "installations" || section === "release" ? (
           <div className="loading-card">
             <RefreshCw className="spin" size={22} />
             Gerçek sistem durumu okunuyor…
