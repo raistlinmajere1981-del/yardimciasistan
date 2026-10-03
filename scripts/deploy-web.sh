@@ -91,7 +91,7 @@ if [[ ! "$public_url" =~ ^https?://[^[:space:]]+$ ]]; then
   exit 2
 fi
 
-required_commands=(npm ssh rsync php mktemp)
+required_commands=(node npm ssh rsync php mktemp)
 for command_name in "${required_commands[@]}"; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     printf 'Gerekli komut bulunamadı: %s\n' "$command_name" >&2
