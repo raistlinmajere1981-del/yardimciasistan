@@ -104,6 +104,29 @@ export interface CreateCommerceSaleInput {
   }>;
 }
 
+export interface CreateCommerceSaleFromOrderSnapshotInput {
+  subtotal: number;
+  discountTotal: number;
+  total: number;
+  currency: string;
+  paymentMethod: string;
+  source: string;
+  locationId?: string;
+  items: Array<{
+    productId: string;
+    productName: string;
+    barcode: string;
+    unitPrice: number;
+    quantity: number;
+    lineTotal: number;
+  }>;
+}
+
+export interface CommerceSaleFromOrderSnapshotResult {
+  sale: CommerceSale;
+  inventoryLocationId: string;
+}
+
 export interface ListCommerceSuppliersOptions {
   search?: string;
   activeOnly?: boolean;
@@ -859,6 +882,148 @@ export function createCommerceSaleInTransaction(
     closedAt: now,
     createdAt: now,
     updatedAt: now
+  };
+}
+
+/**
+ * Creates the final Commerce Sale from an already accepted Order snapshot.
+ * Price/name/barcode/totals come from the order snapshot; current catalog rows
+ * are consulted only for inventory tracking/cost metadata.
+ * Caller owns the surrounding transaction.
+ */
+export function createCommerceSaleFromOrderSnapshotInTransaction(
+  database: DatabaseSync,
+  input: CreateCommerceSaleFromOrderSnapshotInput,
+  status: "paid" | "credit",
+  now: string
+): CommerceSaleFromOrderSnapshotResult {
+  const businessId = activeBusinessId(database);
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new Error("Sipariş fulfillment için en az bir ürün gerekli.");
+  }
+
+  const currency = String(input.currency ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Sipariş para birimi geçersiz.");
+
+  const subtotal = roundMoney(Number(input.subtotal));
+  const discountTotal = roundMoney(Number(input.discountTotal));
+  const total = roundMoney(Number(input.total));
+  moneyToMinor(subtotal);
+  moneyToMinor(discountTotal);
+  moneyToMinor(total);
+  if (subtotal < 0 || discountTotal < 0 || total < 0 || discountTotal > subtotal) {
+    throw new Error("Sipariş toplamları geçersiz.");
+  }
+  if (roundMoney(subtotal - discountTotal) !== total) {
+    throw new Error("Sipariş toplamı snapshot ile uyuşmuyor.");
+  }
+
+  const saleId = createId("sale_");
+  const inventoryEnabled = isInventoryTrackingEnabled(database);
+  const inventoryLocationId = inventoryEnabled
+    ? resolveInventoryLocation(database, businessId, input.locationId, now)
+    : "";
+
+  const prepared = input.items.map((item) => {
+    const productId = String(item.productId ?? "").trim();
+    const productName = String(item.productName ?? "").trim().slice(0, 240);
+    const barcode = String(item.barcode ?? "").trim().slice(0, 120);
+    const unitPrice = roundMoney(Number(item.unitPrice));
+    const quantity = roundQuantity(Number(item.quantity));
+    const lineTotal = roundMoney(Number(item.lineTotal));
+    if (!productId || !productName) throw new Error("Sipariş ürün snapshot'ı eksik.");
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Sipariş adedi sıfırdan büyük olmalı.");
+    moneyToMinor(unitPrice);
+    moneyToMinor(lineTotal);
+    if (unitPrice < 0 || lineTotal < 0 || roundMoney(unitPrice * quantity) !== lineTotal) {
+      throw new Error("Sipariş ürün fiyat snapshot'ı geçersiz.");
+    }
+
+    const row = getProductRow(database, businessId, productId);
+    if (!row) throw new Error("Sipariş ürünlerinden biri artık bulunamadı.");
+    return {
+      product: mapProduct(row),
+      productId,
+      productName,
+      barcode,
+      unitPrice,
+      quantity,
+      lineTotal
+    };
+  });
+
+  const preparedSubtotal = roundMoney(prepared.reduce((sum, item) => sum + item.lineTotal, 0));
+  if (preparedSubtotal !== subtotal) {
+    throw new Error("Sipariş satır toplamları snapshot ara toplamıyla uyuşmuyor.");
+  }
+
+  const paymentMethod = status === "credit"
+    ? ""
+    : String(input.paymentMethod ?? "").trim().slice(0, 80);
+  const source = String(input.source ?? "commerce-order").trim().slice(0, 80) || "commerce-order";
+
+  database.prepare(`
+    INSERT INTO commerce_sales (
+      id, business_id, status, subtotal, discount_total, total, currency,
+      payment_method, source, opened_at, closed_at, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+  `).run(
+    saleId, businessId, status, subtotal, discountTotal, total, currency,
+    paymentMethod, source, now, now, now, now
+  );
+
+  const insertSaleItem = database.prepare(`
+    INSERT INTO commerce_sale_items (
+      id, sale_id, product_id, product_name, barcode, unit_price,
+      quantity, line_total, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const item of prepared) {
+    insertSaleItem.run(
+      createId("sale_item_"),
+      saleId,
+      item.productId,
+      item.productName,
+      item.barcode,
+      item.unitPrice,
+      item.quantity,
+      item.lineTotal,
+      now
+    );
+
+    if (inventoryEnabled && item.product.trackInventory) {
+      applyInventoryMovementInTransaction(database, businessId, {
+        productId: item.productId,
+        locationId: inventoryLocationId,
+        type: "sale",
+        quantityDelta: -item.quantity,
+        unitCost: item.product.purchasePrice,
+        referenceType: "commerce_sale",
+        referenceId: saleId,
+        note: `${item.productName} sipariş fulfillment satışı`,
+        actorSource: source
+      }, now);
+    }
+  }
+
+  return {
+    sale: {
+      id: saleId,
+      businessId,
+      status,
+      subtotal,
+      discountTotal,
+      total,
+      currency,
+      paymentMethod,
+      source,
+      openedAt: now,
+      closedAt: now,
+      createdAt: now,
+      updatedAt: now
+    },
+    inventoryLocationId
   };
 }
 
