@@ -27,6 +27,10 @@ test("market profile is available as retail foundation without accommodation cou
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.ORDERS), false);
   assert.equal(market.optionalCapabilities.includes(C.ORDERS), false);
   assert.equal(market.optionalCapabilities.includes(C.REQUESTS), true);
+  assert.equal(market.optionalCapabilities.includes(C.WHOLESALE), true);
+  assert.equal(market.defaultCapabilities.includes(C.WHOLESALE), false);
+  assert.equal(market.defaultCapabilities.includes(C.ORDERS), false);
+  assert.equal(market.label, "Market / Perakende / Toptan");
   assert.equal(market.defaultOptionalCapabilities.includes(C.REQUESTS), false);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.REQUESTS), false);
   assert.equal(getBusinessProfiles().some((profile) => profile.id === "market"), true);
