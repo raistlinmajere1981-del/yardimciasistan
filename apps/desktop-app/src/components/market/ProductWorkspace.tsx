@@ -29,6 +29,7 @@ export function ProductWorkspace({
   categories,
   inventoryEnabled,
   productDataEnabled,
+  wholesaleEnabled,
   busy,
   onReload,
   onProductSaved,
@@ -39,6 +40,7 @@ export function ProductWorkspace({
   categories: CatalogCategory[];
   inventoryEnabled: boolean;
   productDataEnabled: boolean;
+  wholesaleEnabled: boolean;
   busy: boolean;
   onReload: () => Promise<void>;
   onProductSaved: (product: CatalogProduct) => void;
@@ -254,6 +256,7 @@ export function ProductWorkspace({
             categories={categories}
             inventoryEnabled={inventoryEnabled}
             productDataEnabled={productDataEnabled}
+            wholesaleEnabled={wholesaleEnabled}
             disabled={busy || resourceState !== "success" || saveState === "loading"}
             mode="details"
             localImageDataUrl={localImageDataUrl}
