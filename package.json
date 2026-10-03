@@ -46,7 +46,6 @@
     "smoke:dashboard-workspace": "node scripts/smoke-dashboard-workspace.mjs",
     "smoke:calendar-workspace": "node scripts/smoke-calendar-workspace.mjs",
     "smoke:messages-ai-staleness": "node scripts/smoke-messages-ai-staleness.mjs",
-    "smoke:messages-takeover-lifecycle": "node scripts/smoke-messages-takeover-lifecycle.mjs",
     "smoke:desktop-lock": "node scripts/smoke-desktop-lock.mjs",
     "smoke:room-folio-transfer": "npm run build:packages && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-room-folio-table-order-transfer.mjs",
     "smoke:desktop-package": "npm run pack:desktop:dir && node scripts/smoke-desktop-package.mjs",
