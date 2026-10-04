@@ -2,11 +2,11 @@
 
 Bu belge yeni özel yönetim uygulamasının hedefini tanımlar.
 
-Yeni admin uygulaması mevcut terminal konsolunun görsel sürümü değildir. Sıfırdan,
-yalnız gerçek operasyon ihtiyaçlarına göre tasarlanır. Mevcut `tools/admin` geçici
-bir araçtır; işe yarayan script ve registry'ler yeniden kullanılabilir ancak TUI
-mimarisi, menü yapısı veya ekran modeli korunmak zorunda değildir. Yeni uygulama
-yeterli kapsama ulaştığında eski terminal admin tamamen kaldırılabilir.
+Admin Control Center mevcut terminal konsolunun görsel sürümü değildir. Sıfırdan,
+yalnız gerçek operasyon ihtiyaçlarına göre tasarlanmıştır. Canonical script ve
+registry'ler yeniden kullanılır; eski TUI mimarisi ürün sınırı değildir. Yeni
+uygulama gerekli operasyon kapsamına ulaştığı için legacy `tools/admin` artık
+ürün akışının parçası değildir.
 
 ## Ürün sınırı
 
@@ -234,18 +234,25 @@ ana uygulama değişikliği olarak ele alınır.
 7. Deploy workflow'ları.
 8. Destek merkezi.
 9. Sistem/credential yönetimi.
-10. Yeni uygulama eski terminal admin'in tüm gerekli işlerini karşıladığında
-    `tools/admin` ve ona özel kodların kaldırılması.
+10. Legacy terminal admin ve ona özel kodların kaldırılması.
 
-## İlk kabul noktası
+## Mevcut durum
 
-İlk anlamlı sürüm şu durumda hazır sayılır:
+İlk kabul noktası tamamlandı:
 
-- uygulama ayrı açılıyor ve hiçbir müşteri paketine girmiyor,
-- Genel Bakış mock veri kullanmadan gerçek repo/sürüm/kurulum durumunu gösteriyor,
-- BlackSea ve Yardımcı Asistan kurulumlarının health + version drift'i görülebiliyor,
-- Full Verify mevcut HEAD ile ilişkilendirilebiliyor,
-- hiçbir secret normal UI/log/history içinde açığa çıkmıyor.
+- uygulama ayrı açılıyor ve müşteri paketlerine girmiyor,
+- Genel Bakış gerçek repo/sürüm/kurulum/operasyon verisini gösteriyor,
+- kurulum health + version drift görülebiliyor,
+- doğrulamalar çalıştırılabiliyor ve branch + HEAD ile yerel geçmişe yazılıyor,
+- Release ve Deploy canonical scriptleri güvenli IPC sınırı üzerinden orkestre ediyor,
+- Destek merkezi gerçek raporları okuyup durum/çözüm kaydı güncelleyebiliyor,
+- Sistem ekranı araç zinciri, credential referansları, ADB ve bağımlılık durumunu gösteriyor,
+- secret değerleri renderer, log ve geçmişe aktarılmıyor.
 
-Bu noktadan sonra ekranlar gerçek kullanım baskısına göre genişletilir; eski terminal
-admin'in yapısı yeni tasarım için kısıt kabul edilmez.
+Root giriş noktası `npm run admin` yeni Control Center'ı açar. `npm run admin:check`
+typecheck + production renderer build doğrulamasını çalıştırır. Normal `build:apps`,
+Desktop/Android installer ve release akışları Admin Control Center'ı paketlemez.
+
+Fonksiyonel kapsam tamamlandıktan sonra bir sonraki çalışma biçimi, uygulamayı gerçek
+operasyonlarda kullanıp ihtiyaçları toplamak ve yalnız buna göre görsel/ergonomik
+düzeltmeler yapmaktır.
