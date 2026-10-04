@@ -10,11 +10,13 @@ import {
   KeyRound,
   LifeBuoy,
   PackageCheck,
+  Play,
   RefreshCw,
   Rocket,
   Server,
   Settings,
   ShieldCheck,
+  Square,
   Timer,
   TriangleAlert,
   XCircle
@@ -25,7 +27,8 @@ import type {
   HealthCheckSnapshot,
   InstallationSnapshot,
   OverviewSnapshot,
-  StatusKind
+  StatusKind,
+  VerificationRunState
 } from "../shared/contracts";
 
 type Section = "overview" | "installations" | "release" | "tests" | "deploy" | "support" | "system";
@@ -557,12 +560,46 @@ function Tests({
   const defaultPreset = verification.presets.includes("full") ? "full" : verification.presets[0] ?? "";
   const [preset, setPreset] = useState(defaultPreset);
   const [domain, setDomain] = useState("all");
+  const [runState, setRunState] = useState<VerificationRunState>({
+    running: false,
+    selectionLabel: "",
+    startedAt: null,
+    finishedAt: null,
+    result: "idle",
+    exitCode: null,
+    outputTail: []
+  });
+  const [runMessage, setRunMessage] = useState("");
 
   useEffect(() => {
     if (preset && !verification.presets.includes(preset)) {
       setPreset(verification.presets[0] ?? "");
     }
   }, [preset, verification.presets]);
+
+  useEffect(() => {
+    let previousRunning = false;
+    let active = true;
+
+    void window.adminControlCenter.getVerificationRunState().then((state) => {
+      if (!active) return;
+      previousRunning = state.running;
+      setRunState(state);
+    });
+
+    const unsubscribe = window.adminControlCenter.onVerificationRunState((state) => {
+      if (!active) return;
+      const justFinished = previousRunning && !state.running;
+      previousRunning = state.running;
+      setRunState(state);
+      if (justFinished) onRefresh();
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [onRefresh]);
 
   const planIds = new Set(verification.plans[preset] ?? []);
   const visibleChecks = verification.checks.filter((check) =>
@@ -577,6 +614,31 @@ function Tests({
         ? "warning"
         : "unknown";
 
+  const runTone: StatusKind = runState.result === "passed"
+    ? "ready"
+    : runState.result === "failed"
+      ? "error"
+      : runState.result === "running"
+        ? "warning"
+        : runState.result === "cancelled"
+          ? "warning"
+          : "unknown";
+
+  const startRun = useCallback(async (mode: "preset" | "domain" | "check", value: string) => {
+    if (!value || runState.running) return;
+    setRunMessage("");
+    const result = await window.adminControlCenter.startVerification({ mode, value });
+    setRunMessage(result.message);
+    if (!result.accepted) {
+      setTimeout(() => setRunMessage(""), 4000);
+    }
+  }, [runState.running]);
+
+  const cancelRun = useCallback(async () => {
+    const cancelled = await window.adminControlCenter.cancelVerification();
+    if (!cancelled) setRunMessage("Çalışan doğrulama bulunamadı.");
+  }, []);
+
   return (
     <>
       <header className="page-header">
@@ -584,13 +646,30 @@ function Tests({
           <p className="eyebrow">DOĞRULAMA MERKEZİ</p>
           <h1>Testler</h1>
           <p className="page-subtitle">
-            Canonical verification registry ve son yerel doğrulama raporu doğrudan okunuyor.
+            Canonical verification registry, son rapor ve kontrollü çalıştırma akışı tek yerde.
           </p>
         </div>
-        <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
-          <RefreshCw size={17} className={refreshing ? "spin" : ""} />
-          {refreshing ? "Yenileniyor" : "Durumu Yenile"}
-        </button>
+        <div className="verification-header-actions">
+          {runState.running ? (
+            <button className="button button--danger" onClick={() => void cancelRun()}>
+              <Square size={16} />
+              İptal Et
+            </button>
+          ) : (
+            <button
+              className="button button--primary"
+              disabled={!preset}
+              onClick={() => void startRun("preset", preset)}
+            >
+              <Play size={16} />
+              {preset || "Plan"} Çalıştır
+            </button>
+          )}
+          <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
+            <RefreshCw size={17} className={refreshing ? "spin" : ""} />
+            {refreshing ? "Yenileniyor" : "Durumu Yenile"}
+          </button>
+        </div>
       </header>
 
       <section className="verification-summary">
@@ -637,6 +716,7 @@ function Tests({
               className={preset === item ? "preset-card preset-card--active" : "preset-card"}
               key={item}
               onClick={() => setPreset(item)}
+              disabled={runState.running}
             >
               <span>{item}</span>
               <strong>{verification.planCounts[item] ?? 0}</strong>
@@ -646,28 +726,79 @@ function Tests({
         </div>
       </section>
 
+      {runState.result !== "idle" || runMessage ? (
+        <section className="panel verification-run-panel">
+          <div className="verification-run-head">
+            <div>
+              <p className="panel-kicker">CANLI ÇALIŞTIRMA</p>
+              <div className="verification-run-title">
+                <span className={statusClass(runTone)}>
+                  {runState.result === "running"
+                    ? "Çalışıyor"
+                    : runState.result === "passed"
+                      ? "Temiz"
+                      : runState.result === "failed"
+                        ? "Başarısız"
+                        : runState.result === "cancelled"
+                          ? "İptal edildi"
+                          : "Hazır"}
+                </span>
+                <strong>{runState.selectionLabel || runMessage}</strong>
+              </div>
+            </div>
+            {runState.startedAt ? (
+              <small className="quiet">
+                {new Date(runState.startedAt).toLocaleTimeString("tr-TR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit"
+                })}
+              </small>
+            ) : null}
+          </div>
+
+          <div className="verification-console">
+            {runState.outputTail.length
+              ? runState.outputTail.map((line, index) => <div key={`${index}:${line}`}>{line}</div>)
+              : <div>{runMessage || "Çıktı bekleniyor…"}</div>}
+          </div>
+        </section>
+      ) : null}
+
       <section className="panel verification-panel">
         <div className="panel-header verification-toolbar">
           <div>
             <p className="panel-kicker">CANONICAL PLAN</p>
             <h2>{preset || "Plan"} kontrolleri</h2>
           </div>
-          <div className="domain-filter">
-            <button
-              className={domain === "all" ? "filter-chip filter-chip--active" : "filter-chip"}
-              onClick={() => setDomain("all")}
-            >
-              Tümü
-            </button>
-            {verification.domains.map((item) => (
+          <div className="verification-toolbar-actions">
+            {domain !== "all" ? (
               <button
-                key={item}
-                className={domain === item ? "filter-chip filter-chip--active" : "filter-chip"}
-                onClick={() => setDomain(item)}
+                className="button button--secondary button--compact"
+                disabled={runState.running}
+                onClick={() => void startRun("domain", domain)}
               >
-                {item}
+                <Play size={14} />
+                {domain} çalıştır
               </button>
-            ))}
+            ) : null}
+            <div className="domain-filter">
+              <button
+                className={domain === "all" ? "filter-chip filter-chip--active" : "filter-chip"}
+                onClick={() => setDomain("all")}
+              >
+                Tümü
+              </button>
+              {verification.domains.map((item) => (
+                <button
+                  key={item}
+                  className={domain === item ? "filter-chip filter-chip--active" : "filter-chip"}
+                  onClick={() => setDomain(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -683,7 +814,7 @@ function Tests({
                   : "unknown";
 
             return (
-              <div className="verification-row" key={check.id}>
+              <div className="verification-row verification-row--action" key={check.id}>
                 <span className="verification-index">{String(index + 1).padStart(2, "0")}</span>
                 <div className="verification-check-copy">
                   <strong>{check.label}</strong>
@@ -707,6 +838,13 @@ function Tests({
                   </span>
                   {result ? <small>{result.durationMs} ms</small> : null}
                 </div>
+                <button
+                  className="text-button verification-run-check"
+                  disabled={runState.running}
+                  onClick={() => void startRun("check", check.id)}
+                >
+                  Çalıştır
+                </button>
               </div>
             );
           })}
@@ -717,10 +855,10 @@ function Tests({
       <section className="panel verification-note">
         <FlaskConical size={20} />
         <div>
-          <strong>Çalıştırma butonlarını bir sonraki dilimde bağlayacağım.</strong>
+          <strong>Doğrulamalar canonical verify runner üzerinden çalışır.</strong>
           <p>
-            Şu an ekran registry'yi ve mevcut raporu salt-okunur gösteriyor. Sonraki adımda preset/domain/check
-            çalıştırma, canlı ilerleme, iptal ve Admin'e özel doğrulama geçmişi gelecek.
+            Admin kendi test komutlarını üretmez; scripts/verify.mjs çalıştırılır. Aynı anda tek plan çalışır,
+            canlı çıktı gösterilir ve gerektiğinde süreç ağacı iptal edilebilir.
           </p>
         </div>
       </section>
