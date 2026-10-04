@@ -156,6 +156,21 @@ export type DeploymentRunState = {
   outputTail: string[];
 };
 
+export type ReleaseOperationRequest = {
+  action: "package" | "preview" | "publish";
+};
+
+export type ReleaseOperationState = {
+  running: boolean;
+  action: "package" | "preview" | "publish" | "";
+  stage: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: "idle" | "running" | "passed" | "failed" | "cancelled";
+  exitCode: number | null;
+  outputTail: string[];
+};
+
 export type SupportReportStatus = "new" | "reviewing" | "resolved";
 
 export type SupportReportListItem = {
@@ -274,6 +289,10 @@ export type AdminBridge = {
   startDeployment(request: DeploymentRunRequest): Promise<{ accepted: boolean; message: string }>;
   cancelDeployment(): Promise<boolean>;
   onDeploymentRunState(listener: (state: DeploymentRunState) => void): () => void;
+  getReleaseOperationState(): Promise<ReleaseOperationState>;
+  startReleaseOperation(request: ReleaseOperationRequest): Promise<{ accepted: boolean; message: string }>;
+  cancelReleaseOperation(): Promise<boolean>;
+  onReleaseOperationState(listener: (state: ReleaseOperationState) => void): () => void;
   getSystemEnvironment(): Promise<SystemEnvironmentSnapshot>;
   listSupportReports(limit?: number): Promise<SupportReportListItem[]>;
   getSupportReportDetail(reportId: string, refresh?: boolean): Promise<SupportReportDetail>;
