@@ -3,6 +3,11 @@ import { join, resolve } from "node:path";
 import { checkDependencyUpdates } from "./services/dependency-update-service";
 import { DeploymentRunner, getDeploymentTargets } from "./services/deployment-runner";
 import { getOverviewSnapshot } from "./services/overview-service";
+import {
+  getSupportReportDetail,
+  listSupportReports,
+  updateSupportReportStatus
+} from "./services/support-service";
 import { VerificationRunner } from "./services/verification-runner";
 
 const APP_ROOT = resolve(__dirname, "../..");
@@ -67,6 +72,13 @@ ipcMain.handle("admin:get-deployment-targets", () => getDeploymentTargets(REPO_R
 ipcMain.handle("admin:get-deployment-run-state", () => deploymentRunner.getState());
 ipcMain.handle("admin:start-deployment", (_event, request) => deploymentRunner.start(request));
 ipcMain.handle("admin:cancel-deployment", () => deploymentRunner.cancel());
+ipcMain.handle("admin:list-support-reports", (_event, limit) => listSupportReports(REPO_ROOT, limit));
+ipcMain.handle("admin:get-support-report-detail", (_event, reportId) => getSupportReportDetail(REPO_ROOT, reportId));
+ipcMain.handle(
+  "admin:update-support-report-status",
+  (_event, reportId, status, resolvedInVersion, resolutionNote) =>
+    updateSupportReportStatus(REPO_ROOT, reportId, status, resolvedInVersion, resolutionNote)
+);
 ipcMain.handle("admin:open-external", async (_event, value: unknown) => {
   const url = typeof value === "string" ? value.trim() : "";
   if (!/^https?:\/\//i.test(url)) return false;
