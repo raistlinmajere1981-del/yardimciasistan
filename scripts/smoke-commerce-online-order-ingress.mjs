@@ -98,7 +98,7 @@ try {
     name: "Order product", salePrice: 25, purchasePrice: 10, unit: "piece", currency: "TRY", taxRate: 20,
     trackInventory: true, isActive: true
   });
-  const envelope = { id: "web-1", items: [{ productId: product.id, quantity: 2, unitPrice: 0.01 }], buyer: { name: "Guest contact", phone: "+44 7911 123456", email: "guest@example.test" }, note: "Guest order note", createdAt: new Date().toISOString() };
+  const envelope = { id: "web-1", items: [{ productId: product.id, quantity: 2, unitPrice: 0.01 }], delivery: { method: "shipping", address: { recipientName: "Other Recipient", addressLine1: "42 Example Road", district: "Central", city: "London", countryCode: "GB" } }, buyer: { name: "Guest contact", phone: "+44 7911 123456", email: "guest@example.test" }, note: "Guest order note", createdAt: new Date().toISOString() };
   const first = enqueue(envelope);
   assert.equal(syncApi({ action: "pull_web_orders", client_id: "desktop-test", after_seq: 0 }, false).status, 401);
   assert.equal(syncApi({ action: "acknowledge_web_orders", client_id: "desktop-test", through_seq: 1 }, false).status, 401);
@@ -120,6 +120,7 @@ try {
   assert.equal(created.order.sourceReference, "web-1");
   assert.equal(created.order.customerId, "");
   assert.deepEqual(created.order.buyerSnapshot, envelope.buyer);
+  assert.deepEqual(created.order.deliverySnapshot, envelope.delivery);
   assert.equal(created.order.note, envelope.note);
   assert.deepEqual(getRuntimeOrder(database.databasePath, created.order.id).order.buyerSnapshot, envelope.buyer);
   assert.equal(created.items[0].unitPrice, 25, "canonical price ignores payload unitPrice");
@@ -130,7 +131,7 @@ try {
   const normalized = ingress.importOrder({ ...first, id: "normalized", items: [{ productId: ` ${product.id} `, quantity: "1.23456" }] });
   assert.equal(normalized.items[0].quantity, 1.2346);
   for (const bad of [null, { ...first, id: "" }, { ...first, createdAt: "invalid" }, { ...first, syncSeq: 0 },
-    { ...first, buyer: undefined }, { ...first, buyer: { name: "Guest", phone: "123" } }, { ...first, note: "x".repeat(2001) },
+    { ...first, delivery: undefined }, { ...first, delivery: { method: "shipping", address: null } }, { ...first, buyer: undefined }, { ...first, buyer: { name: "Guest", phone: "123" } }, { ...first, note: "x".repeat(2001) },
     { ...first, items: [] }, { ...first, items: [{ productId: product.id, quantity: true }] },
     { ...first, items: [{ productId: product.id, quantity: 0 }] }]) {
     assert.throws(() => ingress.importOrder(bad), /geçersiz/);
@@ -146,7 +147,7 @@ try {
   fixtureDb.prepare("UPDATE catalog_products SET is_active = 0 WHERE id = ?").run(unavailable.id);
   fixtureDb.close();
   assert.throws(() => ingress.importOrder({ ...first, id: "inactive", items: [{ productId: unavailable.id, quantity: 1 }] }), /aktif değil/);
-  const broken = enqueue({ ...envelope, id: "web-broken", items: [{ productId: unavailable.id, quantity: 1 }] });
+  const broken = enqueue({ ...envelope, id: "web-broken", delivery: { method: "shipping", address: { ...envelope.delivery.address, city: "" } } });
   const later = enqueue({ ...envelope, id: "web-later" });
   let result = await coordinator().runNow();
   assert.equal(result.ok, false);
@@ -202,6 +203,7 @@ try {
   database.initialize();
   assert.equal(database.getSyncRuntimeStatus().webOrderCursor, later.syncSeq, "cursor survives restart");
   assert.deepEqual(getRuntimeOrder(database.databasePath, created.order.id).order.buyerSnapshot, envelope.buyer, "buyer survives ack and restart");
+  assert.deepEqual(getRuntimeOrder(database.databasePath, created.order.id).order.deliverySnapshot, envelope.delivery, "delivery survives restart");
   console.log("commerce-online-order-ingress-smoke-ok");
 } finally {
   globalThis.fetch = originalFetch;

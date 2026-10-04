@@ -226,7 +226,7 @@ function ya_storage_enqueue_web_order(array $order): array
     $id = ya_storage_string($order['id'] ?? '');
     $createdAt = ya_storage_string($order['createdAt'] ?? '');
     if ($id === '' || strlen($id) > 180 || $createdAt === '' || !is_array($order['items'] ?? null)
-        || !is_array($order['buyer'] ?? null)) {
+        || !is_array($order['buyer'] ?? null) || !is_array($order['delivery'] ?? null)) {
         throw new InvalidArgumentException('invalid_web_order_envelope');
     }
     // Store only transport fields, never client pricing or canonical Customer identity.
@@ -235,7 +235,13 @@ function ya_storage_enqueue_web_order(array $order): array
         : null, $order['items']);
     $buyer = ['name' => $order['buyer']['name'] ?? null, 'phone' => $order['buyer']['phone'] ?? null];
     if (isset($order['buyer']['email'])) $buyer['email'] = $order['buyer']['email'];
-    $payload = ['id' => $id, 'items' => $items, 'buyer' => $buyer, 'createdAt' => $createdAt];
+    // Transport allowlist only; public submission and Desktop ingress own address validation.
+    $delivery = ['method' => $order['delivery']['method'] ?? null, 'address' => null];
+    if ($delivery['method'] === 'shipping') {
+        $address = $order['delivery']['address'] ?? null;
+        $delivery['address'] = is_array($address) ? array_intersect_key($address, array_flip(['recipientName', 'addressLine1', 'addressLine2', 'district', 'city', 'postalCode', 'countryCode', 'note'])) : null;
+    }
+    $payload = ['id' => $id, 'items' => $items, 'buyer' => $buyer, 'delivery' => $delivery, 'createdAt' => $createdAt];
     if (isset($order['note'])) $payload['note'] = $order['note'];
     $database = ya_storage_open();
     $statement = $database->prepare(<<<'SQL'

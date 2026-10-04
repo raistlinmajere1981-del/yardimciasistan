@@ -8,6 +8,7 @@ import {
   getBusinessProfile,
   normalizeBirthdaySettings,
   type BirthdaySettings,
+  type OnlineSalesDeliverySettings,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 
@@ -55,6 +56,7 @@ export interface SetupFormState {
   productDataAutoSearch: boolean;
   productDataIncludeImages: boolean;
   birthdaySettings: BirthdaySettings;
+  onlineSalesDelivery: OnlineSalesDeliverySettings;
 }
 
 export const aiServicePresets = [
@@ -107,6 +109,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiServiceDrafts,
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
+    onlineSalesDelivery: { ...setupData.onlineSalesDelivery },
     productDataEnabled: setupData.productData.enabled,
     productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,
@@ -231,6 +234,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       clearAiApiKey: setupForm.clearAiApiKey,
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
+      onlineSalesDelivery: setupForm.onlineSalesDelivery,
       productData: {
         enabled: setupForm.productDataEnabled,
         provider: setupForm.productDataProvider,

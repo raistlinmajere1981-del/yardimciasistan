@@ -1133,6 +1133,7 @@ test("pushTableCatalog publishes only customer-facing table data", async () => {
 
 test("web orders use dedicated actions and do not alter request cursor payloads", async () => {
   const envelope = { id: "web-order-guest", items: [{ productId: "product-1", quantity: 2 }],
+    delivery: { method: "shipping", address: { recipientName: "Recipient", addressLine1: "42 Road", district: "Central", city: "London", countryCode: "GB" } },
     buyer: { name: "Guest", phone: "+1 202 555 0100", email: "guest@example.test" }, note: "Guest note",
     createdAt: "2026-10-04T00:00:00Z", syncSeq: 9 };
   const calls = [];
@@ -1189,7 +1190,7 @@ test("online catalog publication uses the versioned transport and a public field
     }
   });
   await transport.publishOnlineCatalog({ sourceRevision: 4, idempotencyKey: "desktop-catalog:online_catalog:4", value: {
-    version: 1, enabled: true, updatedAt: "2026-10-04T00:00:00Z", products: [{
+    version: 1, enabled: true, deliveryMethods: ["pickup", "shipping"], updatedAt: "2026-10-04T00:00:00Z", products: [{
       productId: "p1", name: "Public product", description: "Public description", sku: "SKU-1", unit: "piece",
       price: 25, currency: "TRY", taxRate: 20, imageUrl: "", availability: "available", sortOrder: 0,
       purchasePrice: 10, dealerPriceA: 15, barcode: "private-barcode", internalNotes: "private"
@@ -1198,7 +1199,7 @@ test("online catalog publication uses the versioned transport and a public field
   assert.deepEqual(calls[0], {
     action: "publish_online_catalog", client_id: "desktop-catalog", source_revision: 4,
     idempotency_key: "desktop-catalog:online_catalog:4", online_catalog: {
-      version: 1, enabled: true, updated_at: "2026-10-04T00:00:00Z", products: [{
+      version: 1, enabled: true, delivery_methods: ["pickup", "shipping"], updated_at: "2026-10-04T00:00:00Z", products: [{
         product_id: "p1", name: "Public product", description: "Public description", sku: "SKU-1", unit: "piece",
         price: 25, currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0
       }]

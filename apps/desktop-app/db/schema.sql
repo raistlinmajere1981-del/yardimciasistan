@@ -211,6 +211,7 @@ CREATE TABLE commerce_orders (
   customer_id TEXT NULL,
   customer_name TEXT NOT NULL DEFAULT '',
   buyer_snapshot_json TEXT NOT NULL DEFAULT 'null' CHECK (json_valid(buyer_snapshot_json)),
+  delivery_snapshot_json TEXT NOT NULL DEFAULT '{"method":"pickup","address":null}' CHECK (json_valid(delivery_snapshot_json)),
   status TEXT NOT NULL DEFAULT 'placed'
     CHECK (status IN ('placed', 'confirmed', 'fulfilled', 'cancelled')),
   source TEXT NOT NULL DEFAULT 'desktop',
@@ -796,6 +797,8 @@ CREATE TABLE settings (
   product_data_provider TEXT NOT NULL DEFAULT 'open_food_facts',
   product_data_auto_search INTEGER NOT NULL DEFAULT 1 CHECK (product_data_auto_search IN (0, 1)),
   product_data_include_images INTEGER NOT NULL DEFAULT 1 CHECK (product_data_include_images IN (0, 1)),
+  online_sales_pickup_enabled INTEGER NOT NULL DEFAULT 1 CHECK (online_sales_pickup_enabled IN (0, 1)),
+  online_sales_shipping_enabled INTEGER NOT NULL DEFAULT 0 CHECK (online_sales_shipping_enabled IN (0, 1) AND (online_sales_pickup_enabled = 1 OR online_sales_shipping_enabled = 1)),
   setup_completed INTEGER NOT NULL DEFAULT 0 CHECK (setup_completed IN (0, 1)),
   app_password_verifier TEXT NOT NULL DEFAULT '',
   app_password_updated_at TEXT NOT NULL DEFAULT '',

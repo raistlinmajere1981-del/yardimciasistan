@@ -490,3 +490,35 @@ email to 254 and note to 2000. PII is never included in diagnostics.
 Creating a guest order does not reserve stock or create a Sale, payment or fulfillment.
 Shipping, address, delivery method, customer/dealer login and checkout UI remain deferred.
 Only the current transport/database contract is supported; no historical compatibility.
+
+## D-030 — Delivery is order intent; shipping execution is separate
+
+**Status:** ACCEPTED (2026-10-04)
+
+Commerce Order owns an immutable delivery snapshot, separate from its buyer/contact
+snapshot and canonical Customer address. Initial methods are `pickup` (address null)
+and `shipping` (structured address required). Guest delivery capture creates neither
+a Customer nor an address-book entry and never mutates Customer data. Manual/desktop
+creation with omitted delivery defaults to pickup; web submission and ingress require
+an explicit method. There is no historical schema migration or envelope fallback.
+
+`channel.online_sales` configuration owns pickupEnabled/shippingEnabled, with at least
+one enabled; defaults are pickup ON and shipping OFF. These are staged Services Settings
+fields in the existing Setup persistence path, not new capabilities. Desktop publishes
+only allowed delivery methods in the public online catalog. Hosting validates the current
+method allowlist for new submissions; receipt replay remains independent of later changes.
+Delivery and normalized address are part of the public idempotency fingerprint. Desktop
+validates the imported snapshot and remains authoritative for canonical orders/pricing.
+
+Address fields are bounded: recipient 160, address lines 300 each, district/city 120 each,
+postal code 32, note 500 characters. Country is a normalized two-letter uppercase code
+(non-TR countries supported). Required text must be nonempty; control characters are
+rejected (line breaks allowed only in address note). Optional empty text is omitted.
+Pickup discards any supplied address; client carrier/price/tracking/status fields have
+no authority and never enter the canonical snapshot.
+
+Selecting shipping creates no Sale, inventory movement, reservation or fulfillment.
+Order totals remain product totals; no shipping charge or zero-price shipping promise is
+created. Shipping costs/pricing need a separate domain decision. Providers, labels,
+tracking, carrier status and shipment lifecycle belong to a later shipping/fulfillment
+layer. Existing explicit Order → Sale fulfillment and order lifecycle remain unchanged.

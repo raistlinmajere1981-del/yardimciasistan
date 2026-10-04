@@ -30,6 +30,12 @@ const layoutSettingsDefinition = {
   visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ACCOMMODATION_ROOMS) || caps.includes(C.FOOD_TABLES)
 } satisfies SettingsSectionDefinition;
 
+export const onlineSalesDeliveryDefinition = {
+  id: "settings-online-delivery", category: "services", title: "Online Satış Teslimatı",
+  keywords: "online satış işletmeden teslim pickup kargo shipping teslimat",
+  persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ONLINE_SALES)
+} as const satisfies SettingsSectionDefinition;
+
 export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-business", category: "business", title: "İşletme", keywords: "firma adı sektör tipi telefon whatsapp e-posta adres", persistence: "staged" },
   { id: "settings-options", category: "business", title: "Ek özellikler", keywords: "yetenek talepler oda masa rezervasyonları qr menü stok veresiye müşteri hesabı satın alma tedarikçi etiket", persistence: "staged" },
@@ -37,6 +43,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-social-links", category: "business", title: "Sosyal Medya", keywords: "facebook instagram youtube tiktok x sosyal medya profil bağlantı link", persistence: "resource", visible: (_, initialized) => initialized },
   { id: "settings-google-reviews", category: "business", title: "Google Yorumları", keywords: "google places yorum değerlendirme puan place id api anahtarı", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   layoutSettingsDefinition,
+  onlineSalesDeliveryDefinition,
   { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },

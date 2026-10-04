@@ -58,6 +58,7 @@ function createDealerOrder(productId, customerId, quantity, reference) {
     customerId,
     source: "desktop-wholesale",
     sourceReference: reference,
+    ...(reference === "fulfillment-smoke-paid-order" ? { deliverySnapshot: { method: "shipping", address: { recipientName: "Recipient", addressLine1: "42 Road", district: "Central", city: "London", countryCode: "GB" } } } : {}),
     items: [{ productId, quantity }]
   });
 }
@@ -154,6 +155,8 @@ try {
     });
 
     assert.equal(paid.order.order.status, "fulfilled");
+    assert.deepEqual(paid.order.order.deliverySnapshot, paidOrder.order.deliverySnapshot);
+    assert.equal(paid.order.order.deliverySnapshot.method, "shipping");
     assert.equal(paid.sale.status, "paid");
     assert.equal(paid.sale.paymentMethod, "cash");
     assert.equal(paid.sale.subtotal, 160);

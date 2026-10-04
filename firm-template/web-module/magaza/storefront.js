@@ -9,6 +9,8 @@
   const discrete = (unit) => ['piece', 'pack', 'box'].includes(unit);
   const scale = 10000;
   let catalog = new Map(), catalogStatus = 'loading', loading = false;
+  let deliveryMethods = [], deliveryMethod = '';
+  const deliveryLabels = { pickup: 'İşletmeden teslim', shipping: 'Kargo ile gönderim' };
   let cart = [], pending = null, busy = false, retryUntil = 0, timer;
   function read(storage, key) { try { return JSON.parse(window[storage].getItem(key)); } catch { return null; } }
   function write(storage, key, value) { try { value === null ? window[storage].removeItem(key) : window[storage].setItem(key, JSON.stringify(value)); } catch { /* storage may be blocked */ } }
@@ -39,9 +41,10 @@
     }
     const savedAttempt = read('sessionStorage', attemptKey);
     if (savedAttempt?.version === 1 && /^[A-Za-z0-9_-]{16,128}$/.test(savedAttempt.key)) {
-      pending = { key: savedAttempt.key, payload: null };
+      pending = { key: savedAttempt.key, method: savedAttempt.method, payload: null };
+      if (Object.hasOwn(deliveryLabels, savedAttempt.method)) deliveryMethod = savedAttempt.method;
       $('checkout').hidden = false;
-      message('Önceki gönderimin sonucu belirsiz. Aynı iletişim bilgileriyle tekrar deneyin. Yeni sipariş göndermeyin.');
+      message('Önceki gönderimin sonucu belirsiz. Aynı iletişim ve teslimat bilgileriyle tekrar deneyin. Yeni sipariş göndermeyin.');
     }
   } catch { /* browser storage may be unavailable */ }
   function persistCart() {
@@ -93,6 +96,8 @@
     $('clear-cart').disabled = !cart.length || Boolean(pending) || busy;
     $('open-checkout').disabled = !validCart() || Boolean(pending) || busy;
     $('buyer-fields').disabled = busy || Boolean(pending?.payload);
+    $('delivery-fields').disabled = busy || Boolean(pending?.payload);
+    renderDelivery();
     $('submit-order').disabled = busy || Date.now() < retryUntil || (!pending && !validCart());
     $('submit-order').textContent = busy ? 'Gönderiliyor…' : pending ? 'Aynı siparişi tekrar dene' : 'Siparişi gönder';
     $('checkout-form').setAttribute('aria-busy', String(busy));
@@ -162,8 +167,11 @@
     try {
       const response = await fetch(new URL('api/catalog.php', new URL('../', location.href)), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
       const result = await response.json();
-      if (!response.ok || result.ok !== true || typeof result.enabled !== 'boolean' || !Array.isArray(result.products)) throw new Error('catalog_unavailable');
+      if (!response.ok || result.ok !== true || typeof result.enabled !== 'boolean' || !Array.isArray(result.products)
+          || !Array.isArray(result.delivery_methods) || (result.enabled && (!result.delivery_methods.length || result.delivery_methods.length > 2
+          || new Set(result.delivery_methods).size !== result.delivery_methods.length || result.delivery_methods.some((method) => !Object.hasOwn(deliveryLabels, method))))) throw new Error('catalog_unavailable');
       const products = result.enabled ? result.products.map(snapshot) : [];
+      deliveryMethods = result.enabled ? result.delivery_methods : [];
       catalog = new Map(products.map((product) => [product.product_id, product]));
       catalogStatus = !result.enabled ? 'disabled' : 'ready';
       // A pending payload never changes; display snapshots can reflect current catalog.
@@ -176,6 +184,35 @@
     } finally {
       loading = false; $('refresh').disabled = false; $('product-grid').setAttribute('aria-busy', 'false'); renderProducts(); renderCart();
     }
+  }
+  function renderDelivery() {
+    if (pending) deliveryMethod = pending.payload?.delivery.method || pending.method || deliveryMethod;
+    else if (!deliveryMethods.includes(deliveryMethod)) deliveryMethod = deliveryMethods[0] || '';
+    $('delivery-choice').hidden = deliveryMethods.length < 2 || Boolean(pending);
+    $('delivery-summary').textContent = deliveryLabels[deliveryMethod] || 'Teslimat yöntemleri katalogla birlikte yüklenir.';
+    for (const option of $('delivery-method').options) option.hidden = !deliveryMethods.includes(option.value);
+    $('delivery-method').value = deliveryMethod;
+    $('shipping-fields').hidden = deliveryMethod !== 'shipping';
+  }
+  function validateDelivery() {
+    if (deliveryMethod === 'pickup') return { method: 'pickup' };
+    if (deliveryMethod !== 'shipping') { message('Teslimat yöntemini kontrol edin.'); return null; }
+    const address = {}, errors = [];
+    const limits = { recipientName: 160, addressLine1: 300, addressLine2: 300, district: 120, city: 120, postalCode: 32, countryCode: 2, note: 500 };
+    for (const [key, maximum] of Object.entries(limits)) {
+      const input = $(`delivery-${key}`);
+      let value = input.value.trim();
+      if (key === 'countryCode') value = value.toUpperCase();
+      const required = ['recipientName', 'addressLine1', 'district', 'city', 'countryCode'].includes(key);
+      const controls = key === 'note' ? /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/ : /[\x00-\x1f\x7f]/;
+      const invalid = (required && !value) || [...value].length > maximum || controls.test(value) || (key === 'countryCode' && !/^[A-Za-z]{2}$/.test(input.value.trim()));
+      $(`delivery-${key}-error`).textContent = invalid ? (key === 'countryCode' ? 'İki harfli ülke kodunu yazın (TR, GB gibi).' : `Bu alanı kontrol edin (en fazla ${maximum} karakter).`) : '';
+      input.setAttribute('aria-invalid', String(invalid));
+      if (invalid) errors.push(input);
+      else if (value) address[key] = value;
+    }
+    if (errors.length) { errors[0].focus(); return null; }
+    return { method: 'shipping', address };
   }
   function validateBuyer() {
     const values = { name: $('buyer-name').value.trim(), phone: $('buyer-phone').value.trim(), email: $('buyer-email').value.trim(), note: $('order-note').value.trim() };
@@ -206,12 +243,14 @@
     if (!pending?.payload) {
       if ((!pending && !validCart()) || document.querySelector('.quantity-controls [aria-invalid="true"]') || !cart.length) { message('Sepetteki ürünleri ve miktarları kontrol edin.'); return; }
       const contact = validateBuyer(); if (!contact) return;
+      if (!pending && !deliveryMethods.includes(deliveryMethod)) { message('Teslimat yöntemini kontrol edin.'); return; }
+      const delivery = validateDelivery(); if (!delivery) return;
       try {
         const key = pending?.key || newKey();
-        const payload = { idempotencyKey: key, items: cart.map((item) => ({ productId: item.productId, quantity: item.q / scale })), ...contact };
+        const payload = { idempotencyKey: key, items: cart.map((item) => ({ productId: item.productId, quantity: item.q / scale })), delivery, ...contact };
         if (new TextEncoder().encode(JSON.stringify(payload)).length > 16384) { message('Sipariş bilgileri çok uzun. Notu veya sepeti kısaltın.'); return; }
-        pending = { key, payload };
-        write('sessionStorage', attemptKey, { version: 1, key });
+        pending = { key, method: delivery.method, payload };
+        write('sessionStorage', attemptKey, { version: 1, key, method: delivery.method });
       } catch { message('Güvenli sipariş kimliği üretilemedi. Güncel bir tarayıcı ve güvenli bağlantı kullanın.'); return; }
     }
     busy = true; message(''); renderProducts(); renderCart();
@@ -231,6 +270,8 @@
         $('catalog-state').textContent = 'Mağazamız şu anda online sipariş almıyor.'; message('Mağaza sipariş almayı durdurdu. Sepetiniz korunuyor.');
       } else if (response.status === 422 && result.code === 'product_not_published') {
         forgetAttempt(); await loadCatalog(); message('Ürünlerden biri artık satışta değil. Sepetinizi kontrol edip ilgili satırı kaldırın.');
+      } else if (response.status === 422 && result.code === 'delivery_method_unavailable') {
+        forgetAttempt(); await loadCatalog(); message('Seçilen teslimat yöntemi artık sunulmuyor. Güncel yöntemle siparişinizi tekrar gönderebilirsiniz.');
       } else if (response.status === 429) {
         const header = response.headers.get('Retry-After');
         const seconds = /^\d+$/.test(header || '') ? Number(header) : header && Number.isFinite(Date.parse(header)) ? Math.max(1, Math.ceil((Date.parse(header) - Date.now()) / 1000)) : Number(result.retry_after_seconds) || 60;
@@ -238,12 +279,13 @@
         message(`Çok kısa sürede fazla istek gönderildi. ${Math.ceil((retryUntil - Date.now()) / 1000)} saniye sonra aynı siparişi tekrar deneyebilirsiniz.`);
         clearTimeout(timer); timer = setTimeout(() => { message('Bekleme süresi doldu. Aynı siparişi tekrar deneyebilirsiniz.'); updateControls(); }, retryUntil - Date.now());
       } else if (response.status >= 400 && response.status < 500) {
-        forgetAttempt(); message('Sipariş gönderilemedi. Ürünleri ve iletişim bilgilerini kontrol edin.');
+        forgetAttempt(); message('Sipariş gönderilemedi. Ürünleri, iletişim ve teslimat bilgilerini kontrol edin.');
       } else throw new Error('uncertain_submission');
     } catch {
       message('Siparişin sonucu doğrulanamadı. Bilgileriniz ve sepetiniz korunuyor. Aynı siparişi tekrar deneyin; yeni bir sipariş başlatmayın.');
     } finally { busy = false; renderProducts(); renderCart(); }
   }
+  $('delivery-method').addEventListener('change', () => { if (pending || busy) return; deliveryMethod = $('delivery-method').value; renderDelivery(); });
   $('refresh').addEventListener('click', loadCatalog);
   $('clear-cart').addEventListener('click', () => { if (pending || busy) return; cart = []; persistCart(); renderCart(); });
   $('open-checkout').addEventListener('click', () => { if ($('open-checkout').disabled) return; $('checkout').hidden = false; $('buyer-name').focus(); });

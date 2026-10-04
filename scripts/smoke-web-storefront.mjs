@@ -29,11 +29,11 @@ function storage(code) {
   assert.equal(result.status, 0, result.stderr); return result.stdout ? JSON.parse(result.stdout) : null;
 }
 const clearGuard = () => storage("if ($db->query(\"SELECT 1 FROM sqlite_master WHERE name='public_request_guard_events'\")->fetchColumn()) $db->exec('DELETE FROM public_request_guard_events');");
-async function publish(enabled = true, products = [product, weighted]) {
+async function publish(enabled = true, products = [product, weighted], methods = ['pickup']) {
   revision++;
   const result = await fetch(`${base}/api/sync.php`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-YA-Sync-Secret': secret },
     body: JSON.stringify({ action: 'publish_online_catalog', client_id: 'a4-browser', source_revision: revision, idempotency_key: `publication-${revision}`,
-      online_catalog: { version: 1, enabled, updated_at: new Date().toISOString(), products: enabled ? products : [] } }) });
+      online_catalog: { version: 1, enabled, delivery_methods: enabled ? methods : [], updated_at: new Date().toISOString(), products: enabled ? products : [] } }) });
   assert.equal(result.status, 200, await result.text());
 }
 const quantityInput = (page, name = product.name) => page.getByRole('textbox', { name: `${name}: miktar`, exact: false });
@@ -197,7 +197,8 @@ try {
   for (const pii of ['Guest Example', '+44 7911 123456', 'guest@example.test', 'Test order note']) assert.equal(JSON.stringify(browserStorage).includes(pii), false);
   await page.locator('#submit-order').click(); await expect(page.locator('#success')).toBeVisible();
   assert.deepEqual(requests[1], requests[0]); assert.match(requests[0].idempotencyKey, /^[A-Za-z0-9_-]{16,128}$/);
-  assert.deepEqual(Object.keys(requests[0]).sort(), ['buyer', 'idempotencyKey', 'items', 'note']);
+  assert.deepEqual(Object.keys(requests[0]).sort(), ['buyer', 'delivery', 'idempotencyKey', 'items', 'note']);
+  assert.deepEqual(requests[0].delivery, { method: 'pickup' });
   assert.deepEqual(requests[0].items, [{ productId: 'p-one', quantity: 1 }]);
   await expect(page.locator('#reference')).toHaveText(/^web_order_[a-f0-9]{32}$/);
   await expect(page.locator('#cart-count')).toHaveText('0');
@@ -248,6 +249,72 @@ try {
   await reload.getByLabel('E-posta').fill('guest@example.test'); await reload.getByLabel('Sipariş notu').fill('Test order note');
   await reload.locator('#submit-order').click(); await expect.poll(() => retryRequests.length).toBe(2); assert.deepEqual(retryRequests[1], retryRequests[0]);
   await reload.context().close();
+
+  // Public delivery configuration controls choices; shipping fields are independent of buyer.
+  const address = { recipientName: 'Delivery Recipient', addressLine1: '42 Example Road', addressLine2: 'Floor 2', district: 'Central', city: 'London', postalCode: 'SW1A 1AA', countryCode: 'gb', note: 'Ring bell' };
+  const fillAddress = async (target) => { for (const [key, value] of Object.entries(address)) await target.locator(`#delivery-${key}`).fill(value); };
+  for (const [methods, viewport] of [[['pickup'], { width: 1440, height: 900 }], [['shipping'], { width: 375, height: 812 }], [['pickup', 'shipping'], { width: 320, height: 780 }]]) {
+    await publish(true, [product], methods);
+    const deliveryPage = await freshPage(viewport); await ready(deliveryPage); await add(deliveryPage).click(); await contact(deliveryPage);
+    if (methods.length === 2) {
+      await expect(deliveryPage.locator('#delivery-choice')).toBeVisible();
+      await expect(deliveryPage.locator('#shipping-fields')).toBeHidden();
+      await deliveryPage.locator('#delivery-method').selectOption('shipping');
+      await expect(deliveryPage.locator('#shipping-fields')).toBeVisible();
+      await deliveryPage.locator('#delivery-method').selectOption('pickup');
+      await expect(deliveryPage.locator('#shipping-fields')).toBeHidden();
+      await deliveryPage.locator('#delivery-method').selectOption('shipping');
+    } else await expect(deliveryPage.locator('#delivery-choice')).toBeHidden();
+    const shipping = methods.includes('shipping');
+    await expect(deliveryPage.locator('#shipping-fields'))[shipping ? 'toBeVisible' : 'toBeHidden']();
+    const attempts = [];
+    await deliveryPage.route('**/api/order.php', async (route) => {
+      attempts.push(route.request().postDataJSON());
+      if (shipping && attempts.length === 1) { const accepted = await route.fetch(); assert.equal(accepted.status(), 201); await route.abort(); }
+      else await route.continue();
+    });
+    if (shipping) {
+      await deliveryPage.locator('#submit-order').click(); await expect(deliveryPage.locator('#delivery-recipientName')).toBeFocused();
+      assert.equal(attempts.length, 0);
+      await fillAddress(deliveryPage);
+      await expect(deliveryPage.getByText('Kargo ücreti ayrıca belirlenecektir.')).toBeVisible();
+    }
+    assert.equal(await deliveryPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `delivery overflow ${viewport.width}`);
+    clearGuard(); await deliveryPage.locator('#submit-order').click();
+    if (shipping) {
+      await expect(deliveryPage.locator('#submission-message')).toContainText('sonucu doğrulanamadı');
+      await expect(deliveryPage.locator('#delivery-recipientName')).toBeDisabled();
+      const persisted = await deliveryPage.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }));
+      for (const value of ['Delivery Recipient', '42 Example Road', 'SW1A 1AA', 'Ring bell']) assert.equal(persisted.includes(value), false);
+      // Only the non-PII method/key survives refresh, even if the method was subsequently disabled.
+      await publish(true, [product], ['pickup']);
+      deliveryPage.on('dialog', (dialog) => dialog.accept()); await deliveryPage.reload();
+      await expect(deliveryPage.locator('#shipping-fields')).toBeVisible();
+      await expect(deliveryPage.locator('#delivery-recipientName')).toHaveValue('');
+      await deliveryPage.locator('#buyer-name').fill('Guest Example'); await deliveryPage.locator('#buyer-phone').fill('+1 (202) 555-0100');
+      await deliveryPage.locator('#buyer-email').fill('guest@example.test'); await deliveryPage.locator('#order-note').fill('Test order note');
+      await fillAddress(deliveryPage); clearGuard(); await deliveryPage.locator('#submit-order').click();
+      await expect.poll(() => attempts.length).toBe(2); assert.deepEqual(attempts[1], attempts[0]);
+    }
+    await expect(deliveryPage.locator('#success')).toBeVisible();
+    assert.deepEqual(attempts[0].delivery, shipping ? { method: 'shipping', address: { ...address, countryCode: 'GB' } } : { method: 'pickup' });
+    assert.deepEqual(Object.keys(attempts[0]).sort(), ['buyer', 'delivery', 'idempotencyKey', 'items', 'note']);
+    await deliveryPage.context().close();
+  }
+  // A definitive method rejection refreshes the allowed methods without losing draft PII.
+  await publish(true, [product], ['shipping']);
+  const changedMethod = await freshPage(); await ready(changedMethod); await add(changedMethod).click(); await contact(changedMethod); await fillAddress(changedMethod);
+  await changedMethod.route('**/api/order.php', async (route) => {
+    await publish(true, [product], ['pickup']);
+    await route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'delivery_method_unavailable' }) });
+  });
+  await changedMethod.locator('#submit-order').click();
+  await expect(changedMethod.locator('#submission-message')).toContainText('teslimat yöntemi artık sunulmuyor');
+  await expect(changedMethod.locator('#delivery-summary')).toHaveText('İşletmeden teslim');
+  await expect(changedMethod.locator('#shipping-fields')).toBeHidden();
+  await expect(changedMethod.locator('#buyer-name')).toHaveValue('Guest Example');
+  await expect(changedMethod.locator('#delivery-recipientName')).toHaveValue('Delivery Recipient');
+  await changedMethod.context().close();
 
   // Mobile keyboard checkout + actual API, long content, unsafe image, storage unavailable.
   const long = { ...product, name: 'UzunÜrünAdı'.repeat(18), description: 'Uzun açıklama '.repeat(90), image_url: 'javascript:alert(1)' };

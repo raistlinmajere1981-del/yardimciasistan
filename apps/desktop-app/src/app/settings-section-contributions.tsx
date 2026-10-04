@@ -4,6 +4,7 @@ import type { BusinessCapabilitySnapshot } from "../../electron/business-capabil
 import { settingsFieldOwners } from "./settings-draft-model";
 import {
   isSettingsSectionVisible,
+  onlineSalesDeliveryDefinition,
   type SettingsSectionDefinition,
   type StagedSettingsCategoryId
 } from "./settings-registry";
@@ -33,7 +34,20 @@ type StagedSettingsContributions = {
 
 const stagedSettingsContributions = {
   business: [],
-  services: []
+  services: [{
+    definition: onlineSalesDeliveryDefinition,
+    render: ({ draft, onChange }) => (
+      <section id="settings-online-delivery" tabIndex={-1} className="settings-service-card is-enabled">
+        <div className="settings-service-card-header"><div><strong>Online Satış Teslimatı</strong><span>En az bir teslimat yöntemi açık olmalı.</span></div></div>
+        <div className="settings-service-card-body">
+        <label className="settings-service-toggle"><input type="checkbox" checked={draft.onlineSalesDelivery.pickupEnabled}
+          onChange={(event) => onChange({ onlineSalesDelivery: { ...draft.onlineSalesDelivery, pickupEnabled: event.target.checked } })} /><span>İşletmeden teslim</span></label>
+        <label className="settings-service-toggle"><input type="checkbox" checked={draft.onlineSalesDelivery.shippingEnabled}
+          onChange={(event) => onChange({ onlineSalesDelivery: { ...draft.onlineSalesDelivery, shippingEnabled: event.target.checked } })} /><span>Kargo ile gönderim</span></label>
+        </div>
+      </section>
+    )
+  }]
 } satisfies StagedSettingsContributions;
 
 interface StagedSettingsContributionSlotProps<C extends StagedSettingsCategoryId> {

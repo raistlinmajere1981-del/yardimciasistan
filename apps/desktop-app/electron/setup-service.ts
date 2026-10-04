@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
   createId,
+  normalizeOnlineSalesDeliverySettings,
   getBusinessProfile,
   normalizeBirthdaySettings,
   normalizeBusinessType,
@@ -99,6 +100,10 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? false,
     aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
     aiProfiles,
+    onlineSalesDelivery: {
+      pickupEnabled: Number(settings?.online_sales_pickup_enabled ?? 1) === 1,
+      shippingEnabled: Number(settings?.online_sales_shipping_enabled ?? 0) === 1
+    },
     productData: {
       enabled: Number(settings?.product_data_enabled ?? 0) === 1,
       provider: "open_food_facts",
@@ -135,6 +140,15 @@ export function saveSetupData(
   const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
   const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
   const existingSettings = db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+  let onlineSalesDelivery;
+  try {
+    onlineSalesDelivery = normalizeOnlineSalesDeliverySettings(input.onlineSalesDelivery ?? {
+      pickupEnabled: Number(existingSettings?.online_sales_pickup_enabled ?? 1) === 1,
+      shippingEnabled: Number(existingSettings?.online_sales_shipping_enabled ?? 0) === 1
+    });
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Online satış teslimat ayarları geçersiz." };
+  }
   const productDataSettings = {
     enabled: input.productData?.enabled ?? Number(existingSettings?.product_data_enabled ?? 0) === 1,
     provider: "open_food_facts" as const,
@@ -385,6 +399,9 @@ export function saveSetupData(
     db.prepare("UPDATE settings SET local_network_enabled = ?, updated_at = ? WHERE id = ?")
       .run(input.localNetworkEnabled === false ? 0 : 1, now, settingsId);
 
+    db.prepare("UPDATE settings SET online_sales_pickup_enabled = ?, online_sales_shipping_enabled = ? WHERE id = ?")
+      .run(onlineSalesDelivery.pickupEnabled ? 1 : 0, onlineSalesDelivery.shippingEnabled ? 1 : 0, settingsId);
+
     upsertAiServiceProfileInTransaction(db, {
       service: storedAiService,
       projectName: aiProjectName,
@@ -431,6 +448,10 @@ export function saveSetupData(
   const enabledCapabilities = new Set(readEnabledBusinessCapabilities(db));
   if (enabledCapabilities.has(BUSINESS_CAPABILITIES.QR_MENU)) {
     queueSyncJob(db, "menu_publish", now);
+  }
+  if (Number(existingSettings?.online_sales_pickup_enabled ?? 1) !== Number(onlineSalesDelivery.pickupEnabled)
+      || Number(existingSettings?.online_sales_shipping_enabled ?? 0) !== Number(onlineSalesDelivery.shippingEnabled)) {
+    queueSyncJob(db, "online_catalog_publish", now);
   }
   queueSyncJob(db, "android_snapshot", now);
 

@@ -13,7 +13,7 @@ final class YaOnlineOrderRejection extends RuntimeException
 
 function ya_online_order_invalid(): never
 {
-    throw new YaOnlineOrderRejection(422, 'invalid_order', 'Lütfen ürünleri ve iletişim bilgilerini kontrol edin.');
+    throw new YaOnlineOrderRejection(422, 'invalid_order', 'Lütfen ürünleri, iletişim ve teslimat bilgilerini kontrol edin.');
 }
 
 function ya_online_order_text(mixed $value, int $maximum, bool $multiline = false): string
@@ -23,6 +23,28 @@ function ya_online_order_text(mixed $value, int $maximum, bool $multiline = fals
     $controls = $multiline ? '/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/' : '/[\x00-\x1f\x7f]/';
     if (mb_strlen($value) > $maximum || preg_match($controls, $value)) ya_online_order_invalid();
     return $value;
+}
+
+/** Address/contact are independent snapshots. Carrier/price fields are excluded. */
+function ya_online_order_delivery(mixed $input): array
+{
+    if (!is_array($input) || array_is_list($input)) ya_online_order_invalid();
+    if (($input['method'] ?? '') === 'pickup') return ['method' => 'pickup', 'address' => null];
+    if (($input['method'] ?? '') !== 'shipping' || !is_array($input['address'] ?? null) || array_is_list($input['address'])) ya_online_order_invalid();
+    $raw = $input['address'];
+    $address = [];
+    foreach (['recipientName' => 160, 'addressLine1' => 300, 'district' => 120, 'city' => 120, 'countryCode' => 2] as $key => $limit) {
+        $value = ya_online_order_text($raw[$key] ?? null, $limit);
+        if ($value === '') ya_online_order_invalid();
+        $address[$key] = $value;
+    }
+    $address['countryCode'] = strtoupper($address['countryCode']);
+    if (preg_match('/^[A-Z]{2}$/D', $address['countryCode']) !== 1) ya_online_order_invalid();
+    foreach (['addressLine2' => 300, 'postalCode' => 32, 'note' => 500] as $key => $limit) {
+        $value = ya_online_order_text($raw[$key] ?? '', $limit, $key === 'note');
+        if ($value !== '') $address[$key] = $value;
+    }
+    return ['method' => 'shipping', 'address' => $address];
 }
 
 /** Semantic allowlist. Extra client fields, including prices, have no authority. */
@@ -55,6 +77,7 @@ function ya_online_order_normalize(array $input): array
     $email = ya_online_order_text($buyer['email'] ?? '', 254);
     if ($email !== '' && preg_match('/^[^\s@]+@[^\s@]+\.[^\s@]+$/u', $email) !== 1) ya_online_order_invalid();
     return [
+        'delivery' => ya_online_order_delivery($input['delivery'] ?? null),
         'items' => array_values($normalized),
         'buyer' => ['name' => $name, 'phone' => $phone, ...($email !== '' ? ['email' => $email] : [])],
         'note' => ya_online_order_text($input['note'] ?? '', 2000, true)
@@ -86,6 +109,9 @@ function ya_online_order_submit(array $input): array
         $catalog = ya_online_catalog_projection(ya_storage_get_publication('online_catalog', []));
         if (!$catalog['enabled']) {
             throw new YaOnlineOrderRejection(403, 'online_sales_disabled', 'Web siparişleri şu anda kapalı.');
+        }
+        if (!in_array($request['delivery']['method'], $catalog['delivery_methods'], true)) {
+            throw new YaOnlineOrderRejection(422, 'delivery_method_unavailable', 'Seçilen teslimat yöntemi artık sunulmuyor.');
         }
         $publishedIds = array_fill_keys(array_column($catalog['products'], 'product_id'), true);
         foreach ($request['items'] as $item) {

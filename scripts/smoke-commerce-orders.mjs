@@ -156,6 +156,18 @@ try {
     "Sipariş oluşturmak stoğu değiştirmemeli."
   );
 
+  assert.deepEqual(created.order.deliverySnapshot, { method: "pickup", address: null }, "manual default pickup");
+  const delivery = { method: "shipping", address: { recipientName: "Independent Recipient", addressLine1: "42 Example Road", addressLine2: "Floor 2", district: "Central", city: "London", postalCode: "SW1A 1AA", countryCode: "gb", note: "Ring bell" } };
+  const shipped = createRuntimeOrder(databasePath, { ...orderInput, source: "delivery-smoke", sourceReference: "shipping-test", buyerSnapshot: { name: "Independent Buyer", phone: "+44 7911 123456" }, deliverySnapshot: delivery });
+  assert.deepEqual(shipped.order.deliverySnapshot, { ...delivery, address: { ...delivery.address, countryCode: "GB" } });
+  assert.deepEqual(getRuntimeOrder(databasePath, shipped.order.id).order.deliverySnapshot, shipped.order.deliverySnapshot);
+  assert.equal(shipped.order.buyerSnapshot.name, "Independent Buyer");
+  assert.equal(shipped.order.total, created.order.total, "delivery adds no charge");
+  assert.throws(() => createRuntimeOrder(databasePath, { ...orderInput, sourceReference: "invalid-delivery", deliverySnapshot: { method: "shipping" } }), /teslimat.*geçersiz/);
+  assert.throws(() => createRuntimeOrder(databasePath, { ...orderInput, source: "web-online-sales", sourceReference: "missing-delivery" }), /teslimat.*geçersiz/);
+  const pickup = createRuntimeOrder(databasePath, { ...orderInput, source: "delivery-smoke", sourceReference: "explicit-pickup", deliverySnapshot: { method: "pickup", address: delivery.address } });
+  assert.deepEqual(getRuntimeOrder(databasePath, pickup.order.id).order.deliverySnapshot, { method: "pickup", address: null });
+
   const duplicate = createRuntimeOrder(databasePath, orderInput);
   assert.equal(duplicate.order.id, created.order.id, "Aynı sourceReference idempotent olmalı.");
 
@@ -163,7 +175,7 @@ try {
   try {
     assert.equal(
       Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_orders").get().count),
-      1
+      3
     );
     assert.equal(
       Number(raw.prepare("SELECT COUNT(*) AS count FROM commerce_sales WHERE deleted_at = ''").get().count),

@@ -87,6 +87,7 @@ export const defaultSetupData: DesktopSetupData = {
   syncSecret: "",
   autoSyncEnabled: true,
   localNetworkEnabled: true,
+  onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },
   aiEnabled: false,
   aiProvider: "openai_compatible",
   aiService: "openai",

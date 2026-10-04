@@ -36,13 +36,13 @@ async function sync(payload) {
 let revision = 0;
 const publishedProduct = { product_id: "published-product", name: "Published product", description: "", sku: "", unit: "piece", price: 25,
   currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0 };
-async function publish(enabled, extraProducts = []) {
+async function publish(enabled, extraProducts = [], methods = ["pickup"]) {
   revision += 1;
   return sync({ action: "publish_online_catalog", client_id: "desktop-a3", source_revision: revision, idempotency_key: `catalog-${revision}`,
-    online_catalog: { version: 1, enabled, updated_at: new Date().toISOString(), products: enabled ? [publishedProduct, ...extraProducts] : [] } });
+    online_catalog: { version: 1, enabled, delivery_methods: enabled ? methods : [], updated_at: new Date().toISOString(), products: enabled ? [publishedProduct, ...extraProducts] : [] } });
 }
 const buyer = { name: "Guest buyer", phone: "+1 (202) 555-0100", email: "guest@example.test" };
-const input = { idempotencyKey: "guest-order-key-0001", items: [{ productId: "published-product", quantity: 2 }], buyer, note: "Guest note" };
+const input = { idempotencyKey: "guest-order-key-0001", items: [{ productId: "published-product", quantity: 2 }], buyer, delivery: { method: "pickup" }, note: "Guest note" };
 async function submit(payload, options = {}) {
   if (options.clear !== false) clearGuard();
   const response = await fetch(`${baseUrl}/api/order.php`, { method: options.method ?? "POST",
@@ -99,8 +99,10 @@ try {
   assert.equal((await submit({ ...input, note: "Different order intent" })).status, 409);
   assert.equal((await submit({ ...input, buyer: { ...buyer, phone: "+44 7911 123456" } })).status, 409);
   assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), 1);
+  assert.deepEqual((await submit({ ...input, delivery: { method: "pickup", address: { arbitrary: "discarded" }, shippingPrice: 999 } })).payload, accepted.payload);
   const pulled = await sync({ action: "pull_web_orders", client_id: "desktop-a3", after_seq: 0 });
   assert.deepEqual(pulled.orders[0].buyer, buyer);
+  assert.deepEqual(pulled.orders[0].delivery, { method: "pickup", address: null });
   assert.equal(pulled.orders[0].note, input.note);
   assert.deepEqual(pulled.orders[0].items, input.items);
   assert.equal(JSON.stringify(pulled.orders[0]).includes("fake-customer"), false);
@@ -126,6 +128,27 @@ try {
   assert.equal(multiAccepted.status, 201);
   assert.deepEqual((await submit({ ...multiItem, items: [...multiItem.items].reverse(), note: ` ${input.note} ` })).payload,
     multiAccepted.payload, "normalized row order and trimmed fields preserve semantic identity");
+  const address = { recipientName: "Delivery Recipient", addressLine1: "42 Example Road", addressLine2: "Floor 2", district: "Central", city: "London", postalCode: "SW1A 1AA", countryCode: "gb", note: "Ring bell" };
+  const shipping = { ...input, idempotencyKey: "guest-order-key-shipping", delivery: { method: "shipping", address } };
+  assert.equal((await submit(shipping)).payload.code, "delivery_method_unavailable");
+  await publish(true, [], ["pickup", "shipping"]);
+  for (const delivery of [undefined, null, { method: "carrier" }, { method: "shipping" }, { method: "shipping", address: {} },
+    ...[{ recipientName: "" }, { addressLine1: "x".repeat(301) }, { addressLine2: "x".repeat(301) }, { district: "" }, { city: "x".repeat(121) },
+      { postalCode: "x".repeat(33) }, { countryCode: "TUR" }, { countryCode: "1X" }, { countryCode: "ß" }, { note: "x".repeat(501) }, { recipientName: "unsafe\u0000name" }]
+      .map((patch) => ({ method: "shipping", address: { ...address, ...patch } }))]) {
+    assert.equal((await submit({ ...shipping, delivery })).status, 422);
+  }
+  const shipped = await submit({ ...shipping, delivery: { ...shipping.delivery, carrier: "fake", shippingPrice: 999, trackingNumber: "fake", address: { ...address, secret: "private-field" } } });
+  assert.equal(shipped.status, 201);
+  assert.deepEqual((await submit({ ...shipping, delivery: { method: "shipping", address: { ...address, countryCode: "GB" } } })).payload, shipped.payload);
+  assert.equal((await submit({ ...shipping, delivery: { method: "pickup" } })).status, 409);
+  assert.equal((await submit({ ...shipping, delivery: { method: "shipping", address: { ...address, addressLine1: "Other road" } } })).status, 409);
+  const shippingPulled = (await sync({ action: "pull_web_orders", client_id: "desktop-a3", after_seq: 0 })).orders.find((order) => order.id === shipped.payload.order_id);
+  assert.deepEqual(shippingPulled.delivery, { method: "shipping", address: { ...address, countryCode: "GB" } });
+  assert.deepEqual(shippingPulled.buyer, buyer);
+  assert.equal(JSON.stringify(shippingPulled).includes("private-field"), false);
+  await publish(true); // Accepted shipping replay survives a later method configuration change.
+  assert.deepEqual((await submit(shipping)).payload, shipped.payload);
   clearGuard();
   for (let index = 0; index < 8; index += 1) assert.equal((await submit(input, { clear: false })).status, 201);
   const limited = await submit(input, { clear: false });
@@ -138,7 +161,7 @@ try {
   assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), 0);
   assert.equal((await fetch(`${baseUrl}/api/catalog.php`)).status, 200, "read-only deployment health remains clean after reset");
   assert.equal((await submit(input)).status, 403);
-  for (const privateValue of [buyer.name, buyer.phone, buyer.email, input.idempotencyKey]) assert.equal(serverOutput.includes(privateValue), false);
+  for (const privateValue of [buyer.name, buyer.phone, buyer.email, input.idempotencyKey, address.recipientName, address.addressLine1, address.note]) assert.equal(serverOutput.includes(privateValue), false);
   console.log("web-order-submission-smoke-ok");
 } finally {
   server.kill();

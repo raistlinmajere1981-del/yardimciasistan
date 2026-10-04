@@ -5,6 +5,16 @@ declare(strict_types=1);
 function ya_online_catalog_projection(array $candidate): array
 {
     $enabled = ($candidate['enabled'] ?? false) === true;
+    $methods = [];
+    if ($enabled) {
+        $methods = $candidate['delivery_methods'] ?? null;
+        if (!is_array($methods) || !array_is_list($methods) || count($methods) < 1 || count($methods) > 2
+            || count(array_unique($methods, SORT_REGULAR)) !== count($methods)) throw new InvalidArgumentException('invalid_delivery_methods');
+        foreach ($methods as $method) {
+            if (!in_array($method, ['pickup', 'shipping'], true)) throw new InvalidArgumentException('invalid_delivery_methods');
+        }
+        $methods = array_values(array_intersect(['pickup', 'shipping'], $methods));
+    }
     $products = [];
     if ($enabled) {
         if (!is_array($candidate['products'] ?? null)) throw new InvalidArgumentException('invalid_online_catalog');
@@ -45,7 +55,7 @@ function ya_online_catalog_projection(array $candidate): array
     usort($products, static fn (array $a, array $b): int =>
         ($a['sort_order'] <=> $b['sort_order']) ?: strcmp($a['name'], $b['name']) ?: strcmp($a['product_id'], $b['product_id']));
     return [
-        'version' => 1, 'enabled' => $enabled,
+        'version' => 1, 'enabled' => $enabled, 'delivery_methods' => $methods,
         'updated_at' => mb_substr(is_string($candidate['updated_at'] ?? null) ? $candidate['updated_at'] : '', 0, 64),
         'products' => $products
     ];

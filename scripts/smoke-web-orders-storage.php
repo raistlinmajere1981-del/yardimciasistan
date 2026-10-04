@@ -10,8 +10,9 @@ function expect(bool $condition, string $message): void {
 }
 try {
     $now = date(DATE_ATOM);
-    $order = ['id' => 'order-1', 'items' => [['productId' => 'product-1', 'quantity' => 2]], 'buyer' => ['name' => 'Guest', 'phone' => '+1 (202) 555-0100', 'email' => 'guest@example.test'], 'note' => 'Guest note', 'createdAt' => $now];
+    $order = ['id' => 'order-1', 'items' => [['productId' => 'product-1', 'quantity' => 2]], 'buyer' => ['name' => 'Guest', 'phone' => '+1 (202) 555-0100', 'email' => 'guest@example.test'], 'delivery' => ['method' => 'pickup', 'address' => null], 'note' => 'Guest note', 'createdAt' => $now];
     $first = ya_storage_enqueue_web_order($order);
+    expect($first['delivery'] === $order['delivery'], 'delivery round-trip');
     $duplicate = ya_storage_enqueue_web_order([...$order, 'items' => []]);
     expect($first['buyer'] === $order['buyer'] && $first['note'] === $order['note'], 'buyer and note round-trip');
     expect($first === $duplicate, 'duplicate id must retain first payload and sequence');

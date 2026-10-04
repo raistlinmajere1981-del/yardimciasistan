@@ -34,6 +34,7 @@ export * from "./utils/id";
 export * from "./utils/market-companion";
 export * from "./utils/money";
 export * from "./utils/commerce-order-contact";
+export * from "./utils/commerce-order-delivery";
 export * from "./utils/phone";
 export * from "./utils/validation";
 

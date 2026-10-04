@@ -1,11 +1,11 @@
-import { validateBirthdaySettings } from "@yardimci-asistan/shared";
+import { normalizeOnlineSalesDeliverySettings, validateBirthdaySettings } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "./setup-model";
 import type { StagedSettingsCategoryId } from "./settings-registry";
 
 // Setup persistence now owns only Business and Services. Operations has its own BusinessLayout draft.
 export const settingsFieldOwners = {
   business: ["businessName", "profileId", "profileOptions", "phone", "whatsapp", "email", "address"],
-  services: ["webModuleUrl", "syncSecret", "autoSyncEnabled", "localNetworkEnabled", "aiEnabled", "aiProvider", "aiService", "aiProjectName", "aiGoogleCurl", "aiBaseUrl", "aiModel", "aiModelOptions", "aiApiKey", "aiStoredApiKeyConfigured", "clearAiApiKey", "aiTimeoutSeconds", "aiServiceDrafts", "whatsappEnabled", "androidEnabled", "productDataEnabled", "productDataProvider", "productDataAutoSearch", "productDataIncludeImages", "birthdaySettings"]
+  services: ["onlineSalesDelivery", "webModuleUrl", "syncSecret", "autoSyncEnabled", "localNetworkEnabled", "aiEnabled", "aiProvider", "aiService", "aiProjectName", "aiGoogleCurl", "aiBaseUrl", "aiModel", "aiModelOptions", "aiApiKey", "aiStoredApiKeyConfigured", "clearAiApiKey", "aiTimeoutSeconds", "aiServiceDrafts", "whatsappEnabled", "androidEnabled", "productDataEnabled", "productDataProvider", "productDataAutoSearch", "productDataIncludeImages", "birthdaySettings"]
 } as const satisfies Record<StagedSettingsCategoryId, readonly (keyof SetupFormState)[]>;
 
 export const stagedSettingsCategories = ["business", "services"] as const;
@@ -55,6 +55,8 @@ export function validateSettingsCategory(
   }
 
   if (category === "services") {
+    try { normalizeOnlineSalesDeliverySettings(form.onlineSalesDelivery); }
+    catch (error) { return error instanceof Error ? error.message : "Online satış teslimat ayarları geçersiz."; }
     if (!/^https?:\/\//i.test(form.webModuleUrl.trim())) {
       return "Web modül adresi http veya https ile başlamalı.";
     }

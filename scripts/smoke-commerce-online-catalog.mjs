@@ -78,6 +78,7 @@ try {
   database.saveCommerceProductPublication({ productId: unpublished.id, isPublished: false });
   raw.prepare("UPDATE catalog_products SET image_asset_path = '/private/local.jpg', image_source_url = 'https://images.example.com/product.jpg' WHERE id = ?").run(product.id);
   const catalog = database.createCommerceOnlineCatalog();
+  assert.deepEqual(catalog.deliveryMethods, ["pickup"]);
   assert.deepEqual(catalog.products.map((p) => p.productId), [product.id]);
   assert.deepEqual(Object.keys(catalog.products[0]).sort(), ["productId", "name", "description", "sku", "unit", "price", "currency", "taxRate", "imageUrl", "availability", "sortOrder"].sort());
   assert.equal(catalog.products[0].price, 25, "resolved retail price, never dealer/cost");
@@ -97,6 +98,7 @@ try {
   assert.equal((await coordinator.runNow()).ok, true);
   let published = readCatalog().payload;
   assert.equal(published.enabled, true);
+  assert.deepEqual(published.delivery_methods, ["pickup"]);
   assert.equal(published.products.length, 1);
   assert.equal(published.products[0].price, 25);
   assert.equal(published.products[0].product_id, product.id);
@@ -107,9 +109,29 @@ try {
   assert.equal(endpoint("catalog.php", {}, "GET", false, `"ya-online-catalog-${published.server_revision}"`).status, 304);
   assert.equal(endpoint("sync.php", { ...request, source_revision: request.source_revision - 1, idempotency_key: "stale-publication" }).status, request.source_revision > 1 ? 409 : 422);
 
+  const setupBeforeDelivery = database.getSetupData();
+  const saveDelivery = (onlineSalesDelivery) => database.saveInitialSetup({ ...setupBeforeDelivery, onlineSalesDelivery });
+  assert.deepEqual(setupBeforeDelivery.onlineSalesDelivery, { pickupEnabled: true, shippingEnabled: false });
+  assert.throws(() => raw.exec("UPDATE settings SET online_sales_pickup_enabled = 0, online_sales_shipping_enabled = 0"), /CHECK/);
+  assert.equal(saveDelivery({ pickupEnabled: false, shippingEnabled: false }).ok, false);
+  assert.deepEqual(database.getSetupData().onlineSalesDelivery, setupBeforeDelivery.onlineSalesDelivery);
+  assert.equal(saveDelivery({ pickupEnabled: true, shippingEnabled: true }).ok, true);
+  assert.deepEqual(database.createCommerceOnlineCatalog().deliveryMethods, ["pickup", "shipping"]);
+  assert.equal((await coordinator.runNow()).ok, true);
+  assert.deepEqual(readCatalog().payload.delivery_methods, ["pickup", "shipping"]);
+  assert.equal(saveDelivery({ pickupEnabled: false, shippingEnabled: true }).ok, true);
+  assert.equal((await coordinator.runNow()).ok, true);
+  assert.deepEqual(readCatalog().payload.delivery_methods, ["shipping"]);
+  assert.equal(saveDelivery({ pickupEnabled: true, shippingEnabled: false }).ok, true);
+  assert.equal((await coordinator.runNow()).ok, true);
+
+  for (const methods of [[], ["pickup", "pickup"], ["pickup", "carrier"], [null], undefined]) {
+    assert.equal(endpoint("sync.php", { ...request, source_revision: 999, idempotency_key: "invalid-methods", online_catalog: { ...request.online_catalog, delivery_methods: methods } }).status, 422);
+  }
+
   // Defense in depth: injected private fields never enter hosting storage or public output.
   const dirty = { ...request, source_revision: request.source_revision + 100, idempotency_key: "public-allowlist-test",
-    online_catalog: { ...request.online_catalog, internal_notes: "secret", products: request.online_catalog.products.map((p) => ({ ...p, barcode: "secret", purchase_price: 9, dealer_price: 12, supplier: "secret" })) } };
+    online_catalog: { ...request.online_catalog, internal_notes: "secret", delivery_settings: { carrier: "secret" }, products: request.online_catalog.products.map((p) => ({ ...p, barcode: "secret", purchase_price: 9, dealer_price: 12, supplier: "secret" })) } };
   assert.equal(endpoint("sync.php", dirty).status, 200);
   published = readCatalog().payload;
   assert.equal(JSON.stringify(published).includes("secret"), false);
@@ -134,11 +156,12 @@ try {
   assert.equal((await coordinator.runNow()).ok, true);
   assert.equal(readCatalog().payload.products[0].price, 31);
   setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: false });
-  assert.deepEqual(database.createCommerceOnlineCatalog(), { version: 1, enabled: false, updatedAt: "", products: [] });
+  assert.deepEqual(database.createCommerceOnlineCatalog(), { version: 1, enabled: false, deliveryMethods: [], updatedAt: "", products: [] });
   assert.throws(() => database.saveCommerceProductPublication({ productId: product.id, isPublished: false }), /etkin değil/);
   assert.equal((await coordinator.runNow()).ok, true);
   assert.equal(readCatalog().payload.enabled, false);
   assert.deepEqual(readCatalog().payload.products, []);
+  assert.deepEqual(readCatalog().payload.delivery_methods, []);
   setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
   assert.equal(database.getCommerceProductPublication(product.id).isPublished, true, "disabled channel preserves settings");
   assert.equal((await coordinator.runNow()).ok, true);

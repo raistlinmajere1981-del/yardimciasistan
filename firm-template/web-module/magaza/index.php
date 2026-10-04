@@ -52,6 +52,42 @@ header("Content-Security-Policy: default-src 'none'; script-src 'self'; style-sr
               <textarea id="order-note" name="note" rows="3" maxlength="2000" aria-describedby="note-error"></textarea>
               <p id="note-error" class="field-error"></p>
             </fieldset>
+            <fieldset id="delivery-fields">
+              <legend>Teslimat</legend>
+              <p id="delivery-summary"></p>
+              <div id="delivery-choice" hidden>
+                <label for="delivery-method">Teslimat yöntemi</label>
+                <select id="delivery-method"><option value="pickup">İşletmeden teslim</option><option value="shipping">Kargo ile gönderim</option></select>
+              </div>
+              <fieldset id="shipping-fields" hidden>
+                <legend>Teslimat adresi</legend>
+                <label for="delivery-recipientName">Teslim alacak kişi</label>
+                <input id="delivery-recipientName" name="recipientName" maxlength="160" autocomplete="shipping name" aria-describedby="delivery-recipientName-error">
+                <p id="delivery-recipientName-error" class="field-error"></p>
+                <label for="delivery-addressLine1">Adres</label>
+                <input id="delivery-addressLine1" name="addressLine1" maxlength="300" autocomplete="shipping address-line1" aria-describedby="delivery-addressLine1-error">
+                <p id="delivery-addressLine1-error" class="field-error"></p>
+                <label for="delivery-addressLine2">Adres devamı (isteğe bağlı)</label>
+                <input id="delivery-addressLine2" name="addressLine2" maxlength="300" autocomplete="shipping address-line2" aria-describedby="delivery-addressLine2-error">
+                <p id="delivery-addressLine2-error" class="field-error"></p>
+                <label for="delivery-district">İlçe</label>
+                <input id="delivery-district" name="district" maxlength="120" autocomplete="shipping address-level2" aria-describedby="delivery-district-error">
+                <p id="delivery-district-error" class="field-error"></p>
+                <label for="delivery-city">İl / şehir</label>
+                <input id="delivery-city" name="city" maxlength="120" autocomplete="shipping address-level1" aria-describedby="delivery-city-error">
+                <p id="delivery-city-error" class="field-error"></p>
+                <label for="delivery-postalCode">Posta kodu (isteğe bağlı)</label>
+                <input id="delivery-postalCode" name="postalCode" maxlength="32" autocomplete="shipping postal-code" aria-describedby="delivery-postalCode-error">
+                <p id="delivery-postalCode-error" class="field-error"></p>
+                <label for="delivery-countryCode">Ülke kodu (TR, GB, DE gibi)</label>
+                <input id="delivery-countryCode" name="countryCode" maxlength="2" autocomplete="shipping country" aria-describedby="delivery-countryCode-error" value="TR">
+                <p id="delivery-countryCode-error" class="field-error"></p>
+                <label for="delivery-note">Teslimat notu (isteğe bağlı)</label>
+                <textarea id="delivery-note" name="deliveryNote" rows="2" maxlength="500" autocomplete="off" aria-describedby="delivery-note-error"></textarea>
+                <p id="delivery-note-error" class="field-error"></p>
+                <p>Kargo ücreti ayrıca belirlenecektir.</p>
+              </fieldset>
+            </fieldset>
             <p id="submission-message" role="alert"></p>
             <button id="submit-order" type="submit">Siparişi gönder</button>
           </form>

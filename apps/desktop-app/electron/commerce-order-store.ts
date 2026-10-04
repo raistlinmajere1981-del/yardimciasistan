@@ -1,6 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import {
   createId,
+  normalizeCommerceOrderDeliverySnapshot,
+  type CommerceOrderDeliverySnapshot,
   moneyToMinor,
   normalizeCommerceOrderBuyerSnapshot,
   type CommerceOrderBuyerSnapshot,
@@ -25,6 +27,7 @@ const COMMERCE_UNITS = new Set<CommerceUnit>([
 export interface CreateCommerceOrderInput {
   customerId?: string;
   buyerSnapshot?: CommerceOrderBuyerSnapshot;
+  deliverySnapshot?: CommerceOrderDeliverySnapshot;
   source?: string;
   sourceReference?: string;
   discountTotal?: number;
@@ -98,6 +101,7 @@ function mapOrder(row: Record<string, unknown>): CommerceOrder {
     customerId: String(row.customer_id ?? ""),
     customerName: String(row.customer_name ?? ""),
     buyerSnapshot: JSON.parse(String(row.buyer_snapshot_json ?? "null")) as CommerceOrderBuyerSnapshot | null,
+    deliverySnapshot: normalizeCommerceOrderDeliverySnapshot(JSON.parse(String(row.delivery_snapshot_json))),
     status: String(row.status ?? "placed") as CommerceOrderStatus,
     source: String(row.source ?? ""),
     sourceReference: String(row.source_reference ?? ""),
@@ -356,21 +360,24 @@ export function createCommerceOrder(
       const note = String(input.note ?? "").trim().slice(0, 4000);
       const buyerSnapshot = input.buyerSnapshot === undefined ? null
         : normalizeCommerceOrderBuyerSnapshot(input.buyerSnapshot);
+      const deliverySnapshot = normalizeCommerceOrderDeliverySnapshot(input.deliverySnapshot === undefined && source !== "web-online-sales"
+        ? { method: "pickup" } : input.deliverySnapshot);
       const now = new Date().toISOString();
       const orderId = createId("commerce_order_");
 
       database.prepare(`
         INSERT INTO commerce_orders (
-          id, business_id, customer_id, customer_name, buyer_snapshot_json, status, source, source_reference,
+          id, business_id, customer_id, customer_name, buyer_snapshot_json, delivery_snapshot_json, status, source, source_reference,
           subtotal, discount_total, total, currency, note, placed_at,
           confirmed_at, fulfilled_at, cancelled_at, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, '')
+        ) VALUES (?, ?, ?, ?, ?, ?, 'placed', ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, '')
       `).run(
         orderId,
         businessId,
         storedCustomerId,
         customerName,
         JSON.stringify(buyerSnapshot),
+        JSON.stringify(deliverySnapshot),
         source,
         sourceReference,
         subtotal,

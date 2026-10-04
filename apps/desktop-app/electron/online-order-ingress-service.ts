@@ -1,4 +1,4 @@
-import { BUSINESS_CAPABILITIES, hasBusinessCapability, normalizeCommerceOrderBuyerSnapshot } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, hasBusinessCapability, normalizeCommerceOrderBuyerSnapshot, normalizeCommerceOrderDeliverySnapshot } from "@yardimci-asistan/shared";
 import type { WebOrderEnvelope } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase } from "./database";
 
@@ -41,12 +41,14 @@ export class OnlineOrderIngressService {
     if (new Set(items.map((item) => item.productId)).size !== items.length
         || items.reduce((sum, item) => sum + item.quantity, 0) > 10000) return invalidEnvelope();
     const buyerSnapshot = normalizeCommerceOrderBuyerSnapshot(envelope.buyer);
+    const deliverySnapshot = normalizeCommerceOrderDeliverySnapshot(envelope.delivery);
     const note = envelope.note === undefined ? "" : envelope.note;
     if (typeof note !== "string" || [...note].length > 2000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(note)) return invalidEnvelope();
     return this.database.createCommerceOrder({
       source: "web-online-sales",
       sourceReference: id,
       buyerSnapshot,
+      deliverySnapshot,
       note: note.trim(),
       items
     });

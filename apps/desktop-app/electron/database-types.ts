@@ -1,4 +1,5 @@
 import type {
+  OnlineSalesDeliverySettings,
   BirthdaySettings,
   CustomerGender,
   CustomerIdentityType,
@@ -544,6 +545,7 @@ export interface DesktopSetupData {
   aiLastPublishedAt: string;
   aiProfiles: DesktopAiServiceProfile[];
   productData: DesktopProductDataSettings;
+  onlineSalesDelivery: OnlineSalesDeliverySettings;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;
@@ -575,6 +577,7 @@ export interface SaveInitialSetupInput {
   clearAiApiKey: boolean;
   aiProfiles?: SaveAiServiceProfileInput[];
   productData?: DesktopProductDataSettings;
+  onlineSalesDelivery?: OnlineSalesDeliverySettings;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;

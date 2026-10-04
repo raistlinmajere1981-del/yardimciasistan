@@ -439,12 +439,12 @@ Katalog yenilendiğinde fiyat/birim snapshot'ı güncellenir; yayınından kald�
 ürün açıkça işaretlenir ve yeni checkout engellenir. Adet/paket/kutu tam sayı,
 diğer birimler dört ondalığa kadar kabul eder. Farklı para birimleri ayrı ara
 toplamlar gösterir. POST yalnız ürün kimliği, miktar, guest iletişim bilgileri,
-isteğe bağlı not ve idempotency key taşır; fiyat ve toplam göndermez.
+teslimat tercihi/adres snapshot’ı, isteğe bağlı not ve idempotency key taşır; fiyat ve toplam göndermez.
 
 Belirsiz ağ/5xx sonucunda gönderilmiş payload bellekte sabitlenir; sepet ve
-iletişim alanları kilitlenir, aynı key/payload ile tekrar denenir. Sekmeye özel
-sessionStorage yalnız version/key taşır; ad, telefon, e-posta ve not hiçbir
-browser storage'a yazılmaz. Sayfa yenilenirse aynı iletişim bilgileri yeniden
+iletişim/teslimat alanları kilitlenir, aynı key/payload ile tekrar denenir. Sekmeye özel
+sessionStorage yalnız version/key/method taşır; ad, telefon, e-posta, adres ve not hiçbir
+browser storage'a yazılmaz. Sayfa yenilenirse aynı iletişim/teslimat bilgileri yeniden
 girilerek aynı key denenir; farklı içerik 409 ile güvenli biçimde durur. Belirsiz
 sipariş için otomatik yeni key üretme/iptal yolu yoktur. Kullanıcı sonucu
 netleştirmek için aynı gönderimi tekrar denemeli veya işletmeyle iletişime
@@ -457,3 +457,27 @@ mevcut API üzerinden yapılabilir.
 browser davranışlarını ve desktop/dar viewport'u kontrol eder. Paketleme mağaza
 PHP/JS/CSS dosyalarını zorunlu sayar; deploy sağlık kontrolü mağaza için 200,
 katalog JSON sözleşmesi ve order GET için 405 bekler.
+
+## Sipariş teslimatı (B1)
+
+Desktop Servisler kategorisindeki Online Satış Teslimatı staged ayarları,
+`channel.online_sales` altında işletmeden teslim/kargo izinlerini yönetir.
+Varsayılan pickup açık, shipping kapalıdır; en az biri açık olmalıdır. Katalog
+publication’ı yalnız public-safe `delivery_methods: ["pickup", "shipping"]`
+alt kümesini yayınlar. Kapalı kanalda yöntemler ve ürünler boş kalır.
+
+Checkout yalnız yayınlanan yöntemleri sunar. Tek yöntemde seçim göstermez;
+kargoda structured adres ister. Ülke iki harfli koddur (varsayılan TR; TR-only
+kısıtı yoktur). POST’ta `delivery: {method: "pickup"}` veya
+`delivery: {method: "shipping", address: {recipientName, addressLine1,
+addressLine2?, district, city, postalCode?, countryCode, note?}}` bulunur.
+Hosting normalize edilmiş delivery/adresi idempotency fingerprint’ine dahil
+eder. Yeni gönderimde kapatılmış yöntemi `422 delivery_method_unavailable`
+ile reddeder; checkout kataloğu yeniler ve formu korur. Önceden kabul edilmiş
+siparişin aynı key ile replay’i sonradan değişen izinlerden bağımsızdır.
+
+Delivery buyer/contact’tan ayrı, immutable Commerce Order snapshot’ıdır.
+Ingress geçersiz adresli kaydı import/ack etmez. Guest Customer/address-book
+oluşturulmaz; kargo ücreti, provider, takip ve otomatik fulfillment yoktur.
+Sipariş toplamı yalnız ürün toplamıdır. Manual sipariş yöntem verilmezse pickup
+kullanır. Desktop Siparişler detayında teslimat bilgileri read-only gösterilir.

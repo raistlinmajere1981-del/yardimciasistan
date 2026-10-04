@@ -415,7 +415,7 @@ try {
     buyerSnapshot: guest, note: "Guest order note", ...overrides
   } });
   displayFixtures = [
-    fixture("ui-guest", {}),
+    fixture("ui-guest", { deliverySnapshot: { method: "shipping", address: { recipientName: "Separate Recipient", addressLine1: "42 Example Road", addressLine2: "Floor 2", district: "Central", city: "London", postalCode: "SW1A 1AA", countryCode: "GB", note: "Ring bell" } } }),
     fixture("ui-no-email", { buyerSnapshot: { name: "Guest without email", phone: "+1 (202) 555-0100" } }),
     fixture("ui-customer-priority", { customerId: customer.savedId, customerName: "Canonical Customer", buyerSnapshot: { ...guest, name: "Contact Snapshot" } }),
     fixture("ui-no-buyer", { buyerSnapshot: null, source: "online_sales" }),
@@ -433,8 +433,15 @@ try {
   await expect(buyer.locator("dd")).toHaveText([guest.name, guest.phone, guest.email]);
   await expect(buyer.locator("input, textarea, select")).toHaveCount(0);
   await expect(detail.locator(".market-order-note")).toHaveText("Guest order note");
+  const delivery = detail.getByRole("region", { name: "Teslimat", exact: true });
+  await expect(delivery).toContainText("Teslimat: Kargo");
+  await expect(delivery.locator("dd")).toHaveText(["Separate Recipient", "42 Example Road", "Floor 2", "Central / London", "SW1A 1AA", "GB", "Ring bell"]);
+  await expect(delivery).toContainText("Kargo ücreti ayrıca belirlenecektir.");
+  await expect(delivery.locator("input, textarea, select")).toHaveCount(0);
 
   await card("Guest without email").click();
+  await expect(delivery).toContainText("Teslimat: İşletmeden teslim");
+  await expect(delivery.locator("dl")).toHaveCount(0);
   await expect(buyer.locator("dt")).toHaveText(["Ad", "Telefon"]);
   await expect(buyer.locator("dd")).toHaveText(["Guest without email", "+1 (202) 555-0100"]);
   await expect(buyer.getByText("E-posta", { exact: true })).toHaveCount(0);

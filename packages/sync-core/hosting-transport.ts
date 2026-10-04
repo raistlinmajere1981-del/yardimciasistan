@@ -154,6 +154,7 @@ export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Prom
     online_catalog: {
       version: options.catalog.version,
       enabled: options.catalog.enabled,
+      delivery_methods: options.catalog.deliveryMethods,
       updated_at: options.catalog.updatedAt,
       products: options.catalog.products.map((product) => ({
         product_id: product.productId, name: product.name, description: product.description,

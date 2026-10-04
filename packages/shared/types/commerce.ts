@@ -165,6 +165,7 @@ export interface CommerceOrder {
   customerName: string;
   /** Contact at submission time; independent of canonical Customer identity. */
   buyerSnapshot: CommerceOrderBuyerSnapshot | null;
+  deliverySnapshot: CommerceOrderDeliverySnapshot;
   status: CommerceOrderStatus;
   source: string;
   sourceReference: string;
@@ -185,6 +186,29 @@ export interface CommerceOrderBuyerSnapshot {
   name: string;
   phone: string;
   email?: string;
+}
+
+export type CommerceOrderDeliveryMethod = "pickup" | "shipping";
+
+/** Immutable order address; independent of Customer identity/address. */
+export interface CommerceOrderShippingAddress {
+  recipientName: string;
+  addressLine1: string;
+  addressLine2?: string;
+  district: string;
+  city: string;
+  postalCode?: string;
+  countryCode: string;
+  note?: string;
+}
+
+export type CommerceOrderDeliverySnapshot =
+  | { method: "pickup"; address: null }
+  | { method: "shipping"; address: CommerceOrderShippingAddress };
+
+export interface OnlineSalesDeliverySettings {
+  pickupEnabled: boolean;
+  shippingEnabled: boolean;
 }
 
 export interface CommerceOrderItem {
@@ -391,6 +415,7 @@ export interface PublishedCommerceProduct {
 }
 
 export interface CommerceOnlineCatalog {
+  deliveryMethods: CommerceOrderDeliveryMethod[];
   version: 1;
   enabled: boolean;
   updatedAt: string;

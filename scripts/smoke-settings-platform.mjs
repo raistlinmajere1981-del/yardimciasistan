@@ -64,6 +64,30 @@ try {
   await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [] }));
   await expect(page.getByLabel('Veresiye / Müşteri Hesabı', { exact: true })).toHaveCount(0);
 
+  // Online delivery is one staged Services draft under the online-sales capability.
+  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: ['channel.online_sales'] }));
+  await select('Servisler');
+  const deliverySettings = page.locator('#settings-online-delivery');
+  await expect(deliverySettings).toBeVisible();
+  await expect(deliverySettings.getByLabel('İşletmeden teslim', { exact: true })).toBeChecked();
+  await expect(deliverySettings.getByLabel('Kargo ile gönderim', { exact: true })).not.toBeChecked();
+  const deliverySetupCount = (await setupCalls()).length;
+  await deliverySettings.getByLabel('Kargo ile gönderim', { exact: true }).check();
+  await expect(tab('Servisler')).toContainText('Değişiklik var');
+  expect((await setupCalls()).length).toBe(deliverySetupCount);
+  await discard();
+  await expect(deliverySettings.getByLabel('Kargo ile gönderim', { exact: true })).not.toBeChecked();
+  await deliverySettings.getByLabel('İşletmeden teslim', { exact: true }).uncheck();
+  await save();
+  await expect(page.getByText('En az bir online satış teslimat yöntemi açık olmalı.', { exact: true })).toBeVisible();
+  expect((await setupCalls()).length).toBe(deliverySetupCount);
+  await deliverySettings.getByLabel('Kargo ile gönderim', { exact: true }).check();
+  await save();
+  expect((await setupCalls()).at(-1).input.onlineSalesDelivery).toEqual({ pickupEnabled: false, shippingEnabled: true });
+  await expect(tab('Servisler')).not.toContainText('Değişiklik var');
+  await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [], onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false } }));
+  await expect(deliverySettings).toHaveCount(0);
+
   // Product data belongs only to the retail/barcode profile, not generic catalog users such as restaurant.
   await select('Servisler');
   await expect(page.locator('#settings-product-data')).toHaveCount(0);

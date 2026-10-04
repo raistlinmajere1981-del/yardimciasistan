@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability, type CommerceOnlineCatalog, type CommerceUnit } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability, type CommerceOnlineCatalog, type CommerceOrderDeliveryMethod, type CommerceUnit } from "@yardimci-asistan/shared";
 import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service";
 
 function publicImageUrl(value: unknown): string {
@@ -16,13 +16,18 @@ function publicImageUrl(value: unknown): string {
 
 export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iterable<BusinessCapability>): CommerceOnlineCatalog {
   if (!hasBusinessCapability(capabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)) {
-    return { version: 1, enabled: false, updatedAt: "", products: [] };
+    return { version: 1, enabled: false, updatedAt: "", deliveryMethods: [], products: [] };
   }
   // One read snapshot keeps canonical price resolution and publication fields coherent.
   db.exec("SAVEPOINT online_catalog_read");
   try {
     const business = db.prepare("SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1").get();
     const businessId = String(business?.id ?? "");
+    const settings = db.prepare("SELECT online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = '' LIMIT 1").get(businessId);
+    const deliveryMethods: CommerceOrderDeliveryMethod[] = [];
+    if (Number(settings?.online_sales_pickup_enabled) === 1) deliveryMethods.push("pickup");
+    if (Number(settings?.online_sales_shipping_enabled) === 1) deliveryMethods.push("shipping");
+    if (!deliveryMethods.length) throw new Error("Online satış teslimat ayarları geçersiz.");
     const rows = db.prepare(`
       SELECT p.id, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url,
              p.updated_at AS product_updated_at, publication.title_override,
@@ -48,9 +53,10 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
       SELECT MAX(updated_at) AS updated_at FROM (
         SELECT updated_at FROM catalog_products WHERE business_id = ?
         UNION ALL SELECT updated_at FROM commerce_product_publications WHERE business_id = ?
+        UNION ALL SELECT updated_at FROM settings WHERE business_id = ? AND deleted_at = ''
         UNION ALL SELECT updated_at FROM business_capabilities WHERE business_id = ? AND capability_id = 'channel.online_sales'
       )
-    `).get(businessId, businessId, businessId);
-    return { version: 1, enabled: true, updatedAt: String(timestamp?.updated_at ?? ""), products };
+    `).get(businessId, businessId, businessId, businessId);
+    return { version: 1, enabled: true, deliveryMethods, updatedAt: String(timestamp?.updated_at ?? ""), products };
   } finally { db.exec("RELEASE online_catalog_read"); }
 }

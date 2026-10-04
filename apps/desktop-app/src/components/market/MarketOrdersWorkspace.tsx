@@ -513,6 +513,24 @@ export function MarketOrdersWorkspace({
               </section>
             )}
 
+            <section className="market-order-buyer" aria-label="Teslimat">
+              <strong>Teslimat: {selectedOrder.order.deliverySnapshot.method === "pickup" ? "İşletmeden teslim" : "Kargo"}</strong>
+              {selectedOrder.order.deliverySnapshot.method === "shipping" && (
+                <>
+                  <dl>
+                    <dt>Alıcı</dt><dd>{selectedOrder.order.deliverySnapshot.address.recipientName}</dd>
+                    <dt>Adres</dt><dd>{selectedOrder.order.deliverySnapshot.address.addressLine1}</dd>
+                    {selectedOrder.order.deliverySnapshot.address.addressLine2 && <><dt>Adres devamı</dt><dd>{selectedOrder.order.deliverySnapshot.address.addressLine2}</dd></>}
+                    <dt>İlçe / şehir</dt><dd>{selectedOrder.order.deliverySnapshot.address.district} / {selectedOrder.order.deliverySnapshot.address.city}</dd>
+                    {selectedOrder.order.deliverySnapshot.address.postalCode && <><dt>Posta kodu</dt><dd>{selectedOrder.order.deliverySnapshot.address.postalCode}</dd></>}
+                    <dt>Ülke</dt><dd>{selectedOrder.order.deliverySnapshot.address.countryCode}</dd>
+                    {selectedOrder.order.deliverySnapshot.address.note && <><dt>Teslimat notu</dt><dd>{selectedOrder.order.deliverySnapshot.address.note}</dd></>}
+                  </dl>
+                  <p className="market-muted">Kargo ücreti ayrıca belirlenecektir.</p>
+                </>
+              )}
+            </section>
+
             <div className="market-order-detail-lines">
               {selectedOrder.items.map((item) => (
                 <div key={item.id}>

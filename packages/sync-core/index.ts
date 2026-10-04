@@ -4,6 +4,7 @@ import {
   type BusinessCapability,
   type CommerceOnlineCatalog,
   type CommerceOrderBuyerSnapshot,
+  type CommerceOrderDeliverySnapshot,
   type CustomerRequest,
   type ISODateTimeString,
   type MenuStockUnit,
@@ -35,6 +36,7 @@ export interface WebOrderEnvelope {
   id: string;
   items: Array<{ productId: string; quantity: number }>;
   buyer: CommerceOrderBuyerSnapshot;
+  delivery: CommerceOrderDeliverySnapshot;
   note?: string;
   createdAt: ISODateTimeString;
   syncSeq: number;
