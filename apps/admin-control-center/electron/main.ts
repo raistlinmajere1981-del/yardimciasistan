@@ -9,7 +9,7 @@ import {
   updateSupportReportStatus
 } from "./services/support-service";
 import { getSystemEnvironment } from "./services/system-environment-service";
-import { VerificationRunner } from "./services/verification-runner";
+import { listVerificationHistory, VerificationRunner } from "./services/verification-runner";
 
 const APP_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = process.env.YARDIMCI_REPO_ROOT
@@ -67,6 +67,7 @@ function createWindow() {
 ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));
 ipcMain.handle("admin:check-dependency-updates", () => checkDependencyUpdates(REPO_ROOT));
 ipcMain.handle("admin:get-verification-run-state", () => verificationRunner.getState());
+ipcMain.handle("admin:get-verification-history", (_event, limit) => listVerificationHistory(REPO_ROOT, limit));
 ipcMain.handle("admin:start-verification", (_event, request) => verificationRunner.start(request));
 ipcMain.handle("admin:cancel-verification", () => verificationRunner.cancel());
 ipcMain.handle("admin:get-deployment-targets", () => getDeploymentTargets(REPO_ROOT));
