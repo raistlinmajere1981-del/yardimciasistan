@@ -2719,3 +2719,74 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+.verification-history-panel {
+  margin-top: 16px;
+  padding-bottom: 10px;
+}
+
+.verification-history-list {
+  display: grid;
+}
+
+.verification-history-row {
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.verification-history-row:last-child {
+  border-bottom: 0;
+}
+
+.verification-history-row > div {
+  min-width: 0;
+}
+
+.verification-history-row strong,
+.verification-history-row small {
+  display: block;
+}
+
+.verification-history-row strong {
+  font-size: 13px;
+}
+
+.verification-history-row small {
+  margin-top: 4px;
+  color: #879bb0;
+  font-size: 11px;
+}
+
+.verification-history-row > small {
+  margin: 0;
+  text-align: right;
+}
+
+.history-head {
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #7c91a7;
+  background: #eef3f7;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.history-head--current {
+  color: #16734e;
+  background: #e5f7ee;
+}
+
+@media (max-width: 860px) {
+  .verification-history-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .verification-history-row > small {
+    display: none;
+  }
+}
