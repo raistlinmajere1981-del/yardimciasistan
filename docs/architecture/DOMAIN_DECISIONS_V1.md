@@ -438,8 +438,14 @@ this foundation. Only the current schema is supported; no historical migration c
 **Status:** ACCEPTED (2026-10-04)
 
 Product Publication is not a second canonical Product. A publication references
-`catalog_products` by `productId` and owns only channel settings. Web visibility is
-explicit opt-in, default OFF, with one publication per product/channel (`online_sales`).
+`catalog_products` by `productId` and owns only channel settings, with one publication
+per product/channel (`online_sales`). When `channel.online_sales` is enabled, canonical
+Product creation persists a publication with `isPublished=true` by default in the same
+transaction. The create form may explicitly opt out; users may also disable publication
+later per product. With the channel disabled, new products are not automatically published.
+Existing products retain their stored publication state (including absent/false), and
+enabling the capability later never bulk-publishes old products. Product edits do not
+reapply the creation default. The existing publication trigger/outbox lifecycle is reused.
 
 Desktop is authoritative. Only active, non-deleted products with an enabled publication
 enter the public projection. `channel.online_sales` OFF publishes a disabled empty

@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import {
+  BUSINESS_CAPABILITIES,
   createId,
   moneyToMinor,
   normalizeBarcodeIdentity,
@@ -11,6 +12,8 @@ import {
   type InventoryMovement,
   type InventoryMovementType
 } from "@yardimci-asistan/shared";
+import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
+import { saveCommerceProductPublication } from "./commerce-product-publication-store.js";
 import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 
 const COMMERCE_UNITS = new Set<CommerceUnit>([
@@ -31,6 +34,8 @@ export interface SaveCatalogProductInput {
   id?: string;
   categoryId?: string;
   name: string;
+  /** Creation-only channel preference; defaults to published when online sales is enabled. */
+  onlineSalesPublished?: boolean;
   brand?: string;
   sku?: string;
   barcode?: string;
@@ -593,6 +598,13 @@ export function saveCatalogProductInTransaction(
       throw new Error("Bu stok kodu başka bir üründe kullanılıyor.", { cause: error });
     }
     throw error;
+  }
+
+  if (!existing && readEnabledBusinessCapabilities(database).includes(BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+    if (input.onlineSalesPublished !== undefined && typeof input.onlineSalesPublished !== "boolean") {
+      throw new Error("Ürün yayın bilgisi geçersiz.");
+    }
+    saveCommerceProductPublication(database, { productId: id, isPublished: input.onlineSalesPublished ?? true });
   }
 
   const saved = getProductRow(database, businessId, id);

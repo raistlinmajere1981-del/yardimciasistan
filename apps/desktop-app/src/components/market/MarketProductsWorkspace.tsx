@@ -76,6 +76,8 @@ export function MarketProductsWorkspace({
   const navigation = useWorkspaceNavigation();
   const { snapshot } = useBusinessCapabilityRuntime();
   const inventoryEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.INVENTORY);
+  const onlineSalesEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.ONLINE_SALES);
+  const [onlineSalesPublished, setOnlineSalesPublished] = useState(onlineSalesEnabled);
   const wholesaleEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.WHOLESALE);
   const [search, setSearch] = useState("");
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
@@ -102,8 +104,9 @@ export function MarketProductsWorkspace({
     setManualImageDataUrl("");
     setSaveState("idle");
     setSaveMessage("Bulunan ürün bilgilerini kontrol edip kaydedin.");
+    setOnlineSalesPublished(onlineSalesEnabled);
     setCreateOpen(true);
-  }, [inventoryEnabled, productLookupRequest]);
+  }, [inventoryEnabled, onlineSalesEnabled, productLookupRequest]);
 
   useEffect(() => {
     if (createOpen || !pendingProductId) return;
@@ -123,6 +126,7 @@ export function MarketProductsWorkspace({
     setManualImageDataUrl("");
     setSaveState("idle");
     setSaveMessage("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
+    setOnlineSalesPublished(onlineSalesEnabled);
     setCreateOpen(true);
   }
 
@@ -194,6 +198,7 @@ export function MarketProductsWorkspace({
     try {
       saved = await bridge.saveProduct({
         ...productFormToSaveInput(productForm),
+        ...(onlineSalesEnabled ? { onlineSalesPublished } : {}),
         ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
         ...(imageDraftMode === "clear" ? { clearImage: true } : {})
       });
@@ -330,6 +335,10 @@ export function MarketProductsWorkspace({
             onChange={setProductForm}
             onStateChange={onStateChange}
           />
+          {onlineSalesEnabled && <label className="market-check">
+            <input type="checkbox" checked={onlineSalesPublished} disabled={busy || saveState === "loading"}
+              onChange={(event) => setOnlineSalesPublished(event.target.checked)} /> Web satışında yayınla
+          </label>}
         </div>
       </FormDialog>}
     </>

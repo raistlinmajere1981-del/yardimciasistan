@@ -37,8 +37,10 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let saves = 0;
+  const createdProducts = [];
   let failSave = false;
   await page.exposeFunction("__publicationCall", (method, input) => {
+    if (method === "create") { const saved = saveRuntimeCatalogProduct(database.databasePath, input); createdProducts.push(saved); return saved; }
     if (method === "get") return database.getCommerceProductPublication(input);
     if (method === "save") {
       saves++;
@@ -50,6 +52,7 @@ try {
   await page.addInitScript((product) => {
     window.__product = product;
     window.yardimciDesktop = { commerce: {
+      saveProduct: (input) => window.__publicationCall("create", input),
       getProductPublication: (id) => window.__publicationCall("get", id),
       saveProductPublication: (input) => window.__publicationCall("save", input)
     } };
@@ -58,8 +61,8 @@ try {
   await page.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
   const checkbox = page.getByRole("checkbox", { name: "Web satışında yayınla", exact: true });
   await expect(checkbox).toBeEnabled();
-  await expect(checkbox).not.toBeChecked();
-  await checkbox.check();
+  await expect(checkbox).toBeChecked();
+  assert.equal(database.getCommerceProductPublication(product.id).isPublished, true);
   await expect(checkbox).toBeChecked();
   await expect.poll(() => database.getCommerceProductPublication(product.id)?.isPublished).toBe(true);
   await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
@@ -72,7 +75,7 @@ try {
   await expect(checkbox).toBeChecked();
   assert.equal(database.getCommerceProductPublication(product.id).isPublished, true);
   failSave = false;
-  await checkbox.uncheck();
+  await checkbox.click();
   await expect(checkbox).not.toBeChecked();
   await expect.poll(() => database.getCommerceProductPublication(product.id).isPublished).toBe(false);
   const beforeToggleSaves = saves;
@@ -84,6 +87,37 @@ try {
   await page.evaluate(() => window.__onlineToggle(true));
   await expect(checkbox).toBeEnabled();
   await expect(checkbox).not.toBeChecked();
+  await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  for (const optOut of [false, true]) {
+    await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
+    const create = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
+    const createCheckbox = create.getByRole("checkbox", { name: "Web satışında yayınla", exact: true });
+    await expect(createCheckbox).toBeChecked();
+    if (optOut) await createCheckbox.uncheck();
+    await create.getByLabel("Ürün adı", { exact: true }).fill(optOut ? "Created unpublished" : "Created published");
+    await create.getByLabel("Satış fiyatı", { exact: true }).fill("25");
+    await create.getByLabel("Alış fiyatı", { exact: true }).fill("10");
+    await create.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+    await expect(create).toHaveCount(0);
+    const saved = createdProducts.at(-1);
+    assert.equal(database.getCommerceProductPublication(saved.id).isPublished, !optOut);
+    if (optOut) await expect(checkbox).not.toBeChecked();
+    else await expect(checkbox).toBeChecked();
+    assert.equal(database.createCommerceOnlineCatalog().products.some((entry) => entry.productId === saved.id), !optOut);
+    await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  }
+  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: false });
+  await page.evaluate(() => window.__onlineToggle(false));
+  await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
+  const offlineCreate = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
+  await expect(offlineCreate.getByRole("checkbox", { name: "Web satışında yayınla" })).toHaveCount(0);
+  await offlineCreate.getByLabel("Ürün adı", { exact: true }).fill("Created offline");
+  await offlineCreate.getByLabel("Satış fiyatı", { exact: true }).fill("25");
+  await offlineCreate.getByLabel("Alış fiyatı", { exact: true }).fill("10");
+  await offlineCreate.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(offlineCreate).toHaveCount(0);
+  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+  assert.equal(database.getCommerceProductPublication(createdProducts.at(-1).id), null);
   assert.deepEqual(errors, []);
   console.log("commerce-online-catalog-ui-smoke-ok");
 } finally { await browser?.close(); await server?.close(); database.close(); rmSync(root, { recursive: true, force: true }); }
