@@ -1,7 +1,11 @@
+import { readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 
+function sitePhpFiles(directory) { return readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? sitePhpFiles(`${directory}/${entry.name}`) : entry.name.endsWith(".php") ? [`${directory}/${entry.name}`] : []); }
 const phpFiles = [
+  ...sitePhpFiles("test-site/landing"),
+  "firm-template/web-module/lib/website-navigation.php",
   "firm-template/web-module/lib/marketing.php",
   "firm-template/web-module/api/marketing.php",
   "firm-template/web-module/api/marketing-media.php",

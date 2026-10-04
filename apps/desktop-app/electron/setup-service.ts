@@ -3,6 +3,7 @@ import type { MessagingSecretWrite } from "./business-messaging/secret-service";
 import { getArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
 import type { DatabaseSync } from "node:sqlite";
 import {
+  normalizeWebsiteNavigation,
   BUSINESS_CAPABILITIES,
   createId,
   normalizeOnlineSalesDeliverySettings,
@@ -91,6 +92,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     address: String(business?.address ?? ""),
     webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
     syncSecret,
+    websiteNavigation: normalizeWebsiteNavigation(JSON.parse(String(settings?.website_navigation_json ?? "[]"))),
     autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
     localNetworkEnabled: Number(settings?.local_network_enabled ?? 1) === 1,
     aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
@@ -137,6 +139,9 @@ export function saveSetupData(
   shippingSecretWrite: ShippingSecretWrite = { mode: "keep" },
   messagingSecretWrite: MessagingSecretWrite = { mode: "keep" }
 ): StoredSetupSaveResult {
+  let websiteNavigation;
+  try { websiteNavigation = normalizeWebsiteNavigation(input.websiteNavigation ?? JSON.parse(String(db.prepare("SELECT website_navigation_json FROM settings WHERE deleted_at = '' LIMIT 1").get()?.website_navigation_json ?? "[]"))); }
+  catch { return { ok: false, message: "Website menüsü geçersiz." }; }
   const businessName = input.businessName.trim();
   const syncSecret = input.syncSecret.trim();
   const webModuleUrl = normalizeUrl(input.webModuleUrl);
@@ -421,6 +426,12 @@ export function saveSetupData(
     db.prepare("UPDATE settings SET dealer_portal_enabled = ? WHERE id = ?")
       .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);
 
+    const navigationJson = JSON.stringify(websiteNavigation);
+    db.prepare("UPDATE settings SET website_navigation_json = ? WHERE id = ?").run(navigationJson, settingsId);
+    if (!existingSettings || JSON.stringify(normalizeWebsiteNavigation(JSON.parse(String(existingSettings.website_navigation_json ?? "[]")))) !== navigationJson
+      || String(existingSettings.web_module_url ?? "") !== webModuleUrl || String(existingSettings.sync_secret ?? "") !== syncSecret) {
+      queueSyncJob(db, "website_navigation_publish", now);
+    }
     if (input.whatsappCloud) saveMessagingConfiguration(db, businessId, input.whatsappCloud, messagingSecretWrite);
     if (input.arasShipping) saveArasShippingConfigurationInTransaction(db, businessId, input.arasShipping, shippingSecretWrite);
 

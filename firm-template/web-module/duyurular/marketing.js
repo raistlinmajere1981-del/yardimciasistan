@@ -8,9 +8,15 @@
     .then(data => {
       for (const surface of surfaces) {
         surface.replaceChildren();
-        const items = data.ok && Array.isArray(data.publications) ? data.publications.filter(item => item.published && item.placement === 'homepage_feature') : [];
+        let items = data.ok && Array.isArray(data.publications) ? data.publications.filter(item => item.published && item.placement === 'homepage_feature') : [];
+        const wrapper = surface.closest('[data-marketing-wrapper]');
+        if (wrapper) wrapper.hidden = !items.length;
+        const empty = surface.parentElement.querySelector('[data-marketing-empty]');
+        if (empty) empty.hidden = items.length > 0;
+        const limit = Number(surface.dataset.marketingLimit);
+        if (Number.isInteger(limit) && limit > 0) items = items.slice(0, Math.min(limit, 20));
         if (!items.length) { surface.hidden = true; continue; }
-        const heading = document.createElement('h2'); heading.textContent = 'Duyurular / Kampanyalar'; surface.append(heading);
+        const heading = document.createElement('h2'); heading.textContent = 'Duyurular / Kampanyalar'; if (surface.dataset.marketingHeading !== 'false') surface.append(heading);
         const grid = document.createElement('div'); grid.className = 'ya-marketing-grid';
         for (const item of items) {
           const card = document.createElement('article'); card.className = 'ya-marketing-card';

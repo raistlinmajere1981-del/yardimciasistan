@@ -239,7 +239,7 @@ try {
   assert.equal(firstCycle.pulledActions, 1);
   assert.equal(firstCycle.appliedActions, 1);
   assert.equal(firstCycle.failedActions, 0);
-  assert.equal(firstCycle.publishedJobs, 3);
+  assert.equal(firstCycle.publishedJobs, 4, "menu, catalog, Android snapshot and Website navigation are acknowledged");
   assert.ok(dashboardChangeCount >= 1);
   assert.ok(statusEvents.some((status) => status.phase === "syncing"));
   assert.equal(statusEvents.at(-1)?.phase, "success");
@@ -1179,6 +1179,7 @@ function assertCapabilitiesShape() {
     protocol_version: 2,
     storage: "sqlite",
     features: [
+      "website_navigation",
       "marketing_website_publications",
       "business_messaging_status_v1",
       "web_orders_v1",

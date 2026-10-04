@@ -1,3 +1,5 @@
+> D4.1: aşağıdaki tarihsel raporda geçen `test-site/landing/demo/` kaynakları tek kök site ağacına taşındı. Güncel sözleşme: `test-site/landing/README.md`.
+
 # D4 — Pazarlama Stüdyosu ve Website Yayınlama
 
 Başlangıç: `main`, `e351aaa47509424d1521a1da014dac5d6fb6b56c`, temiz çalışma ağacı.

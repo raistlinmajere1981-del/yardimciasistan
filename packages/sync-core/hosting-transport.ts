@@ -1,4 +1,4 @@
-import type { MarketingWebsiteProjection } from "@yardimci-asistan/shared";
+import type { WebsiteNavigationPublication, MarketingWebsiteProjection } from "@yardimci-asistan/shared";
 import type { CommerceOnlineCatalog, DealerAccessProjection } from "@yardimci-asistan/shared";
 import type {
   DealerAccessPublicationSuccess,
@@ -423,6 +423,14 @@ export class PhpHostingSyncTransport implements SyncTransport {
       actionId: input.actionId,
       status: input.status,
       errorMessage: input.errorMessage
+    });
+  }
+
+  publishWebsiteNavigation(input: VersionedPublication<WebsiteNavigationPublication>): Promise<DealerAccessPublicationResult> {
+    return syncRequest<DealerAccessPublicationSuccess>(this.config, {
+      action: "publish_website_navigation", client_id: this.config.clientId,
+      source_revision: input.sourceRevision, idempotency_key: input.idempotencyKey,
+      navigation: input.value
     });
   }
 

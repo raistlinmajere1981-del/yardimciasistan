@@ -1009,3 +1009,21 @@ OpenAI configured profiles use the Images endpoint (gpt-image-1 default or expli
 saved gpt-image model); Gemini/custom image support requires a matching saved image
 model. Other profiles remain safely unavailable for image generation until an adapter
 exists. This is a capability assertion, not proof of provider account quota/permission.
+
+## D-039 — Known website navigation and demo showcase (D4.1)
+
+**Status:** Accepted. **Scope:** Website page visibility/order; personal Alwaysdata showcase.
+
+Website pages are a bounded static typed registry, separate from Desktop application navigation.
+Desktop publishes only pageId/visible/order in a revisioned `website_navigation` projection;
+URLs and HTML never cross this boundary. Host resolves known routes and combines user intent
+with public capability/publication availability. `demoOnly` installation/guide entries are
+excluded from customer-host resolution. Settings ownership is Services/Website, staged through
+the existing setup save transaction. The durable sync outbox and monotonic revision ledger
+own retries/idempotency; only matching revision acknowledgement completes an intent.
+Saving changed menu settings requests an explicit sync cycle without enabling passive auto-sync.
+
+Alwaysdata root is a personal showcase/workspace, not a real customer website. Only its root
+and installation PHP surfaces may read and display that installation's configured sync secret.
+The rendering helper stays in test-site/landing; customer packages and BlackSea never include it.
+Business operations, marketing D4 contracts and existing catalog/store routes remain unchanged.

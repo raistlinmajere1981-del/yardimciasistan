@@ -605,6 +605,13 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     publishBusinessAiContextFromMain()
   ]);
   getSyncCoordinator().restart();
+  if (getDatabase().getPendingSyncJobs().some(job => job.jobType === "website_navigation_publish" && job.attemptCount === 0)) {
+    void getSyncCoordinator().runNow().then(() => {
+      if (getDatabase().getPendingSyncJobs().some(job => job.jobType === "website_navigation_publish" && job.attemptCount === 0)) {
+        void getSyncCoordinator().runNow();
+      }
+    });
+  }
   const setupData = getDatabase().getSetupData();
   const dashboardData = getDatabase().getDashboardData();
 

@@ -1,0 +1,85 @@
+[
+  {
+    "id": "home",
+    "label": "Ana Sayfa",
+    "path": "/",
+    "availability": "always",
+    "userVisible": true,
+    "order": 0,
+    "fixed": true
+  },
+  {
+    "id": "rooms",
+    "label": "Odalar",
+    "path": "/odalar/",
+    "availability": "rooms",
+    "userVisible": true,
+    "order": 10
+  },
+  {
+    "id": "restaurant",
+    "label": "Restoran",
+    "path": "/restoran/",
+    "availability": "restaurant",
+    "userVisible": true,
+    "order": 20
+  },
+  {
+    "id": "qr_menu",
+    "label": "QR Menü",
+    "path": "/qr-menu/",
+    "availability": "qr_menu",
+    "userVisible": true,
+    "order": 30
+  },
+  {
+    "id": "store",
+    "label": "Mağaza",
+    "path": "/yardimci-asistan/magaza/",
+    "availability": "store",
+    "userVisible": true,
+    "order": 40
+  },
+  {
+    "id": "announcements",
+    "label": "Kampanyalar",
+    "path": "/duyurular/",
+    "availability": "announcements",
+    "userVisible": true,
+    "order": 50
+  },
+  {
+    "id": "reviews",
+    "label": "Yorumlar",
+    "path": "/yorumlar/",
+    "availability": "reviews",
+    "userVisible": true,
+    "order": 60
+  },
+  {
+    "id": "contact",
+    "label": "İletişim",
+    "path": "/iletisim/",
+    "availability": "always",
+    "userVisible": true,
+    "order": 70
+  },
+  {
+    "id": "installation",
+    "label": "Kurulum",
+    "path": "/kurulum/",
+    "availability": "always",
+    "userVisible": true,
+    "order": 80,
+    "demoOnly": true
+  },
+  {
+    "id": "guide",
+    "label": "Kullanım Kılavuzu",
+    "path": "/kullanim-kilavuzu/",
+    "availability": "always",
+    "userVisible": true,
+    "order": 90,
+    "demoOnly": true
+  }
+]

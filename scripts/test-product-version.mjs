@@ -32,10 +32,7 @@ function fixture() {
     web_module_version: "0.1.0"
   });
   mkdirSync(join(root, "test-site", "landing", "assets"), { recursive: true });
-  writeFileSync(
-    join(root, "test-site", "landing", "assets", "index-fixture.js"),
-    'kr="0.1.0".trim()||"0.1.0",Xr=""||`/downloads/YardimciAsistan-Setup-${kr}.exe`,wr="0.1.0".trim()||"0.1.0",Jy=""||`/downloads/YardimciAsistan-Android-${wr}.apk`;'
-  );
+  writeJson(join(root, "test-site", "landing", "release.json"), { desktopVersion: "0.1.0", androidVersion: "0.1.0" });
   return root;
 }
 
@@ -50,8 +47,8 @@ test("sync canonical sürümü desktop/android metadata'ya yazar", () => {
     assert.deepEqual(product, { version: "0.1.7", androidVersionCode: 4, webModuleVersion: "0.1.5" });
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "desktop-app", "package.json"))).version, "0.1.7");
     assert.equal(JSON.parse(readFileSync(join(root, "apps", "android-app", "package.json"))).version, "0.1.7");
-    const landing = readFileSync(join(root, "test-site", "landing", "assets", "index-fixture.js"), "utf8");
-    assert.equal((landing.match(/"0\.1\.7"\.trim\(\)\|\|"0\.1\.7"/g) ?? []).length, 2);
+    const landing = JSON.parse(readFileSync(join(root, "test-site", "landing", "release.json"), "utf8"));
+    assert.deepEqual(landing, { desktopVersion: "0.1.7", androidVersion: "0.1.7" });
     assert.deepEqual(
       JSON.parse(readFileSync(join(root, "firm-template", "web-module", "config", "version.json"), "utf8")),
       { product_version: "0.1.7", web_module_version: "0.1.5" }
@@ -66,12 +63,8 @@ test("check landing download sürümü geride kalırsa hata verir", () => {
   const root = fixture();
   try {
     syncProductVersion(root);
-    const landingPath = join(root, "test-site", "landing", "assets", "index-fixture.js");
-    const landing = readFileSync(landingPath, "utf8").replace(
-      '"0.1.7".trim()||"0.1.7"',
-      '"0.1.6".trim()||"0.1.6"'
-    );
-    writeFileSync(landingPath, landing);
+    const landingPath = join(root, "test-site", "landing", "release.json");
+    writeJson(landingPath, { desktopVersion: "0.1.6", androidVersion: "0.1.7" });
     assert.throws(() => checkProductVersion(root), /landing download 1=0\.1\.6/);
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -849,6 +849,7 @@ CREATE TABLE settings (
   product_data_include_images INTEGER NOT NULL DEFAULT 1 CHECK (product_data_include_images IN (0, 1)),
   dealer_portal_enabled INTEGER NOT NULL DEFAULT 0 CHECK (dealer_portal_enabled IN (0, 1)),
   online_sales_pickup_enabled INTEGER NOT NULL DEFAULT 1 CHECK (online_sales_pickup_enabled IN (0, 1)),
+  website_navigation_json TEXT NOT NULL DEFAULT '[]',
   online_sales_shipping_enabled INTEGER NOT NULL DEFAULT 0 CHECK (online_sales_shipping_enabled IN (0, 1) AND (online_sales_pickup_enabled = 1 OR online_sales_shipping_enabled = 1)),
   setup_completed INTEGER NOT NULL DEFAULT 0 CHECK (setup_completed IN (0, 1)),
   app_password_verifier TEXT NOT NULL DEFAULT '',
@@ -897,7 +898,7 @@ CREATE TABLE stock_image_imports (
 
 CREATE TABLE sync_outbox (
   job_key TEXT PRIMARY KEY,
-  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish', 'marketing_website_publish')),
+  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish', 'marketing_website_publish', 'website_navigation_publish')),
   source_revision INTEGER NOT NULL DEFAULT 1,
   attempt_count INTEGER NOT NULL DEFAULT 0,
   claim_token TEXT NOT NULL DEFAULT '', claimed_at TEXT NOT NULL DEFAULT '',

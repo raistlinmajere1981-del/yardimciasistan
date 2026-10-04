@@ -1,3 +1,4 @@
+import { WebsiteNavigationFields } from "./WebsiteNavigationFields";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { useEffect, useState } from "react";
@@ -92,6 +93,7 @@ export function WebSettingsSection({ form, onFormChange }: SetupFieldsProps) {
             {form.profileOptions.includes(C.MARKETING_STUDIO) && <ActionButton variant="secondary" type="button" onClick={() => void testMarketingConnection()} disabled={webConnectionTestState === "loading"}>Kaydedilmiş Website yayın bağlantısını test et</ActionButton>}
             <span className="setup-connection-message" role={webConnectionTestState === "error" ? "alert" : "status"} aria-live="polite">{webConnectionTestMessage}</span>
           </div>
+          <WebsiteNavigationFields items={form.websiteNavigation} onChange={items => update("websiteNavigation", items)} />
         </ServiceSettingsCard>
 
   );

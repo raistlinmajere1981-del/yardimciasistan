@@ -995,6 +995,22 @@ export class SyncCoordinator {
           "Web modülü bayi erişimini desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
         continue;
       }
+      if (job.jobType === "website_navigation_publish") {
+        const result = transport.publishWebsiteNavigation
+          ? await transport.publishWebsiteNavigation({ sourceRevision: job.sourceRevision,
+              idempotencyKey: `${clientId}:${job.jobKey}:${job.sourceRevision}`,
+              value: { revision: job.sourceRevision, items: this.options.database.getSetupData().websiteNavigation ?? [] } })
+          : { ok: false as const, message: "Web modülü Website menüsünü desteklemiyor." };
+        if (result.ok && result.source_revision === job.sourceRevision) {
+          this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
+          published += 1;
+        } else {
+          const message = result.ok ? "Website menü revision onayı doğrulanamadı." : result.message;
+          this.options.database.failSyncJob(job.jobKey, job.sourceRevision, message, calculateNextAttempt(job.attemptCount));
+          errors.push(message);
+        }
+        continue;
+      }
       if (job.jobType === "marketing_website_publish") {
         const publisher = this.options.marketingWebsite;
         const config = this.options.getSyncConfig();

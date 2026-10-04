@@ -1,3 +1,4 @@
+export * from "./types/website-navigation";
 export * from "./types/ai";
 export * from "./types/business";
 export * from "./types/business-ai-context";

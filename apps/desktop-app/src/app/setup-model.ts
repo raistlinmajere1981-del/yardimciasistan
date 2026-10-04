@@ -1,3 +1,5 @@
+import { defaultWebsiteNavigation } from "@yardimci-asistan/shared";
+import type { WebsiteNavigationItem } from "@yardimci-asistan/shared";
 import { emptyWhatsAppCloudConfiguration, type WhatsAppCloudConfigurationInput } from "@yardimci-asistan/shared";
 import type {
   DesktopAiModelOption,
@@ -28,6 +30,7 @@ export interface AiServiceFormDraft {
 }
 
 export interface SetupFormState {
+  websiteNavigation: WebsiteNavigationItem[];
   businessName: string;
   profileId: string;
   profileOptions: BusinessCapability[];
@@ -89,6 +92,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
   const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
 
   return {
+    websiteNavigation: setupData.websiteNavigation ?? defaultWebsiteNavigation(),
     businessName: setupData.businessName || "",
     profileId: setupData.profileId || "pension_restaurant",
     profileOptions: [...setupData.profileOptions],
@@ -230,6 +234,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       address: setupForm.address,
       webModuleUrl: setupForm.webModuleUrl,
       syncSecret: setupForm.syncSecret,
+      websiteNavigation: setupForm.websiteNavigation,
       autoSyncEnabled: setupForm.autoSyncEnabled,
       localNetworkEnabled: setupForm.localNetworkEnabled,
       aiEnabled: setupForm.aiEnabled,

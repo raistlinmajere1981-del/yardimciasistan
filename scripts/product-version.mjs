@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -129,19 +129,9 @@ export function bumpProductVersion(part, root = repoRoot) {
 }
 
 export function syncLandingDownloadVersion(root = repoRoot, version = readProductVersion(root).version) {
-  const bundle = findLandingDownloadBundle(root);
-  if (!bundle) return false;
-
-  const source = readFileSync(bundle, "utf8");
-  const marker = /"\d+\.\d+\.\d+"\.trim\(\)\|\|"\d+\.\d+\.\d+"/g;
-  const matches = source.match(marker) ?? [];
-  if (matches.length !== 2) {
-    throw new Error(
-      `Landing download bundle içinde 2 sürüm işareti bekleniyordu, ${matches.length} bulundu: ${bundle}`
-    );
-  }
-  const replacement = `"${version}".trim()||"${version}"`;
-  writeFileSync(bundle, source.replace(marker, replacement));
+  const path = resolve(root, "test-site", "landing", "release.json");
+  if (!existsSync(dirname(path))) return false;
+  writeJson(path, { desktopVersion: version, androidVersion: version });
   return true;
 }
 
@@ -168,33 +158,12 @@ export function readWebModuleVersionMetadata(root = repoRoot) {
 }
 
 export function readLandingDownloadVersions(root = repoRoot) {
-  const bundle = findLandingDownloadBundle(root);
-  if (!bundle) return [];
-  const source = readFileSync(bundle, "utf8");
-  const matches = [...source.matchAll(/"(\d+\.\d+\.\d+)"\.trim\(\)\|\|"\1"/g)];
-  if (matches.length !== 2) {
-    throw new Error(
-      `Landing download bundle içinde 2 sürüm işareti bekleniyordu, ${matches.length} bulundu: ${bundle}`
-    );
-  }
-  return matches.map((match) => match[1]);
-}
-
-function findLandingDownloadBundle(root) {
-  const assetsDir = resolve(root, "test-site", "landing", "assets");
-  if (!existsSync(assetsDir)) return "";
-  const candidates = readdirSync(assetsDir)
-    .filter((name) => /^index-.*\.js$/.test(name))
-    .map((name) => resolve(assetsDir, name))
-    .filter((path) => {
-      const source = readFileSync(path, "utf8");
-      return source.includes("/downloads/YardimciAsistan-Setup-${")
-        && source.includes("/downloads/YardimciAsistan-Android-${");
-    });
-  if (candidates.length > 1) {
-    throw new Error(`Birden fazla landing download bundle bulundu: ${candidates.join(", ")}`);
-  }
-  return candidates[0] ?? "";
+  const path = resolve(root, "test-site", "landing", "release.json");
+  if (!existsSync(path)) return [];
+  const release = JSON.parse(readFileSync(path, "utf8"));
+  validateVersion(release.desktopVersion);
+  validateVersion(release.androidVersion);
+  return [release.desktopVersion, release.androidVersion];
 }
 
 function validateVersion(version) {

@@ -765,6 +765,26 @@ try {
   await expect(tab('Servisler')).not.toContainText('Değişiklik var');
   await page.evaluate(() => window.refreshSettings({ servicePreferences: { whatsapp: false, android: false } }));
 
+  // Website menu is a staged Services field, with one category save and discard lifecycle.
+  await select('Servisler');
+  const websiteMenu = page.getByRole('group', { name: 'Website Menü', exact: true });
+  await expect(websiteMenu).toBeVisible();
+  const beforeMenu = (await setupCalls()).length;
+  await websiteMenu.getByLabel('Odalar', { exact: true }).uncheck();
+  await websiteMenu.getByRole('button', { name: 'QR Menü yukarı taşı', exact: true }).click();
+  await expect(tab('Servisler')).toContainText('Değişiklik var');
+  expect((await setupCalls()).length).toBe(beforeMenu);
+  await discard();
+  await expect(websiteMenu.getByLabel('Odalar', { exact: true })).toBeChecked();
+  await websiteMenu.getByLabel('Odalar', { exact: true }).uncheck();
+  await websiteMenu.getByRole('button', { name: 'QR Menü yukarı taşı', exact: true }).click();
+  await save();
+  const menuSaved = (await setupCalls()).at(-1).input.websiteNavigation;
+  expect(menuSaved.find(item => item.pageId === 'rooms').visible).toBe(false);
+  expect(menuSaved.find(item => item.pageId === 'qr_menu').order).toBeLessThan(menuSaved.find(item => item.pageId === 'restaurant').order);
+  expect(Object.keys(menuSaved[0]).sort()).toEqual(['order', 'pageId', 'visible']);
+  await expect(tab('Servisler')).not.toContainText('Değişiklik var');
+
   // Responsive body remains bounded after the new footer/dialog architecture.
   for (const width of [1440, 1024, 900, 760, 600]) {
     await page.setViewportSize({ width, height: 900 });

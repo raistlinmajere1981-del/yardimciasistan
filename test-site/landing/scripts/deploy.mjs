@@ -5,13 +5,15 @@
  * Deploys landing code:
  *   www/index.php
  *   www/favicon.png
- *   www/assets/     (landing + public-site assets; add/update, never delete)
+ *   www/assets/     (showcase assets; add/update, never delete)
  *   www/inc/        (public-site shared PHP)
  *   www/odalar/
  *   www/restoran/
  *   www/qr-menu/
  *   www/yorumlar/
  *   www/iletisim/
+ *   www/duyurular/, www/kurulum/, www/kullanim-kilavuzu/
+ *   www/release.json
  *
  * With --with-downloads it also deploys the current release artifacts:
  *   www/downloads/YardimciAsistan-Setup-<version>.exe
@@ -99,21 +101,20 @@ for (const cmd of ["ssh", "scp", "rsync", "php"]) {
 const localIndex = join(repoRoot, "index.php");
 const localFavicon = join(repoRoot, "favicon.png");
 const localAssets = join(repoRoot, "assets");
-const localDemo = join(repoRoot, "demo");
-const publicRouteDirs = ["odalar", "restoran", "qr-menu", "yorumlar", "iletisim"];
-const landingBundle = join(localAssets, "index-t2kNTUv0.js");
+const localSite = repoRoot;
+const localRelease = join(repoRoot, "release.json");
+const publicRouteDirs = ["odalar", "restoran", "qr-menu", "yorumlar", "iletisim", "duyurular", "kurulum", "kullanim-kilavuzu"];
 const requiredLocal = [
   localIndex,
   localFavicon,
-  landingBundle,
-  join(localAssets, "index-fcReLA3k.css"),
-  join(localDemo, "index.php"),
-  join(localDemo, "assets", "css", "site.css"),
-  join(localDemo, "assets", "js", "site.js"),
-  join(localDemo, "assets", "js", "rooms.js"),
-  join(localDemo, "assets", "js", "tables.js"),
-  join(localDemo, "restoran", "index.php"),
-  join(localDemo, "restoran", "masa", "index.php")
+  localRelease,
+  join(localSite, "index.php"),
+  join(localSite, "assets", "css", "site.css"),
+  join(localSite, "assets", "js", "site.js"),
+  join(localSite, "assets", "js", "rooms.js"),
+  join(localSite, "assets", "js", "tables.js"),
+  join(localSite, "restoran", "index.php"),
+  join(localSite, "restoran", "masa", "index.php")
 ];
 for (const f of requiredLocal) {
   if (!existsSync(f)) fail(`Yerel kaynak dosya eksik: ${f}`);
@@ -150,20 +151,9 @@ if (withDownloads) {
     );
   }
 
-  const bundleSource = readFileSync(landingBundle, "utf8");
-  const desktopMarker = `"${desktopVersion}".trim()||"${desktopVersion}"`;
-  const androidMarker = `"${androidVersion}".trim()||"${androidVersion}"`;
-  if (
-    !bundleSource.includes("/downloads/YardimciAsistan-Setup-${kr}.exe") ||
-    !bundleSource.includes("/downloads/YardimciAsistan-Android-${wr}.apk") ||
-    !readFileSync(localIndex, "utf8").includes('data-ya-x86-download="1"') ||
-    !bundleSource.includes(desktopMarker) ||
-    !bundleSource.includes(androidMarker)
-  ) {
-    fail(
-      "Landing bundle ile release surumleri eslesmiyor. " +
-      "Kurulum dosyalarini yayinlamadan once landing download surumlerini guncelleyin."
-    );
+  const release = JSON.parse(readFileSync(localRelease, "utf8"));
+  if (release.desktopVersion !== desktopVersion || release.androidVersion !== androidVersion) {
+    fail("Site release.json ile kurulum paketlerinin sürümleri eşleşmiyor.");
   }
 
   downloadArtifacts.push(
@@ -229,19 +219,19 @@ if (withDownloads) {
 
 step("Yerel PHP syntax kontrolu");
 runLocal("php", ["-l", localIndex]);
-runLocal("sh", ["-c", `find '${localDemo}' -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`]);
-console.log("Demo PHP dosyalari temiz.");
+runLocal("sh", ["-c", `find '${localSite}' -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`]);
+console.log("Site PHP dosyalari temiz.");
 
-step("Yerel demo JavaScript syntax kontrolu");
+step("Yerel site JavaScript syntax kontrolu");
 for (const script of [
-  join(localDemo, "assets", "js", "site.js"),
-  join(localDemo, "assets", "js", "rooms.js"),
-  join(localDemo, "assets", "js", "tables.js"),
-  join(localDemo, "assets", "js", "qr-menu.js")
+  join(localSite, "assets", "js", "site.js"),
+  join(localSite, "assets", "js", "rooms.js"),
+  join(localSite, "assets", "js", "tables.js"),
+  join(localSite, "assets", "js", "qr-menu.js")
 ]) {
   runLocal(process.execPath, ["--check", script]);
 }
-console.log("Demo JavaScript dosyalari temiz.");
+console.log("Site JavaScript dosyalari temiz.");
 
 // Eski hardcoded test degeri: bilerek parcali yazildi ki bu dosya
 // repo genelinde literal taramasina takilmasin. Guard amaclidir,
@@ -249,7 +239,7 @@ console.log("Demo JavaScript dosyalari temiz.");
 const STALE_HARDCODED = ["112233", "445566"].join("");
 
 step("Kaynakta hardcoded secret taramasi");
-const hardcodedHits = grepLocal(STALE_HARDCODED, [localIndex, localAssets, localDemo]);
+const hardcodedHits = grepLocal(STALE_HARDCODED, [localIndex, localAssets, localSite]);
 if (hardcodedHits.length > 0) {
   console.error(hardcodedHits.join("\n"));
   fail("Kaynakta hardcoded deger var; deploy durduruldu.");
@@ -262,7 +252,7 @@ if (!liveSecret) fail("Canli sync_secret okunamadi; deploy durduruldu.");
 console.log(`Canli sync_secret uzunlugu: ${liveSecret.length}`);
 
 step("Gercek secret'in kaynaga gomulmedigi kontrol ediliyor");
-const leakHits = grepLocalFixedString(liveSecret, [localIndex, localAssets, localDemo]);
+const leakHits = grepLocalFixedString(liveSecret, [localIndex, localAssets, localSite]);
 if (leakHits.length > 0) {
   console.error(leakHits.join("\n"));
   fail("Kaynak dosyalarda canli secret bulunuyor; deploy durduruldu.");
@@ -297,15 +287,6 @@ if (dryRun) {
     `${localAssets}/`,
     `${deployHost}:${remoteWww}/assets/`
   ]);
-  console.log("Public-site ortak asset farklari (root /assets altina ekleme/guncelleme):");
-  runLocal("rsync", [
-    "-azn",
-    "--itemize-changes",
-    "-e",
-    "ssh -o BatchMode=yes -o ConnectTimeout=15",
-    `${localDemo}/assets/`,
-    `${deployHost}:${remoteWww}/assets/`
-  ]);
   console.log("Public-site ortak PHP farklari (/inc):");
   runLocal("rsync", [
     "-azn",
@@ -313,7 +294,7 @@ if (dryRun) {
     "--itemize-changes",
     "-e",
     "ssh -o BatchMode=yes -o ConnectTimeout=15",
-    `${localDemo}/inc/`,
+    `${localSite}/inc/`,
     `${deployHost}:${remoteWww}/inc/`
   ]);
   for (const route of publicRouteDirs) {
@@ -324,7 +305,7 @@ if (dryRun) {
       "--itemize-changes",
       "-e",
       "ssh -o BatchMode=yes -o ConnectTimeout=15",
-      `${localDemo}/${route}/`,
+      `${localSite}/${route}/`,
       `${deployHost}:${remoteWww}/${route}/`
     ]);
   }
@@ -364,9 +345,9 @@ step(`Yedek aliniyor: ${remoteBackup}`);
 sshRun(`mkdir -p ${remoteBackup} && test ! -e ${remoteTmpIndex} && test ! -e ${remoteTmpFavicon}`);
 sshRun(
   `cd ${remoteWww} && ` +
-    `for f in index.php index.html favicon.png; do [ -f "$f" ] && cp -p "$f" ${remoteBackup}/ || true; done && ` +
+    `for f in index.php index.html favicon.png release.json; do [ -f "$f" ] && cp -p "$f" ${remoteBackup}/ || true; done && ` +
     `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ` +
-    `for d in inc odalar restoran qr-menu yorumlar iletisim demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
+    `for d in inc odalar restoran qr-menu yorumlar iletisim duyurular kurulum kullanim-kilavuzu demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
     `ls -la ${remoteBackup}/`
 );
 
@@ -374,9 +355,6 @@ step("Gecici isimle upload + syntax kontrolu");
 runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localIndex, `${deployHost}:${remoteTmpIndex}`]);
 runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localFavicon, `${deployHost}:${remoteTmpFavicon}`]);
 sshRun(`php -l ${remoteTmpIndex}`);
-
-step("Atomic devreye alma");
-sshRun(`mv ${remoteTmpIndex} ${remoteWww}/index.php && mv ${remoteTmpFavicon} ${remoteWww}/favicon.png && php -l ${remoteWww}/index.php`);
 
 step("Assetler esitleniyor (ekleme/guncelleme, silme yok)");
 runLocal("rsync", [
@@ -388,15 +366,7 @@ runLocal("rsync", [
   `${deployHost}:${remoteWww}/assets/`
 ]);
 
-step("Canli referans public-site root rotalarina yayinlaniyor");
-runLocal("rsync", [
-  "-az",
-  "--omit-dir-times",
-  "-e",
-  "ssh -o BatchMode=yes -o ConnectTimeout=15",
-  `${localDemo}/assets/`,
-  `${deployHost}:${remoteWww}/assets/`
-]);
+step("Showcase root rotaları yayınlanıyor");
 sshRun(`mkdir -p '${remoteWww}/inc'`);
 runLocal("rsync", [
   "-az",
@@ -404,7 +374,7 @@ runLocal("rsync", [
   "--omit-dir-times",
   "-e",
   "ssh -o BatchMode=yes -o ConnectTimeout=15",
-  `${localDemo}/inc/`,
+  `${localSite}/inc/`,
   `${deployHost}:${remoteWww}/inc/`
 ]);
 for (const route of publicRouteDirs) {
@@ -415,13 +385,17 @@ for (const route of publicRouteDirs) {
     "--omit-dir-times",
     "-e",
     "ssh -o BatchMode=yes -o ConnectTimeout=15",
-    `${localDemo}/${route}/`,
+    `${localSite}/${route}/`,
     `${deployHost}:${remoteWww}/${route}/`
   ]);
 }
 const publicPhpRoots = ["inc", ...publicRouteDirs].map((route) => `'${remoteWww}/${route}'`).join(" ");
 sshRun(`find ${publicPhpRoots} -type f -name '*.php' -print | while IFS= read -r file; do php -l "$file" >/dev/null || exit 1; done`);
-sshRun(`rm -rf '${remoteWww}/demo'`);
+sshRun(`rm -rf '${remoteWww}/demo' '${remoteWww}/assets/product-guide' && rm -f '${remoteWww}/assets/index-t2kNTUv0.js' '${remoteWww}/assets/index-fcReLA3k.css' '${remoteWww}/index.html'`);
+runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localRelease, `${deployHost}:${remoteWww}/release.json`]);
+step("Atomic devreye alma");
+sshRun(`mv ${remoteTmpIndex} ${remoteWww}/index.php && mv ${remoteTmpFavicon} ${remoteWww}/favicon.png && php -l ${remoteWww}/index.php`);
+
 if (withDownloads) {
   step("Kurulum dosyalari atomik olarak yayinlaniyor");
   sshRun(`mkdir -p ${remoteDownloads}`);
@@ -453,7 +427,7 @@ if (withDownloads) {
 step("Uzak dogrulama: hardcoded yok, syntax temiz");
 sshRun(`php -l ${remoteWww}/index.php`);
 const remoteGrep = sshCapture(
-  `grep -r -c '${STALE_HARDCODED}' ${remoteWww}/index.php ${remoteWww}/assets/index-t2kNTUv0.js 2>/dev/null || echo CLEAN`
+  `grep -r -c '${STALE_HARDCODED}' ${remoteWww}/index.php ${remoteWww}/inc/demo-installation.php 2>/dev/null || echo CLEAN`
 );
 if (!remoteGrep.includes("CLEAN") && remoteGrep.trim() !== "0") {
   // grep -c her dosya icin sayi basar; 0 disinda sayi varsa kirli demektir.
@@ -654,15 +628,13 @@ async function smoke(base, secret, webModuleBase) {
   const root = await get("/");
   if (root.response.status !== 200) fail(`GET / HTTP ${root.response.status}`);
   if (root.text.includes(STALE_HARDCODED)) fail("Canli kokte hardcoded var.");
-  const meta = root.text.match(/name="ya-sync-key" content="([^"]*)"/);
-  const win = root.text.match(/window\.__YA_SYNC_KEY__ = "([^"]*)"/);
-  if (!meta || !win) fail("Sync key alani (meta/window) bulunamadi.");
-  if (sha256Hex(meta[1]) !== expectedHash || sha256Hex(win[1]) !== expectedHash) {
-    fail("Canli sync key degeri config ile eslesmiyor.");
-  }
-  console.log("Kok: 200, sync key config ile ayni, hardcoded yok.");
+  const field = root.text.match(/id="demo-sync-secret" readonly value="([^"]*)"/);
+  const decoded = field?.[1].replaceAll('&quot;', '"').replaceAll('&#039;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
+  if (!field || sha256Hex(decoded) !== expectedHash) fail("Demo bağlantı anahtarı config ile eşleşmiyor.");
+  if (root.text.includes('type="module"') || root.text.includes('Canlı Sistem')) fail("Eski landing hâlâ aktif.");
+  console.log("Kök: yeni showcase, demo anahtarı config ile aynı.");
 
-  for (const path of ["/odalar/", "/odalar/oda/", "/qr-menu/", "/yorumlar/", "/iletisim/", "/restoran/", "/restoran/masa/"]) {
+  for (const path of ["/odalar/", "/odalar/oda/", "/qr-menu/", "/yorumlar/", "/iletisim/", "/restoran/", "/restoran/masa/", "/kurulum/", "/kullanim-kilavuzu/", "/duyurular/"]) {
     const page = await get(path);
     if (page.response.status !== 200) fail(`Public-site route HTTP smoke basarisiz: ${path} -> ${page.response.status}`);
   }

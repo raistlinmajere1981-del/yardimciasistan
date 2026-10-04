@@ -70,8 +70,8 @@ const androidSyncClientSource = source("apps/android-app/src/main/java/com/yardi
 const androidActivitySource = source("apps/android-app/src/main/java/com/yardimciasistan/android/MainActivity.java");
 const hostingSyncSource = source("firm-template/web-module/api/sync.php");
 const menuCssSource = source("apps/desktop-app/src/styles/pages/menu.css");
-const testSiteHeaderSource = source("test-site/landing/demo/inc/header.php");
-const testSiteQrMenuSource = source("test-site/landing/demo/assets/js/qr-menu.js");
+const testSiteHeaderSource = source("test-site/landing/inc/site.php");
+const testSiteQrMenuSource = source("test-site/landing/assets/js/qr-menu.js");
 
 // A — service.whatsapp controls both renderer affordances and hard boundaries.
 assert.match(requestsSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
@@ -176,11 +176,7 @@ assert.match(
   /\.menu-page-layout\s*\{[\s\S]{0,200}gap:\s*var\(--space-3\)/,
   "QR service panel must keep a visible gap above the menu management grid"
 );
-assert.match(
-  testSiteHeaderSource,
-  /demo_qr_menu_available\(\)[\s\S]{0,220}href="\/qr-menu\/"/,
-  "test-site navigation must omit QR menu when the web publication is disabled"
-);
+assert.match(testSiteHeaderSource, /'qr_menu'=>site_qr_menu_available\(\)/, "site navigation availability uses the QR publication gate");
 assert.match(
   testSiteQrMenuSource,
   /response\.status === 404[\s\S]{0,120}window\.location\.replace\("\/"\)/,
