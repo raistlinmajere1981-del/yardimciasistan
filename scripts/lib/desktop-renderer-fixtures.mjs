@@ -118,6 +118,18 @@ function createSetupFixture() {
     syncSecret: "",
     autoSyncEnabled: true,
     localNetworkEnabled: true,
+    arasShipping: {
+      providerId: "aras",
+      providerName: "Aras Kargo",
+      enabled: false,
+      environment: "test",
+      customerCode: "",
+      username: "",
+      hasSecret: false,
+      configured: false
+    },
+    dealerPortalEnabled: false,
+    onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },
     aiEnabled: true,
     aiProvider: "openai_compatible",
     aiService: "openai",

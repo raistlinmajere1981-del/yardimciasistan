@@ -151,10 +151,21 @@ try {
         Object.assign(setup, {
           businessName: input.businessName,
           profileId: input.profileId,
+          profileOptions: input.profileOptions ?? setup.profileOptions,
           phone: input.phone,
           whatsapp: input.whatsapp,
           email: input.email,
           address: input.address,
+          webModuleUrl: input.webModuleUrl ?? setup.webModuleUrl,
+          syncSecret: input.syncSecret ?? setup.syncSecret,
+          autoSyncEnabled: input.autoSyncEnabled ?? setup.autoSyncEnabled,
+          localNetworkEnabled: input.localNetworkEnabled ?? setup.localNetworkEnabled,
+          arasShipping: input.arasShipping ?? setup.arasShipping,
+          dealerPortalEnabled: input.dealerPortalEnabled ?? setup.dealerPortalEnabled,
+          onlineSalesDelivery: input.onlineSalesDelivery ?? setup.onlineSalesDelivery,
+          productData: input.productData ?? setup.productData,
+          servicePreferences: input.servicePreferences ?? setup.servicePreferences,
+          birthdaySettings: input.birthdaySettings ?? setup.birthdaySettings,
           setupRequired: false
         });
         window.__designCalls.push({ kind: 'setup', input });

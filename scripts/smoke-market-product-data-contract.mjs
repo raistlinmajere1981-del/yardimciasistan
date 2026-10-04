@@ -11,6 +11,7 @@ const store = read("apps/desktop-app/electron/commerce-store.ts");
 const ipc = read("apps/desktop-app/electron/commerce-ipc.ts");
 const preload = read("apps/desktop-app/electron/preload.ts");
 const settings = read("apps/desktop-app/src/components/settings/ServicesSettingsSection.tsx");
+const serviceCard = read("apps/desktop-app/src/components/settings/ServiceSettingsCard.tsx");
 const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
 const products = read("apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx");
 const productFields = read("apps/desktop-app/src/components/market/ProductFormFields.tsx");
@@ -65,7 +66,9 @@ assert.match(preload, /lookupExternalProductByBarcode/);
 assert.match(preload, /previewExternalProductImage/);
 assert.match(preload, /getProductImageDataUrl/);
 
-assert.match(settings, />Ürün Verisi</);
+assert.match(settings, /title="Ürün Verisi"/);
+assert.match(settings, /settings-product-data/);
+assert.match(serviceCard, /<strong>\{title\}<\/strong>/);
 assert.match(settings, /Bilinmeyen barkodu otomatik ara/);
 assert.match(settings, /Görselleri ekle/);
 assert.match(settings, /Open Food Facts/);
