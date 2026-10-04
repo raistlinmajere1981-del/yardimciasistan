@@ -8,7 +8,7 @@ export function publicImageUrl(value: unknown): string {
     // A2 does not publish local media. Project only public HTTPS source images;
     // credentials, query parameters and local/private hosts never leave Desktop.
     if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash
-        || !url.hostname.includes(".") || /^[\d.:\[\]]+$/.test(url.hostname)
+        || !url.hostname.includes(".") || /^[\d.:[\]]+$/.test(url.hostname)
         || /\.(local|localhost|internal|test)$/.test(url.hostname)) return "";
     return url.href;
   } catch { return ""; }
