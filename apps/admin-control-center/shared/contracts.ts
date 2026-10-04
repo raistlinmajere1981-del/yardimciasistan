@@ -117,6 +117,34 @@ export type VerificationRunState = {
   outputTail: string[];
 };
 
+export type DeploymentTargetSnapshot = {
+  id: string;
+  installationId: string;
+  title: string;
+  description: string;
+  confirmText: string;
+  impact: string[];
+  available: boolean;
+  availabilityNote: string;
+};
+
+export type DeploymentRunRequest = {
+  targetId: string;
+  action: "preflight" | "deploy";
+};
+
+export type DeploymentRunState = {
+  running: boolean;
+  targetId: string;
+  action: "preflight" | "deploy" | "";
+  stage: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: "idle" | "running" | "passed" | "failed" | "cancelled";
+  exitCode: number | null;
+  outputTail: string[];
+};
+
 export type DependencyUpdateItem = {
   name: string;
   current: string;
@@ -162,5 +190,10 @@ export type AdminBridge = {
   startVerification(request: VerificationRunRequest): Promise<{ accepted: boolean; message: string }>;
   cancelVerification(): Promise<boolean>;
   onVerificationRunState(listener: (state: VerificationRunState) => void): () => void;
+  getDeploymentTargets(): Promise<DeploymentTargetSnapshot[]>;
+  getDeploymentRunState(): Promise<DeploymentRunState>;
+  startDeployment(request: DeploymentRunRequest): Promise<{ accepted: boolean; message: string }>;
+  cancelDeployment(): Promise<boolean>;
+  onDeploymentRunState(listener: (state: DeploymentRunState) => void): () => void;
   openExternal(url: string): Promise<boolean>;
 };
