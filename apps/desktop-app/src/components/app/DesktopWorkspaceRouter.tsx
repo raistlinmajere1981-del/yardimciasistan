@@ -1,6 +1,7 @@
 import { RoomCategoryControl, RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
 import { useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
+  BUSINESS_CAPABILITIES as C,
   getReservationDomain,
   isReservationTypeAvailable
 } from "@yardimci-asistan/shared";
@@ -42,6 +43,7 @@ import {
 import { SettingsWorkspace } from "../settings/SettingsWorkspace";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
+import { CampaignsPage } from "../../pages/CampaignsPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
 import { useCalendarPageController } from "../calendar/calendar-page-state";
 import { usePensionPageController } from "../pension/pension-page-state";
@@ -506,6 +508,8 @@ export function DesktopWorkspaceRouter({
           foodMenuEnabled={foodMenuEnabled}
           inventoryEnabled={inventoryEnabled}
         />
+      ) : activePage === "campaigns" ? (
+        <CampaignsPage enabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} />
       ) : activePage === "market" ? (
         <MarketPage
           customers={dashboardData.customers}

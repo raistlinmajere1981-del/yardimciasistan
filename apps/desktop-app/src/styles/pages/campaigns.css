@@ -1,0 +1,37 @@
+.campaign-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+.campaign-workspace {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-2);
+}
+.campaign-workspace > .panel {
+  max-width: 60rem;
+}
+.campaign-list-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.campaign-list-row > div:first-child {
+  flex: 1;
+  display: grid;
+  gap: var(--space-1);
+}
+.campaign-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.campaign-counts dd {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+}

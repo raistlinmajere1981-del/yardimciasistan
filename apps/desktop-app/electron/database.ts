@@ -1,4 +1,6 @@
 import * as messagingStore from "./business-messaging/store";
+import * as campaignStore from "./messaging-campaigns/store";
+import type { BusinessMessageTemplate, MessagingChannel } from "@yardimci-asistan/shared";
 import type { MessagingSecretWrite } from "./business-messaging/secret-service";
 import { getRuntimeOrder, applyRuntimeShipmentProviderResult } from "./commerce-runtime";
 import type { ShipmentProviderResultInput } from "./commerce-shipment-store";
@@ -972,6 +974,18 @@ export class DesktopDatabase {
   applyShipmentProviderResult(input: ShipmentProviderResultInput) { return applyRuntimeShipmentProviderResult(this.databasePath, input); }
 
   getMessagingConfiguration() { return messagingStore.getMessagingConfiguration(this.db); }
+  getCustomerMessagingPreference(customerId: string, channel: MessagingChannel, purpose: "marketing") { return campaignStore.getCustomerMessagingPreference(this.db, customerId, channel, purpose); }
+  saveCustomerMessagingPreference(input: Parameters<typeof campaignStore.saveCustomerMessagingPreference>[1]) { return campaignStore.saveCustomerMessagingPreference(this.db, input); }
+  listMessagingSegments() { return campaignStore.listMessagingSegments(this.db); }
+  saveMessagingSegment(input: Parameters<typeof campaignStore.saveMessagingSegment>[1]) { return campaignStore.saveMessagingSegment(this.db, input); }
+  previewMessagingSegment(id: string, channel: MessagingChannel) { return campaignStore.previewMessagingSegment(this.db, id, channel); }
+  listMessagingCampaigns() { return campaignStore.listMessagingCampaigns(this.db); }
+  getMessagingCampaign(id: string) { return campaignStore.getMessagingCampaign(this.db, id); }
+  getMessagingCampaignDetail(id: string) { return campaignStore.getMessagingCampaignDetail(this.db, id); }
+  createMessagingCampaign(input: Parameters<typeof campaignStore.createMessagingCampaign>[1]) { return campaignStore.createMessagingCampaign(this.db, input); }
+  previewMessagingCampaign(id: string) { return campaignStore.previewMessagingCampaign(this.db, id); }
+  prepareMessagingCampaign(id: string, template: BusinessMessageTemplate) { return campaignStore.prepareMessagingCampaign(this.db, id, template); }
+  cancelMessagingCampaign(id: string) { return campaignStore.cancelMessagingCampaign(this.db, id); }
   getEncryptedMessagingToken() { return String(messagingStore.getStoredMessagingConfiguration(this.db)?.access_token_encrypted ?? ""); }
   getMessagingCustomer(id: string) { return messagingStore.getMessagingCustomer(this.db, id); }
   getBusinessMessage(id: string) { return messagingStore.getBusinessMessage(this.db, id); }

@@ -2640,3 +2640,80 @@ CREATE TABLE business_message_provider_bindings (
   message_id TEXT PRIMARY KEY REFERENCES business_messages(id), account_key TEXT NOT NULL,
   intent_hash TEXT NOT NULL, submitted INTEGER NOT NULL DEFAULT 0
 );
+
+-- D-036: desktop-only marketing intent. No contact/body snapshots or dispatcher.
+CREATE TABLE customer_messaging_preferences (
+  business_id TEXT NOT NULL REFERENCES business(id), customer_id TEXT NOT NULL REFERENCES customers(id),
+  channel TEXT NOT NULL CHECK(channel IN ('whatsapp','sms')), purpose TEXT NOT NULL CHECK(purpose='marketing'),
+  status TEXT NOT NULL DEFAULT 'unknown' CHECK(status IN ('unknown','opted_in','opted_out')),
+  source TEXT NOT NULL CHECK(length(source) BETWEEN 1 AND 80), note TEXT NOT NULL DEFAULT '' CHECK(length(note)<=500),
+  recorded_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY(customer_id,channel,purpose)
+);
+CREATE TABLE messaging_segments (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '', filter_definition_json TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT NOT NULL DEFAULT '',
+  UNIQUE(id,business_id)
+);
+CREATE TABLE messaging_campaigns (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), name TEXT NOT NULL,
+  purpose TEXT NOT NULL CHECK(purpose='marketing'), channel TEXT NOT NULL CHECK(channel IN ('whatsapp','sms')),
+  provider_id TEXT, segment_id TEXT NOT NULL, template_name TEXT NOT NULL, template_language TEXT NOT NULL,
+  bindings_json TEXT NOT NULL, template_snapshot_json TEXT, preparation_counts_json TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','prepared','cancelled','completed')),
+  prepared_at TEXT NOT NULL DEFAULT '', cancelled_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(id,business_id), FOREIGN KEY(segment_id,business_id) REFERENCES messaging_segments(id,business_id)
+);
+CREATE TABLE messaging_campaign_recipients (
+  id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL REFERENCES messaging_campaigns(id), customer_id TEXT NOT NULL REFERENCES customers(id),
+  status TEXT NOT NULL CHECK(status IN ('prepared','skipped','cancelled')),
+  skip_reason TEXT NOT NULL DEFAULT '' CHECK(skip_reason IN ('','unknown_consent','opted_out','missing_recipient','customer_unavailable')),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(campaign_id,customer_id), UNIQUE(id,campaign_id,customer_id)
+);
+CREATE TABLE messaging_outbox (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), campaign_id TEXT NOT NULL,
+  campaign_recipient_id TEXT NOT NULL, customer_id TEXT NOT NULL REFERENCES customers(id),
+  channel TEXT NOT NULL CHECK(channel IN ('whatsapp','sms')), provider_id TEXT NOT NULL,
+  business_message_id TEXT REFERENCES business_messages(id),
+  status TEXT NOT NULL CHECK(status IN ('pending','claimed','dispatched','skipped','failed','cancelled')),
+  operation_key TEXT NOT NULL UNIQUE, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count>=0),
+  next_attempt_at TEXT NOT NULL DEFAULT '', last_error TEXT NOT NULL DEFAULT '' CHECK(length(last_error)<=240),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(campaign_id,customer_id,channel),
+  FOREIGN KEY(campaign_id,business_id) REFERENCES messaging_campaigns(id,business_id),
+  FOREIGN KEY(campaign_recipient_id,campaign_id,customer_id) REFERENCES messaging_campaign_recipients(id,campaign_id,customer_id)
+);
+CREATE INDEX messaging_outbox_pending ON messaging_outbox(business_id,status,next_attempt_at);
+CREATE INDEX messaging_outbox_customer ON messaging_outbox(customer_id,channel,status);
+
+-- Every canonical preference writer (including future importers) suppresses unsent pending intent.
+CREATE TRIGGER trg_messaging_preference_suppress_insert AFTER INSERT ON customer_messaging_preferences
+WHEN NEW.status != 'opted_in'
+BEGIN
+  UPDATE messaging_campaign_recipients SET status='skipped',
+    skip_reason=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END, updated_at=NEW.updated_at
+    WHERE id IN (SELECT campaign_recipient_id FROM messaging_outbox WHERE business_id=NEW.business_id
+      AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending');
+  UPDATE messaging_outbox SET status='skipped', last_error=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END,
+    updated_at=NEW.updated_at WHERE business_id=NEW.business_id AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending';
+END;
+CREATE TRIGGER trg_messaging_preference_suppress_update AFTER UPDATE OF status ON customer_messaging_preferences
+WHEN NEW.status != 'opted_in'
+BEGIN
+  UPDATE messaging_campaign_recipients SET status='skipped',
+    skip_reason=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END, updated_at=NEW.updated_at
+    WHERE id IN (SELECT campaign_recipient_id FROM messaging_outbox WHERE business_id=NEW.business_id
+      AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending');
+  UPDATE messaging_outbox SET status='skipped', last_error=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END,
+    updated_at=NEW.updated_at WHERE business_id=NEW.business_id AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending';
+END;
+CREATE TRIGGER trg_messaging_customer_deleted AFTER UPDATE OF deleted_at ON customers
+WHEN NEW.deleted_at != ''
+BEGIN
+  UPDATE messaging_campaign_recipients SET status='skipped', skip_reason='customer_unavailable', updated_at=NEW.updated_at
+    WHERE id IN (SELECT campaign_recipient_id FROM messaging_outbox WHERE customer_id=NEW.id AND status='pending');
+  UPDATE messaging_outbox SET status='skipped', last_error='customer_unavailable', updated_at=NEW.updated_at
+    WHERE customer_id=NEW.id AND status='pending';
+END;

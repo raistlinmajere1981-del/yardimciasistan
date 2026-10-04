@@ -1,4 +1,4 @@
-import type { BusinessMessagingBridge } from "@yardimci-asistan/shared";
+import type { BusinessMessagingBridge, MessagingCampaignBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
   KbsConnectionTestResult,
@@ -191,7 +191,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends BusinessMessagingBridge {
+export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
@@ -390,6 +390,17 @@ async function invokeCommerceMutation<T>(channel: string, ...args: unknown[]): P
 }
 
 const bridge: DesktopBridge = {
+  getCustomerMessagingPreference: (customerId, channel, purpose) => invokeWhenUnlocked("messagingCampaigns:preference", customerId, channel, purpose),
+  saveCustomerMessagingPreference: (input) => invokeWhenUnlocked("messagingCampaigns:savePreference", input),
+  listMessagingSegments: () => invokeWhenUnlocked("messagingCampaigns:segments"),
+  saveMessagingSegment: (input) => invokeWhenUnlocked("messagingCampaigns:saveSegment", input),
+  previewMessagingSegment: (id, channel) => invokeWhenUnlocked("messagingCampaigns:previewSegment", id, channel),
+  listMessagingCampaigns: () => invokeWhenUnlocked("messagingCampaigns:campaigns"),
+  createMessagingCampaign: (input) => invokeWhenUnlocked("messagingCampaigns:create", input),
+  getMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:campaign", id),
+  previewMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:preview", id),
+  prepareMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:prepare", id),
+  cancelMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:cancel", id),
   getBusinessMessagingConfiguration: () => invokeWhenUnlocked("businessMessaging:configuration"),
   testBusinessMessagingConnection: (input) => invokeWhenUnlocked("businessMessaging:testConnection", input),
   listBusinessMessagingTemplates: () => invokeWhenUnlocked("businessMessaging:templates"),

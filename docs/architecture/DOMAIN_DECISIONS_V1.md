@@ -790,3 +790,78 @@ No campaigns, segmentation, automated birthday conversion, inbound inbox, bots, 
 editing, marketing scheduling, SMS or payment are introduced. Real Meta requests are absent
 from portable verification. See `docs/architecture/business-messaging.md` for deployment
 credentials, end-to-end activation and operational limits.
+
+## D-036 — Campaign / Segmentation / Consent / Outbox foundation (D2)
+
+**Status:** Accepted. **Scope:** Desktop-only marketing preparation; no dispatch.
+
+Campaign is communication/marketing intent, separate from Customer, BusinessMessage and
+provider request. Segment is a typed selection of canonical Customers, never a Customer
+copy. Channel (`whatsapp`, future `sms`) describes communication semantics; provider
+(`whatsapp_cloud` initially) describes transport. WhatsApp Web stays an interactive user
+flow and is not a campaign provider. Purpose is only `marketing` in D2.
+
+`customer_messaging_preferences` owns technical eligibility per Customer/channel/purpose,
+with source, bounded note and recording/update timestamps. Absence means `unknown`.
+Only explicit `opted_in` is marketing-eligible; `opted_out` is a hard block. This is not a
+legal compliance guarantee. D1 single operational sends and existing WhatsApp Web/birthday
+behavior do not acquire a retrospective marketing-consent gate. The canonical Customer
+Workspace contributes an immediate preference operation, separate from profile draft save.
+Customer deletion remains soft deletion: preference/history FKs preserve canonical identity,
+and pending campaign intent is suppressed. Assigned foreign-business Customers cannot match;
+existing unassigned local Customers belong to the current local business context.
+
+Initial segment filters are a versioned conjunction of at most one rule each for canonical
+Customer source (`eq`), commercial profile dealer status (`eq`: candidate/active/inactive),
+and phone presence (`present`/`absent`). Empty rules match all non-deleted Customers. No
+arbitrary field/operator, JS, expression, HTML or SQL is accepted. Presence and usable phone
+are distinct. Backend evaluates the allowlist against the entire canonical set, independent
+of dashboard's bounded Customer projection. Segmentation and messaging eligibility are
+separate: preview returns only matched/eligible/unknown/opt-out/missing-contact counts and
+creates no audience or outbox. Exclusive skip priority is opt-out, unknown, unusable phone.
+Customer has no independent active flag today; non-deleted defines active canonical identity.
+Dealer status is a segment criterion, not an additional eligibility gate.
+
+Draft owns immutable-on-preparation template identity and typed parameter bindings:
+`static_text`, `customer.fullName`, `commercial.companyName`. D1 approved discovery remains
+the single template catalog. Prepare re-reads approval/language/support/parameter structure
+and validates every eligible Customer's bound values; unsupported components and missing
+values reject the whole operation. No second rendering engine is introduced. Approved
+template metadata and binding definitions persist; resolved per-Customer parameter values,
+phone/email and message body do not enter recipient/outbox snapshots.
+
+Lifecycle is `draft → prepared`, `draft/prepared → cancelled`; `completed` is reserved for
+D3. Drafts may be saved without available provider credentials; preparation requires an
+available provider for the selected channel. One atomic SQLite transaction re-reads draft,
+segment, current canonical contacts and consent, freezes every matched Customer identity,
+records eligible recipients as `prepared` and ineligible recipients as `skipped` with reason,
+creates eligible `pending` outbox, and marks campaign prepared. Any failure rolls everything
+back. Repeating prepare returns the existing prepared state even offline. Later segment or
+Customer changes never change frozen membership. Preparation counts record the original
+decision; current skipped and pending counts reflect later suppression.
+
+Outbox is provider-neutral durable intent with unique campaign/Customer/channel identity and
+a stable SHA-256 operation key derived from that tuple. Recipients are unique per campaign/
+Customer. D2 does not create BusinessMessage, claim pending rows, schedule, retry or send.
+No Meta POST occurs on create/preview/prepare/cancel. The optional `messaging.campaigns`
+capability depends only on `core.customers`, defaults OFF for every profile, and uses the
+existing staged Business profile option transaction. It has no WhatsApp Web/Cloud dependency.
+Provider availability is a separate prepare-time check. Consent remains owned by Customers.
+
+Opt-out uses two safety layers: canonical preference mutation atomically marks pending
+outbox/recipient skipped (also when consent becomes unknown); opt-in never resurrects them.
+Canonical Customer deletion similarly suppresses pending rows. D3 must revalidate current
+Customer/contact/explicit consent immediately before submission, including already claimed
+rows. Audience is recipient intent, not durable authorization to send. Cancellation blocks
+all pending rows without deleting membership/history. Claimed/in-flight behavior and dispatch
+status extensions require D3's controlled dispatch decision.
+
+D3 seam: pending outbox → controlled claim → create/attach authoritative D1 BusinessMessage
+→ BusinessMessaging service/provider adapter → providerMessageId/status. Campaign recipient
+is never a BusinessMessage. SMS may reuse this intent/outbox foundation with a future adapter.
+No worker, rate limiter, scheduler, SMS adapter, inbound chat, template authoring, tracking,
+analytics or web publication/API is part of D2. Desktop canonical storage and isolated,
+session-gated preload/IPC remain the only campaign access path. Diagnostics log milestones,
+counts and opaque campaign/segment ids, never Customer lists/contact/names, parameter values,
+raw filters, bodies or secrets. Schema changes extend only current `db/schema.sql`; no
+historical migration/compatibility upgrade chain is added.

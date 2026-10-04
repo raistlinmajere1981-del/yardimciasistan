@@ -14,6 +14,7 @@ export const BUSINESS_CAPABILITIES = {
   DEVICES: "core.devices",
 
   WHATSAPP: "service.whatsapp",
+  MESSAGING_CAMPAIGNS: "messaging.campaigns",
   AI: "service.ai",
   ANDROID: "service.android",
 
@@ -69,6 +70,7 @@ const C = BUSINESS_CAPABILITIES;
  */
 export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability, readonly BusinessCapability[]>> = {
   [C.REQUESTS]: [C.CUSTOMERS],
+  [C.MESSAGING_CAMPAIGNS]: [C.CUSTOMERS],
   [C.ACCOMMODATION_RESERVATIONS]: [C.ACCOMMODATION_ROOMS],
   [C.ACCOMMODATION_STAYS]: [C.ACCOMMODATION_ROOMS],
   [C.ACCOMMODATION_FOLIO]: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS, C.FINANCE],
@@ -101,7 +103,7 @@ export const CORE_BUSINESS_CAPABILITIES: BusinessCapability[] = [
   C.DEVICES
 ];
 
-const COMMON_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS];
+const COMMON_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS, C.MESSAGING_CAMPAIGNS];
 const COMMON_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS];
 
 const ACCOMMODATION_REQUIRED_CAPABILITIES: BusinessCapability[] = [

@@ -12,10 +12,11 @@ import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { pensionNavigationContribution } from "../components/pension/pension-navigation";
 import { restaurantNavigationContribution } from "../components/restaurant/restaurant-navigation";
+import { campaignNavigationContribution } from "../components/messaging-campaigns/campaign-navigation";
 import { runtimeHasCapability } from "./capabilities";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 
-export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "reports" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "campaigns" | "reports" | "settings";
 
 /** Customer-work subview id; a view state, not a DesktopPage route. */
 export type CustomerWorkTab = "requests" | "customers" | "kbs" | "prepared";
@@ -197,6 +198,7 @@ const navigationContributions = [
   pensionNavigationContribution,
   restaurantNavigationContribution,
   marketContribution,
+  campaignNavigationContribution,
   menuContribution,
   reportsContribution,
   settingsContribution

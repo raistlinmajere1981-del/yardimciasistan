@@ -1,4 +1,5 @@
 import { BusinessTemplateMessagePanel } from "./BusinessTemplateMessagePanel";
+import { CustomerMessagingPreferences } from "./CustomerMessagingPreferences";
 import { useEffect, useMemo, useState } from "react";
 import { BedDouble, History, MessageCircle, Save, Trash2 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
@@ -186,6 +187,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
       </form>
 
       <aside className="customer-workspace-operations" aria-label="Müşteri işlemleri">
+        <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
         {wholesaleEnabled && customer.commercialProfile?.dealerStatus === "active" && <DealerWebAccessPanel key={customer.id} customerId={customerId} disabled={dirty || saveState === "loading"} />}
         {staysEnabled && <section className="panel customer-operation-card form-stack" aria-label="Konaklama">

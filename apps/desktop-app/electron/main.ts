@@ -1,5 +1,8 @@
 import { BusinessMessagingStatusSyncService } from "./business-messaging/status-sync-service";
 import { BusinessMessagingService } from "./business-messaging/service";
+import { MessagingCampaignService } from "./messaging-campaigns/service";
+import { MessagingCampaignError } from "./messaging-campaigns/validation";
+import { registerMessagingCampaignsIpc } from "./ipc/messaging-campaigns-ipc";
 import { createMessagingSecretWrite } from "./business-messaging/secret-service";
 import { registerBusinessMessagingIpc } from "./ipc/business-messaging-ipc";
 import { ShippingProviderService } from "./shipping-provider-service";
@@ -463,6 +466,13 @@ app.on("before-quit", () => {
 
 const businessMessagingStatusSyncService = new BusinessMessagingStatusSyncService(getDatabase, notifyBusinessMessagingChanged);
 const businessMessagingService = new BusinessMessagingService(getDatabase);
+const messagingCampaignService = new MessagingCampaignService(getDatabase, {
+  assertAvailable: (channel, providerId) => {
+    if (channel !== "whatsapp" || providerId !== "whatsapp_cloud") throw new MessagingCampaignError("unavailable_provider", "Bu kanal için kullanılabilir sağlayıcı yok.");
+    if (!businessMessagingService.getConfiguration().configured) throw new MessagingCampaignError("unconfigured", "WhatsApp Business servis ayarlarını tamamlayın.");
+  },
+  listTemplates: () => businessMessagingService.listTemplates()
+});
 function notifyBusinessMessagingChanged() {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("businessMessaging:changed");
@@ -471,6 +481,7 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
+  registerMessagingCampaignsIpc({ service: messagingCampaignService, assertUnlocked: assertAppSessionUnlocked });
   registerBusinessMessagingIpc({ service: businessMessagingService, assertUnlocked: assertAppSessionUnlocked, onChanged: notifyBusinessMessagingChanged });
   const notifyShipmentsChanged = (orderId: string) => {
     for (const window of BrowserWindow.getAllWindows()) {
