@@ -1,3 +1,4 @@
+import { registerCommerceShipmentIpcHandlers } from "./ipc/commerce-shipment-ipc";
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
@@ -453,6 +454,17 @@ app.on("before-quit", () => {
 });
 
 function registerIpcHandlers() {
+  registerCommerceShipmentIpcHandlers({
+    getDatabase,
+    assertUnlocked: assertAppSessionUnlocked,
+    onChanged: (orderId) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+          window.webContents.send("commerce:shipmentsChanged", orderId);
+        }
+      }
+    }
+  });
   desktopIpcRegistryHandle = registerDesktopIpcHandlers({
     getDatabase,
     getSyncCoordinator,

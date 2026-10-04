@@ -226,6 +226,48 @@ export interface CommerceOrderItem {
   createdAt: string;
 }
 
+export type CommerceShipmentStatus = "draft" | "ready" | "dispatched" | "delivered" | "cancelled";
+
+/** Physical shipping operation; independent of Order → Sale fulfillment. */
+export interface CommerceShipment {
+  status: CommerceShipmentStatus;
+  id: string;
+  businessId: string;
+  orderId: string;
+  providerId: string;
+  providerName: string;
+  externalReference: string;
+  trackingNumber: string;
+  trackingUrl: string;
+  labelReference: string;
+  note: string;
+  readyAt: string;
+  dispatchedAt: string;
+  deliveredAt: string;
+  cancelledAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateCommerceShipmentStatusInput {
+  shipmentId: string;
+  status: CommerceShipmentStatus;
+}
+
+/** Future provider boundary. No implementation is installed in B2. */
+export interface CommerceShippingProviderAdapter {
+  readonly providerId: string;
+  createShipment(input: { shipment: CommerceShipment; delivery: CommerceOrderDeliverySnapshot }): Promise<{
+    externalReference: string;
+    trackingNumber?: string;
+    trackingUrl?: string;
+    labelReference?: string;
+  }>;
+  getShipmentStatus(externalReference: string): Promise<CommerceShipmentStatus>;
+  cancelShipment(externalReference: string): Promise<void>;
+  getLabel(externalReference: string): Promise<{ reference: string }>;
+}
+
 export interface CommerceOrderDetail {
   order: CommerceOrder;
   items: CommerceOrderItem[];

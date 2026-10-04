@@ -2,6 +2,7 @@ import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type {
+  CommerceShipment,
   CatalogProduct,
   CommerceOrder,
   CommerceOrderDetail,
@@ -21,6 +22,8 @@ type OrdersFixtureInitial = {
 type OrdersFixtureControl = typeof window & {
   __woInitial: OrdersFixtureInitial;
   __woEmit: () => void;
+  __woEmitShipment: (orderId: string) => void;
+  __woShipmentListenerCount: () => number;
   __woSetVisible: (visible: boolean) => void;
   __woListenerCount: () => number;
   __woDispose: () => void;
@@ -40,8 +43,15 @@ async function read(method: string, args: unknown[]) {
 const listeners = new Set<() => void>();
 control.__woEmit = () => { for (const listener of listeners) listener(); };
 control.__woListenerCount = () => listeners.size;
+const shipmentListeners = new Set<(orderId: string) => void>();
+control.__woEmitShipment = (id) => { for (const listener of shipmentListeners) listener(id); };
+control.__woShipmentListenerCount = () => shipmentListeners.size;
 const commerceBridge = {
+  onShipmentsChanged: (listener: (orderId: string) => void) => { shipmentListeners.add(listener); return () => { shipmentListeners.delete(listener); }; },
   onOrdersChanged: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+  listShipmentsForOrder: (orderId: string) => read("listShipmentsForOrder", [orderId]) as Promise<CommerceShipment[]>,
+  createShipmentForOrder: (orderId: string) => control.__woCall("createShipmentForOrder", [orderId]) as Promise<CommerceShipment>,
+  updateShipmentStatus: (input: unknown) => control.__woCall("updateShipmentStatus", [input]) as Promise<CommerceShipment>,
   listOrders: (options?: unknown) =>
     read("listOrders", [options]) as Promise<CommerceOrder[]>,
   getOrder: (orderId: string) =>

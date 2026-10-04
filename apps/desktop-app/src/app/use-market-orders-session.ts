@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CatalogProduct, CommerceOrder, CommerceOrderDetail, CommerceResolvedUnitPrice } from "@yardimci-asistan/shared";
+import type { CommerceShipment, CommerceShipmentStatus, CatalogProduct, CommerceOrder, CommerceOrderDetail, CommerceResolvedUnitPrice } from "@yardimci-asistan/shared";
 
 export interface MarketOrderDraftLine {
   product: CatalogProduct;
@@ -26,6 +26,12 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
   const [lines, setLines] = useState<MarketOrderDraftLine[]>([]);
   const [orders, setOrders] = useState<CommerceOrder[]>([]);
   const [selectedOrder, setSelectedOrderState] = useState<CommerceOrderDetail | null>(null);
+  const [shipments, setShipments] = useState<CommerceShipment[]>([]);
+  const [loadingShipments, setLoadingShipments] = useState(false);
+  const [shipmentError, setShipmentError] = useState("");
+  const [mutatingShipment, setMutatingShipment] = useState(false);
+  const shipmentGeneration = useRef(0);
+  const shipmentMutationRef = useRef(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fulfillmentPayment, setFulfillmentPayment] = useState<FulfillmentPaymentChoice>("cash");
@@ -116,7 +122,74 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     };
   }, [bridge, enabled, reloadOrders]);
 
-  return { customerId, setCustomerId, customerIdRef, search, setSearch, note, setNote, lines, setLines,
+  const shipmentOrderId = selectedOrder?.order.deliverySnapshot.method === "shipping" ? selectedOrder.order.id : "";
+  const shipmentOrderRef = useRef(shipmentOrderId);
+  shipmentOrderRef.current = shipmentOrderId;
+
+  const reloadShipments = useCallback(async () => {
+    const orderId = shipmentOrderRef.current;
+    if (!bridge || !enabledRef.current || !orderId) return;
+    const request = ++shipmentGeneration.current;
+    setLoadingShipments(true);
+    setShipmentError("");
+    try {
+      const next = await bridge.listShipmentsForOrder(orderId);
+      if (enabledRef.current && request === shipmentGeneration.current && shipmentOrderRef.current === orderId) setShipments(next);
+    } catch (error) {
+      if (enabledRef.current && request === shipmentGeneration.current && shipmentOrderRef.current === orderId) {
+        setShipmentError(error instanceof Error ? error.message : "Gönderiler yüklenemedi.");
+      }
+    } finally {
+      if (request === shipmentGeneration.current) setLoadingShipments(false);
+    }
+  }, [bridge]);
+
+  const invalidateShipments = useCallback(() => { ++shipmentGeneration.current; }, []);
+
+  useEffect(() => {
+    invalidateShipments();
+    setShipments([]);
+    setShipmentError("");
+    setLoadingShipments(false);
+    if (!enabled || !shipmentOrderId || !bridge) return;
+    void reloadShipments();
+    const unsubscribe = bridge.onShipmentsChanged?.((orderId) => {
+      if (orderId === shipmentOrderRef.current) void reloadShipments();
+    });
+    return () => { invalidateShipments(); unsubscribe?.(); };
+  }, [bridge, enabled, shipmentOrderId, reloadShipments, invalidateShipments]);
+
+  const mutateShipment = useCallback(async (shipmentId?: string, status?: CommerceShipmentStatus) => {
+    const orderId = shipmentOrderRef.current;
+    if (!bridge || !enabledRef.current || !orderId || shipmentMutationRef.current) return;
+    shipmentMutationRef.current = true;
+    setMutatingShipment(true);
+    setShipmentError("");
+    ++shipmentGeneration.current;
+    try {
+      const shipment = shipmentId && status
+        ? await bridge.updateShipmentStatus({ shipmentId, status })
+        : await bridge.createShipmentForOrder(orderId);
+      if (enabledRef.current && shipmentOrderRef.current === orderId && selectedIdRef.current === orderId) {
+        ++shipmentGeneration.current;
+        setLoadingShipments(false);
+        setShipments((current) => current.some((entry) => entry.id === shipment.id)
+          ? current.map((entry) => entry.id === shipment.id ? shipment : entry) : [...current, shipment]);
+      }
+    } catch (error) {
+      if (enabledRef.current && shipmentOrderRef.current === orderId && selectedIdRef.current === orderId) {
+        const message = error instanceof Error ? error.message : "Gönderi güncellenemedi.";
+        // Reconcile a committed mutation whose response was lost before allowing another create.
+        await reloadShipments();
+        if (enabledRef.current && shipmentOrderRef.current === orderId && selectedIdRef.current === orderId) setShipmentError(message);
+      }
+    } finally {
+      shipmentMutationRef.current = false;
+      setMutatingShipment(false);
+    }
+  }, [bridge, reloadShipments]);
+
+  return { shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments, customerId, setCustomerId, customerIdRef, search, setSearch, note, setNote, lines, setLines,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
     fulfillmentPayment, setFulfillmentPayment, resolvingProductId, setResolvingProductId,
     draftReferenceRef, resetDraftReference, reloadOrders, openOrder };

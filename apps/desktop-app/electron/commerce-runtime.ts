@@ -35,6 +35,9 @@ import {
   lookupExternalProductByBarcode
 } from "./product-data-service";
 
+import { listShipmentsForOrder, getShipment, createShipmentForOrder, updateShipmentStatus } from "./commerce-shipment-store";
+import type { UpdateCommerceShipmentStatusInput } from "@yardimci-asistan/shared";
+
 import { fulfillCommerceOrder } from "./commerce-order-fulfillment-service";
 import {
   createCommerceOrder,
@@ -476,4 +479,29 @@ export function receiveRuntimePurchase(
     );
   }
   return receiveCommercePurchase(databasePath, input);
+}
+
+
+function requireShipmentCapability(databasePath: string) {
+  requireCapability(databasePath, BUSINESS_CAPABILITIES.ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
+}
+
+export function listRuntimeShipmentsForOrder(databasePath: string, orderId: string) {
+  requireShipmentCapability(databasePath);
+  return listShipmentsForOrder(databasePath, orderId);
+}
+
+export function getRuntimeShipment(databasePath: string, shipmentId: string) {
+  requireShipmentCapability(databasePath);
+  return getShipment(databasePath, shipmentId);
+}
+
+export function createRuntimeShipmentForOrder(databasePath: string, orderId: string) {
+  requireShipmentCapability(databasePath);
+  return createShipmentForOrder(databasePath, orderId);
+}
+
+export function updateRuntimeShipmentStatus(databasePath: string, input: UpdateCommerceShipmentStatusInput) {
+  requireShipmentCapability(databasePath);
+  return updateShipmentStatus(databasePath, input);
 }

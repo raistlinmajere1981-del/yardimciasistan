@@ -249,6 +249,31 @@ CREATE TABLE commerce_order_items (
   created_at TEXT NOT NULL
 );
 
+-- Provider-neutral physical shipment; many shipments may reference one order.
+CREATE TABLE commerce_shipments (
+  id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES business(id),
+  order_id TEXT NOT NULL REFERENCES commerce_orders(id),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'ready', 'dispatched', 'delivered', 'cancelled')),
+  provider_id TEXT NOT NULL DEFAULT '',
+  provider_name TEXT NOT NULL DEFAULT '',
+  external_reference TEXT NOT NULL DEFAULT '',
+  tracking_number TEXT NOT NULL DEFAULT '',
+  tracking_url TEXT NOT NULL DEFAULT '',
+  label_reference TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  ready_at TEXT NOT NULL DEFAULT '',
+  dispatched_at TEXT NOT NULL DEFAULT '',
+  delivered_at TEXT NOT NULL DEFAULT '',
+  cancelled_at TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX idx_commerce_shipments_order ON commerce_shipments (order_id, created_at, id);
+CREATE INDEX idx_commerce_shipments_status ON commerce_shipments (business_id, status);
+
 CREATE TABLE commerce_order_fulfillments (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL REFERENCES business(id),

@@ -528,3 +528,32 @@ Order totals remain product totals; no shipping charge or zero-price shipping pr
 created. Shipping costs/pricing need a separate domain decision. Providers, labels,
 tracking, carrier status and shipment lifecycle belong to a later shipping/fulfillment
 layer. Existing explicit Order → Sale fulfillment and order lifecycle remain unchanged.
+
+
+## D-031 — Shipment owns physical shipping, independently of fulfillment
+
+**Status:** ACCEPTED (2026-10-04)
+
+Shipment is a provider-neutral physical sending operation for a Commerce Order. It is
+neither Commerce Order, Sale, inventory movement nor the immutable delivery snapshot.
+Only an existing non-cancelled Order with delivery method `shipping` can create a Shipment.
+Placed, confirmed and fulfilled Orders are eligible: fulfillment is a separate commercial
+operation and may happen before or after shipping. One Order may own multiple Shipments;
+there is no unique order_id constraint. B2 UI exposes creation when no Shipment exists
+and displays existing records without partial-shipment allocation or additional creation UI.
+
+Lifecycle is draft → ready → dispatched → delivered; draft/ready may be cancelled.
+Delivered and cancelled are terminal. Repeating the current status is an idempotent no-op;
+all other transitions outside this graph are rejected. Store transactions authoritatively
+write the relevant status timestamp and updatedAt, preserving earlier timestamps.
+Order cancellation never automatically mutates Shipment: draft/ready shipments can still
+be cancelled but cannot advance; dispatched shipments may record delivery even when the
+Order was subsequently cancelled. New shipments cannot be created for cancelled Orders.
+
+Shipment mutations never change Order status or create Sale, stock, payment, reservation
+or fulfillment. Confirmation/fulfillment never dispatches a Shipment. The provider adapter
+is a typed boundary only, with no production fake, SDK, credentials or automatic execution.
+B2 is local desktop persistence; existing web ingress/publication outboxes do not transport
+shipments. A future provider/sync slice must explicitly define its own execution contract.
+Shipment-specific change events refresh only the selected Order's shipment projection;
+local mutation responses update that projection immediately without polling.

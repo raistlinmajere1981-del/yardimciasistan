@@ -102,6 +102,11 @@ export interface DesktopCommerceBridge {
   createPaidSale: (input: CreateCommerceSaleInput) => Promise<CommerceSale>;
   resolveProductPrice: (input: ResolveCommerceProductPriceInput) => Promise<CommerceResolvedUnitPrice>;
 
+  onShipmentsChanged: (listener: (orderId: string) => void) => () => void;
+  listShipmentsForOrder: (orderId: string) => Promise<import("@yardimci-asistan/shared").CommerceShipment[]>;
+  createShipmentForOrder: (orderId: string) => Promise<import("@yardimci-asistan/shared").CommerceShipment>;
+  updateShipmentStatus: (input: import("@yardimci-asistan/shared").UpdateCommerceShipmentStatusInput) => Promise<import("@yardimci-asistan/shared").CommerceShipment>;
+
   onOrdersChanged: (listener: () => void) => () => void;
   listOrders: (options?: ListCommerceOrdersOptions) => Promise<CommerceOrder[]>;
   getOrder: (orderId: string) => Promise<CommerceOrderDetail | null>;

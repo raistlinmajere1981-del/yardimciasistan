@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import type { CatalogProduct } from "@yardimci-asistan/shared";
 import type { MarketOrdersSession, FulfillmentPaymentChoice } from "../../app/use-market-orders-session";
 import type { DesktopCustomer } from "../../../electron/database";
+import { MarketOrderShipments } from "./MarketOrderShipments";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
@@ -474,6 +475,10 @@ export function MarketOrdersWorkspace({
                 </>
               )}
             </section>
+
+            {selectedOrder.order.deliverySnapshot.method === "shipping" && (
+              <MarketOrderShipments session={session} orderStatus={selectedOrder.order.status} busy={disabled} />
+            )}
 
             <div className="market-order-detail-lines">
               {selectedOrder.items.map((item) => (

@@ -504,6 +504,14 @@ const bridge: DesktopBridge = {
       ipcRenderer.on("commerce:ordersChanged", handler);
       return () => ipcRenderer.removeListener("commerce:ordersChanged", handler);
     },
+    onShipmentsChanged: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, orderId: string) => listener(orderId);
+      ipcRenderer.on("commerce:shipmentsChanged", handler);
+      return () => ipcRenderer.removeListener("commerce:shipmentsChanged", handler);
+    },
+    listShipmentsForOrder: (orderId) => invokeWhenUnlocked<import("@yardimci-asistan/shared").CommerceShipment[]>("commerce:shipment:listForOrder", orderId),
+    createShipmentForOrder: (orderId) => invokeCommerceMutation<import("@yardimci-asistan/shared").CommerceShipment>("commerce:shipment:create", orderId),
+    updateShipmentStatus: (input) => invokeCommerceMutation<import("@yardimci-asistan/shared").CommerceShipment>("commerce:shipment:updateStatus", input),
     listOrders: (options) => invokeWhenUnlocked<CommerceOrder[]>("commerce:order:list", options),
     getOrder: (orderId) => invokeWhenUnlocked<CommerceOrderDetail | null>("commerce:order:get", orderId),
     createOrder: (input) => invokeCommerceMutation<CommerceOrderDetail>("commerce:order:create", input),

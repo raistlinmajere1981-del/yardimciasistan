@@ -129,6 +129,7 @@ try {
   raw = new DatabaseSync(database.databasePath);
   const calls = [];
   let displayFixtures = [];
+  let loseFirstShipmentResponse = true;
   let loseFirstCreateOrderResponse = true;
   let loseFirstFulfillResponse = true;
 
@@ -180,9 +181,21 @@ try {
     console.error(error.message);
   });
 
+  let holdNextShipments = false, releaseShipments;
   let holdNextList = false, releaseList, holdNextDetail = false, releaseDetail, failNextDetail = false;
   await page.exposeFunction("__woCall", async (method, args) => {
     calls.push({ method, args: structuredClone(args) });
+    if (method === "listShipmentsForOrder") {
+      const snapshot = displayFixtures.some((detail) => detail.order.id === args[0]) ? [] : database.listShipmentsForOrder(args[0]);
+      if (holdNextShipments) { holdNextShipments = false; return new Promise((resolve) => { releaseShipments = () => resolve(snapshot); }); }
+      return snapshot;
+    }
+    if (method === "createShipmentForOrder") {
+      const shipment = database.createShipmentForOrder(args[0]);
+      if (loseFirstShipmentResponse) { loseFirstShipmentResponse = false; throw new Error("Simulated lost shipment response"); }
+      return shipment;
+    }
+    if (method === "updateShipmentStatus") return database.updateShipmentStatus(args[0]);
     if (method === "listOrders") {
       const snapshot = structuredClone([...displayFixtures.map((detail) => detail.order), ...listRuntimeOrders(database.databasePath, args[0] ?? {})]);
       if (holdNextList) { holdNextList = false; return new Promise((resolve) => { releaseList = () => resolve(snapshot); }); }
@@ -445,6 +458,74 @@ try {
   );
   assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, 8);
 
+  await expect(detail.getByRole("region", { name: "Gönderim", exact: true })).toHaveCount(0);
+  const shipmentOrder = createRuntimeOrder(database.databasePath, {
+    buyerSnapshot: { name: "Shipment UI Buyer", phone: "+1 (202) 555-0100" },
+    deliverySnapshot: { method: "shipping", address: { recipientName: "Shipment Recipient", addressLine1: "Test Road", district: "Central", city: "London", countryCode: "GB" } },
+    items: [{ productId: product.id, quantity: 1 }]
+  });
+  await page.getByRole("button", { name: "Yenile", exact: true }).click();
+  await page.locator(".market-order-card").filter({ hasText: "Shipment UI Buyer" }).click();
+  const shipmentSection = detail.getByRole("region", { name: "Gönderim", exact: true });
+  await expect(shipmentSection.getByRole("button", { name: "Gönderi oluştur", exact: true })).toBeVisible();
+  await shipmentSection.getByRole("button", { name: "Gönderi oluştur", exact: true }).click();
+  await expect(shipmentSection.getByText("Taslak", { exact: true })).toBeVisible();
+  await expect(shipmentSection.getByRole("alert")).toContainText("Simulated lost shipment response");
+  assert.equal(database.listShipmentsForOrder(shipmentOrder.order.id).length, 1, "lost create response is reconciled before another create");
+  await shipmentSection.getByRole("button", { name: "Yenile", exact: true }).click();
+  await expect(shipmentSection.getByRole("alert")).toHaveCount(0);
+  raw.prepare("UPDATE commerce_shipments SET provider_name = 'Presentation Provider', tracking_number = 'TRACK-123', tracking_url = 'https://example.test/track' WHERE order_id = ?").run(shipmentOrder.order.id);
+  await page.evaluate((id) => window.__woEmitShipment(id), shipmentOrder.order.id);
+  await expect(shipmentSection).toContainText("Presentation Provider");
+  await expect(shipmentSection).toContainText("TRACK-123");
+  await expect(shipmentSection).toContainText("https://example.test/track");
+  await expect(shipmentSection.getByRole("button", { name: "Gönderi oluştur", exact: true })).toHaveCount(0);
+  await expect(shipmentSection.getByRole("button", { name: "İptal", exact: true })).toBeVisible();
+  const shipmentReads = calls.filter((call) => call.method === "listShipmentsForOrder").length;
+  await page.evaluate(() => window.__woEmitShipment("unselected-order"));
+  assert.equal(calls.filter((call) => call.method === "listShipmentsForOrder").length, shipmentReads);
+  assert.equal(await page.evaluate(() => window.__woShipmentListenerCount()), 1);
+  holdNextShipments = true;
+  await shipmentSection.getByRole("button", { name: "Hazırla", exact: true }).click();
+  await expect(shipmentSection.getByText("Hazır", { exact: true })).toBeVisible();
+  // Start a delayed read, then leave for pickup; its result must not cross order identity.
+  const listsBeforeShipmentEvent = calls.filter((call) => call.method === "listOrders").length;
+  await page.evaluate((id) => window.__woEmitShipment(id), shipmentOrder.order.id);
+  await expect.poll(() => typeof releaseShipments).toBe("function");
+  await page.locator(".market-order-card").filter({ hasText: "Bayi Sipariş Testi" }).click();
+  releaseShipments();
+  await expect.poll(() => page.evaluate(() => window.__woPendingReads())).toBe(0);
+  await expect(shipmentSection).toHaveCount(0);
+  assert.equal(calls.filter((call) => call.method === "listOrders").length, listsBeforeShipmentEvent);
+  await page.locator(".market-order-card").filter({ hasText: "Shipment UI Buyer" }).click();
+  await expect(shipmentSection.getByText("Hazır", { exact: true })).toBeVisible();
+  await page.evaluate(() => window.__woSetVisible(false));
+  await page.evaluate(() => window.__woSetVisible(true));
+  await expect(shipmentSection.getByText("Hazır", { exact: true })).toBeVisible();
+  await shipmentSection.getByRole("button", { name: "Gönderildi", exact: true }).click();
+  await expect(shipmentSection.getByText("Gönderildi", { exact: true })).toBeVisible();
+  await expect(shipmentSection.getByRole("button", { name: "İptal", exact: true })).toHaveCount(0);
+  await shipmentSection.getByRole("button", { name: "Teslim edildi", exact: true }).click();
+  await expect(shipmentSection.getByText("Teslim edildi", { exact: true })).toBeVisible();
+  await expect(shipmentSection.getByRole("button")).toHaveCount(0);
+  assert.equal(getRuntimeOrder(database.databasePath, shipmentOrder.order.id).order.status, "placed");
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, 8);
+  await page.locator(".market-order-card").filter({ hasText: "Bayi Sipariş Testi" }).click();
+  await expect(shipmentSection).toHaveCount(0);
+  raw.prepare("UPDATE commerce_orders SET deleted_at = 'fixture-hidden' WHERE id = ?").run(shipmentOrder.order.id);
+  const cancelOrder = createRuntimeOrder(database.databasePath, {
+    ...shipmentOrder.order, buyerSnapshot: { name: "Shipment Cancel Buyer", phone: "+1 (202) 555-0100" },
+    items: [{ productId: product.id, quantity: 1 }]
+  });
+  await page.getByRole("button", { name: "Yenile", exact: true }).click();
+  await page.locator(".market-order-card").filter({ hasText: "Shipment Cancel Buyer" }).click();
+  await shipmentSection.getByRole("button", { name: "Gönderi oluştur", exact: true }).click();
+  await shipmentSection.getByRole("button", { name: "İptal", exact: true }).click();
+  await expect(shipmentSection.getByText("İptal", { exact: true })).toBeVisible();
+  await expect(shipmentSection.getByRole("button")).toHaveCount(0);
+  raw.prepare("UPDATE commerce_orders SET deleted_at = 'fixture-hidden' WHERE id = ?").run(cancelOrder.order.id);
+  await page.locator(".market-order-card").filter({ hasText: "Bayi Sipariş Testi" }).click();
+
   // Read-only presentation fixtures: exercise existing buyerSnapshot fields
   // without creating new backend/domain test cases or changing persistence.
   const existingDetail = getRuntimeOrder(database.databasePath, orderRow.id);
@@ -552,6 +633,7 @@ try {
   await expect(detail.getByRole("heading", { name: "New live web buyer", exact: true })).toBeVisible();
   await page.evaluate(() => window.__woDispose());
   assert.equal(await page.evaluate(() => window.__woListenerCount()), 0, "controller disposal unsubscribes");
+  assert.equal(await page.evaluate(() => window.__woShipmentListenerCount()), 0);
   assert.deepEqual(pageErrors, []);
   console.log("commerce-wholesale-orders-ui-smoke-ok");
 } catch (error) {

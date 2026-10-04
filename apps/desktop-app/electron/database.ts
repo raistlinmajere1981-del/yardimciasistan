@@ -1,7 +1,7 @@
 import { createCommerceOnlineCatalog } from "./commerce-online-catalog-publication";
 import { getCommerceProductPublication, listCommerceProductPublications, saveCommerceProductPublication, deleteCommerceProductPublication } from "./commerce-product-publication-store";
 import { hasBusinessCapability, type SaveCommerceProductPublicationInput } from "@yardimci-asistan/shared";
-import { createRuntimeOrder } from "./commerce-runtime";
+import { listRuntimeShipmentsForOrder, getRuntimeShipment, createRuntimeShipmentForOrder, updateRuntimeShipmentStatus, createRuntimeOrder } from "./commerce-runtime";
 import type { CreateCommerceOrderInput } from "./commerce-order-store";
 import { DatabaseSync } from "node:sqlite";
 import {
@@ -918,6 +918,13 @@ export class DesktopDatabase {
 
   createCommerceOnlineCatalog() {
     return createCommerceOnlineCatalog(this.db, this.getEnabledBusinessCapabilities());
+  }
+
+  listShipmentsForOrder(orderId: string) { return listRuntimeShipmentsForOrder(this.databasePath, orderId); }
+  getShipment(shipmentId: string) { return getRuntimeShipment(this.databasePath, shipmentId); }
+  createShipmentForOrder(orderId: string) { return createRuntimeShipmentForOrder(this.databasePath, orderId); }
+  updateShipmentStatus(input: import("@yardimci-asistan/shared").UpdateCommerceShipmentStatusInput) {
+    return updateRuntimeShipmentStatus(this.databasePath, input);
   }
 
   createCommerceOrder(input: CreateCommerceOrderInput) {
