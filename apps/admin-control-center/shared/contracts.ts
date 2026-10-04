@@ -101,6 +101,22 @@ export type VerificationSnapshot = {
   latest: VerificationReportSnapshot;
 };
 
+export type VerificationRunRequest = {
+  mode: "preset" | "domain" | "check";
+  value: string;
+  includeManual?: boolean;
+};
+
+export type VerificationRunState = {
+  running: boolean;
+  selectionLabel: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: "idle" | "running" | "passed" | "failed" | "cancelled";
+  exitCode: number | null;
+  outputTail: string[];
+};
+
 export type DependencyUpdateItem = {
   name: string;
   current: string;
@@ -142,5 +158,9 @@ export type OverviewSnapshot = {
 export type AdminBridge = {
   getOverview(): Promise<OverviewSnapshot>;
   checkDependencyUpdates(): Promise<DependencyUpdateReport>;
+  getVerificationRunState(): Promise<VerificationRunState>;
+  startVerification(request: VerificationRunRequest): Promise<{ accepted: boolean; message: string }>;
+  cancelVerification(): Promise<boolean>;
+  onVerificationRunState(listener: (state: VerificationRunState) => void): () => void;
   openExternal(url: string): Promise<boolean>;
 };
