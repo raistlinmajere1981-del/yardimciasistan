@@ -254,16 +254,20 @@ export interface UpdateCommerceShipmentStatusInput {
   status: CommerceShipmentStatus;
 }
 
-/** Future provider boundary. No implementation is installed in B2. */
+/** Provider-neutral adapter boundary; protocol and credentials remain in main. */
 export interface CommerceShippingProviderAdapter {
   readonly providerId: string;
-  createShipment(input: { shipment: CommerceShipment; delivery: CommerceOrderDeliverySnapshot }): Promise<{
+  createShipment(input: { shipment: CommerceShipment; delivery: CommerceOrderDeliverySnapshot; receiverPhone: string; orderReference: string }): Promise<{
     externalReference: string;
     trackingNumber?: string;
     trackingUrl?: string;
     labelReference?: string;
   }>;
-  getShipmentStatus(externalReference: string): Promise<CommerceShipmentStatus>;
+  getShipmentStatus(externalReference: string): Promise<{
+    status: CommerceShipmentStatus | null;
+    trackingNumber?: string;
+    trackingUrl?: string;
+  }>;
   cancelShipment(externalReference: string): Promise<void>;
   getLabel(externalReference: string): Promise<{ reference: string }>;
 }

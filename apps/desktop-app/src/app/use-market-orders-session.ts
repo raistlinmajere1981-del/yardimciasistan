@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { emptyArasShippingConfiguration } from "@yardimci-asistan/shared";
 import type { CommerceShipment, CommerceShipmentStatus, CatalogProduct, CommerceOrder, CommerceOrderDetail, CommerceResolvedUnitPrice } from "@yardimci-asistan/shared";
 
 export interface MarketOrderDraftLine {
@@ -26,6 +27,7 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
   const [lines, setLines] = useState<MarketOrderDraftLine[]>([]);
   const [orders, setOrders] = useState<CommerceOrder[]>([]);
   const [selectedOrder, setSelectedOrderState] = useState<CommerceOrderDetail | null>(null);
+  const [shippingProvider, setShippingProvider] = useState(emptyArasShippingConfiguration);
   const [shipments, setShipments] = useState<CommerceShipment[]>([]);
   const [loadingShipments, setLoadingShipments] = useState(false);
   const [shipmentError, setShipmentError] = useState("");
@@ -133,7 +135,11 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     setLoadingShipments(true);
     setShipmentError("");
     try {
-      const next = await bridge.listShipmentsForOrder(orderId);
+      const [next, config] = await Promise.all([
+        bridge.listShipmentsForOrder(orderId),
+        bridge.getShippingProviderConfiguration?.().catch(() => emptyArasShippingConfiguration()) ?? emptyArasShippingConfiguration()
+      ]);
+      if (enabledRef.current && request === shipmentGeneration.current && shipmentOrderRef.current === orderId) setShippingProvider(config);
       if (enabledRef.current && request === shipmentGeneration.current && shipmentOrderRef.current === orderId) setShipments(next);
     } catch (error) {
       if (enabledRef.current && request === shipmentGeneration.current && shipmentOrderRef.current === orderId) {
@@ -156,10 +162,11 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     const unsubscribe = bridge.onShipmentsChanged?.((orderId) => {
       if (orderId === shipmentOrderRef.current) void reloadShipments();
     });
-    return () => { invalidateShipments(); unsubscribe?.(); };
+    const unsubscribeConfig = bridge.onShippingConfigurationChanged?.(() => { void reloadShipments(); });
+    return () => { invalidateShipments(); unsubscribe?.(); unsubscribeConfig?.(); };
   }, [bridge, enabled, shipmentOrderId, reloadShipments, invalidateShipments]);
 
-  const mutateShipment = useCallback(async (shipmentId?: string, status?: CommerceShipmentStatus) => {
+  const mutateShipment = useCallback(async (shipmentId?: string, status?: CommerceShipmentStatus, providerAction?: "register" | "refresh") => {
     const orderId = shipmentOrderRef.current;
     if (!bridge || !enabledRef.current || !orderId || shipmentMutationRef.current) return;
     shipmentMutationRef.current = true;
@@ -167,7 +174,9 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     setShipmentError("");
     ++shipmentGeneration.current;
     try {
-      const shipment = shipmentId && status
+      const shipment = shipmentId && providerAction
+        ? providerAction === "register" ? await bridge.registerShipmentWithProvider(shipmentId) : await bridge.refreshShipmentProviderStatus(shipmentId)
+        : shipmentId && status
         ? await bridge.updateShipmentStatus({ shipmentId, status })
         : await bridge.createShipmentForOrder(orderId);
       if (enabledRef.current && shipmentOrderRef.current === orderId && selectedIdRef.current === orderId) {
@@ -189,7 +198,7 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     }
   }, [bridge, reloadShipments]);
 
-  return { shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments, customerId, setCustomerId, customerIdRef, search, setSearch, note, setNote, lines, setLines,
+  return { shippingProvider, shipments, loadingShipments, shipmentError, mutatingShipment, mutateShipment, reloadShipments, customerId, setCustomerId, customerIdRef, search, setSearch, note, setNote, lines, setLines,
     orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
     fulfillmentPayment, setFulfillmentPayment, resolvingProductId, setResolvingProductId,
     draftReferenceRef, resetDraftReference, reloadOrders, openOrder };

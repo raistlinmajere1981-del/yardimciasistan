@@ -22,6 +22,7 @@ type OrdersFixtureInitial = {
 type OrdersFixtureControl = typeof window & {
   __woInitial: OrdersFixtureInitial;
   __woEmit: () => void;
+  __woEmitShippingConfiguration: () => void;
   __woEmitShipment: (orderId: string) => void;
   __woShipmentListenerCount: () => number;
   __woSetVisible: (visible: boolean) => void;
@@ -46,9 +47,15 @@ control.__woListenerCount = () => listeners.size;
 const shipmentListeners = new Set<(orderId: string) => void>();
 control.__woEmitShipment = (id) => { for (const listener of shipmentListeners) listener(id); };
 control.__woShipmentListenerCount = () => shipmentListeners.size;
+const shippingConfigListeners = new Set<() => void>();
+control.__woEmitShippingConfiguration = () => { for (const listener of shippingConfigListeners) listener(); };
 const commerceBridge = {
+  onShippingConfigurationChanged: (listener: () => void) => { shippingConfigListeners.add(listener); return () => { shippingConfigListeners.delete(listener); }; },
   onShipmentsChanged: (listener: (orderId: string) => void) => { shipmentListeners.add(listener); return () => { shipmentListeners.delete(listener); }; },
   onOrdersChanged: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+  getShippingProviderConfiguration: () => control.__woCall("getShippingProviderConfiguration", []) as Promise<import("../../packages/shared/index").ArasShippingConfiguration>,
+  registerShipmentWithProvider: (shipmentId: string) => control.__woCall("registerShipmentWithProvider", [shipmentId]) as Promise<CommerceShipment>,
+  refreshShipmentProviderStatus: (shipmentId: string) => control.__woCall("refreshShipmentProviderStatus", [shipmentId]) as Promise<CommerceShipment>,
   listShipmentsForOrder: (orderId: string) => read("listShipmentsForOrder", [orderId]) as Promise<CommerceShipment[]>,
   createShipmentForOrder: (orderId: string) => control.__woCall("createShipmentForOrder", [orderId]) as Promise<CommerceShipment>,
   updateShipmentStatus: (input: unknown) => control.__woCall("updateShipmentStatus", [input]) as Promise<CommerceShipment>,

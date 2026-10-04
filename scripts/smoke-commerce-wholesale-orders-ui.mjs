@@ -185,6 +185,7 @@ try {
   let holdNextList = false, releaseList, holdNextDetail = false, releaseDetail, failNextDetail = false;
   await page.exposeFunction("__woCall", async (method, args) => {
     calls.push({ method, args: structuredClone(args) });
+    if (method === "getShippingProviderConfiguration") return database.getArasShippingConfiguration();
     if (method === "listShipmentsForOrder") {
       const snapshot = displayFixtures.some((detail) => detail.order.id === args[0]) ? [] : database.listShipmentsForOrder(args[0]);
       if (holdNextShipments) { holdNextShipments = false; return new Promise((resolve) => { releaseShipments = () => resolve(snapshot); }); }

@@ -1,3 +1,7 @@
+import { getRuntimeOrder, applyRuntimeShipmentProviderResult } from "./commerce-runtime";
+import type { ShipmentProviderResultInput } from "./commerce-shipment-store";
+import { getShipmentRegistration, prepareShipmentRegistration, markShipmentRegistrationSubmitted, type ShipmentRegistration } from "./shipping-registration-store";
+import { getArasShippingConfiguration, getStoredArasShippingConfiguration, type ShippingSecretWrite } from "./shipping-configuration-store";
 import { createCommerceOnlineCatalog } from "./commerce-online-catalog-publication";
 import { getCommerceProductPublication, listCommerceProductPublications, saveCommerceProductPublication, deleteCommerceProductPublication } from "./commerce-product-publication-store";
 import { hasBusinessCapability, type SaveCommerceProductPublicationInput } from "@yardimci-asistan/shared";
@@ -920,6 +924,26 @@ export class DesktopDatabase {
     return createCommerceOnlineCatalog(this.db, this.getEnabledBusinessCapabilities());
   }
 
+  getCommerceOrder(orderId: string) { return getRuntimeOrder(this.databasePath, orderId); }
+  getShipmentRegistration(shipmentId: string) {
+    if (!this.getShipment(shipmentId)) throw new Error("Gönderi bulunamadı.");
+    return getShipmentRegistration(this.db, shipmentId);
+  }
+  prepareShipmentRegistration(input: Omit<ShipmentRegistration, "state">) {
+    const shipment = this.getShipment(input.shipmentId);
+    if (!shipment || !["draft", "ready"].includes(shipment.status)) throw new Error("Yalnız taslak veya hazır gönderi sağlayıcıya kaydedilebilir.");
+    return prepareShipmentRegistration(this.db, input);
+  }
+  markShipmentRegistrationSubmitted(shipmentId: string) {
+    const shipment = this.getShipment(shipmentId);
+    if (!shipment || !["draft", "ready"].includes(shipment.status) || this.getCommerceOrder(shipment.orderId)?.order.status === "cancelled") return false;
+    return markShipmentRegistrationSubmitted(this.db, shipmentId);
+  }
+  applyShipmentProviderResult(input: ShipmentProviderResultInput) { return applyRuntimeShipmentProviderResult(this.databasePath, input); }
+
+  getArasShippingConfiguration() { return getArasShippingConfiguration(this.db); }
+  getEncryptedShippingPassword() { return String(getStoredArasShippingConfiguration(this.db)?.password_encrypted ?? ""); }
+
   listShipmentsForOrder(orderId: string) { return listRuntimeShipmentsForOrder(this.databasePath, orderId); }
   getShipment(shipmentId: string) { return getRuntimeShipment(this.databasePath, shipmentId); }
   createShipmentForOrder(orderId: string) { return createRuntimeShipmentForOrder(this.databasePath, orderId); }
@@ -951,13 +975,15 @@ export class DesktopDatabase {
   saveInitialSetup(
     input: SaveInitialSetupInput,
     aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
-    aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {}
+    aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {},
+    shippingSecretWrite: ShippingSecretWrite = { mode: "keep" }
   ): DesktopSetupSaveResult {
     const result = saveStoredSetupData(
       this.db,
       input,
       aiApiKeyWrite,
-      aiProfileApiKeyWrites
+      aiProfileApiKeyWrites,
+      shippingSecretWrite
     );
     if (!result.ok) return result;
     return {

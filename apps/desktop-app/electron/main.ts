@@ -1,3 +1,6 @@
+import { ShippingProviderService } from "./shipping-provider-service";
+import { registerShippingProviderIpcHandlers } from "./ipc/shipping-provider-ipc";
+import { createShippingSecretWrite } from "./shipping-secret-service";
 import { registerCommerceShipmentIpcHandlers } from "./ipc/commerce-shipment-ipc";
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
 import { app, BrowserWindow } from "electron";
@@ -453,17 +456,19 @@ app.on("before-quit", () => {
   void localCompanionServer?.stop();
 });
 
+const shippingProviderService = new ShippingProviderService(getDatabase);
+
 function registerIpcHandlers() {
+  const notifyShipmentsChanged = (orderId: string) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("commerce:shipmentsChanged", orderId);
+    }
+  };
+  registerShippingProviderIpcHandlers({ service: shippingProviderService, assertUnlocked: assertAppSessionUnlocked, onChanged: notifyShipmentsChanged });
   registerCommerceShipmentIpcHandlers({
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
-    onChanged: (orderId) => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-          window.webContents.send("commerce:shipmentsChanged", orderId);
-        }
-      }
-    }
+    onChanged: notifyShipmentsChanged
   });
   desktopIpcRegistryHandle = registerDesktopIpcHandlers({
     getDatabase,
@@ -511,15 +516,22 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     return profileSecretUpdates;
   }
 
+  let shippingSecretWrite;
+  try { shippingSecretWrite = createShippingSecretWrite(input.arasShipping); }
+  catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Kargo şifresi kaydedilemedi." }; }
   const localResult = getDatabase().saveInitialSetup({
     ...input,
     aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
+    arasShipping: input.arasShipping ? { ...input.arasShipping, password: "" } : undefined,
     aiProfiles: profileSecretUpdates.profiles
-  }, secretUpdate.update, profileSecretUpdates.updates);
+  }, secretUpdate.update, profileSecretUpdates.updates, shippingSecretWrite);
   if (!localResult.ok) {
     return localResult;
   }
 
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("commerce:shippingConfigurationChanged");
+  }
   markLocalCompanionSnapshotDirty();
   getAndroidActionSyncService().markSnapshotPublishPending();
   reconcileLocalCompanionAdvertisement();

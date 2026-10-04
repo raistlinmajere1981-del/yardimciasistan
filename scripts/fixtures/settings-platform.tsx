@@ -108,11 +108,21 @@ let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, last
 let kbsSettings = { enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false };
 window.yardimciDesktop = {
   getSetupData: async () => structuredClone(canonical),
+  commerce: {
+    testShippingProviderConnection: async () => { window.settingsCalls.push({ kind: "shipping-test" }); return { ok: true, providerId: canonical.arasShipping.providerId, message: "Fixture kargo bağlantısı doğrulandı.", testedAt: new Date().toISOString() }; }
+  },
   saveInitialSetup: async input => {
     window.settingsCalls.push({ kind: "setup", input });
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
-    canonical = { ...canonical, ...input, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured };
+    const arasShipping = input.arasShipping ? {
+      ...canonical.arasShipping, enabled: input.arasShipping.enabled, environment: input.arasShipping.environment,
+      username: input.arasShipping.username, customerCode: input.arasShipping.customerCode,
+      hasSecret: input.arasShipping.clearPassword ? false : Boolean(input.arasShipping.password) || canonical.arasShipping.hasSecret,
+      configured: input.arasShipping.enabled && Boolean(input.arasShipping.username && input.arasShipping.customerCode
+        && (input.arasShipping.password || (canonical.arasShipping.hasSecret && !input.arasShipping.clearPassword)))
+    } : canonical.arasShipping;
+    canonical = { ...canonical, ...input, arasShipping, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured };
     return { ok: true, message: "Kaydedildi", setupData: structuredClone(canonical), dashboardData: { ...defaultDashboardData, androidDevices: structuredClone(androidDevices) } };
   },
   getBusinessPublicProfile: async () => profile,

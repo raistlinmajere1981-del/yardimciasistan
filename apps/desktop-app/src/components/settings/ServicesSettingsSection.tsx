@@ -7,6 +7,7 @@ import { AndroidDevicesSection } from "./AndroidDevicesSection";
 type SyncState = "idle" | "loading" | "success" | "error";
 import { AiSettingsSection } from "./AiSettingsSection";
 import { WebSettingsSection } from "./WebSettingsSection";
+import { ServiceSettingsCard } from "./ServiceSettingsCard";
 export interface ServicesSettingsProps {
   form: SetupFormState;
   enabledCapabilities: BusinessCapability[];
@@ -157,23 +158,8 @@ export function ServicesSettingsSection({
           </section>
 
           {hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.RETAIL_BARCODE) && (
-          <section id="settings-product-data" tabIndex={-1} className={`settings-service-card${form.productDataEnabled ? " is-enabled" : " is-disabled"}`}>
-            <div className="settings-service-card-header">
-              <div>
-                <strong>Ürün Verisi</strong>
-                <span>{form.productDataEnabled ? "Açık" : "Kapalı"}</span>
-              </div>
-              <label className="settings-service-toggle">
-                <input
-                  aria-label="Ürün Verisi servisi"
-                  checked={form.productDataEnabled}
-                  onChange={(event) => update("productDataEnabled", event.target.checked)}
-                  type="checkbox"
-                />
-                <span>{form.productDataEnabled ? "Açık" : "Kapalı"}</span>
-              </label>
-            </div>
-            <fieldset className="settings-service-card-body form-stack" disabled={!form.productDataEnabled}>
+          <ServiceSettingsCard id="settings-product-data" title="Ürün Verisi"
+            enabled={form.productDataEnabled} onEnabledChange={(enabled) => update("productDataEnabled", enabled)}>
               <label className="form-field form-field--medium">
                 Sağlayıcı
                 <select
@@ -205,8 +191,7 @@ export function ServicesSettingsSection({
               <small>
                 Otomatik arama kapalıysa ürün kartındaki “Ürün Bilgilerini Ara” düğmesiyle manuel sorgu yapılabilir.
               </small>
-            </fieldset>
-          </section>
+          </ServiceSettingsCard>
           )}
 
           <AiSettingsSection

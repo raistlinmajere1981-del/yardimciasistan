@@ -504,6 +504,15 @@ const bridge: DesktopBridge = {
       ipcRenderer.on("commerce:ordersChanged", handler);
       return () => ipcRenderer.removeListener("commerce:ordersChanged", handler);
     },
+    getShippingProviderConfiguration: () => invokeWhenUnlocked<import("@yardimci-asistan/shared").ArasShippingConfiguration>("commerce:shipping:configuration"),
+    testShippingProviderConnection: (input) => invokeWhenUnlocked<import("@yardimci-asistan/shared").ShippingConnectionTestResult>("commerce:shipping:testConnection", input),
+    registerShipmentWithProvider: (shipmentId) => invokeCommerceMutation<import("@yardimci-asistan/shared").CommerceShipment>("commerce:shipping:registerShipment", shipmentId),
+    refreshShipmentProviderStatus: (shipmentId) => invokeCommerceMutation<import("@yardimci-asistan/shared").CommerceShipment>("commerce:shipping:refreshStatus", shipmentId),
+    onShippingConfigurationChanged: (listener) => {
+      const handler = () => listener();
+      ipcRenderer.on("commerce:shippingConfigurationChanged", handler);
+      return () => ipcRenderer.removeListener("commerce:shippingConfigurationChanged", handler);
+    },
     onShipmentsChanged: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, orderId: string) => listener(orderId);
       ipcRenderer.on("commerce:shipmentsChanged", handler);

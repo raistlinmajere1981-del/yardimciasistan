@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
+    "@xmldom/xmldom": "0.8.13",
     "@yardimci-asistan/ai-core": "0.1.0",
     "@yardimci-asistan/shared": "0.1.0",
     "@yardimci-asistan/sync-core": "0.1.0",

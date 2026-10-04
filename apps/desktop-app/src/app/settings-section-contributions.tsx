@@ -1,3 +1,4 @@
+import { ArasShippingSettingsSection } from "../components/settings/ArasShippingSettingsSection";
 import type { ReactNode, SetStateAction } from "react";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
@@ -5,6 +6,7 @@ import { settingsFieldOwners } from "./settings-draft-model";
 import {
   isSettingsSectionVisible,
   onlineSalesDeliveryDefinition,
+  arasShippingDefinition,
   type SettingsSectionDefinition,
   type StagedSettingsCategoryId
 } from "./settings-registry";
@@ -35,6 +37,10 @@ type StagedSettingsContributions = {
 const stagedSettingsContributions = {
   business: [],
   services: [{
+    definition: arasShippingDefinition,
+    render: ({ draft, onChange, busy }) => <ArasShippingSettingsSection draft={draft.arasShipping}
+      busy={busy} onChange={(arasShipping) => onChange({ arasShipping })} />
+  }, {
     definition: onlineSalesDeliveryDefinition,
     render: ({ draft, onChange }) => (
       <section id="settings-online-delivery" tabIndex={-1} className="settings-service-card is-enabled">

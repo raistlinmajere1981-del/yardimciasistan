@@ -1,4 +1,4 @@
-import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
+import { ARAS_SHIPPING_PROVIDER, BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 import type { SetupFormState } from "./setup-model";
@@ -36,6 +36,12 @@ export const onlineSalesDeliveryDefinition = {
   persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ONLINE_SALES)
 } as const satisfies SettingsSectionDefinition;
 
+export const arasShippingDefinition = {
+  id: "settings-shipping-provider", category: "services", title: ARAS_SHIPPING_PROVIDER.name,
+  keywords: "kargo gönderim shipping sağlayıcı bağlantı müşteri kodu şifre",
+  persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ORDERS)
+} as const satisfies SettingsSectionDefinition;
+
 export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-business", category: "business", title: "İşletme", keywords: "firma adı sektör tipi telefon whatsapp e-posta adres", persistence: "staged" },
   { id: "settings-options", category: "business", title: "Ek özellikler", keywords: "yetenek talepler oda masa rezervasyonları qr menü stok veresiye müşteri hesabı satın alma tedarikçi etiket", persistence: "staged" },
@@ -44,6 +50,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-google-reviews", category: "business", title: "Google Yorumları", keywords: "google places yorum değerlendirme puan place id api anahtarı", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   layoutSettingsDefinition,
   onlineSalesDeliveryDefinition,
+  arasShippingDefinition,
   { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },

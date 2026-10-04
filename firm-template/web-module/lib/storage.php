@@ -304,7 +304,7 @@ function ya_storage_pull_web_orders(int $limit, int $afterSeq): array
 {
     $limit = max(1, min($limit, 200));
     $statement = ya_storage_open()->prepare(
-        'SELECT seq, payload_json FROM web_orders WHERE seq > :after_seq ORDER BY seq ASC LIMIT :limit'
+        "SELECT seq, payload_json FROM web_orders WHERE seq > :after_seq AND imported_at = '' ORDER BY seq ASC LIMIT :limit"
     );
     $statement->bindValue(':after_seq', max(0, $afterSeq), PDO::PARAM_INT);
     $statement->bindValue(':limit', $limit + 1, PDO::PARAM_INT);

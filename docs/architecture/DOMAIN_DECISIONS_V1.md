@@ -557,3 +557,61 @@ B2 is local desktop persistence; existing web ingress/publication outboxes do no
 shipments. A future provider/sync slice must explicitly define its own execution contract.
 Shipment-specific change events refresh only the selected Order's shipment projection;
 local mutation responses update that projection immediately without polling.
+
+## D-032 — Aras is a provider adapter, not Shipment domain
+
+**Status:** ACCEPTED (2026-10-04)
+
+Aras Kargo (`aras`) is the first static shipping provider adapter. Its SOAP/XML, endpoints,
+credentials and external-state interpretation live outside the provider-neutral Shipment
+store. Provider id/display name are owned by the shared static provider configuration
+metadata. Store writes accept only normalized provider metadata and internal status;
+provider failures never mutate Order, Sale, stock or fulfillment.
+
+Services Settings owns the staged Aras configuration through the existing Setup/category
+save transaction: enabled, test/production environment, customer code, username and a
+write-only password. Main encrypts the password using Electron safeStorage; Linux basic_text
+fallback is rejected. Only encrypted envelopes are persisted. Read APIs expose hasSecret
+and configured, never password or encrypted payload; no reveal IPC exists. An absent or
+incomplete configuration is unconfigured and disables remote operations. Connection testing
+is an explicit read-only operation on draft settings, with no persistence side effect.
+
+B3 registers an existing draft/ready shipping Shipment. Receiver/address come exclusively
+from the immutable delivery snapshot; ReceiverPhone1 uses the immutable buyer/contact
+snapshot phone, with no live Customer fallback. A missing snapshot phone is rejected.
+This first adapter supports domestic TR orders and one parcel per registration; no weights,
+shipping fees, COD, reservations or additional commercial side effects are fabricated.
+
+Shipment.id is the immutable IntegrationCode. A durable registration record binds provider,
+account/environment fingerprint and reference. Before SetOrder, a compare-and-set records
+submitted. Each Shipment may cross that boundary at most once, including concurrent
+processes/restarts. Every retry first calls GetOrderWithIntegrationCode. A matching remote
+record reconciles the same local Shipment; an absent result after a submitted attempt is
+ambiguous and cannot authorize a second SetOrder. No automatic network retry is performed.
+A different provider account/environment cannot reuse the existing registration.
+
+SetOrder result codes have no documented meaning in the public WSDL. A positive registration
+requires a matching GetOrderWithIntegrationCode read-back, not a guessed success code.
+ExternalReference is that integration reference; only provider-returned tracking numbers
+are stored. Tracking URLs are constructed from validated numeric tracking numbers on the
+provider's fixed tracking host, never copied from an arbitrary remote URL.
+
+GetCargoInfo is the explicit manual status query. Its DataTable has an open schema in the
+public WSDL: the adapter projects a small allowlist of reference/tracking/status fields.
+Only exact delivered or in-transit descriptions map to internal status. Unknown, numeric,
+preparation, failed-delivery and return states preserve the current lifecycle and are
+logged without raw values. The provider-neutral store advances through the existing
+legal lifecycle steps atomically, never backwards and never out of a terminal state;
+status timestamps remain store-authoritative. Registration alone does not dispatch.
+
+Submitted/ambiguous registrations block local status mutation until reconciliation.
+A registered remote shipment cannot be locally cancelled: remote cancellation is a later
+explicit operation, and the existing local cancel action remains for unbound shipments.
+Order cancellation does not invoke provider cancellation or override D-031 lifecycle rules.
+
+B3 uses fixed HTTPS SOAP 1.1 endpoints, bounded responses, timeout, redirect rejection,
+namespace/structure validation and entity/DTD rejection. Fault/HTTP/network errors expose
+fixed safe messages. Structured diagnostics contain only operation/provider/shipment ids,
+bounded error codes and HTTP status; no credentials, recipient/address/phone, raw SOAP,
+raw provider state or provider-returned error text. No polling, webhook, labels, automatic
+Sale/fulfillment or new provider/sync outbox execution is introduced.

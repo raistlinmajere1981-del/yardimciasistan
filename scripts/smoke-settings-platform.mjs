@@ -100,6 +100,71 @@ try {
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('ürün verisi');
   await expect(page.getByRole('button', { name: 'Servisler · Ürün Verisi', exact: true })).toBeVisible();
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  const productService = page.locator('#settings-product-data');
+  const productToggle = productService.getByRole('checkbox', { name: 'Ürün Verisi servisi', exact: true });
+  const serviceSetupBefore = (await setupCalls()).length;
+  await expect(productService.locator('.settings-service-card-body')).toHaveCount(0);
+  await productToggle.check();
+  await expect(productService.getByRole('combobox')).toBeVisible();
+  await expect(productService.getByLabel('Bilinmeyen barkodu otomatik ara', { exact: true })).toBeVisible();
+  await expect(productService.getByLabel('Görselleri ekle', { exact: true })).toBeVisible();
+  await expect(productService).toContainText('Veri lisansı: ODbL');
+  expect((await setupCalls()).length).toBe(serviceSetupBefore);
+  await discard();
+  await expect(productToggle).not.toBeChecked();
+  await expect(productService.locator('.settings-service-card-body')).toHaveCount(0);
+  await productToggle.check();
+  await save();
+  expect((await setupCalls()).at(-1).input.productData.enabled).toBe(true);
+  await productToggle.uncheck();
+  await expect(productService.locator('.settings-service-card-body')).toHaveCount(0);
+  await discard();
+  await expect(productToggle).toBeChecked();
+  await expect(productService.getByRole('combobox')).toBeVisible();
+
+  await page.evaluate(() => window.refreshSettings({ profileOptions: ['commerce.wholesale'] }));
+  const arasService = page.locator('#settings-shipping-provider');
+  const arasToggle = arasService.getByRole('checkbox', { name: 'Aras Kargo servisi', exact: true });
+  const arasSetupBefore = (await setupCalls()).length;
+  await expect(arasService.locator('.settings-service-card-body')).toHaveCount(0);
+  await arasToggle.check();
+  await expect(arasService.getByText('Etkin · Yapılandırılmamış', { exact: true })).toBeVisible();
+  for (const label of ['Müşteri kodu', 'Kullanıcı adı', 'Şifre', 'Ortam']) await expect(arasService.getByLabel(label, { exact: true })).toBeVisible();
+  await expect(arasService.getByRole('button', { name: 'Bağlantıyı test et', exact: true })).toBeDisabled();
+  expect((await setupCalls()).length).toBe(arasSetupBefore);
+  await discard();
+  await expect(arasToggle).not.toBeChecked();
+  await expect(arasService.locator('.settings-service-card-body')).toHaveCount(0);
+  await arasToggle.check();
+  await save();
+  expect((await setupCalls()).at(-1).input.arasShipping.enabled).toBe(true);
+  await arasToggle.uncheck();
+  await expect(arasService.locator('.settings-service-card-body')).toHaveCount(0);
+  await discard();
+  await expect(arasToggle).toBeChecked();
+  await expect(arasService.getByLabel('Müşteri kodu', { exact: true })).toBeVisible();
+
+  for (const width of [1440, 600]) {
+    await page.setViewportSize({ width, height: 900 });
+    const geometry = await page.evaluate(() => {
+      const aras = document.querySelector('#settings-shipping-provider');
+      const product = document.querySelector('#settings-product-data');
+      const fields = [...aras.querySelectorAll('.form-grid > label')].map(node => node.getBoundingClientRect());
+      const previous = aras.parentElement.previousElementSibling.getBoundingClientRect();
+      const productRect = product.getBoundingClientRect();
+      const nextRect = product.nextElementSibling.getBoundingClientRect();
+      return {
+        columns: Math.abs(fields[0].top - fields[1].top) < 1 ? 2 : 1,
+        headerFields: [...aras.querySelectorAll('.settings-service-card-header input:not([type="checkbox"]), .settings-service-card-header select')].length,
+        targets: [aras, product].every(card => card.querySelector('.settings-service-card-header .settings-service-toggle').getBoundingClientRect().height >= 44),
+        controls: [...aras.querySelectorAll('.form-grid input, .form-grid select')].every(node => node.getBoundingClientRect().height >= 44),
+        separateCards: aras.getBoundingClientRect().top > previous.bottom && nextRect.top > productRect.bottom,
+        bodyX: document.querySelector('.settings-category-body').scrollWidth <= document.querySelector('.settings-category-body').clientWidth + 1
+      };
+    });
+    expect(geometry, `service card layout ${width}`).toEqual({ columns: width > 760 ? 2 : 1, headerFields: 0, targets: true, controls: true, separateCards: true, bodyX: true });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [] }));
   await expect(page.locator('#settings-product-data')).toHaveCount(0);
   await expect(page.locator('#settings-kbs')).toBeVisible();

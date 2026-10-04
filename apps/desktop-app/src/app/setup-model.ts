@@ -5,6 +5,8 @@ import type {
   SaveInitialSetupInput
 } from "../../electron/database";
 import {
+  emptyArasShippingConfiguration,
+  type ArasShippingConfigurationInput,
   getBusinessProfile,
   normalizeBirthdaySettings,
   type BirthdaySettings,
@@ -56,6 +58,7 @@ export interface SetupFormState {
   productDataAutoSearch: boolean;
   productDataIncludeImages: boolean;
   birthdaySettings: BirthdaySettings;
+  arasShipping: ArasShippingConfigurationInput & { hasSecret: boolean; configured: boolean };
   onlineSalesDelivery: OnlineSalesDeliverySettings;
 }
 
@@ -109,6 +112,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiServiceDrafts,
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
+    arasShipping: { ...(setupData.arasShipping ?? emptyArasShippingConfiguration()), password: "", clearPassword: false },
     onlineSalesDelivery: { ...setupData.onlineSalesDelivery },
     productDataEnabled: setupData.productData.enabled,
     productDataProvider: setupData.productData.provider,
@@ -234,6 +238,9 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       clearAiApiKey: setupForm.clearAiApiKey,
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
+      arasShipping: { enabled: setupForm.arasShipping.enabled, environment: setupForm.arasShipping.environment,
+        customerCode: setupForm.arasShipping.customerCode, username: setupForm.arasShipping.username,
+        password: setupForm.arasShipping.password, clearPassword: setupForm.arasShipping.clearPassword },
       onlineSalesDelivery: setupForm.onlineSalesDelivery,
       productData: {
         enabled: setupForm.productDataEnabled,

@@ -143,6 +143,8 @@ taşır. POST submission hiçbir canonical Customer/Sale/ödeme yaratmaz.
 
 `pullWebOrders()` buyer snapshot ve notu bağımsız `web_orders` cursor hattında taşır;
 Desktop ingress canonical order üzerinde saklar ve güncel retail fiyatı tekrar çözer.
+Pull yalnız henüz ack edilmemiş inbox kayıtlarını döndürür; cursor sıfırlansa veya yeni
+client kullanılsa bile ack edilmiş geçmiş kayıtlar tekrar taşınmaz.
 `acknowledgeWebOrders()` yalnız başarıyla import edilmiş prefix'i onaylar. Customer
 requests cursor/ack state'i bu işlemlerden bağımsızdır.
 

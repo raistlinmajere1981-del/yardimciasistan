@@ -1,3 +1,4 @@
+import { getArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
 import type { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
@@ -100,6 +101,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? false,
     aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
     aiProfiles,
+    arasShipping: getArasShippingConfiguration(db),
     onlineSalesDelivery: {
       pickupEnabled: Number(settings?.online_sales_pickup_enabled ?? 1) === 1,
       shippingEnabled: Number(settings?.online_sales_shipping_enabled ?? 0) === 1
@@ -127,7 +129,8 @@ export function saveSetupData(
   db: DatabaseSync,
   input: SaveInitialSetupInput,
   aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
-  aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {}
+  aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {},
+  shippingSecretWrite: ShippingSecretWrite = { mode: "keep" }
 ): StoredSetupSaveResult {
   const businessName = input.businessName.trim();
   const syncSecret = input.syncSecret.trim();
@@ -140,6 +143,10 @@ export function saveSetupData(
   const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
   const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
   const existingSettings = db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+  if (input.arasShipping) {
+    try { normalizeArasShippingInput(input.arasShipping); }
+    catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Kargo ayarları geçersiz." }; }
+  }
   let onlineSalesDelivery;
   try {
     onlineSalesDelivery = normalizeOnlineSalesDeliverySettings(input.onlineSalesDelivery ?? {
@@ -401,6 +408,8 @@ export function saveSetupData(
 
     db.prepare("UPDATE settings SET online_sales_pickup_enabled = ?, online_sales_shipping_enabled = ? WHERE id = ?")
       .run(onlineSalesDelivery.pickupEnabled ? 1 : 0, onlineSalesDelivery.shippingEnabled ? 1 : 0, settingsId);
+
+    if (input.arasShipping) saveArasShippingConfigurationInTransaction(db, businessId, input.arasShipping, shippingSecretWrite);
 
     upsertAiServiceProfileInTransaction(db, {
       service: storedAiService,

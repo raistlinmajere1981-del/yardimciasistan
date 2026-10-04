@@ -6,6 +6,7 @@ export * from "./types/business-capabilities";
 export * from "./types/business-public-profile";
 export * from "./types/capability-policy";
 export * from "./types/commerce";
+export * from "./types/shipping";
 export * from "./types/common";
 export * from "./types/customer";
 export * from "./types/customer-credit";

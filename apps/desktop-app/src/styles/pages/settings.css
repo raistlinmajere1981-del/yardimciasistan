@@ -140,6 +140,16 @@
   font-weight: var(--weight-medium);
 }
 
+.settings-service-panel > .settings-service-card-header > .settings-service-toggle {
+  flex: 0 0 auto;
+  min-height: var(--control-height-lg);
+  min-width: var(--control-height-lg);
+}
+
+.settings-service-panel .settings-service-card-body :where(input:not([type="checkbox"]):not([type="radio"]), select, button, .form-check) {
+  min-height: var(--control-height-lg);
+}
+
 .settings-service-card-body {
   margin: 0;
   border: 0;
@@ -1059,6 +1069,7 @@
 .settings-category-body > * + *,
 .settings-category-body .settings-resource-fields > * + * { margin-top: var(--space-4); }
 .settings-resource-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.settings-category-body > * + .settings-resource-fields { margin-top: var(--space-4); }
 .settings-resource-fields.settings-panel-body { padding: var(--space-4); }
 .settings-category-actions {
   display: flex;

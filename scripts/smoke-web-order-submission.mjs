@@ -110,7 +110,12 @@ try {
   const receiptText = JSON.stringify(receipt);
   for (const privateValue of [buyer.name, buyer.phone, buyer.email, input.note, input.idempotencyKey]) assert.equal(receiptText.includes(privateValue), false);
   await sync({ action: "acknowledge_web_orders", client_id: "desktop-a3", through_seq: pulled.next_cursor });
-  assert.deepEqual((await sync({ action: "pull_web_orders", client_id: "desktop-a3", after_seq: 0 })).orders[0].buyer, buyer);
+  for (const clientId of ["desktop-a3", "desktop-after-reset"]) {
+    const inbox = await sync({ action: "pull_web_orders", client_id: clientId, after_seq: 0 });
+    assert.deepEqual(inbox.orders, [], "acknowledged order is absent even for a new zero-cursor client");
+    assert.equal(inbox.next_cursor, 0);
+    assert.equal(inbox.has_more, false);
+  }
   await publish(false);
   assert.deepEqual((await submit(input)).payload, accepted.payload, "receipt replay survives publication disable and ack");
   assert.equal((await submit({ ...input, idempotencyKey: "guest-order-key-new-2" })).status, 403);

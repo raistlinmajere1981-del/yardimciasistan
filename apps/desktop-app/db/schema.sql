@@ -274,6 +274,31 @@ CREATE TABLE commerce_shipments (
 CREATE INDEX idx_commerce_shipments_order ON commerce_shipments (order_id, created_at, id);
 CREATE INDEX idx_commerce_shipments_status ON commerce_shipments (business_id, status);
 
+-- Local provider configuration. Password is an OS-keyring encrypted envelope only.
+CREATE TABLE commerce_shipping_provider_config (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  provider_id TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+  environment TEXT NOT NULL DEFAULT 'test' CHECK (environment IN ('test', 'production')),
+  customer_code TEXT NOT NULL DEFAULT '',
+  username TEXT NOT NULL DEFAULT '',
+  password_encrypted TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (business_id, provider_id)
+);
+
+-- Durable send boundary: submitted is ambiguous until reconciled by reference.
+CREATE TABLE commerce_shipment_registrations (
+  shipment_id TEXT PRIMARY KEY REFERENCES commerce_shipments(id),
+  provider_id TEXT NOT NULL,
+  integration_code TEXT NOT NULL,
+  account_fingerprint TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('prepared', 'submitted', 'registered')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (provider_id, account_fingerprint, integration_code)
+);
+
 CREATE TABLE commerce_order_fulfillments (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL REFERENCES business(id),

@@ -35,7 +35,7 @@ import {
   lookupExternalProductByBarcode
 } from "./product-data-service";
 
-import { listShipmentsForOrder, getShipment, createShipmentForOrder, updateShipmentStatus } from "./commerce-shipment-store";
+import { applyShipmentProviderResult, type ShipmentProviderResultInput, listShipmentsForOrder, getShipment, createShipmentForOrder, updateShipmentStatus } from "./commerce-shipment-store";
 import type { UpdateCommerceShipmentStatusInput } from "@yardimci-asistan/shared";
 
 import { fulfillCommerceOrder } from "./commerce-order-fulfillment-service";
@@ -504,4 +504,10 @@ export function createRuntimeShipmentForOrder(databasePath: string, orderId: str
 export function updateRuntimeShipmentStatus(databasePath: string, input: UpdateCommerceShipmentStatusInput) {
   requireShipmentCapability(databasePath);
   return updateShipmentStatus(databasePath, input);
+}
+
+
+export function applyRuntimeShipmentProviderResult(databasePath: string, input: ShipmentProviderResultInput) {
+  requireShipmentCapability(databasePath);
+  return applyShipmentProviderResult(databasePath, input);
 }

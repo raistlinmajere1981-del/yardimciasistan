@@ -88,13 +88,14 @@ function coordinator() {
 const webCalls = () => calls.filter((call) => /web_orders/.test(call.action));
 try {
   database.initialize();
-  const setup = database.saveInitialSetup({
+  const setupInput = {
     businessName: "Online Orders A1", profileId: "market", phone: "", whatsapp: "", email: "", address: "",
     webModuleUrl: "https://orders.example.test/module", syncSecret: secret, autoSyncEnabled: false,
     aiEnabled: false, aiProvider: "openai_compatible", aiService: "openai", aiProjectName: "", aiModel: "",
     aiModelOptions: [], aiBaseUrl: "https://api.openai.com/v1", aiTimeoutSeconds: 30, aiApiKey: "", clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: false }, initialCounts: { rooms: 0, tables: 0 }, tableCategories: []
-  });
+  };
+  const setup = database.saveInitialSetup(setupInput);
   assert.equal(setup.ok, true);
   const product = saveRuntimeCatalogProduct(database.databasePath, {
     name: "Order product", salePrice: 25, purchasePrice: 10, unit: "piece", currency: "TRY", taxRate: 20,
@@ -162,10 +163,14 @@ try {
   try {
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders WHERE source_reference = 'web-later'").get().n, 0);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders WHERE source_reference = 'web-1'").get().n, 1);
-    // Simulate crash after canonical commit, before cursor persistence.
+    // A reset cursor cannot replay the acknowledged prefix, even with pending poison records.
     raw.exec("UPDATE sync_runtime SET web_order_cursor = 0, web_order_acknowledged_cursor = 0");
     await coordinator().runNow();
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders WHERE source_reference = 'web-1'").get().n, 1);
+    assert.equal(database.getSyncRuntimeStatus().webOrderCursor, 0);
+    assert.deepEqual(syncApi({ action: "pull_web_orders", client_id: "desktop-after-reset", after_seq: 0 }).payload.orders.map((order) => order.id), ["web-broken", "web-later"]);
+    // Restore this fixture's persisted prefix for the remaining ack retry checks.
+    raw.prepare("UPDATE sync_runtime SET web_order_cursor = ?, web_order_acknowledged_cursor = ?").run(first.syncSeq, first.syncSeq);
     const eventCountBeforeInvalid = ordersChanged;
     const ackCount = webCalls().filter((call) => call.action === "acknowledge_web_orders").length;
     await coordinator().runNow();
@@ -184,10 +189,17 @@ try {
     assert.equal(database.getSyncRuntimeStatus().webOrderCursor, later.syncSeq);
     assert.equal(ordersChanged, beforeBatchEvents + 1, "two imported orders emit one event even when ack fails");
     assert.equal(database.getSyncRuntimeStatus().webOrderAcknowledgedCursor, first.syncSeq);
+    assert.deepEqual(syncApi({ action: "pull_web_orders", client_id: "desktop-after-reset", after_seq: 0 }).payload.orders.map((order) => order.id), ["web-broken", "web-later"], "failed ack leaves imported orders pending on hosting");
+    // Lost local cursor after import + failed ack re-pulls the same records without duplicates.
+    raw.prepare("UPDATE sync_runtime SET web_order_cursor = ?").run(first.syncSeq);
+    assert.equal((await coordinator().runNow()).ok, false);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders").get().n, 4);
+    assert.equal(database.getSyncRuntimeStatus().webOrderCursor, later.syncSeq);
+    const eventsBeforeAckRetry = ordersChanged;
     rejectAck = false;
     result = await coordinator().runNow();
     assert.equal(result.ok, true);
-    assert.equal(ordersChanged, beforeBatchEvents + 1, "zero-import ack retry emits no event");
+    assert.equal(ordersChanged, eventsBeforeAckRetry, "zero-import ack retry emits no event");
     assert.equal(database.getSyncRuntimeStatus().webOrderAcknowledgedCursor, later.syncSeq);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders").get().n, 4);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_sales").get().n, 0);
@@ -213,6 +225,28 @@ try {
   assert.equal(database.getSyncRuntimeStatus().webOrderCursor, later.syncSeq, "cursor survives restart");
   assert.deepEqual(getRuntimeOrder(database.databasePath, created.order.id).order.buyerSnapshot, envelope.buyer, "buyer survives ack and restart");
   assert.deepEqual(getRuntimeOrder(database.databasePath, created.order.id).order.deliverySnapshot, envelope.delivery, "delivery survives restart");
+  // Fresh current-schema Desktop has none of the old product ids, but acked hosting history is not poison.
+  database.close();
+  database = new DesktopDatabase({ appPath: join(process.cwd(), "apps/desktop-app"), userDataPath: join(root, "desktop-reset") });
+  database.initialize();
+  assert.equal(database.saveInitialSetup(setupInput).ok, true);
+  // This web-order fixture intentionally has no Android publishing endpoint.
+  for (const job of database.getPendingSyncJobs()) {
+    if (job.jobType === "android_snapshot") database.completeSyncJob(job.jobKey, job.sourceRevision);
+  }
+  setBusinessCapability(database.databasePath, { capability: "commerce.orders", enabled: true });
+  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+  const resetResult = await coordinator().runNow();
+  assert.equal(resetResult.ok, true, `empty inbox succeeds without historical product ids: ${JSON.stringify(resetResult)}`);
+  assert.equal(database.getSyncRuntimeStatus().webOrderCursor, 0);
+  const currentProduct = saveRuntimeCatalogProduct(database.databasePath, { name: "Current reset product", salePrice: 25, isActive: true, trackInventory: false });
+  const fresh = enqueue({ ...envelope, id: "web-after-reset", items: [{ productId: currentProduct.id, quantity: 1 }] });
+  assert.deepEqual(syncApi({ action: "pull_web_orders", client_id: "desktop-after-reset", after_seq: 0 }).payload.orders.map((order) => order.id), ["web-after-reset"]);
+  assert.equal((await coordinator().runNow()).ok, true, "new pending order imports alongside acknowledged history");
+  assert.equal(database.getSyncRuntimeStatus().webOrderCursor, fresh.syncSeq);
+  const resetDb = new DatabaseSync(database.databasePath);
+  try { assert.deepEqual(resetDb.prepare("SELECT source_reference FROM commerce_orders").all().map((row) => row.source_reference), ["web-after-reset"]); }
+  finally { resetDb.close(); }
   console.log("commerce-online-order-ingress-smoke-ok");
 } finally {
   globalThis.fetch = originalFetch;
