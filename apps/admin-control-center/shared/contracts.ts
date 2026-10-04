@@ -145,6 +145,44 @@ export type DeploymentRunState = {
   outputTail: string[];
 };
 
+export type SupportReportStatus = "new" | "reviewing" | "resolved";
+
+export type SupportReportListItem = {
+  reportId: string;
+  receivedAt: string;
+  status: SupportReportStatus;
+  appVersion: string;
+  platform: string;
+  arch: string;
+  sessionCount: number;
+  eventCount: number;
+  warnCount: number;
+  errorCount: number;
+  abruptSessionCount: number;
+  screenshotBytes: number;
+  notePresent: boolean;
+  clientHash: string;
+  resolvedInVersion: string;
+  resolutionNote: string;
+};
+
+export type SupportEventSummary = {
+  timestamp: string;
+  level: string;
+  scope: string;
+  event: string;
+  message: string;
+  errorMessage: string;
+};
+
+export type SupportReportDetail = {
+  meta: SupportReportListItem;
+  note: string;
+  app: Record<string, string>;
+  screenshotDataUrl: string | null;
+  recent: SupportEventSummary[];
+};
+
 export type DependencyUpdateItem = {
   name: string;
   current: string;
@@ -195,5 +233,13 @@ export type AdminBridge = {
   startDeployment(request: DeploymentRunRequest): Promise<{ accepted: boolean; message: string }>;
   cancelDeployment(): Promise<boolean>;
   onDeploymentRunState(listener: (state: DeploymentRunState) => void): () => void;
+  listSupportReports(limit?: number): Promise<SupportReportListItem[]>;
+  getSupportReportDetail(reportId: string, refresh?: boolean): Promise<SupportReportDetail>;
+  updateSupportReportStatus(
+    reportId: string,
+    status: SupportReportStatus,
+    resolvedInVersion?: string,
+    resolutionNote?: string
+  ): Promise<SupportReportListItem>;
   openExternal(url: string): Promise<boolean>;
 };
