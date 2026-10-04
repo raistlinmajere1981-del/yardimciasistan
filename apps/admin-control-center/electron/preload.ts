@@ -12,6 +12,15 @@ const bridge: AdminBridge = {
     ipcRenderer.on("admin:verification-run-state", handler);
     return () => ipcRenderer.removeListener("admin:verification-run-state", handler);
   },
+  getDeploymentTargets: () => ipcRenderer.invoke("admin:get-deployment-targets"),
+  getDeploymentRunState: () => ipcRenderer.invoke("admin:get-deployment-run-state"),
+  startDeployment: (request) => ipcRenderer.invoke("admin:start-deployment", request),
+  cancelDeployment: () => ipcRenderer.invoke("admin:cancel-deployment"),
+  onDeploymentRunState: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
+    ipcRenderer.on("admin:deployment-run-state", handler);
+    return () => ipcRenderer.removeListener("admin:deployment-run-state", handler);
+  },
   openExternal: (url) => ipcRenderer.invoke("admin:open-external", url)
 };
 
