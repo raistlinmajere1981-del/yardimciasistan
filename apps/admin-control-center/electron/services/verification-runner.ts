@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import process from "node:process";
 import type { VerificationRunRequest, VerificationRunState } from "../../shared/contracts";
@@ -9,7 +9,7 @@ const SAFE_VALUE = /^[a-zA-Z0-9:_-]+$/;
 type Listener = (state: VerificationRunState) => void;
 
 export class VerificationRunner {
-  private child: ChildProcessWithoutNullStreams | null = null;
+  private child: ChildProcess | null = null;
   private listeners = new Set<Listener>();
   private cancelled = false;
   private state: VerificationRunState = {
@@ -81,8 +81,8 @@ export class VerificationRunner {
 
     this.child = child;
 
-    child.stdout.on("data", (chunk) => this.appendOutput(chunk.toString()));
-    child.stderr.on("data", (chunk) => this.appendOutput(chunk.toString()));
+    child.stdout?.on("data", (chunk) => this.appendOutput(chunk.toString()));
+    child.stderr?.on("data", (chunk) => this.appendOutput(chunk.toString()));
 
     child.on("error", (error) => {
       this.appendOutput(`Çalıştırma hatası: ${error.message}`);
