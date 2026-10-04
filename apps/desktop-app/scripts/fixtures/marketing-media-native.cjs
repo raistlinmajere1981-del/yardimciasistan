@@ -3,8 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { app, nativeImage } = require('electron');
-const { DesktopDatabase } = require('../../apps/desktop-app/dist-electron/database.js');
-const { MarketingMediaService } = require('../../apps/desktop-app/dist-electron/marketing/media-service.js');
+const { DesktopDatabase } = require('../../dist-electron/database.js');
+const { MarketingMediaService } = require('../../dist-electron/marketing/media-service.js');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'marketing-native-'));
 fs.mkdirSync(path.join(root,'electron'));app.setPath('userData',path.join(root,'electron'));
 app.whenReady().then(() => {

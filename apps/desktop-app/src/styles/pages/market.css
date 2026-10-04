@@ -782,15 +782,14 @@ button.market-list-row {
   overscroll-behavior: contain;
 }
 
-.market-order-customer,
-.market-order-customer-summary,
-.market-order-draft,
-.market-order-detail {
+.market-order-customer {
   display: grid;
   gap: var(--space-3);
 }
 
 .market-order-customer-summary {
+  display: grid;
+  gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--color-accent-border);
   border-radius: var(--radius-md);
@@ -840,12 +839,12 @@ button.market-list-row {
 }
 
 .market-order-draft {
+  display: grid;
+  gap: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
 }
 
-.market-order-lines,
-.market-order-list,
 .market-order-detail-lines {
   display: grid;
   align-content: start;
@@ -854,12 +853,20 @@ button.market-list-row {
 }
 
 .market-order-lines {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-height: 0;
   max-height: 280px;
   overflow: auto;
   overscroll-behavior: contain;
 }
 
 .market-order-list {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-height: 0;
   max-height: 330px;
   overflow: auto;
   overscroll-behavior: contain;
@@ -882,23 +889,21 @@ button.market-list-row {
   background: var(--color-accent-soft);
 }
 
-.market-order-card > span:first-child,
-.market-order-card-meta {
-  display: grid;
-  gap: var(--space-1);
-}
-
 .market-order-card small,
 .market-order-detail-lines small {
   color: var(--color-text-muted);
 }
 
 .market-order-card-meta {
+  display: grid;
+  gap: var(--space-1);
   justify-items: end;
   flex: 0 0 auto;
 }
 
 .market-order-card > span:first-child {
+  display: grid;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -909,6 +914,8 @@ button.market-list-row {
 }
 
 .market-order-detail {
+  display: grid;
+  gap: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
 }

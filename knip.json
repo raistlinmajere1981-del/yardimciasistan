@@ -12,6 +12,20 @@
         "scripts/**/*.{js,mjs,cjs,ts}"
       ]
     },
+    "apps/admin-control-center": {
+      "entry": [
+        "electron/main.ts",
+        "electron/preload.ts",
+        "scripts/**/*.{js,mjs,cjs,ts}"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "electron/**/*.ts",
+        "shared/**/*.ts",
+        "scripts/**/*.{js,mjs,cjs,ts}",
+        "*.config.ts"
+      ]
+    },
     "apps/desktop-app": {
       "entry": [
         "electron/main-entry.ts",
