@@ -8,6 +8,7 @@ import {
   listSupportReports,
   updateSupportReportStatus
 } from "./services/support-service";
+import { getSystemEnvironment } from "./services/system-environment-service";
 import { VerificationRunner } from "./services/verification-runner";
 
 const APP_ROOT = resolve(__dirname, "../..");
@@ -72,6 +73,7 @@ ipcMain.handle("admin:get-deployment-targets", () => getDeploymentTargets(REPO_R
 ipcMain.handle("admin:get-deployment-run-state", () => deploymentRunner.getState());
 ipcMain.handle("admin:start-deployment", (_event, request) => deploymentRunner.start(request));
 ipcMain.handle("admin:cancel-deployment", () => deploymentRunner.cancel());
+ipcMain.handle("admin:get-system-environment", () => getSystemEnvironment(REPO_ROOT));
 ipcMain.handle("admin:list-support-reports", (_event, limit) => listSupportReports(REPO_ROOT, limit));
 ipcMain.handle("admin:get-support-report-detail", (_event, reportId) => getSupportReportDetail(REPO_ROOT, reportId));
 ipcMain.handle(
