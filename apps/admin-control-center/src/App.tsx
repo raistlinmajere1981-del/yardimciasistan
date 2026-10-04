@@ -33,6 +33,7 @@ import type {
   SupportReportDetail,
   SupportReportListItem,
   SupportReportStatus,
+  SystemEnvironmentSnapshot,
   VerificationRunState
 } from "../shared/contracts";
 
@@ -1525,6 +1526,25 @@ function System({ data }: { data: OverviewSnapshot }) {
   const [checking, setChecking] = useState(false);
   const [report, setReport] = useState<DependencyUpdateReport | null>(null);
   const [checkError, setCheckError] = useState("");
+  const [environment, setEnvironment] = useState<SystemEnvironmentSnapshot | null>(null);
+  const [environmentLoading, setEnvironmentLoading] = useState(true);
+  const [environmentError, setEnvironmentError] = useState("");
+
+  const loadEnvironment = useCallback(async () => {
+    setEnvironmentLoading(true);
+    setEnvironmentError("");
+    try {
+      setEnvironment(await window.adminControlCenter.getSystemEnvironment());
+    } catch (value) {
+      setEnvironmentError(value instanceof Error ? value.message : String(value));
+    } finally {
+      setEnvironmentLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadEnvironment();
+  }, [loadEnvironment]);
 
   const runDependencyCheck = useCallback(async () => {
     setChecking(true);
@@ -1556,10 +1576,21 @@ function System({ data }: { data: OverviewSnapshot }) {
           <p className="eyebrow">YEREL YÖNETİM</p>
           <h1>Sistem</h1>
           <p className="page-subtitle">
-            Admin çalışma ortamı ve Yardımcı Asistan workspace bağımlılıklarının manuel kontrolü.
+            Admin çalışma ortamı, araç zinciri, credential referansları ve bağımlılık kontrolleri.
           </p>
         </div>
+        <button className="button button--secondary" onClick={() => void loadEnvironment()} disabled={environmentLoading}>
+          <RefreshCw size={17} className={environmentLoading ? "spin" : ""} />
+          {environmentLoading ? "Kontrol ediliyor" : "Ortamı Yenile"}
+        </button>
       </header>
+
+      {environmentError ? (
+        <div className="error-banner">
+          <TriangleAlert size={18} />
+          <span>Ortam bilgisi okunamadı: {environmentError}</span>
+        </div>
+      ) : null}
 
       <section className="system-summary-grid">
         <article className="summary-card">
@@ -1568,9 +1599,18 @@ function System({ data }: { data: OverviewSnapshot }) {
           <small>HEAD {data.repo.head}</small>
         </article>
         <article className="summary-card">
-          <span>Ürün sürümü</span>
-          <strong>v{data.product.version}</strong>
-          <small>Web v{data.product.webModuleVersion} · Android #{data.product.androidVersionCode}</small>
+          <span>Araç zinciri</span>
+          <strong>
+            {environment
+              ? `${environment.tools.filter((item) => item.available).length} / ${environment.tools.length}`
+              : "—"}
+          </strong>
+          <small>{environment ? "gerekli yerel araç hazır" : "Ortam okunuyor"}</small>
+        </article>
+        <article className="summary-card">
+          <span>Android cihaz</span>
+          <strong>{environment ? environment.androidDevices.length : "—"}</strong>
+          <small>{environment?.androidDevices[0]?.model || "Bağlı cihaz yok"}</small>
         </article>
         <article className="summary-card">
           <span>Kütüphane durumu</span>
@@ -1586,9 +1626,94 @@ function System({ data }: { data: OverviewSnapshot }) {
           <small>
             {report
               ? `${report.packageManager} · ${report.nodeVersion}`
-              : "Yalnız isteğe bağlı olarak npm registry kontrol edilir."}
+              : "İsteğe bağlı npm registry kontrolü"}
           </small>
         </article>
+      </section>
+
+      <section className="system-environment-grid">
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">ARAÇ ZİNCİRİ</p>
+              <h2>Yerel araçlar</h2>
+            </div>
+          </div>
+          <div className="system-tool-list">
+            {environment?.tools.map((item) => (
+              <div className="system-tool-row" key={item.id}>
+                <span className="installation-dot" data-status={item.available ? "ready" : "error"} />
+                <div>
+                  <strong>{item.label}</strong>
+                  <small>{item.detail}</small>
+                </div>
+                <span className={statusClass(item.available ? "ready" : "error")}>
+                  {item.available ? "Hazır" : "Eksik"}
+                </span>
+              </div>
+            ))}
+            {!environment ? <div className="empty-row">Ortam bilgisi okunuyor…</div> : null}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">CREDENTIAL REFERANSLARI</p>
+              <h2>Yerel kayıt durumu</h2>
+            </div>
+          </div>
+          <div className="system-credential-list">
+            {environment?.credentials.map((item) => (
+              <div className="system-credential-row" key={item.ref}>
+                <KeyRound size={17} />
+                <div>
+                  <strong>{item.ref}</strong>
+                  <small>{item.usedBy.join(" · ")}</small>
+                </div>
+                <span className={statusClass(item.status === "configured" ? "ready" : item.status === "unreadable" ? "error" : "unconfigured")}>
+                  {credentialLabel(item.status)}
+                </span>
+              </div>
+            ))}
+            {!environment?.credentials.length && environment ? (
+              <div className="empty-row">Credential referansı bulunamadı.</div>
+            ) : null}
+          </div>
+        </article>
+      </section>
+
+      <section className="panel system-paths-panel">
+        <div className="panel-header">
+          <div>
+            <p className="panel-kicker">ÇALIŞMA YOLLARI</p>
+            <h2>Repo ve cihazlar</h2>
+          </div>
+          <span className="quiet">
+            {environment?.checkedAt ? new Date(environment.checkedAt).toLocaleTimeString("tr-TR") : ""}
+          </span>
+        </div>
+        <div className="system-paths-grid">
+          <div><span>Yardımcı Asistan repo</span><strong>{environment?.repoRoot ?? "—"}</strong></div>
+          <div><span>BlackSea repo</span><strong>{environment?.blackSeaRoot ?? "Bulunamadı"}</strong></div>
+        </div>
+        <div className="android-device-list">
+          {environment?.androidDevices.map((device) => (
+            <div className="android-device-row" key={device.serial}>
+              <Activity size={17} />
+              <div>
+                <strong>{device.model || device.device || device.serial}</strong>
+                <small>{device.serial} · {device.state}</small>
+              </div>
+              <span className={statusClass(device.state === "device" ? "ready" : "warning")}>
+                {device.state}
+              </span>
+            </div>
+          ))}
+          {environment && !environment.androidDevices.length ? (
+            <div className="empty-row">ADB üzerinden bağlı Android cihaz görünmüyor.</div>
+          ) : null}
+        </div>
       </section>
 
       <section className="panel dependency-panel">
