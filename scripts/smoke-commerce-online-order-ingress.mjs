@@ -60,7 +60,7 @@ globalThis.fetch = async (url, init) => {
     if (!supported) result.payload.features = result.payload.features.filter((feature) => feature !== "web_orders_v1");
     return new Response(JSON.stringify(result.payload), { status: result.status });
   }
-  if (body.action === "publish_online_catalog" || body.action === "pull_web_orders" || body.action === "acknowledge_web_orders") {
+  if (body.action === "publish_online_catalog" || body.action === "publish_website_navigation" || body.action === "pull_web_orders" || body.action === "acknowledge_web_orders") {
     if (body.action === "acknowledge_web_orders" && rejectAck) {
       return new Response(JSON.stringify({ ok: false, message: "ack retry" }), { status: 503 });
     }
