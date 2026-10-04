@@ -935,3 +935,77 @@ Diagnostics contain stable dispatch milestones, opaque campaign/outbox/BusinessM
 and bounded error categories only, never phone/name/body/parameters/customer-id lists/secrets.
 Desktop canonical storage remains authoritative; no web recipient publication, SMS, scheduled
 campaign, inbound chat, analytics or independent Settings/retry subsystem is introduced.
+
+## D-038 — Marketing studio, channel publications and reusable media
+
+**Status:** Accepted. **Scope:** D4; Website is the first executable publish adapter.
+
+MarketingContent is editorial intent, separate from Campaign (D-036/D-037 audience,
+consent and controlled delivery), Publication (a channel instance), MediaAsset and
+provider requests. `marketing.studio` is provider-neutral, optional and default OFF
+for every profile. Pazarlama reuses the existing campaign workspace and operations;
+`messaging.campaigns` still gates those operations independently.
+
+Content owns master text and independent typed website/whatsapp/sms/instagram
+variants. Saving a variant never overwrites another channel. One canonical Content
+editor serves all entry points. Content archive does not silently unpublish an
+existing instance; archived content cannot create or publish new instances.
+
+MediaAsset owns immutable validated image files under userData/assets/marketing/files,
+SQLite metadata and opaque storage references. Content/publication relations own
+ordering, never binary/base64. Uploads and generated images enter the same library.
+Ephemeral resized IPC previews are projections. Assets may be reused. Archive hides
+an asset from new selections and preserves existing references. Physical deletion
+is refused while any content/publication or acknowledged live snapshot references
+it, including every in-flight intent and pending removal/unpublish awaiting ack. No silent deletion of live media.
+
+AI capabilities are text_generation, rewrite, channel_adaptation and image_generation.
+The resolver uses existing saved AI service profiles and safeStorage credentials,
+preferring the selected configured service then capable configured alternatives.
+Provider-specific image endpoints/model support stay inside ai-core adapters.
+Unavailable capabilities are disabled gracefully. AI output is an explicit candidate:
+text is applied only after user acceptance; generated images are kept/deleted/attached
+through the canonical library. Neither action creates/publishes a publication.
+Marketing AI does not assemble customer/recipient context or send request bodies or
+credential data. Inputs are editorial/business context only; obvious contact/identity
+tokens are removed. Customer names are read locally only as a redaction vocabulary,
+which never enters provider requests. Raw prompts, full generated bodies and
+binary data are never diagnostic metadata. Image metadata contains only provider/model
+ids and a fixed generation intent, no raw prompt.
+
+MarketingChannel is not Provider. The static typed registry owns text/media limits,
+configuration state, edit/unpublish/publish/test capabilities. Website uses the
+existing Web Module URL and sync secret, without another secret or persistence path.
+WhatsApp Business keeps the D1 Settings card and configuration ownership. SMS and
+Instagram stay safe planned channels with no generic credential form; D5 will own
+adapter-specific config and safeStorage writes. Settings never returns AI or social
+provider secrets. Website settings reuse the existing staged Services fields;
+connection tests are explicit operational actions using saved connection config.
+
+Publication owns an explicit editable text/title/media snapshot and `homepage_feature`
+placement. Its intent revision increases on every edit/state change; `publishedRevision`
+advances only on matching web acknowledgement. Master/variant edits do not mutate
+live instances. Live edits queue a new revision, keeping the last acknowledged snapshot
+and its media guarded until ack. Unpublish is also a revisioned tombstone. A failed
+attempt retains the durable intent and retries using the existing sync outbox.
+
+Explicit user publication actions request a forced cycle even when passive auto-sync
+is disabled; failures retain the same durable job. Desktop is authoritative. Existing sync coordinator, durable outbox, monotonic source
+revision ledger, idempotency receipt and ack semantics carry a sanitized aggregate
+projection (opaque publication/image ids, public text, local public image URLs and
+ordered dimensions/alt text). Web is never a canonical Content store. Media uploads
+reuse streaming multipart transport; deterministic asset hash paths allow retries and
+site changes without persisting target-specific remote URLs. Web projection validation
+and escaped responsive rendering expose only published instances. A generic embeddable
+Duyurular / Kampanyalar surface and a standalone public page work for any website.
+
+D5 owns real WhatsApp/SMS/Instagram publication adapters. No scheduling, autonomous
+posting, analytics, inbox, social accounts or video is introduced by D4.
+
+
+D4 image adapter references: [OpenAI Image API](https://developers.openai.com/api/docs/guides/image-generation)
+and [Gemini image generation](https://ai.google.dev/gemini-api/docs/image-generation).
+OpenAI configured profiles use the Images endpoint (gpt-image-1 default or explicit
+saved gpt-image model); Gemini/custom image support requires a matching saved image
+model. Other profiles remain safely unavailable for image generation until an adapter
+exists. This is a capability assertion, not proof of provider account quota/permission.

@@ -1,3 +1,7 @@
+import { MarketingMediaService } from "./marketing/media-service";
+import { MarketingStudioService } from "./marketing/service";
+import { MarketingWebsitePublicationService } from "./marketing/website-publication";
+import { registerMarketingIpc } from "./ipc/marketing-ipc";
 import { BusinessMessagingStatusSyncService } from "./business-messaging/status-sync-service";
 import { BusinessMessagingService } from "./business-messaging/service";
 import { CampaignDispatchService } from "./messaging-campaigns/dispatch-service";
@@ -332,6 +336,7 @@ if (!hasSingleInstanceLock) {
       onlineOrderIngress: new OnlineOrderIngressService(desktopDatabase),
       pullBusinessMessagingStatuses: (config) => businessMessagingStatusSyncService.pull(config),
       database: desktopDatabase,
+      marketingWebsite: marketingWebsiteService,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
       createAndroidSnapshot: () => createAndroidOperationsSnapshot(getDatabase(), getDatabase().getDashboardData()),
       createAiCatalog: () => createBusinessAiCatalog(getDatabase()),
@@ -473,6 +478,18 @@ app.on("before-quit", (event) => {
 
 const businessMessagingStatusSyncService = new BusinessMessagingStatusSyncService(getDatabase, notifyBusinessMessagingChanged);
 const businessMessagingService = new BusinessMessagingService(getDatabase);
+const marketingMediaService = new MarketingMediaService(getDatabase, () => getDatabase().userDataPath);
+const marketingWebsiteService = new MarketingWebsitePublicationService(getDatabase, marketingMediaService);
+const marketingStudioService = new MarketingStudioService(getDatabase, marketingMediaService, () => {
+  // Explicit user publication actions work even when passive automatic sync is disabled.
+  const coordinator = getSyncCoordinator();
+  void coordinator.runNow().then(() => {
+    // An action can arrive after the active cycle captured its outbox. Drain the new intent once.
+    if (getDatabase().getPendingSyncJobs().some(job => job.jobType === "marketing_website_publish" && job.attemptCount === 0)) {
+      void coordinator.runNow();
+    }
+  });
+});
 const messagingCampaignService = new MessagingCampaignService(getDatabase, {
   assertAvailable: (channel, providerId) => {
     if (channel !== "whatsapp" || providerId !== "whatsapp_cloud") throw new MessagingCampaignError("unavailable_provider", "Bu kanal için kullanılabilir sağlayıcı yok.");
@@ -497,6 +514,7 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
+  registerMarketingIpc({ service: marketingStudioService, assertUnlocked: assertAppSessionUnlocked });
   registerMessagingCampaignsIpc({ service: messagingCampaignService, assertUnlocked: assertAppSessionUnlocked });
   registerBusinessMessagingIpc({ service: businessMessagingService, assertUnlocked: assertAppSessionUnlocked, onChanged: notifyBusinessMessagingChanged });
   const notifyShipmentsChanged = (orderId: string) => {

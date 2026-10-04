@@ -897,7 +897,7 @@ CREATE TABLE stock_image_imports (
 
 CREATE TABLE sync_outbox (
   job_key TEXT PRIMARY KEY,
-  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish')),
+  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish', 'marketing_website_publish')),
   source_revision INTEGER NOT NULL DEFAULT 1,
   attempt_count INTEGER NOT NULL DEFAULT 0,
   claim_token TEXT NOT NULL DEFAULT '', claimed_at TEXT NOT NULL DEFAULT '',
@@ -2734,3 +2734,52 @@ BEGIN
   UPDATE business_messages SET status='cancelled' WHERE id=NEW.business_message_id AND purpose='marketing' AND status='draft'
     AND EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=NEW.business_message_id AND b.submitted=0);
 END;
+
+-- D-038: desktop canonical content, reusable disk assets and explicit publication snapshots.
+CREATE TABLE marketing_contents (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), title TEXT NOT NULL,
+  purpose TEXT NOT NULL CHECK(purpose IN ('announcement','promotion')),
+  source TEXT NOT NULL CHECK(source IN ('manual','ai')), master_text TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('draft','ready','archived')), revision INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE marketing_content_variants (
+  content_id TEXT NOT NULL REFERENCES marketing_contents(id), channel TEXT NOT NULL CHECK(channel IN ('website','whatsapp','sms','instagram')),
+  title TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, metadata_json TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(content_id,channel)
+);
+CREATE TABLE media_assets (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), kind TEXT NOT NULL CHECK(kind='image'),
+  source TEXT NOT NULL CHECK(source IN ('upload','ai')), storage_ref TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL,
+  width INTEGER NOT NULL CHECK(width>0), height INTEGER NOT NULL CHECK(height>0), file_size INTEGER NOT NULL CHECK(file_size>0),
+  alt_text TEXT NOT NULL DEFAULT '', ai_metadata_json TEXT NOT NULL DEFAULT '{}', content_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL, archived_at TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE marketing_content_media (
+  content_id TEXT NOT NULL REFERENCES marketing_contents(id), media_asset_id TEXT NOT NULL REFERENCES media_assets(id),
+  sort_order INTEGER NOT NULL CHECK(sort_order>=0), role TEXT NOT NULL CHECK(role IN ('primary','gallery')),
+  PRIMARY KEY(content_id,media_asset_id), UNIQUE(content_id,sort_order)
+);
+CREATE TABLE marketing_publications (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), content_id TEXT NOT NULL REFERENCES marketing_contents(id),
+  channel TEXT NOT NULL CHECK(channel IN ('website','whatsapp','sms','instagram')),
+  status TEXT NOT NULL CHECK(status IN ('draft','publishing','published','unpublished','failed')),
+  placement TEXT NOT NULL CHECK(placement='homepage_feature'), title TEXT NOT NULL, text TEXT NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1, published_revision INTEGER NOT NULL DEFAULT 0,
+  desired_published INTEGER NOT NULL DEFAULT 0 CHECK(desired_published IN (0,1)),
+  published_snapshot_json TEXT NOT NULL DEFAULT '{}', published_at TEXT NOT NULL DEFAULT '', unpublished_at TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE marketing_publication_media (
+  publication_id TEXT NOT NULL REFERENCES marketing_publications(id), media_asset_id TEXT NOT NULL REFERENCES media_assets(id),
+  sort_order INTEGER NOT NULL CHECK(sort_order>=0), PRIMARY KEY(publication_id,media_asset_id), UNIQUE(publication_id,sort_order)
+);
+CREATE INDEX idx_marketing_contents_business ON marketing_contents(business_id, updated_at);
+CREATE INDEX idx_marketing_publications_business ON marketing_publications(business_id, channel);
+CREATE INDEX idx_media_assets_business ON media_assets(business_id, archived_at);
+-- Retain every in-flight intent's files until a matching acknowledgement supersedes it.
+CREATE TABLE marketing_publication_pending_media (
+  publication_id TEXT NOT NULL REFERENCES marketing_publications(id),
+  media_asset_id TEXT NOT NULL REFERENCES media_assets(id),
+  revision INTEGER NOT NULL, PRIMARY KEY(publication_id,media_asset_id)
+);

@@ -1,3 +1,5 @@
+import * as marketingAssetStore from "./marketing/asset-store";
+import * as marketingStore from "./marketing/store";
 import * as messagingStore from "./business-messaging/store";
 import type { DispatchResult } from "./messaging-campaigns/dispatch-contract";
 import * as campaignDispatchStore from "./messaging-campaigns/dispatch-store";
@@ -981,6 +983,19 @@ export class DesktopDatabase {
   listMessagingSegments() { return campaignStore.listMessagingSegments(this.db); }
   saveMessagingSegment(input: Parameters<typeof campaignStore.saveMessagingSegment>[1]) { return campaignStore.saveMessagingSegment(this.db, input); }
   previewMessagingSegment(id: string, channel: MessagingChannel) { return campaignStore.previewMessagingSegment(this.db, id, channel); }
+  listMarketingContents() { return marketingStore.listMarketingContents(this.db); }
+  saveMarketingContent(input: Parameters<typeof marketingStore.saveMarketingContent>[1], source: "manual" | "ai" = "manual") { return marketingStore.saveMarketingContent(this.db, input, source); }
+  listMediaAssets() { return marketingAssetStore.listMediaAssets(this.db); }
+  getMediaAsset(id: string) { return marketingAssetStore.getMediaAsset(this.db, id); }
+  insertMediaAsset(input: Parameters<typeof marketingAssetStore.insertMediaAsset>[1]) { return marketingAssetStore.insertMediaAsset(this.db, input); }
+  marketingAssetUsage(id: string) { return marketingAssetStore.assetUsage(this.db, id); }
+  manageMediaAsset(id: string, action: "archive" | "delete", altText?: string) { return marketingAssetStore.manageMediaAsset(this.db, id, action, altText); }
+  listMarketingPublications() { return marketingStore.listMarketingPublications(this.db); }
+  saveMarketingPublication(input: Parameters<typeof marketingStore.saveMarketingPublication>[1]) { return marketingStore.saveMarketingPublication(this.db, input); }
+  requestMarketingPublication(id: string, revision: number, published: boolean) { return marketingStore.requestMarketingPublication(this.db, id, revision, published); }
+  acknowledgeMarketingPublications(sent: Parameters<typeof marketingStore.acknowledgeMarketingPublications>[1], now: string) { return marketingStore.acknowledgeMarketingPublications(this.db, sent, now); }
+  failMarketingPublications(sent: Parameters<typeof marketingStore.failMarketingPublications>[1]) { return marketingStore.failMarketingPublications(this.db, sent); }
+  marketingPrivateNames() { return marketingStore.marketingPrivateNames(this.db); }
   listMessagingCampaigns() { return campaignStore.listMessagingCampaigns(this.db); }
   getMessagingCampaign(id: string) { return campaignStore.getMessagingCampaign(this.db, id); }
   getMessagingCampaignDetail(id: string) { return campaignStore.getMessagingCampaignDetail(this.db, id); }

@@ -1,4 +1,5 @@
 import {
+  type MarketingWebsiteProjection,
   type BusinessAiCatalog,
   type BusinessAiContext,
   type BusinessCapability,
@@ -942,6 +943,7 @@ export interface SyncTransport {
   acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult>;
   pullAndroidActions(input?: PullActionsInput): Promise<PullAndroidActionsResult>;
   completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult>;
+  publishMarketingWebsite?(input: VersionedPublication<MarketingWebsiteProjection>): Promise<DealerAccessPublicationResult>;
   publishDealerAccess?(input: VersionedPublication<DealerAccessProjection>): Promise<DealerAccessPublicationResult>;
   publishOnlineCatalog(input: VersionedPublication<CommerceOnlineCatalog>): Promise<PushOnlineCatalogResult>;
   publishMenu(input: VersionedPublication<PublishedQrMenu>): Promise<PushMenuResult>;

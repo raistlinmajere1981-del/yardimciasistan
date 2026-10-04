@@ -7,3 +7,4 @@ export * from "./providers/google-ai-studio";
 export * from "./providers/generate-chat";
 
 export * from "./providers/failure-classification";
+export * from "./providers/image-generation";

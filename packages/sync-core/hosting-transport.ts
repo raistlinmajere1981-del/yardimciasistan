@@ -1,3 +1,4 @@
+import type { MarketingWebsiteProjection } from "@yardimci-asistan/shared";
 import type { CommerceOnlineCatalog, DealerAccessProjection } from "@yardimci-asistan/shared";
 import type {
   DealerAccessPublicationSuccess,
@@ -422,6 +423,14 @@ export class PhpHostingSyncTransport implements SyncTransport {
       actionId: input.actionId,
       status: input.status,
       errorMessage: input.errorMessage
+    });
+  }
+
+  publishMarketingWebsite(input: VersionedPublication<MarketingWebsiteProjection>): Promise<DealerAccessPublicationResult> {
+    return syncRequest<DealerAccessPublicationSuccess>(this.config, {
+      action: "publish_marketing_website", client_id: this.config.clientId,
+      source_revision: input.sourceRevision, idempotency_key: input.idempotencyKey,
+      marketing: input.value
     });
   }
 

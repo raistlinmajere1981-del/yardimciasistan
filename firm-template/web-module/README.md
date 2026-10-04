@@ -513,3 +513,20 @@ Set hosting environment secrets `YA_WHATSAPP_VERIFY_TOKEN` and `YA_WHATSAPP_APP_
 without putting them in `business.json` or publications. The isolated status inbox is
 pulled/acknowledged by desktop with the existing sync credential; no inbound conversation
 storage exists. See [Business Messaging deployment](../../docs/architecture/business-messaging.md).
+
+### D4 Website pazarlama yüzeyi
+
+Desktop Pazarlama > İçerik Stüdyosu > Website ile yayınlanan içerikler
+`duyurular/` genel public sayfasında görünür. Herhangi bir işletme sitesinin
+ana sayfasına aynı responsive blok eklenebilir (modül yolunu kurulumunuza göre değiştirin):
+
+```html
+<link rel="stylesheet" href="/yardimci-asistan/duyurular/marketing.css">
+<section data-marketing-surface hidden aria-label="Duyurular / Kampanyalar"></section>
+<script src="/yardimci-asistan/duyurular/marketing.js" defer></script>
+```
+
+Boş/yayından kaldırılmış içerik görünmez. Public API yalnız yayın projection'ını
+okur; provider sırları, yerel dosya yolları, Content/AI metadata yayınlanmaz.
+Desktop intent revision ve kalıcı sync outbox ile yayınlar; tekrarlar idempotenttir.
+Görseller ortak asset kütüphanesinde kalır, publication içinde binary bulunmaz.

@@ -10,6 +10,7 @@ const YA_GOOGLE_REVIEWS_CACHE_FILE = YA_BASE_DIR . '/data/google-reviews-cache.j
 
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/online-catalog.php';
+require_once YA_BASE_DIR . '/lib/marketing.php';
 require_once YA_BASE_DIR . '/lib/dealer-access.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/google-reviews.php';
@@ -25,7 +26,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_dealer_access', 'publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
+if (in_array($action, ['publish_marketing_website', 'publish_dealer_access', 'publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -124,6 +125,10 @@ try {
         ya_sync_publish_dealer_access($payload);
     }
 
+    if ($action === 'publish_marketing_website') {
+        ya_sync_publish_marketing_website($payload);
+    }
+
     if ($action === 'publish_online_catalog') {
         ya_sync_publish_online_catalog($payload);
     }
@@ -200,6 +205,9 @@ function ya_sync_reset_runtime(): void
     // runtime keeps neither room nor table media from the previous installation.
     ya_sync_prune_room_media([]);
     ya_sync_prune_table_media([]);
+    foreach (glob(YA_BASE_DIR . '/media/marketing/*/*.png') ?: [] as $marketingFile) {
+        if (is_file($marketingFile)) @unlink($marketingFile);
+    }
 
     // Remove one-time legacy JSON backups left by pre-SQLite installations.
     foreach (glob(YA_BASE_DIR . '/data/*.legacy-backup-v1') ?: [] as $legacyFile) {
@@ -3597,4 +3605,17 @@ function ya_sync_publish_dealer_access(array $payload): void
     ya_sync_response(200, ['ok' => true, 'message' => 'Bayi erişimi yayınlandı.',
         'published_at' => $publication['published_at'], 'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'], 'deduplicated' => $publication['deduplicated']]);
+}
+
+function ya_sync_publish_marketing_website(array $payload): void
+{
+    $revision = $payload['source_revision'] ?? null;
+    $key = ya_sync_string($payload['idempotency_key'] ?? '');
+    if (!is_array($payload['marketing'] ?? null) || !is_int($revision) || $revision < 1 || $key === '' || strlen($key) > 240) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Pazarlama yayın bilgisi geçersiz.']);
+    }
+    try { $projection = ya_marketing_projection($payload['marketing']); }
+    catch (InvalidArgumentException $error) { ya_sync_response(422, ['ok' => false, 'message' => 'Pazarlama yayın verisi geçersiz.']); }
+    $publication = ya_storage_publish('marketing_website', $projection, ya_sync_require_client_id($payload), $revision, $key, date(DATE_ATOM));
+    ya_sync_response(200, array_merge(['ok' => true, 'message' => 'Website pazarlama yayını eşitlendi.'], $publication));
 }

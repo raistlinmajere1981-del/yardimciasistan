@@ -1,0 +1,21 @@
+.marketing-page { display: flex; flex-direction: column; min-height: 0; height: 100%; gap: var(--space-3); }
+.marketing-tabs, .marketing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.marketing-body { flex: 1; min-height: 0; overflow: auto; }
+.marketing-split { display: grid; grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr); gap: var(--space-4); }
+.marketing-list { display: flex; flex-direction: column; gap: var(--space-2); align-self: start; }
+.marketing-list > button { display: flex; flex-direction: column; align-items: start; text-align: start; gap: var(--space-1); }
+.marketing-list > button.is-selected { border-color: var(--color-accent); }
+.marketing-editor { min-width: 0; padding: var(--space-4); background: var(--color-bg-panel); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.marketing-editor fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.marketing-confirm, .marketing-candidate, .marketing-preview { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-block: var(--space-3); }
+.marketing-candidate p, .marketing-preview p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.marketing-candidate > img { max-width: 100%; max-height: 20rem; object-fit: contain; }
+.marketing-library, .marketing-asset-picker, .marketing-preview-gallery { display: grid; grid-template-columns: repeat(auto-fill,minmax(10rem,1fr)); gap: var(--space-3); }
+.marketing-library article { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.marketing-library img, .marketing-asset-picker img, .marketing-preview-gallery img { width: 100%; height: 10rem; object-fit: contain; }
+.marketing-selected-media { display: flex; flex-direction: column; padding: 0; gap: var(--space-2); list-style: none; }
+.marketing-selected-media li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.marketing-selected-media img { width: 6rem; height: 4rem; object-fit: contain; }
+.marketing-asset-picker button { display: flex; flex-direction: column; text-align: start; }
+.marketing-message { margin: 0; }
+@media (max-width: 800px) { .marketing-split { grid-template-columns: 1fr; } }

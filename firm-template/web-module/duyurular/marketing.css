@@ -1,0 +1,9 @@
+[data-marketing-surface] { max-width: 72rem; margin: 2rem auto; padding: 1rem; font-family: inherit; color: inherit; }
+[data-marketing-surface][hidden] { display: none; }
+.ya-marketing-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); }
+.ya-marketing-card { min-width: 0; border: 1px solid #8886; border-radius: 1rem; padding: 1.25rem; }
+.ya-marketing-card h3 { margin-top: 0; overflow-wrap: anywhere; }
+.ya-marketing-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.ya-marketing-gallery { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+.ya-marketing-gallery img { width: 100%; height: auto; max-height: 24rem; object-fit: contain; border-radius: .5rem; }
+@media (max-width: 480px) { .ya-marketing-gallery { grid-template-columns: 1fr; } }

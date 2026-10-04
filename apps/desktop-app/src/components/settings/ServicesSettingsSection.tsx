@@ -1,3 +1,4 @@
+import { MarketingChannelsSettingsSection } from "./MarketingChannelsSettingsSection";
 import type { AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
@@ -67,6 +68,7 @@ export function ServicesSettingsSection({
   return (
         <div id="settings-connections" className="settings-services-workspace">
           <WebSettingsSection form={form} onFormChange={onFormChange} />
+          {enabledCapabilities.includes(BUSINESS_CAPABILITIES.MARKETING_STUDIO) && <MarketingChannelsSettingsSection />}
 
           <section id="settings-whatsapp" tabIndex={-1} className={`settings-service-card${form.whatsappEnabled ? " is-enabled" : " is-disabled"}`}>
             <div className="settings-service-card-header">

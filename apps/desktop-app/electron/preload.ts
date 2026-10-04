@@ -1,4 +1,4 @@
-import type { BusinessMessagingBridge, MessagingCampaignBridge } from "@yardimci-asistan/shared";
+import type { BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
   KbsConnectionTestResult,
@@ -191,7 +191,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge {
+export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
@@ -390,6 +390,16 @@ async function invokeCommerceMutation<T>(channel: string, ...args: unknown[]): P
 }
 
 const bridge: DesktopBridge = {
+  getMarketingChannels: () => invokeWhenUnlocked("marketing:channels"),
+  getMarketingStudio: () => invokeWhenUnlocked("marketing:studio"),
+  saveMarketingContent: (input) => invokeWhenUnlocked("marketing:saveContent", input),
+  uploadMarketingAssets: () => invokeWhenUnlocked("marketing:uploadAssets"),
+  manageMarketingAsset: (id, action, altText) => invokeWhenUnlocked("marketing:manageAsset", id, action, altText),
+  generateMarketingAi: (input) => invokeWhenUnlocked("marketing:generate", input),
+  saveMarketingPublication: (input) => invokeWhenUnlocked("marketing:savePublication", input),
+  publishMarketingPublication: (id, revision) => invokeWhenUnlocked("marketing:publish", id, revision),
+  unpublishMarketingPublication: (id, revision) => invokeWhenUnlocked("marketing:unpublish", id, revision),
+  testMarketingWebsiteConnection: () => invokeWhenUnlocked("marketing:testWebsite"),
   getCustomerMessagingPreference: (customerId, channel, purpose) => invokeWhenUnlocked("messagingCampaigns:preference", customerId, channel, purpose),
   saveCustomerMessagingPreference: (input) => invokeWhenUnlocked("messagingCampaigns:savePreference", input),
   listMessagingSegments: () => invokeWhenUnlocked("messagingCampaigns:segments"),

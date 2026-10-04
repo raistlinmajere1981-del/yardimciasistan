@@ -43,6 +43,7 @@ import {
 import { SettingsWorkspace } from "../settings/SettingsWorkspace";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
+import { MarketingPage } from "../../pages/MarketingPage";
 import { CampaignsPage } from "../../pages/CampaignsPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
 import { useCalendarPageController } from "../calendar/calendar-page-state";
@@ -508,6 +509,8 @@ export function DesktopWorkspaceRouter({
           foodMenuEnabled={foodMenuEnabled}
           inventoryEnabled={inventoryEnabled}
         />
+      ) : activePage === "marketing" ? (
+        <MarketingPage enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} campaignsEnabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} onSettings={() => requestPageChange("settings")} />
       ) : activePage === "campaigns" ? (
         <CampaignsPage enabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} />
       ) : activePage === "market" ? (

@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   Home,
+  Megaphone,
   Menu as MenuIcon,
   Settings,
   Store,
@@ -16,7 +17,7 @@ import { campaignNavigationContribution } from "../components/messaging-campaign
 import { runtimeHasCapability } from "./capabilities";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 
-export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "campaigns" | "reports" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "campaigns" | "marketing" | "reports" | "settings";
 
 /** Customer-work subview id; a view state, not a DesktopPage route. */
 export type CustomerWorkTab = "requests" | "customers" | "kbs" | "prepared";
@@ -198,6 +199,11 @@ const navigationContributions = [
   pensionNavigationContribution,
   restaurantNavigationContribution,
   marketContribution,
+  {
+    pageId: "marketing", icon: Megaphone, order: 64, contentScroll: "workspace",
+    condition: { allOf: [C.MARKETING_STUDIO] },
+    presentation: {label: "Pazarlama", eyebrow: "İçerik ve yayınlar", title: "Pazarlama", description: "İçerikleri, kanal varyantlarını, ortak medyayı ve website yayınlarını yönetin."}
+  },
   campaignNavigationContribution,
   menuContribution,
   reportsContribution,
@@ -218,7 +224,8 @@ export function buildNavigationFromContributions(
   contributions: readonly NavigationContribution[]
 ): NavigationItem[] {
   return [...contributions]
-    .filter((contribution) => matchesCapabilityCondition(capabilities, contribution.condition))
+    .filter((contribution) => matchesCapabilityCondition(capabilities, contribution.condition)
+      && !(contribution.pageId === "campaigns" && runtimeHasCapability(capabilities, C.MARKETING_STUDIO)))
     .sort((left, right) => left.order - right.order)
     .map((contribution) => {
       const presentation = resolvePresentation(contribution, capabilities);

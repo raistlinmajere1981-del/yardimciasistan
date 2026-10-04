@@ -1,3 +1,5 @@
+import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
+import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { SetupFormState } from "../../app/setup-model";
@@ -15,6 +17,15 @@ export function WebSettingsSection({ form, onFormChange }: SetupFieldsProps) {
 
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
+  };
+
+  const testMarketingConnection = async () => {
+    setWebConnectionTestState("loading");
+    try {
+      const result = await window.yardimciDesktop!.testMarketingWebsiteConnection();
+      setWebConnectionTestState(result.ok && result.value.connected ? "success" : "error");
+      setWebConnectionTestMessage(result.ok ? result.value.message : result.message);
+    } catch { setWebConnectionTestState("error"); setWebConnectionTestMessage("Website bağlantısı kontrol edilemedi."); }
   };
 
   const testWebConnection = async () => {
@@ -51,18 +62,11 @@ export function WebSettingsSection({ form, onFormChange }: SetupFieldsProps) {
   };
 
   return (
-        <section id="settings-web" tabIndex={-1} className="settings-service-card is-enabled settings-web-section">
-          <div className="settings-service-card-header">
-            <div>
-              <strong>Web Modülü</strong>
-              <span>{form.webModuleUrl.trim() && form.syncSecret.trim() ? "Yapılandırıldı" : "Yapılandırılmadı"}</span>
-            </div>
-            <label className="settings-service-toggle">
-              <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
-              <span>Otomatik eşitle</span>
-            </label>
-          </div>
-          <div className="settings-service-card-body">
+        <ServiceSettingsCard id="settings-web" title="Website / Web Modülü" enabled status={form.webModuleUrl.trim() && form.syncSecret.trim() ? "Yapılandırıldı" : "Yapılandırılmadı"}>
+          <label className="settings-service-toggle">
+            <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
+            <span>Otomatik eşitle</span>
+          </label>
           <div className="form-grid">
             <label className="form-field form-field--long form-field--span setup-field">
               Web eşitleme adresi
@@ -85,10 +89,10 @@ export function WebSettingsSection({ form, onFormChange }: SetupFieldsProps) {
               <RefreshCw size={16} aria-hidden="true" />
               {webConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Web Bağlantısını Dene"}
             </ActionButton>
+            {form.profileOptions.includes(C.MARKETING_STUDIO) && <ActionButton variant="secondary" type="button" onClick={() => void testMarketingConnection()} disabled={webConnectionTestState === "loading"}>Kaydedilmiş Website yayın bağlantısını test et</ActionButton>}
             <span className="setup-connection-message" role={webConnectionTestState === "error" ? "alert" : "status"} aria-live="polite">{webConnectionTestMessage}</span>
           </div>
-          </div>
-        </section>
+        </ServiceSettingsCard>
 
   );
 }

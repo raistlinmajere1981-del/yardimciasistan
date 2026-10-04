@@ -1,3 +1,4 @@
+import type { MarketingWebsitePublicationService } from "./marketing/website-publication";
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
 import { DealerWebOrderAccessRejected } from "./dealer-web-order-rejection";
 import {
@@ -67,6 +68,7 @@ export interface AutomaticSyncCycleResult {
 
 export interface SyncCoordinatorOptions {
   database: DesktopDatabase;
+  marketingWebsite?: MarketingWebsitePublicationService;
   onlineOrderIngress?: OnlineOrderIngressService;
   pullBusinessMessagingStatuses?: (config: { baseUrl: string; syncSecret: string }) => Promise<string>;
   getSyncConfig: () => { baseUrl: string; syncSecret: string };
@@ -991,6 +993,25 @@ export class SyncCoordinator {
       if (job.jobType === "dealer_access_publish" && (!this.dealerAccessSupported || !transport.publishDealerAccess)) {
         this.options.database.failSyncJob(job.jobKey, job.sourceRevision,
           "Web modülü bayi erişimini desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
+        continue;
+      }
+      if (job.jobType === "marketing_website_publish") {
+        const publisher = this.options.marketingWebsite;
+        const config = this.options.getSyncConfig();
+        const prepared = publisher && transport.publishMarketingWebsite
+          ? await publisher.prepare(config, clientId) : { ok: false as const, message: "Web modülü pazarlama yayınına hazır değil." };
+        const result = prepared.ok ? await transport.publishMarketingWebsite!({sourceRevision: job.sourceRevision,
+          idempotencyKey: `${clientId}:${job.jobKey}:${job.sourceRevision}`, value: prepared.projection}) : prepared;
+        if (result.ok && prepared.ok && result.source_revision === job.sourceRevision) {
+          publisher!.acknowledge(prepared.sent, result.published_at, this.activeOperationId);
+          this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
+          this.options.onDashboardChanged(); published += 1;
+        } else {
+          publisher?.fail(prepared.ok ? prepared.sent : "sent" in prepared ? prepared.sent ?? [] : []);
+          const message = result.ok ? "Website revision onayı doğrulanamadı." : result.message;
+          this.options.database.failSyncJob(job.jobKey, job.sourceRevision, message, calculateNextAttempt(job.attemptCount));
+          errors.push(message);
+        }
         continue;
       }
       const idempotencyKey = `${clientId}:${job.jobKey}:${job.sourceRevision}`;

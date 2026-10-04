@@ -14,6 +14,7 @@ export const BUSINESS_CAPABILITIES = {
   DEVICES: "core.devices",
 
   WHATSAPP: "service.whatsapp",
+  MARKETING_STUDIO: "marketing.studio",
   MESSAGING_CAMPAIGNS: "messaging.campaigns",
   AI: "service.ai",
   ANDROID: "service.android",
@@ -103,7 +104,7 @@ export const CORE_BUSINESS_CAPABILITIES: BusinessCapability[] = [
   C.DEVICES
 ];
 
-const COMMON_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS, C.MESSAGING_CAMPAIGNS];
+const COMMON_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS, C.MESSAGING_CAMPAIGNS, C.MARKETING_STUDIO];
 const COMMON_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS];
 
 const ACCOMMODATION_REQUIRED_CAPABILITIES: BusinessCapability[] = [

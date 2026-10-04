@@ -15,6 +15,12 @@ const manifestPath = join(outputRoot, "manifest.json");
 const tarballPath = join(outputRoot, "yardimci-asistan.tar.gz");
 const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
+  "api/marketing.php",
+  "api/marketing-media.php",
+  "lib/marketing.php",
+  "duyurular/index.php",
+  "duyurular/marketing.js",
+  "duyurular/marketing.css",
   "api/whatsapp-webhook.php",
   "api/business-messaging-status.php",
   "lib/business-messaging.php",
