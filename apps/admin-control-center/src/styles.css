@@ -2597,3 +2597,125 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+.system-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.system-environment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.system-tool-list,
+.system-credential-list {
+  display: grid;
+}
+
+.system-tool-row,
+.system-credential-row,
+.android-device-row {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.system-tool-row:last-child,
+.system-credential-row:last-child,
+.android-device-row:last-child {
+  border-bottom: 0;
+}
+
+.system-tool-row strong,
+.system-tool-row small,
+.system-credential-row strong,
+.system-credential-row small,
+.android-device-row strong,
+.android-device-row small {
+  display: block;
+}
+
+.system-tool-row strong,
+.system-credential-row strong,
+.android-device-row strong {
+  font-size: 14px;
+}
+
+.system-tool-row small,
+.system-credential-row small,
+.android-device-row small {
+  margin-top: 4px;
+  color: #8498ad;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-credential-row > svg,
+.android-device-row > svg {
+  color: #4b7da9;
+}
+
+.system-paths-panel {
+  margin-bottom: 16px;
+}
+
+.system-paths-grid {
+  padding-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.system-paths-grid > div {
+  min-width: 0;
+  padding: 12px 13px;
+  border-radius: 10px;
+  background: #f7fbff;
+  border: 1px solid #e5eef6;
+}
+
+.system-paths-grid span,
+.system-paths-grid strong {
+  display: block;
+}
+
+.system-paths-grid span {
+  color: #8a9eb3;
+  font-size: 11px;
+}
+
+.system-paths-grid strong {
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.android-device-list {
+  margin-top: 12px;
+  border-top: 1px solid #e8eff6;
+}
+
+@media (max-width: 1180px) {
+  .system-summary-grid,
+  .system-environment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .system-summary-grid,
+  .system-environment-grid,
+  .system-paths-grid {
+    grid-template-columns: 1fr;
+  }
+}
