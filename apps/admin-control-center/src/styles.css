@@ -2884,3 +2884,57 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+.overview-ops-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.overview-op-card {
+  min-height: 108px;
+  padding: 16px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(188, 213, 237, 0.72);
+  box-shadow: 0 12px 32px rgba(47, 90, 133, 0.055);
+}
+
+.overview-op-card span,
+.overview-op-card strong,
+.overview-op-card small {
+  display: block;
+}
+
+.overview-op-card span {
+  color: #7b91a9;
+  font-size: 12px;
+}
+
+.overview-op-card strong {
+  margin: 8px 0 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.overview-op-card small {
+  color: #869bb0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+@media (max-width: 1180px) {
+  .overview-ops-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .overview-ops-grid {
+    grid-template-columns: 1fr;
+  }
+}
