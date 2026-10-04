@@ -74,12 +74,14 @@ globalThis.fetch = async (url, init) => {
   // Unrelated publishing capabilities are intentionally absent from this fixture.
   return new Response("{}", { status: 404 });
 };
+let ordersChanged = 0;
 function coordinator() {
   return new SyncCoordinator({
     database,
     onlineOrderIngress: new OnlineOrderIngressService(database),
     getSyncConfig: () => ({ baseUrl: "https://orders.example.test/module", syncSecret: secret }),
     createAndroidSnapshot: () => ({}),
+    onCommerceOrdersChanged: () => { ordersChanged++; },
     onDashboardChanged: () => {}, onStatusChanged: () => {}
   });
 }
@@ -113,6 +115,7 @@ try {
   supported = false;
   await coordinator().runNow();
   assert.equal(webCalls().length, 0, "unsupported protocol does not pull or ack");
+  assert.equal(ordersChanged, 0, "disabled/unsupported import emits no commerce event");
   supported = true;
   const ingress = new OnlineOrderIngressService(database);
   const created = ingress.importOrder({ ...first, items: envelope.items });
@@ -151,6 +154,7 @@ try {
   const later = enqueue({ ...envelope, id: "web-later" });
   let result = await coordinator().runNow();
   assert.equal(result.ok, false);
+  assert.equal(ordersChanged, 1, "successful prefix emits once despite a later invalid record");
   assert.equal(database.getSyncRuntimeStatus().webOrderCursor, first.syncSeq);
   assert.equal(database.getSyncRuntimeStatus().webOrderAcknowledgedCursor, first.syncSeq);
   assert.equal(webCalls().filter((call) => call.action === "acknowledge_web_orders").at(-1).through_seq, first.syncSeq);
@@ -162,9 +166,11 @@ try {
     raw.exec("UPDATE sync_runtime SET web_order_cursor = 0, web_order_acknowledged_cursor = 0");
     await coordinator().runNow();
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders WHERE source_reference = 'web-1'").get().n, 1);
+    const eventCountBeforeInvalid = ordersChanged;
     const ackCount = webCalls().filter((call) => call.action === "acknowledge_web_orders").length;
     await coordinator().runNow();
     assert.equal(webCalls().filter((call) => call.action === "acknowledge_web_orders").length, ackCount, "failed first record is never acked");
+    assert.equal(ordersChanged, eventCountBeforeInvalid, "invalid-only import emits no event");
     const pending = syncApi({ action: "pull_web_orders", client_id: "desktop-test", after_seq: first.syncSeq }).payload;
     assert.deepEqual(pending.orders.map((order) => order.id), ["web-broken", "web-later"]);
     // Repair fixture input, then verify pending ack retry without duplicate import.
@@ -172,13 +178,16 @@ try {
       join(hosting, "lib/storage.php"), JSON.stringify({ ...envelope, id: "web-broken" })
     ]);
     rejectAck = true;
+    const beforeBatchEvents = ordersChanged;
     result = await coordinator().runNow();
     assert.equal(result.ok, false);
     assert.equal(database.getSyncRuntimeStatus().webOrderCursor, later.syncSeq);
+    assert.equal(ordersChanged, beforeBatchEvents + 1, "two imported orders emit one event even when ack fails");
     assert.equal(database.getSyncRuntimeStatus().webOrderAcknowledgedCursor, first.syncSeq);
     rejectAck = false;
     result = await coordinator().runNow();
     assert.equal(result.ok, true);
+    assert.equal(ordersChanged, beforeBatchEvents + 1, "zero-import ack retry emits no event");
     assert.equal(database.getSyncRuntimeStatus().webOrderAcknowledgedCursor, later.syncSeq);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders").get().n, 4);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_sales").get().n, 0);

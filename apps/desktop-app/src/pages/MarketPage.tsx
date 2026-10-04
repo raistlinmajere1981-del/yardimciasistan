@@ -62,6 +62,7 @@ export function MarketPage({
     dataState,
     productDataEnabled,
     quickSaleSession,
+    ordersSession,
     reloadCatalog,
     upsertProduct,
     handleStateChange
@@ -167,6 +168,7 @@ export function MarketPage({
         />
       ) : activeTab === "orders" ? (
         <MarketOrdersWorkspace
+          session={ordersSession}
           customers={customers}
           products={products}
           customerCreditEnabled={customerCreditEnabled}

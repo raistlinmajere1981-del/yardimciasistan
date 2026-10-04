@@ -102,6 +102,7 @@ export interface DesktopCommerceBridge {
   createPaidSale: (input: CreateCommerceSaleInput) => Promise<CommerceSale>;
   resolveProductPrice: (input: ResolveCommerceProductPriceInput) => Promise<CommerceResolvedUnitPrice>;
 
+  onOrdersChanged: (listener: () => void) => () => void;
   listOrders: (options?: ListCommerceOrdersOptions) => Promise<CommerceOrder[]>;
   getOrder: (orderId: string) => Promise<CommerceOrderDetail | null>;
   createOrder: (input: CreateCommerceOrderInput) => Promise<CommerceOrderDetail>;

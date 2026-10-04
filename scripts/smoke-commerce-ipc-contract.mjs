@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { runInNewContext } from "node:vm";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -212,5 +213,28 @@ assert.doesNotMatch(
   /code:\s*"invalid_category"[\s\S]{0,500}\(\?:Kategori \|/,
   "Category classification must not broadly downgrade technical category consistency failures."
 );
+
+
+// Exercise the compiled isolated bridge rather than parsing the subscription body.
+const listeners = new Map();
+let exposedBridge;
+runInNewContext(read("apps/desktop-app/dist-electron/preload.js"), {
+  exports: {}, require: (name) => {
+    assert.equal(name, "electron");
+    return { contextBridge: { exposeInMainWorld: (_key, bridge) => { exposedBridge = bridge; } }, webFrame: {}, ipcRenderer: {
+      on: (channel, handler) => { const set = listeners.get(channel) ?? new Set(); set.add(handler); listeners.set(channel, set); },
+      removeListener: (channel, handler) => listeners.get(channel)?.delete(handler), invoke: async () => ({ locked: false })
+    } };
+  }
+});
+let notifications = 0;
+const unsubscribe = exposedBridge.commerce.onOrdersChanged(() => { notifications++; });
+const emitOrdersChanged = () => { for (const listener of listeners.get("commerce:ordersChanged") ?? []) listener({ sender: "electron-event" }); };
+emitOrdersChanged();
+assert.equal(notifications, 1);
+unsubscribe(); unsubscribe();
+emitOrdersChanged();
+assert.equal(notifications, 1);
+assert.equal(listeners.get("commerce:ordersChanged").size, 0);
 
 console.log("commerce-ipc-contract-smoke-ok");

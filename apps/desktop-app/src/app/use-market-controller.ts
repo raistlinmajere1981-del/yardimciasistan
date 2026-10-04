@@ -7,6 +7,7 @@ import {
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { runtimeHasCapability } from "./capabilities";
 import { reportAppStatus } from "./runtime-state";
+import { useMarketOrdersSession } from "./use-market-orders-session";
 import { useMarketQuickSaleSession } from "./use-market-quick-sale-session";
 
 export type MarketAsyncState = "idle" | "loading" | "success" | "error";
@@ -38,6 +39,11 @@ export function useMarketController({
     setDataState(state);
     reportAppStatus(state, message);
   }, []);
+
+  const ordersSession = useMarketOrdersSession({
+    enabled: enabled && runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ORDERS),
+    onStateChange: handleStateChange
+  });
 
   const upsertProduct = useCallback((product: CatalogProduct) => {
     reloadGeneration.current += 1;
@@ -109,6 +115,7 @@ export function useMarketController({
     dataState,
     productDataEnabled,
     quickSaleSession,
+    ordersSession,
     reloadCatalog,
     upsertProduct,
     handleStateChange

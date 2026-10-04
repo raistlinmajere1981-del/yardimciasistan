@@ -180,10 +180,20 @@ try {
     console.error(error.message);
   });
 
+  let holdNextList = false, releaseList, holdNextDetail = false, releaseDetail, failNextDetail = false;
   await page.exposeFunction("__woCall", async (method, args) => {
     calls.push({ method, args: structuredClone(args) });
-    if (method === "listOrders") return [...displayFixtures.map((detail) => detail.order), ...listRuntimeOrders(database.databasePath, args[0] ?? {})];
-    if (method === "getOrder") return displayFixtures.find((detail) => detail.order.id === args[0]) ?? getRuntimeOrder(database.databasePath, args[0]);
+    if (method === "listOrders") {
+      const snapshot = structuredClone([...displayFixtures.map((detail) => detail.order), ...listRuntimeOrders(database.databasePath, args[0] ?? {})]);
+      if (holdNextList) { holdNextList = false; return new Promise((resolve) => { releaseList = () => resolve(snapshot); }); }
+      return snapshot;
+    }
+    if (method === "getOrder") {
+      if (failNextDetail) { failNextDetail = false; throw new Error("Fixture detail failure"); }
+      const snapshot = structuredClone(displayFixtures.find((detail) => detail.order.id === args[0]) ?? getRuntimeOrder(database.databasePath, args[0]));
+      if (holdNextDetail) { holdNextDetail = false; return new Promise((resolve) => { releaseDetail = () => resolve(snapshot); }); }
+      return snapshot;
+    }
     if (method === "resolveProductPrice") {
       await new Promise((resolve) => setTimeout(resolve, 150));
       return resolveRuntimeProductPrice(database.databasePath, args[0]);
@@ -241,7 +251,18 @@ try {
   await page.getByRole("button", { name: "Bayi Ürünü miktarını artır", exact: true }).click();
   await expect(quantityInput).toHaveValue("2");
 
-  await page.getByLabel("Sipariş notu", { exact: true }).fill("UI smoke bayi siparişi");
+  await page.getByRole("textbox", { name: "Sipariş notu", exact: true }).fill("UI smoke bayi siparişi");
+  await page.getByPlaceholder("Ürün ara", { exact: true }).fill("Bayi");
+  const listsBeforeRemount = calls.filter((call) => call.method === "listOrders").length;
+  await page.evaluate(() => window.__woSetVisible(false));
+  await expect(page.locator(".market-order-layout")).toHaveCount(0);
+  await page.evaluate(() => window.__woSetVisible(true));
+  await expect(dealerSelect).toHaveValue(customer.savedId);
+  await expect(quantityInput).toHaveValue("2");
+  await expect(page.getByPlaceholder("Ürün ara", { exact: true })).toHaveValue("Bayi");
+  await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("UI smoke bayi siparişi");
+  assert.equal(calls.filter((call) => call.method === "listOrders").length, listsBeforeRemount);
+  assert.equal(await page.evaluate(() => window.__woListenerCount()), 1, "StrictMode cleanup leaves one controller listener");
   const orderTotal = page.locator(".market-sale-grand-total").filter({ hasText: "Sipariş toplamı" });
   await expect(orderTotal).toContainText("₺160");
 
@@ -255,9 +276,14 @@ try {
     "The first call committed even though its response was lost."
   );
 
+  await page.evaluate(() => window.__woSetVisible(false));
+  await expect(page.locator(".market-order-layout")).toHaveCount(0);
+  await page.evaluate(() => window.__woSetVisible(true));
   await saveButton.click();
 
   await expect(page.locator(".market-order-card")).toHaveCount(1);
+  await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("");
+  await expect(page.locator(".market-order-lines")).not.toContainText("Bayi Ürünü");
   const detail = page.locator(".market-order-detail");
   await expect(detail).toBeVisible();
   await expect(detail).toContainText("Bayi Sipariş Testi");
@@ -331,6 +357,19 @@ try {
   const paymentSelect = detail.getByLabel("Sipariş ödeme tercihi", { exact: true });
   await expect(paymentSelect).toBeVisible();
   await paymentSelect.selectOption("card");
+  await page.evaluate(() => window.__woSetVisible(false));
+  await expect(page.locator(".market-order-layout")).toHaveCount(0);
+  await page.evaluate(() => window.__woSetVisible(true));
+  await expect(detail.getByText("Onaylandı", { exact: true })).toBeVisible();
+  await expect(paymentSelect).toHaveValue("card");
+  const detailsBeforePaymentRefresh = calls.filter((call) => call.method === "getOrder").length;
+  await page.evaluate(() => window.__woEmit());
+  await expect.poll(() => calls.filter((call) => call.method === "getOrder").length).toBe(detailsBeforePaymentRefresh + 1);
+  await expect(paymentSelect).toHaveValue("card", { timeout: 5000 });
+  failNextDetail = true;
+  await page.locator(".market-order-card").first().click();
+  await expect.poll(() => page.evaluate(() => window.__woPendingReads())).toBe(0);
+  await expect(paymentSelect).toHaveValue("card", { timeout: 5000 });
   const fulfillButton = detail.getByRole("button", { name: "Siparişi Tamamla", exact: true });
   await fulfillButton.click();
 
@@ -466,6 +505,53 @@ try {
   await expect(buyer).toHaveCount(0);
   await expect(card("Bayi Sipariş Testi")).toContainText("Manuel bayi");
 
+  // Controller session stays alive while the page/tab UI is absent; no polling.
+  await productButton.click();
+  await expect(quantityInput).toHaveValue("1");
+  await page.getByRole("textbox", { name: "Sipariş notu", exact: true }).fill("Retained manual draft");
+  const retainedDetail = detail.getByRole("heading", { name: "Bayi Sipariş Testi", exact: true });
+  await expect(retainedDetail).toBeVisible();
+  holdNextList = true;
+  await page.evaluate(() => window.__woEmit());
+  await expect.poll(() => typeof releaseList).toBe("function");
+  await expect(dealerSelect).toBeEnabled();
+  const fresh = fixture("ui-live-web", { buyerSnapshot: { name: "New live web buyer", phone: "+1 (202) 555-0100" } });
+  displayFixtures.unshift(fresh);
+  raw.prepare("UPDATE commerce_orders SET note = ? WHERE id = ?").run("Live refreshed detail", orderRow.id);
+  await page.evaluate(() => window.__woEmit());
+  await expect(card("New live web buyer")).toBeVisible();
+  await expect(retainedDetail).toBeVisible();
+  await expect(detail.locator(".market-order-note")).toHaveText("Live refreshed detail");
+  await expect(dealerSelect).toBeEnabled(); // quiet background reload never disables compose controls
+  releaseList();
+  await expect.poll(() => page.evaluate(() => window.__woPendingReads())).toBe(0);
+  await expect(card("New live web buyer")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("Retained manual draft");
+  await page.evaluate(() => window.__woSetVisible(false));
+  await expect(page.locator(".market-order-layout")).toHaveCount(0);
+  displayFixtures.unshift(fixture("ui-hidden-web", { buyerSnapshot: { name: "While away web buyer", phone: "+44 7911 123456" } }));
+  const listsBeforeHiddenEvent = calls.filter((call) => call.method === "listOrders").length;
+  await page.evaluate(() => window.__woEmit());
+  await expect.poll(() => calls.filter((call) => call.method === "listOrders").length).toBe(listsBeforeHiddenEvent + 1);
+  await page.evaluate(() => window.__woSetVisible(true));
+  await expect(card("While away web buyer")).toBeVisible();
+  await expect(retainedDetail).toBeVisible();
+  await expect(quantityInput).toHaveValue("1");
+  await expect(page.getByPlaceholder("Ürün ara", { exact: true })).toHaveValue("Bayi");
+  await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("Retained manual draft");
+  const listsBeforeManual = calls.filter((call) => call.method === "listOrders").length;
+  await page.getByRole("button", { name: "Yenile", exact: true }).click();
+  await expect.poll(() => calls.filter((call) => call.method === "listOrders").length).toBe(listsBeforeManual + 1);
+  holdNextDetail = true;
+  await page.evaluate(() => window.__woEmit());
+  await expect.poll(() => typeof releaseDetail).toBe("function");
+  await card("New live web buyer").click();
+  await expect(detail.getByRole("heading", { name: "New live web buyer", exact: true })).toBeVisible();
+  releaseDetail();
+  await expect.poll(() => page.evaluate(() => window.__woPendingReads())).toBe(0);
+  await expect(detail.getByRole("heading", { name: "New live web buyer", exact: true })).toBeVisible();
+  await page.evaluate(() => window.__woDispose());
+  assert.equal(await page.evaluate(() => window.__woListenerCount()), 0, "controller disposal unsubscribes");
   assert.deepEqual(pageErrors, []);
   console.log("commerce-wholesale-orders-ui-smoke-ok");
 } catch (error) {

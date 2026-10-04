@@ -499,6 +499,11 @@ const bridge: DesktopBridge = {
     setInventoryCount: (input) => invokeCommerceMutation<InventoryCountResult>("commerce:inventory:setCount", input),
     createPaidSale: (input) => invokeCommerceMutation<CommerceSale>("commerce:sale:createPaid", input),
     resolveProductPrice: (input) => invokeWhenUnlocked<CommerceResolvedUnitPrice>("commerce:price:resolve", input),
+    onOrdersChanged: (listener) => {
+      const handler = () => listener();
+      ipcRenderer.on("commerce:ordersChanged", handler);
+      return () => ipcRenderer.removeListener("commerce:ordersChanged", handler);
+    },
     listOrders: (options) => invokeWhenUnlocked<CommerceOrder[]>("commerce:order:list", options),
     getOrder: (orderId) => invokeWhenUnlocked<CommerceOrderDetail | null>("commerce:order:get", orderId),
     createOrder: (input) => invokeCommerceMutation<CommerceOrderDetail>("commerce:order:create", input),

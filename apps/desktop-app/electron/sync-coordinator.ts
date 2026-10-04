@@ -81,6 +81,7 @@ export interface SyncCoordinatorOptions {
     clientId: string
   ) => Promise<{ ok: boolean; message: string; uploaded?: number; status?: number }>;
   onDashboardChanged: () => void;
+  onCommerceOrdersChanged?: () => void;
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
 
@@ -417,6 +418,7 @@ export class SyncCoordinator {
         && hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)) {
       const orderResult = await this.pullWebOrderPages(transport);
       dashboardChanged ||= orderResult.count > 0;
+      if (orderResult.count > 0) this.options.onCommerceOrdersChanged?.();
       if (orderResult.error) errors.push(orderResult.error);
     }
 

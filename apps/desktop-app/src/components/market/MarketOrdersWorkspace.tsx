@@ -1,32 +1,13 @@
 import { CheckCircle2, ClipboardList, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  CatalogProduct,
-  CommerceOrder,
-  CommerceOrderDetail,
-  CommerceResolvedUnitPrice
-} from "@yardimci-asistan/shared";
+import { useMemo } from "react";
+import type { CatalogProduct } from "@yardimci-asistan/shared";
+import type { MarketOrdersSession, FulfillmentPaymentChoice } from "../../app/use-market-orders-session";
 import type { DesktopCustomer } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
-interface DraftLine {
-  product: CatalogProduct;
-  pricing: CommerceResolvedUnitPrice;
-  quantity: number;
-}
-
-type FulfillmentPaymentChoice = "cash" | "card" | "bank" | "other" | "credit";
-
 function fulfillmentOperationKey(orderId: string, paymentChoice: FulfillmentPaymentChoice | "no_payment") {
   return `desktop-order-fulfillment:${orderId}:${paymentChoice}`;
-}
-
-function createManualOrderReference() {
-  const randomId = typeof crypto?.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `desktop-wholesale:${randomId}`;
 }
 
 function money(value: number, currency = "TRY") {
@@ -79,12 +60,14 @@ function catalogPreviewPrice(product: CatalogProduct, customer: DesktopCustomer 
 }
 
 export function MarketOrdersWorkspace({
+  session,
   customers,
   products,
   customerCreditEnabled = false,
   busy,
   onStateChange
 }: {
+  session: MarketOrdersSession;
   customers: DesktopCustomer[];
   products: CatalogProduct[];
   customerCreditEnabled?: boolean;
@@ -97,22 +80,10 @@ export function MarketOrdersWorkspace({
     [customers]
   );
   const orderProducts = useMemo(() => products.filter((product) => product.isActive !== false), [products]);
-  const [customerId, setCustomerId] = useState("");
-  const [search, setSearch] = useState("");
-  const [note, setNote] = useState("");
-  const [lines, setLines] = useState<DraftLine[]>([]);
-  const [orders, setOrders] = useState<CommerceOrder[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<CommerceOrderDetail | null>(null);
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [fulfillmentPayment, setFulfillmentPayment] = useState<FulfillmentPaymentChoice>("cash");
-  const [resolvingProductId, setResolvingProductId] = useState("");
-  const customerIdRef = useRef("");
-  const draftReferenceRef = useRef(createManualOrderReference());
-
-  const resetDraftReference = useCallback(() => {
-    draftReferenceRef.current = createManualOrderReference();
-  }, []);
+  const { customerId, setCustomerId, customerIdRef, search, setSearch, note, setNote, lines, setLines,
+    orders, selectedOrder, setSelectedOrder, loadingOrders, submitting, setSubmitting,
+    fulfillmentPayment, setFulfillmentPayment, resolvingProductId, setResolvingProductId,
+    draftReferenceRef, resetDraftReference, reloadOrders, openOrder } = session;
 
   const selectedCustomer = activeDealers.find((customer) => customer.id === customerId);
   const filteredProducts = useMemo(() => {
@@ -127,22 +98,6 @@ export function MarketOrdersWorkspace({
   const currency = lines[0]?.pricing.currency ?? "TRY";
   const subtotal = lines.reduce((sum, line) => sum + line.pricing.unitPrice * line.quantity, 0);
   const disabled = busy || submitting || loadingOrders;
-
-  const reloadOrders = useCallback(async () => {
-    if (!bridge) return;
-    setLoadingOrders(true);
-    try {
-      setOrders(await bridge.listOrders({ limit: 100 }));
-    } catch (error) {
-      onStateChange("error", error instanceof Error ? error.message : "Siparişler yüklenemedi.");
-    } finally {
-      setLoadingOrders(false);
-    }
-  }, [bridge, onStateChange]);
-
-  useEffect(() => {
-    void reloadOrders();
-  }, [reloadOrders]);
 
   function changeCustomer(nextCustomerId: string) {
     customerIdRef.current = nextCustomerId;
@@ -218,17 +173,6 @@ export function MarketOrdersWorkspace({
       onStateChange("error", error instanceof Error ? error.message : "Sipariş kaydedilemedi.");
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function openOrder(orderId: string) {
-    if (!bridge) return;
-    try {
-      const detail = await bridge.getOrder(orderId);
-      setSelectedOrder(detail);
-      setFulfillmentPayment("cash");
-    } catch (error) {
-      onStateChange("error", error instanceof Error ? error.message : "Sipariş detayı yüklenemedi.");
     }
   }
 

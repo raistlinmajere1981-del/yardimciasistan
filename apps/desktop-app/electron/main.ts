@@ -341,6 +341,7 @@ if (!hasSingleInstanceLock) {
         config,
         clientId
       ),
+      onCommerceOrdersChanged: notifyCommerceOrdersChanged,
       onDashboardChanged: () => {
         markLocalCompanionSnapshotDirty();
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
@@ -765,6 +766,14 @@ function processAndroidActionQueue(
   allowPlaceholderSecret: boolean
 ) {
   return getAndroidActionSyncService().processQueue(allowPlaceholderSecret);
+}
+
+function notifyCommerceOrdersChanged() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      window.webContents.send("commerce:ordersChanged");
+    }
+  }
 }
 
 function notifyDesktopDashboardChanged(dashboardData: DesktopDashboardData) {
