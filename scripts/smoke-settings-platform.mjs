@@ -65,7 +65,31 @@ try {
   await expect(page.getByLabel('Veresiye / Müşteri Hesabı', { exact: true })).toHaveCount(0);
 
   // Online delivery is one staged Services draft under the online-sales capability.
-  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: ['channel.online_sales'] }));
+  const deliveryForms = await page.evaluate(async () => {
+    const { toSetupForm } = await import('/src/app/setup-model.ts');
+    const { validateSettingsCategory } = await import('/src/app/settings-draft-model.ts');
+    const setup = window.persistedSettings();
+    const missingDelivery = { ...setup };
+    delete missingDelivery.onlineSalesDelivery;
+    return {
+      defaults: [missingDelivery, { ...setup, onlineSalesDelivery: undefined }].map(input => {
+        const form = toSetupForm(input);
+        return { delivery: form.onlineSalesDelivery, validation: validateSettingsCategory(form, 'services') };
+      }),
+      explicit: [
+        { pickupEnabled: true, shippingEnabled: false },
+        { pickupEnabled: false, shippingEnabled: true },
+        { pickupEnabled: true, shippingEnabled: true },
+        { pickupEnabled: false, shippingEnabled: false }
+      ].map(delivery => ({ input: delivery, output: toSetupForm({ ...setup, onlineSalesDelivery: delivery }).onlineSalesDelivery }))
+    };
+  });
+  for (const form of deliveryForms.defaults) {
+    expect(form.delivery).toEqual({ pickupEnabled: true, shippingEnabled: false });
+    expect(form.validation).toBeNull();
+  }
+  for (const form of deliveryForms.explicit) expect(form.output).toEqual(form.input);
+  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: ['channel.online_sales'], onlineSalesDelivery: undefined }));
   await select('Servisler');
   const deliverySettings = page.locator('#settings-online-delivery');
   await expect(deliverySettings).toBeVisible();
