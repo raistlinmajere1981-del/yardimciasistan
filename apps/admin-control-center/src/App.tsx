@@ -34,6 +34,7 @@ import type {
   SupportReportListItem,
   SupportReportStatus,
   SystemEnvironmentSnapshot,
+  VerificationHistoryItem,
   VerificationRunState
 } from "../shared/contracts";
 
@@ -576,6 +577,19 @@ function Tests({
     outputTail: []
   });
   const [runMessage, setRunMessage] = useState("");
+  const [history, setHistory] = useState<VerificationHistoryItem[]>([]);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      setHistory(await window.adminControlCenter.getVerificationHistory(20));
+    } catch {
+      setHistory([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   useEffect(() => {
     if (preset && !verification.presets.includes(preset)) {
@@ -598,14 +612,17 @@ function Tests({
       const justFinished = previousRunning && !state.running;
       previousRunning = state.running;
       setRunState(state);
-      if (justFinished) onRefresh();
+      if (justFinished) {
+        onRefresh();
+        void loadHistory();
+      }
     });
 
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [onRefresh]);
+  }, [loadHistory, onRefresh]);
 
   const planIds = new Set(verification.plans[preset] ?? []);
   const visibleChecks = verification.checks.filter((check) =>
@@ -855,6 +872,50 @@ function Tests({
             );
           })}
           {!visibleChecks.length ? <div className="empty-row">Bu filtre için kontrol bulunamadı.</div> : null}
+        </div>
+      </section>
+
+      <section className="panel verification-history-panel">
+        <div className="panel-header">
+          <div>
+            <p className="panel-kicker">ADMİN DOĞRULAMA GEÇMİŞİ</p>
+            <h2>HEAD ile ilişkilendirilmiş koşular</h2>
+          </div>
+          <span className="quiet">{history.length ? `son ${history.length} kayıt` : "henüz kayıt yok"}</span>
+        </div>
+
+        <div className="verification-history-list">
+          {history.slice(0, 8).map((item) => {
+            const tone: StatusKind = item.result === "passed"
+              ? "ready"
+              : item.result === "failed"
+                ? "error"
+                : "warning";
+            const currentHead = item.head === data.repo.head;
+            return (
+              <div className="verification-history-row" key={item.id}>
+                <span className={statusClass(tone)}>
+                  {item.result === "passed" ? "Temiz" : item.result === "failed" ? "Başarısız" : "İptal"}
+                </span>
+                <div>
+                  <strong>{item.selectionLabel}</strong>
+                  <small>
+                    {item.branch} · {item.head}
+                    {item.dirtyCount ? ` · ${item.dirtyCount} değişiklik` : " · temiz"}
+                  </small>
+                </div>
+                <span className={currentHead ? "history-head history-head--current" : "history-head"}>
+                  {currentHead ? "mevcut HEAD" : "eski HEAD"}
+                </span>
+                <small>{new Date(item.finishedAt).toLocaleString("tr-TR")}</small>
+              </div>
+            );
+          })}
+          {!history.length ? (
+            <div className="empty-row">
+              Bundan sonraki admin doğrulamaları branch + HEAD bilgisiyle burada tutulacak.
+            </div>
+          ) : null}
         </div>
       </section>
 
