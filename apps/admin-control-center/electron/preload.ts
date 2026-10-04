@@ -21,6 +21,7 @@ const bridge: AdminBridge = {
     ipcRenderer.on("admin:deployment-run-state", handler);
     return () => ipcRenderer.removeListener("admin:deployment-run-state", handler);
   },
+  getSystemEnvironment: () => ipcRenderer.invoke("admin:get-system-environment"),
   listSupportReports: (limit) => ipcRenderer.invoke("admin:list-support-reports", limit),
   getSupportReportDetail: (reportId) => ipcRenderer.invoke("admin:get-support-report-detail", reportId),
   updateSupportReportStatus: (reportId, status, resolvedInVersion, resolutionNote) =>
