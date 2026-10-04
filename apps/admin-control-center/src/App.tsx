@@ -29,6 +29,7 @@ import type {
   HealthCheckSnapshot,
   InstallationSnapshot,
   OverviewSnapshot,
+  ReleaseOperationState,
   StatusKind,
   SupportReportDetail,
   SupportReportListItem,
@@ -410,6 +411,133 @@ function Release({
 }) {
   const webInstallations = data.installations.filter((item) => item.versionEndpoint);
   const publishedDesktop = data.release.desktop.filter((item) => item.status === "ready").length;
+  const [confirmPublish, setConfirmPublish] = useState(false);
+  const [message, setMessage] = useState("");
+  const [verifyRun, setVerifyRun] = useState<VerificationRunState>({
+    running: false,
+    selectionLabel: "",
+    startedAt: null,
+    finishedAt: null,
+    result: "idle",
+    exitCode: null,
+    outputTail: []
+  });
+  const [releaseRun, setReleaseRun] = useState<ReleaseOperationState>({
+    running: false,
+    action: "",
+    stage: "",
+    startedAt: null,
+    finishedAt: null,
+    result: "idle",
+    exitCode: null,
+    outputTail: []
+  });
+
+  useEffect(() => {
+    let active = true;
+    let previousVerify = false;
+    let previousRelease = false;
+
+    void Promise.all([
+      window.adminControlCenter.getVerificationRunState(),
+      window.adminControlCenter.getReleaseOperationState()
+    ]).then(([verificationState, releaseState]) => {
+      if (!active) return;
+      previousVerify = verificationState.running;
+      previousRelease = releaseState.running;
+      setVerifyRun(verificationState);
+      setReleaseRun(releaseState);
+    });
+
+    const unsubscribeVerify = window.adminControlCenter.onVerificationRunState((state) => {
+      if (!active) return;
+      const justFinished = previousVerify && !state.running;
+      previousVerify = state.running;
+      setVerifyRun(state);
+      if (justFinished) onRefresh();
+    });
+
+    const unsubscribeRelease = window.adminControlCenter.onReleaseOperationState((state) => {
+      if (!active) return;
+      const justFinished = previousRelease && !state.running;
+      previousRelease = state.running;
+      setReleaseRun(state);
+      if (justFinished) {
+        setConfirmPublish(false);
+        onRefresh();
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribeVerify();
+      unsubscribeRelease();
+    };
+  }, [onRefresh]);
+
+  const busy = verifyRun.running || releaseRun.running;
+  const latestIsRelease = data.verification.latest.selectionLabel === "preset=release";
+  const verificationTone: StatusKind = verifyRun.running
+    ? "warning"
+    : latestIsRelease && data.verification.latest.result === "passed"
+      ? "ready"
+      : latestIsRelease && data.verification.latest.result === "failed"
+        ? "error"
+        : "unknown";
+
+  const packageTone: StatusKind = releaseRun.action === "package"
+    ? releaseRun.result === "passed"
+      ? "ready"
+      : releaseRun.result === "failed"
+        ? "error"
+        : releaseRun.result === "running"
+          ? "warning"
+          : "unknown"
+    : "unknown";
+
+  const publishTone: StatusKind = publishedDesktop === data.release.desktop.length && publishedDesktop > 0
+    ? "ready"
+    : "warning";
+
+  const liveTone: StatusKind = webInstallations.every((item) => item.status === "ready")
+    ? "ready"
+    : webInstallations.some((item) => item.status === "error")
+      ? "error"
+      : "warning";
+
+  const startVerify = useCallback(async () => {
+    setMessage("");
+    const result = await window.adminControlCenter.startVerification({ mode: "preset", value: "release" });
+    setMessage(result.message);
+  }, []);
+
+  const startReleaseAction = useCallback(async (action: "package" | "preview" | "publish") => {
+    setMessage("");
+    const result = await window.adminControlCenter.startReleaseOperation({ action });
+    setMessage(result.message);
+    if (result.accepted) setConfirmPublish(false);
+  }, []);
+
+  const cancelCurrent = useCallback(async () => {
+    if (verifyRun.running) {
+      await window.adminControlCenter.cancelVerification();
+      return;
+    }
+    if (releaseRun.running) await window.adminControlCenter.cancelReleaseOperation();
+  }, [releaseRun.running, verifyRun.running]);
+
+  const activeOutput = verifyRun.running || (verifyRun.result !== "idle" && releaseRun.result === "idle")
+    ? verifyRun
+    : releaseRun;
+  const activeOutputTone: StatusKind = activeOutput.result === "passed"
+    ? "ready"
+    : activeOutput.result === "failed"
+      ? "error"
+      : activeOutput.result === "running"
+        ? "warning"
+        : activeOutput.result === "cancelled"
+          ? "warning"
+          : "unknown";
 
   return (
     <>
@@ -418,16 +546,24 @@ function Release({
           <p className="eyebrow">SÜRÜM AKIŞI</p>
           <h1>Release</h1>
           <p className="page-subtitle">
-            Kaynak sürümü, yayın manifestleri ve canlı web modülleri aynı snapshot içinde karşılaştırılır.
+            Kaynak, doğrulama, paketleme, yayın ve canlı kontrol tek akışta izlenir.
           </p>
         </div>
-        <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
-          <RefreshCw size={17} className={refreshing ? "spin" : ""} />
-          {refreshing ? "Kontrol ediliyor" : "Yayını Kontrol Et"}
-        </button>
+        <div className="verification-header-actions">
+          {busy ? (
+            <button className="button button--danger" onClick={() => void cancelCurrent()}>
+              <Square size={16} />
+              İşlemi İptal Et
+            </button>
+          ) : null}
+          <button className="button button--secondary" onClick={onRefresh} disabled={refreshing}>
+            <RefreshCw size={17} className={refreshing ? "spin" : ""} />
+            {refreshing ? "Kontrol ediliyor" : "Yayını Kontrol Et"}
+          </button>
+        </div>
       </header>
 
-      <section className="release-flow">
+      <section className="release-pipeline">
         <article className="release-stage release-stage--source">
           <span>1</span>
           <div>
@@ -436,25 +572,134 @@ function Release({
             <p>{data.repo.branch} · {data.repo.head}</p>
           </div>
         </article>
-        <div className="release-connector" />
         <article className="release-stage">
           <span>2</span>
           <div>
-            <small>DESKTOP YAYINI</small>
-            <strong>{publishedDesktop} / {data.release.desktop.length}</strong>
-            <p>Manifest güncel</p>
+            <small>DOĞRULAMA</small>
+            <strong>{statusLabel(verificationTone)}</strong>
+            <p>{verifyRun.running ? "Release verify çalışıyor" : latestIsRelease ? data.verification.latest.selectionLabel : "Release verify bekleniyor"}</p>
           </div>
         </article>
-        <div className="release-connector" />
         <article className="release-stage">
           <span>3</span>
           <div>
-            <small>WEB MODÜLLERİ</small>
-            <strong>{webInstallations.filter((item) => item.status === "ready").length} / {webInstallations.length}</strong>
-            <p>Canlı sürüm uyumlu</p>
+            <small>PAKETLER</small>
+            <strong>{statusLabel(packageTone)}</strong>
+            <p>{releaseRun.action === "package" ? releaseRun.stage || "Paketleniyor" : "Bu oturumda çalıştırılmadı"}</p>
+          </div>
+        </article>
+        <article className="release-stage">
+          <span>4</span>
+          <div>
+            <small>YAYIN</small>
+            <strong>{publishedDesktop} / {data.release.desktop.length}</strong>
+            <p>Desktop manifest güncel</p>
+          </div>
+        </article>
+        <article className="release-stage">
+          <span>5</span>
+          <div>
+            <small>CANLI KONTROL</small>
+            <strong>{statusLabel(liveTone)}</strong>
+            <p>{webInstallations.filter((item) => item.status === "ready").length} / {webInstallations.length} web modülü uyumlu</p>
           </div>
         </article>
       </section>
+
+      <section className="panel release-actions-panel">
+        <div className="panel-header">
+          <div>
+            <p className="panel-kicker">OPERASYONLAR</p>
+            <h2>Release adımları</h2>
+          </div>
+          <span className="quiet">Her adım canonical scriptleri çalıştırır.</span>
+        </div>
+
+        <div className="release-action-grid">
+          <button className="release-action-card" disabled={busy} onClick={() => void startVerify()}>
+            <FlaskConical size={22} />
+            <div>
+              <strong>1 · Release Check</strong>
+              <small>verify:release presetini çalıştırır.</small>
+            </div>
+          </button>
+          <button className="release-action-card" disabled={busy} onClick={() => void startReleaseAction("package")}>
+            <PackageCheck size={22} />
+            <div>
+              <strong>2 · Paketleri Oluştur</strong>
+              <small>Windows x64/x86, Linux, Android APK ve web modülü.</small>
+            </div>
+          </button>
+          <button className="release-action-card" disabled={busy} onClick={() => void startReleaseAction("preview")}>
+            <ShieldCheck size={22} />
+            <div>
+              <strong>3 · Yayın Farkını Gör</strong>
+              <small>Landing + downloads dry-run; canlıya yazmaz.</small>
+            </div>
+          </button>
+          <button className="release-action-card release-action-card--danger" disabled={busy} onClick={() => setConfirmPublish(true)}>
+            <Rocket size={22} />
+            <div>
+              <strong>4 · Kurulumları Yayınla</strong>
+              <small>Landing, installer dosyaları ve update feed canlıya gider.</small>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      {confirmPublish && !busy ? (
+        <section className="panel deployment-confirm">
+          <div className="deployment-confirm-title">
+            <TriangleAlert size={22} />
+            <div>
+              <p className="panel-kicker">RELEASE YAYIN ONAYI</p>
+              <h2>Güncel kurulum dosyaları ve update feed canlıya yayınlanacak.</h2>
+            </div>
+          </div>
+          <div className="deployment-impact">
+            <div>• Landing sayfası güncellenir; web modülü dizinine dokunulmaz.</div>
+            <div>• Windows x64/x86 installer ve Android APK /downloads altına atomik yüklenir.</div>
+            <div>• Windows update manifestleri /updates/stable altında güncellenir.</div>
+            <div>• İşlem sonunda HTTP ve artifact doğrulaması çalışır.</div>
+          </div>
+          <div className="deployment-confirm-actions">
+            <button className="button button--secondary" onClick={() => setConfirmPublish(false)}>Vazgeç</button>
+            <button className="button button--danger" onClick={() => void startReleaseAction("publish")}>
+              <Rocket size={16} />
+              Canlıya Yayınla
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {activeOutput.result !== "idle" || message ? (
+        <section className="panel verification-run-panel">
+          <div className="verification-run-head">
+            <div>
+              <p className="panel-kicker">RELEASE ÇIKTISI</p>
+              <div className="verification-run-title">
+                <span className={statusClass(activeOutputTone)}>
+                  {activeOutput.result === "running"
+                    ? "Çalışıyor"
+                    : activeOutput.result === "passed"
+                      ? "Tamamlandı"
+                      : activeOutput.result === "failed"
+                        ? "Başarısız"
+                        : activeOutput.result === "cancelled"
+                          ? "İptal edildi"
+                          : "Hazır"}
+                </span>
+                <strong>{"stage" in activeOutput ? activeOutput.stage || message : activeOutput.selectionLabel || message}</strong>
+              </div>
+            </div>
+          </div>
+          <div className="verification-console">
+            {activeOutput.outputTail.length
+              ? activeOutput.outputTail.map((line, index) => <div key={`${index}:${line}`}>{line}</div>)
+              : <div>{message || "Çıktı bekleniyor…"}</div>}
+          </div>
+        </section>
+      ) : null}
 
       <section className="release-grid">
         <article className="panel">
@@ -463,7 +708,7 @@ function Release({
               <p className="panel-kicker">DESKTOP UPDATE FEED</p>
               <h2>Yayın manifestleri</h2>
             </div>
-            <span className="status status--ready">Beklenen v{data.release.expectedVersion}</span>
+            <span className={statusClass(publishTone)}>Beklenen v{data.release.expectedVersion}</span>
           </div>
 
           <div className="release-list">
@@ -481,10 +726,7 @@ function Release({
                   <strong>{channel.liveVersion ? `v${channel.liveVersion}` : "—"}</strong>
                   {channel.durationMs !== null ? <small>{channel.durationMs} ms</small> : null}
                 </div>
-                <button
-                  className="text-button"
-                  onClick={() => window.adminControlCenter.openExternal(channel.manifestUrl)}
-                >
+                <button className="text-button" onClick={() => window.adminControlCenter.openExternal(channel.manifestUrl)}>
                   Manifest
                 </button>
               </div>
@@ -528,17 +770,6 @@ function Release({
             ))}
           </div>
         </article>
-      </section>
-
-      <section className="panel release-note">
-        <Rocket size={20} />
-        <div>
-          <strong>Bu ekran henüz yayın işlemi yapmıyor.</strong>
-          <p>
-            Şimdilik canonical kaynaklarla canlı durumu salt-okunur doğruluyoruz. Build, doğrulama ve yayın
-            workflow'larını sonraki dilimde bu snapshot'ın üzerine bağlayacağız.
-          </p>
-        </div>
       </section>
     </>
   );
