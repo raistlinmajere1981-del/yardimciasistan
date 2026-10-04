@@ -38,8 +38,8 @@ export const dealerPortalDefinition = {
 
 export const onlineSalesDeliveryDefinition = {
   id: "settings-online-delivery", category: "services", title: "Online Satış Teslimatı",
-  keywords: "online satış işletmeden teslim pickup kargo shipping teslimat",
-  persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ONLINE_SALES)
+  keywords: "online satış bayi web sipariş işletmeden teslim pickup kargo shipping teslimat",
+  persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ONLINE_SALES) || caps.includes(C.WHOLESALE)
 } as const satisfies SettingsSectionDefinition;
 
 export const arasShippingDefinition = {

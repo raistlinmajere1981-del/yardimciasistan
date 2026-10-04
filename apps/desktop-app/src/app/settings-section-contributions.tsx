@@ -52,13 +52,13 @@ const stagedSettingsContributions = {
       busy={busy} onChange={(arasShipping) => onChange({ arasShipping })} />
   }, {
     definition: onlineSalesDeliveryDefinition,
-    render: ({ draft, onChange }) => (
+    render: ({ draft, onChange, busy, configurationCapabilities }) => (
       <section id="settings-online-delivery" tabIndex={-1} className="settings-service-card is-enabled">
-        <div className="settings-service-card-header"><div><strong>Online Satış Teslimatı</strong><span>En az bir teslimat yöntemi açık olmalı.</span></div></div>
+        <div className="settings-service-card-header"><div><strong>{configurationCapabilities.includes("channel.online_sales") ? "Online Satış Teslimatı" : "Bayi Sipariş Teslimatı"}</strong><span>En az bir teslimat yöntemi açık olmalı.</span></div></div>
         <div className="settings-service-card-body">
-        <label className="settings-service-toggle"><input type="checkbox" checked={draft.onlineSalesDelivery.pickupEnabled}
+        <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.onlineSalesDelivery.pickupEnabled}
           onChange={(event) => onChange({ onlineSalesDelivery: { ...draft.onlineSalesDelivery, pickupEnabled: event.target.checked } })} /><span>İşletmeden teslim</span></label>
-        <label className="settings-service-toggle"><input type="checkbox" checked={draft.onlineSalesDelivery.shippingEnabled}
+        <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.onlineSalesDelivery.shippingEnabled}
           onChange={(event) => onChange({ onlineSalesDelivery: { ...draft.onlineSalesDelivery, shippingEnabled: event.target.checked } })} /><span>Kargo ile gönderim</span></label>
         </div>
       </section>

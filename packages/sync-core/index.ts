@@ -33,15 +33,18 @@ export interface PullRequestsOptions extends SyncCoreConfig {
 }
 
 /** Hosting inbox record; canonical business ownership remains in commerce.orders. */
-export interface WebOrderEnvelope {
+interface WebOrderEnvelopeBase {
   id: string;
   items: Array<{ productId: string; quantity: number }>;
-  buyer: CommerceOrderBuyerSnapshot;
   delivery: CommerceOrderDeliverySnapshot;
   note?: string;
   createdAt: ISODateTimeString;
   syncSeq: number;
 }
+export type WebOrderEnvelope = WebOrderEnvelopeBase & (
+  | { kind?: "guest"; buyer: CommerceOrderBuyerSnapshot }
+  | { kind: "dealer"; dealerAccessId: string; accessRevision: number; catalogRevision?: string; buyer?: never }
+);
 
 export interface PullWebOrdersOptions extends SyncCoreConfig {
   clientId: string;

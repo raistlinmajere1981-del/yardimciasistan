@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/storage.php';
+require_once __DIR__ . '/online-catalog.php';
 
 const YA_DEALER_ERROR = 'Bağlantı geçersiz veya süresi dolmuş.';
 const YA_DEALER_SESSION_LIFETIME = 28800;
@@ -30,7 +31,23 @@ function ya_dealer_projection(array $input): array
             'access_revision' => $revision, 'enabled' => $enabled,
             'invite_hash' => $enabled ? $hash : '', 'invite_expires_at' => $enabled ? $expires : 0];
     }
-    return ['version' => 1, 'enabled' => $input['enabled'], 'dealers' => $rows];
+    $catalogs = []; $catalogIds = []; $owners = array_column($rows, null, 'access_id');
+    if (!is_array($input['catalogs'] ?? [])) throw new InvalidArgumentException('dealer_catalog_invalid');
+    foreach ($input['catalogs'] ?? [] as $catalog) {
+        if (!is_array($catalog)) throw new InvalidArgumentException('dealer_catalog_invalid');
+        $id = $catalog['access_id'] ?? '';
+        if (!is_string($id)) throw new InvalidArgumentException('dealer_catalog_invalid');
+        $owner = $owners[$id] ?? null;
+        if (!$owner || !$owner['enabled'] || isset($catalogIds[$id])
+            || ($catalog['access_revision'] ?? null) !== $owner['access_revision']
+            || !is_string($catalog['catalog_revision'] ?? null)
+            || preg_match('/^[a-f0-9]{64}$/D', $catalog['catalog_revision']) !== 1) throw new InvalidArgumentException('dealer_catalog_invalid');
+        $safe = ya_online_catalog_projection(['enabled' => true, 'delivery_methods' => $catalog['delivery_methods'] ?? null, 'products' => $catalog['products'] ?? null]);
+        $catalogIds[$id] = true;
+        $catalogs[] = ['access_id' => $id, 'access_revision' => $owner['access_revision'], 'catalog_revision' => $catalog['catalog_revision'],
+            'delivery_methods' => $safe['delivery_methods'], 'products' => $safe['products']];
+    }
+    return ['version' => 1, 'enabled' => $input['enabled'], 'dealers' => $rows, 'catalogs' => $catalogs];
 }
 
 /** Called inside the existing versioned publication transaction, only for an accepted new revision. */
@@ -56,6 +73,10 @@ function ya_dealer_apply_projection(PDO $db, array $projection): void
         consumed_at = CASE WHEN dealer_access.access_revision <> excluded.access_revision THEN 0 ELSE dealer_access.consumed_at END');
     foreach ($projection['dealers'] as $row) $upsert->execute([$row['access_id'], $row['customer_ref'], $row['display_name'],
         $row['access_revision'], (int)$row['enabled'], $row['invite_hash'], $row['invite_expires_at']]);
+    $db->exec('DELETE FROM dealer_catalogs');
+    $catalogInsert = $db->prepare('INSERT INTO dealer_catalogs (dealer_access_id, access_revision, catalog_revision, payload_json) VALUES (?, ?, ?, ?)');
+    foreach ($projection['catalogs'] as $catalog) $catalogInsert->execute([$catalog['access_id'], $catalog['access_revision'],
+        $catalog['catalog_revision'], ya_storage_encode($catalog)]);
     $revoke = $db->prepare('UPDATE dealer_sessions SET revoked_at = ? WHERE revoked_at = 0 AND EXISTS
         (SELECT 1 FROM dealer_access a WHERE a.access_id = dealer_sessions.dealer_access_id
         AND (a.enabled = 0 OR a.access_revision <> dealer_sessions.access_revision))');
@@ -97,13 +118,19 @@ function ya_dealer_claim(string $token): ?string
     } catch (Throwable $error) { $db->exec('ROLLBACK'); throw $error; }
 }
 
-function ya_dealer_identity(string $token): ?array
+function ya_dealer_session_access(string $token): ?array
 {
     if (preg_match('/^[A-Za-z0-9_-]{43}$/D', $token) !== 1) return null;
-    $find = ya_storage_open()->prepare('SELECT a.access_id, a.display_name FROM dealer_sessions s JOIN dealer_access a ON a.access_id = s.dealer_access_id
+    $find = ya_storage_open()->prepare('SELECT a.access_id, a.display_name, a.access_revision FROM dealer_sessions s JOIN dealer_access a ON a.access_id = s.dealer_access_id
         WHERE s.session_hash = ? AND s.expires_at > ? AND s.revoked_at = 0 AND a.enabled = 1 AND a.access_revision = s.access_revision');
     $find->execute([hash('sha256', $token), time()]); $row = $find->fetch();
     return $row ?: null;
+}
+
+function ya_dealer_identity(string $token): ?array
+{
+    $access = ya_dealer_session_access($token);
+    return $access ? ['access_id' => $access['access_id'], 'display_name' => $access['display_name']] : null;
 }
 
 function ya_dealer_logout(string $token): void

@@ -156,3 +156,11 @@ requests cursor/ack state'i bu işlemlerden bağımsızdır.
 npm run build
 npm test
 ```
+
+
+D-034 extends the existing private dealer access publication with per-access sanitized
+catalogs (content revisions, resolved wholesale prices, delivery allowlist). Access and
+catalog apply atomically. `web_orders` now carries a typed guest/dealer union; dealer
+identity comes only from the server-side session. Both kinds retain the same cursor and
+prefix acknowledgement behavior. Desktop revalidates access in the canonical create
+transaction and resolves current wholesale prices; catalogRevision is only a hint.

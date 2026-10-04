@@ -536,6 +536,7 @@ try {
     buyerSnapshot: guest, note: "Guest order note", ...overrides
   } });
   displayFixtures = [
+    fixture("ui-dealer-web", { customerId: customer.savedId, customerName: "Web Dealer Customer", source: "web-dealer", buyerSnapshot: null }),
     fixture("ui-guest", { deliverySnapshot: { method: "shipping", address: { recipientName: "Separate Recipient", addressLine1: "42 Example Road", addressLine2: "Floor 2", district: "Central", city: "London", postalCode: "SW1A 1AA", countryCode: "GB", note: "Ring bell" } } }),
     fixture("ui-no-email", { buyerSnapshot: { name: "Guest without email", phone: "+1 (202) 555-0100" } }),
     fixture("ui-customer-priority", { customerId: customer.savedId, customerName: "Canonical Customer", buyerSnapshot: { ...guest, name: "Contact Snapshot" } }),
@@ -543,7 +544,7 @@ try {
     fixture("ui-empty-contact", { buyerSnapshot: { name: "Only name", phone: "", email: "" }, source: "custom-source" })
   ];
   await page.getByRole("button", { name: "Yenile", exact: true }).click();
-  await expect(page.locator(".market-order-card")).toHaveCount(6);
+  await expect(page.locator(".market-order-card")).toHaveCount(7);
   const card = (name) => page.locator(".market-order-card").filter({ has: page.getByText(name, { exact: true }) });
   await expect(card(guest.name)).toContainText("Web siparişi");
   await card(guest.name).click();
@@ -586,6 +587,12 @@ try {
   await expect(detail.getByRole("heading", { name: "Bayi Sipariş Testi", exact: true })).toBeVisible();
   await expect(buyer).toHaveCount(0);
   await expect(card("Bayi Sipariş Testi")).toContainText("Manuel bayi");
+
+  await expect(card("Web Dealer Customer")).toContainText("Bayi web siparişi");
+  await card("Web Dealer Customer").click();
+  await expect(detail.getByRole("heading", { name: "Web Dealer Customer", exact: true })).toBeVisible();
+  await expect(buyer).toHaveCount(0);
+  await card("Bayi Sipariş Testi").click();
 
   // Controller session stays alive while the page/tab UI is absent; no polling.
   await productButton.click();

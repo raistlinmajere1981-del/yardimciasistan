@@ -63,6 +63,8 @@ function ya_storage_capabilities(): array
             'web_orders_v1',
             'online_catalog_v1',
             'dealer_access_v1',
+            'dealer_catalog_v1',
+            'dealer_orders_v1',
             'request_cursor',
             'request_acknowledgement',
             'android_action_queue',
@@ -81,6 +83,7 @@ function ya_storage_reset_runtime(): array
     $database = ya_storage_open();
     $tables = [
         'dealer_sessions',
+        'dealer_catalogs',
         'dealer_access',
         'web_requests',
         'web_orders',
@@ -226,25 +229,31 @@ function ya_storage_pull_requests(int $limit, bool $includeSynced, ?int $afterSe
 /** Inbox API; the public submission service owns guest and catalog validation. */
 function ya_storage_enqueue_web_order(array $order): array
 {
+    if (!in_array($order['kind'] ?? 'guest', ['guest', 'dealer'], true)) throw new InvalidArgumentException('invalid_web_order_kind');
     $id = ya_storage_string($order['id'] ?? '');
     $createdAt = ya_storage_string($order['createdAt'] ?? '');
     if ($id === '' || strlen($id) > 180 || $createdAt === '' || !is_array($order['items'] ?? null)
-        || !is_array($order['buyer'] ?? null) || !is_array($order['delivery'] ?? null)) {
+        || (($order['kind'] ?? 'guest') !== 'dealer' && !is_array($order['buyer'] ?? null)) || !is_array($order['delivery'] ?? null)) {
         throw new InvalidArgumentException('invalid_web_order_envelope');
     }
     // Store only transport fields, never client pricing or canonical Customer identity.
     $items = array_map(static fn ($item) => is_array($item)
         ? ['productId' => $item['productId'] ?? null, 'quantity' => $item['quantity'] ?? null]
         : null, $order['items']);
-    $buyer = ['name' => $order['buyer']['name'] ?? null, 'phone' => $order['buyer']['phone'] ?? null];
-    if (isset($order['buyer']['email'])) $buyer['email'] = $order['buyer']['email'];
+    $identity = ['kind' => 'guest', 'buyer' => ['name' => $order['buyer']['name'] ?? null, 'phone' => $order['buyer']['phone'] ?? null]];
+    if (($order['kind'] ?? 'guest') === 'dealer') {
+        if (!is_string($order['dealerAccessId'] ?? null) || preg_match('/^[a-f0-9-]{36}$/D', $order['dealerAccessId']) !== 1
+            || !is_int($order['accessRevision'] ?? null) || $order['accessRevision'] < 1) throw new InvalidArgumentException('invalid_dealer_order');
+        $identity = ['kind' => 'dealer', 'dealerAccessId' => $order['dealerAccessId'], 'accessRevision' => $order['accessRevision']];
+        if (isset($order['catalogRevision'])) $identity['catalogRevision'] = $order['catalogRevision'];
+    } elseif (isset($order['buyer']['email'])) $identity['buyer']['email'] = $order['buyer']['email'];
     // Transport allowlist only; public submission and Desktop ingress own address validation.
     $delivery = ['method' => $order['delivery']['method'] ?? null, 'address' => null];
     if ($delivery['method'] === 'shipping') {
         $address = $order['delivery']['address'] ?? null;
         $delivery['address'] = is_array($address) ? array_intersect_key($address, array_flip(['recipientName', 'addressLine1', 'addressLine2', 'district', 'city', 'postalCode', 'countryCode', 'note'])) : null;
     }
-    $payload = ['id' => $id, 'items' => $items, 'buyer' => $buyer, 'delivery' => $delivery, 'createdAt' => $createdAt];
+    $payload = ['id' => $id, 'items' => $items, ...$identity, 'delivery' => $delivery, 'createdAt' => $createdAt];
     if (isset($order['note'])) $payload['note'] = $order['note'];
     $database = ya_storage_open();
     $statement = $database->prepare(<<<'SQL'
@@ -763,6 +772,12 @@ function ya_storage_create_schema(PDO $database): void
           consumed_at INTEGER NOT NULL DEFAULT 0
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_dealer_invite_hash ON dealer_access(invite_hash) WHERE invite_hash <> '';
+        CREATE TABLE IF NOT EXISTS dealer_catalogs (
+          dealer_access_id TEXT PRIMARY KEY REFERENCES dealer_access(access_id),
+          access_revision INTEGER NOT NULL,
+          catalog_revision TEXT NOT NULL,
+          payload_json TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS dealer_sessions (
           session_hash TEXT PRIMARY KEY,
           dealer_access_id TEXT NOT NULL REFERENCES dealer_access(access_id),

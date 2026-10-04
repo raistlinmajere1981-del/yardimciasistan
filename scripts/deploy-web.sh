@@ -147,6 +147,9 @@ required_package_files=(
   api/dealer/session.php
   api/dealer/logout.php
   lib/dealer-access.php
+  api/dealer/catalog.php
+  api/dealer/order.php
+  lib/dealer-order.php
   magaza/index.php
   magaza/storefront.js
   magaza/storefront.css
@@ -458,7 +461,9 @@ if command -v curl >/dev/null 2>&1; then
   dealer_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/session.php" || true)"
   dealer_claim_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/claim.php" || true)"
   dealer_logout_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/logout.php" || true)"
-  if [[ "$dealer_shell_status" != "200" || "$dealer_session_status" != "401" || "$dealer_claim_status" != "405" || "$dealer_logout_status" != "405" ]]; then
+  dealer_catalog_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/catalog.php" || true)"
+  dealer_order_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/order.php" || true)"
+  if [[ "$dealer_shell_status" != "200" || "$dealer_session_status" != "401" || "$dealer_claim_status" != "405" || "$dealer_logout_status" != "405" || "$dealer_catalog_status" != "401" || "$dealer_order_status" != "405" ]]; then
     printf 'Yayın uygulandı ancak bayi portalı/oturum sağlık kontrolü başarısız oldu.\n' >&2
     exit 1
   fi

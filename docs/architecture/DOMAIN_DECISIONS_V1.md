@@ -664,3 +664,68 @@ access ids. `/bayi/` renders public-safe identity and logout only.
 
 Dealer catalogs, prices, orders, payment, application/self-registration, OTP, messaging,
 password recovery and shipping selection remain outside C1.
+
+
+## D-034 — Authenticated dealer catalogs project prices; Desktop creates canonical dealer orders
+
+**Status:** ACCEPTED (2026-10-04)
+
+A dealer order is a canonical Commerce Order linked to the canonical Customer resolved
+from D-033 access. It uses source `web-dealer` and the hosting order id as
+`sourceReference`; it is not a guest buyer snapshot. Identity only selects the Customer.
+The existing wholesale resolver prepares the displayed price using the current commercial
+price group, including existing retail fallback. Canonical creation resolves prices again
+inside its transaction, following D-024: current Desktop pricing wins without a price lock.
+Client unit prices, totals, discounts and price groups never determine order prices.
+
+Initial dealer visibility is every active, non-deleted canonical Catalog Product while
+Wholesale and the dealer portal are enabled. Public `online_sales` publication flags and
+retail title overrides do not control this channel. No second publication checkbox is
+introduced. The existing public publication model is unchanged; a future per-product
+dealer visibility requirement must extend it explicitly. Product/publication changes still
+invalidate the private publication outbox; price, active-state and profile changes produce
+fresh derived catalogs. The per-access catalog revision hashes projected content plus
+the durable private publication generation, not a price lock. Every invalidation renews
+it, including profile changes that resolve to identical prices; no private profile fields
+are included in the published revision.
+
+Only enabled, eligible dealer access receives a sanitized per-access private catalog.
+D-033's durable versioned access publication atomically carries access state plus catalogs;
+hosting stores catalogs in `dealer_catalogs`, outside public catalog APIs. Revocation,
+missing access and access-revision mismatch make a catalog inaccessible immediately when
+publication applies. There is no request-time Desktop lookup and no Customer list/contact,
+tax, notes, costs, raw canonical Customer ids or price-group publication. All channels use
+the existing staged delivery allowlist (`onlineSalesDelivery`); Services exposes that same
+configuration for Wholesale even with Online Sales disabled. No second save path is added.
+
+The reliable `web_orders` cursor/ack line and hashed receipts are reused with a typed
+union: guest carries buyer snapshot; `kind: dealer` carries opaque `dealerAccessId` and
+`accessRevision`, items, delivery and note, with no buyer. Guest identity and dealer access
+cannot be mixed. Session-derived identity is required for catalog and order endpoints;
+request-selected access/customer identities are rejected or never used. Bounded JSON,
+same-origin mutation protection and rate limiting apply. Shipping reuses D-030's immutable
+address snapshot; no address-book mutation, fee, payment, Sale or automatic Shipment occurs.
+D-031's explicit Shipment operation remains available after import. D-032 is unchanged:
+without a buyer contact snapshot phone the first Aras adapter cannot register a shipment;
+no live Customer phone fallback is introduced by C2.
+
+Hosting fingerprints normalized dealer identity (including access revision), sorted items,
+delivery and note with its existing private keyed receipt secret. Receipt keys are scoped
+to dealer access, separate from guests. Same key + same semantic intent replays its
+acceptance; changed intent conflicts. Catalog revision is only a bounded transport hint,
+excluded from the semantic fingerprint. Current valid access is checked even for receipt
+replays. Retries never rely on client prices. Browser persistence contains only product ids,
+quantities and a non-authentication retry key/method; address and note stay in memory.
+
+Desktop ingress delegates to canonical creation through the compatibility facade. In the
+creation transaction it resolves access to Customer, validates current revision, enabled
+portal/Wholesale, active profile and current allowed delivery, then snapshots authoritative
+prices. Stale/revoked dealer records cannot import. An invalid access generation is a terminal
+transport outcome: Desktop persists only opaque order/access references and a fixed
+`access_revoked` reason in `commerce_dealer_order_rejections`, then advances the same cursor.
+Thus revocation cannot permanently block later valid orders in the shared queue. Other
+validation/storage failures retain the retryable prefix contract; they are never skipped.
+Canonical `source + sourceReference` uniqueness prevents duplicate Desktop orders after
+lost acknowledgements. Existing order UI uses canonical customerName and a dealer source
+label, without the guest contact block. Fulfillment, shipping execution and Aras remain
+explicit operations.

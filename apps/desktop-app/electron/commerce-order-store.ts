@@ -1,6 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import {
   createId,
+  BUSINESS_CAPABILITIES,
+  hasBusinessCapability,
   normalizeCommerceOrderDeliverySnapshot,
   type CommerceOrderDeliverySnapshot,
   moneyToMinor,
@@ -13,6 +15,8 @@ import {
   type CommerceUnit
 } from "@yardimci-asistan/shared";
 import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service";
+import { readEnabledBusinessCapabilities } from "./business-capability-store";
+import { DealerWebOrderAccessRejected } from "./dealer-web-order-rejection";
 
 const ORDER_STATUSES = new Set<CommerceOrderStatus>([
   "placed",
@@ -228,15 +232,36 @@ export function getCommerceOrder(
 export function createCommerceOrder(
   databasePath: string,
   input: CreateCommerceOrderInput,
-  options: { wholesaleEnabled?: boolean } = {}
+  options: { wholesaleEnabled?: boolean; dealerAccess?: { accessId: string; accessRevision: number } } = {}
 ): CommerceOrderDetail {
   const database = openDatabase(databasePath);
   try {
     database.exec("BEGIN IMMEDIATE");
     try {
       const businessId = activeBusinessId(database);
-      const sourceRaw = String(input.source ?? "desktop").trim() || "desktop";
+      let dealerCustomerId: string | undefined;
+      if (options.dealerAccess) {
+        const access = options.dealerAccess;
+        const dealer = database.prepare(`SELECT a.customer_id FROM commerce_dealer_web_access a
+          JOIN customers c ON c.id = a.customer_id AND c.business_id = a.business_id
+          JOIN customer_commercial_profiles p ON p.customer_id = c.id AND p.business_id = a.business_id
+          JOIN settings s ON s.business_id = a.business_id AND s.deleted_at = ''
+          WHERE a.id = ? AND a.business_id = ? AND a.enabled = 1 AND a.access_revision = ?
+            AND c.deleted_at = '' AND p.dealer_status = 'active' AND s.dealer_portal_enabled = 1`)
+          .get(access.accessId, businessId, access.accessRevision);
+        if (!dealer || !hasBusinessCapability(readEnabledBusinessCapabilities(database), BUSINESS_CAPABILITIES.WHOLESALE)) {
+          throw new DealerWebOrderAccessRejected();
+        }
+        dealerCustomerId = String(dealer.customer_id);
+        const delivery = normalizeCommerceOrderDeliverySnapshot(input.deliverySnapshot);
+        const settings = database.prepare("SELECT online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = ''").get(businessId)!;
+        if (Number(settings[delivery.method === "pickup" ? "online_sales_pickup_enabled" : "online_sales_shipping_enabled"]) !== 1) {
+          throw new Error("Bayi teslimat yöntemi kapalı.");
+        }
+      }
+      const sourceRaw = options.dealerAccess ? "web-dealer" : String(input.source ?? "desktop").trim() || "desktop";
       const sourceReference = String(input.sourceReference ?? "").trim();
+      if (sourceRaw === "web-dealer" && (!options.dealerAccess || !sourceReference)) throw new Error("Bayi web siparişi erişim kimliği gerekli.");
       if (sourceRaw.length > 80) throw new Error("Sipariş kaynağı en fazla 80 karakter olabilir.");
       if (sourceReference.length > 180) throw new Error("Sipariş kaynak kimliği en fazla 180 karakter olabilir.");
       const source = sourceRaw;
@@ -263,7 +288,7 @@ export function createCommerceOrder(
         throw new Error("Tek siparişte en fazla 500 ürün satırı olabilir.");
       }
 
-      const customerId = String(input.customerId ?? "").trim();
+      const customerId = dealerCustomerId ?? String(input.customerId ?? "").trim();
       let storedCustomerId: string | null = null;
       let customerName = "";
       if (customerId) {
@@ -312,7 +337,7 @@ export function createCommerceOrder(
           database,
           businessId,
           { productId, customerId: storedCustomerId ?? "" },
-          options.wholesaleEnabled === true
+          Boolean(options.dealerAccess) || options.wholesaleEnabled === true
         );
         const itemCurrency = normalizeCurrency(resolvedPrice.currency || row.currency);
         if (currency && itemCurrency !== currency) {
@@ -346,7 +371,7 @@ export function createCommerceOrder(
         });
       }
 
-      const discountTotal = roundMoney(Number(input.discountTotal ?? 0));
+      const discountTotal = options.dealerAccess ? 0 : roundMoney(Number(input.discountTotal ?? 0));
       if (!Number.isFinite(discountTotal) || discountTotal < 0) {
         throw new Error("Sipariş indirimi geçersiz.");
       }
@@ -358,9 +383,9 @@ export function createCommerceOrder(
       moneyToMinor(total);
 
       const note = String(input.note ?? "").trim().slice(0, 4000);
-      const buyerSnapshot = input.buyerSnapshot === undefined ? null
+      const buyerSnapshot = options.dealerAccess || input.buyerSnapshot === undefined ? null
         : normalizeCommerceOrderBuyerSnapshot(input.buyerSnapshot);
-      const deliverySnapshot = normalizeCommerceOrderDeliverySnapshot(input.deliverySnapshot === undefined && source !== "web-online-sales"
+      const deliverySnapshot = normalizeCommerceOrderDeliverySnapshot(input.deliverySnapshot === undefined && source !== "web-online-sales" && source !== "web-dealer"
         ? { method: "pickup" } : input.deliverySnapshot);
       const now = new Date().toISOString();
       const orderId = createId("commerce_order_");

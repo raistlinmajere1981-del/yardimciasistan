@@ -42,6 +42,7 @@ function orderStatusTone(status: string): StatusTone {
 function sourceLabel(source: string) {
   if (source === "desktop-wholesale") return "Manuel bayi";
   if (source === "web-online-sales") return "Web siparişi";
+  if (source === "web-dealer") return "Bayi web siparişi";
   if (source === "online_sales") return "Online satış";
   return source || "Sipariş";
 }
@@ -443,7 +444,7 @@ export function MarketOrdersWorkspace({
               <StatusBadge tone={orderStatusTone(selectedOrder.order.status)}>{orderStatusLabel(selectedOrder.order.status)}</StatusBadge>
             </header>
 
-            {selectedOrder.order.buyerSnapshot && (
+            {selectedOrder.order.source !== "web-dealer" && selectedOrder.order.buyerSnapshot && (
               <section className="market-order-buyer" aria-label="Sipariş veren">
                 <strong>Sipariş veren</strong>
                 <dl>

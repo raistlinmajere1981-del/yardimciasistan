@@ -347,7 +347,8 @@ export function getRuntimeOrder(
 
 export function createRuntimeOrder(
   databasePath: string,
-  input: CreateCommerceOrderInput
+  input: CreateCommerceOrderInput,
+  options: { dealerAccess?: { accessId: string; accessRevision: number } } = {}
 ): CommerceOrderDetail {
   requireCapability(
     databasePath,
@@ -355,6 +356,7 @@ export function createRuntimeOrder(
     "Sipariş yönetimi bu işletmede etkin değil."
   );
   return createCommerceOrder(databasePath, input, {
+    dealerAccess: options.dealerAccess,
     wholesaleEnabled: hasPersistedBusinessCapability(databasePath, BUSINESS_CAPABILITIES.WHOLESALE)
   });
 }

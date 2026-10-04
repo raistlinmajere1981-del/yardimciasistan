@@ -48,9 +48,8 @@ function ya_online_order_delivery(mixed $input): array
 }
 
 /** Semantic allowlist. Extra client fields, including prices, have no authority. */
-function ya_online_order_normalize(array $input): array
+function ya_online_order_items(mixed $items): array
 {
-    $items = $input['items'] ?? null;
     if (!is_array($items) || !array_is_list($items) || count($items) < 1 || count($items) > 50) ya_online_order_invalid();
     $normalized = [];
     $totalQuantity = 0;
@@ -67,6 +66,12 @@ function ya_online_order_normalize(array $input): array
         $normalized[$productId] = ['productId' => $productId, 'quantity' => $quantity];
     }
     ksort($normalized, SORT_STRING); // Row order is not part of request identity.
+    return array_values($normalized);
+}
+
+function ya_online_order_normalize(array $input): array
+{
+    $items = ya_online_order_items($input['items'] ?? null);
     $buyer = $input['buyer'] ?? null;
     if (!is_array($buyer)) ya_online_order_invalid();
     $name = ya_online_order_text($buyer['name'] ?? null, 160);
@@ -78,7 +83,7 @@ function ya_online_order_normalize(array $input): array
     if ($email !== '' && preg_match('/^[^\s@]+@[^\s@]+\.[^\s@]+$/u', $email) !== 1) ya_online_order_invalid();
     return [
         'delivery' => ya_online_order_delivery($input['delivery'] ?? null),
-        'items' => array_values($normalized),
+        'items' => $items,
         'buyer' => ['name' => $name, 'phone' => $phone, ...($email !== '' ? ['email' => $email] : [])],
         'note' => ya_online_order_text($input['note'] ?? '', 2000, true)
     ];

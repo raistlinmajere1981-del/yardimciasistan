@@ -1,4 +1,5 @@
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
+import { DealerWebOrderAccessRejected } from "./dealer-web-order-rejection";
 import {
   PhpHostingSyncTransport,
   pushAiCatalog,
@@ -417,7 +418,8 @@ export class SyncCoordinator {
     }
 
     if (this.webOrdersSupported
-        && hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+        && (hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)
+          || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.WHOLESALE))) {
       const orderResult = await this.pullWebOrderPages(transport);
       dashboardChanged ||= orderResult.count > 0;
       if (orderResult.count > 0) this.options.onCommerceOrdersChanged?.();
@@ -522,10 +524,18 @@ export class SyncCoordinator {
           break;
         }
         for (const envelope of result.orders) {
-          ingress.importOrder(envelope, cursor);
+          try {
+            ingress.importOrder(envelope, cursor);
+            count += 1;
+          } catch (error) {
+            if (!(error instanceof DealerWebOrderAccessRejected) || envelope.kind !== "dealer") throw error;
+            this.options.database.recordRejectedDealerWebOrder(envelope.id, envelope.dealerAccessId, envelope.accessRevision);
+            desktopLog.warn({ scope: "online-order-ingress", event: "dealer.order.ingress.rejected",
+              message: "Geçersiz bayi erişimine ait sipariş taşıma kaydı reddedildi.", operationId: this.activeOperationId,
+              meta: { accessId: envelope.dealerAccessId, webOrderId: envelope.id, category: "access_revoked" } });
+          }
           cursor = envelope.syncSeq;
           this.options.database.recordWebOrderCursor(cursor);
-          count += 1;
         }
         if (!result.has_more) break;
       }
