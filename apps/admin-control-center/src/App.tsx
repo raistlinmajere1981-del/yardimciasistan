@@ -24,6 +24,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   DependencyUpdateReport,
+  DeploymentRunState,
+  DeploymentTargetSnapshot,
   HealthCheckSnapshot,
   InstallationSnapshot,
   OverviewSnapshot,
@@ -866,6 +868,294 @@ function Tests({
   );
 }
 
+function Deploy({
+  data,
+  onRefresh
+}: {
+  data: OverviewSnapshot;
+  onRefresh: () => void;
+}) {
+  const [targets, setTargets] = useState<DeploymentTargetSnapshot[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [confirmId, setConfirmId] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [runMessage, setRunMessage] = useState("");
+  const [runState, setRunState] = useState<DeploymentRunState>({
+    running: false,
+    targetId: "",
+    action: "",
+    stage: "",
+    startedAt: null,
+    finishedAt: null,
+    result: "idle",
+    exitCode: null,
+    outputTail: []
+  });
+
+  useEffect(() => {
+    let active = true;
+    let previousRunning = false;
+
+    void Promise.all([
+      window.adminControlCenter.getDeploymentTargets(),
+      window.adminControlCenter.getDeploymentRunState()
+    ]).then(([nextTargets, state]) => {
+      if (!active) return;
+      setTargets(nextTargets);
+      setSelectedId((current) => current || nextTargets[0]?.id || "");
+      previousRunning = state.running;
+      setRunState(state);
+      setLoadError("");
+    }).catch((value) => {
+      if (!active) return;
+      setLoadError(value instanceof Error ? value.message : String(value));
+    });
+
+    const unsubscribe = window.adminControlCenter.onDeploymentRunState((state) => {
+      if (!active) return;
+      const justFinished = previousRunning && !state.running;
+      previousRunning = state.running;
+      setRunState(state);
+      if (justFinished) {
+        setConfirmId("");
+        onRefresh();
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [onRefresh]);
+
+  const selected = targets.find((item) => item.id === selectedId) ?? targets[0];
+  const selectedInstallation = data.installations.find(
+    (item) => item.id === selected?.installationId
+  );
+
+  const runTone: StatusKind = runState.result === "passed"
+    ? "ready"
+    : runState.result === "failed"
+      ? "error"
+      : runState.result === "running"
+        ? "warning"
+        : runState.result === "cancelled"
+          ? "warning"
+          : "unknown";
+
+  const start = useCallback(async (
+    targetId: string,
+    action: "preflight" | "deploy"
+  ) => {
+    setRunMessage("");
+    const result = await window.adminControlCenter.startDeployment({ targetId, action });
+    setRunMessage(result.message);
+    if (result.accepted) setConfirmId("");
+  }, []);
+
+  const cancel = useCallback(async () => {
+    const cancelled = await window.adminControlCenter.cancelDeployment();
+    if (!cancelled) setRunMessage("Çalışan deploy işlemi bulunamadı.");
+  }, []);
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">YAYIN OPERASYONLARI</p>
+          <h1>Deploy</h1>
+          <p className="page-subtitle">
+            Ön kontrol, etki özeti, açık onay, deploy ve canlı doğrulama aynı akışta.
+          </p>
+        </div>
+        {runState.running ? (
+          <button className="button button--danger" onClick={() => void cancel()}>
+            <Square size={16} />
+            İşlemi İptal Et
+          </button>
+        ) : null}
+      </header>
+
+      {loadError ? (
+        <div className="error-banner">
+          <TriangleAlert size={18} />
+          <span>Deploy hedefleri okunamadı: {loadError}</span>
+        </div>
+      ) : null}
+
+      <section className="deploy-layout">
+        <aside className="deployment-picker">
+          <div className="picker-heading">
+            <div>
+              <p className="panel-kicker">HEDEFLER</p>
+              <strong>{targets.length} yayın hedefi</strong>
+            </div>
+          </div>
+
+          <div className="picker-list">
+            {targets.map((target) => {
+              const installation = data.installations.find(
+                (item) => item.id === target.installationId
+              );
+              return (
+                <button
+                  key={target.id}
+                  className={target.id === selected?.id ? "picker-item picker-item--active" : "picker-item"}
+                  onClick={() => {
+                    setSelectedId(target.id);
+                    setConfirmId("");
+                  }}
+                >
+                  <span
+                    className="installation-dot"
+                    data-status={target.available ? installation?.status ?? "unknown" : "error"}
+                  />
+                  <span className="picker-copy">
+                    <strong>{target.title}</strong>
+                    <small>{target.available ? target.availabilityNote : "Kullanılamıyor"}</small>
+                  </span>
+                  <span className={statusClass(target.available ? installation?.status ?? "unknown" : "error")}>
+                    {target.available ? statusLabel(installation?.status ?? "unknown") : "Eksik"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {selected ? (
+          <div className="deployment-detail">
+            <section className="panel deployment-hero">
+              <div>
+                <p className="panel-kicker">SEÇİLİ HEDEF</p>
+                <div className="deployment-title">
+                  <CloudUpload size={24} />
+                  <div>
+                    <h2>{selected.title}</h2>
+                    <p>{selected.description}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="deployment-actions">
+                <button
+                  className="button button--secondary"
+                  disabled={!selected.available || runState.running}
+                  onClick={() => void start(selected.id, "preflight")}
+                >
+                  <ShieldCheck size={16} />
+                  Ön Kontrol
+                </button>
+                <button
+                  className="button button--primary"
+                  disabled={!selected.available || runState.running}
+                  onClick={() => setConfirmId(selected.id)}
+                >
+                  <CloudUpload size={16} />
+                  Deploy
+                </button>
+              </div>
+            </section>
+
+            <section className="deployment-summary-grid">
+              <article className="summary-card">
+                <span>Canlı durum</span>
+                <strong>{selectedInstallation ? statusLabel(selectedInstallation.status) : "Bilinmiyor"}</strong>
+                <small>{selectedInstallation?.statusNote ?? "Kurulum health kaydı yok."}</small>
+              </article>
+              <article className="summary-card">
+                <span>Credential</span>
+                <strong>{selectedInstallation ? credentialLabel(selectedInstallation.credentialStatus) : "—"}</strong>
+                <small>{selectedInstallation?.credentialRef ?? "Referans yok"}</small>
+              </article>
+              <article className="summary-card">
+                <span>Hazırlık</span>
+                <strong>{selected.available ? "Hazır" : "Eksik"}</strong>
+                <small>{selected.availabilityNote}</small>
+              </article>
+            </section>
+
+            {confirmId === selected.id && !runState.running ? (
+              <section className="panel deployment-confirm">
+                <div className="deployment-confirm-title">
+                  <TriangleAlert size={22} />
+                  <div>
+                    <p className="panel-kicker">CANLI İŞLEM ONAYI</p>
+                    <h2>{selected.confirmText}</h2>
+                  </div>
+                </div>
+                <div className="deployment-impact">
+                  {selected.impact.map((item) => <div key={item}>• {item}</div>)}
+                </div>
+                <div className="deployment-confirm-actions">
+                  <button className="button button--secondary" onClick={() => setConfirmId("")}>
+                    Vazgeç
+                  </button>
+                  <button className="button button--danger" onClick={() => void start(selected.id, "deploy")}>
+                    <CloudUpload size={16} />
+                    Canlıya Yayınla
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {runState.result !== "idle" || runMessage ? (
+              <section className="panel deployment-run-panel">
+                <div className="verification-run-head">
+                  <div>
+                    <p className="panel-kicker">OPERASYON ÇIKTISI</p>
+                    <div className="verification-run-title">
+                      <span className={statusClass(runTone)}>
+                        {runState.result === "running"
+                          ? "Çalışıyor"
+                          : runState.result === "passed"
+                            ? "Tamamlandı"
+                            : runState.result === "failed"
+                              ? "Başarısız"
+                              : runState.result === "cancelled"
+                                ? "İptal edildi"
+                                : "Hazır"}
+                      </span>
+                      <strong>{runState.stage || runMessage}</strong>
+                    </div>
+                  </div>
+                  {runState.action ? (
+                    <span className="quiet">
+                      {runState.action === "preflight" ? "ön kontrol" : "deploy"}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="verification-console">
+                  {runState.outputTail.length
+                    ? runState.outputTail.map((line, index) => (
+                        <div key={`${index}:${line}`}>{line}</div>
+                      ))
+                    : <div>{runMessage || "Çıktı bekleniyor…"}</div>}
+                </div>
+              </section>
+            ) : null}
+
+            <section className="panel deployment-impact-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">ETKİ SINIRI</p>
+                  <h2>Bu hedefte ne değişir?</h2>
+                </div>
+              </div>
+              <div className="deployment-impact deployment-impact--quiet">
+                {selected.impact.map((item) => <div key={item}>• {item}</div>)}
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="loading-card">Deploy hedefleri hazırlanıyor…</div>
+        )}
+      </section>
+    </>
+  );
+}
+
 function System({ data }: { data: OverviewSnapshot }) {
   const [checking, setChecking] = useState(false);
   const [report, setReport] = useState<DependencyUpdateReport | null>(null);
@@ -1054,7 +1344,7 @@ function Placeholder({ section }: { section: Section }) {
       <p className="eyebrow">SONRAKİ DİLİM</p>
       <h1>{label}</h1>
       <p>
-        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar, Release, Testler ve Sistem gerçek veri hattı üzerinde;
+        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar, Release, Testler, Deploy ve Sistem gerçek veri hattı üzerinde;
         sonraki ekranlar aynı güvenli IPC sınırı üzerinden eklenecek.
       </p>
     </section>
@@ -1215,9 +1505,11 @@ export default function App() {
           <Release data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "tests" && data ? (
           <Tests data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
+        ) : section === "deploy" && data ? (
+          <Deploy data={data} onRefresh={() => void loadOverview()} />
         ) : section === "system" && data ? (
           <System data={data} />
-        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" || section === "system" ? (
+        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" || section === "deploy" || section === "system" ? (
           <div className="loading-card">
             <RefreshCw className="spin" size={22} />
             Gerçek sistem durumu okunuyor…
