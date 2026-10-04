@@ -175,7 +175,7 @@ const BASE_CHECKS = [
   check("verification-registry-tests", "Doğrulama registry testleri", "node", ["--test", "scripts/test-verification-registry.mjs"], {
     phase: 5, presets: ["full"], domains: ["platform"]
   }),
-  check("admin-tests", "Terminal Admin testleri", "npm", ["run", "test:admin"], {
+  check("admin-tests", "Admin Control Center doğrulaması", "npm", ["run", "test:admin"], {
     phase: 5, presets: ["full"], domains: ["platform"]
   }),
   check("doctor", "Geliştirme ortamı kontrolü", "node", ["scripts/dev-doctor.mjs"], {
