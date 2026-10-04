@@ -2067,3 +2067,143 @@ body {
     font-size: 29px;
   }
 }
+
+
+.deploy-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.8fr) minmax(0, 2fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.deployment-picker {
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(188, 213, 237, 0.76);
+  box-shadow: 0 16px 48px rgba(47, 90, 133, 0.07);
+}
+
+.deployment-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.deployment-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.deployment-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+.deployment-title > svg {
+  margin-top: 2px;
+  color: #1777d6;
+}
+
+.deployment-title h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.deployment-title p {
+  margin: 6px 0 0;
+  max-width: 760px;
+  color: #7289a2;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.deployment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.deployment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.deployment-confirm {
+  border-color: #efcfd2;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(230, 95, 105, 0.08), transparent 32%),
+    rgba(255, 255, 255, 0.92);
+}
+
+.deployment-confirm-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #b34750;
+}
+
+.deployment-confirm-title h2 {
+  margin: 0;
+  color: #73353b;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.deployment-impact {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+  color: #6f849a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.deployment-impact--quiet {
+  margin-top: 14px;
+}
+
+.deployment-confirm-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.deployment-run-panel {
+  padding-bottom: 16px;
+}
+
+.deployment-impact-panel {
+  padding-bottom: 18px;
+}
+
+@media (max-width: 1180px) {
+  .deploy-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .deployment-picker .picker-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .deployment-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .deployment-actions {
+    justify-content: flex-start;
+  }
+
+  .deployment-summary-grid,
+  .deployment-picker .picker-list {
+    grid-template-columns: 1fr;
+  }
+}
