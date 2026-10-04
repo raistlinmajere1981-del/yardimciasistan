@@ -101,6 +101,17 @@ export type VerificationSnapshot = {
   latest: VerificationReportSnapshot;
 };
 
+export type VerificationHistoryItem = {
+  id: string;
+  selectionLabel: string;
+  startedAt: string;
+  finishedAt: string;
+  result: "passed" | "failed" | "cancelled";
+  branch: string;
+  head: string;
+  dirtyCount: number;
+};
+
 export type VerificationRunRequest = {
   mode: "preset" | "domain" | "check";
   value: string;
@@ -254,6 +265,7 @@ export type AdminBridge = {
   getOverview(): Promise<OverviewSnapshot>;
   checkDependencyUpdates(): Promise<DependencyUpdateReport>;
   getVerificationRunState(): Promise<VerificationRunState>;
+  getVerificationHistory(limit?: number): Promise<VerificationHistoryItem[]>;
   startVerification(request: VerificationRunRequest): Promise<{ accepted: boolean; message: string }>;
   cancelVerification(): Promise<boolean>;
   onVerificationRunState(listener: (state: VerificationRunState) => void): () => void;
