@@ -1,3 +1,4 @@
+import { emptyWhatsAppCloudConfiguration } from "@yardimci-asistan/shared";
 import { emptyArasShippingConfiguration, getBusinessProfile } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 
@@ -87,6 +88,7 @@ export const defaultSetupData: DesktopSetupData = {
   syncSecret: "",
   autoSyncEnabled: true,
   localNetworkEnabled: true,
+  whatsappCloud: emptyWhatsAppCloudConfiguration(),
   arasShipping: emptyArasShippingConfiguration(),
   dealerPortalEnabled: false,
   onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },

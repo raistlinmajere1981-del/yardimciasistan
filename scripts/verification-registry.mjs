@@ -1,4 +1,8 @@
 const SMOKE_FILES = [
+  "scripts/smoke-business-messaging-hosting.mjs",
+  "scripts/smoke-business-messaging-provider.mjs",
+  "scripts/smoke-business-messaging-webhook.php",
+  "scripts/smoke-business-messaging-ui.mjs",
   "scripts/smoke-commerce-dealer-orders.mjs",
   "scripts/smoke-commerce-dealer-access.mjs",
   "scripts/smoke-web-dealer-portal.mjs",
@@ -185,7 +189,7 @@ const BASE_CHECKS = [
     phase: 15, presets: ["dev", "full"], domains: ["platform"]
   }),
   check("typecheck-electron", "Electron TypeScript kontrolü", "npm", ["run", "typecheck:electron"], {
-    phase: 15, presets: ["full"], domains: ["desktop", "hospitality", "finance", "commerce", "android"]
+    phase: 15, presets: ["full"], domains: ["desktop", "hospitality", "finance", "commerce", "android", "business-messaging"]
   }),
   check("unit-tests", "Tüm workspace birim testleri", "npm", ["test"], {
     phase: 20, presets: ["full"], domains: ["platform"]
@@ -202,7 +206,7 @@ const BASE_CHECKS = [
     requires: ["version-check"]
   }),
   check("php-lint", "Web modülü PHP lint", "node", ["scripts/php-lint.mjs"], {
-    phase: 20, presets: ["full"], domains: ["web"]
+    phase: 20, presets: ["full"], domains: ["web", "business-messaging"]
   }),
   check("local-lab", "Yerel web laboratuvarı", "node", ["scripts/local-dev-lab.mjs", "--once"], {
     phase: 35, presets: ["full"], domains: ["web"],
@@ -436,6 +440,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-business-messaging-hosting.mjs" || file === "scripts/smoke-business-messaging-webhook.php") return ["php-lint"];
   if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-web-storefront.mjs") return ["php-lint"];
   if (file === "scripts/smoke-web-order-submission.mjs") return ["php-lint"];
@@ -461,6 +466,19 @@ function smokeDomains(file) {
     domains.add("finance");
     domains.add("hospitality");
   }
+  if (/business-messaging/.test(name)) { domains.add("customers"); domains.add("web"); domains.add("platform"); }
+  if (/business-messaging/.test(name) || [
+    "scripts/smoke-market-customer-credit-whatsapp.mjs",
+    "scripts/smoke-birthday-foundation.mjs",
+    "scripts/smoke-settings-platform.mjs",
+    "scripts/smoke-commerce-aras-provider.mjs",
+    "scripts/smoke-commerce-aras-ui.mjs",
+    "scripts/smoke-commerce-dealer-orders.mjs",
+    "scripts/smoke-commerce-online-order-ingress.mjs",
+    "scripts/smoke-automatic-sync.mjs",
+    "scripts/smoke-database-schema.mjs",
+    "scripts/smoke-desktop-logging-contract.mjs"
+  ].includes(file)) domains.add("business-messaging");
   if (/customer|birthday|messages/.test(name)) domains.add("customers");
   if (/desktop|workspace|dashboard|calendar|settings|appearance|locale|sector|app-lock|reports|business-layout/.test(name)) {
     domains.add("desktop");

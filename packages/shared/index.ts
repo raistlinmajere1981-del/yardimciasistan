@@ -41,3 +41,4 @@ export * from "./utils/phone";
 export * from "./utils/validation";
 
 export { normalizeTableCategoryInputs, normalizeTableCategoryName, tableCategoryKey, type NormalizedTableCategoryInput } from "./utils/table-category-settings";
+export * from "./types/business-messaging";

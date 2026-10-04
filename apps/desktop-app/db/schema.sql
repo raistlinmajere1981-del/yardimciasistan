@@ -2617,3 +2617,26 @@ CREATE TABLE commerce_dealer_order_rejections (
   reason TEXT NOT NULL CHECK (reason = 'access_revoked'),
   created_at TEXT NOT NULL
 );
+
+-- D-035: delivery intent and provider credentials are isolated from commerce/customer state.
+CREATE TABLE business_messaging_provider_config (
+  business_id TEXT NOT NULL REFERENCES business(id), provider_id TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0, waba_id TEXT NOT NULL DEFAULT '', phone_number_id TEXT NOT NULL DEFAULT '',
+  access_token_encrypted TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+  PRIMARY KEY (business_id, provider_id)
+);
+CREATE TABLE business_messages (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), customer_id TEXT REFERENCES customers(id),
+  related_entity_type TEXT NOT NULL DEFAULT '', related_entity_id TEXT NOT NULL DEFAULT '',
+  provider_id TEXT NOT NULL, recipient TEXT NOT NULL, message_kind TEXT NOT NULL CHECK(message_kind IN ('template','session')),
+  template_name TEXT NOT NULL, template_language TEXT NOT NULL, provider_message_id TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL CHECK(status IN ('draft','queued','accepted','delivered','read','failed','cancelled')),
+  failure_code TEXT NOT NULL DEFAULT '', failure_message TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL, accepted_at TEXT NOT NULL DEFAULT '', delivered_at TEXT NOT NULL DEFAULT '',
+  read_at TEXT NOT NULL DEFAULT '', failed_at TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX business_message_provider_reference ON business_messages(provider_id, provider_message_id) WHERE provider_message_id != '';
+CREATE TABLE business_message_provider_bindings (
+  message_id TEXT PRIMARY KEY REFERENCES business_messages(id), account_key TEXT NOT NULL,
+  intent_hash TEXT NOT NULL, submitted INTEGER NOT NULL DEFAULT 0
+);

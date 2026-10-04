@@ -1,3 +1,4 @@
+import { WhatsAppBusinessSettingsSection } from "../components/settings/WhatsAppBusinessSettingsSection";
 import { ArasShippingSettingsSection } from "../components/settings/ArasShippingSettingsSection";
 import type { ReactNode, SetStateAction } from "react";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
@@ -8,6 +9,7 @@ import {
   onlineSalesDeliveryDefinition,
   dealerPortalDefinition,
   arasShippingDefinition,
+  whatsappCloudDefinition,
   type SettingsSectionDefinition,
   type StagedSettingsCategoryId
 } from "./settings-registry";
@@ -38,6 +40,9 @@ type StagedSettingsContributions = {
 const stagedSettingsContributions = {
   business: [],
   services: [{
+    definition: whatsappCloudDefinition,
+    render: ({ draft, onChange, busy }) => <WhatsAppBusinessSettingsSection draft={draft.whatsappCloud} busy={busy} onChange={(whatsappCloud) => onChange({ whatsappCloud })} />
+  }, {
     definition: dealerPortalDefinition,
     render: ({ draft, onChange, busy }) => (
       <section id="settings-dealer-portal" tabIndex={-1} className="settings-service-card">

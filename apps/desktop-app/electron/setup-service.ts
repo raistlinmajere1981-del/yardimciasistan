@@ -1,3 +1,5 @@
+import { getMessagingConfiguration, normalizeMessagingConfiguration, saveMessagingConfiguration } from "./business-messaging/store";
+import type { MessagingSecretWrite } from "./business-messaging/secret-service";
 import { getArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
 import type { DatabaseSync } from "node:sqlite";
 import {
@@ -102,6 +104,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
     aiProfiles,
     arasShipping: getArasShippingConfiguration(db),
+    whatsappCloud: getMessagingConfiguration(db),
     dealerPortalEnabled: Number(settings?.dealer_portal_enabled ?? 0) === 1,
     onlineSalesDelivery: {
       pickupEnabled: Number(settings?.online_sales_pickup_enabled ?? 1) === 1,
@@ -131,7 +134,8 @@ export function saveSetupData(
   input: SaveInitialSetupInput,
   aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
   aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {},
-  shippingSecretWrite: ShippingSecretWrite = { mode: "keep" }
+  shippingSecretWrite: ShippingSecretWrite = { mode: "keep" },
+  messagingSecretWrite: MessagingSecretWrite = { mode: "keep" }
 ): StoredSetupSaveResult {
   const businessName = input.businessName.trim();
   const syncSecret = input.syncSecret.trim();
@@ -144,6 +148,10 @@ export function saveSetupData(
   const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
   const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
   const existingSettings = db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+  if (input.whatsappCloud) {
+    try { normalizeMessagingConfiguration(input.whatsappCloud); }
+    catch { return { ok: false, message: "WhatsApp Business ayarları geçersiz." }; }
+  }
   if (input.arasShipping) {
     try { normalizeArasShippingInput(input.arasShipping); }
     catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Kargo ayarları geçersiz." }; }
@@ -413,6 +421,7 @@ export function saveSetupData(
     db.prepare("UPDATE settings SET dealer_portal_enabled = ? WHERE id = ?")
       .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);
 
+    if (input.whatsappCloud) saveMessagingConfiguration(db, businessId, input.whatsappCloud, messagingSecretWrite);
     if (input.arasShipping) saveArasShippingConfigurationInTransaction(db, businessId, input.arasShipping, shippingSecretWrite);
 
     upsertAiServiceProfileInTransaction(db, {

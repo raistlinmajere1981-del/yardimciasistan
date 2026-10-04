@@ -545,6 +545,7 @@ export interface DesktopSetupData {
   aiLastPublishedAt: string;
   aiProfiles: DesktopAiServiceProfile[];
   productData: DesktopProductDataSettings;
+  whatsappCloud: import("@yardimci-asistan/shared").WhatsAppCloudConfiguration;
   arasShipping: import("@yardimci-asistan/shared").ArasShippingConfiguration;
   dealerPortalEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
@@ -579,6 +580,7 @@ export interface SaveInitialSetupInput {
   clearAiApiKey: boolean;
   aiProfiles?: SaveAiServiceProfileInput[];
   productData?: DesktopProductDataSettings;
+  whatsappCloud?: import("@yardimci-asistan/shared").WhatsAppCloudConfigurationInput;
   arasShipping?: import("@yardimci-asistan/shared").ArasShippingConfigurationInput;
   dealerPortalEnabled?: boolean;
   onlineSalesDelivery?: OnlineSalesDeliverySettings;

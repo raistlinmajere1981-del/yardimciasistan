@@ -1,3 +1,4 @@
+import { emptyWhatsAppCloudConfiguration, type WhatsAppCloudConfigurationInput } from "@yardimci-asistan/shared";
 import type {
   DesktopAiModelOption,
   DesktopAiService,
@@ -58,6 +59,7 @@ export interface SetupFormState {
   productDataAutoSearch: boolean;
   productDataIncludeImages: boolean;
   birthdaySettings: BirthdaySettings;
+  whatsappCloud: WhatsAppCloudConfigurationInput & { hasSecret: boolean; configured: boolean };
   arasShipping: ArasShippingConfigurationInput & { hasSecret: boolean; configured: boolean };
   dealerPortalEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
@@ -113,6 +115,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiServiceDrafts,
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
+    whatsappCloud: { ...(setupData.whatsappCloud ?? emptyWhatsAppCloudConfiguration()), accessToken: "", clearAccessToken: false },
     arasShipping: { ...(setupData.arasShipping ?? emptyArasShippingConfiguration()), password: "", clearPassword: false },
     dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
     onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? { pickupEnabled: true, shippingEnabled: false }) },
@@ -240,6 +243,8 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       clearAiApiKey: setupForm.clearAiApiKey,
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
+      whatsappCloud: { enabled: setupForm.whatsappCloud.enabled, wabaId: setupForm.whatsappCloud.wabaId,
+        phoneNumberId: setupForm.whatsappCloud.phoneNumberId, accessToken: setupForm.whatsappCloud.accessToken, clearAccessToken: setupForm.whatsappCloud.clearAccessToken },
       arasShipping: { enabled: setupForm.arasShipping.enabled, environment: setupForm.arasShipping.environment,
         customerCode: setupForm.arasShipping.customerCode, username: setupForm.arasShipping.username,
         password: setupForm.arasShipping.password, clearPassword: setupForm.arasShipping.clearPassword },

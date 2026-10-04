@@ -68,6 +68,7 @@ export interface AutomaticSyncCycleResult {
 export interface SyncCoordinatorOptions {
   database: DesktopDatabase;
   onlineOrderIngress?: OnlineOrderIngressService;
+  pullBusinessMessagingStatuses?: (config: { baseUrl: string; syncSecret: string }) => Promise<string>;
   getSyncConfig: () => { baseUrl: string; syncSecret: string };
   createAndroidSnapshot: () => AndroidOperationsSnapshot;
   createAiCatalog?: () => BusinessAiCatalog;
@@ -102,6 +103,7 @@ export class SyncCoordinator {
   private message = "Otomatik senkron hazır.";
   private capabilitiesTarget = "";
   private webOrdersSupported = false;
+  private businessMessagingStatusesSupported = false;
   private onlineCatalogSupported = false;
   private dealerAccessSupported = false;
   private nextPassiveRunAt = 0;
@@ -402,9 +404,15 @@ export class SyncCoordinator {
         return this.result(false, message, counts);
       }
       this.webOrdersSupported = capabilities.features.includes("web_orders_v1");
+      this.businessMessagingStatusesSupported = capabilities.features.includes("business_messaging_status_v1");
       this.onlineCatalogSupported = capabilities.features.includes("online_catalog_v1");
       this.dealerAccessSupported = capabilities.features.includes("dealer_access_v1");
       this.capabilitiesTarget = targetKey;
+    }
+
+    if (this.businessMessagingStatusesSupported && this.options.pullBusinessMessagingStatuses) {
+      const failure = await this.options.pullBusinessMessagingStatuses(config);
+      if (failure) errors.push(failure);
     }
 
     let dashboardChanged = false;

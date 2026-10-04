@@ -2,6 +2,9 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 
 const phpFiles = [
+  "firm-template/web-module/api/whatsapp-webhook.php",
+  "firm-template/web-module/api/business-messaging-status.php",
+  "firm-template/web-module/lib/business-messaging.php",
   "firm-template/web-module/bayi/index.php",
   "firm-template/web-module/api/dealer/claim.php",
   "firm-template/web-module/api/dealer/session.php",

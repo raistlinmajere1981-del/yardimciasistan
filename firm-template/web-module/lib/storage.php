@@ -60,6 +60,7 @@ function ya_storage_capabilities(): array
         'protocol_version' => 2,
         'storage' => 'sqlite',
         'features' => [
+            'business_messaging_status_v1',
             'web_orders_v1',
             'online_catalog_v1',
             'dealer_access_v1',
@@ -82,6 +83,7 @@ function ya_storage_reset_runtime(): array
 {
     $database = ya_storage_open();
     $tables = [
+        'business_messaging_status_queue',
         'dealer_sessions',
         'dealer_catalogs',
         'dealer_access',
@@ -755,6 +757,12 @@ function ya_storage_update_state(array $changes): void
 
 function ya_storage_create_schema(PDO $database): void
 {
+    $database->exec("CREATE TABLE IF NOT EXISTS business_messaging_status_queue (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT, event_key TEXT NOT NULL UNIQUE, account_key TEXT NOT NULL,
+        payload_json TEXT NOT NULL, acknowledged INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+    )");
+    $database->exec('CREATE INDEX IF NOT EXISTS business_messaging_status_pending ON business_messaging_status_queue(account_key, acknowledged, seq)');
+
     $database->exec(<<<'SQL'
         CREATE TABLE IF NOT EXISTS sync_meta (
           key TEXT PRIMARY KEY,

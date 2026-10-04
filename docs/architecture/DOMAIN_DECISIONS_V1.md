@@ -729,3 +729,64 @@ Canonical `source + sourceReference` uniqueness prevents duplicate Desktop order
 lost acknowledgements. Existing order UI uses canonical customerName and a dealer source
 label, without the guest contact block. Fulfillment, shipping execution and Aras remain
 explicit operations.
+
+## D-035 — Business Messaging provider foundation (D1)
+
+**Decision:** WhatsApp Web and the official WhatsApp Business Cloud API are separate
+delivery providers. The existing user-approved Web/prepared-message/birthday/credit
+flows keep their contracts. Cloud configuration never enables, disables or converts Web.
+
+BusinessMessage is a delivery intent, not Customer, Order, Sale or Campaign. Optional
+canonical references provide context only. Its provider-neutral projection owns recipient,
+message kind, template identity, provider message reference, lifecycle and bounded safe
+failure metadata. Template and session/free-form semantics are distinct; D1 executes only
+approved text templates. Meta account ids/credentials belong to provider configuration;
+account binding and intent fingerprint belong to the delivery boundary, not Customer/Order.
+Provider failures never mutate canonical customer or commerce state.
+
+Servisler owns a static staged `whatsappCloud` Settings contribution and saves through the
+existing Setup transaction. Disabled and enabled/unconfigured are valid states. Main owns
+safeStorage encryption/decryption and rejects Linux `basic_text`. Only ciphertext is stored
+in the private provider config table. Setup/configuration reads return `hasSecret` and
+`configured`, never token/ciphertext; there is no reveal endpoint. Tests use in-memory draft
+credentials without saving them. Graph API access stays in the main-process adapter; version
+is central, redirects are rejected, timeout covers response reads, response/catalog sizes
+are bounded, errors never expose provider text or raw network exceptions.
+
+Meta is the template authority. Each send revalidates approval and required parameters.
+Catalog includes approved metadata and component summaries; unsupported media/buttons
+cannot send in D1. The Customer workspace contains a bounded operation panel, not another
+Customer editor/modal. Its clearly named Business action requires persisted configuration;
+`WhatsApp'tan Yaz` remains the Web handoff. Text parameter values are transient and never
+persisted or logged. The canonical Customer phone is resolved and normalized in main.
+
+Desktop generates a stable BusinessMessage id before remote submission and binds a SHA-256
+intent fingerprint and provider account. A transaction claims submission and queues the
+intent before HTTP. Concurrent/restarted/exact retries replay the same local record;
+changed parameters conflict. Cloud does not provide a remote deduplication/query guarantee
+for this operation, so a timeout/lost response/crash NEVER authorizes another POST for that
+intent. Queued means unresolved; failed network results can still reconcile through a signed
+status carrying `biz_opaque_callback_data`. A deliberate later message must be a new intent.
+Duplicate provider references cannot attach to two local messages or mutate another intent.
+
+Hosting receives GET verification and POST raw-body HMAC-SHA256 verification at
+`api/whatsapp-webhook.php`. Verify token and Meta app secret are hosting environment secrets,
+separate from the desktop access token and hosting sync credential. Missing secrets disable
+the endpoint. Inbound conversations are discarded. Only sanitized outbound status metadata
+enters a focused SQLite inbox, scoped by the hash of WABA + Phone Number ID. Sent maps to
+accepted; delivered/read/failed map explicitly. A durable event hash de-duplicates retries.
+
+The existing SyncCoordinator runs focused status pull when hosting advertises
+`business_messaging_status_v1`. Local status writes commit before exact sequence ACK. Lost
+ACKs replay safely; acknowledged payloads are cleared while hash receipts remain. There is
+no order-queue overloading. Matching uses provider message id plus account binding; opaque
+local callback can recover an unknown provider id for an already-submitted intent. Unknown
+messages are safely ignored/acknowledged. Status updates cannot downgrade delivered/read
+or turn those confirmed states into failure. Status reads remain behind the application
+session gate. Structured desktop events contain operation ids, provider/status/result codes
+only, never recipient, customer name, parameters, access token or raw webhook body.
+
+No campaigns, segmentation, automated birthday conversion, inbound inbox, bots, template
+editing, marketing scheduling, SMS or payment are introduced. Real Meta requests are absent
+from portable verification. See `docs/architecture/business-messaging.md` for deployment
+credentials, end-to-end activation and operational limits.

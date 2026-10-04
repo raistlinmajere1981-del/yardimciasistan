@@ -15,6 +15,9 @@ const manifestPath = join(outputRoot, "manifest.json");
 const tarballPath = join(outputRoot, "yardimci-asistan.tar.gz");
 const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
+  "api/whatsapp-webhook.php",
+  "api/business-messaging-status.php",
+  "lib/business-messaging.php",
   "bayi/index.php",
   "bayi/portal.js",
   "bayi/portal.css",

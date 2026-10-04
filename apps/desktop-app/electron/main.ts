@@ -1,3 +1,7 @@
+import { BusinessMessagingStatusSyncService } from "./business-messaging/status-sync-service";
+import { BusinessMessagingService } from "./business-messaging/service";
+import { createMessagingSecretWrite } from "./business-messaging/secret-service";
+import { registerBusinessMessagingIpc } from "./ipc/business-messaging-ipc";
 import { ShippingProviderService } from "./shipping-provider-service";
 import { registerShippingProviderIpcHandlers } from "./ipc/shipping-provider-ipc";
 import { createShippingSecretWrite } from "./shipping-secret-service";
@@ -321,6 +325,7 @@ if (!hasSingleInstanceLock) {
     reconcileEgmKbsBackgroundSession();
     syncCoordinator = new SyncCoordinator({
       onlineOrderIngress: new OnlineOrderIngressService(desktopDatabase),
+      pullBusinessMessagingStatuses: (config) => businessMessagingStatusSyncService.pull(config),
       database: desktopDatabase,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
       createAndroidSnapshot: () => createAndroidOperationsSnapshot(getDatabase(), getDatabase().getDashboardData()),
@@ -456,9 +461,17 @@ app.on("before-quit", () => {
   void localCompanionServer?.stop();
 });
 
+const businessMessagingStatusSyncService = new BusinessMessagingStatusSyncService(getDatabase, notifyBusinessMessagingChanged);
+const businessMessagingService = new BusinessMessagingService(getDatabase);
+function notifyBusinessMessagingChanged() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("businessMessaging:changed");
+  }
+}
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
+  registerBusinessMessagingIpc({ service: businessMessagingService, assertUnlocked: assertAppSessionUnlocked, onChanged: notifyBusinessMessagingChanged });
   const notifyShipmentsChanged = (orderId: string) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("commerce:shipmentsChanged", orderId);
@@ -516,6 +529,9 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     return profileSecretUpdates;
   }
 
+  let messagingSecretWrite;
+  try { messagingSecretWrite = createMessagingSecretWrite(input.whatsappCloud); }
+  catch (error) { return { ok: false, message: error instanceof Error ? error.message : "WhatsApp Business anahtarı kaydedilemedi." }; }
   let shippingSecretWrite;
   try { shippingSecretWrite = createShippingSecretWrite(input.arasShipping); }
   catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Kargo şifresi kaydedilemedi." }; }
@@ -523,8 +539,9 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     ...input,
     aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
     arasShipping: input.arasShipping ? { ...input.arasShipping, password: "" } : undefined,
+    whatsappCloud: input.whatsappCloud ? { ...input.whatsappCloud, accessToken: "" } : undefined,
     aiProfiles: profileSecretUpdates.profiles
-  }, secretUpdate.update, profileSecretUpdates.updates, shippingSecretWrite);
+  }, secretUpdate.update, profileSecretUpdates.updates, shippingSecretWrite, messagingSecretWrite);
   if (!localResult.ok) {
     return localResult;
   }
@@ -532,6 +549,7 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("commerce:shippingConfigurationChanged");
   }
+  notifyBusinessMessagingChanged();
   markLocalCompanionSnapshotDirty();
   getAndroidActionSyncService().markSnapshotPublishPending();
   reconcileLocalCompanionAdvertisement();

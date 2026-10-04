@@ -1,3 +1,4 @@
+import type { BusinessMessagingBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
   KbsConnectionTestResult,
@@ -190,7 +191,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge {
+export interface DesktopBridge extends BusinessMessagingBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
@@ -389,6 +390,17 @@ async function invokeCommerceMutation<T>(channel: string, ...args: unknown[]): P
 }
 
 const bridge: DesktopBridge = {
+  getBusinessMessagingConfiguration: () => invokeWhenUnlocked("businessMessaging:configuration"),
+  testBusinessMessagingConnection: (input) => invokeWhenUnlocked("businessMessaging:testConnection", input),
+  listBusinessMessagingTemplates: () => invokeWhenUnlocked("businessMessaging:templates"),
+  prepareBusinessTemplateMessage: (input) => invokeWhenUnlocked("businessMessaging:prepare", input),
+  sendBusinessTemplateMessage: (id, parameters) => invokeWhenUnlocked("businessMessaging:send", id, parameters),
+  getBusinessMessage: (id) => invokeWhenUnlocked("businessMessaging:message", id),
+  onBusinessMessagingChanged: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on("businessMessaging:changed", handler);
+    return () => ipcRenderer.removeListener("businessMessaging:changed", handler);
+  },
   setUiScale: (scale: number) => webFrame.setZoomFactor(scale),
   getAppLockStatus: () => ipcRenderer.invoke("appLock:getStatus"),
   getCurrentDiagnosticSession: () => invokeWhenUnlocked<DesktopDiagnosticSessionSummary | null>("diagnostics:getCurrentSession"),

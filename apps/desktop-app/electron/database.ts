@@ -1,3 +1,5 @@
+import * as messagingStore from "./business-messaging/store";
+import type { MessagingSecretWrite } from "./business-messaging/secret-service";
 import { getRuntimeOrder, applyRuntimeShipmentProviderResult } from "./commerce-runtime";
 import type { ShipmentProviderResultInput } from "./commerce-shipment-store";
 import { getShipmentRegistration, prepareShipmentRegistration, markShipmentRegistrationSubmitted, type ShipmentRegistration } from "./shipping-registration-store";
@@ -969,6 +971,16 @@ export class DesktopDatabase {
   }
   applyShipmentProviderResult(input: ShipmentProviderResultInput) { return applyRuntimeShipmentProviderResult(this.databasePath, input); }
 
+  getMessagingConfiguration() { return messagingStore.getMessagingConfiguration(this.db); }
+  getEncryptedMessagingToken() { return String(messagingStore.getStoredMessagingConfiguration(this.db)?.access_token_encrypted ?? ""); }
+  getMessagingCustomer(id: string) { return messagingStore.getMessagingCustomer(this.db, id); }
+  getBusinessMessage(id: string) { return messagingStore.getBusinessMessage(this.db, id); }
+  getMessageBinding(id: string) { return messagingStore.getMessageBinding(this.db, id); }
+  prepareBusinessMessage(input: Parameters<typeof messagingStore.prepareBusinessMessage>[1]) { return messagingStore.prepareBusinessMessage(this.db, input); }
+  claimBusinessMessage(id: string) { return messagingStore.claimBusinessMessage(this.db, id); }
+  applyBusinessMessageStatus(input: messagingStore.MessagingStatusUpdate) { return messagingStore.applyBusinessMessageStatus(this.db, input); }
+  failBusinessMessage(id: string, code: string, message: string) { return messagingStore.failBusinessMessage(this.db, id, code, message); }
+
   getArasShippingConfiguration() { return getArasShippingConfiguration(this.db); }
   getEncryptedShippingPassword() { return String(getStoredArasShippingConfiguration(this.db)?.password_encrypted ?? ""); }
 
@@ -1016,14 +1028,16 @@ export class DesktopDatabase {
     input: SaveInitialSetupInput,
     aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
     aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {},
-    shippingSecretWrite: ShippingSecretWrite = { mode: "keep" }
+    shippingSecretWrite: ShippingSecretWrite = { mode: "keep" },
+    messagingSecretWrite: MessagingSecretWrite = { mode: "keep" }
   ): DesktopSetupSaveResult {
     const result = saveStoredSetupData(
       this.db,
       input,
       aiApiKeyWrite,
       aiProfileApiKeyWrites,
-      shippingSecretWrite
+      shippingSecretWrite,
+      messagingSecretWrite
     );
     if (!result.ok) return result;
     return {

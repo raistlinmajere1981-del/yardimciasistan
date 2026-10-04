@@ -1,3 +1,4 @@
+import { BusinessTemplateMessagePanel } from "./BusinessTemplateMessagePanel";
 import { useEffect, useMemo, useState } from "react";
 import { BedDouble, History, MessageCircle, Save, Trash2 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
@@ -60,8 +61,9 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const [baseline, setBaseline] = useState<CustomerFormState>(() => toCustomerForm(customer));
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [entryRoomId, setEntryRoomId] = useState(data.rooms.find((room) => room.isActive)?.id ?? "");
+  const [messagingBusy, setMessagingBusy] = useState(false);
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
-  const closeBlocked = useWorkspaceCloseGuard({ busy: saveState === "loading", dirty });
+  const closeBlocked = useWorkspaceCloseGuard({ busy: saveState === "loading" || messagingBusy, dirty });
   const history = intent.mode === "history";
   const presentation = navigation.current?.presentation ?? "centered";
 
@@ -143,7 +145,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     actions={<ActionButton
       variant="ghost"
       size="sm"
-      disabled={saveState === "loading" || dirty}
+      disabled={saveState === "loading" || messagingBusy || dirty}
       title={dirty ? "Geçmişe geçmeden önce değişiklikleri kaydedin veya geri alın." : undefined}
       onClick={() => navigation.updateWorkspaceMode({ entityType: "customer", mode: history ? "main" : "history" })}
     >
@@ -184,6 +186,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
       </form>
 
       <aside className="customer-workspace-operations" aria-label="Müşteri işlemleri">
+        <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
         {wholesaleEnabled && customer.commercialProfile?.dealerStatus === "active" && <DealerWebAccessPanel key={customer.id} customerId={customerId} disabled={dirty || saveState === "loading"} />}
         {staysEnabled && <section className="panel customer-operation-card form-stack" aria-label="Konaklama">
           <div className="customer-operation-card__heading">

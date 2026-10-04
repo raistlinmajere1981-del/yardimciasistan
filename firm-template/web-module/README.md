@@ -507,3 +507,9 @@ Revocation/rotation becomes effective after successful Desktop sync; no online r
 means no guarantee that remote sessions have already ended. Claimed status is hosting
 state and is not inferred from Desktop's “Davet hazır” label. Runtime reset clears both
 dealer access and sessions. Customer contacts/tax/notes and price groups are not published.
+
+WhatsApp Business Cloud outbound status webhooks use `api/whatsapp-webhook.php`.
+Set hosting environment secrets `YA_WHATSAPP_VERIFY_TOKEN` and `YA_WHATSAPP_APP_SECRET`
+without putting them in `business.json` or publications. The isolated status inbox is
+pulled/acknowledged by desktop with the existing sync credential; no inbound conversation
+storage exists. See [Business Messaging deployment](../../docs/architecture/business-messaging.md).

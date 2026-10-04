@@ -48,6 +48,11 @@ export const arasShippingDefinition = {
   persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ORDERS)
 } as const satisfies SettingsSectionDefinition;
 
+export const whatsappCloudDefinition = {
+  id: "settings-whatsapp-business", category: "services", title: "WhatsApp Business",
+  keywords: "meta cloud business waba token şablon mesaj bağlantı", persistence: "staged"
+} as const satisfies SettingsSectionDefinition;
+
 export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-business", category: "business", title: "İşletme", keywords: "firma adı sektör tipi telefon whatsapp e-posta adres", persistence: "staged" },
   { id: "settings-options", category: "business", title: "Ek özellikler", keywords: "yetenek talepler oda masa rezervasyonları qr menü stok veresiye müşteri hesabı satın alma tedarikçi etiket", persistence: "staged" },
@@ -58,6 +63,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   onlineSalesDeliveryDefinition,
   dealerPortalDefinition,
   arasShippingDefinition,
+  whatsappCloudDefinition,
   { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },
