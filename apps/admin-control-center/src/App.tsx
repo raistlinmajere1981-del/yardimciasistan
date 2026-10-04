@@ -1061,6 +1061,74 @@ function Placeholder({ section }: { section: Section }) {
   );
 }
 
+function StartupSplash({
+  error,
+  onRetry
+}: {
+  error: string;
+  onRetry: () => void;
+}) {
+  const phases = [
+    "Admin arayüzü hazırlanıyor…",
+    "Repo ve sürüm bilgileri okunuyor…",
+    "Canlı kurulumlar kontrol ediliyor…",
+    "Doğrulama ve yayın durumu toparlanıyor…"
+  ];
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    if (error) return;
+    const timer = window.setInterval(() => {
+      setPhase((current) => Math.min(current + 1, phases.length - 1));
+    }, 900);
+    return () => window.clearInterval(timer);
+  }, [error, phases.length]);
+
+  return (
+    <main className="startup-splash">
+      <div className="startup-card">
+        <div className="startup-brand-mark">YA</div>
+        <p className="startup-kicker">YARDIMCI ASİSTAN</p>
+        <h1>Admin Control Center</h1>
+
+        {error ? (
+          <>
+            <div className="startup-error">
+              <TriangleAlert size={22} />
+              <div>
+                <strong>Başlangıç tamamlanamadı.</strong>
+                <span>{error}</span>
+              </div>
+            </div>
+            <button className="button button--primary startup-retry" onClick={onRetry}>
+              <RefreshCw size={17} />
+              Tekrar Dene
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="startup-progress">
+              <RefreshCw className="spin" size={22} />
+              <div>
+                <strong>{phases[phase]}</strong>
+                <span>Ağ kontrolleri bağlantı durumuna göre birkaç saniye sürebilir.</span>
+              </div>
+            </div>
+            <div className="startup-steps" aria-hidden="true">
+              {phases.map((_, index) => (
+                <span
+                  key={index}
+                  className={index <= phase ? "startup-step startup-step--active" : "startup-step"}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
   const [section, setSection] = useState<Section>("overview");
   const [data, setData] = useState<OverviewSnapshot | null>(null);
@@ -1089,6 +1157,10 @@ export default function App() {
     if (data.counts.drift > 0) return { text: `${data.counts.drift} dikkat`, tone: "warning" as StatusKind };
     return { text: "Sistemler stabil", tone: "ready" as StatusKind };
   }, [data]);
+
+  if (!data) {
+    return <StartupSplash error={error} onRetry={() => void loadOverview()} />;
+  }
 
   return (
     <div className="app-shell">
