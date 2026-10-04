@@ -22,6 +22,14 @@ const bridge: AdminBridge = {
     ipcRenderer.on("admin:deployment-run-state", handler);
     return () => ipcRenderer.removeListener("admin:deployment-run-state", handler);
   },
+  getReleaseOperationState: () => ipcRenderer.invoke("admin:get-release-operation-state"),
+  startReleaseOperation: (request) => ipcRenderer.invoke("admin:start-release-operation", request),
+  cancelReleaseOperation: () => ipcRenderer.invoke("admin:cancel-release-operation"),
+  onReleaseOperationState: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
+    ipcRenderer.on("admin:release-operation-state", handler);
+    return () => ipcRenderer.removeListener("admin:release-operation-state", handler);
+  },
   getSystemEnvironment: () => ipcRenderer.invoke("admin:get-system-environment"),
   listSupportReports: (limit) => ipcRenderer.invoke("admin:list-support-reports", limit),
   getSupportReportDetail: (reportId) => ipcRenderer.invoke("admin:get-support-report-detail", reportId),
