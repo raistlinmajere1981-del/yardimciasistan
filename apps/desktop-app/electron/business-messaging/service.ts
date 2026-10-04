@@ -1,3 +1,5 @@
+import { reconcile, type DispatchResult } from "../messaging-campaigns/dispatch-contract";
+import { MessagingCampaignError } from "../messaging-campaigns/validation";
 import { createHash } from "node:crypto";
 import { normalizeInternationalPhone } from "@yardimci-asistan/whatsapp-bridge";
 import { BUSINESS_CAPABILITIES, type BusinessTemplateIntentInput, type BusinessMessageTemplate, type WhatsAppCloudConfigurationInput, type BusinessMessagingConnectionResult } from "@yardimci-asistan/shared";
@@ -61,6 +63,7 @@ export class BusinessMessagingService {
   getMessage(id: string) { this.assertCustomers(); const message = this.getDatabase().getBusinessMessage(id); if (!message) throw new BusinessMessagingError("missing_message"); return message; }
   async send(id: string, parameters: string[][]) {
     const message = this.getMessage(id), db = this.getDatabase();
+    if (message.campaignId) throw new BusinessMessagingError("campaign_dispatch_only", "Kampanya mesajları kontrollü gönderim üzerinden işlenir.");
     const binding = db.getMessageBinding(id);
     if (!binding) throw new BusinessMessagingError("missing_message");
     // Retry is an exact intent replay. No new POST, even after process crash or lost response.
@@ -92,4 +95,47 @@ export class BusinessMessagingService {
       return db.failBusinessMessage(id, error.code, error.message);
     }
   }
+  /** D-037 transport boundary: no campaign provider request can bypass its outbox lease and submission fence. */
+  async dispatchCampaignItem(id: string, token: string, intervalMs: number, allowed: () => boolean, now: () => Date): Promise<DispatchResult> {
+    const db = this.getDatabase(), claim = db.getCampaignDispatchClaim(id, token);
+    if (!claim) return { kind: "deferred", nextAttemptAt: now().toISOString() };
+    if (claim.submitted) return reconcile(claim);
+    if (!allowed() || claim.campaign.status !== "running") return { kind: "deferred", nextAttemptAt: now().toISOString() };
+    let submitting = false;
+    try {
+      if (claim.item.channel !== "whatsapp" || claim.item.providerId !== "whatsapp_cloud") return { kind: "failed", category: "unavailable_provider" };
+      const credentials = this.credentials(), accountKey = messagingAccountKey(credentials.wabaId, credentials.phoneNumberId);
+      const adapter = new WhatsAppCloudProviderAdapter(credentials, this.httpOptions);
+      const template = (await adapter.listTemplates()).find((value) => value.name === claim.campaign.templateName && value.language === claim.campaign.templateLanguage);
+      if (!allowed()) return { kind: "deferred", nextAttemptAt: now().toISOString() };
+      const current = this.credentials();
+      if (messagingAccountKey(current.wabaId, current.phoneNumberId) !== accountKey || current.accessToken !== credentials.accessToken) return { kind: "failed", category: "account_changed" };
+      if (!template) return { kind: "failed", category: "missing_template" };
+      const submission = db.beginCampaignSubmission(id, token, template, accountKey, now().toISOString(), intervalMs);
+      if (submission.kind !== "ready") return submission;
+      submitting = true;
+      const result = await adapter.sendTemplateMessage({ message: submission.message, parameters: submission.parameters, template });
+      // Persist the authoritative receipt first. Recovery can then reconcile the outbox without another POST.
+      const saved = db.applyBusinessMessageStatus({ ...result, messageId: submission.message.id, status: "accepted", timestamp: now().toISOString(), accountKey });
+      if (!saved || saved.id !== submission.message.id) return { kind: "retry", category: "submission_uncertain" };
+      return { kind: "accepted", businessMessageId: saved.id };
+    } catch (caught) {
+      if (caught instanceof MessagingCampaignError) return { kind: "failed", category: caught.code };
+      const error = normalizeBusinessMessagingError(caught);
+      if (submitting) {
+        if (!error.disposition?.rejected) return { kind: "retry", category: "submission_uncertain" };
+        if (error.disposition.retry !== "none") {
+          if (!db.releaseRejectedCampaignMessage(id, token)) return { kind: "retry", category: "submission_uncertain" };
+          return { kind: "retry", category: error.disposition.retry, retryAfterMs: error.disposition.retryAfterMs };
+        }
+        return { kind: "failed", category: error.code };
+      }
+      // Metadata I/O is read-only; its transient errors can safely be retried.
+      if (["network", "timeout"].includes(error.code) || (error.disposition && error.disposition.retry !== "none")) return {
+        kind: "retry", category: error.disposition?.retry === "rate_limit" ? "rate_limit" : "transient", retryAfterMs: error.disposition?.retryAfterMs
+      };
+      return { kind: "failed", category: error.code };
+    }
+  }
+
 }

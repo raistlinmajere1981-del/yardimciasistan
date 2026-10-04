@@ -30,7 +30,16 @@ export class WhatsAppCloudProviderAdapter implements BusinessMessagingProviderAd
       if (!object(data)) throw new BusinessMessagingError("invalid_response");
       if (!response.ok || data.error) {
         const code = object(data.error) && Number.isSafeInteger(data.error.code) ? `provider_${data.error.code}` : `http_${response.status}`;
-        throw new BusinessMessagingError(code, "WhatsApp Business sağlayıcısı isteği kabul etmedi.");
+        // Provider code allowlist stays here, never in the campaign worker/domain policy.
+        const providerCode = object(data.error) && Number.isSafeInteger(data.error.code) ? Number(data.error.code) : 0;
+        const throttled = response.status === 429 || [4, 80007, 130429, 131056].includes(providerCode);
+        const retry = throttled ? "rate_limit" : response.status >= 500 || (object(data.error) && data.error.is_transient === true) ? "transient" : "none";
+        const after = response.headers.get("retry-after");
+        const delay = after && /^\d{1,6}$/.test(after) ? Number(after) * 1000 : after ? Date.parse(after) - Date.now() : 0;
+        // A structured error proves rejection. A malformed 5xx or lost response does not prove non-submission.
+        throw new BusinessMessagingError(code, "WhatsApp Business sağlayıcısı isteği kabul etmedi.", {
+          rejected: object(data.error) && Number.isSafeInteger(data.error.code) && !data.messages, retry, ...(Number.isFinite(delay) && delay > 0 ? { retryAfterMs: Math.min(delay, 86400000) } : {})
+        });
       }
       return data;
     } catch (error) {

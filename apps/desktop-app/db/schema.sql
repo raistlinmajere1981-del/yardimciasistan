@@ -900,6 +900,7 @@ CREATE TABLE sync_outbox (
   job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish')),
   source_revision INTEGER NOT NULL DEFAULT 1,
   attempt_count INTEGER NOT NULL DEFAULT 0,
+  claim_token TEXT NOT NULL DEFAULT '', claimed_at TEXT NOT NULL DEFAULT '',
   next_attempt_at TEXT NOT NULL DEFAULT '',
   last_error TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
@@ -1025,6 +1026,7 @@ CREATE TABLE birthday_message_deliveries (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'prepared', 'sent', 'skipped', 'failed')),
   attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
   last_attempted_at TEXT NOT NULL DEFAULT '',
+  claim_token TEXT NOT NULL DEFAULT '', claimed_at TEXT NOT NULL DEFAULT '',
   next_attempt_at TEXT NOT NULL DEFAULT '',
   prepared_at TEXT NOT NULL DEFAULT '',
   sent_at TEXT NOT NULL DEFAULT '',
@@ -2627,6 +2629,8 @@ CREATE TABLE business_messaging_provider_config (
 );
 CREATE TABLE business_messages (
   id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), customer_id TEXT REFERENCES customers(id),
+  purpose TEXT NOT NULL DEFAULT 'operational' CHECK(purpose IN ('operational','marketing')),
+  campaign_id TEXT REFERENCES messaging_campaigns(id), campaign_recipient_id TEXT REFERENCES messaging_campaign_recipients(id),
   related_entity_type TEXT NOT NULL DEFAULT '', related_entity_id TEXT NOT NULL DEFAULT '',
   provider_id TEXT NOT NULL, recipient TEXT NOT NULL, message_kind TEXT NOT NULL CHECK(message_kind IN ('template','session')),
   template_name TEXT NOT NULL, template_language TEXT NOT NULL, provider_message_id TEXT NOT NULL DEFAULT '',
@@ -2641,7 +2645,7 @@ CREATE TABLE business_message_provider_bindings (
   intent_hash TEXT NOT NULL, submitted INTEGER NOT NULL DEFAULT 0
 );
 
--- D-036: desktop-only marketing intent. No contact/body snapshots or dispatcher.
+-- D-036: desktop-only marketing intent. No contact/body snapshots. D-037 owns dispatch.
 CREATE TABLE customer_messaging_preferences (
   business_id TEXT NOT NULL REFERENCES business(id), customer_id TEXT NOT NULL REFERENCES customers(id),
   channel TEXT NOT NULL CHECK(channel IN ('whatsapp','sms')), purpose TEXT NOT NULL CHECK(purpose='marketing'),
@@ -2661,7 +2665,7 @@ CREATE TABLE messaging_campaigns (
   purpose TEXT NOT NULL CHECK(purpose='marketing'), channel TEXT NOT NULL CHECK(channel IN ('whatsapp','sms')),
   provider_id TEXT, segment_id TEXT NOT NULL, template_name TEXT NOT NULL, template_language TEXT NOT NULL,
   bindings_json TEXT NOT NULL, template_snapshot_json TEXT, preparation_counts_json TEXT,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','prepared','cancelled','completed')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','prepared','running','paused','cancelled','completed')),
   prepared_at TEXT NOT NULL DEFAULT '', cancelled_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
   UNIQUE(id,business_id), FOREIGN KEY(segment_id,business_id) REFERENCES messaging_segments(id,business_id)
 );
@@ -2679,11 +2683,16 @@ CREATE TABLE messaging_outbox (
   business_message_id TEXT REFERENCES business_messages(id),
   status TEXT NOT NULL CHECK(status IN ('pending','claimed','dispatched','skipped','failed','cancelled')),
   operation_key TEXT NOT NULL UNIQUE, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count>=0),
+  claim_token TEXT NOT NULL DEFAULT '', claimed_at TEXT NOT NULL DEFAULT '',
   next_attempt_at TEXT NOT NULL DEFAULT '', last_error TEXT NOT NULL DEFAULT '' CHECK(length(last_error)<=240),
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
   UNIQUE(campaign_id,customer_id,channel),
   FOREIGN KEY(campaign_id,business_id) REFERENCES messaging_campaigns(id,business_id),
   FOREIGN KEY(campaign_recipient_id,campaign_id,customer_id) REFERENCES messaging_campaign_recipients(id,campaign_id,customer_id)
+);
+CREATE UNIQUE INDEX messaging_outbox_message ON messaging_outbox(business_message_id) WHERE business_message_id IS NOT NULL;
+CREATE TABLE messaging_dispatch_runtime (
+  business_id TEXT PRIMARY KEY REFERENCES business(id), next_dispatch_at TEXT NOT NULL
 );
 CREATE INDEX messaging_outbox_pending ON messaging_outbox(business_id,status,next_attempt_at);
 CREATE INDEX messaging_outbox_customer ON messaging_outbox(customer_id,channel,status);
@@ -2695,9 +2704,9 @@ BEGIN
   UPDATE messaging_campaign_recipients SET status='skipped',
     skip_reason=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END, updated_at=NEW.updated_at
     WHERE id IN (SELECT campaign_recipient_id FROM messaging_outbox WHERE business_id=NEW.business_id
-      AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending');
+      AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending' AND NOT EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=messaging_outbox.business_message_id AND b.submitted=1));
   UPDATE messaging_outbox SET status='skipped', last_error=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END,
-    updated_at=NEW.updated_at WHERE business_id=NEW.business_id AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending';
+    updated_at=NEW.updated_at WHERE business_id=NEW.business_id AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending' AND NOT EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=messaging_outbox.business_message_id AND b.submitted=1);
 END;
 CREATE TRIGGER trg_messaging_preference_suppress_update AFTER UPDATE OF status ON customer_messaging_preferences
 WHEN NEW.status != 'opted_in'
@@ -2705,15 +2714,23 @@ BEGIN
   UPDATE messaging_campaign_recipients SET status='skipped',
     skip_reason=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END, updated_at=NEW.updated_at
     WHERE id IN (SELECT campaign_recipient_id FROM messaging_outbox WHERE business_id=NEW.business_id
-      AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending');
+      AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending' AND NOT EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=messaging_outbox.business_message_id AND b.submitted=1));
   UPDATE messaging_outbox SET status='skipped', last_error=CASE WHEN NEW.status='opted_out' THEN 'opted_out' ELSE 'unknown_consent' END,
-    updated_at=NEW.updated_at WHERE business_id=NEW.business_id AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending';
+    updated_at=NEW.updated_at WHERE business_id=NEW.business_id AND customer_id=NEW.customer_id AND channel=NEW.channel AND status='pending' AND NOT EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=messaging_outbox.business_message_id AND b.submitted=1);
 END;
 CREATE TRIGGER trg_messaging_customer_deleted AFTER UPDATE OF deleted_at ON customers
 WHEN NEW.deleted_at != ''
 BEGIN
   UPDATE messaging_campaign_recipients SET status='skipped', skip_reason='customer_unavailable', updated_at=NEW.updated_at
-    WHERE id IN (SELECT campaign_recipient_id FROM messaging_outbox WHERE customer_id=NEW.id AND status='pending');
+    WHERE id IN (SELECT campaign_recipient_id FROM messaging_outbox WHERE customer_id=NEW.id AND status='pending' AND NOT EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=messaging_outbox.business_message_id AND b.submitted=1));
   UPDATE messaging_outbox SET status='skipped', last_error='customer_unavailable', updated_at=NEW.updated_at
-    WHERE customer_id=NEW.id AND status='pending';
+    WHERE customer_id=NEW.id AND status='pending' AND NOT EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=messaging_outbox.business_message_id AND b.submitted=1);
+END;
+
+-- A certainly unsent canonical campaign message shares the terminal cancellation of its transport intent.
+CREATE TRIGGER trg_campaign_outbox_terminal_message AFTER UPDATE OF status ON messaging_outbox
+WHEN NEW.status IN ('skipped','cancelled') AND NEW.business_message_id IS NOT NULL
+BEGIN
+  UPDATE business_messages SET status='cancelled' WHERE id=NEW.business_message_id AND purpose='marketing' AND status='draft'
+    AND EXISTS(SELECT 1 FROM business_message_provider_bindings b WHERE b.message_id=NEW.business_message_id AND b.submitted=0);
 END;

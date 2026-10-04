@@ -400,6 +400,14 @@ const bridge: DesktopBridge = {
   getMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:campaign", id),
   previewMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:preview", id),
   prepareMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:prepare", id),
+  startMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:start", id),
+  pauseMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:pause", id),
+  resumeMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:resume", id),
+  onMessagingCampaignsChanged: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on("messagingCampaigns:changed", handler);
+    return () => ipcRenderer.removeListener("messagingCampaigns:changed", handler);
+  },
   cancelMessagingCampaign: (id) => invokeWhenUnlocked("messagingCampaigns:cancel", id),
   getBusinessMessagingConfiguration: () => invokeWhenUnlocked("businessMessaging:configuration"),
   testBusinessMessagingConnection: (input) => invokeWhenUnlocked("businessMessaging:testConnection", input),

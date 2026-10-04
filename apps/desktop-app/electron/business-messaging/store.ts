@@ -39,6 +39,7 @@ export function getMessagingCustomer(db: DatabaseSync, id: string) {
 }
 function project(row: Record<string, unknown>): BusinessMessage {
   return { id: String(row.id), businessId: String(row.business_id), customerId: row.customer_id ? String(row.customer_id) : undefined,
+    purpose: row.purpose as BusinessMessage["purpose"], campaignId: row.campaign_id ? String(row.campaign_id) : undefined, campaignRecipientId: row.campaign_recipient_id ? String(row.campaign_recipient_id) : undefined,
     relatedEntityType: row.related_entity_type ? String(row.related_entity_type) : undefined, relatedEntityId: row.related_entity_id ? String(row.related_entity_id) : undefined,
     providerId: "whatsapp_cloud", recipient: String(row.recipient), messageKind: row.message_kind === "session" ? "session" : "template",
     templateName: String(row.template_name), templateLanguage: String(row.template_language), providerMessageId: String(row.provider_message_id),
@@ -51,25 +52,32 @@ export function getBusinessMessage(db: DatabaseSync, id: string): BusinessMessag
 export function getMessageBinding(db: DatabaseSync, id: string) {
   return db.prepare("SELECT * FROM business_message_provider_bindings WHERE message_id=?").get(id);
 }
-export function prepareBusinessMessage(db: DatabaseSync, input: { customerId: string; recipient: string; templateName: string; templateLanguage: string; intentHash: string; accountKey: string }) {
+export interface PrepareBusinessMessageInput { customerId: string; recipient: string; templateName: string; templateLanguage: string; intentHash: string; accountKey: string; campaignId?: string; campaignRecipientId?: string }
+/** Caller owns the transaction, allowing an outbox attachment to commit with the canonical message. */
+export function insertBusinessMessage(db: DatabaseSync, input: PrepareBusinessMessageInput) {
   const id = `business_message_${randomUUID()}`;
+  db.prepare(`INSERT INTO business_messages(id,business_id,customer_id,provider_id,recipient,message_kind,template_name,template_language,status,created_at,purpose,campaign_id,campaign_recipient_id)
+    VALUES (?,?,?,'whatsapp_cloud',?,'template',?,?,'draft',?,?,?,?)`)
+    .run(id, business(db), input.customerId, input.recipient, input.templateName, input.templateLanguage, new Date().toISOString(), input.campaignId ? "marketing" : "operational", input.campaignId ?? null, input.campaignRecipientId ?? null);
+  db.prepare("INSERT INTO business_message_provider_bindings(message_id,account_key,intent_hash) VALUES (?,?,?)").run(id, input.accountKey, input.intentHash);
+  return getBusinessMessage(db, id)!;
+}
+export function prepareBusinessMessage(db: DatabaseSync, input: PrepareBusinessMessageInput) {
   db.exec("BEGIN IMMEDIATE");
-  try {
-    db.prepare(`INSERT INTO business_messages(id,business_id,customer_id,provider_id,recipient,message_kind,template_name,template_language,status,created_at)
-      VALUES (?,?,?,'whatsapp_cloud',?,'template',?,?,'draft',?)`)
-      .run(id, business(db), input.customerId, input.recipient, input.templateName, input.templateLanguage, new Date().toISOString());
-    db.prepare("INSERT INTO business_message_provider_bindings(message_id,account_key,intent_hash) VALUES (?,?,?)").run(id, input.accountKey, input.intentHash);
-    db.exec("COMMIT"); return getBusinessMessage(db, id)!;
-  } catch (error) { db.exec("ROLLBACK"); throw error; }
+  try { const result = insertBusinessMessage(db, input); db.exec("COMMIT"); return result; }
+  catch (error) { db.exec("ROLLBACK"); throw error; }
+}
+/** Durable submission fence. Caller owns the transaction. */
+export function claimBusinessMessageInTransaction(db: DatabaseSync, id: string) {
+  const changed = db.prepare("UPDATE business_message_provider_bindings SET submitted=1 WHERE message_id=? AND submitted=0 AND EXISTS(SELECT 1 FROM business_messages m WHERE m.id=message_id AND m.status='draft')").run(id).changes;
+  if (changed) db.prepare("UPDATE business_messages SET status='queued' WHERE id=? AND status='draft'").run(id);
+  return Boolean(changed);
 }
 /** Claim before HTTP, durable across restart. Cloud API has no send deduplication API. */
 export function claimBusinessMessage(db: DatabaseSync, id: string) {
   db.exec("BEGIN IMMEDIATE");
-  try {
-    const changed = db.prepare("UPDATE business_message_provider_bindings SET submitted=1 WHERE message_id=? AND submitted=0 AND EXISTS(SELECT 1 FROM business_messages m WHERE m.id=message_id AND m.status='draft')").run(id).changes;
-    if (changed) db.prepare("UPDATE business_messages SET status='queued' WHERE id=? AND status='draft'").run(id);
-    db.exec("COMMIT"); return Boolean(changed);
-  } catch (error) { db.exec("ROLLBACK"); throw error; }
+  try { const changed = claimBusinessMessageInTransaction(db, id); db.exec("COMMIT"); return changed; }
+  catch (error) { db.exec("ROLLBACK"); throw error; }
 }
 export interface MessagingStatusUpdate { providerMessageId: string; status: "accepted" | "delivered" | "read" | "failed"; timestamp: string; failureCode?: string; messageId?: string; accountKey?: string }
 export function applyBusinessMessageStatus(db: DatabaseSync, input: MessagingStatusUpdate) {
@@ -100,7 +108,7 @@ export function applyBusinessMessageStatus(db: DatabaseSync, input: MessagingSta
   return getBusinessMessage(db, current.id);
 }
 export function failBusinessMessage(db: DatabaseSync, id: string, code: string, message: string) {
-  db.prepare("UPDATE business_messages SET status='failed', failure_code=?, failure_message=?, failed_at=? WHERE id=? AND status='queued'")
+  db.prepare("UPDATE business_messages SET status='failed', failure_code=?, failure_message=?, failed_at=? WHERE id=? AND (status='queued' OR (status='draft' AND purpose='marketing'))")
     .run(code.slice(0,64), message.slice(0,240), new Date().toISOString(), id);
   return getBusinessMessage(db, id)!;
 }

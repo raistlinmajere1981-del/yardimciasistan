@@ -37,7 +37,7 @@ export interface MessagingAudienceCounts {
   missingRecipientCount: number;
 }
 export interface MessagingCampaign extends MessagingCampaignInput {
-  id: string; businessId: string; status: "draft" | "prepared" | "cancelled" | "completed";
+  id: string; businessId: string; status: "draft" | "prepared" | "running" | "paused" | "cancelled" | "completed";
   preparedAt: string; cancelledAt: string; createdAt: string; updatedAt: string;
   /** Provider-approved metadata captured at preparation. No resolved Customer values. */
   templateSnapshot: BusinessMessageTemplate | null;
@@ -48,15 +48,16 @@ export interface MessagingCampaignRecipient {
   id: string; campaignId: string; customerId: string; status: "prepared" | "skipped" | "cancelled";
   skipReason: MessagingRecipientSkipReason; createdAt: string; updatedAt: string;
 }
-/** Durable intent seam for D3. D2 has no claim/dispatch worker or send IPC. */
+/** Durable intent; dispatched means provider acceptance, not delivery. */
 export interface MessagingOutboxItem {
   id: string; businessId: string; campaignId: string; campaignRecipientId: string; customerId: string;
   channel: MessagingChannel; providerId: BusinessMessagingProviderId; businessMessageId?: string;
   status: "pending" | "claimed" | "dispatched" | "skipped" | "failed" | "cancelled";
-  operationKey: string; attemptCount: number; nextAttemptAt: string; lastError: string; createdAt: string; updatedAt: string;
+  claimToken: string; claimedAt: string; operationKey: string; attemptCount: number; nextAttemptAt: string; lastError: string; createdAt: string; updatedAt: string;
 }
 export interface MessagingCampaignDetail {
-  campaign: MessagingCampaign; matchedCount: number; eligibleCount: number; skippedCount: number; pendingOutboxCount: number;
+  errorCounts: { category: string; count: number }[];
+  campaign: MessagingCampaign; matchedCount: number; eligibleCount: number; skippedCount: number; pendingOutboxCount: number; claimedOutboxCount: number; dispatchedCount: number; failedCount: number; cancelledCount: number;
 }
 export interface MessagingCampaignBridge {
   getCustomerMessagingPreference(customerId: string, channel: MessagingChannel, purpose: MessagingPurpose): Promise<BusinessMessagingResult<CustomerMessagingPreference>>;
@@ -69,5 +70,9 @@ export interface MessagingCampaignBridge {
   getMessagingCampaign(id: string): Promise<BusinessMessagingResult<MessagingCampaignDetail>>;
   previewMessagingCampaign(id: string): Promise<BusinessMessagingResult<MessagingAudienceCounts>>;
   prepareMessagingCampaign(id: string): Promise<BusinessMessagingResult<MessagingCampaignDetail>>;
+  startMessagingCampaign(id: string): Promise<BusinessMessagingResult<MessagingCampaignDetail>>;
+  pauseMessagingCampaign(id: string): Promise<BusinessMessagingResult<MessagingCampaignDetail>>;
+  resumeMessagingCampaign(id: string): Promise<BusinessMessagingResult<MessagingCampaignDetail>>;
+  onMessagingCampaignsChanged(listener: () => void): () => void;
   cancelMessagingCampaign(id: string): Promise<BusinessMessagingResult<MessagingCampaignDetail>>;
 }

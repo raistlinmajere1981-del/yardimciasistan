@@ -8,7 +8,7 @@ import { StatusBadge } from "../components/ui/StatusBadge";
 
 const emptyCampaign = (): MessagingCampaignInput => ({ name: "", purpose: "marketing", channel: "whatsapp", providerId: "whatsapp_cloud", segmentId: "", templateName: "", templateLanguage: "", bindings: [] });
 const emptySegment = (): SaveMessagingSegmentInput => ({ name: "", description: "", filterDefinition: { version: 1, rules: [] } });
-const statusLabels = { draft: "Taslak", prepared: "Hazırlandı", cancelled: "İptal edildi", completed: "Tamamlandı" };
+const statusLabels = { draft: "Taslak", prepared: "Hazırlandı", running: "Gönderim sürüyor", paused: "Duraklatıldı", cancelled: "İptal edildi", completed: "Tamamlandı" };
 function resultValue<T>(result: BusinessMessagingResult<T>) { if (!result.ok) throw new Error(result.message); return result.value; }
 function AudienceCounts({ value }: { value: MessagingAudienceCounts }) {
   return <dl className="campaign-counts" aria-label="Kitle önizlemesi">
@@ -64,12 +64,16 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard }: { enabled: bo
       const configuration = await window.yardimciDesktop!.getBusinessMessagingConfiguration();
       if (!mounted.current) return;
       setConfigured(configuration.configured);
-      if (configuration.configured) {
-        const values = resultValue(await window.yardimciDesktop!.listBusinessMessagingTemplates());
-        if (mounted.current) setTemplates(values);
-      }
     });
   }, [enabled]);
+  useEffect(() => {
+    if (!enabled || !configured) { setTemplates([]); return; }
+    let live = true;
+    void window.yardimciDesktop!.listBusinessMessagingTemplates().then((result) => {
+      if (live && mounted.current) setTemplates(resultValue(result));
+    }).catch((error) => { if (live && mounted.current) setMessage(error instanceof Error ? error.message : "Şablonlar okunamadı."); });
+    return () => { live = false; };
+  }, [enabled, configured]);
   function navigate(next: () => void) {
     if (busy) return;
     if (dirty) { setPendingLeave(() => next); return; }
@@ -89,6 +93,37 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard }: { enabled: bo
   async function openCampaign(id: string) {
     await action(async () => { const value = resultValue(await window.yardimciDesktop!.getMessagingCampaign(id)); if (mounted.current) { setDetail(value); setView("detail"); setPreview(null); } });
   }
+  async function dispatchAction(kind: "start" | "pause" | "resume") {
+    if (!detail) return;
+    await action(async () => {
+      const bridge = window.yardimciDesktop!, operation = kind === "start" ? bridge.startMessagingCampaign : kind === "pause" ? bridge.pauseMessagingCampaign : bridge.resumeMessagingCampaign;
+      const value = resultValue(await operation(detail.campaign.id));
+      if (mounted.current) setDetail(value);
+      await reload();
+      const current = resultValue(await bridge.getMessagingCampaign(detail.campaign.id));
+      if (mounted.current) setDetail(current);
+    });
+  }
+  const campaignId = detail?.campaign.id;
+  useEffect(() => {
+    if (!enabled) return;
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.onMessagingCampaignsChanged) return;
+    let live = true, version = 0;
+    const refresh = async () => {
+      const revision = ++version;
+      try {
+        const [list, configuration, current] = await Promise.all([bridge.listMessagingCampaigns(), bridge.getBusinessMessagingConfiguration(),
+          view === "detail" && campaignId ? bridge.getMessagingCampaign(campaignId) : Promise.resolve(null)]);
+        if (!live || !mounted.current || revision !== version) return;
+        setCampaigns(resultValue(list)); setConfigured(configuration.configured);
+        if (current) setDetail(resultValue(current));
+      } catch { /* The explicit operation displays errors; background refresh keeps the last view. */ }
+    };
+    const disposeCampaign = bridge.onMessagingCampaignsChanged(() => { void refresh(); });
+    const disposeProvider = bridge.onBusinessMessagingChanged?.(() => { void refresh(); });
+    return () => { live = false; disposeCampaign(); disposeProvider?.(); };
+  }, [enabled, view, campaignId]);
   const selectedTemplate = templates.find((item) => item.name === draft.templateName && item.language === draft.templateLanguage);
   function selectTemplate(name: string, language: string) {
     const template = templates.find((item) => item.name === name && item.language === language);
@@ -111,7 +146,7 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard }: { enabled: bo
     </div></section>}
     <div className="campaign-workspace" aria-busy={busy}>
       {message && <p role="status">{message}</p>}
-      <p className="muted">Bu aşamada kitle ve bekleyen gönderim kayıtları hazırlanır. Mesaj gönderimi yapılmaz.</p>
+      <p className="muted">Hazırlama yalnız kitleyi dondurur. Gönderim, siz başlattıktan sonra kontrollü olarak ilerler. Kabul edilme, teslim veya okunma anlamına gelmez.</p>
       {view === "list" && <section className="panel form-stack" aria-label="Kampanya listesi">
         <h2>Kampanyalar</h2>
         {!campaigns.length && <p>Henüz kampanya yok. Önce bir segment kaydedin.</p>}
@@ -151,14 +186,24 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard }: { enabled: bo
         <div className="campaign-list-row"><h2>{detail.campaign.name}</h2><StatusBadge>{statusLabels[detail.campaign.status]}</StatusBadge></div>
         <p>WhatsApp · {detail.campaign.templateName} · {detail.campaign.templateLanguage}</p>
         {detail.campaign.preparedAt && <><p>Kitle üyeliği hazırlama anında donduruldu. Güncel iletişim tercihi gönderimden önce yeniden denetlenecek.</p>
-          <dl className="campaign-counts" aria-label="Hazırlanan kitle"><div><dt>Eşleşen</dt><dd>{detail.matchedCount}</dd></div><div><dt>Hazırlamada uygun</dt><dd>{detail.eligibleCount}</dd></div><div><dt>Atlanan</dt><dd>{detail.skippedCount}</dd></div><div><dt>Bekleyen outbox</dt><dd>{detail.pendingOutboxCount}</dd></div></dl></>}
+          <dl className="campaign-counts" aria-label="Hazırlanan kitle"><div><dt>Eşleşen</dt><dd>{detail.matchedCount}</dd></div><div><dt>Hazırlamada uygun</dt><dd>{detail.eligibleCount}</dd></div><div><dt>Atlanan</dt><dd>{detail.skippedCount}</dd></div><div><dt>Bekleyen outbox</dt><dd>{detail.pendingOutboxCount}</dd></div><div><dt>İşleniyor</dt><dd>{detail.claimedOutboxCount}</dd></div>
+            <div><dt>Gönderim kabul edildi</dt><dd>{detail.dispatchedCount}</dd></div><div><dt>Başarısız</dt><dd>{detail.failedCount}</dd></div><div><dt>İptal</dt><dd>{detail.cancelledCount}</dd></div></dl>
+          <label>İlerleme <progress aria-label="Kampanya ilerlemesi" max={Math.max(1, detail.matchedCount)} value={detail.matchedCount - detail.pendingOutboxCount - detail.claimedOutboxCount} /></label>
+          <p>{detail.matchedCount - detail.pendingOutboxCount - detail.claimedOutboxCount}/{detail.matchedCount} kayıt sonuçlandı.</p></>}
+        {!!detail.errorCounts.length && <section aria-label="Gönderim hata özeti"><h3>Sonuçlanamayan gönderimler</h3>
+          {detail.errorCounts.map(({ category, count }) => <p key={category}>{category === "submission_uncertain" ? "Sağlayıcı sonucu belirsiz; tekrar gönderilmedi" : category === "max_attempts" ? "Deneme sınırına ulaşıldı" : category === "unconfigured" || category === "account_changed" ? "Servis yapılandırması" : category.startsWith("provider_") ? "Sağlayıcı reddi" : "Şablon veya gönderim doğrulaması"}: {count}</p>)}
+        </section>}
         {preview && <AudienceCounts value={preview} />}
         <div className="action-row">
           {detail.campaign.status === "draft" && <>
             <ActionButton variant="secondary" disabled={busy} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.previewMessagingCampaign(detail.campaign.id)); if (mounted.current) setPreview(value); })}>Kitleyi önizle</ActionButton>
             <ActionButton disabled={busy} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.prepareMessagingCampaign(detail.campaign.id)); if (mounted.current) { setDetail(value); setPreview(null); } await reload(); })}>Hazırla</ActionButton>
           </>}
-          {["draft", "prepared"].includes(detail.campaign.status) && <ActionButton variant="danger" disabled={busy} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.cancelMessagingCampaign(detail.campaign.id)); if (mounted.current) { setDetail(value); setPreview(null); } await reload(); })}>Kampanyayı iptal et</ActionButton>}
+          {detail.campaign.status === "prepared" && <ActionButton disabled={busy || !configured} onClick={() => void dispatchAction("start")}>Gönderimi Başlat</ActionButton>}
+          {detail.campaign.status === "running" && <ActionButton variant="secondary" disabled={busy} onClick={() => void dispatchAction("pause")}>Duraklat</ActionButton>}
+          {detail.campaign.status === "paused" && <ActionButton disabled={busy || !configured} onClick={() => void dispatchAction("resume")}>Devam Et</ActionButton>}
+          {["prepared", "paused"].includes(detail.campaign.status) && !configured && <p>Gönderim için WhatsApp Business servis ayarlarını tamamlayın.</p>}
+          {["draft", "prepared", "running", "paused"].includes(detail.campaign.status) && <ActionButton variant="danger" disabled={busy} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.cancelMessagingCampaign(detail.campaign.id)); if (mounted.current) { setDetail(value); setPreview(null); } await reload(); })}>Kampanyayı iptal et</ActionButton>}
           <ActionButton variant="secondary" disabled={busy} onClick={() => void openCampaign(detail.campaign.id)}>Durumu yenile</ActionButton>
         </div>
       </section>}

@@ -1,4 +1,6 @@
 import * as messagingStore from "./business-messaging/store";
+import type { DispatchResult } from "./messaging-campaigns/dispatch-contract";
+import * as campaignDispatchStore from "./messaging-campaigns/dispatch-store";
 import * as campaignStore from "./messaging-campaigns/store";
 import type { BusinessMessageTemplate, MessagingChannel } from "@yardimci-asistan/shared";
 import type { MessagingSecretWrite } from "./business-messaging/secret-service";
@@ -988,6 +990,14 @@ export class DesktopDatabase {
   cancelMessagingCampaign(id: string) { return campaignStore.cancelMessagingCampaign(this.db, id); }
   getEncryptedMessagingToken() { return String(messagingStore.getStoredMessagingConfiguration(this.db)?.access_token_encrypted ?? ""); }
   getMessagingCustomer(id: string) { return messagingStore.getMessagingCustomer(this.db, id); }
+  getCampaignDispatchClaim(id: string, token: string) { return campaignDispatchStore.getDispatchClaim(this.db, id, token); }
+  recoverCampaignDispatchClaims(now: string, staleBefore: string) { return campaignDispatchStore.recoverDispatchClaims(this.db, now, staleBefore); }
+  claimCampaignDispatchBatch(now: string, size: number) { return campaignDispatchStore.claimDispatchBatch(this.db, now, size); }
+  transitionCampaignDispatch(id: string, action: "start" | "pause" | "resume") { return campaignDispatchStore.transitionCampaignDispatch(this.db, id, action); }
+  beginCampaignSubmission(id: string, token: string, template: BusinessMessageTemplate, accountKey: string, now: string, intervalMs: number) { return campaignDispatchStore.beginCampaignSubmission(this.db, id, token, template, accountKey, now, intervalMs); }
+  releaseRejectedCampaignMessage(id: string, token: string) { return campaignDispatchStore.releaseRejectedCampaignMessage(this.db, id, token); }
+  finishCampaignDispatchClaim(id: string, token: string, result: DispatchResult, now: string, nextAttemptAt = "", rateLimitUntil = "") { return campaignDispatchStore.finishDispatchClaim(this.db, id, token, result, now, nextAttemptAt, rateLimitUntil); }
+  completeDispatchCampaigns(now: string) { return campaignDispatchStore.completeDispatchCampaigns(this.db, now); }
   getBusinessMessage(id: string) { return messagingStore.getBusinessMessage(this.db, id); }
   getMessageBinding(id: string) { return messagingStore.getMessageBinding(this.db, id); }
   prepareBusinessMessage(input: Parameters<typeof messagingStore.prepareBusinessMessage>[1]) { return messagingStore.prepareBusinessMessage(this.db, input); }

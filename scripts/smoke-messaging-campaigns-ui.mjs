@@ -63,7 +63,7 @@ try {
   await expect(page.getByLabel('Kampanya çalışma alanı', { exact: true })).toContainText('Hazırlandı');
   const prepared = page.getByLabel('Hazırlanan kitle', { exact: true });
   await expect(prepared).toContainText('Eşleşen4'); await expect(prepared).toContainText('Hazırlamada uygun1'); await expect(prepared).toContainText('Atlanan3'); await expect(prepared).toContainText('Bekleyen outbox1');
-  await expect(page.getByRole('button', { name: /şimdi gönder|send now|gönder/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /şimdi gönder|send now/i })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Hazırla', exact: true })).toHaveCount(0);
   mkdirSync('artifacts/messaging-campaigns', { recursive: true });
   await page.screenshot({ path: 'artifacts/messaging-campaigns/prepared.png' });

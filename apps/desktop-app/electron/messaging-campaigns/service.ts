@@ -10,14 +10,14 @@ export interface CampaignTemplateCatalog {
   listTemplates(providerId: BusinessMessagingProviderId): Promise<BusinessMessageTemplate[]>;
 }
 export class MessagingCampaignService {
-  constructor(private readonly getDatabase: () => DesktopDatabase, private readonly catalog: CampaignTemplateCatalog) {}
+  constructor(private readonly getDatabase: () => DesktopDatabase, private readonly catalog: CampaignTemplateCatalog, private readonly onChanged: () => void = () => {}) {}
   private log(event: string, meta: Record<string, string | number>, operationId?: string) {
     desktopLog.info({ scope: "messaging", event: `messaging.${event}`, message: "Pazarlama niyeti işlemi kaydedildi.", operationId, meta });
   }
   getPreference(customerId: string, channel: MessagingChannel, purpose: "marketing") { return this.getDatabase().getCustomerMessagingPreference(customerId, channel, purpose); }
   savePreference(input: SaveMessagingPreferenceInput) {
     const value = this.getDatabase().saveCustomerMessagingPreference(input);
-    this.log("consent.updated", { channel: value.channel, purpose: value.purpose, status: value.status }); return value;
+    this.log("consent.updated", { channel: value.channel, purpose: value.purpose, status: value.status }); this.onChanged(); return value;
   }
   listSegments() { return this.getDatabase().listMessagingSegments(); }
   saveSegment(input: SaveMessagingSegmentInput) { return this.getDatabase().saveMessagingSegment(input); }
@@ -53,8 +53,23 @@ export class MessagingCampaignService {
     this.log("outbox.prepared", { campaignId: id, pendingCount: detail.pendingOutboxCount }, id);
     return detail;
   }
+  async startCampaign(id: string, resume = false) {
+    const value = this.getDatabase().getMessagingCampaign(id);
+    if (!value.providerId) invalid("missing_provider", "Gönderim için sağlayıcı seçin.");
+    this.catalog.assertAvailable(value.channel, value.providerId);
+    const template = (await this.catalog.listTemplates(value.providerId)).find((item) => item.name === value.templateName && item.language === value.templateLanguage);
+    if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor.");
+    validateCampaignTemplate(value, template);
+    this.catalog.assertAvailable(value.channel, value.providerId);
+    const detail = this.getDatabase().transitionCampaignDispatch(id, resume ? "resume" : "start");
+    this.log("dispatch.campaign.started", { campaignId: id }, id); this.onChanged(); return detail;
+  }
+  pauseCampaign(id: string) {
+    const detail = this.getDatabase().transitionCampaignDispatch(id, "pause");
+    this.log("dispatch.campaign.paused", { campaignId: id }, id); this.onChanged(); return detail;
+  }
   cancelCampaign(id: string) {
     const detail = this.getDatabase().cancelMessagingCampaign(id);
-    this.log("campaign.cancelled", { campaignId: id }, id); return detail;
+    this.log("campaign.cancelled", { campaignId: id }, id); this.onChanged(); return detail;
   }
 }

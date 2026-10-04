@@ -7,10 +7,10 @@ import { configuration, providerFixture, secretFixture, serviceFixture } from '.
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require('../../apps/desktop-app/dist-electron/database.js');
 export const { BUSINESS_CAPABILITIES: C } = require('../../packages/shared/dist');
-export function campaignFixture() {
+export function campaignFixture(options = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'messaging-campaign-'));
-  const db = new DesktopDatabase({ appPath: resolve('apps/desktop-app'), userDataPath: dir });
-  const http = providerFixture(), secrets = secretFixture(), logs = [];
+  let db = new DesktopDatabase({ appPath: resolve('apps/desktop-app'), userDataPath: dir });
+  const http = options.http ?? providerFixture(), secrets = secretFixture(), logs = [];
   const single = serviceFixture(() => db, http, secrets, logs);
   db.initialize();
   const setup = { businessName: 'Campaign Fixture', profileId: 'market', profileOptions: [C.MESSAGING_CAMPAIGNS, C.WHOLESALE], phone: '', whatsapp: '', email: '', address: '',
@@ -29,7 +29,7 @@ export function campaignFixture() {
     listTemplates: () => single.listTemplates()
   };
   const service = new exports.MessagingCampaignService(() => db, catalog);
-  return { db, http, secrets, single, service, catalog, setup, logs,
+  return { get db() { return db; }, reopen: () => { db.close(); db = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dir }); db.initialize(); }, http, secrets, single, service, catalog, setup, logs,
     dispose: () => { db.close(); rmSync(dir, { recursive: true, force: true }); } };
 }
 let phoneSequence = 0;

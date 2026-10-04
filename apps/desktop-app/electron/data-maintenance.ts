@@ -62,6 +62,8 @@ interface DataMaintenanceRemoteResetResult {
 }
 
 interface DataMaintenanceIpcOptions {
+  beforeMaintenance?: () => Promise<void>;
+  afterMaintenanceAbort?: () => void;
   resetConnectedWebRuntime?: () => Promise<DataMaintenanceRemoteResetResult>;
 }
 
@@ -677,11 +679,12 @@ function formatBackupDate(value: string) {
   }).format(date);
 }
 
-async function prepareRestore(userDataPath: string, backupId: string, confirm: (request: DataMaintenanceConfirmation) => Promise<boolean>): Promise<DesktopDataMaintenanceResult> {
+async function prepareRestore(userDataPath: string, backupId: string, confirm: (request: DataMaintenanceConfirmation) => Promise<boolean>, options: DataMaintenanceIpcOptions = {}): Promise<DesktopDataMaintenanceResult> {
   const paths = resolvePaths(userDataPath);
   const id = safeBackupId(backupId);
   if (!id) return { ok: false, message: "Geri yüklenecek yedek kaydı geçersiz." };
 
+  let suspended = false;
   try {
     const backupFolderPath = path.join(paths.projectBackupPath, id);
     const backup = readBackupItem(backupFolderPath);
@@ -699,6 +702,8 @@ async function prepareRestore(userDataPath: string, backupId: string, confirm: (
       return { ok: false, cancelled: true, message: "Geri yükleme iptal edildi." };
     }
 
+    suspended = true;
+    await options.beforeMaintenance?.();
     const safetyBackup = createSafetyBackup(paths);
     fs.mkdirSync(paths.maintenancePath, { recursive: true });
     removeIfExists(paths.stagedRestorePath);
@@ -728,6 +733,7 @@ async function prepareRestore(userDataPath: string, backupId: string, confirm: (
         : "Seçilen yedek geri yükleniyor; uygulama yeniden başlatılıyor."
     };
   } catch (error) {
+    if (suspended) options.afterMaintenanceAbort?.();
     removeIfExists(paths.markerPath);
     removeIfExists(paths.stagedRestorePath);
     removeDirectoryIfExists(paths.stagedRestoreAssetsPath);
@@ -752,12 +758,14 @@ async function prepareReset(
   }
 
   try {
+    await options.beforeMaintenance?.();
     const safetyBackup = createSafetyBackup(paths);
 
     let webResetApplied = false;
     if (options.resetConnectedWebRuntime) {
       const remote = await options.resetConnectedWebRuntime();
       if (!remote.ok) {
+        options.afterMaintenanceAbort?.();
         removeIfExists(paths.markerPath);
         return {
           ok: false,
@@ -790,6 +798,7 @@ async function prepareReset(
         : `${webResetApplied ? "Bağlı web çalışma verileri temizlendi; " : ""}uygulama temiz başlangıç için yeniden başlatılıyor.`
     };
   } catch (error) {
+    options.afterMaintenanceAbort?.();
     removeIfExists(paths.markerPath);
     return { ok: false, message: `Veriler sıfırlanamadı: ${errorMessage(error)}` };
   }
@@ -815,7 +824,7 @@ export function registerDataMaintenanceIpcHandlers(
   ipcMain.handle("dataMaintenance:openBackupDirectory", () => openBackupDirectory(userDataPath()));
   ipcMain.handle("dataMaintenance:openBackupItemDirectory", (_event, backupId: string) => openBackupItemDirectory(userDataPath(), backupId));
   ipcMain.handle("dataMaintenance:deleteBackup", (event, backupId: string) => deleteBackup(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request)));
-  ipcMain.handle("dataMaintenance:restoreBackup", (event, backupId: string) => prepareRestore(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request)));
+  ipcMain.handle("dataMaintenance:restoreBackup", (event, backupId: string) => prepareRestore(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request), options));
   ipcMain.handle("dataMaintenance:resetLocalData", (event) => prepareReset(
     userDataPath(),
     (request) => requestDataMaintenanceConfirmation(event.sender, request),

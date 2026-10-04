@@ -3,6 +3,7 @@ export type BusinessMessagingProviderId = "whatsapp_cloud";
 export type BusinessMessageStatus = "draft" | "queued" | "accepted" | "delivered" | "read" | "failed" | "cancelled";
 export interface BusinessMessage {
   id: string; businessId: string; customerId?: string;
+  purpose?: "operational" | "marketing"; campaignId?: string; campaignRecipientId?: string;
   relatedEntityType?: string; relatedEntityId?: string;
   providerId: BusinessMessagingProviderId; recipient: string;
   messageKind: "template" | "session";

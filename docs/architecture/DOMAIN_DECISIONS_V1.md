@@ -865,3 +865,73 @@ session-gated preload/IPC remain the only campaign access path. Diagnostics log 
 counts and opaque campaign/segment ids, never Customer lists/contact/names, parameter values,
 raw filters, bodies or secrets. Schema changes extend only current `db/schema.sql`; no
 historical migration/compatibility upgrade chain is added.
+
+## D-037 — Controlled Campaign Dispatch (D3)
+
+**Status:** Accepted. **Scope:** Explicitly started desktop campaigns; no date scheduler or real-provider verification calls.
+
+CampaignDispatchService owns background orchestration separately from the campaign store and
+SyncCoordinator. Stores perform only canonical SQLite operations. The transport seam delegates
+to BusinessMessagingService and D1's WhatsAppCloudProviderAdapter, never Graph code in the worker.
+An optional, provider-neutral `messaging.campaigns` capability remains OFF by default. Start/resume
+require enabled, configured provider credentials and current approved template metadata.
+
+Lifecycle is draft → prepared → running ↔ paused; running → completed when every local outbox
+intent is dispatched/skipped/failed/cancelled. Draft/prepared/running/paused may be cancelled.
+Provider acceptance does not mean delivery/read or success for all audience members. Outbox
+dispatched means POST acceptance; D1 signed webhooks continue to update BusinessMessage delivery
+independently, including delivery failure, without resetting campaign transport or retrying it.
+Prepared membership stays frozen. Pause stops new claims/submissions; existing HTTP finishes.
+Cancel terminalizes certainly unsent pending/claimed items and preserves in-flight submission
+until its response. An unresolved submitted item is failed with submission_uncertain, never
+misrepresented as certainly unsent cancellation. Existing in-flight acceptance is reconciled.
+
+BEGIN IMMEDIATE atomically claims due pending intents belonging to running campaigns, ordered
+by nextAttemptAt, createdAt, opaque id, in bounded batches. Each lease has a random fencing token
+and claimedAt. Completion checks also occur transactionally. Expired leases are recovered without
+resetting the separate durable BusinessMessage submission fence; token-qualified writes prevent
+a stale worker overwriting a newer lease. Recovery uses any existing acceptance receipt first.
+
+Immediately after template discovery yields, backend rechecks capability, running state, account,
+canonical non-deleted business Customer, usable current phone and explicit whatsapp/marketing
+opted_in. Unknown/opt-out/deletion/unusable contact are skipped. Preparation is not permission to
+send. Static text and the D-036 field allowlist resolve against current canonical Customer data;
+missing/unsupported/changed template component identity or binding is non-retryable failed.
+Resolved values never enter diagnostics, recipient snapshots or outbox. A transaction attaches
+exactly one canonical BusinessMessage (purpose marketing, campaign and recipient relationships)
+to an outbox intent and claims its submission before POST. Final failure also terminalizes its canonical message; suppression/cancel terminalizes a
+certainly unsent marketing draft without changing operational-message semantics. D1 interactive send cannot send a
+campaign BusinessMessage through its single-send IPC. D1 operational and WhatsApp Web semantics
+remain independent of marketing consent.
+
+Internal configurable defaults are batch 3, minimum submission interval 3 seconds, maximum 4
+attempts, lease 5 minutes, polling 15 seconds, transient backoff 5 seconds, throttling backoff
+60 seconds, exponential cap 15 minutes. They are conservative implementation policy, not claimed
+Meta limits. The business-scoped next submission permit and each row's nextAttemptAt persist in
+SQLite; timers only wake the single-flight worker. Numeric/date Retry-After is respected up to
+24 hours and extends the shared rate gate. Deferral for rate/pause/drain does not consume attempts.
+Running work resumes after restart/session unlock. Shutdown and maintenance stop new claims and
+drain in-flight work before database teardown. Confirmed reset/restore drains before its safety
+backup, even without a configured hosting runtime; abort resumes the worker. Development
+relaunch preserves before-quit draining, and diagnostic finalization follows worker receipt writes.
+
+**Crash/idempotency boundary:** Cloud's POST does not offer a deduplication/query guarantee in
+D1. Exactly-once remote transport cannot be promised. A structured provider error proving the
+request was rejected permits throttling/transient retry with the SAME BusinessMessage identity,
+resetting only its submission fence. Such certainly rejected, unsubmitted retries resolve current
+contact/bindings again. Permanent rejection fails. Read-only catalog network/timeout failures
+may retry safely. A POST timeout/network loss/malformed result, or a crash after POST before
+receipt persistence, is submission_uncertain: durable retry performs receipt/webhook reconciliation
+ONLY, never another POST. After bounded reconciliation attempts it fails explicitly. If acceptance
+was saved to BusinessMessage before an outbox-update crash, recovery marks dispatched without POST.
+An uncertain intent keeps its fence even after failure/opt-out; a later signed status can update
+BusinessMessage. This deliberately prioritizes avoiding duplicate sends over blindly resubmitting
+an uncertain transport. No provider-safe idempotency capability is invented.
+
+Preference/deletion suppression affects only certainly unsent pending records. Submitted records
+retain their acceptance/reconciliation history; an opt-out cannot undo an already in-flight POST.
+Every future actual submission must still pass current consent, including reclaimed and retry items.
+Diagnostics contain stable dispatch milestones, opaque campaign/outbox/BusinessMessage ids, counts
+and bounded error categories only, never phone/name/body/parameters/customer-id lists/secrets.
+Desktop canonical storage remains authoritative; no web recipient publication, SMS, scheduled
+campaign, inbound chat, analytics or independent Settings/retry subsystem is introduced.

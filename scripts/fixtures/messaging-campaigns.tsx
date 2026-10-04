@@ -10,12 +10,20 @@ const control = window as typeof window & { __campaignInitial: { dashboard: Desk
 const call = (method: string, ...args: unknown[]) => control.__campaignCall(method, args);
 window.yardimciDesktop = {
   getBusinessMessagingConfiguration: () => call('configuration'), listBusinessMessagingTemplates: () => call('templates'),
-  onBusinessMessagingChanged: () => () => {},
+  onBusinessMessagingChanged: (listener) => {
+    window.addEventListener('fixture-provider-changed', listener);
+    return () => window.removeEventListener('fixture-provider-changed', listener);
+  },
+  onMessagingCampaignsChanged: (listener) => {
+    window.addEventListener('fixture-campaigns-changed', listener);
+    return () => window.removeEventListener('fixture-campaigns-changed', listener);
+  },
   getCustomerMessagingPreference: (...args) => call('preference', ...args), saveCustomerMessagingPreference: (input) => call('savePreference', input),
   listMessagingSegments: () => call('segments'), saveMessagingSegment: (input) => call('saveSegment', input),
   previewMessagingSegment: (...args) => call('previewSegment', ...args),
   listMessagingCampaigns: () => call('campaigns'), createMessagingCampaign: (input) => call('create', input),
   getMessagingCampaign: (id) => call('campaign', id), previewMessagingCampaign: (id) => call('preview', id),
+  startMessagingCampaign: (id) => call('start', id), pauseMessagingCampaign: (id) => call('pause', id), resumeMessagingCampaign: (id) => call('resume', id),
   prepareMessagingCampaign: (id) => call('prepare', id), cancelMessagingCampaign: (id) => call('cancel', id)
 } as typeof window.yardimciDesktop;
 const definition: WorkspaceDefinition<CustomerWorkspaceIntent, DesktopDashboardData> = {

@@ -93,8 +93,9 @@ app.on("before-quit", () => {
     event: "app.shutdown.requested",
     message: "Masaüstü uygulaması kapatılıyor."
   });
-  finalizeDesktopLogging("before-quit");
 });
+// Worker receipts must flush before the diagnostic session is finalized. Keep its existing end reason.
+app.on("will-quit", () => finalizeDesktopLogging("before-quit"));
 
 type PendingMaintenanceKind = "restore" | "reset" | "";
 
@@ -129,22 +130,20 @@ function installDevelopmentRelaunchBridge() {
   // the same Vite server alive and spawn the replacement Electron itself.
   const mutableApp = app as unknown as {
     relaunch: (...args: unknown[]) => void;
-    quit: () => void;
   };
-  const originalQuit = app.quit.bind(app);
   let relaunchRequested = false;
 
   mutableApp.relaunch = () => {
     relaunchRequested = true;
   };
-  mutableApp.quit = () => {
+  // Preserve before-quit so dispatch/sync drains finish before the development process exits.
+  app.on("will-quit", (event) => {
     if (relaunchRequested) {
+      event.preventDefault();
       relaunchRequested = false;
       app.exit(DEV_RELAUNCH_EXIT_CODE);
-      return;
     }
-    originalQuit();
-  };
+  });
 }
 
 function prepareRestoredStateForFullRepublish() {
@@ -296,6 +295,8 @@ void mainProcessReady.then(async ({
 
     registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked, userDataPath });
     registerDataMaintenanceIpcHandlers(userDataPath, {
+      beforeMaintenance: suspendAutomaticSyncForMaintenance,
+      afterMaintenanceAbort: resumeAutomaticSyncAfterMaintenanceAbort,
       resetConnectedWebRuntime: async () => {
         const database = new DesktopDatabase({
           appPath: app.getAppPath(),
@@ -325,21 +326,8 @@ void mainProcessReady.then(async ({
             };
           }
 
-          await suspendAutomaticSyncForMaintenance();
-          try {
-            const result = await resetHostingRuntime({
-              baseUrl: normalizedBaseUrl,
-              syncSecret: normalizedSecret
-            });
-            if (!result.ok) {
-              resumeAutomaticSyncAfterMaintenanceAbort();
-              return { ok: false, message: result.message };
-            }
-            return { ok: true, message: result.message };
-          } catch (error) {
-            resumeAutomaticSyncAfterMaintenanceAbort();
-            throw error;
-          }
+          const result = await resetHostingRuntime({ baseUrl: normalizedBaseUrl, syncSecret: normalizedSecret });
+          return { ok: result.ok, message: result.message };
         } finally {
           database.close();
         }

@@ -1,5 +1,6 @@
 import { BusinessMessagingStatusSyncService } from "./business-messaging/status-sync-service";
 import { BusinessMessagingService } from "./business-messaging/service";
+import { CampaignDispatchService } from "./messaging-campaigns/dispatch-service";
 import { MessagingCampaignService } from "./messaging-campaigns/service";
 import { MessagingCampaignError } from "./messaging-campaigns/validation";
 import { registerMessagingCampaignsIpc } from "./ipc/messaging-campaigns-ipc";
@@ -320,6 +321,7 @@ if (!hasSingleInstanceLock) {
       getSyncStatus: () => syncCoordinator?.getStatus(),
       onUnlocked: () => {
         reconcileEgmKbsBackgroundSession();
+        campaignDispatchService.wake();
       },
       onLocked: () => {
         egmKbsBackgroundSession.destroy();
@@ -421,6 +423,7 @@ if (!hasSingleInstanceLock) {
     registerIpcHandlers();
     createMainWindow();
     syncCoordinator.start();
+    campaignDispatchService.start();
     if (!desktopDatabase.getSetupData().setupRequired) {
       void publishBusinessAiContextFromMain();
       if (getGoogleReviewsSettings(desktopDatabase.databasePath).publicationPending) {
@@ -449,19 +452,23 @@ if (!hasSingleInstanceLock) {
 }
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    syncCoordinator?.stop();
-    localCompanionMdnsAdvertiser?.stop();
-    void localCompanionServer?.stop();
-    desktopDatabase?.close();
-    app.quit();
-  }
+  if (process.platform !== "darwin") app.quit();
 });
-
-app.on("before-quit", () => {
+let campaignShutdownDrained = false;
+let campaignShutdownStarted = false;
+app.on("before-quit", (event) => {
   syncCoordinator?.stop();
   localCompanionMdnsAdvertiser?.stop();
   void localCompanionServer?.stop();
+  if (campaignShutdownDrained || !desktopDatabase) return;
+  event.preventDefault();
+  if (campaignShutdownStarted) return;
+  campaignShutdownStarted = true;
+  void Promise.allSettled([campaignDispatchService.suspendAndDrain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()]).then(() => {
+    campaignShutdownDrained = true;
+    desktopDatabase?.close();
+    app.quit();
+  });
 });
 
 const businessMessagingStatusSyncService = new BusinessMessagingStatusSyncService(getDatabase, notifyBusinessMessagingChanged);
@@ -472,7 +479,16 @@ const messagingCampaignService = new MessagingCampaignService(getDatabase, {
     if (!businessMessagingService.getConfiguration().configured) throw new MessagingCampaignError("unconfigured", "WhatsApp Business servis ayarlarını tamamlayın.");
   },
   listTemplates: () => businessMessagingService.listTemplates()
+}, () => { notifyMessagingCampaignsChanged(); campaignDispatchService.wake(); });
+const campaignDispatchService = new CampaignDispatchService(getDatabase, businessMessagingService, {
+  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()),
+  onChanged: () => { notifyMessagingCampaignsChanged(); notifyBusinessMessagingChanged(); }
 });
+function notifyMessagingCampaignsChanged() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("messagingCampaigns:changed");
+  }
+}
 function notifyBusinessMessagingChanged() {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("businessMessaging:changed");
@@ -610,6 +626,7 @@ export function scheduleAutomaticSyncSoon() {
 export async function suspendAutomaticSyncForMaintenance() {
   maintenanceSyncSuspended = true;
   desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
+  await campaignDispatchService.suspendAndDrain();
   await syncCoordinator?.suspendAndDrain();
   const androidPull = getAndroidActionSyncService().currentInFlight();
   if (androidPull) {
@@ -626,6 +643,7 @@ export async function suspendAutomaticSyncForMaintenance() {
 export function resumeAutomaticSyncAfterMaintenanceAbort() {
   maintenanceSyncSuspended = false;
   syncCoordinator?.restart();
+  campaignDispatchService.start();
 }
 
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {

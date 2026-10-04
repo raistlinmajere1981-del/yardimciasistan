@@ -21,5 +21,8 @@ export function registerMessagingCampaignsIpc(options: { service: MessagingCampa
   ipcMain.handle("messagingCampaigns:campaign", (_event, id: string) => operation(() => service.getCampaign(id)));
   ipcMain.handle("messagingCampaigns:preview", (_event, id: string) => operation(() => service.previewCampaign(id)));
   ipcMain.handle("messagingCampaigns:prepare", (_event, id: string) => operation(() => service.prepareCampaign(id)));
+  ipcMain.handle("messagingCampaigns:start", (_event, id: string) => operation(() => service.startCampaign(id)));
+  ipcMain.handle("messagingCampaigns:pause", (_event, id: string) => operation(() => service.pauseCampaign(id)));
+  ipcMain.handle("messagingCampaigns:resume", (_event, id: string) => operation(() => service.startCampaign(id, true)));
   ipcMain.handle("messagingCampaigns:cancel", (_event, id: string) => operation(() => service.cancelCampaign(id)));
 }

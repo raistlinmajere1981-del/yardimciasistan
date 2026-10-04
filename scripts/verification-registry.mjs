@@ -1,4 +1,7 @@
 const SMOKE_FILES = [
+  "scripts/smoke-messaging-dispatch.mjs",
+  "scripts/smoke-messaging-dispatch-lifecycle.mjs",
+  "scripts/smoke-messaging-dispatch-ui.mjs",
   "scripts/smoke-messaging-campaigns.mjs",
   "scripts/smoke-messaging-campaigns-ui.mjs",
   "scripts/smoke-business-messaging-hosting.mjs",
@@ -458,6 +461,7 @@ function smokeRequires(file) {
 function smokeDomains(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   const domains = new Set();
+  if (/messaging-dispatch/.test(name)) { domains.add("messaging-dispatch"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
   if (/messaging-campaigns/.test(name)) { domains.add("messaging-campaigns"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
   if (/dealer-access|dealer-portal|wholesale-customer-ui\.mjs/.test(file)) domains.add("dealer-access");
 
