@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability, type CommerceOnlineCatalog, type CommerceOrderDeliveryMethod, type CommerceUnit } from "@yardimci-asistan/shared";
 import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service";
 
-function publicImageUrl(value: unknown): string {
+export function publicImageUrl(value: unknown): string {
   try {
     const url = new URL(String(value ?? ""));
     // A2 does not publish local media. Project only public HTTPS source images;

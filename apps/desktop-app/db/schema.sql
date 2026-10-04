@@ -2538,3 +2538,82 @@ UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = access_revi
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
+
+-- D-034: the private dealer publication includes canonical resolved catalogs.
+CREATE TRIGGER trg_dealer_catalog_catalog_products_insert AFTER INSERT ON catalog_products
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+-- D-034: the private dealer publication includes canonical resolved catalogs.
+CREATE TRIGGER trg_dealer_catalog_catalog_products_update AFTER UPDATE ON catalog_products
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+-- D-034: the private dealer publication includes canonical resolved catalogs.
+CREATE TRIGGER trg_dealer_catalog_catalog_products_delete AFTER DELETE ON catalog_products
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = OLD.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+-- D-034: the private dealer publication includes canonical resolved catalogs.
+CREATE TRIGGER trg_dealer_catalog_commerce_product_publications_insert AFTER INSERT ON commerce_product_publications
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+-- D-034: the private dealer publication includes canonical resolved catalogs.
+CREATE TRIGGER trg_dealer_catalog_commerce_product_publications_update AFTER UPDATE ON commerce_product_publications
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+-- D-034: the private dealer publication includes canonical resolved catalogs.
+CREATE TRIGGER trg_dealer_catalog_commerce_product_publications_delete AFTER DELETE ON commerce_product_publications
+WHEN EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = OLD.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_dealer_catalog_delivery AFTER UPDATE OF online_sales_pickup_enabled, online_sales_shipping_enabled ON settings
+WHEN (NEW.online_sales_pickup_enabled <> OLD.online_sales_pickup_enabled OR NEW.online_sales_shipping_enabled <> OLD.online_sales_shipping_enabled)
+  AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
+BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('dealer_access', 'dealer_access_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+-- Terminal transport outcomes only; rejected access never creates a Commerce Order.
+CREATE TABLE commerce_dealer_order_rejections (
+  web_order_id TEXT PRIMARY KEY,
+  dealer_access_id TEXT NOT NULL,
+  access_revision INTEGER NOT NULL,
+  reason TEXT NOT NULL CHECK (reason = 'access_revoked'),
+  created_at TEXT NOT NULL
+);

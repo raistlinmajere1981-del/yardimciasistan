@@ -147,6 +147,8 @@ try {
   await expect(productService.getByRole('combobox')).toBeVisible();
 
   await page.evaluate(() => window.refreshSettings({ profileOptions: ['commerce.wholesale'] }));
+  await expect(page.locator('#settings-online-delivery')).toBeVisible();
+  await expect(page.locator('#settings-online-delivery')).toContainText('Bayi Sipariş Teslimatı');
   const dealerPortal = page.locator('#settings-dealer-portal');
   const dealerToggle = dealerPortal.getByRole('checkbox', { name: 'Bayi portalını etkinleştir', exact: true });
   const dealerSetupCount = (await setupCalls()).length;

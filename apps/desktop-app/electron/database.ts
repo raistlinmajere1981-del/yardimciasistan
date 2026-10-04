@@ -983,6 +983,18 @@ export class DesktopDatabase {
     return createRuntimeOrder(this.databasePath, input);
   }
 
+  createDealerWebOrder(accessId: string, accessRevision: number, input: Pick<CreateCommerceOrderInput, "sourceReference" | "items" | "deliverySnapshot" | "note">) {
+    return createRuntimeOrder(this.databasePath, { ...input, source: "web-dealer" },
+      { dealerAccess: { accessId, accessRevision } });
+  }
+
+  recordRejectedDealerWebOrder(orderId: string, accessId: string, accessRevision: number) {
+    // Durable transport outcome, with no order/customer/contact/address payload.
+    this.db.prepare(`INSERT INTO commerce_dealer_order_rejections (web_order_id, dealer_access_id, access_revision, reason, created_at)
+      VALUES (?, ?, ?, 'access_revoked', ?) ON CONFLICT(web_order_id) DO NOTHING`)
+      .run(orderId, accessId, accessRevision, new Date().toISOString());
+  }
+
   recordWebOrderCursor(cursor: number, acknowledged = false) {
     recordStoredWebOrderCursor(this.db, cursor, acknowledged);
   }

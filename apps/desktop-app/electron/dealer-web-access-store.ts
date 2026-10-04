@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type DealerAccessAction, type DealerAccessProjection, type DealerAccessResult, type DealerWebAccess } from "@yardimci-asistan/shared";
 import { desktopLog } from "./desktop-logger";
 import { readEnabledBusinessCapabilities } from "./business-capability-store";
+import { createDealerCatalogs } from "./dealer-catalog-publication";
 
 function accessFromRow(row: Record<string, unknown>): DealerWebAccess {
   return { accessId: String(row.id), customerId: String(row.customer_id), enabled: Number(row.enabled) === 1,
@@ -66,11 +67,12 @@ export function createDealerAccessProjection(db: DatabaseSync): DealerAccessProj
     const rows = db.prepare(`SELECT a.*, p.company_name, p.dealer_status, c.deleted_at FROM commerce_dealer_web_access a
       LEFT JOIN customer_commercial_profiles p ON p.customer_id = a.customer_id AND p.business_id = a.business_id
       LEFT JOIN customers c ON c.id = a.customer_id WHERE a.business_id = ? ORDER BY a.id`).all(String(settings?.business_id ?? ""));
-    return { version: 1, enabled, dealers: rows.map((row) => {
+    const projection: DealerAccessProjection = { version: 1, enabled, dealers: rows.map((row) => {
       const eligible = enabled && Number(row.enabled) === 1 && row.dealer_status === "active" && row.deleted_at === "";
       return { access_id: String(row.id), customer_ref: String(row.customer_ref), display_name: Array.from(String(row.company_name ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")).slice(0, 160).join(""),
         access_revision: Number(row.access_revision), enabled: eligible, invite_hash: eligible ? String(row.invite_hash) : "",
         invite_expires_at: eligible && row.invite_expires_at ? Math.floor(Date.parse(String(row.invite_expires_at)) / 1000) : 0 };
     }) };
+    return { ...projection, catalogs: createDealerCatalogs(db, projection) };
   } finally { db.exec("RELEASE dealer_access_projection"); }
 }

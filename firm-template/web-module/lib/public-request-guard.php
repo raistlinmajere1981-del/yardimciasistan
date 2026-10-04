@@ -39,7 +39,7 @@ function ya_public_guard_enforce(string $bucket): void
         return;
     }
 
-    if ($bucket !== 'dealer_claim') ya_public_guard_apply_cors();
+    if (!in_array($bucket, ['dealer_claim', 'dealer_order'], true)) ya_public_guard_apply_cors();
 
     $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
     if ($contentLength > YA_PUBLIC_GUARD_MAX_BODY_BYTES) {
@@ -54,7 +54,7 @@ function ya_public_guard_enforce(string $bucket): void
     try {
         $database = ya_public_guard_open_database();
         if (!$database instanceof PDO) {
-            if ($bucket === 'dealer_claim') throw new RuntimeException('dealer_guard_unavailable');
+            if (in_array($bucket, ['dealer_claim', 'dealer_order'], true)) throw new RuntimeException('dealer_guard_unavailable');
             return;
         }
 
@@ -119,7 +119,7 @@ function ya_public_guard_enforce(string $bucket): void
             throw $error;
         }
     } catch (Throwable $error) {
-        if ($bucket === 'dealer_claim') throw new RuntimeException('dealer_guard_unavailable', 0, $error);
+        if (in_array($bucket, ['dealer_claim', 'dealer_order'], true)) throw new RuntimeException('dealer_guard_unavailable', 0, $error);
         // Defensive throttling must not become a single point of failure.
         return;
     }
@@ -147,7 +147,7 @@ function ya_public_guard_policy(string $bucket): ?array
         ];
     }
 
-    if ($bucket === 'request' || $bucket === 'order') {
+    if ($bucket === 'request' || $bucket === 'order' || $bucket === 'dealer_order') {
         return [
             'subject_windows' => [
                 ['seconds' => 600, 'limit' => 8, 'retry_after' => 120],
