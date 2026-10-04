@@ -5,6 +5,7 @@ const bridge: AdminBridge = {
   getOverview: () => ipcRenderer.invoke("admin:get-overview"),
   checkDependencyUpdates: () => ipcRenderer.invoke("admin:check-dependency-updates"),
   getVerificationRunState: () => ipcRenderer.invoke("admin:get-verification-run-state"),
+  getVerificationHistory: (limit) => ipcRenderer.invoke("admin:get-verification-history", limit),
   startVerification: (request) => ipcRenderer.invoke("admin:start-verification", request),
   cancelVerification: () => ipcRenderer.invoke("admin:cancel-verification"),
   onVerificationRunState: (listener) => {
