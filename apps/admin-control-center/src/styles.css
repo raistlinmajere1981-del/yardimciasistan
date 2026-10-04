@@ -1708,3 +1708,114 @@ nav {
     display: none;
   }
 }
+
+
+.button--primary {
+  color: white;
+  background: linear-gradient(135deg, #1676dc, #2499e6);
+  border: 1px solid rgba(18, 103, 194, 0.4);
+  box-shadow: 0 8px 20px rgba(22, 118, 220, 0.18);
+}
+
+.button--danger {
+  color: #b13e48;
+  background: #fff0f1;
+  border: 1px solid #f2cfd3;
+}
+
+.button--compact {
+  min-height: 30px;
+  padding-inline: 10px;
+  font-size: 10px;
+}
+
+.verification-header-actions,
+.verification-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.verification-toolbar-actions {
+  max-width: 68%;
+}
+
+.verification-run-panel {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+}
+
+.verification-run-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.verification-run-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.verification-run-title strong {
+  font-size: 12px;
+}
+
+.verification-console {
+  max-height: 230px;
+  overflow: auto;
+  padding: 13px 14px;
+  border-radius: 11px;
+  background: #102033;
+  color: #d9e7f3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.verification-console div + div {
+  margin-top: 2px;
+}
+
+.verification-row--action {
+  grid-template-columns: 32px minmax(0, 1fr) 100px 90px auto;
+}
+
+.verification-run-check {
+  min-width: 64px;
+}
+
+@media (max-width: 1050px) {
+  .verification-toolbar-actions {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .verification-row--action {
+    grid-template-columns: 26px minmax(0, 1fr) 80px auto;
+  }
+
+  .verification-row--action .verification-deps {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .verification-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .verification-row--action {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+  }
+
+  .verification-row--action .verification-last-status {
+    display: none;
+  }
+}
