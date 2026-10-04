@@ -101,6 +101,17 @@ export type VerificationSnapshot = {
   latest: VerificationReportSnapshot;
 };
 
+export type VerificationHistoryItem = {
+  id: string;
+  selectionLabel: string;
+  startedAt: string;
+  finishedAt: string;
+  result: "passed" | "failed" | "cancelled";
+  branch: string;
+  head: string;
+  dirtyCount: number;
+};
+
 export type VerificationRunRequest = {
   mode: "preset" | "domain" | "check";
   value: string;
@@ -115,6 +126,116 @@ export type VerificationRunState = {
   result: "idle" | "running" | "passed" | "failed" | "cancelled";
   exitCode: number | null;
   outputTail: string[];
+};
+
+export type DeploymentTargetSnapshot = {
+  id: string;
+  installationId: string;
+  title: string;
+  description: string;
+  confirmText: string;
+  impact: string[];
+  available: boolean;
+  availabilityNote: string;
+};
+
+export type DeploymentRunRequest = {
+  targetId: string;
+  action: "preflight" | "deploy";
+};
+
+export type DeploymentRunState = {
+  running: boolean;
+  targetId: string;
+  action: "preflight" | "deploy" | "";
+  stage: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: "idle" | "running" | "passed" | "failed" | "cancelled";
+  exitCode: number | null;
+  outputTail: string[];
+};
+
+export type ReleaseOperationRequest = {
+  action: "package" | "preview" | "publish";
+};
+
+export type ReleaseOperationState = {
+  running: boolean;
+  action: "package" | "preview" | "publish" | "";
+  stage: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: "idle" | "running" | "passed" | "failed" | "cancelled";
+  exitCode: number | null;
+  outputTail: string[];
+};
+
+export type SupportReportStatus = "new" | "reviewing" | "resolved";
+
+export type SupportReportListItem = {
+  reportId: string;
+  receivedAt: string;
+  status: SupportReportStatus;
+  appVersion: string;
+  platform: string;
+  arch: string;
+  sessionCount: number;
+  eventCount: number;
+  warnCount: number;
+  errorCount: number;
+  abruptSessionCount: number;
+  screenshotBytes: number;
+  notePresent: boolean;
+  clientHash: string;
+  resolvedInVersion: string;
+  resolutionNote: string;
+};
+
+export type SupportEventSummary = {
+  timestamp: string;
+  level: string;
+  scope: string;
+  event: string;
+  message: string;
+  errorMessage: string;
+};
+
+export type SupportReportDetail = {
+  meta: SupportReportListItem;
+  note: string;
+  app: Record<string, string>;
+  screenshotDataUrl: string | null;
+  recent: SupportEventSummary[];
+};
+
+export type SystemToolSnapshot = {
+  id: string;
+  label: string;
+  available: boolean;
+  detail: string;
+};
+
+export type SystemCredentialSnapshot = {
+  ref: string;
+  status: CredentialStatus;
+  usedBy: string[];
+};
+
+export type AndroidDeviceSnapshot = {
+  serial: string;
+  state: string;
+  model: string;
+  device: string;
+};
+
+export type SystemEnvironmentSnapshot = {
+  checkedAt: string;
+  repoRoot: string;
+  blackSeaRoot: string | null;
+  tools: SystemToolSnapshot[];
+  credentials: SystemCredentialSnapshot[];
+  androidDevices: AndroidDeviceSnapshot[];
 };
 
 export type DependencyUpdateItem = {
@@ -159,8 +280,27 @@ export type AdminBridge = {
   getOverview(): Promise<OverviewSnapshot>;
   checkDependencyUpdates(): Promise<DependencyUpdateReport>;
   getVerificationRunState(): Promise<VerificationRunState>;
+  getVerificationHistory(limit?: number): Promise<VerificationHistoryItem[]>;
   startVerification(request: VerificationRunRequest): Promise<{ accepted: boolean; message: string }>;
   cancelVerification(): Promise<boolean>;
   onVerificationRunState(listener: (state: VerificationRunState) => void): () => void;
+  getDeploymentTargets(): Promise<DeploymentTargetSnapshot[]>;
+  getDeploymentRunState(): Promise<DeploymentRunState>;
+  startDeployment(request: DeploymentRunRequest): Promise<{ accepted: boolean; message: string }>;
+  cancelDeployment(): Promise<boolean>;
+  onDeploymentRunState(listener: (state: DeploymentRunState) => void): () => void;
+  getReleaseOperationState(): Promise<ReleaseOperationState>;
+  startReleaseOperation(request: ReleaseOperationRequest): Promise<{ accepted: boolean; message: string }>;
+  cancelReleaseOperation(): Promise<boolean>;
+  onReleaseOperationState(listener: (state: ReleaseOperationState) => void): () => void;
+  getSystemEnvironment(): Promise<SystemEnvironmentSnapshot>;
+  listSupportReports(limit?: number): Promise<SupportReportListItem[]>;
+  getSupportReportDetail(reportId: string, refresh?: boolean): Promise<SupportReportDetail>;
+  updateSupportReportStatus(
+    reportId: string,
+    status: SupportReportStatus,
+    resolvedInVersion?: string,
+    resolutionNote?: string
+  ): Promise<SupportReportListItem>;
   openExternal(url: string): Promise<boolean>;
 };
