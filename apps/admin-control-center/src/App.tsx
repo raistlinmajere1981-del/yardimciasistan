@@ -80,6 +80,87 @@ function Overview({
 }) {
   const repoTone: StatusKind = data.repo.dirtyCount === 0 ? "ready" : "warning";
   const healthyText = `${data.counts.healthy} / ${data.counts.installations}`;
+  const [ops, setOps] = useState<{
+    loading: boolean;
+    fullVerify: VerificationHistoryItem | null;
+    openSupport: number | null;
+    androidDevices: number | null;
+    lastOperation: string;
+    lastOperationTone: StatusKind;
+  }>({
+    loading: true,
+    fullVerify: null,
+    openSupport: null,
+    androidDevices: null,
+    lastOperation: "",
+    lastOperationTone: "unknown"
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    void Promise.allSettled([
+      window.adminControlCenter.getVerificationHistory(30),
+      window.adminControlCenter.listSupportReports(120),
+      window.adminControlCenter.getSystemEnvironment(),
+      window.adminControlCenter.getDeploymentRunState(),
+      window.adminControlCenter.getReleaseOperationState()
+    ]).then(([historyResult, supportResult, systemResult, deployResult, releaseResult]) => {
+      if (!active) return;
+
+      const history = historyResult.status === "fulfilled" ? historyResult.value : [];
+      const fullVerify = history.find((item) =>
+        item.result === "passed"
+        && ["preset=full", "preset=pre-main", "preset=release"].includes(item.selectionLabel)
+      ) ?? null;
+
+      const support = supportResult.status === "fulfilled" ? supportResult.value : null;
+      const environment = systemResult.status === "fulfilled" ? systemResult.value : null;
+      const deployState = deployResult.status === "fulfilled" ? deployResult.value : null;
+      const releaseState = releaseResult.status === "fulfilled" ? releaseResult.value : null;
+
+      const operations = [
+        deployState?.startedAt ? {
+          label: deployState.running
+            ? `Deploy · ${deployState.stage || deployState.targetId}`
+            : `Deploy · ${deployState.result}`,
+          time: deployState.finishedAt || deployState.startedAt,
+          tone: deployState.running ? "warning" as StatusKind
+            : deployState.result === "passed" ? "ready" as StatusKind
+              : deployState.result === "failed" ? "error" as StatusKind
+                : "unknown" as StatusKind
+        } : null,
+        releaseState?.startedAt ? {
+          label: releaseState.running
+            ? `Release · ${releaseState.stage}`
+            : `Release · ${releaseState.result}`,
+          time: releaseState.finishedAt || releaseState.startedAt,
+          tone: releaseState.running ? "warning" as StatusKind
+            : releaseState.result === "passed" ? "ready" as StatusKind
+              : releaseState.result === "failed" ? "error" as StatusKind
+                : "unknown" as StatusKind
+        } : null
+      ].filter((item): item is { label: string; time: string; tone: StatusKind } => Boolean(item))
+        .sort((a, b) => b.time.localeCompare(a.time));
+
+      setOps({
+        loading: false,
+        fullVerify,
+        openSupport: support ? support.filter((item) => item.status !== "resolved").length : null,
+        androidDevices: environment?.androidDevices.length ?? null,
+        lastOperation: operations[0]?.label ?? "Bu oturumda işlem yok",
+        lastOperationTone: operations[0]?.tone ?? "unknown"
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const fullVerifyCurrent = ops.fullVerify
+    ? ops.fullVerify.head === data.repo.head && ops.fullVerify.dirtyCount === 0
+    : false;
 
   return (
     <>
@@ -132,6 +213,37 @@ function Overview({
             <strong>{data.counts.errors === 0 ? "Stabil" : `${data.counts.errors} hata`}</strong>
             <small>HEAD {data.repo.head}</small>
           </div>
+        </article>
+      </section>
+
+      <section className="overview-ops-grid">
+        <article className="overview-op-card">
+          <span>Son başarılı doğrulama</span>
+          <strong>{ops.loading ? "Okunuyor…" : ops.fullVerify ? ops.fullVerify.selectionLabel : "Kayıt yok"}</strong>
+          <small className={ops.fullVerify ? statusClass(fullVerifyCurrent ? "ready" : "warning") : "status status--unknown"}>
+            {ops.fullVerify
+              ? fullVerifyCurrent
+                ? `Mevcut HEAD · ${ops.fullVerify.head}`
+                : `Eski HEAD · ${ops.fullVerify.head}`
+              : "Admin üzerinden full/pre-main/release koşusu bekleniyor"}
+          </small>
+        </article>
+        <article className="overview-op-card">
+          <span>Açık destek</span>
+          <strong>{ops.loading ? "…" : ops.openSupport ?? "—"}</strong>
+          <small>{ops.openSupport === null ? "Destek sunucusu okunamadı" : ops.openSupport ? "İlgilenilmesi gereken rapor" : "Açık rapor yok"}</small>
+        </article>
+        <article className="overview-op-card">
+          <span>Android / ADB</span>
+          <strong>{ops.loading ? "…" : ops.androidDevices ?? "—"}</strong>
+          <small>{ops.androidDevices === null ? "Ortam bilgisi okunamadı" : ops.androidDevices ? "Bağlı cihaz" : "Bağlı cihaz yok"}</small>
+        </article>
+        <article className="overview-op-card">
+          <span>Son operasyon</span>
+          <strong>{ops.loading ? "Okunuyor…" : ops.lastOperation}</strong>
+          <small className={statusClass(ops.lastOperationTone)}>
+            {ops.lastOperationTone === "ready" ? "Tamamlandı" : ops.lastOperationTone === "error" ? "Başarısız" : ops.lastOperationTone === "warning" ? "Çalışıyor / dikkat" : "Oturum kaydı yok"}
+          </small>
         </article>
       </section>
 
