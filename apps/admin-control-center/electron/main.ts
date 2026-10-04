@@ -2,11 +2,19 @@ import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join, resolve } from "node:path";
 import { checkDependencyUpdates } from "./services/dependency-update-service";
 import { getOverviewSnapshot } from "./services/overview-service";
+import { VerificationRunner } from "./services/verification-runner";
 
 const APP_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = process.env.YARDIMCI_REPO_ROOT
   ? resolve(process.env.YARDIMCI_REPO_ROOT)
   : resolve(APP_ROOT, "../..");
+const verificationRunner = new VerificationRunner(REPO_ROOT);
+
+verificationRunner.subscribe((state) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send("admin:verification-run-state", state);
+  }
+});
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -44,6 +52,9 @@ function createWindow() {
 
 ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));
 ipcMain.handle("admin:check-dependency-updates", () => checkDependencyUpdates(REPO_ROOT));
+ipcMain.handle("admin:get-verification-run-state", () => verificationRunner.getState());
+ipcMain.handle("admin:start-verification", (_event, request) => verificationRunner.start(request));
+ipcMain.handle("admin:cancel-verification", () => verificationRunner.cancel());
 ipcMain.handle("admin:open-external", async (_event, value: unknown) => {
   const url = typeof value === "string" ? value.trim() : "";
   if (!/^https?:\/\//i.test(url)) return false;
