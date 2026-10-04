@@ -444,8 +444,9 @@ try {
   await expect(settings.getByLabel("İşletme açıklaması")).toBeVisible();
   await expect(settings.locator(".settings-profile-options")).toBeVisible();
   await expect(settings.getByText("Ek özellikler")).toBeVisible();
-  await expect(settings.locator(".settings-profile-option")).toHaveCount(5);
-  await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode/)).toHaveCount(0);
+  await expect(settings.locator(".settings-profile-option")).toHaveCount(6);
+  await expect(settings.getByText("Kampanyalar", { exact: true })).toBeVisible();
+  await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode|messaging\.campaigns/)).toHaveCount(0);
   expect(await settings.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await sectionNav.getByRole("tab", { name: "İşletme Düzeni", exact: true }).click();
   const tableWorkspace = page.locator("#settings-operations");
