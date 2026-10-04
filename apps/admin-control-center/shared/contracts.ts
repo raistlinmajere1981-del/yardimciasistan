@@ -101,6 +101,45 @@ export type VerificationSnapshot = {
   latest: VerificationReportSnapshot;
 };
 
+export type VerificationRunRequest = {
+  mode: "preset" | "domain" | "check";
+  value: string;
+  includeManual?: boolean;
+};
+
+export type VerificationRunState = {
+  running: boolean;
+  selectionLabel: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: "idle" | "running" | "passed" | "failed" | "cancelled";
+  exitCode: number | null;
+  outputTail: string[];
+};
+
+export type DependencyUpdateItem = {
+  name: string;
+  current: string;
+  wanted: string;
+  latest: string;
+  dependent: string;
+  location: string;
+  type: string;
+  homepage: string | null;
+  majorUpdate: boolean;
+};
+
+export type DependencyUpdateReport = {
+  checkedAt: string;
+  status: "current" | "updates" | "error";
+  nodeVersion: string;
+  packageManager: string;
+  count: number;
+  majorCount: number;
+  message: string;
+  items: DependencyUpdateItem[];
+};
+
 export type OverviewSnapshot = {
   generatedAt: string;
   repo: RepoSnapshot;
@@ -118,5 +157,10 @@ export type OverviewSnapshot = {
 
 export type AdminBridge = {
   getOverview(): Promise<OverviewSnapshot>;
+  checkDependencyUpdates(): Promise<DependencyUpdateReport>;
+  getVerificationRunState(): Promise<VerificationRunState>;
+  startVerification(request: VerificationRunRequest): Promise<{ accepted: boolean; message: string }>;
+  cancelVerification(): Promise<boolean>;
+  onVerificationRunState(listener: (state: VerificationRunState) => void): () => void;
   openExternal(url: string): Promise<boolean>;
 };
