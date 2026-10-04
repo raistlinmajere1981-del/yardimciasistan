@@ -30,6 +30,9 @@ import type {
   InstallationSnapshot,
   OverviewSnapshot,
   StatusKind,
+  SupportReportDetail,
+  SupportReportListItem,
+  SupportReportStatus,
   VerificationRunState
 } from "../shared/contracts";
 
@@ -1156,6 +1159,368 @@ function Deploy({
   );
 }
 
+function supportStatusLabel(status: SupportReportStatus) {
+  if (status === "reviewing") return "İnceleniyor";
+  if (status === "resolved") return "Çözüldü";
+  return "Yeni";
+}
+
+function supportStatusTone(status: SupportReportStatus): StatusKind {
+  if (status === "resolved") return "ready";
+  if (status === "reviewing") return "warning";
+  return "error";
+}
+
+function Support({ productVersion }: { productVersion: string }) {
+  const [reports, setReports] = useState<SupportReportListItem[]>([]);
+  const [filter, setFilter] = useState<"all" | SupportReportStatus>("all");
+  const [selectedId, setSelectedId] = useState("");
+  const [detail, setDetail] = useState<SupportReportDetail | null>(null);
+  const [loadingList, setLoadingList] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState("");
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [showResolve, setShowResolve] = useState(false);
+  const [resolvedVersion, setResolvedVersion] = useState(productVersion);
+  const [resolutionNote, setResolutionNote] = useState("");
+
+  const loadList = useCallback(async () => {
+    setLoadingList(true);
+    setError("");
+    try {
+      const next = await window.adminControlCenter.listSupportReports(120);
+      setReports(next);
+      setSelectedId((current) => current && next.some((item) => item.reportId === current)
+        ? current
+        : next[0]?.reportId ?? "");
+    } catch (value) {
+      setError(value instanceof Error ? value.message : String(value));
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
+
+  const loadDetail = useCallback(async (reportId: string) => {
+    if (!reportId) {
+      setDetail(null);
+      return;
+    }
+    setLoadingDetail(true);
+    setError("");
+    try {
+      setDetail(await window.adminControlCenter.getSupportReportDetail(reportId, true));
+    } catch (value) {
+      setDetail(null);
+      setError(value instanceof Error ? value.message : String(value));
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadList();
+  }, [loadList]);
+
+  useEffect(() => {
+    void loadDetail(selectedId);
+    setShowResolve(false);
+    setResolutionNote("");
+    setResolvedVersion(productVersion);
+  }, [loadDetail, productVersion, selectedId]);
+
+  const updateStatus = useCallback(async (
+    status: SupportReportStatus,
+    version = "",
+    note = ""
+  ) => {
+    if (!selectedId || statusBusy) return;
+    setStatusBusy(true);
+    setError("");
+    try {
+      const updated = await window.adminControlCenter.updateSupportReportStatus(
+        selectedId,
+        status,
+        version,
+        note
+      );
+      setReports((current) => current.map((item) =>
+        item.reportId === updated.reportId ? updated : item
+      ));
+      await loadDetail(selectedId);
+      setShowResolve(false);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : String(value));
+    } finally {
+      setStatusBusy(false);
+    }
+  }, [loadDetail, selectedId, statusBusy]);
+
+  const counts = useMemo(() => ({
+    all: reports.length,
+    new: reports.filter((item) => item.status === "new").length,
+    reviewing: reports.filter((item) => item.status === "reviewing").length,
+    resolved: reports.filter((item) => item.status === "resolved").length
+  }), [reports]);
+
+  const filtered = reports.filter((item) => filter === "all" || item.status === filter);
+  const selectedMeta = reports.find((item) => item.reportId === selectedId) ?? detail?.meta ?? null;
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">DESTEK MERKEZİ</p>
+          <h1>Destek</h1>
+          <p className="page-subtitle">
+            Kullanıcı hata raporları, ekran görüntüsü ve son WARN/ERROR olayları tek yerde.
+          </p>
+        </div>
+        <button className="button button--secondary" onClick={() => void loadList()} disabled={loadingList}>
+          <RefreshCw size={17} className={loadingList ? "spin" : ""} />
+          {loadingList ? "Yenileniyor" : "Raporları Yenile"}
+        </button>
+      </header>
+
+      {error ? (
+        <div className="error-banner">
+          <TriangleAlert size={18} />
+          <span>{error}</span>
+        </div>
+      ) : null}
+
+      <section className="support-summary-grid">
+        <button className={filter === "all" ? "support-stat support-stat--active" : "support-stat"} onClick={() => setFilter("all")}>
+          <span>Tümü</span><strong>{counts.all}</strong>
+        </button>
+        <button className={filter === "new" ? "support-stat support-stat--active" : "support-stat"} onClick={() => setFilter("new")}>
+          <span>Yeni</span><strong>{counts.new}</strong>
+        </button>
+        <button className={filter === "reviewing" ? "support-stat support-stat--active" : "support-stat"} onClick={() => setFilter("reviewing")}>
+          <span>İnceleniyor</span><strong>{counts.reviewing}</strong>
+        </button>
+        <button className={filter === "resolved" ? "support-stat support-stat--active" : "support-stat"} onClick={() => setFilter("resolved")}>
+          <span>Çözüldü</span><strong>{counts.resolved}</strong>
+        </button>
+      </section>
+
+      <section className="support-layout">
+        <aside className="support-list-panel">
+          <div className="picker-heading">
+            <div>
+              <p className="panel-kicker">RAPORLAR</p>
+              <strong>{filtered.length} kayıt</strong>
+            </div>
+          </div>
+
+          <div className="support-list">
+            {filtered.map((report) => (
+              <button
+                key={report.reportId}
+                className={report.reportId === selectedId ? "support-list-item support-list-item--active" : "support-list-item"}
+                onClick={() => setSelectedId(report.reportId)}
+              >
+                <div className="support-list-title">
+                  <span className="installation-dot" data-status={supportStatusTone(report.status)} />
+                  <div>
+                    <strong>{report.reportId}</strong>
+                    <small>{new Date(report.receivedAt).toLocaleString("tr-TR")}</small>
+                  </div>
+                </div>
+                <div className="support-list-meta">
+                  <span className={statusClass(supportStatusTone(report.status))}>{supportStatusLabel(report.status)}</span>
+                  <small>{report.errorCount} error · {report.warnCount} warn</small>
+                </div>
+              </button>
+            ))}
+            {!loadingList && !filtered.length ? (
+              <div className="empty-row">Bu filtrede destek raporu yok.</div>
+            ) : null}
+          </div>
+        </aside>
+
+        <div className="support-detail">
+          {loadingDetail ? (
+            <div className="loading-card"><RefreshCw className="spin" size={22} /> Rapor indiriliyor…</div>
+          ) : detail && selectedMeta ? (
+            <>
+              <section className="panel support-hero">
+                <div>
+                  <p className="panel-kicker">RAPOR</p>
+                  <div className="support-hero-title">
+                    <h2>{detail.meta.reportId}</h2>
+                    <span className={statusClass(supportStatusTone(detail.meta.status))}>
+                      {supportStatusLabel(detail.meta.status)}
+                    </span>
+                  </div>
+                  <p>
+                    v{detail.meta.appVersion || "?"} · {detail.meta.platform || "platform ?"} {detail.meta.arch}
+                  </p>
+                </div>
+
+                <div className="support-actions">
+                  {detail.meta.status !== "reviewing" ? (
+                    <button
+                      className="button button--secondary"
+                      disabled={statusBusy}
+                      onClick={() => void updateStatus("reviewing")}
+                    >
+                      İncelemeye Al
+                    </button>
+                  ) : null}
+                  {detail.meta.status !== "resolved" ? (
+                    <button
+                      className="button button--primary"
+                      disabled={statusBusy}
+                      onClick={() => setShowResolve(true)}
+                    >
+                      Çözüldü İşaretle
+                    </button>
+                  ) : null}
+                  {detail.meta.status === "resolved" ? (
+                    <button
+                      className="button button--secondary"
+                      disabled={statusBusy}
+                      onClick={() => void updateStatus("reviewing")}
+                    >
+                      Yeniden Aç
+                    </button>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="support-metrics-grid">
+                <article className="summary-card">
+                  <span>Oturum</span>
+                  <strong>{detail.meta.sessionCount}</strong>
+                  <small>{detail.meta.abruptSessionCount} ani kapanış</small>
+                </article>
+                <article className="summary-card">
+                  <span>ERROR</span>
+                  <strong>{detail.meta.errorCount}</strong>
+                  <small>{detail.meta.eventCount} toplam olay</small>
+                </article>
+                <article className="summary-card">
+                  <span>WARN</span>
+                  <strong>{detail.meta.warnCount}</strong>
+                  <small>{detail.meta.screenshotBytes ? "Ekran görüntüsü var" : "Ekran görüntüsü yok"}</small>
+                </article>
+              </section>
+
+              {showResolve ? (
+                <section className="panel support-resolve-panel">
+                  <div>
+                    <p className="panel-kicker">ÇÖZÜM KAYDI</p>
+                    <h2>Raporu çözüldü olarak kapat</h2>
+                  </div>
+                  <div className="support-resolve-fields">
+                    <label>
+                      <span>Çözüldüğü sürüm</span>
+                      <input value={resolvedVersion} onChange={(event) => setResolvedVersion(event.target.value)} />
+                    </label>
+                    <label>
+                      <span>Çözüm notu</span>
+                      <textarea
+                        rows={3}
+                        value={resolutionNote}
+                        onChange={(event) => setResolutionNote(event.target.value)}
+                        placeholder="Kısa çözüm notu"
+                      />
+                    </label>
+                  </div>
+                  <div className="deployment-confirm-actions">
+                    <button className="button button--secondary" onClick={() => setShowResolve(false)}>Vazgeç</button>
+                    <button
+                      className="button button--primary"
+                      disabled={statusBusy}
+                      onClick={() => void updateStatus("resolved", resolvedVersion, resolutionNote)}
+                    >
+                      Kaydet ve Kapat
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
+              {detail.note ? (
+                <section className="panel support-note-panel">
+                  <p className="panel-kicker">KULLANICI NOTU</p>
+                  <p>{detail.note}</p>
+                </section>
+              ) : null}
+
+              <section className="support-evidence-grid">
+                <article className="panel">
+                  <div className="panel-header">
+                    <div>
+                      <p className="panel-kicker">WARN / ERROR</p>
+                      <h2>Son olaylar</h2>
+                    </div>
+                  </div>
+                  <div className="support-events">
+                    {detail.recent.map((event, index) => (
+                      <div className="support-event" key={`${event.timestamp}:${event.event}:${index}`}>
+                        <div className="support-event-head">
+                          <span className={statusClass(event.level === "ERROR" ? "error" : "warning")}>{event.level}</span>
+                          <strong>{event.scope || event.event || "Olay"}</strong>
+                          <small>{event.timestamp ? new Date(event.timestamp).toLocaleString("tr-TR") : ""}</small>
+                        </div>
+                        <p>{event.message || event.errorMessage || "Mesaj yok."}</p>
+                        {event.errorMessage && event.errorMessage !== event.message ? <small>{event.errorMessage}</small> : null}
+                      </div>
+                    ))}
+                    {!detail.recent.length ? <div className="empty-row">WARN/ERROR olayı yok.</div> : null}
+                  </div>
+                </article>
+
+                <article className="panel support-screenshot-panel">
+                  <div className="panel-header">
+                    <div>
+                      <p className="panel-kicker">EKRAN GÖRÜNTÜSÜ</p>
+                      <h2>Hata anı</h2>
+                    </div>
+                  </div>
+                  {detail.screenshotDataUrl ? (
+                    <img src={detail.screenshotDataUrl} alt="Destek raporu ekran görüntüsü" />
+                  ) : (
+                    <div className="support-no-screenshot">Bu raporda ekran görüntüsü yok.</div>
+                  )}
+                </article>
+              </section>
+
+              <section className="panel support-app-panel">
+                <div className="panel-header">
+                  <div>
+                    <p className="panel-kicker">DIAGNOSTIC SNAPSHOT</p>
+                    <h2>Uygulama bilgileri</h2>
+                  </div>
+                  {detail.meta.resolvedInVersion ? (
+                    <span className="status status--ready">Çözüldü: v{detail.meta.resolvedInVersion}</span>
+                  ) : null}
+                </div>
+                <div className="support-app-grid">
+                  {Object.entries(detail.app).map(([key, value]) => (
+                    <div key={key}><span>{key}</span><strong>{value}</strong></div>
+                  ))}
+                </div>
+                {detail.meta.resolutionNote ? (
+                  <div className="support-resolution-note">
+                    <strong>Çözüm notu</strong>
+                    <p>{detail.meta.resolutionNote}</p>
+                  </div>
+                ) : null}
+              </section>
+            </>
+          ) : (
+            <div className="loading-card">
+              <LifeBuoy size={22} />
+              {reports.length ? "Rapor seçin." : "Henüz destek raporu yok."}
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
 function System({ data }: { data: OverviewSnapshot }) {
   const [checking, setChecking] = useState(false);
   const [report, setReport] = useState<DependencyUpdateReport | null>(null);
@@ -1344,7 +1709,7 @@ function Placeholder({ section }: { section: Section }) {
       <p className="eyebrow">SONRAKİ DİLİM</p>
       <h1>{label}</h1>
       <p>
-        Bu yüzey henüz bağlanmadı. Genel Bakış, Kurulumlar, Release, Testler, Deploy ve Sistem gerçek veri hattı üzerinde;
+        Ana operasyon yüzeyleri gerçek veri hattına bağlandı;
         sonraki ekranlar aynı güvenli IPC sınırı üzerinden eklenecek.
       </p>
     </section>
@@ -1507,9 +1872,11 @@ export default function App() {
           <Tests data={data} refreshing={refreshing} onRefresh={() => void loadOverview()} />
         ) : section === "deploy" && data ? (
           <Deploy data={data} onRefresh={() => void loadOverview()} />
+        ) : section === "support" && data ? (
+          <Support productVersion={data.product.version} />
         ) : section === "system" && data ? (
           <System data={data} />
-        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" || section === "deploy" || section === "system" ? (
+        ) : section === "overview" || section === "installations" || section === "release" || section === "tests" || section === "deploy" || section === "support" || section === "system" ? (
           <div className="loading-card">
             <RefreshCw className="spin" size={22} />
             Gerçek sistem durumu okunuyor…
