@@ -21,6 +21,16 @@ const bridge: AdminBridge = {
     ipcRenderer.on("admin:deployment-run-state", handler);
     return () => ipcRenderer.removeListener("admin:deployment-run-state", handler);
   },
+  listSupportReports: (limit) => ipcRenderer.invoke("admin:list-support-reports", limit),
+  getSupportReportDetail: (reportId) => ipcRenderer.invoke("admin:get-support-report-detail", reportId),
+  updateSupportReportStatus: (reportId, status, resolvedInVersion, resolutionNote) =>
+    ipcRenderer.invoke(
+      "admin:update-support-report-status",
+      reportId,
+      status,
+      resolvedInVersion,
+      resolutionNote
+    ),
   openExternal: (url) => ipcRenderer.invoke("admin:open-external", url)
 };
 
