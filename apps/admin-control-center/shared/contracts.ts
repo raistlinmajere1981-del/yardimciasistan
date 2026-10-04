@@ -183,6 +183,35 @@ export type SupportReportDetail = {
   recent: SupportEventSummary[];
 };
 
+export type SystemToolSnapshot = {
+  id: string;
+  label: string;
+  available: boolean;
+  detail: string;
+};
+
+export type SystemCredentialSnapshot = {
+  ref: string;
+  status: CredentialStatus;
+  usedBy: string[];
+};
+
+export type AndroidDeviceSnapshot = {
+  serial: string;
+  state: string;
+  model: string;
+  device: string;
+};
+
+export type SystemEnvironmentSnapshot = {
+  checkedAt: string;
+  repoRoot: string;
+  blackSeaRoot: string | null;
+  tools: SystemToolSnapshot[];
+  credentials: SystemCredentialSnapshot[];
+  androidDevices: AndroidDeviceSnapshot[];
+};
+
 export type DependencyUpdateItem = {
   name: string;
   current: string;
@@ -233,6 +262,7 @@ export type AdminBridge = {
   startDeployment(request: DeploymentRunRequest): Promise<{ accepted: boolean; message: string }>;
   cancelDeployment(): Promise<boolean>;
   onDeploymentRunState(listener: (state: DeploymentRunState) => void): () => void;
+  getSystemEnvironment(): Promise<SystemEnvironmentSnapshot>;
   listSupportReports(limit?: number): Promise<SupportReportListItem[]>;
   getSupportReportDetail(reportId: string, refresh?: boolean): Promise<SupportReportDetail>;
   updateSupportReportStatus(
