@@ -2790,3 +2790,97 @@ body {
     display: none;
   }
 }
+
+
+.release-pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.release-pipeline .release-stage {
+  min-height: 122px;
+}
+
+.release-actions-panel {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+}
+
+.release-action-grid {
+  padding-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.release-action-card {
+  min-height: 96px;
+  padding: 15px;
+  border: 1px solid #dce8f3;
+  border-radius: 13px;
+  background: #f8fbfe;
+  color: #3473ab;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: 140ms ease;
+}
+
+.release-action-card:hover:not(:disabled) {
+  border-color: #badbf6;
+  background: #edf7ff;
+  transform: translateY(-1px);
+}
+
+.release-action-card:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.release-action-card:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.release-action-card--danger {
+  color: #b34851;
+  background: #fff7f7;
+  border-color: #f0d8da;
+}
+
+.release-action-card strong,
+.release-action-card small {
+  display: block;
+}
+
+.release-action-card strong {
+  color: #183657;
+  font-size: 14px;
+}
+
+.release-action-card small {
+  margin-top: 5px;
+  color: #7f94aa;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1260px) {
+  .release-pipeline {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .release-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .release-pipeline,
+  .release-action-grid {
+    grid-template-columns: 1fr;
+  }
+}
