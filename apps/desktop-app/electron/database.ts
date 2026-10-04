@@ -2,6 +2,8 @@ import { getRuntimeOrder, applyRuntimeShipmentProviderResult } from "./commerce-
 import type { ShipmentProviderResultInput } from "./commerce-shipment-store";
 import { getShipmentRegistration, prepareShipmentRegistration, markShipmentRegistrationSubmitted, type ShipmentRegistration } from "./shipping-registration-store";
 import { getArasShippingConfiguration, getStoredArasShippingConfiguration, type ShippingSecretWrite } from "./shipping-configuration-store";
+import { getDealerWebAccess, changeDealerWebAccess, createDealerAccessProjection } from "./dealer-web-access-store";
+import type { DealerAccessAction } from "@yardimci-asistan/shared";
 import { createCommerceOnlineCatalog } from "./commerce-online-catalog-publication";
 import { getCommerceProductPublication, listCommerceProductPublications, saveCommerceProductPublication, deleteCommerceProductPublication } from "./commerce-product-publication-store";
 import { hasBusinessCapability, type SaveCommerceProductPublicationInput } from "@yardimci-asistan/shared";
@@ -918,6 +920,32 @@ export class DesktopDatabase {
   deleteCommerceProductPublication(productId: string) {
     this.assertProductPublicationCapability();
     deleteCommerceProductPublication(this.db, productId);
+  }
+
+  invalidateRestoredDealerAccess() {
+    this.db.prepare(`UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = MAX(access_revision + 1, ?),
+      invite_hash = '', invite_issued_at = '', invite_expires_at = '', revoked_at = ?, updated_at = ?`)
+      .run(Date.now(), new Date().toISOString(), new Date().toISOString());
+  }
+
+  getDealerWebAccess(customerId: string) {
+    this.assertWholesaleAccess();
+    return getDealerWebAccess(this.db, customerId);
+  }
+
+  changeDealerWebAccess(customerId: string, action: DealerAccessAction) {
+    this.assertWholesaleAccess();
+    return changeDealerWebAccess(this.db, customerId, action);
+  }
+
+  private assertWholesaleAccess() {
+    if (!hasBusinessCapability(this.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.WHOLESALE)) {
+      throw new Error("Bayi / Toptan Satış bu işletmede etkin değil.");
+    }
+  }
+
+  createDealerAccessProjection() {
+    return createDealerAccessProjection(this.db);
   }
 
   createCommerceOnlineCatalog() {

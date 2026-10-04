@@ -30,6 +30,12 @@ const layoutSettingsDefinition = {
   visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ACCOMMODATION_ROOMS) || caps.includes(C.FOOD_TABLES)
 } satisfies SettingsSectionDefinition;
 
+export const dealerPortalDefinition = {
+  id: "settings-dealer-portal", category: "services", title: "Bayi Web Erişimi",
+  keywords: "bayi wholesale portal davet web erişimi", persistence: "staged",
+  visible: (caps: readonly BusinessCapability[]) => caps.includes(C.WHOLESALE)
+} as const satisfies SettingsSectionDefinition;
+
 export const onlineSalesDeliveryDefinition = {
   id: "settings-online-delivery", category: "services", title: "Online Satış Teslimatı",
   keywords: "online satış işletmeden teslim pickup kargo shipping teslimat",
@@ -50,6 +56,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-google-reviews", category: "business", title: "Google Yorumları", keywords: "google places yorum değerlendirme puan place id api anahtarı", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   layoutSettingsDefinition,
   onlineSalesDeliveryDefinition,
+  dealerPortalDefinition,
   arasShippingDefinition,
   { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },

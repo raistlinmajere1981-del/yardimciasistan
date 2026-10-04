@@ -1,0 +1,4 @@
+.dealer-shell { max-width: 640px; min-height: 100dvh; display: grid; align-content: center; padding-block: 32px; }
+.dealer-shell h1 { font-size: clamp(1.6rem, 5vw, 2.5rem); }
+.dealer-shell button { margin-top: 12px; }
+#dealer-name { font-weight: 600; overflow-wrap: anywhere; }

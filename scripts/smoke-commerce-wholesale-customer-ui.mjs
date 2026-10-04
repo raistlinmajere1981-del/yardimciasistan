@@ -29,6 +29,7 @@ try {
     businessName: "Wholesale UI Smoke",
     profileId: "market",
     profileOptions: [C.WHOLESALE],
+    dealerPortalEnabled: true,
     phone: "",
     whatsapp: "",
     email: "",
@@ -99,6 +100,8 @@ try {
 
   await page.exposeFunction("__whCall", async (method, args) => {
     calls.push({ method, args: structuredClone(args) });
+    if (method === "getDealerWebAccess") return database.getDealerWebAccess(args[0]);
+    if (method === "changeDealerWebAccess") return database.changeDealerWebAccess(args[0], args[1]);
     if (method === "saveCustomer") return database.saveCustomer(args[0]);
     if (method === "deleteCustomer") return database.deleteCustomer(args[0]);
     throw new Error(`Unexpected wholesale UI bridge call: ${method}`);
@@ -106,6 +109,10 @@ try {
 
   await page.addInitScript((dashboard) => {
     window.__whInitial = dashboard;
+    window.yardimciDesktop = {
+      getDealerWebAccess: (id) => window.__whCall("getDealerWebAccess", [id]),
+      changeDealerWebAccess: (id, action) => window.__whCall("changeDealerWebAccess", [id, action])
+    };
   }, database.getDashboardData());
 
   const port = server.httpServer.address().port;
@@ -148,6 +155,20 @@ try {
   await expect(workspace.getByLabel("Fiyat grubu", { exact: true })).toHaveValue("dealer_a");
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("30");
 
+  const accessPanel = workspace.getByRole("region", { name: "Web bayi erişimi" });
+  await expect(accessPanel).toBeVisible();
+  await accessPanel.getByRole("button", { name: "Web erişimini etkinleştir" }).click();
+  await accessPanel.getByRole("button", { name: "Davet oluştur", exact: true }).click();
+  const inviteOne = await accessPanel.getByLabel("Davet bağlantısı").inputValue();
+  assert.match(inviteOne, /\/bayi\/#invite=[A-Za-z0-9_-]{43}$/);
+  await accessPanel.getByRole("button", { name: "Daveti yenile" }).click();
+  await expect(accessPanel.getByLabel("Davet bağlantısı")).not.toHaveValue(inviteOne);
+  await accessPanel.getByRole("button", { name: "Oturumları sonlandır" }).click();
+  await expect(accessPanel.getByLabel("Davet bağlantısı")).toHaveCount(0);
+  await accessPanel.getByRole("button", { name: "Web erişimini kapat" }).click();
+  await expect(accessPanel).toContainText("İptal edildi");
+  assert.equal(calls.filter((call) => call.method === "saveCustomer").length, 1, "access actions do not submit Customer draft");
+
   const firstSave = calls.find((call) => call.method === "saveCustomer");
   assert.ok(firstSave);
   assert.deepEqual(firstSave.args[0].commercialProfile, {
@@ -175,6 +196,7 @@ try {
 
   await workspace.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("45");
   await workspace.getByLabel("Ticari not", { exact: true }).fill("Vade güncellendi.");
+  await expect(accessPanel.getByRole("button", { name: "Web erişimini etkinleştir" })).toBeDisabled();
   await workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("45");
 
@@ -209,6 +231,7 @@ try {
   workspace = page.locator("dialog.customer-workspace-frame");
   await expect(workspace).toBeVisible();
   await expect(workspace.getByText("Ticari bilgiler", { exact: true })).toHaveCount(0);
+  await expect(workspace.getByRole("region", { name: "Web bayi erişimi" })).toHaveCount(0);
 
   await workspace.getByLabel("Ad soyad", { exact: true }).fill("Ada Bayi Güncel");
   const saveCallCountBeforeBasicEdit = calls.filter((call) => call.method === "saveCustomer").length;
@@ -256,6 +279,13 @@ try {
   mkdirSync(artifacts, { recursive: true });
   await workspace.screenshot({ path: join(artifacts, "commercial-profile-narrow.png") });
 
+  await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  await page.getByRole("button", { name: "Yeni Müşteri", exact: true }).click();
+  const normalCreate = page.getByRole("dialog", { name: "Yeni müşteri ekle", exact: true });
+  await normalCreate.getByLabel("Ad soyad", { exact: true }).fill("Normal Müşteri");
+  await normalCreate.getByRole("button", { name: "Kaydet", exact: true }).click();
+  await expect(page.locator("dialog.customer-workspace-frame")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Web bayi erişimi" })).toHaveCount(0);
   assert.deepEqual(pageErrors, []);
   console.log("commerce-wholesale-customer-ui-smoke-ok");
 } catch (error) {

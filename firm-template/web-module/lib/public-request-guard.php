@@ -39,7 +39,7 @@ function ya_public_guard_enforce(string $bucket): void
         return;
     }
 
-    ya_public_guard_apply_cors();
+    if ($bucket !== 'dealer_claim') ya_public_guard_apply_cors();
 
     $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
     if ($contentLength > YA_PUBLIC_GUARD_MAX_BODY_BYTES) {
@@ -54,6 +54,7 @@ function ya_public_guard_enforce(string $bucket): void
     try {
         $database = ya_public_guard_open_database();
         if (!$database instanceof PDO) {
+            if ($bucket === 'dealer_claim') throw new RuntimeException('dealer_guard_unavailable');
             return;
         }
 
@@ -117,7 +118,8 @@ function ya_public_guard_enforce(string $bucket): void
             }
             throw $error;
         }
-    } catch (Throwable) {
+    } catch (Throwable $error) {
+        if ($bucket === 'dealer_claim') throw new RuntimeException('dealer_guard_unavailable', 0, $error);
         // Defensive throttling must not become a single point of failure.
         return;
     }
@@ -125,6 +127,12 @@ function ya_public_guard_enforce(string $bucket): void
 
 function ya_public_guard_policy(string $bucket): ?array
 {
+    if ($bucket === 'dealer_claim') {
+        return [
+            'subject_windows' => [['seconds' => 600, 'limit' => 8, 'retry_after' => 120]],
+            'global_windows' => [['seconds' => 3600, 'limit' => 500, 'retry_after' => 120]]
+        ];
+    }
     if ($bucket === 'chat') {
         return [
             'subject_windows' => [

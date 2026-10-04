@@ -123,6 +123,21 @@ try {
   await expect(productService.getByRole('combobox')).toBeVisible();
 
   await page.evaluate(() => window.refreshSettings({ profileOptions: ['commerce.wholesale'] }));
+  const dealerPortal = page.locator('#settings-dealer-portal');
+  const dealerToggle = dealerPortal.getByRole('checkbox', { name: 'Bayi portalını etkinleştir', exact: true });
+  const dealerSetupCount = (await setupCalls()).length;
+  await expect(dealerPortal).toBeVisible();
+  await expect(dealerToggle).not.toBeChecked();
+  await dealerToggle.check();
+  await expect(tab('Servisler')).toContainText('Değişiklik var');
+  expect((await setupCalls()).length).toBe(dealerSetupCount);
+  await discard();
+  await expect(dealerToggle).not.toBeChecked();
+  await dealerToggle.check(); await save();
+  expect((await setupCalls()).at(-1).input.dealerPortalEnabled).toBe(true);
+  await dealerToggle.uncheck(); await save();
+  expect((await setupCalls()).at(-1).input.dealerPortalEnabled).toBe(false);
+
   const arasService = page.locator('#settings-shipping-provider');
   const arasToggle = arasService.getByRole('checkbox', { name: 'Aras Kargo servisi', exact: true });
   const arasSetupBefore = (await setupCalls()).length;

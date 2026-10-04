@@ -12,6 +12,7 @@ import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
+import { DealerWebAccessPanel } from "./DealerWebAccessPanel";
 import { CustomerCreditPanel } from "./CustomerCreditPanel";
 import { CustomerRoomReceivablesPanel } from "./CustomerRoomReceivablesPanel";
 import { CustomerFormFields } from "./CustomerFormFields";
@@ -183,6 +184,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
       </form>
 
       <aside className="customer-workspace-operations" aria-label="Müşteri işlemleri">
+        {wholesaleEnabled && customer.commercialProfile?.dealerStatus === "active" && <DealerWebAccessPanel key={customer.id} customerId={customerId} disabled={dirty || saveState === "loading"} />}
         {staysEnabled && <section className="panel customer-operation-card form-stack" aria-label="Konaklama">
           <div className="customer-operation-card__heading">
             <div><h3>Konaklama</h3><small>Oda ve aktif kalış</small></div>

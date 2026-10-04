@@ -15,6 +15,13 @@ const manifestPath = join(outputRoot, "manifest.json");
 const tarballPath = join(outputRoot, "yardimci-asistan.tar.gz");
 const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
+  "bayi/index.php",
+  "bayi/portal.js",
+  "bayi/portal.css",
+  "api/dealer/claim.php",
+  "api/dealer/session.php",
+  "api/dealer/logout.php",
+  "lib/dealer-access.php",
   "README.md",
   "magaza/index.php",
   "magaza/storefront.js",

@@ -3,6 +3,7 @@ import {
   type BusinessAiContext,
   type BusinessCapability,
   type CommerceOnlineCatalog,
+  type DealerAccessProjection,
   type CommerceOrderBuyerSnapshot,
   type CommerceOrderDeliverySnapshot,
   type CustomerRequest,
@@ -84,6 +85,16 @@ export interface AcknowledgeRequestsOptions extends SyncCoreConfig {
   clientId: string;
   throughSeq: number;
 }
+
+export interface DealerAccessPublicationSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  source_revision: number;
+  server_revision: number;
+  deduplicated: boolean;
+}
+export type DealerAccessPublicationResult = DealerAccessPublicationSuccess | SyncFailure;
 
 export interface PushOnlineCatalogOptions extends SyncCoreConfig {
   clientId: string;
@@ -928,6 +939,7 @@ export interface SyncTransport {
   acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult>;
   pullAndroidActions(input?: PullActionsInput): Promise<PullAndroidActionsResult>;
   completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult>;
+  publishDealerAccess?(input: VersionedPublication<DealerAccessProjection>): Promise<DealerAccessPublicationResult>;
   publishOnlineCatalog(input: VersionedPublication<CommerceOnlineCatalog>): Promise<PushOnlineCatalogResult>;
   publishMenu(input: VersionedPublication<PublishedQrMenu>): Promise<PushMenuResult>;
   publishAndroidSnapshot(input: VersionedPublication<AndroidOperationsSnapshot>): Promise<PushAndroidSnapshotResult>;

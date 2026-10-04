@@ -10,6 +10,7 @@ const YA_GOOGLE_REVIEWS_CACHE_FILE = YA_BASE_DIR . '/data/google-reviews-cache.j
 
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/online-catalog.php';
+require_once YA_BASE_DIR . '/lib/dealer-access.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/google-reviews.php';
 
@@ -24,7 +25,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
+if (in_array($action, ['publish_dealer_access', 'publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -117,6 +118,10 @@ try {
 
     if ($action === 'publish_business_context') {
         ya_sync_publish_business_context($payload);
+    }
+
+    if ($action === 'publish_dealer_access') {
+        ya_sync_publish_dealer_access($payload);
     }
 
     if ($action === 'publish_online_catalog') {
@@ -3576,4 +3581,20 @@ function ya_sync_string_array(mixed $value): array
 function ya_sync_header(string $name): string
 {
     return ya_sync_string($_SERVER[$name] ?? '');
+}
+
+function ya_sync_publish_dealer_access(array $payload): void
+{
+    $revision = $payload['source_revision'] ?? null;
+    $key = ya_sync_string($payload['idempotency_key'] ?? '');
+    if (!is_array($payload['dealer_access'] ?? null) || !is_int($revision) || $revision < 1 || $key === '' || strlen($key) > 240) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Bayi erişim yayını geçersiz.']);
+    }
+    try { $projection = ya_dealer_projection($payload['dealer_access']); }
+    catch (InvalidArgumentException) { ya_sync_response(422, ['ok' => false, 'message' => 'Bayi erişim yayını geçersiz.']); }
+    $publication = ya_storage_publish('dealer_access_private', $projection, ya_sync_require_client_id($payload), $revision, $key,
+        date(DATE_ATOM), static fn(PDO $db) => ya_dealer_apply_projection($db, $projection));
+    ya_sync_response(200, ['ok' => true, 'message' => 'Bayi erişimi yayınlandı.',
+        'published_at' => $publication['published_at'], 'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'], 'deduplicated' => $publication['deduplicated']]);
 }

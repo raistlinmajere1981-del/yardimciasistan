@@ -102,6 +102,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
     aiProfiles,
     arasShipping: getArasShippingConfiguration(db),
+    dealerPortalEnabled: Number(settings?.dealer_portal_enabled ?? 0) === 1,
     onlineSalesDelivery: {
       pickupEnabled: Number(settings?.online_sales_pickup_enabled ?? 1) === 1,
       shippingEnabled: Number(settings?.online_sales_shipping_enabled ?? 0) === 1
@@ -408,6 +409,9 @@ export function saveSetupData(
 
     db.prepare("UPDATE settings SET online_sales_pickup_enabled = ?, online_sales_shipping_enabled = ? WHERE id = ?")
       .run(onlineSalesDelivery.pickupEnabled ? 1 : 0, onlineSalesDelivery.shippingEnabled ? 1 : 0, settingsId);
+
+    db.prepare("UPDATE settings SET dealer_portal_enabled = ? WHERE id = ?")
+      .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);
 
     if (input.arasShipping) saveArasShippingConfigurationInTransaction(db, businessId, input.arasShipping, shippingSecretWrite);
 

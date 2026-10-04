@@ -1,3 +1,4 @@
+import { registerDealerAccessIpcHandlers } from "./ipc/dealer-access-ipc";
 import { registerCommerceProductPublicationIpcHandlers } from "./ipc/commerce-product-publication-ipc";
 import { app, ipcMain } from "electron";
 import {
@@ -159,6 +160,8 @@ export function registerDesktopIpcHandlers(
     publishAndroidSnapshot,
     publishAiSettings
   });
+
+  registerDealerAccessIpcHandlers({ getDatabase, assertUnlocked, onCommit: () => getSyncCoordinator().scheduleSoon() });
 
   registerCommerceProductPublicationIpcHandlers({
     getDatabase, assertUnlocked, onCommit: () => getSyncCoordinator().scheduleSoon()

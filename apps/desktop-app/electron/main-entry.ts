@@ -201,6 +201,8 @@ function prepareRestoredStateForFullRepublish() {
     // Android is disabled it deliberately publishes data/permission tombstones.
     database.queueSyncJob("android_snapshot", now);
     database.queueSyncJob("online_catalog_publish", now);
+    database.invalidateRestoredDealerAccess();
+    database.queueSyncJob("dealer_access_publish", now);
   } finally {
     database.close();
   }

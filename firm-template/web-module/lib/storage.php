@@ -62,6 +62,7 @@ function ya_storage_capabilities(): array
         'features' => [
             'web_orders_v1',
             'online_catalog_v1',
+            'dealer_access_v1',
             'request_cursor',
             'request_acknowledgement',
             'android_action_queue',
@@ -79,6 +80,8 @@ function ya_storage_reset_runtime(): array
 {
     $database = ya_storage_open();
     $tables = [
+        'dealer_sessions',
+        'dealer_access',
         'web_requests',
         'web_orders',
         'web_order_submission_receipts',
@@ -599,7 +602,8 @@ function ya_storage_publish(
     string $clientId,
     ?int $sourceRevision,
     string $idempotencyKey,
-    string $now
+    string $now,
+    ?callable $applyInTransaction = null
 ): array {
     $database = ya_storage_open();
     $clientId = ya_storage_normalize_client_id($clientId);
@@ -645,6 +649,7 @@ function ya_storage_publish(
                 'published_at' => $now
             ];
         } else {
+            if ($applyInTransaction !== null) $applyInTransaction($database);
             $serverRevision = ya_storage_bump_revision($database, 'server_revision');
             $upsert = $database->prepare(<<<'SQL'
                 INSERT INTO publications (
@@ -746,6 +751,28 @@ function ya_storage_create_schema(PDO $database): void
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS dealer_access (
+          access_id TEXT PRIMARY KEY,
+          customer_ref TEXT NOT NULL UNIQUE,
+          display_name TEXT NOT NULL,
+          access_revision INTEGER NOT NULL CHECK (access_revision > 0),
+          enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+          invite_hash TEXT NOT NULL DEFAULT '',
+          invite_expires_at INTEGER NOT NULL DEFAULT 0,
+          consumed_at INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dealer_invite_hash ON dealer_access(invite_hash) WHERE invite_hash <> '';
+        CREATE TABLE IF NOT EXISTS dealer_sessions (
+          session_hash TEXT PRIMARY KEY,
+          dealer_access_id TEXT NOT NULL REFERENCES dealer_access(access_id),
+          access_revision INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          expires_at INTEGER NOT NULL,
+          revoked_at INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_dealer_sessions_access ON dealer_sessions(dealer_access_id);
+        CREATE INDEX IF NOT EXISTS idx_dealer_sessions_expiry ON dealer_sessions(expires_at);
 
         CREATE TABLE IF NOT EXISTS web_requests (
           seq INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -6,6 +6,7 @@ import { settingsFieldOwners } from "./settings-draft-model";
 import {
   isSettingsSectionVisible,
   onlineSalesDeliveryDefinition,
+  dealerPortalDefinition,
   arasShippingDefinition,
   type SettingsSectionDefinition,
   type StagedSettingsCategoryId
@@ -37,6 +38,15 @@ type StagedSettingsContributions = {
 const stagedSettingsContributions = {
   business: [],
   services: [{
+    definition: dealerPortalDefinition,
+    render: ({ draft, onChange, busy }) => (
+      <section id="settings-dealer-portal" tabIndex={-1} className="settings-service-card">
+        <div className="settings-service-card-head"><div><h3>Bayi Web Erişimi</h3><p>Aktif bayilere tek kullanımlık davet ile web erişimi verin.</p></div></div>
+        <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.dealerPortalEnabled}
+          onChange={(event) => onChange({ dealerPortalEnabled: event.target.checked })} /><span>Bayi portalını etkinleştir</span></label>
+      </section>
+    )
+  }, {
     definition: arasShippingDefinition,
     render: ({ draft, onChange, busy }) => <ArasShippingSettingsSection draft={draft.arasShipping}
       busy={busy} onChange={(arasShipping) => onChange({ arasShipping })} />

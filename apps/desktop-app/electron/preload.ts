@@ -298,6 +298,8 @@ export interface DesktopBridge {
   updateRequestStatus: (input: UpdateRequestStatusInput) => Promise<DesktopStatusUpdateResult>;
   deleteRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
   deleteCustomer: (customerId: string) => Promise<DesktopStatusUpdateResult>;
+  getDealerWebAccess: (customerId: string) => Promise<import("@yardimci-asistan/shared").DealerWebAccess | null>;
+  changeDealerWebAccess: (customerId: string, action: import("@yardimci-asistan/shared").DealerAccessAction) => Promise<import("@yardimci-asistan/shared").DealerAccessResult>;
   saveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   prepareBirthdayWhatsApp: (customerId: string) => Promise<DesktopBirthdayPrepareResult>;
   assignCustomerRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
@@ -557,6 +559,8 @@ const bridge: DesktopBridge = {
   convertRequestToReservation: (requestId: string) => ipcRenderer.invoke("request:convertToReservation", requestId),
   updateRequestStatus: (input: UpdateRequestStatusInput) => ipcRenderer.invoke("request:updateStatus", input),
   deleteRequest: (requestId: string) => ipcRenderer.invoke("request:delete", requestId),
+  getDealerWebAccess: (customerId) => invokeWhenUnlocked("dealer:access:get", customerId),
+  changeDealerWebAccess: (customerId, action) => invokeWhenUnlocked("dealer:access:change", customerId, action),
   deleteCustomer: (customerId: string) => ipcRenderer.invoke("customer:delete", customerId),
   saveCustomer: (input: SaveCustomerInput) => ipcRenderer.invoke("customer:save", input),
   prepareBirthdayWhatsApp: (customerId: string) => ipcRenderer.invoke("birthday:prepareWhatsApp", customerId),

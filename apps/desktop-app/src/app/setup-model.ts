@@ -59,6 +59,7 @@ export interface SetupFormState {
   productDataIncludeImages: boolean;
   birthdaySettings: BirthdaySettings;
   arasShipping: ArasShippingConfigurationInput & { hasSecret: boolean; configured: boolean };
+  dealerPortalEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
 }
 
@@ -113,6 +114,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
     arasShipping: { ...(setupData.arasShipping ?? emptyArasShippingConfiguration()), password: "", clearPassword: false },
+    dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
     onlineSalesDelivery: { ...setupData.onlineSalesDelivery },
     productDataEnabled: setupData.productData.enabled,
     productDataProvider: setupData.productData.provider,
@@ -241,6 +243,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       arasShipping: { enabled: setupForm.arasShipping.enabled, environment: setupForm.arasShipping.environment,
         customerCode: setupForm.arasShipping.customerCode, username: setupForm.arasShipping.username,
         password: setupForm.arasShipping.password, clearPassword: setupForm.arasShipping.clearPassword },
+      dealerPortalEnabled: setupForm.dealerPortalEnabled,
       onlineSalesDelivery: setupForm.onlineSalesDelivery,
       productData: {
         enabled: setupForm.productDataEnabled,

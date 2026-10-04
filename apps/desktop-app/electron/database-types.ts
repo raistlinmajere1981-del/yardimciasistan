@@ -546,6 +546,7 @@ export interface DesktopSetupData {
   aiProfiles: DesktopAiServiceProfile[];
   productData: DesktopProductDataSettings;
   arasShipping: import("@yardimci-asistan/shared").ArasShippingConfiguration;
+  dealerPortalEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
   servicePreferences: {
     whatsapp: boolean;
@@ -579,6 +580,7 @@ export interface SaveInitialSetupInput {
   aiProfiles?: SaveAiServiceProfileInput[];
   productData?: DesktopProductDataSettings;
   arasShipping?: import("@yardimci-asistan/shared").ArasShippingConfigurationInput;
+  dealerPortalEnabled?: boolean;
   onlineSalesDelivery?: OnlineSalesDeliverySettings;
   servicePreferences: {
     whatsapp: boolean;
@@ -1062,7 +1064,7 @@ export interface RecordSyncEventInput {
   status?: number;
 }
 
-export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish";
+export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish" | "dealer_access_publish";
 
 export interface DesktopSyncJob {
   jobKey: string;

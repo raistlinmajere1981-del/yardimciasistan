@@ -1,5 +1,7 @@
-import type { CommerceOnlineCatalog } from "@yardimci-asistan/shared";
+import type { CommerceOnlineCatalog, DealerAccessProjection } from "@yardimci-asistan/shared";
 import type {
+  DealerAccessPublicationSuccess,
+  DealerAccessPublicationResult,
   AcknowledgeRequestsOptions,
   AcknowledgeRequestsResult,
   AcknowledgeRequestsSuccess,
@@ -420,6 +422,14 @@ export class PhpHostingSyncTransport implements SyncTransport {
       actionId: input.actionId,
       status: input.status,
       errorMessage: input.errorMessage
+    });
+  }
+
+  publishDealerAccess(input: VersionedPublication<DealerAccessProjection>): Promise<DealerAccessPublicationResult> {
+    return syncRequest<DealerAccessPublicationSuccess>(this.config, {
+      action: "publish_dealer_access", client_id: this.config.clientId,
+      source_revision: input.sourceRevision, idempotency_key: input.idempotencyKey,
+      dealer_access: input.value
     });
   }
 

@@ -140,6 +140,13 @@ if [[ "$skip_pack" == false ]]; then
 fi
 
 required_package_files=(
+  bayi/index.php
+  bayi/portal.js
+  bayi/portal.css
+  api/dealer/claim.php
+  api/dealer/session.php
+  api/dealer/logout.php
+  lib/dealer-access.php
   magaza/index.php
   magaza/storefront.js
   magaza/storefront.css
@@ -445,6 +452,14 @@ if command -v curl >/dev/null 2>&1; then
       -X OPTIONS "${public_url%/}/api/chat.php" >/dev/null; then
     printf 'Yayın uygulandı ancak canlı HTTP kontrolü başarısız oldu.\n' >&2
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
+    exit 1
+  fi
+  dealer_shell_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/bayi/" || true)"
+  dealer_session_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/session.php" || true)"
+  dealer_claim_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/claim.php" || true)"
+  dealer_logout_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "${public_url%/}/api/dealer/logout.php" || true)"
+  if [[ "$dealer_shell_status" != "200" || "$dealer_session_status" != "401" || "$dealer_claim_status" != "405" || "$dealer_logout_status" != "405" ]]; then
+    printf 'Yayın uygulandı ancak bayi portalı/oturum sağlık kontrolü başarısız oldu.\n' >&2
     exit 1
   fi
   storefront_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \

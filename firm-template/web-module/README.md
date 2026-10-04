@@ -481,3 +481,29 @@ Ingress geçersiz adresli kaydı import/ack etmez. Guest Customer/address-book
 oluşturulmaz; kargo ücreti, provider, takip ve otomatik fulfillment yoktur.
 Sipariş toplamı yalnız ürün toplamıdır. Manual sipariş yöntem verilmezse pickup
 kullanır. Desktop Siparişler detayında teslimat bilgileri read-only gösterilir.
+
+
+### Dealer portal (C1 / D-033)
+
+`/bayi/` is a minimal dealer identity shell. Wholesale + the Desktop Services setting
+“Bayi Web Erişimi” enable invitations from the canonical Customer Workspace. Manually
+share the one-time HTTPS fragment link; the invitation expires in 72 hours. The link is
+shown only at creation and must not be entered into analytics or request-body logging.
+The page has no analytics/external assets and removes the fragment immediately.
+
+`POST api/dealer/claim.php` accepts `{ "invite_token": "…" }`; claim/logout require
+`Content-Type: application/json` and `X-YA-Dealer: 1` from the same origin. Claim returns
+only `{ "ok": true }` and sets a HttpOnly cookie; `GET api/dealer/session.php` returns
+only `{ "authenticated": true, "dealer": { "access_id": "…", "display_name": "…" } }`
+or 401 `{ "authenticated": false }`. `POST api/dealer/logout.php` revokes the session.
+Cookies are Secure in production, Strict, scoped to `/api/dealer/`, and expire in 8 hours.
+Only the loopback PHP development server permits HTTP cookies; production requires HTTPS.
+
+The sync-secret-protected POST `publish_dealer_access` action uses the existing versioned
+publication/receipt contract, private `dealer_access_private` storage and transactional
+`dealer_access` projection application. There is no public dealer list endpoint. Deploy
+must deny direct access to `data/` and `config/` using their packaged access rules.
+Revocation/rotation becomes effective after successful Desktop sync; no online round trip
+means no guarantee that remote sessions have already ended. Claimed status is hosting
+state and is not inferred from Desktop's “Davet hazır” label. Runtime reset clears both
+dealer access and sessions. Customer contacts/tax/notes and price groups are not published.

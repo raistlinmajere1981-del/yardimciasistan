@@ -615,3 +615,52 @@ fixed safe messages. Structured diagnostics contain only operation/provider/ship
 bounded error codes and HTTP status; no credentials, recipient/address/phone, raw SOAP,
 raw provider state or provider-returned error text. No polling, webhook, labels, automatic
 Sale/fulfillment or new provider/sync outbox execution is introduced.
+
+
+## D-033 — Dealer Web Identity is canonical Customer access, not a second Customer
+
+**Status:** ACCEPTED (2026-10-04)
+
+Dealer Web Identity references canonical Customer + an active commercial dealer profile.
+Desktop owns `commerce_dealer_web_access`, eligibility, enabled state, invite generation
+and monotonically increasing access revisions. Wholesale owns the staged
+`dealerPortalEnabled` subfeature configuration (default OFF); this is neither a new
+sector/capability nor an alias of Online Sales. Disabling Wholesale/portal, removing or
+inactivating a dealer profile, or deleting its Customer invalidates access and clears
+invites. Re-enabling a capability never restores old access. Restore invalidates restored
+access generations before publication.
+
+The web module owns only a sanitized private access projection, one-time claim consumption
+and server-side transport sessions. It never owns or receives the canonical Customer list.
+Projection includes independently random access/customer reference ids, company display
+name, revision, enabled state and private invite hash/expiry. Contact, tax, notes, guest
+buyer snapshots, pricing and internal Customer ids do not cross this boundary. Price
+group could later annotate identity, but never establishes price authority; C1 omits it.
+
+Immediate Customer Workspace operations enable access, issue/rotate an invite, revoke all
+sessions and disable access. They do not participate in the customer card draft; dirty
+cards must be saved/discarded first. Access status means Desktop-authorized access, not a
+claim that a hosting session is currently live. The durable versioned publication/outbox
+owns retries, idempotency and stale-publication rejection. Revocation takes effect on
+hosting after successful publication; an offline/failed sync must not be presented as
+completed remote revocation. Private projection application and publication receipt
+commit atomically; retry never resets consumed invites.
+
+Invites contain 256 bits of cryptographic randomness, expire after 72 hours, disclose
+only at generation and persist only as SHA-256 hashes. Links carry tokens in fragments,
+never query parameters; the portal removes the fragment before claim. Claim is explicit
+same-origin JSON POST, rate-limited with hashed IP counters and fail-closed storage.
+Generic failure is “Bağlantı geçersiz veya süresi dolmuş.” Consume + session creation is
+atomic. Rotation increments access revision, invalidating old invites and sessions.
+
+Hosting sessions carry 256-bit opaque random tokens in HttpOnly, production Secure,
+SameSite=Strict cookies scoped to the module's `/api/dealer/` path, with an eight-hour
+absolute lifetime. Only hashes persist in `dealer_sessions`. Every authenticated read
+joins enabled access and matching revision; session tokens never enter renderer JSON or
+browser storage. Logout is same-origin POST and revokes the stored session before
+expiring its cookie. Strict JSON + a non-CORS custom header protect claim/logout from
+cross-origin mutations. Hosting logs only stable allowlisted events/categories/opaque
+access ids. `/bayi/` renders public-safe identity and logout only.
+
+Dealer catalogs, prices, orders, payment, application/self-registration, OTP, messaging,
+password recovery and shipping selection remain outside C1.

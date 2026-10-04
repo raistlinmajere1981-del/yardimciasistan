@@ -1179,6 +1179,9 @@ function assertCapabilitiesShape() {
     protocol_version: 2,
     storage: "sqlite",
     features: [
+      "web_orders_v1",
+      "online_catalog_v1",
+      "dealer_access_v1",
       "request_cursor",
       "request_acknowledgement",
       "android_action_queue",

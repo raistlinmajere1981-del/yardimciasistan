@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-commerce-dealer-access.mjs",
+  "scripts/smoke-web-dealer-portal.mjs",
   "scripts/smoke-web-storefront.mjs",
   "scripts/smoke-web-order-submission.mjs",
   "scripts/smoke-commerce-online-catalog.mjs",
@@ -433,6 +435,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-web-dealer-portal.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-web-storefront.mjs") return ["php-lint"];
   if (file === "scripts/smoke-web-order-submission.mjs") return ["php-lint"];
   if (file === "scripts/smoke-support-endpoint.mjs" || file === "scripts/smoke-web-version.mjs") return [];
@@ -447,6 +450,7 @@ function smokeRequires(file) {
 function smokeDomains(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   const domains = new Set();
+  if (/dealer-access|dealer-portal|wholesale-customer-ui\.mjs/.test(file)) domains.add("dealer-access");
 
   if (/android/.test(name)) domains.add("android");
   if (/web|sync|public-room|connection/.test(name)) domains.add("web");

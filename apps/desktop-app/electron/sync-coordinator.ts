@@ -102,6 +102,7 @@ export class SyncCoordinator {
   private capabilitiesTarget = "";
   private webOrdersSupported = false;
   private onlineCatalogSupported = false;
+  private dealerAccessSupported = false;
   private nextPassiveRunAt = 0;
   private marketBarcodeFastPullActive = false;
   private availabilityHeartbeatSupported: boolean | null = null;
@@ -401,6 +402,7 @@ export class SyncCoordinator {
       }
       this.webOrdersSupported = capabilities.features.includes("web_orders_v1");
       this.onlineCatalogSupported = capabilities.features.includes("online_catalog_v1");
+      this.dealerAccessSupported = capabilities.features.includes("dealer_access_v1");
       this.capabilitiesTarget = targetKey;
     }
 
@@ -968,6 +970,11 @@ export class SyncCoordinator {
           "Web modülü online ürün kataloğunu desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
         continue;
       }
+      if (job.jobType === "dealer_access_publish" && (!this.dealerAccessSupported || !transport.publishDealerAccess)) {
+        this.options.database.failSyncJob(job.jobKey, job.sourceRevision,
+          "Web modülü bayi erişimini desteklemiyor.", new Date(Date.now() + 300_000).toISOString());
+        continue;
+      }
       const idempotencyKey = `${clientId}:${job.jobKey}:${job.sourceRevision}`;
       const result = job.jobType === "menu_publish"
         ? await transport.publishMenu({
@@ -981,6 +988,9 @@ export class SyncCoordinator {
               idempotencyKey,
               value: this.options.database.createCommerceOnlineCatalog()
             })
+        : job.jobType === "dealer_access_publish"
+          ? await transport.publishDealerAccess!({ sourceRevision: job.sourceRevision, idempotencyKey,
+              value: this.options.database.createDealerAccessProjection() })
         : await transport.publishAndroidSnapshot({
             sourceRevision: job.sourceRevision,
             idempotencyKey,
@@ -994,7 +1004,7 @@ export class SyncCoordinator {
         this.options.database.recordSyncEvent({
           direction: "push",
           entityType: job.jobType === "menu_publish" ? "menu"
-            : job.jobType === "online_catalog_publish" ? "online_catalog" : "android_snapshot",
+            : job.jobType === "online_catalog_publish" ? "online_catalog" : job.jobType === "dealer_access_publish" ? "dealer_access" : "android_snapshot",
           ok: true
         });
         published += 1;
@@ -1010,7 +1020,7 @@ export class SyncCoordinator {
       this.options.database.recordSyncEvent({
         direction: "push",
         entityType: job.jobType === "menu_publish" ? "menu"
-            : job.jobType === "online_catalog_publish" ? "online_catalog" : "android_snapshot",
+            : job.jobType === "online_catalog_publish" ? "online_catalog" : job.jobType === "dealer_access_publish" ? "dealer_access" : "android_snapshot",
         ok: false,
         message: result.message,
         status: result.status
