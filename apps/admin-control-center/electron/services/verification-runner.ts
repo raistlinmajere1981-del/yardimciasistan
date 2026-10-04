@@ -71,7 +71,8 @@ export class VerificationRunner {
     };
     this.emit();
 
-    const child = spawn(process.execPath, args, {
+    const nodeExecutable = process.env.npm_node_execpath?.trim() || (process.platform === "win32" ? "node.exe" : "node");
+    const child = spawn(nodeExecutable, args, {
       cwd: this.repoRoot,
       env: process.env,
       shell: false,
@@ -80,6 +81,7 @@ export class VerificationRunner {
     });
 
     this.child = child;
+    this.appendOutput(`Node: ${nodeExecutable}`);
 
     child.stdout?.on("data", (chunk) => this.appendOutput(chunk.toString()));
     child.stderr?.on("data", (chunk) => this.appendOutput(chunk.toString()));
