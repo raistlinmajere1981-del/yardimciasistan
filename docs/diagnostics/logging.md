@@ -39,6 +39,15 @@ Diagnostics are designed to be shareable with developers and coding agents, but 
 
 The logger applies recursive redaction and size limits as a second line of defense.
 
+D5 additionally masks API hash/auth key fields, SMS recipients/body, Instagram caption,
+raw provider request/response metadata and staging URL/path/query values (including encoded
+forms). This applies to main/renderer events, Error message/stack, sanitized console output
+and support export of older sessions. Stable scope/event/operationId and safe outcome codes
+remain available. Callers must still avoid collecting raw payloads or unlabelled secrets;
+redaction is not permission to log them. Existing session files are not rewritten.
+Hosting access/error/proxy logs require the separate rules in
+`infrastructure/hosting/README.md`; PHP cannot control ingress access logs.
+
 ## Runtime capture
 
 Electron main automatically captures:

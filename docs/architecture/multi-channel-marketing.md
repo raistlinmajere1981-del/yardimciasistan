@@ -36,13 +36,21 @@ bytes itself; no static staging directory, directory index or arbitrary path is 
 Existing authenticated sync secret authorizes upload/delete only, never public GET.
 
 Configure the web server/reverse proxy access logs to exclude the route
-`/api/instagram-media.php/*` or redact its final capability path. For example, Apache
-VirtualHost configuration can set `SetEnvIf Request_URI "^/[^?]*api/instagram-media\\.php/" instagram_stage`
-and apply `env=!instagram_stage` to the existing access CustomLog; nginx can use a
-matching location with `access_log off`. Do not enable request-body/header debugging
+`/api/instagram-media.php`, its capability paths and rejected queries. Apply the Apache
+conditional-log or nginx location rules in the hosting guide below to every relevant
+access/error/proxy log. Do not enable request-body/header debugging
 on this route or provider APIs. The application emits only stable publication IDs and
 safe outcome codes, never URLs, capabilities, tokens, API key/hash, phone, full SMS,
 caption or raw responses. Upload/delete tokens travel in multipart body, not query.
+
+Concrete server snippets and activation checks live in
+`infrastructure/hosting/README.md`. They cover the base upload/delete endpoint as well as
+capability GETs and rejected queries; an existing unfiltered access/global/proxy/audit log
+must be amended separately. PHP disables route error logging/display before staging loads.
+Desktop diagnostics and support export additionally redact staging URLs/paths (including
+encoded forms), API hash, recipient/body/caption and raw-response metadata. Console mirroring
+forwards sanitized output as well as persisting sanitized structured events. These are
+logging-only defenses; provider calls, HTTP responses and delivery lifecycles are unchanged.
 
 Expiry is enforced during reads; expired files are also pruned on subsequent uploads.
 Desktop records the stage origin, so changing a web installation cannot silently send an

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
+import { isMarketingDiagnosticSensitiveKey, redactMarketingDiagnosticText } from "./marketing-diagnostic-redaction";
 import {
   resolveDesktopLogSessionsPath,
   resolveLogsPath
@@ -64,7 +65,7 @@ let pendingEventBytes = 0;
 let pendingFlushTimer: NodeJS.Timeout | null = null;
 
 function sanitizeText(value: string, maxLength = MAX_STRING_LENGTH): string {
-  return value
+  return redactMarketingDiagnosticText(value)
     .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s,;]+/gi, "$1[redacted]")
     .replace(/\bbearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]")
     .replace(/((?:sync[_ -]?secret|api[_ -]?key|password|token|authorization|cookie)\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]")
@@ -74,7 +75,7 @@ function sanitizeText(value: string, maxLength = MAX_STRING_LENGTH): string {
 }
 
 function isSensitiveKey(key: string): boolean {
-  return /(?:password|passphrase|secret|token|api.?key|authorization|cookie|credential|private.?key)/i.test(key);
+  return isMarketingDiagnosticSensitiveKey(key) || /(?:password|passphrase|secret|token|api.?key|authorization|cookie|credential|private.?key)/i.test(key);
 }
 
 function sanitizeValue(value: unknown, key = "", depth = 0): unknown {
@@ -302,7 +303,7 @@ function installConsoleMirror() {
       event: "console.warn",
       message: args.map(consoleArgText).join(" ")
     });
-    originalWarn(...args);
+    originalWarn(...args.map(consoleArgText));
   };
 
   console.error = (...args: unknown[]) => {
@@ -311,7 +312,7 @@ function installConsoleMirror() {
       event: "console.error",
       message: args.map(consoleArgText).join(" ")
     });
-    originalError(...args);
+    originalError(...args.map(consoleArgText));
   };
 }
 

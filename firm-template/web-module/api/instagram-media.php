@@ -1,5 +1,9 @@
 <?php
 declare(strict_types=1);
+// Warnings/fatals must not put capability paths, request data or headers in PHP logs/output.
+// Access/proxy logs need server-level rules; see infrastructure/hosting/README.md.
+ini_set('log_errors', '0');
+ini_set('display_errors', '0');
 require_once __DIR__ . '/../lib/instagram-staging.php';
 header('X-Content-Type-Options: nosniff'); header('Cache-Control: no-store'); header('Referrer-Policy: no-referrer');
 function ya_instagram_stage_response(int $status, array $data): never {

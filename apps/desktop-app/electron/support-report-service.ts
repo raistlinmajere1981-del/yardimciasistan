@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
+import { isMarketingDiagnosticSensitiveKey, redactMarketingDiagnosticText } from "./marketing-diagnostic-redaction";
 import { app, clipboard, nativeImage, net } from "electron";
 import {
   createDiagnosticSupportSnapshot,
@@ -87,7 +88,7 @@ function readOrCreateSupportClientId(userDataPath: string) {
 }
 
 function scrubText(value: string) {
-  return String(value ?? "")
+  return redactMarketingDiagnosticText(String(value ?? ""))
     .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s,;]+/gi, "$1[redacted]")
     .replace(/\bbearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]")
     .replace(/((?:sync[_ -]?secret|api[_ -]?key|password|token|authorization|cookie)\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]")
@@ -100,7 +101,7 @@ function scrubText(value: string) {
 }
 
 function isOutboundSensitiveKey(key: string) {
-  return /(?:password|secret|token|api.?key|authorization|cookie|credential|private.?key|phone|email|identity.?number|document.?serial|address|customer.?name|guest.?name|full.?name)/i.test(key);
+  return isMarketingDiagnosticSensitiveKey(key) || /(?:password|secret|token|api.?key|authorization|cookie|credential|private.?key|phone|email|identity.?number|document.?serial|address|customer.?name|guest.?name|full.?name)/i.test(key);
 }
 
 function scrubValue(value: unknown, key = "", depth = 0): unknown {
