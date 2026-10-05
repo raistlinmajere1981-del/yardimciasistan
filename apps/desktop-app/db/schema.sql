@@ -604,26 +604,9 @@ CREATE TABLE "menu_stock_movements" (
   FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
 );
 
-CREATE TABLE notifications (
-  id TEXT PRIMARY KEY,
-  type TEXT NOT NULL,
-  title TEXT NOT NULL,
-  message TEXT NOT NULL DEFAULT '',
-  related_type TEXT NOT NULL DEFAULT '',
-  related_id TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'unread',
-  priority TEXT NOT NULL DEFAULT 'normal',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  read_at TEXT NOT NULL DEFAULT '',
-  deleted_at TEXT NOT NULL DEFAULT '',
-  sync_status TEXT NOT NULL DEFAULT 'local_only'
-);
-
 CREATE TABLE pension_payments (
   id TEXT PRIMARY KEY,
   reservation_id TEXT NOT NULL,
-  stay_id TEXT NOT NULL DEFAULT '',
   amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
   currency TEXT NOT NULL DEFAULT 'TRY',
   payment_method TEXT NOT NULL DEFAULT 'unspecified'
@@ -902,7 +885,6 @@ CREATE TABLE sync_outbox (
   job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish', 'marketing_website_publish')),
   source_revision INTEGER NOT NULL DEFAULT 1,
   attempt_count INTEGER NOT NULL DEFAULT 0,
-  claim_token TEXT NOT NULL DEFAULT '', claimed_at TEXT NOT NULL DEFAULT '',
   next_attempt_at TEXT NOT NULL DEFAULT '',
   last_error TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
@@ -913,20 +895,6 @@ CREATE TABLE sync_outbox_revisions (
   job_key TEXT PRIMARY KEY,
   source_revision INTEGER NOT NULL CHECK (source_revision > 0),
   updated_at TEXT NOT NULL
-);
-
-CREATE TABLE sync_records (
-  id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,
-  entity_id TEXT NOT NULL,
-  direction TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  last_attempt_at TEXT NOT NULL DEFAULT '',
-  error_message TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  deleted_at TEXT NOT NULL DEFAULT '',
-  sync_status TEXT NOT NULL DEFAULT 'local_only'
 );
 
 CREATE TABLE sync_runtime (
@@ -1028,7 +996,6 @@ CREATE TABLE birthday_message_deliveries (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'prepared', 'sent', 'skipped', 'failed')),
   attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
   last_attempted_at TEXT NOT NULL DEFAULT '',
-  claim_token TEXT NOT NULL DEFAULT '', claimed_at TEXT NOT NULL DEFAULT '',
   next_attempt_at TEXT NOT NULL DEFAULT '',
   prepared_at TEXT NOT NULL DEFAULT '',
   sent_at TEXT NOT NULL DEFAULT '',
@@ -2211,7 +2178,7 @@ BEGIN
   WHERE source_type = 'restaurant_order' AND source_id = NEW.id;
 END;
 
--- BEGIN HOSPITALITY GUEST SCHEMA
+-- Hospitality guest schema.
 CREATE UNIQUE INDEX idx_stay_one_occupied_room ON customer_room_stays(room_id)
   WHERE status = 'checked_in' AND deleted_at = '';
 CREATE TABLE hospitality_entry_receipts (
@@ -2346,7 +2313,6 @@ BEGIN
       'issuingAuthority', NEW.issuing_authority, 'address', NEW.address))
   WHERE status != 'sent' AND guest_id IN (SELECT id FROM stay_guests WHERE customer_id = NEW.id);
 END;
--- END HOSPITALITY GUEST SCHEMA
 
 CREATE TRIGGER trg_online_catalog_commerce_product_publications_insert
 AFTER INSERT ON commerce_product_publications

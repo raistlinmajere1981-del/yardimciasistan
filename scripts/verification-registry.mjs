@@ -78,6 +78,7 @@ const SMOKE_FILES = [
   "scripts/smoke-dashboard-workspace.mjs",
   "scripts/smoke-data-paths.mjs",
   "scripts/smoke-database-schema.mjs",
+  "scripts/smoke-schema-authority.mjs",
   "scripts/smoke-desktop-appearance.mjs",
   "scripts/smoke-desktop-clean-startup.mjs",
   "scripts/smoke-desktop-customer-pension.mjs",
@@ -490,6 +491,7 @@ function smokeDomains(file) {
 
   if (name === "nexa-assets") return ["desktop", "web", "platform"];
   if (name === "storage-correctness") return ["hospitality", "finance", "web", "platform"];
+  if (name === "schema-authority") return ["platform", "hospitality", "finance", "customers", "web"];
   if (name === "domain-mutation-ownership") return ["commerce", "hospitality", "finance", "android", "customers"];
   const domains = new Set();
   if (/marketing-|showcase-|instagram-/.test(name)) domains.add("marketing");

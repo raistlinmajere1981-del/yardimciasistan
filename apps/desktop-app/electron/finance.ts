@@ -459,9 +459,9 @@ export class DesktopFinanceService {
       const now = new Date().toISOString();
       db.prepare(`
         INSERT INTO pension_payments (
-          id, reservation_id, stay_id, amount_minor, currency, payment_method, paid_at,
+          id, reservation_id, amount_minor, currency, payment_method, paid_at,
           note, created_at, updated_at, deleted_at, sync_status
-        ) VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, '', 'local_only')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'local_only')
       `).run(
         `pension_payment_${randomUUID()}`,
         reservationId,
@@ -576,19 +576,7 @@ function cleanText(value: unknown, maxLength: number): string {
 
 
 function ensureFinanceCategories(db: DatabaseSync) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS finance_categories (
-      id TEXT PRIMARY KEY,
-      direction TEXT NOT NULL CHECK (direction IN ('income', 'expense')),
-      name TEXT NOT NULL,
-      is_system INTEGER NOT NULL DEFAULT 0 CHECK (is_system IN (0, 1)),
-      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-  `);
-
+  // Normal product data seed only; persistent structure belongs to schema.sql.
   const now = new Date().toISOString();
   const insert = db.prepare(`
     INSERT OR IGNORE INTO finance_categories (

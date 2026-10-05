@@ -8,6 +8,7 @@ import {
   mkdirSync,
   mkdtempSync,
   existsSync,
+  readFileSync,
   rmSync
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,10 +17,12 @@ import { join } from "node:path";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
+const { assertCurrentDesktopSchema } = require("../apps/desktop-app/dist-electron/desktop-database-compatibility.js");
 const syncClientIdPattern = /^desktop-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const repoRoot = process.cwd();
 const appPath = join(repoRoot, "apps", "desktop-app");
 const schemaPath = join(appPath, "db", "schema.sql");
+const schemaSql = readFileSync(schemaPath, "utf8");
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-database-schema-"));
 const cleanUserDataPath = join(tempRoot, "clean-user-data");
 const cleanBackupPath = join(tempRoot, "clean-backups");
@@ -29,6 +32,14 @@ const backupFilePath = join(tempRoot, "current-schema.sqlite");
 
 try {
   assert.equal(existsSync(schemaPath), true, "Desktop current schema.sql bulunmalı.");
+  const standalone = new DatabaseSync(":memory:");
+  try {
+    standalone.exec("PRAGMA foreign_keys = ON");
+    standalone.exec(schemaSql);
+    assertCurrentDatabase(standalone);
+  } finally {
+    standalone.close();
+  }
 
   const firstDatabase = openDatabase(cleanUserDataPath, cleanBackupPath);
   firstDatabase.initialize();
@@ -211,6 +222,7 @@ async function initializeConcurrently(userDataPath) {
 }
 
 function assertCurrentDatabase(database, options = {}) {
+  assertCurrentDesktopSchema(database, schemaSql);
   assert.equal(database.prepare("PRAGMA quick_check").get().quick_check, "ok");
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
 

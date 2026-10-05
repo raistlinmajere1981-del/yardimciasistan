@@ -271,20 +271,6 @@ export class DesktopDatabase {
         this.db.exec(schemaSql);
       }
 
-      // Install the current guest model from its canonical schema, once. Existing
-      // stays retain their known primary guest; unnamed occupants are never invented.
-      if (!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'stay_guests'").get()) {
-        const guestSchema = schemaSql.split("-- BEGIN HOSPITALITY GUEST SCHEMA")[1]?.split("-- END HOSPITALITY GUEST SCHEMA")[0];
-        if (!guestSchema) throw new Error("Konaklama misafir şeması bulunamadı.");
-        this.db.exec(guestSchema);
-        this.db.exec(`INSERT INTO stay_guests (id, stay_id, customer_id, status, checked_in_at, checked_out_at, created_at, updated_at)
-          SELECT 'guest_' || id, id, customer_id, status, checked_in_at, checked_out_at, created_at, updated_at
-          FROM customer_room_stays WHERE deleted_at = '';
-          INSERT INTO stay_room_history (id, stay_id, room_id, entered_at, left_at)
-          SELECT 'room_' || id, id, room_id, checked_in_at, checked_out_at FROM customer_room_stays
-          WHERE deleted_at = '' AND checked_in_at != '';`);
-      }
-
       assertCurrentDesktopSchema(this.db, schemaSql);
 
       this.ensureSyncClientId();

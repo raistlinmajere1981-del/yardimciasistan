@@ -320,9 +320,6 @@ export function deleteRequestInTransaction(
       `)
     .run(updatedAt, updatedAt, requestId);
   db
-    .prepare("UPDATE notifications SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE related_type = 'request' AND related_id = ? AND deleted_at = ''")
-    .run(updatedAt, updatedAt, requestId);
-  db
     .prepare("UPDATE requests SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
     .run(updatedAt, updatedAt, requestId);
   insertDeletionEvent(db, androidAction, insertAndroidEvent, "request.deleted", "request", requestId, {

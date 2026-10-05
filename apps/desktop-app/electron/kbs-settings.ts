@@ -83,7 +83,6 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
   if (!passwordUpdate.ok) return passwordUpdate;
   const db = new DatabaseSync(databasePath);
   try {
-    ensureKbsSettingsTable(db);
     const now = new Date().toISOString();
     db.exec("BEGIN IMMEDIATE");
     db.prepare(`
@@ -218,7 +217,6 @@ export async function testKbsConnection(
 function readStoredSettings(databasePath: string): StoredKbsSettings {
   const db = new DatabaseSync(databasePath);
   try {
-    ensureKbsSettingsTable(db);
     const row = db.prepare("SELECT * FROM kbs_service_settings WHERE id = 'primary' LIMIT 1").get() as Record<string, unknown> | undefined;
     return {
       enabled: Number(row?.enabled ?? 0) === 1,
@@ -231,22 +229,6 @@ function readStoredSettings(databasePath: string): StoredKbsSettings {
   } finally {
     db.close();
   }
-}
-
-function ensureKbsSettingsTable(db: DatabaseSync) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS kbs_service_settings (
-      id TEXT PRIMARY KEY CHECK (id = 'primary'),
-      enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
-      provider TEXT NOT NULL DEFAULT 'egm' CHECK (provider IN ('egm', 'jandarma')),
-      facility_code TEXT NOT NULL DEFAULT '',
-      username TEXT NOT NULL DEFAULT '',
-      authorized_identity_number TEXT NOT NULL DEFAULT '',
-      password_encrypted TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-  `);
 }
 
 function normalizeInput(input: SaveKbsSettingsInput): SaveKbsSettingsInput {

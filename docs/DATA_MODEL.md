@@ -775,46 +775,10 @@ cancelled
 
 # 13. Notification / Bildirim Modeli
 
-PC ve Android tarafında gösterilecek bildirimleri temsil eder.
-
-## Alanlar
-
-```json
-{
-  "id": "notification_001",
-  "type": "new_request",
-  "title": "Yeni müşteri talebi",
-  "message": "Ahmet Yılmaz pansiyon rezervasyonu sordu.",
-  "related_type": "request",
-  "related_id": "request_001",
-  "status": "unread",
-  "priority": "normal",
-  "created_at": "2026-07-10T14:30:00+03:00",
-  "read_at": ""
-}
-```
-
-## type Değerleri
-
-```text
-new_request
-reservation_pending
-reservation_today
-room_status
-table_status
-ai_reply_ready
-whatsapp_message_ready
-sync_problem
-system
-```
-
-## status Değerleri
-
-```text
-unread
-read
-archived
-```
+Masaüstü bildirimleri `apps/desktop-app/src/app/notifications.ts` tarafından yaşayan
+dashboard kaynaklarından türetilir; ayrı bir persisted bildirim entity'si yoktur.
+`hospitality_notifications` ise misafir giriş/çıkış ve KBS workflow'unun yaşayan,
+ayrı bir kaydıdır. İki kavram birbirinin yerine kullanılmaz.
 
 ---
 
@@ -865,54 +829,13 @@ archived
 
 ---
 
-# 15. SyncRecord / Senkronizasyon Modeli
+# 15. Senkronizasyon Modeli
 
-PC uygulaması ile firma hosting mini API arasındaki veri aktarımını takip eder.
-
-## Alanlar
-
-```json
-{
-  "id": "sync_001",
-  "entity_type": "request",
-  "entity_id": "request_001",
-  "direction": "pull",
-  "status": "success",
-  "last_attempt_at": "2026-07-10T14:30:00+03:00",
-  "error_message": "",
-  "created_at": "2026-07-10T14:30:00+03:00",
-  "updated_at": "2026-07-10T14:30:00+03:00"
-}
-```
-
-## entity_type Değerleri
-
-```text
-request
-reservation
-menu
-business
-notification
-settings
-```
-
-## direction Değerleri
-
-```text
-pull
-push
-two_way
-```
-
-## status Değerleri
-
-```text
-pending
-success
-failed
-conflict
-skipped
-```
+Güncel masaüstü runtime'ı cursor ve son deneme/başarı durumunu `sync_runtime` içinde,
+bekleyen yayın işlerini `sync_outbox` içinde tutar. `sync_outbox_revisions` revision
+authority'sidir; `desktop_sync_identity` yerel istemci kimliğini tutar. İş tamamlama
+ve retry mevcut source revision üzerinden koşulludur; ayrı bir genel senkron kayıt
+entity'si veya kullanılmayan claim token alanı yoktur.
 
 ---
 
@@ -1087,9 +1010,7 @@ menu_categories
 menu_items
 ai_conversations
 whatsapp_messages
-notifications
 daily_tasks
-sync_records
 sync_runtime
 sync_outbox
 sync_outbox_revisions
@@ -1125,9 +1046,7 @@ sync_status
 9. menu_items
 10. whatsapp_messages
 11. ai_conversations
-12. notifications
-13. sync_records
-14. events
+12. events
 ```
 
 ---

@@ -26,7 +26,6 @@ export * from "./types/room-public-catalog";
 export * from "./types/table-public-details";
 export * from "./types/table-public-catalog";
 export * from "./types/stock-image";
-export * from "./types/sync";
 export * from "./types/table";
 export * from "./types/whatsapp";
 export * from "./types/wholesale";

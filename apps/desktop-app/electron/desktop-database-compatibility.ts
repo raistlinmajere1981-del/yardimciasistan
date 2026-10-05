@@ -15,22 +15,22 @@ export interface DesktopDatabaseCompatibility {
   reason: string;
 }
 
-interface CanonicalTable {
+interface SchemaObject {
+  type: string;
   name: string;
-  columns: string[];
+  sql: string;
 }
 
-const GUEST_BOOTSTRAP_TABLES = new Set([
-  "hospitality_entry_receipts",
-  "stay_guests",
-  "hospitality_notifications",
-  "stay_room_history"
-]);
-
-function tableExists(database: DatabaseSync, tableName: string) {
-  return Boolean(database.prepare(
-    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1"
-  ).get(tableName));
+function schemaObjects(database: DatabaseSync): Map<string, SchemaObject> {
+  const rows = database.prepare(`
+    SELECT type, name, sql FROM sqlite_master
+    WHERE type IN ('table', 'index', 'view', 'trigger') AND name NOT LIKE 'sqlite_%'
+    ORDER BY type, name
+  `).all() as Array<{ type: string; name: string; sql: string }>;
+  return new Map(rows.map((row) => [
+    `${row.type}:${row.name}`,
+    { ...row, sql: row.sql.trim() }
+  ]));
 }
 
 function tableColumns(database: DatabaseSync, tableName: string) {
@@ -40,56 +40,43 @@ function tableColumns(database: DatabaseSync, tableName: string) {
   );
 }
 
-function canonicalTables(schemaSql: string): CanonicalTable[] {
+export function currentDesktopSchemaProblem(
+  database: DatabaseSync,
+  schemaSql: string
+): string {
   const canonical = new DatabaseSync(":memory:");
   try {
     canonical.exec("PRAGMA foreign_keys = ON;");
     canonical.exec(schemaSql);
-    const rows = canonical.prepare(`
-      SELECT name
-      FROM sqlite_master
-      WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-      ORDER BY name ASC
-    `).all() as Array<{ name?: unknown }>;
+    const expected = schemaObjects(canonical);
+    const actual = schemaObjects(database);
 
-    return rows.map((row) => {
-      const name = String(row.name ?? "");
-      return {
-        name,
-        columns: [...tableColumns(canonical, name)]
-      };
-    });
+    // Retain useful missing-table/column diagnostics before checking full definitions.
+    for (const table of expected.values()) {
+      if (table.type !== "table") continue;
+      if (!actual.has(`table:${table.name}`)) return `Eksik tablo: ${table.name}`;
+      const columns = tableColumns(database, table.name);
+      for (const columnName of tableColumns(canonical, table.name)) {
+        if (!columns.has(columnName)) return `Eksik alan: ${table.name}.${columnName}`;
+      }
+    }
+
+    // SQLite's own persisted DDL catalog is the signature, not a historical snapshot
+    // or a schema parser. This includes table constraints/defaults/FKs, unique/partial
+    // indexes, views and trigger bodies. Only canonical definitions are current;
+    // semantically equivalent handwritten DDL is intentionally not a second authority.
+    for (const [key, object] of expected) {
+      const existing = actual.get(key);
+      if (!existing) return `Eksik şema nesnesi: ${key}`;
+      if (existing.sql !== object.sql) return `Şema tanımı farklı: ${key}`;
+    }
+    for (const key of actual.keys()) {
+      if (!expected.has(key)) return `Beklenmeyen şema nesnesi: ${key}`;
+    }
+    return "";
   } finally {
     canonical.close();
   }
-}
-
-function guestBootstrapCanRun(database: DatabaseSync) {
-  return [...GUEST_BOOTSTRAP_TABLES].every((tableName) => !tableExists(database, tableName));
-}
-
-export function currentDesktopSchemaProblem(
-  database: DatabaseSync,
-  schemaSql: string,
-  options: { allowGuestBootstrap?: boolean } = {}
-): string {
-  const allowGuestBootstrap = options.allowGuestBootstrap === true && guestBootstrapCanRun(database);
-
-  for (const table of canonicalTables(schemaSql)) {
-    if (!tableExists(database, table.name)) {
-      if (allowGuestBootstrap && GUEST_BOOTSTRAP_TABLES.has(table.name)) continue;
-      return `Eksik tablo: ${table.name}`;
-    }
-
-    const columns = tableColumns(database, table.name);
-    for (const columnName of table.columns) {
-      if (!columns.has(columnName)) {
-        return `Eksik alan: ${table.name}.${columnName}`;
-      }
-    }
-  }
-
-  return "";
 }
 
 export function assertCurrentDesktopSchema(database: DatabaseSync, schemaSql: string) {
@@ -134,7 +121,7 @@ export function inspectDesktopDatabaseCompatibility(
       return { state: "fresh", reason: "Yerel veritabanı boş." };
     }
 
-    const problem = currentDesktopSchemaProblem(database, schemaSql, { allowGuestBootstrap: true });
+    const problem = currentDesktopSchemaProblem(database, schemaSql);
     if (problem) {
       return { state: "incompatible", reason: problem };
     }

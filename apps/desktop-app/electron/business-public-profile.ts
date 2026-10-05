@@ -53,7 +53,6 @@ interface BusinessPublicProfileRow {
 export function getBusinessPublicProfile(databasePath: string): BusinessPublicProfile {
   const db = new DatabaseSync(databasePath);
   try {
-    ensureBusinessPublicSocialLinksTable(db);
     const businessId = getActiveBusinessId(db);
     if (!businessId) return { ...EMPTY_BUSINESS_PUBLIC_PROFILE };
 
@@ -91,7 +90,6 @@ export function saveBusinessPublicProfile(
 
   const db = new DatabaseSync(databasePath);
   try {
-    ensureBusinessPublicSocialLinksTable(db);
     const businessId = getActiveBusinessId(db);
     if (!businessId) {
       return { ok: false, message: "İşletme profili henüz oluşturulmamış." };
@@ -278,18 +276,4 @@ function parseJsonArray(value: unknown): unknown[] {
   } catch {
     return [];
   }
-}
-
-
-function ensureBusinessPublicSocialLinksTable(db: DatabaseSync): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS business_public_social_links (
-      business_id TEXT PRIMARY KEY,
-      links_json TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      sync_status TEXT NOT NULL DEFAULT 'local_only',
-      FOREIGN KEY (business_id) REFERENCES business(id) ON DELETE CASCADE
-    )
-  `);
 }

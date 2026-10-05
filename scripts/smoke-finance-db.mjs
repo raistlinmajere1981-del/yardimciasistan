@@ -158,9 +158,9 @@ function verifyFinanceFoundation(databasePath) {
 
     sqlite.prepare(`
       INSERT INTO pension_payments (
-        id, reservation_id, stay_id, amount_minor, currency, payment_method, paid_at,
+        id, reservation_id, amount_minor, currency, payment_method, paid_at,
         note, created_at, updated_at, deleted_at, sync_status
-      ) VALUES (?, ?, '', 100000, 'TRY', 'cash', ?, 'Kapora', ?, ?, '', 'local_only')
+      ) VALUES (?, ?, 100000, 'TRY', 'cash', ?, 'Kapora', ?, ?, '', 'local_only')
     `).run("finance_smoke_payment_1", "finance_smoke_reservation", now, now, now);
 
     assert.equal(
@@ -183,9 +183,9 @@ function verifyFinanceFoundation(databasePath) {
 
     sqlite.prepare(`
       INSERT INTO pension_payments (
-        id, reservation_id, stay_id, amount_minor, currency, payment_method, paid_at,
+        id, reservation_id, amount_minor, currency, payment_method, paid_at,
         note, created_at, updated_at, deleted_at, sync_status
-      ) VALUES (?, ?, '', 350000, 'TRY', 'card', ?, 'Kalan ödeme', ?, ?, '', 'local_only')
+      ) VALUES (?, ?, 350000, 'TRY', 'card', ?, 'Kalan ödeme', ?, ?, '', 'local_only')
     `).run("finance_smoke_payment_2", "finance_smoke_reservation", now, now, now);
 
     assert.equal(
