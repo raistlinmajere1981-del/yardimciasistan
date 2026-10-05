@@ -1440,7 +1440,7 @@ function ya_chat_unsupported_business_domain(array $businessContext, string $pro
         || preg_match('/(^|\\s)(pansiyon|konaklama|geceleme)(\\s|$)/u', $normalized) === 1
         || (
             preg_match('/(^|\\s)oda(\\s|$)/u', $normalized) === 1
-            && preg_match('/(^|\\s)(musait|bos|rezerv|gece|kisi|konak|kalma|yatak|var)(\\s|$)/u', $normalized) === 1
+            && preg_match('/(^|\\s)(musait|bos|rezerv|gece|kisi|konak|kalma|yatak|yatak)(\\s|$)/u', $normalized) === 1
         );
     if ($accommodationIntent && !$hasAccommodation) {
         return 'accommodation';
