@@ -563,10 +563,11 @@ assert.match(
   /ya_chat_unsupported_business_domain\([\s\S]{0,1200}unsupported_business_domain/,
   "web chat must enforce the same unsupported-domain guard before provider generation"
 );
+assert.match(webChatSource, /capability_ids/, "web chat must consume published capability ids");
 assert.match(
   webChatSource,
-  /capability_ids[\s\S]{0,3200}accommodation\.rooms[\s\S]{0,3200}food_service\.tables/,
-  "web chat domain guard must be driven by published capability ids"
+  /function ya_chat_unsupported_business_domain[\s\S]{0,2600}accommodation\.rooms[\s\S]{0,1200}food_service\.tables/,
+  "web chat domain guard must evaluate accommodation and food-service capabilities"
 );
 
 // F — admin expands role grants, then intersects them with business capabilities.
