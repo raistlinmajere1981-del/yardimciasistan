@@ -42,6 +42,7 @@ export const defaultDashboardData: DesktopDashboardData = {
     provider: "egm",
     pendingCount: 0,
     failedCount: 0,
+    submissionUnknownCount: 0,
     sentCount: 0,
     checkedInGuestCount: 0,
     activeUnsentCount: 0,

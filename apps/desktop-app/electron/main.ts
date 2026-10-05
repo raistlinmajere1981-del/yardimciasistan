@@ -773,7 +773,7 @@ function finalizeDesktopHospitalityMutation(
     const relevant = result.dashboardData.hospitalityNotifications.filter((notification) =>
       notification.stayId === savedId
       && kinds.includes(notification.kind)
-      && notification.status !== "sent"
+      && (notification.status === "pending" || notification.status === "failed")
     );
     const ready = relevant.filter((notification) => notification.identityReady);
     const missingIdentityCount = relevant.length - ready.length;

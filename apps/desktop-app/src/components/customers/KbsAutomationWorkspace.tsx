@@ -205,7 +205,7 @@ export function KbsAutomationWorkspace({
       <article className="panel kbs-overview-card" data-surface-role="integration">
         <span>Gönderim durumu</span>
         <strong>{overview.failedCount > 0 ? String(overview.failedCount) + " hata" : String(overview.sentCount) + " gönderildi"}</strong>
-        <small>{overview.pendingCount} kuyrukta</small>
+        <small>{overview.pendingCount} kuyrukta{overview.submissionUnknownCount > 0 ? ` · ${overview.submissionUnknownCount} sonuç belirsiz` : ""}</small>
       </article>
     </div>
 
@@ -294,7 +294,9 @@ export function KbsAutomationWorkspace({
               <StatusBadge tone={statusTone(notification.status)}>{statusLabel(notification.status)}</StatusBadge>
               {!notification.identityReady && <StatusBadge tone="danger">Kimlik eksik</StatusBadge>}
             </>}
-            description={notification.status === "sent"
+            description={notification.status === "submission_unknown"
+              ? "Gönderim sürüyor veya sonucu belirsiz. Yeniden gönderim engellendi; resmi KBS kaydını kontrol edin."
+              : notification.status === "sent"
               ? "Gönderim: " + formatDateTime(notification.sentAt || notification.occurredAt) + (notification.provider ? " · " + providerLabel(notification.provider) : "")
               : "İşlem zamanı: " + formatDateTime(notification.occurredAt)}
             actions={<>
@@ -311,7 +313,7 @@ export function KbsAutomationWorkspace({
                 <UserRound size={15} aria-hidden="true" />
                 {notification.identityReady ? "Müşteriyi Aç" : "Kimliği Tamamla"}
               </ActionButton>
-              {notification.status !== "sent" && <ActionButton
+              {(notification.status === "pending" || notification.status === "failed") && <ActionButton
                 variant="primary"
                 size="sm"
                 disabled={!overview.configured || !notification.identityReady}
@@ -355,6 +357,7 @@ function kindLabel(kind: DesktopDashboardData["hospitalityNotifications"][number
 function statusLabel(status: DesktopDashboardData["hospitalityNotifications"][number]["status"]) {
   if (status === "sent") return "Bildirildi";
   if (status === "failed") return "Hata";
+  if (status === "submission_unknown") return "Sonuç belirsiz";
   return "Bekliyor";
 }
 

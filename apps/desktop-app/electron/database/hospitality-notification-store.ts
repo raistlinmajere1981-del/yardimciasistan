@@ -37,7 +37,7 @@ export function getHospitalityNotifications(db: DatabaseSync): DesktopHospitalit
     JOIN customer_room_stays s ON s.id = n.stay_id
     JOIN rooms r ON r.id = n.room_id
     ORDER BY
-      CASE n.status WHEN 'failed' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END,
+      CASE n.status WHEN 'submission_unknown' THEN 0 WHEN 'failed' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END,
       n.occurred_at DESC,
       n.created_at DESC
     LIMIT 500
@@ -91,6 +91,7 @@ export function getKbsOverview(db: DatabaseSync): DesktopKbsOverview {
     SELECT
       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_count,
+      SUM(CASE WHEN status = 'submission_unknown' THEN 1 ELSE 0 END) AS submission_unknown_count,
       SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent_count
     FROM hospitality_notifications
   `).get() as Record<string, unknown> | undefined;
@@ -131,6 +132,7 @@ export function getKbsOverview(db: DatabaseSync): DesktopKbsOverview {
     provider,
     pendingCount: Number(counts?.pending_count ?? 0),
     failedCount: Number(counts?.failed_count ?? 0),
+    submissionUnknownCount: Number(counts?.submission_unknown_count ?? 0),
     sentCount: Number(counts?.sent_count ?? 0),
     checkedInGuestCount: Number(checkedIn?.count ?? 0),
     activeUnsentCount: Number(activeUnsent?.count ?? 0),
@@ -143,7 +145,7 @@ function normalizeKind(value: unknown): DesktopHospitalityNotification["kind"] {
 }
 
 function normalizeStatus(value: unknown): DesktopHospitalityNotification["status"] {
-  return value === "sent" || value === "failed" ? value : "pending";
+  return value === "sent" || value === "failed" || value === "submission_unknown" ? value : "pending";
 }
 
 function normalizeProvider(value: unknown): DesktopHospitalityNotification["provider"] {
@@ -175,7 +177,7 @@ export function markHospitalityNotificationSentExternally(
         provider = ?,
         provider_reference = 'external',
         sent_at = ?
-    WHERE id = ?
+    WHERE id = ? AND status != 'sent'
   `).run(provider, now, notificationId);
   return { ok: true, message: "Kimlik bildirimi haricen gönderilmiş olarak işaretlendi." };
 }
@@ -190,14 +192,16 @@ export function retryHospitalityNotification(
   const row = db.prepare("SELECT status FROM hospitality_notifications WHERE id = ? LIMIT 1").get(notificationId) as { status?: string } | undefined;
   if (!row) return { ok: false, message: "Kimlik bildirimi kaydı bulunamadı." };
   if (row.status === "sent") return { ok: false, message: "Gönderilmiş bildirim tekrar kuyruğa alınamaz." };
+  if (row.status === "submission_unknown") return { ok: false, message: "Gönderim sonucu belirsiz; resmi KBS kaydı kontrol edilmeden yeniden gönderilemez." };
 
-  db.prepare(`
+  const changed = db.prepare(`
     UPDATE hospitality_notifications
     SET status = 'pending',
         provider = '',
         provider_reference = '',
         sent_at = ''
-    WHERE id = ?
-  `).run(notificationId);
+    WHERE id = ? AND status IN ('pending', 'failed')
+  `).run(notificationId).changes;
+  if (!changed) return { ok: false, message: "Gönderim durumu değişti; bildirim yeniden kuyruğa alınamadı." };
   return { ok: true, message: "Kimlik bildirimi yeniden gönderim kuyruğuna alındı." };
 }

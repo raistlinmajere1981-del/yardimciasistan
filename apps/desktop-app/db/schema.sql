@@ -2210,7 +2210,7 @@ CREATE TABLE hospitality_notifications (
   kind TEXT NOT NULL CHECK (kind IN ('arrival', 'departure', 'room_change')),
   occurred_at TEXT NOT NULL,
   identity_snapshot TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'submission_unknown')),
   provider TEXT NOT NULL DEFAULT '',
   provider_reference TEXT NOT NULL DEFAULT '',
   sent_at TEXT NOT NULL DEFAULT '',
@@ -2311,7 +2311,7 @@ BEGIN
       'documentExpiryDate', NEW.document_expiry_date, 'birthPlace', NEW.birth_place,
       'motherName', NEW.mother_name, 'fatherName', NEW.father_name,
       'issuingAuthority', NEW.issuing_authority, 'address', NEW.address))
-  WHERE status != 'sent' AND guest_id IN (SELECT id FROM stay_guests WHERE customer_id = NEW.id);
+   WHERE status IN ('pending', 'failed') AND guest_id IN (SELECT id FROM stay_guests WHERE customer_id = NEW.id);
 END;
 
 CREATE TRIGGER trg_online_catalog_commerce_product_publications_insert

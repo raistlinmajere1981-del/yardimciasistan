@@ -20,6 +20,7 @@ export interface KbsIdentitySnapshot {
 }
 
 export interface KbsDeliveryInput {
+  /** Stable logical delivery identity, not a claim of provider-side deduplication support. */
   notificationId: string;
   kind: "arrival" | "departure" | "room_change";
   occurredAt: string;
@@ -37,11 +38,14 @@ export type KbsDeliveryResult =
     }
   | {
       ok: false;
-      state: "waiting" | "interaction_required" | "failed";
+      state: "waiting" | "interaction_required" | "failed" | "submission_unknown";
       message: string;
       provider: KbsProvider;
       retryable: boolean;
       code?: string;
+      /** waiting/interaction_required promise no submission. A failed response needs
+       * explicit rejection evidence to reopen the fence; missing evidence is unknown. */
+      submission?: "rejected" | "unknown";
     };
 
 export interface KbsProviderAdapter {
@@ -85,6 +89,9 @@ export function classifyJandarmaOperationResult(
     state: "failed",
     provider: "jandarma",
     retryable,
+    // A result code is not a verified guarantee that no remote side effect occurred.
+    // Native receipt/query/idempotency support is not implemented by this binding.
+    submission: "unknown",
     code: "jandarma_" + String(input.code),
     message: input.message || jandarmaResultMessage(input.code, notificationId)
   };

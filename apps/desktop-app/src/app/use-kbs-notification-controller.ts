@@ -36,7 +36,7 @@ export function useKbsNotificationController({
       const result = await window.yardimciDesktop.sendKbsNotification(notificationId);
       setDashboardData(result.dashboardData);
       setStatusMessage(result.message);
-      setSyncState(result.ok || result.state !== "failed" ? "success" : "error");
+      setSyncState(result.ok || (result.state !== "failed" && result.state !== "submission_unknown") ? "success" : "error");
       return result;
     } catch {
       const errorMessage = "Kimlik bildirimi gönderim denemesi tamamlanamadı.";

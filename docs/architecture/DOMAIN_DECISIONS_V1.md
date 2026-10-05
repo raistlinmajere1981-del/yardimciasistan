@@ -928,6 +928,14 @@ An uncertain intent keeps its fence even after failure/opt-out; a later signed s
 BusinessMessage. This deliberately prioritizes avoiding duplicate sends over blindly resubmitting
 an uncertain transport. No provider-safe idempotency capability is invented.
 
+Message/binding refresh and proven-rejection release are owned by the canonical
+Business Messaging store (`refreshUnsubmittedBusinessMessageInTransaction` and
+`releaseRejectedBusinessMessageInTransaction`). Campaign adapters pass their existing
+transaction and retain lease validation; they never implement message/binding UPDATEs.
+Refresh requires an unsubmitted draft bound to the same account. Release requires a
+queued, submitted intent with no acceptance/delivery/read evidence. Terminal states and
+uncertainty fences cannot be reopened by campaign retry or lease recovery.
+
 Preference/deletion suppression affects only certainly unsent pending records. Submitted records
 retain their acceptance/reconciliation history; an opt-out cannot undo an already in-flight POST.
 Every future actual submission must still pass current consent, including reclaimed and retry items.
@@ -1242,3 +1250,34 @@ workspaces; no duplicate entity editor, operation, tracker or nested modal is in
 
 See `docs/architecture/unified-marketing-analytics.md` for the metric matrix, precise
 cohort/rate definitions, optional capability/cache contract and portable test coverage.
+
+## D-042 — KBS submission uncertainty is a durable no-resubmit fence
+
+**Status:** Accepted for the explicitly requested runtime hardening. No verified native
+provider idempotency/query guarantee exists in the current adapter contract. EGM performs
+only session inspection; Jandarma's live SOAP binding is still unverified, and its success
+classifier returns no remote receipt. `notificationId` is the stable logical delivery id;
+it is not represented as an unsupported provider idempotency key.
+
+`KbsDeliveryService.deliver` is the manual and background submission authority. An enabled,
+configured notification atomically commits `pending/failed → submission_unknown` before
+adapter I/O. No local transaction spans network work. The same primary notification id and
+conditional state write fence concurrent connections, replay and restarts without a lease
+expiry. `submission_unknown` means in-flight OR possibly submitted; it never claims sent.
+
+Provider success atomically writes sent/reference/time. Waiting/interaction-required
+adapter results promise no submission and return to pending; only explicit rejection
+evidence permits failed/retry. Exceptions and unsuccessful responses without verified
+rejection evidence stay unknown. Existing Jandarma failure codes alone do not establish
+absence of remote effects. Local result persistence failure leaves the pre-I/O fence
+intact, including after provider success; a retry must never clear it.
+
+Unknown delivery is surfaced for manual reconciliation using the existing externally-sent
+operation after checking the official provider record. There is no new automatic retry,
+new notification identity, or force-reset operation. Unknown identity snapshots remain
+frozen. This chooses avoiding blind duplicate submission over at-least-once delivery:
+crash before actual send can leave an unsent fenced notification needing operator review.
+Provider-native exactly-once semantics, lost receipts after local write failure and a
+future verified negative-reconciliation/resubmit operation remain explicit limitations.
+Configuration, notification creation, provider automation and other hospitality operations
+are unchanged. Current schema only; no migration or backward compatibility is introduced.

@@ -73,6 +73,26 @@ export function claimBusinessMessageInTransaction(db: DatabaseSync, id: string) 
   if (changed) db.prepare("UPDATE business_messages SET status='queued' WHERE id=? AND status='draft'").run(id);
   return Boolean(changed);
 }
+/** Refresh only a certainly unsubmitted draft. Caller commits this with its intent/fence.
+ * Terminal states, receipts, account changes and unresolved submissions cannot be reset. */
+export function refreshUnsubmittedBusinessMessageInTransaction(db: DatabaseSync, id: string, input: { recipient: string; intentHash: string; accountKey: string }) {
+  const message = getBusinessMessage(db, id), binding = getMessageBinding(db, id);
+  if (!message || message.status !== "draft" || message.providerMessageId || message.acceptedAt || message.deliveredAt || message.readAt
+    || !binding || Number(binding.submitted) !== 0 || binding.account_key !== input.accountKey) return false;
+  db.prepare("UPDATE business_messages SET recipient=?,failure_code='',failure_message='',failed_at='' WHERE id=? AND status='draft'").run(input.recipient, id);
+  db.prepare("UPDATE business_message_provider_bindings SET intent_hash=? WHERE message_id=? AND submitted=0").run(input.intentHash, id);
+  return true;
+}
+/** Only explicit adapter rejection proves a queued submission was not accepted.
+ * Caller owns the transaction and transport lease; lease recovery is never rejection evidence. */
+export function releaseRejectedBusinessMessageInTransaction(db: DatabaseSync, id: string) {
+  const message = getBusinessMessage(db, id), binding = getMessageBinding(db, id);
+  if (!message || message.status !== "queued" || message.providerMessageId || message.acceptedAt || message.deliveredAt || message.readAt
+    || !binding || Number(binding.submitted) !== 1) return false;
+  db.prepare("UPDATE business_message_provider_bindings SET submitted=0 WHERE message_id=? AND submitted=1").run(id);
+  db.prepare("UPDATE business_messages SET status='draft' WHERE id=? AND status='queued'").run(id);
+  return true;
+}
 /** Claim before HTTP, durable across restart. Cloud API has no send deduplication API. */
 export function claimBusinessMessage(db: DatabaseSync, id: string) {
   db.exec("BEGIN IMMEDIATE");

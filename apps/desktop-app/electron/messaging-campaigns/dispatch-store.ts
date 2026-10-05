@@ -1,7 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import { normalizePhone, type BusinessMessageTemplate, type MessagingOutboxItem } from "@yardimci-asistan/shared";
-import { claimBusinessMessageInTransaction, getBusinessMessage, getMessageBinding, insertBusinessMessage, failBusinessMessage } from "../business-messaging/store";
+import { claimBusinessMessageInTransaction, getBusinessMessage, getMessageBinding, insertBusinessMessage, failBusinessMessage,
+  refreshUnsubmittedBusinessMessageInTransaction, releaseRejectedBusinessMessageInTransaction } from "../business-messaging/store";
 import { assertCampaignCapabilities, campaignTransaction, getMessagingCampaign, getMessagingCampaignDetail } from "./store";
 import { invalid, validateSmsText, resolveCampaignBindings, validateCampaignTemplate } from "./validation";
 import { reconcile, type DispatchClaim, type DispatchResult } from "./dispatch-contract";
@@ -100,8 +101,9 @@ export function beginCampaignSubmission(db: DatabaseSync, id: string, token: str
       db.prepare("UPDATE messaging_outbox SET business_message_id=? WHERE id=? AND claim_token=?").run(message.id, id, token);
     } else {
       // Only a proven-rejected, unsubmitted intent can pick up changed canonical contact/bindings on retry.
-      db.prepare("UPDATE business_messages SET recipient=?,status='draft',failure_code='',failure_message='',failed_at='' WHERE id=? AND provider_message_id=''").run(phone.whatsapp, message.id);
-      db.prepare("UPDATE business_message_provider_bindings SET intent_hash=? WHERE message_id=? AND submitted=0").run(hash, message.id);
+      if (!refreshUnsubmittedBusinessMessageInTransaction(db, message.id, { recipient: phone.whatsapp, intentHash: hash, accountKey })) {
+        return { kind: "failed", category: "submission_conflict" };
+      }
     }
     if (!claimBusinessMessageInTransaction(db, message.id)) return { kind: "failed", category: "submission_conflict" };
     return { kind: "ready", message: getBusinessMessage(db, message.id)!, parameters };
@@ -111,10 +113,8 @@ export function beginCampaignSubmission(db: DatabaseSync, id: string, token: str
 export function releaseRejectedCampaignMessage(db: DatabaseSync, id: string, token: string) {
   return campaignTransaction(db, () => {
     const claim = getDispatchClaim(db, id, token);
-    if (!claim?.message || claim.message.providerMessageId) return false;
-    db.prepare("UPDATE business_message_provider_bindings SET submitted=0 WHERE message_id=?").run(claim.message.id);
-    db.prepare("UPDATE business_messages SET status='draft' WHERE id=? AND status='queued'").run(claim.message.id);
-    return true;
+    if (!claim?.message) return false;
+    return releaseRejectedBusinessMessageInTransaction(db, claim.message.id);
   });
 }
 export function finishDispatchClaim(db: DatabaseSync, id: string, token: string, result: DispatchResult, now: string, nextAttemptAt = "", rateLimitUntil = "") {

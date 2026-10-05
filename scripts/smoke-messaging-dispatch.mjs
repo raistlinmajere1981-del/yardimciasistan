@@ -81,6 +81,7 @@ await scenario('transient rejection retries same BusinessMessage; durable backof
   assert.equal(retried.business_message_id, row.business_message_id); assert.equal(retried.attempt_count, 2);
   assert.equal(f.posts()[0].body.biz_opaque_callback_data, f.posts()[1].body.biz_opaque_callback_data); assert.equal(f.posts()[1].body.to, '905551112233');
   assert.equal(f.raw.prepare('SELECT COUNT(*) AS n FROM business_messages').get().n, 1);
+  assert.equal(f.raw.prepare('SELECT COUNT(*) AS n FROM business_message_provider_bindings').get().n, 1);
 });
 await scenario('rate limit honors Retry-After globally, bounded max attempts', async (f) => {
   const { campaign } = await f.prepare(2); await f.service.startCampaign(campaign.id); f.state.mode = 'rate'; const worker = f.worker();
@@ -202,5 +203,59 @@ await scenario('opt-out suppresses a certainly rejected retry and cancels its ca
   f.service.savePreference(preference(customers[0], 'opted_out'));
   assert.equal(f.items(campaign.id)[0].status, 'skipped'); assert.equal(f.db.getBusinessMessage(row.business_message_id).status, 'cancelled');
   f.clock.advance(1000000); f.state.mode = 'success'; await f.tick(f.worker()); assert.equal(f.posts().length, 1);
+});
+await scenario('canonical rejection release is atomic, guarded and never reopens terminal messages', async (f) => {
+  const { campaign } = await f.prepare(); await f.service.startCampaign(campaign.id);
+  const row = f.db.claimCampaignDispatchBatch(f.clock.now().toISOString(), 1)[0];
+  const template = (await f.single.listTemplates())[0];
+  const ready = f.db.beginCampaignSubmission(row.id, row.claimToken, template, accountKey, f.clock.now().toISOString(), 3000);
+  assert.equal(ready.kind, 'ready');
+  const id = ready.message.id;
+  f.raw.exec("CREATE TRIGGER fixture_release_failure BEFORE UPDATE OF status ON business_messages WHEN NEW.status='draft' BEGIN SELECT RAISE(ABORT,'release failure'); END");
+  assert.throws(() => f.db.releaseRejectedCampaignMessage(row.id, row.claimToken), /release failure/);
+  assert.equal(f.db.getMessageBinding(id).submitted, 1); assert.equal(f.db.getBusinessMessage(id).status, 'queued');
+  f.raw.exec('DROP TRIGGER fixture_release_failure');
+  assert.equal(f.db.releaseRejectedCampaignMessage(row.id, 'stale-token'), false);
+  assert.equal(f.db.releaseRejectedCampaignMessage(row.id, row.claimToken), true);
+  assert.equal(f.db.getMessageBinding(id).submitted, 0); assert.equal(f.db.getBusinessMessage(id).status, 'draft');
+  assert.equal(f.db.releaseRejectedCampaignMessage(row.id, row.claimToken), false);
+  f.db.failBusinessMessage(id, 'max_attempts', 'Fixture terminal');
+  f.clock.advance(3000);
+  assert.equal(f.db.beginCampaignSubmission(row.id, row.claimToken, template, accountKey, f.clock.now().toISOString(), 3000).kind, 'failed');
+  assert.equal(f.db.getBusinessMessage(id).status, 'failed'); assert.equal(f.db.getMessageBinding(id).submitted, 0);
+  assert.equal(f.posts().length, 0);
+});
+await scenario('canonical intent refresh rollback preserves recipient, fingerprint and fence', async (f) => {
+  const { campaign, customers } = await f.prepare(); await f.service.startCampaign(campaign.id); f.state.mode = 'transient';
+  await f.tick(f.worker()); const row = f.items(campaign.id)[0], before = f.db.getBusinessMessage(row.business_message_id), binding = f.db.getMessageBinding(before.id);
+  f.raw.prepare('UPDATE customers SET phone=? WHERE id=?').run('05551112233', customers[0]); f.clock.advance(5000);
+  const claim = f.db.claimCampaignDispatchBatch(f.clock.now().toISOString(), 1)[0], template = (await f.single.listTemplates())[0];
+  f.raw.exec("CREATE TRIGGER fixture_refresh_failure BEFORE UPDATE OF intent_hash ON business_message_provider_bindings BEGIN SELECT RAISE(ABORT,'refresh failure'); END");
+  assert.throws(() => f.db.beginCampaignSubmission(claim.id, claim.claimToken, template, accountKey, f.clock.now().toISOString(), 3000), /refresh failure/);
+  assert.deepEqual(f.db.getBusinessMessage(before.id), before); assert.deepEqual(f.db.getMessageBinding(before.id), binding);
+  assert.equal(f.posts().length, 1); f.raw.exec('DROP TRIGGER fixture_refresh_failure'); f.state.mode = 'success';
+  const result = await f.single.dispatchCampaignItem(claim.id, claim.claimToken, 3000, () => true, f.clock.now);
+  assert.equal(result.kind, 'accepted');
+  f.db.finishCampaignDispatchClaim(claim.id, claim.claimToken, result, f.clock.now().toISOString());
+  assert.equal(f.items(campaign.id)[0].status, 'dispatched'); assert.equal(f.db.getBusinessMessage(before.id).status, 'accepted');
+  assert.equal(f.db.getBusinessMessage(before.id).recipient, '905551112233');
+  assert.equal(f.raw.prepare('SELECT COUNT(*) AS n FROM business_message_provider_bindings').get().n, 1);
+  const posts = f.posts().length;
+  await f.single.dispatchCampaignItem(claim.id, claim.claimToken, 3000, () => true, f.clock.now);
+  assert.equal(f.posts().length, posts);
+});
+await scenario('late webhook evidence prevents canonical rejection release and preserves recipient projection', async (f) => {
+  const { campaign } = await f.prepare(); await f.service.startCampaign(campaign.id);
+  const row = f.db.claimCampaignDispatchBatch(f.clock.now().toISOString(), 1)[0], template = (await f.single.listTemplates())[0];
+  const ready = f.db.beginCampaignSubmission(row.id, row.claimToken, template, accountKey, f.clock.now().toISOString(), 3000);
+  for (const status of ['accepted', 'delivered', 'read']) {
+    f.db.applyBusinessMessageStatus({ messageId: ready.message.id, providerMessageId: 'wamid.canonical_terminal', status, timestamp: f.clock.now().toISOString(), accountKey });
+    assert.equal(f.db.releaseRejectedCampaignMessage(row.id, row.claimToken), false);
+    assert.equal(f.db.getMessageBinding(ready.message.id).submitted, 1); assert.equal(f.db.getBusinessMessage(ready.message.id).status, status);
+  }
+  f.db.finishCampaignDispatchClaim(row.id, row.claimToken, { kind: 'retry', category: 'transient' }, f.clock.now().toISOString());
+  assert.equal(f.items(campaign.id)[0].status, 'dispatched');
+  assert.equal(f.service.getCampaign(campaign.id).pendingOutboxCount, 0);
+  assert.equal(f.posts().length, 0);
 });
 console.log(`Controlled campaign dispatch: ${passed}/${passed} scenarios passed. No real provider calls.`);

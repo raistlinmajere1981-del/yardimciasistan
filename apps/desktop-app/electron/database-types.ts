@@ -147,7 +147,7 @@ export interface DesktopCustomer {
 }
 
 type DesktopHospitalityNotificationKind = "arrival" | "departure" | "room_change";
-type DesktopHospitalityNotificationStatus = "pending" | "sent" | "failed";
+type DesktopHospitalityNotificationStatus = "pending" | "sent" | "failed" | "submission_unknown";
 type DesktopKbsProvider = "egm" | "jandarma";
 
 export interface DesktopHospitalityNotification {
@@ -179,6 +179,7 @@ export interface DesktopKbsOverview {
   provider: DesktopKbsProvider;
   pendingCount: number;
   failedCount: number;
+  submissionUnknownCount: number;
   sentCount: number;
   checkedInGuestCount: number;
   activeUnsentCount: number;
@@ -190,6 +191,7 @@ type DesktopKbsDeliveryState =
   | "already_sent"
   | "waiting"
   | "interaction_required"
+  | "submission_unknown"
   | "failed";
 
 export type DesktopKbsDeliveryMutationResult =
@@ -203,7 +205,7 @@ export type DesktopKbsDeliveryMutationResult =
     }
   | {
       ok: false;
-      state: "waiting" | "interaction_required" | "failed";
+      state: "waiting" | "interaction_required" | "failed" | "submission_unknown";
       message: string;
       provider: DesktopKbsProvider;
       retryable: boolean;
