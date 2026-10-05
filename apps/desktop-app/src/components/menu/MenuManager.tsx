@@ -1,3 +1,4 @@
+import { usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
@@ -104,6 +105,8 @@ export function MenuManager({
       return categoryDifference || compareMenuRecords(left, right);
     });
   }, [dashboardData.menu.items, selectedCategoryId, sortedCategories]);
+  const categoryScroll = usePageViewScroll("menu.categories.scroll", sortedCategories.length);
+  const productScroll = usePageViewScroll(`menu.products.scroll.${selectedCategoryId}`, visibleItems.length);
 
   const pendingCategoryDelete = dashboardData.menu.categories.find((category) => category.id === pendingCategoryDeleteId);
   const pendingCategoryProductCount = pendingCategoryDelete
@@ -305,7 +308,7 @@ export function MenuManager({
               <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
             </div>
 
-            <DataList className="menu-record-list menu-category-list">
+            <DataList ref={categoryScroll} className="menu-record-list menu-category-list">
               {sortedCategories.map((category) => {
                 const productCount = dashboardData.menu.items.filter((item) => item.category_id === category.id).length;
                 if (editingCategoryId === category.id && editingCategoryForm) {
@@ -447,7 +450,7 @@ export function MenuManager({
               </div>
             </div>
 
-            <DataList className="menu-record-list menu-product-list">
+            <DataList ref={productScroll} className="menu-record-list menu-product-list">
               {visibleItems.length === 0 && <p className="empty-state">Bu kategoride henüz ürün yok.</p>}
               {visibleItems.map((item) => {
                 const stockBadge = getMenuStockBadge(item);

@@ -1,22 +1,14 @@
 import { ChevronDown, Search, X } from "lucide-react";
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type RefObject
-} from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
-interface SearchSelectOption {
+export interface SearchSelectOption {
   id: string;
   label: string;
   description?: string;
   keywords?: string;
   disabled?: boolean;
+  leading?: ReactNode;
 }
-
 interface SearchSelectProps {
   value: string;
   options: SearchSelectOption[];
@@ -28,198 +20,95 @@ interface SearchSelectProps {
   disabled?: boolean;
   clearable?: boolean;
   autoFocus?: boolean;
+  onCreate?: () => void;
+  createLabel?: string;
 }
 
-export function SearchSelect({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-  placeholder = "Seçin",
-  searchPlaceholder = "Ara",
-  emptyMessage = "Eşleşen kayıt yok.",
-  disabled = false,
-  clearable = true,
-  autoFocus = false
-}: SearchSelectProps) {
-  const anchorRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const position = useAnchoredPopover(open, anchorRef, popoverRef);
-  const selected = options.find((option) => option.id === value);
-
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase("tr-TR");
-    if (!normalized) return options;
-    return options.filter((option) =>
-      `${option.label} ${option.description ?? ""} ${option.keywords ?? ""}`
-        .toLocaleLowerCase("tr-TR")
-        .includes(normalized)
-    );
-  }, [options, query]);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    requestAnimationFrame(() => searchRef.current?.focus());
-  }, [open]);
-
-  useDismissPopover(open, setOpen, anchorRef, popoverRef);
-
-  const choose = (next: string) => {
-    onChange(next);
-    setOpen(false);
-    requestAnimationFrame(() => anchorRef.current?.focus());
-  };
-
-  return (
-    <div className="search-select">
-      <button
-        ref={anchorRef}
-        type="button"
-        className="search-select-trigger"
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-        autoFocus={autoFocus}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className={selected ? undefined : "is-placeholder"}>
-          {selected?.label ?? placeholder}
-        </span>
-        <ChevronDown size={16} aria-hidden="true" />
-      </button>
-      {open && (
-        <div
-          ref={popoverRef}
-          className="search-select-popover"
-          role="dialog"
-          aria-label={`${ariaLabel} seçici`}
-          style={position}
-        >
-          <div className="search-select-search">
-            <Search size={16} aria-hidden="true" />
-            <input
-              ref={searchRef}
-              aria-label={`${ariaLabel} ara`}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={searchPlaceholder}
-            />
-            {query && (
-              <button
-                type="button"
-                className="picker-icon-button"
-                aria-label="Aramayı temizle"
-                onClick={() => {
-                  setQuery("");
-                  searchRef.current?.focus();
-                }}
-              >
-                <X size={15} aria-hidden="true" />
-              </button>
-            )}
-          </div>
-          {clearable && value && (
-            <button type="button" className="search-select-clear" onClick={() => choose("")}>
-              Seçimi temizle
-            </button>
-          )}
-          <div className="search-select-options" role="listbox" aria-label={ariaLabel}>
-            {filtered.length === 0 && <p>{emptyMessage}</p>}
-            {filtered.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                role="option"
-                aria-selected={option.id === value}
-                className={option.id === value ? "is-selected" : ""}
-                disabled={option.disabled}
-                onClick={() => choose(option.id)}
-              >
-                <span>{option.label}</span>
-                {option.description && <small>{option.description}</small>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function useDismissPopover(
-  open: boolean,
-  setOpen: (open: boolean) => void,
-  anchorRef: RefObject<HTMLElement | null>,
-  popoverRef: RefObject<HTMLElement | null>
-) {
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && (anchorRef.current?.contains(target) || popoverRef.current?.contains(target))) return;
-      setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setOpen(false);
-      requestAnimationFrame(() => anchorRef.current?.focus());
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [anchorRef, open, popoverRef, setOpen]);
-}
-
-function useAnchoredPopover(
-  open: boolean,
-  anchorRef: RefObject<HTMLElement | null>,
-  popoverRef: RefObject<HTMLElement | null>
-): CSSProperties {
+/** Non-modal top-layer picker: also works inside the one canonical modal boundary. */
+export function SearchSelect({ value, options, onChange, ariaLabel, placeholder = "Seçin", searchPlaceholder = "Ara",
+  emptyMessage = "Eşleşen kayıt yok.", disabled = false, clearable = true, autoFocus = false, onCreate, createLabel = "Yeni ekle" }: SearchSelectProps) {
+  const anchorRef = useRef<HTMLButtonElement>(null), popoverRef = useRef<HTMLDivElement>(null), searchRef = useRef<HTMLInputElement>(null);
+  const id = useId(), listId = `${id}-options`;
+  const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [activeId, setActiveId] = useState("");
   const [position, setPosition] = useState<CSSProperties>({ visibility: "hidden" });
+  const selected = options.find(option => option.id === value);
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("tr-TR"), digits = needle.replace(/\D/g, "");
+    return options.filter(option => !needle || `${option.label} ${option.description ?? ""} ${option.keywords ?? ""}`.toLocaleLowerCase("tr-TR").includes(needle)
+      || /^\+?[\d\s()-]+$/.test(needle) && digits.length > 0 && `${option.description ?? ""} ${option.keywords ?? ""}`.replace(/\D/g, "").includes(digits));
+  }, [options, query]);
+  const enabledOptions = filtered.filter(option => !option.disabled);
+  const active = enabledOptions.find(option => option.id === activeId) ?? enabledOptions.find(option => option.id === value) ?? enabledOptions[0];
+  const optionId = (option: SearchSelectOption) => `${id}-${options.indexOf(option)}`;
+  const close = (restore = true) => { setOpen(false); if (restore) anchorRef.current?.focus({ preventScroll: true }); };
+  const choose = (next: string) => { close(); onChange(next); };
+  function show() { if (disabled) return; setQuery(""); setActiveId(value); setOpen(true); }
 
   useLayoutEffect(() => {
     if (!open) return;
-    const place = () => {
-      const anchor = anchorRef.current;
-      const popover = popoverRef.current;
-      if (!anchor || !popover) return;
-      const anchorRect = anchor.getBoundingClientRect();
-      const popoverRect = popover.getBoundingClientRect();
-      const gap = 6;
-      const edge = 8;
-      let top = anchorRect.bottom + gap;
-      if (top + popoverRect.height > window.innerHeight - edge) {
-        top = Math.max(edge, anchorRect.top - popoverRect.height - gap);
-      }
-      let left = anchorRect.left;
-      if (left + popoverRect.width > window.innerWidth - edge) {
-        left = Math.max(edge, window.innerWidth - popoverRect.width - edge);
-      }
-      setPosition({
-        top,
-        left,
-        minWidth: Math.min(Math.max(anchorRect.width, 260), window.innerWidth - edge * 2),
-        visibility: "visible"
-      });
+    const popover = popoverRef.current!, anchor = anchorRef.current!;
+    popover.showPopover();
+    function place() {
+      const rect = anchor.getBoundingClientRect(), edge = 8, gap = 6;
+      const below = window.innerHeight - rect.bottom - gap - edge, above = rect.top - gap - edge;
+      const height = Math.min(430, Math.max(below, above), window.innerHeight - edge * 2);
+      const width = Math.min(Math.max(rect.width, 320), 420, window.innerWidth - edge * 2);
+      const actualHeight = Math.min(popover.scrollHeight, height);
+      setPosition({ width, maxHeight: height, left: Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge)),
+        top: Math.max(edge, below >= actualHeight ? rect.bottom + gap : rect.top - gap - actualHeight), visibility: "visible" });
+    }
+    place();
+    const focusFrame = requestAnimationFrame(() => searchRef.current?.focus());
+    const observer = new ResizeObserver(place); observer.observe(popover);
+    window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
+    return () => { cancelAnimationFrame(focusFrame); observer.disconnect(); if (popover.matches(":popover-open")) popover.hidePopover(); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open]);
+  useEffect(() => {
+    if (open && active) document.getElementById(optionId(active))?.scrollIntoView({ block: "nearest" });
+  }, [open, active?.id, query]);
+  useEffect(() => {
+    if (!open) return;
+    const pointer = (event: PointerEvent) => { const target = event.target as Node; if (!anchorRef.current?.contains(target) && !popoverRef.current?.contains(target)) setOpen(false); };
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault(); event.stopImmediatePropagation(); close();
     };
-    const frame = requestAnimationFrame(place);
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [anchorRef, open, popoverRef]);
-
-  return position;
+    const focus = (event: FocusEvent) => { if (!popoverRef.current?.contains(event.target as Node) && event.target !== anchorRef.current) setOpen(false); };
+    document.addEventListener("pointerdown", pointer, true); document.addEventListener("keydown", escape, true); document.addEventListener("focusin", focus);
+    return () => { document.removeEventListener("pointerdown", pointer, true); document.removeEventListener("keydown", escape, true); document.removeEventListener("focusin", focus); };
+  }, [open]);
+  useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
+  function navigate(event: KeyboardEvent) {
+    if (event.nativeEvent.isComposing) return;
+    const index = enabledOptions.findIndex(option => option.id === active?.id);
+    const next = event.key === "ArrowDown" ? Math.min(index + 1, enabledOptions.length - 1) : event.key === "ArrowUp" ? Math.max(index - 1, 0)
+      : event.key === "Home" ? 0 : event.key === "End" ? enabledOptions.length - 1 : -1;
+    if (next >= 0) { event.preventDefault(); setActiveId(enabledOptions[next].id); }
+    else if (event.key === "Enter") { event.preventDefault(); if (active) choose(active.id); }
+  }
+  return <div className="search-select">
+    <button ref={anchorRef} type="button" className="search-select-trigger" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open}
+      aria-controls={open ? `${id}-picker` : undefined} disabled={disabled} autoFocus={autoFocus} onClick={() => open ? close() : show()}
+      onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); show(); } }}>
+      <span className={selected ? undefined : "is-placeholder"}>{selected?.label ?? placeholder}</span><ChevronDown size={16} aria-hidden="true" />
+    </button>
+    {open && <div ref={popoverRef} id={`${id}-picker`} popover="manual" className="search-select-popover" role="dialog" aria-label={`${ariaLabel} seçici`} style={position}>
+      <div className="search-select-search"><Search size={16} aria-hidden="true" />
+        <input ref={searchRef} role="combobox" aria-label={`${ariaLabel} ara`} aria-expanded="true" aria-autocomplete="list" aria-controls={listId}
+          aria-activedescendant={active ? optionId(active) : undefined} value={query} onChange={event => { setQuery(event.target.value); setActiveId(""); }} onKeyDown={navigate} placeholder={searchPlaceholder} />
+        {query && <button type="button" className="picker-icon-button" aria-label="Aramayı temizle" onClick={() => { setQuery(""); setActiveId(value); searchRef.current?.focus(); }}><X size={15} aria-hidden="true" /></button>}
+      </div>
+      {clearable && value && <button type="button" className="search-select-clear" onClick={() => choose("")}>Seçimi temizle</button>}
+      <div id={listId} className="search-select-options" role="listbox" aria-label={ariaLabel}>
+        {!filtered.length && <p role="status">{emptyMessage}</p>}
+        {filtered.map(option => <button key={option.id} id={optionId(option)} type="button" role="option" data-value={option.id} aria-selected={option.id === value} tabIndex={-1}
+          className={`${option.id === value ? "is-selected" : ""} ${option.id === active?.id ? "is-active" : ""}`} disabled={option.disabled} title={[option.label, option.description].filter(Boolean).join(" · ")}
+          onPointerMove={() => { if (!option.disabled) setActiveId(option.id); }} onClick={() => choose(option.id)}>
+          {option.leading && <span className="search-select-option-leading" aria-hidden="true">{option.leading}</span>}
+          <span className="search-select-option-copy"><span>{option.label}</span>{option.description && <small>{option.description}</small>}</span>
+        </button>)}
+      </div>
+      {onCreate && <button type="button" className="search-select-clear" onClick={() => { close(); onCreate(); }}>{createLabel}</button>}
+    </div>}
+  </div>;
 }

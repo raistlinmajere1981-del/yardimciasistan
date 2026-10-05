@@ -37,7 +37,7 @@ try {
   const overview = await page.getByLabel('Pazarlama analitiği', { exact: true }).innerText(); for (const privateValue of ['CUSTOMER_PII_PRIVATE','CAMPAIGN_NAME_PRIVATE','PUBLICATION_TITLE_PRIVATE','CONTENT_BODY_PRIVATE','CAPTION_PRIVATE','905550000001']) assert(!overview.includes(privateValue));
   await page.getByLabel('Son kampanyalar').getByRole('button', { name: 'Kampanyayı aç' }).first().click();
   await expect(page.getByLabel('Kampanya analitiği')).toBeVisible(); await expect(page.getByLabel('Kampanya metrikleri')).toContainText('Kitle5'); await expect(page.getByLabel('Kampanya metrikleri')).toContainText('Kabul edilen3');
-  await page.getByRole('button', { name: 'Analitik', exact: true }).click(); await page.getByLabel('Son yayınlar').locator('.campaign-list-row').filter({ hasText: 'Website yayını' }).getByRole('button', { name: 'Yayını aç' }).click();
+  await page.getByRole('button', { name: 'Analitik', exact: true }).click(); await page.getByLabel('Son yayınlar').locator('.list-row').filter({ hasText: 'Website yayını' }).getByRole('button', { name: 'Yayını aç' }).click();
   await expect(page.getByLabel('Yayın analitiği')).toContainText('Ziyaret verisi toplanmıyor.'); await expect(page.getByLabel('Yayın analitiği')).toContainText('Yayın zamanı:');
   // Optional provider capability supplies 0 as a measured value and preserves failed/stale snapshots.
   f.provider(true); await page.getByRole('button', { name: 'Yayınlar', exact: true }).click();

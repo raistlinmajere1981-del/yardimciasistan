@@ -1,3 +1,4 @@
+import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useMemo, useState } from "react";
 import { BedDouble, CalendarClock, IdCard, Plus, Trash2, Users } from "lucide-react";
 import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, SaveCustomerInput } from "../../../electron/database";
@@ -39,8 +40,8 @@ export function CustomersWorkspace({
   onSendKbs
 }: CustomersWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
-  const [searchText, setSearchText] = useState("");
-  const [filter, setFilter] = useState<CustomerFilter>("all");
+  const [searchText, setSearchText] = usePageViewState("customers.search", "");
+  const [filter, setFilter] = usePageViewState<CustomerFilter>("customers.filter", "all");
   const [createOpen, setCreateOpen] = useState(false);
   const [pendingCustomerId, setPendingCustomerId] = useState("");
   const hasDealerCustomers = wholesaleEnabled && customers.some((customer) => Boolean(customer.commercialProfile));
@@ -87,7 +88,6 @@ export function CustomersWorkspace({
       ] : []),
       ...customerStays.map((stay) => stay.roomName + " " + stay.roomNumber)
     ].join(" ").toLocaleLowerCase("tr-TR");
-
     return { customer, activeStay, plannedStay, activeReservations, arrivalNotification, kbsState, roomText, haystack };
   }).filter((row) => {
     const searchOk = row.haystack.includes(searchText.trim().toLocaleLowerCase("tr-TR"));
@@ -113,6 +113,7 @@ export function CustomersWorkspace({
     }
   }, [createOpen, navigation, pendingCustomerId]);
 
+  const pageScroll = usePageViewScroll(`customers.scroll`, rows.length);
   return <section className="panel customers-workspace" aria-label="Müşteri yönetimi">
     <div className="card__header">
       <div><p>Müşteriler</p><h2>{rows.length === customers.length ? String(customers.length) + " kayıt" : String(rows.length) + "/" + String(customers.length) + " kayıt"}</h2></div>
@@ -152,7 +153,7 @@ export function CustomersWorkspace({
       />
     </div>
 
-    <DataList className="customers-workspace__items">
+    <DataList ref={pageScroll} className="customers-workspace__items">
       {rows.length === 0 ? <div className="empty-state"><Users size={24} aria-hidden="true" /><strong>Müşteri bulunamadı.</strong><p>Arama veya filtreyi değiştirin.</p></div> : rows.map((row) => {
         const customer = row.customer;
         const openCustomer = () => navigation.openWorkspace({

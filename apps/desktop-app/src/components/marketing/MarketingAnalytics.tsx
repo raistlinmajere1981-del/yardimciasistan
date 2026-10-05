@@ -1,3 +1,5 @@
+import { DataListItem } from "../ui/DataList";
+import { Panel } from "../ui/Panel";
 import { useEffect, useRef, useState } from "react";
 import type { MarketingAnalyticsRangeInput, MarketingAnalyticsSnapshot } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
@@ -44,26 +46,28 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
   }, [range, refreshVersion]);
   const summary = data?.summary;
   return <section className="marketing-analytics" aria-label="Pazarlama analitiği" aria-busy={busy}>
-    <div className="marketing-actions"><h2>Analitik</h2><label className="form-field">Tarih aralığı<select aria-label="Tarih aralığı" value={custom ? "custom" : range.preset} onChange={e => { const preset = e.target.value as MarketingAnalyticsRangeInput["preset"]; setCustom(preset === "custom"); if (preset !== "custom") onRange({ preset }); }}><option value="7d">Son 7 gün</option><option value="30d">Son 30 gün</option><option value="90d">Son 90 gün</option><option value="custom">Özel aralık</option></select></label>
+    <div className="marketing-actions"><label className="form-field">Tarih aralığı<select aria-label="Tarih aralığı" value={custom ? "custom" : range.preset} onChange={e => { const preset = e.target.value as MarketingAnalyticsRangeInput["preset"]; setCustom(preset === "custom"); if (preset !== "custom") onRange({ preset }); }}><option value="7d">Son 7 gün</option><option value="30d">Son 30 gün</option><option value="90d">Son 90 gün</option><option value="custom">Özel aralık</option></select></label>
       {custom && <><label className="form-field">Başlangıç tarihi<input aria-label="Başlangıç tarihi" type="date" lang="tr-TR" value={startDate} onChange={e => setStartDate(e.target.value)}/></label><label className="form-field">Bitiş tarihi<input aria-label="Bitiş tarihi" type="date" lang="tr-TR" value={endDate} onChange={e => setEndDate(e.target.value)}/></label><ActionButton variant="secondary" disabled={!startDate || !endDate || busy} onClick={() => onRange({ preset: "custom", startDate, endDate })}>Aralığı uygula</ActionButton></>}
       <ActionButton variant="secondary" disabled={busy} onClick={() => setRefreshVersion(v => v + 1)}>Yerel verileri yenile</ActionButton>
     </div>
     {message && <p role="alert">{message}</p>}
     {!data && !message && <p role="status">Analitik yükleniyor…</p>}
     {data && summary && <>
+      <details className="record-disclosure"><summary>Ölçümler nasıl okunur?</summary><div className="record-disclosure__body">
       <p className="muted">{data.range.startDate} – {data.range.endDate} · {data.range.timezone}. Hazırlanan alıcılar ve oluşturulan kampanya/yayınlar bu aralığa göre seçilir. Sonuçlar güncel yerel durumdur. Aktif Website yayınları şu anki onaylı durumu gösterir.</p>
       <p className="muted">— veri mevcut değil; 0 ölçülmüş sıfırdır. Toplamlar mevcut sinyalleri içerir. Kabul, teslim ve okunma birbirinden ayrıdır.</p>
+      </div></details>
       <dl className="campaign-counts marketing-analytics-summary" aria-label="Analitik genel özet">{([["Aktif kampanya", summary.activeCampaigns], ["Bitmiş kampanya", summary.completedCampaigns], ["Kabul edilen", summary.accepted], ["Teslim edilen", summary.delivered], ["Okunan", summary.read], ["Başarısız", summary.failed], ["Yayınlanan içerik", summary.published]] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{count(value)}</dd>{value === null && <small>Henüz veri yok</small>}</div>)}</dl>
-      <div className="marketing-analytics-channels">{data.channels.map(c => <section className="marketing-editor" aria-label={`${channelNames[c.channel]} analitiği`} key={c.channel}><h3>{channelNames[c.channel]}</h3>
+      <div className="marketing-analytics-channels">{data.channels.map(c => <Panel as="section" surfaceRole="communication" className="marketing-editor" aria-label={`${channelNames[c.channel]} analitiği`} key={c.channel}><h3>{channelNames[c.channel]}</h3>
         <p className="muted">{c.serviceState === "ready" ? "Servis yapılandırılmış" : c.serviceState === "unconfigured" ? "Servis yapılandırılmamış" : "Servis kapalı"}</p>
         <AnalyticsMetricList metrics={c.metrics.filter(m => !["audience", "eligible", "prepared", "pending", "read"].includes(m.metric) || m.metric === "read" && c.channel === "whatsapp")} label={`${channelNames[c.channel]} metrikleri`}/>
         {(c.channel === "whatsapp" || c.channel === "sms") && <p>Teslim oranı (teslim / kabul): {rate(c.deliveryRate)}{c.channel === "whatsapp" ? ` · Okunma oranı (okunan / teslim): ${rate(c.readRate)}` : ""}</p>}
         {c.channel === "website" && <p>Ziyaret verisi toplanmıyor.</p>}
         {c.channel === "instagram" && <p>{c.providerCapabilities.some(m => m.availability === "available") ? "Etkileşim ölçümleri yayın ayrıntısında; yayın yaşam süresini kapsar. Erişim farklı yayınlar arasında toplanmaz." : `Etkileşim: ${analyticsAvailabilityLabels[c.serviceState === "ready" ? (c.providerCapabilities.find(m=>["permission_denied","permission_unverified"].includes(m.availability))?.availability ?? c.providerCapabilities[0]?.availability ?? "unsupported") : c.serviceState]}.`}</p>}
-      </section>)}</div>
+      </Panel>)}</div>
       <AnalyticsTrends data={data}/>
-      <section aria-label="Son kampanyalar"><h3>Son kampanyalar</h3><p className="muted">Bu aralıkta oluşturulan kampanyalar · satır sayıları tüm hazırlanan kitleyi kapsar.</p>{!data.recentCampaigns.length && <p>Bu aralıkta henüz kampanya yok.</p>}{data.recentCampaigns.map(c => <div className="campaign-list-row" key={c.id}><span>{channelNames[c.channel]} kampanyası · {new Date(c.createdAt).toLocaleDateString("tr-TR")} · {campaignStatuses[c.status]}</span><span>{count(c.metrics.find(m => m.metric === "accepted")?.value ?? null)} kabul</span><ActionButton variant="secondary" onClick={() => onCampaign(c.id)}>Kampanyayı aç</ActionButton></div>)}</section>
-      <section aria-label="Son yayınlar"><h3>Son yayınlar</h3>{!data.recentPublications.length && <p>Bu aralıkta henüz yayın yok.</p>}{data.recentPublications.map(p => <div className="campaign-list-row" key={p.id}><span>{channelNames[p.channel]} yayını · {new Date(p.createdAt).toLocaleDateString("tr-TR")} · {publicationStatuses[p.status]}</span><ActionButton variant="secondary" onClick={() => onPublication(p.id)}>Yayını aç</ActionButton></div>)}</section>
+      <section aria-label="Son kampanyalar"><h3>Son kampanyalar</h3><p className="muted">Bu aralıkta oluşturulan kampanyalar · satır sayıları tüm hazırlanan kitleyi kapsar.</p>{!data.recentCampaigns.length && <p>Bu aralıkta henüz kampanya yok.</p>}{data.recentCampaigns.map(c => <DataListItem twoLine key={c.id} title={`${channelNames[c.channel]} kampanyası`} meta={`${new Date(c.createdAt).toLocaleDateString("tr-TR")} · ${campaignStatuses[c.status]} · ${count(c.metrics.find(m => m.metric === "accepted")?.value ?? null)} kabul`} actions={<ActionButton variant="secondary" onClick={() => onCampaign(c.id)}>Kampanyayı aç</ActionButton>} />)}</section>
+      <section aria-label="Son yayınlar"><h3>Son yayınlar</h3>{!data.recentPublications.length && <p>Bu aralıkta henüz yayın yok.</p>}{data.recentPublications.map(p => <DataListItem twoLine key={p.id} title={`${channelNames[p.channel]} yayını`} meta={`${new Date(p.createdAt).toLocaleDateString("tr-TR")} · ${publicationStatuses[p.status]}`} actions={<ActionButton variant="secondary" onClick={() => onPublication(p.id)}>Yayını aç</ActionButton>} />)}</section>
       <small>Yerel okuma: {new Date(data.measuredAt).toLocaleString("tr-TR")}</small>
     </>}
   </section>;

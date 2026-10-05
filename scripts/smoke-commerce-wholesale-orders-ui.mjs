@@ -1,3 +1,4 @@
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
@@ -244,7 +245,7 @@ try {
 
   const dealerSelect = page.getByLabel("Sipariş müşterisi", { exact: true });
   await expect(dealerSelect).toBeVisible();
-  await dealerSelect.selectOption(customer.savedId);
+  await chooseSearchSelect(page, "Sipariş müşterisi", { value: customer.savedId });
 
   await expect(page.getByText("Aktif bayi · Bayi A", { exact: true })).toBeVisible();
 
@@ -271,7 +272,7 @@ try {
   await page.evaluate(() => window.__woSetVisible(false));
   await expect(page.locator(".market-order-layout")).toHaveCount(0);
   await page.evaluate(() => window.__woSetVisible(true));
-  await expect(dealerSelect).toHaveValue(customer.savedId);
+  await expect(dealerSelect).toContainText(savedCustomer.commercialProfile.companyName);
   await expect(quantityInput).toHaveValue("2");
   await expect(page.getByPlaceholder("Ürün ara", { exact: true })).toHaveValue("Bayi");
   await expect(page.getByRole("textbox", { name: "Sipariş notu", exact: true })).toHaveValue("UI smoke bayi siparişi");

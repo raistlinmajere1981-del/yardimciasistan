@@ -1,3 +1,7 @@
+import { usePageViewState, usePageViewScroll } from "../app/page-view-state";
+import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
+import { DataListItem } from "../components/ui/DataList";
+import { SearchSelect } from "../components/ui/SearchSelect";
 import { useEffect, useRef, useState } from "react";
 import type { BusinessMessageTemplate, BusinessMessagingResult, MessagingAudienceCounts, MessagingCampaign,
   MessagingCampaignDetail, MessagingCampaignInput, MessagingSegment, MessagingSegmentRule,
@@ -25,11 +29,13 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard, entry, onPlan }
   const [segments, setSegments] = useState<MessagingSegment[]>([]);
   const [templates, setTemplates] = useState<BusinessMessageTemplate[]>([]);
   const [configured, setConfigured] = useState(false), [smsConfigured,setSmsConfigured]=useState(false);
-  const [view, setView] = useState<"list" | "new" | "detail" | "segments">(entry?.draft?"new":"list");
+  const [view, setView] = usePageViewState<"list" | "new" | "detail" | "segments">("campaigns.view", entry?.draft?"new":"list");
+  const [selectedId, setSelectedId] = usePageViewState("campaigns.selectedId", "");
   const [draft, setDraft] = useState(()=>entry?.draft??emptyCampaign());
   const [segmentDraft, setSegmentDraft] = useState(emptySegment);
   const [segmentBaseline, setSegmentBaseline] = useState(() => JSON.stringify(emptySegment()));
   const [detail, setDetail] = useState<MessagingCampaignDetail | null>(null);
+  const workspaceScroll = usePageViewScroll(`campaigns.scroll.${view}`, detail?.campaign.updatedAt ?? campaigns.length);
   const [preview, setPreview] = useState<MessagingAudienceCounts | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -93,8 +99,10 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard, entry, onPlan }
     return !rule ? "" : rule.field === "phone" ? rule.operator : rule.value;
   }
   async function openCampaign(id: string) {
-    await action(async () => { const value = resultValue(await window.yardimciDesktop!.getMessagingCampaign(id)); if (mounted.current) { setDetail(value); setView("detail"); setPreview(null); } });
+    await action(async () => { const result = await window.yardimciDesktop!.getMessagingCampaign(id); if (!result.ok && result.code === "missing_campaign" && mounted.current) { setSelectedId(""); setDetail(null); setView("list"); } const value = resultValue(result); if (mounted.current) { setDetail(value); setSelectedId(value.campaign.id); setView("detail"); setPreview(null); } });
   }
+  useEffect(() => { if (enabled && view === "detail" && selectedId && !entry?.campaignId && !entry?.draft) void openCampaign(selectedId); }, [enabled]);
+  useEffect(() => { if (entry?.draft) { setDraft(entry.draft); setView("new"); } }, [entry?.draft]);
   useEffect(()=>{if(entry?.campaignId && enabled)void openCampaign(entry.campaignId);},[entry?.campaignId,enabled]);
   async function dispatchAction(kind: "start" | "pause" | "resume") {
     if (!detail) return;
@@ -140,35 +148,32 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard, entry, onPlan }
   const activeConfigured=(view==="detail"?detail?.campaign.channel:draft.channel)==="sms"?smsConfigured:configured;
   if (!enabled) return <div className="empty-state"><strong>Kampanyalar kapalı.</strong><p>İşletme → Ek özellikler bölümünden etkinleştirin.</p></div>;
   return <div className="campaign-page">
-    <div className="action-row">
-      <ActionButton variant="secondary" disabled={busy} onClick={() => navigate(() => setView("list"))}>Kampanya listesi</ActionButton>
-      <ActionButton disabled={busy} onClick={() => navigate(() => { setDraft(emptyCampaign()); setView("new"); })}>Yeni kampanya</ActionButton>
-      <ActionButton variant="secondary" disabled={busy} onClick={() => navigate(() => setView("segments"))}>Segmentler</ActionButton>
+    <div className="page-toolbar"><FeatureViewSelector label="Kampanya görünümleri" disabled={busy} value={view === "segments" ? "segments" : "list"}
+      items={[{id:"list",label:"Kampanya listesi"},{id:"segments",label:"Segmentler"}]} onChange={id => navigate(() => setView(id))} />
+      <div className="page-toolbar__actions"><ActionButton disabled={busy} onClick={() => navigate(() => { setDraft(emptyCampaign()); setView("new"); })}>Yeni kampanya</ActionButton></div>
     </div>
     {pendingLeave && <section className="panel form-stack" aria-label="Kaydedilmemiş değişiklikler"><p>Kaydedilmemiş değişiklikler var.</p><div className="action-row">
       <ActionButton variant="danger" onClick={() => { setDraft(emptyCampaign()); setSegmentDraft(emptySegment()); setSegmentBaseline(JSON.stringify(emptySegment())); setPreview(null); const next = pendingLeave; setPendingLeave(null); next(); }}>Vazgeç ve devam et</ActionButton>
       <ActionButton variant="secondary" onClick={() => setPendingLeave(null)}>Düzenlemeye dön</ActionButton>
     </div></section>}
-    <div className="campaign-workspace" aria-busy={busy}>
+    <div ref={workspaceScroll} className="campaign-workspace" aria-busy={busy}>
       {message && <p role="status">{message}</p>}
-      <p className="muted">Hazırlama yalnız kitleyi dondurur. Gönderim, siz başlattıktan sonra kontrollü olarak ilerler. Kabul edilme, teslim veya okunma anlamına gelmez.</p>
+
       {view === "list" && <section className="panel form-stack" aria-label="Kampanya listesi">
-        <h2>Kampanyalar</h2>
         {!campaigns.length && <p>Henüz kampanya yok. Önce bir segment kaydedin.</p>}
-        {campaigns.map((item) => <div className="campaign-list-row" key={item.id}><div><strong>{item.name}</strong><small>{item.channel==="sms"?"SMS / İleti Merkezi":`${item.templateName} · ${item.templateLanguage}`}</small></div>
-          <StatusBadge>{statusLabels[item.status]}</StatusBadge><ActionButton variant="secondary" disabled={busy} onClick={() => void openCampaign(item.id)}>Aç</ActionButton></div>)}
+        {campaigns.map(item => <DataListItem twoLine key={item.id} title={item.name} meta={`${item.channel==="sms"?"SMS / İleti Merkezi":`${item.templateName} · ${item.templateLanguage}`} · ${statusLabels[item.status]}`}
+          actions={<ActionButton variant="secondary" disabled={busy} onClick={() => void openCampaign(item.id)}>Aç</ActionButton>} />)}
       </section>}
       {view === "new" && <section className="panel form-stack" aria-label="Yeni kampanya">
         <h2>Yeni kampanya</h2>
         <label className="form-field"><span>Kampanya adı</span><input maxLength={120} value={draft.name} disabled={busy} onChange={(event) => updateDraft({ name: event.target.value })} /></label>
-        <label className="form-field"><span>Segment</span><select value={draft.segmentId} disabled={busy} onChange={(event) => updateDraft({ segmentId: event.target.value })}><option value="">Segment seçin</option>{segments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="form-field"><span>Segment</span><SearchSelect ariaLabel="Segment" value={draft.segmentId} disabled={busy} placeholder="Segment seçin" onChange={segmentId => updateDraft({ segmentId })} options={segments.map(item => ({ id: item.id, label: item.name, description: item.description }))} /></label>
         <label className="form-field"><span>Kanal</span><select value={draft.channel} disabled={busy||Boolean(draft.contentId)} onChange={event=>{const channel=event.target.value as "whatsapp"|"sms";updateDraft({channel,providerId:channel==="sms"?"iletimerkezi":"whatsapp_cloud",templateName:"",templateLanguage:"",bindings:[],text:channel==="sms"?"":undefined});}}><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option></select></label>
         <p>{draft.channel==="sms"?"İleti Merkezi · düz metin":"WhatsApp Business · onaylı şablon"}</p>
         {!activeConfigured && <p>Servis yapılandırılmamış. Hazırlamak ve göndermek için Ayarlar → Servisler'i tamamlayın.</p>}
         {draft.channel==="sms"?<label className="form-field">SMS metni<textarea aria-label="SMS metni" maxLength={160} value={draft.text??""} disabled={busy||Boolean(draft.contentId)} onChange={e=>updateDraft({text:e.target.value})}/><small>{draft.text?.length??0}/160 karakter · yalnız düz metin</small></label>:<>
         {draft.contentId && <p>Stüdyo metni referans taslağıdır. Gerçek gönderim yalnız onaylı şablon ve aşağıdaki parametre bağlantılarıyla yapılır.</p>}
-        <label className="form-field"><span>Onaylı şablon</span><select value={draft.templateName} disabled={busy} onChange={(event) => { const first = templates.find((item) => item.name === event.target.value); selectTemplate(event.target.value, first?.language ?? ""); }}>
-          <option value="">Şablon seçin</option>{[...new Set(templates.map((item) => item.name))].map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
+        <label className="form-field"><span>Onaylı şablon</span><SearchSelect ariaLabel="Onaylı şablon" value={draft.templateName} disabled={busy} placeholder="Şablon seçin" onChange={name => { const first = templates.find(item => item.name === name); selectTemplate(name, first?.language ?? ""); }} options={[...new Set(templates.map(item => item.name))].map(name => ({ id: name, label: name, description: templates.filter(item => item.name === name).map(item => item.language).join(" · ") }))} /></label>
         <label className="form-field"><span>Şablon dili</span><select value={draft.templateLanguage} disabled={busy} onChange={(event) => selectTemplate(draft.templateName, event.target.value)}><option value="">Dil seçin</option>{templates.filter((item) => item.name === draft.templateName).map((item) => <option key={item.language} value={item.language}>{item.language}</option>)}</select></label>
         {selectedTemplate && !selectedTemplate.supported && <p role="alert">Bu şablonun bileşenleri kampanyalarda desteklenmiyor.</p>}
         {selectedTemplate?.supported && selectedTemplate.components.map((component, ci) => component.parameters.map((parameter, pi) => {
@@ -185,24 +190,27 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard, entry, onPlan }
           <ActionButton variant="secondary" disabled={busy || !draft.segmentId} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.previewMessagingSegment(draft.segmentId, draft.channel)); if (mounted.current) setPreview(value); })}>Kitleyi önizle</ActionButton>
           <ActionButton disabled={busy || !draft.name.trim() || !draft.segmentId || (draft.channel==="sms"?!draft.text?.trim():!selectedTemplate?.supported)} onClick={() => void action(async () => {
             const campaign = resultValue(await window.yardimciDesktop!.createMessagingCampaign(draft)); await reload();
-            const value = resultValue(await window.yardimciDesktop!.getMessagingCampaign(campaign.id)); if (mounted.current) { setDetail(value); setDraft(emptyCampaign()); setView("detail"); setPreview(null); }
+            const value = resultValue(await window.yardimciDesktop!.getMessagingCampaign(campaign.id)); if (mounted.current) { setDetail(value); setSelectedId(value.campaign.id); setDraft(emptyCampaign()); setView("detail"); setPreview(null); }
           })}>Taslağı kaydet</ActionButton>
         </div>
         {preview && <AudienceCounts value={preview} />}
       </section>}
+      {view === "detail" && !detail && (busy ? <p role="status">Kampanya yükleniyor…</p> : <ActionButton variant="secondary" onClick={() => void openCampaign(selectedId)}>Kampanyayı yeniden yükle</ActionButton>)}
       {view === "detail" && detail && <section className="panel form-stack" aria-label="Kampanya çalışma alanı">
-        <div className="campaign-list-row"><h2>{detail.campaign.name}</h2><StatusBadge>{statusLabels[detail.campaign.status]}</StatusBadge></div>
+        <div className="action-row"><h2>{detail.campaign.name}</h2><StatusBadge>{statusLabels[detail.campaign.status]}</StatusBadge></div>
         <p>{detail.campaign.channel==="sms"?"SMS / İleti Merkezi":`WhatsApp · ${detail.campaign.templateName} · ${detail.campaign.templateLanguage}`}</p>{detail.campaign.channel==="sms" && <p>{detail.campaign.text}</p>}
         {detail.campaign.preparedAt && <><p>Kitle üyeliği hazırlama anında donduruldu. Güncel iletişim tercihi gönderimden önce yeniden denetlenecek.</p>
           <dl className="campaign-counts" aria-label="Hazırlanan kitle"><div><dt>Eşleşen</dt><dd>{detail.matchedCount}</dd></div><div><dt>Hazırlamada uygun</dt><dd>{detail.eligibleCount}</dd></div><div><dt>Atlanan</dt><dd>{detail.skippedCount}</dd></div><div><dt>Bekleyen outbox</dt><dd>{detail.pendingOutboxCount}</dd></div><div><dt>İşleniyor</dt><dd>{detail.claimedOutboxCount}</dd></div>
             <div><dt>Gönderim kabul edildi</dt><dd>{detail.dispatchedCount}</dd></div><div><dt>Başarısız</dt><dd>{detail.failedCount}</dd></div><div><dt>İptal</dt><dd>{detail.cancelledCount}</dd></div></dl>
           <label>İlerleme <progress aria-label="Kampanya ilerlemesi" max={Math.max(1, detail.matchedCount)} value={detail.matchedCount - detail.pendingOutboxCount - detail.claimedOutboxCount} /></label>
           <p>{detail.matchedCount - detail.pendingOutboxCount - detail.claimedOutboxCount}/{detail.matchedCount} kayıt sonuçlandı.</p></>}
+        <details><summary>Kampanya bilgileri</summary><dl><dt>Oluşturulma</dt><dd>{new Date(detail.campaign.createdAt).toLocaleString("tr-TR")}</dd><dt>Sağlayıcı</dt><dd>{detail.campaign.providerId}</dd></dl></details>
         <MarketingEntityAnalytics kind="campaign" id={detail.campaign.id} revision={detail.campaign.updatedAt}/>
         {!!detail.errorCounts.length && <section aria-label="Gönderim hata özeti"><h3>Sonuçlanamayan gönderimler</h3>
           {detail.errorCounts.map(({ category, count }) => <p key={category}>{category === "submission_uncertain" ? "Sağlayıcı sonucu belirsiz; tekrar gönderilmedi" : category === "max_attempts" ? "Deneme sınırına ulaşıldı" : category === "unconfigured" || category === "account_changed" ? "Servis yapılandırması" : category.startsWith("provider_") ? "Sağlayıcı reddi" : "Şablon veya gönderim doğrulaması"}: {count}</p>)}
         </section>}
         {preview && <AudienceCounts value={preview} />}
+        <small>Hazırlama kitleyi dondurur; gönderim siz başlattıktan sonra ilerler. Kabul, teslim ve okunma farklı durumlardır.</small>
         <div className="action-row">
           {detail.campaign.status === "draft" && <>
             <ActionButton variant="secondary" disabled={busy} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.previewMessagingCampaign(detail.campaign.id)); if (mounted.current) setPreview(value); })}>Kitleyi önizle</ActionButton>
@@ -219,11 +227,7 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard, entry, onPlan }
       </section>}
       {view === "segments" && <section className="panel form-stack" aria-label="Segment düzenleyici">
         <h2>Segmentler</h2>
-        <label className="form-field"><span>Kayıtlı segment</span><select value={segmentDraft.id ?? ""} disabled={busy} onChange={(event) => navigate(() => {
-          const item = segments.find((value) => value.id === event.target.value);
-          const next = item ? { id: item.id, name: item.name, description: item.description, filterDefinition: item.filterDefinition } : emptySegment();
-          setSegmentDraft(next); setSegmentBaseline(JSON.stringify(next));
-        })}><option value="">Yeni segment</option>{segments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="form-field"><span>Kayıtlı segment</span><SearchSelect ariaLabel="Kayıtlı segment" value={segmentDraft.id ?? ""} disabled={busy} placeholder="Yeni segment" onChange={id => navigate(() => { const item = segments.find(value => value.id === id); const next = item ? { id: item.id, name: item.name, description: item.description, filterDefinition: item.filterDefinition } : emptySegment(); setSegmentDraft(next); setSegmentBaseline(JSON.stringify(next)); })} options={segments.map(item => ({ id: item.id, label: item.name, description: item.description }))} onCreate={() => navigate(() => { setSegmentDraft(emptySegment()); setSegmentBaseline(JSON.stringify(emptySegment())); })} createLabel="Yeni segment" /></label>
         <label className="form-field"><span>Segment adı</span><input value={segmentDraft.name} maxLength={120} disabled={busy} onChange={(event) => { setSegmentDraft({ ...segmentDraft, name: event.target.value }); setPreview(null); }} /></label>
         <label className="form-field"><span>Segment açıklaması</span><input value={segmentDraft.description ?? ""} maxLength={500} disabled={busy} onChange={(event) => setSegmentDraft({ ...segmentDraft, description: event.target.value })} /></label>
         <p>Boş filtre tüm müşterileri seçer. Filtreler birlikte uygulanır; pazarlama uygunluğu ayrıca denetlenir.</p>

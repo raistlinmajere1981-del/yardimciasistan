@@ -491,16 +491,25 @@ assert.match(
   "an AI-only dashboard must not retain the business-capacity heading"
 );
 assert.doesNotMatch(systemHealthSource, /AI devre dışı olsa|Android modülü bu işletmede kullanılmıyor/);
-assert.match(
+// UX consolidation: navigation presentations are static label+title; capability gating lives in conditions, not copy.
+assert.doesNotMatch(navigationSource, /eyebrow/, "navigation copy must not carry eyebrow presentation");
+assert.doesNotMatch(
   navigationSource,
-  /runtimeHasCapability\(capabilities, C\.REQUESTS\) \? "yeni talepler" : ""/,
-  "dashboard copy must derive topics from enabled capabilities"
+  /description:/,
+  "navigation copy must not carry description presentation"
 );
 assert.match(
   navigationSource,
-  /runtimeHasCapability\(capabilities, C\.WHATSAPP\) \? "hazır mesajları" : ""/,
-  "customer-work copy must gate prepared messages on the WhatsApp capability"
+  /presentation:\s*\{\s*label:\s*"Ana Ekran",\s*title:\s*"Bugün ne var\?"\s*\}/,
+  "dashboard presentation is a static label+title"
 );
+assert.match(
+  navigationSource,
+  /presentation:\s*\{\s*label:\s*"Müşteri İşleri",\s*title:\s*"Müşteri İşleri"\s*\}/,
+  "customer-work presentation is a static label+title"
+);
+assert.match(frameSource, /title=\{pageMeta\.title\}/, "page header consumes the static navigation title");
+assert.doesNotMatch(frameSource, /pageMeta\.(eyebrow|description)/, "page header must not read removed navigation copy");
 
 // E — a composed pension + retail set exposes both domains without inventing food service.
 const pensionRetail = new Set([
@@ -524,9 +533,10 @@ assert.equal(hybridProjection.reservations.some((reservation) => reservation.res
 assert.match(navigationSource, /pageId:\s*"market"[\s\S]{0,220}condition:\s*\{\s*anyOf:/);
 assert.match(
   navigationSource,
-  /\?\s*\(accommodationFolioEnabled\s*\?\s*"[^"]*bekleyen oda alacaklarını/,
-  "room receivable copy must stay inside the accommodation folio capability branch"
+  /financeEnabled \? "Kasa" : "Raporlar"/,
+  "reports presentation keeps the finance-driven Kasa/Raporlar title"
 );
+assert.doesNotMatch(navigationSource, /bekleyen oda alacaklarını/, "folio copy must not live in navigation presentation");
 
 // F — admin expands role grants, then intersects them with business capabilities.
 const marketAdmin = androidEffectivePermissionsForRole("admin", ANDROID_PERMISSIONS, marketCapabilities);

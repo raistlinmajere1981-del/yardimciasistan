@@ -1,3 +1,4 @@
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -28,11 +29,13 @@ try {
   await page.getByRole('button',{name:'WhatsApp Business',exact:true}).click();await page.getByLabel('Kanal metni',{exact:true}).fill('Bağımsız WhatsApp');
   await page.getByRole('button',{name:'Website',exact:true}).click();await expect(page.getByLabel('Kanal metni',{exact:true})).toHaveValue('AI aday metni');
   await page.getByRole('button',{name:'Görsel yükle',exact:true}).click();const uploaded=f.db.listMediaAssets()[0].id;
-  await page.getByRole('button',{name:`Yüklenen görsel ekle ${uploaded}`,exact:true}).click();
+  await chooseSearchSelect(page, 'Medya seç', { value: uploaded });
   await page.getByRole('button',{name:'AI ile görsel oluştur',exact:true}).click();await expect(page.getByLabel('AI görsel önizlemesi')).toBeVisible();
   await page.getByRole('button',{name:'İçeriğe ekle',exact:true}).click();await expect(page.getByLabel('Seçilen görseller',{exact:true})).toContainText('2 / 20');
   await page.getByRole('button',{name:'Görsel 2 yukarı',exact:true}).click();
   await page.getByRole('button',{name:'İçeriği kaydet',exact:true}).click();await expect(page.getByText('İçerik kaydedildi.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Fixture sayfa değiştir'}).click();await page.getByRole('button',{name:'Fixture sayfa değiştir'}).click();
+  await expect(page.getByLabel('İçerik başlığı',{exact:true})).toHaveValue('UI D4 duyuru');
   const content=f.db.listMarketingContents()[0];assert.equal(content.content.source,'ai');assert.equal(content.variants.find(v=>v.channel==='whatsapp').text,'Bağımsız WhatsApp');
   assert.equal(content.media[1].mediaAssetId,uploaded);assert.equal(f.db.listMarketingPublications().length,0);
   await page.getByRole('button',{name:'Website önizlemesi',exact:true}).click();await expect(page.getByLabel('Website yayın önizlemesi',{exact:true})).toBeVisible();
@@ -50,6 +53,13 @@ try {
   await expect(page.getByRole('button',{name:'Görseli sil',exact:true}).first()).toBeDisabled();
   await expect(page.getByRole('dialog')).toHaveCount(0);assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>localStorage.length),0);
   mkdirSync('artifacts/marketing',{recursive:true});await page.screenshot({path:'artifacts/marketing/library.png'});
+  await page.getByRole('button',{name:'Fixture sayfa değiştir'}).click();await page.getByRole('button',{name:'Fixture sayfa değiştir'}).click();
+  await expect(page.getByLabel('Medya kütüphanesi',{exact:true})).toBeVisible();
+  for (const scheme of ['light','dark']) for (const width of [1440,1280,390]) {
+    await page.setViewportSize({width,height:720});await page.evaluate(s=>document.documentElement.dataset.colorScheme=s,scheme);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await page.screenshot({path:`artifacts/marketing/library-${scheme}-${width}.png`});
+  }
   f.state.unavailable=true;await page.getByRole('button',{name:'Durumu yenile',exact:true}).click();
   await page.getByRole('button',{name:'İçerik Stüdyosu',exact:true}).click();await page.getByRole('button',{name:'Yeni içerik',exact:true}).click();
   for(const name of ['AI ile metin oluştur','AI ile yeniden yaz','AI kanal varyantı oluştur','AI ile görsel oluştur']) await expect(page.getByRole('button',{name,exact:true})).toBeDisabled();

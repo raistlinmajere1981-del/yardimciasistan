@@ -1,3 +1,4 @@
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -46,8 +47,8 @@ try {
   await expect(counts).toContainText('İzin bilinmiyor1'); await expect(counts).toContainText('İzin vermiyor1'); await expect(counts).toContainText('Telefon eksik/geçersiz1');
   await page.getByRole('button', { name: 'Yeni kampanya', exact: true }).click();
   await page.getByLabel('Kampanya adı', { exact: true }).fill('UI Marketing campaign');
-  await page.getByRole('combobox', { name: 'Segment', exact: true }).selectOption({ label: 'UI All customers' });
-  await page.getByRole('combobox', { name: 'Onaylı şablon', exact: true }).selectOption('fixture_template');
+  await chooseSearchSelect(page, "Segment", 'UI All customers');
+  await chooseSearchSelect(page, "Onaylı şablon", { value: 'fixture_template' });
   await page.getByRole('combobox', { name: 'Şablon dili', exact: true }).selectOption('tr');
   await page.getByRole('combobox', { name: 'body 1 bağlantısı', exact: true }).selectOption('customer.fullName');
   // Inline discard guard preserves the draft when returning to editing.

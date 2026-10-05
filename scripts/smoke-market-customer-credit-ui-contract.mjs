@@ -1,3 +1,4 @@
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -232,8 +233,7 @@ try {
   const quick = page.locator(".market-sale-cart");
   const chooseCustomer = async () => {
     await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
-    await quick.getByLabel("Müşteri ara", { exact: true }).fill("555111");
-    await quick.getByLabel("Müşteri", { exact: true }).selectOption(customerId);
+    await chooseSearchSelect(quick, "Müşteri", { value: customerId, search: "555111" });
     await expect(quick.getByRole("definition").filter({ hasText: "₺500,00" })).toBeVisible();
   };
   const addProduct = () => page.locator(".market-sale-product").filter({ hasText: product.name }).click();
@@ -243,13 +243,15 @@ try {
   await addProduct();
   await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
   await expect(quick.getByRole("button", { name: "Satışı Veresiye Kaydet" })).toBeDisabled();
-  await expect(quick.getByLabel("Müşteri", { exact: true }).locator(`option[value="${deletedId}"]`)).toHaveCount(0);
+  await quick.getByLabel("Müşteri", { exact: true }).click();
+  await expect(quick.getByRole("option").filter({hasText:"Silinen"})).toHaveCount(0);
+  await expect(quick.locator(`[role="option"][data-value="${deletedId}"]`)).toHaveCount(0);
+  await quick.getByRole("combobox", {name:"Müşteri ara"}).press("Escape");
   await chooseCustomer();
   await expect(quick.locator(".customer-credit-balances")).toContainText("€20,00");
   await quick.getByRole("button", { name: "Seçimi Temizle" }).click();
   await expect(quick.getByRole("button", { name: "Satışı Veresiye Kaydet" })).toBeDisabled();
-  await quick.getByLabel("Müşteri ara", { exact: true }).fill("ahmet");
-  await quick.getByLabel("Müşteri", { exact: true }).selectOption(customerId);
+  await chooseSearchSelect(quick, "Müşteri", { value: customerId, search: "ahmet" });
   await expect(quick.locator(".customer-credit-balances")).toContainText("₺500,00");
   await page.setViewportSize({ width: 900, height: 1000 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "Narrow customer picker must not overflow horizontally.");
@@ -443,7 +445,7 @@ try {
   await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
   await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
-  await quick.getByLabel("Müşteri", { exact: true }).selectOption(other);
+  await chooseSearchSelect(quick, "Müşteri", { value: other });
   failReview = true;
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-review-recovery")).toContainText("Veresiye satış kaydedildi");
@@ -462,7 +464,7 @@ try {
   await expect(page.locator(".market-phone-device")).toContainText("Hazır");
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
   await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
-  await quick.getByLabel("Müşteri", { exact: true }).selectOption(other);
+  await chooseSearchSelect(quick, "Müşteri", { value: other });
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(0);
   await quick.screenshot({ path: join(artifacts, "credit-receipt.png") });

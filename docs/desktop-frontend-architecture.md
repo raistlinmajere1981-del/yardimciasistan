@@ -12,6 +12,7 @@ App.tsx
   → controllers / application coordination
   → DesktopAppView
       → lock boundary + Appearance
+      → PageViewStateProvider (unlocked business/database session)
       → DesktopAppFrame
           → global shell/navigation/header
           → global canonical Workspace hosts
@@ -61,8 +62,12 @@ props'larına bağlar.
 Router canonical entity editor mantığını kopyalamaz. Bir Page başka bir entity üzerinde
 çalışmak istediğinde Workspace navigation intent açar.
 
-Page context'in sunum unmount'ından uzun yaşaması gerekiyorsa controller Router
-seviyesinde tutulabilir. Calendar ve Pension bunun kanıtlanmış örnekleridir.
+Controller'lar mevcut sahiplerinde kalır. Route/remount boyunca yalnız sunum bağlamı
+`app/page-view-state.tsx` içindeki `usePageViewState` / `usePageViewScroll` ile korunur.
+Store unlocked işletme/veritabanı oturumuna aittir; kilit/logout ve context değişiminde
+sıfırlanır. Entity snapshot, secret, kaydedilmemiş form ve domain mutation bu store'a
+girmez. Persist edilen entity ID, açılışta canonical veriyle yeniden doğrulanır.
+[Canonical UI sözleşmesi](design-system/UX_CONSOLIDATION.md) kullanım sınırlarını açıklar.
 
 ## Controller ownership
 

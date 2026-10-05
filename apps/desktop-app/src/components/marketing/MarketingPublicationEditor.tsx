@@ -1,3 +1,4 @@
+import { Panel } from "../ui/Panel";
 import type { MarketingPublicationInput, MarketingAssetView } from "@yardimci-asistan/shared";
 import { MarketingMediaGallery } from "./MarketingMediaGallery";
 export function MarketingPublicationEditor({draft,onChange,assets,maxImages,busy}:{draft:MarketingPublicationInput;onChange:(draft:MarketingPublicationInput)=>void;assets:MarketingAssetView[];maxImages:number;busy:boolean}) {
@@ -9,7 +10,7 @@ export function MarketingPublicationEditor({draft,onChange,assets,maxImages,busy
   </fieldset>;
 }
 export function MarketingWebsitePreview({draft,assets}:{draft:MarketingPublicationInput;assets:MarketingAssetView[]}) {
-  return <article aria-label="Website yayın önizlemesi" className="marketing-preview">
+  return <Panel as="article" surfaceRole="communication" aria-label="Website yayın önizlemesi" className="marketing-preview">
     <h3>{draft.title}</h3><p>{draft.text}</p><div className="marketing-preview-gallery">{draft.mediaAssetIds.map(id=>{const a=assets.find(asset=>asset.id===id);return a?<img key={id} src={a.previewUrl} alt={a.altText || "Yayın görseli"}/>:null;})}</div>
-  </article>;
+  </Panel>;
 }

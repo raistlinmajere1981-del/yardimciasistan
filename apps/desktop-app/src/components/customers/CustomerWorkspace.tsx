@@ -1,3 +1,4 @@
+import { SearchSelect } from "../ui/SearchSelect";
 import { BusinessTemplateMessagePanel } from "./BusinessTemplateMessagePanel";
 import { CustomerMessagingPreferences } from "./CustomerMessagingPreferences";
 import { useEffect, useMemo, useState } from "react";
@@ -211,9 +212,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
             <p className="customer-operation-empty">Aktif konaklama yok.</p>
             <label className="form-field">
               <span>Konaklama odası</span>
-              <select aria-label="Konaklama odası" value={entryRoomId} onChange={(event) => setEntryRoomId(event.target.value)}>
-                {data.rooms.filter((room) => room.isActive).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
-              </select>
+              <SearchSelect ariaLabel="Konaklama odası" value={entryRoomId} onChange={setEntryRoomId} clearable={false} options={data.rooms.filter(room => room.isActive).map(room => ({ id: room.id, label: room.name }))} />
             </label>
             <ActionButton
               type="button"

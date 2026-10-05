@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { usePageViewState } from "../../app/page-view-state";
 
 export type CalendarViewMode = "day" | "week" | "month";
 
 /** Calendar page context survives ordinary page navigation because the controller lives in DesktopWorkspaceRouter. */
 export function useCalendarPageController() {
-  const [viewMode, setViewMode] = useState<CalendarViewMode>("week");
-  const [selectedDate, setSelectedDate] = useState(() => calendarLocalDateKey(new Date()));
+  const [viewMode, setViewMode] = usePageViewState<CalendarViewMode>("calendar.view", "week");
+  const [selectedDate, setSelectedDate] = usePageViewState("calendar.date", () => calendarLocalDateKey(new Date()));
 
   return {
     viewMode,

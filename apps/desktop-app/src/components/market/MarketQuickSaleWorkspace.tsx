@@ -1,3 +1,4 @@
+import { usePageViewState } from "../../app/page-view-state";
 import { AlertTriangle, Barcode, Minus, Plus, Search, ShoppingCart, Smartphone, Trash2, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -132,9 +133,9 @@ export function MarketQuickSaleWorkspace({
   onExternalProductFound
 }: MarketQuickSaleWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
-  const [search, setSearch] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [barcodeMode, setBarcodeMode] = useState<BarcodeMode>("keyboard-wedge");
+  const [search, setSearch] = usePageViewState("market.sale.search", "");
+  const [categoryId, setCategoryId] = usePageViewState("market.sale.category", "");
+  const [barcodeMode, setBarcodeMode] = usePageViewState<BarcodeMode>("market.sale.barcodeMode", "keyboard-wedge");
   const [simulatedBarcode, setSimulatedBarcode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [phoneBarcodeReady, setPhoneBarcodeReady] = useState(false);

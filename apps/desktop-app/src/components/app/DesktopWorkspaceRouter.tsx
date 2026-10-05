@@ -1,3 +1,4 @@
+import { usePageViewState } from "../../app/page-view-state";
 import { RoomCategoryControl, RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
 import { useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
@@ -200,7 +201,7 @@ export function DesktopWorkspaceRouter({
   const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
   useMarketingScheduleStatus(enabledCapabilities.includes(C.MARKETING_STUDIO),setStatusMessage);
   const [marketingScheduleEntry,setMarketingScheduleEntry]=useState<MessagingCampaign>();
-  const [marketView, setMarketView] = useState<MarketView>("quickSale");
+  const [marketView, setMarketView] = usePageViewState<MarketView>("market.view", "quickSale");
   const [kbsEgmSessionRequest, setKbsEgmSessionRequest] = useState(0);
   const [kbsSessionRetryNotificationId, setKbsSessionRetryNotificationId] = useState("");
   const kbsController = useKbsNotificationController({

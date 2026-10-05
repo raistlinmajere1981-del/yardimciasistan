@@ -23,7 +23,7 @@ export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["
     </div>
     {draft.hasApiKey && <label className="form-check"><input type="checkbox" checked={Boolean(draft.clearApiKey)} onChange={e=>change({clearApiKey:e.target.checked,apiKey:""})}/>Kayıtlı API Key'i kaldır</label>}
     {draft.hasApiHash && <label className="form-check"><input type="checkbox" checked={Boolean(draft.clearApiHash)} onChange={e=>change({clearApiHash:e.target.checked,apiHash:""})}/>Kayıtlı API Hash'i kaldır</label>}
-    <p>Servisler kaydedildiğinde uygulanır. Test bakiye ve onaylı başlığı sorgular. Yerel SMS izni ve sağlayıcı İYS kontrolü gönderimde ayrı ayrı uygulanır.</p>
+    <p>Test bakiye ve onaylı başlığı sorgular. Yerel SMS izni ve sağlayıcı İYS kontrolü gönderimde ayrı ayrı uygulanır.</p>
     <div className="action-row"><ActionButton variant="secondary" disabled={busy||testing||!complete} busy={testing} onClick={()=>void test()}>Bağlantıyı test et</ActionButton>
       <ActionButton variant="secondary" disabled={busy||testing||!complete} onClick={()=>void test(true)}>Başlık listesini yenile</ActionButton></div>
     {result && <p role="status">{result.ok?"Başarılı":"Başarısız"} · {result.message} · {new Date(result.testedAt).toLocaleString("tr-TR")}</p>}
@@ -40,7 +40,7 @@ export function InstagramSettingsSection({draft,busy,onChange}:{draft:SetupFormS
     <label className="form-field">Access Token<input aria-label="Instagram Access Token" type="password" autoComplete="new-password" maxLength={4096} value={draft.accessToken??""} placeholder={draft.hasSecret?"Kayıtlı anahtarı değiştirmek için girin":"Instagram User access token"} onChange={e=>change({accessToken:e.target.value,clearAccessToken:false})}/></label>
     {draft.hasSecret && <label className="form-check"><input type="checkbox" checked={Boolean(draft.clearAccessToken)} onChange={e=>change({clearAccessToken:e.target.checked,accessToken:""})}/>Kayıtlı erişim anahtarını kaldır</label>}
     <p>Instagram Login · Business / Creator · API {INSTAGRAM_API_VERSION}. Token izinleri: instagram_business_basic ve instagram_business_content_publish.</p>
-    <p>Görsel aktarımı için HTTPS Web Modülü gerekir. Servisler kaydedildiğinde uygulanır; test yalnız hesap bilgisini okur.</p>
+    <p>Görsel aktarımı için HTTPS Web Modülü gerekir. Test yalnız hesap bilgisini okur.</p>
     <ActionButton variant="secondary" disabled={busy||testing||!complete} busy={testing} onClick={()=>void test()}>Bağlantıyı test et</ActionButton>
     {result && <p role="status">{result.ok?"Başarılı":"Başarısız"} · {result.message}{result.accountType?` · ${result.accountType}`:""} · {new Date(result.testedAt).toLocaleString("tr-TR")}</p>}
   </ServiceSettingsCard>;

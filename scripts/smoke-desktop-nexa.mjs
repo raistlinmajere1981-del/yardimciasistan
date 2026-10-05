@@ -55,8 +55,11 @@ try {
   await page.evaluate(() => { Object.defineProperty(document, "hasFocus", { configurable: true, value: () => true }); window.dispatchEvent(new Event("focus")); });
   await expect(habitat).toHaveAttribute("data-motion-active", "true");
   // With eleven entries, the compact mode appears before navigation is squeezed.
-  await page.setViewportSize({ width: 1280, height: 740 });
+  await page.setViewportSize({ width: 1280, height: 840 });
   await expect(habitat).toHaveClass(/--compact/);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(page.getByRole("button", { name: "Ayarlar", exact: true })).toBeInViewport();
+  await expect.poll(() => page.locator('.desktop-shell').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.setViewportSize({ width: 1280, height: 360 });
   await expect(habitat).toHaveClass(/--hidden/);
   const settings = page.getByRole("button", { name: "Ayarlar", exact: true });

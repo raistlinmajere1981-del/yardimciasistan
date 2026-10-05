@@ -1,3 +1,4 @@
+import { SearchSelect } from "../ui/SearchSelect";
 import type { MarketingAssetView } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 export function MarketingMediaGallery({assets,selected,onChange,maxImages,disabled=false}:{assets:MarketingAssetView[];selected:string[];onChange:(ids:string[])=>void;maxImages:number;disabled?:boolean}) {
@@ -13,9 +14,10 @@ export function MarketingMediaGallery({assets,selected,onChange,maxImages,disabl
         <ActionButton variant="secondary" disabled={disabled} aria-label={`Görsel ${index+1} çıkar`} onClick={()=>onChange(selected.filter(value=>value!==id))}>Çıkar</ActionButton>
       </li>;
     })}</ol>
-    <div className="marketing-asset-picker">{assets.filter(a=>!a.archivedAt && !selected.includes(a.id)).map(asset=><button type="button" key={asset.id} disabled={disabled || selected.length>=maxImages}
-      aria-label={`${asset.source==="ai"?"AI":"Yüklenen"} görsel ekle ${asset.id}`} onClick={()=>onChange([...selected,asset.id])}>
-      <img src={asset.previewUrl} alt={asset.altText || "Kütüphane görseli"}/><span>{asset.source==="ai"?"AI":"Yüklenen"} · Ekle</span>
-    </button>)}</div>
+    <SearchSelect ariaLabel="Medya seç" value="" placeholder="Görsel ekle" clearable={false} disabled={disabled || selected.length >= maxImages}
+      onChange={id => onChange([...selected, id])} options={assets.filter(asset => !asset.archivedAt && !selected.includes(asset.id)).map(asset => ({
+        id: asset.id, label: asset.altText || `${asset.source === "ai" ? "AI" : "Yüklenen"} görsel`, description: `${asset.source === "ai" ? "AI" : "Yüklenen"} · ${asset.width} × ${asset.height}`, keywords: asset.id,
+        leading: <img src={asset.previewUrl} alt="" />
+      }))} emptyMessage="Seçilebilecek görsel yok. Görsel yükleyin veya oluşturun." />
   </section>;
 }

@@ -57,7 +57,7 @@ try {
   const next = f.service.createCampaign(campaignInput(campaign.segmentId, { name: 'Cancel fixture' }));
   await f.service.prepareCampaign(next.id); await refresh();
   await page.getByRole('button', { name: 'Kampanya listesi', exact: true }).click();
-  await page.locator('.campaign-list-row').filter({ hasText: 'Cancel fixture' }).getByRole('button', { name: 'Aç', exact: true }).click();
+  await page.locator('article.list-row').filter({ hasText: 'Cancel fixture' }).getByRole('button', { name: 'Aç', exact: true }).click();
   await page.getByRole('button', { name: 'Gönderimi Başlat', exact: true }).click(); await expect(workspace).toContainText('Gönderim sürüyor');
   await page.getByRole('button', { name: 'Kampanyayı iptal et', exact: true }).click(); await expect(workspace).toContainText('İptal edildi');
   await f.tick(worker); assert.equal(f.posts().length, 2);
@@ -66,7 +66,7 @@ try {
   f.state.mode = 'lost';
   for (let i = 0; i < 8; i++) { f.clock.advance(1000000); await f.tick(worker); }
   await refresh(); await page.getByRole('button', { name: 'Kampanya listesi', exact: true }).click();
-  await page.locator('.campaign-list-row').filter({ hasText: 'Uncertain fixture' }).getByRole('button', { name: 'Aç', exact: true }).click();
+  await page.locator('article.list-row').filter({ hasText: 'Uncertain fixture' }).getByRole('button', { name: 'Aç', exact: true }).click();
   await expect(workspace).toContainText('Tamamlandı'); await expect(counts).toContainText('Başarısız2');
   await expect(page.getByLabel('Gönderim hata özeti', { exact: true })).toContainText('Sağlayıcı sonucu belirsiz; tekrar gönderilmedi: 2');
   assert.equal(f.posts().length, 4, 'two uncertain intents never duplicate POST');

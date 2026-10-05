@@ -1,3 +1,5 @@
+import { usePageViewState, usePageViewScroll } from "../app/page-view-state";
+import { ActionButton } from "../components/ui/ActionButton";
 import { observeNexaAi } from "../app/nexa-activity";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -76,9 +78,9 @@ export function ReportsPage({
   inventoryEnabled
 }: ReportsPageProps) {
   const initialRange = useMemo(() => createPresetRange("last7"), []);
-  const [range, setRange] = useState<DesktopReportRangeInput>(initialRange);
-  const [customStart, setCustomStart] = useState(initialRange.startDate);
-  const [customEnd, setCustomEnd] = useState(initialRange.endDate);
+  const [range, setRange] = usePageViewState<DesktopReportRangeInput>("reports.range", initialRange);
+  const [customStart, setCustomStart] = usePageViewState("reports.start", initialRange.startDate);
+  const [customEnd, setCustomEnd] = usePageViewState("reports.end", initialRange.endDate);
   const [report, setReport] = useState<DesktopReportData>(() => emptyReport(initialRange));
   const [loading, setLoading] = useState(false);
   const [reportMessage, setReportMessage] = useState("");
@@ -88,7 +90,7 @@ export function ReportsPage({
   const [cashAiMode, setCashAiMode] = useState<DesktopFinanceAiMode | "">("");
   const [cashAiContent, setCashAiContent] = useState("");
   const [cashAiMessage, setCashAiMessage] = useState("");
-  const [activeView, setActiveView] = useState<"cash" | "reports">("cash");
+  const [activeView, setActiveView] = usePageViewState<"cash" | "reports">("reports.view", "cash");
 
   useEffect(() => {
     let active = true;
@@ -238,15 +240,15 @@ export function ReportsPage({
       </div>
       <div className="report-ai-actions finance-ai-actions">
         {CASH_AI_ACTIONS.map((action) => (
-          <button
-            className={cashAiMode === action.mode ? "is-active" : ""}
+          <ActionButton variant="secondary" size="sm"
+            aria-pressed={cashAiMode === action.mode}
             type="button"
             disabled={cashAiMode === action.mode && cashAiMessage.includes("hazırlanıyor")}
             onClick={() => void generateCashAiComment(action.mode)}
             key={action.mode}
           >
             {action.label}
-          </button>
+          </ActionButton>
         ))}
       </div>
       {cashAiMessage && <p className="report-ai-status" role="status">{cashAiMessage}</p>}
@@ -254,6 +256,7 @@ export function ReportsPage({
     </Panel>
   ) : null;
 
+  const scroll = usePageViewScroll(`reports.scroll`, report);
   return (
     <PageWorkSurface mode="fill" className="reports-page-surface">
       <section className="reports-page" aria-label={financeEnabled && reportsEnabled ? "Kasa ve işletme raporları" : financeEnabled ? "Kasa" : "İşletme raporları"}>
@@ -284,7 +287,7 @@ export function ReportsPage({
         <FinanceWorkspace controller={financeController} topPanel={financeAiPanel} />
       )}
 
-      {reportsEnabled && (!financeEnabled || activeView === "reports") && <div className="reports-detail-view">
+      {reportsEnabled && (!financeEnabled || activeView === "reports") && <div ref={scroll} className="reports-detail-view">
 
       <Panel className="report-filter-panel" padding="compact">
         <div className="report-filter-heading">
@@ -298,24 +301,22 @@ export function ReportsPage({
           <div className="report-period-controls">
             <div className="report-date-presets" role="group" aria-label="Detaylı rapor tarih aralığı">
               {REPORT_PRESETS.map((option) => (
-                <button
-                  className={range.preset === option.preset ? "is-active" : ""}
+                <ActionButton variant="secondary" size="sm"
                   type="button"
                   aria-pressed={range.preset === option.preset}
                   onClick={() => selectPreset(option.preset)}
                   key={option.preset}
                 >
                   {option.label}
-                </button>
+                </ActionButton>
               ))}
-              <button
-                className={range.preset === "custom" ? "is-active" : ""}
+              <ActionButton variant="secondary" size="sm"
                 type="button"
                 aria-pressed={range.preset === "custom"}
                 onClick={selectCustom}
               >
                 Tarih Aralığı
-              </button>
+              </ActionButton>
             </div>
 
             {range.preset === "custom" && (
@@ -347,15 +348,15 @@ export function ReportsPage({
           {aiEnabled && (
             <div className="report-ai-actions report-filter-ai-actions" role="group" aria-label="AI rapor yorumu">
               {REPORT_AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
-                <button
-                  className={reportAiMode === action.mode ? "is-active" : ""}
+                <ActionButton variant="secondary" size="sm"
+                  aria-pressed={reportAiMode === action.mode}
                   type="button"
                   disabled={loading || (reportAiMode === action.mode && reportAiMessage.includes("hazırlanıyor"))}
                   onClick={() => void generateReportAiComment(action.mode)}
                   key={action.mode}
                 >
                   {action.label}
-                </button>
+                </ActionButton>
               ))}
             </div>
           )}

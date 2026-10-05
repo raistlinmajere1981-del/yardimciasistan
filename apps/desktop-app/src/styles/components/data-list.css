@@ -257,3 +257,12 @@
     margin-inline-start: 0;
   }
 }
+
+.list-row--two-line .list-row__heading { flex-wrap: nowrap; }
+.list-row--two-line :is(.list-row__title, .list-row__heading h3, .list-row__meta) {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

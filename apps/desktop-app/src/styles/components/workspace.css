@@ -81,7 +81,7 @@
 .workspace-tabs { display: flex; gap: var(--space-1); overflow-x: auto; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--color-border); }
 .workspace-tabs [role="tab"] {
   flex: 0 0 auto;
-  min-height: var(--control-height-md);
+  min-height: max(var(--interaction-target-min), var(--control-height-md));
   padding: var(--space-1) var(--space-3);
   color: var(--color-text-muted);
   background: transparent;
@@ -95,8 +95,8 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: var(--control-height-md);
-  height: var(--control-height-md);
+  width: max(var(--interaction-target-min), var(--control-height-md));
+  height: max(var(--interaction-target-min), var(--control-height-md));
   padding: 0;
   color: var(--color-text-muted);
   background: var(--color-bg-panel);
@@ -105,7 +105,7 @@
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease-standard);
 }
-.icon-button--sm { width: var(--control-height-sm); height: var(--control-height-sm); }
+.icon-button--sm { width: max(var(--interaction-target-min), var(--control-height-sm)); height: max(var(--interaction-target-min), var(--control-height-sm)); }
 .icon-button:hover { background: var(--color-bg-hover); }
 .icon-button--selected { color: var(--color-accent); background: var(--color-accent-soft); }
 .icon-button--danger { color: var(--color-danger); background: var(--color-danger-soft); }

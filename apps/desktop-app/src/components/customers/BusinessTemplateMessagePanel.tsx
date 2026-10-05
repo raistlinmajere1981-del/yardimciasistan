@@ -1,3 +1,4 @@
+import { SearchSelect } from "../ui/SearchSelect";
 import { useEffect, useState } from "react";
 import type { BusinessMessage, BusinessMessageTemplate } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
@@ -46,9 +47,7 @@ export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChang
   return <section className="panel customer-operation-card form-stack" aria-label="WhatsApp Business mesajı">
     <ActionButton variant="secondary" disabled={disabled || busy} busy={busy} onClick={() => void load()}>WhatsApp Business mesajı</ActionButton>
     {open && <>
-      <label className="form-field">Onaylı şablon<select aria-label="Onaylı şablon" value={selected} disabled={busy || Boolean(message)} onChange={(event) => choose(event.target.value)}>
-        <option value="">Şablon seçin</option>{templates.map((item) => <option key={`${item.name}:${item.language}`} value={`${item.name}:${item.language}`} disabled={!item.supported}>{item.name} · {item.language} · {item.category}{!item.supported ? " (desteklenmeyen bileşen)" : ""}</option>)}
-      </select></label>
+      <label className="form-field">Onaylı şablon<SearchSelect ariaLabel="Onaylı şablon" value={selected} disabled={busy || Boolean(message)} onChange={choose} clearable={false} options={templates.map(t => ({ id: `${t.name}:${t.language}`, label: t.name, description: `${t.language} · ${t.category}${!t.supported ? " · desteklenmeyen bileşen" : ""}`, disabled: !t.supported }))} /></label>
       {!templates.length && <p>Onaylı şablon bulunamadı.</p>}
       {template?.components.map((component, index) => <div className="form-stack" key={index}>
         {component.parameters.map((name, param) => <label className="form-field" key={name}>{component.type} · {name}<input aria-label={`${component.type} ${name}`} value={parameters[index]?.[param] ?? ""} maxLength={2000} disabled={busy || Boolean(message)}

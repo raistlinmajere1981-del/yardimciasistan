@@ -1,3 +1,8 @@
+import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
+import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
+import { DataListButton } from "../components/ui/DataList";
+import { Panel } from "../components/ui/Panel";
+import { usePageViewState, usePageViewScroll } from "../app/page-view-state";
 import { observeNexaAi } from "../app/nexa-activity";
 import { useEffect, useRef, useState } from "react";
 import { MARKETING_CHANNELS, type MarketingContentInput, type MarketingContentDetail, type MarketingPublication, type MarketingPublicationInput,
@@ -27,13 +32,20 @@ function publicationStatus(p:MarketingPublication) {
 type View="studio"|"campaigns"|"publications"|"media"|"calendar"|"analytics";
 /** One editorial workspace family; list/preview/publication modes share the same owned drafts. */
 export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,onSettings,scheduleEntry,onScheduleEntryConsumed}:{enabled:boolean;campaignsEnabled:boolean;scheduleEntry?:MessagingCampaign;onScheduleEntryConsumed?:()=>void;registerPageLeaveGuard?:RegisterPageLeaveGuard;onSettings?:()=>void}) {
-  const [analyticsRange,setAnalyticsRange]=useState<MarketingAnalyticsRangeInput>({preset:"30d"});
-  const [calendar,setCalendar]=useState<MarketingScheduleSnapshot|null>(null),[calendarMonth,setCalendarMonth]=useState(()=>new Date().toISOString().slice(0,7));
+  const [selectedContentId, setSelectedContentId] = usePageViewState("marketing.contentId", "");
+  const [selectedPublicationId, setSelectedPublicationId] = usePageViewState("marketing.publicationId", "");
+  const [selectedScheduleId, setSelectedScheduleId] = usePageViewState("marketing.scheduleId", "");
+  const restored = useRef(false);
+  const [analyticsRange,setAnalyticsRange]=usePageViewState<MarketingAnalyticsRangeInput>("marketing.analytics.range", {preset:"30d"});
+  const [calendar,setCalendar]=useState<MarketingScheduleSnapshot|null>(null),[calendarMonth,setCalendarMonth]=usePageViewState("marketing.calendar.month", ()=>new Date().toISOString().slice(0,7));
   const [planDraft,setPlanDraft]=useState<MarketingScheduleInput|null>(null),[planBaseline,setPlanBaseline]=useState("");
   const [campaignEntry,setCampaignEntry]=useState<{draft?:MessagingCampaignInput;campaignId?:string}>();
-  const [snapshot,setSnapshot]=useState<MarketingStudioSnapshot|null>(null),[view,setView]=useState<View>("studio");
+  const [snapshot,setSnapshot]=useState<MarketingStudioSnapshot|null>(null),[view,setView]=usePageViewState<View>("marketing.view", "studio");
+  const bodyScroll = usePageViewScroll(`marketing.scroll.${view}`, snapshot);
+  const studioScroll = usePageViewScroll<HTMLElement>("marketing.studio.listScroll", snapshot?.contents.length);
+  const publicationsScroll = usePageViewScroll<HTMLElement>("marketing.publications.listScroll", snapshot?.publications.length);
   const [draft,setDraft]=useState<MarketingContentInput|null>(null),[baseline,setBaseline]=useState("");
-  const [channel,setChannel]=useState<MarketingChannel>("website"),[instructions,setInstructions]=useState("");
+  const [channel,setChannel]=usePageViewState<MarketingChannel>("marketing.channel", "website"),[instructions,setInstructions]=useState("");
   const [candidate,setCandidate]=useState<{text:string;channel?:MarketingChannel}|null>(null),[generated,setGenerated]=useState<MarketingAssetView|null>(null);
   const [aspect,setAspect]=useState<"square"|"landscape"|"portrait">("square"),[style,setStyle]=useState("");
   const [pubDraft,setPubDraft]=useState<MarketingPublicationInput|null>(null),[pubBaseline,setPubBaseline]=useState("");
@@ -62,12 +74,12 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
     if(view==="campaigns" && campaignGuard.current)return campaignGuard.current(destination,continuation);
     if(!dirty)return true;setPending(()=>continuation);return false;
   }),[busy,dirty,view,registerPageLeaveGuard]);
-  function editContent(detail?:MarketingContentDetail) {const next=detail?contentDraft(detail):emptyContent();setDraft(next);setBaseline(JSON.stringify(next));setPubDraft(null);setPubBaseline("");setView("studio");}
-  function editPublication(p:MarketingPublication) {const next=publicationDraft(p);setPubDraft(next);setPubBaseline(JSON.stringify(next));setDraft(null);setBaseline("");setView("publications");}
+  function editContent(detail?:MarketingContentDetail) {restored.current=true;setSelectedContentId(detail?.content.id ?? "");const next=detail?contentDraft(detail):emptyContent();setDraft(next);setBaseline(JSON.stringify(next));setPubDraft(null);setPubBaseline("");setView("studio");}
+  function editPublication(p:MarketingPublication) {restored.current=true;setSelectedPublicationId(p.id);const next=publicationDraft(p);setPubDraft(next);setPubBaseline(JSON.stringify(next));setDraft(null);setBaseline("");setView("publications");}
   async function saveContent() {
     if(!draft)throw new Error("İçerik seçin.");
     const saved=value(await bridge().saveMarketingContent(draft));
-    if(mounted.current){const next=contentDraft(saved);setDraft(next);setBaseline(JSON.stringify(next));}await reload();return saved;
+    if(mounted.current){const next=contentDraft(saved);setDraft(next);setSelectedContentId(saved.content.id);setBaseline(JSON.stringify(next));}await reload();return saved;
   }
   async function ai(capability:MarketingAiCapability,toChannel?:MarketingChannel) {
     if(!draft)return;const ticket=epoch.current;
@@ -103,15 +115,18 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
   async function savePublication(publish:boolean) {
     if(!pubDraft)return;
     await action(async()=>{let saved=value(await bridge().saveMarketingPublication(pubDraft));
-      if(mounted.current){const next=publicationDraft(saved);setPubDraft(next);setPubBaseline(JSON.stringify(next));}
+      if(mounted.current){setSelectedPublicationId(saved.id);const next=publicationDraft(saved);setPubDraft(next);setPubBaseline(JSON.stringify(next));}
       if(publish)saved=value(await bridge().publishMarketingPublication(saved.id,saved.revision));
-      if(mounted.current){const next=publicationDraft(saved);setPubDraft(next);setPubBaseline(JSON.stringify(next));setDraft(null);setBaseline("");setPreview(false);setView("publications");setMessage(saved.channel==="instagram"?(saved.status==="published"?"Instagram yayını tamamlandı.":saved.status==="failed"?`Instagram yayını başarısız: ${saved.providerSummary?.failureCode??"operation_failed"}. Sonucu denetleyin; belirsiz gönderim tekrarlanmaz.`:"Instagram görseli işleniyor. Yayınlar ekranından durumu kontrol edin."):publish?"Website yayını hazırlanıyor. Senkron onayı bekleniyor.":"Yayın değişikliği kaydedildi.");}await reload();
+      if(mounted.current){setSelectedPublicationId(saved.id);const next=publicationDraft(saved);setPubDraft(next);setPubBaseline(JSON.stringify(next));setDraft(null);setBaseline("");setPreview(false);setView("publications");setMessage(saved.channel==="instagram"?(saved.status==="published"?"Instagram yayını tamamlandı.":saved.status==="failed"?`Instagram yayını başarısız: ${saved.providerSummary?.failureCode??"operation_failed"}. Sonucu denetleyin; belirsiz gönderim tekrarlanmaz.`:"Instagram görseli işleniyor. Yayınlar ekranından durumu kontrol edin."):publish?"Website yayını hazırlanıyor. Senkron onayı bekleniyor.":"Yayın değişikliği kaydedildi.");}await reload();
     });
   }
   function openPlan(detail:MarketingScheduleDetail) {
-    const next=scheduleDraft(detail);setPlanDraft(next);setPlanBaseline(JSON.stringify(next));setDraft(null);setPubDraft(null);setView("calendar");
+    restored.current = true;
+    setSelectedScheduleId(detail.schedule.id);const next=scheduleDraft(detail);setPlanDraft(next);setPlanBaseline(JSON.stringify(next));setDraft(null);setPubDraft(null);setView("calendar");
   }
   function createPlan(target:MarketingPublication|MessagingCampaign) {
+    restored.current = true;
+    setSelectedScheduleId("");
     const isPublication="mediaAssetIds" in target,timezone=calendar?.defaultTimezone??Intl.DateTimeFormat().resolvedOptions().timeZone;
     const next:MarketingScheduleInput={name:isPublication?target.title:target.name,targetType:isPublication?"public_publication":"audience_campaign",targetId:target.id,channel:target.channel,expectedTargetRevision:isPublication?target.revision:undefined,scheduleType:"once",timezone,startsLocal:scheduleLocal(new Date(Date.now()+3600000).toISOString(),timezone),missedRunPolicy:"run_once_when_resumed"};
     setPlanDraft(next);setPlanBaseline(JSON.stringify(next));setDraft(null);setPubDraft(null);setView("calendar");
@@ -121,24 +136,38 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
     await action(async()=>{const saved=value(await bridge().saveMarketingPublication(pubDraft));await reload();createPlan(saved);});
   }
   useEffect(()=>{if(scheduleEntry){createPlan(scheduleEntry);onScheduleEntryConsumed?.();}},[scheduleEntry]);
+  useEffect(() => {
+    if (restored.current || !snapshot || !calendar && selectedScheduleId && view === "calendar") return;
+    restored.current = true;
+    if (view === "studio" && selectedContentId) {
+      const detail = snapshot.contents.find(item => item.content.id === selectedContentId);
+      if (detail) editContent(detail); else setSelectedContentId("");
+    } else if (view === "publications" && selectedPublicationId) {
+      const publication = snapshot.publications.find(item => item.id === selectedPublicationId);
+      if (publication) editPublication(publication); else setSelectedPublicationId("");
+    } else if (view === "calendar" && selectedScheduleId) {
+      const plan = calendar?.schedules.find(item => item.schedule.id === selectedScheduleId);
+      if (plan) openPlan(plan); else setSelectedScheduleId("");
+    }
+  }, [snapshot, calendar]);
   const selectedPlan=planDraft?.id?calendar?.schedules.find(d=>d.schedule.id===planDraft.id):undefined;
   if(!enabled)return <p>Pazarlama bu işletmede etkin değil.</p>;
   const activePub=pubDraft?.id?snapshot?.publications.find(p=>p.id===pubDraft.id):undefined;
   const activeVariant=draft?.variants.find(v=>v.channel===channel);
   const invalidSms = channel === "sms" && Boolean(activeVariant && (!activeVariant.text.trim() || activeVariant.text.length > 160 || /<\/?[A-Za-z][^>]*>|[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(activeVariant.text)));
-  return <section className="marketing-page" aria-label="Pazarlama">
-    <nav className="marketing-tabs" aria-label="Pazarlama yüzeyleri">{([ ["studio","İçerik Stüdyosu"],["campaigns","Kampanyalar"],["publications","Yayınlar"],["media","Medya"],["calendar","Takvim"],["analytics","Analitik"] ] as const).map(([id,label])=>
-      <ActionButton key={id} variant={view===id?"primary":"secondary"} aria-pressed={view===id} disabled={busy} onClick={()=>navigate(()=>{setView(id);})}>{label}</ActionButton>)}
-      <ActionButton variant="secondary" onClick={()=>navigate(()=>onSettings?.())} disabled={busy}>Kanallar / Ayarlar</ActionButton>
-      <ActionButton variant="secondary" onClick={()=>void action(reload)} disabled={busy}>Durumu yenile</ActionButton>
-    </nav>
+  return <FeatureWorkspacePage label="Pazarlama" bodyLabel="Pazarlama çalışma alanı" layout="fill" toolbar={<>
+    <FeatureViewSelector label="Pazarlama yüzeyleri" value={view} disabled={busy} onChange={id => navigate(() => setView(id))}
+      items={[{id:"studio",label:"İçerik Stüdyosu"},{id:"campaigns",label:"Kampanyalar"},{id:"publications",label:"Yayınlar"},{id:"media",label:"Medya"},{id:"calendar",label:"Takvim"},{id:"analytics",label:"Analitik"}]} />
+    <div className="page-toolbar__actions"><ActionButton variant="quiet" onClick={()=>navigate(()=>onSettings?.())} disabled={busy}>Kanallar / Ayarlar</ActionButton>
+      <ActionButton variant="quiet" onClick={()=>void action(reload)} disabled={busy}>Durumu yenile</ActionButton></div>
+    </>}><div className="marketing-page">
     {!!calendar?.schedules.some(d=>d.executions[0]?.status==="failed") && <p role="status"><ActionButton variant="secondary" onClick={()=>navigate(()=>{setView("calendar");setPlanDraft(null);})}>Başarısız pazarlama planları · Takvimi aç</ActionButton></p>}
     {message && <p role="status" className="marketing-message">{message}</p>}
-    {pending && <section className="marketing-confirm" aria-label="Kaydedilmemiş değişiklikler"><p>Kaydedilmemiş değişiklikler var.</p>
+    {pending && <Panel as="section" padding="compact" className="marketing-confirm" aria-label="Kaydedilmemiş değişiklikler"><p>Kaydedilmemiş değişiklikler var.</p>
       <ActionButton variant="danger" onClick={()=>{setDraft(null);setPubDraft(null);setPlanDraft(null);setCandidate(null);setGenerated(null);const next=pending;setPending(null);next();}}>Değişiklikleri bırak</ActionButton>
-      <ActionButton variant="secondary" onClick={()=>setPending(null)}>Düzenlemeye dön</ActionButton></section>}
+      <ActionButton variant="secondary" onClick={()=>setPending(null)}>Düzenlemeye dön</ActionButton></Panel>}
     {view==="campaigns"?<CampaignsPage enabled={campaignsEnabled} entry={campaignEntry} onPlan={campaign=>navigate(()=>createPlan(campaign))} registerPageLeaveGuard={guard=>{campaignGuard.current=guard;return()=>{campaignGuard.current=null;};}}/>:
-    <div className="marketing-body">
+    <div ref={bodyScroll} className="marketing-body">
       {view==="analytics" && <MarketingAnalytics range={analyticsRange} onRange={setAnalyticsRange}
         onCampaign={id=>navigate(()=>{setCampaignEntry({campaignId:id});setView("campaigns");})}
         onPublication={id=>navigate(()=>{const p=snapshot?.publications.find(p=>p.id===id);if(p)editPublication(p);})}/>}
@@ -150,12 +179,12 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
         onResult={id=>navigate(()=>{setPlanDraft(null);const p=snapshot?.publications.find(p=>p.id===id);if(p)editPublication(p);else {setCampaignEntry({campaignId:id});setView("campaigns");}})}
         onTarget={()=>navigate(()=>{const p=snapshot?.publications.find(p=>p.id===planDraft.targetId);setPlanDraft(null);if(p)editPublication(p);else {setCampaignEntry({campaignId:planDraft.targetId});setView("campaigns");}})}
       />:<MarketingCalendar snapshot={calendar} channels={snapshot?.channels??[]} month={calendarMonth} onMonth={setCalendarMonth} onOpen={detail=>navigate(()=>openPlan(detail))}/>)}
-      {view==="studio" && <div className="marketing-split"><aside className="marketing-list" aria-label="Pazarlama içerikleri">
+      {view==="studio" && <div className="marketing-split"><aside ref={studioScroll} className="marketing-list" aria-label="Pazarlama içerikleri">
         <ActionButton onClick={()=>navigate(()=>editContent())} disabled={busy}>Yeni içerik</ActionButton>
         {!snapshot?.contents.length && <p>İlk duyurunuzu veya tanıtım içeriğinizi oluşturun.</p>}
-        {snapshot?.contents.map(item=><button key={item.content.id} disabled={busy} className={draft?.id===item.content.id?"is-selected":""} onClick={()=>navigate(()=>editContent(item))}>
-          <strong>{item.content.title}</strong><span>{item.content.status==="archived"?"Arşivlenmiş":item.content.status==="ready"?"Hazır":"Taslak"}</span></button>)}
-      </aside><section className="marketing-editor" aria-label="İçerik çalışma alanı">
+        {snapshot?.contents.map(item=><DataListButton twoLine key={item.content.id} disabled={busy} selected={draft?.id===item.content.id} aria-pressed={draft?.id===item.content.id} title={item.content.title}
+          meta={item.content.status==="archived"?"Arşivlenmiş":item.content.status==="ready"?"Hazır":"Taslak"} onClick={()=>navigate(()=>editContent(item))} />)}
+      </aside><Panel as="section" surfaceRole="communication" className="marketing-editor" aria-label="İçerik çalışma alanı">
         {!draft?<p>Bir içerik seçin veya yeni içerik oluşturun.</p>:preview && pubDraft?<>
           <h2>{pubDraft.channel==="instagram"?"Instagram":"Website"} önizlemesi</h2><MarketingPublicationEditor draft={pubDraft} onChange={setPubDraft} assets={snapshot?.assets??[]} maxImages={snapshot?.channels.find(c=>c.id===pubDraft.channel)?.maxImages??0} busy={busy}/>
           <MarketingWebsitePreview draft={pubDraft} assets={snapshot?.assets??[]}/>
@@ -174,7 +203,7 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
             <div className="marketing-actions"><ActionButton variant="secondary" disabled={!snapshot?.aiCapabilities.includes("text_generation")} onClick={()=>void ai("text_generation")}>AI ile metin oluştur</ActionButton>
               <ActionButton variant="secondary" disabled={!snapshot?.aiCapabilities.includes("rewrite")} onClick={()=>void ai("rewrite")}>AI ile yeniden yaz</ActionButton></div>
             {!snapshot?.aiCapabilities.length && <p>Uygun AI servisi yapılandırılmamış.</p>}
-            <nav className="marketing-tabs" aria-label="Kanal varyantları">{snapshot?.channels.map(c=><ActionButton key={c.id} variant={channel===c.id?"primary":"secondary"} aria-pressed={channel===c.id} onClick={()=>setChannel(c.id)}>{c.displayName}</ActionButton>)}</nav>
+            <FeatureViewSelector label="Kanal varyantları" value={channel} disabled={busy} onChange={setChannel} items={(snapshot?.channels??[]).map(c => ({id:c.id,label:c.displayName}))} />
             <p>{channelAvailable?"Etkin · Servis yapılandırılmış":"Servis yapılandırılmamış veya kapalı"}</p>
             {!channelAvailable && <ActionButton variant="secondary" onClick={()=>navigate(()=>onSettings?.())}>Servisler ayarlarına git</ActionButton>}
             {selectedChannel?.requiresConsent && <p>Segment ve kanalın pazarlama izni zorunludur. Bilinmeyen veya izin vermeyen müşterilere gönderilmez.</p>}
@@ -187,8 +216,8 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
               {channel==="instagram" && <><p>Tek görsel · oran 4:5–1.91:1 · açıklama en fazla 2200 karakter.</p><MarketingMediaGallery assets={snapshot?.assets??[]} selected={activeVariant.mediaAssetId?[activeVariant.mediaAssetId]:[]} maxImages={1} onChange={ids=>setDraft({...draft,variants:draft.variants.map(v=>v.channel===channel?{...v,mediaAssetId:ids[0]}:v)})}/></>}
               <ActionButton variant="secondary" disabled={!snapshot?.aiCapabilities.includes("channel_adaptation")} onClick={()=>void ai("channel_adaptation",channel)}>AI kanal varyantı oluştur</ActionButton>
             </>}
-            {candidate && <section aria-label="AI taslak önizlemesi" className="marketing-candidate"><h3>{candidate.channel?"Kanal taslağı":"Ana metin taslağı"}</h3><p>{candidate.text}</p>
-              <ActionButton onClick={applyCandidate}>Taslağı uygula</ActionButton><ActionButton variant="secondary" onClick={()=>setCandidate(null)}>Taslağı bırak</ActionButton></section>}
+            {candidate && <Panel as="section" padding="compact" aria-label="AI taslak önizlemesi" className="marketing-candidate"><h3>{candidate.channel?"Kanal taslağı":"Ana metin taslağı"}</h3><p>{candidate.text}</p>
+              <ActionButton onClick={applyCandidate}>Taslağı uygula</ActionButton><ActionButton variant="secondary" onClick={()=>setCandidate(null)}>Taslağı bırak</ActionButton></Panel>}
             {selectedChannel?.supportsImages && channel!=="instagram" && <><h3>Medya galeri</h3><MarketingMediaGallery assets={snapshot?.assets??[]} selected={draft.mediaAssetIds} onChange={mediaAssetIds=>setDraft({...draft,mediaAssetIds})} maxImages={maxImages}/></>}
             {selectedChannel?.supportsImages && <>
             <ActionButton variant="secondary" onClick={()=>void action(async()=>{await bridge().uploadMarketingAssets().then(value);await reload();})}>Görsel yükle</ActionButton>
@@ -196,25 +225,33 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
             <label className="form-field">Görsel stil ipucu<input value={style} maxLength={500} onChange={e=>setStyle(e.target.value)}/></label>
             <ActionButton variant="secondary" disabled={!snapshot?.aiCapabilities.includes("image_generation")} onClick={()=>void ai("image_generation")}>AI ile görsel oluştur</ActionButton>
             {!snapshot?.aiCapabilities.includes("image_generation") && <small>Görsel üretimi için uygun AI servisi yapılandırılmamış.</small>}
-            {generated && <section aria-label="AI görsel önizlemesi" className="marketing-candidate"><img src={generated.previewUrl} alt="AI görsel adayı"/>
+            {generated && <Panel as="section" padding="compact" aria-label="AI görsel önizlemesi" className="marketing-candidate"><img src={generated.previewUrl} alt="AI görsel adayı"/>
               <ActionButton variant="secondary" onClick={()=>setGenerated(null)}>Kütüphanede tut</ActionButton>
               <ActionButton disabled={channel!=="instagram"&&draft.mediaAssetIds.length>=maxImages} onClick={()=>{setDraft(channel==="instagram"?{...draft,variants:draft.variants.map(v=>v.channel===channel?{...v,mediaAssetId:generated.id}:v)}:{...draft,mediaAssetIds:[...draft.mediaAssetIds,generated.id]});setGenerated(null);}}>İçeriğe ekle</ActionButton>
-              <ActionButton variant="danger" onClick={()=>void action(async()=>{value(await bridge().manageMarketingAsset(generated.id,"delete"));setGenerated(null);await reload();})}>Adayı sil</ActionButton></section>}
+              <ActionButton variant="danger" onClick={()=>void action(async()=>{value(await bridge().manageMarketingAsset(generated.id,"delete"));setGenerated(null);await reload();})}>Adayı sil</ActionButton></Panel>}
             </>}
             <label className="form-field">İçerik durumu<select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value as MarketingContentInput["status"]})}><option value="draft">Taslak</option><option value="ready">Hazır</option><option value="archived">Arşivlenmiş</option></select></label>
             <div className="marketing-actions"><ActionButton disabled={!draft.title.trim()} onClick={()=>void action(async()=>{await saveContent();setMessage("İçerik kaydedildi.");})}>İçeriği kaydet</ActionButton>
               {channel==="website" && <ActionButton variant="secondary" disabled={draft.status==="archived"||!draft.title.trim()} onClick={()=>void preparePublic("website")}>Website önizlemesi</ActionButton>}
-              {selectedChannel?.requiresAudience && <ActionButton disabled={!channelAvailable||invalidSms||draft.status==="archived"||!draft.title.trim()} onClick={()=>void prepareCampaign()}>Kampanya oluştur / hazırla</ActionButton>}
-              {selectedChannel?.supportsDirectPublish && channel!=="website" && <ActionButton disabled={!channelAvailable||!activeVariant?.mediaAssetId||!activeVariant?.text.trim()||draft.status==="archived"||!draft.title.trim()} onClick={()=>void preparePublic(channel)}>{snapshot?.publications.some(p=>p.contentId===draft.id&&p.channel==="instagram"&&p.status==="published")?"Instagram’da yeni gönderi önizlemesi":"Instagram önizlemesi"}</ActionButton>}</div>
+              {selectedChannel?.requiresAudience && <ActionButton variant="secondary" disabled={!channelAvailable||invalidSms||draft.status==="archived"||!draft.title.trim()} onClick={()=>void prepareCampaign()}>Kampanya oluştur / hazırla</ActionButton>}
+              {selectedChannel?.supportsDirectPublish && channel!=="website" && <ActionButton variant="secondary" disabled={!channelAvailable||!activeVariant?.mediaAssetId||!activeVariant?.text.trim()||draft.status==="archived"||!draft.title.trim()} onClick={()=>void preparePublic(channel)}>{snapshot?.publications.some(p=>p.contentId===draft.id&&p.channel==="instagram"&&p.status==="published")?"Instagram’da yeni gönderi önizlemesi":"Instagram önizlemesi"}</ActionButton>}</div>
           </fieldset>
         </>}
-      </section></div>}
-      {view==="publications" && <div className="marketing-split"><aside className="marketing-list" aria-label="Yayınlar">
+      </Panel></div>}
+      {view==="publications" && <div className="marketing-split"><aside ref={publicationsScroll} className="marketing-list" aria-label="Yayınlar">
         {!snapshot?.publications.length && <p>Henüz public yayın yok. İçerik Stüdyosu'ndan kanal akışını açın.</p>}
-        {snapshot?.publications.map(p=><button disabled={busy} key={p.id} onClick={()=>navigate(()=>editPublication(p))}><strong>{p.title}</strong><span>{snapshot.channels.find(c=>c.id===p.channel)?.displayName} · {publicationStatus(p)}</span><small>Sürüm {p.revision} · Yayındaki sürüm {p.publishedRevision} · {new Date(p.createdAt).toLocaleString("tr-TR")}{p.publishedAt?` · Yayın: ${new Date(p.publishedAt).toLocaleString("tr-TR")}`:""}{p.providerSummary?.mediaId?` · Medya: ${p.providerSummary.mediaId}`:""}</small></button>)}
-        {snapshot?.campaigns?.map(({campaign:c,dispatchedCount,pendingOutboxCount,failedCount})=><button key={c.id} disabled={busy} onClick={()=>navigate(()=>{setCampaignEntry({campaignId:c.id});setView("campaigns");})}><strong>{c.name}</strong><span>{snapshot.channels.find(channel=>channel.id===c.channel)?.displayName} · {c.status}</span><small>{dispatchedCount} kabul · {pendingOutboxCount} bekleyen · {failedCount} başarısız · {new Date(c.createdAt).toLocaleString("tr-TR")} · {c.providerId}</small></button>)}
-      </aside><section className="marketing-editor" aria-label="Yayın çalışma alanı">{!pubDraft?<p>Bir yayın veya kampanya seçin.</p>:<>
-        <h2>{activePub?.title??"Yayın"}</h2><p>{activePub?publicationStatus(activePub):"Taslak"} · {activePub?.mediaAssetIds.length??0} görsel</p>
+        {snapshot?.publications.map(p=><DataListButton twoLine disabled={busy} key={p.id} title={p.title} selected={pubDraft?.id===p.id} aria-pressed={pubDraft?.id===p.id}
+          meta={`${snapshot.channels.find(c=>c.id===p.channel)?.displayName} · ${publicationStatus(p)}`} onClick={()=>navigate(()=>editPublication(p))} />)}
+        {snapshot?.campaigns?.map(({campaign:c,dispatchedCount,pendingOutboxCount,failedCount})=><DataListButton twoLine key={c.id} disabled={busy} title={c.name}
+          meta={`${snapshot.channels.find(channel=>channel.id===c.channel)?.displayName} · ${c.status} · ${dispatchedCount} kabul · ${pendingOutboxCount} bekleyen · ${failedCount} başarısız`}
+          onClick={()=>navigate(()=>{setCampaignEntry({campaignId:c.id});setView("campaigns");})} />)}
+      </aside><Panel as="section" surfaceRole="communication" className="marketing-editor" aria-label="Yayın çalışma alanı">{!pubDraft?<p>Bir yayın veya kampanya seçin.</p>:<>
+        <h2>{activePub?.title??"Yayın"}</h2>
+        {activePub && <details className="record-disclosure"><summary>Yayın bilgileri</summary><div className="record-disclosure__body">
+          Sürüm {activePub.revision} · Yayındaki sürüm {activePub.publishedRevision} · {new Date(activePub.createdAt).toLocaleString("tr-TR")}
+          {activePub.publishedAt && <p>Yayın: {new Date(activePub.publishedAt).toLocaleString("tr-TR")}</p>}
+          {activePub.providerSummary?.mediaId && <p>Medya: {activePub.providerSummary.mediaId}</p>}
+        </div></details>}<p>{activePub?publicationStatus(activePub):"Taslak"} · {activePub?.mediaAssetIds.length??0} görsel</p>
         {activePub && <ActionButton variant="secondary" disabled={busy||dirty||snapshot?.contents.find(c=>c.content.id===activePub.contentId)?.content.status!=="ready"||activePub.channel==="instagram"&&activePub.status!=="draft"} onClick={()=>navigate(()=>createPlan(activePub))}>Planla</ActionButton>}
         {activePub && <MarketingEntityAnalytics kind="publication" id={activePub.id} revision={`${activePub.revision}:${activePub.status}:${activePub.updatedAt}`}/>}
         {activePub && activePub.revision!==pubDraft.expectedRevision && <p>Kayıt değişti. Listeden yeniden açın.</p>}
@@ -222,20 +259,20 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
         <MarketingPublicationEditor draft={pubDraft} onChange={setPubDraft} assets={snapshot?.assets??[]} maxImages={maxImages} busy={busy}/><MarketingWebsitePreview draft={pubDraft} assets={snapshot?.assets??[]}/>
         <div className="marketing-actions"><ActionButton disabled={busy||!canPublish} onClick={()=>void savePublication(!activePub?.desiredPublished)}>{activePub?.desiredPublished?"Yayını güncelle":"Website'te yayınla"}</ActionButton>
           {activePub && (activePub.desiredPublished || activePub.status==="failed") && <ActionButton variant="danger" disabled={busy||dirty} onClick={()=>setUnpublishConfirm(true)}>Yayından kaldır</ActionButton>}</div>
-        {unpublishConfirm && <section className="marketing-confirm" aria-label="Yayından kaldırma onayı"><p>Website yayını kaldırılsın mı?</p>
+        {unpublishConfirm && <Panel as="section" padding="compact" className="marketing-confirm" aria-label="Yayından kaldırma onayı"><p>Website yayını kaldırılsın mı?</p>
           <ActionButton variant="danger" disabled={busy} onClick={()=>void action(async()=>{const saved=value(await bridge().unpublishMarketingPublication(pubDraft.id!,pubDraft.expectedRevision!));const next=publicationDraft(saved);setPubDraft(next);setPubBaseline(JSON.stringify(next));setUnpublishConfirm(false);await reload();})}>Kaldırmayı onayla</ActionButton>
-          <ActionButton variant="secondary" disabled={busy} onClick={()=>setUnpublishConfirm(false)}>Vazgeç</ActionButton></section>}
-      </>}</>}</section></div>}
-      {view==="media" && <section aria-label="Medya kütüphanesi"><div className="marketing-actions"><h2>Medya kütüphanesi</h2><ActionButton variant="secondary" disabled={busy} onClick={()=>void action(async()=>{value(await bridge().uploadMarketingAssets());await reload();})}>Görsel yükle</ActionButton></div>
+          <ActionButton variant="secondary" disabled={busy} onClick={()=>setUnpublishConfirm(false)}>Vazgeç</ActionButton></Panel>}
+      </>}</>}</Panel></div>}
+      {view==="media" && <section aria-label="Medya kütüphanesi"><div className="marketing-actions"><ActionButton disabled={busy} onClick={()=>void action(async()=>{value(await bridge().uploadMarketingAssets());await reload();})}>Görsel yükle</ActionButton></div>
         {!snapshot?.assets.length && <p>Yüklenen ve AI ile oluşturulan görseller burada görünür.</p>}
-        {assetConfirm && <section className="marketing-confirm" aria-label="Medya işlem onayı"><p>{assetConfirm.action==="delete"?"Görsel kalıcı olarak silinsin mi?":"Görsel yeni seçimlerden arşivlensin mi?"}</p>
-          <ActionButton variant="danger" disabled={busy} onClick={()=>void action(async()=>{value(await bridge().manageMarketingAsset(assetConfirm.id,assetConfirm.action));setAssetConfirm(null);await reload();})}>İşlemi onayla</ActionButton><ActionButton variant="secondary" onClick={()=>setAssetConfirm(null)}>Vazgeç</ActionButton></section>}
-        <div className="marketing-library">{snapshot?.assets.map(a=><article key={a.id}><img src={a.previewUrl} alt={a.altText||"Medya kütüphanesi görseli"}/><p>{a.source==="ai"?"AI görseli":"Yüklenen görsel"} · {a.width} × {a.height}</p>
+        {assetConfirm && <Panel as="section" padding="compact" className="marketing-confirm" aria-label="Medya işlem onayı"><p>{assetConfirm.action==="delete"?"Görsel kalıcı olarak silinsin mi?":"Görsel yeni seçimlerden arşivlensin mi?"}</p>
+          <ActionButton variant="danger" disabled={busy} onClick={()=>void action(async()=>{value(await bridge().manageMarketingAsset(assetConfirm.id,assetConfirm.action));setAssetConfirm(null);await reload();})}>İşlemi onayla</ActionButton><ActionButton variant="secondary" onClick={()=>setAssetConfirm(null)}>Vazgeç</ActionButton></Panel>}
+        <div className="marketing-library">{snapshot?.assets.map(a=><Panel key={a.id} padding="compact" surfaceRole="communication"><img src={a.previewUrl} alt={a.altText||"Medya kütüphanesi görseli"}/><p>{a.source==="ai"?"AI görseli":"Yüklenen görsel"} · {a.width} × {a.height}</p>
           <p>{a.usageCount} kullanım · {a.activePublicationCount} aktif yayın{a.archivedAt?" · Arşivlenmiş":""}</p>
           {!a.archivedAt && <ActionButton variant="secondary" disabled={busy} onClick={()=>setAssetConfirm({id:a.id,action:"archive"})}>Arşivle</ActionButton>}
           <ActionButton variant="danger" disabled={busy||a.usageCount>0} onClick={()=>setAssetConfirm({id:a.id,action:"delete"})}>Görseli sil</ActionButton>
-        </article>)}</div>
+        </Panel>)}</div>
       </section>}
     </div>}
-  </section>;
+  </div></FeatureWorkspacePage>;
 }

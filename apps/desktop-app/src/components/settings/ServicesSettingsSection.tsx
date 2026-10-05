@@ -68,19 +68,8 @@ export function ServicesSettingsSection({
         <div id="settings-connections" className="settings-services-workspace">
           <WebSettingsSection form={form} onFormChange={onFormChange} />
 
-          <section id="settings-whatsapp" tabIndex={-1} className={`settings-service-card${form.whatsappEnabled ? " is-enabled" : " is-disabled"}`}>
-            <div className="settings-service-card-header">
-              <div>
-                <strong>WhatsApp</strong>
-                <span>{form.whatsappEnabled ? "Açık" : "Kapalı"}</span>
-              </div>
-              <label className="settings-service-toggle">
-                <input aria-label="WhatsApp servisi" checked={form.whatsappEnabled} onChange={(event) => update("whatsappEnabled", event.target.checked)} type="checkbox" />
-                <span>{form.whatsappEnabled ? "Açık" : "Kapalı"}</span>
-              </label>
-            </div>
-            {form.whatsappEnabled && (
-            <fieldset className="settings-service-card-body setup-birthday-settings form-stack">
+          <ServiceSettingsCard id="settings-whatsapp" title="WhatsApp" enabled={form.whatsappEnabled} onEnabledChange={enabled => update("whatsappEnabled", enabled)}>
+            <div className="setup-birthday-settings form-stack">
               <div className="setup-section-title setup-section-title--subsection">
                 <h3>Doğum Günü Mesajları</h3>
               </div>
@@ -104,23 +93,11 @@ export function ServicesSettingsSection({
                 <small>{"{ad}"} ve {"{işletme}"} yer tutucuları desteklenir.</small>
               </label>
             </div>
-            </fieldset>
-            )}
-          </section>
-
-          <section id="settings-android" tabIndex={-1} className={`settings-service-card${form.androidEnabled ? " is-enabled" : " is-disabled"}`}>
-            <div className="settings-service-card-header">
-              <div>
-                <strong>Android</strong>
-                <span>{form.androidEnabled ? `${dashboardData?.androidDevices.length ?? 0} cihaz` : "Kapalı"}</span>
-              </div>
-              <label className="settings-service-toggle">
-                <input aria-label="Android servisi" checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
-                <span>{form.androidEnabled ? "Açık" : "Kapalı"}</span>
-              </label>
             </div>
-            {form.androidEnabled && (
-              <div className="settings-service-card-body">
+          </ServiceSettingsCard>
+
+          <ServiceSettingsCard id="settings-android" title="Android" enabled={form.androidEnabled} onEnabledChange={enabled => update("androidEnabled", enabled)}>
+              <div className="form-stack">
                 <div className="form-stack">
                   <label className="form-check setup-checkline">
                     <input
@@ -154,8 +131,7 @@ export function ServicesSettingsSection({
                   />
                 )}
               </div>
-            )}
-          </section>
+          </ServiceSettingsCard>
 
           {hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.RETAIL_BARCODE) && (
           <ServiceSettingsCard id="settings-product-data" title="Ürün Verisi"

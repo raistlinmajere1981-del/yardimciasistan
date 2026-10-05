@@ -274,7 +274,7 @@ try {
   await button('Müşteriler').click();
   const customerEntry = page.locator('.customer-record-row').first(); await customerEntry.click();
   const customerDialog = page.getByRole('dialog');
-  await customerDialog.getByLabel('Konaklama odası').selectOption('room-102'); await button('Konaklama Başlat').click();
+  await chooseSearchSelect(customerDialog, 'Konaklama odası', { value: 'room-102' }); await button('Konaklama Başlat').click();
   await expect(customerDialog).toHaveCount(0);
   await expect(workspace).toBeVisible();
   const manualEntryForm = workspace.getByRole('form', { name: 'Misafir girişi', exact: true });

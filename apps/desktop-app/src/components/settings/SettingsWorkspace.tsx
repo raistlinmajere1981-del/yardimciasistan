@@ -1,3 +1,4 @@
+import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useRef, useState } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type { SaveInitialSetupInput } from "../../../electron/database";
@@ -71,8 +72,8 @@ interface PendingPageTransition {
 type PendingTransition = PendingCategoryTransition | PendingPageTransition;
 
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
-  const [active, setActive] = useState<SettingsCategoryId>("business");
-  const [query, setQuery] = useState("");
+  const [active, setActive] = usePageViewState<SettingsCategoryId>("settings.category", "business");
+  const [query, setQuery] = usePageViewState("settings.search", "");
   const [focusTarget, setFocusTarget] = useState("");
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
   const [guardBusy, setGuardBusy] = useState(false);
@@ -370,6 +371,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     setFocusTarget("");
   }, [active, focusTarget]);
 
+  const pageScroll = usePageViewScroll(`settings.scroll.${active}`, active);
   return (
     <div ref={root} className="settings-workspace setup-capabilities">
       <div className="settings-search">
@@ -414,7 +416,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         aria-labelledby={`settings-tab-${active}`}
         tabIndex={0}
       >
-        <div className="settings-category-body" role="region" aria-label={`${category.title} ayar içeriği`}>
+        <div ref={pageScroll} className="settings-category-body" role="region" aria-label={`${category.title} ayar içeriği`}>
           {active === "business" && (
             <>
               <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>

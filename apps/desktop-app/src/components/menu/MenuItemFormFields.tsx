@@ -1,3 +1,4 @@
+import { SearchSelect } from "../ui/SearchSelect";
 import { useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData } from "../../../electron/database";
 import {
@@ -145,9 +146,7 @@ export function MenuItemFormFields({
 
             <label className="form-field menu-item-field-category">
               Kategori
-              <select value={form.category_id} onChange={(event) => onChange({ ...form, category_id: event.target.value })}>
-                {dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
+              <SearchSelect ariaLabel="Kategori" value={form.category_id} clearable={false} onChange={category_id => onChange({ ...form, category_id })} options={dashboardData.menu.categories.map(category => ({ id: category.id, label: category.name }))} />
             </label>
 
             <label className="form-field menu-item-field-price">

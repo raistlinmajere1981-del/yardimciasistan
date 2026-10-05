@@ -1,3 +1,4 @@
+import { SearchSelect } from "../ui/SearchSelect";
 import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { CatalogProduct, CommerceUnit, InventoryBalance, InventoryMovement } from "@yardimci-asistan/shared";
@@ -110,10 +111,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
         <header className="market-panel-heading"><span>Stok</span><h2>Fiziksel Sayım</h2><p>Mevcut fiziksel miktarı yazın; fark sistem tarafından hesaplanır.</p></header>
         <label className="market-field">
           Ürün
-          <select value={productId} onChange={(event) => setProductId(event.target.value)}>
-            <option value="">Ürün seçin</option>
-            {trackedProducts.map((product) => <option value={product.id} key={product.id}>{product.name}</option>)}
-          </select>
+          <SearchSelect ariaLabel="Ürün" value={productId} placeholder="Ürün seçin" onChange={setProductId} options={trackedProducts.map(product => ({ id: product.id, label: product.name, description: product.barcode, keywords: product.sku }))} />
         </label>
         {selectedProduct && (
           <div className="market-stock-card">

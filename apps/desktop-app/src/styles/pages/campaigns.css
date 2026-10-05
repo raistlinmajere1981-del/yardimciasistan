@@ -6,6 +6,7 @@
   min-height: 0;
 }
 .campaign-workspace {
+  flex: 1;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
@@ -13,17 +14,6 @@
 }
 .campaign-workspace > .panel {
   max-width: 60rem;
-}
-.campaign-list-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-.campaign-list-row > div:first-child {
-  flex: 1;
-  display: grid;
-  gap: var(--space-1);
 }
 .campaign-counts {
   display: flex;

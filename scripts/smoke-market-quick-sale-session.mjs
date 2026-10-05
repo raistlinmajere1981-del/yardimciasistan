@@ -1,3 +1,4 @@
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { resolve } from "node:path";
@@ -366,7 +367,7 @@ try {
   // Credit capability normalization happens even while Quick Sale is unmounted.
   await productRow().click();
   await payment().selectOption("credit");
-  await quick().getByLabel("Müşteri", { exact: true }).selectOption("customer-1");
+  await chooseSearchSelect(quick(), "Müşteri", {value:"customer-1"});
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await page.evaluate(() => window.__m8bToggleCredit(false));
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();

@@ -215,9 +215,7 @@ function DesktopAppFrameContent({
       )}
       header={(
         <PageHeader
-          eyebrow={pageMeta.eyebrow}
           title={pageMeta.title}
-          description={pageMeta.description}
           notice={centralNotice ? (
             <GlobalMessageBar
               tone={centralNotice.tone}

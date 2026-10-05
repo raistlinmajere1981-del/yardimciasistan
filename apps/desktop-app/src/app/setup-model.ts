@@ -1,7 +1,8 @@
-import { emptySmsConfiguration, emptyInstagramConfiguration, type SmsConfigurationInput, type InstagramConfigurationInput } from "@yardimci-asistan/shared";
+import { defaultSetupData } from "./bootstrap-defaults";
+import { type SmsConfigurationInput, type InstagramConfigurationInput } from "@yardimci-asistan/shared";
 import { defaultWebsiteNavigation } from "@yardimci-asistan/shared";
 import type { WebsiteNavigationItem } from "@yardimci-asistan/shared";
-import { emptyWhatsAppCloudConfiguration, type WhatsAppCloudConfigurationInput } from "@yardimci-asistan/shared";
+import { type WhatsAppCloudConfigurationInput } from "@yardimci-asistan/shared";
 import type {
   DesktopAiModelOption,
   DesktopAiService,
@@ -9,7 +10,6 @@ import type {
   SaveInitialSetupInput
 } from "../../electron/database";
 import {
-  emptyArasShippingConfiguration,
   type ArasShippingConfigurationInput,
   getBusinessProfile,
   normalizeBirthdaySettings,
@@ -97,18 +97,18 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
   return {
     websiteNavigation: setupData.websiteNavigation ?? defaultWebsiteNavigation(),
     businessName: setupData.businessName || "",
-    profileId: setupData.profileId || "pension_restaurant",
+    profileId: setupData.profileId || defaultSetupData.profileId,
     profileOptions: [...setupData.profileOptions],
     phone: setupData.phone || "",
     whatsapp: setupData.whatsapp || "",
     email: setupData.email || "",
     address: setupData.address || "",
-    webModuleUrl: setupData.webModuleUrl || "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
+    webModuleUrl: setupData.webModuleUrl || defaultSetupData.webModuleUrl,
     syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : generateSyncSecret(),
     autoSyncEnabled: setupData.autoSyncEnabled,
     localNetworkEnabled: setupData.localNetworkEnabled !== false,
     aiEnabled: setupData.aiEnabled,
-    aiProvider: setupData.aiProvider || "openai_compatible",
+    aiProvider: setupData.aiProvider || defaultSetupData.aiProvider,
     aiService: service,
     aiProjectName: activeAiDraft.projectName,
     aiGoogleCurl: activeAiDraft.googleCurl,
@@ -122,12 +122,12 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiServiceDrafts,
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
-    sms: { ...(setupData.sms ?? emptySmsConfiguration()), apiKey: "", apiHash: "", clearApiKey: false, clearApiHash: false },
-    instagram: { ...(setupData.instagram ?? emptyInstagramConfiguration()), accessToken: "", clearAccessToken: false },
-    whatsappCloud: { ...(setupData.whatsappCloud ?? emptyWhatsAppCloudConfiguration()), accessToken: "", clearAccessToken: false },
-    arasShipping: { ...(setupData.arasShipping ?? emptyArasShippingConfiguration()), password: "", clearPassword: false },
+    sms: { ...(setupData.sms ?? defaultSetupData.sms), apiKey: "", apiHash: "", clearApiKey: false, clearApiHash: false },
+    instagram: { ...(setupData.instagram ?? defaultSetupData.instagram), accessToken: "", clearAccessToken: false },
+    whatsappCloud: { ...(setupData.whatsappCloud ?? defaultSetupData.whatsappCloud), accessToken: "", clearAccessToken: false },
+    arasShipping: { ...(setupData.arasShipping ?? defaultSetupData.arasShipping), password: "", clearPassword: false },
     dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
-    onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? { pickupEnabled: true, shippingEnabled: false }) },
+    onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? defaultSetupData.onlineSalesDelivery) },
     productDataEnabled: setupData.productData.enabled,
     productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,

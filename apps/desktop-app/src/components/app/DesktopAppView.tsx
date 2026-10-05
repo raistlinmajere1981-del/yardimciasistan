@@ -1,3 +1,4 @@
+import { PageViewStateProvider } from "../../app/page-view-state";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
 import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
@@ -103,7 +104,7 @@ export function DesktopAppView({
   }
 
   return (
-    <DesktopAppFrame
+    <PageViewStateProvider key={`${desktopSyncController.businessCapabilities?.businessId ?? ""}:${surfaceData.databasePath}`}><DesktopAppFrame
       activePage={activePage}
       requestPageChange={requestPageChange}
       setCustomerWorkTab={setCustomerWorkTab}
@@ -143,6 +144,6 @@ export function DesktopAppView({
         setUiPreferences={setUiPreferences}
         onDashboardRefresh={desktopSyncController.loadDashboardData}
       />
-    </DesktopAppFrame>
+    </DesktopAppFrame></PageViewStateProvider>
   );
 }

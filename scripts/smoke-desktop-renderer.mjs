@@ -641,7 +641,8 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Menü", exact: true })).toBeVisible();
-  await expect(page.locator(".page-header-copy > p")).toHaveText("Kategori ve ürünleri düzenleyip web menüsünü yayınlayın.");
+  await expect(page.getByRole("heading", {name:"Menü",level:1,exact:true})).toBeVisible();
+  await expect(page.locator(".page-header-copy > p")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Kategoriler", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ürünler", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürün ekle", exact: true })).toBeVisible();
@@ -667,7 +668,7 @@ try {
   await stockImageDialog.locator(".stock-image-row").nth(1).getByRole("button", { name: "Yok say" }).click();
   await stockImageDialog.getByRole("button", { name: "Manuel satır ekle" }).click();
   const manualStockLine = stockImageDialog.locator(".stock-image-row").last();
-  await manualStockLine.locator("select").selectOption("item_local_preview");
+  await chooseSearchSelect(manualStockLine, "Menü karşılığı Manuel eklenen satır", { value: "item_local_preview" });
   await manualStockLine.locator("input[type='number']").fill("4");
   await stockImageDialog.getByRole("checkbox").check();
   await expect(stockImageDialog.getByRole("button", { name: "Stokları Güncelle" })).toBeEnabled();
@@ -1885,6 +1886,14 @@ try {
   await compactPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
   const compactCustomerRows = compactPage.locator(".customers-workspace .customer-record-row");
   await expect(compactCustomerRows).toHaveCount(8);
+  const customerSearch = compactPage.locator(".customer-search input");
+  await customerSearch.fill("Kompakt Misafir 4");
+  await expect(compactCustomerRows).toHaveCount(1);
+  await compactPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  await compactPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
+  await expect(customerSearch).toHaveValue("Kompakt Misafir 4");
+  await expect(compactCustomerRows).toHaveCount(1);
+  await customerSearch.fill("");
 
   await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
   const pensionBoard = compactPage.getByRole("region", { name: "Pansiyon operasyonları", exact: true });
@@ -2112,6 +2121,9 @@ try {
   await expect(compactPage.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
   await compactPage.getByRole("tab", { name: "Servisler", exact: true }).click();
   await expect(compactPage.locator(".settings-service-card", { hasText: "Android" })).toBeVisible();
+  await compactPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
+  await expect(compactPage.getByRole("tab", { name: "Servisler", exact: true })).toHaveAttribute("aria-selected", "true");
   await compactPage.getByRole("tab", { name: "Uygulama", exact: true }).click();
   await expect(compactPage.getByRole("heading", { name: "Görünüm" })).toBeVisible();
   expect(await compactPage.locator(".setup-capabilities").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);

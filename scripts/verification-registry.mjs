@@ -1,4 +1,5 @@
 const SMOKE_FILES = [
+  "scripts/smoke-ux-consolidation.mjs",
   "scripts/smoke-nexa-assets.mjs",
   "scripts/smoke-desktop-nexa.mjs",
   "scripts/smoke-web-nexa.mjs",

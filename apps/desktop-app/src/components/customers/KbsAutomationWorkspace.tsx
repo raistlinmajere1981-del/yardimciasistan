@@ -1,3 +1,4 @@
+import { usePageViewState } from "../../app/page-view-state";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BadgeCheck, BedDouble, IdCard, UserRound } from "lucide-react";
 import type { DesktopDashboardData } from "../../../electron/database";
@@ -37,7 +38,7 @@ export function KbsAutomationWorkspace({
 }: KbsAutomationWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const { confirm, confirmDialog } = useConfirmDialog();
-  const [filter, setFilter] = useState<KbsFilter>("attention");
+  const [filter, setFilter] = usePageViewState<KbsFilter>("kbs.filter", "attention");
   const [egmSessionOpen, setEgmSessionOpen] = useState(false);
   const [egmSessionMessage, setEgmSessionMessage] = useState("");
   const [egmSessionError, setEgmSessionError] = useState("");

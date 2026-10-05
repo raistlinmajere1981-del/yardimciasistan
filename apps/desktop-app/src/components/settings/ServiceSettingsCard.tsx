@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 interface ServiceSettingsCardProps {
   id: string;
+  className?: string;
   title: string;
   status?: string;
   enabled: boolean;
@@ -11,10 +12,10 @@ interface ServiceSettingsCardProps {
 }
 
 /** Presentation only: toggles update the owning Settings draft. */
-export function ServiceSettingsCard({ id, title, status, enabled, onEnabledChange, disabled, children }: ServiceSettingsCardProps) {
+export function ServiceSettingsCard({ id, title, status, enabled, onEnabledChange, disabled, className = "", children }: ServiceSettingsCardProps) {
   return (
     <section id={id} tabIndex={-1} aria-label={title}
-      className={`settings-service-card settings-service-panel${enabled ? " is-enabled" : " is-disabled"}`}>
+      className={`settings-service-card settings-service-panel ${className}${enabled ? " is-enabled" : " is-disabled"}`}>
       <div className="settings-service-card-header">
         <div><strong>{title}</strong><span>{status ?? (enabled ? "Etkin" : "Kapalı")}</span></div>
         {onEnabledChange && <label className="settings-service-toggle">

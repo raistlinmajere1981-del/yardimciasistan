@@ -1,3 +1,4 @@
+import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
 import { Archive, Boxes, ClipboardList, ShoppingBasket, Smartphone, Tags, Truck, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -28,7 +29,6 @@ import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 interface MarketTabDefinition {
   id: MarketView;
   label: string;
-  description: string;
   icon: LucideIcon;
   enabled: boolean;
 }
@@ -69,13 +69,13 @@ export function MarketPage({
   } = controller;
 
   const tabs = useMemo<MarketTabDefinition[]>(() => [
-    { id: "quickSale", label: "Hızlı Satış", description: "Kasada hızlı ürün ekleme ve ödeme", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
-    { id: "products", label: "Ürünler", description: "Ürün ve kategori yönetimi", icon: Archive, enabled: catalogEnabled },
-    { id: "orders", label: "Siparişler", description: "Bayi ve kanal siparişleri", icon: ClipboardList, enabled: ordersEnabled && wholesaleEnabled },
-    { id: "phoneCarts", label: "Telefon Sepetleri", description: "Telefonda hazırlanan satış sepetleri", icon: Smartphone, enabled: catalogEnabled && salesEnabled },
-    { id: "inventory", label: "Stok", description: "Fiziksel sayım ve hareket geçmişi", icon: Boxes, enabled: inventoryEnabled },
-    { id: "purchasing", label: "Tedarikçiler / Alım", description: "Tedarikçi ve stok girişi", icon: Truck, enabled: suppliersEnabled || purchasingEnabled },
-    { id: "labels", label: "Etiketler", description: "Ürün ve raf etiketi hazırlama", icon: Tags, enabled: labelsEnabled }
+    { id: "quickSale", label: "Hızlı Satış", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
+    { id: "products", label: "Ürünler", icon: Archive, enabled: catalogEnabled },
+    { id: "orders", label: "Siparişler", icon: ClipboardList, enabled: ordersEnabled && wholesaleEnabled },
+    { id: "phoneCarts", label: "Telefon Sepetleri", icon: Smartphone, enabled: catalogEnabled && salesEnabled },
+    { id: "inventory", label: "Stok", icon: Boxes, enabled: inventoryEnabled },
+    { id: "purchasing", label: "Tedarikçiler / Alım", icon: Truck, enabled: suppliersEnabled || purchasingEnabled },
+    { id: "labels", label: "Etiketler", icon: Tags, enabled: labelsEnabled }
   ], [catalogEnabled, inventoryEnabled, labelsEnabled, ordersEnabled, purchasingEnabled, salesEnabled, suppliersEnabled, wholesaleEnabled]);
   const availableTabs = tabs.filter((tab) => tab.enabled);
   const activeTab = availableTabs.some((tab) => tab.id === activeView)
@@ -123,18 +123,8 @@ export function MarketPage({
   return (
     <PageWorkSurface mode="fill" className="market-page-surface">
       <section className="market-page" aria-label="Satış yönetimi">
-      <nav className="market-tabs" aria-label="Satış çalışma alanları">
-        {tabs.map((tab) => {
-          if (!tab.enabled) return null;
-          const Icon = tab.icon;
-          return (
-            <button key={tab.id} type="button" className={activeTab === tab.id ? "is-active" : ""} onClick={() => onViewChange(tab.id)}>
-              <Icon size={17} aria-hidden="true" />
-              <span><strong>{tab.label}</strong><small>{tab.description}</small></span>
-            </button>
-          );
-        })}
-      </nav>
+      <FeatureViewSelector label="Satış çalışma alanları" value={activeTab} onChange={onViewChange}
+        items={tabs.filter(tab => tab.enabled).map(tab => { const Icon = tab.icon; return {id:tab.id,label:tab.label,icon:<Icon size={17} aria-hidden="true" />}; })} />
 
       <div className={`market-workspace market-workspace--${activeTab}`}>
       {activeTab === "quickSale" ? (

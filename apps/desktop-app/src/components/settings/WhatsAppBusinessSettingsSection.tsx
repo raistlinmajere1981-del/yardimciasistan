@@ -23,7 +23,7 @@ export function WhatsAppBusinessSettingsSection({ draft, busy, onChange }: {
         placeholder={draft.hasSecret ? "Kayıtlı anahtarı değiştirmek için girin" : "Erişim anahtarı"} onChange={(event) => change({ accessToken: event.target.value, clearAccessToken: false })} /></label>
     </div>
     {draft.hasSecret && <label className="form-check"><input type="checkbox" checked={Boolean(draft.clearAccessToken)} onChange={(event) => change({ clearAccessToken: event.target.checked, accessToken: "" })} />Kayıtlı erişim anahtarını kaldır</label>}
-    <p>Değişiklikler Servisler kategorisi kaydedildiğinde uygulanır. Bağlantı testi ayarları kaydetmez.</p>
+    <small>Bağlantı testi ayarları kaydetmez.</small>
     <ActionButton variant="secondary" size="sm" disabled={busy || testing || !complete} busy={testing} onClick={() => void test()}>Bağlantıyı test et</ActionButton>
     {message && <p role="status">{message}</p>}
   </ServiceSettingsCard>;

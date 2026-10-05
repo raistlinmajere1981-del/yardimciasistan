@@ -1,3 +1,4 @@
+import { SearchSelect } from "../ui/SearchSelect";
 import { CheckCircle2, ClipboardList, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards, XCircle } from "lucide-react";
 import { useMemo } from "react";
 import type { CatalogProduct } from "@yardimci-asistan/shared";
@@ -245,19 +246,7 @@ export function MarketOrdersWorkspace({
         <div className="market-order-customer">
           <label className="market-field">
             Aktif bayi
-            <select
-              aria-label="Sipariş müşterisi"
-              value={customerId}
-              onChange={(event) => changeCustomer(event.target.value)}
-              disabled={disabled || Boolean(resolvingProductId)}
-            >
-              <option value="">Bayi seçin</option>
-              {activeDealers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.commercialProfile?.companyName || customer.fullName} · {priceGroupLabel(customer.commercialProfile?.priceGroup ?? "retail")}
-                </option>
-              ))}
-            </select>
+            <SearchSelect ariaLabel="Sipariş müşterisi" value={customerId} onChange={changeCustomer} disabled={disabled || Boolean(resolvingProductId)} placeholder="Bayi seçin" options={activeDealers.map(customer => ({ id: customer.id, label: customer.commercialProfile?.companyName || customer.fullName, description: `${customer.fullName} · ${priceGroupLabel(customer.commercialProfile?.priceGroup ?? "retail")}`, keywords: customer.phone }))} />
           </label>
           {selectedCustomer && (
             <div className="market-order-customer-summary">

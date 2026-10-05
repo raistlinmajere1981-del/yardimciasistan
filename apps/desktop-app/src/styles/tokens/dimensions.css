@@ -1,4 +1,5 @@
 :root {
+  --interaction-target-min: 44px;
   --control-height-sm: 32px;
   --control-height-md: 36px;
   --control-height-lg: 44px;

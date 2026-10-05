@@ -1,3 +1,5 @@
+import { SearchSelect } from "../ui/SearchSelect";
+import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { Plus, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -79,7 +81,7 @@ export function MarketProductsWorkspace({
   const onlineSalesEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.ONLINE_SALES);
   const [onlineSalesPublished, setOnlineSalesPublished] = useState(onlineSalesEnabled);
   const wholesaleEnabled = runtimeHasCapability(snapshot, BUSINESS_CAPABILITIES.WHOLESALE);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = usePageViewState("market.products.search", "");
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [createOpen, setCreateOpen] = useState(false);
   const [productForm, setProductForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
@@ -229,6 +231,7 @@ export function MarketProductsWorkspace({
     setCreateOpen(false);
   }
 
+  const pageScroll = usePageViewScroll(`market.products.scroll`, filteredProducts.length);
   return (
     <>
       <div className="market-two-column">
@@ -243,7 +246,7 @@ export function MarketProductsWorkspace({
             <Search size={16} aria-hidden="true" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad, marka, SKU veya barkod ara" />
           </label>
-          <div className="market-list">
+          <div ref={pageScroll} className="market-list">
             {filteredProducts.map((product) => (
               <DataListButton
                 className="market-list-row"
@@ -282,7 +285,7 @@ export function MarketProductsWorkspace({
             <div className="market-form-grid">
               <label className="market-field">Kategori adı<input value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} /></label>
               <label className="market-field">Kod<input value={categoryForm.code} onChange={(event) => setCategoryForm((current) => ({ ...current, code: event.target.value }))} /></label>
-              <label className="market-field">Üst kategori<select value={categoryForm.parentId} onChange={(event) => setCategoryForm((current) => ({ ...current, parentId: event.target.value }))}><option value="">Ana kategori</option>{categories.filter((category) => category.id !== categoryForm.id).map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
+              <label className="market-field">Üst kategori<SearchSelect ariaLabel="Üst kategori" value={categoryForm.parentId} placeholder="Ana kategori" onChange={parentId => setCategoryForm(current => ({ ...current, parentId }))} options={categories.filter(category => category.id !== categoryForm.id).map(category => ({ id: category.id, label: category.name }))} /></label>
               <label className="market-field">Sıra<input type="number" value={categoryForm.sortOrder} onChange={(event) => setCategoryForm((current) => ({ ...current, sortOrder: event.target.value }))} /></label>
               <label className="market-check"><input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif kategori</label>
               <div className="market-form-actions market-field-wide">

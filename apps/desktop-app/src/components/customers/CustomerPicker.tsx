@@ -1,4 +1,5 @@
-import { useId, useMemo, useState } from "react";
+import { SearchSelect } from "../ui/SearchSelect";
+import { useId } from "react";
 import type { DesktopCustomer } from "../../../electron/database";
 import { useCustomerCreditAccount } from "../../app/use-customer-credit-account";
 import { ActionButton } from "../ui/ActionButton";
@@ -10,36 +11,23 @@ export function CustomerPicker({ customers, value, onChange, disabled }: {
   onChange: (customerId: string) => void;
   disabled: boolean;
 }) {
-  const [search, setSearch] = useState("");
   const labelId = useId();
-  const options = useMemo(() => {
-    const needle = search.trim().toLocaleLowerCase("tr-TR");
-    const digits = needle.replace(/\D/g, "");
-    return customers.filter((customer) => customer.id === value
-      || customer.fullName.toLocaleLowerCase("tr-TR").includes(needle)
-      || (digits.length > 0 && customer.phone.replace(/\D/g, "").includes(digits)));
-  }, [customers, search, value]);
   const selected = customers.find((customer) => customer.id === value);
 
   return (
     <section className="panel record-stack customer-credit-picker" aria-labelledby={labelId}>
       <h3 id={labelId}>Veresiye müşterisi</h3>
-      <label className="form-field form-field--medium">Müşteri ara
-        <input type="search" placeholder="Ad veya telefon" value={search} onChange={(event) => setSearch(event.target.value)} disabled={disabled} />
-      </label>
       <label className="form-field form-field--medium">Müşteri
-        <select aria-label="Müşteri" value={selected?.id ?? ""} onChange={(event) => onChange(event.target.value)} disabled={disabled} required>
-          <option value="">Kayıtlı müşteri seçin</option>
-          {options.map((customer) => <option key={customer.id} value={customer.id}>{customer.fullName}{customer.phone ? ` · ${customer.phone}` : ""}</option>)}
-        </select>
+        <SearchSelect ariaLabel="Müşteri" value={selected?.id ?? ""} placeholder="Kayıtlı müşteri seçin" disabled={disabled} onChange={onChange}
+          searchPlaceholder="Ad veya telefon" options={customers.map(customer => ({ id: customer.id, label: customer.fullName, description: customer.phone }))}
+          emptyMessage="Bu aramaya uygun müşteri yok. Yeni kayıt için Müşteriler ekranını kullanın." />
       </label>
-      {!options.length && <p>Bu aramaya uygun müşteri yok. Yeni kayıt için Müşteriler ekranını kullanın.</p>}
       {selected ? <>
         <div className="action-row"><strong>{selected.fullName}</strong>
           <ActionButton variant="ghost" size="sm" onClick={() => onChange("")} disabled={disabled}>Seçimi Temizle</ActionButton>
         </div>
         <SelectedCustomerDebt key={selected.id} customerId={selected.id} />
-      </> : <p>Veresiye kaydetmek için bir müşteri seçin.</p>}
+      </> : null}
     </section>
   );
 }

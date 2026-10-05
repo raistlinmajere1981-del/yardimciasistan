@@ -1,3 +1,5 @@
+import { usePageViewState } from "../../app/page-view-state";
+import { SearchSelect } from "../ui/SearchSelect";
 import { Download, FileImage, FileText, Printer, Tags } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CatalogCategory, CatalogProduct } from "@yardimci-asistan/shared";
@@ -27,12 +29,12 @@ export function MarketLabelsWorkspace({
   onStateChange
 }: MarketLabelsWorkspaceProps) {
   const activeProducts = useMemo(() => products.filter((product) => product.isActive), [products]);
-  const [productId, setProductId] = useState("");
-  const [sizeId, setSizeId] = useState<LabelSizePreset["id"]>("58x40");
-  const [copies, setCopies] = useState("1");
-  const [showPrice, setShowPrice] = useState(true);
-  const [showSku, setShowSku] = useState(true);
-  const [showBarcode, setShowBarcode] = useState(true);
+  const [productId, setProductId] = usePageViewState("market.labels.productId", "");
+  const [sizeId, setSizeId] = usePageViewState<LabelSizePreset["id"]>("market.labels.size", "58x40");
+  const [copies, setCopies] = usePageViewState("market.labels.copies", "1");
+  const [showPrice, setShowPrice] = usePageViewState("market.labels.showPrice", true);
+  const [showSku, setShowSku] = usePageViewState("market.labels.showSku", true);
+  const [showBarcode, setShowBarcode] = usePageViewState("market.labels.showBarcode", true);
   const [previewDataUrl, setPreviewDataUrl] = useState("");
   const [previewMessage, setPreviewMessage] = useState("Etiket önizlemesi için ürün seçin.");
   const [exporting, setExporting] = useState<LabelPrinterId | "">("");
@@ -134,11 +136,7 @@ export function MarketLabelsWorkspace({
         <div className="market-form-grid">
           <label className="market-field market-field-wide">
             Ürün
-            <select value={productId} onChange={(event) => setProductId(event.target.value)} disabled={disabled}>
-              {activeProducts.map((item) => (
-                <option value={item.id} key={item.id}>{item.name}</option>
-              ))}
-            </select>
+            <SearchSelect ariaLabel="Ürün" value={productId} disabled={disabled} clearable={false} onChange={setProductId} options={activeProducts.map(product => ({ id: product.id, label: product.name, description: product.barcode, keywords: product.sku }))} />
           </label>
           <label className="market-field">
             Etiket ölçüsü

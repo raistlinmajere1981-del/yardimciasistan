@@ -1,3 +1,4 @@
+import { Panel } from "../ui/Panel";
 import type { MarketingChannelRegistry, MarketingRecurrenceRule, MarketingScheduleDetail, MarketingScheduleInput, MarketingPublication } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 export const scheduleStatuses={active:"Aktif",paused:"Plan duraklatıldı",completed:"Tamamlandı",cancelled:"İptal edildi"};
@@ -20,7 +21,7 @@ export function MarketingScheduleWorkspace({draft,onChange,detail,channels,publi
     const localTime=draft.startsLocal.slice(11),date=new Date(`${draft.startsLocal}:00Z`);
     onChange({...draft,scheduleType:"recurring",recurrenceRule:frequency==="weekly"?{frequency,interval:1,localTime,weekdays:[date.getUTCDay()||7]}:frequency==="monthly"?{frequency,interval:1,localTime,dayOfMonth:date.getUTCDate()}:{frequency,interval:1,localTime}});
   }
-  return <section className="marketing-editor" aria-label="Plan çalışma alanı">
+  return <Panel as="section" surfaceRole="communication" className="marketing-editor" aria-label="Plan çalışma alanı">
     <div className="marketing-actions"><h2>{s?draft.name:"Yeni plan"}</h2><ActionButton variant="secondary" disabled={busy} onClick={onClose}>Takvime dön</ActionButton></div>
     <p>Hedef: {detail?.targetSummary.name??publication?.title??draft.name}{detail?.targetSummary.mediaCount!==undefined?` · ${detail.targetSummary.mediaCount} görsel`:""}</p>
     <p>{channel?.displayName} · {draft.targetType==="audience_campaign"?"Hazırlanmış kampanya · tek seferlik başlangıç":"Yayın · dondurulmuş sürüm"}{s?.targetRevision?` ${s.targetRevision}`:""}</p>
@@ -56,5 +57,5 @@ export function MarketingScheduleWorkspace({draft,onChange,detail,channels,publi
     <p>Planı iptal etmek yayımlanmış içeriği geri almaz veya kampanyayı iptal etmez.</p>
     {onTarget && <ActionButton variant="secondary" disabled={busy} onClick={onTarget}>Hedefi aç</ActionButton>}
     {detail && <section aria-label="Plan çalışma geçmişi"><h3>Son çalışma sonuçları</h3>{!detail.executions.length && <p>Henüz çalışma yok.</p>}{detail.executions.map(e=><p key={e.id}>{scheduleDate(e.plannedAt,s!.timezone)} · {executionStatuses[e.status]}{e.lastError?` · ${e.lastError}`:""}{e.resultReference?" · Hedef niyeti kaydedildi":""}{e.resultReference && onResult && <ActionButton variant="secondary" disabled={busy} onClick={()=>onResult(e.resultReference!)}>Çalışma hedefini aç</ActionButton>}</p>)}</section>}
-  </section>;
+  </Panel>;
 }

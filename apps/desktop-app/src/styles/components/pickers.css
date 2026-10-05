@@ -10,7 +10,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   width: 100%;
-  min-height: var(--control-height-md);
+  min-height: max(var(--interaction-target-min), var(--control-height-md));
   padding: var(--space-1) var(--space-3);
   color: var(--color-text);
   background: var(--color-bg-field);
@@ -80,7 +80,7 @@
 .date-picker-presets button,
 .date-picker-grid button,
 .time-picker-list button {
-  min-height: var(--control-height-sm);
+  min-height: max(var(--interaction-target-min), var(--control-height-sm));
   color: var(--color-text);
   background: transparent;
   border: 1px solid transparent;
@@ -93,7 +93,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--control-height-sm);
+  width: max(var(--interaction-target-min), var(--control-height-sm));
   padding: 0;
   color: var(--color-text-muted);
   background: var(--color-bg-surface);
@@ -144,7 +144,7 @@
 }
 
 .date-picker-presets button {
-  min-height: var(--control-height-sm);
+  min-height: max(var(--interaction-target-min), var(--control-height-sm));
   padding-inline: var(--space-3);
   color: var(--color-text-muted);
   background: var(--color-bg-surface);
@@ -279,7 +279,7 @@
 .search-select-trigger {
   display: flex;
   width: 100%;
-  min-height: var(--control-height-md);
+  min-height: max(var(--interaction-target-min), var(--control-height-md));
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
@@ -318,8 +318,11 @@
   z-index: 42;
   width: min(420px, calc(100vw - var(--space-4)));
   max-height: min(430px, calc(100vh - var(--space-4)));
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  inset: auto;
+  margin: 0;
+  padding: 0;
   color: var(--color-text);
   background: var(--color-bg-panel);
   border: 1px solid var(--color-border-strong);
@@ -346,7 +349,7 @@
 }
 
 .search-select-clear {
-  min-height: var(--control-height-sm);
+  min-height: max(var(--interaction-target-min), var(--control-height-sm));
   padding: var(--space-1) var(--space-3);
   border: 0;
   border-bottom: 1px solid var(--color-border);
@@ -364,6 +367,7 @@
 }
 
 .search-select-options {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-2);
@@ -380,9 +384,10 @@
 
 .search-select-options > button {
   width: 100%;
-  min-height: var(--control-height-lg);
-  display: grid;
-  gap: 2px;
+  min-height: max(var(--interaction-target-min), var(--control-height-lg));
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -398,9 +403,22 @@
   border-color: var(--color-border);
 }
 
+.search-select-options > button.is-active {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
 .search-select-options > button.is-selected {
   background: var(--color-accent-soft);
   border-color: var(--color-accent-border);
+}
+
+.search-select-options > button span,
+.search-select-options > button small,
+.search-select-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-select-options > button span {
@@ -424,6 +442,16 @@
   cursor: not-allowed;
 }
 
-.form-field > .search-select {
+.form-field > .search-select,
+.market-field > .search-select {
   width: min(100%, var(--field-width));
 }
+
+.search-select-option-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-1);
+}
+.search-select-option-leading { flex: 0 0 var(--control-height-lg); }
+.search-select-option-leading img { display: block; width: var(--control-height-lg); height: var(--control-height-lg); object-fit: contain; }

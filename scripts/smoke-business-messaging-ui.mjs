@@ -1,3 +1,4 @@
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -54,7 +55,7 @@ try {
   await page.getByRole('button', { name: 'Müşteriyi aç' }).click();
   await expect(page.getByRole('button', { name: "WhatsApp'tan Yaz", exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'WhatsApp Business mesajı', exact: true }).click();
-  await page.getByLabel('Onaylı şablon', { exact: true }).selectOption('fixture_template:tr');
+  await chooseSearchSelect(page, "Onaylı şablon", { value: 'fixture_template:tr' });
   await expect(page.getByRole('button', { name: 'Gönder', exact: true })).toBeDisabled();
   await page.getByLabel('body 1', { exact: true }).fill('UI_PARAMETER_PRIVATE');
   await expect(page.getByLabel('Şablon önizlemesi')).toContainText('Sipariş UI_PARAMETER_PRIVATE hazır.');

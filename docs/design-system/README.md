@@ -133,6 +133,8 @@ gelir. Reduced-motion tercihi dekoratif hareketleri azaltmaya devam eder.
 Güncel ortak sözlük:
 
 - `PageWorkSurface`
+- `FeatureWorkspacePage` / `FeatureViewSelector`
+- `SearchSelect`
 - `ActionButton`
 - `IconButton`
 - `StatusBadge`
@@ -174,7 +176,7 @@ paylaşır. Ana çalışma sayfalarında varsayılan model `fill`'dir: yüzey ka
 doldurur, veri arttığında scroll doğru iç panel/list tarafından sahiplenilir.
 
 `fill` kullanan ana yüzeyler arasında Müşteri İşleri, Menü, Market, Raporlar, Pansiyon,
-Restoran, Talepler, WhatsApp Web ve Takvim bulunur. Takvim de `fill` kullanır; ancak
+Restoran, Talepler, WhatsApp Web, Pazarlama ve Takvim bulunur. Takvim de `fill` kullanır; ancak
 gün/hafta/ay grid geometrisi nedeniyle normal panel akışından bilinçli bir istisnadır.
 
 `flow` yalnız gerçek içerik akışının sayfa yüksekliğini belirlemesi gereken yardımcı
@@ -235,3 +237,15 @@ V3 ilerledikçe audit şu alanları da shared sözleşmeye bağlamalıdır:
 8. Responsive document overflow yaratma.
 9. Reduced-motion ve keyboard davranışını koru.
 10. `design:audit:strict` ve ilgili behavior smoke'u çalıştır.
+
+## Uygulama genelinde çalışma bağlamı
+
+Mevcut canonical örnekler ve seçim/görünüm hafızası sözleşmesi
+[UX consolidation](UX_CONSOLIDATION.md) belgesinde kayıtlıdır. Yeni bir görsel sistem
+oluşturulmaz; burada tanımlı primitive'ler genişletilir.
+
+Tıklanabilir kontrolün minimum hedefi `--interaction-target-min` (44px)'dir.
+Compact density padding ve yazı yoğunluğunu azaltır; etkileşim hedefini küçültmez.
+Uzun koleksiyon satırlarında `DataListButton` / `DataListItem` `twoLine` kullanılır:
+başlık + metadata. Tam metin tooltip/erişilebilir isimde ve seçilen kaydın workspace'inde
+korunur. Açıklama gerekiyorsa işlem veya alanın yakınında kısa contextual yardım bırakılır.

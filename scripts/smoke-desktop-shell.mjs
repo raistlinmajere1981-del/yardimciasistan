@@ -151,7 +151,7 @@ try {
   await page.goto(baseUrl);
   const observations = [];
   const screens = [['Ana Ekran','Bugün ne var?'],['Müşteri İşleri','Müşteri İşleri'],['Takvim','Takvim'],['Pansiyon','Pansiyon'],['Restoran','Restoran'],['Menü','Menü'],['Kasa','Kasa'],['Satış','Satış'],['Ayarlar','Ayarlar']];
-  for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768]]) {
+  for (const [width, height] of [[1440,1000],[1280,720],[1366,768],[1024,768],[900,768]]) {
     await page.setViewportSize({ width, height });
     for (const [index, [name, title]] of screens.entries()) {
       await page.locator('.sidebar').getByRole('button', { name, exact: true }).click();

@@ -66,7 +66,7 @@
 
 .finance-ai-panel {
   display: grid;
-  grid-template-columns: minmax(170px, 0.65fr) minmax(330px, 1fr) minmax(520px, 1.7fr);
+  grid-template-columns: minmax(10rem, 0.65fr) minmax(0, 1fr) minmax(0, 1.7fr);
   align-items: center;
   gap: var(--space-3);
 }
@@ -105,9 +105,6 @@
 
 .finance-ai-panel .finance-ai-actions button {
   width: 100%;
-  min-height: var(--control-height-sm);
-  padding-inline: var(--space-2);
-  font-size: var(--text-xs);
 }
 
 .finance-ai-panel .report-ai-status {
@@ -215,34 +212,6 @@
 .report-filter-ai-feedback .report-ai-result {
   max-height: 180px;
   overflow: auto;
-}
-
-.report-date-presets button,
-.report-ai-actions button {
-  min-height: var(--control-height-sm);
-  padding: var(--space-1) var(--space-3);
-  color: var(--color-text);
-  background: var(--color-bg-field);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  transition: all var(--motion-fast) var(--ease-standard);
-}
-
-.report-date-presets button:hover,
-.report-ai-actions button:hover,
-.report-date-presets button.is-active,
-.report-ai-actions button.is-active {
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent-border);
-}
-
-.report-ai-actions button:disabled {
-  cursor: wait;
-  opacity: 0.7;
 }
 
 .report-custom-dates {

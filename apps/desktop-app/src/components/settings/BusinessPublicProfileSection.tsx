@@ -363,7 +363,6 @@ export function BusinessPublicProfileSection({
       <div className="settings-panel-header">
         <div>
           <h2>Müşteriye Açık Bilgiler</h2>
-          <p>Harita, açıklama ve müşteriye gösterilen işletme ayrıntıları.</p>
         </div>
       </div>
       <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving || disabled}>
@@ -373,6 +372,8 @@ export function BusinessPublicProfileSection({
       ) : (
         <div className="business-public-profile-body">
           <div className="business-public-profile-map-point">
+            <h3>Website haritası</h3>
+            <small>Harita gösterimi yalnız website üzerindeki kaynağı seçer.</small>
             <label>
               Harita gösterimi
               <select aria-label="Harita gösterimi" value={draft.mapDisplayMode} disabled={loading || saving} onChange={(event) => update("mapDisplayMode", event.target.value as BusinessMapDisplayMode)}>
@@ -385,6 +386,10 @@ export function BusinessPublicProfileSection({
               <input aria-label="Google Maps embed bağlantısı" aria-describedby="business-map-embed-help" type="url" maxLength={4096} value={draft.googleMapsEmbedUrl} disabled={loading || saving} onChange={(event) => update("googleMapsEmbedUrl", event.target.value)} />
               <small id="business-map-embed-help">Google Maps'teki Haritayı paylaş / Yerleştirme bağlantısını kullanın.</small>
             </label>}
+          </div>
+          <details className="business-public-profile-map-point record-disclosure" open={draft.mapDisplayMode === "manual"}>
+            <summary>İşletme konumu</summary>
+            <small>İşletmenin adres ve koordinatlarıdır. Manuel website haritası bu konumu kullanır; Google Maps seçimi konum bilgilerini değiştirmez.</small>
             <div className="business-public-profile-address-lookup">
               <div>
                 <strong>Adrese göre haritada bul</strong>
@@ -457,7 +462,7 @@ export function BusinessPublicProfileSection({
               </label>
             </div>
             {coordinateError && <small className="business-public-profile-field-error" role="status">{coordinateError}</small>}
-          </div>
+          </details>
 
           <label className="form-field form-field--fluid form-field--span">
             İşletme açıklaması

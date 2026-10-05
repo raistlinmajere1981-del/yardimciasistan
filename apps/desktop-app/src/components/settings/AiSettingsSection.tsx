@@ -1,3 +1,4 @@
+import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
@@ -140,20 +141,9 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
   );
 
   return (
-        <section id="settings-ai" tabIndex={-1} className={`settings-service-card setup-ai-section${form.aiEnabled ? " is-enabled" : " is-disabled"}`}>
-          {confirmDialog}
-          <div className="settings-service-card-header">
-            <div>
-              <strong>AI Yardımcı</strong>
-              <span>{form.aiEnabled ? (form.aiStoredApiKeyConfigured ? "Hazır" : "Açık · anahtar bekliyor") : "Kapalı"}</span>
-            </div>
-            <label className="settings-service-toggle">
-              <input aria-label="AI Yardımcı servisi" checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
-              <span>{form.aiEnabled ? "Açık" : "Kapalı"}</span>
-            </label>
-          </div>
-          {form.aiEnabled && (
-          <div className="settings-service-card-body">
+        <>{confirmDialog}<ServiceSettingsCard id="settings-ai" title="AI Yardımcı" className="setup-ai-section" enabled={form.aiEnabled}
+          status={form.aiEnabled ? (form.aiStoredApiKeyConfigured ? "Hazır" : "Etkin · anahtar bekliyor") : "Kapalı"}
+          onEnabledChange={enabled => update("aiEnabled", enabled)}>
           <div className="form-grid">
             <div className="setup-ai-provider-row form-field--span">
               <label className="form-field form-field--medium setup-ai-service-field">
@@ -275,9 +265,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
             </div>}
           </div>
           {form.aiService !== "gemini" && renderAiConnectionActions(false)}
-          </div>
-          )}
-        </section>
+        </ServiceSettingsCard></>
 
   );
 }

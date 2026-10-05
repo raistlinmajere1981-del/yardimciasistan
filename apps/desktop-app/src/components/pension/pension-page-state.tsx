@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from "react";
+import { usePageViewState } from "../../app/page-view-state";
+import { createContext, useContext } from "react";
 
 export interface PensionFilters {
   reservationStatus: string;
@@ -10,7 +11,7 @@ export interface PensionFilters {
 
 /** Page controller stays mounted in the router so panel filters survive workspace/page transitions. */
 export function usePensionPageController() {
-  const [filters, setFilters] = useState<PensionFilters>({
+  const [filters, setFilters] = usePageViewState<PensionFilters>("pension.filters", {
     reservationStatus: "all",
     reservationDate: "",
     taskStatus: "pending",

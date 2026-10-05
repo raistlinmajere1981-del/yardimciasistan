@@ -1,3 +1,4 @@
+import { chooseSearchSelect } from './test-helpers/search-select.mjs';
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -344,7 +345,7 @@ try {
   await page.locator(".market-sale-product").filter({ hasText: product.name }).click();
   const quick = page.locator(".market-sale-cart");
   await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
-  await quick.getByLabel("Müşteri", { exact: true }).selectOption(customerId);
+  await chooseSearchSelect(quick, "Müşteri", {value:customerId});
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-receipt")).toContainText("Veresiye satış kaydedildi.");
   assert.equal(preparedCount(), noAutoStart); assert.equal(external.length, noAutoExternal);

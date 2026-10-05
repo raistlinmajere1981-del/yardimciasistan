@@ -27,7 +27,7 @@ export function ArasShippingSettingsSection({ draft, busy, onChange }: {
     } finally { setTesting(false); }
   }
   return <ServiceSettingsCard id="settings-shipping-provider" title={ARAS_SHIPPING_PROVIDER.name}
-    status={`Etkin · ${draft.configured ? "Yapılandırılmış" : "Yapılandırılmamış"}`}
+    status={draft.enabled ? `Etkin · ${draft.configured ? "Yapılandırılmış" : "Yapılandırılmamış"}` : "Kapalı"}
     enabled={draft.enabled} disabled={busy || testing} onEnabledChange={(enabled) => change({ enabled })}>
     <div className="form-grid">
       <label className="form-field form-field--fluid">Müşteri kodu<input value={draft.customerCode} maxLength={100} onChange={(event) => change({ customerCode: event.target.value })} /></label>
@@ -38,7 +38,7 @@ export function ArasShippingSettingsSection({ draft, busy, onChange }: {
         <option value="test">Test</option><option value="production">Canlı</option></select></label>
     </div>
     {draft.hasSecret && <label className="form-check setup-checkline"><input type="checkbox" checked={Boolean(draft.clearPassword)} onChange={(event) => change({ clearPassword: event.target.checked, password: "" })} /><span>Kayıtlı şifreyi kaldır</span></label>}
-    <p>Değişiklikler Servisler kategorisi kaydedildiğinde uygulanır. Bağlantı testi ayarları kaydetmez.</p>
+    <small>Bağlantı testi ayarları kaydetmez.</small>
     <div className="settings-inline-actions"><ActionButton variant="secondary" size="sm" disabled={busy || testing || !canTest} busy={testing} onClick={() => void testConnection()}>Bağlantıyı test et</ActionButton></div>
     {message && <p role="status">{message}</p>}
   </ServiceSettingsCard>;

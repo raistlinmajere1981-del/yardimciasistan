@@ -1,3 +1,4 @@
+import { SearchSelect } from "../ui/SearchSelect";
 import { PackagePlus, Plus, Save, Truck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BUSINESS_CAPABILITIES, parseMoneyToMajor, type CatalogProduct, type CommercePurchaseOrder, type CommerceSupplier } from "@yardimci-asistan/shared";
@@ -190,11 +191,11 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
       {purchasingEnabled && (
         <section className="market-panel">
           <header className="market-panel-heading"><span>Alım</span><h2>Stok Girişi</h2><p>Teslim alınmış alımı tek transaction ile sipariş + stok hareketine dönüştürür.</p></header>
-          {suppliersEnabled && <label className="market-field">Tedarikçi<select value={purchaseSupplierId} onChange={(event) => setPurchaseSupplierId(event.target.value)}><option value="">Tedarikçisiz alım</option>{suppliers.filter((supplier) => supplier.isActive).map((supplier) => <option value={supplier.id} key={supplier.id}>{supplier.name}</option>)}</select></label>}
+          {suppliersEnabled && <label className="market-field">Tedarikçi<SearchSelect ariaLabel="Tedarikçi" value={purchaseSupplierId} placeholder="Tedarikçisiz alım" onChange={setPurchaseSupplierId} options={suppliers.filter(supplier => supplier.isActive).map(supplier => ({ id: supplier.id, label: supplier.name }))} /></label>}
           <div className="market-purchase-lines">
             {purchaseLines.map((line, index) => (
               <div className="market-purchase-line" key={line.key}>
-                <label className="market-field">Ürün<select value={line.productId} onChange={(event) => updatePurchaseLine(line.key, { productId: event.target.value })}><option value="">Ürün seçin</option>{products.filter((product) => product.trackInventory && product.isActive).map((product) => <option value={product.id} key={product.id}>{product.name}</option>)}</select></label>
+                <label className="market-field">Ürün<SearchSelect ariaLabel={`${index + 1}. alım ürünü`} value={line.productId} placeholder="Ürün seçin" onChange={productId => updatePurchaseLine(line.key, { productId })} options={products.filter(product => product.trackInventory && product.isActive).map(product => ({ id: product.id, label: product.name, description: product.barcode, keywords: product.sku }))} /></label>
                 <label className="market-field">Miktar<input type="number" min="0" step="0.0001" value={line.quantity} onChange={(event) => updatePurchaseLine(line.key, { quantity: event.target.value })} /></label>
                 <label className="market-field">Birim maliyet<MoneyInput value={line.unitCost} onChange={(unitCost) => updatePurchaseLine(line.key, { unitCost })} /></label>
                 {purchaseLines.length > 1 && <ActionButton variant="secondary" type="button" className="market-icon-button" aria-label={`${index + 1}. satırı kaldır`} onClick={() => setPurchaseLines((current) => current.filter((item) => item.key !== line.key))}>×</ActionButton>}

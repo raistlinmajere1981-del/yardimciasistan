@@ -141,36 +141,6 @@ export function formatCustomerSource(value: string) {
   return labels[value] ?? "Müşteri";
 }
 
-export function formatIdentityType(value: string): string {
-  if (value === "tc_identity_card") return "T.C. Kimlik Kartı";
-  if (value === "passport") return "Pasaport";
-  if (value === "other") return "Diğer belge";
-  return "-";
-}
-
-export function formatCustomerGender(value: string): string {
-  if (value === "female") return "Kadın";
-  if (value === "male") return "Erkek";
-  if (value === "unspecified") return "Belirtilmemiş";
-  return "-";
-}
-
-export function hasCustomerIdentityDetails(customer: CustomerRecord): boolean {
-  return Boolean(
-    customer.identityNumber
-    || customer.nationality
-    || customer.birthDate
-    || customer.gender
-    || customer.documentSerialNumber
-    || customer.documentExpiryDate
-    || customer.birthPlace
-    || customer.motherName
-    || customer.fatherName
-    || customer.issuingAuthority
-    || customer.address
-  );
-}
-
 export function formatCustomerRoomStayStatus(value: string): string {
   if (value === "planned") return "Planlandı";
   if (value === "checked_in") return "Giriş yaptı";

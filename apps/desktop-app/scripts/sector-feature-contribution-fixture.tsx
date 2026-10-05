@@ -33,9 +33,7 @@ const testNavigationContribution = {
   contentScroll: "workspace",
   presentation: {
     label: "Test Konaklama",
-    eyebrow: "Test",
-    title: "Test Konaklama",
-    description: "Canonical Pension page reuse fixture."
+    title: "Test Konaklama"
   }
 } satisfies NavigationContribution;
 

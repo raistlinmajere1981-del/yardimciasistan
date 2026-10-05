@@ -1,3 +1,4 @@
+import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useState } from "react";
 import {
   Bell,
@@ -130,7 +131,7 @@ export function RequestsWorkspace({
   onDelete
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
-  const [requestFilter, setRequestFilter] = useState<RequestFilter>("all");
+  const [requestFilter, setRequestFilter] = usePageViewState<RequestFilter>("requests.filter", "all");
   const [aiCopyMessage, setAiCopyMessage] = useState("");
   const waitingRequests = requests.filter((request) => isRequestWaitingForReply(request.status));
   const visibleRequests = requestFilter === "waiting" ? waitingRequests : requests;
@@ -165,6 +166,7 @@ export function RequestsWorkspace({
     setManualFormOpen(true);
   }
 
+  const pageScroll = usePageViewScroll(`requests.scroll`, visibleRequests.length);
   return (
     <section className="record-workspace requests-workspace" aria-label="Talep yönetimi">
       <aside className="panel record-workspace__list" data-surface-role="communication">
@@ -193,7 +195,7 @@ export function RequestsWorkspace({
             { id: "waiting", label: `Yanıt bekleyen · ${waitingRequests.length}` }
           ]}
         />
-        <DataList className="record-workspace__items">
+        <DataList ref={pageScroll} className="record-workspace__items">
           {visibleRequests.length === 0 ? (
             <div className="empty-state">
               <Bell size={24} aria-hidden="true" />

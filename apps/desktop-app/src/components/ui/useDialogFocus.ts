@@ -19,6 +19,7 @@ export function useDialogFocus(open: boolean) {
       const dialogs = Array.from(document.querySelectorAll('[aria-modal="true"]'));
       if (dialogs.at(-1) !== dialog) return;
       if (event.key === "Escape") {
+        if (event.defaultPrevented || event.target instanceof Element && event.target.closest("[popover]:popover-open")) return;
         const close = dialog.querySelector<HTMLButtonElement>('[data-dialog-close], .drawer-close-button, .overlay-close');
         if (close && !close.disabled) { event.preventDefault(); event.stopPropagation(); close.click(); }
       }

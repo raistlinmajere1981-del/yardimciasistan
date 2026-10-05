@@ -23,7 +23,7 @@
   justify-content: center;
   justify-self: start;
   gap: var(--space-2);
-  min-height: var(--control-height-md);
+  min-height: max(var(--interaction-target-min), var(--control-height-md));
   padding: var(--space-1) var(--space-3);
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -115,13 +115,13 @@
 }
 
 .action-button-sm {
-  min-height: var(--control-height-sm);
+  min-height: max(var(--interaction-target-min), var(--control-height-sm));
   padding-inline: var(--space-2);
   font-size: var(--text-xs);
 }
 
 .action-button-lg {
-  min-height: var(--control-height-lg);
+  min-height: max(var(--interaction-target-min), var(--control-height-lg));
   padding-inline: var(--space-5);
 }
 

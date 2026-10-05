@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode, Ref } from "react";
 
 interface DataListItemProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   title: ReactNode;
@@ -7,6 +7,7 @@ interface DataListItemProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   description?: ReactNode;
   actions?: ReactNode;
   selected?: boolean;
+  twoLine?: boolean;
 }
 
 export function DataListItem({
@@ -16,17 +17,18 @@ export function DataListItem({
   description,
   actions,
   selected = false,
+  twoLine = false,
   className = "",
   ...props
 }: DataListItemProps) {
   return (
-    <article className={`list-row${selected ? " is-selected" : ""} ${className}`.trim()} {...props}>
+    <article className={`list-row${selected ? " is-selected" : ""}${twoLine ? " list-row--two-line" : ""} ${className}`.trim()} {...props}>
       <div className="list-row__main">
         <div className="list-row__heading">
           {leading}
-          <h3>{title}</h3>
+          <h3 title={typeof title === "string" ? title : undefined}>{title}</h3>
         </div>
-        {meta && <div className="list-row__meta">{meta}</div>}
+        {meta && <div className="list-row__meta" title={typeof meta === "string" ? meta : undefined}>{meta}</div>}
         {description && <p className="list-row__description">{description}</p>}
       </div>
       {actions && <div className="list-row__actions">{actions}</div>}
@@ -41,6 +43,7 @@ interface DataListButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElemen
   description?: ReactNode;
   trailing?: ReactNode;
   selected?: boolean;
+  twoLine?: boolean;
 }
 
 export function DataListButton({
@@ -50,22 +53,23 @@ export function DataListButton({
   description,
   trailing,
   selected = false,
+  twoLine = false,
   className = "",
   type = "button",
   ...props
 }: DataListButtonProps) {
   return (
     <button
-      className={`list-row list-row--button${selected ? " is-selected" : ""} ${className}`.trim()}
+      className={`list-row list-row--button${selected ? " is-selected" : ""}${twoLine ? " list-row--two-line" : ""} ${className}`.trim()}
       type={type}
       {...props}
     >
       <span className="list-row__main">
         <span className="list-row__heading">
           {leading}
-          <strong className="list-row__title">{title}</strong>
+          <strong title={typeof title === "string" ? title : undefined} className="list-row__title">{title}</strong>
         </span>
-        {meta && <span className="list-row__meta">{meta}</span>}
+        {meta && <span className="list-row__meta" title={typeof meta === "string" ? meta : undefined}>{meta}</span>}
         {description && <span className="list-row__description">{description}</span>}
       </span>
       {trailing && <span className="list-row__trailing">{trailing}</span>}
@@ -73,6 +77,6 @@ export function DataListButton({
   );
 }
 
-export function DataList({ className = "", ...props }: HTMLAttributes<HTMLDivElement>) {
+export function DataList({ className = "", ...props }: HTMLAttributes<HTMLDivElement> & { ref?: Ref<HTMLDivElement> }) {
   return <div className={`data-records ${className}`.trim()} {...props} />;
 }

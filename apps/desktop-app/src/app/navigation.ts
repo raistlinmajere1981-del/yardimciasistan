@@ -30,9 +30,7 @@ export interface NavigationItem {
 
 export interface NavigationPresentation {
   label: string;
-  eyebrow: string;
   title: string;
-  description: string;
 }
 
 export interface NavigationContribution {
@@ -49,20 +47,7 @@ const dashboardContribution = {
   icon: Home,
   order: 0,
   contentScroll: "workspace",
-  presentation: (capabilities) => {
-    const topics = [
-      runtimeHasCapability(capabilities, C.REQUESTS) ? "yeni talepler" : "",
-      runtimeHasCapability(capabilities, C.TASKS) ? "günlük işler" : "",
-      runtimeHasCapability(capabilities, C.ACCOMMODATION_RESERVATIONS)
-        || runtimeHasCapability(capabilities, C.FOOD_RESERVATIONS) ? "bekleyen rezervasyonlar" : ""
-    ].filter(Boolean);
-    return {
-      label: "Ana Ekran",
-      eyebrow: "Günlük özet",
-      title: "Bugün ne var?",
-      description: topics.length > 0 ? `${topics.join(", ")} ve işletme durumunuz.` : "Etkin işletme operasyonlarının özeti."
-    };
-  }
+  presentation: { label: "Ana Ekran", title: "Bugün ne var?" }
 } satisfies NavigationContribution;
 
 const customerWorkContribution = {
@@ -71,19 +56,7 @@ const customerWorkContribution = {
   order: 10,
   condition: { allOf: [C.CUSTOMERS] },
   contentScroll: "workspace",
-  presentation: (capabilities) => {
-    const topics = [
-      runtimeHasCapability(capabilities, C.REQUESTS) ? "talepleri" : "",
-      "müşteri kayıtlarını",
-      runtimeHasCapability(capabilities, C.WHATSAPP) ? "hazır mesajları" : ""
-    ].filter(Boolean);
-    return {
-      label: "Müşteri İşleri",
-      eyebrow: "Müşteri operasyonu",
-      title: "Müşteri İşleri",
-      description: `${topics.join(", ")} tek çalışma alanında yönetin.`
-    };
-  }
+  presentation: { label: "Müşteri İşleri", title: "Müşteri İşleri" }
 } satisfies NavigationContribution;
 
 const calendarContribution = {
@@ -92,23 +65,7 @@ const calendarContribution = {
   order: 75,
   condition: { allOf: [C.CALENDAR] },
   contentScroll: "workspace",
-  presentation: (capabilities) => {
-    const reservationsEnabled = runtimeHasCapability(capabilities, C.ACCOMMODATION_RESERVATIONS)
-      || runtimeHasCapability(capabilities, C.FOOD_RESERVATIONS);
-    const tasksEnabled = runtimeHasCapability(capabilities, C.TASKS);
-    return {
-      label: "Takvim",
-      eyebrow: "Operasyon planı",
-      title: "Takvim",
-      description: reservationsEnabled && tasksEnabled
-        ? "Etkin rezervasyon alanlarını ve günlük işleri gün veya hafta bazında görün."
-        : reservationsEnabled
-          ? "Etkin rezervasyon alanlarını gün veya hafta bazında görün."
-          : tasksEnabled
-            ? "Günlük işleri gün veya hafta bazında görün."
-            : "Etkin takvim alanlarını gün veya hafta bazında görün."
-    };
-  }
+  presentation: { label: "Takvim", title: "Takvim" }
 } satisfies NavigationContribution;
 
 const marketContribution = {
@@ -117,23 +74,7 @@ const marketContribution = {
   order: 50,
   condition: { anyOf: [C.CATALOG, C.SALES, C.ORDERS, C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS] },
   contentScroll: "workspace",
-  presentation: (capabilities) => {
-    const topics = [
-      runtimeHasCapability(capabilities, C.CATALOG) ? "ürünleri" : "",
-      runtimeHasCapability(capabilities, C.INVENTORY) ? "stokları" : "",
-      runtimeHasCapability(capabilities, C.SALES) ? "satışları" : "",
-      runtimeHasCapability(capabilities, C.ORDERS) ? "siparişleri" : "",
-      runtimeHasCapability(capabilities, C.RETAIL_PURCHASING)
-        || runtimeHasCapability(capabilities, C.RETAIL_SUPPLIERS) ? "tedariki" : "",
-      runtimeHasCapability(capabilities, C.RETAIL_LABELS) ? "etiketleri" : ""
-    ].filter(Boolean);
-    return {
-      label: "Satış",
-      eyebrow: "Satış operasyonu",
-      title: "Satış",
-      description: topics.length > 0 ? `${topics.join(", ")} tek çalışma alanında yönetin.` : "Etkin satış ve perakende araçlarını tek çalışma alanında yönetin."
-    };
-  }
+  presentation: { label: "Satış", title: "Satış" }
 } satisfies NavigationContribution;
 
 const menuContribution = {
@@ -142,14 +83,7 @@ const menuContribution = {
   order: 60,
   condition: { allOf: [C.FOOD_MENU] },
   contentScroll: "workspace",
-  presentation: (capabilities) => ({
-    label: "Menü",
-    eyebrow: "İçerik",
-    title: "Menü",
-    description: runtimeHasCapability(capabilities, C.QR_MENU)
-      ? "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın."
-      : "Kategori ve ürünleri yerel menünüz için düzenleyin."
-  })
+  presentation: { label: "Menü", title: "Menü" }
 } satisfies NavigationContribution;
 
 const reportsContribution = {
@@ -160,22 +94,7 @@ const reportsContribution = {
   contentScroll: "workspace",
   presentation: (capabilities) => {
     const financeEnabled = runtimeHasCapability(capabilities, C.FINANCE);
-    const reportsEnabled = runtimeHasCapability(capabilities, C.REPORTS);
-    const accommodationFolioEnabled = runtimeHasCapability(capabilities, C.ACCOMMODATION_FOLIO);
-    return {
-      label: financeEnabled ? "Kasa" : "Raporlar",
-      eyebrow: financeEnabled ? "Günlük para takibi" : "İşletme analizi",
-      title: financeEnabled ? "Kasa" : "Raporlar",
-      description: financeEnabled && reportsEnabled
-        ? (accommodationFolioEnabled
-            ? "Para giriş çıkışını, bekleyen oda alacaklarını ve işletme raporlarını takip edin."
-            : "Para giriş çıkışını ve işletme raporlarını takip edin.")
-        : financeEnabled
-          ? (accommodationFolioEnabled
-              ? "Bugünün para giriş çıkışını ve bekleyen oda alacaklarını takip edin."
-              : "Bugünün para giriş çıkışını takip edin.")
-          : "İşletme operasyonlarının dönemsel sonuçlarını takip edin."
-    };
+    return { label: financeEnabled ? "Kasa" : "Raporlar", title: financeEnabled ? "Kasa" : "Raporlar" };
   }
 } satisfies NavigationContribution;
 
@@ -184,12 +103,7 @@ const settingsContribution = {
   icon: Settings,
   order: 90,
   contentScroll: "workspace",
-  presentation: {
-    label: "Ayarlar",
-    eyebrow: "Yapılandırma",
-    title: "Ayarlar",
-    description: "İşletme, görünüm ve bağlantı tercihlerini düzenleyin."
-  }
+  presentation: { label: "Ayarlar", title: "Ayarlar" }
 } satisfies NavigationContribution;
 
 const navigationContributions = [
@@ -202,7 +116,7 @@ const navigationContributions = [
   {
     pageId: "marketing", icon: Megaphone, order: 64, contentScroll: "workspace",
     condition: { allOf: [C.MARKETING_STUDIO] },
-    presentation: {label: "Pazarlama", eyebrow: "İçerik ve yayınlar", title: "Pazarlama", description: "İçerikleri, kanal varyantlarını, ortak medyayı ve website yayınlarını yönetin."}
+    presentation: {label: "Pazarlama", title: "Pazarlama"}
   },
   campaignNavigationContribution,
   menuContribution,
@@ -242,9 +156,7 @@ export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapability
   if (!contribution) throw new Error(`Navigation contribution is missing for ${page}.`);
   const presentation = resolvePresentation(contribution, capabilities);
   return {
-    eyebrow: presentation.eyebrow,
-    title: presentation.title,
-    description: presentation.description
+    title: presentation.title
   };
 }
 
