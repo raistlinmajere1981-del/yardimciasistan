@@ -337,13 +337,12 @@ export function markLocalRequestsSynced(db: DatabaseSync, requestIds: string[]) 
     return;
   }
 
-  const statement = db.prepare("UPDATE requests SET sync_status = 'synced', updated_at = ? WHERE id = ?");
-  const now = new Date().toISOString();
+  const statement = db.prepare("UPDATE requests SET sync_status = 'synced' WHERE id = ? AND sync_status != 'local_only'");
 
   db.exec("BEGIN");
   try {
     for (const id of requestIds) {
-      statement.run(now, id);
+      statement.run(id);
     }
     db.exec("COMMIT");
   } catch (error) {

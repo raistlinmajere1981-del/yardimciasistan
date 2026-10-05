@@ -131,13 +131,10 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
     return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
   }
-  if (hasStoredOverlappingCustomerRoomStay(db, roomId, checkInDate, checkOutDate)) {
-    return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
-  }
-  const reservationConflict = findStoredConflictingRoomReservation(db, roomId, customerId, checkInDate, checkOutDate, reservationId || undefined);
-  if (reservationConflict) {
-    return { ok: false, message: `Oda bu tarihlerde ${reservationConflict} rezervasyonuna bağlı.` };
-  }
+  const dateValidation = validateStayDatesInTransaction(db, {
+    roomId, customerId, checkInDate, checkOutDate, reservationId: reservationId || undefined
+  });
+  if (!dateValidation.ok) return dateValidation;
 
   const id = createId("stay_");
   const now = new Date().toISOString();
@@ -199,6 +196,41 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
       : `${String(customer.full_name ?? "Müşteri")} ${roomLabel ? `· ${roomLabel}` : ""} oda planına eklendi.`,
     savedId: id
   };
+}
+
+function validateStayDatesInTransaction(db: DatabaseSync, input: {
+  roomId: string; customerId: string; checkInDate: string; checkOutDate: string;
+  stayId?: string; reservationId?: string;
+}): { ok: true } | { ok: false; message: string } {
+  if (!input.checkInDate || (input.checkOutDate && input.checkOutDate < input.checkInDate)) {
+    return { ok: false, message: "Konaklama tarihleri geçersiz." };
+  }
+  if (hasStoredOverlappingCustomerRoomStay(db, input.roomId, input.checkInDate, input.checkOutDate, input.stayId)) {
+    return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
+  }
+  const conflict = findStoredConflictingRoomReservation(db, input.roomId, input.customerId,
+    input.checkInDate, input.checkOutDate, input.reservationId);
+  return conflict ? { ok: false, message: `Oda bu tarihlerde ${conflict} rezervasyonuna bağlı.` } : { ok: true };
+}
+
+/** Caller owns the transaction, including any financial details coordinated with these dates. */
+export function updateStayDatesInTransaction(db: DatabaseSync, input: {
+  stayId: string; checkInDate: string; checkOutDate: string; now: string;
+}): { ok: true } | { ok: false; message: string } {
+  const stay = db.prepare("SELECT room_id, customer_id, reservation_id FROM customer_room_stays WHERE id = ? AND deleted_at = ''")
+    .get(input.stayId) as { room_id: string; customer_id: string; reservation_id: string } | undefined;
+  if (!stay) return { ok: false, message: "Konaklama kaydı bulunamadı." };
+  const checkInDate = normalizeDateInput(input.checkInDate);
+  const checkOutDate = normalizeDateInput(input.checkOutDate);
+  if (input.checkOutDate && !checkOutDate) return { ok: false, message: "Konaklama tarihleri geçersiz." };
+  const validation = validateStayDatesInTransaction(db, {
+    roomId: stay.room_id, customerId: stay.customer_id, reservationId: stay.reservation_id,
+    stayId: input.stayId, checkInDate, checkOutDate
+  });
+  if (!validation.ok) return validation;
+  db.prepare("UPDATE customer_room_stays SET check_in_date = ?, check_out_date = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+    .run(checkInDate, checkOutDate, input.now, input.stayId);
+  return { ok: true };
 }
 
 export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCustomerRoomStayStatusInput): { ok: true; message: string; savedId: string } | { ok: false; message: string } {

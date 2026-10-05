@@ -655,7 +655,7 @@ export type MenuStockMovementType =
   | "order_remove"
   | "order_cancel";
 
-export type MenuStockSourceType = "desktop" | "android" | "table_order" | "stock_image_import";
+export type MenuStockSourceType = "desktop" | "android" | "table_order" | "room_folio" | "stock_image_import";
 
 export interface DesktopMenuStockMovement {
   id: string;

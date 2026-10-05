@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
 import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
+import { mutateMenuStockInTransaction } from "./database/menu-stock-store.js";
+import { updateStayDatesInTransaction } from "./stay-reservation-service.js";
 
 export type RoomFolioPaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
 type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
@@ -303,7 +305,12 @@ export class DesktopRoomFolioService {
 
     const db = connection ?? this.openDatabase();
     let folioId = "";
+    let authoritySavepoint = false;
     try {
+      // Deposit snapshot and authority handoff must share one SQLite snapshot,
+      // including when check-in already owns the surrounding transaction.
+      db.exec("SAVEPOINT folio_open");
+      authoritySavepoint = true;
       const existing = db.prepare(`
         SELECT id, status FROM room_folios WHERE stay_id = ? AND deleted_at = ''
       `).get(stayId) as { id?: string; status: string } | undefined;
@@ -353,61 +360,58 @@ export class DesktopRoomFolioService {
       const now = new Date().toISOString();
       folioId = `room_folio_${randomUUID()}`;
 
-      db.exec("SAVEPOINT folio_open");
-      try {
+      db.prepare(`
+        INSERT INTO room_folios (
+          id, stay_id, room_id, customer_id, reservation_id, status, guest_count,
+          check_in_date, planned_check_out_date, nightly_price_minor, currency,
+          lodging_total_minor, lodging_manual_override, opened_at, closed_at, note,
+          created_at, updated_at, deleted_at, sync_status
+        ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, '', 'local_only')
+      `).run(
+        folioId,
+        stayId,
+        text(stay.room_id),
+        text(stay.customer_id),
+        text(stay.reservation_id),
+        clampGuestCount(stay.guest_count),
+        checkInDate,
+        checkOutDate,
+        nightlyPriceMinor,
+        normalizeCurrency(stay.price_currency),
+        lodgingTotalMinor,
+        lodgingManualOverride,
+        now,
+        now,
+        now
+      );
+
+      for (const payment of reservationPayments) {
         db.prepare(`
-          INSERT INTO room_folios (
-            id, stay_id, room_id, customer_id, reservation_id, status, guest_count,
-            check_in_date, planned_check_out_date, nightly_price_minor, currency,
-            lodging_total_minor, lodging_manual_override, opened_at, closed_at, note,
-            created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, '', 'local_only')
+          INSERT OR IGNORE INTO room_folio_payments (
+            id, folio_id, amount_minor, currency, payment_method, paid_at, note,
+            origin, reference_id, created_at, updated_at, deleted_at, sync_status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reservation', ?, ?, ?, '', 'local_only')
         `).run(
+          `room_folio_reservation_${text(payment.id)}`,
           folioId,
-          stayId,
-          text(stay.room_id),
-          text(stay.customer_id),
-          text(stay.reservation_id),
-          clampGuestCount(stay.guest_count),
-          checkInDate,
-          checkOutDate,
-          nightlyPriceMinor,
-          normalizeCurrency(stay.price_currency),
-          lodgingTotalMinor,
-          lodgingManualOverride,
-          now,
-          now,
-          now
+          safeMinor(payment.amount_minor),
+          normalizeCurrency(payment.currency),
+          normalizePaymentMethod(payment.payment_method),
+          normalizeTimestamp(payment.paid_at) || now,
+          cleanText(payment.note, 500),
+          text(payment.id),
+          normalizeTimestamp(payment.created_at) || now,
+          normalizeTimestamp(payment.updated_at) || now
         );
-
-        for (const payment of reservationPayments) {
-          db.prepare(`
-            INSERT OR IGNORE INTO room_folio_payments (
-              id, folio_id, amount_minor, currency, payment_method, paid_at, note,
-              origin, reference_id, created_at, updated_at, deleted_at, sync_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reservation', ?, ?, ?, '', 'local_only')
-          `).run(
-            `room_folio_reservation_${text(payment.id)}`,
-            folioId,
-            safeMinor(payment.amount_minor),
-            normalizeCurrency(payment.currency),
-            normalizePaymentMethod(payment.payment_method),
-            normalizeTimestamp(payment.paid_at) || now,
-            cleanText(payment.note, 500),
-            text(payment.id),
-            normalizeTimestamp(payment.created_at) || now,
-            normalizeTimestamp(payment.updated_at) || now
-          );
-        }
-
-        db.exec("RELEASE folio_open");
-      } catch (error) {
-        db.exec("ROLLBACK TO folio_open; RELEASE folio_open");
-        throw error;
       }
+
+      db.exec("RELEASE folio_open");
+      authoritySavepoint = false;
     } catch (error) {
+      if (authoritySavepoint) db.exec("ROLLBACK TO folio_open");
       return { ok: false, message: friendlyDatabaseError(error, "Oda adisyonu açılamadı.") };
     } finally {
+      if (authoritySavepoint) db.exec("RELEASE folio_open");
       if (!connection) db.close();
     }
 
@@ -444,6 +448,13 @@ export class DesktopRoomFolioService {
       const now = new Date().toISOString();
       db.exec("BEGIN");
       try {
+        const dates = updateStayDatesInTransaction(db, {
+          stayId: text(current.stay_id), checkInDate, checkOutDate, now
+        });
+        if (!dates.ok) {
+          db.exec("ROLLBACK");
+          return dates;
+        }
         db.prepare(`
           UPDATE room_folios
           SET guest_count = ?, check_in_date = ?, planned_check_out_date = ?,
@@ -451,11 +462,6 @@ export class DesktopRoomFolioService {
               updated_at = ?, sync_status = 'local_only'
           WHERE id = ?
         `).run(guestCount, checkInDate, checkOutDate, nightlyPriceMinor, requestedTotal, manualOverride ? 1 : 0, now, folioId);
-        db.prepare(`
-          UPDATE customer_room_stays
-          SET guest_count = ?, check_in_date = ?, check_out_date = ?, updated_at = ?, sync_status = 'local_only'
-          WHERE id = ?
-        `).run(guestCount, checkInDate, checkOutDate, now, text(current.stay_id));
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
@@ -489,7 +495,7 @@ export class DesktopRoomFolioService {
 
       db.exec("BEGIN");
       try {
-        this.applyMenuStockDelta(db, menu, quantity, "order_add", itemId, now);
+        this.applyMenuStockDelta(db, menu, quantity, "order_add", folioId, now);
         db.prepare(`
           INSERT INTO room_folio_items (
             id, folio_id, kind, menu_item_id, label, unit_price_minor, quantity,
@@ -538,7 +544,7 @@ export class DesktopRoomFolioService {
       db.exec("BEGIN");
       try {
         if (quantityDelta !== 0) {
-          this.applyMenuStockDelta(db, menu, quantityDelta, "order_update", itemId, now);
+          this.applyMenuStockDelta(db, menu, quantityDelta, "order_update", folioId, now);
         }
         db.prepare(`
           UPDATE room_folio_items
@@ -688,7 +694,7 @@ export class DesktopRoomFolioService {
         if (text(item.kind) === "menu" && text(item.menu_item_id)) {
           const menu = this.getMenuStockRow(db, text(item.menu_item_id));
           if (menu) {
-            this.applyMenuStockDelta(db, menu, -Math.max(1, Number(item.quantity) || 1), "order_remove", itemId, now);
+            this.applyMenuStockDelta(db, menu, -Math.max(1, Number(item.quantity) || 1), "order_remove", folioId, now);
           }
         }
         db.prepare(`
@@ -873,34 +879,12 @@ export class DesktopRoomFolioService {
     now: string
   ) {
     if (!isInventoryTrackingEnabled(db)) return;
-    if (menu.stock_quantity === null || menu.stock_quantity === undefined) return;
-    const before = Math.max(0, Number(menu.stock_quantity) || 0);
-    const consumptionPerUnit = Math.max(0.000001, Number(menu.stock_consumption_quantity) || 1);
-    const consumedDelta = quantityDelta * consumptionPerUnit;
-    const after = before - consumedDelta;
-    if (after < -0.000001) {
-      throw new Error("room_folio_stock_insufficient");
-    }
-    const safeAfter = Math.max(0, after);
-    db.prepare(`
-      UPDATE menu_items SET stock_quantity = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?
-    `).run(safeAfter, now, text(menu.id));
-    db.prepare(`
-      INSERT INTO menu_stock_movements (
-        id, menu_item_id, type, quantity_change, quantity_before, quantity_after,
-        source_type, source_id, actor_device_id, note, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'table_order', ?, '', 'Oda adisyonu', ?)
-    `).run(
-      `stock_room_folio_${randomUUID()}`,
-      text(menu.id),
-      movementType,
-      -consumedDelta,
-      before,
-      safeAfter,
-      sourceId,
-      now
-    );
-    menu.stock_quantity = safeAfter;
+    const result = mutateMenuStockInTransaction(db, {
+      menuItemId: text(menu.id), type: movementType, quantityChange: -quantityDelta,
+      sourceType: "room_folio", sourceId, actorSource: "desktop", actorDeviceId: "",
+      note: "Oda adisyonu", now
+    });
+    if (!result.ok) throw new Error(result.message);
   }
 
   private openDatabase() {
@@ -1064,7 +1048,7 @@ function text(value: unknown): string {
 
 function friendlyDatabaseError(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  if (message.includes("room_folio_stock_insufficient")) return "Bu ürün için yeterli stok yok.";
+  if (message === "Bu ürün stokta yeterli değil.") return "Bu ürün için yeterli stok yok.";
   if (message.includes("room_folio_payment_exceeds_remaining")) return "Ödeme kalan tutardan büyük olamaz.";
   if (message.includes("room_folio_total_required")) return "Ödeme almadan önce oda hesabında bir tutar olmalı.";
   return fallback;

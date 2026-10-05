@@ -462,10 +462,6 @@ export function upsertSyncedRequests(
       sync_status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
-      customer_id = excluded.customer_id,
-      source = excluded.source,
-      request_type = excluded.request_type,
-      status = excluded.status,
       customer_name = excluded.customer_name,
       customer_phone = excluded.customer_phone,
       date_text = excluded.date_text,
@@ -475,20 +471,19 @@ export function upsertSyncedRequests(
       guest_count = excluded.guest_count,
       adult_count = excluded.adult_count,
       child_count = excluded.child_count,
-      message = excluded.message,
-      ai_summary = excluded.ai_summary,
-      ai_suggested_reply = excluded.ai_suggested_reply,
-      whatsapp_message = excluded.whatsapp_message,
-      assigned_to = excluded.assigned_to,
-      priority = excluded.priority,
-      updated_at = excluded.updated_at,
-      sync_status = excluded.sync_status
+      message = excluded.message
+    WHERE requests.deleted_at = '' AND requests.source = excluded.source
   `);
 
   db.exec("BEGIN");
   try {
     for (const request of requests) {
-      const customerId = ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
+      // Web owns ingress facts; identity and post-import operator/AI decisions
+      // (including customer linkage, summary, drafts and updated_at) stay local.
+      // Replay must not recreate a deleted/detached customer either.
+      const existing = db.prepare("SELECT customer_id FROM requests WHERE id = ?").get(request.id) as { customer_id: string } | undefined;
+      const customerId = existing ? existing.customer_id
+        : ensureCustomerForRequest(db, request as unknown as Record<string, unknown>, new Date().toISOString());
       statement.run(
         request.id,
         customerId,

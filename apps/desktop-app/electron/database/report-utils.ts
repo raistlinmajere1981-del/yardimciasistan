@@ -139,6 +139,7 @@ export function formatLocalIsoDate(value: Date): string {
 }
 
 export function reportStockSourceLabel(sourceType: MenuStockSourceType): string {
+  if (sourceType === "room_folio") return "Oda hesabı";
   if (sourceType === "android") {
     return "Android manuel";
   }

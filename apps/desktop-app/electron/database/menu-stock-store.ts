@@ -222,7 +222,7 @@ export function mutateMenuStockInTransaction(db: DatabaseSync, input: {
 
   const storedQuantity = nullableNumber(item.stock_quantity);
   if (storedQuantity === null && !input.allowStartTracking) {
-    if (input.sourceType === "table_order") {
+    if (input.sourceType === "table_order" || input.sourceType === "room_folio") {
       return {
         ok: true,
         message: "Ürün stok takibinde değil.",

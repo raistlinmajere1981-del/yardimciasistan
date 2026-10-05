@@ -99,65 +99,72 @@ export function saveBusinessPublicProfile(
 
     const now = new Date().toISOString();
     const profile = normalized.profile;
-    db.prepare(`
-      INSERT INTO business_public_profile (
-        business_id, map_display_mode, google_maps_embed_url, description, latitude, longitude, directions_note,
-        check_in_time, check_out_time, breakfast_start_time, breakfast_end_time,
-        features_json, policy_note, payment_note, languages_json,
-        created_at, updated_at, sync_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
-      ON CONFLICT(business_id) DO UPDATE SET
-        map_display_mode = excluded.map_display_mode,
-        google_maps_embed_url = excluded.google_maps_embed_url,
-        description = excluded.description,
-        latitude = excluded.latitude,
-        longitude = excluded.longitude,
-        directions_note = excluded.directions_note,
-        check_in_time = excluded.check_in_time,
-        check_out_time = excluded.check_out_time,
-        breakfast_start_time = excluded.breakfast_start_time,
-        breakfast_end_time = excluded.breakfast_end_time,
-        features_json = excluded.features_json,
-        policy_note = excluded.policy_note,
-        payment_note = excluded.payment_note,
-        languages_json = excluded.languages_json,
-        updated_at = excluded.updated_at,
-        sync_status = 'local_only'
-    `).run(
-      businessId,
-      profile.mapDisplayMode,
-      profile.googleMapsEmbedUrl,
-      profile.description,
-      profile.latitude,
-      profile.longitude,
-      profile.directionsNote,
-      profile.checkInTime,
-      profile.checkOutTime,
-      profile.breakfastStartTime,
-      profile.breakfastEndTime,
-      JSON.stringify(profile.features),
-      profile.policyNote,
-      profile.paymentNote,
-      JSON.stringify(profile.languages),
-      now,
-      now
-    );
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare(`
+        INSERT INTO business_public_profile (
+          business_id, map_display_mode, google_maps_embed_url, description, latitude, longitude, directions_note,
+          check_in_time, check_out_time, breakfast_start_time, breakfast_end_time,
+          features_json, policy_note, payment_note, languages_json,
+          created_at, updated_at, sync_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
+        ON CONFLICT(business_id) DO UPDATE SET
+          map_display_mode = excluded.map_display_mode,
+          google_maps_embed_url = excluded.google_maps_embed_url,
+          description = excluded.description,
+          latitude = excluded.latitude,
+          longitude = excluded.longitude,
+          directions_note = excluded.directions_note,
+          check_in_time = excluded.check_in_time,
+          check_out_time = excluded.check_out_time,
+          breakfast_start_time = excluded.breakfast_start_time,
+          breakfast_end_time = excluded.breakfast_end_time,
+          features_json = excluded.features_json,
+          policy_note = excluded.policy_note,
+          payment_note = excluded.payment_note,
+          languages_json = excluded.languages_json,
+          updated_at = excluded.updated_at,
+          sync_status = 'local_only'
+      `).run(
+        businessId,
+        profile.mapDisplayMode,
+        profile.googleMapsEmbedUrl,
+        profile.description,
+        profile.latitude,
+        profile.longitude,
+        profile.directionsNote,
+        profile.checkInTime,
+        profile.checkOutTime,
+        profile.breakfastStartTime,
+        profile.breakfastEndTime,
+        JSON.stringify(profile.features),
+        profile.policyNote,
+        profile.paymentNote,
+        JSON.stringify(profile.languages),
+        now,
+        now
+      );
 
-    db.prepare(`
-      INSERT INTO business_public_social_links (
-        business_id, links_json, created_at, updated_at, sync_status
-      ) VALUES (?, ?, ?, ?, 'local_only')
-      ON CONFLICT(business_id) DO UPDATE SET
-        links_json = excluded.links_json,
-        updated_at = excluded.updated_at,
-        sync_status = 'local_only'
-    `).run(
-      businessId,
-      JSON.stringify(profile.socialLinks),
-      now,
-      now
-    );
+      db.prepare(`
+        INSERT INTO business_public_social_links (
+          business_id, links_json, created_at, updated_at, sync_status
+        ) VALUES (?, ?, ?, ?, 'local_only')
+        ON CONFLICT(business_id) DO UPDATE SET
+          links_json = excluded.links_json,
+          updated_at = excluded.updated_at,
+          sync_status = 'local_only'
+      `).run(
+        businessId,
+        JSON.stringify(profile.socialLinks),
+        now,
+        now
+      );
 
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
     return { ok: true, message: "Müşteriye açık işletme bilgileri kaydedildi.", profile };
   } catch {
     return { ok: false, message: "Müşteriye açık işletme bilgileri kaydedilemedi." };

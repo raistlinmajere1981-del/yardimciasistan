@@ -481,7 +481,10 @@ export class DesktopFinanceService {
         now,
         now
       );
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("reservation_payment_authority_transferred")) {
+        return { ok: false, message: "Bu rezervasyonun ödeme hesabı açılmış. Tahsilatı oda hesabından yapın." };
+      }
       return { ok: false, message: "Pansiyon ödemesi kaydedilemedi." };
     } finally {
       db.close();

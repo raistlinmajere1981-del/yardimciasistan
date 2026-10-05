@@ -594,7 +594,7 @@ CREATE TABLE "menu_stock_movements" (
   quantity_before REAL NOT NULL CHECK (quantity_before >= 0),
   quantity_after REAL NOT NULL CHECK (quantity_after >= 0),
   source_type TEXT NOT NULL CHECK (source_type IN (
-    'desktop', 'android', 'table_order', 'stock_image_import'
+    'desktop', 'android', 'table_order', 'room_folio', 'stock_image_import'
   )),
   source_id TEXT NULL,
   actor_source TEXT NOT NULL CHECK (actor_source IN ('desktop', 'android')),
@@ -1718,6 +1718,12 @@ BEFORE INSERT ON pension_payments
 WHEN NEW.deleted_at = ''
 BEGIN
   SELECT CASE
+    WHEN EXISTS (
+      SELECT 1 FROM room_folios f
+      JOIN customer_room_stays s ON s.id = f.stay_id
+      WHERE f.deleted_at = ''
+        AND (f.reservation_id = NEW.reservation_id OR s.reservation_id = NEW.reservation_id)
+    ) THEN RAISE(ABORT, 'reservation_payment_authority_transferred')
     WHEN COALESCE((
       SELECT agreed_total_minor
       FROM reservations
