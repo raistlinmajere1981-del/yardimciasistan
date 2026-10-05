@@ -15,6 +15,16 @@ export class MarketingMediaService {
     const root=path.resolve(this.userDataPath(),"assets","marketing"),file=path.resolve(root,asset.storageRef);
     if (!file.startsWith(root+path.sep)) throw new MarketingError("invalid_media","Görsel yolu geçersiz."); return file;
   }
+  instagramJpeg(id: string): Buffer {
+    const asset = this.database().getMediaAsset(id), ratio = asset.width / asset.height;
+    if (ratio < 0.8 || ratio > 1.91) throw new MarketingError("instagram_image_ratio", "Instagram görsel oranı 4:5 ile 1.91:1 arasında olmalı.");
+    let image = nativeImage.createFromPath(this.absolutePath(asset));
+    if (image.isEmpty()) throw new MarketingError("invalid_media", "Görsel okunamadı.");
+    if (asset.width < 320 || asset.width > 1440) image = image.resize({ width: Math.min(1440, Math.max(320, asset.width)), quality: "best" });
+    const bytes = image.toJPEG(90);
+    if (!bytes.length || bytes.length > 8 * 1024 * 1024) throw new MarketingError("invalid_media", "Instagram görseli en fazla 8 MB olabilir.");
+    return bytes;
+  }
   view(asset: MediaAsset): MarketingAssetView {
     const {storageRef:_storage,contentHash:_hash,...publicAsset}=asset;
     let previewUrl="";

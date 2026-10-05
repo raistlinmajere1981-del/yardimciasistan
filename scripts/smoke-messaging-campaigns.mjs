@@ -66,7 +66,8 @@ try {
   const missingCompany = service.createCampaign(campaignInput(all.id, { bindings: [[{ type: 'customer_field', field: 'commercial.companyName' }]] }));
   await assert.rejects(service.prepareCampaign(missingCompany.id), failCode('invalid_input'));
   assert.equal(count('messaging_campaign_recipients', missingCompany.id), 0); assert.equal(count('messaging_outbox', missingCompany.id), 0);
-  const badChannel = service.createCampaign(campaignInput(all.id, { channel: 'sms' }));
+  assert.throws(()=>service.createCampaign(campaignInput(all.id,{channel:'sms'})),failCode('invalid_provider'));
+  const badChannel = service.createCampaign(campaignInput(all.id, { channel: 'sms', providerId:'iletimerkezi',templateName:'',templateLanguage:'',bindings:[],text:'SMS taslağı' }));
   await assert.rejects(service.prepareCampaign(badChannel.id), /unavailable/);
   const noProvider = service.createCampaign(campaignInput(all.id, { providerId: undefined }));
   await assert.rejects(service.prepareCampaign(noProvider.id), failCode('missing_provider'));

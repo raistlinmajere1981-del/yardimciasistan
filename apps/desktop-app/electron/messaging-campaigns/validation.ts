@@ -30,18 +30,21 @@ export function validateSegmentFilter(value: unknown): MessagingSegmentFilter {
   return value as unknown as MessagingSegmentFilter;
 }
 export function validateCampaignInput(value: MessagingCampaignInput): MessagingCampaignInput {
-  if (!object(value) || !keys(value, ["name", "purpose", "channel", "providerId", "segmentId", "templateName", "templateLanguage", "bindings"]) || value.purpose !== "marketing") invalid("invalid_campaign", "Yalnız pazarlama kampanyası destekleniyor.");
+  if (!object(value) || !keys(value, ["name", "purpose", "channel", "providerId", "segmentId", "templateName", "templateLanguage", "bindings", "contentId", "contentRevision", "text"]) || value.purpose !== "marketing") invalid("invalid_campaign", "Yalnız pazarlama kampanyası destekleniyor.");
   validateChannel(value.channel);
-  if (value.providerId !== undefined && value.providerId !== "whatsapp_cloud") invalid("invalid_provider", "Sağlayıcı desteklenmiyor.");
+  if (value.providerId !== undefined && value.providerId !== (value.channel === "sms" ? "iletimerkezi" : "whatsapp_cloud")) invalid("invalid_provider", "Sağlayıcı desteklenmiyor.");
   if (!Array.isArray(value.bindings) || value.bindings.length > 10 || value.bindings.some((group) => !Array.isArray(group) || group.length > 30)) invalid("invalid_bindings", "Şablon bağlantıları geçersiz.");
   for (const binding of value.bindings.flat()) {
     if (!object(binding)) invalid("invalid_bindings", "Şablon bağlantısı geçersiz.");
     if (binding.type === "static_text" && keys(binding, ["type", "value"])) boundedText(binding.value, 2000, true);
     else if (!(binding.type === "customer_field" && keys(binding, ["type", "field"]) && ["customer.fullName", "commercial.companyName"].includes(String(binding.field)))) invalid("invalid_bindings", "Şablon bağlantısı desteklenmiyor.");
   }
-  return { name: boundedText(value.name, 120, true), purpose: "marketing", channel: value.channel, providerId: value.providerId,
-    segmentId: boundedText(value.segmentId, 100, true), templateName: boundedText(value.templateName, 512, true),
-    templateLanguage: boundedText(value.templateLanguage, 40, true), bindings: value.bindings };
+  const smsText = value.channel === "sms" ? validateSmsText(value.text) : undefined;
+  if (value.channel === "sms" && (value.bindings.length || value.templateName || value.templateLanguage)) invalid("invalid_campaign", "SMS yalnız düz metin kullanır.");
+  if (value.contentId !== undefined) { boundedText(value.contentId, 100, true); if (!Number.isSafeInteger(value.contentRevision) || value.contentRevision! < 1) invalid("invalid_campaign", "İçerik sürümü geçersiz."); }
+  return { contentId: value.contentId, contentRevision: value.contentRevision, ...(smsText ? { text: smsText } : {}), name: boundedText(value.name, 120, true), purpose: "marketing", channel: value.channel, providerId: value.providerId,
+    segmentId: boundedText(value.segmentId, 100, true), templateName: boundedText(value.templateName, 512, value.channel === "whatsapp"),
+    templateLanguage: boundedText(value.templateLanguage, 40, value.channel === "whatsapp"), bindings: value.bindings };
 }
 export function validateCampaignTemplate(input: MessagingCampaignInput, template: BusinessMessageTemplate) {
   if (!template || template.status !== "APPROVED" || template.name !== input.templateName || template.language !== input.templateLanguage) invalid("missing_template", "Onaylı şablon artık kullanılamıyor.");
@@ -51,4 +54,10 @@ export function validateCampaignTemplate(input: MessagingCampaignInput, template
 export function resolveCampaignBindings(bindings: MessagingTemplateBinding[][], customer: { fullName: string; companyName: string }): string[][] {
   return bindings.map((group) => group.map((binding) => boundedText(binding.type === "static_text" ? binding.value
     : binding.field === "customer.fullName" ? customer.fullName : customer.companyName, 2000, true)));
+}
+
+export function validateSmsText(value: unknown): string {
+  const text = boundedText(value, 160, true);
+  if (/<\/?[A-Za-z][^>]*>/.test(text)) invalid("invalid_sms_text", "SMS HTML içeremez.");
+  return text;
 }

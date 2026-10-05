@@ -1,4 +1,7 @@
 const SMOKE_FILES = [
+  "scripts/smoke-marketing-multichannel.mjs",
+  "scripts/smoke-marketing-multichannel-ui.mjs",
+  "scripts/smoke-instagram-staging.mjs",
   "scripts/smoke-showcase-website.mjs",
   "scripts/smoke-marketing-media-native.mjs",
   "scripts/smoke-marketing-studio.mjs",
@@ -450,6 +453,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-instagram-staging.mjs") return ["php-lint"];
   if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-business-messaging-hosting.mjs" || file === "scripts/smoke-business-messaging-webhook.php") return ["php-lint"];
   if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "php-lint"];
@@ -467,7 +471,7 @@ function smokeRequires(file) {
 function smokeDomains(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   const domains = new Set();
-  if (/marketing-|showcase-/.test(name)) domains.add("marketing");
+  if (/marketing-|showcase-|instagram-/.test(name)) domains.add("marketing");
   if (/messaging-dispatch/.test(name)) { domains.add("messaging-dispatch"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
   if (/messaging-campaigns/.test(name)) { domains.add("messaging-campaigns"); domains.add("business-messaging"); domains.add("customers"); domains.add("platform"); }
   if (/dealer-access|dealer-portal|wholesale-customer-ui\.mjs/.test(file)) domains.add("dealer-access");

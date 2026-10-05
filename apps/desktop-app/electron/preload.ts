@@ -1,4 +1,4 @@
-import type { BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge } from "@yardimci-asistan/shared";
+import type { BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
   KbsConnectionTestResult,
@@ -191,7 +191,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge {
+export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge, MarketingProviderBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
@@ -390,6 +390,11 @@ async function invokeCommerceMutation<T>(channel: string, ...args: unknown[]): P
 }
 
 const bridge: DesktopBridge = {
+  getSmsConfiguration: () => invokeWhenUnlocked("marketingProviders:smsConfiguration"),
+  getInstagramConfiguration: () => invokeWhenUnlocked("marketingProviders:instagramConfiguration"),
+  testSmsConnection: (input) => invokeWhenUnlocked("marketingProviders:testSms", input),
+  listSmsSenderIds: (input) => invokeWhenUnlocked("marketingProviders:smsSenders", input),
+  testInstagramConnection: (input) => invokeWhenUnlocked("marketingProviders:testInstagram", input),
   getMarketingChannels: () => invokeWhenUnlocked("marketing:channels"),
   getMarketingStudio: () => invokeWhenUnlocked("marketing:studio"),
   saveMarketingContent: (input) => invokeWhenUnlocked("marketing:saveContent", input),

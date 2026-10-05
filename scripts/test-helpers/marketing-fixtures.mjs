@@ -26,7 +26,7 @@ export function marketingFixture({ enabled = true, ai = false } = {}) {
     const compiled=new URL(file,base), localRequire=createRequire(compiled), exports={};cache.set(file,exports);
     runInNewContext(readFileSync(compiled,'utf8'),{exports,Buffer,Error,URL,process,setTimeout,clearTimeout,Uint8Array,AbortController,fetch:fetchImpl,
       require:(name)=>name==='electron'?{nativeImage:{createFromBuffer:fakeImage,createFromPath:file=>fakeImage(readFileSync(file))},dialog:{showOpenDialog:async()=>({canceled:!state.selected.length,filePaths:state.selected})}}
-        :name==='../desktop-logger'?{desktopLog:{info:event=>logs.push(event)}}
+        :name==='../desktop-logger'?{desktopLog:{info:event=>logs.push(event),warn:event=>logs.push(event),error:event=>logs.push(event)}}
         :name==='../ai-secret-service'?{getEffectiveAiApiKey:()=>state.unavailable?'':'fixture_key'}
         :name==='@yardimci-asistan/ai-core'?{...aiCore,generateConfiguredChat:(config)=>aiCore.generateConfiguredChat(config,fetchImpl),generateConfiguredImage:(...args)=>aiCore.generateConfiguredImage(...args,fetchImpl)}
         :name.startsWith('./')?load(name.slice(2)+'.js'):localRequire(name)});
@@ -40,5 +40,5 @@ export function marketingFixture({ enabled = true, ai = false } = {}) {
   const service=new (load('service.js').MarketingStudioService)(()=>foundation.db,media,()=>{schedules++;});
   const publisher=new (load('website-publication.js').MarketingWebsitePublicationService)(()=>foundation.db,media);
   const uploadPath=join(foundation.db.userDataPath,'upload.png');writeFileSync(uploadPath,imageBytes);
-  return {...foundation,service,media,publisher,logs,calls,state,load,uploadPath,get schedules(){return schedules;}};
+  return {...foundation,get db(){return foundation.db;},service,media,publisher,logs,calls,state,load,uploadPath,get schedules(){return schedules;}};
 }

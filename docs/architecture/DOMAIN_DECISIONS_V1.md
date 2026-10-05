@@ -1010,7 +1010,9 @@ saved gpt-image model); Gemini/custom image support requires a matching saved im
 model. Other profiles remain safely unavailable for image generation until an adapter
 exists. This is a capability assertion, not proof of provider account quota/permission.
 
-## D-039 — Known website navigation and demo showcase (D4.1)
+## D-038.1 — Known website navigation and demo showcase (D4.1)
+
+Numbering note: this D4.1 entry was originally D-039 at baseline `2243e368`. Its accepted behavior is preserved; D-039 now names the explicitly requested D5 decision.
 
 **Status:** Accepted. **Scope:** Website page visibility/order; personal Alwaysdata showcase.
 
@@ -1027,3 +1029,94 @@ Alwaysdata root is a personal showcase/workspace, not a real customer website. O
 and installation PHP surfaces may read and display that installation's configured sync secret.
 The rendering helper stays in test-site/landing; customer packages and BlackSea never include it.
 Business operations, marketing D4 contracts and existing catalog/store routes remain unchanged.
+
+
+## D-039 — Multi-channel Marketing Publishing (D5)
+
+**Status:** Accepted. **Scope:** Website, WhatsApp Cloud, İleti Merkezi SMS and Instagram Login single-image publishing.
+
+Channel identity (`website`, `whatsapp`, `sms`, `instagram`) remains independent of
+transport provider (`website`, `whatsapp_cloud`, `iletimerkezi`, `instagram_api`). The
+static typed MarketingChannelRegistry reports family, service availability, media bounds,
+audience/consent requirements and actual publish/edit/unpublish/test capabilities.
+
+Two families have distinct authoritative entities:
+
+- **Audience delivery:** WhatsApp and SMS reuse D-036 Campaign/Segment/Recipient/Consent
+  and D-037 Outbox/BusinessMessage. The Studio links content ID/revision to a canonical
+  campaign draft and opens the existing Campaign editor. Preparation freezes membership;
+  only an explicit Start/Resume starts the existing controlled worker.
+- **Public publishing:** Website keeps D-038 revision/sync acknowledgement ownership.
+  Instagram uses one canonical MarketingPublication plus provider-specific container and
+  submission state. No audience campaign or provider-specific message/publication copy is created.
+
+WhatsApp's editorial/AI variant is a reference draft. Arbitrary free text never becomes
+a Cloud marketing send: approved template catalog, supported binding contract, canonical
+Customer and current WhatsApp marketing consent remain authoritative D1–D3 checks.
+
+SMS uses the same customer/channel/purpose preference resource, independently from
+WhatsApp. Default `unknown` and `opted_out` block preparation and final submission.
+Eligibility uses current non-deleted business Customer and current usable phone. SMS text
+is an immutable, validated campaign snapshot (first version: 160 characters, plain text,
+no HTML/images). Studio-linked text must equal the saved SMS variant at the cited revision.
+Recipient lists are never sent during preview/preparation. The adapter receives one
+current recipient only after the D3 lease, consent guard and durable submission fence commit.
+No second message table or dispatch scheduler is introduced.
+
+İleti Merkezi HTTP/JSON is isolated in IletiMerkeziSmsProviderAdapter. Connection test
+uses side-effect-free `get-balance` and `get-sender`. Successful sends retain the order ID
+in canonical BusinessMessage.providerMessageId; `getDeliveryReport` normalizes single
+recipient order status. API key/hash use main-process safeStorage with insecure Linux
+`basic_text` rejected. Settings reads expose only presence flags; sender is non-secret.
+Marketing requests always use `iys="1"` plus the explicitly selected BIREYSEL/TACIR list.
+Provider İYS errors normalize to `iys_rejected`; they never overwrite local consent.
+Operator/opt-out suffixes remain provider-owned. Full İYS reconciliation is deferred.
+
+Instagram uses Modern Meta Instagram API with Instagram Login on `graph.instagram.com`,
+professional Business/Creator accounts and `instagram_business_basic` /
+`instagram_business_content_publish`. No Facebook Page is required. A manual user token
+and account ID form the foundation; token storage remains main-process safeStorage and
+can later be owned by OAuth without changing publication or renderer ownership. API
+version is centrally defined. Connection test verifies the token's own account profile.
+Renderer never calls Graph. Edit/unpublish capabilities are false.
+
+Studio selects one Instagram asset independently of Website's ordered multi-image gallery.
+Canonical PNG MediaAsset files stay on Desktop. An ephemeral JPEG (320–1440 px wide,
+4:5–1.91:1 aspect, <=8 MiB) strips metadata before authenticated multipart upload to
+`instagram-media.php`. The hosting stage stores only expiring transport bytes under the
+existing protected data directory, addressed by a 256-bit random capability and hashed
+at rest. Public GET accepts only an exact JPEG capability path, no query, filename or
+listing. Server enforces JPEG signature/MIME, dimensions, size, <=20-minute TTL, immutable
+replay and expiry on every read. Authenticated deletion is idempotent. Staging is not a
+MediaAsset store; no Customer metadata is uploaded. Hosting access logs must omit/redact
+this capability route as described in `docs/architecture/multi-channel-marketing.md`.
+
+**Crash / idempotency:** audience channels keep D3 outbox operation keys, one attached
+BusinessMessage and a submission fence before POST. Proven provider rejection can reopen
+that same local intent for existing backoff; uncertain responses never reopen the fence.
+Provider acceptance is persisted before outbox completion. İleti Merkezi duplicate-order
+code 451 is treated as uncertain, never as permission to resend.
+
+Instagram commits a stable publication snapshot, account identity and stage capability
+before upload; it commits `create_submitted` before container POST and the returned
+container ID before any publish POST. `publish_submitted` commits before media_publish.
+Explicit structured rejection permits an explicit safe retry of that phase. A lost create
+response leaves an unrecoverable unknown container: no automatic or repeated create.
+A lost publish response permits container status reads only; `PUBLISHED` confirms success
+without inventing a provider media ID/permalink. `FINISHED` does not prove rejection of a
+prior publish and never reopens its fence. Known receipt commits before optional permalink
+read and cleanup. In-progress containers continue only through user action. Local edits
+do not edit/repost a provider post; a new post is an explicit new publication.
+Exactly-once remote delivery cannot be guaranteed. The conservative approach may leave
+an unsent/unknown intent after a crash; it prioritizes preventing duplicate posts/sends.
+
+Settings fields join the existing Services category ownership/save/discard contribution
+model. Toggles are independent; closed card bodies are hidden. Marketing uses only active,
+configured services. Unified Publications projects canonical public publications and
+campaign progress directly without duplicate underlying records. AI prepares variants and
+assets only; it never prepares recipients, dispatches or publishes autonomously.
+
+Portable verification mocks real providers and exercises actual SQLite, PHP staging,
+Electron image conversion and browser flows. Live provider calls are excluded. Carousel,
+Reel/Story, Facebook, inbound SMS/social inbox, scheduling/calendar, analytics, full İYS
+reconciliation, OAuth wizard, multiple accounts/providers remain outside D5.

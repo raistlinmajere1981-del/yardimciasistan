@@ -165,6 +165,8 @@ required_package_files=(
   api/room-media.php
   api/tables.php
   api/table-media.php
+  api/instagram-media.php
+  lib/instagram-staging.php
   api/sync.php
   api/version.php
   config/business.json

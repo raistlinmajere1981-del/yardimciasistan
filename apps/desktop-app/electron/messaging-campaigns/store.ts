@@ -4,7 +4,7 @@ import { BUSINESS_CAPABILITIES as C, normalizePhone, type BusinessMessageTemplat
   type MessagingAudienceCounts, type MessagingCampaign, type MessagingCampaignDetail, type MessagingCampaignInput,
   type MessagingChannel, type MessagingConsentStatus, type MessagingSegment, type MessagingRecipientSkipReason,
   type SaveMessagingPreferenceInput, type SaveMessagingSegmentInput } from "@yardimci-asistan/shared";
-import { boundedText, invalid, resolveCampaignBindings, validateCampaignInput, validateCampaignTemplate, validateChannel, validateSegmentFilter } from "./validation";
+import { validateSmsText, boundedText, invalid, resolveCampaignBindings, validateCampaignInput, validateCampaignTemplate, validateChannel, validateSegmentFilter } from "./validation";
 
 type Row = Record<string, unknown>;
 function business(db: DatabaseSync): string {
@@ -98,6 +98,7 @@ function campaign(row: Row): MessagingCampaign {
     providerId: row.provider_id ? row.provider_id as MessagingCampaign["providerId"] : undefined, segmentId: String(row.segment_id), templateName: String(row.template_name),
     templateLanguage: String(row.template_language), bindings: JSON.parse(String(row.bindings_json)), status: row.status as MessagingCampaign["status"],
     preparedAt: String(row.prepared_at), cancelledAt: String(row.cancelled_at), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+    contentId: row.content_id ? String(row.content_id) : undefined, contentRevision: row.content_revision ? Number(row.content_revision) : undefined, text: String(row.text ?? ""),
     templateSnapshot: row.template_snapshot_json ? JSON.parse(String(row.template_snapshot_json)) : null,
     preparationCounts: row.preparation_counts_json ? JSON.parse(String(row.preparation_counts_json)) : null };
 }
@@ -112,10 +113,18 @@ export function listMessagingCampaigns(db: DatabaseSync) {
 }
 export function createMessagingCampaign(db: DatabaseSync, value: MessagingCampaignInput) {
   assertCampaignCapabilities(db); const input = validateCampaignInput(value); getSegment(db, input.segmentId);
+  if (input.contentId) {
+    const content = db.prepare("SELECT revision,status FROM marketing_contents WHERE id=? AND business_id=?").get(input.contentId, business(db));
+    if (!content || Number(content.revision) !== input.contentRevision || content.status === "archived") invalid("stale_content", "Güncel içeriği kaydedip tekrar deneyin.");
+    if (input.channel === "sms") {
+      const variant = db.prepare("SELECT text FROM marketing_content_variants WHERE content_id=? AND channel='sms'").get(input.contentId);
+      if (!variant || String(variant.text) !== input.text) invalid("stale_content", "SMS varyantını kaydedip tekrar deneyin.");
+    }
+  }
   const now = new Date().toISOString(), id = `campaign_${randomUUID()}`;
-  db.prepare(`INSERT INTO messaging_campaigns(id,business_id,name,purpose,channel,provider_id,segment_id,template_name,template_language,bindings_json,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, business(db), input.name, input.purpose, input.channel, input.providerId ?? null,
-      input.segmentId, input.templateName, input.templateLanguage, JSON.stringify(input.bindings), now, now);
+  db.prepare(`INSERT INTO messaging_campaigns(id,business_id,name,purpose,channel,provider_id,segment_id,template_name,template_language,bindings_json,content_id,content_revision,text,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, business(db), input.name, input.purpose, input.channel, input.providerId ?? null,
+      input.segmentId, input.templateName, input.templateLanguage, JSON.stringify(input.bindings), input.contentId ?? null, input.contentRevision ?? null, input.text ?? "", now, now);
   return getMessagingCampaign(db, id);
 }
 export function getMessagingCampaignDetail(db: DatabaseSync, id: string): MessagingCampaignDetail {
@@ -133,15 +142,16 @@ export function previewMessagingCampaign(db: DatabaseSync, id: string) {
   if (value.status !== "draft") invalid("not_draft", "Hazırlanmış kampanyanın üyeleri dondurulmuştur.");
   return counts(resolveAudience(db, value.segmentId, value.channel));
 }
-export function prepareMessagingCampaign(db: DatabaseSync, id: string, template: BusinessMessageTemplate) {
+export function prepareMessagingCampaign(db: DatabaseSync, id: string, template: BusinessMessageTemplate | null) {
   return campaignTransaction(db, () => {
     const value = getMessagingCampaign(db, id);
     if (value.status === "prepared") return getMessagingCampaignDetail(db, id);
     if (value.status !== "draft") invalid("not_draft", "Yalnız taslak kampanya hazırlanabilir.");
     if (!value.providerId) invalid("missing_provider", "Hazırlamak için sağlayıcı seçin.");
     const input = validateCampaignInput({ name: value.name, purpose: value.purpose, channel: value.channel, providerId: value.providerId,
-      segmentId: value.segmentId, templateName: value.templateName, templateLanguage: value.templateLanguage, bindings: value.bindings });
-    validateCampaignTemplate(input, template);
+      segmentId: value.segmentId, templateName: value.templateName, templateLanguage: value.templateLanguage, bindings: value.bindings, text: value.text, contentId: value.contentId, contentRevision: value.contentRevision });
+    if (input.channel === "whatsapp") { if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor."); validateCampaignTemplate(input, template); }
+    else validateSmsText(input.text);
     const audience = resolveAudience(db, value.segmentId, value.channel), summary = counts(audience), now = new Date().toISOString();
     for (const member of audience) {
       if (!member.skipReason) resolveCampaignBindings(value.bindings, member); // Validate all eligible values; never persist them.

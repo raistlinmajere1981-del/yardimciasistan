@@ -3,8 +3,8 @@ import { MarketingMediaGallery } from "./MarketingMediaGallery";
 export function MarketingPublicationEditor({draft,onChange,assets,maxImages,busy}:{draft:MarketingPublicationInput;onChange:(draft:MarketingPublicationInput)=>void;assets:MarketingAssetView[];maxImages:number;busy:boolean}) {
   return <fieldset className="form-stack marketing-publication-fields" disabled={busy}>
     <label className="form-field">Yayın başlığı<input value={draft.title} maxLength={240} onChange={e=>onChange({...draft,title:e.target.value})}/></label>
-    <label className="form-field">Yayın metni<textarea aria-label="Yayın metni" value={draft.text} rows={7} maxLength={12000} onChange={e=>onChange({...draft,text:e.target.value})}/></label>
-    <p>Ana sayfa · Duyurular / Kampanyalar</p>
+    <label className="form-field">Yayın metni<textarea aria-label="Yayın metni" value={draft.text} rows={7} maxLength={draft.channel==="instagram"?2200:12000} onChange={e=>onChange({...draft,text:e.target.value})}/></label>
+    <p>{draft.channel==="instagram"?"Instagram · tek görsel + açıklama":"Ana sayfa · Duyurular / Kampanyalar"}</p>
     <MarketingMediaGallery assets={assets} selected={draft.mediaAssetIds} maxImages={maxImages} disabled={busy} onChange={mediaAssetIds=>onChange({...draft,mediaAssetIds})}/>
   </fieldset>;
 }

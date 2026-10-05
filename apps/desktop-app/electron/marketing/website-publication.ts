@@ -30,8 +30,9 @@ export class MarketingWebsitePublicationService {
   }
   acknowledge(sent:MarketingPublication[],timestamp:string,operationId?:string) {
     this.database().acknowledgeMarketingPublications(sent,timestamp);
+    for (const p of sent.filter(p=>p.desiredPublished)) desktopLog.info({scope:"marketing",event:"marketing.publish.succeeded",message:"Website yayını doğrulandı.",operationId:p.id,meta:{channel:"website",revision:p.revision}});
     for (const p of sent) desktopLog.info({scope:"marketing",event:!p.desiredPublished?"marketing.publication.unpublished":p.publishedRevision?"marketing.publication.updated":"marketing.publication.published",
       message:"Website yayın revision onayı alındı.",operationId,meta:{publicationId:p.id,channel:p.channel,revision:p.revision,imageCount:p.mediaAssetIds.length}});
   }
-  fail(sent:MarketingPublication[]) { this.database().failMarketingPublications(sent); }
+  fail(sent:MarketingPublication[]) { this.database().failMarketingPublications(sent);for(const p of sent)desktopLog.error({scope:"marketing",event:"marketing.publish.failed",message:"Website yayın eşitlemesi tamamlanamadı.",operationId:p.id,meta:{channel:"website"}}); }
 }

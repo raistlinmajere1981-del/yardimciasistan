@@ -30,6 +30,7 @@ export type MessagingTemplateBinding =
   | { type: "customer_field"; field: "customer.fullName" | "commercial.companyName" };
 export interface MessagingCampaignInput {
   name: string; purpose: MessagingPurpose; channel: MessagingChannel; providerId?: BusinessMessagingProviderId;
+  contentId?: string; contentRevision?: number; text?: string;
   segmentId: string; templateName: string; templateLanguage: string; bindings: MessagingTemplateBinding[][];
 }
 export interface MessagingAudienceCounts {

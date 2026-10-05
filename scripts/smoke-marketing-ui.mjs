@@ -25,7 +25,7 @@ try {
   await page.getByRole('button',{name:'Taslağı uygula',exact:true}).click();await expect(page.getByLabel('Ana metin',{exact:true})).toHaveValue('AI aday metni');
   await page.getByRole('button',{name:'AI kanal varyantı oluştur',exact:true}).click();await page.getByRole('button',{name:'Taslağı uygula',exact:true}).click();
   await expect(page.getByLabel('Kanal metni',{exact:true})).toHaveValue('AI aday metni');
-  await page.getByRole('button',{name:'WhatsApp',exact:true}).click();await page.getByLabel('Kanal metni',{exact:true}).fill('Bağımsız WhatsApp');
+  await page.getByRole('button',{name:'WhatsApp Business',exact:true}).click();await page.getByLabel('Kanal metni',{exact:true}).fill('Bağımsız WhatsApp');
   await page.getByRole('button',{name:'Website',exact:true}).click();await expect(page.getByLabel('Kanal metni',{exact:true})).toHaveValue('AI aday metni');
   await page.getByRole('button',{name:'Görsel yükle',exact:true}).click();const uploaded=f.db.listMediaAssets()[0].id;
   await page.getByRole('button',{name:`Yüklenen görsel ekle ${uploaded}`,exact:true}).click();
@@ -53,7 +53,7 @@ try {
   f.state.unavailable=true;await page.getByRole('button',{name:'Durumu yenile',exact:true}).click();
   await page.getByRole('button',{name:'İçerik Stüdyosu',exact:true}).click();await page.getByRole('button',{name:'Yeni içerik',exact:true}).click();
   for(const name of ['AI ile metin oluştur','AI ile yeniden yaz','AI kanal varyantı oluştur','AI ile görsel oluştur']) await expect(page.getByRole('button',{name,exact:true})).toBeDisabled();
-  await page.getByRole('button',{name:'SMS',exact:true}).click();await expect(page.getByText('Servis yapılandırılmamış · Yayın desteği sonraki aşamada',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'SMS',exact:true}).click();await expect(page.getByText('Servis yapılandırılmamış veya kapalı',{exact:true})).toBeVisible();
   assert.deepEqual(errors,[]);
   console.log('D4 user flow: draft preservation, explicit AI acceptance, independent variants, upload/generate/select/reorder, preview/publish/live update/unpublish and media usage passed.');
 } finally {await browser?.close();await server?.close();f.dispose();}

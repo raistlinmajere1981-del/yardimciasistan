@@ -547,6 +547,8 @@ export interface DesktopSetupData {
   aiLastPublishedAt: string;
   aiProfiles: DesktopAiServiceProfile[];
   productData: DesktopProductDataSettings;
+  sms: import("@yardimci-asistan/shared").SmsConfiguration;
+  instagram: import("@yardimci-asistan/shared").InstagramConfiguration;
   whatsappCloud: import("@yardimci-asistan/shared").WhatsAppCloudConfiguration;
   arasShipping: import("@yardimci-asistan/shared").ArasShippingConfiguration;
   dealerPortalEnabled: boolean;
@@ -583,6 +585,8 @@ export interface SaveInitialSetupInput {
   clearAiApiKey: boolean;
   aiProfiles?: SaveAiServiceProfileInput[];
   productData?: DesktopProductDataSettings;
+  sms?: import("@yardimci-asistan/shared").SmsConfigurationInput;
+  instagram?: import("@yardimci-asistan/shared").InstagramConfigurationInput;
   whatsappCloud?: import("@yardimci-asistan/shared").WhatsAppCloudConfigurationInput;
   arasShipping?: import("@yardimci-asistan/shared").ArasShippingConfigurationInput;
   dealerPortalEnabled?: boolean;

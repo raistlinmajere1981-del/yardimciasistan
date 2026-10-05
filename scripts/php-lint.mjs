@@ -9,6 +9,8 @@ const phpFiles = [
   "firm-template/web-module/lib/marketing.php",
   "firm-template/web-module/api/marketing.php",
   "firm-template/web-module/api/marketing-media.php",
+  "firm-template/web-module/api/instagram-media.php",
+  "firm-template/web-module/lib/instagram-staging.php",
   "firm-template/web-module/duyurular/index.php",
   "firm-template/web-module/api/whatsapp-webhook.php",
   "firm-template/web-module/api/business-messaging-status.php",

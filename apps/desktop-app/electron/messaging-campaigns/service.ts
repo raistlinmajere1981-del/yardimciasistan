@@ -2,7 +2,7 @@ import type { BusinessMessageTemplate, BusinessMessagingProviderId, MessagingCam
   SaveMessagingPreferenceInput, SaveMessagingSegmentInput } from "@yardimci-asistan/shared";
 import type { DesktopDatabase } from "../database";
 import { desktopLog } from "../desktop-logger";
-import { invalid, validateCampaignTemplate } from "./validation";
+import { invalid, validateSmsText, validateCampaignTemplate } from "./validation";
 
 /** Read-only provider metadata seam. Deliberately has no send/claim method. */
 export interface CampaignTemplateCatalog {
@@ -43,9 +43,9 @@ export class MessagingCampaignService {
     if (value.status !== "draft") invalid("not_draft", "Yalnız taslak kampanya hazırlanabilir.");
     if (!value.providerId) invalid("missing_provider", "Hazırlamak için sağlayıcı seçin.");
     this.catalog.assertAvailable(value.channel, value.providerId);
-    const template = (await this.catalog.listTemplates(value.providerId)).find((item) => item.name === value.templateName && item.language === value.templateLanguage);
-    if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor.");
-    validateCampaignTemplate(value, template);
+    const template = value.channel === "whatsapp" ? (await this.catalog.listTemplates(value.providerId)).find((item) => item.name === value.templateName && item.language === value.templateLanguage) ?? null : null;
+    if (value.channel === "whatsapp") { if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor."); validateCampaignTemplate(value, template); }
+    else validateSmsText(value.text);
     this.catalog.assertAvailable(value.channel, value.providerId);
     // After catalog I/O: backend re-reads campaign, segment, current contact and consent under one transaction.
     const detail = db.prepareMessagingCampaign(id, template);
@@ -57,9 +57,9 @@ export class MessagingCampaignService {
     const value = this.getDatabase().getMessagingCampaign(id);
     if (!value.providerId) invalid("missing_provider", "Gönderim için sağlayıcı seçin.");
     this.catalog.assertAvailable(value.channel, value.providerId);
-    const template = (await this.catalog.listTemplates(value.providerId)).find((item) => item.name === value.templateName && item.language === value.templateLanguage);
-    if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor.");
-    validateCampaignTemplate(value, template);
+    const template = value.channel === "whatsapp" ? (await this.catalog.listTemplates(value.providerId)).find((item) => item.name === value.templateName && item.language === value.templateLanguage) ?? null : null;
+    if (value.channel === "whatsapp") { if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor."); validateCampaignTemplate(value, template); }
+    else validateSmsText(value.text);
     this.catalog.assertAvailable(value.channel, value.providerId);
     const detail = this.getDatabase().transitionCampaignDispatch(id, resume ? "resume" : "start");
     this.log("dispatch.campaign.started", { campaignId: id }, id); this.onChanged(); return detail;

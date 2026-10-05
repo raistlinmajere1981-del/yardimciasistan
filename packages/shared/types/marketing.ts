@@ -9,7 +9,7 @@ export interface MarketingContent {
   revision: number; createdAt: string; updatedAt: string;
 }
 export interface MarketingContentVariant {
-  contentId: string; channel: MarketingChannel; text: string; title?: string;
+  contentId: string; channel: MarketingChannel; mediaAssetId?: string; text: string; title?: string;
   metadata: { version: 1; adaptation?: "manual" | "ai" };
   createdAt: string; updatedAt: string;
 }
@@ -29,12 +29,15 @@ export interface MarketingPublication {
   id: string; businessId: string; contentId: string; channel: MarketingChannel;
   status: "draft" | "publishing" | "published" | "unpublished" | "failed";
   placement: MarketingPlacement; title: string; text: string; mediaAssetIds: string[];
+  providerSummary?: { containerId: string; mediaId: string; permalink: string; failureCode: string };
   revision: number; publishedRevision: number; desiredPublished: boolean;
   publishedAt: string; unpublishedAt: string; createdAt: string; updatedAt: string;
 }
 export interface MarketingChannelDefinition {
-  id: MarketingChannel; displayName: string; enabled: boolean; configured: boolean;
-  supportsText: boolean; supportsImages: boolean; maxImages?: number;
+  id: MarketingChannel; family: "audience_delivery" | "public_publishing"; providerId: "website" | "whatsapp_cloud" | "iletimerkezi" | "instagram_api";
+  requiresAudience: boolean; requiresConsent: boolean; supportsConnectionTest: boolean;
+  displayName: string; enabled: boolean; configured: boolean;
+  supportsText: boolean; supportsImages: boolean; maxImages: number;
   supportsDirectPublish: boolean; supportsUnpublish: boolean; supportsEditPublished: boolean;
   connectionTestAvailable: boolean; state: "ready" | "unconfigured" | "planned" | "disabled";
 }
@@ -42,7 +45,7 @@ export type MarketingChannelRegistry = readonly MarketingChannelDefinition[];
 export interface MarketingContentDetail { content: MarketingContent; variants: MarketingContentVariant[]; media: MarketingContentMedia[] }
 export interface MarketingContentInput {
   id?: string; expectedRevision?: number; source?: "manual" | "ai"; title: string; purpose: MarketingContent["purpose"];
-  masterText: string; status: MarketingContent["status"]; variants: Array<Pick<MarketingContentVariant, "channel" | "text" | "title" | "metadata">>;
+  masterText: string; status: MarketingContent["status"]; variants: Array<Pick<MarketingContentVariant, "channel" | "text" | "title" | "metadata" | "mediaAssetId">>;
   mediaAssetIds: string[];
 }
 export interface MarketingPublicationInput {
@@ -56,6 +59,7 @@ export interface MarketingAiInput {
 export interface MarketingAiResult { text?: string; asset?: MarketingAssetView }
 export interface MarketingStudioSnapshot {
   contents: MarketingContentDetail[]; assets: MarketingAssetView[]; publications: MarketingPublication[];
+  campaigns?: import("./messaging-campaigns").MessagingCampaignDetail[];
   channels: MarketingChannelRegistry; aiCapabilities: MarketingAiCapability[];
 }
 export interface MarketingWebsiteProjection {

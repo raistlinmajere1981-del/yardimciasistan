@@ -1,3 +1,5 @@
+import { smsConfiguration, instagramConfiguration, validateSmsConfiguration, validateInstagramConfiguration, saveMarketingProviderConfigurations } from "./marketing/provider-configuration-store";
+import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets";
 import { getMessagingConfiguration, normalizeMessagingConfiguration, saveMessagingConfiguration } from "./business-messaging/store";
 import type { MessagingSecretWrite } from "./business-messaging/secret-service";
 import { getArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
@@ -106,6 +108,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
     aiProfiles,
     arasShipping: getArasShippingConfiguration(db),
+    sms: smsConfiguration(db), instagram: instagramConfiguration(db),
     whatsappCloud: getMessagingConfiguration(db),
     dealerPortalEnabled: Number(settings?.dealer_portal_enabled ?? 0) === 1,
     onlineSalesDelivery: {
@@ -137,7 +140,8 @@ export function saveSetupData(
   aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
   aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {},
   shippingSecretWrite: ShippingSecretWrite = { mode: "keep" },
-  messagingSecretWrite: MessagingSecretWrite = { mode: "keep" }
+  messagingSecretWrite: MessagingSecretWrite = { mode: "keep" },
+  marketingSecretWrites: MarketingProviderSecretWrites = {}
 ): StoredSetupSaveResult {
   let websiteNavigation;
   try { websiteNavigation = normalizeWebsiteNavigation(input.websiteNavigation ?? JSON.parse(String(db.prepare("SELECT website_navigation_json FROM settings WHERE deleted_at = '' LIMIT 1").get()?.website_navigation_json ?? "[]"))); }
@@ -153,6 +157,8 @@ export function saveSetupData(
   const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
   const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
   const existingSettings = db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+  try { if (input.sms) validateSmsConfiguration(input.sms); if (input.instagram) validateInstagramConfiguration(input.instagram); }
+  catch { return { ok: false, message: "SMS / Instagram servis ayarları geçersiz." }; }
   if (input.whatsappCloud) {
     try { normalizeMessagingConfiguration(input.whatsappCloud); }
     catch { return { ok: false, message: "WhatsApp Business ayarları geçersiz." }; }
@@ -432,6 +438,7 @@ export function saveSetupData(
       || String(existingSettings.web_module_url ?? "") !== webModuleUrl || String(existingSettings.sync_secret ?? "") !== syncSecret) {
       queueSyncJob(db, "website_navigation_publish", now);
     }
+    saveMarketingProviderConfigurations(db, businessId, input.sms, input.instagram, marketingSecretWrites);
     if (input.whatsappCloud) saveMessagingConfiguration(db, businessId, input.whatsappCloud, messagingSecretWrite);
     if (input.arasShipping) saveArasShippingConfigurationInTransaction(db, businessId, input.arasShipping, shippingSecretWrite);
 

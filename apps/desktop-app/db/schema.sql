@@ -2633,7 +2633,7 @@ CREATE TABLE business_messages (
   purpose TEXT NOT NULL DEFAULT 'operational' CHECK(purpose IN ('operational','marketing')),
   campaign_id TEXT REFERENCES messaging_campaigns(id), campaign_recipient_id TEXT REFERENCES messaging_campaign_recipients(id),
   related_entity_type TEXT NOT NULL DEFAULT '', related_entity_id TEXT NOT NULL DEFAULT '',
-  provider_id TEXT NOT NULL, recipient TEXT NOT NULL, message_kind TEXT NOT NULL CHECK(message_kind IN ('template','session')),
+  provider_id TEXT NOT NULL, recipient TEXT NOT NULL, message_kind TEXT NOT NULL CHECK(message_kind IN ('template','session','text')),
   template_name TEXT NOT NULL, template_language TEXT NOT NULL, provider_message_id TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL CHECK(status IN ('draft','queued','accepted','delivered','read','failed','cancelled')),
   failure_code TEXT NOT NULL DEFAULT '', failure_message TEXT NOT NULL DEFAULT '',
@@ -2665,6 +2665,7 @@ CREATE TABLE messaging_campaigns (
   id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), name TEXT NOT NULL,
   purpose TEXT NOT NULL CHECK(purpose='marketing'), channel TEXT NOT NULL CHECK(channel IN ('whatsapp','sms')),
   provider_id TEXT, segment_id TEXT NOT NULL, template_name TEXT NOT NULL, template_language TEXT NOT NULL,
+  content_id TEXT REFERENCES marketing_contents(id), content_revision INTEGER, text TEXT NOT NULL DEFAULT '',
   bindings_json TEXT NOT NULL, template_snapshot_json TEXT, preparation_counts_json TEXT,
   status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','prepared','running','paused','cancelled','completed')),
   prepared_at TEXT NOT NULL DEFAULT '', cancelled_at TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -2746,7 +2747,7 @@ CREATE TABLE marketing_contents (
 );
 CREATE TABLE marketing_content_variants (
   content_id TEXT NOT NULL REFERENCES marketing_contents(id), channel TEXT NOT NULL CHECK(channel IN ('website','whatsapp','sms','instagram')),
-  title TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, metadata_json TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, media_asset_id TEXT REFERENCES media_assets(id), metadata_json TEXT NOT NULL,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(content_id,channel)
 );
 CREATE TABLE media_assets (
@@ -2784,3 +2785,20 @@ CREATE TABLE marketing_publication_pending_media (
   media_asset_id TEXT NOT NULL REFERENCES media_assets(id),
   revision INTEGER NOT NULL, PRIMARY KEY(publication_id,media_asset_id)
 );
+
+-- D-039: independent provider configuration; secrets are safeStorage ciphertext only.
+CREATE TABLE marketing_provider_config (
+  business_id TEXT NOT NULL REFERENCES business(id), provider_id TEXT NOT NULL CHECK(provider_id IN ('iletimerkezi','instagram_api')),
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)), account_id TEXT NOT NULL DEFAULT '', sender_id TEXT NOT NULL DEFAULT '',
+  iys_list TEXT NOT NULL DEFAULT 'BIREYSEL' CHECK(iys_list IN ('BIREYSEL','TACIR')),
+  secret_one_encrypted TEXT NOT NULL DEFAULT '', secret_two_encrypted TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+  PRIMARY KEY(business_id,provider_id)
+);
+-- Provider-specific submission state augments the canonical public publication; never a second publication.
+CREATE TABLE instagram_publication_state (
+  publication_id TEXT PRIMARY KEY REFERENCES marketing_publications(id), account_key TEXT NOT NULL,
+  container_id TEXT NOT NULL DEFAULT '', provider_media_id TEXT NOT NULL DEFAULT '', permalink TEXT NOT NULL DEFAULT '',
+  create_submitted INTEGER NOT NULL DEFAULT 0, publish_submitted INTEGER NOT NULL DEFAULT 0, failure_code TEXT NOT NULL DEFAULT '',
+  stage_token TEXT NOT NULL DEFAULT '', stage_expires_at TEXT NOT NULL DEFAULT '', stage_base_url TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX instagram_published_reference ON instagram_publication_state(provider_media_id) WHERE provider_media_id!='';

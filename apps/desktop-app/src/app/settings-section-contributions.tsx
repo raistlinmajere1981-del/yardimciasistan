@@ -1,3 +1,4 @@
+import { SmsSettingsSection, InstagramSettingsSection } from "../components/settings/MarketingChannelsSettingsSection";
 import { WhatsAppBusinessSettingsSection } from "../components/settings/WhatsAppBusinessSettingsSection";
 import { ArasShippingSettingsSection } from "../components/settings/ArasShippingSettingsSection";
 import type { ReactNode, SetStateAction } from "react";
@@ -9,7 +10,7 @@ import {
   onlineSalesDeliveryDefinition,
   dealerPortalDefinition,
   arasShippingDefinition,
-  whatsappCloudDefinition,
+  whatsappCloudDefinition, smsProviderDefinition, instagramProviderDefinition,
   type SettingsSectionDefinition,
   type StagedSettingsCategoryId
 } from "./settings-registry";
@@ -40,6 +41,12 @@ type StagedSettingsContributions = {
 const stagedSettingsContributions = {
   business: [],
   services: [{
+    definition: smsProviderDefinition,
+    render: ({ draft, onChange, busy }) => <SmsSettingsSection draft={draft.sms} busy={busy} onChange={sms=>onChange({sms})}/>
+  }, {
+    definition: instagramProviderDefinition,
+    render: ({ draft, onChange, busy }) => <InstagramSettingsSection draft={draft.instagram} busy={busy} onChange={instagram=>onChange({instagram})}/>
+  }, {
     definition: whatsappCloudDefinition,
     render: ({ draft, onChange, busy }) => <WhatsAppBusinessSettingsSection draft={draft.whatsappCloud} busy={busy} onChange={(whatsappCloud) => onChange({ whatsappCloud })} />
   }, {

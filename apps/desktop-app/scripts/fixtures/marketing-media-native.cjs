@@ -20,6 +20,9 @@ app.whenReady().then(() => {
       const canonical=db.getMediaAsset(asset.id),file=service.absolutePath(canonical);assert.ok(fs.existsSync(file));assert.ok(asset.previewUrl.startsWith('data:image/png'));
       assert.equal(nativeImage.createFromPath(file).getSize().width,2);service.manage(asset.id,'delete');assert.equal(fs.existsSync(file),false);
     }
+    const square=service.importBytes(nativeImage.createFromBitmap(Buffer.alloc(4*4*4,255),{width:4,height:4}).toPNG(),'upload');
+    const staged=nativeImage.createFromBuffer(service.instagramJpeg(square.id));assert.equal(staged.getSize().width,320);assert.equal(staged.getSize().height,320);assert.equal(db.getMediaAsset(square.id).mimeType,'image/png');
+    const wide=service.importBytes(image.toPNG(),'upload');assert.throws(()=>service.instagramJpeg(wide.id),e=>e.code==='instagram_image_ratio');
     assert.throws(()=>service.importBytes(Buffer.from('invalid image'),'upload'),error=>error.code==='invalid_media');
     console.log('D4 real Electron native image validation, PNG/JPEG normalization, dimensions, preview, canonical storage and physical deletion passed.');
   } finally {db.close();fs.rmSync(root,{recursive:true,force:true});}

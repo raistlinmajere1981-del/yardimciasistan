@@ -1,3 +1,4 @@
+import { emptySmsConfiguration, emptyInstagramConfiguration } from "@yardimci-asistan/shared";
 import { emptyWhatsAppCloudConfiguration } from "@yardimci-asistan/shared";
 import { emptyArasShippingConfiguration, getBusinessProfile } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
@@ -75,6 +76,7 @@ export const defaultDashboardData: DesktopDashboardData = {
 };
 
 export const defaultSetupData: DesktopSetupData = {
+  sms: emptySmsConfiguration(), instagram: emptyInstagramConfiguration(),
   setupRequired: true,
   appPasswordConfigured: false,
   businessName: "",

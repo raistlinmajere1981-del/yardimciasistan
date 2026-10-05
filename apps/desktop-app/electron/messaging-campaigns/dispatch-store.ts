@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { normalizePhone, type BusinessMessageTemplate, type MessagingOutboxItem } from "@yardimci-asistan/shared";
 import { claimBusinessMessageInTransaction, getBusinessMessage, getMessageBinding, insertBusinessMessage, failBusinessMessage } from "../business-messaging/store";
 import { assertCampaignCapabilities, campaignTransaction, getMessagingCampaign, getMessagingCampaignDetail } from "./store";
-import { invalid, resolveCampaignBindings, validateCampaignTemplate } from "./validation";
+import { invalid, validateSmsText, resolveCampaignBindings, validateCampaignTemplate } from "./validation";
 import { reconcile, type DispatchClaim, type DispatchResult } from "./dispatch-contract";
 
 function item(row: Record<string, unknown>): MessagingOutboxItem {
@@ -62,7 +62,7 @@ export function transitionCampaignDispatch(db: DatabaseSync, id: string, action:
 }
 export type CampaignSubmission = DispatchResult | { kind: "ready"; message: NonNullable<DispatchClaim["message"]>; parameters: string[][] };
 /** Final synchronous eligibility check + rate permit + canonical message attachment + submission fence, one transaction. */
-export function beginCampaignSubmission(db: DatabaseSync, id: string, token: string, template: BusinessMessageTemplate, accountKey: string, now: string, intervalMs: number): CampaignSubmission {
+export function beginCampaignSubmission(db: DatabaseSync, id: string, token: string, template: BusinessMessageTemplate | null, accountKey: string, now: string, intervalMs: number): CampaignSubmission {
   return campaignTransaction(db, () => {
     const claim = getDispatchClaim(db, id, token);
     if (!claim) return { kind: "deferred", nextAttemptAt: now };
@@ -77,11 +77,13 @@ export function beginCampaignSubmission(db: DatabaseSync, id: string, token: str
     if (customer.consent !== "opted_in") return { kind: "skipped", category: customer.consent === "opted_out" ? "opted_out" : "unknown_consent" };
     const phone = normalizePhone(String(customer.phone));
     if (!phone.ok) return { kind: "skipped", category: "missing_recipient" };
-    validateCampaignTemplate(claim.campaign, template);
-    // A changed component identity is unsafe even when the parameter count coincidentally matches.
-    const shape = (value: BusinessMessageTemplate) => value.components.map(({ type, parameters }) => ({ type, parameters }));
-    if (!claim.campaign.templateSnapshot || JSON.stringify(shape(template)) !== JSON.stringify(shape(claim.campaign.templateSnapshot))) return { kind: "failed", category: "template_changed" };
-    const parameters = resolveCampaignBindings(claim.campaign.bindings, { fullName: String(customer.full_name), companyName: String(customer.company_name ?? "") });
+    if (claim.item.channel === "whatsapp") {
+      if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor.");
+      validateCampaignTemplate(claim.campaign, template);
+      const shape = (value: BusinessMessageTemplate) => value.components.map(({ type, parameters }) => ({ type, parameters }));
+      if (!claim.campaign.templateSnapshot || JSON.stringify(shape(template)) !== JSON.stringify(shape(claim.campaign.templateSnapshot))) return { kind: "failed", category: "template_changed" };
+    } else validateSmsText(claim.campaign.text);
+    const parameters = claim.item.channel === "sms" ? [] : resolveCampaignBindings(claim.campaign.bindings, { fullName: String(customer.full_name), companyName: String(customer.company_name ?? "") });
     const existingBinding = claim.message ? getMessageBinding(db, claim.message.id) : null;
     if (existingBinding && existingBinding.account_key !== accountKey) return { kind: "failed", category: "account_changed" };
     const gate = db.prepare("SELECT next_dispatch_at FROM messaging_dispatch_runtime WHERE business_id=?").get(claim.item.businessId);
@@ -89,10 +91,10 @@ export function beginCampaignSubmission(db: DatabaseSync, id: string, token: str
     db.prepare(`INSERT INTO messaging_dispatch_runtime(business_id,next_dispatch_at) VALUES (?,?)
       ON CONFLICT(business_id) DO UPDATE SET next_dispatch_at=excluded.next_dispatch_at`)
       .run(claim.item.businessId, new Date(Date.parse(now) + intervalMs).toISOString());
-    const hash = createHash("sha256").update(JSON.stringify([claim.item.customerId, phone.whatsapp, template.name, template.language, parameters])).digest("hex");
+    const hash = createHash("sha256").update(JSON.stringify(claim.item.channel === "sms" ? [claim.item.customerId, phone.whatsapp, "sms", claim.campaign.text] : [claim.item.customerId, phone.whatsapp, template!.name, template!.language, parameters])).digest("hex");
     let message = claim.message;
     if (!message) {
-      message = insertBusinessMessage(db, { customerId: claim.item.customerId, recipient: phone.whatsapp, templateName: template.name, templateLanguage: template.language,
+      message = insertBusinessMessage(db, { customerId: claim.item.customerId, recipient: phone.whatsapp, templateName: template?.name ?? "", templateLanguage: template?.language ?? "", providerId: claim.item.providerId, messageKind: claim.item.channel === "sms" ? "text" : "template",
         intentHash: hash, accountKey, campaignId: claim.campaign.id, campaignRecipientId: claim.item.campaignRecipientId });
       db.prepare("UPDATE messaging_outbox SET business_message_id=? WHERE id=? AND claim_token=?").run(message.id, id, token);
     } else {

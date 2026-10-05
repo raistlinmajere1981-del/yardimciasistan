@@ -1,3 +1,7 @@
+import { InstagramPublicationService } from "./marketing/instagram-publication-service";
+import { registerMarketingProviderIpc } from "./ipc/marketing-provider-ipc";
+import { SmsMessagingService } from "./business-messaging/sms-service";
+import { createMarketingProviderSecretWrites } from "./marketing/provider-secrets";
 import { MarketingMediaService } from "./marketing/media-service";
 import { MarketingStudioService } from "./marketing/service";
 import { MarketingWebsitePublicationService } from "./marketing/website-publication";
@@ -469,7 +473,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (campaignShutdownStarted) return;
   campaignShutdownStarted = true;
-  void Promise.allSettled([campaignDispatchService.suspendAndDrain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()]).then(() => {
+  void Promise.allSettled([campaignDispatchService.suspendAndDrain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()]).then(() => {
     campaignShutdownDrained = true;
     desktopDatabase?.close();
     app.quit();
@@ -478,7 +482,9 @@ app.on("before-quit", (event) => {
 
 const businessMessagingStatusSyncService = new BusinessMessagingStatusSyncService(getDatabase, notifyBusinessMessagingChanged);
 const businessMessagingService = new BusinessMessagingService(getDatabase);
+const smsMessagingService = new SmsMessagingService(getDatabase);
 const marketingMediaService = new MarketingMediaService(getDatabase, () => getDatabase().userDataPath);
+const instagramPublicationService = new InstagramPublicationService(getDatabase, marketingMediaService, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()) });
 const marketingWebsiteService = new MarketingWebsitePublicationService(getDatabase, marketingMediaService);
 const marketingStudioService = new MarketingStudioService(getDatabase, marketingMediaService, () => {
   // Explicit user publication actions work even when passive automatic sync is disabled.
@@ -489,15 +495,21 @@ const marketingStudioService = new MarketingStudioService(getDatabase, marketing
       void coordinator.runNow();
     }
   });
-});
+}, instagramPublicationService);
 const messagingCampaignService = new MessagingCampaignService(getDatabase, {
   assertAvailable: (channel, providerId) => {
+    if (channel === "sms" && providerId === "iletimerkezi") { if (!smsMessagingService.getConfiguration().configured) throw new MessagingCampaignError("unconfigured", "SMS servis ayarlarını tamamlayın."); return; }
     if (channel !== "whatsapp" || providerId !== "whatsapp_cloud") throw new MessagingCampaignError("unavailable_provider", "Bu kanal için kullanılabilir sağlayıcı yok.");
     if (!businessMessagingService.getConfiguration().configured) throw new MessagingCampaignError("unconfigured", "WhatsApp Business servis ayarlarını tamamlayın.");
   },
   listTemplates: () => businessMessagingService.listTemplates()
 }, () => { notifyMessagingCampaignsChanged(); campaignDispatchService.wake(); });
-const campaignDispatchService = new CampaignDispatchService(getDatabase, businessMessagingService, {
+const campaignDispatchService = new CampaignDispatchService(getDatabase, {
+  dispatchCampaignItem: (id, token, interval, allowed, now) => {
+    const claim = getDatabase().getCampaignDispatchClaim(id, token);
+    return (claim?.item.channel === "sms" ? smsMessagingService : businessMessagingService).dispatchCampaignItem(id, token, interval, allowed, now);
+  }
+}, {
   allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()),
   onChanged: () => { notifyMessagingCampaignsChanged(); notifyBusinessMessagingChanged(); }
 });
@@ -514,6 +526,7 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
+  registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingIpc({ service: marketingStudioService, assertUnlocked: assertAppSessionUnlocked });
   registerMessagingCampaignsIpc({ service: messagingCampaignService, assertUnlocked: assertAppSessionUnlocked });
   registerBusinessMessagingIpc({ service: businessMessagingService, assertUnlocked: assertAppSessionUnlocked, onChanged: notifyBusinessMessagingChanged });
@@ -574,6 +587,9 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     return profileSecretUpdates;
   }
 
+  let marketingSecretWrites;
+  try { marketingSecretWrites = createMarketingProviderSecretWrites(input.sms, input.instagram); }
+  catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Servis anahtarı kaydedilemedi." }; }
   let messagingSecretWrite;
   try { messagingSecretWrite = createMessagingSecretWrite(input.whatsappCloud); }
   catch (error) { return { ok: false, message: error instanceof Error ? error.message : "WhatsApp Business anahtarı kaydedilemedi." }; }
@@ -584,9 +600,11 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     ...input,
     aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
     arasShipping: input.arasShipping ? { ...input.arasShipping, password: "" } : undefined,
+    sms: input.sms ? { ...input.sms, apiKey: "", apiHash: "" } : undefined,
+    instagram: input.instagram ? { ...input.instagram, accessToken: "" } : undefined,
     whatsappCloud: input.whatsappCloud ? { ...input.whatsappCloud, accessToken: "" } : undefined,
     aiProfiles: profileSecretUpdates.profiles
-  }, secretUpdate.update, profileSecretUpdates.updates, shippingSecretWrite, messagingSecretWrite);
+  }, secretUpdate.update, profileSecretUpdates.updates, shippingSecretWrite, messagingSecretWrite, marketingSecretWrites);
   if (!localResult.ok) {
     return localResult;
   }
@@ -652,6 +670,7 @@ export async function suspendAutomaticSyncForMaintenance() {
   maintenanceSyncSuspended = true;
   desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
   await campaignDispatchService.suspendAndDrain();
+  await instagramPublicationService.drain();
   await syncCoordinator?.suspendAndDrain();
   const androidPull = getAndroidActionSyncService().currentInFlight();
   if (androidPull) {

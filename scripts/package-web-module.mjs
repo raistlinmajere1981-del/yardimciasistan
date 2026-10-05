@@ -17,6 +17,8 @@ const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
   "api/marketing.php",
   "api/marketing-media.php",
+  "api/instagram-media.php",
+  "lib/instagram-staging.php",
   "lib/marketing.php",
   "duyurular/index.php",
   "duyurular/marketing.js",

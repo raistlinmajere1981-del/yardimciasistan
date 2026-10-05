@@ -53,14 +53,17 @@ export const whatsappCloudDefinition = {
   keywords: "meta cloud business waba token şablon mesaj bağlantı", persistence: "staged"
 } as const satisfies SettingsSectionDefinition;
 
-export const marketingChannelsDefinition = {
-  id: "settings-marketing-sms", category: "services", title: "Pazarlama kanalları",
-  keywords: "website instagram sms pazarlama marketing yayın bağlantı", persistence: "action",
-  visible: (caps: readonly BusinessCapability[]) => caps.includes(C.MARKETING_STUDIO)
+export const smsProviderDefinition = {
+  id: "settings-marketing-sms", category: "services", title: "SMS / İleti Merkezi",
+  keywords: "sms ileti merkezi api key hash başlık sender iys pazarlama bağlantı", persistence: "staged"
+} as const satisfies SettingsSectionDefinition;
+export const instagramProviderDefinition = {
+  id: "settings-marketing-instagram", category: "services", title: "Instagram",
+  keywords: "instagram profesyonel business creator token hesap yayın bağlantı", persistence: "staged"
 } as const satisfies SettingsSectionDefinition;
 
 export const settingsSections: readonly SettingsSectionDefinition[] = [
-  marketingChannelsDefinition,
+  smsProviderDefinition, instagramProviderDefinition,
   { id: "settings-business", category: "business", title: "İşletme", keywords: "firma adı sektör tipi telefon whatsapp e-posta adres", persistence: "staged" },
   { id: "settings-options", category: "business", title: "Ek özellikler", keywords: "yetenek talepler oda masa rezervasyonları qr menü stok veresiye müşteri hesabı satın alma tedarikçi etiket", persistence: "staged" },
   { id: "settings-public-profile", category: "business", title: "Müşteriye Açık Bilgiler", keywords: "public profile harita konum açıklama özellikler giriş çıkış kahvaltı dil ödeme", persistence: "resource", visible: (_, initialized) => initialized },

@@ -11,7 +11,7 @@ try {
   const registry=f.service.channels(); const website=registry.find(c=>c.id==='website');
   assert.equal(website.supportsDirectPublish,true);assert.equal(website.supportsEditPublished,true);assert.equal(website.supportsUnpublish,true);assert.equal(website.maxImages,20);
   assert.equal(registry.find(c=>c.id==='whatsapp').configured,true);
-  for(const id of ['sms','instagram']){const c=registry.find(c=>c.id===id);assert.equal(c.configured,false);assert.equal(c.supportsDirectPublish,false);assert.equal(c.state,'planned');}
+  for(const id of ['sms','instagram']){const c=registry.find(c=>c.id===id);assert.equal(c.configured,false);assert.equal(c.supportsDirectPublish,id==='instagram');assert.equal(c.state,'disabled');}
   f.state.selected=[f.uploadPath];const [a]=await f.service.upload(); const b=f.media.importBytes(imageBytes,'upload');
   assert.equal(a.width,1);assert.equal(a.source,'upload');assert.ok(a.previewUrl.startsWith('data:image/png'));assert.equal('storageRef' in a,false);
   assert.throws(()=>f.media.importBytes(Buffer.from('invalid'),'upload'),e=>e.code==='invalid_media');

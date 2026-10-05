@@ -1,3 +1,6 @@
+import * as instagramPublicationStore from "./marketing/instagram-publication-store";
+import * as marketingProviderStore from "./marketing/provider-configuration-store";
+import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets";
 import * as marketingAssetStore from "./marketing/asset-store";
 import * as marketingStore from "./marketing/store";
 import * as messagingStore from "./business-messaging/store";
@@ -983,6 +986,16 @@ export class DesktopDatabase {
   listMessagingSegments() { return campaignStore.listMessagingSegments(this.db); }
   saveMessagingSegment(input: Parameters<typeof campaignStore.saveMessagingSegment>[1]) { return campaignStore.saveMessagingSegment(this.db, input); }
   previewMessagingSegment(id: string, channel: MessagingChannel) { return campaignStore.previewMessagingSegment(this.db, id, channel); }
+  getMarketingPublication(id: string) { return marketingStore.getMarketingPublication(this.db,id); }
+  getInstagramPublicationState(id: string) { return instagramPublicationStore.instagramPublicationState(this.db,id); }
+  beginInstagramPublication(id: string, revision: number, accountKey: string, stage: Parameters<typeof instagramPublicationStore.beginInstagramPublication>[4]) { return instagramPublicationStore.beginInstagramPublication(this.db,id,revision,accountKey,stage); }
+  claimInstagramSubmission(id: string, phase: "create" | "publish") { return instagramPublicationStore.claimInstagramSubmission(this.db,id,phase); }
+  recordInstagramContainer(id: string, containerId: string) { return instagramPublicationStore.recordInstagramContainer(this.db,id,containerId); }
+  finishInstagramPublication(id: string, result: Parameters<typeof instagramPublicationStore.finishInstagramPublication>[2]) { return instagramPublicationStore.finishInstagramPublication(this.db,id,result); }
+  clearInstagramStage(id: string) { instagramPublicationStore.clearInstagramStage(this.db,id); }
+  getSmsConfiguration() { return marketingProviderStore.smsConfiguration(this.db); }
+  getInstagramConfiguration() { return marketingProviderStore.instagramConfiguration(this.db); }
+  getStoredMarketingProvider(provider: "iletimerkezi" | "instagram_api") { return marketingProviderStore.storedMarketingProvider(this.db, provider); }
   listMarketingContents() { return marketingStore.listMarketingContents(this.db); }
   saveMarketingContent(input: Parameters<typeof marketingStore.saveMarketingContent>[1], source: "manual" | "ai" = "manual") { return marketingStore.saveMarketingContent(this.db, input, source); }
   listMediaAssets() { return marketingAssetStore.listMediaAssets(this.db); }
@@ -1001,7 +1014,7 @@ export class DesktopDatabase {
   getMessagingCampaignDetail(id: string) { return campaignStore.getMessagingCampaignDetail(this.db, id); }
   createMessagingCampaign(input: Parameters<typeof campaignStore.createMessagingCampaign>[1]) { return campaignStore.createMessagingCampaign(this.db, input); }
   previewMessagingCampaign(id: string) { return campaignStore.previewMessagingCampaign(this.db, id); }
-  prepareMessagingCampaign(id: string, template: BusinessMessageTemplate) { return campaignStore.prepareMessagingCampaign(this.db, id, template); }
+  prepareMessagingCampaign(id: string, template: BusinessMessageTemplate | null) { return campaignStore.prepareMessagingCampaign(this.db, id, template); }
   cancelMessagingCampaign(id: string) { return campaignStore.cancelMessagingCampaign(this.db, id); }
   getEncryptedMessagingToken() { return String(messagingStore.getStoredMessagingConfiguration(this.db)?.access_token_encrypted ?? ""); }
   getMessagingCustomer(id: string) { return messagingStore.getMessagingCustomer(this.db, id); }
@@ -1009,7 +1022,7 @@ export class DesktopDatabase {
   recoverCampaignDispatchClaims(now: string, staleBefore: string) { return campaignDispatchStore.recoverDispatchClaims(this.db, now, staleBefore); }
   claimCampaignDispatchBatch(now: string, size: number) { return campaignDispatchStore.claimDispatchBatch(this.db, now, size); }
   transitionCampaignDispatch(id: string, action: "start" | "pause" | "resume") { return campaignDispatchStore.transitionCampaignDispatch(this.db, id, action); }
-  beginCampaignSubmission(id: string, token: string, template: BusinessMessageTemplate, accountKey: string, now: string, intervalMs: number) { return campaignDispatchStore.beginCampaignSubmission(this.db, id, token, template, accountKey, now, intervalMs); }
+  beginCampaignSubmission(id: string, token: string, template: BusinessMessageTemplate | null, accountKey: string, now: string, intervalMs: number) { return campaignDispatchStore.beginCampaignSubmission(this.db, id, token, template, accountKey, now, intervalMs); }
   releaseRejectedCampaignMessage(id: string, token: string) { return campaignDispatchStore.releaseRejectedCampaignMessage(this.db, id, token); }
   finishCampaignDispatchClaim(id: string, token: string, result: DispatchResult, now: string, nextAttemptAt = "", rateLimitUntil = "") { return campaignDispatchStore.finishDispatchClaim(this.db, id, token, result, now, nextAttemptAt, rateLimitUntil); }
   completeDispatchCampaigns(now: string) { return campaignDispatchStore.completeDispatchCampaigns(this.db, now); }
@@ -1068,7 +1081,8 @@ export class DesktopDatabase {
     aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
     aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {},
     shippingSecretWrite: ShippingSecretWrite = { mode: "keep" },
-    messagingSecretWrite: MessagingSecretWrite = { mode: "keep" }
+    messagingSecretWrite: MessagingSecretWrite = { mode: "keep" },
+    marketingSecretWrites: MarketingProviderSecretWrites = {}
   ): DesktopSetupSaveResult {
     const result = saveStoredSetupData(
       this.db,
@@ -1076,7 +1090,8 @@ export class DesktopDatabase {
       aiApiKeyWrite,
       aiProfileApiKeyWrites,
       shippingSecretWrite,
-      messagingSecretWrite
+      messagingSecretWrite,
+      marketingSecretWrites
     );
     if (!result.ok) return result;
     return {

@@ -41,7 +41,7 @@ function project(row: Record<string, unknown>): BusinessMessage {
   return { id: String(row.id), businessId: String(row.business_id), customerId: row.customer_id ? String(row.customer_id) : undefined,
     purpose: row.purpose as BusinessMessage["purpose"], campaignId: row.campaign_id ? String(row.campaign_id) : undefined, campaignRecipientId: row.campaign_recipient_id ? String(row.campaign_recipient_id) : undefined,
     relatedEntityType: row.related_entity_type ? String(row.related_entity_type) : undefined, relatedEntityId: row.related_entity_id ? String(row.related_entity_id) : undefined,
-    providerId: "whatsapp_cloud", recipient: String(row.recipient), messageKind: row.message_kind === "session" ? "session" : "template",
+    providerId: row.provider_id as BusinessMessage["providerId"], recipient: String(row.recipient), messageKind: row.message_kind as BusinessMessage["messageKind"],
     templateName: String(row.template_name), templateLanguage: String(row.template_language), providerMessageId: String(row.provider_message_id),
     status: String(row.status) as BusinessMessageStatus, failureCode: String(row.failure_code), failureMessage: String(row.failure_message),
     createdAt: String(row.created_at), acceptedAt: String(row.accepted_at), deliveredAt: String(row.delivered_at), readAt: String(row.read_at), failedAt: String(row.failed_at) };
@@ -52,13 +52,13 @@ export function getBusinessMessage(db: DatabaseSync, id: string): BusinessMessag
 export function getMessageBinding(db: DatabaseSync, id: string) {
   return db.prepare("SELECT * FROM business_message_provider_bindings WHERE message_id=?").get(id);
 }
-export interface PrepareBusinessMessageInput { customerId: string; recipient: string; templateName: string; templateLanguage: string; intentHash: string; accountKey: string; campaignId?: string; campaignRecipientId?: string }
+export interface PrepareBusinessMessageInput { providerId?: BusinessMessage["providerId"]; messageKind?: BusinessMessage["messageKind"]; customerId: string; recipient: string; templateName: string; templateLanguage: string; intentHash: string; accountKey: string; campaignId?: string; campaignRecipientId?: string }
 /** Caller owns the transaction, allowing an outbox attachment to commit with the canonical message. */
 export function insertBusinessMessage(db: DatabaseSync, input: PrepareBusinessMessageInput) {
   const id = `business_message_${randomUUID()}`;
   db.prepare(`INSERT INTO business_messages(id,business_id,customer_id,provider_id,recipient,message_kind,template_name,template_language,status,created_at,purpose,campaign_id,campaign_recipient_id)
-    VALUES (?,?,?,'whatsapp_cloud',?,'template',?,?,'draft',?,?,?,?)`)
-    .run(id, business(db), input.customerId, input.recipient, input.templateName, input.templateLanguage, new Date().toISOString(), input.campaignId ? "marketing" : "operational", input.campaignId ?? null, input.campaignRecipientId ?? null);
+    VALUES (?,?,?,?,?,?,?,?,'draft',?,?,?,?)`)
+    .run(id, business(db), input.customerId, input.providerId ?? "whatsapp_cloud", input.recipient, input.messageKind ?? "template", input.templateName, input.templateLanguage, new Date().toISOString(), input.campaignId ? "marketing" : "operational", input.campaignId ?? null, input.campaignRecipientId ?? null);
   db.prepare("INSERT INTO business_message_provider_bindings(message_id,account_key,intent_hash) VALUES (?,?,?)").run(id, input.accountKey, input.intentHash);
   return getBusinessMessage(db, id)!;
 }
@@ -79,16 +79,16 @@ export function claimBusinessMessage(db: DatabaseSync, id: string) {
   try { const changed = claimBusinessMessageInTransaction(db, id); db.exec("COMMIT"); return changed; }
   catch (error) { db.exec("ROLLBACK"); throw error; }
 }
-export interface MessagingStatusUpdate { providerMessageId: string; status: "accepted" | "delivered" | "read" | "failed"; timestamp: string; failureCode?: string; messageId?: string; accountKey?: string }
+export interface MessagingStatusUpdate { providerId?: BusinessMessage["providerId"]; providerMessageId: string; status: "accepted" | "delivered" | "read" | "failed"; timestamp: string; failureCode?: string; messageId?: string; accountKey?: string }
 export function applyBusinessMessageStatus(db: DatabaseSync, input: MessagingStatusUpdate) {
   if (!/^[A-Za-z0-9_.=:-]{1,512}$/.test(input.providerMessageId) || !["accepted", "delivered", "read", "failed"].includes(input.status) || !Number.isFinite(Date.parse(input.timestamp))) throw new BusinessMessagingError("invalid_status");
-  const known = db.prepare("SELECT id FROM business_messages WHERE provider_id='whatsapp_cloud' AND provider_message_id=?").get(input.providerMessageId);
+  const known = db.prepare("SELECT id FROM business_messages WHERE provider_id=? AND provider_message_id=?").get(input.providerId ?? "whatsapp_cloud", input.providerMessageId);
   if (known && input.messageId && known.id !== input.messageId) return null;
   const localId = String(known?.id ?? input.messageId ?? "");
   const row = db.prepare(`SELECT m.* FROM business_messages m JOIN business_message_provider_bindings b ON b.message_id=m.id
-    WHERE m.business_id=? AND m.provider_id='whatsapp_cloud' AND b.submitted=1 AND m.id=?
+    WHERE m.business_id=? AND m.provider_id=? AND b.submitted=1 AND m.id=?
     AND (m.provider_message_id='' OR m.provider_message_id=?) AND (?='' OR b.account_key=?)`)
-    .get(business(db), localId, input.providerMessageId, input.accountKey ?? "", input.accountKey ?? "");
+    .get(business(db), input.providerId ?? "whatsapp_cloud", localId, input.providerMessageId, input.accountKey ?? "", input.accountKey ?? "");
   if (!row) return null;
   const current = project(row);
   const ranks = { draft: 0, queued: 1, failed: 1, accepted: 2, delivered: 3, read: 4, cancelled: 5 };
@@ -104,7 +104,7 @@ export function applyBusinessMessageStatus(db: DatabaseSync, input: MessagingSta
   db.prepare(`UPDATE business_messages SET provider_message_id=?, status=?, ${column}=CASE WHEN ${column}='' THEN ? ELSE ${column} END,
     failure_code=?, failure_message=? WHERE id=?`).run(input.providerMessageId, input.status, input.timestamp,
       input.status === "failed" ? (/^[A-Za-z0-9_-]{1,64}$/.test(input.failureCode ?? "") ? input.failureCode! : "provider_failed") : "",
-      input.status === "failed" ? "WhatsApp Business mesajı iletilemedi." : "", current.id);
+      input.status === "failed" ? (current.providerId === "iletimerkezi" ? "SMS mesajı iletilemedi." : "WhatsApp Business mesajı iletilemedi.") : "", current.id);
   return getBusinessMessage(db, current.id);
 }
 export function failBusinessMessage(db: DatabaseSync, id: string, code: string, message: string) {

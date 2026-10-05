@@ -1,12 +1,12 @@
 /** D-035: a delivery intent, never a Customer/Order state. */
-export type BusinessMessagingProviderId = "whatsapp_cloud";
+export type BusinessMessagingProviderId = "whatsapp_cloud" | "iletimerkezi";
 export type BusinessMessageStatus = "draft" | "queued" | "accepted" | "delivered" | "read" | "failed" | "cancelled";
 export interface BusinessMessage {
   id: string; businessId: string; customerId?: string;
   purpose?: "operational" | "marketing"; campaignId?: string; campaignRecipientId?: string;
   relatedEntityType?: string; relatedEntityId?: string;
   providerId: BusinessMessagingProviderId; recipient: string;
-  messageKind: "template" | "session";
+  messageKind: "template" | "session" | "text";
   templateName: string; templateLanguage: string; providerMessageId: string;
   status: BusinessMessageStatus; failureCode: string; failureMessage: string;
   createdAt: string; acceptedAt: string; deliveredAt: string; readAt: string; failedAt: string;
