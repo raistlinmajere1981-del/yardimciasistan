@@ -1,0 +1,23 @@
+.nexa-habitat {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  height: 144px;
+  margin-top: auto;
+  place-items: center;
+  pointer-events: none;
+  isolation: isolate;
+}
+.nexa-habitat--compact { height: 72px; }
+.nexa-habitat--micro { height: 44px; }
+.nexa-habitat--hidden { height: 0; }
+.nexa-habitat-back { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: -2; }
+.nexa-habitat-shadow { position: absolute; bottom: var(--space-2); width: 50%; height: var(--space-5); z-index: -1; }
+.nexa-character { width: 112px; height: 112px; object-fit: contain; }
+.nexa-habitat--wide .nexa-character { align-self: start; }
+.nexa-habitat--compact .nexa-character { width: 56px; height: 56px; }
+.nexa-habitat--micro .nexa-character { width: 40px; height: 40px; }
+.nexa-habitat--micro .nexa-habitat-shadow { height: var(--space-2); bottom: 0; width: 100%; }
+.nexa-habitat-copy { position: absolute; bottom: 0; font-size: var(--text-xs); color: var(--color-text-muted); }
+.nexa-habitat[data-motion-active="true"] .nexa-character { animation: nexa-state-in var(--motion-normal) var(--ease-standard) both; }
+@keyframes nexa-state-in { from { opacity: .65; transform: translateY(1px); } to { opacity: 1; transform: translateY(0); } }

@@ -4,6 +4,7 @@ import {
   normalizeInternationalPhone as normalizeBridgeInternationalPhone
 } from "@yardimci-asistan/whatsapp-bridge";
 import { widgetStyles } from "./widget-styles";
+import { widgetNexa, widgetNexaUrl } from "./widget-nexa";
 import { iconTemplate, type IconName } from "./widget-icons";
 import {
   buildInfoSuggestions,
@@ -146,8 +147,45 @@ let externalActionBound = false;
 let closeAnimationTimer = 0;
 let panelEntrancePending = false;
 let businessContextLoadId = 0;
+let nexaLifecycleBound = false;
+
+function nexaImage(role: "launcher" | "welcome" | "header") {
+  return `<img class="ya-widget-nexa" data-nexa-role="${role}" src="${escapeAttribute(widgetNexaUrl(role, widgetNexa.getState(), config.apiBaseUrl))}" alt="" aria-hidden="true" decoding="async" />`;
+}
+
+function updateNexaPresentation() {
+  const root = document.getElementById(ROOT_ID);
+  const active = state.isOpen && document.visibilityState === "visible" && document.hasFocus();
+  widgetNexa.setActive(active);
+  if (!root) return;
+  root.dataset.nexaMotionActive = String(active && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const next = widgetNexa.getState();
+  if (root.dataset.nexaState === next) return;
+  root.dataset.nexaState = next;
+  const image = root.querySelector<HTMLImageElement>('[data-nexa-role="header"]');
+  if (image) {
+    image.src = widgetNexaUrl("header", next, config.apiBaseUrl);
+    image.classList.remove("is-nexa-changing");
+    if (root.dataset.nexaMotionActive === "true") {
+      void image.offsetWidth;
+      image.classList.add("is-nexa-changing");
+    }
+  }
+}
+
+function bindNexaLifecycle() {
+  if (nexaLifecycleBound) return;
+  nexaLifecycleBound = true;
+  widgetNexa.subscribe(updateNexaPresentation);
+  document.addEventListener("visibilitychange", updateNexaPresentation);
+  window.addEventListener("focus", updateNexaPresentation);
+  window.addEventListener("blur", updateNexaPresentation);
+  window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", updateNexaPresentation);
+}
 
 export function init(userConfig: Partial<WidgetConfig> = {}) {
+  widgetNexa.reset();
+  bindNexaLifecycle();
   const mergedConfig = {
     ...defaultConfig,
     ...initialScriptConfig,
@@ -169,6 +207,7 @@ export function init(userConfig: Partial<WidgetConfig> = {}) {
 }
 
 export function open(options: WidgetOpenOptions = {}) {
+  widgetNexa.reset();
   panelEntrancePending = !state.isOpen;
   if (closeAnimationTimer) {
     window.clearTimeout(closeAnimationTimer);
@@ -202,6 +241,8 @@ export function close() {
 }
 
 function finalizeClose() {
+  widgetNexa.reset();
+  widgetNexa.setActive(false);
   state = {
     ...state,
     isOpen: false,
@@ -251,20 +292,19 @@ function render() {
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
   if (state.isOpen) panelEntrancePending = false;
   bindEvents(root);
+  updateNexaPresentation();
 }
 
 function buttonTemplate() {
   return `
     <button class="ya-widget-button" type="button" data-ya-open aria-label="Yardımcı Asistan'ı aç">
       <span class="ya-widget-launcher-avatar">
-        ${brandMarkTemplate()}
-        <span class="ya-widget-online-dot" aria-hidden="true"></span>
+        ${nexaImage("launcher")}
       </span>
       <span class="ya-widget-launcher-copy">
-        <strong>${config.aiEnabled ? "AI Asistan" : "İşletme Yardımcısı"}</strong>
-        <small>Size yardımcı olayım</small>
+        <strong>Nexa</strong>
+        <small>Yardımcı Asistan</small>
       </span>
-      ${iconTemplate("sparkles", "ya-widget-launcher-sparkle")}
     </button>
   `;
 }
@@ -274,12 +314,9 @@ function panelTemplate() {
     <section class="ya-widget-panel${panelEntrancePending ? " is-opening" : ""}" role="dialog" aria-labelledby="ya-widget-title">
       <header class="ya-widget-header">
         <div class="ya-widget-identity">
-          <span class="ya-widget-avatar">
-            ${brandMarkTemplate()}
-            <span class="ya-widget-avatar-spark" aria-hidden="true">${iconTemplate("sparkles")}</span>
-          </span>
+          ${state.view === "home" ? "" : `<span class="ya-widget-avatar">${nexaImage("header")}</span>`}
           <span class="ya-widget-title-copy">
-            <strong id="ya-widget-title">${escapeHtml(getAssistantTitle())}</strong>
+            <strong id="ya-widget-title"><span class="ya-widget-business-mark">${brandMarkTemplate()}</span>${escapeHtml(getAssistantTitle())}</strong>
             <small>${escapeHtml(getAssistantSubtitle())}</small>
           </span>
         </div>
@@ -304,7 +341,7 @@ function panelTemplate() {
 
 function brandMarkTemplate() {
   if (!config.logoUrl) {
-    return `<span class="ya-widget-mark ya-widget-mark-fallback">${config.aiEnabled ? "AI" : "YA"}</span>`;
+    return "";
   }
 
   return `<img class="ya-widget-mark" src="${escapeAttribute(config.logoUrl)}" alt="" aria-hidden="true" />`;
@@ -369,10 +406,10 @@ function homeTemplate() {
   return `
     <div class="ya-widget-home">
       <div class="ya-widget-welcome">
-        <span class="ya-widget-bot-bubble" aria-hidden="true">${iconTemplate("sparkles")}</span>
+        <span class="ya-widget-nexa-welcome">${nexaImage("welcome")}</span>
         <div>
           <span class="ya-widget-kicker">İşletme yardımcısı</span>
-          <h2 class="ya-widget-view-title" tabindex="-1">Ne yapmak istiyorsunuz?</h2>
+          <h2 class="ya-widget-view-title" tabindex="-1">Merhaba, ben Nexa.</h2>
           <p>İşlemi seçin; gerekli alanı doğrudan açayım.</p>
         </div>
       </div>
@@ -571,7 +608,6 @@ function infoTemplate() {
       ${
         state.aiAnswer
           ? `<div class="ya-widget-ai-answer">
-              <span class="ya-widget-answer-avatar" aria-hidden="true">${iconTemplate("sparkles")}</span>
               <p><strong>AI Yardımcı</strong><span>${escapeHtml(state.aiAnswer)}</span></p>
             </div>`
           : ""
@@ -1248,6 +1284,7 @@ async function handleAiSubmit(event: Event) {
   }
 
   state = { ...state, questionDraft: message, status: "", aiLoading: true };
+  const settleNexa = widgetNexa.begin();
   render();
 
   let failureStatus = "";
@@ -1273,8 +1310,10 @@ async function handleAiSubmit(event: Event) {
       aiLoading: false,
       status: result.fallback ? formatAiError(result.error) : ""
     };
+    settleNexa(result.fallback ? "error" : "response");
     render();
   } catch {
+    settleNexa("error");
     state = {
       ...state,
       aiLoading: false,

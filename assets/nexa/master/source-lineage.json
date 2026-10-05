@@ -1,0 +1,41 @@
+{
+  "sleep": {
+    "generatedSourceFilename": "exec-9e51dd12-ded0-4e63-9ed7-412df098d8bc.png",
+    "assembledBody": "nexa-body-source-1254.png",
+    "expressionLayer": "expressions/nexa-sleep-expression.png"
+  },
+  "ready": {
+    "generatedSourceFilename": "exec-18edc3a1-704d-425a-8dfa-bbc8a80866d5.png",
+    "assembledBody": "nexa-body-source-1254.png",
+    "expressionLayer": "expressions/nexa-ready-expression.png"
+  },
+  "listening": {
+    "generatedSourceFilename": "exec-775f1922-ffcf-4c5b-b551-1408d5bc5aa0.png",
+    "assembledBody": "nexa-body-source-1254.png",
+    "expressionLayer": "expressions/nexa-listening-expression.png"
+  },
+  "thinking": {
+    "generatedSourceFilename": "exec-d7cb85ad-7faa-433a-8d18-ac2ae6039a94.png",
+    "assembledBody": "nexa-body-source-1254.png",
+    "expressionLayer": "expressions/nexa-thinking-expression.png"
+  },
+  "speaking": {
+    "generatedSourceFilename": "exec-43ade7e1-7c7d-46d3-8158-68b387c84f3b.png",
+    "assembledBody": "nexa-body-source-1254.png",
+    "expressionLayer": "expressions/nexa-speaking-expression.png"
+  },
+  "success": {
+    "generatedSourceFilename": "exec-ab5d5526-7835-4764-92f4-08a5d53652d9.png",
+    "assembledBody": "nexa-body-source-1254.png",
+    "expressionLayer": "expressions/nexa-success-expression.png"
+  },
+  "warning": {
+    "generatedSourceFilename": "exec-ae80766d-0c31-44ae-89ff-fedd523ea3bf.png",
+    "assembledBody": "nexa-body-source-1254.png",
+    "expressionLayer": "expressions/nexa-warning-expression.png"
+  },
+  "optical": {
+    "generatedSourceFilename": "exec-3586ab1c-7fc6-4b68-a1d5-d6ba0ebd3a91.png",
+    "assembledBody": "nexa-optical-body-source-1254.png"
+  }
+}

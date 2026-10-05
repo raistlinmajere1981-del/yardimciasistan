@@ -1,3 +1,4 @@
+import { observeNexaAi } from "../app/nexa-activity";
 import { useEffect, useMemo, useState } from "react";
 import {
   Banknote,
@@ -180,7 +181,7 @@ export function ReportsPage({
       return;
     }
     try {
-      const result = await window.yardimciDesktop.generateReportAiComment({ mode, range });
+      const result = await observeNexaAi(() => window.yardimciDesktop!.generateReportAiComment({ mode, range }));
       if (result.ok) {
         setReportAiContent(result.content);
         setReportAiMessage("AI dönem yorumu hazır.");
@@ -201,7 +202,7 @@ export function ReportsPage({
       return;
     }
     try {
-      const result = await window.yardimciDesktop.generateFinanceAiComment({ mode });
+      const result = await observeNexaAi(() => window.yardimciDesktop!.generateFinanceAiComment({ mode }));
       if (result.ok) {
         setCashAiContent(result.content);
         setCashAiMessage("AI kasa yorumu hazır.");

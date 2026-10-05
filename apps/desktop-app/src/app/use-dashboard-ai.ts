@@ -1,3 +1,4 @@
+import { observeNexaAi } from "./nexa-activity";
 import { useEffect, useRef, useState } from "react";
 import type { SyncState } from "./runtime-state";
 
@@ -36,7 +37,7 @@ export function useDashboardAi(aiEnabled: boolean) {
     setMessage("Günlük işletme değerlendirmesi hazırlanıyor...");
 
     try {
-      const result = await bridge.generateDailyBusinessEvaluation();
+      const result = await observeNexaAi(() => bridge.generateDailyBusinessEvaluation(), "response", () => generation === generationRef.current && aiEnabled);
       if (generation !== generationRef.current || !aiEnabled) return;
       if (!result.ok) {
         setState("error");

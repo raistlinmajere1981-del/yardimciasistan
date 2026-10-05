@@ -73,6 +73,46 @@ function report(file, node, sourceFile, rule, message) {
   });
 }
 
+function isDocumentElementNode(node) {
+  return (
+    ts.isPropertyAccessExpression(node)
+    && ts.isIdentifier(node.expression)
+    && node.expression.text === "document"
+    && node.name.text === "documentElement"
+  );
+}
+
+function isSafeAppearanceObserve(node) {
+  if (!ts.isCallExpression(node)) return null;
+  if (!ts.isPropertyAccessExpression(node.expression)) return null;
+  if (node.expression.name.text !== "observe") return null;
+  if (!ts.isIdentifier(node.expression.expression)) return null;
+  const observerName = node.expression.expression.text;
+  if (node.arguments.length < 2) return null;
+  if (!isDocumentElementNode(node.arguments[0])) return null;
+  const options = node.arguments[1];
+  if (!ts.isObjectLiteralExpression(options)) return null;
+  let attributesTrue = false;
+  let attributeFilter = null;
+  let hasUnsafeSubscription = false;
+  for (const prop of options.properties) {
+    if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) continue;
+    const key = prop.name.text;
+    if (key === "attributes") {
+      attributesTrue = prop.initializer.kind === ts.SyntaxKind.TrueKeyword;
+    } else if (key === "attributeFilter") {
+      if (!ts.isArrayLiteralExpression(prop.initializer)) return null;
+      attributeFilter = prop.initializer.elements.map((el) => (ts.isStringLiteral(el) ? el.text : ""));
+    } else if ((key === "childList" || key === "subtree" || key === "characterData") && prop.initializer.kind === ts.SyntaxKind.TrueKeyword) {
+      hasUnsafeSubscription = true;
+    }
+  }
+  if (!attributesTrue || hasUnsafeSubscription) return null;
+  if (!attributeFilter || attributeFilter.length === 0) return null;
+  if (!attributeFilter.every((entry) => entry.startsWith("data-"))) return null;
+  return observerName;
+}
+
 function auditFile(file) {
   const absolute = path.join(ROOT, file);
   const text = fs.readFileSync(absolute, "utf8");
@@ -86,6 +126,9 @@ function auditFile(file) {
     "apps/desktop-app/src/components/app/DesktopAppView.tsx",
     "apps/desktop-app/src/components/app/DesktopAppFrame.tsx"
   ]).has(normalizedFile);
+  const mutationObserverCandidates = [];
+  const safeAppearanceObservers = new Set();
+  const seenObserverInitializers = new Set();
 
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
@@ -160,14 +203,19 @@ function auditFile(file) {
       }
     }
 
-    if (isDesktopRenderer && ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "MutationObserver") {
-      report(
-        file,
-        node,
-        sourceFile,
-        "renderer-no-dom-observer",
-        "Renderer React ağacını MutationObserver ile sonradan yamamamalı."
-      );
+    if (isDesktopRenderer && ts.isVariableDeclaration(node) && node.initializer && ts.isNewExpression(node.initializer) && ts.isIdentifier(node.initializer.expression) && node.initializer.expression.text === "MutationObserver") {
+      seenObserverInitializers.add(node.initializer);
+      const varName = ts.isIdentifier(node.name) ? node.name.text : null;
+      mutationObserverCandidates.push({ node: node.initializer, varName });
+    }
+
+    if (isDesktopRenderer && ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "MutationObserver" && !seenObserverInitializers.has(node)) {
+      mutationObserverCandidates.push({ node, varName: null });
+    }
+
+    if (isDesktopRenderer && ts.isCallExpression(node)) {
+      const safeObserver = isSafeAppearanceObserve(node);
+      if (safeObserver) safeAppearanceObservers.add(safeObserver);
     }
 
     if (
@@ -224,6 +272,17 @@ function auditFile(file) {
   }
 
   visit(sourceFile);
+
+  for (const candidate of mutationObserverCandidates) {
+    if (candidate.varName && safeAppearanceObservers.has(candidate.varName)) continue;
+    report(
+      file,
+      candidate.node,
+      sourceFile,
+      "renderer-no-dom-observer",
+      "Renderer React ağacını MutationObserver ile sonradan yamamamalı. İstisna: yalnızca document.documentElement üzerinde data-* appearance özniteliklerini (attributes:true + attributeFilter) izleyen gözlemciler."
+    );
+  }
 }
 
 const files = SOURCE_ROOTS.flatMap(walk);

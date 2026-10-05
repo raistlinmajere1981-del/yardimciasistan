@@ -1,3 +1,4 @@
+import { observeNexaAi } from "../app/nexa-activity";
 import { useEffect, useRef, useState } from "react";
 import { MARKETING_CHANNELS, type MarketingContentInput, type MarketingContentDetail, type MarketingPublication, type MarketingPublicationInput,
   type MarketingAnalyticsRangeInput, type MarketingStudioSnapshot, type MarketingResult, type MarketingChannel, type MarketingAiCapability, type MarketingAssetView, type MessagingCampaignInput, type MarketingScheduleInput, type MarketingScheduleSnapshot, type MarketingScheduleDetail, type MessagingCampaign } from "@yardimci-asistan/shared";
@@ -70,7 +71,7 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
   }
   async function ai(capability:MarketingAiCapability,toChannel?:MarketingChannel) {
     if(!draft)return;const ticket=epoch.current;
-    await action(async()=>{const result=value(await bridge().generateMarketingAi({capability,channel:toChannel,text:draft.masterText,instructions,aspect,styleHints:style}));
+    await action(async()=>{const result=value(await observeNexaAi(() => bridge().generateMarketingAi({capability,channel:toChannel,text:draft.masterText,instructions,aspect,styleHints:style}), "response", () => mounted.current && ticket === epoch.current));
       if(!mounted.current||ticket!==epoch.current)return;
       if(result.asset){setGenerated(result.asset);await reload();}else if(result.text)setCandidate({text:result.text,channel:toChannel});
     });

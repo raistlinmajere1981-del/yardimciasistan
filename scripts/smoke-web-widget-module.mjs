@@ -1,17 +1,23 @@
 import { chromium, expect } from "@playwright/test";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
+import { nexaRuntimePaths } from "./nexa-assets.mjs";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-widget-module-"));
 const webModuleRoot = join(tempRoot, "web-module");
 const widgetBundlePath = join(process.cwd(), "packages", "web-widget", "dist", "widget.js");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
 cpSync(widgetBundlePath, join(webModuleRoot, "widget.js"));
+for (const path of nexaRuntimePaths("web")) {
+  const destination = join(webModuleRoot, path);
+  mkdirSync(join(destination, ".."), { recursive: true });
+  cpSync(join(process.cwd(), "packages/web-widget/dist", path), destination);
+}
 const syncSecret = "pilot-web-smoke-secret";
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
@@ -186,7 +192,7 @@ try {
   await injectWidget(page, baseUrl);
 
   await expect(page.getByRole("button", { name: "Yardımcı Asistan'ı aç" })).toBeVisible();
-  await expect(page.locator(".ya-widget-button img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);
+  await expect(page.locator('[data-nexa-role="launcher"]')).toHaveAttribute("src", /\/assets\/nexa\/.*\.webp$/);
 
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);

@@ -5,6 +5,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { join, relative } from "node:path";
 import process from "node:process";
 import { readProductVersion } from "./product-version.mjs";
+import { nexaRuntimePaths } from "./nexa-assets.mjs";
 
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, "firm-template", "web-module");
@@ -123,6 +124,13 @@ cpSync(sourceRoot, packageRoot, {
   filter: shouldCopySourcePath
 });
 cpSync(widgetBundlePath, join(packageRoot, "widget.js"));
+for (const assetPath of nexaRuntimePaths("web")) {
+  const source = join(repoRoot, "packages/web-widget/dist", assetPath);
+  assert.ok(existsSync(source), `Web Nexa build asset missing: ${assetPath}`);
+  const destination = join(packageRoot, assetPath);
+  mkdirSync(join(destination, ".."), { recursive: true });
+  cpSync(source, destination);
+}
 assert.equal(
   sha256(join(packageRoot, "widget.js")),
   sha256(widgetBundlePath),

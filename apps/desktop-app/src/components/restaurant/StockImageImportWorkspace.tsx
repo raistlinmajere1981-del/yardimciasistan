@@ -1,3 +1,4 @@
+import { observeNexaAi } from "../../app/nexa-activity";
 import { Camera, FileImage, Plus, RotateCw, Sparkles, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StockImageAnalysis, StockImageConfidence } from "@yardimci-asistan/shared";
@@ -174,12 +175,12 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
     try {
       const prepared = await prepareImage(selectedFile, rotation);
       if (analysisAttemptRef.current !== attempt) return;
-      const result = await bridge.analyzeStockImage({
+      const result = await observeNexaAi(async () => bridge.analyzeStockImage({
         importId,
         fileName: prepared.name,
         mimeType: prepared.type,
         bytes: await prepared.arrayBuffer()
-      });
+      }), "response", () => analysisAttemptRef.current === attempt);
       if (analysisAttemptRef.current !== attempt) return;
       if (!result.ok) {
         setStage("image");
@@ -267,7 +268,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
     }
     setError("");
     setMessage("Stoklar tek işlem içinde güncelleniyor…");
-    const result = await bridge.applyStockImageImport({
+    const result = await observeNexaAi(() => bridge.applyStockImageImport({
       importId: activeImportId,
       imageHash,
       duplicateWarningAcknowledged: duplicateAcknowledged,
@@ -277,7 +278,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
         raw_text: line.rawText,
         confidence: line.confidence
       }))
-    });
+    }), "success");
     if (!result.ok) {
       setError(result.message);
       setMessage("");

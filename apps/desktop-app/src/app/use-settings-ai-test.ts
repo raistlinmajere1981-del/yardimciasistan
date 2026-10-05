@@ -1,3 +1,4 @@
+import { observeNexaAi } from "./nexa-activity";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import type { SetupFormState } from "./setup-model";
@@ -66,7 +67,7 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     }
 
     try {
-    const result = await bridge.testAiConnection({
+    const result = await observeNexaAi(() => bridge.testAiConnection({
       provider: setupForm.aiProvider,
       service: setupForm.aiService,
       projectName: setupForm.aiProjectName,
@@ -75,7 +76,7 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
       apiKey,
       useStoredApiKey: !setupForm.clearAiApiKey && setupForm.aiStoredApiKeyConfigured && apiKey.trim() === "",
       timeoutSeconds: Number(setupForm.aiTimeoutSeconds)
-    });
+    }), "success", isCurrent);
 
     if (!isCurrent()) return;
     setAiConnectionTestState(result.ok ? "success" : "error");

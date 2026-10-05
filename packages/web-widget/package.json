@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@yardimci-asistan/shared": "0.1.0",
     "@yardimci-asistan/whatsapp-bridge": "0.1.0"
   },
   "devDependencies": {

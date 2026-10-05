@@ -1,3 +1,4 @@
+import { observeNexaAi } from "./nexa-activity";
 import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
@@ -222,11 +223,11 @@ export function useCustomerController({
     setStatusMessage("Kimlik görseli AI ile okunuyor...");
     let result: DesktopIdentityImageAnalyzeResult;
     try {
-      result = await window.yardimciDesktop.analyzeIdentityImage({
+      result = await observeNexaAi(async () => window.yardimciDesktop!.analyzeIdentityImage({
         fileName: file.name,
         mimeType: file.type,
         bytes: await file.arrayBuffer()
-      });
+      }));
     } catch {
       result = { ok: false, code: "image_unreadable", message: "Kimlik görseli okunamadı." };
     }

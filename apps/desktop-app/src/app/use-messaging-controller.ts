@@ -1,3 +1,4 @@
+import { observeNexaAi } from "./nexa-activity";
 import { useConfirmDialog } from "../components/ui/useConfirmDialog";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
@@ -537,7 +538,7 @@ export function useMessagingController({
     setAiMessage(`${request.customer_name} için cevap taslağı hazırlanıyor...`);
 
     try {
-      const result = await bridge.createOwnerReplySuggestion(request.id);
+      const result = await observeNexaAi(() => bridge.createOwnerReplySuggestion(request.id), "response", () => generation === suggestionGenerationRef.current && aiEpoch === aiCapabilityEpochRef.current && aiEnabledRef.current && customersEnabledRef.current);
       const current = (
         generation === suggestionGenerationRef.current
         && aiEpoch === aiCapabilityEpochRef.current
@@ -612,10 +613,10 @@ export function useMessagingController({
     setAiMessage("Mesaj yeniden hazırlanıyor...");
 
     try {
-      const result = await bridge.rewriteOwnerReplySuggestion({
+      const result = await observeNexaAi(() => bridge.rewriteOwnerReplySuggestion({
         requestId: request.id,
         instructions
-      });
+      }), "response", operationCurrent);
       if (!operationCurrent()) return;
       if (!result.ok) {
         if (replyFeedbackOwnerRef.current === feedbackOwner) {

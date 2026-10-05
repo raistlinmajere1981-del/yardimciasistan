@@ -1,5 +1,6 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { DesktopPage, NavigationItem } from "../../app/navigation";
+import { NexaHabitat } from "./NexaHabitat";
 
 interface SidebarProps {
   items: NavigationItem[];
@@ -59,6 +60,7 @@ export function Sidebar({ items, activePage, businessName, collapsed = false, on
         {primaryItems.map(renderItem)}
       </nav>
 
+      <NexaHabitat collapsed={collapsed} />
       {settingsItem && (
         <nav className="sidebar-footer-nav" aria-label="Uygulama ayarları">
           {renderItem(settingsItem)}

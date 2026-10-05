@@ -1,4 +1,7 @@
 const SMOKE_FILES = [
+  "scripts/smoke-nexa-assets.mjs",
+  "scripts/smoke-desktop-nexa.mjs",
+  "scripts/smoke-web-nexa.mjs",
   "scripts/smoke-marketing-analytics.mjs",
   "scripts/smoke-marketing-analytics-ui.mjs",
   "scripts/smoke-marketing-schedules.mjs",
@@ -458,6 +461,8 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-nexa-assets.mjs") return [];
+  if (file === "scripts/smoke-web-nexa.mjs") return ["build-packages"];
   if (file === "scripts/smoke-marketing-log-privacy.mjs") return ["php-lint"];
   if (file === "scripts/smoke-instagram-staging.mjs") return ["php-lint"];
   if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "php-lint"];
@@ -476,6 +481,8 @@ function smokeRequires(file) {
 
 function smokeDomains(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
+
+  if (name === "nexa-assets") return ["desktop", "web", "platform"];
   const domains = new Set();
   if (/marketing-|showcase-|instagram-/.test(name)) domains.add("marketing");
   if (name === "marketing-log-privacy") domains.add("diagnostics");

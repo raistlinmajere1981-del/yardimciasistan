@@ -40,6 +40,7 @@ export * from "./utils/commerce-order-contact";
 export * from "./utils/commerce-order-delivery";
 export * from "./utils/phone";
 export * from "./utils/validation";
+export * from "./utils/nexa";
 
 export { normalizeTableCategoryInputs, normalizeTableCategoryName, tableCategoryKey, type NormalizedTableCategoryInput } from "./utils/table-category-settings";
 export * from "./types/business-messaging";

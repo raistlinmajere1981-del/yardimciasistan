@@ -154,18 +154,13 @@ function renderAvailabilityAnswer(form: HTMLFormElement, answer: string, live: b
   container.dataset.yaAvailabilityAnswer = "1";
   container.replaceChildren();
 
-  const avatar = document.createElement("span");
-  avatar.className = "ya-widget-answer-avatar";
-  avatar.setAttribute("aria-hidden", "true");
-  avatar.innerHTML = availabilityIcon();
-
   const copy = document.createElement("p");
   const title = document.createElement("strong");
   title.textContent = live ? "Canlı Müsaitlik" : "Müsaitlik Kontrolü";
   const text = document.createElement("span");
   text.textContent = answer;
   copy.append(title, text);
-  container.append(avatar, copy);
+  container.append(copy);
 
   const trust = subview.querySelector<HTMLElement>(".ya-widget-inline-trust");
   if (trust) {
@@ -236,8 +231,4 @@ function pickAvailabilityRuntimeConfig(input: Partial<AvailabilityRuntimeConfig>
   const result: Partial<AvailabilityRuntimeConfig> = {};
   if (typeof input.apiBaseUrl === "string" && input.apiBaseUrl.trim()) result.apiBaseUrl = input.apiBaseUrl;
   return result;
-}
-
-function availabilityIcon() {
-  return '<svg class="ya-widget-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 9h16"/><path d="m9 14 2 2 4-4"/></svg>';
 }

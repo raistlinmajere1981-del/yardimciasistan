@@ -1,0 +1,1751 @@
+{
+  "schemaVersion": 1,
+  "character": "Nexa",
+  "defaultState": "ready",
+  "pathBase": "repository-root",
+  "states": [
+    "sleep",
+    "ready",
+    "listening",
+    "thinking",
+    "speaking",
+    "success",
+    "warning"
+  ],
+  "stateLabels": {
+    "sleep": "UYKU",
+    "ready": "HAZIR",
+    "listening": "DİNLİYOR",
+    "thinking": "DÜŞÜNÜYOR",
+    "speaking": "KONUŞUYOR",
+    "success": "BAŞARILI",
+    "warning": "UYARI"
+  },
+  "themePolicy": "Same character pixels for light and dark. Only separate habitat and contact-shadow assets vary.",
+  "motion": {
+    "static": true,
+    "motionSafe": true,
+    "bakedAnimation": false
+  },
+  "registration": {
+    "canvas": "square",
+    "contentHeightRatio": 0.88,
+    "crop": [
+      134,
+      130,
+      1178,
+      1174
+    ],
+    "sharedBodyAlpha": true,
+    "stateChanges": "inner-face-only",
+    "edgeTreatment": "Detached alpha specks removed; nearest opaque RGB extended beneath common alpha fringe."
+  },
+  "opticalPolicy": {
+    "stateSizes": [
+      32,
+      48
+    ],
+    "source": "master/nexa-optical-source-1254.png",
+    "changes": [
+      "broad internal color masses",
+      "no thin internal ribbons",
+      "solid navy facial features",
+      "no tiny eye highlights"
+    ]
+  },
+  "webPolicy": {
+    "conversationAvatarPlacement": "header-only",
+    "perMessageAvatar": false
+  },
+  "assets": [
+    {
+      "id": "master.nexa-ready-512",
+      "state": "ready",
+      "usage": "master",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/master/nexa-ready-512.png",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/png",
+      "bytes": 182850,
+      "sha256": "6ee4f84534e134cf6fc311f3170e3f21d44354c1b874ed95696e0f44dcd7f724",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "master.nexa-optical-512",
+      "state": "ready",
+      "usage": "optical-master",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/master/nexa-optical-512.png",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/png",
+      "bytes": 153559,
+      "sha256": "a9155d49612714c3dc4c679eae86c453416cf587e7d4eaca914a812d3a0c5dae",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-sleep-512",
+      "state": "sleep",
+      "usage": "state",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/states/nexa-sleep-512.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 123104,
+      "sha256": "ed617e1d97059abf06a16c5f0cfd83fa06bf37bbc454b18086d6fdbe05ecb62e",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-sleep-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-sleep-256",
+      "state": "sleep",
+      "usage": "state",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-sleep-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 37600,
+      "sha256": "9fbdae465719965ee8e2843a856309ac1f05b681647787c4264edbccea27a527",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-sleep-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-sleep-128",
+      "state": "sleep",
+      "usage": "state",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/states/nexa-sleep-128.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 14310,
+      "sha256": "ebf69a9d3c6cb19e5094b85036689cdf6aa7de86a0884b0cb318497f57d01239",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-sleep-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-sleep-96",
+      "state": "sleep",
+      "usage": "state",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/states/nexa-sleep-96.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 9112,
+      "sha256": "621c40cd2b6a5f9c8ad224c736d456597e7d6e867aa9c34245264d7e9a7931f7",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-sleep-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-sleep-64",
+      "state": "sleep",
+      "usage": "state",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/states/nexa-sleep-64.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5092,
+      "sha256": "a594bf7e5944c282c7b36be4f3d71ffbf1c5c70b2bce29c7fab71e2fb55b42a5",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-sleep-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-sleep-48",
+      "state": "sleep",
+      "usage": "state",
+      "dimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "assetPath": "assets/nexa/states/nexa-sleep-48.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 3054,
+      "sha256": "e3b3f79d840effad774ab0145589a35494b05b474d8fe3ab0ee1a226ecb222ba",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-sleep-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-sleep-32",
+      "state": "sleep",
+      "usage": "state",
+      "dimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "assetPath": "assets/nexa/states/nexa-sleep-32.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 1840,
+      "sha256": "2d892998bb2f5651a93f673c5c3704f22d53611193da3b3701b8642340a7c68f",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-sleep-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-ready-512",
+      "state": "ready",
+      "usage": "state",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-512.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 124244,
+      "sha256": "5db60cd69c0478808ec22c3fbfcf59660d5f225db975e05aa6ef76f44059f9e0",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-ready-256",
+      "state": "ready",
+      "usage": "state",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38084,
+      "sha256": "c8f4bd7222065c359b040afcd3adcf08162d7e1b417dfc0851d9d23f193e3f89",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-ready-128",
+      "state": "ready",
+      "usage": "state",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-128.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 14470,
+      "sha256": "96a14c90617dc9dd8527d498698657a830a51b761989bb663c170815ae5d5a25",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-ready-96",
+      "state": "ready",
+      "usage": "state",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-96.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 9202,
+      "sha256": "91d19941bbc1f844b296b288069a2719e6c19d8d7ecfc932fd72925788081c7c",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-ready-64",
+      "state": "ready",
+      "usage": "state",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-64.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5148,
+      "sha256": "4904b78fdba27ef56c526a17e9570439e235ece751fabd6790a62b15fd108d72",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-ready-48",
+      "state": "ready",
+      "usage": "state",
+      "dimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-48.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 3128,
+      "sha256": "3ece597954adb08cafd95a9db46f8ce99bf3298f9c4c59ed2928658aa9cbd014",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-ready-32",
+      "state": "ready",
+      "usage": "state",
+      "dimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-32.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 1874,
+      "sha256": "9cdecfa7336d9fdfcd704ef1bbc07d105c89aacfde8a7e9de2159fa6f2652014",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-listening-512",
+      "state": "listening",
+      "usage": "state",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/states/nexa-listening-512.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 124206,
+      "sha256": "fe06476a36dadcece221b1612289419f038c25cdd6f6f3546933a1c450ed0bca",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-listening-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-listening-256",
+      "state": "listening",
+      "usage": "state",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-listening-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38100,
+      "sha256": "7143f8d8e6972c251b3cfe4491af1368d15ff62b201952a36927e4339af7423a",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-listening-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-listening-128",
+      "state": "listening",
+      "usage": "state",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/states/nexa-listening-128.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 14570,
+      "sha256": "6076c5646044e14b70f4df191c3112037a53d2dae585de0515e40f87ec627e08",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-listening-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-listening-96",
+      "state": "listening",
+      "usage": "state",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/states/nexa-listening-96.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 9274,
+      "sha256": "6a1a508295dddc3303535d1a3f38f55505b9ef541a39a83627b40452b0c61db7",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-listening-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-listening-64",
+      "state": "listening",
+      "usage": "state",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/states/nexa-listening-64.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5174,
+      "sha256": "1570bcf5f3869ed3cc18e5f818cccf6dee0da56e6e6e8ea371d8ae4cfd63dc2f",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-listening-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-listening-48",
+      "state": "listening",
+      "usage": "state",
+      "dimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "assetPath": "assets/nexa/states/nexa-listening-48.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 3120,
+      "sha256": "37e0f6e4d1e3085a74c77fb5b920875e2dbc722a8bb6ac64510945b372ec8ad2",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-listening-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-listening-32",
+      "state": "listening",
+      "usage": "state",
+      "dimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "assetPath": "assets/nexa/states/nexa-listening-32.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 1866,
+      "sha256": "cbecb57b37ad0c80b996d15452fc1cfd942f7bfd910072c3ef02c00dcabb2dc4",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-listening-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-thinking-512",
+      "state": "thinking",
+      "usage": "state",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/states/nexa-thinking-512.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 124118,
+      "sha256": "34fc6b9d86a3fd9c39ff6cab03a7e50a3903a32eef30a3cadda01bf9b6f7789e",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-thinking-256",
+      "state": "thinking",
+      "usage": "state",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-thinking-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38136,
+      "sha256": "e619f121b336b2cc6f6fd8c49575d518ec5f8eec242ce8ebc0db4ee0afd0ec49",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-thinking-128",
+      "state": "thinking",
+      "usage": "state",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/states/nexa-thinking-128.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 14518,
+      "sha256": "da3e3fe6773bccbd0a87b9bef747e9716a2fa830e39635d352c633ec47ca1583",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-thinking-96",
+      "state": "thinking",
+      "usage": "state",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/states/nexa-thinking-96.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 9242,
+      "sha256": "c3a5acd2fb5ef7ab5a854b1c5f81c34dfb63491e0934cca5e142da0a89844076",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-thinking-64",
+      "state": "thinking",
+      "usage": "state",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/states/nexa-thinking-64.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5164,
+      "sha256": "e75cfa7efd7b9b9cea157c4da8fae73b780d96deaadd84992888c0c06b1b12a7",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-thinking-48",
+      "state": "thinking",
+      "usage": "state",
+      "dimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "assetPath": "assets/nexa/states/nexa-thinking-48.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 3074,
+      "sha256": "a6a9e54f76a106d705cb2bbb51615c719c308b1f9b57fafa2724d1fab2a63f9f",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-thinking-32",
+      "state": "thinking",
+      "usage": "state",
+      "dimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "assetPath": "assets/nexa/states/nexa-thinking-32.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 1866,
+      "sha256": "fb39bea7021be1c45d75ce46a3d641bb25b5ec4aec375c119cca43eb3a63a0cd",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-speaking-512",
+      "state": "speaking",
+      "usage": "state",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/states/nexa-speaking-512.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 124414,
+      "sha256": "5502d6840142fea2b02f032d187d7f6bb7d8aa477130868e02c756ee347c05e6",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-speaking-256",
+      "state": "speaking",
+      "usage": "state",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-speaking-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38300,
+      "sha256": "ed84bd8cea354af587169326305ed521c818049ea893317073111dccaa8ad50e",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-speaking-128",
+      "state": "speaking",
+      "usage": "state",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/states/nexa-speaking-128.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 14584,
+      "sha256": "09770add79a1cb9b96f1cd17a64fe1dbec0b37a3e0d9aaed91f9f67bdaa13d83",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-speaking-96",
+      "state": "speaking",
+      "usage": "state",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/states/nexa-speaking-96.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 9352,
+      "sha256": "0be48d62c1c09a4853cf794ab97f960e3e3d0431f18c0d064e48a090584ec99f",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-speaking-64",
+      "state": "speaking",
+      "usage": "state",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/states/nexa-speaking-64.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5190,
+      "sha256": "bf2715144b02b7ba4e255eb35381d26043511e9ef339597eebd58f328dd8fd68",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-speaking-48",
+      "state": "speaking",
+      "usage": "state",
+      "dimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "assetPath": "assets/nexa/states/nexa-speaking-48.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 3104,
+      "sha256": "9becd9f6dd3e2b4d9890509e2c2eb771a4ce8aa979527a327bae220b841c08df",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-speaking-32",
+      "state": "speaking",
+      "usage": "state",
+      "dimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "assetPath": "assets/nexa/states/nexa-speaking-32.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 1874,
+      "sha256": "998477a58fb1ff12477975bc38a5a627ab81e9a165869125af395d7b7971d389",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-success-512",
+      "state": "success",
+      "usage": "state",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/states/nexa-success-512.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 124328,
+      "sha256": "b124543ad87ce5d0c59f20d6ead57d09ca11aa87601aac35ad160e57be38ab54",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-success-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-success-256",
+      "state": "success",
+      "usage": "state",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-success-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38078,
+      "sha256": "c29a7545577a6d5f334e1c978a54f61d04a8ecad1321adcf807125de94bcaf97",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-success-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-success-128",
+      "state": "success",
+      "usage": "state",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/states/nexa-success-128.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 14524,
+      "sha256": "a99bebe6dd53c28a3242d11138b774aef5bbf9727ac3bb5efa369a8dfd0eb3e7",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-success-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-success-96",
+      "state": "success",
+      "usage": "state",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/states/nexa-success-96.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 9236,
+      "sha256": "7fb8a120d30f4bd19b9f881c09652201e69d0146cafdd8b7f5c337a501acbcd5",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-success-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-success-64",
+      "state": "success",
+      "usage": "state",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/states/nexa-success-64.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5158,
+      "sha256": "46a40c63c2bd110d2eae84c2c9aaa19978db3093b021f23648d1f1a36878a150",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-success-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-success-48",
+      "state": "success",
+      "usage": "state",
+      "dimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "assetPath": "assets/nexa/states/nexa-success-48.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 3068,
+      "sha256": "4d417672752a489386604a630eb98e848fb1d71d6373516c8f753ebaf0564e6b",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-success-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-success-32",
+      "state": "success",
+      "usage": "state",
+      "dimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "assetPath": "assets/nexa/states/nexa-success-32.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 1868,
+      "sha256": "60d9c7cf797ca9af341ef9f26e937b70e3a65cf106771c0e0c9f398bc89d6a6a",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-success-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-warning-512",
+      "state": "warning",
+      "usage": "state",
+      "dimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetPath": "assets/nexa/states/nexa-warning-512.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 124034,
+      "sha256": "b29ea8b23fc90736c503aec043474ed6636fafa67961da98861d1bdec283f763",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-warning-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-warning-256",
+      "state": "warning",
+      "usage": "state",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-warning-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38028,
+      "sha256": "f9773fe7a439e1b19984a7b53043729ee65faac9e16ddb8d0d5d86d3bc4e087a",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-warning-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-warning-128",
+      "state": "warning",
+      "usage": "state",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/states/nexa-warning-128.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 14484,
+      "sha256": "d85a6d9087938fff667d89ef0f2d52ff5d2cc77a9cfa432cc6f75f6bf644ff71",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-warning-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-warning-96",
+      "state": "warning",
+      "usage": "state",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/states/nexa-warning-96.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 9230,
+      "sha256": "70f5a9020967183796dcfc9a3d38dd3fe899fb83e83df019c8ccaf6f495456b2",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-warning-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-warning-64",
+      "state": "warning",
+      "usage": "state",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/states/nexa-warning-64.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5118,
+      "sha256": "65a9c940e498b4a432dcdd35439924cdfdd70dfdf93f4e4fcfeb5cd400e64012",
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-warning-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-warning-48",
+      "state": "warning",
+      "usage": "state",
+      "dimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "assetPath": "assets/nexa/states/nexa-warning-48.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 3082,
+      "sha256": "0f44663e9efffd04c7abafa822105327b9f19d61cc3df4a52d8a7580220c7581",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-warning-expression.png"
+      }
+    },
+    {
+      "id": "states.nexa-warning-32",
+      "state": "warning",
+      "usage": "state",
+      "dimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "assetPath": "assets/nexa/states/nexa-warning-32.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 1870,
+      "sha256": "60eaddba12e1ea4c53af4f0ca544b8f3073ff22110ffe662d6829e1a211debfe",
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-warning-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-wide",
+      "state": "ready",
+      "usage": "desktop-wide",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38084,
+      "sha256": "c8f4bd7222065c359b040afcd3adcf08162d7e1b417dfc0851d9d23f193e3f89",
+      "recommendedDisplayDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "pixelRatio": 2.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-compact",
+      "state": "ready",
+      "usage": "desktop-compact",
+      "dimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "assetPath": "assets/nexa/desktop/nexa-desktop-compact.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 11444,
+      "sha256": "590c7c0f4475271cd2e722573859ec4bdc8181e97b2e6cb2c7a2762b79aaea7c",
+      "recommendedDisplayDimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "pixelRatio": 2.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-micro",
+      "state": "ready",
+      "usage": "desktop-micro",
+      "dimensions": {
+        "width": 40,
+        "height": 40
+      },
+      "assetPath": "assets/nexa/desktop/nexa-desktop-micro.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 2560,
+      "sha256": "a7675b5183bf19c4db4a46d53544b084b45857a0b7235a035d6c568d8c9872c9",
+      "recommendedDisplayDimensions": {
+        "width": 40,
+        "height": 40
+      },
+      "pixelRatio": 1.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "web.nexa-web-launcher",
+      "state": "ready",
+      "usage": "web-launcher",
+      "dimensions": {
+        "width": 96,
+        "height": 96
+      },
+      "assetPath": "assets/nexa/web/nexa-web-launcher.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 7690,
+      "sha256": "941d9cffd2fe6e3f5fcfc7b75a28943e10995c558f69b2499285e96f68d669c6",
+      "recommendedDisplayDimensions": {
+        "width": 48,
+        "height": 48
+      },
+      "pixelRatio": 2.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "web.nexa-web-welcome",
+      "state": "ready",
+      "usage": "web-welcome",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "assetPath": "assets/nexa/states/nexa-ready-256.webp",
+      "detail": "full",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 38084,
+      "sha256": "c8f4bd7222065c359b040afcd3adcf08162d7e1b417dfc0851d9d23f193e3f89",
+      "recommendedDisplayDimensions": {
+        "width": 128,
+        "height": 128
+      },
+      "pixelRatio": 2.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "web.nexa-web-compact-header",
+      "state": "ready",
+      "usage": "web-compact-header",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/web/nexa-web-compact-header.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 4578,
+      "sha256": "7a09913c80c5c24a303ff56d7224d89daf09c971290117827c5fd8e0abf60b82",
+      "recommendedDisplayDimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "pixelRatio": 2.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "web.nexa-web-thinking-header",
+      "state": "thinking",
+      "usage": "web-thinking-header",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/web/nexa-web-thinking-header.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 4518,
+      "sha256": "7cc28fa304d87f26411de3a2442ddd1e878025ece77cd358e5d3cacf4e430611",
+      "recommendedDisplayDimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "pixelRatio": 2.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-thinking-expression.png"
+      }
+    },
+    {
+      "id": "web.nexa-web-speaking-header",
+      "state": "speaking",
+      "usage": "web-speaking-header",
+      "dimensions": {
+        "width": 64,
+        "height": 64
+      },
+      "assetPath": "assets/nexa/web/nexa-web-speaking-header.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 4502,
+      "sha256": "4f430efa94d60e20f121e24d0604331691c6ced4dd1e24f65584bbf3f2780ef0",
+      "recommendedDisplayDimensions": {
+        "width": 32,
+        "height": 32
+      },
+      "pixelRatio": 2.0,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-speaking-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-micro-36",
+      "state": "ready",
+      "usage": "desktop-micro",
+      "dimensions": {
+        "width": 36,
+        "height": 36
+      },
+      "assetPath": "assets/nexa/desktop/nexa-desktop-micro-36.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 2256,
+      "sha256": "34cf2bf81cd388b6cf59f8dd12cbd0020cb13312d84cc0199da968467475653a",
+      "recommendedDisplayDimensions": {
+        "width": 36,
+        "height": 36
+      },
+      "pixelRatio": 1,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-micro-44",
+      "state": "ready",
+      "usage": "desktop-micro",
+      "dimensions": {
+        "width": 44,
+        "height": 44
+      },
+      "assetPath": "assets/nexa/desktop/nexa-desktop-micro-44.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 2968,
+      "sha256": "bb43de6be93f792d135ffbb5789f2a1c67a8432f74bf4c050e5b2a27bb442c3e",
+      "recommendedDisplayDimensions": {
+        "width": 44,
+        "height": 44
+      },
+      "pixelRatio": 1,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-micro-72",
+      "state": "ready",
+      "usage": "desktop-micro",
+      "dimensions": {
+        "width": 72,
+        "height": 72
+      },
+      "assetPath": "assets/nexa/desktop/nexa-desktop-micro-72.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 5296,
+      "sha256": "dfe06f69e67064f7384b679db867ba59a46375df6333e2ad79c5ddef2bc439d7",
+      "recommendedDisplayDimensions": {
+        "width": 36,
+        "height": 36
+      },
+      "pixelRatio": 2,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-micro-80",
+      "state": "ready",
+      "usage": "desktop-micro",
+      "dimensions": {
+        "width": 80,
+        "height": 80
+      },
+      "assetPath": "assets/nexa/desktop/nexa-desktop-micro-80.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 6036,
+      "sha256": "5c89e9eb2376331c9c7b71fb2a926e245f808369adf609b35a05cd9bd72025d9",
+      "recommendedDisplayDimensions": {
+        "width": 40,
+        "height": 40
+      },
+      "pixelRatio": 2,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "desktop.nexa-desktop-micro-88",
+      "state": "ready",
+      "usage": "desktop-micro",
+      "dimensions": {
+        "width": 88,
+        "height": 88
+      },
+      "assetPath": "assets/nexa/desktop/nexa-desktop-micro-88.webp",
+      "detail": "optical",
+      "theme": "independent",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/webp",
+      "bytes": 6792,
+      "sha256": "8d22f8447f6c19e17ae94f757ee91633049386f61e67e0337aefd3e6980d47d5",
+      "recommendedDisplayDimensions": {
+        "width": 44,
+        "height": 44
+      },
+      "pixelRatio": 2,
+      "source": {
+        "body": "assets/nexa/master/nexa-optical-body-source-1254.png",
+        "expression": "assets/nexa/master/expressions/nexa-ready-expression.png"
+      }
+    },
+    {
+      "id": "habitat.nexa-habitat-wide-light",
+      "state": null,
+      "usage": "habitat-wide",
+      "dimensions": {
+        "width": 256,
+        "height": 144
+      },
+      "assetPath": "assets/nexa/habitat/nexa-habitat-wide-light.svg",
+      "detail": "habitat",
+      "theme": "light",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 535,
+      "sha256": "2efa2524def42eebd3f37f3e3713dd874df3de29f938255661278593f90f6d2b",
+      "vectorSource": "assets/nexa/habitat/nexa-habitat-wide-light.svg"
+    },
+    {
+      "id": "habitat.nexa-habitat-compact-light",
+      "state": null,
+      "usage": "habitat-compact",
+      "dimensions": {
+        "width": 192,
+        "height": 80
+      },
+      "assetPath": "assets/nexa/habitat/nexa-habitat-compact-light.svg",
+      "detail": "habitat",
+      "theme": "light",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 522,
+      "sha256": "eca2d4bf697bda37db5ab2e2d05df9943c5c84ff05b8b357ae8bbef061925ec6",
+      "vectorSource": "assets/nexa/habitat/nexa-habitat-compact-light.svg"
+    },
+    {
+      "id": "habitat.nexa-contact-shadow-light",
+      "state": null,
+      "usage": "contact-shadow",
+      "dimensions": {
+        "width": 128,
+        "height": 24
+      },
+      "assetPath": "assets/nexa/habitat/nexa-contact-shadow-light.svg",
+      "detail": "shadow",
+      "theme": "light",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 316,
+      "sha256": "dfaacc2c2f3ff978ee8491e15e9ac0c5e4e663909dee85f26a7c370fee043030",
+      "vectorSource": "assets/nexa/habitat/nexa-contact-shadow-light.svg"
+    },
+    {
+      "id": "habitat.nexa-micro-shadow-light",
+      "state": null,
+      "usage": "micro-shadow",
+      "dimensions": {
+        "width": 48,
+        "height": 12
+      },
+      "assetPath": "assets/nexa/habitat/nexa-micro-shadow-light.svg",
+      "detail": "shadow",
+      "theme": "light",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 312,
+      "sha256": "470bb94144f0a7b77215969e0d94396cf27fe93720e6a28778ca1082ea6c6045",
+      "vectorSource": "assets/nexa/habitat/nexa-micro-shadow-light.svg"
+    },
+    {
+      "id": "habitat.nexa-habitat-wide-dark",
+      "state": null,
+      "usage": "habitat-wide",
+      "dimensions": {
+        "width": 256,
+        "height": 144
+      },
+      "assetPath": "assets/nexa/habitat/nexa-habitat-wide-dark.svg",
+      "detail": "habitat",
+      "theme": "dark",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 535,
+      "sha256": "00b7a358aa64e7d0e7c9e1790f6928b3e74439b0e42ded8aca73ff86bb7712d2",
+      "vectorSource": "assets/nexa/habitat/nexa-habitat-wide-dark.svg"
+    },
+    {
+      "id": "habitat.nexa-habitat-compact-dark",
+      "state": null,
+      "usage": "habitat-compact",
+      "dimensions": {
+        "width": 192,
+        "height": 80
+      },
+      "assetPath": "assets/nexa/habitat/nexa-habitat-compact-dark.svg",
+      "detail": "habitat",
+      "theme": "dark",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 522,
+      "sha256": "a7a6ebff446a1e97fad63ce62c64efbf26f03dba91e7298e3c23eea6ef7e9309",
+      "vectorSource": "assets/nexa/habitat/nexa-habitat-compact-dark.svg"
+    },
+    {
+      "id": "habitat.nexa-contact-shadow-dark",
+      "state": null,
+      "usage": "contact-shadow",
+      "dimensions": {
+        "width": 128,
+        "height": 24
+      },
+      "assetPath": "assets/nexa/habitat/nexa-contact-shadow-dark.svg",
+      "detail": "shadow",
+      "theme": "dark",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 316,
+      "sha256": "baf462e0d1cc505f94a3ce25278f3ecdc622c2d136e96b6c79c91942880cb92a",
+      "vectorSource": "assets/nexa/habitat/nexa-contact-shadow-dark.svg"
+    },
+    {
+      "id": "habitat.nexa-micro-shadow-dark",
+      "state": null,
+      "usage": "micro-shadow",
+      "dimensions": {
+        "width": 48,
+        "height": 12
+      },
+      "assetPath": "assets/nexa/habitat/nexa-micro-shadow-dark.svg",
+      "detail": "shadow",
+      "theme": "dark",
+      "static": true,
+      "motionSafe": true,
+      "animated": false,
+      "format": "image/svg+xml",
+      "bytes": 312,
+      "sha256": "1b93e18755393d157c7addaa419593c03363c5be1bba7f959c09ae1c9b00b554",
+      "vectorSource": "assets/nexa/habitat/nexa-micro-shadow-dark.svg"
+    }
+  ],
+  "sources": {
+    "body": "assets/nexa/master/nexa-body-source-1254.png",
+    "opticalBody": "assets/nexa/master/nexa-optical-body-source-1254.png",
+    "expressionMask": "assets/nexa/master/nexa-expression-mask-1254.png",
+    "readyHighResolution": "assets/nexa/master/nexa-ready-source-1254.png",
+    "opticalHighResolution": "assets/nexa/master/nexa-optical-source-1254.png",
+    "expressions": {
+      "sleep": "assets/nexa/master/expressions/nexa-sleep-expression.png",
+      "ready": "assets/nexa/master/expressions/nexa-ready-expression.png",
+      "listening": "assets/nexa/master/expressions/nexa-listening-expression.png",
+      "thinking": "assets/nexa/master/expressions/nexa-thinking-expression.png",
+      "speaking": "assets/nexa/master/expressions/nexa-speaking-expression.png",
+      "success": "assets/nexa/master/expressions/nexa-success-expression.png",
+      "warning": "assets/nexa/master/expressions/nexa-warning-expression.png"
+    },
+    "generationPrompts": "assets/nexa/master/generation-prompts.json",
+    "lineage": "assets/nexa/master/source-lineage.json"
+  },
+  "runtime": {
+    "stateAliases": {
+      "pleased": "success",
+      "concerned": "warning"
+    },
+    "desktop": {
+      "wide": {
+        "usage": "state",
+        "width": 256,
+        "displaySize": 112
+      },
+      "compact": {
+        "usage": "state",
+        "width": 96,
+        "displaySize": 56
+      },
+      "micro": {
+        "usage": "state",
+        "width": 48,
+        "displaySize": 40
+      }
+    },
+    "web": {
+      "launcher": {
+        "usage": "web-launcher"
+      },
+      "welcome": {
+        "usage": "web-welcome"
+      },
+      "ready": {
+        "usage": "web-compact-header"
+      },
+      "thinking": {
+        "usage": "web-thinking-header"
+      },
+      "speaking": {
+        "usage": "web-speaking-header"
+      },
+      "concerned": {
+        "usage": "state",
+        "state": "warning",
+        "width": 48
+      }
+    },
+    "fallbackPolicy": "WebP supported by target Electron and modern browsers; no redundant runtime PNG fallback. Source masters remain PNG."
+  }
+}
