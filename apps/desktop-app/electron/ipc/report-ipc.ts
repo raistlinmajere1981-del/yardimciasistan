@@ -36,6 +36,7 @@ export function registerReportIpcHandlers(options: {
   ipcMain.handle(
     "report:generateAiComment",
     async (_event, input: GenerateDesktopReportAiInput): Promise<GenerateDesktopReportAiResult> => {
+      assertUnlocked();
       assertCapability(BUSINESS_CAPABILITIES.REPORTS, "Raporlar bu işletmede etkin değil.");
       assertCapability(BUSINESS_CAPABILITIES.AI, "AI rapor yorumu bu işletmede etkin değil.");
       return generateDesktopReportAiComment(getDatabase(), input);

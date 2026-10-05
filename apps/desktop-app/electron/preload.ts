@@ -372,6 +372,7 @@ export interface DesktopBridge extends MarketingAnalyticsBridge, BusinessMessagi
   openExternal: (url: string) => Promise<boolean>;
 }
 
+// UX preflight only: every protected operation rechecks the authoritative session in main.
 async function invokeWhenUnlocked<T>(channel: string, ...args: unknown[]): Promise<T> {
   const status = await ipcRenderer.invoke("appLock:getStatus") as AppLockStatus;
   if (status.locked) throw new Error("Uygulama kilitli. Devam etmek için kilidi açın.");

@@ -21,6 +21,7 @@ for (const kind of ['reset', 'restore', 'remote_failure', 'drain_failure', 'decl
       : name === './data-maintenance-confirmation' ? { requestDataMaintenanceConfirmation: async () => kind !== 'declined' } : require(name) });
   try {
     exports.registerDataMaintenanceIpcHandlers(() => root, {
+      assertUnlocked: () => {},
       beforeMaintenance: async () => { events.push('drain'); enter(); await gate; if (kind === 'drain_failure') throw new Error('fixture drain failure'); },
       afterMaintenanceAbort: () => { resume++; events.push('resume'); },
       resetConnectedWebRuntime: async () => { events.push('remote'); return { ok: kind !== 'remote_failure', skipped: true, message: 'fixture' }; }

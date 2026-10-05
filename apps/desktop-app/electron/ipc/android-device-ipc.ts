@@ -12,6 +12,7 @@ import type {
 
 export function registerAndroidDeviceIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   finalizeDeviceMutation: (result: DesktopAndroidDeviceMutationResult) => DesktopAndroidDeviceMutationResult;
   listInstallDevices: () => DesktopAndroidInstallationSnapshot;
@@ -28,43 +29,51 @@ export function registerAndroidDeviceIpcHandlers(options: {
   } = options;
 
   ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     const result = getDatabase().setAndroidDeviceRole(String(deviceId ?? ""), String(role ?? ""));
     return finalizeDeviceMutation(result);
   });
 
   ipcMain.handle("androidDevice:setPermissionGroupsBatch", (_event, updates: DesktopAndroidPermissionGroupsUpdate[]): DesktopAndroidDeviceMutationResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     return finalizeDeviceMutation(getDatabase().setAndroidDevicePermissionGroupsBatch(updates));
   });
 
   ipcMain.handle("androidDevice:setActive", (_event, deviceId: unknown, active: unknown): DesktopAndroidDeviceMutationResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     const result = getDatabase().setAndroidDeviceActive(String(deviceId ?? ""), active === true);
     return finalizeDeviceMutation(result);
   });
 
   ipcMain.handle("androidDevice:resetPermissions", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     return finalizeDeviceMutation(getDatabase().resetAndroidDevicePermissions(String(deviceId ?? "")));
   });
 
   ipcMain.handle("androidDevice:revoke", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     return finalizeDeviceMutation(getDatabase().revokeAndroidDevice(String(deviceId ?? "")));
   });
 
   ipcMain.handle("androidDevice:listInstallDevices", (): DesktopAndroidInstallationSnapshot => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android kurulumu bu işletmede etkin değil.");
     return listInstallDevices();
   });
 
   ipcMain.handle("androidDevice:install", async (_event, serial: unknown): Promise<DesktopAndroidInstallResult> => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android kurulumu bu işletmede etkin değil.");
     return installOnDevice(String(serial ?? ""));
   });
 
   ipcMain.handle("androidDevice:provision", async (_event, serial: unknown): Promise<DesktopAndroidInstallResult> => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android bağlantısı bu işletmede etkin değil.");
     return provisionOnDevice(String(serial ?? ""));
   });

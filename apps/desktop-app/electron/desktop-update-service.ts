@@ -966,7 +966,7 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
   }
 }
 
-export function registerDesktopUpdateIpcHandlers(userDataPath: () => string) {
+export function registerDesktopUpdateIpcHandlers(userDataPath: () => string, assertUnlocked: () => void) {
   const channels = [
     "update:getStatus",
     "update:check",
@@ -976,14 +976,28 @@ export function registerDesktopUpdateIpcHandlers(userDataPath: () => string) {
   ];
   for (const channel of channels) ipcMain.removeHandler(channel);
 
+  // Local read-only update status is available while locked; explicit network,
+  // configuration and installer actions require the authoritative session.
   ipcMain.handle("update:getStatus", () => getStatus(userDataPath()));
-  ipcMain.handle("update:check", (_event, force = true) => checkDesktopUpdate(userDataPath(), force === true));
-  ipcMain.handle("update:download", () => downloadDesktopUpdate(userDataPath()));
+  ipcMain.handle("update:check", (_event, force = true) => {
+    assertUnlocked();
+    return checkDesktopUpdate(userDataPath(), force === true);
+  });
+  ipcMain.handle("update:download", () => {
+    assertUnlocked();
+    return downloadDesktopUpdate(userDataPath());
+  });
   ipcMain.handle(
     "update:savePreferences",
-    (_event, input: DesktopUpdatePreferencesInput) => saveDesktopUpdatePreferences(userDataPath(), input)
+    (_event, input: DesktopUpdatePreferencesInput) => {
+      assertUnlocked();
+      return saveDesktopUpdatePreferences(userDataPath(), input);
+    }
   );
-  ipcMain.handle("update:restartAndInstall", () => restartForPendingDesktopUpdate(userDataPath()));
+  ipcMain.handle("update:restartAndInstall", () => {
+    assertUnlocked();
+    return restartForPendingDesktopUpdate(userDataPath());
+  });
 }
 
 export function startAutomaticDesktopUpdateChecks(userDataPath: () => string) {

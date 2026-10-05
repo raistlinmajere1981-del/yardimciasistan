@@ -13,6 +13,7 @@ import type {
 
 export function registerTableOrderIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   hasCapability?: (capability: BusinessCapability) => boolean;
 }) {
@@ -26,18 +27,21 @@ export function registerTableOrderIpcHandlers(options: {
     : true;
 
   ipcMain.handle("tableOrder:list", (): DesktopTableOrder[] => {
+    options.assertUnlocked();
     if (!canReadFoodOrders()) return [];
     assertFoodOrdersAccess();
     return getDatabase().listTableOrders();
   });
 
   ipcMain.handle("tableOrder:getActive", (_event, tableId: unknown): DesktopTableOrder | null => {
+    options.assertUnlocked();
     if (!canReadFoodOrders()) return null;
     assertFoodOrdersAccess();
     return typeof tableId === "string" ? getDatabase().getActiveTableOrder(tableId) : null;
   });
 
   ipcMain.handle("tableOrder:open", (_event, tableId: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     return typeof tableId === "string"
       ? getDatabase().openTableOrder(tableId)
@@ -45,6 +49,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:addItem", (_event, input: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Siparişe ürün eklemek için menü yönetimi etkin olmalı.");
     const parsedInput = parseAddTableOrderItemInput(input);
@@ -54,6 +59,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:updateItemQuantity", (_event, input: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     const parsedInput = parseUpdateTableOrderItemQuantityInput(input);
     return parsedInput
@@ -62,6 +68,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:updateItemNote", (_event, input: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     const parsedInput = parseUpdateTableOrderItemNoteInput(input);
     return parsedInput
@@ -70,6 +77,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:removeItem", (_event, itemId: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     return typeof itemId === "string"
       ? getDatabase().removeTableOrderItem(itemId)
@@ -77,6 +85,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:updateDiscount", (_event, input: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     const parsedInput = parseUpdateTableOrderDiscountInput(input);
     return parsedInput
@@ -85,6 +94,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:updateStatus", (_event, input: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     const parsedInput = parseUpdateTableOrderStatusInput(input);
     return parsedInput
@@ -93,6 +103,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:close", (_event, input: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     const parsedInput = parseUpdateTableOrderStatusInput(input);
     return parsedInput
@@ -101,6 +112,7 @@ export function registerTableOrderIpcHandlers(options: {
   });
 
   ipcMain.handle("tableOrder:recalculate", (_event, orderId: unknown): DesktopTableOrderResult => {
+    options.assertUnlocked();
     assertFoodOrdersAccess();
     return typeof orderId === "string"
       ? getDatabase().recalculateTableOrderTotal(orderId)

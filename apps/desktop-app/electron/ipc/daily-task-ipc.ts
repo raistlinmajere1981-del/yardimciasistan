@@ -8,6 +8,7 @@ import type {
 
 export function registerDailyTaskIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
   assertTaskScope: (
     taskType: string,
     relatedType?: string,
@@ -20,13 +21,20 @@ export function registerDailyTaskIpcHandlers(options: {
   const { getDatabase, assertTaskScope, finalizeOperationMutation } = options;
 
   ipcMain.handle("dailyTask:save", (_event, input: SaveDailyTaskInput): DesktopStatusUpdateResult => {
-    const dashboard = getDatabase().getDashboardData();
-    const existingTask = input?.id
-      ? dashboard.dailyTasks.find((item) => item.id === String(input.id))
+    options.assertUnlocked();
+    const taskId = String(input?.id ?? "").trim();
+    const existingTask = taskId
+      ? getDatabase().getDailyTaskById(taskId)
       : undefined;
+    // A missing update ID is rejected by the mutation owner, preserving input
+    // validation/not-found precedence without falling back to core task scope.
+    if (taskId && !existingTask) return finalizeOperationMutation(getDatabase().saveDailyTask(input));
     const existingReservation = existingTask?.relatedType === "reservation"
-      ? dashboard.reservations.find((reservation) => reservation.id === existingTask.relatedId)
+      ? getDatabase().getReservationById(existingTask.relatedId)
       : undefined;
+    if (existingTask?.relatedType === "reservation" && !existingReservation) {
+      return { ok: false, message: "Rezervasyon bulunamadı." };
+    }
     if (existingTask) {
       assertTaskScope(
         existingTask.taskType,
@@ -41,11 +49,13 @@ export function registerDailyTaskIpcHandlers(options: {
   });
 
   ipcMain.handle("dailyTask:delete", (_event, taskId: unknown): DesktopStatusUpdateResult => {
-    const dashboard = getDatabase().getDashboardData();
-    const task = dashboard.dailyTasks.find((item) => item.id === String(taskId ?? ""));
+    options.assertUnlocked();
+    const task = getDatabase().getDailyTaskById(String(taskId ?? ""));
+    if (!task) return finalizeOperationMutation(getDatabase().deleteDailyTask(String(taskId ?? "")));
     const reservation = task?.relatedType === "reservation"
-      ? dashboard.reservations.find((item) => item.id === task.relatedId)
+      ? getDatabase().getReservationById(task.relatedId)
       : undefined;
+    if (task.relatedType === "reservation" && !reservation) return { ok: false, message: "Rezervasyon bulunamadı." };
     assertTaskScope(
       task?.taskType ?? "",
       task?.relatedType ?? "",
@@ -57,11 +67,13 @@ export function registerDailyTaskIpcHandlers(options: {
   });
 
   ipcMain.handle("dailyTask:updateStatus", (_event, input: UpdateDailyTaskStatusInput): DesktopStatusUpdateResult => {
-    const dashboard = getDatabase().getDashboardData();
-    const task = dashboard.dailyTasks.find((item) => item.id === String(input?.taskId ?? ""));
+    options.assertUnlocked();
+    const task = getDatabase().getDailyTaskById(String(input?.taskId ?? ""));
+    if (!task) return getDatabase().updateDailyTaskStatus(input);
     const reservation = task?.relatedType === "reservation"
-      ? dashboard.reservations.find((item) => item.id === task.relatedId)
+      ? getDatabase().getReservationById(task.relatedId)
       : undefined;
+    if (task.relatedType === "reservation" && !reservation) return { ok: false, message: "Rezervasyon bulunamadı." };
     assertTaskScope(
       task?.taskType ?? "",
       task?.relatedType ?? "",

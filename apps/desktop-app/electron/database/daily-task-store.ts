@@ -33,7 +33,18 @@ export function getDailyTasks(db: DatabaseSync): DesktopDailyTask[] {
       `)
     .all() as Array<Record<string, unknown>>;
 
-  return rows.map((row) => ({
+  return rows.map(mapDailyTaskRow);
+}
+
+/** Persisted scope lookup, independent of presentation ordering/limits. */
+export function getDailyTaskById(db: DatabaseSync, taskId: string): DesktopDailyTask | null {
+  const row = db.prepare("SELECT * FROM daily_tasks WHERE id = ? AND deleted_at = ''")
+    .get(taskId.trim()) as Record<string, unknown> | undefined;
+  return row ? mapDailyTaskRow(row) : null;
+}
+
+function mapDailyTaskRow(row: Record<string, unknown>): DesktopDailyTask {
+  return {
     id: String(row.id ?? ""),
     title: String(row.title ?? ""),
     description: String(row.description ?? ""),
@@ -44,7 +55,7 @@ export function getDailyTasks(db: DatabaseSync): DesktopDailyTask[] {
     relatedType: String(row.related_type ?? ""),
     relatedId: String(row.related_id ?? ""),
     updatedAt: String(row.updated_at ?? "")
-  }));
+  };
 }
 
 export function saveDailyTask(db: DatabaseSync, input: SaveDailyTaskInput): { ok: true; message: string } | { ok: false; message: string } {

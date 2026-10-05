@@ -73,6 +73,14 @@ export function getActiveResourceReservationTitles(db: DatabaseSync, resourceTyp
   return map;
 }
 
+/** ID lookup for mutation scope; never consult the bounded dashboard list. */
+export function getReservationById(db: DatabaseSync, reservationId: string): DesktopReservation | null {
+  const row = db.prepare(`SELECT r.*, c.full_name AS customer_name, c.phone AS customer_phone
+    FROM reservations r LEFT JOIN customers c ON c.id = r.customer_id AND c.deleted_at = ''
+    WHERE r.id = ? AND r.deleted_at = ''`).get(reservationId.trim()) as Record<string, unknown> | undefined;
+  return row ? mapReservationRow(row) : null;
+}
+
 function mapReservationRow(row: Record<string, unknown>): DesktopReservation {
   return {
     id: String(row.id ?? ""),
@@ -250,28 +258,39 @@ export function findConflictingRoomReservation(
 ): string {
   const candidateEnd = checkOutDate || "9999-12-31";
   if (excludedReservationId !== undefined) {
-    const rows = db.prepare(`
+    const row = db.prepare(`
       SELECT title FROM reservations, json_each(reservations.room_ids_json) AS assigned
       WHERE reservations.id != ? AND reservations.deleted_at = ''
         AND reservations.status IN ('pending', 'approved') AND assigned.value = ?
         AND start_date < ? AND ? < COALESCE(NULLIF(end_date, ''), '9999-12-31') LIMIT 1
     `).get(excludedReservationId, roomId, candidateEnd, checkInDate) as { title: string } | undefined;
-    return rows ? rows.title || "başka bir müşteri" : "";
+    return row ? row.title || "başka bir müşteri" : "";
   }
 
-  for (const reservation of getReservations(db)) {
-    if (
-      reservation.customerId === customerId
-      || !reservation.roomIds.includes(roomId)
-      || !["pending", "approved"].includes(reservation.status)
-    ) {
-      continue;
-    }
-    const reservationStart = reservation.startDate;
-    const reservationEnd = reservation.endDate || "9999-12-31";
-    if (reservationStart < candidateEnd && checkInDate < reservationEnd) {
-      return reservation.customerName || reservation.title || "başka bir müşteri";
-    }
-  }
-  return "";
+  // Preserve the unlinked manual Stay's same-customer exemption, presentation
+  // ordering and customer-name label, without using the bounded dashboard list.
+  const row = db.prepare(`
+    SELECT r.title, c.full_name AS customer_name
+    FROM reservations r LEFT JOIN customers c ON c.id = r.customer_id AND c.deleted_at = ''
+    WHERE r.deleted_at = '' AND r.status IN ('pending', 'approved')
+      AND r.customer_id <> ?
+      AND EXISTS (SELECT 1 FROM json_each(r.room_ids_json) WHERE value = ?)
+      AND r.start_date < ? AND ? < COALESCE(NULLIF(r.end_date, ''), '9999-12-31')
+    ORDER BY r.start_date ASC, r.time ASC, r.created_at DESC LIMIT 1
+  `).get(customerId, roomId, candidateEnd, checkInDate) as
+    { title?: string; customer_name?: string } | undefined;
+  return row ? row.customer_name || row.title || "başka bir müşteri" : "";
+}
+
+/** Booking overlap keeps its existing missing-date fallback (not Stay's open-ended range). */
+export function hasConflictingRoomReservation(db: DatabaseSync, roomId: string,
+  startDate: string, endDate: string, excludedReservationId: string): boolean {
+  return Boolean(db.prepare(`SELECT 1 FROM reservations r
+    WHERE r.deleted_at = '' AND r.status IN ('pending', 'approved') AND r.id <> ?
+      AND EXISTS (SELECT 1 FROM json_each(r.room_ids_json) WHERE value = ?)
+      AND COALESCE(NULLIF(r.start_date, ''), r.end_date) <> ''
+      AND COALESCE(NULLIF(r.end_date, ''), r.start_date) <> ''
+      AND COALESCE(NULLIF(r.start_date, ''), r.end_date) < ?
+      AND ? < COALESCE(NULLIF(r.end_date, ''), r.start_date)
+    LIMIT 1`).get(excludedReservationId, roomId, endDate, startDate));
 }

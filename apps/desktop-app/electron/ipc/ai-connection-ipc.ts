@@ -8,10 +8,12 @@ import {
 
 export function registerAiConnectionIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
 }) {
   const { getDatabase } = options;
 
   ipcMain.handle("ai:testConnection", async (_event, input: AiConnectionTestInput): Promise<AiConnectionTestResult> => {
+    options.assertUnlocked();
     return testAiConnection(getDatabase(), input);
   });
 }

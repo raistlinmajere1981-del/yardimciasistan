@@ -50,6 +50,7 @@ export function registerAppIpcHandlers(options: {
   });
 
   ipcMain.handle("shell:openExternal", async (_event, url: string) => {
+    assertUnlocked();
     if (!/^https?:\/\//.test(url) && !/^tel:/.test(url)) {
       return false;
     }

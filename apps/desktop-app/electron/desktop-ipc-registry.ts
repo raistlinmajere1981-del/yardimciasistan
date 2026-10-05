@@ -153,6 +153,7 @@ export function registerDesktopIpcHandlers(
   });
 
   registerSyncIpcHandlers({
+    assertUnlocked,
     getDatabase,
     getCoordinator: getSyncCoordinator,
     assertCapability,
@@ -220,6 +221,7 @@ export function registerDesktopIpcHandlers(
   );
 
   registerMenuIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability,
     assertMenuItemSubfeatureMutation,
@@ -228,6 +230,7 @@ export function registerDesktopIpcHandlers(
   });
 
   registerImageAnalysisIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability,
     finalizeStockImageApply
@@ -250,6 +253,7 @@ export function registerDesktopIpcHandlers(
   });
 
   registerAndroidDeviceIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability,
     finalizeDeviceMutation,
@@ -282,9 +286,10 @@ export function registerDesktopIpcHandlers(
     }
   });
 
-  registerAiConnectionIpcHandlers({ getDatabase });
+  registerAiConnectionIpcHandlers({ getDatabase, assertUnlocked });
 
   registerRequestIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability,
     assertRequestType,
@@ -304,6 +309,7 @@ export function registerDesktopIpcHandlers(
 
 
   registerWhatsAppIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability,
     finalizeRecordDeletion
@@ -330,6 +336,7 @@ export function registerDesktopIpcHandlers(
   });
 
   registerTableOrderIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability,
     hasCapability: (capability) =>
@@ -337,6 +344,7 @@ export function registerDesktopIpcHandlers(
   });
 
   registerReservationIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability,
     assertReservationType,
@@ -344,12 +352,14 @@ export function registerDesktopIpcHandlers(
   });
 
   registerDailyTaskIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertTaskScope,
     finalizeOperationMutation
   });
 
   registerBusinessAiIpcHandlers({
+    assertUnlocked,
     getDatabase,
     assertCapability
   });

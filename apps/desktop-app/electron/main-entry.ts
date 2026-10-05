@@ -295,6 +295,7 @@ void mainProcessReady.then(async ({
 
     registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked, userDataPath });
     registerDataMaintenanceIpcHandlers(userDataPath, {
+      assertUnlocked: assertAppSessionUnlocked,
       beforeMaintenance: suspendAutomaticSyncForMaintenance,
       afterMaintenanceAbort: resumeAutomaticSyncAfterMaintenanceAbort,
       resetConnectedWebRuntime: async () => {
@@ -333,12 +334,12 @@ void mainProcessReady.then(async ({
         }
       }
     });
-    registerDesktopUpdateIpcHandlers(userDataPath);
+    registerDesktopUpdateIpcHandlers(userDataPath, assertAppSessionUnlocked);
     startAutomaticDesktopUpdateChecks(userDataPath);
 
     registerBusinessCapabilityIpcHandlers({
       databasePath,
-      assertUnlocked: () => undefined,
+      assertUnlocked: assertAppSessionUnlocked,
       // Capability changes must always publish the hosted manifest, including
       // the tombstone created while service.android is being switched off.
       onMutation: () => publishCommittedMutation(true)
@@ -352,10 +353,7 @@ void mainProcessReady.then(async ({
 
     registerFinanceIpcHandlers({
       databasePath,
-      // The isolated preload bridge checks appLock:getStatus before exposing
-      // these channels to renderer code. The handler remains internal-only;
-      // nodeIntegration is disabled in the renderer.
-      assertUnlocked: () => undefined,
+      assertUnlocked: assertAppSessionUnlocked,
       assertCapability: () => assertPersistedBusinessCapability(
         databasePath(),
         BUSINESS_CAPABILITIES.FINANCE,
@@ -376,7 +374,7 @@ void mainProcessReady.then(async ({
 
     registerRoomFolioIpcHandlers({
       databasePath,
-      assertUnlocked: () => undefined,
+      assertUnlocked: assertAppSessionUnlocked,
       assertCapability: () => assertPersistedBusinessCapability(
         databasePath(),
         BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO,
@@ -403,6 +401,6 @@ void mainProcessReady.then(async ({
       onMutation: publishCommittedMutation
     });
 
-    registerWebConnectionIpcHandlers();
+    registerWebConnectionIpcHandlers({ assertUnlocked: assertAppSessionUnlocked });
   });
 });

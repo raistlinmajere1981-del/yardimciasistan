@@ -15,12 +15,14 @@ import {
 
 export function registerImageAnalysisIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   finalizeStockImageApply: (result: DesktopStockImageApplyResult) => DesktopStockImageApplyResult;
 }) {
   const { getDatabase, assertCapability, finalizeStockImageApply } = options;
 
   ipcMain.handle("stockImage:analyze", async (_event, value: unknown): Promise<DesktopStockImageAnalyzeResult> => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI stok analizi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
@@ -28,6 +30,7 @@ export function registerImageAnalysisIpcHandlers(options: {
   });
 
   ipcMain.handle("stockImage:cancel", (_event, importIdValue: unknown): boolean => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI stok analizi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
@@ -35,6 +38,7 @@ export function registerImageAnalysisIpcHandlers(options: {
   });
 
   ipcMain.handle("stockImage:apply", (_event, value: unknown): DesktopStockImageApplyResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI stok analizi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
@@ -48,6 +52,7 @@ export function registerImageAnalysisIpcHandlers(options: {
   ipcMain.handle(
     "customer:analyzeIdentityImage",
     async (_event, value: unknown): Promise<DesktopIdentityImageAnalyzeResult> => {
+      options.assertUnlocked();
       assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
       assertCapability(BUSINESS_CAPABILITIES.AI, "AI kimlik analizi bu işletmede etkin değil.");
       return analyzeDesktopIdentityImage(getDatabase(), value);

@@ -33,6 +33,8 @@ import { assignHospitalityStay, enterReservedHospitalityStay, checkInHospitality
 import { KbsDeliveryService } from "./kbs-delivery-service.js";
 import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
 import { createDesktopDashboardData } from "./desktop-dashboard-service.js";
+import { getReservationById } from "./database/reservation-store.js";
+import { getDailyTaskById } from "./database/daily-task-store.js";
 import type { KbsProviderAdapter } from "./kbs-provider-adapter.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
 import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
@@ -419,6 +421,14 @@ export class DesktopDatabase {
       return result;
     }
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  getDailyTaskById(taskId: string) {
+    return getDailyTaskById(this.db, taskId);
+  }
+
+  getReservationById(reservationId: string) {
+    return getReservationById(this.db, reservationId);
   }
 
   deleteDailyTask(taskIdInput: string): DesktopStatusUpdateResult {

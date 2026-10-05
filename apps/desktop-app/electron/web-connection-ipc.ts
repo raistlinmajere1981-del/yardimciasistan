@@ -5,9 +5,12 @@ import {
   type WebConnectionTestResult
 } from "./web-connection-test";
 
-export function registerWebConnectionIpcHandlers() {
+export function registerWebConnectionIpcHandlers(options: { assertUnlocked: () => void }) {
   ipcMain.handle(
     "sync:testConnection",
-    async (_event, input: WebConnectionTestInput): Promise<WebConnectionTestResult> => testWebConnection(input)
+    async (_event, input: WebConnectionTestInput): Promise<WebConnectionTestResult> => {
+      options.assertUnlocked();
+      return testWebConnection(input);
+    }
   );
 }

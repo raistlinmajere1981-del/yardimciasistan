@@ -141,7 +141,7 @@ for(const kind of ['reset','restore']) {
     runInNewContext(readFileSync(new URL('../apps/desktop-app/dist-electron/data-maintenance.js',import.meta.url),'utf8'),{exports,Buffer,Error,process,setTimeout:()=>{relaunch=true;return {unref(){}};},clearTimeout,
       require:name=>name==='electron'?{app:{isPackaged:true,getAppPath:()=>process.cwd()+'/apps/desktop-app',getVersion:()=> 'fixture',relaunch(){},quit(){}},ipcMain:{removeHandler(){},handle:(name,action)=>handlers.set(name,action)},session:{defaultSession:{clearStorageData:async()=>{}}},shell:{}}
       :name==='./desktop-logger'?{desktopLog:{info(){},warn(){},error(){}}}:name==='./data-maintenance-confirmation'?{requestDataMaintenanceConfirmation:async()=>true}:maintenanceRequire(name)});
-    exports.registerDataMaintenanceIpcHandlers(()=>g.db.userDataPath,{beforeMaintenance:async()=>{await runtime.suspendAndDrain();finishedDrain=true;},resetConnectedWebRuntime:async()=>({ok:true,skipped:true,message:'fixture'})});
+    exports.registerDataMaintenanceIpcHandlers(()=>g.db.userDataPath,{assertUnlocked:()=>{},beforeMaintenance:async()=>{await runtime.suspendAndDrain();finishedDrain=true;},resetConnectedWebRuntime:async()=>({ok:true,skipped:true,message:'fixture'})});
     let backup;if(kind==='restore')backup=handlers.get('dataMaintenance:createBackup')().backup;
     const work=kind==='restore'?handlers.get('dataMaintenance:restoreBackup')({sender:{}},backup.id):handlers.get('dataMaintenance:resetLocalData')({sender:{}});
     await new Promise(done=>setTimeout(done,10));assert.equal(relaunch,false);assert.equal(finishedDrain,false);assert.equal(invocations,1,'maintenance stops further claims');

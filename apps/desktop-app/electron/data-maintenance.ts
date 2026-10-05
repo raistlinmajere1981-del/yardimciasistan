@@ -806,7 +806,7 @@ async function prepareReset(
 
 export function registerDataMaintenanceIpcHandlers(
   userDataPath: () => string,
-  options: DataMaintenanceIpcOptions = {}
+  options: DataMaintenanceIpcOptions & { assertUnlocked: () => void }
 ) {
   const channels = [
     "dataMaintenance:createBackup",
@@ -819,15 +819,24 @@ export function registerDataMaintenanceIpcHandlers(
   ];
   for (const channel of channels) ipcMain.removeHandler(channel);
 
-  ipcMain.handle("dataMaintenance:createBackup", () => createManualBackup(userDataPath()));
-  ipcMain.handle("dataMaintenance:listBackups", () => getBackups(userDataPath()));
-  ipcMain.handle("dataMaintenance:openBackupDirectory", () => openBackupDirectory(userDataPath()));
-  ipcMain.handle("dataMaintenance:openBackupItemDirectory", (_event, backupId: string) => openBackupItemDirectory(userDataPath(), backupId));
-  ipcMain.handle("dataMaintenance:deleteBackup", (event, backupId: string) => deleteBackup(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request)));
-  ipcMain.handle("dataMaintenance:restoreBackup", (event, backupId: string) => prepareRestore(userDataPath(), backupId, (request) => requestDataMaintenanceConfirmation(event.sender, request), options));
-  ipcMain.handle("dataMaintenance:resetLocalData", (event) => prepareReset(
+  const unlocked = <T>(operation: () => T): T => {
+    options.assertUnlocked();
+    return operation();
+  };
+  const confirm = async (sender: Electron.WebContents, request: DataMaintenanceConfirmation) => {
+    const approved = await requestDataMaintenanceConfirmation(sender, request);
+    options.assertUnlocked();
+    return approved;
+  };
+  ipcMain.handle("dataMaintenance:createBackup", () => unlocked(() => createManualBackup(userDataPath())));
+  ipcMain.handle("dataMaintenance:listBackups", () => unlocked(() => getBackups(userDataPath())));
+  ipcMain.handle("dataMaintenance:openBackupDirectory", () => unlocked(() => openBackupDirectory(userDataPath())));
+  ipcMain.handle("dataMaintenance:openBackupItemDirectory", (_event, backupId: string) => unlocked(() => openBackupItemDirectory(userDataPath(), backupId)));
+  ipcMain.handle("dataMaintenance:deleteBackup", (event, backupId: string) => unlocked(() => deleteBackup(userDataPath(), backupId, (request) => confirm(event.sender, request))));
+  ipcMain.handle("dataMaintenance:restoreBackup", (event, backupId: string) => unlocked(() => prepareRestore(userDataPath(), backupId, (request) => confirm(event.sender, request), options)));
+  ipcMain.handle("dataMaintenance:resetLocalData", (event) => unlocked(() => prepareReset(
     userDataPath(),
-    (request) => requestDataMaintenanceConfirmation(event.sender, request),
+    (request) => confirm(event.sender, request),
     options
-  ));
+  )));
 }

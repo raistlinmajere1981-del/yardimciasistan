@@ -14,11 +14,13 @@ import {
 
 export function registerBusinessAiIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
 }) {
   const { getDatabase, assertCapability } = options;
 
   ipcMain.handle("ai:createOwnerReplySuggestion", async (_event, requestId: string): Promise<RequestAiSuggestionResult> => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri kayıtları bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI bu işletmede etkin değil.");
@@ -26,6 +28,7 @@ export function registerBusinessAiIpcHandlers(options: {
   });
 
   ipcMain.handle("ai:rewriteOwnerReplySuggestion", async (_event, input: RewriteRequestAiSuggestionInput): Promise<RequestAiSuggestionResult> => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri kayıtları bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI bu işletmede etkin değil.");
@@ -33,6 +36,7 @@ export function registerBusinessAiIpcHandlers(options: {
   });
 
   ipcMain.handle("ai:generateDailyBusinessEvaluation", async (): Promise<DailyBusinessEvaluationResult> => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI bu işletmede etkin değil.");
     return generateDailyBusinessEvaluation(getDatabase());
   });

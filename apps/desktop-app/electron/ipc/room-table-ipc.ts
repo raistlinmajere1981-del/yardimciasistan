@@ -16,6 +16,7 @@ export function registerRoomTableIpcHandlers(options: {
   const { getDatabase, assertCapability, assertUnlocked } = options;
 
   ipcMain.handle("room:updateStatus", (_event, input: UpdateRoomStatusInput): DesktopStatusUpdateResult => {
+    assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Oda yönetimi bu işletmede etkin değil.");
     if (String(input?.status ?? "").trim() === "reserved") {
       assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS, "Odayı rezerve etmek için konaklama rezervasyonları etkin olmalı.");
@@ -31,6 +32,7 @@ export function registerRoomTableIpcHandlers(options: {
   });
 
   ipcMain.handle("table:updateStatus", (_event, input: UpdateTableStatusInput): DesktopStatusUpdateResult => {
+    assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_TABLES, "Masa yönetimi bu işletmede etkin değil.");
     const requestedStatus = String(input?.status ?? "").trim();
     if (requestedStatus === "reserved") {

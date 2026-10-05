@@ -56,11 +56,13 @@ export function registerCustomerIpcHandlers(options: {
   });
 
   ipcMain.handle("customer:delete", (_event, customerId: unknown): DesktopStatusUpdateResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     return finalizeRecordDeletion(getDatabase().deleteCustomer(String(customerId ?? "")));
   });
 
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
+    options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     if (input.commercialProfile !== undefined) {
       assertCapability(BUSINESS_CAPABILITIES.WHOLESALE, "Bayi / Toptan Satış bu işletmede etkin değil.");

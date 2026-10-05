@@ -27,12 +27,14 @@ export function registerKbsWebviewIpcEvents(options: {
 
   ipcMain.on("kbs:registerWebview", (event, webContentsId: unknown) => {
     if (!isTrustedRendererUrl(event.sender.getURL())) return;
+    try { assertUnlocked(); } catch { return; }
     const id = Number(webContentsId);
     if (!Number.isInteger(id) || id <= 0) return;
     attachWebview(id);
   });
 
   ipcMain.on("kbs:unregisterWebview", (event, webContentsId: unknown) => {
+    // Detachment is trusted-sender cleanup and must also work after locking.
     if (!isTrustedRendererUrl(event.sender.getURL())) return;
     const id = Number(webContentsId);
     if (Number.isInteger(id) && id > 0) detachWebview(id);

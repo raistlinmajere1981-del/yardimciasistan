@@ -16,7 +16,7 @@ import {
 } from "./database/customer-room-stay-store.js";
 import {
   findConflictingRoomReservation as findStoredConflictingRoomReservation,
-  getReservations as getStoredReservations
+  hasConflictingRoomReservation
 } from "./database/reservation-store.js";
 import { findActiveOrderForTables } from "./database/table-order-store.js";
 import {
@@ -451,16 +451,7 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
       return { ok: false, message: `${String(room.name ?? "Seçilen oda")} bu tarihlerde aktif bir konaklama kaydına bağlı.` };
     }
 
-    const conflict = getStoredReservations(db).find((reservation) => {
-      if (reservation.id === reservationId) return false;
-      if (!["pending", "approved"].includes(reservation.status) || !reservation.roomIds.includes(roomId)) {
-        return false;
-      }
-      const existingStart = reservation.startDate || reservation.endDate;
-      const existingEnd = reservation.endDate || reservation.startDate;
-      if (!existingStart || !existingEnd) return false;
-      return existingStart < endDate && startDate < existingEnd;
-    });
+    const conflict = hasConflictingRoomReservation(db, roomId, startDate, endDate, reservationId);
     if (conflict) {
       return {
         ok: false,
