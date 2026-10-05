@@ -31,8 +31,8 @@ export function MarketingScheduleWorkspace({draft,onChange,detail,channels,publi
     <fieldset className="form-stack" disabled={busy||Boolean(terminal)||inFlight}>
       <label className="form-field">Plan adı<input maxLength={240} value={draft.name} onChange={e=>onChange({...draft,name:e.target.value})}/></label>
       <div className="marketing-schedule-fields">
-        <label className="form-field">Tarih<input type="date" value={draft.startsLocal.slice(0,10)} onChange={e=>onChange({...draft,startsLocal:`${e.target.value}T${draft.startsLocal.slice(11)}`})}/></label>
-        <label className="form-field">Saat<input type="time" value={draft.startsLocal.slice(11)} onChange={e=>onChange({...draft,startsLocal:`${draft.startsLocal.slice(0,10)}T${e.target.value}`,recurrenceRule:rule?{...rule,localTime:e.target.value}:undefined})}/></label>
+        <label className="form-field">Tarih<input type="date" lang="tr-TR" value={draft.startsLocal.slice(0,10)} onChange={e=>onChange({...draft,startsLocal:`${e.target.value}T${draft.startsLocal.slice(11)}`})}/></label>
+        <label className="form-field">Saat<input type="time" lang="tr-TR" value={draft.startsLocal.slice(11)} onChange={e=>onChange({...draft,startsLocal:`${draft.startsLocal.slice(0,10)}T${e.target.value}`,recurrenceRule:rule?{...rule,localTime:e.target.value}:undefined})}/></label>
       </div>
       <label className="form-field">Saat dilimi<input aria-label="Saat dilimi" value={draft.timezone} placeholder="Europe/Istanbul" onChange={e=>onChange({...draft,timezone:e.target.value})}/><small>IANA adı · Plan kaydedilen saat dilimini korur.</small></label>
       <label className="form-field">Plan türü<select aria-label="Plan türü" value={draft.scheduleType} onChange={e=>e.target.value==="once"?onChange({...draft,scheduleType:"once",recurrenceRule:undefined}):setRule("daily")}><option value="once">Tek sefer</option><option value="recurring" disabled={!channel?.supportsRecurringScheduling}>Tekrar</option></select></label>
