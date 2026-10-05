@@ -15,16 +15,12 @@ Tek aktif site kaynağı bu dizindir; React/Vite bundle veya ayrı `/demo` uygul
 - `/kullanim-kilavuzu/`: sonraki ekran görüntülü bölümlere uygun sidebar/content shell.
 - `/yardimci-asistan/magaza/`: mevcut mağaza sözleşmesi korunur; modülün canonical route'u.
 
-## Website Menü
+## Navigasyon sahipliği
 
-Desktop **Ayarlar → Servisler → Website → Menü** mevcut staged Services kayıt akışını kullanır.
-`packages/shared/types/website-navigation.ts` bilinen page id, label, path, availability ve varsayılan sırayı tanımlar.
-PHP registry snapshot'ı `firm-template/web-module/config/website-pages.json` içindedir; smoke tam eşitliğini doğrular.
+Bu showcase kendi route listesini ve sırasını `inc/site.php` içinde sahiplenir. Opsiyonel sayfalar yalnız ilgili
+capability/publication gerçekten kullanılabilir olduğunda header/footer'da görünür. Desktop müşteri sitelerinin
+sayfa listesini, sırasını veya görünürlüğünü yayınlamaz; her müşteri sitesi kendi bilgi mimarisini korur.
 
-`website_navigation` yalnız `{revision, items: [{pageId, visible, order}]}` taşır. Ham URL/HTML kabul edilmez.
-Mevcut durable sync outbox, monoton revision ledger, idempotency receipt ve revision-qualified ack kullanılır.
-Gizli veya yayın/capability açısından kullanılamayan sayfalar header/footer'da gösterilmez.
-`demoOnly` kurulum/kılavuz sayfaları müşteri hostlarında registry resolver tarafından dışlanır.
 
 ## Demo anahtarı sınırı
 

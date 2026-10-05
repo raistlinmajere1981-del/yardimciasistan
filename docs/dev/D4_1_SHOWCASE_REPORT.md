@@ -1,5 +1,7 @@
 # D4.1 — Alwaysdata showcase / çalışma merkezi
 
+> **Superseded navigation note (2026-10-05):** Desktop-managed `website_navigation` publication was removed. Each website host now owns its route list/order and derives optional visibility from published capabilities/content. The rest of this file is a historical implementation report.
+
 Doğrudan `main` üzerinde uygulandı; başlangıç HEAD: `848f482e02cfbceb7dc698ea15c44541e6eba32a`.
 Başlangıç çalışma ağacı temizdi. Commit oluşturulmadı.
 

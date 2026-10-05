@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { cpSync, mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -11,15 +11,11 @@ import { marketingFixture, imageBytes, editorialInput } from './test-helpers/mar
 const require = createRequire(import.meta.url);
 const { PhpHostingSyncTransport } = require('../packages/sync-core/dist');
 const { SyncCoordinator } = require('../apps/desktop-app/dist-electron/sync-coordinator.js');
-const { WEBSITE_PAGES, defaultWebsiteNavigation, normalizeWebsiteNavigation } = require('../packages/shared/dist');
 const root = mkdtempSync(join(tmpdir(), 'ya-showcase-')), f = marketingFixture();
 cpSync('test-site/landing', root, { recursive: true });
 const moduleRoot = join(root, 'yardimci-asistan'); cpSync('firm-template/web-module', moduleRoot, { recursive: true });
 const secret = 'showcase-only-test-key<&"';
 writeFileSync(join(moduleRoot, 'config/business.json'), JSON.stringify({ sync_secret: secret, allowed_origins: [] }));
-assert.deepEqual(JSON.parse(readFileSync(join(moduleRoot, 'config/website-pages.json'))), WEBSITE_PAGES);
-assert.throws(() => normalizeWebsiteNavigation([{ pageId: 'evil', visible: true, order: 0 }]));
-assert.throws(() => normalizeWebsiteNavigation([{ pageId: 'home', visible: true, order: 0, path: 'https://evil.example' }]));
 assert.equal(existsSync('test-site/landing/demo'), false);
 const port = await new Promise(resolvePort => { const server = http.createServer(); server.listen(0, '127.0.0.1', () => { const p = server.address().port; server.close(() => resolvePort(p)); }); });
 const base = `http://127.0.0.1:${port}`, config = { baseUrl: `${base}/yardimci-asistan`, syncSecret: secret };
@@ -27,9 +23,8 @@ const php = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', root], { stdio: 'igno
 const clientId = f.db.getSyncRuntimeStatus().clientId, transport = new PhpHostingSyncTransport({ ...config, clientId });
 const coordinator = new SyncCoordinator({ database: f.db, marketingWebsite: f.publisher, getSyncConfig: () => config, createAndroidSnapshot: () => ({}), onDashboardChanged: () => {}, onStatusChanged: () => {} });
 let browser;
-const clearOthers = () => { for (const job of f.db.getPendingSyncJobs()) if (!['website_navigation_publish', 'marketing_website_publish'].includes(job.jobType)) f.db.completeSyncJob(job.jobKey, job.sourceRevision); };
+const clearOthers = () => { for (const job of f.db.getPendingSyncJobs()) if (job.jobType !== 'marketing_website_publish') f.db.completeSyncJob(job.jobKey, job.sourceRevision); };
 const push = async () => { clearOthers(); const result = await coordinator.publishOutbox(transport); assert.deepEqual(result.errors, []); };
-const post = payload => fetch(`${config.baseUrl}/api/sync.php`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-YA-Sync-Secret': secret }, body: JSON.stringify(payload) });
 // Real storage publications, isolated from a customer's runtime. Leaf endpoint regressions have their own registered smokes.
 const seed = (name, value, revision = 1) => {
   const file = join(root, 'seed.json'); writeFileSync(file, JSON.stringify(value));
@@ -38,16 +33,9 @@ const seed = (name, value, revision = 1) => {
 };
 try {
   for (let n = 0; n < 50; n++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(r => setTimeout(r, 100)); }
-  assert.ok((await transport.getCapabilities()).features.includes('website_navigation'));
+  const capabilities = await transport.getCapabilities();
+  assert.ok(!capabilities.features.includes('website_navigation'));
   await push(); assert.equal(f.db.getSyncRuntimeStatus().enabled, false);
-  const navJobRevision = Number(f.db.getSetupData().websiteNavigation.length); assert.equal(navJobRevision, 10);
-  const defaults = { revision: 1, items: defaultWebsiteNavigation() };
-  const navRequest = { sourceRevision: 1, idempotencyKey: 'nav-dedupe', value: defaults };
-  // Separate client namespace exercises replay without colliding with desktop's revision ledger.
-  const probe = new PhpHostingSyncTransport({ ...config, clientId: 'nav-probe' });
-  assert.equal((await probe.publishWebsiteNavigation(navRequest)).ok, true);
-  assert.equal((await probe.publishWebsiteNavigation(navRequest)).deduplicated, true);
-  assert.equal((await post({ action: 'publish_website_navigation', client_id: clientId, source_revision: 9, idempotency_key: 'bad-route', navigation: { revision: 9, items: [{ pageId: 'rooms', visible: true, order: 0, path: '/evil/' }] } })).status, 422);
   browser = await launchChromiumForSmoke(chromium); const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(base); await expect(page.locator('#demo-sync-secret')).toHaveValue(secret);
@@ -106,9 +94,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(base);
   await page.reload(); for (const path of ['/odalar/', '/restoran/', '/qr-menu/', '/yardimci-asistan/magaza/']) await expect(page.locator(`[data-site-nav] a[href="${path}"]`)).toHaveCount(1);
-  const items = defaultWebsiteNavigation().map(item => ({ ...item, visible: item.pageId !== 'rooms', order: item.pageId === 'qr_menu' ? 0 : item.order + 10 }));
-  assert.equal(f.db.saveInitialSetup({ ...f.setup, profileOptions: f.db.getSetupData().profileOptions, websiteNavigation: items }).ok, true); await push();
-  await page.reload(); await expect(page.locator('[data-site-nav] a[href="/odalar/"]')).toHaveCount(0); assert.equal(await page.locator('[data-site-nav] a').first().getAttribute('href'), '/qr-menu/');
+  assert.equal(await page.locator('[data-site-nav] a').first().getAttribute('href'), '/');
   seed('menu', { enabled: false, categories: [], items: [] }, 2); await page.reload(); await expect(page.locator('[data-site-nav] a[href="/qr-menu/"]')).toHaveCount(0);
   const a = f.media.importBytes(imageBytes, 'upload'), b = f.media.importBytes(imageBytes, 'upload'), c = f.media.importBytes(imageBytes, 'upload');
   const content = f.service.saveContent(editorialInput());
@@ -132,13 +118,7 @@ try {
   await page.reload(); await expect(page.locator('[data-google-rating]')).toContainText('4.8'); await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(3);
   await page.goto(base + '/yorumlar/'); await expect(page.locator('[data-google-review-list] blockquote')).toHaveCount(4);
   await page.goto(base);
-  f.db.queueSyncJob('website_navigation_publish'); clearOthers();
-  const pending = f.db.getPendingSyncJobs().find(job => job.jobType === 'website_navigation_publish');
-  const wrongAck = Object.create(transport); wrongAck.publishWebsiteNavigation = async () => ({ ok: true, source_revision: pending.sourceRevision + 1 });
-  await coordinator.publishOutbox(wrongAck); assert.ok(f.db.getPendingSyncJobs('9999').some(job => job.jobType === 'website_navigation_publish'), 'wrong revision ack retains intent');
-  f.db.queueSyncJob('website_navigation_publish'); await push();
   mkdirSync('artifacts/showcase', { recursive: true }); await page.screenshot({ path: 'artifacts/showcase/mobile.png', fullPage: true }); await page.setViewportSize({ width: 1440, height: 1000 }); await page.screenshot({ path: 'artifacts/showcase/desktop.png', fullPage: true });
   assert.deepEqual(errors, []);
-  assert.ok(!readFileSync('firm-template/web-module/lib/website-navigation.php', 'utf8').includes('sync_secret'));
-  console.log('Showcase routes, demo-only secret, downloads, typed menu/availability/order, real publication multi-image/edit/reorder/remove/add/unpublish, mobile menu and reduced motion passed.');
+  console.log('Showcase routes, host-owned availability navigation, demo-only secret, downloads, real publication multi-image/edit/reorder/remove/add/unpublish, mobile menu and reduced motion passed.');
 } finally { await browser?.close(); coordinator.stop(); php.kill(); await new Promise(r => php.once('exit', r)); f.dispose(); rmSync(root, { recursive: true, force: true }); }

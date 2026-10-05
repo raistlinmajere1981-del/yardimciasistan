@@ -90,10 +90,22 @@ function render_site_hero(string $eyebrow, string $title, string $description = 
 function site_hero_image(): string { return site_asset('showcase/workspace.webp'); }
 function site_navigation(): array
 {
-    $library = dirname(__DIR__) . '/yardimci-asistan/lib/website-navigation.php';
-    if (!is_file($library)) return [['id'=>'home','label'=>'Ana Sayfa','path'=>'/'], ['id'=>'installation','label'=>'Kurulum','path'=>'/kurulum/'], ['id'=>'guide','label'=>'Kullanım Kılavuzu','path'=>'/kullanim-kilavuzu/'], ['id'=>'contact','label'=>'İletişim','path'=>'/iletisim/']];
-    require_once $library;
-    return ya_website_navigation_items(site_publication('website_navigation') ?? [], site_availability(), true);
+    // Navigation belongs to this showcase host. Customer websites may expose a
+    // different route set and ordering; Desktop only publishes feature/content availability.
+    $pages = [
+        ['id'=>'home','label'=>'Ana Sayfa','path'=>'/','availability'=>'always'],
+        ['id'=>'rooms','label'=>'Odalar','path'=>'/odalar/','availability'=>'rooms'],
+        ['id'=>'restaurant','label'=>'Restoran','path'=>'/restoran/','availability'=>'restaurant'],
+        ['id'=>'qr_menu','label'=>'QR Menü','path'=>'/qr-menu/','availability'=>'qr_menu'],
+        ['id'=>'store','label'=>'Mağaza','path'=>'/yardimci-asistan/magaza/','availability'=>'store'],
+        ['id'=>'announcements','label'=>'Kampanyalar','path'=>'/duyurular/','availability'=>'announcements'],
+        ['id'=>'reviews','label'=>'Yorumlar','path'=>'/yorumlar/','availability'=>'reviews'],
+        ['id'=>'contact','label'=>'İletişim','path'=>'/iletisim/','availability'=>'always'],
+        ['id'=>'installation','label'=>'Kurulum','path'=>'/kurulum/','availability'=>'always'],
+        ['id'=>'guide','label'=>'Kullanım Kılavuzu','path'=>'/kullanim-kilavuzu/','availability'=>'always'],
+    ];
+    $availability = site_availability();
+    return array_values(array_filter($pages, static fn(array $page): bool => ($availability[$page['availability']] ?? false) === true));
 }
 function site_availability(): array
 {

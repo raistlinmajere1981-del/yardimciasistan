@@ -36,7 +36,7 @@ globalThis.fetch = async (url, init) => {
   if (!String(url).endsWith("/api/sync.php")) return new Response("{}", { status: 404 });
   const body = JSON.parse(init.body);
   calls.push(body);
-  if (["capabilities", "publish_website_navigation", "publish_online_catalog", "pull_web_orders"].includes(body.action)) {
+  if (["capabilities", "publish_online_catalog", "pull_web_orders"].includes(body.action)) {
     if (body.action === "publish_online_catalog" && failPublication) return Response.json({ ok: false, message: "retry" }, { status: 503 });
     const result = endpoint("sync.php", body);
     if (body.action === "capabilities" && !supportsCatalog) result.payload.features = result.payload.features.filter((feature) => feature !== "online_catalog_v1");

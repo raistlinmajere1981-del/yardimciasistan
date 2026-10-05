@@ -1821,7 +1821,3 @@
   border-radius: var(--radius-panel);
   background: var(--color-bg-panel);
 }
-
-.website-navigation-fields { margin-top: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-.website-navigation-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2); }
-.website-navigation-row label { display: flex; align-items: center; gap: var(--space-2); }

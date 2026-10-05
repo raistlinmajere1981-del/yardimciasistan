@@ -1179,7 +1179,6 @@ function assertCapabilitiesShape() {
     protocol_version: 2,
     storage: "sqlite",
     features: [
-      "website_navigation",
       "marketing_website_publications",
       "business_messaging_status_v1",
       "web_orders_v1",

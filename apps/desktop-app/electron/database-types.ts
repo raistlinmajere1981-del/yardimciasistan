@@ -1,4 +1,3 @@
-import type { WebsiteNavigationItem } from "@yardimci-asistan/shared";
 import type {
   OnlineSalesDeliverySettings,
   BirthdaySettings,
@@ -522,7 +521,6 @@ interface DesktopProductDataSettings {
 }
 
 export interface DesktopSetupData {
-  websiteNavigation?: WebsiteNavigationItem[];
   setupRequired: boolean;
   appPasswordConfigured: boolean;
   businessName: string;
@@ -561,7 +559,6 @@ export interface DesktopSetupData {
 }
 
 export interface SaveInitialSetupInput {
-  websiteNavigation?: WebsiteNavigationItem[];
   businessName: string;
   profileId: string;
   profileOptions?: BusinessCapability[];
@@ -1073,7 +1070,7 @@ export interface RecordSyncEventInput {
   status?: number;
 }
 
-export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish" | "dealer_access_publish" | "marketing_website_publish" | "website_navigation_publish";
+export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish" | "dealer_access_publish" | "marketing_website_publish";
 
 export interface DesktopSyncJob {
   jobKey: string;

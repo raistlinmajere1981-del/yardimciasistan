@@ -12,7 +12,6 @@ require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/business-map.php';
 require_once YA_BASE_DIR . '/lib/online-catalog.php';
 require_once YA_BASE_DIR . '/lib/marketing.php';
-require_once YA_BASE_DIR . '/lib/website-navigation.php';
 require_once YA_BASE_DIR . '/lib/dealer-access.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/google-reviews.php';
@@ -28,7 +27,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_website_navigation', 'publish_marketing_website', 'publish_dealer_access', 'publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
+if (in_array($action, ['publish_marketing_website', 'publish_dealer_access', 'publish_online_catalog', 'publish_ai_settings', 'publish_business_context', 'publish_room_catalog', 'publish_table_catalog', 'publish_ai_catalog', 'publish_google_reviews_settings', 'test_google_reviews_settings', 'reset_runtime'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -125,10 +124,6 @@ try {
 
     if ($action === 'publish_dealer_access') {
         ya_sync_publish_dealer_access($payload);
-    }
-
-    if ($action === 'publish_website_navigation') {
-        ya_sync_publish_website_navigation($payload);
     }
 
     if ($action === 'publish_marketing_website') {
@@ -3628,15 +3623,3 @@ function ya_sync_publish_marketing_website(array $payload): void
     ya_sync_response(200, array_merge(['ok' => true, 'message' => 'Website pazarlama yayını eşitlendi.'], $publication));
 }
 
-function ya_sync_publish_website_navigation(array $payload): void
-{
-    $revision = $payload['source_revision'] ?? null;
-    $key = ya_sync_string($payload['idempotency_key'] ?? '');
-    try { $projection = ya_website_navigation_projection($payload['navigation'] ?? null); }
-    catch (InvalidArgumentException) { ya_sync_response(422, ['ok' => false, 'message' => 'Website menüsü geçersiz.']); }
-    if (!is_int($revision) || $revision < 1 || $revision !== $projection['revision'] || $key === '' || strlen($key) > 240) {
-        ya_sync_response(422, ['ok' => false, 'message' => 'Website menü revision bilgisi geçersiz.']);
-    }
-    $publication = ya_storage_publish('website_navigation', $projection, ya_sync_require_client_id($payload), $revision, $key, date(DATE_ATOM));
-    ya_sync_response(200, array_merge(['ok' => true, 'message' => 'Website menüsü eşitlendi.'], $publication));
-}

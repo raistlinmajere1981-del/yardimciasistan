@@ -63,7 +63,7 @@ export function getPendingSyncJobs(db: DatabaseSync, now = new Date().toISOStrin
 }
 
 export function queueSyncJob(db: DatabaseSync, jobType: DesktopSyncJobType, timestamp = new Date().toISOString()) {
-  const jobKey = jobType === "website_navigation_publish" ? "website_navigation" : jobType === "marketing_website_publish" ? "marketing_website" : jobType === "menu_publish" ? "menu"
+  const jobKey = jobType === "marketing_website_publish" ? "marketing_website" : jobType === "menu_publish" ? "menu"
     : jobType === "online_catalog_publish" ? "online_catalog" : jobType === "dealer_access_publish" ? "dealer_access" : "android_snapshot";
   db
     .prepare(`
