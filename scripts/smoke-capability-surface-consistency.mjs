@@ -530,7 +530,16 @@ const hybridProjection = projectAndroidOperationsSnapshot(fullSnapshot, pensionR
 assert.equal(hybridProjection.rooms.length > 0, true);
 assert.deepEqual(hybridProjection.tables, []);
 assert.equal(hybridProjection.reservations.some((reservation) => reservation.reservation_type === "table"), false);
-assert.match(navigationSource, /pageId:\s*"market"[\s\S]{0,220}condition:\s*\{\s*anyOf:/);
+assert.match(
+  navigationSource,
+  /pageId:\\s*"market"[\\s\\S]{0,220}condition:\\s*\\{\\s*anyOf:\\s*\\[C\\.RETAIL_BARCODE,[^\\]]*C\\.WHOLESALE,[^\\]]*C\\.ONLINE_SALES\\]/,
+  "Satış navigation is owned by retail/commerce surface capabilities, not generic catalog/sales capabilities"
+);
+for (const profileId of ["pension_restaurant", "pension", "restaurant"]) {
+  const capabilities = getBusinessProfile(profileId).defaultCapabilities;
+  assert.equal(capabilities.includes(C.RETAIL_BARCODE), false, `${profileId} must not expose the retail Satış surface`);
+}
+assert.equal(getBusinessProfile("market").defaultCapabilities.includes(C.RETAIL_BARCODE), true);
 assert.match(
   navigationSource,
   /financeEnabled \? "Kasa" : "Raporlar"/,
