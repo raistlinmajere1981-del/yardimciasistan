@@ -50,6 +50,24 @@ export const BUSINESS_PUBLIC_PROFILE_LIMITS = {
   socialUrl: 1000
 } as const;
 
+export type BusinessMapDisplayMode = "manual" | "google_maps_embed";
+
+/** Website presentation only; never resolves or replaces canonical coordinates. */
+export function normalizeGoogleMapsEmbedUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const raw = value.trim();
+  if (!raw || raw.length > 4096 || /[<>\\\s]/.test(raw)) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash
+      || !["google.com", "www.google.com"].includes(url.hostname)
+      || url.pathname !== "/maps/embed" || !url.searchParams.get("pb")) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Customer-facing business facts that do not already have an authoritative
  * source elsewhere. Business name, phone, WhatsApp, e-mail and street address
@@ -57,6 +75,8 @@ export const BUSINESS_PUBLIC_PROFILE_LIMITS = {
  * future public context instead of being duplicated here.
  */
 export interface BusinessPublicProfile {
+  mapDisplayMode: BusinessMapDisplayMode;
+  googleMapsEmbedUrl: string;
   description: string;
   latitude: number | null;
   longitude: number | null;

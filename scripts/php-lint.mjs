@@ -7,6 +7,8 @@ const phpFiles = [
   "infrastructure/hosting/instagram-staging-log-filter.php",
   ...sitePhpFiles("test-site/landing"),
   "firm-template/web-module/lib/website-navigation.php",
+  "firm-template/web-module/lib/business-map.php",
+  "firm-template/web-module/api/business.php",
   "firm-template/web-module/lib/marketing.php",
   "firm-template/web-module/api/marketing.php",
   "firm-template/web-module/api/marketing-media.php",

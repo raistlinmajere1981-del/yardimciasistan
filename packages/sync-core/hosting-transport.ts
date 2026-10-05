@@ -309,6 +309,8 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
       whatsapp_enabled: options.context.whatsappEnabled,
       email: options.context.email,
       address: options.context.address,
+      mapDisplayMode: options.context.mapDisplayMode ?? "manual",
+      googleMapsEmbedUrl: options.context.googleMapsEmbedUrl ?? "",
       latitude: options.context.latitude,
       longitude: options.context.longitude,
       description: options.context.description,

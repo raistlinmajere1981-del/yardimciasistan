@@ -13,6 +13,8 @@ const {
 } = require("../apps/desktop-app/dist-electron/business-public-profile.js");
 
 const expectedEmptyProfile = {
+  mapDisplayMode: "manual",
+  googleMapsEmbedUrl: "",
   description: "",
   latitude: null,
   longitude: null,
@@ -139,7 +141,45 @@ try {
     raw.close();
   }
 
-  console.log("business-public-profile-smoke-ok: baseline table, safe normalization, map/time validation and persistence verified");
+  const beforeMapSwitch = getBusinessPublicProfile(database.databasePath);
+  const embedUrl = "https://www.google.com/maps/embed?pb=!1m18!2m3";
+  const google = saveBusinessPublicProfile(database.databasePath, { ...beforeMapSwitch, mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: embedUrl });
+  assert.equal(google.ok, true);
+  assert.equal(google.profile.latitude, beforeMapSwitch.latitude);
+  assert.equal(google.profile.longitude, beforeMapSwitch.longitude);
+  assert.equal(getBusinessPublicProfile(database.databasePath).googleMapsEmbedUrl, embedUrl);
+  for (const url of ["", "https://evil.test/maps/embed?pb=x", "http://www.google.com/maps/embed?pb=x", "javascript:alert(1)", '<iframe src="https://www.google.com/maps/embed?pb=x"></iframe>', "https://user:pass@www.google.com/maps/embed?pb=x", "https://www.google.com/maps/search?pb=x", "https://www.google.com/maps/embed?pb=" + "x".repeat(4096)]) {
+    assert.equal(saveBusinessPublicProfile(database.databasePath, { ...beforeMapSwitch, mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: url }).ok, false, url);
+  }
+  const manual = saveBusinessPublicProfile(database.databasePath, { ...beforeMapSwitch, mapDisplayMode: "manual", googleMapsEmbedUrl: embedUrl });
+  assert.equal(manual.ok, true);
+  assert.equal(manual.profile.googleMapsEmbedUrl, embedUrl);
+  assert.equal(manual.profile.latitude, beforeMapSwitch.latitude);
+  assert.equal(manual.profile.longitude, beforeMapSwitch.longitude);
+  assert.equal(saveBusinessPublicProfile(database.databasePath, { ...beforeMapSwitch, mapDisplayMode: "invalid" }).ok, false);
+  assert.deepEqual(getBusinessPublicProfile(database.databasePath), manual.profile);
+  const { createCurrentBusinessAiContext, publishBusinessAiContext } = require("../apps/desktop-app/dist-electron/business-ai-context-service.js");
+  const aiContext = createCurrentBusinessAiContext(database);
+  assert.equal("mapDisplayMode" in aiContext, false);
+  assert.equal("googleMapsEmbedUrl" in aiContext, false);
+  const originalFetch = globalThis.fetch;
+  const published = [];
+  globalThis.fetch = async (_url, init) => {
+    published.push(JSON.parse(init.body).business_context);
+    return new Response(JSON.stringify({ ok: true, message: "ok", published_at: new Date().toISOString(), profile_id: "pension_restaurant" }), { status: 200 });
+  };
+  try {
+    for (const mode of ["manual", "google_maps_embed"]) {
+      assert.equal(saveBusinessPublicProfile(database.databasePath, { ...beforeMapSwitch, mapDisplayMode: mode, googleMapsEmbedUrl: embedUrl }).ok, true);
+      assert.equal((await publishBusinessAiContext(database, { baseUrl: "https://example.test/yardimci-asistan", syncSecret: "test" })).ok, true);
+      assert.equal(published.at(-1).mapDisplayMode, mode);
+      assert.equal(published.at(-1).googleMapsEmbedUrl, embedUrl);
+      assert.equal(published.at(-1).latitude, beforeMapSwitch.latitude);
+      assert.equal(published.at(-1).longitude, beforeMapSwitch.longitude);
+    }
+  } finally { globalThis.fetch = originalFetch; }
+  console.log("business-public-profile-smoke-ok: default/manual/google persistence, URL validation, coordinate preservation and website publication verified");
+
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });

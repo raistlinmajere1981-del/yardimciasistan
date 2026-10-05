@@ -949,6 +949,8 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
       whatsappEnabled: false,
       email: "info@example.test",
       address: "Örnek Mahallesi",
+      mapDisplayMode: "google_maps_embed",
+      googleMapsEmbedUrl: "https://www.google.com/maps/embed?pb=test",
       latitude: 41.1,
       longitude: 33.2,
       description: "Mahalle marketi.",
@@ -976,6 +978,8 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
   assert.deepEqual(calls[0].body.business_context.feature_ids, []);
   assert.deepEqual(calls[0].body.business_context.social_links, []);
   assert.equal(calls[0].body.business_context.latitude, 41.1);
+  assert.equal(calls[0].body.business_context.mapDisplayMode, "google_maps_embed");
+  assert.equal(calls[0].body.business_context.googleMapsEmbedUrl, "https://www.google.com/maps/embed?pb=test");
   assert.equal(calls[0].body.business_context.longitude, 33.2);
   assert.equal("sync_secret" in calls[0].body, false);
 });

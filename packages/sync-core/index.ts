@@ -2,7 +2,7 @@ import {
   type WebsiteNavigationPublication,
   type MarketingWebsiteProjection,
   type BusinessAiCatalog,
-  type BusinessAiContext,
+  type BusinessWebContext,
   type BusinessCapability,
   type CommerceOnlineCatalog,
   type DealerAccessProjection,
@@ -153,7 +153,7 @@ export interface PushAiSettingsOptions extends SyncCoreConfig {
 
 export interface PushBusinessContextOptions extends SyncCoreConfig {
   clientId: string;
-  context: BusinessAiContext;
+  context: BusinessWebContext;
 }
 
 export interface PushRoomCatalogOptions extends SyncCoreConfig {

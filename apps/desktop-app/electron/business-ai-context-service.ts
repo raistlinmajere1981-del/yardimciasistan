@@ -1,6 +1,8 @@
 import {
   createBusinessAiContext,
-  type BusinessAiContext
+  normalizeGoogleMapsEmbedUrl,
+  type BusinessAiContext,
+  type BusinessWebContext
 } from "@yardimci-asistan/shared";
 import {
   pushBusinessContext,
@@ -28,7 +30,12 @@ export async function publishBusinessAiContext(
   database: DesktopDatabase,
   syncConfig: AiSettingsSyncConfig
 ): Promise<PushBusinessContextResult> {
-  const context = createCurrentBusinessAiContext(database);
+  const profile = getBusinessPublicProfile(database.databasePath);
+  const context: BusinessWebContext = {
+    ...createCurrentBusinessAiContext(database),
+    mapDisplayMode: profile.mapDisplayMode,
+    googleMapsEmbedUrl: normalizeGoogleMapsEmbedUrl(profile.googleMapsEmbedUrl)
+  };
   const result = await pushBusinessContext({
     ...syncConfig,
     clientId: database.getSyncRuntimeStatus().clientId,

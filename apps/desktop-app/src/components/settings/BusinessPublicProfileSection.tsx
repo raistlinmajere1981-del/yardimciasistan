@@ -7,6 +7,8 @@ import {
   getBusinessPublicFeatureCatalogForCapabilities,
   hasBusinessCapability,
   normalizeBusinessSocialLinkUrl,
+  normalizeGoogleMapsEmbedUrl,
+  type BusinessMapDisplayMode,
   type BusinessCapability,
   type BusinessPublicFeatureId,
   type BusinessPublicProfile,
@@ -21,6 +23,8 @@ import { TimePicker } from "../ui/DateTimePicker";
 import { ActionButton } from "../ui/ActionButton";
 
 interface BusinessPublicProfileDraft {
+  mapDisplayMode: BusinessMapDisplayMode;
+  googleMapsEmbedUrl: string;
   description: string;
   latitude: string;
   longitude: string;
@@ -45,6 +49,8 @@ interface BusinessPublicProfileSectionProps {
 type AddressLookupState = "idle" | "loading" | "success" | "error";
 
 const EMPTY_DRAFT: BusinessPublicProfileDraft = {
+  mapDisplayMode: "manual",
+  googleMapsEmbedUrl: "",
   description: "",
   latitude: "",
   longitude: "",
@@ -234,6 +240,10 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     const coordinates = parseCoordinates(draft.latitude, draft.longitude);
     if (!coordinates.ok) return coordinates;
 
+    if ((draft.googleMapsEmbedUrl.trim() && !normalizeGoogleMapsEmbedUrl(draft.googleMapsEmbedUrl))
+      || (draft.mapDisplayMode === "google_maps_embed" && !normalizeGoogleMapsEmbedUrl(draft.googleMapsEmbedUrl))) {
+      return { ok: false, message: "Google Maps embed bağlantısı geçerli bir HTTPS yerleştirme URL'si olmalı." };
+    }
     const socialLinks: BusinessSocialLink[] = [];
     for (const link of draft.socialLinks) {
       const rawUrl = link.url.trim();
@@ -252,6 +262,8 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     return {
       ok: true,
       input: {
+        mapDisplayMode: draft.mapDisplayMode,
+        googleMapsEmbedUrl: draft.googleMapsEmbedUrl.trim(),
         description: draft.description,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
@@ -361,6 +373,18 @@ export function BusinessPublicProfileSection({
       ) : (
         <div className="business-public-profile-body">
           <div className="business-public-profile-map-point">
+            <label>
+              Harita gösterimi
+              <select aria-label="Harita gösterimi" value={draft.mapDisplayMode} disabled={loading || saving} onChange={(event) => update("mapDisplayMode", event.target.value as BusinessMapDisplayMode)}>
+                <option value="manual">Manuel</option>
+                <option value="google_maps_embed">Google Maps</option>
+              </select>
+            </label>
+            {draft.mapDisplayMode === "google_maps_embed" && <label>
+              Google Maps embed bağlantısı
+              <input aria-label="Google Maps embed bağlantısı" aria-describedby="business-map-embed-help" type="url" maxLength={4096} value={draft.googleMapsEmbedUrl} disabled={loading || saving} onChange={(event) => update("googleMapsEmbedUrl", event.target.value)} />
+              <small id="business-map-embed-help">Google Maps'teki Haritayı paylaş / Yerleştirme bağlantısını kullanın.</small>
+            </label>}
             <div className="business-public-profile-address-lookup">
               <div>
                 <strong>Adrese göre haritada bul</strong>
@@ -653,6 +677,8 @@ function socialLinkPlaceholder(platform: BusinessSocialPlatformId): string {
 
 function toDraft(profile: BusinessPublicProfile): BusinessPublicProfileDraft {
   return {
+    mapDisplayMode: profile.mapDisplayMode ?? "manual",
+    googleMapsEmbedUrl: profile.googleMapsEmbedUrl ?? "",
     description: profile.description,
     latitude: profile.latitude === null ? "" : String(profile.latitude),
     longitude: profile.longitude === null ? "" : String(profile.longitude),

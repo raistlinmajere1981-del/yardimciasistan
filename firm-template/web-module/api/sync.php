@@ -9,6 +9,7 @@ const YA_GOOGLE_REVIEWS_SETTINGS_FILE = YA_BASE_DIR . '/data/google-reviews.loca
 const YA_GOOGLE_REVIEWS_CACHE_FILE = YA_BASE_DIR . '/data/google-reviews-cache.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/business-map.php';
 require_once YA_BASE_DIR . '/lib/online-catalog.php';
 require_once YA_BASE_DIR . '/lib/marketing.php';
 require_once YA_BASE_DIR . '/lib/website-navigation.php';
@@ -1444,6 +1445,8 @@ function ya_sync_publish_business_context(array $payload): void
         'whatsapp_enabled' => ya_sync_bool($candidate['whatsapp_enabled'] ?? false),
         'email' => mb_substr(ya_sync_string($candidate['email'] ?? ''), 0, 160),
         'address' => mb_substr(ya_sync_string($candidate['address'] ?? ''), 0, 500),
+        'mapDisplayMode' => ($candidate['mapDisplayMode'] ?? '') === 'google_maps_embed' ? 'google_maps_embed' : 'manual',
+        'googleMapsEmbedUrl' => ya_business_google_maps_embed_url($candidate['googleMapsEmbedUrl'] ?? ''),
         'latitude' => $latitude,
         'longitude' => $longitude,
         'description' => mb_substr(ya_sync_string($candidate['description'] ?? ''), 0, 1600),

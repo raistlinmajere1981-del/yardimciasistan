@@ -5,6 +5,7 @@ const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/business-map.php';
 
 $config = ya_business_load_json(YA_CONFIG_FILE);
 ya_business_apply_cors($config);
@@ -81,6 +82,8 @@ ya_business_response(200, [
         'whatsapp' => $whatsapp,
         'email' => $email,
         'website' => ya_business_string($config['website'] ?? ''),
+        'mapDisplayMode' => ($publicContext['mapDisplayMode'] ?? '') === 'google_maps_embed' ? 'google_maps_embed' : 'manual',
+        'googleMapsEmbedUrl' => ya_business_google_maps_embed_url($publicContext['googleMapsEmbedUrl'] ?? ''),
         'address' => $address,
         'latitude' => is_numeric($publicContext['latitude'] ?? null) ? (float) $publicContext['latitude'] : null,
         'longitude' => is_numeric($publicContext['longitude'] ?? null) ? (float) $publicContext['longitude'] : null,

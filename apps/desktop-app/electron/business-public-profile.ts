@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_PUBLIC_PROFILE_LIMITS,
+  normalizeGoogleMapsEmbedUrl,
   hasCompleteBusinessPublicMapPoint,
   isBusinessPublicClockTime,
   normalizeBusinessPublicFeatures,
@@ -11,6 +12,8 @@ import {
 } from "@yardimci-asistan/shared";
 
 const EMPTY_BUSINESS_PUBLIC_PROFILE: BusinessPublicProfile = {
+  mapDisplayMode: "manual",
+  googleMapsEmbedUrl: "",
   description: "",
   latitude: null,
   longitude: null,
@@ -31,6 +34,8 @@ export type BusinessPublicProfileSaveResult =
   | { ok: false; message: string };
 
 interface BusinessPublicProfileRow {
+  map_display_mode?: unknown;
+  google_maps_embed_url?: unknown;
   description?: unknown;
   latitude?: unknown;
   longitude?: unknown;
@@ -53,7 +58,7 @@ export function getBusinessPublicProfile(databasePath: string): BusinessPublicPr
     if (!businessId) return { ...EMPTY_BUSINESS_PUBLIC_PROFILE };
 
     const row = db.prepare(`
-      SELECT description, latitude, longitude, directions_note,
+      SELECT map_display_mode, google_maps_embed_url, description, latitude, longitude, directions_note,
              check_in_time, check_out_time, breakfast_start_time, breakfast_end_time,
              features_json, policy_note, payment_note, languages_json
       FROM business_public_profile
@@ -96,12 +101,14 @@ export function saveBusinessPublicProfile(
     const profile = normalized.profile;
     db.prepare(`
       INSERT INTO business_public_profile (
-        business_id, description, latitude, longitude, directions_note,
+        business_id, map_display_mode, google_maps_embed_url, description, latitude, longitude, directions_note,
         check_in_time, check_out_time, breakfast_start_time, breakfast_end_time,
         features_json, policy_note, payment_note, languages_json,
         created_at, updated_at, sync_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
       ON CONFLICT(business_id) DO UPDATE SET
+        map_display_mode = excluded.map_display_mode,
+        google_maps_embed_url = excluded.google_maps_embed_url,
         description = excluded.description,
         latitude = excluded.latitude,
         longitude = excluded.longitude,
@@ -118,6 +125,8 @@ export function saveBusinessPublicProfile(
         sync_status = 'local_only'
     `).run(
       businessId,
+      profile.mapDisplayMode,
+      profile.googleMapsEmbedUrl,
       profile.description,
       profile.latitude,
       profile.longitude,
@@ -160,6 +169,15 @@ export function saveBusinessPublicProfile(
 function normalizeProfileInput(
   input: SaveBusinessPublicProfileInput
 ): { ok: true; profile: BusinessPublicProfile } | { ok: false; message: string } {
+  const mapDisplayMode = input?.mapDisplayMode ?? "manual";
+  if (mapDisplayMode !== "manual" && mapDisplayMode !== "google_maps_embed") {
+    return { ok: false, message: "Harita gösterimi geçerli olmalı." };
+  }
+  const rawEmbedUrl = input?.googleMapsEmbedUrl ?? "";
+  const googleMapsEmbedUrl = normalizeGoogleMapsEmbedUrl(rawEmbedUrl);
+  if ((rawEmbedUrl !== "" && !googleMapsEmbedUrl) || (mapDisplayMode === "google_maps_embed" && !googleMapsEmbedUrl)) {
+    return { ok: false, message: "Google Maps embed bağlantısı geçerli bir HTTPS yerleştirme URL'si olmalı." };
+  }
   const latitude = normalizeNullableNumber(input?.latitude);
   const longitude = normalizeNullableNumber(input?.longitude);
   const hasAnyMapValue = latitude !== null || longitude !== null;
@@ -182,6 +200,8 @@ function normalizeProfileInput(
   return {
     ok: true,
     profile: {
+      mapDisplayMode,
+      googleMapsEmbedUrl,
       description: cleanText(input?.description, BUSINESS_PUBLIC_PROFILE_LIMITS.description),
       latitude,
       longitude,
@@ -204,6 +224,8 @@ function mapProfileRow(row: BusinessPublicProfileRow): BusinessPublicProfile {
   const longitude = normalizeNullableNumber(row.longitude);
   const mapPoint = hasCompleteBusinessPublicMapPoint(latitude, longitude);
   return {
+    mapDisplayMode: row.map_display_mode === "google_maps_embed" ? "google_maps_embed" : "manual",
+    googleMapsEmbedUrl: normalizeGoogleMapsEmbedUrl(row.google_maps_embed_url),
     description: String(row.description ?? ""),
     latitude: mapPoint ? latitude : null,
     longitude: mapPoint ? longitude : null,

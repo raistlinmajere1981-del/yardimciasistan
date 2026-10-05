@@ -66,6 +66,8 @@ CREATE TABLE business (
 );
 
 CREATE TABLE business_public_profile (
+  map_display_mode TEXT NOT NULL DEFAULT 'manual' CHECK (map_display_mode IN ('manual', 'google_maps_embed')),
+  google_maps_embed_url TEXT NOT NULL DEFAULT '',
   business_id TEXT PRIMARY KEY,
   description TEXT NOT NULL DEFAULT '',
   latitude REAL NULL

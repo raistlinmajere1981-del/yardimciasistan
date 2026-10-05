@@ -691,6 +691,8 @@ try {
         whatsapp_enabled: false,
         email: "info@example.test",
         address: "Gebeş, Sahil Sokak No:45/1, Cide / Kastamonu",
+        mapDisplayMode: "google_maps_embed",
+        googleMapsEmbedUrl: "https://www.google.com/maps/embed?pb=test",
         latitude: 41.891571,
         longitude: 33.003712,
         description: "Mahalle marketi ve tekel bayisi.",
@@ -716,6 +718,9 @@ try {
     ok: true,
     profile_id: "market"
   });
+
+  const publicMapBusiness = await (await page.request.get(`${baseUrl}/api/business.php`)).json();
+  expect(publicMapBusiness.business).toMatchObject({ mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: "https://www.google.com/maps/embed?pb=test", latitude: 41.891571, longitude: 33.003712 });
 
   const roomMediaUpload = await page.request.post(`${baseUrl}/api/room-media.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },

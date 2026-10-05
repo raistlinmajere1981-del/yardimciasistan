@@ -11,7 +11,8 @@ const {
   normalizeBusinessPublicFeatures,
   normalizeBusinessPublicLanguages,
   normalizeBusinessSocialLinks,
-  normalizeBusinessSocialLinkUrl
+  normalizeBusinessSocialLinkUrl,
+  normalizeGoogleMapsEmbedUrl
 } = require("../dist/index.js");
 
 test("business public feature catalog keeps stable unique ids", () => {
@@ -99,4 +100,14 @@ test("business social links are allow-listed, normalized and deduplicated", () =
       { platform: "instagram", url: "https://www.instagram.com/blacksea/" }
     ]
   );
+});
+
+
+test("website Google embed URL allowlist accepts URLs only", () => {
+  const valid = "https://www.google.com/maps/embed?pb=!1m18!2m3";
+  assert.equal(normalizeGoogleMapsEmbedUrl(valid), valid);
+  assert.equal(normalizeGoogleMapsEmbedUrl("https://google.com/maps/embed?pb=x"), "https://google.com/maps/embed?pb=x");
+  for (const value of [null, {}, "", "http://www.google.com/maps/embed?pb=x", "https://evil.test/maps/embed?pb=x", "https://www.google.com.evil.test/maps/embed?pb=x", "https://maps.google.com/maps/embed?pb=x", "https://www.google.com/maps/embed/v1/place?key=x", "https://www.google.com/maps/embed", "https://www.google.com/maps/embed?pb=", "https://user:pass@www.google.com/maps/embed?pb=x", "https://www.google.com:8080/maps/embed?pb=x", "javascript:alert(1)", "data:text/html,x", `<iframe src="${valid}"></iframe>`, valid + "x".repeat(4096)]) {
+    assert.equal(normalizeGoogleMapsEmbedUrl(value), "", String(value));
+  }
 });

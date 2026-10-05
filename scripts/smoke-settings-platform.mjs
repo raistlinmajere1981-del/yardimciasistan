@@ -684,6 +684,29 @@ try {
   await expect(tab('İşletme Düzeni')).toHaveAttribute('aria-selected', 'true');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.description)).toBe('Profil Taslağı');
 
+  // Website map selection uses the existing Business staged save/discard lifecycle.
+  await select('İşletme');
+  await expect(page.getByLabel('Harita gösterimi', { exact: true })).toHaveValue('manual');
+  await expect(page.getByLabel('Google Maps embed bağlantısı', { exact: true })).toHaveCount(0);
+  await page.getByLabel('Harita gösterimi', { exact: true }).selectOption('google_maps_embed');
+  await page.getByLabel('Google Maps embed bağlantısı', { exact: true }).fill('https://evil.test/maps/embed?pb=x');
+  const profileCallCount = await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').length);
+  await save();
+  await expect(page.locator('.global-message-bar')).toContainText('Google Maps embed bağlantısı geçerli');
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').length)).toBe(profileCallCount);
+  await discard();
+  await expect(page.getByLabel('Harita gösterimi', { exact: true })).toHaveValue('manual');
+  await page.getByLabel('Harita gösterimi', { exact: true }).selectOption('google_maps_embed');
+  const embedUrl = 'https://www.google.com/maps/embed?pb=!1m18!2m3';
+  await page.getByLabel('Google Maps embed bağlantısı', { exact: true }).fill(embedUrl);
+  await save();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.mapDisplayMode)).toBe('google_maps_embed');
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.googleMapsEmbedUrl)).toBe(embedUrl);
+  await page.getByLabel('Harita gösterimi', { exact: true }).selectOption('manual');
+  await save();
+  await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.mapDisplayMode)).toBe('manual');
+  expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.googleMapsEmbedUrl)).toBe(embedUrl);
+
   // Google reviews stays inside Business settings, validates the live Google connection and saves with the category.
   await select('İşletme');
   await page.getByLabel('Google yorumlarını web sitesinde göster').check();

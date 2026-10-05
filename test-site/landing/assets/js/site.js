@@ -204,36 +204,7 @@
       const longitudeRaw = business.longitude;
       const latitude = latitudeRaw === null || latitudeRaw === undefined || latitudeRaw === "" ? Number.NaN : Number(latitudeRaw);
       const longitude = longitudeRaw === null || longitudeRaw === undefined || longitudeRaw === "" ? Number.NaN : Number(longitudeRaw);
-      if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-        const latitudeText = latitude.toFixed(6);
-        const longitudeText = longitude.toFixed(6);
-        const latitudeSpan = 0.006;
-        const longitudeSpan = 0.009;
-        const bbox = [
-          longitude - longitudeSpan,
-          latitude - latitudeSpan,
-          longitude + longitudeSpan,
-          latitude + latitudeSpan
-        ].map((value) => value.toFixed(6)).join("%2C");
-
-        document.querySelectorAll("[data-business-map-frame]").forEach((node) => {
-          node.src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${latitudeText}%2C${longitudeText}`;
-          node.hidden = false;
-        });
-        document.querySelectorAll("[data-business-map-placeholder]").forEach((node) => {
-          node.hidden = true;
-        });
-        document.querySelectorAll("[data-business-map-attribution]").forEach((node) => {
-          node.hidden = false;
-        });
-        document.querySelectorAll("[data-business-map-link]").forEach((node) => {
-          node.href = `https://www.openstreetmap.org/?mlat=${latitudeText}&mlon=${longitudeText}#map=17/${latitudeText}/${longitudeText}`;
-          node.hidden = false;
-        });
-        document.querySelectorAll("[data-business-directions-button]").forEach((node) => {
-          node.setAttribute("data-ya-address", `${latitudeText},${longitudeText}`);
-        });
-      }
+      window.YardimciBusinessMap?.render(business);
 
       renderBusinessFeatures(Array.isArray(business.feature_ids) ? business.feature_ids : []);
       renderBusinessSocialLinks(business.social_links);

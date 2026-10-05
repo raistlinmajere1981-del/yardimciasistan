@@ -69,6 +69,41 @@ try {
   await page.goto(base + '/qr-menu/'); await expect(page.locator('.qr-menu-item')).toContainText('Çay');
   await page.goto(base + '/yardimci-asistan/magaza/'); await expect(page.getByRole('article')).toContainText('Örnek ürün');
   await page.goto(base + '/iletisim/'); await expect(page.locator('[data-business-phone]').first()).toContainText('+90 555'); await expect(page.locator('[data-business-map-frame]')).toBeVisible();
+  const mapFrame = page.locator('[data-business-map-frame]');
+  await expect(mapFrame).toHaveAttribute('src', /openstreetmap.org\/export\/embed/);
+  const canonical = { business_name: 'Örnek işletme', phone: '+90 555 000 0000', address: 'Örnek adres', latitude: 41, longitude: 29 };
+  const embedUrl = 'https://www.google.com/maps/embed?pb=!1m18!2m3';
+  let mapRevision = 2;
+  for (const [mode, url, google] of [
+    ['google_maps_embed', embedUrl, true],
+    ['manual', embedUrl, false],
+    ['google_maps_embed', 'https://evil.test/maps/embed?pb=x', false],
+    ['google_maps_embed', '', false]
+  ]) {
+    seed('business_context', { ...canonical, mapDisplayMode: mode, googleMapsEmbedUrl: url }, ++mapRevision);
+    await page.reload();
+    await expect(mapFrame).toHaveAttribute('src', google ? embedUrl : /openstreetmap.org\/export\/embed/);
+    await expect(mapFrame).toHaveAttribute('loading', 'lazy');
+    await expect(mapFrame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    await expect(mapFrame).toHaveAttribute('title', 'İşletme konumu');
+    if (google) await expect(page.locator('[data-business-map-attribution]')).toBeHidden(); else await expect(page.locator('[data-business-map-attribution]')).toBeVisible();
+    const publicBusiness = (await (await page.request.get(base + '/yardimci-asistan/api/business.php')).json()).business;
+    assert.equal(publicBusiness.latitude, 41); assert.equal(publicBusiness.longitude, 29);
+    assert.equal(publicBusiness.mapDisplayMode, mode);
+    assert.equal(publicBusiness.googleMapsEmbedUrl, url === embedUrl ? embedUrl : '');
+    for (const width of [375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      const bounds = await mapFrame.boundingBox(); assert.ok(bounds.width > 0 && bounds.width <= width);
+    }
+  }
+  seed('business_context', { ...canonical, mapDisplayMode: 'google_maps_embed', googleMapsEmbedUrl: embedUrl, latitude: null, longitude: null }, ++mapRevision);
+  await page.reload(); await expect(mapFrame).toHaveAttribute('src', embedUrl);
+  seed('business_context', { ...canonical, latitude: null, longitude: null }, ++mapRevision);
+  await page.reload(); await expect(mapFrame).toBeHidden();
+  await expect(page.locator('[data-business-map-placeholder]')).toBeVisible();
+  seed('business_context', canonical, ++mapRevision);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(base);
   await page.reload(); for (const path of ['/odalar/', '/restoran/', '/qr-menu/', '/yardimci-asistan/magaza/']) await expect(page.locator(`[data-site-nav] a[href="${path}"]`)).toHaveCount(1);
   const items = defaultWebsiteNavigation().map(item => ({ ...item, visible: item.pageId !== 'rooms', order: item.pageId === 'qr_menu' ? 0 : item.order + 10 }));
