@@ -532,7 +532,7 @@ assert.deepEqual(hybridProjection.tables, []);
 assert.equal(hybridProjection.reservations.some((reservation) => reservation.reservation_type === "table"), false);
 assert.match(
   navigationSource,
-  /pageId:\\s*"market"[\\s\\S]{0,220}condition:\\s*\\{\\s*anyOf:\\s*\\[C\\.RETAIL_BARCODE,[^\\]]*C\\.WHOLESALE,[^\\]]*C\\.ONLINE_SALES\\]/,
+  /pageId:\s*"market"[\s\S]{0,220}condition:\s*\{\s*anyOf:\s*\[C\.RETAIL_BARCODE,[^\]]*C\.WHOLESALE,[^\]]*C\.ONLINE_SALES\]/,
   "Satış navigation is owned by retail/commerce surface capabilities, not generic catalog/sales capabilities"
 );
 for (const profileId of ["pension_restaurant", "pension", "restaurant"]) {
