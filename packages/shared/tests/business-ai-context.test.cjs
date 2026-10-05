@@ -116,6 +116,10 @@ test("AI domain guard blocks hospitality intent when capabilities do not expose 
     getUnsupportedBusinessAiDomain(market, "general_info", "bu ürün stokta var mı"),
     null
   );
+  assert.equal(
+    getUnsupportedBusinessAiDomain(market, "general_info", "oda spreyi stokta var mı"),
+    null
+  );
 });
 
 test("AI domain guard honors composed capabilities instead of profile assumptions", () => {
