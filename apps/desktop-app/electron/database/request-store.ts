@@ -6,7 +6,7 @@ import type {
   SaveRequestAiSuggestionInput,
   UpdateRequestStatusInput
 } from "../database-types.js";
-import { insertDatabaseEvent } from "./event-store.js";
+import { insertDatabaseEvent, type DomainMutationContext } from "./event-store.js";
 import { markPreparedWhatsAppMessagesSentInTransaction } from "./prepared-message-store.js";
 import { normalizeStatus } from "./request-utils.js";
 import type { AndroidActionMutationResult } from "./android-utils.js";
@@ -14,7 +14,7 @@ import { getAndroidVersionConflict, nextMutationTimestamp } from "./android-util
 import { insertDeletionEvent } from "./deletion-store.js";
 import type { DeletionAndroidEventSink } from "./deletion-store.js";
 
-export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatusInput): { ok: true; message: string } | { ok: false; message: string } {
+export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatusInput, context: DomainMutationContext & { markPreparedMessagesSent?: boolean } = {}): { ok: true; message: string } | { ok: false; message: string } {
   const requestId = input.requestId.trim();
   const status = normalizeStatus(input.status, ["new", "seen", "waiting_owner", "waiting_customer", "approved", "rejected", "answered", "cancelled", "archived"]);
   if (!requestId || !status) {
@@ -32,15 +32,16 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     };
   }
 
-  const now = new Date().toISOString();
-  db.exec("BEGIN");
+  const now = context.now ?? new Date().toISOString();
+  db.exec("SAVEPOINT request_status");
   try {
     db.prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, requestId);
-    if (status === "answered") {
+    if (status === "answered" && context.markPreparedMessagesSent !== false) {
       markPreparedWhatsAppMessagesSentInTransaction(db, requestId, now);
     }
     insertDatabaseEvent(db, {
       type: "request.status_changed",
+      androidAction: context.androidAction,
       entityType: "request",
       entityId: requestId,
       payload: {
@@ -49,9 +50,9 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE request_status");
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO request_status; RELEASE request_status");
     throw error;
   }
 

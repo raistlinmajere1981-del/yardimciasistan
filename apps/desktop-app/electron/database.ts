@@ -29,7 +29,7 @@ import {
   markHospitalityNotificationSentExternally,
   retryHospitalityNotification
 } from "./database/hospitality-notification-store.js";
-import { DesktopRoomFolioService } from "./room-folio.js";
+import { assignHospitalityStay, enterReservedHospitalityStay, checkInHospitalityStay } from "./hospitality-entry-service.js";
 import { KbsDeliveryService } from "./kbs-delivery-service.js";
 import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
 import { createDesktopDashboardData } from "./desktop-dashboard-service.js";
@@ -559,41 +559,18 @@ export class DesktopDatabase {
   }
 
   assignCustomerToRoom(input: AssignCustomerRoomInput): DesktopCustomerMutationResult {
-    return this.completeStayEntry(() => assignStoredCustomerToRoom(this.db, input), input.status === "checked_in", input);
+    const result = assignHospitalityStay(this.db, this.databasePath, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
   createStayFromReservation(input: CreateStayFromReservationInput): DesktopCustomerMutationResult {
-    return this.completeStayEntry(() => createStoredStayFromReservation(this.db, input), input.status === "checked_in", input);
+    const result = enterReservedHospitalityStay(this.db, this.databasePath, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
   /** Explicit arrival coordinates the enabled financial account in the same transaction. */
   checkInStay(stayId: string): DesktopCustomerMutationResult {
-    return this.completeStayEntry(() => updateStoredCustomerRoomStayStatus(this.db, { stayId, status: "checked_in" }), true);
-  }
-
-  private completeStayEntry(operation: () => Omit<Extract<DesktopCustomerMutationResult, { ok: true }>, "dashboardData"> | Extract<DesktopCustomerMutationResult, { ok: false }>,
-    checkIn: boolean, input?: AssignCustomerRoomInput | CreateStayFromReservationInput): DesktopCustomerMutationResult {
-    let result: ReturnType<typeof operation>;
-    this.db.exec("SAVEPOINT hospitality_entry");
-    try {
-      const receipt = input?.requestId ? this.db.prepare("SELECT stay_id, input_json FROM hospitality_entry_receipts WHERE request_id = ?").get(input.requestId) as { stay_id: string; input_json: string } | undefined : undefined;
-      if (receipt && receipt.input_json !== JSON.stringify(input)) result = { ok: false, message: "Giriş isteği değişti; yeni işlem başlatın." };
-      else if (receipt) result = { ok: true, savedId: receipt.stay_id, message: "Bu giriş daha önce tamamlandı." };
-      else {
-        result = operation();
-        if (result.ok && checkIn && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)) {
-          const folio = new DesktopRoomFolioService(this.databasePath).openFolio(result.savedId, this.db);
-          if (!folio.ok) result = folio;
-        }
-        if (result.ok && input?.requestId) this.db.prepare("INSERT INTO hospitality_entry_receipts (request_id, input_json, stay_id) VALUES (?, ?, ?)")
-          .run(input.requestId, JSON.stringify(input), result.savedId);
-      }
-      if (!result.ok) this.db.exec("ROLLBACK TO hospitality_entry");
-      this.db.exec("RELEASE hospitality_entry");
-    } catch {
-      this.db.exec("ROLLBACK TO hospitality_entry; RELEASE hospitality_entry");
-      return { ok: false, message: "Giriş tamamlanamadı; konaklama, misafir ve hesap değişiklikleri geri alındı." };
-    }
+    const result = checkInHospitalityStay(this.db, this.databasePath, stayId);
     return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
@@ -1424,8 +1401,6 @@ import {
 } from "./database/table-store.js";
 
 import {
-  assignCustomerToRoom as assignStoredCustomerToRoom,
-  createStayFromReservation as createStoredStayFromReservation,
   updateCustomerRoomStayStatus as updateStoredCustomerRoomStayStatus,
   saveManualReservation as saveStoredManualReservation,
   updateReservationStatus as updateStoredReservationStatus,

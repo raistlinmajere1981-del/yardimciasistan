@@ -11,7 +11,7 @@ import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type {
   CreateManualRequestInput
 } from "./database-types.js";
-import { insertDatabaseEvent } from "./database/event-store.js";
+import { insertDatabaseEvent, type DomainMutationContext } from "./database/event-store.js";
 import {
   buildManualRequestReply,
   buildReservationNotes,
@@ -281,7 +281,8 @@ export function createManualRequest(
 export function convertRequestToReservation(
   db: DatabaseSync,
   requestId: string,
-  enabledCapabilities: BusinessCapability[]
+  enabledCapabilities: BusinessCapability[],
+  context: DomainMutationContext & { newReservationId?: string } = {}
 ): StoredRequestReservationConversionResult {
   const id = requestId.trim();
   if (!id) {
@@ -311,12 +312,12 @@ export function convertRequestToReservation(
   }
 
   const existingReservation = db.prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1").get(id) as { id?: string } | undefined;
-  const now = new Date().toISOString();
-  const reservationId = existingReservation?.id || createId("reservation_");
+  const now = context.now ?? new Date().toISOString();
+  const reservationId = existingReservation?.id || context.newReservationId || createId("reservation_");
   const title = buildReservationTitle(request, reservationType);
   let customerId = "";
 
-  db.exec("BEGIN");
+  db.exec("SAVEPOINT request_conversion");
   try {
     customerId = ensureCustomerForRequest(db, request, now);
     db
@@ -391,6 +392,7 @@ export function convertRequestToReservation(
 
     insertDatabaseEvent(db, {
       type: "request.converted_to_reservation",
+      androidAction: context.androidAction,
       entityType: "request",
       entityId: id,
       payload: {
@@ -402,6 +404,7 @@ export function convertRequestToReservation(
     });
     insertDatabaseEvent(db, {
       type: "reservation.approved",
+      androidAction: context.androidAction,
       entityType: "reservation",
       entityId: reservationId,
       payload: {
@@ -412,9 +415,9 @@ export function convertRequestToReservation(
       now
     });
 
-    db.exec("COMMIT");
+    db.exec("RELEASE request_conversion");
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO request_conversion; RELEASE request_conversion");
     throw error;
   }
 

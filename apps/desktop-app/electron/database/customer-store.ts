@@ -9,7 +9,7 @@ import type {
   DesktopCustomer,
   SaveCustomerInput
 } from "../database-types.js";
-import { insertDatabaseEvent } from "./event-store.js";
+import { insertDatabaseEvent, type DomainMutationContext } from "./event-store.js";
 import {
   normalizeCustomerGender,
   normalizeCustomerIdentityType,
@@ -175,7 +175,7 @@ function normalizeCommercialProfile(input: SaveCustomerInput["commercialProfile"
   };
 }
 
-export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
+export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context: DomainMutationContext & { newCustomerId?: string } = {}): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
   const normalized = normalizeCustomerInput(input);
   if (!normalized.ok) {
     return normalized;
@@ -228,16 +228,16 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
     }
   }
 
-  const id = requestedId || createId("customer_");
-  const now = new Date().toISOString();
-  const source = String(existing?.source ?? "manual") || "manual";
+  const id = requestedId || context.newCustomerId || createId("customer_");
+  const now = context.now ?? new Date().toISOString();
+  const source = String(existing?.source ?? (context.androidAction ? "android" : "manual")) || "manual";
   const createdAt = String(existing?.created_at ?? now) || now;
   const customer = normalized.customer;
   const birthdayMessageEnabled = input.birthdayMessageEnabled === undefined
     ? normalizeBoolean(existing?.birthday_message_enabled, true)
     : normalizeBoolean(input.birthdayMessageEnabled, true);
 
-  db.exec("BEGIN IMMEDIATE");
+  db.exec("SAVEPOINT customer_save");
   try {
     db
       .prepare(`
@@ -345,10 +345,11 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
 
     insertDatabaseEvent(db, {
       type: requestedId ? "customer.updated" : "customer.created",
+      androidAction: context.androidAction,
       entityType: "customer",
       entityId: id,
       payload: {
-        source: requestedId ? "desktop_edit" : "desktop_manual",
+        source: context.androidAction ? "android" : requestedId ? "desktop_edit" : "desktop_manual",
         identity_type: customer.identityType,
         has_identity_number: Boolean(customer.identityNumber),
         commercial_profile_changed: input.commercialProfile !== undefined,
@@ -358,9 +359,9 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE customer_save");
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO customer_save; RELEASE customer_save");
     return { ok: false, message: "Müşteri kartı kaydedilemedi. Kimlik ve iletişim alanlarını kontrol edin." };
   }
 

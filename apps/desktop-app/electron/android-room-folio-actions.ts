@@ -1,6 +1,7 @@
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
 import type { DatabaseSync } from "node:sqlite";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
+import { addRoomFolioPaymentInTransaction, type RoomFolioPaymentMethod } from "./room-folio.js";
 
 export interface AndroidRoomFolioMutationResult {
   ok: boolean;
@@ -45,16 +46,6 @@ function addPayment(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFol
   if (current.remainingMinor !== expectedRemainingMinor) {
     return { ok: false, message: "Oda hesabı siz açtıktan sonra değişmiş. Güncel veriyi çekip tekrar deneyin." };
   }
-  if (current.chargeTotalMinor <= 0) {
-    return { ok: false, message: "Ödeme almadan önce oda hesabında bir tutar olmalı." };
-  }
-  if (current.remainingMinor <= 0) {
-    return { ok: false, message: "Bu oda hesabının ödemesi tamamlanmış." };
-  }
-  if (amountMinor > current.remainingMinor) {
-    return { ok: false, message: "Ödeme kalan tutardan büyük olamaz." };
-  }
-
   const methodInput = text(payload.payment_method);
   const paymentMethod = PAYMENT_METHODS.has(methodInput) ? methodInput : "cash";
   const note = cleanText(payload.note, 500);
@@ -62,28 +53,11 @@ function addPayment(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFol
   const referenceId = `android:${text(action.device_id)}/${safeId(action.id)}`;
 
   try {
-    db.prepare(`
-      INSERT INTO room_folio_payments (
-        id, folio_id, amount_minor, currency, payment_method, paid_at, note,
-        origin, reference_id, created_at, updated_at, deleted_at, sync_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'direct', ?, ?, ?, '', 'local_only')
-    `).run(
-      paymentId,
-      folioId,
-      amountMinor,
-      current.currency,
-      paymentMethod,
-      now,
-      note,
-      referenceId,
-      now,
-      now
-    );
+    const result = addRoomFolioPaymentInTransaction(db, { folioId, amountMinor, paymentMethod: paymentMethod as RoomFolioPaymentMethod, note },
+      { paymentId, referenceId, now });
+    if (!result.ok) return result;
   } catch (error) {
     const message = error instanceof Error ? error.message.toLocaleLowerCase("tr-TR") : "";
-    if (message.includes("unique") || message.includes("primary key")) {
-      return { ok: true, message: "Oda tahsilatı daha önce kaydedilmiş." };
-    }
     if (message.includes("room_folio_payment_exceeds_remaining")) {
       return { ok: false, message: "Ödeme kalan tutardan büyük olamaz." };
     }

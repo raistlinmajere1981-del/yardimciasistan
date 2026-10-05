@@ -1,5 +1,6 @@
 import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
+import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import type { DesktopRoom } from "../database-types.js";
 import { insertDatabaseEvent } from "./event-store.js";
 
@@ -53,13 +54,15 @@ export function updateRoomStatus(
   roomId: string,
   status: string,
   oldStatus: string,
-  now: string
+  now: string,
+  androidAction?: AndroidSyncAction
 ): { ok: true; message: string } | { ok: false; message: string } {
-  db.exec("BEGIN");
+  db.exec("SAVEPOINT room_status");
   try {
     db.prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, roomId);
     insertDatabaseEvent(db, {
       type: "room.status_changed",
+      androidAction,
       entityType: "room",
       entityId: roomId,
       payload: {
@@ -68,9 +71,9 @@ export function updateRoomStatus(
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE room_status");
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO room_status; RELEASE room_status");
     throw error;
   }
 

@@ -119,6 +119,31 @@ const DEFAULT_FINANCE_CATEGORIES: ReadonlyArray<{
   { id: "other_expense", direction: "expense", name: "Diğer gider", isSystem: false, sortOrder: 80 }
 ];
 
+/** Uses the caller's connection/transaction; category availability is authoritative here. */
+export function saveManualFinanceEntryInTransaction(db: DatabaseSync, input: SaveManualFinanceEntryInput,
+  metadata: { id?: string; sourceId?: string; now?: string } = {}): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
+  const direction = input?.direction === "income" || input?.direction === "expense" ? input.direction : null;
+  const amountMinor = normalizePositiveAmount(input?.amountMinor);
+  if (!direction || amountMinor === null) return { ok: false, message: "Gelir veya gider için geçerli bir tutar girin." };
+  const paymentMethod = normalizePaymentMethod(input?.paymentMethod);
+  const category = cleanText(input?.category, 180);
+  const description = cleanText(input?.description, 160) || (direction === "income" ? "Manuel gelir" : "Manuel gider");
+  const note = cleanText(input?.note, 500);
+  const now = metadata.now ?? new Date().toISOString();
+  const occurredAt = normalizeTimestamp(input?.occurredAt) || now;
+  const id = metadata.id ?? `finance_manual_${randomUUID()}`;
+  ensureFinanceCategories(db);
+  if (!db.prepare("SELECT id FROM finance_categories WHERE id = ? AND direction = ? AND is_active = 1 LIMIT 1").get(category, direction)) {
+    return { ok: false, message: "Seçilen gelir / gider türü artık kullanılamıyor." };
+  }
+  db.prepare(`INSERT INTO finance_entries (
+    id, direction, amount_minor, currency, payment_method, category, description,
+    occurred_at, source_type, source_id, note, created_at, updated_at, deleted_at, sync_status
+  ) VALUES (?, ?, ?, 'TRY', ?, ?, ?, ?, 'manual', ?, ?, ?, ?, '', 'local_only')`)
+    .run(id, direction, amountMinor, paymentMethod, category, description, occurredAt, metadata.sourceId ?? "", note, now, now);
+  return { ok: true, message: direction === "income" ? "Gelir kasaya eklendi." : "Gider kasaya eklendi.", savedId: id };
+}
+
 export class DesktopFinanceService {
   constructor(private readonly databasePath: string) {}
 
@@ -233,50 +258,17 @@ export class DesktopFinanceService {
   }
 
   saveManualEntry(input: SaveManualFinanceEntryInput): DesktopFinanceMutationResult {
-    const direction = input?.direction === "income" || input?.direction === "expense" ? input.direction : null;
-    const amountMinor = normalizePositiveAmount(input?.amountMinor);
-    if (!direction || amountMinor === null) {
-      return { ok: false, message: "Gelir veya gider için geçerli bir tutar girin." };
-    }
-
-    const paymentMethod = normalizePaymentMethod(input?.paymentMethod);
-    const category = cleanText(input?.category, 180);
-    const description = cleanText(input?.description, 160) || (direction === "income" ? "Manuel gelir" : "Manuel gider");
-    const note = cleanText(input?.note, 500);
-    const occurredAt = normalizeTimestamp(input?.occurredAt) || new Date().toISOString();
-    const now = new Date().toISOString();
-    const id = `finance_manual_${randomUUID()}`;
-
     const db = this.openDatabase();
+    let result: ReturnType<typeof saveManualFinanceEntryInTransaction>;
     try {
-      ensureFinanceCategories(db);
-      const categoryRow = db.prepare(`
-        SELECT id
-        FROM finance_categories
-        WHERE id = ? AND direction = ? AND is_active = 1
-        LIMIT 1
-      `).get(category, direction);
-      if (!categoryRow) {
-        return { ok: false, message: "Seçilen gelir / gider türü artık kullanılamıyor." };
-      }
-
-      db.prepare(`
-        INSERT INTO finance_entries (
-          id, direction, amount_minor, currency, payment_method, category, description,
-          occurred_at, source_type, source_id, note, created_at, updated_at, deleted_at, sync_status
-        ) VALUES (?, ?, ?, 'TRY', ?, ?, ?, ?, 'manual', '', ?, ?, ?, '', 'local_only')
-      `).run(id, direction, amountMinor, paymentMethod, category, description, occurredAt, note, now, now);
+      result = saveManualFinanceEntryInTransaction(db, input);
+      if (!result.ok) return result;
     } catch {
       return { ok: false, message: "Kasa hareketi kaydedilemedi." };
     } finally {
       db.close();
     }
-
-    return {
-      ok: true,
-      message: direction === "income" ? "Gelir kasaya eklendi." : "Gider kasaya eklendi.",
-      data: this.getData()
-    };
+    return { ok: true, message: result.message, data: this.getData() };
   }
 
   saveCategory(input: SaveFinanceCategoryInput): DesktopFinanceMutationResult {

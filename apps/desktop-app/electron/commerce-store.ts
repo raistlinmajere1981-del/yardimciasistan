@@ -298,7 +298,7 @@ function requireTrackedProductRow(database: DatabaseSync, businessId: string, pr
   return { productId, product };
 }
 
-function resolveInventoryLocation(
+export function resolveInventoryLocation(
   database: DatabaseSync,
   businessId: string,
   locationIdInput: string | undefined,
@@ -337,7 +337,8 @@ function mapInventoryBalance(
   };
 }
 
-function applyInventoryMovementInTransaction(
+/** Caller owns the transaction: balance, movement and its sale/purchase receipt stay atomic. */
+export function applyInventoryMovementInTransaction(
   database: DatabaseSync,
   businessId: string,
   input: ApplyInventoryMovementInput,

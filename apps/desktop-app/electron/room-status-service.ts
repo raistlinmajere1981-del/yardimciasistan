@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { UpdateRoomStatusInput } from "./database-types.js";
 import { normalizeStatus } from "./database/request-utils.js";
 import { updateRoomStatus } from "./database/room-store.js";
+import type { DomainMutationContext } from "./database/event-store.js";
 
 export type RoomStatusMutationResult =
   | { ok: true; message: string }
@@ -9,7 +10,8 @@ export type RoomStatusMutationResult =
 
 export function updateRoomStatusWithStayGuard(
   db: DatabaseSync,
-  input: UpdateRoomStatusInput
+  input: UpdateRoomStatusInput,
+  context: DomainMutationContext = {}
 ): RoomStatusMutationResult {
   const roomId = input.roomId.trim();
   const status = normalizeStatus(
@@ -66,6 +68,7 @@ export function updateRoomStatusWithStayGuard(
     roomId,
     status,
     String(room.status ?? ""),
-    new Date().toISOString()
+    context.now ?? new Date().toISOString(),
+    context.androidAction
   );
 }

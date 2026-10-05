@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { applyInventoryMovementInTransaction, resolveInventoryLocation } from "./commerce-store.js";
 import {
   createId,
   type CommercePurchaseOrder,
@@ -101,94 +102,6 @@ function mapPurchaseOrderItem(row: Record<string, unknown>): CommercePurchaseOrd
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? "")
   };
-}
-
-function ensurePrimaryLocation(database: DatabaseSync, businessId: string, now: string) {
-  const existing = database.prepare(`
-    SELECT id
-    FROM inventory_locations
-    WHERE business_id = ? AND is_primary = 1 AND is_active = 1 AND deleted_at = ''
-    LIMIT 1
-  `).get(businessId) as { id?: unknown } | undefined;
-  if (existing?.id) return String(existing.id);
-
-  const id = createId("inventory_location_");
-  database.prepare(`
-    INSERT INTO inventory_locations (
-      id, business_id, name, code, is_primary, is_active, created_at, updated_at, deleted_at
-    ) VALUES (?, ?, 'Ana Stok', 'main', 1, 1, ?, ?, '')
-  `).run(id, businessId, now, now);
-  return id;
-}
-
-function resolveInventoryLocation(
-  database: DatabaseSync,
-  businessId: string,
-  locationIdInput: string | undefined,
-  now: string
-) {
-  const locationId = String(locationIdInput ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
-  const location = database.prepare(`
-    SELECT id
-    FROM inventory_locations
-    WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
-    LIMIT 1
-  `).get(locationId, businessId) as { id?: unknown } | undefined;
-  if (!location?.id) throw new Error("Stok konumu bulunamadı.");
-  return locationId;
-}
-
-function applyPurchaseStockIn(
-  database: DatabaseSync,
-  input: {
-    businessId: string;
-    locationId: string;
-    purchaseOrderId: string;
-    productId: string;
-    productName: string;
-    quantity: number;
-    unitCost: number;
-    source: string;
-    now: string;
-  }
-) {
-  const current = database.prepare(`
-    SELECT quantity, minimum_quantity
-    FROM inventory_balances
-    WHERE product_id = ? AND location_id = ?
-  `).get(input.productId, input.locationId) as Record<string, unknown> | undefined;
-
-  const quantityBefore = roundQuantity(Number(current?.quantity ?? 0));
-  const quantityAfter = roundQuantity(quantityBefore + input.quantity);
-  const minimumQuantity = Math.max(0, roundQuantity(Number(current?.minimum_quantity ?? 0)));
-
-  database.prepare(`
-    INSERT INTO inventory_balances (product_id, location_id, quantity, minimum_quantity, updated_at)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(product_id, location_id) DO UPDATE SET
-      quantity = excluded.quantity,
-      updated_at = excluded.updated_at
-  `).run(input.productId, input.locationId, quantityAfter, minimumQuantity, input.now);
-
-  database.prepare(`
-    INSERT INTO inventory_movements (
-      id, business_id, product_id, location_id, movement_type,
-      quantity_delta, quantity_after, unit_cost, reference_type, reference_id,
-      note, actor_source, created_at
-    ) VALUES (?, ?, ?, ?, 'purchase', ?, ?, ?, 'purchase_order', ?, ?, ?, ?)
-  `).run(
-    createId("inventory_movement_"),
-    input.businessId,
-    input.productId,
-    input.locationId,
-    input.quantity,
-    quantityAfter,
-    input.unitCost,
-    input.purchaseOrderId,
-    `${input.productName} alımı`,
-    input.source,
-    input.now
-  );
 }
 
 export function listCommercePurchaseOrders(
@@ -409,17 +322,17 @@ export function receiveCommercePurchaseInTransaction(
       now
     );
 
-    applyPurchaseStockIn(database, {
-      businessId,
+    applyInventoryMovementInTransaction(database, businessId, {
       locationId,
-      purchaseOrderId,
       productId: prepared.productId,
-      productName: prepared.productName,
-      quantity: prepared.quantity,
+      type: "purchase",
+      quantityDelta: prepared.quantity,
       unitCost: prepared.unitCost,
-      source,
-      now
-    });
+      referenceType: "purchase_order",
+      referenceId: purchaseOrderId,
+      note: `${prepared.productName} alımı`,
+      actorSource: source
+    }, now);
 
     resultItems.push({
       id: prepared.id,

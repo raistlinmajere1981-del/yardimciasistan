@@ -1,5 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
+import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
+
+export interface DomainMutationContext {
+  now?: string;
+  androidAction?: AndroidSyncAction;
+}
 
 export function insertDatabaseEvent(db: DatabaseSync, input: {
   type: string;
@@ -9,6 +15,7 @@ export function insertDatabaseEvent(db: DatabaseSync, input: {
   now: string;
   actorType?: "desktop" | "android";
   actorId?: string;
+  androidAction?: AndroidSyncAction;
 }) {
   db
     .prepare(`
@@ -28,11 +35,11 @@ export function insertDatabaseEvent(db: DatabaseSync, input: {
     .run(
       createId("event_"),
       input.type,
-      input.actorType ?? "desktop",
-      input.actorId ?? "",
+      input.androidAction ? "android" : input.actorType ?? "desktop",
+      input.androidAction?.device_id ?? input.actorId ?? "",
       input.entityType,
       input.entityId,
-      JSON.stringify(input.payload),
+      JSON.stringify(input.androidAction ? { ...input.payload, android_action_id: input.androidAction.id } : input.payload),
       input.now,
       input.now
     );

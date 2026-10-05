@@ -168,6 +168,29 @@ export type DesktopRoomFolioMutationResult =
 
 const PAYMENT_METHODS = new Set<RoomFolioPaymentMethod>(["cash", "card", "bank", "other", "unspecified"]);
 
+export function addRoomFolioPaymentInTransaction(db: DatabaseSync, input: AddRoomFolioPaymentInput,
+  metadata: { paymentId?: string; referenceId?: string; now?: string } = {}): { ok: true; message: string } | { ok: false; message: string } {
+  const folioId = cleanText(input?.folioId, 180);
+  const amountMinor = positiveAmount(input?.amountMinor);
+  if (!folioId || amountMinor === null) return { ok: false, message: "Ödeme tutarı geçersiz." };
+  const folio = db.prepare(`SELECT f.currency, t.charge_total_minor, t.remaining_minor
+    FROM room_folios f JOIN room_folio_totals t ON t.folio_id = f.id
+    WHERE f.id = ? AND f.status = 'open' AND f.deleted_at = ''`).get(folioId) as Record<string, unknown> | undefined;
+  if (!folio) return { ok: false, message: "Oda adisyonu kapalı." };
+  if (safeMinor(folio.charge_total_minor) <= 0) return { ok: false, message: "Ödeme almadan önce oda hesabında bir tutar olmalı." };
+  if (safeMinor(folio.remaining_minor) <= 0) return { ok: false, message: "Bu oda hesabının ödemesi tamamlanmış." };
+  if (amountMinor > safeMinor(folio.remaining_minor)) return { ok: false, message: "Ödeme kalan tutardan büyük olamaz." };
+  const now = metadata.now ?? new Date().toISOString();
+  db.prepare(`INSERT INTO room_folio_payments (
+    id, folio_id, amount_minor, currency, payment_method, paid_at, note,
+    origin, reference_id, created_at, updated_at, deleted_at, sync_status
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, 'direct', ?, ?, ?, '', 'local_only')`)
+    .run(metadata.paymentId ?? `room_folio_payment_${randomUUID()}`, folioId, amountMinor,
+      normalizeCurrency(folio.currency), normalizePaymentMethod(input.paymentMethod), now,
+      cleanText(input.note, 500), metadata.referenceId ?? "", now, now);
+  return { ok: true, message: "Ödeme alındı ve kasaya işlendi." };
+}
+
 export class DesktopRoomFolioService {
   constructor(private readonly databasePath: string) {}
 
@@ -716,41 +739,16 @@ export class DesktopRoomFolioService {
   }
 
   addPayment(input: AddRoomFolioPaymentInput): DesktopRoomFolioMutationResult {
-    const folioId = cleanText(input?.folioId, 180);
-    const amountMinor = positiveAmount(input?.amountMinor);
-    if (!folioId || amountMinor === null) return { ok: false, message: "Ödeme tutarı geçersiz." };
-
     const db = this.openDatabase();
     try {
-      const folio = this.requireOpenFolio(db, folioId);
-      if (!folio) return { ok: false, message: "Oda adisyonu kapalı." };
-      const totals = this.getTotals(db, folioId);
-      if (totals.chargeTotalMinor <= 0) return { ok: false, message: "Ödeme almadan önce oda hesabında bir tutar olmalı." };
-      if (totals.remainingMinor <= 0) return { ok: false, message: "Bu oda hesabının ödemesi tamamlanmış." };
-      if (amountMinor > totals.remainingMinor) return { ok: false, message: "Ödeme kalan tutardan büyük olamaz." };
-      const now = new Date().toISOString();
-      db.prepare(`
-        INSERT INTO room_folio_payments (
-          id, folio_id, amount_minor, currency, payment_method, paid_at, note,
-          origin, reference_id, created_at, updated_at, deleted_at, sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'direct', '', ?, ?, '', 'local_only')
-      `).run(
-        `room_folio_payment_${randomUUID()}`,
-        folioId,
-        amountMinor,
-        normalizeCurrency(folio.currency),
-        normalizePaymentMethod(input?.paymentMethod),
-        now,
-        cleanText(input?.note, 500),
-        now,
-        now
-      );
+      const result = addRoomFolioPaymentInTransaction(db, input);
+      if (!result.ok) return result;
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Ödeme kaydedilemedi.") };
     } finally {
       db.close();
     }
-    return { ok: true, message: "Ödeme alındı ve kasaya işlendi.", data: this.getData(), folioId };
+    return { ok: true, message: "Ödeme alındı ve kasaya işlendi.", data: this.getData(), folioId: cleanText(input.folioId, 180) };
   }
 
   voidPayment(paymentIdValue: string): DesktopRoomFolioMutationResult {

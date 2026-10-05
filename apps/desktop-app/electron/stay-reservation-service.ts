@@ -9,7 +9,7 @@ import type {
   UpdateCustomerRoomStayStatusInput,
   UpdateReservationStatusInput
 } from "./database-types.js";
-import { insertDatabaseEvent } from "./database/event-store.js";
+import { insertDatabaseEvent, type DomainMutationContext } from "./database/event-store.js";
 import {
   findActiveCustomerRoomStay as findStoredActiveCustomerRoomStay,
   hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay
@@ -26,8 +26,16 @@ import {
 } from "./database/request-utils.js";
 import { normalizeLimitedText } from "./database/customer-utils.js";
 
-export function assignCustomerToRoom(db: DatabaseSync, input: AssignCustomerRoomInput): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
-  return createCustomerStay(db, input, "");
+type StayAssignmentContext = DomainMutationContext & { newStayId?: string; allowExtraCapacity?: boolean };
+
+function nominalCapacityFailure(room: Record<string, unknown>, guestCount: number, allowExtraCapacity = true): string {
+  const capacity = Number(room.capacity ?? 0);
+  return !allowExtraCapacity && capacity > 0 && guestCount > capacity
+    ? `Bu odanın kapasitesi en fazla ${capacity} kişi.` : "";
+}
+
+export function assignCustomerToRoom(db: DatabaseSync, input: AssignCustomerRoomInput, context: StayAssignmentContext = {}): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
+  return createCustomerStay(db, input, "", context);
 }
 
 /** Explicit booking conversion: source fields are read from Reservation, never supplied by the caller. */
@@ -76,7 +84,7 @@ function createReservationStayInTransaction(db: DatabaseSync, input: CreateStayF
   }, reservationId);
 }
 
-function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, reservationId: string): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
+function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, reservationId: string, context: StayAssignmentContext = {}): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
   const customerId = String(input?.customerId ?? "").trim();
   const roomId = String(input?.roomId ?? "").trim();
   const checkInDate = normalizeDateInput(String(input?.checkInDate ?? ""));
@@ -131,13 +139,15 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
     return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
   }
+  const capacityFailure = nominalCapacityFailure(room, guestCount, context.allowExtraCapacity);
+  if (capacityFailure) return { ok: false, message: capacityFailure };
   const dateValidation = validateStayDatesInTransaction(db, {
     roomId, customerId, checkInDate, checkOutDate, reservationId: reservationId || undefined
   });
   if (!dateValidation.ok) return dateValidation;
 
-  const id = createId("stay_");
-  const now = new Date().toISOString();
+  const id = context.newStayId ?? createId("stay_");
+  const now = context.now ?? new Date().toISOString();
   db.exec("SAVEPOINT customer_stay");
   try {
     db
@@ -158,7 +168,7 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
         checkOutDate,
         guestCount,
         notes,
-        reservationId ? "reservation" : "manual",
+        reservationId ? "reservation" : context.androidAction ? "android" : "manual",
         status === "checked_in" ? now : "",
         now,
         now
@@ -170,6 +180,7 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
     refreshRoomStatusFromStays(db, roomId, now, false);
     insertDatabaseEvent(db, {
       type: "customer.room_assigned",
+      androidAction: context.androidAction,
       entityType: "customer_room_stay",
       entityId: id,
       payload: {
@@ -233,7 +244,7 @@ export function updateStayDatesInTransaction(db: DatabaseSync, input: {
   return { ok: true };
 }
 
-export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCustomerRoomStayStatusInput): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
+export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCustomerRoomStayStatusInput, context: DomainMutationContext = {}): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
   const stayId = String(input?.stayId ?? "").trim();
   const status = normalizeStatus(String(input?.status ?? ""), ["planned", "checked_in", "checked_out", "cancelled"]);
   if (!stayId || !status) {
@@ -252,7 +263,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
     return { ok: false, message: "Konaklama kaydı bulunamadı." };
   }
   if (status === "checked_out") {
-    try { return checkoutHospitalityStay(db, { stayId }); }
+    try { return checkoutHospitalityStay(db, { stayId }, { now: context.now, android: context.androidAction ? { actionId: context.androidAction.id, deviceId: context.androidAction.device_id } : undefined }); }
     catch { return { ok: false, message: "Konaklama durumu güncellenemedi." }; }
   }
   const previousStatus = String(stay.status ?? "");
@@ -293,7 +304,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
     return { ok: false, message: "Odanın aynı tarihlerde başka bir aktif müşteri kaydı var." };
   }
 
-  const now = new Date().toISOString();
+  const now = context.now ?? new Date().toISOString();
   db.exec("SAVEPOINT stay_status");
   try {
     if (status === "checked_in") {
@@ -320,6 +331,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
     );
     insertDatabaseEvent(db, {
       type: "customer.room_stay_status_changed",
+      androidAction: context.androidAction,
       entityType: "customer_room_stay",
       entityId: stayId,
       payload: {
@@ -347,7 +359,8 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
   };
 }
 
-export function saveManualReservation(db: DatabaseSync, input: SaveManualReservationInput): { ok: true; message: string } | { ok: false; message: string } {
+export function saveManualReservation(db: DatabaseSync, input: SaveManualReservationInput,
+  context: DomainMutationContext & { newReservationId?: string; allowExtraCapacity?: boolean } = {}): { ok: true; message: string } | { ok: false; message: string } {
   const reservationId = String(input?.reservationId ?? "").trim();
   const customerId = String(input?.customerId ?? "").trim();
   const roomId = String(input?.roomId ?? "").trim();
@@ -382,7 +395,7 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
   const isEditing = Boolean(existingReservation);
   const existingStatus = String(existingReservation?.status ?? "approved");
   const existingRequestId = String(existingReservation?.request_id ?? "");
-  const isManualReservation = existingRequestId.startsWith("manual:");
+  const isManualReservation = existingRequestId.startsWith("manual:") || existingRequestId.startsWith("android:");
   const existingRoomIds = existingReservation ? parseStringArray(existingReservation.room_ids_json) : [];
   const previousRoomId = existingRoomIds[0] ?? "";
 
@@ -421,17 +434,19 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
     }
   }
 
-  let room: { id?: string; name?: string; status?: string } | undefined;
+  let room: { id?: string; name?: string; status?: string; capacity?: number } | undefined;
   if (roomId) {
     room = db
-      .prepare("SELECT id, name, status FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-      .get(roomId) as { id?: string; name?: string; status?: string } | undefined;
+      .prepare("SELECT id, name, status, capacity FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+      .get(roomId) as { id?: string; name?: string; status?: string; capacity?: number } | undefined;
     if (!room?.id) {
       return { ok: false, message: "Seçilen oda artık kullanılamıyor." };
     }
     if (String(room.status ?? "") === "maintenance") {
       return { ok: false, message: "Bakım durumundaki odaya rezervasyon açılamaz." };
     }
+    const capacityFailure = nominalCapacityFailure(room, guestCount, context.allowExtraCapacity);
+    if (capacityFailure) return { ok: false, message: capacityFailure };
     if (hasStoredOverlappingCustomerRoomStay(db, roomId, startDate, endDate)) {
       return { ok: false, message: `${String(room.name ?? "Seçilen oda")} bu tarihlerde aktif bir konaklama kaydına bağlı.` };
     }
@@ -454,12 +469,12 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
     }
   }
 
-  const now = new Date().toISOString();
-  const savedReservationId = reservationId || createId("reservation_");
+  const now = context.now ?? new Date().toISOString();
+  const savedReservationId = reservationId || context.newReservationId || createId("reservation_");
   const customerName = String(customer.full_name ?? "").trim() || "Misafir";
   const roomIds = roomId ? [roomId] : [];
 
-  db.exec("BEGIN IMMEDIATE");
+  db.exec("SAVEPOINT room_reservation");
   try {
     if (existingReservation) {
       const nextAdultCount = isManualReservation
@@ -524,7 +539,7 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
           `)
         .run(
           savedReservationId,
-          `manual:${savedReservationId}`,
+          context.androidAction ? `android:${context.androidAction.id}` : `manual:${savedReservationId}`,
           customerId,
           `${customerName} - oda rezervasyonu`,
           startDate,
@@ -546,10 +561,11 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
 
     insertDatabaseEvent(db, {
       type: isEditing ? "reservation.updated" : "reservation.created",
+      androidAction: context.androidAction,
       entityType: "reservation",
       entityId: savedReservationId,
       payload: {
-        source: isManualReservation || !isEditing ? "manual_desktop" : "desktop_edit",
+        source: context.androidAction ? "android" : isManualReservation || !isEditing ? "manual_desktop" : "desktop_edit",
         customer_id: customerId,
         previous_room_ids: existingRoomIds,
         room_ids: roomIds,
@@ -559,9 +575,9 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE room_reservation");
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO room_reservation; RELEASE room_reservation");
     throw error;
   }
 
@@ -577,7 +593,7 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
   };
 }
 
-export function updateReservationStatus(db: DatabaseSync, input: UpdateReservationStatusInput): { ok: true; message: string } | { ok: false; message: string } {
+export function updateReservationStatus(db: DatabaseSync, input: UpdateReservationStatusInput, context: DomainMutationContext = {}): { ok: true; message: string } | { ok: false; message: string } {
   const reservationId = input.reservationId.trim();
   const status = normalizeStatus(input.status, ["pending", "approved", "rejected", "cancelled", "completed"]);
   if (!reservationId || !status) {
@@ -587,14 +603,14 @@ export function updateReservationStatus(db: DatabaseSync, input: UpdateReservati
     };
   }
 
-  const now = new Date().toISOString();
-  db.exec("BEGIN IMMEDIATE");
+  const now = context.now ?? new Date().toISOString();
+  db.exec("SAVEPOINT reservation_status");
   try {
     const reservation = db
       .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
       .get(reservationId) as Record<string, unknown> | undefined;
     if (!reservation) {
-      db.exec("ROLLBACK");
+      db.exec("ROLLBACK TO reservation_status; RELEASE reservation_status");
       return {
         ok: false,
         message: "Rezervasyon bulunamadı."
@@ -604,7 +620,7 @@ export function updateReservationStatus(db: DatabaseSync, input: UpdateReservati
     const roomIds = parseStringArray(reservation.room_ids_json);
     const tableIds = parseStringArray(reservation.table_ids_json);
     if (findActiveOrderForTables(db, tableIds)) {
-      db.exec("ROLLBACK");
+      db.exec("ROLLBACK TO reservation_status; RELEASE reservation_status");
       return {
         ok: false,
         message: "Aktif adisyonu olan masaya bağlı rezervasyon değiştirilemez. Önce adisyonu kapatın."
@@ -650,6 +666,7 @@ export function updateReservationStatus(db: DatabaseSync, input: UpdateReservati
 
     insertDatabaseEvent(db, {
       type: "reservation.status_changed",
+      androidAction: context.androidAction,
       entityType: "reservation",
       entityId: reservationId,
       payload: {
@@ -660,9 +677,9 @@ export function updateReservationStatus(db: DatabaseSync, input: UpdateReservati
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE reservation_status");
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO reservation_status; RELEASE reservation_status");
     throw error;
   }
 

@@ -116,9 +116,7 @@ export function routeAndroidActionInTransaction(
       return applyAndroidReservationAction({
         db,
         action,
-        now,
-        insertEvent: (type, entityId, payload) =>
-          insertEvent(action, type, "reservation", entityId, payload, now)
+        now
       });
     case "reservation_approve":
       return applyAndroidReservationStatus(db, action, "approved", now);

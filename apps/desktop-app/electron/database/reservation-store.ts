@@ -5,7 +5,7 @@ import type {
   DesktopReservation,
   SaveManualRestaurantReservationInput
 } from "../database-types.js";
-import { insertDatabaseEvent } from "./event-store.js";
+import { insertDatabaseEvent, type DomainMutationContext } from "./event-store.js";
 import { normalizeLimitedText } from "./customer-utils.js";
 import {
   normalizeDateInput,
@@ -98,13 +98,28 @@ function mapReservationRow(row: Record<string, unknown>): DesktopReservation {
   };
 }
 
-export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveManualRestaurantReservationInput): { ok: true; message: string } | { ok: false; message: string } {
+export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveManualRestaurantReservationInput,
+  context: DomainMutationContext & { reservationId?: string; newReservationId?: string } = {}): { ok: true; message: string } | { ok: false; message: string } {
   const customerId = String(input?.customerId ?? "").trim();
   const tableId = String(input?.tableId ?? "").trim();
   const date = normalizeDateInput(String(input?.date ?? ""));
   const time = normalizeTimeInput(String(input?.time ?? ""));
   const guestCount = normalizeInteger(input?.guestCount);
   const notes = normalizeLimitedText(input?.notes, 2000);
+  const existing = context.reservationId ? db.prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
+    .get(context.reservationId) as Record<string, unknown> | undefined : undefined;
+  if (context.reservationId && !existing) return { ok: false, message: "Düzenlenecek restoran rezervasyonu bulunamadı." };
+  const previousTableIds = parseStoredStringArray(existing?.table_ids_json);
+  const editableSource = !existing || /^(manual|android):/.test(String(existing.request_id));
+  if (existing) {
+    if (!["table", "breakfast"].includes(String(existing.reservation_type))) return { ok: false, message: "Bu işlem yalnız restoran rezervasyonlarında kullanılabilir." };
+    if (!["pending", "approved"].includes(String(existing.status))) return { ok: false, message: "Tamamlanmış veya iptal edilmiş rezervasyon düzenlenemez." };
+    if (previousTableIds.length > 1) return { ok: false, message: "Birden fazla masaya bağlı rezervasyon telefondan düzenlenemez." };
+    if (String(existing.customer_id) !== customerId) return { ok: false, message: "Rezervasyonun müşteri kaydı değiştirilemez." };
+    if (!editableSource && (existing.start_date !== date || existing.time !== time || Number(existing.guest_count) !== guestCount)) {
+      return { ok: false, message: "Web talebinden oluşan rezervasyonda tarih, saat ve kişi bilgisi değiştirilemez." };
+    }
+  }
 
   if (!customerId || !date || !time || guestCount < 1 || guestCount > 99) {
     return { ok: false, message: "Müşteri, tarih, saat ve geçerli kişi sayısı zorunludur." };
@@ -143,7 +158,7 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
             AND deleted_at = ''
         `)
       .all(date, time) as Array<{ id?: string; title?: string; table_ids_json?: string }>;
-    const conflict = sameSlotRows.find((row) => parseStoredStringArray(row.table_ids_json).includes(tableId));
+    const conflict = sameSlotRows.find((row) => row.id !== context.reservationId && parseStoredStringArray(row.table_ids_json).includes(tableId));
     if (conflict) {
       return {
         ok: false,
@@ -152,46 +167,58 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
     }
   }
 
-  const now = new Date().toISOString();
-  const reservationId = createId("reservation_");
+  const now = context.now ?? new Date().toISOString();
+  const reservationId = context.reservationId || context.newReservationId || createId("reservation_");
   const customerName = String(customer.full_name ?? "").trim() || "Misafir";
   const tableIds = tableId ? [tableId] : [];
 
-  db.exec("BEGIN IMMEDIATE");
+  db.exec("SAVEPOINT table_reservation");
   try {
-    db
-      .prepare(`
-          INSERT INTO reservations (
-            id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
-            guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
-            payment_status, created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, ?, 'table', 'approved', ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, '',
-            'not_required', ?, ?, '', 'local_only')
-        `)
-      .run(
-        reservationId,
-        `manual:${reservationId}`,
-        customerId,
-        `${customerName} - restoran rezervasyonu`,
-        date,
-        date,
-        time,
-        guestCount,
-        guestCount,
-        JSON.stringify(tableIds),
-        notes,
-        now,
-        now
-      );
+    if (existing) {
+      db.prepare(`UPDATE reservations SET start_date = ?, end_date = ?, time = ?, guest_count = ?, adult_count = ?, child_count = ?, table_ids_json = ?, notes = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''`)
+        .run(date, date, time, guestCount, editableSource ? guestCount : Number(existing.adult_count ?? guestCount), editableSource ? 0 : Number(existing.child_count ?? 0), JSON.stringify(tableIds), notes, now, reservationId);
+      const previousTableId = previousTableIds[0] ?? "";
+      const previous = previousTableId ? db.prepare("SELECT current_reservation_id FROM tables WHERE id = ? AND deleted_at = ''").get(previousTableId) as { current_reservation_id?: string } | undefined : undefined;
+      const wasBound = previous?.current_reservation_id === reservationId;
+      if (wasBound && previousTableId !== tableId) db.prepare(`UPDATE tables SET status = CASE WHEN status = 'reserved' THEN 'available' ELSE status END, current_reservation_id = '', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND current_reservation_id = ? AND deleted_at = ''`).run(now, previousTableId, reservationId);
+      if (wasBound && tableId) db.prepare(`UPDATE tables SET status = CASE WHEN status = 'available' THEN 'reserved' ELSE status END, current_reservation_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''`).run(reservationId, now, tableId);
+    } else {
+      db
+        .prepare(`
+            INSERT INTO reservations (
+              id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
+              guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+              payment_status, created_at, updated_at, deleted_at, sync_status
+            ) VALUES (?, ?, ?, 'table', 'approved', ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, '',
+              'not_required', ?, ?, '', 'local_only')
+          `)
+        .run(
+          reservationId,
+          context.androidAction ? `android:${context.androidAction.id}` : `manual:${reservationId}`,
+          customerId,
+          `${customerName} - restoran rezervasyonu`,
+          date,
+          date,
+          time,
+          guestCount,
+          guestCount,
+          JSON.stringify(tableIds),
+          notes,
+          now,
+          now
+        );
+    }
 
     insertDatabaseEvent(db, {
-      type: "reservation.created",
+      type: existing ? "reservation.updated" : "reservation.created",
+      androidAction: context.androidAction,
       entityType: "reservation",
       entityId: reservationId,
       payload: {
-        source: "manual_desktop",
+        source: context.androidAction ? "android" : "manual_desktop",
         customer_id: customerId,
-        reservation_type: "table",
+        reservation_type: existing ? String(existing.reservation_type) : "table",
+        previous_table_ids: previousTableIds,
         table_ids: tableIds,
         date,
         time,
@@ -199,9 +226,9 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE table_reservation");
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO table_reservation; RELEASE table_reservation");
     throw error;
   }
 

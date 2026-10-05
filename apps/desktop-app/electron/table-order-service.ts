@@ -9,8 +9,7 @@ import type {
   UpdateTableOrderItemQuantityInput,
   UpdateTableOrderStatusInput
 } from "./database-types.js";
-import { insertDatabaseEvent } from "./database/event-store.js";
-import { insertAndroidActionEvent } from "./android-action-service.js";
+import { insertDatabaseEvent, type DomainMutationContext } from "./database/event-store.js";
 import {
   getActiveTableOrder,
   getMutableTableOrderItem,
@@ -32,30 +31,42 @@ import {
 import { nextMutationTimestamp } from "./database/android-utils.js";
 import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 
-export function openTableOrder(db: DatabaseSync, tableId: string): DesktopTableOrderResult {
+interface TableOrderMutationContext extends DomainMutationContext { newOrderId?: string; newItemId?: string }
+
+function tableOrderTransaction(db: DatabaseSync) {
+  const nested = db.isTransaction;
+  return {
+    begin: nested ? "SAVEPOINT table_order" : "BEGIN IMMEDIATE",
+    commit: nested ? "RELEASE table_order" : "COMMIT",
+    rollback: nested ? "ROLLBACK TO table_order; RELEASE table_order" : "ROLLBACK"
+  };
+}
+
+export function openTableOrder(db: DatabaseSync, tableId: string, context: TableOrderMutationContext = {}): DesktopTableOrderResult {
   const normalizedTableId = tableId.trim();
   if (!normalizedTableId) {
     return { ok: false, message: "Sipariş açmak için geçerli bir masa seçin." };
   }
 
-  const id = createTableOrderId("table_order_");
-  const now = new Date().toISOString();
+  const id = context.newOrderId ?? createTableOrderId("table_order_");
+  const now = context.now ?? new Date().toISOString();
   let tableName = "Masa";
-  db.exec("BEGIN IMMEDIATE");
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     const table = db
       .prepare("SELECT id, name, status FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''")
       .get(normalizedTableId) as { id?: string; name?: string; status?: string } | undefined;
     if (!table?.id) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Sipariş açılacak aktif masa bulunamadı." };
     }
     tableName = String(table.name ?? "Masa");
 
     const activeOrder = getActiveTableOrder(db, normalizedTableId);
     if (activeOrder) {
-      updateTableStatusForOrder(db, normalizedTableId, activeOrder.status === "payment" ? "bill_waiting" : "occupied", activeOrder.id, now);
-      db.exec("COMMIT");
+      updateTableStatusForOrder(db, normalizedTableId, activeOrder.status === "payment" ? "bill_waiting" : "occupied", activeOrder.id, now, context.androidAction);
+      db.exec(tx.commit);
       return {
         ok: true,
         message: `${tableName} için açık adisyon gösteriliyor.`,
@@ -80,17 +91,18 @@ export function openTableOrder(db: DatabaseSync, tableId: string): DesktopTableO
           ) VALUES (?, ?, 'open', ?, '', 0, 0, 0, '', ?, ?)
         `)
       .run(id, normalizedTableId, now, now, now);
-    updateTableStatusForOrder(db, normalizedTableId, "occupied", id, now);
+    updateTableStatusForOrder(db, normalizedTableId, "occupied", id, now, context.androidAction);
     insertDatabaseEvent(db, {
       type: "table_order.opened",
+      androidAction: context.androidAction,
       entityType: "table_order",
       entityId: id,
       payload: { table_id: normalizedTableId },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
 
@@ -106,7 +118,7 @@ export function openTableOrder(db: DatabaseSync, tableId: string): DesktopTableO
   };
 }
 
-export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInput): DesktopTableOrderResult {
+export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInput, context: TableOrderMutationContext = {}): DesktopTableOrderResult {
   const orderId = input.orderId.trim();
   const menuItemId = input.menuItemId.trim();
   const quantity = normalizeOrderQuantity(input.quantity);
@@ -115,11 +127,12 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
     return { ok: false, message: "Ürün, aktif adisyon ve geçerli adet bilgisi gerekli." };
   }
 
-  const now = new Date().toISOString();
-  db.exec("BEGIN IMMEDIATE");
+  const now = context.now ?? new Date().toISOString();
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     if (!isActiveTableOrder(db, orderId)) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Ürün yalnızca aktif bir adisyona eklenebilir." };
     }
 
@@ -137,7 +150,7 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
         `)
       .get(menuItemId) as { id?: string; name?: string; price?: number; currency?: string } | undefined;
     if (!menuItem?.id) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Yalnızca aktif ve mevcut menü ürünleri siparişe eklenebilir." };
     }
 
@@ -155,7 +168,7 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
         `)
       .get(orderId) as { currency?: string } | undefined;
     if (orderCurrency?.currency && normalizeTableOrderCurrency(orderCurrency.currency) !== currency) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return {
         ok: false,
         message: `Bu adisyon ${normalizeTableOrderCurrency(orderCurrency.currency)} para birimiyle açık; ${currency} ürün eklenemez.`
@@ -164,7 +177,7 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
 
     const existingItem = db
       .prepare(`
-          SELECT id, quantity
+          SELECT id, quantity, updated_at
           FROM table_order_items
           WHERE order_id = ?
             AND menu_item_id = ?
@@ -176,13 +189,13 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
           ORDER BY created_at DESC
           LIMIT 1
         `)
-      .get(orderId, menuItemId, productName, unitPrice, currency, note) as { id?: string; quantity?: number } | undefined;
+      .get(orderId, menuItemId, productName, unitPrice, currency, note) as { id?: string; quantity?: number; updated_at?: string } | undefined;
 
-    const itemId = existingItem?.id || createTableOrderId("table_order_item_");
+    const itemId = existingItem?.id || context.newItemId || createTableOrderId("table_order_item_");
     if (existingItem?.id) {
       const nextQuantity = Number(existingItem.quantity ?? 0) + quantity;
       if (nextQuantity > 999) {
-        db.exec("ROLLBACK");
+        db.exec(tx.rollback);
         return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
       }
       if (isInventoryTrackingEnabled(db)) {
@@ -192,18 +205,18 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
           quantityChange: -quantity,
           sourceType: "table_order",
           sourceId: orderId,
-          actorDeviceId: "",
+          actorDeviceId: context.androidAction?.device_id ?? "",
           note: `${productName} adisyona eklendi.`,
           now
         });
         if (!stockResult.ok) {
-          db.exec("ROLLBACK");
+          db.exec(tx.rollback);
           return stockResult;
         }
       }
       db
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
-        .run(nextQuantity, roundMoney(unitPrice * nextQuantity), now, itemId);
+        .run(nextQuantity, roundMoney(unitPrice * nextQuantity), context.androidAction ? nextMutationTimestamp(existingItem.updated_at, now) : now, itemId);
     } else {
       if (isInventoryTrackingEnabled(db)) {
         const stockResult = mutateStoredMenuStock(db, {
@@ -212,12 +225,12 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
           quantityChange: -quantity,
           sourceType: "table_order",
           sourceId: orderId,
-          actorDeviceId: "",
+          actorDeviceId: context.androidAction?.device_id ?? "",
           note: `${productName} adisyona eklendi.`,
           now
         });
         if (!stockResult.ok) {
-          db.exec("ROLLBACK");
+          db.exec(tx.rollback);
           return stockResult;
         }
       }
@@ -255,34 +268,36 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
     recalculateTableOrderTotalInTransaction(db, orderId, now);
     insertDatabaseEvent(db, {
       type: "table_order.item_added",
+      androidAction: context.androidAction,
       entityType: "table_order",
       entityId: orderId,
       payload: { item_id: itemId, menu_item_id: menuItemId, product_name: productName, quantity, unit_price: unitPrice, currency },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
 
   return getTableOrderMutationResult(db, orderId, "Ürün adisyona eklendi.");
 }
 
-export function updateTableOrderItemQuantity(db: DatabaseSync, input: UpdateTableOrderItemQuantityInput): DesktopTableOrderResult {
+export function updateTableOrderItemQuantity(db: DatabaseSync, input: UpdateTableOrderItemQuantityInput, context: DomainMutationContext = {}): DesktopTableOrderResult {
   const itemId = input.itemId.trim();
   const quantity = normalizeOrderQuantity(input.quantity);
   if (!itemId || !quantity) {
     return { ok: false, message: "Sipariş satırı için 1 ile 999 arasında bir adet girin." };
   }
 
-  const now = new Date().toISOString();
+  const now = context.now ?? new Date().toISOString();
   let orderId = "";
-  db.exec("BEGIN IMMEDIATE");
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     const item = getMutableTableOrderItem(db, itemId);
     if (!item) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
     }
     orderId = String(item.order_id);
@@ -295,12 +310,12 @@ export function updateTableOrderItemQuantity(db: DatabaseSync, input: UpdateTabl
           quantityChange: previousQuantity - quantity,
           sourceType: "table_order",
           sourceId: orderId,
-          actorDeviceId: "",
+          actorDeviceId: context.androidAction?.device_id ?? "",
           note: "Adisyon ürün adedi değiştirildi.",
           now
         });
         if (!stockResult.ok) {
-          db.exec("ROLLBACK");
+          db.exec(tx.rollback);
           return stockResult;
         }
       }
@@ -313,14 +328,15 @@ export function updateTableOrderItemQuantity(db: DatabaseSync, input: UpdateTabl
     recalculateTableOrderTotalInTransaction(db, orderId, now);
     insertDatabaseEvent(db, {
       type: "table_order.item_quantity_changed",
+      androidAction: context.androidAction,
       entityType: "table_order",
       entityId: orderId,
       payload: { item_id: itemId, quantity },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
 
@@ -332,11 +348,12 @@ export function updateTableOrderItemNote(db: DatabaseSync, input: UpdateTableOrd
   const note = String(input.note ?? "").trim().slice(0, 500);
   const now = new Date().toISOString();
   let orderId = "";
-  db.exec("BEGIN IMMEDIATE");
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     const item = getMutableTableOrderItem(db, itemId);
     if (!item) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Not eklenecek aktif sipariş satırı bulunamadı." };
     }
     orderId = String(item.order_id);
@@ -350,23 +367,24 @@ export function updateTableOrderItemNote(db: DatabaseSync, input: UpdateTableOrd
       payload: { item_id: itemId, has_note: Boolean(note) },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
   return getTableOrderMutationResult(db, orderId, "Ürün notu kaydedildi.");
 }
 
-export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string): DesktopTableOrderResult {
+export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string, context: DomainMutationContext = {}): DesktopTableOrderResult {
   const normalizedItemId = itemIdInput.trim();
-  const now = new Date().toISOString();
+  const now = context.now ?? new Date().toISOString();
   let orderId = "";
-  db.exec("BEGIN IMMEDIATE");
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     const item = getMutableTableOrderItem(db, normalizedItemId);
     if (!item) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
     }
     orderId = String(item.order_id);
@@ -377,12 +395,12 @@ export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string): Des
         quantityChange: Number(item.quantity ?? 0),
         sourceType: "table_order",
         sourceId: orderId,
-        actorDeviceId: "",
+        actorDeviceId: context.androidAction?.device_id ?? "",
         note: "Ürün adisyondan silindi.",
         now
       });
       if (!stockResult.ok) {
-        db.exec("ROLLBACK");
+        db.exec(tx.rollback);
         return stockResult;
       }
     }
@@ -391,14 +409,15 @@ export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string): Des
     recalculateTableOrderTotalInTransaction(db, orderId, now);
     insertDatabaseEvent(db, {
       type: "table_order.item_removed",
+      androidAction: context.androidAction,
       entityType: "table_order",
       entityId: orderId,
       payload: { item_id: normalizedItemId },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
 
@@ -414,19 +433,20 @@ export function updateTableOrderDiscount(db: DatabaseSync, input: UpdateTableOrd
   const discountTotal = roundMoney(rawDiscountTotal);
 
   const now = new Date().toISOString();
-  db.exec("BEGIN IMMEDIATE");
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     const current = db
       .prepare("SELECT subtotal, discount_total, status, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
       .get(orderId) as { subtotal?: number; discount_total?: number; status?: string; updated_at?: string } | undefined;
     if (!current) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "İndirim uygulanacak aktif adisyon bulunamadı." };
     }
 
     const subtotal = roundMoney(Number(current.subtotal ?? 0));
     if (discountTotal > subtotal) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "İndirim ara toplamı aşamaz." };
     }
 
@@ -444,9 +464,9 @@ export function updateTableOrderDiscount(db: DatabaseSync, input: UpdateTableOrd
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
 
@@ -457,7 +477,7 @@ export function updateTableOrderDiscount(db: DatabaseSync, input: UpdateTableOrd
   );
 }
 
-export function updateTableOrderStatus(db: DatabaseSync, input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
+export function updateTableOrderStatus(db: DatabaseSync, input: UpdateTableOrderStatusInput, context: DomainMutationContext = {}): DesktopTableOrderResult {
   const orderId = input.orderId.trim();
   const status = normalizeStatus(input.status, TABLE_ORDER_STATUSES) as TableOrderStatus;
   if (!orderId || !status) {
@@ -465,17 +485,18 @@ export function updateTableOrderStatus(db: DatabaseSync, input: UpdateTableOrder
   }
 
   if (status === "paid" || status === "cancelled") {
-    return closeTableOrder(db, { orderId, status });
+    return closeTableOrder(db, { orderId, status }, context);
   }
 
-  const now = new Date().toISOString();
-  db.exec("BEGIN IMMEDIATE");
+  const now = context.now ?? new Date().toISOString();
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     const current = db
       .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
       .get(orderId) as { status?: string; table_id?: string } | undefined;
     if (!current) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Durumu güncellenecek aktif adisyon bulunamadı." };
     }
 
@@ -483,7 +504,7 @@ export function updateTableOrderStatus(db: DatabaseSync, input: UpdateTableOrder
       .prepare("UPDATE table_orders SET status = ?, updated_at = ? WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
       .run(status, now, orderId);
     if (Number(updateResult.changes) !== 1) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Adisyon başka bir işlem tarafından güncellendi; yeniden yükleyin." };
     }
     if (status === "preparing") {
@@ -500,45 +521,48 @@ export function updateTableOrderStatus(db: DatabaseSync, input: UpdateTableOrder
       String(current.table_id ?? ""),
       status === "payment" ? "bill_waiting" : "occupied",
       orderId,
-      now
+      now,
+      context.androidAction
     );
     insertDatabaseEvent(db, {
       type: "table_order.status_changed",
+      androidAction: context.androidAction,
       entityType: "table_order",
       entityId: orderId,
       payload: { old_status: String(current.status ?? ""), new_status: status },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
 
   return getTableOrderMutationResult(db, orderId, "Adisyon durumu güncellendi.");
 }
 
-export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
+export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusInput, context: DomainMutationContext = {}): DesktopTableOrderResult {
   const orderId = input.orderId.trim();
   const status = normalizeStatus(input.status, ["paid", "cancelled"]) as "paid" | "cancelled";
   if (!orderId || !status) {
     return { ok: false, message: "Adisyon yalnızca ödendi veya iptal durumuyla kapatılabilir." };
   }
 
-  const now = new Date().toISOString();
-  db.exec("BEGIN IMMEDIATE");
+  const now = context.now ?? new Date().toISOString();
+  const tx = tableOrderTransaction(db);
+  db.exec(tx.begin);
   try {
     const current = db
       .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
       .get(orderId) as { status?: string; table_id?: string } | undefined;
     if (!current) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
     }
     if (status === "cancelled" && isInventoryTrackingEnabled(db)) {
-      const stockRestore = restoreCancelledOrderStockInTransaction(db, orderId, "", now);
+      const stockRestore = restoreCancelledOrderStockInTransaction(db, orderId, context.androidAction?.device_id ?? "", now);
       if (!stockRestore.ok) {
-        db.exec("ROLLBACK");
+        db.exec(tx.rollback);
         return stockRestore;
       }
     }
@@ -552,20 +576,21 @@ export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusI
         `)
       .run(status, now, now, orderId);
     if (Number(updateResult.changes) !== 1) {
-      db.exec("ROLLBACK");
+      db.exec(tx.rollback);
       return { ok: false, message: "Adisyon başka bir işlem tarafından kapatıldı; yeniden yükleyin." };
     }
-    updateTableStatusForOrder(db, String(current.table_id ?? ""), "available", orderId, now);
+    updateTableStatusForOrder(db, String(current.table_id ?? ""), "available", orderId, now, context.androidAction);
     insertDatabaseEvent(db, {
       type: status === "paid" ? "table_order.paid" : "table_order.cancelled",
+      androidAction: context.androidAction,
       entityType: "table_order",
       entityId: orderId,
       payload: { old_status: String(current.status ?? ""), status },
       now
     });
-    db.exec("COMMIT");
+    db.exec(tx.commit);
   } catch (error) {
-    db.exec("ROLLBACK");
+    db.exec(tx.rollback);
     throw error;
   }
 
@@ -618,15 +643,5 @@ export function updateTableStatusForOrder(
     source: "table_order",
     order_id: orderId
   };
-  if (androidAction) {
-    insertAndroidActionEvent(db, androidAction, "table.status_changed", "table", tableId, payload, now);
-  } else {
-    insertDatabaseEvent(db, {
-      type: "table.status_changed",
-      entityType: "table",
-      entityId: tableId,
-      payload,
-      now
-    });
-  }
+  insertDatabaseEvent(db, { type: "table.status_changed", entityType: "table", entityId: tableId, payload, now, androidAction });
 }
