@@ -124,7 +124,9 @@ export function getUnsupportedBusinessAiDomain(
     || enabled.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
 
   const accommodationIntent = requestType === "pension_reservation"
-    || /(^|\s)(oda|pansiyon|konaklama|geceleme)(\s|$)/u.test(normalized);
+    || /(^|\s)(pansiyon|konaklama|geceleme)(\s|$)/u.test(normalized)
+    || (/(^|\s)oda(\s|$)/u.test(normalized)
+      && /(^|\s)(musait|bos|rezerv|gece|kisi|konak|kalma|yatak|var)(\s|$)/u.test(normalized));
   if (accommodationIntent && !hasAccommodation) {
     return "accommodation";
   }
@@ -150,11 +152,20 @@ export function getUnsupportedBusinessAiDomain(
   return null;
 }
 
+const TURKISH_INTENT_REPLACEMENTS: Record<string, string> = {
+  ç: "c",
+  ğ: "g",
+  ı: "i",
+  ö: "o",
+  ş: "s",
+  ü: "u"
+};
+
 function normalizeIntentText(value: unknown): string {
   return String(value ?? "")
     .trim()
     .toLocaleLowerCase("tr-TR")
-    .replace(/[çğıöşü]/g, (letter) => ({ ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" }[letter] ?? letter))
+    .replace(/[çğıöşü]/g, (letter) => TURKISH_INTENT_REPLACEMENTS[letter] ?? letter)
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
