@@ -1,3 +1,4 @@
+import * as marketingAnalyticsStore from "./marketing/analytics-read-store";
 import * as marketingScheduleStore from "./marketing/schedule-store";
 import * as marketingScheduleTargetStore from "./marketing/schedule-target-store";
 import * as instagramPublicationStore from "./marketing/instagram-publication-store";
@@ -988,6 +989,9 @@ export class DesktopDatabase {
   listMessagingSegments() { return campaignStore.listMessagingSegments(this.db); }
   saveMessagingSegment(input: Parameters<typeof campaignStore.saveMessagingSegment>[1]) { return campaignStore.saveMessagingSegment(this.db, input); }
   previewMessagingSegment(id: string, channel: MessagingChannel) { return campaignStore.previewMessagingSegment(this.db, id, channel); }
+  readMarketingAnalyticsRecords(startAt: string, endAt: string, target?: Parameters<typeof marketingAnalyticsStore.readMarketingAnalyticsRecords>[3]) { return marketingAnalyticsStore.readMarketingAnalyticsRecords(this.db, startAt, endAt, target); }
+  readMarketingMetricSnapshots(targetId: string, providerKey: string, startAt: string, endAt: string) { return marketingAnalyticsStore.readMarketingMetricSnapshots(this.db, targetId, providerKey, startAt, endAt); }
+  saveMarketingMetricSnapshots(records: Parameters<typeof marketingAnalyticsStore.saveMarketingMetricSnapshots>[1], startAt: string, endAt: string) { return marketingAnalyticsStore.saveMarketingMetricSnapshots(this.db, records, startAt, endAt); }
   listMarketingSchedules() { return marketingScheduleStore.listMarketingSchedules(this.db); }
   getMarketingSchedule(id: string) { return marketingScheduleStore.getMarketingSchedule(this.db,id); }
   getMarketingScheduleExecution(id: string) { return marketingScheduleStore.getMarketingScheduleExecution(this.db,id); }

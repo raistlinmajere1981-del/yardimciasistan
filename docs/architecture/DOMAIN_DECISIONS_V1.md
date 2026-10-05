@@ -1209,3 +1209,38 @@ Studio, Publications and Campaigns converge on it without nested dialogs. Existi
 Entity Workspace / Operation and Appearance v2 ownership remain intact. Event/birthday/
 stock triggers, AI autonomous generation/publish, analytics, cron editor, inbox and push
 notifications are outside D6.
+
+## D-041 — Unified Marketing Analytics (D7)
+
+**Status:** Accepted. **Scope:** Read-only Desktop marketing analytics across Website,
+WhatsApp, SMS and Instagram.
+
+MarketingAnalytics is a derived projection, not Campaign, Publication, BusinessMessage
+or a provider response. `MarketingAnalyticsService` aggregates canonical operational
+records and optional genuinely supported provider read-only observations through
+normalized typed metrics. It does not mutate source-of-truth entities or change D3
+completion, D4/D5 publication semantics or D6 scheduling.
+
+Provider-specific names stay inside main-process adapters. Numeric zero and unavailable
+are distinct; missing data, unsupported metric, absent configuration, unverified or
+insufficient permission and refresh failure have explicit typed states. WhatsApp uses
+canonical webhook delivery/read evidence, SMS uses existing İleti Merkezi reconciliation,
+Website uses acknowledged publication state and never invents visitor/traffic metrics.
+Instagram publishing counts are local; D5 basic/publishing credentials do not prove
+Insights access, so no production metrics polling is activated without a verified adapter.
+
+Backend owns calendar-date filtering and timezone boundaries. Overview is a selected
+preparation/creation cohort's current outcomes, not event-time or historical reconstruction;
+active Website count is global current confirmed state. Campaign/publication detail covers
+the entity lifetime. Optional provider post observations are lifetime values; reach is
+not summed between posts or represented as engagement within the selected date interval.
+
+External snapshots alone may be persisted separately: normalized numbers, bounded rows,
+TTL, opaque target/account identity, measurement time and explicit rate-limited refresh.
+Failed refresh preserves the last observation and freshness information. Renderer opening
+never causes a provider metrics request. Analytics payloads/logs contain no Customer PII,
+content, parameters, secrets or raw provider responses. Analytics details join canonical
+workspaces; no duplicate entity editor, operation, tracker or nested modal is introduced.
+
+See `docs/architecture/unified-marketing-analytics.md` for the metric matrix, precise
+cohort/rate definitions, optional capability/cache contract and portable test coverage.

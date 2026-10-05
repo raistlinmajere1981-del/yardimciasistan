@@ -3,6 +3,7 @@ import type { BusinessMessageTemplate, BusinessMessagingResult, MessagingAudienc
   MessagingCampaignDetail, MessagingCampaignInput, MessagingSegment, MessagingSegmentRule,
   MessagingTemplateBinding, SaveMessagingSegmentInput } from "@yardimci-asistan/shared";
 import type { RegisterPageLeaveGuard } from "../app/page-navigation-guard";
+import { MarketingEntityAnalytics } from "../components/marketing/MarketingEntityAnalytics";
 import { ActionButton } from "../components/ui/ActionButton";
 import { StatusBadge } from "../components/ui/StatusBadge";
 
@@ -197,6 +198,7 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard, entry, onPlan }
             <div><dt>Gönderim kabul edildi</dt><dd>{detail.dispatchedCount}</dd></div><div><dt>Başarısız</dt><dd>{detail.failedCount}</dd></div><div><dt>İptal</dt><dd>{detail.cancelledCount}</dd></div></dl>
           <label>İlerleme <progress aria-label="Kampanya ilerlemesi" max={Math.max(1, detail.matchedCount)} value={detail.matchedCount - detail.pendingOutboxCount - detail.claimedOutboxCount} /></label>
           <p>{detail.matchedCount - detail.pendingOutboxCount - detail.claimedOutboxCount}/{detail.matchedCount} kayıt sonuçlandı.</p></>}
+        <MarketingEntityAnalytics kind="campaign" id={detail.campaign.id} revision={detail.campaign.updatedAt}/>
         {!!detail.errorCounts.length && <section aria-label="Gönderim hata özeti"><h3>Sonuçlanamayan gönderimler</h3>
           {detail.errorCounts.map(({ category, count }) => <p key={category}>{category === "submission_uncertain" ? "Sağlayıcı sonucu belirsiz; tekrar gönderilmedi" : category === "max_attempts" ? "Deneme sınırına ulaşıldı" : category === "unconfigured" || category === "account_changed" ? "Servis yapılandırması" : category.startsWith("provider_") ? "Sağlayıcı reddi" : "Şablon veya gönderim doğrulaması"}: {count}</p>)}
         </section>}

@@ -2834,3 +2834,16 @@ CREATE TABLE marketing_schedule_executions (
   created_at TEXT NOT NULL, UNIQUE(schedule_id,occurrence_key)
 );
 CREATE INDEX idx_marketing_schedule_executions_recovery ON marketing_schedule_executions(status,schedule_id);
+
+-- D-041: bounded normalized external observations only; canonical entities remain untouched.
+CREATE TABLE marketing_metric_snapshots (
+  business_id TEXT NOT NULL REFERENCES business(id),
+  target_type TEXT NOT NULL CHECK(target_type='publication'),
+  target_id TEXT NOT NULL REFERENCES marketing_publications(id),
+  channel TEXT NOT NULL CHECK(channel='instagram'),
+  provider_key TEXT NOT NULL,
+  metric TEXT NOT NULL CHECK(metric IN ('reach','views','likes','comments','saves','shares')),
+  range_start TEXT NOT NULL, range_end TEXT NOT NULL,
+  value INTEGER NOT NULL CHECK(value>=0), measured_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+  UNIQUE(business_id,target_id,provider_key,metric,range_start,range_end)
+);

@@ -1,4 +1,4 @@
-import type { BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
+import type { BusinessMessagingBridge, MarketingAnalyticsBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
   KbsConnectionTestResult,
@@ -191,7 +191,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
+export interface DesktopBridge extends MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
@@ -402,6 +402,10 @@ const bridge: DesktopBridge = {
     const handler = () => listener(); ipcRenderer.on("marketingSchedules:changed", handler);
     return () => { ipcRenderer.removeListener("marketingSchedules:changed", handler); };
   },
+  getMarketingAnalytics: (range, opened) => invokeWhenUnlocked("marketingAnalytics:snapshot", range, opened),
+  getMarketingCampaignAnalytics: (id) => invokeWhenUnlocked("marketingAnalytics:campaign", id),
+  getMarketingPublicationAnalytics: (id) => invokeWhenUnlocked("marketingAnalytics:publication", id),
+  refreshMarketingPublicationMetrics: (id) => invokeWhenUnlocked("marketingAnalytics:refreshPublication", id),
   getMarketingChannels: () => invokeWhenUnlocked("marketing:channels"),
   getMarketingStudio: () => invokeWhenUnlocked("marketing:studio"),
   saveMarketingContent: (input) => invokeWhenUnlocked("marketing:saveContent", input),

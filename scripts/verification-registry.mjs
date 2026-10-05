@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-marketing-analytics.mjs",
+  "scripts/smoke-marketing-analytics-ui.mjs",
   "scripts/smoke-marketing-schedules.mjs",
   "scripts/smoke-marketing-schedules-ui.mjs",
   "scripts/smoke-marketing-log-privacy.mjs",

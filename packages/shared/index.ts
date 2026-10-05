@@ -48,3 +48,5 @@ export * from "./types/marketing";
 
 export * from "./types/marketing-providers";
 export * from "./types/marketing-schedules";
+
+export * from "./types/marketing-analytics";

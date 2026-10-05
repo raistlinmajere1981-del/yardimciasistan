@@ -1,3 +1,5 @@
+import { MarketingAnalyticsService } from "./marketing/analytics-service";
+import { registerMarketingAnalyticsIpc } from "./ipc/marketing-analytics-ipc";
 import { MarketingScheduleService } from "./marketing/schedule-service";
 import { MarketingSchedulerService } from "./marketing/scheduler-service";
 import { MarketingScheduledTargetService } from "./marketing/scheduled-target-service";
@@ -490,6 +492,7 @@ app.on("before-quit", (event) => {
 const businessMessagingStatusSyncService = new BusinessMessagingStatusSyncService(getDatabase, notifyBusinessMessagingChanged);
 const businessMessagingService = new BusinessMessagingService(getDatabase);
 const smsMessagingService = new SmsMessagingService(getDatabase);
+const marketingAnalyticsService = new MarketingAnalyticsService(getDatabase, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()) });
 const marketingMediaService = new MarketingMediaService(getDatabase, () => getDatabase().userDataPath);
 const instagramPublicationService = new InstagramPublicationService(getDatabase, marketingMediaService, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()) });
 const marketingWebsiteService = new MarketingWebsitePublicationService(getDatabase, marketingMediaService);
@@ -545,6 +548,7 @@ const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, assertUnlocked: assertAppSessionUnlocked });
+  registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingScheduleIpc({ service: marketingScheduleService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingIpc({ service: marketingStudioService, assertUnlocked: assertAppSessionUnlocked });
   registerMessagingCampaignsIpc({ service: messagingCampaignService, assertUnlocked: assertAppSessionUnlocked });
