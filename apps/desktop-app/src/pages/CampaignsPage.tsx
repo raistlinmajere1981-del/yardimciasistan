@@ -19,7 +19,7 @@ function AudienceCounts({ value }: { value: MessagingAudienceCounts }) {
 }
 
 /** Campaigns' single editor family: list lens + inline entity workspace/subflows. */
-export function CampaignsPage({ enabled, registerPageLeaveGuard, entry }: { enabled: boolean; registerPageLeaveGuard?: RegisterPageLeaveGuard; entry?: { draft?: MessagingCampaignInput; campaignId?: string } }) {
+export function CampaignsPage({ enabled, registerPageLeaveGuard, entry, onPlan }: { enabled: boolean; onPlan?: (campaign:MessagingCampaign)=>void; registerPageLeaveGuard?: RegisterPageLeaveGuard; entry?: { draft?: MessagingCampaignInput; campaignId?: string } }) {
   const [campaigns, setCampaigns] = useState<MessagingCampaign[]>([]);
   const [segments, setSegments] = useState<MessagingSegment[]>([]);
   const [templates, setTemplates] = useState<BusinessMessageTemplate[]>([]);
@@ -206,6 +206,7 @@ export function CampaignsPage({ enabled, registerPageLeaveGuard, entry }: { enab
             <ActionButton variant="secondary" disabled={busy} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.previewMessagingCampaign(detail.campaign.id)); if (mounted.current) setPreview(value); })}>Kitleyi önizle</ActionButton>
             <ActionButton disabled={busy} onClick={() => void action(async () => { const value = resultValue(await window.yardimciDesktop!.prepareMessagingCampaign(detail.campaign.id)); if (mounted.current) { setDetail(value); setPreview(null); } await reload(); })}>Hazırla</ActionButton>
           </>}
+          {detail.campaign.status === "prepared" && onPlan && <ActionButton variant="secondary" disabled={busy} onClick={()=>onPlan(detail.campaign)}>Planla</ActionButton>}
           {detail.campaign.status === "prepared" && <ActionButton disabled={busy || !activeConfigured} onClick={() => void dispatchAction("start")}>Gönderimi Başlat</ActionButton>}
           {detail.campaign.status === "running" && <ActionButton variant="secondary" disabled={busy} onClick={() => void dispatchAction("pause")}>Duraklat</ActionButton>}
           {detail.campaign.status === "paused" && <ActionButton disabled={busy || !activeConfigured} onClick={() => void dispatchAction("resume")}>Devam Et</ActionButton>}

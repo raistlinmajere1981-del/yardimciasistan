@@ -1,3 +1,7 @@
+import { MarketingScheduleService } from "./marketing/schedule-service";
+import { MarketingSchedulerService } from "./marketing/scheduler-service";
+import { MarketingScheduledTargetService } from "./marketing/scheduled-target-service";
+import { registerMarketingScheduleIpc } from "./ipc/marketing-schedule-ipc";
 import { InstagramPublicationService } from "./marketing/instagram-publication-service";
 import { registerMarketingProviderIpc } from "./ipc/marketing-provider-ipc";
 import { SmsMessagingService } from "./business-messaging/sms-service";
@@ -19,7 +23,7 @@ import { registerShippingProviderIpcHandlers } from "./ipc/shipping-provider-ipc
 import { createShippingSecretWrite } from "./shipping-secret-service";
 import { registerCommerceShipmentIpcHandlers } from "./ipc/commerce-shipment-ipc";
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, powerMonitor } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import { desktopLog } from "./desktop-logger";
@@ -330,6 +334,7 @@ if (!hasSingleInstanceLock) {
       onUnlocked: () => {
         reconcileEgmKbsBackgroundSession();
         campaignDispatchService.wake();
+        marketingSchedulerService.wake();
       },
       onLocked: () => {
         egmKbsBackgroundSession.destroy();
@@ -433,6 +438,8 @@ if (!hasSingleInstanceLock) {
     createMainWindow();
     syncCoordinator.start();
     campaignDispatchService.start();
+    marketingSchedulerService.start();
+    powerMonitor.on("resume", () => marketingSchedulerService.wake());
     if (!desktopDatabase.getSetupData().setupRequired) {
       void publishBusinessAiContextFromMain();
       if (getGoogleReviewsSettings(desktopDatabase.databasePath).publicationPending) {
@@ -473,7 +480,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (campaignShutdownStarted) return;
   campaignShutdownStarted = true;
-  void Promise.allSettled([campaignDispatchService.suspendAndDrain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()]).then(() => {
+  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([campaignDispatchService.suspendAndDrain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()])).then(() => {
     campaignShutdownDrained = true;
     desktopDatabase?.close();
     app.quit();
@@ -513,6 +520,17 @@ const campaignDispatchService = new CampaignDispatchService(getDatabase, {
   allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()),
   onChanged: () => { notifyMessagingCampaignsChanged(); notifyBusinessMessagingChanged(); }
 });
+const marketingScheduledTargets = new MarketingScheduledTargetService(getDatabase, messagingCampaignService, marketingStudioService, instagramPublicationService);
+const marketingSchedulerService = new MarketingSchedulerService(getDatabase, marketingScheduledTargets, {
+  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()),
+  onChanged: notifyMarketingSchedulesChanged
+});
+const marketingScheduleService = new MarketingScheduleService(getDatabase, () => { notifyMarketingSchedulesChanged(); marketingSchedulerService.wake(); });
+function notifyMarketingSchedulesChanged() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("marketingSchedules:changed");
+  }
+}
 function notifyMessagingCampaignsChanged() {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("messagingCampaigns:changed");
@@ -527,6 +545,7 @@ const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, assertUnlocked: assertAppSessionUnlocked });
+  registerMarketingScheduleIpc({ service: marketingScheduleService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingIpc({ service: marketingStudioService, assertUnlocked: assertAppSessionUnlocked });
   registerMessagingCampaignsIpc({ service: messagingCampaignService, assertUnlocked: assertAppSessionUnlocked });
   registerBusinessMessagingIpc({ service: businessMessagingService, assertUnlocked: assertAppSessionUnlocked, onChanged: notifyBusinessMessagingChanged });
@@ -669,6 +688,7 @@ export function scheduleAutomaticSyncSoon() {
 export async function suspendAutomaticSyncForMaintenance() {
   maintenanceSyncSuspended = true;
   desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
+  await marketingSchedulerService.suspendAndDrain();
   await campaignDispatchService.suspendAndDrain();
   await instagramPublicationService.drain();
   await syncCoordinator?.suspendAndDrain();
@@ -688,6 +708,7 @@ export function resumeAutomaticSyncAfterMaintenanceAbort() {
   maintenanceSyncSuspended = false;
   syncCoordinator?.restart();
   campaignDispatchService.start();
+  marketingSchedulerService.start();
 }
 
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {

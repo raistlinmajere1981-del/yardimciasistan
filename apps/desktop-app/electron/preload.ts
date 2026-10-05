@@ -1,4 +1,4 @@
-import type { BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
+import type { BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
   KbsConnectionTestResult,
@@ -191,7 +191,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge, MarketingBridge, MarketingProviderBridge {
+export interface DesktopBridge extends BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
@@ -395,6 +395,13 @@ const bridge: DesktopBridge = {
   testSmsConnection: (input) => invokeWhenUnlocked("marketingProviders:testSms", input),
   listSmsSenderIds: (input) => invokeWhenUnlocked("marketingProviders:smsSenders", input),
   testInstagramConnection: (input) => invokeWhenUnlocked("marketingProviders:testInstagram", input),
+  getMarketingSchedules: (month) => invokeWhenUnlocked("marketingSchedules:list", month),
+  saveMarketingSchedule: (input) => invokeWhenUnlocked("marketingSchedules:save", input),
+  transitionMarketingSchedule: (id, revision, action) => invokeWhenUnlocked("marketingSchedules:transition", id, revision, action),
+  onMarketingSchedulesChanged: (listener) => {
+    const handler = () => listener(); ipcRenderer.on("marketingSchedules:changed", handler);
+    return () => { ipcRenderer.removeListener("marketingSchedules:changed", handler); };
+  },
   getMarketingChannels: () => invokeWhenUnlocked("marketing:channels"),
   getMarketingStudio: () => invokeWhenUnlocked("marketing:studio"),
   saveMarketingContent: (input) => invokeWhenUnlocked("marketing:saveContent", input),

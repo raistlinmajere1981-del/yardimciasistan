@@ -51,12 +51,13 @@ export function claimDispatchBatch(db: DatabaseSync, now: string, size: number):
     });
   });
 }
-export function transitionCampaignDispatch(db: DatabaseSync, id: string, action: "start" | "pause" | "resume") {
+export function transitionCampaignDispatch(db: DatabaseSync, id: string, action: "start" | "pause" | "resume", onAccepted?: () => void) {
   return campaignTransaction(db, () => {
     const campaign = getMessagingCampaign(db, id), from = { start: "prepared", pause: "running", resume: "paused" }[action], to = action === "pause" ? "paused" : "running";
-    if (campaign.status === to) return getMessagingCampaignDetail(db, id);
+    if (campaign.status === to) { onAccepted?.(); return getMessagingCampaignDetail(db, id); }
     if (campaign.status !== from) invalid("invalid_transition", "Kampanya durumu bu işlem için uygun değil.");
     db.prepare("UPDATE messaging_campaigns SET status=?,updated_at=? WHERE id=? AND status=?").run(to, new Date().toISOString(), id, from);
+    onAccepted?.();
     return getMessagingCampaignDetail(db, id);
   });
 }

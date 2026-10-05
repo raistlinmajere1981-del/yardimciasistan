@@ -1,3 +1,5 @@
+import * as marketingScheduleStore from "./marketing/schedule-store";
+import * as marketingScheduleTargetStore from "./marketing/schedule-target-store";
 import * as instagramPublicationStore from "./marketing/instagram-publication-store";
 import * as marketingProviderStore from "./marketing/provider-configuration-store";
 import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets";
@@ -986,6 +988,16 @@ export class DesktopDatabase {
   listMessagingSegments() { return campaignStore.listMessagingSegments(this.db); }
   saveMessagingSegment(input: Parameters<typeof campaignStore.saveMessagingSegment>[1]) { return campaignStore.saveMessagingSegment(this.db, input); }
   previewMessagingSegment(id: string, channel: MessagingChannel) { return campaignStore.previewMessagingSegment(this.db, id, channel); }
+  listMarketingSchedules() { return marketingScheduleStore.listMarketingSchedules(this.db); }
+  getMarketingSchedule(id: string) { return marketingScheduleStore.getMarketingSchedule(this.db,id); }
+  getMarketingScheduleExecution(id: string) { return marketingScheduleStore.getMarketingScheduleExecution(this.db,id); }
+  saveMarketingSchedule(input: Parameters<typeof marketingScheduleStore.saveMarketingSchedule>[1], now: string) { return marketingScheduleStore.saveMarketingSchedule(this.db,input,now); }
+  transitionMarketingSchedule(id: string, revision: number, action: "pause"|"resume"|"cancel", now: string) { return marketingScheduleStore.transitionMarketingSchedule(this.db,id,revision,action,now); }
+  recoverMarketingScheduleExecutions() { return marketingScheduleStore.recoverMarketingScheduleExecutions(this.db); }
+  claimMarketingScheduleExecution(now: string, graceMs: number) { return marketingScheduleStore.claimMarketingScheduleExecution(this.db,now,graceMs); }
+  finishMarketingScheduleExecution(id: string, status: "succeeded"|"skipped"|"failed"|"pending", now: string, error = "") { return marketingScheduleStore.finishMarketingScheduleExecution(this.db,id,status,now,error); }
+  prepareScheduledPublication(id: string) { return marketingScheduleTargetStore.prepareScheduledPublication(this.db,id); }
+  transitionScheduledCampaignDispatch(campaignId: string, executionId: string) { return marketingScheduleTargetStore.transitionScheduledCampaignDispatch(this.db,campaignId,executionId); }
   getMarketingPublication(id: string) { return marketingStore.getMarketingPublication(this.db,id); }
   getInstagramPublicationState(id: string) { return instagramPublicationStore.instagramPublicationState(this.db,id); }
   beginInstagramPublication(id: string, revision: number, accountKey: string, stage: Parameters<typeof instagramPublicationStore.beginInstagramPublication>[4]) { return instagramPublicationStore.beginInstagramPublication(this.db,id,revision,accountKey,stage); }

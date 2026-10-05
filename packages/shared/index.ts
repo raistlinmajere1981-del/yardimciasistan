@@ -47,3 +47,4 @@ export * from "./types/messaging-campaigns";
 export * from "./types/marketing";
 
 export * from "./types/marketing-providers";
+export * from "./types/marketing-schedules";

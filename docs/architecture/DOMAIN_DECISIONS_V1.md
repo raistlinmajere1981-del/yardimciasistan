@@ -1120,3 +1120,92 @@ Portable verification mocks real providers and exercises actual SQLite, PHP stag
 Electron image conversion and browser flows. Live provider calls are excluded. Carousel,
 Reel/Story, Facebook, inbound SMS/social inbox, scheduling/calendar, analytics, full İYS
 reconciliation, OAuth wizard, multiple accounts/providers remain outside D5.
+
+## D-040 — Marketing Calendar / Scheduling / Time-based Automation (D6)
+
+**Status:** Accepted. **Scope:** Desktop time-based scheduling; no new providers.
+
+MarketingSchedule is a separate durable time intent, not Campaign, MarketingContent,
+Publication or a provider request. MarketingScheduleExecution is the durable occurrence
+ledger. The neutral scheduler claims time intents and delegates to a focused application
+boundary; it never selects recipients, copies media bytes, posts to providers, prepares
+campaigns, generates AI content or manages provider retries.
+
+| Channel | Canonical target | One-shot | Recurring |
+| --- | --- | --- | --- |
+| WhatsApp | Prepared D2 campaign → D3 start | Yes | No |
+| SMS | Prepared D2 campaign → D3 start | Yes | No |
+| Website | Ready canonical publication revision → D4 publish/update + sync outbox | Yes | Yes |
+| Instagram | Ready canonical publication revision → D5 single-image publication | Yes | Yes |
+
+Audience schedules require a prepared campaign at creation and recheck it at execution.
+A paused/cancelled/not-prepared target is skipped; a disabled/unconfigured channel fails.
+The scheduler never resumes a user-paused campaign automatically. Campaign pause and
+schedule pause are independent. D3 still owns consent, contact/template validation,
+submission fences, provider backoff and delivery. One active/paused schedule per campaign
+prevents competing start plans. Recurring audience delivery is deliberately rejected.
+
+**Frozen revision:** publication revisions are canonical immutable editorial snapshots in
+`marketing_publication_revisions`, including content revision and references to canonical
+MediaAsset IDs. Schedules store only revision references, not content/media copies.
+Content/publication edits leave schedules unchanged; the canonical Schedule workspace's
+explicit “Planı güncelle” plus Save rebinds the selected current publication revision.
+Referenced media are guarded against deletion for active/paused/in-flight plans.
+Website applies the frozen snapshot to its canonical publication and queues the existing
+revisioned publish/update path. Instagram creates one new canonical publication intent per
+occurrence; the occurrence's intent is frozen and linked atomically before any remote work.
+The source draft remains an editorial source, and recurring runs do not reuse a published
+Instagram record as a new remote post. Archiving content retains existing D4/D5 rejection.
+
+**Recurrence:** only typed daily/weekly/monthly rules. Interval 1–365, ISO weekdays 1–7,
+monthly day 1–31 and local time HH:mm. No renderer cron. startsAt is a lower bound and
+calendar anchor. Weekly interval uses the anchor's Monday week; daily uses the anchor
+calendar date; monthly uses the anchor month. The first occurrence must match the rule.
+Short months clamp day 29/30/31 to the last day rather than omit a month. Subsequent
+occurrences keep the original rule's day. Evaluation seeks near the requested date;
+it never enumerates a missed backlog.
+
+**Timezone/DST:** a valid named IANA timezone is explicit and persisted. The default is
+the local system timezone at creation (there is no independent business timezone setting).
+Changing the OS timezone does not change saved plans. Explicit plan edits can change it.
+The original local start is also retained so a DST gap does not silently alter form intent.
+All persisted instants are UTC ISO timestamps; recurrence is wall-clock calendar arithmetic
+in the saved timezone. Folds use the first instant; gaps shift by the transition's gap,
+matching [Temporal compatible disambiguation](https://tc39.es/proposal-temporal/docs/timezone.html).
+Calendar month projection uses the current local timezone, labels retain each plan's timezone.
+
+**Missed runs:** default `run_once_when_resumed`, alternative `skip`. A lateness tolerance
+of 60 seconds distinguishes normal bounded timer jitter from a missed run. Startup, unlock,
+OS wake, forward clock changes and schedule resume all consult the persisted earliest
+unconsumed nextRunAt. A recovery consumes at most one catch-up occurrence per plan;
+nextRunAt advances strictly past now and the consumed instant. Skip records one skipped
+ledger entry for the collapsed missed range. No backlog burst. Pausing retains that earliest
+instant, so Resume can apply the selected policy. Backward clock changes cannot consume
+an occurrence again: nextRunAt and the unique ledger remain ahead of the consumed instant.
+
+**Idempotency/crash:** occurrenceKey = scheduleId + planned UTC instant, unique under
+(scheduleId, occurrenceKey). Claim, occurrence insertion and nextRunAt advance are one
+transaction. D3 start and the execution's accepted campaign reference commit together.
+Website frozen intent, sync job and execution reference commit together. Instagram new
+canonical intent and execution reference commit together, then D5's existing create/publish
+submission fences and receipts protect remote effects. Recovery reuses these references.
+Scheduler success means durable canonical acceptance for D3/Website, confirmed publication
+for Instagram. It does not claim remote exactly-once delivery, consent or sync acknowledgement.
+Instagram processing continues through the existing D5 status path on the same intent at
+bounded wakes; rejected/uncertain actions become failures with no scheduler provider retry.
+Provider rejection recovery remains an explicit D5 action on the result publication.
+
+**Lifecycle:** single-flight, bounded 15-second wake hints and DB authority. Startup reclaims
+previous-runtime claims only; no expiry steals a live action. Shutdown/maintenance stop new
+claims and drain scheduler before draining D3/D5/sync or replacing DB/files. Session lock
+and marketing capability gate background work. Pause stops new claims without aborting
+in-flight actions; Cancel removes future occurrences, preserving target lifecycle. Schedule
+edits are blocked while an execution is pending/claimed. Terminal schedules cannot be
+edited/resumed; users create a new plan. Failures and skipped results are visible in Takvim
+and structured diagnostics with only IDs, channel, revisions and bounded safe outcome codes.
+
+The calendar is a projection and the inline Plan workspace is the sole schedule editor;
+Studio, Publications and Campaigns converge on it without nested dialogs. Existing Page /
+Entity Workspace / Operation and Appearance v2 ownership remain intact. Event/birthday/
+stock triggers, AI autonomous generation/publish, analytics, cron editor, inbox and push
+notifications are outside D6.

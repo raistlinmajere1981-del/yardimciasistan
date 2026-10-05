@@ -53,7 +53,7 @@ export class MessagingCampaignService {
     this.log("outbox.prepared", { campaignId: id, pendingCount: detail.pendingOutboxCount }, id);
     return detail;
   }
-  async startCampaign(id: string, resume = false) {
+  async startCampaign(id: string, resume = false, scheduleExecutionId?: string) {
     const value = this.getDatabase().getMessagingCampaign(id);
     if (!value.providerId) invalid("missing_provider", "Gönderim için sağlayıcı seçin.");
     this.catalog.assertAvailable(value.channel, value.providerId);
@@ -61,7 +61,7 @@ export class MessagingCampaignService {
     if (value.channel === "whatsapp") { if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor."); validateCampaignTemplate(value, template); }
     else validateSmsText(value.text);
     this.catalog.assertAvailable(value.channel, value.providerId);
-    const detail = this.getDatabase().transitionCampaignDispatch(id, resume ? "resume" : "start");
+    const detail = scheduleExecutionId ? this.getDatabase().transitionScheduledCampaignDispatch(id,scheduleExecutionId) : this.getDatabase().transitionCampaignDispatch(id, resume ? "resume" : "start");
     this.log("dispatch.campaign.started", { campaignId: id }, id); this.onChanged(); return detail;
   }
   pauseCampaign(id: string) {

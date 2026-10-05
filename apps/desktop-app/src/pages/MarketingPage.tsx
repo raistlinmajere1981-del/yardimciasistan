@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { MARKETING_CHANNELS, type MarketingContentInput, type MarketingContentDetail, type MarketingPublication, type MarketingPublicationInput,
-  type MarketingStudioSnapshot, type MarketingResult, type MarketingChannel, type MarketingAiCapability, type MarketingAssetView, type MessagingCampaignInput } from "@yardimci-asistan/shared";
+  type MarketingStudioSnapshot, type MarketingResult, type MarketingChannel, type MarketingAiCapability, type MarketingAssetView, type MessagingCampaignInput, type MarketingScheduleInput, type MarketingScheduleSnapshot, type MarketingScheduleDetail, type MessagingCampaign } from "@yardimci-asistan/shared";
 import type { RegisterPageLeaveGuard, PageLeaveGuard } from "../app/page-navigation-guard";
 import { ActionButton } from "../components/ui/ActionButton";
 import { MarketingMediaGallery } from "../components/marketing/MarketingMediaGallery";
 import { MarketingPublicationEditor, MarketingWebsitePreview } from "../components/marketing/MarketingPublicationEditor";
+import { MarketingCalendar } from "../components/marketing/MarketingCalendar";
+import { MarketingScheduleWorkspace, scheduleDraft, scheduleLocal } from "../components/marketing/MarketingScheduleWorkspace";
 import { CampaignsPage } from "./CampaignsPage";
 
 const emptyContent=():MarketingContentInput=>({title:"",purpose:"announcement",masterText:"",status:"draft",source:"manual",variants:MARKETING_CHANNELS.map(channel=>({channel,title:"",text:"",metadata:{version:1,adaptation:"manual"}})),mediaAssetIds:[]});
@@ -19,9 +21,11 @@ function publicationStatus(p:MarketingPublication) {
   if(p.channel!=="instagram")return statuses[p.status];
   return p.status==="publishing"?"Instagram görseli işleniyor":p.status==="failed"?(p.providerSummary?.failureCode==="submission_uncertain"?"Sonuç belirsiz · tekrar gönderilmedi":"Instagram yayını başarısız"):statuses[p.status];
 }
-type View="studio"|"campaigns"|"publications"|"media";
+type View="studio"|"campaigns"|"publications"|"media"|"calendar";
 /** One editorial workspace family; list/preview/publication modes share the same owned drafts. */
-export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,onSettings}:{enabled:boolean;campaignsEnabled:boolean;registerPageLeaveGuard?:RegisterPageLeaveGuard;onSettings?:()=>void}) {
+export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,onSettings,scheduleEntry,onScheduleEntryConsumed}:{enabled:boolean;campaignsEnabled:boolean;scheduleEntry?:MessagingCampaign;onScheduleEntryConsumed?:()=>void;registerPageLeaveGuard?:RegisterPageLeaveGuard;onSettings?:()=>void}) {
+  const [calendar,setCalendar]=useState<MarketingScheduleSnapshot|null>(null),[calendarMonth,setCalendarMonth]=useState(()=>new Date().toISOString().slice(0,7));
+  const [planDraft,setPlanDraft]=useState<MarketingScheduleInput|null>(null),[planBaseline,setPlanBaseline]=useState("");
   const [campaignEntry,setCampaignEntry]=useState<{draft?:MessagingCampaignInput;campaignId?:string}>();
   const [snapshot,setSnapshot]=useState<MarketingStudioSnapshot|null>(null),[view,setView]=useState<View>("studio");
   const [draft,setDraft]=useState<MarketingContentInput|null>(null),[baseline,setBaseline]=useState("");
@@ -31,14 +35,16 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
   const [pubDraft,setPubDraft]=useState<MarketingPublicationInput|null>(null),[pubBaseline,setPubBaseline]=useState("");
   const [preview,setPreview]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
   const [pending,setPending]=useState<(()=>void)|null>(null),[unpublishConfirm,setUnpublishConfirm]=useState(false),[assetConfirm,setAssetConfirm]=useState<{id:string;action:"archive"|"delete"}|null>(null);
-  const mounted=useRef(true),epoch=useRef(0),campaignGuard=useRef<PageLeaveGuard|null>(null);
-  const dirty=Boolean(draft && JSON.stringify(draft)!==baseline)||Boolean(pubDraft && JSON.stringify(pubDraft)!==pubBaseline);
+  const mounted=useRef(true),scheduleLoad=useRef(0),epoch=useRef(0),campaignGuard=useRef<PageLeaveGuard|null>(null);
+  const dirty=Boolean(planDraft && JSON.stringify(planDraft)!==planBaseline)||Boolean(draft && JSON.stringify(draft)!==baseline)||Boolean(pubDraft && JSON.stringify(pubDraft)!==pubBaseline);
   const website=snapshot?.channels.find(c=>c.id==="website"),maxImages=website?.maxImages??0;
   const selectedChannel=snapshot?.channels.find(c=>c.id===channel);
   const channelAvailable=Boolean(selectedChannel?.enabled&&selectedChannel.configured);
   const canPublish=Boolean(website?.enabled && website.configured && website.supportsDirectPublish);
   const bridge=()=>window.yardimciDesktop!;
-  async function reload() {const next=value(await bridge().getMarketingStudio());if(mounted.current)setSnapshot(next);}
+  async function reloadCalendar() {if(!bridge().getMarketingSchedules)return;const ticket=++scheduleLoad.current;const next=value(await bridge().getMarketingSchedules(calendarMonth));if(mounted.current && ticket===scheduleLoad.current)setCalendar(next);}
+  useEffect(()=>{if(!enabled)return;void reloadCalendar().catch(()=>{});return bridge().onMarketingSchedulesChanged?.(()=>{void reloadCalendar().catch(()=>{});});},[enabled,calendarMonth]);
+  async function reload() {const next=value(await bridge().getMarketingStudio());if(mounted.current)setSnapshot(next);await reloadCalendar();}
   async function action(work:()=>Promise<void>) {if(busy)return;setBusy(true);setMessage("");try{await work();}catch(error){if(mounted.current)setMessage(error instanceof Error?error.message:"İşlem tamamlanamadı.");}finally{if(mounted.current)setBusy(false);}}
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;epoch.current++;};},[]);
   useEffect(()=>{if(!enabled || !window.yardimciDesktop?.getMarketingStudio)return;void action(reload);const timer=setInterval(()=>{void reload().catch(()=>{});},4000);return()=>clearInterval(timer);},[enabled]);
@@ -98,22 +104,44 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
       if(mounted.current){const next=publicationDraft(saved);setPubDraft(next);setPubBaseline(JSON.stringify(next));setDraft(null);setBaseline("");setPreview(false);setView("publications");setMessage(saved.channel==="instagram"?(saved.status==="published"?"Instagram yayını tamamlandı.":saved.status==="failed"?`Instagram yayını başarısız: ${saved.providerSummary?.failureCode??"operation_failed"}. Sonucu denetleyin; belirsiz gönderim tekrarlanmaz.`:"Instagram görseli işleniyor. Yayınlar ekranından durumu kontrol edin."):publish?"Website yayını hazırlanıyor. Senkron onayı bekleniyor.":"Yayın değişikliği kaydedildi.");}await reload();
     });
   }
+  function openPlan(detail:MarketingScheduleDetail) {
+    const next=scheduleDraft(detail);setPlanDraft(next);setPlanBaseline(JSON.stringify(next));setDraft(null);setPubDraft(null);setView("calendar");
+  }
+  function createPlan(target:MarketingPublication|MessagingCampaign) {
+    const isPublication="mediaAssetIds" in target,timezone=calendar?.defaultTimezone??Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const next:MarketingScheduleInput={name:isPublication?target.title:target.name,targetType:isPublication?"public_publication":"audience_campaign",targetId:target.id,channel:target.channel,expectedTargetRevision:isPublication?target.revision:undefined,scheduleType:"once",timezone,startsLocal:scheduleLocal(new Date(Date.now()+3600000).toISOString(),timezone),missedRunPolicy:"run_once_when_resumed"};
+    setPlanDraft(next);setPlanBaseline(JSON.stringify(next));setDraft(null);setPubDraft(null);setView("calendar");
+  }
+  async function planPublication() {
+    if(!pubDraft)return;
+    await action(async()=>{const saved=value(await bridge().saveMarketingPublication(pubDraft));await reload();createPlan(saved);});
+  }
+  useEffect(()=>{if(scheduleEntry){createPlan(scheduleEntry);onScheduleEntryConsumed?.();}},[scheduleEntry]);
+  const selectedPlan=planDraft?.id?calendar?.schedules.find(d=>d.schedule.id===planDraft.id):undefined;
   if(!enabled)return <p>Pazarlama bu işletmede etkin değil.</p>;
   const activePub=pubDraft?.id?snapshot?.publications.find(p=>p.id===pubDraft.id):undefined;
   const activeVariant=draft?.variants.find(v=>v.channel===channel);
   const invalidSms = channel === "sms" && Boolean(activeVariant && (!activeVariant.text.trim() || activeVariant.text.length > 160 || /<\/?[A-Za-z][^>]*>|[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(activeVariant.text)));
   return <section className="marketing-page" aria-label="Pazarlama">
-    <nav className="marketing-tabs" aria-label="Pazarlama yüzeyleri">{([ ["studio","İçerik Stüdyosu"],["campaigns","Kampanyalar"],["publications","Yayınlar"],["media","Medya"] ] as const).map(([id,label])=>
+    <nav className="marketing-tabs" aria-label="Pazarlama yüzeyleri">{([ ["studio","İçerik Stüdyosu"],["campaigns","Kampanyalar"],["publications","Yayınlar"],["calendar","Takvim"],["media","Medya"] ] as const).map(([id,label])=>
       <ActionButton key={id} variant={view===id?"primary":"secondary"} aria-pressed={view===id} disabled={busy} onClick={()=>navigate(()=>{setView(id);})}>{label}</ActionButton>)}
       <ActionButton variant="secondary" onClick={()=>navigate(()=>onSettings?.())} disabled={busy}>Kanallar / Ayarlar</ActionButton>
       <ActionButton variant="secondary" onClick={()=>void action(reload)} disabled={busy}>Durumu yenile</ActionButton>
     </nav>
+    {!!calendar?.schedules.some(d=>d.executions[0]?.status==="failed") && <p role="status"><ActionButton variant="secondary" onClick={()=>navigate(()=>{setView("calendar");setPlanDraft(null);})}>Başarısız pazarlama planları · Takvimi aç</ActionButton></p>}
     {message && <p role="status" className="marketing-message">{message}</p>}
     {pending && <section className="marketing-confirm" aria-label="Kaydedilmemiş değişiklikler"><p>Kaydedilmemiş değişiklikler var.</p>
-      <ActionButton variant="danger" onClick={()=>{setDraft(null);setPubDraft(null);setCandidate(null);setGenerated(null);const next=pending;setPending(null);next();}}>Değişiklikleri bırak</ActionButton>
+      <ActionButton variant="danger" onClick={()=>{setDraft(null);setPubDraft(null);setPlanDraft(null);setCandidate(null);setGenerated(null);const next=pending;setPending(null);next();}}>Değişiklikleri bırak</ActionButton>
       <ActionButton variant="secondary" onClick={()=>setPending(null)}>Düzenlemeye dön</ActionButton></section>}
-    {view==="campaigns"?<CampaignsPage enabled={campaignsEnabled} entry={campaignEntry} registerPageLeaveGuard={guard=>{campaignGuard.current=guard;return()=>{campaignGuard.current=null;};}}/>:
+    {view==="campaigns"?<CampaignsPage enabled={campaignsEnabled} entry={campaignEntry} onPlan={campaign=>navigate(()=>createPlan(campaign))} registerPageLeaveGuard={guard=>{campaignGuard.current=guard;return()=>{campaignGuard.current=null;};}}/>:
     <div className="marketing-body">
+      {view==="calendar" && (planDraft?<MarketingScheduleWorkspace draft={planDraft} onChange={setPlanDraft} detail={selectedPlan} channels={snapshot?.channels??[]} publication={snapshot?.publications.find(p=>p.id===planDraft.targetId)} busy={busy}
+        onClose={()=>navigate(()=>{setPlanDraft(null);})}
+        onSave={()=>void action(async()=>{const saved=value(await bridge().saveMarketingSchedule(planDraft));await reload();openPlan(saved);setMessage("Plan kaydedildi.");})}
+        onTransition={kind=>void action(async()=>{if(!selectedPlan)return;const saved=value(await bridge().transitionMarketingSchedule(selectedPlan.schedule.id,selectedPlan.schedule.revision,kind));await reload();openPlan(saved);})}
+        onResult={id=>navigate(()=>{setPlanDraft(null);const p=snapshot?.publications.find(p=>p.id===id);if(p)editPublication(p);else {setCampaignEntry({campaignId:id});setView("campaigns");}})}
+        onTarget={()=>navigate(()=>{const p=snapshot?.publications.find(p=>p.id===planDraft.targetId);setPlanDraft(null);if(p)editPublication(p);else {setCampaignEntry({campaignId:planDraft.targetId});setView("campaigns");}})}
+      />:<MarketingCalendar snapshot={calendar} channels={snapshot?.channels??[]} month={calendarMonth} onMonth={setCalendarMonth} onOpen={detail=>navigate(()=>openPlan(detail))}/>)}
       {view==="studio" && <div className="marketing-split"><aside className="marketing-list" aria-label="Pazarlama içerikleri">
         <ActionButton onClick={()=>navigate(()=>editContent())} disabled={busy}>Yeni içerik</ActionButton>
         {!snapshot?.contents.length && <p>İlk duyurunuzu veya tanıtım içeriğinizi oluşturun.</p>}
@@ -125,6 +153,8 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
           <MarketingWebsitePreview draft={pubDraft} assets={snapshot?.assets??[]}/>
           {!snapshot?.channels.some(c=>c.id===pubDraft.channel&&c.enabled&&c.configured) && <p>Servis yapılandırılmamış. Ayarlar &gt; Servisler'den tamamlayın.</p>}
           <ActionButton disabled={busy||!snapshot?.channels.some(c=>c.id===pubDraft.channel&&c.enabled&&c.configured)||(pubDraft.channel==="instagram"&&pubDraft.mediaAssetIds.length!==1)} onClick={()=>void savePublication(true)}>{pubDraft.channel==="instagram"?"Instagram’da yayınla":"Website'te yayınla"}</ActionButton>
+          {draft?.status!=="ready" && <p>Planlamak için içeriği Hazır olarak kaydedin.</p>}
+          <ActionButton variant="secondary" disabled={busy||draft?.status!=="ready"} onClick={()=>void planPublication()}>Planla</ActionButton>
           <ActionButton variant="secondary" disabled={busy} onClick={()=>{setPreview(false);setPubDraft(null);setPubBaseline("");}}>İçeriğe dön</ActionButton>
         </>:<>
           <h2>{draft.id?"İçeriği düzenle":"Yeni içerik"}</h2>
@@ -177,6 +207,7 @@ export function MarketingPage({enabled,campaignsEnabled,registerPageLeaveGuard,o
         {snapshot?.campaigns?.map(({campaign:c,dispatchedCount,pendingOutboxCount,failedCount})=><button key={c.id} disabled={busy} onClick={()=>navigate(()=>{setCampaignEntry({campaignId:c.id});setView("campaigns");})}><strong>{c.name}</strong><span>{snapshot.channels.find(channel=>channel.id===c.channel)?.displayName} · {c.status}</span><small>{dispatchedCount} kabul · {pendingOutboxCount} bekleyen · {failedCount} başarısız · {new Date(c.createdAt).toLocaleString("tr-TR")} · {c.providerId}</small></button>)}
       </aside><section className="marketing-editor" aria-label="Yayın çalışma alanı">{!pubDraft?<p>Bir yayın veya kampanya seçin.</p>:<>
         <h2>{activePub?.title??"Yayın"}</h2><p>{activePub?publicationStatus(activePub):"Taslak"} · {activePub?.mediaAssetIds.length??0} görsel</p>
+        {activePub && <ActionButton variant="secondary" disabled={busy||dirty||snapshot?.contents.find(c=>c.content.id===activePub.contentId)?.content.status!=="ready"||activePub.channel==="instagram"&&activePub.status!=="draft"} onClick={()=>navigate(()=>createPlan(activePub))}>Planla</ActionButton>}
         {activePub && activePub.revision!==pubDraft.expectedRevision && <p>Kayıt değişti. Listeden yeniden açın.</p>}
         {pubDraft.channel==="instagram"?<><MarketingWebsitePreview draft={pubDraft} assets={snapshot?.assets??[]}/><p>Instagram yayını değiştirilemez / kaldırılamaz. Güncel içerik için Stüdyo’dan açıkça yeni yayın oluşturun.</p><p>{activePub?.providerSummary?.failureCode}</p>{activePub?.providerSummary?.permalink && <a href={activePub.providerSummary.permalink} target="_blank" rel="noreferrer">Instagram gönderisi</a>}<ActionButton disabled={busy||dirty||!snapshot?.channels.some(c=>c.id===pubDraft.channel&&c.enabled&&c.configured)} onClick={()=>void action(async()=>{const saved=value(await bridge().publishMarketingPublication(pubDraft.id!,pubDraft.expectedRevision!));const next=publicationDraft(saved);setPubDraft(next);setPubBaseline(JSON.stringify(next));await reload();})}>{activePub?.status==="published"?"Durumu / temizliği kontrol et":"Yayınla / durumu kontrol et"}</ActionButton></>:<>
         <MarketingPublicationEditor draft={pubDraft} onChange={setPubDraft} assets={snapshot?.assets??[]} maxImages={maxImages} busy={busy}/><MarketingWebsitePreview draft={pubDraft} assets={snapshot?.assets??[]}/>

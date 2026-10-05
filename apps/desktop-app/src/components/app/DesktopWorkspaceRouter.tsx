@@ -3,11 +3,13 @@ import { useState, type Dispatch, type MutableRefObject, type SetStateAction } f
 import {
   BUSINESS_CAPABILITIES as C,
   getReservationDomain,
-  isReservationTypeAvailable
+  isReservationTypeAvailable,
+  type MessagingCampaign
 } from "@yardimci-asistan/shared";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { projectDesktopWorkspaceFeatures } from "../../app/desktop-workspace-features";
+import { useMarketingScheduleStatus } from "../../app/use-marketing-schedule-status";
 import { useDashboardAi } from "../../app/use-dashboard-ai";
 import { useKbsNotificationController } from "../../app/use-kbs-notification-controller";
 import type { DesktopPage, CustomerWorkTab } from "../../app/navigation";
@@ -196,6 +198,8 @@ export function DesktopWorkspaceRouter({
     return domain === "accommodation" || domain === "mixed" || domain === "generic";
   });
   const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
+  useMarketingScheduleStatus(enabledCapabilities.includes(C.MARKETING_STUDIO),setStatusMessage);
+  const [marketingScheduleEntry,setMarketingScheduleEntry]=useState<MessagingCampaign>();
   const [marketView, setMarketView] = useState<MarketView>("quickSale");
   const [kbsEgmSessionRequest, setKbsEgmSessionRequest] = useState(0);
   const [kbsSessionRetryNotificationId, setKbsSessionRetryNotificationId] = useState("");
@@ -510,9 +514,9 @@ export function DesktopWorkspaceRouter({
           inventoryEnabled={inventoryEnabled}
         />
       ) : activePage === "marketing" ? (
-        <MarketingPage enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} campaignsEnabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} onSettings={() => requestPageChange("settings")} />
+        <MarketingPage scheduleEntry={marketingScheduleEntry} onScheduleEntryConsumed={()=>setMarketingScheduleEntry(undefined)} enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} campaignsEnabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} onSettings={() => requestPageChange("settings")} />
       ) : activePage === "campaigns" ? (
-        <CampaignsPage enabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} />
+        <CampaignsPage onPlan={enabledCapabilities.includes(C.MARKETING_STUDIO)?campaign=>{setMarketingScheduleEntry(campaign);requestPageChange("marketing");}:undefined} enabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} />
       ) : activePage === "market" ? (
         <MarketPage
           customers={dashboardData.customers}

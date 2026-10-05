@@ -40,6 +40,11 @@ export class MarketingStudioService {
     if(value.channel === "website" && value.desiredPublished) this.scheduleSync();return value;
   }
   publish(id:string,revision:number) {this.gate();if(this.database().getMarketingPublication(id).channel === "instagram") {if(!this.instagram)throw new MarketingError("channel_unavailable","Instagram yapılandırılmamış.");return this.instagram.publish(id,revision);}this.websiteGate();const value=this.database().requestMarketingPublication(id,revision,true);desktopLog.info({scope:"marketing",event:"marketing.publish.started",message:"Website yayın niyeti kaydedildi.",operationId:id,meta:{channel:"website"}});this.scheduleSync();return value;}
+  /** Record Website's existing durable publication intent and sync job in the execution transaction. */
+  publishScheduledWebsite(executionId: string) {
+    this.websiteGate(); const value=this.database().prepareScheduledPublication(executionId);
+    this.scheduleSync(); return value;
+  }
   unpublish(id:string,revision:number) {this.gate();if(this.database().getMarketingPublication(id).channel === "instagram") throw new MarketingError("channel_unavailable","Instagram yayınını kaldırma desteklenmiyor.");this.websiteGate();const value=this.database().requestMarketingPublication(id,revision,false);this.scheduleSync();return value;}
   async testWebsite() {
     this.websiteGate();const result=await getSyncCapabilities(getWebSyncConfig(this.database().getSetupData()));

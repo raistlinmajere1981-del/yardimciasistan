@@ -2802,3 +2802,35 @@ CREATE TABLE instagram_publication_state (
   stage_token TEXT NOT NULL DEFAULT '', stage_expires_at TEXT NOT NULL DEFAULT '', stage_base_url TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX instagram_published_reference ON instagram_publication_state(provider_media_id) WHERE provider_media_id!='';
+
+-- D-040: immutable canonical publication revisions; scheduler holds references only.
+CREATE TABLE marketing_publication_revisions (
+  publication_id TEXT NOT NULL REFERENCES marketing_publications(id), revision INTEGER NOT NULL,
+  content_revision INTEGER NOT NULL, snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY(publication_id,revision)
+);
+CREATE TABLE marketing_schedules (
+  id TEXT PRIMARY KEY, business_id TEXT NOT NULL REFERENCES business(id), name TEXT NOT NULL,
+  target_type TEXT NOT NULL CHECK(target_type IN ('audience_campaign','public_publication')),
+  target_id TEXT NOT NULL, channel TEXT NOT NULL CHECK(channel IN ('website','instagram','whatsapp','sms')),
+  target_revision INTEGER, content_revision INTEGER,
+  schedule_type TEXT NOT NULL CHECK(schedule_type IN ('once','recurring')), timezone TEXT NOT NULL,
+  starts_at TEXT NOT NULL, starts_local TEXT NOT NULL, recurrence_json TEXT,
+  status TEXT NOT NULL CHECK(status IN ('active','paused','completed','cancelled')),
+  missed_run_policy TEXT NOT NULL CHECK(missed_run_policy IN ('run_once_when_resumed','skip')),
+  next_run_at TEXT NOT NULL, last_run_at TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  CHECK(schedule_type='once' OR channel IN ('website','instagram')),
+  CHECK((target_type='audience_campaign' AND channel IN ('whatsapp','sms') AND target_revision IS NULL)
+     OR (target_type='public_publication' AND channel IN ('website','instagram') AND target_revision IS NOT NULL)),
+  FOREIGN KEY(target_id,target_revision) REFERENCES marketing_publication_revisions(publication_id,revision)
+);
+CREATE INDEX idx_marketing_schedules_due ON marketing_schedules(business_id,status,next_run_at);
+CREATE TABLE marketing_schedule_executions (
+  id TEXT PRIMARY KEY, schedule_id TEXT NOT NULL REFERENCES marketing_schedules(id), occurrence_key TEXT NOT NULL,
+  planned_at TEXT NOT NULL, claimed_at TEXT NOT NULL DEFAULT '', completed_at TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL CHECK(status IN ('pending','claimed','succeeded','skipped','failed')),
+  result_reference TEXT, action_revision INTEGER, last_error TEXT NOT NULL DEFAULT '' CHECK(length(last_error)<=160),
+  created_at TEXT NOT NULL, UNIQUE(schedule_id,occurrence_key)
+);
+CREATE INDEX idx_marketing_schedule_executions_recovery ON marketing_schedule_executions(status,schedule_id);

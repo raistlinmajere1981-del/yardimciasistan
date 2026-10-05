@@ -30,7 +30,11 @@ export function assetUsage(db: DatabaseSync, id: string): {usageCount:number;act
     JOIN marketing_publication_media m ON m.publication_id=p.id WHERE m.media_asset_id=? AND p.business_id=?`).all(id,business(db));
   const snapshots = db.prepare("SELECT id,published_snapshot_json FROM marketing_publications WHERE business_id=?").all(business(db))
     .filter(r => (JSON.parse(String(r.published_snapshot_json)).mediaAssetIds ?? []).includes(id));
-  return {usageCount:contentCount+variantCount+new Set([...pubs.map(p => String(p.id)),...snapshots.map(r => String(r.id)),...pending]).size,
+  const planned = db.prepare(`SELECT s.id,r.snapshot_json FROM marketing_schedules s JOIN marketing_publication_revisions r
+    ON r.publication_id=s.target_id AND r.revision=s.target_revision WHERE s.business_id=? AND
+    (s.status IN ('active','paused') OR EXISTS(SELECT 1 FROM marketing_schedule_executions e WHERE e.schedule_id=s.id AND e.status IN ('pending','claimed')))`)
+    .all(business(db)).filter(r=>(JSON.parse(String(r.snapshot_json)).mediaAssetIds ?? []).includes(id)).length;
+  return {usageCount:contentCount+variantCount+planned+new Set([...pubs.map(p => String(p.id)),...snapshots.map(r => String(r.id)),...pending]).size,
     activePublicationCount:new Set([...pubs.filter(p => Number(p.desired_published)===1).map(p => String(p.id)),...snapshots.map(r => String(r.id)),...pending]).size};
 }
 export function manageMediaAsset(db: DatabaseSync, id: string, action: "archive" | "delete", altText?: string): void {

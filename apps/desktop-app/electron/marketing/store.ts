@@ -86,7 +86,7 @@ export function getMarketingPublication(db: DatabaseSync, id: string): Marketing
 export function listMarketingPublications(db: DatabaseSync): MarketingPublication[] {
   return db.prepare("SELECT * FROM marketing_publications WHERE business_id=? ORDER BY created_at DESC,id").all(business(db)).map(r => publicationRow(db,r));
 }
-export function saveMarketingPublication(db: DatabaseSync, input: MarketingPublicationInput): MarketingPublication {
+export function saveMarketingPublication(db: DatabaseSync, input: MarketingPublicationInput, retainedMediaIds: readonly string[] = []): MarketingPublication {
   return transaction(db, () => {
     marketingChannel(input.channel);
     if (!(["website", "instagram"].includes(input.channel)) || input.placement !== "homepage_feature") throw new MarketingError("channel_unavailable", "Bu kanal henüz yayın desteklemiyor.");
@@ -102,7 +102,7 @@ export function saveMarketingPublication(db: DatabaseSync, input: MarketingPubli
     const content = getMarketingContent(db,input.contentId).content;
     if (content.status === "archived") throw new MarketingError("archived_content", "Arşivlenmiş içerik yayınlanamaz.");
     if (old && old.contentId !== content.id) throw new MarketingError("invalid_input", "Yayının içerik kimliği değiştirilemez.");
-    const ids = marketingAssetIds(input.mediaAssetIds); validateAssets(db,ids,old?.mediaAssetIds);
+    const ids = marketingAssetIds(input.mediaAssetIds); validateAssets(db,ids,[...(old?.mediaAssetIds??[]),...retainedMediaIds]);
     if (input.channel === "instagram" && ids.length !== 1) throw new MarketingError("invalid_media", "Instagram için bir görsel seçin.");
     const title = marketingText(input.title,240,true), text = marketingText(input.text,input.channel === "instagram" ? 2200 : 12000,input.channel === "website");
     const id = old?.id ?? `publication_${randomUUID()}`, now = new Date().toISOString();
@@ -113,7 +113,7 @@ export function saveMarketingPublication(db: DatabaseSync, input: MarketingPubli
     db.prepare("DELETE FROM marketing_publication_media WHERE publication_id=?").run(id);
     ids.forEach((assetId,index) => db.prepare("INSERT INTO marketing_publication_media VALUES(?,?,?)").run(id,assetId,index));
     if (old?.desiredPublished && old.channel === "website") {retainPendingMedia(db,old);retainPendingMedia(db,getMarketingPublication(db,id));queueSyncJob(db,"marketing_website_publish");}
-    return getMarketingPublication(db,id);
+    const saved=getMarketingPublication(db,id); captureMarketingPublicationRevision(db,saved); return saved;
   });
 }
 export function requestMarketingPublication(db: DatabaseSync, id: string, expected: number, published: boolean): MarketingPublication {
@@ -147,4 +147,11 @@ export function failMarketingPublications(db: DatabaseSync, sent: MarketingPubli
 /** Local-only redaction vocabulary. This list never enters provider requests. */
 export function marketingPrivateNames(db: DatabaseSync): string[] {
   return db.prepare("SELECT full_name FROM customers WHERE full_name<>''").all().map(r => String(r.full_name));
+}
+
+/** Canonical editorial revision history; no provider state, bytes or scheduler-owned content copy. */
+export function captureMarketingPublicationRevision(db: DatabaseSync,p: MarketingPublication): void {
+  const content=getMarketingContent(db,p.contentId).content;
+  db.prepare("INSERT INTO marketing_publication_revisions(publication_id,revision,content_revision,snapshot_json,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING")
+    .run(p.id,p.revision,content.revision,JSON.stringify({contentId:p.contentId,channel:p.channel,placement:p.placement,title:p.title,text:p.text,mediaAssetIds:p.mediaAssetIds}),new Date().toISOString());
 }

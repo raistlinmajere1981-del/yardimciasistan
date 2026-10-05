@@ -38,6 +38,7 @@ export interface MarketingChannelDefinition {
   requiresAudience: boolean; requiresConsent: boolean; supportsConnectionTest: boolean;
   displayName: string; enabled: boolean; configured: boolean;
   supportsText: boolean; supportsImages: boolean; maxImages: number;
+  supportsScheduling: boolean; supportsRecurringScheduling: boolean;
   supportsDirectPublish: boolean; supportsUnpublish: boolean; supportsEditPublished: boolean;
   connectionTestAvailable: boolean; state: "ready" | "unconfigured" | "planned" | "disabled";
 }
