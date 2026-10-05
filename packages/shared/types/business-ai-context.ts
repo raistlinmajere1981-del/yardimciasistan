@@ -126,7 +126,7 @@ export function getUnsupportedBusinessAiDomain(
   const accommodationIntent = requestType === "pension_reservation"
     || /(^|\s)(pansiyon|konaklama|geceleme)(\s|$)/u.test(normalized)
     || (/(^|\s)oda(\s|$)/u.test(normalized)
-      && /(^|\s)(musait|bos|rezerv|gece|kisi|konak|kalma|yatak|var)(\s|$)/u.test(normalized));
+      && /(^|\s)(musait|bos|rezerv|gece|kisi|konak|kalma|yatak|yatak)(\s|$)/u.test(normalized));
   if (accommodationIntent && !hasAccommodation) {
     return "accommodation";
   }
