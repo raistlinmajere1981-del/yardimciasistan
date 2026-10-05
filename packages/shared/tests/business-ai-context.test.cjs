@@ -2,7 +2,8 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   BUSINESS_CAPABILITIES,
-  createBusinessAiContext
+  createBusinessAiContext,
+  getUnsupportedBusinessAiDomain
 } = require("../dist");
 
 const publicProfile = {
@@ -53,6 +54,13 @@ test("market AI context keeps general business facts and drops hospitality-only 
   assert.deepEqual(context.socialLinks, [
     { platform: "instagram", url: "https://instagram.com/testpansiyon" }
   ]);
+  assert.deepEqual(context.capabilityIds, [
+    BUSINESS_CAPABILITIES.CATALOG,
+    BUSINESS_CAPABILITIES.INVENTORY,
+    BUSINESS_CAPABILITIES.RETAIL_BARCODE,
+    BUSINESS_CAPABILITIES.SALES,
+    BUSINESS_CAPABILITIES.WHATSAPP
+  ].sort());
   assert.equal(context.checkInTime, "");
   assert.equal(context.checkOutTime, "");
   assert.equal(context.breakfastStartTime, "");
@@ -82,4 +90,47 @@ test("hospitality AI context keeps accommodation facts and hides disabled WhatsA
   assert.equal(context.breakfastStartTime, "08:00");
   assert.equal(context.whatsappEnabled, false);
   assert.equal(context.whatsapp, "");
+});
+
+
+test("AI domain guard blocks hospitality intent when capabilities do not expose that domain", () => {
+  const market = [
+    BUSINESS_CAPABILITIES.CATALOG,
+    BUSINESS_CAPABILITIES.INVENTORY,
+    BUSINESS_CAPABILITIES.SALES,
+    BUSINESS_CAPABILITIES.RETAIL_BARCODE
+  ];
+  assert.equal(
+    getUnsupportedBusinessAiDomain(market, "general_info", "yarın için 2 kişilik müsait oda var mı"),
+    "accommodation"
+  );
+  assert.equal(
+    getUnsupportedBusinessAiDomain(market, "pension_reservation", "yarın geliriz"),
+    "accommodation"
+  );
+  assert.equal(
+    getUnsupportedBusinessAiDomain(market, "restaurant_reservation", "iki kişilik masa"),
+    "food_service"
+  );
+  assert.equal(
+    getUnsupportedBusinessAiDomain(market, "general_info", "bu ürün stokta var mı"),
+    null
+  );
+});
+
+test("AI domain guard honors composed capabilities instead of profile assumptions", () => {
+  const composed = [
+    BUSINESS_CAPABILITIES.CATALOG,
+    BUSINESS_CAPABILITIES.SALES,
+    BUSINESS_CAPABILITIES.RETAIL_BARCODE,
+    BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS
+  ];
+  assert.equal(
+    getUnsupportedBusinessAiDomain(composed, "general_info", "yarın müsait oda var mı"),
+    null
+  );
+  assert.equal(
+    getUnsupportedBusinessAiDomain(composed, "restaurant_reservation", "masa ayırtmak istiyorum"),
+    "food_service"
+  );
 });

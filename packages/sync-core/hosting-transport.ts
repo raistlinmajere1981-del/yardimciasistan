@@ -324,6 +324,7 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
         platform: link.platform,
         url: link.url
       })),
+      capability_ids: options.context.capabilityIds ?? [],
       check_in_time: options.context.checkInTime,
       check_out_time: options.context.checkOutTime,
       breakfast_start_time: options.context.breakfastStartTime,

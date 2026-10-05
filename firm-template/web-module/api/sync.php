@@ -1452,6 +1452,7 @@ function ya_sync_publish_business_context(array $payload): void
         'features' => $features,
         'feature_ids' => $featureIds,
         'social_links' => $socialLinks,
+        'capability_ids' => ya_sync_sanitize_business_capabilities($candidate['capability_ids'] ?? []),
         'check_in_time' => mb_substr(ya_sync_string($candidate['check_in_time'] ?? ''), 0, 5),
         'check_out_time' => mb_substr(ya_sync_string($candidate['check_out_time'] ?? ''), 0, 5),
         'breakfast_start_time' => mb_substr(ya_sync_string($candidate['breakfast_start_time'] ?? ''), 0, 5),

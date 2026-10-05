@@ -961,6 +961,7 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
       features: [],
       featureIds: [],
       socialLinks: [],
+      capabilityIds: ["commerce.catalog", "commerce.inventory", "commerce.sales", "retail.barcode"],
       checkInTime: "",
       checkOutTime: "",
       breakfastStartTime: "",
@@ -977,6 +978,7 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
   assert.deepEqual(calls[0].body.business_context.features, []);
   assert.deepEqual(calls[0].body.business_context.feature_ids, []);
   assert.deepEqual(calls[0].body.business_context.social_links, []);
+  assert.deepEqual(calls[0].body.business_context.capability_ids, ["commerce.catalog", "commerce.inventory", "commerce.sales", "retail.barcode"]);
   assert.equal(calls[0].body.business_context.latitude, 41.1);
   assert.equal(calls[0].body.business_context.mapDisplayMode, "google_maps_embed");
   assert.equal(calls[0].body.business_context.googleMapsEmbedUrl, "https://www.google.com/maps/embed?pb=test");

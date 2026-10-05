@@ -37,6 +37,7 @@ export interface BusinessAiContext {
   features: string[];
   featureIds: string[];
   socialLinks: BusinessSocialLink[];
+  capabilityIds?: BusinessCapability[];
   checkInTime: string;
   checkOutTime: string;
   breakfastStartTime: string;
@@ -91,6 +92,7 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
     features: normalizedFeatureIds.map(getBusinessPublicFeatureLabel),
     featureIds: normalizedFeatureIds,
     socialLinks: normalizeBusinessSocialLinks(source.publicProfile.socialLinks),
+    capabilityIds: [...enabled].sort(),
     checkInTime: hasAccommodation ? source.publicProfile.checkInTime : "",
     checkOutTime: hasAccommodation ? source.publicProfile.checkOutTime : "",
     breakfastStartTime: hasAccommodation ? source.publicProfile.breakfastStartTime : "",
@@ -100,4 +102,59 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
 
 function cleanText(value: unknown, maxLength: number): string {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+
+export type BusinessAiUnsupportedDomain = "accommodation" | "food_service";
+
+/**
+ * Hard domain guard for AI reply surfaces. Request labels can be generic or stale,
+ * so strong intent in the message is evaluated against the persisted capability set.
+ */
+export function getUnsupportedBusinessAiDomain(
+  capabilities: Iterable<BusinessCapability>,
+  requestType: string,
+  message: string
+): BusinessAiUnsupportedDomain | null {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  const normalized = normalizeIntentText(message);
+  const hasAccommodation = enabled.has(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS);
+  const hasFoodService = enabled.has(BUSINESS_CAPABILITIES.FOOD_TABLES)
+    || enabled.has(BUSINESS_CAPABILITIES.FOOD_MENU)
+    || enabled.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
+
+  const accommodationIntent = requestType === "pension_reservation"
+    || /(^|\s)(oda|pansiyon|konaklama|geceleme)(\s|$)/u.test(normalized);
+  if (accommodationIntent && !hasAccommodation) {
+    return "accommodation";
+  }
+
+  const breakfastIntent = requestType === "breakfast_request"
+    || /(^|\s)kahvalti(\s|$)/u.test(normalized);
+  if (breakfastIntent && !hasAccommodation && !hasFoodService) {
+    return "food_service";
+  }
+
+  const foodIntent = requestType === "restaurant_reservation"
+    || /(^|\s)(restoran|restaurant)(\s|$)/u.test(normalized)
+    || /masa\s+(rezerv|ayirt|musait)/u.test(normalized)
+    || /aksam\s+yemegi/u.test(normalized);
+  if (foodIntent && !hasFoodService) {
+    return "food_service";
+  }
+
+  if (requestType === "qr_menu_question" && !enabled.has(BUSINESS_CAPABILITIES.FOOD_MENU)) {
+    return "food_service";
+  }
+
+  return null;
+}
+
+function normalizeIntentText(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[çğıöşü]/g, (letter) => ({ ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" }[letter] ?? letter))
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }

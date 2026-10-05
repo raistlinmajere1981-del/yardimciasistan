@@ -62,6 +62,7 @@ const messageWorkspaceSource = source("apps/desktop-app/src/components/messages/
 const messagingControllerSource = source("apps/desktop-app/src/app/use-messaging-controller.ts");
 const dashboardSource = source("apps/desktop-app/src/pages/DashboardPage.tsx");
 const systemHealthSource = source("apps/desktop-app/src/components/dashboard/SystemHealthPanel.tsx");
+const businessAiServiceSource = source("apps/desktop-app/electron/business-ai-service.ts");
 const androidMainSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/MainActivity.java");
 const androidUiRulesSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidUiRules.java");
 const androidSyncControllerSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidOperationsSyncController.java");
@@ -69,6 +70,7 @@ const androidFinanceSource = source("apps/android-app/src/main/java/com/yardimci
 const androidSyncClientSource = source("apps/android-app/src/main/java/com/yardimciasistan/android/HostingSyncClient.java");
 const androidActivitySource = source("apps/android-app/src/main/java/com/yardimciasistan/android/MainActivity.java");
 const hostingSyncSource = source("firm-template/web-module/api/sync.php");
+const webChatSource = source("firm-template/web-module/api/chat.php");
 const menuCssSource = source("apps/desktop-app/src/styles/pages/menu.css");
 const testSiteHeaderSource = source("test-site/landing/inc/site.php");
 const testSiteQrMenuSource = source("test-site/landing/assets/js/qr-menu.js");
@@ -546,6 +548,26 @@ assert.match(
   "reports presentation keeps the finance-driven Kasa/Raporlar title"
 );
 assert.doesNotMatch(navigationSource, /bekleyen oda alacaklarını/, "folio copy must not live in navigation presentation");
+assert.match(
+  businessAiServiceSource,
+  /getUnsupportedBusinessAiDomain\(capabilities, request\.request_type, request\.message\)/,
+  "owner reply AI must hard-guard unsupported sector intent before provider generation"
+);
+assert.match(
+  businessAiServiceSource,
+  /return database\.saveRequestAiSuggestion\([\s\S]{0,700}missingFields:\s*\[\]/,
+  "unsupported sector intent must save a deterministic local reply instead of calling the provider"
+);
+assert.match(
+  webChatSource,
+  /ya_chat_unsupported_business_domain\([\s\S]{0,1200}unsupported_business_domain/,
+  "web chat must enforce the same unsupported-domain guard before provider generation"
+);
+assert.match(
+  webChatSource,
+  /capability_ids[\s\S]{0,3200}accommodation\.rooms[\s\S]{0,3200}food_service\.tables/,
+  "web chat domain guard must be driven by published capability ids"
+);
 
 // F — admin expands role grants, then intersects them with business capabilities.
 const marketAdmin = androidEffectivePermissionsForRole("admin", ANDROID_PERMISSIONS, marketCapabilities);

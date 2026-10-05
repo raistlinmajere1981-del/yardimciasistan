@@ -4,6 +4,7 @@ import {
 } from "@yardimci-asistan/ai-core";
 import {
   BUSINESS_CAPABILITIES,
+  getUnsupportedBusinessAiDomain,
   isOperationalTaskAvailable,
   isReservationTypeAvailable,
   type BusinessCapability
@@ -32,6 +33,20 @@ export async function createOwnerReplySuggestionForRequest(
       ok: false,
       message: "AI taslağı için talep bulunamadı."
     };
+  }
+
+  const capabilities = database.getEnabledBusinessCapabilities();
+  const unsupportedDomain = getUnsupportedBusinessAiDomain(capabilities, request.request_type, request.message);
+  if (unsupportedDomain) {
+    const customerName = request.customer_name.trim();
+    const greeting = customerName ? `Merhaba ${customerName},` : "Merhaba,";
+    const serviceLabel = unsupportedDomain === "accommodation" ? "konaklama/oda" : "restoran/masa";
+    return database.saveRequestAiSuggestion({
+      requestId: request.id,
+      summary: `${customerName || "Müşteri"}, işletmede etkin olmayan ${serviceLabel} hizmeti hakkında bilgi istiyor.`,
+      suggestedReply: `${greeting} işletmemizde ${serviceLabel} hizmeti etkin değil. Ürünlerimiz veya sunduğumuz diğer hizmetlerle ilgili başka bir konuda memnuniyetle yardımcı olabiliriz.`,
+      missingFields: []
+    });
   }
 
   const setup = database.getSetupData();
