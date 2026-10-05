@@ -515,7 +515,7 @@ try {
   expect(await disabledAiStockImport.json()).toMatchObject({ code: "android_action_capability_disabled" });
 
   const disabledAiChatPayload = {
-    message: "12 Temmuz için kesin rezervasyon yapabilir misiniz?",
+    message: "Merhaba, bilgi almak istiyorum.",
     history: [
       {
         role: "assistant",
@@ -682,6 +682,7 @@ try {
       action: "publish_business_context",
       client_id: "desktop-web-ai-context-smoke",
       business_context: {
+        capability_ids: ["commerce.catalog", "commerce.inventory", "commerce.sales", "retail.barcode"],
         version: 1,
         business_name: "Nehir Tekel",
         profile_id: "market",
@@ -1069,7 +1070,7 @@ try {
   });
 
   const metroChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
-    data: { message: "Metro var mı, fiyatı ne kadar?" }
+    data: { message: "Metro var mı?" }
   });
   expect(metroChatResponse.ok()).toBe(true);
   const metroChatResult = await metroChatResponse.json();
@@ -1099,16 +1100,27 @@ try {
   expect(catalogMissPrompt).not.toContain("Ülker Metro Klasik (50,4 g)");
   expect(catalogMissPrompt).not.toContain("Pepsi 330 ml");
 
+  const beforeUnsupportedRequests = mockAiRequests.length;
   const marketIsolationResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: { message: "Odalarınız kaç kişilik ve giriş saati kaç?" }
   });
   expect(marketIsolationResponse.ok()).toBe(true);
   const marketIsolationResult = await marketIsolationResponse.json();
+  expect(marketIsolationResult.error.code).toBe("unsupported_business_domain");
+  expect(mockAiRequests.length).toBe(beforeUnsupportedRequests);
   expect(marketIsolationResult.knowledge_files).toEqual(["firma", "sik-sorulan-sorular"]);
   const marketIsolationPrompt = String(mockAiRequests.at(-1).body.messages?.[0]?.content ?? "");
   expect(marketIsolationPrompt).toContain("Sektör: Market / Perakende");
   expect(marketIsolationPrompt).not.toContain("## Odalar");
   expect(marketIsolationPrompt).not.toContain("Giriş saati:");
+
+  const unknownDomainResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: { message: "Kuantum terapi hizmeti veriyor musunuz?" }
+  });
+  const unknownDomainResult = await unknownDomainResponse.json();
+  expect(unknownDomainResult.error.code).toBe("unrecognized_business_intent");
+  expect(unknownDomainResult.answer).toContain("doğrulayamıyorum");
+  expect(mockAiRequests.length).toBe(beforeUnsupportedRequests);
 
   const rateLimitedResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: {
@@ -1172,7 +1184,9 @@ try {
   const aiRequest = requests.find((request) => request.id === aiRequestResult.request_id);
   expect(aiRequest).toBeTruthy();
   expect(aiRequest.source).toBe("web_ai");
-  expect(aiRequest.request_type).toBe("pension_reservation");
+  expect(aiRequest.request_type).toBe("general_info");
+  expect(aiRequest.message).toContain("balkonlu oda");
+  expect(aiRequestResult.error.code).toBe("unsupported_business_domain");
   expect(aiRequest.customer_phone).toBe("+905553334455");
   expect(aiRequest.date_text).toBe("18 Temmuz");
   expect(aiRequest.time).toBe("20:00");
@@ -1197,7 +1211,7 @@ return ${toPhpArray({
   })};
 `);
   const geminiChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
-    data: { message: "Gemini authorization key testi" }
+    data: { message: "Merhaba, Gemini authorization key testi" }
   });
   expect(geminiChatResponse.ok()).toBe(true);
   const geminiChatResult = await geminiChatResponse.json();

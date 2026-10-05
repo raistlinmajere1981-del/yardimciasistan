@@ -1,0 +1,119 @@
+{
+  "domains": {
+    "accommodation": {
+      "label": "konaklama/oda",
+      "anyOf": [
+        "accommodation.rooms"
+      ]
+    },
+    "food_service": {
+      "label": "restoran",
+      "anyOf": [
+        "food_service.tables",
+        "food_service.menu",
+        "food_service.orders"
+      ]
+    },
+    "tables": {
+      "label": "masa",
+      "anyOf": [
+        "food_service.tables"
+      ]
+    },
+    "menu": {
+      "label": "menü",
+      "anyOf": [
+        "food_service.menu"
+      ]
+    },
+    "breakfast": {
+      "label": "kahvaltı",
+      "anyOf": [
+        "accommodation.rooms",
+        "food_service.tables",
+        "food_service.menu",
+        "food_service.orders"
+      ]
+    },
+    "commerce": {
+      "label": "ürün/katalog",
+      "anyOf": [
+        "commerce.catalog"
+      ]
+    },
+    "appointment": {
+      "label": "randevu",
+      "anyOf": []
+    }
+  },
+  "intents": {
+    "accommodation": {
+      "requestTypes": [
+        "pension_reservation"
+      ],
+      "patterns": [
+        "(^|\\s)(pansiyon[a-z]*|konaklama[a-z]*|geceleme[a-z]*|otel[a-z]*)(\\s|$)",
+        "(^|\\s)odalar[a-z]*(\\s|$)",
+        "(^|\\s)oda(\\s|$).*?(musait|bos|rezerv|gece|kisi|konak|kalma|yatak)",
+        "(musait|bos|rezerv|gece|kisi|konak|kalma|yatak).*?(^|\\s)oda(\\s|$)",
+        "(^|\\s)oda\\s+(var|fiyat|istiyorum)",
+        "(balkonlu|manzarali)\\s+oda(\\s|$)"
+      ]
+    },
+    "food_service": {
+      "requestTypes": [
+        "restaurant_reservation"
+      ],
+      "patterns": [
+        "(^|\\s)(restoran[a-z]*|restaurant)(\\s|$)",
+        "masa\\s+(rezerv|ayirt|musait)",
+        "aksam\\s+yemegi"
+      ]
+    },
+    "tables": {
+      "requestTypes": [
+        "restaurant_reservation"
+      ],
+      "patterns": [
+        "masa\\s+(rezerv|ayirt|musait|var|fiyat)",
+        "kisilik\\s+masa"
+      ]
+    },
+    "menu": {
+      "requestTypes": [
+        "qr_menu_question"
+      ],
+      "patterns": [
+        "(^|\\s)(menu|menunuz)(\\s|$)"
+      ]
+    },
+    "breakfast": {
+      "requestTypes": [
+        "breakfast_request"
+      ],
+      "patterns": [
+        "(^|\\s)(kahvalti[a-z]*|serpme)(\\s|$)"
+      ]
+    },
+    "commerce": {
+      "requestTypes": [],
+      "patterns": [
+        "(^|\\s)(urun[a-z]*|stok[a-z]*|satiyor|satis|katalog|barkod)(\\s|$)"
+      ]
+    },
+    "appointment": {
+      "requestTypes": [
+        "appointment"
+      ],
+      "patterns": [
+        "(^|\\s)(randevu[a-z]*|appointment)(\\s|$)"
+      ]
+    }
+  },
+  "informationPatterns": [
+    "(^|\\s)(merhaba|selam|adres|konum|ulasim|telefon|iletisim|odeme|kart|nakit|dil|saat|acik|kapali)(\\s|$)",
+    "nasil\\s+(gel|geleb)",
+    "(^|\\s)(fiyat[a-z]*|ucret[a-z]*)(\\s|$)",
+    "(^|\\s)(tanitim|kampanya|indirim)(\\s|$)"
+  ]
+}

@@ -4,7 +4,9 @@ import {
 } from "@yardimci-asistan/ai-core";
 import {
   BUSINESS_CAPABILITIES,
-  getUnsupportedBusinessAiDomain,
+  evaluateBusinessAiInput,
+  businessAiBoundaryReply,
+  buildBusinessAiAuthorityPrompt,
   isOperationalTaskAvailable,
   isReservationTypeAvailable,
   type BusinessCapability
@@ -36,22 +38,27 @@ export async function createOwnerReplySuggestionForRequest(
   }
 
   const capabilities = database.getEnabledBusinessCapabilities();
-  const unsupportedDomain = getUnsupportedBusinessAiDomain(capabilities, request.request_type, request.message);
-  if (unsupportedDomain) {
+  let decision = evaluateBusinessAiInput(capabilities, request.request_type, `${request.message}\n${instructions}`);
+  let catalogContext: ReturnType<typeof createRelevantBusinessAiCatalogContext> | undefined;
+  if (decision.kind === "unrecognized" && (capabilities.includes(BUSINESS_CAPABILITIES.CATALOG) || capabilities.includes(BUSINESS_CAPABILITIES.FOOD_MENU))) {
+    catalogContext = createRelevantBusinessAiCatalogContext(database, request.message);
+    decision = evaluateBusinessAiInput(capabilities, request.request_type, `${request.message}\n${instructions}`, catalogContext.matches.map((item) => item.source));
+  }
+  const boundaryReply = businessAiBoundaryReply(decision);
+  if (boundaryReply) {
     const customerName = request.customer_name.trim();
     const greeting = customerName ? `Merhaba ${customerName},` : "Merhaba,";
-    const serviceLabel = unsupportedDomain === "accommodation" ? "konaklama/oda" : "restoran/masa";
     return database.saveRequestAiSuggestion({
       requestId: request.id,
-      summary: `${customerName || "Müşteri"}, işletmede etkin olmayan ${serviceLabel} hizmeti hakkında bilgi istiyor.`,
-      suggestedReply: `${greeting} işletmemizde ${serviceLabel} hizmeti etkin değil. Ürünlerimiz veya sunduğumuz diğer hizmetlerle ilgili başka bir konuda memnuniyetle yardımcı olabiliriz.`,
+      summary: `${customerName || "Müşteri"}, işletmede desteklenmeyen veya doğrulanamayan hizmet hakkında bilgi istiyor.`,
+      suggestedReply: `${greeting} ${boundaryReply}`,
       missingFields: []
     });
   }
 
   const setup = database.getSetupData();
   const businessContext = createCurrentBusinessAiContext(database);
-  const catalogContext = createRelevantBusinessAiCatalogContext(database, request.message);
+  catalogContext ??= createRelevantBusinessAiCatalogContext(database, request.message);
   const config = createDesktopAiConfig(database, setup);
   const operationId = createDiagnosticOperationId("ai-owner-reply");
   const startedAt = Date.now();
@@ -259,6 +266,7 @@ function buildDailyBusinessEvaluationMessages(input: {
     "Günlük operasyonu Öncelikler, Riskler ve Önerilen Sıra başlıklarıyla değerlendir.",
     "Kesin rezervasyon, müsaitlik veya bağlayıcı fiyat onayı verme.",
     "Olmayan bilgi üretme.",
+    buildBusinessAiAuthorityPrompt(input.businessContext.capabilityIds),
     "Güncel işletme bağlamında yer almayan sektör, hizmet veya müşteri bilgilerini varsayma."
   ];
 

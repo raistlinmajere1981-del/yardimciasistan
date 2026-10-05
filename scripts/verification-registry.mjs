@@ -189,6 +189,9 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  check("business-ai-boundary", "AI business domain authority contract", "node", ["scripts/smoke-business-ai-boundary.mjs"], {
+    phase: 50, presets: ["full"], domains: ["platform", "web", "marketing"], requires: ["build-desktop", "php-lint"]
+  }),
   check("installation-registry-tests", "Installation registry sözleşmesi", "node", ["--test", "scripts/test-installation-registry.mjs"], {
     phase: 5, presets: ["dev", "full"], domains: ["platform"]
   }),

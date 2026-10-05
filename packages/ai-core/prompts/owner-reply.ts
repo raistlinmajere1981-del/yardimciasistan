@@ -1,5 +1,10 @@
 import type { AIMessage, AIProviderConfig, OwnerReplyInput, OwnerReplySuggestion } from "../types";
 import { generateConfiguredChat } from "../providers/generate-chat";
+import { evaluateBusinessAiInput, businessAiBoundaryReply, buildBusinessAiAuthorityPrompt } from "@yardimci-asistan/shared";
+
+function ownerReplyDecision(input: OwnerReplyInput) {
+  return evaluateBusinessAiInput(input.businessContext?.capabilityIds ?? [], input.requestType, `${input.message}\n${input.instructions ?? ""}`, input.catalogContext?.matches?.map((item) => item.source));
+}
 
 const requestTypeLabels: Record<string, string> = {
   general_info: "bilgi talebi",
@@ -13,6 +18,10 @@ const requestTypeLabels: Record<string, string> = {
 };
 
 export function createOwnerReplySuggestion(input: OwnerReplyInput): OwnerReplySuggestion {
+  const boundaryReply = businessAiBoundaryReply(ownerReplyDecision(input));
+  if (boundaryReply) {
+    return { summary: "Desteklenmeyen veya doğrulanamayan hizmet talebi.", missingFields: [], suggestedReply: boundaryReply, provider: "disabled", fallback: true };
+  }
   const missingFields = getMissingFields(input);
   const requestType = requestTypeLabels[input.requestType] ?? "genel talep";
   const summary = [
@@ -60,6 +69,7 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         "Müsaitlik veya bağlayıcı fiyat sorulursa ve güncel bağlamda doğrulanmış bilgi yoksa işletme sahibinin kontrol edip dönüş yapacağını belirt.",
         "Eksik bilgi varsa yalnız talebin türü için gerçekten gerekli olan bilgiyi müşteriden nazikçe iste.",
         "Güncel işletme bağlamı verilmişse onu esas al; bağlamda bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.",
+        buildBusinessAiAuthorityPrompt(input.businessContext?.capabilityIds ?? []),
         "Ürün/menü eşleşmeleri verilmişse fiyat ve bulunabilirlik sorularında yalnız bu güncel eşleşmeleri kullan; eşleşme yoksa ürün veya fiyat uydurma.",
         "Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz; eşleşme yoksa yalnız güncel katalogda doğrulanamadığını belirt ve satılmayan ürün kategorileri hakkında çıkarım yapma.",
         "Yanıtı sadece JSON olarak ver: {\"summary\":\"...\",\"missingFields\":[\"...\"],\"suggestedReply\":\"...\"}.",
@@ -89,6 +99,8 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
 
 export async function generateOwnerReplySuggestion(input: OwnerReplyInput, config: AIProviderConfig, fetchImpl?: typeof fetch): Promise<OwnerReplySuggestion> {
   const fallbackSuggestion = createOwnerReplySuggestion(input);
+
+  if (businessAiBoundaryReply(ownerReplyDecision(input))) return fallbackSuggestion;
 
   if (!config.enabled || config.provider === "disabled") {
     return fallbackSuggestion;

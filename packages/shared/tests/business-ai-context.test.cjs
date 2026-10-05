@@ -3,7 +3,10 @@ const test = require("node:test");
 const {
   BUSINESS_CAPABILITIES,
   createBusinessAiContext,
-  getUnsupportedBusinessAiDomain
+  evaluateBusinessAiInput,
+  canBusinessSpeakForAiDomain,
+  detectBusinessAiDomainMentions,
+  BUSINESS_AI_DOMAIN_POLICY
 } = require("../dist");
 
 const publicProfile = {
@@ -101,24 +104,24 @@ test("AI domain guard blocks hospitality intent when capabilities do not expose 
     BUSINESS_CAPABILITIES.RETAIL_BARCODE
   ];
   assert.equal(
-    getUnsupportedBusinessAiDomain(market, "general_info", "yarın için 2 kişilik müsait oda var mı"),
+    evaluateBusinessAiInput(market, "general_info", "yarın için 2 kişilik müsait oda var mı").domain,
     "accommodation"
   );
   assert.equal(
-    getUnsupportedBusinessAiDomain(market, "pension_reservation", "yarın geliriz"),
+    evaluateBusinessAiInput(market, "pension_reservation", "yarın geliriz").domain,
     "accommodation"
   );
   assert.equal(
-    getUnsupportedBusinessAiDomain(market, "restaurant_reservation", "iki kişilik masa"),
+    evaluateBusinessAiInput(market, "restaurant_reservation", "iki kişilik masa").domain,
     "food_service"
   );
   assert.equal(
-    getUnsupportedBusinessAiDomain(market, "general_info", "bu ürün stokta var mı"),
-    null
+    evaluateBusinessAiInput(market, "general_info", "bu ürün stokta var mı").kind,
+    "supported"
   );
   assert.equal(
-    getUnsupportedBusinessAiDomain(market, "general_info", "oda spreyi stokta var mı"),
-    null
+    evaluateBusinessAiInput(market, "general_info", "oda spreyi stokta var mı").kind,
+    "supported"
   );
 });
 
@@ -130,11 +133,70 @@ test("AI domain guard honors composed capabilities instead of profile assumption
     BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS
   ];
   assert.equal(
-    getUnsupportedBusinessAiDomain(composed, "general_info", "yarın müsait oda var mı"),
-    null
+    evaluateBusinessAiInput(composed, "general_info", "yarın müsait oda var mı").kind,
+    "supported"
   );
   assert.equal(
-    getUnsupportedBusinessAiDomain(composed, "restaurant_reservation", "masa ayırtmak istiyorum"),
+    evaluateBusinessAiInput(composed, "restaurant_reservation", "masa ayırtmak istiyorum").domain,
     "food_service"
   );
+});
+
+test("mention detection never supplies business support; unknown domains fail closed", () => {
+  assert.deepEqual(detectBusinessAiDomainMentions("", "Konaklama istiyorum"), ["accommodation"]);
+  assert.equal(canBusinessSpeakForAiDomain([], "accommodation"), false);
+  assert.equal(canBusinessSpeakForAiDomain([BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS], "accommodation"), true);
+  for (const domain of ["quantum_spa", "new_domain", "toString", "__proto__"]) {
+    assert.equal(canBusinessSpeakForAiDomain(Object.values(BUSINESS_CAPABILITIES), domain), false);
+  }
+  assert.equal(evaluateBusinessAiInput([], "", "Kuantum terapi hizmeti veriyor musunuz?").kind, "unrecognized");
+  assert.equal(evaluateBusinessAiInput([], "new_service_request", "Holografik terapi istiyorum").kind, "unrecognized");
+  assert.equal(evaluateBusinessAiInput([], "general_info", "Merhaba").kind, "information");
+  assert.equal(evaluateBusinessAiInput([BUSINESS_CAPABILITIES.CATALOG], "", "Pepsi var mı?", ["catalog"]).kind, "supported");
+  assert.equal(evaluateBusinessAiInput([], "", "Pepsi var mı?", ["catalog"]).kind, "unsupported");
+  assert.equal(evaluateBusinessAiInput([BUSINESS_CAPABILITIES.CATALOG], "", "Çorba var mı?", ["menu"]).kind, "unsupported");
+});
+
+test("profile/service/verified labels cannot turn descriptions into capabilities", () => {
+  const context = createBusinessAiContext({
+    businessName: "Restoran Otel", profileId: "pension_restaurant", phone: "", whatsapp: "", email: "", address: "",
+    enabledCapabilities: [], publicProfile: { ...publicProfile, description: "Konaklama, restoran ve randevu sunarız." }
+  });
+  // These fields do not exist in the product; even a foreign caller's metadata is not authority.
+  Object.assign(context, { offeredServices: ["konaklama"], tenantVerticals: ["hotel"], verifiedDomains: ["accommodation"] });
+  assert.deepEqual(context.capabilityIds, []);
+  assert.equal(evaluateBusinessAiInput(context.capabilityIds, "", "Konaklama istiyorum").kind, "unsupported");
+  assert.equal(canBusinessSpeakForAiDomain(context.capabilityIds, "accommodation"), false);
+});
+
+test("breakfast amenity exception and appointment denial are explicit", () => {
+  const rooms = [BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS];
+  assert.equal(evaluateBusinessAiInput(rooms, "breakfast_request", "Kahvaltı var mı?").kind, "supported");
+  assert.equal(canBusinessSpeakForAiDomain(rooms, "food_service"), false);
+  assert.equal(evaluateBusinessAiInput(rooms, "restaurant_reservation", "").kind, "unsupported");
+  assert.equal(evaluateBusinessAiInput([], "breakfast_request", "").kind, "unsupported");
+  assert.equal(evaluateBusinessAiInput([BUSINESS_CAPABILITIES.CALENDAR, BUSINESS_CAPABILITIES.TASKS], "", "Randevu almak istiyorum").kind, "unsupported");
+  assert.equal(canBusinessSpeakForAiDomain(Object.values(BUSINESS_CAPABILITIES), "appointment"), false);
+  assert.equal(evaluateBusinessAiInput(rooms, "qr_menu_question", "").kind, "unsupported");
+  assert.equal(evaluateBusinessAiInput([BUSINESS_CAPABILITIES.FOOD_MENU], "qr_menu_question", "").kind, "supported");
+  assert.equal(evaluateBusinessAiInput([BUSINESS_CAPABILITIES.FOOD_MENU], "restaurant_reservation", "Masa ayırtmak istiyorum").domain, "tables");
+  assert.equal(canBusinessSpeakForAiDomain([BUSINESS_CAPABILITIES.FOOD_MENU], "tables"), false);
+  assert.equal(evaluateBusinessAiInput([BUSINESS_CAPABILITIES.FOOD_TABLES], "general_info", "Bu akşam 4 kişilik masa var mı?").kind, "supported");
+  assert.equal(evaluateBusinessAiInput([], "general_info", "Bu akşam 4 kişilik masa var mı?").domain, "tables");
+  for (const text of ["Balkonlu oda var mı?", "Konaklamanız hakkında bilgi istiyorum"]) {
+    assert.equal(evaluateBusinessAiInput(rooms, "general_info", text).kind, "supported");
+    assert.equal(evaluateBusinessAiInput([], "general_info", text).kind, "unsupported");
+  }
+  assert.equal(evaluateBusinessAiInput([BUSINESS_CAPABILITIES.CATALOG], "general_info", "Oda spreyi var mı?").kind, "unrecognized");
+});
+
+test("every AI capability reference belongs to the canonical registry", () => {
+  const ids = new Set(Object.values(BUSINESS_CAPABILITIES));
+  for (const rule of Object.values(BUSINESS_AI_DOMAIN_POLICY)) {
+    for (const id of rule.anyOf) assert.ok(ids.has(id), `Unregistered AI capability: ${id}`);
+  }
+  for (const [domain, rule] of Object.entries(BUSINESS_AI_DOMAIN_POLICY)) {
+    assert.equal(canBusinessSpeakForAiDomain([], domain), false);
+    for (const id of rule.anyOf) assert.equal(canBusinessSpeakForAiDomain([id], domain), true);
+  }
 });

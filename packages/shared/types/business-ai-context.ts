@@ -14,6 +14,7 @@ import {
   type BusinessSocialLink
 } from "./business-public-profile";
 import type { BusinessType } from "./business";
+import { canBusinessSpeakForAiDomain } from "./business-ai-policy";
 
 export const BUSINESS_AI_CONTEXT_VERSION = 1 as const;
 
@@ -37,7 +38,8 @@ export interface BusinessAiContext {
   features: string[];
   featureIds: string[];
   socialLinks: BusinessSocialLink[];
-  capabilityIds?: BusinessCapability[];
+  /** Functional business truth. Profile labels and descriptions never grant capabilities. */
+  capabilityIds: BusinessCapability[];
   checkInTime: string;
   checkOutTime: string;
   breakfastStartTime: string;
@@ -60,10 +62,8 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
   const enabled = source.enabledCapabilities instanceof Set
     ? source.enabledCapabilities
     : new Set(source.enabledCapabilities);
-  const hasAccommodation = hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS);
-  const hasFoodService = hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_MENU)
-    || hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_TABLES)
-    || hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_ORDERS);
+  const hasAccommodation = canBusinessSpeakForAiDomain(enabled, "accommodation");
+  const hasFoodService = canBusinessSpeakForAiDomain(enabled, "food_service");
   const hospitalityDetailsRelevant = hasAccommodation || hasFoodService;
   const normalizedFeatureIds = hospitalityDetailsRelevant
     ? normalizeBusinessPublicFeatures(source.publicProfile.features)
@@ -102,70 +102,4 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
 
 function cleanText(value: unknown, maxLength: number): string {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, maxLength);
-}
-
-
-export type BusinessAiUnsupportedDomain = "accommodation" | "food_service";
-
-/**
- * Hard domain guard for AI reply surfaces. Request labels can be generic or stale,
- * so strong intent in the message is evaluated against the persisted capability set.
- */
-export function getUnsupportedBusinessAiDomain(
-  capabilities: Iterable<BusinessCapability>,
-  requestType: string,
-  message: string
-): BusinessAiUnsupportedDomain | null {
-  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
-  const normalized = normalizeIntentText(message);
-  const hasAccommodation = enabled.has(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS);
-  const hasFoodService = enabled.has(BUSINESS_CAPABILITIES.FOOD_TABLES)
-    || enabled.has(BUSINESS_CAPABILITIES.FOOD_MENU)
-    || enabled.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
-
-  const accommodationIntent = requestType === "pension_reservation"
-    || /(^|\s)(pansiyon|konaklama|geceleme)(\s|$)/u.test(normalized)
-    || (/(^|\s)oda(\s|$)/u.test(normalized)
-      && /(^|\s)(musait|bos|rezerv|gece|kisi|konak|kalma|yatak|yatak)(\s|$)/u.test(normalized));
-  if (accommodationIntent && !hasAccommodation) {
-    return "accommodation";
-  }
-
-  const breakfastIntent = requestType === "breakfast_request"
-    || /(^|\s)kahvalti(\s|$)/u.test(normalized);
-  if (breakfastIntent && !hasAccommodation && !hasFoodService) {
-    return "food_service";
-  }
-
-  const foodIntent = requestType === "restaurant_reservation"
-    || /(^|\s)(restoran|restaurant)(\s|$)/u.test(normalized)
-    || /masa\s+(rezerv|ayirt|musait)/u.test(normalized)
-    || /aksam\s+yemegi/u.test(normalized);
-  if (foodIntent && !hasFoodService) {
-    return "food_service";
-  }
-
-  if (requestType === "qr_menu_question" && !enabled.has(BUSINESS_CAPABILITIES.FOOD_MENU)) {
-    return "food_service";
-  }
-
-  return null;
-}
-
-const TURKISH_INTENT_REPLACEMENTS: Record<string, string> = {
-  ç: "c",
-  ğ: "g",
-  ı: "i",
-  ö: "o",
-  ş: "s",
-  ü: "u"
-};
-
-function normalizeIntentText(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .replace(/[çğıöşü]/g, (letter) => TURKISH_INTENT_REPLACEMENTS[letter] ?? letter)
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 }

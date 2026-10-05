@@ -66,6 +66,8 @@ const requiredFiles = [
   "api/android-stock-image-analysis.php",
   "api/android-identity-image-analysis.php",
   "lib/storage.php",
+  "lib/business-ai-policy.php",
+  "lib/business-ai-policy.json",
   "lib/online-catalog.php",
   "lib/online-order.php",
   "lib/google-reviews.php",

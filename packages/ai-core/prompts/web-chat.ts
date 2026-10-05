@@ -1,5 +1,6 @@
 import type { AICompletionResult, AIMessage, AIProviderConfig, WebChatRequest } from "../types";
 import { generateConfiguredChat } from "../providers/generate-chat";
+import { evaluateBusinessAiInput, businessAiBoundaryReply, buildBusinessAiAuthorityPrompt } from "@yardimci-asistan/shared";
 
 const FALLBACK_WEB_ANSWER = "AI yardımcı şu anda aktif değil. Talebinizi form veya WhatsApp üzerinden iletebilirsiniz; işletme sahibi müsaitlik ve fiyat bilgisini kontrol edip dönüş yapacaktır.";
 
@@ -25,7 +26,7 @@ export function buildWebChatMessages(request: WebChatRequest): AIMessage[] {
   ];
 }
 
-export function buildWebChatSystemPrompt(request: Pick<WebChatRequest, "businessName" | "knowledgeDocuments">): string {
+export function buildWebChatSystemPrompt(request: Pick<WebChatRequest, "businessName" | "knowledgeDocuments" | "businessContext">): string {
   const knowledge = request.knowledgeDocuments
     .map((document) => [`## ${document.title}`, document.content].join("\n"))
     .join("\n\n");
@@ -38,6 +39,7 @@ export function buildWebChatSystemPrompt(request: Pick<WebChatRequest, "business
     "Eksik tarih, saat, kişi sayısı, telefon veya tercih bilgisi varsa en fazla iki kısa soru sor.",
     "Gerekirse talep formuna veya WhatsApp'a yönlendir.",
     "Bilmediğin konuda tahmin yürütme; işletme sahibinin dönüş yapacağını söyle.",
+    buildBusinessAiAuthorityPrompt(request.businessContext?.capabilityIds ?? []),
     "",
     "Firma bilgileri:",
     knowledge || "Firma bilgi dosyası bulunamadı."
@@ -45,6 +47,8 @@ export function buildWebChatSystemPrompt(request: Pick<WebChatRequest, "business
 }
 
 export async function generateWebChatReply(request: WebChatRequest, config: AIProviderConfig, fetchImpl?: typeof fetch): Promise<AICompletionResult> {
+  const boundaryReply = businessAiBoundaryReply(evaluateBusinessAiInput(request.businessContext?.capabilityIds ?? [], "", request.message));
+  if (boundaryReply) return { ok: true, provider: "disabled", fallback: true, answer: boundaryReply };
   if (!config.enabled || config.provider === "disabled") {
     return {
       ok: true,

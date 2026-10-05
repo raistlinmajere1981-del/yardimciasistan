@@ -6,7 +6,7 @@ import { chromium, expect } from '@playwright/test';
 import { createServer } from 'vite';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { marketingFixture } from './test-helpers/marketing-fixtures.mjs';
-const f=marketingFixture({ai:true});f.state.selected=[f.uploadPath];
+const f=marketingFixture({ai:true});f.state.selected=[f.uploadPath];f.state.response='Ürün kampanyası';
 let browser,server;
 try {
   server=await createServer({root:resolve('apps/desktop-app'),configFile:resolve('apps/desktop-app/vite.renderer.config.ts'),logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();browser=await launchChromiumForSmoke(chromium);
@@ -23,11 +23,11 @@ try {
   await page.getByRole('button',{name:'Düzenlemeye dön',exact:true}).click();await expect(page.getByLabel('İçerik başlığı',{exact:true})).toHaveValue('UI D4 duyuru');
   await page.getByRole('button',{name:'AI ile metin oluştur',exact:true}).click();await expect(page.getByLabel('AI taslak önizlemesi')).toBeVisible();
   await expect(page.getByLabel('Ana metin',{exact:true})).toHaveValue('Kampanya amacı');assert.equal(f.db.listMarketingPublications().length,0);
-  await page.getByRole('button',{name:'Taslağı uygula',exact:true}).click();await expect(page.getByLabel('Ana metin',{exact:true})).toHaveValue('AI aday metni');
+  await page.getByRole('button',{name:'Taslağı uygula',exact:true}).click();await expect(page.getByLabel('Ana metin',{exact:true})).toHaveValue('Ürün kampanyası');
   await page.getByRole('button',{name:'AI kanal varyantı oluştur',exact:true}).click();await page.getByRole('button',{name:'Taslağı uygula',exact:true}).click();
-  await expect(page.getByLabel('Kanal metni',{exact:true})).toHaveValue('AI aday metni');
+  await expect(page.getByLabel('Kanal metni',{exact:true})).toHaveValue('Ürün kampanyası');
   await page.getByRole('button',{name:'WhatsApp Business',exact:true}).click();await page.getByLabel('Kanal metni',{exact:true}).fill('Bağımsız WhatsApp');
-  await page.getByRole('button',{name:'Website',exact:true}).click();await expect(page.getByLabel('Kanal metni',{exact:true})).toHaveValue('AI aday metni');
+  await page.getByRole('button',{name:'Website',exact:true}).click();await expect(page.getByLabel('Kanal metni',{exact:true})).toHaveValue('Ürün kampanyası');
   await page.getByRole('button',{name:'Görsel yükle',exact:true}).click();const uploaded=f.db.listMediaAssets()[0].id;
   await chooseSearchSelect(page, 'Medya seç', { value: uploaded });
   await page.getByRole('button',{name:'AI ile görsel oluştur',exact:true}).click();await expect(page.getByLabel('AI görsel önizlemesi')).toBeVisible();

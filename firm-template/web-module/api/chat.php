@@ -9,6 +9,7 @@ const YA_AI_CONVERSATIONS_FILE = YA_BASE_DIR . '/data/ai-conversations.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
+require_once YA_BASE_DIR . '/lib/business-ai-policy.php';
 
 $businessConfig = ya_chat_load_json(YA_CONFIG_FILE, []);
 $aiConfig = is_file(YA_AI_CONFIG_FILE) ? require YA_AI_CONFIG_FILE : [];
@@ -418,23 +419,17 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
     if ($requestType === '') {
         $requestType = ya_chat_detect_request_type($message);
     }
-    $unsupportedDomain = ya_chat_unsupported_business_domain(
-        $businessContext,
-        ya_chat_string($businessConfig['profile_id'] ?? ''),
-        $requestType,
-        $message
-    );
-    if ($unsupportedDomain !== '') {
+    $decision = ya_business_ai_evaluate($businessContext['capability_ids'] ?? [], $requestType, $message, array_column($catalogContext, 'source'));
+    if (in_array($decision['kind'], ['unsupported', 'unrecognized'], true)) {
+        $unsupportedDomain = $decision['domain'] ?? '';
         return [
             'answer' => ya_chat_unsupported_business_answer($unsupportedDomain),
             'fallback' => true,
             'provider' => $provider,
             'model' => '',
             'error' => ya_chat_error(
-                'unsupported_business_domain',
-                $unsupportedDomain === 'accommodation'
-                    ? 'Bu işletmede konaklama/oda hizmeti etkin değil.'
-                    : 'Bu işletmede restoran/masa hizmeti etkin değil.',
+                $decision['kind'] === 'unsupported' ? 'unsupported_business_domain' : 'unrecognized_business_intent',
+                ya_chat_unsupported_business_answer($unsupportedDomain),
                 false
             )
         ];
@@ -555,6 +550,7 @@ function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocu
         'Gerekirse etkin kanallara yönlendir; WhatsApp kapalıysa WhatsApp önermemelisin.',
         'Bilmediğin konuda tahmin yürütme; güncel işletme bağlamında bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.',
         'Güncel işletme bağlamı, aşağıdaki ek bilgi dosyalarıyla çelişirse güncel işletme bağlamını esas al.',
+        ya_business_ai_authority_prompt($businessContext['capability_ids'] ?? []),
         'Güncel ürün/menü eşleşmeleri verilmişse fiyat ve bulunabilirlik sorularında yalnız bu eşleşmeleri kullan; eşleşme yoksa ürün veya fiyat uydurma.',
         'Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz. Eşleşme yoksa yalnız güncel katalogda doğrulayamadığını söyle; işletmenin satmadığı ürün veya ürün kategorileri hakkında çıkarım yapma.',
         '',
@@ -1292,12 +1288,8 @@ function ya_chat_extract_request(array $businessConfig, array $businessContext, 
     if ($requestType === '') {
         $requestType = ya_chat_detect_request_type($message);
     }
-    if (ya_chat_unsupported_business_domain(
-        $businessContext,
-        ya_chat_string($businessConfig['profile_id'] ?? ''),
-        $requestType,
-        $message
-    ) !== '') {
+    $decision = ya_business_ai_evaluate($businessContext['capability_ids'] ?? [], $requestType, $message);
+    if (in_array($decision['kind'], ['unsupported', 'unrecognized'], true)) {
         // Preserve the customer's message, but do not create an impossible hospitality-domain request.
         $requestType = 'general_info';
     }
@@ -1379,23 +1371,11 @@ function ya_chat_normalize_request_type(string $requestType): string
 
 function ya_chat_detect_request_type(string $text): string
 {
+    foreach (ya_business_ai_mentions('', $text) as $domain) {
+        $types = ya_business_ai_policy()['intents'][$domain]['requestTypes'];
+        if ($types !== [] && $domain !== 'appointment') return $types[0];
+    }
     $normalized = ya_chat_lower($text);
-
-    if (ya_chat_contains_any($normalized, ['kahvaltı', 'kahvalti', 'serpme'])) {
-        return 'breakfast_request';
-    }
-
-    if (ya_chat_contains_any($normalized, ['oda', 'pansiyon', 'konaklama', 'geceleme'])) {
-        return 'pension_reservation';
-    }
-
-    if (ya_chat_contains_any($normalized, ['masa', 'restoran', 'restaurant', 'akşam yemeği', 'aksam yemegi'])) {
-        return 'restaurant_reservation';
-    }
-
-    if (ya_chat_contains_any($normalized, ['menü', 'menu', 'qr'])) {
-        return 'qr_menu_question';
-    }
 
     if (ya_chat_contains_any($normalized, ['adres', 'konum', 'ulaşım', 'ulasim', 'nasıl gel', 'nasil gel'])) {
         return 'location_question';
@@ -1408,71 +1388,11 @@ function ya_chat_detect_request_type(string $text): string
     return 'general_info';
 }
 
-function ya_chat_unsupported_business_domain(array $businessContext, string $profileId, string $requestType, string $message): string
-{
-    $capabilityIds = array_values(array_filter(array_map(
-        'ya_chat_string',
-        is_array($businessContext['capability_ids'] ?? null) ? $businessContext['capability_ids'] : []
-    )));
-    $capabilities = array_fill_keys($capabilityIds, true);
-
-    // Compatibility only for already-published contexts. New publications always carry capability_ids.
-    if ($capabilities === []) {
-        if ($profileId === 'pension_restaurant') {
-            $capabilities['accommodation.rooms'] = true;
-            $capabilities['food_service.tables'] = true;
-            $capabilities['food_service.menu'] = true;
-        } elseif ($profileId === 'pension') {
-            $capabilities['accommodation.rooms'] = true;
-        } elseif ($profileId === 'restaurant') {
-            $capabilities['food_service.tables'] = true;
-            $capabilities['food_service.menu'] = true;
-        }
-    }
-
-    $hasAccommodation = isset($capabilities['accommodation.rooms']);
-    $hasFoodService = isset($capabilities['food_service.tables'])
-        || isset($capabilities['food_service.menu'])
-        || isset($capabilities['food_service.orders']);
-    $normalized = ya_chat_catalog_normalize($message);
-
-    $accommodationIntent = $requestType === 'pension_reservation'
-        || preg_match('/(^|\\s)(pansiyon|konaklama|geceleme)(\\s|$)/u', $normalized) === 1
-        || (
-            preg_match('/(^|\\s)oda(\\s|$)/u', $normalized) === 1
-            && preg_match('/(^|\\s)(musait|bos|rezerv|gece|kisi|konak|kalma|yatak|yatak)(\\s|$)/u', $normalized) === 1
-        );
-    if ($accommodationIntent && !$hasAccommodation) {
-        return 'accommodation';
-    }
-
-    $breakfastIntent = $requestType === 'breakfast_request'
-        || preg_match('/(^|\\s)kahvalti(\\s|$)/u', $normalized) === 1;
-    if ($breakfastIntent && !$hasAccommodation && !$hasFoodService) {
-        return 'food_service';
-    }
-
-    $foodIntent = $requestType === 'restaurant_reservation'
-        || preg_match('/(^|\\s)(restoran|restaurant)(\\s|$)/u', $normalized) === 1
-        || preg_match('/masa\\s+(rezerv|ayirt|musait)/u', $normalized) === 1
-        || preg_match('/aksam\\s+yemegi/u', $normalized) === 1;
-    if ($foodIntent && !$hasFoodService) {
-        return 'food_service';
-    }
-
-    if ($requestType === 'qr_menu_question' && !isset($capabilities['food_service.menu'])) {
-        return 'food_service';
-    }
-
-    return '';
-}
-
 function ya_chat_unsupported_business_answer(string $domain): string
 {
-    if ($domain === 'accommodation') {
-        return 'Bu işletmede konaklama/oda hizmeti etkin değil. Ürünlerimiz veya sunduğumuz diğer hizmetlerle ilgili başka bir konuda yardımcı olabilirim.';
-    }
-    return 'Bu işletmede restoran/masa hizmeti etkin değil. Ürünlerimiz veya sunduğumuz diğer hizmetlerle ilgili başka bir konuda yardımcı olabilirim.';
+    $rule = ya_business_ai_policy()['domains'][$domain] ?? null;
+    if (!is_array($rule)) return 'Bu hizmetin işletmemiz tarafından sunulduğunu doğrulayamıyorum. Hangi ürün veya hizmet hakkında bilgi istediğinizi netleştirebilir misiniz?';
+    return 'Bu işletmede ' . $rule['label'] . ' hizmeti etkin değil. Ürünlerimiz veya sunduğumuz diğer hizmetlerle ilgili başka bir konuda yardımcı olabilirim.';
 }
 
 function ya_chat_extract_guest_count(array $payload, string $message): int

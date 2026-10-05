@@ -1,5 +1,5 @@
 import { generateConfiguredChat, generateConfiguredImage, imageModelForProfile, type AIProviderConfig } from "@yardimci-asistan/ai-core";
-import { BUSINESS_CAPABILITIES as C, hasBusinessCapability, type MarketingAiCapability, type MarketingAiInput } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, hasBusinessCapability, evaluateBusinessAiInput, businessAiBoundaryReply, buildBusinessAiAuthorityPrompt, type MarketingAiCapability, type MarketingAiInput } from "@yardimci-asistan/shared";
 import type { DesktopDatabase } from "../database";
 import { getEffectiveAiApiKey } from "../ai-secret-service";
 import { MarketingError, marketingText, marketingChannel } from "./validation";
@@ -39,15 +39,19 @@ export class MarketingAiService {
     const names=db.marketingPrivateNames();
     const text=sanitizeMarketingAiText(marketingText(input.text,12000),names), instructions=sanitizeMarketingAiText(marketingText(input.instructions,2000),names);
     const style=sanitizeMarketingAiText(marketingText(input.styleHints??"",500),names);
+    const capabilities=db.getEnabledBusinessCapabilities();
+    const boundaryReply=businessAiBoundaryReply(evaluateBusinessAiInput(capabilities,"",`${text}\n${instructions}\n${style}`));
+    if (boundaryReply) throw new MarketingError("unsupported_business_domain",boundaryReply);
+    const authority=buildBusinessAiAuthorityPrompt(capabilities);
     if (input.capability==="image_generation") {
       if (input.aspect && !["square","landscape","portrait"].includes(input.aspect)) throw new MarketingError("invalid_input","Görsel oranı geçersiz.");
-      try { return {image:await generateConfiguredImage(config,`Pazarlama görseli. ${text}\n${instructions}\nStil: ${style}`,input.aspect??"square")}; }
+      try { return {image:await generateConfiguredImage(config,`${authority}\nPazarlama görseli. ${text}\n${instructions}\nStil: ${style}`,input.aspect??"square")}; }
       catch { throw new MarketingError("ai_failed","AI görseli oluşturulamadı. Servis ve model erişimini kontrol edin."); }
     }
     const channel=input.capability==="channel_adaptation"?marketingChannel(input.channel):undefined;
     const channelRules={website:"Açık duyuru metni, başlık metinden ayrı.",whatsapp:"Kısa, sıcak WhatsApp taslağı.",sms:"En fazla 160 karakter; link ve telefon ekleme.",instagram:"Instagram caption, kısa açıklama ve ilgili az sayıda hashtag."};
     const completion=await generateConfiguredChat({...config,messages:[
-      {role:"system",content:`Türkçe pazarlama taslağı üret. İşlem: ${input.capability}. Olmayan fiyat/hizmet üretme. Kişi, telefon, kimlik veya anahtar bilgisi ekleme. Sadece taslak metnini döndür. ${channel?channelRules[channel]:""}`},
+      {role:"system",content:`${authority}\nTürkçe pazarlama taslağı üret. İşlem: ${input.capability}. Olmayan fiyat/hizmet üretme. Kişi, telefon, kimlik veya anahtar bilgisi ekleme. Sadece taslak metnini döndür. ${channel?channelRules[channel]:""}`},
       {role:"user",content:JSON.stringify({text,instructions})}
     ]});
     if (!completion.ok) throw new MarketingError("ai_failed","AI metni oluşturulamadı. Servis ve model erişimini kontrol edin.");

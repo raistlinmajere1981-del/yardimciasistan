@@ -43,7 +43,7 @@ try {
   assert.throws(()=>f.service.saveContent(editorialInput({mediaAssetIds:[c.id]})),e=>e.code==='archived_asset');
   const before=raw.prepare('SELECT COUNT(*) n FROM marketing_publications').get().n;
   db.saveCustomer({fullName:'PRIVATE CUSTOMER',phone:'05551112233',email:'',notes:'',tags:[]});
-  const generated=await f.service.generate({capability:'text_generation',text:'PRIVATE CUSTOMER 05551112233 user@example.test',instructions:'token=PRIVATE_SECRET'});
+  const generated=await f.service.generate({capability:'text_generation',text:'Tanıtım PRIVATE CUSTOMER 05551112233 user@example.test',instructions:'token=PRIVATE_SECRET'});
   assert.equal(generated.text,'AI aday metni');assert.equal(raw.prepare('SELECT COUNT(*) n FROM marketing_publications').get().n,before);
   assert.ok(!JSON.stringify(f.calls).includes('PRIVATE CUSTOMER'));assert.ok(!JSON.stringify(f.calls).includes('05551112233'));assert.ok(!JSON.stringify(f.calls).includes('PRIVATE_SECRET'));
   const adapted=await f.service.generate({capability:'channel_adaptation',channel:'sms',text:'Tanıtım',instructions:''});assert.equal(adapted.text,'AI aday metni');
@@ -67,7 +67,7 @@ try {
   assert.ok(f.calls.at(-1).url.endsWith('/models/gemini-2.5-flash-image:generateContent'));
   f.state.selectedAiService='openai';f.state.aiProfiles=null;
   f.state.unavailable=true;await assert.rejects(f.service.generate({capability:'rewrite',text:'x',instructions:''}),e=>e.code==='ai_unavailable');f.state.unavailable=false;
-  f.state.fail=true;await assert.rejects(f.service.generate({capability:'text_generation',text:'x',instructions:''}),e=>e.code==='ai_failed');f.state.fail=false;
+  f.state.fail=true;await assert.rejects(f.service.generate({capability:'text_generation',text:'Tanıtım',instructions:''}),e=>e.code==='ai_failed');f.state.fail=false;
   const current=db.listMarketingPublications()[0];const removed=f.service.unpublish(current.id,current.revision);assert.equal(removed.status,'publishing');
   f.publisher.acknowledge([removed],new Date().toISOString());assert.equal(db.listMarketingPublications()[0].status,'unpublished');
   const latest=db.listMarketingContents().find(c=>c.content.id===content.content.id);

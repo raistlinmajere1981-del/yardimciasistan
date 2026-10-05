@@ -550,7 +550,7 @@ assert.match(
 assert.doesNotMatch(navigationSource, /bekleyen oda alacaklarını/, "folio copy must not live in navigation presentation");
 assert.match(
   businessAiServiceSource,
-  /getUnsupportedBusinessAiDomain\(capabilities, request\.request_type, request\.message\)/,
+  /evaluateBusinessAiInput\(capabilities, request\.request_type,/,
   "owner reply AI must hard-guard unsupported sector intent before provider generation"
 );
 assert.match(
@@ -560,15 +560,11 @@ assert.match(
 );
 assert.match(
   webChatSource,
-  /ya_chat_unsupported_business_domain\([\s\S]{0,1200}unsupported_business_domain/,
+  /ya_business_ai_evaluate\([\s\S]{0,1200}unsupported_business_domain/,
   "web chat must enforce the same unsupported-domain guard before provider generation"
 );
 assert.match(webChatSource, /capability_ids/, "web chat must consume published capability ids");
-assert.match(
-  webChatSource,
-  /function ya_chat_unsupported_business_domain[\s\S]{0,2600}accommodation\.rooms[\s\S]{0,1200}food_service\.tables/,
-  "web chat domain guard must evaluate accommodation and food-service capabilities"
-);
+// Cross-language mapping and runtime behavior are protected by business-ai-boundary.
 
 // F — admin expands role grants, then intersects them with business capabilities.
 const marketAdmin = androidEffectivePermissionsForRole("admin", ANDROID_PERMISSIONS, marketCapabilities);

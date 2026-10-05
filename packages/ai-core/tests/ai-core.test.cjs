@@ -371,7 +371,7 @@ test("generateWebChatReply returns safe fallback when disabled", async () => {
   const result = await generateWebChatReply(
     {
       businessName: "Deniz Çiçeği",
-      message: "Fiyat nedir?",
+      message: "Kart geçiyor mu?",
       knowledgeDocuments: []
     },
     {
@@ -395,7 +395,8 @@ test("createOwnerReplySuggestion keeps owner approval boundary", () => {
     requestType: "pension_reservation",
     dateText: "",
     guestCount: 2,
-    message: "Balkonlu oda istiyorum."
+    message: "Balkonlu oda istiyorum.",
+    businessContext: { capabilityIds: ["accommodation.rooms"] }
   });
 
   assert.match(suggestion.summary, /pansiyon rezervasyonu/);
@@ -413,9 +414,9 @@ test("createOwnerReplySuggestion keeps generic price questions free of reservati
     message: ""
   });
 
-  assert.match(suggestion.summary, /fiyat sorusu/);
-  assert.deepEqual(suggestion.missingFields, ["kısa not"]);
-  assert.match(suggestion.suggestedReply, /mesajınızı aldık/i);
+  assert.match(suggestion.summary, /doğrulanamayan/);
+  assert.deepEqual(suggestion.missingFields, []);
+  assert.match(suggestion.suggestedReply, /netleştirebilir/i);
   assert.doesNotMatch(suggestion.suggestedReply, /rezervasyonunuz onaylandı/i);
 });
 
@@ -429,7 +430,8 @@ test("generateOwnerReplySuggestion uses provider JSON when available", async () 
       dateText: "18-20 Temmuz",
       guestCount: 2,
       message: "Balkonlu oda var mı?",
-      instructions: "Kısa ve samimi yaz."
+      instructions: "Kısa ve samimi yaz.",
+      businessContext: { capabilityIds: ["accommodation.rooms"] }
     },
     {
       enabled: true,
@@ -480,7 +482,8 @@ test("generateOwnerReplySuggestion falls back on provider errors or unsafe appro
     requestType: "pension_reservation",
     dateText: "18-20 Temmuz",
     guestCount: 2,
-    message: "Balkonlu oda var mı?"
+    message: "Balkonlu oda var mı?",
+    businessContext: { capabilityIds: ["accommodation.rooms"] }
   };
 
   const failedSuggestion = await generateOwnerReplySuggestion(
@@ -549,6 +552,7 @@ test("owner reply uses current business context and does not demand reservation 
     guestCount: 0,
     message: "Nasıl gelebilirim?",
     businessContext: {
+      capabilityIds: [],
       profileId: "market",
       profileLabel: "Market / Perakende",
       directionsNote: "Ana caddeden ikinci sokak."
@@ -567,6 +571,7 @@ test("owner reply prompt carries published business context and forbids sector a
     guestCount: 0,
     message: "Kart geçiyor mu?",
     businessContext: {
+      capabilityIds: [],
       profileId: "market",
       profileLabel: "Market / Perakende",
       paymentNote: "Nakit ve kart kabul edilir.",
@@ -595,4 +600,33 @@ test("owner reply prompt carries published business context and forbids sector a
   assert.match(system, /bağlamda bulunmayan sektör/);
   assert.equal(user.businessContext.profileId, "market");
   assert.equal(user.businessContext.paymentNote, "Nakit ve kart kabul edilir.");
+});
+
+test("owner and web generation do not call providers for unsupported/unknown domains", async () => {
+  const config = { enabled: true, provider: "openai_compatible", baseUrl: "https://example.test/v1", model: "test", apiKey: "test" };
+  const mustNotFetch = () => { throw new Error("Provider must not be called"); };
+  for (const message of ["Konaklama istiyorum", "Restoran var mı?", "Randevu istiyorum", "Kuantum terapi hizmeti veriyor musunuz?"]) {
+    const businessContext = { capabilityIds: [], profileId: "pension_restaurant", description: "Konaklama ve restoran sunuyoruz", offeredServices: ["konaklama"], verifiedDomains: ["accommodation"], tenantVerticals: ["hotel"] };
+    const owner = await generateOwnerReplySuggestion({ businessName: "Test", customerName: "Test", requestType: "general_info", dateText: "", guestCount: 0, message, businessContext }, config, mustNotFetch);
+    assert.equal(owner.fallback, true);
+    assert.match(owner.suggestedReply, /etkin değil|doğrulayamıyorum/);
+    const web = await generateWebChatReply({ businessName: "Test", message, knowledgeDocuments: [], businessContext }, config, mustNotFetch);
+    assert.equal(web.fallback, true);
+    assert.match(web.answer, /etkin değil|doğrulayamıyorum/);
+  }
+  const noContext = await generateOwnerReplySuggestion({ businessName: "Otel", customerName: "", requestType: "pension_reservation", dateText: "", guestCount: 2, message: "Oda" }, config, mustNotFetch);
+  assert.match(noContext.suggestedReply, /etkin değil/);
+});
+
+test("web generation retains supported domains and includes an explicit capability allowlist", async () => {
+  let body;
+  const result = await generateWebChatReply({
+    businessName: "Test", message: "Konaklama istiyorum", businessContext: { capabilityIds: ["accommodation.rooms"] }, knowledgeDocuments: []
+  }, { enabled: true, provider: "openai_compatible", baseUrl: "https://example.test/v1", model: "test", apiKey: "test" }, async (_url, init) => {
+    body = JSON.parse(init.body);
+    return Response.json({ choices: [{ message: { content: "Talebinizi kontrol edebiliriz." } }] });
+  });
+  assert.equal(result.ok, true);
+  assert.match(body.messages[0].content, /capabilityIds/);
+  assert.match(body.messages[0].content, /bilinmeyen\/yeni/);
 });

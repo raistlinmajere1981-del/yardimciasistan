@@ -1,3 +1,5 @@
+import type { BusinessAiContext, BusinessAiCatalogSource } from "@yardimci-asistan/shared";
+
 export type AIProviderName = "disabled" | "openai_compatible";
 
 export interface KnowledgeDocument {
@@ -72,6 +74,8 @@ export interface WebChatRequest {
   message: string;
   businessName: string;
   knowledgeDocuments: KnowledgeDocument[];
+  /** Trusted business authority; omission is an empty capability set, never inferred from knowledge. */
+  businessContext?: Pick<BusinessAiContext, "capabilityIds">;
   history?: Array<Pick<AIMessage, "role" | "content">>;
 }
 
@@ -84,8 +88,9 @@ export interface OwnerReplyInput {
   message: string;
   tone?: "warm" | "formal" | "short";
   instructions?: string;
-  businessContext?: object;
-  catalogContext?: object;
+  /** Trusted business authority; customer message and instructions are intent only. */
+  businessContext?: Pick<BusinessAiContext, "capabilityIds"> & Partial<BusinessAiContext>;
+  catalogContext?: object & { matches?: Array<{ source: BusinessAiCatalogSource }> };
 }
 
 export interface OwnerReplySuggestion {

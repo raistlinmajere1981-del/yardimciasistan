@@ -1,6 +1,7 @@
 export * from "./types/ai";
 export * from "./types/business";
 export * from "./types/business-ai-context";
+export * from "./types/business-ai-policy";
 export * from "./types/business-web-context";
 export * from "./types/business-ai-catalog";
 export * from "./types/business-capabilities";
