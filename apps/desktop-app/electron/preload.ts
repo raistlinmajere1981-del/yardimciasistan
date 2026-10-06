@@ -167,7 +167,6 @@ import type {
 import type { BusinessLocationGeocodeResponse } from "./business-location-geocode";
 import type { CommerceIpcMutationResult, DesktopCommerceBridge, MarketBarcodeFastPullState } from "./commerce-ipc-contract";
 import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
-import type { CommerceStoreSnapshot } from "./commerce-store";
 import type { InventoryCountResult } from "./commerce-runtime";
 import type {
   DesktopUpdateActionResult,
@@ -197,7 +196,6 @@ type AiApiKeyRevealResult =
 export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
-  getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
   listDiagnosticSessions: () => Promise<DesktopDiagnosticSessionSummary[]>;
   readDiagnosticSession: (input?: DesktopDiagnosticReadInput) => Promise<DesktopDiagnosticReadResult | null>;
   writeDiagnosticEvent: (input: DesktopDiagnosticWriteInput) => Promise<unknown>;
@@ -288,7 +286,6 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => Promise<BusinessCapabilitySnapshot>;
-  applyBusinessProfile: (profileId: string, preserveUserOverrides?: boolean) => Promise<BusinessCapabilitySnapshot>;
   commerce: DesktopCommerceBridge;
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDevicePermissionGroupsBatch: (updates: DesktopAndroidPermissionGroupsUpdate[]) => Promise<DesktopAndroidDeviceMutationResult>;
@@ -416,7 +413,6 @@ const bridge: DesktopBridge = {
   getMarketingShare: (id) => invokeWhenUnlocked("marketing:share", id),
   saveMarketingShare: (input) => invokeWhenUnlocked("marketing:saveShare", input),
   submitMarketingShare: (id, revision) => invokeWhenUnlocked("marketing:submitShare", id, revision),
-  getMarketingChannels: () => invokeWhenUnlocked("marketing:channels"),
   getMarketingStudio: () => invokeWhenUnlocked("marketing:studio"),
   saveMarketingContent: (input) => invokeWhenUnlocked("marketing:saveContent", input),
   uploadMarketingAssets: () => invokeWhenUnlocked("marketing:uploadAssets"),
@@ -458,7 +454,6 @@ const bridge: DesktopBridge = {
   },
   setUiScale: (scale: number) => webFrame.setZoomFactor(scale),
   getAppLockStatus: () => ipcRenderer.invoke("appLock:getStatus"),
-  getCurrentDiagnosticSession: () => invokeWhenUnlocked<DesktopDiagnosticSessionSummary | null>("diagnostics:getCurrentSession"),
   listDiagnosticSessions: () => invokeWhenUnlocked<DesktopDiagnosticSessionSummary[]>("diagnostics:listSessions"),
   readDiagnosticSession: (input = {}) => invokeWhenUnlocked<DesktopDiagnosticReadResult | null>("diagnostics:readSession", input),
   writeDiagnosticEvent: (input: DesktopDiagnosticWriteInput) => ipcRenderer.invoke("diagnostics:writeRendererEvent", input),
@@ -548,12 +543,9 @@ const bridge: DesktopBridge = {
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:clearOverride", capability),
-  applyBusinessProfile: (profileId: string, preserveUserOverrides = true) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:applyProfile", profileId, preserveUserOverrides),
   commerce: {
     completeMarketSale: (input) => invokeCommerceMutation<CompleteMarketSaleResult>("commerce:sale:completeMarket", input),
-    getSnapshot: () => invokeWhenUnlocked<CommerceStoreSnapshot>("commerce:getSnapshot"),
     listCategories: (options) => invokeWhenUnlocked<CatalogCategory[]>("commerce:category:list", options),
-    getCategory: (categoryId) => invokeWhenUnlocked<CatalogCategory | null>("commerce:category:get", categoryId),
     saveCategory: (input) => invokeCommerceMutation<CatalogCategory>("commerce:category:save", input),
     deleteCategory: (categoryId) => invokeCommerceMutation<DeleteCatalogCategoryResult>("commerce:category:delete", categoryId),
     listProducts: (options) => invokeWhenUnlocked<CatalogProduct[]>("commerce:product:list", options),
@@ -605,7 +597,6 @@ const bridge: DesktopBridge = {
     recordCustomerCreditPayment: (input) => invokeCommerceMutation<CustomerCreditEntry>("commerce:customerCredit:payment", input),
     addCustomerCreditAdjustment: (input) => invokeCommerceMutation<CustomerCreditEntry>("commerce:customerCredit:adjustment", input),
     listCartDrafts: (options) => invokeWhenUnlocked<CommerceSaleDraftDetail[]>("commerce:cartDraft:list", options),
-    getCartDraft: (draftId) => invokeWhenUnlocked<CommerceSaleDraftDetail | null>("commerce:cartDraft:get", draftId),
     loadCartDraftForQuickSale: (draftId) => invokeWhenUnlocked<MarketCartDraftLoadResult>("commerce:cartDraft:loadForQuickSale", draftId),
     markCartDraftReviewed: (draftId) => invokeCommerceMutation<CommerceSaleDraft>("commerce:cartDraft:markReviewed", draftId),
     consumePendingBarcodeScans: (options) => invokeWhenUnlocked<MarketBarcodeScanEvent[]>("commerce:barcodeScan:consumePending", options),
@@ -613,7 +604,6 @@ const bridge: DesktopBridge = {
     listSuppliers: (options) => invokeWhenUnlocked<CommerceSupplier[]>("commerce:supplier:list", options),
     saveSupplier: (input) => invokeCommerceMutation<CommerceSupplier>("commerce:supplier:save", input),
     listPurchaseOrders: (options) => invokeWhenUnlocked<CommercePurchaseOrder[]>("commerce:purchase:list", options),
-    getPurchaseOrder: (purchaseOrderId) => invokeWhenUnlocked<CommercePurchaseOrderDetail | null>("commerce:purchase:get", purchaseOrderId),
     receivePurchase: (input) => invokeCommerceMutation<CommercePurchaseOrderDetail>("commerce:purchase:receive", input)
   },
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),

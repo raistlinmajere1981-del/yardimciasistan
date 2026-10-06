@@ -39,10 +39,3 @@ export interface StockImageApplyLine {
   raw_text: string;
   confidence: StockImageConfidence;
 }
-
-export interface MenuStockImageImportApplyPayload {
-  import_id: string;
-  image_hash: string;
-  duplicate_warning_acknowledged?: boolean;
-  lines: StockImageApplyLine[];
-}

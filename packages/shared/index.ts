@@ -1,4 +1,3 @@
-export * from "./types/ai";
 export * from "./types/business";
 export * from "./types/business-ai-context";
 export * from "./types/business-ai-policy";
@@ -30,7 +29,6 @@ export * from "./types/table";
 export * from "./types/whatsapp";
 export * from "./types/wholesale";
 export * from "./types/dealer-access";
-export * from "./utils/date";
 export * from "./utils/birthday";
 export * from "./utils/barcode";
 export * from "./utils/id";
@@ -39,7 +37,6 @@ export * from "./utils/money";
 export * from "./utils/commerce-order-contact";
 export * from "./utils/commerce-order-delivery";
 export * from "./utils/phone";
-export * from "./utils/validation";
 export * from "./utils/nexa";
 
 export { normalizeTableCategoryInputs, normalizeTableCategoryName, tableCategoryKey, type NormalizedTableCategoryInput } from "./utils/table-category-settings";

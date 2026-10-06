@@ -20,14 +20,10 @@ import {
   deleteRuntimeCatalogCategory,
   findRuntimeProductByBarcode,
   fulfillRuntimeOrder,
-  getCommerceRuntimeSnapshot,
-  getRuntimeCatalogCategory,
   getRuntimeOrder,
   getRuntimeProductImageDataUrl,
   lookupRuntimeExternalProductByBarcode,
   getRuntimeInventoryBalance,
-  getRuntimePurchaseOrder,
-  getMarketCartDraft,
   loadMarketCartDraftForQuickSale,
   listRuntimeCatalogCategories,
   listRuntimeCatalogProducts,
@@ -113,15 +109,8 @@ export function registerCommerceIpcHandlers(options: {
     return operation();
   };
 
-  ipcMain.handle("commerce:getSnapshot", () =>
-    read(() => getCommerceRuntimeSnapshot(databasePath()))
-  );
-
   ipcMain.handle("commerce:category:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listCategories"]>[0]) =>
     read(() => listRuntimeCatalogCategories(databasePath(), optionsArg))
-  );
-  ipcMain.handle("commerce:category:get", (_event, categoryId: string) =>
-    read(() => getRuntimeCatalogCategory(databasePath(), categoryId))
   );
   ipcMain.handle("commerce:category:save", (_event, input: Parameters<DesktopCommerceBridge["saveCategory"]>[0]) =>
     mutateForIpc("commerce:category:save", () => saveRuntimeCatalogCategory(databasePath(), input))
@@ -235,9 +224,6 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:cartDraft:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listCartDrafts"]>[0]) =>
     read(() => listMarketCartDrafts(databasePath(), optionsArg))
   );
-  ipcMain.handle("commerce:cartDraft:get", (_event, draftId: string) =>
-    read(() => getMarketCartDraft(databasePath(), draftId))
-  );
   ipcMain.handle("commerce:cartDraft:loadForQuickSale", (_event, draftId: string) =>
     read(() => loadMarketCartDraftForQuickSale(databasePath(), draftId))
   );
@@ -257,9 +243,6 @@ export function registerCommerceIpcHandlers(options: {
 
   ipcMain.handle("commerce:purchase:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listPurchaseOrders"]>[0]) =>
     read(() => listRuntimePurchaseOrders(databasePath(), optionsArg))
-  );
-  ipcMain.handle("commerce:purchase:get", (_event, purchaseOrderId: string) =>
-    read(() => getRuntimePurchaseOrder(databasePath(), purchaseOrderId))
   );
   ipcMain.handle("commerce:purchase:receive", (_event, input: Parameters<DesktopCommerceBridge["receivePurchase"]>[0]) =>
     mutateForIpc("commerce:purchase:receive", () => receiveRuntimePurchase(databasePath(), input))

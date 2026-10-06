@@ -72,7 +72,6 @@ export interface MarketingWebsiteProjection {
 }
 export type MarketingResult<T> = { ok: true; value: T } | { ok: false; code: string; message: string };
 export interface MarketingBridge {
-  getMarketingChannels(): Promise<MarketingResult<MarketingChannelRegistry>>;
   getMarketingStudio(): Promise<MarketingResult<MarketingStudioSnapshot>>;
   saveMarketingContent(input: MarketingContentInput): Promise<MarketingResult<MarketingContentDetail>>;
   uploadMarketingAssets(): Promise<MarketingResult<MarketingAssetView[]>>;

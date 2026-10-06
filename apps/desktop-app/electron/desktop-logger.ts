@@ -503,11 +503,6 @@ export function finalizeDesktopLogging(reason = "quit") {
   writeManifest();
 }
 
-export function getCurrentDiagnosticSession(): DesktopDiagnosticSessionSummary | null {
-  flushPendingEvents();
-  return sessionManifest ? toSummary(sessionManifest, sessionPath) : null;
-}
-
 export function listDiagnosticSessions(): DesktopDiagnosticSessionSummary[] {
   flushPendingEvents();
   if (!sessionsPath) return [];

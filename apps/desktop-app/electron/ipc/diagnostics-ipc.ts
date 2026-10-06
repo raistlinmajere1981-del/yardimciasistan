@@ -1,6 +1,5 @@
 import { ipcMain } from "electron";
 import {
-  getCurrentDiagnosticSession,
   listDiagnosticSessions,
   readDiagnosticSession,
   writeRendererDiagnostic
@@ -21,11 +20,6 @@ export function registerDiagnosticsIpcHandlers(options: {
   assertUnlocked: () => void;
   userDataPath: () => string;
 }) {
-  ipcMain.handle("diagnostics:getCurrentSession", () => {
-    options.assertUnlocked();
-    return getCurrentDiagnosticSession();
-  });
-
   ipcMain.handle("diagnostics:listSessions", () => {
     options.assertUnlocked();
     return listDiagnosticSessions();

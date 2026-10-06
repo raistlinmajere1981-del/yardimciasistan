@@ -44,5 +44,3 @@ export interface CustomerRequest extends TimestampedRecord {
   priority: Priority;
   sync_status: SyncStatus;
 }
-
-export type RequestRecord = CustomerRequest;

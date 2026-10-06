@@ -13,5 +13,3 @@ export interface BusinessTable extends TimestampedRecord, SoftDeletableRecord {
   is_active: boolean;
   sort_order: number;
 }
-
-export type Table = BusinessTable;

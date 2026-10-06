@@ -78,9 +78,9 @@ try {
   const ipcFile=new URL('../apps/desktop-app/dist-electron/ipc/marketing-ipc.js',import.meta.url),ipcRequire=createRequire(ipcFile),handlers=new Map(),exports={};
   runInNewContext(readFileSync(ipcFile,'utf8'),{exports,require:name=>name==='electron'?{ipcMain:{handle:(name,handler)=>handlers.set(name,handler)}}:ipcRequire(name)});
   let locked=true,reads=0,complete;
-  exports.registerMarketingIpc({assertUnlocked:()=>{if(locked)throw new Error('fixture_locked');},service:{channels:()=>{reads++;return [];},generate:()=>new Promise(resolve=>{complete=resolve;})}});
-  await assert.rejects(handlers.get('marketing:channels')(),/fixture_locked/);assert.equal(reads,0);
-  locked=false;assert.equal((await handlers.get('marketing:channels')()).ok,true);
+  exports.registerMarketingIpc({assertUnlocked:()=>{if(locked)throw new Error('fixture_locked');},service:{snapshot:()=>{reads++;return {};},generate:()=>new Promise(resolve=>{complete=resolve;})}});
+  await assert.rejects(handlers.get('marketing:studio')(),/fixture_locked/);assert.equal(reads,0);
+  locked=false;assert.equal((await handlers.get('marketing:studio')()).ok,true);
   const late=handlers.get('marketing:generate')(null,{capability:'rewrite'});locked=true;complete({text:'PRIVATE_LATE_RESULT'});
   const blocked=await late;assert.equal(blocked.ok,false);assert.ok(!JSON.stringify(blocked).includes('PRIVATE_LATE_RESULT'));
   console.log('D4 content/variants, uploaded/generated reusable assets, ordering, archive/delete/in-flight guards, resolver/privacy/no-auto-publish and revision lifecycle passed.');

@@ -28,9 +28,3 @@ export interface MenuItem extends TimestampedRecord {
   stock_note: string | null;
   sort_order: number;
 }
-
-export interface QrMenu {
-  categories: MenuCategory[];
-  items: MenuItem[];
-  updated_at: string;
-}

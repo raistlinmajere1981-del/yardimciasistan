@@ -13,9 +13,7 @@ const mainEntrySource = read("apps/desktop-app/electron/main-entry.ts");
 const contractSource = read("apps/desktop-app/electron/commerce-ipc-contract.ts");
 
 const channels = [
-  "commerce:getSnapshot",
   "commerce:category:list",
-  "commerce:category:get",
   "commerce:category:save",
   "commerce:category:delete",
   "commerce:product:list",
@@ -36,14 +34,12 @@ const channels = [
   "commerce:order:updateStatus",
   "commerce:order:fulfill",
   "commerce:cartDraft:list",
-  "commerce:cartDraft:get",
   "commerce:cartDraft:loadForQuickSale",
   "commerce:cartDraft:markReviewed",
   "commerce:barcodeScan:consumePending",
   "commerce:supplier:list",
   "commerce:supplier:save",
   "commerce:purchase:list",
-  "commerce:purchase:get",
   "commerce:purchase:receive"
 ];
 
@@ -62,9 +58,7 @@ for (const channel of channels) {
 }
 
 const contractMethods = [
-  "getSnapshot",
   "listCategories",
-  "getCategory",
   "saveCategory",
   "deleteCategory",
   "listProducts",
@@ -85,7 +79,6 @@ const contractMethods = [
   "updateOrderStatus",
   "fulfillOrder",
   "listCartDrafts",
-  "getCartDraft",
   "loadCartDraftForQuickSale",
   "markCartDraftReviewed",
   "consumePendingBarcodeScans",
@@ -93,7 +86,6 @@ const contractMethods = [
   "listSuppliers",
   "saveSupplier",
   "listPurchaseOrders",
-  "getPurchaseOrder",
   "receivePurchase"
 ];
 

@@ -41,7 +41,6 @@ import type {
 } from "./commerce-purchase-store";
 import type {
   ApplyInventoryMovementInput,
-  CommerceStoreSnapshot,
   CreateCommerceSaleInput,
   ListCatalogProductsOptions,
   ListCommerceSuppliersOptions,
@@ -79,10 +78,8 @@ export interface MarketBarcodeFastPullState {
  */
 export interface DesktopCommerceBridge {
   completeMarketSale: (input: import("./market-sale-operation").CompleteMarketSaleInput) => Promise<import("./market-sale-operation").CompleteMarketSaleResult>;
-  getSnapshot: () => Promise<CommerceStoreSnapshot>;
 
   listCategories: (options?: ListCatalogCategoriesOptions) => Promise<CatalogCategory[]>;
-  getCategory: (categoryId: string) => Promise<CatalogCategory | null>;
   saveCategory: (input: SaveCatalogCategoryInput) => Promise<CatalogCategory>;
   deleteCategory: (categoryId: string) => Promise<DeleteCatalogCategoryResult>;
 
@@ -128,7 +125,6 @@ export interface DesktopCommerceBridge {
   addCustomerCreditAdjustment: (input: AddCustomerCreditAdjustmentInput) => Promise<CustomerCreditEntry>;
 
   listCartDrafts: (options?: ListMarketCartDraftsOptions) => Promise<CommerceSaleDraftDetail[]>;
-  getCartDraft: (draftId: string) => Promise<CommerceSaleDraftDetail | null>;
   loadCartDraftForQuickSale: (draftId: string) => Promise<MarketCartDraftLoadResult>;
   markCartDraftReviewed: (draftId: string) => Promise<CommerceSaleDraft>;
   consumePendingBarcodeScans: (options?: ConsumePendingMarketBarcodeScansOptions) => Promise<MarketBarcodeScanEvent[]>;
@@ -138,6 +134,5 @@ export interface DesktopCommerceBridge {
   saveSupplier: (input: SaveCommerceSupplierInput) => Promise<CommerceSupplier>;
 
   listPurchaseOrders: (options?: ListCommercePurchaseOrdersOptions) => Promise<CommercePurchaseOrder[]>;
-  getPurchaseOrder: (purchaseOrderId: string) => Promise<CommercePurchaseOrderDetail | null>;
   receivePurchase: (input: ReceiveCommercePurchaseInput) => Promise<CommercePurchaseOrderDetail>;
 }

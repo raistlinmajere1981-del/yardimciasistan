@@ -75,7 +75,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   useLayoutEffect(() => {
     if (history) return;
     const target = intent.mode === "account" || intent.action === "payment" ? "room-account"
-      : ["check-in", "checkout", "room-status"].includes(intent.action ?? "") ? "room-operations"
+      : intent.action === "check-in" ? "room-operations"
         : intent.mode === "stay" || intent.action ? "room-stay" : "";
     const panel = target ? surface.current?.querySelector<HTMLElement>(`#${target}`) : null;
     panel?.focus({ preventScroll: true });

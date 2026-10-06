@@ -62,7 +62,6 @@ assert.ok(mainImportIndex > initializeIndex, "desktop logging must initialize be
 assert.match(entry, /finalizeDesktopLogging\("before-quit"\)/);
 assert.match(entry, /registerDiagnosticsIpcHandlers/);
 
-assert.match(diagnosticsIpc, /diagnostics:getCurrentSession/);
 assert.match(diagnosticsIpc, /diagnostics:listSessions/);
 assert.match(diagnosticsIpc, /diagnostics:readSession/);
 assert.match(diagnosticsIpc, /diagnostics:writeRendererEvent/);

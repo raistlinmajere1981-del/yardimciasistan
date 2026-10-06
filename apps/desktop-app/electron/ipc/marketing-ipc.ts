@@ -14,7 +14,6 @@ export function registerMarketingIpc(options:{service:MarketingStudioService;sha
   ipcMain.handle("marketing:saveShare",(_event,input:MarketingShareInput)=>operation(()=>options.shares.save(input)));
   ipcMain.handle("marketing:submitShare",(_event,id:string,revision:number)=>operation(()=>options.shares.submit(id,revision)));
   const s=options.service;
-  ipcMain.handle("marketing:channels",()=>operation(()=>s.channels()));
   ipcMain.handle("marketing:studio",()=>operation(()=>s.snapshot()));
   ipcMain.handle("marketing:saveContent",(_event,input:MarketingContentInput)=>operation(()=>s.saveContent(input)));
   ipcMain.handle("marketing:uploadAssets",()=>operation(()=>s.upload()));

@@ -63,8 +63,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
     const panel = intent.mode === "account" || intent.mode === "customer" || intent.action === "room-transfer"
       ? surface.current?.querySelector<HTMLElement>(target) : null;
     panel?.focus({ preventScroll: true }); panel?.scrollIntoView({ block: "nearest", inline: "nearest" });
-    if (intent.action === "add-item" && menuEnabled) surface.current?.querySelector<HTMLInputElement>('input[aria-label="Sipariş için ürün ara"]')?.focus({ preventScroll: true });
-  }, [history, intent.mode, intent.action, menuEnabled]);
+  }, [history, intent.mode, intent.action]);
   useEffect(() => {
     if (!history || !ordersEnabled) return;
     const request = ++historyRead.current;
