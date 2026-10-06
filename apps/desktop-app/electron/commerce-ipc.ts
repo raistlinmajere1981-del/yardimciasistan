@@ -4,9 +4,6 @@ import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerc
 import { desktopLog } from "./desktop-logger";
 import { completeMarketSale } from "./market-sale-operation";
 import {
-  archiveExternalProductImage,
-  archiveManualProductImage,
-  clearProductImage,
   previewExternalProductImage
 } from "./product-data-service";
 import {
@@ -44,6 +41,7 @@ import {
   resolveRuntimeProductPrice,
   saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct,
+  prepareRuntimeCatalogProductImage,
   saveRuntimeSupplier,
   setRuntimeInventoryCount,
   updateRuntimeOrderStatus
@@ -136,50 +134,16 @@ export function registerCommerceIpcHandlers(options: {
     read(() => listRuntimeCatalogProducts(databasePath(), optionsArg))
   );
   ipcMain.handle("commerce:product:save", async (_event, input: Parameters<DesktopCommerceBridge["saveProduct"]>[0]) => {
-    const mutation = mutateForIpc("commerce:product:save", () => saveRuntimeCatalogProduct(databasePath(), input));
-    if (!mutation.ok) return mutation;
-    let saved = mutation.value;
-    if (input.clearImage) {
-      try {
-        clearProductImage(databasePath(), saved.id);
-        saved = { ...saved, imageAssetPath: "", imageSourceUrl: "", imageLicense: "" };
-      } catch (error) {
-        desktopLog.warn({
-          scope: "product-data",
-          event: "product-data.image-clear.failed",
-          message: "Ürün görseli temizlenemedi.",
-          meta: { productId: saved.id },
-          error
-        });
-      }
-    } else if (input.manualImageDataUrl) {
-      try {
-        const imageAssetPath = archiveManualProductImage(databasePath(), saved.id, input.manualImageDataUrl);
-        saved = { ...saved, imageAssetPath, imageSourceUrl: "", imageLicense: "" };
-      } catch (error) {
-        desktopLog.warn({
-          scope: "product-data",
-          event: "product-data.manual-image-archive.failed",
-          message: "Manuel ürün görseli arşivlenemedi.",
-          meta: { productId: saved.id },
-          error
-        });
-      }
-    } else if (saved.imageSourceUrl && !saved.imageAssetPath && input.imageSourceUrl !== undefined) {
-      try {
-        const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.dataSource, saved.imageSourceUrl);
-        if (imageAssetPath) saved = { ...saved, imageAssetPath };
-      } catch (error) {
-        desktopLog.warn({
-          scope: "product-data",
-          event: "product-data.image-archive.failed",
-          message: "Ürün görseli arşivlenemedi.",
-          meta: { productId: saved.id },
-          error
-        });
-      }
-    }
-    return { ok: true, value: saved } satisfies CommerceIpcMutationResult<typeof saved>;
+    options.assertUnlocked();
+    const productDatabasePath = databasePath();
+    let image: Awaited<ReturnType<typeof prepareRuntimeCatalogProductImage>>;
+    try { image = await prepareRuntimeCatalogProductImage(productDatabasePath, input); }
+    catch (error) { return mutateForIpc("commerce:product:save", () => { throw error; }); }
+    // Recheck the session after asynchronous acquisition, before any canonical write.
+    return mutateForIpc("commerce:product:save", () => {
+      if (databasePath() !== productDatabasePath) throw new Error("Ürün veritabanı değişti; yeniden yükleyin.");
+      return saveRuntimeCatalogProduct(productDatabasePath, input, image);
+    });
   });
   ipcMain.handle("commerce:product:findByBarcode", (_event, barcode: string) =>
     read(() => findRuntimeProductByBarcode(databasePath(), barcode))

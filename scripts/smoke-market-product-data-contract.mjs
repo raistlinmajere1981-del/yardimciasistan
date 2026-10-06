@@ -44,10 +44,9 @@ assert.match(service, /response\.status === 404[\s\S]*status: "not_found"/);
 assert.match(service, /resolveProductAssetRelativePath/);
 assert.match(service, /resolveProductAssetAbsolutePath/);
 assert.match(service, /hostname\.endsWith\("\.openfoodfacts\.org"\)/);
-assert.match(service, /archiveManualProductImage/);
-assert.match(service, /clearProductImage/);
+assert.match(service, /prepareProductImageForSave/);
 assert.match(service, /Manuel ürün görseli JPEG, PNG veya WEBP olmalı/);
-assert.match(service, /resolveProductAssetAbsolutePath\(dataRoot, productId, "front\.jpg"\)/);
+assert.match(service, /fs\.renameSync\(tempPath, absolutePath\)/);
 
 assert.match(store, /brand: String\(row\.brand/);
 assert.match(store, /imageAssetPath: String\(row\.image_asset_path/);
@@ -55,10 +54,9 @@ assert.match(store, /dataSource: String\(row\.data_source/);
 
 assert.match(ipc, /commerce:product:lookupExternal/);
 assert.match(ipc, /commerce:product:previewExternalImage/);
-assert.match(ipc, /archiveManualProductImage/);
-assert.match(ipc, /clearProductImage/);
-assert.match(ipc, /input\.manualImageDataUrl/);
-assert.match(ipc, /input\.clearImage/);
+assert.match(ipc, /prepareRuntimeCatalogProductImage/);
+assert.match(service, /input\.manualImageDataUrl/);
+assert.match(service, /input\.clearImage/);
 assert.match(store, /manualImageDataUrl\?: string/);
 assert.match(store, /clearImage\?: boolean/);
 assert.match(ipc, /commerce:product:imageDataUrl/);

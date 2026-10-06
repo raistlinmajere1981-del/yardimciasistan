@@ -19,6 +19,7 @@ import {
   type ListCustomerCreditEntriesOptions,
   type RecordCustomerCreditPaymentInput
 } from "@yardimci-asistan/shared";
+import { synchronizeFinanceSourceInTransaction } from "./finance";
 import { createCommerceSaleInTransaction } from "./commerce-store";
 
 type Row = Record<string, unknown>;
@@ -219,6 +220,7 @@ function insertEntry(db: DatabaseSync, entry: CustomerCreditEntry): CustomerCred
   `).run(entry.id, entry.businessId, entry.customerId, entry.direction, entry.amountMinor,
     entry.currency, entry.entryType, entry.saleId, entry.paymentMethod, entry.occurredAt,
     entry.note, entry.source, entry.createdAt, entry.updatedAt);
+  if (entry.entryType === "payment") synchronizeFinanceSourceInTransaction(db, "customer_credit_payment", entry.id);
   return entry;
 }
 
@@ -282,7 +284,7 @@ export function recordCustomerCreditPayment(databasePath: string, input: RecordC
     const now = new Date().toISOString();
     const paidAt = input.paidAt === undefined ? new Date(now) : new Date(input.paidAt);
     if (!Number.isFinite(paidAt.getTime())) throw new Error("Tahsilat tarihi geçersiz.");
-    // The INSERT trigger projects finance income on this exact connection.
+    // The finance owner writes the collection on this exact transaction.
     return insertEntry(db, {
       ...entryBase(businessId, customer.id, now, input.note, input.source),
       direction: "credit", entryType: "payment", amountMinor, currency,

@@ -29,6 +29,7 @@ import {
   TABLE_ORDER_STATUSES
 } from "./database/stock-utils.js";
 import { nextMutationTimestamp } from "./database/android-utils.js";
+import { synchronizeFinanceSourceInTransaction } from "./finance.js";
 import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 
 interface TableOrderMutationContext extends DomainMutationContext { newOrderId?: string; newItemId?: string }
@@ -579,6 +580,7 @@ export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusI
       db.exec(tx.rollback);
       return { ok: false, message: "Adisyon başka bir işlem tarafından kapatıldı; yeniden yükleyin." };
     }
+    synchronizeFinanceSourceInTransaction(db, "restaurant_order", orderId);
     updateTableStatusForOrder(db, String(current.table_id ?? ""), "available", orderId, now, context.androidAction);
     insertDatabaseEvent(db, {
       type: status === "paid" ? "table_order.paid" : "table_order.cancelled",

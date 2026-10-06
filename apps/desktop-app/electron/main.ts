@@ -1,3 +1,4 @@
+import { cleanupOrphanProductImages } from "./product-data-service";
 import { MarketingAnalyticsService } from "./marketing/analytics-service";
 import { registerMarketingAnalyticsIpc } from "./ipc/marketing-analytics-ipc";
 import { MarketingScheduleService } from "./marketing/schedule-service";
@@ -321,6 +322,7 @@ if (!hasSingleInstanceLock) {
       backupPath: resolveProjectBackupPath(runtimeDataRoot)
     });
     desktopDatabase.initialize();
+    cleanupOrphanProductImages(desktopDatabase.databasePath);
     androidActionSyncService = new AndroidActionSyncService({
       database: desktopDatabase,
       isSuspended: () => maintenanceSyncSuspended,

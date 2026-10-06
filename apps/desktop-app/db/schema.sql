@@ -1501,19 +1501,6 @@ BEGIN SELECT RAISE(ABORT, 'Veresiye hareketi silinemez; düzeltme hareketi ekley
 CREATE TRIGGER trg_customer_credit_no_update BEFORE UPDATE ON customer_credit_entries
 BEGIN SELECT RAISE(ABORT, 'Veresiye hareketi değiştirilemez; düzeltme hareketi ekleyin.'); END;
 
-CREATE TRIGGER trg_customer_credit_payment_finance_insert
-AFTER INSERT ON customer_credit_entries WHEN NEW.entry_type = 'payment'
-BEGIN
-  INSERT INTO finance_entries (
-    id, direction, amount_minor, currency, payment_method, category, description,
-    occurred_at, source_type, source_id, note, created_at, updated_at, deleted_at, sync_status
-  ) VALUES (
-    'finance_credit_' || NEW.id, 'income', NEW.amount_minor, NEW.currency,
-    NEW.payment_method, 'other_income', 'Veresiye tahsilatı', NEW.occurred_at,
-    'customer_credit_payment', NEW.id, NEW.note, NEW.created_at, NEW.updated_at, '', 'local_only'
-  );
-END;
-
 CREATE TRIGGER trg_customer_credit_sale_no_update BEFORE UPDATE ON commerce_sales
 WHEN EXISTS (SELECT 1 FROM customer_credit_entries WHERE sale_id = OLD.id)
 BEGIN SELECT RAISE(ABORT, 'Veresiye satışının muhasebe izi değiştirilemez.'); END;
@@ -1566,168 +1553,6 @@ BEGIN
     next_attempt_at = '',
     last_error = '',
     updated_at = excluded.updated_at;
-END;
-
-CREATE TRIGGER trg_paid_table_order_finance_insert
-AFTER INSERT ON table_orders
-WHEN NEW.status = 'paid'
-  AND NEW.total > 0
-  AND NOT EXISTS (
-    SELECT 1
-    FROM room_folio_table_order_transfers
-    WHERE table_order_id = NEW.id
-  )
-BEGIN
-  INSERT OR IGNORE INTO finance_entries (
-    id, direction, amount_minor, currency, payment_method, category, description,
-    occurred_at, source_type, source_id, note, created_at, updated_at, sync_status
-  ) VALUES (
-    'finance_restaurant_' || NEW.id,
-    'income',
-    CAST(ROUND(NEW.total * 100) AS INTEGER),
-    COALESCE((SELECT currency FROM table_order_items WHERE order_id = NEW.id LIMIT 1), 'TRY'),
-    'unspecified',
-    'restaurant',
-    'Restoran adisyonu',
-    COALESCE(NULLIF(NEW.closed_at, ''), NEW.updated_at),
-    'restaurant_order',
-    NEW.id,
-    NEW.note,
-    NEW.created_at,
-    NEW.updated_at,
-    'local_only'
-  );
-END;
-
-CREATE TRIGGER trg_paid_table_order_finance_update
-AFTER UPDATE OF status, total, closed_at, note, updated_at ON table_orders
-WHEN NEW.status = 'paid'
-  AND NEW.total > 0
-  AND NOT EXISTS (
-    SELECT 1
-    FROM room_folio_table_order_transfers
-    WHERE table_order_id = NEW.id
-  )
-BEGIN
-  INSERT INTO finance_entries (
-    id, direction, amount_minor, currency, payment_method, category, description,
-    occurred_at, source_type, source_id, note, created_at, updated_at, sync_status
-  ) VALUES (
-    'finance_restaurant_' || NEW.id,
-    'income',
-    CAST(ROUND(NEW.total * 100) AS INTEGER),
-    COALESCE((SELECT currency FROM table_order_items WHERE order_id = NEW.id LIMIT 1), 'TRY'),
-    'unspecified',
-    'restaurant',
-    'Restoran adisyonu',
-    COALESCE(NULLIF(NEW.closed_at, ''), NEW.updated_at),
-    'restaurant_order',
-    NEW.id,
-    NEW.note,
-    NEW.created_at,
-    NEW.updated_at,
-    'local_only'
-  )
-  ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
-    amount_minor = excluded.amount_minor,
-    currency = excluded.currency,
-    occurred_at = excluded.occurred_at,
-    note = excluded.note,
-    updated_at = excluded.updated_at,
-    deleted_at = '';
-END;
-
-CREATE TRIGGER trg_pension_payment_finance_insert
-AFTER INSERT ON pension_payments
-WHEN NEW.deleted_at = ''
-BEGIN
-  INSERT INTO finance_entries (
-    id,
-    direction,
-    amount_minor,
-    currency,
-    payment_method,
-    category,
-    description,
-    occurred_at,
-    source_type,
-    source_id,
-    note,
-    created_at,
-    updated_at,
-    deleted_at,
-    sync_status
-  ) VALUES (
-    'finance_pension_' || NEW.id,
-    'income',
-    NEW.amount_minor,
-    NEW.currency,
-    NEW.payment_method,
-    'pension',
-    'Pansiyon ödemesi',
-    NEW.paid_at,
-    'pension_payment',
-    NEW.id,
-    NEW.note,
-    NEW.created_at,
-    NEW.updated_at,
-    '',
-    'local_only'
-  )
-  ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
-    amount_minor = excluded.amount_minor,
-    currency = excluded.currency,
-    payment_method = excluded.payment_method,
-    occurred_at = excluded.occurred_at,
-    note = excluded.note,
-    updated_at = excluded.updated_at,
-    deleted_at = '';
-END;
-
-CREATE TRIGGER trg_pension_payment_finance_update
-AFTER UPDATE ON pension_payments
-BEGIN
-  INSERT INTO finance_entries (
-    id,
-    direction,
-    amount_minor,
-    currency,
-    payment_method,
-    category,
-    description,
-    occurred_at,
-    source_type,
-    source_id,
-    note,
-    created_at,
-    updated_at,
-    deleted_at,
-    sync_status
-  ) VALUES (
-    'finance_pension_' || NEW.id,
-    'income',
-    NEW.amount_minor,
-    NEW.currency,
-    NEW.payment_method,
-    'pension',
-    'Pansiyon ödemesi',
-    NEW.paid_at,
-    'pension_payment',
-    NEW.id,
-    NEW.note,
-    NEW.created_at,
-    NEW.updated_at,
-    NEW.deleted_at,
-    'local_only'
-  )
-  ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
-    amount_minor = excluded.amount_minor,
-    currency = excluded.currency,
-    payment_method = excluded.payment_method,
-    occurred_at = excluded.occurred_at,
-    note = excluded.note,
-    updated_at = excluded.updated_at,
-    deleted_at = excluded.deleted_at;
 END;
 
 CREATE TRIGGER trg_pension_payment_remaining_guard
@@ -1839,52 +1664,6 @@ BEGIN
     ELSE 'paid'
   END
   WHERE id = NEW.id;
-END;
-
-CREATE TRIGGER trg_room_folio_payment_finance_insert
-AFTER INSERT ON room_folio_payments
-WHEN NEW.deleted_at = '' AND NEW.origin = 'direct'
-BEGIN
-  INSERT INTO finance_entries (
-    id, direction, amount_minor, currency, payment_method, category, description,
-    occurred_at, source_type, source_id, note, created_at, updated_at, deleted_at, sync_status
-  ) VALUES (
-    'finance_room_folio_' || NEW.id,
-    'income', NEW.amount_minor, NEW.currency, NEW.payment_method, 'pension', 'Oda tahsilatı',
-    NEW.paid_at, 'room_folio_payment', NEW.id, NEW.note,
-    NEW.created_at, NEW.updated_at, '', 'local_only'
-  )
-  ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
-    amount_minor = excluded.amount_minor,
-    currency = excluded.currency,
-    payment_method = excluded.payment_method,
-    occurred_at = excluded.occurred_at,
-    note = excluded.note,
-    updated_at = excluded.updated_at,
-    deleted_at = '';
-END;
-
-CREATE TRIGGER trg_room_folio_payment_finance_update
-AFTER UPDATE ON room_folio_payments
-WHEN NEW.origin = 'direct'
-BEGIN
-  INSERT INTO finance_entries (
-    id, direction, amount_minor, currency, payment_method, category, description,
-    occurred_at, source_type, source_id, note, created_at, updated_at, deleted_at, sync_status
-  ) VALUES (
-    'finance_room_folio_' || NEW.id,
-    'income', NEW.amount_minor, NEW.currency, NEW.payment_method, 'pension', 'Oda tahsilatı',
-    NEW.paid_at, 'room_folio_payment', NEW.id, NEW.note,
-    NEW.created_at, NEW.updated_at, NEW.deleted_at, 'local_only'
-  )
-  ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
-    amount_minor = excluded.amount_minor,
-    currency = excluded.currency,
-    payment_method = excluded.payment_method,
-    occurred_at = excluded.occurred_at,
-    note = excluded.note,
-    updated_at = excluded.updated_at,
-    deleted_at = excluded.deleted_at;
 END;
 
 CREATE TRIGGER trg_room_folio_payment_remaining_guard
@@ -2267,25 +2046,6 @@ CREATE TRIGGER trg_sync_whatsapp_messages_update AFTER UPDATE ON whatsapp_messag
   VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
-END;
-
-CREATE TRIGGER trg_unpaid_table_order_finance_update
-AFTER UPDATE OF status, updated_at ON table_orders
-WHEN OLD.status = 'paid' AND NEW.status != 'paid'
-BEGIN
-  UPDATE finance_entries
-  SET deleted_at = NEW.updated_at, updated_at = NEW.updated_at
-  WHERE source_type = 'restaurant_order'
-    AND source_id = NEW.id;
-END;
-
-CREATE TRIGGER trg_zero_paid_table_order_finance_update
-AFTER UPDATE OF status, total, updated_at ON table_orders
-WHEN NEW.status = 'paid' AND NEW.total <= 0
-BEGIN
-  UPDATE finance_entries
-  SET deleted_at = NEW.updated_at, updated_at = NEW.updated_at
-  WHERE source_type = 'restaurant_order' AND source_id = NEW.id;
 END;
 
 -- Hospitality guest schema.

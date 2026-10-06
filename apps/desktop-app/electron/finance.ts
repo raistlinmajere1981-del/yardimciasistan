@@ -99,6 +99,52 @@ export type DesktopFinanceMutationResult =
 
 const PAYMENT_METHODS = new Set<FinancePaymentMethod>(["cash", "card", "bank", "other", "unspecified"]);
 
+export type FinanceSource = "restaurant_order" | "pension_payment" | "room_folio_payment" | "customer_credit_payment";
+
+/** Canonical automatic ledger writer. The source owner must write on this transaction first.
+ * System collections have fixed categories, independent of manual category availability.
+ * Reservation deposits copied into a folio are not a second collection. */
+export function synchronizeFinanceSourceInTransaction(db: DatabaseSync, source: FinanceSource, sourceId: string): void {
+  if (!db.isTransaction) throw new Error("Finance source write requires a transaction.");
+  let row: Record<string, unknown> | undefined;
+  let prefix: string, category: string, description: string;
+  if (source === "restaurant_order") {
+    row = db.prepare(`SELECT o.*, CAST(ROUND(o.total * 100) AS INTEGER) AS amount_minor,
+      COALESCE((SELECT currency FROM table_order_items WHERE order_id = o.id LIMIT 1), 'TRY') AS currency,
+      'unspecified' AS payment_method, COALESCE(NULLIF(o.closed_at, ''), o.updated_at) AS occurred_at,
+      EXISTS(SELECT 1 FROM room_folio_table_order_transfers WHERE table_order_id = o.id) AS transferred
+      FROM table_orders o WHERE o.id = ?`).get(sourceId);
+    if (!row) throw new Error("Finance source not found.");
+    if (row.status !== "paid" || Number(row.total) <= 0 || row.transferred) {
+      db.prepare("UPDATE finance_entries SET deleted_at = ?, updated_at = ? WHERE source_type = ? AND source_id = ?")
+        .run(String(row.updated_at), String(row.updated_at), source, sourceId);
+      return;
+    }
+    prefix = "finance_restaurant_"; category = "restaurant"; description = "Restoran adisyonu";
+  } else if (source === "pension_payment") {
+    row = db.prepare("SELECT *, paid_at AS occurred_at FROM pension_payments WHERE id = ?").get(sourceId);
+    prefix = "finance_pension_"; category = "pension"; description = "Pansiyon ödemesi";
+  } else if (source === "room_folio_payment") {
+    row = db.prepare("SELECT *, paid_at AS occurred_at FROM room_folio_payments WHERE id = ?").get(sourceId);
+    if (row && row.origin !== "direct") return;
+    prefix = "finance_room_folio_"; category = "pension"; description = "Oda tahsilatı";
+  } else {
+    row = db.prepare("SELECT * FROM customer_credit_entries WHERE id = ? AND entry_type = 'payment'").get(sourceId);
+    prefix = "finance_credit_"; category = "other_income"; description = "Veresiye tahsilatı";
+  }
+  if (!row) throw new Error("Finance source not found.");
+  db.prepare(`INSERT INTO finance_entries (
+    id, direction, amount_minor, currency, payment_method, category, description,
+    occurred_at, source_type, source_id, note, created_at, updated_at, deleted_at, sync_status
+  ) VALUES (?, 'income', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
+    ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
+      amount_minor = excluded.amount_minor, currency = excluded.currency,
+      payment_method = excluded.payment_method, occurred_at = excluded.occurred_at,
+      note = excluded.note, updated_at = excluded.updated_at, deleted_at = excluded.deleted_at`)
+    .run(prefix + sourceId, Number(row.amount_minor), String(row.currency), String(row.payment_method), category, description,
+      String(row.occurred_at), source, sourceId, String(row.note), String(row.created_at), String(row.updated_at), String(row.deleted_at ?? ""));
+}
+
 const DEFAULT_FINANCE_CATEGORIES: ReadonlyArray<{
   id: string;
   direction: FinanceDirection;
@@ -426,6 +472,7 @@ export class DesktopFinanceService {
 
     const db = this.openDatabase();
     try {
+      db.exec("BEGIN IMMEDIATE");
       const balance = db.prepare(`
         SELECT
           reservations.reservation_type,
@@ -457,13 +504,14 @@ export class DesktopFinanceService {
       if (amountMinor > remaining) return { ok: false, message: "Ödeme tutarı kalan alacaktan büyük olamaz." };
 
       const now = new Date().toISOString();
+      const paymentId = `pension_payment_${randomUUID()}`;
       db.prepare(`
         INSERT INTO pension_payments (
           id, reservation_id, amount_minor, currency, payment_method, paid_at,
           note, created_at, updated_at, deleted_at, sync_status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'local_only')
       `).run(
-        `pension_payment_${randomUUID()}`,
+        paymentId,
         reservationId,
         amountMinor,
         normalizeCurrency(balance.currency),
@@ -473,12 +521,15 @@ export class DesktopFinanceService {
         now,
         now
       );
+      synchronizeFinanceSourceInTransaction(db, "pension_payment", paymentId);
+      db.exec("COMMIT");
     } catch (error) {
       if (error instanceof Error && error.message.includes("reservation_payment_authority_transferred")) {
         return { ok: false, message: "Bu rezervasyonun ödeme hesabı açılmış. Tahsilatı oda hesabından yapın." };
       }
       return { ok: false, message: "Pansiyon ödemesi kaydedilemedi." };
     } finally {
+      if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
 

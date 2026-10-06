@@ -1,3 +1,4 @@
+import { synchronizeFinanceSourceInTransaction } from "./finance";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
@@ -170,6 +171,7 @@ const PAYMENT_METHODS = new Set<RoomFolioPaymentMethod>(["cash", "card", "bank",
 
 export function addRoomFolioPaymentInTransaction(db: DatabaseSync, input: AddRoomFolioPaymentInput,
   metadata: { paymentId?: string; referenceId?: string; now?: string } = {}): { ok: true; message: string } | { ok: false; message: string } {
+  if (!db.isTransaction) throw new Error("Room folio payment requires a transaction.");
   const folioId = cleanText(input?.folioId, 180);
   const amountMinor = positiveAmount(input?.amountMinor);
   if (!folioId || amountMinor === null) return { ok: false, message: "Ödeme tutarı geçersiz." };
@@ -181,13 +183,15 @@ export function addRoomFolioPaymentInTransaction(db: DatabaseSync, input: AddRoo
   if (safeMinor(folio.remaining_minor) <= 0) return { ok: false, message: "Bu oda hesabının ödemesi tamamlanmış." };
   if (amountMinor > safeMinor(folio.remaining_minor)) return { ok: false, message: "Ödeme kalan tutardan büyük olamaz." };
   const now = metadata.now ?? new Date().toISOString();
+  const paymentId = metadata.paymentId ?? `room_folio_payment_${randomUUID()}`;
   db.prepare(`INSERT INTO room_folio_payments (
     id, folio_id, amount_minor, currency, payment_method, paid_at, note,
     origin, reference_id, created_at, updated_at, deleted_at, sync_status
   ) VALUES (?, ?, ?, ?, ?, ?, ?, 'direct', ?, ?, ?, '', 'local_only')`)
-    .run(metadata.paymentId ?? `room_folio_payment_${randomUUID()}`, folioId, amountMinor,
+    .run(paymentId, folioId, amountMinor,
       normalizeCurrency(folio.currency), normalizePaymentMethod(input.paymentMethod), now,
       cleanText(input.note, 500), metadata.referenceId ?? "", now, now);
+  synchronizeFinanceSourceInTransaction(db, "room_folio_payment", paymentId);
   return { ok: true, message: "Ödeme alındı ve kasaya işlendi." };
 }
 
@@ -741,11 +745,14 @@ export class DesktopRoomFolioService {
   addPayment(input: AddRoomFolioPaymentInput): DesktopRoomFolioMutationResult {
     const db = this.openDatabase();
     try {
+      db.exec("BEGIN IMMEDIATE");
       const result = addRoomFolioPaymentInTransaction(db, input);
       if (!result.ok) return result;
+      db.exec("COMMIT");
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Ödeme kaydedilemedi.") };
     } finally {
+      if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
     return { ok: true, message: "Ödeme alındı ve kasaya işlendi.", data: this.getData(), folioId: cleanText(input.folioId, 180) };
@@ -757,6 +764,7 @@ export class DesktopRoomFolioService {
     const db = this.openDatabase();
     let folioId = "";
     try {
+      db.exec("BEGIN IMMEDIATE");
       const payment = db.prepare(`
         SELECT folio_id, origin FROM room_folio_payments WHERE id = ? AND deleted_at = ''
       `).get(paymentId) as Record<string, unknown> | undefined;
@@ -768,7 +776,10 @@ export class DesktopRoomFolioService {
       db.prepare(`
         UPDATE room_folio_payments SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?
       `).run(now, now, paymentId);
+      synchronizeFinanceSourceInTransaction(db, "room_folio_payment", paymentId);
+      db.exec("COMMIT");
     } finally {
+      if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
     return { ok: true, message: "Ödeme kaydı geri alındı.", data: this.getData(), folioId };

@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { randomUUID } from "node:crypto";
 import { app, nativeImage } from "electron";
 import {
   normalizeBarcodeIdentity,
+  createId,
   type ProductDataProviderId,
   type ProductLookupMode,
   type ProductLookupResponse
@@ -13,6 +15,8 @@ import {
   resolveProductAssetAbsolutePath,
   resolveProductAssetRelativePath
 } from "./data-paths.js";
+import { attachCatalogProductImageInTransaction, type SaveCatalogProductInput, type CatalogProductImageMutation } from "./commerce-store";
+import { desktopLog } from "./desktop-logger";
 
 const OPEN_FOOD_FACTS_PROVIDER: ProductDataProviderId = "open_food_facts";
 const OPEN_FOOD_FACTS_API = "https://world.openfoodfacts.org/api/v2/product";
@@ -292,13 +296,23 @@ function normalizedManualProductImage(dataUrlInput: string): Buffer {
 
 function writeProductImageAsset(databasePath: string, productId: string, encoded: Buffer): string {
   const dataRoot = path.dirname(databasePath);
-  const absolutePath = resolveProductAssetAbsolutePath(dataRoot, productId, "front.jpg");
-  const relativePath = resolveProductAssetRelativePath(productId, "front.jpg");
+  const fileName = `image_${randomUUID()}.jpg`;
+  const absolutePath = resolveProductAssetAbsolutePath(dataRoot, productId, fileName);
+  const relativePath = resolveProductAssetRelativePath(productId, fileName);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-  const tempPath = `${absolutePath}.tmp-${process.pid}`;
+  const tempPath = `${absolutePath}.tmp`;
   try {
-    fs.writeFileSync(tempPath, encoded);
-    fs.copyFileSync(tempPath, absolutePath);
+    const descriptor = fs.openSync(tempPath, "wx");
+    try {
+      fs.writeFileSync(descriptor, encoded);
+      fs.fsyncSync(descriptor);
+    } finally { fs.closeSync(descriptor); }
+    // Complete an immutable file before any DB reference. No post-commit finalize is needed.
+    fs.renameSync(tempPath, absolutePath);
+    if (process.platform !== "win32") {
+      const directory = fs.openSync(path.dirname(absolutePath), "r");
+      try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
+    }
   } finally {
     try {
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
@@ -307,6 +321,64 @@ function writeProductImageAsset(databasePath: string, productId: string, encoded
     }
   }
   return relativePath;
+}
+
+/** Image acquisition is optional, as in the existing save contract. A failed prepare
+ * keeps the current asset; product validation/commit still owns success or failure. */
+export async function prepareProductImageForSave(databasePath: string, input: SaveCatalogProductInput): Promise<CatalogProductImageMutation | undefined> {
+  const productId = String(input.id ?? "").trim() || createId("product_");
+  if (input.clearImage) return { productId, assetPath: "", sourceUrl: "", license: "" };
+  const sourceUrl = String(input.imageSourceUrl ?? "").trim().slice(0, 1200);
+  if (!input.manualImageDataUrl && !sourceUrl) return undefined;
+  try {
+    let encoded: Buffer;
+    let license = String(input.imageLicense ?? "").trim().slice(0, 80);
+    if (input.manualImageDataUrl) encoded = normalizedManualProductImage(input.manualImageDataUrl);
+    else {
+      const settings = productDataSettings(databasePath);
+      if (!settings.enabled || !settings.includeImages) return undefined;
+      const db = openDatabase(databasePath);
+      let providerId = String(input.dataSource ?? "").trim().slice(0, 80);
+      try {
+        const row = db.prepare("SELECT image_asset_path, image_source_url, data_source, image_license FROM catalog_products WHERE id = ? AND deleted_at = ''").get(productId);
+        if (row?.image_asset_path && row.image_source_url === sourceUrl) return undefined;
+        if (input.dataSource === undefined) providerId = String(row?.data_source ?? "").trim().slice(0, 80);
+        if (input.imageLicense === undefined) license = String(row?.image_license ?? "").trim().slice(0, 80);
+      } finally { db.close(); }
+      encoded = await fetchNormalizedProductImage(providerId, sourceUrl);
+    }
+    const assetPath = writeProductImageAsset(databasePath, productId, encoded);
+    return { productId, assetPath, sourceUrl: input.manualImageDataUrl ? "" : sourceUrl,
+      license: input.manualImageDataUrl ? "" : license };
+  } catch (error) {
+    desktopLog.warn({ scope: "product-data", event: input.manualImageDataUrl ? "product-data.manual-image-archive.failed" : "product-data.image-archive.failed",
+      message: input.manualImageDataUrl ? "Manuel ürün görseli arşivlenemedi." : "Ürün görseli arşivlenemedi.", meta: { productId }, error });
+    return undefined;
+  }
+}
+
+/** Startup only, before background work: collect abandoned prepared files and replaced
+ * immutable images under a DB write lock. Never follow symlinks or remove referenced assets. */
+export function cleanupOrphanProductImages(databasePath: string): void {
+  const db = openDatabase(databasePath);
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    const referenced = new Set(db.prepare("SELECT image_asset_path FROM catalog_products WHERE image_asset_path <> ''").all()
+      .map(row => String(row.image_asset_path)));
+    const root = path.join(path.dirname(databasePath), "assets", "products");
+    if (fs.existsSync(root)) for (const directory of fs.readdirSync(root, { withFileTypes: true })) {
+      if (!directory.isDirectory() || !/^[A-Za-z0-9_-]{1,64}$/.test(directory.name)) continue;
+      for (const file of fs.readdirSync(path.join(root, directory.name), { withFileTypes: true })) {
+        if (!file.isFile() || !/^image_[0-9a-f-]{36}\.jpg(?:\.tmp)?$/.test(file.name)) continue;
+        const relative = `assets/products/${directory.name}/${file.name}`;
+        if (!referenced.has(relative)) fs.unlinkSync(path.join(root, directory.name, file.name));
+      }
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    desktopLog.warn({ scope: "product-data", event: "product-data.orphan-cleanup.failed", message: "Kullanılmayan ürün görselleri temizlenemedi.", error });
+  } finally { db.close(); }
 }
 
 export async function previewExternalProductImage(
@@ -334,73 +406,13 @@ export async function archiveExternalProductImage(
 
   const database = openDatabase(databasePath);
   try {
-    database.prepare(`
-      UPDATE catalog_products
-      SET image_asset_path = ?, updated_at = ?
-      WHERE id = ? AND deleted_at = ''
-    `).run(relativePath, new Date().toISOString(), productId);
+    database.exec("BEGIN IMMEDIATE");
+    const attached = attachCatalogProductImageInTransaction(database, productId, imageUrl, relativePath);
+    database.exec("COMMIT");
+    return attached ? relativePath : "";
   } finally {
+    if (database.isTransaction) database.exec("ROLLBACK");
     database.close();
-  }
-  return relativePath;
-}
-
-export function archiveManualProductImage(
-  databasePath: string,
-  productId: string,
-  dataUrl: string
-): string {
-  const encoded = normalizedManualProductImage(dataUrl);
-  const relativePath = writeProductImageAsset(databasePath, productId, encoded);
-  const database = openDatabase(databasePath);
-  try {
-    database.prepare(`
-      UPDATE catalog_products
-      SET image_asset_path = ?,
-          image_source_url = '',
-          image_license = '',
-          updated_at = ?
-      WHERE id = ? AND deleted_at = ''
-    `).run(relativePath, new Date().toISOString(), productId);
-  } finally {
-    database.close();
-  }
-  return relativePath;
-}
-
-export function clearProductImage(databasePath: string, productId: string): void {
-  const database = openDatabase(databasePath);
-  let relativePath = "";
-  try {
-    const row = database.prepare(`
-      SELECT image_asset_path
-      FROM catalog_products
-      WHERE id = ? AND deleted_at = ''
-      LIMIT 1
-    `).get(productId) as { image_asset_path?: unknown } | undefined;
-    relativePath = text(row?.image_asset_path, 500);
-    database.prepare(`
-      UPDATE catalog_products
-      SET image_asset_path = '',
-          image_source_url = '',
-          image_license = '',
-          updated_at = ?
-      WHERE id = ? AND deleted_at = ''
-    `).run(new Date().toISOString(), productId);
-  } finally {
-    database.close();
-  }
-
-  try {
-    const dataRoot = path.dirname(databasePath);
-    const absolutePath = relativePath
-      ? resolveProductAssetAbsoluteFromRelative(dataRoot, relativePath)
-      : resolveProductAssetAbsolutePath(dataRoot, productId, "front.jpg");
-    if (fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
-      fs.unlinkSync(absolutePath);
-    }
-  } catch {
-    // The database reference is already cleared; filesystem cleanup is best effort.
   }
 }
 

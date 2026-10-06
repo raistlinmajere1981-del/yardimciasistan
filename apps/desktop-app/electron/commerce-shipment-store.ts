@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { getShipmentRegistration, confirmShipmentRegistrationInTransaction } from "./shipping-registration-store";
 import { createId, normalizeCommerceOrderDeliverySnapshot,
   type CommerceShipment, type CommerceShipmentStatus, type UpdateCommerceShipmentStatusInput
 } from "@yardimci-asistan/shared";
@@ -95,7 +96,7 @@ function updateShipmentStatusInTransaction(db: DatabaseSync, businessId: string,
     if (current.status === target) return current;
     if (!transitions[current.status].includes(target)) throw new CommerceShipmentDomainError("Geçersiz gönderi durum geçişi.");
     if (!providerUpdate) {
-      const registration = db.prepare("SELECT state FROM commerce_shipment_registrations WHERE shipment_id = ?").get(String(row.id));
+      const registration = getShipmentRegistration(db, String(row.id));
       if (registration?.state === "submitted") throw new CommerceShipmentDomainError("Sağlayıcı sonucu belirsiz gönderi önce sorgulanmalı.");
       if (input.status === "cancelled" && row.provider_id && row.external_reference) {
         throw new CommerceShipmentDomainError("Sağlayıcıya kayıtlı gönderi yerel olarak iptal edilemez.");
@@ -132,23 +133,22 @@ export function applyShipmentProviderResult(path: string, input: ShipmentProvide
   return withDatabase(path, true, (db, businessId) => {
     const row = shipmentRow(db, businessId, input.shipmentId);
     if (!row) throw new CommerceShipmentDomainError("Gönderi bulunamadı.");
-    const registration = db.prepare("SELECT * FROM commerce_shipment_registrations WHERE shipment_id = ?").get(input.shipmentId);
-    if (!registration || registration.provider_id !== input.providerId || registration.integration_code !== input.externalReference
-      || registration.account_fingerprint !== input.accountFingerprint) throw new CommerceShipmentDomainError("Gönderi sağlayıcı kaydı eşleşmedi.");
+    const now = new Date().toISOString();
+    if (!confirmShipmentRegistrationInTransaction(db, { shipmentId: input.shipmentId, providerId: input.providerId,
+      integrationCode: input.externalReference, accountFingerprint: input.accountFingerprint }, now)) {
+      throw new CommerceShipmentDomainError("Gönderi sağlayıcı kaydı eşleşmedi.");
+    }
     if (row.provider_id && (row.provider_id !== input.providerId || row.external_reference !== input.externalReference)) {
       throw new CommerceShipmentDomainError("Gönderinin sağlayıcı bağlantısı değiştirilemez.");
     }
     for (const value of [input.providerId, input.providerName, input.externalReference, input.trackingNumber ?? "", input.trackingUrl ?? ""]) {
       if (typeof value !== "string" || value.length > 500 || /[\x00-\x1f\x7f]/.test(value)) throw new CommerceShipmentDomainError("Gönderi sağlayıcı bilgileri geçersiz.");
     }
-    const now = new Date().toISOString();
     db.prepare(`UPDATE commerce_shipments SET provider_id = ?, provider_name = ?, external_reference = ?,
       tracking_number = CASE WHEN ? <> '' THEN ? ELSE tracking_number END,
       tracking_url = CASE WHEN ? <> '' OR ? <> '' THEN ? ELSE tracking_url END, updated_at = ? WHERE id = ? AND business_id = ?`)
       .run(input.providerId, input.providerName, input.externalReference, input.trackingNumber ?? "", input.trackingNumber ?? "",
         input.trackingNumber ?? "", input.trackingUrl ?? "", input.trackingUrl ?? "", now, input.shipmentId, businessId);
-    db.prepare("UPDATE commerce_shipment_registrations SET state = 'registered', updated_at = ? WHERE shipment_id = ?")
-      .run(now, input.shipmentId);
     const order = requireOrder(db, businessId, String(row.order_id));
     const steps: CommerceShipmentStatus[] = ["draft", "ready", "dispatched", "delivered"];
     const current = steps.indexOf(row.status as CommerceShipmentStatus);

@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { DesktopRoomFolioService } = require("../apps/desktop-app/dist-electron/room-folio.js");
 const { saveBusinessLayout } = require("../apps/desktop-app/dist-electron/business-layout.js");
+const { synchronizeFinanceSourceInTransaction } = require("../apps/desktop-app/dist-electron/finance.js");
 const { DesktopFinanceService } = require("../apps/desktop-app/dist-electron/finance.js");
 
 const appPath = join(process.cwd(), "apps", "desktop-app");
@@ -121,10 +122,13 @@ try {
   `).run(today, checkout, now, now);
   sqlite.prepare(`UPDATE customer_room_stays SET reservation_id = 'folio_smoke_reservation' WHERE id = ?`)
     .run("room_folio_smoke_stay");
+  sqlite.exec("BEGIN IMMEDIATE");
   sqlite.prepare(`
     INSERT INTO pension_payments (id, reservation_id, amount_minor, payment_method, paid_at, note, created_at, updated_at)
     VALUES ('folio_smoke_deposit', 'folio_smoke_reservation', ?, 'bank', ?, 'Rezervasyon kaporası', ?, ?)
   `).run(depositAmount, now, now, now);
+  synchronizeFinanceSourceInTransaction(sqlite, "pension_payment", "folio_smoke_deposit");
+  sqlite.exec("COMMIT");
   sqlite.close();
 
   const profileData = service.getData();

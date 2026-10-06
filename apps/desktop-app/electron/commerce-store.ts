@@ -56,10 +56,18 @@ export interface SaveCatalogProductInput {
   dataLicense?: string;
   imageLicense?: string;
   sourceFetchedAt?: string;
-  /** Renderer-only image draft. Store ignores it; IPC archives after product identity exists. */
+  /** Optional image draft; the application prepares the asset before persistence. */
   manualImageDataUrl?: string;
-  /** Renderer-only image mutation. Store ignores it; IPC removes durable asset after save. */
+  /** Explicit image removal, applied with the product transaction by the application. */
   clearImage?: boolean;
+}
+
+/** Internal application-prepared asset identity, never accepted directly from the renderer. */
+export interface CatalogProductImageMutation {
+  productId: string;
+  assetPath: string;
+  sourceUrl: string;
+  license: string;
 }
 
 export interface ApplyInventoryMovementInput {
@@ -474,14 +482,16 @@ export function findCatalogProductByBarcode(databasePath: string, barcodeInput: 
 export function saveCatalogProductInTransaction(
   database: DatabaseSync,
   input: SaveCatalogProductInput,
-  now = new Date().toISOString()
+  now = new Date().toISOString(),
+  image?: CatalogProductImageMutation
 ): CatalogProduct {
   const businessId = activeBusinessId(database);
   const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
   if (!name) throw new Error("Ürün adı gerekli.");
   if (name.length > 180) throw new Error("Ürün adı en fazla 180 karakter olabilir.");
 
-  const id = String(input.id ?? "").trim() || createId("product_");
+  const id = String(input.id ?? "").trim() || image?.productId || createId("product_");
+  if (image && image.productId !== id) throw new Error("Ürün görsel kimliği eşleşmedi.");
   const existing = getProductRow(database, businessId, id);
   if (input.id && !existing) throw new Error("Düzenlenecek ürün bulunamadı.");
 
@@ -492,12 +502,14 @@ export function saveCatalogProductInTransaction(
   const barcode = normalizeBarcodeIdentity(input.barcode, 80);
   const description = String(input.description ?? "").trim().slice(0, 2000);
   const previousImageSourceUrl = String(existing?.image_source_url ?? "").trim().slice(0, 1200);
-  const imageSourceUrl = input.imageSourceUrl === undefined
+  const requestedImageSourceUrl = String(input.imageSourceUrl ?? "").trim().slice(0, 1200);
+  const preserveImageMetadata = existing?.image_asset_path && !image && (input.manualImageDataUrl
+    || (input.imageSourceUrl !== undefined && requestedImageSourceUrl !== previousImageSourceUrl));
+  const imageSourceUrl = image?.sourceUrl ?? ((preserveImageMetadata || input.imageSourceUrl === undefined)
     ? previousImageSourceUrl
-    : String(input.imageSourceUrl ?? "").trim().slice(0, 1200);
-  const imageAssetPath = input.imageSourceUrl !== undefined && imageSourceUrl !== previousImageSourceUrl
-    ? ""
-    : String(existing?.image_asset_path ?? "").trim().slice(0, 500);
+    : requestedImageSourceUrl);
+  // A requested optional replacement must not detach the previous valid asset on prepare failure.
+  const imageAssetPath = image ? image.assetPath : String(existing?.image_asset_path ?? "").trim().slice(0, 500);
   const dataSource = input.dataSource === undefined
     ? String(existing?.data_source ?? "").trim().slice(0, 80)
     : String(input.dataSource ?? "").trim().slice(0, 80);
@@ -507,9 +519,9 @@ export function saveCatalogProductInTransaction(
   const dataLicense = input.dataLicense === undefined
     ? String(existing?.data_license ?? "").trim().slice(0, 80)
     : String(input.dataLicense ?? "").trim().slice(0, 80);
-  const imageLicense = input.imageLicense === undefined
+  const imageLicense = image?.license ?? ((preserveImageMetadata || input.imageLicense === undefined)
     ? String(existing?.image_license ?? "").trim().slice(0, 80)
-    : String(input.imageLicense ?? "").trim().slice(0, 80);
+    : String(input.imageLicense ?? "").trim().slice(0, 80));
   const sourceFetchedAt = input.sourceFetchedAt === undefined
     ? String(existing?.source_fetched_at ?? "").trim().slice(0, 80)
     : String(input.sourceFetchedAt ?? "").trim().slice(0, 80);
@@ -613,12 +625,12 @@ export function saveCatalogProductInTransaction(
   return mapProduct(saved);
 }
 
-export function saveCatalogProduct(databasePath: string, input: SaveCatalogProductInput): CatalogProduct {
+export function saveCatalogProduct(databasePath: string, input: SaveCatalogProductInput, image?: CatalogProductImageMutation): CatalogProduct {
   const database = openDatabase(databasePath);
   try {
     database.exec("BEGIN IMMEDIATE");
     try {
-      const saved = saveCatalogProductInTransaction(database, input);
+      const saved = saveCatalogProductInTransaction(database, input, new Date().toISOString(), image);
       database.exec("COMMIT");
       return saved;
     } catch (error) {
@@ -628,6 +640,14 @@ export function saveCatalogProduct(databasePath: string, input: SaveCatalogProdu
   } finally {
     database.close();
   }
+}
+
+/** Late optional Android acquisition can only attach to the still-current, empty image intent. */
+export function attachCatalogProductImageInTransaction(database: DatabaseSync, productId: string, imageUrl: string, assetPath: string): boolean {
+  if (!database.isTransaction) throw new Error("Product image attachment requires a transaction.");
+  return database.prepare(`UPDATE catalog_products SET image_asset_path = ?, updated_at = ?
+    WHERE id = ? AND deleted_at = '' AND image_source_url = ? AND image_asset_path = ''`)
+    .run(assetPath, new Date().toISOString(), productId, imageUrl).changes === 1;
 }
 
 export function getInventoryBalance(databasePath: string, productIdInput: string, locationId?: string): InventoryBalance {

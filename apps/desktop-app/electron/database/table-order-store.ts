@@ -12,6 +12,7 @@ import { androidPayloadString } from "./android-utils.js";
 import { mutateMenuStockInTransaction } from "./menu-stock-store.js";
 import { nextMutationTimestamp } from "./android-utils.js";
 import { normalizeStockPrecision, normalizeTableOrderCurrency, roundMoney } from "./stock-utils.js";
+import { synchronizeFinanceSourceInTransaction } from "../finance.js";
 
 export function listTableOrders(db: DatabaseSync): DesktopTableOrder[] {
   const rows = db
@@ -305,13 +306,14 @@ export function recalculateTableOrderTotalInTransaction(db: DatabaseSync, orderI
             END
           ), 0) AS subtotal,
           table_orders.discount_total AS discount_total,
+          table_orders.status AS status,
           table_orders.updated_at AS updated_at
         FROM table_orders
         LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
         WHERE table_orders.id = ?
         GROUP BY table_orders.id
       `)
-    .get(orderId) as { subtotal?: number; discount_total?: number; updated_at?: string } | undefined;
+    .get(orderId) as { subtotal?: number; discount_total?: number; updated_at?: string; status?: string } | undefined;
   if (!row) {
     throw new Error("Table order not found while recalculating totals.");
   }
@@ -323,6 +325,7 @@ export function recalculateTableOrderTotalInTransaction(db: DatabaseSync, orderI
   db
     .prepare("UPDATE table_orders SET subtotal = ?, discount_total = ?, total = ?, updated_at = ? WHERE id = ?")
     .run(subtotal, discountTotal, total, updatedAt, orderId);
+  if (row.status === "paid") synchronizeFinanceSourceInTransaction(db, "restaurant_order", orderId);
 }
 
 export function getTableOrderMutationResult(db: DatabaseSync, orderId: string, message: string): DesktopTableOrderResult {

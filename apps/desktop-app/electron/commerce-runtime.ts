@@ -32,7 +32,8 @@ import {
 } from "./commerce-category-store";
 import {
   getProductImageDataUrl,
-  lookupExternalProductByBarcode
+  lookupExternalProductByBarcode,
+  prepareProductImageForSave
 } from "./product-data-service";
 
 import { applyShipmentProviderResult, type ShipmentProviderResultInput, listShipmentsForOrder, getShipment, createShipmentForOrder, updateShipmentStatus } from "./commerce-shipment-store";
@@ -219,10 +220,7 @@ export function listRuntimeCatalogProducts(
   return listCatalogProducts(databasePath, options);
 }
 
-export function saveRuntimeCatalogProduct(
-  databasePath: string,
-  input: SaveCatalogProductInput
-): CatalogProduct {
+function assertRuntimeCatalogProductSave(databasePath: string, input: SaveCatalogProductInput): void {
   requireCapability(
     databasePath,
     BUSINESS_CAPABILITIES.CATALOG,
@@ -241,7 +239,20 @@ export function saveRuntimeCatalogProduct(
     throw new Error("Seçilen ürün kategorisi bulunamadı.");
   }
 
-  return saveCatalogProduct(databasePath, input);
+}
+
+export function prepareRuntimeCatalogProductImage(databasePath: string, input: SaveCatalogProductInput) {
+  assertRuntimeCatalogProductSave(databasePath, input);
+  return prepareProductImageForSave(databasePath, input);
+}
+
+export function saveRuntimeCatalogProduct(
+  databasePath: string,
+  input: SaveCatalogProductInput,
+  image?: import("./commerce-store").CatalogProductImageMutation
+): CatalogProduct {
+  assertRuntimeCatalogProductSave(databasePath, input);
+  return saveCatalogProduct(databasePath, input, image);
 }
 
 export function getRuntimeInventoryBalance(

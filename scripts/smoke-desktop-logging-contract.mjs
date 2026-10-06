@@ -7,6 +7,7 @@ const logger = read("apps/desktop-app/electron/desktop-logger.ts");
 const entry = read("apps/desktop-app/electron/main-entry.ts");
 const dataPaths = read("apps/desktop-app/electron/data-paths.ts");
 const commerceIpc = read("apps/desktop-app/electron/commerce-ipc.ts");
+const productDataService = read("apps/desktop-app/electron/product-data-service.ts");
 const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
 const dataMaintenance = read("apps/desktop-app/electron/data-maintenance.ts");
 const updateService = read("apps/desktop-app/electron/desktop-update-service.ts");
@@ -88,7 +89,7 @@ assert.doesNotMatch(diagnosticsViewer, />Scope</);
 assert.match(commerceIpc, /commerce:product:previewExternalImage/);
 // Runtime diagnostics must use the structured API with stable events.
 assert.match(commerceIpc, /product-data\.image-preview\.failed/);
-assert.match(commerceIpc, /product-data\.image-archive\.failed/);
+assert.match(productDataService, /product-data\.image-archive\.failed/);
 assert.match(commerceIpc, /commerce\.domain\.rejected/);
 assert.match(commerceIpc, /desktopLog\.warn\(\{[\s\S]*?event:\s*"commerce\.domain\.rejected"/);
 assert.match(commerceIpc, /mutateForIpc\("commerce:sale:createPaid"/);
@@ -127,6 +128,7 @@ assert.doesNotMatch(logger, /legacy\.(info|warn|error)/);
 for (const [name, source] of [
   ["main-entry", entry],
   ["commerce-ipc", commerceIpc],
+  ["product-data-service", productDataService],
   ["sync-coordinator", syncCoordinator],
   ["data-maintenance", dataMaintenance],
   ["update-service", updateService],

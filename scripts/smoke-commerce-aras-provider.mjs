@@ -111,6 +111,27 @@ try {
   await service.testConnection({ ...config, password: "draft-only-test-password" });
   assert.deepEqual(raw.prepare("SELECT * FROM commerce_shipping_provider_config").get(), initialConfig, "test has no persistence side effect");
 
+  // The remote submission fence commits before I/O; receipt + local shipment commit together.
+  for (const owner of ["registration", "shipment"]) {
+    const shipment = newShipment();
+    const before = database.getShipment(shipment.id);
+    if (owner === "registration") raw.exec(`CREATE TRIGGER test_receipt_fail BEFORE UPDATE ON commerce_shipment_registrations
+      WHEN NEW.state = 'registered' BEGIN SELECT RAISE(ABORT, 'injected_receipt'); END`);
+    else raw.exec(`CREATE TRIGGER test_receipt_fail BEFORE UPDATE ON commerce_shipments
+      BEGIN SELECT RAISE(ABORT, 'injected_shipment'); END`);
+    await assert.rejects(service.registerShipment(shipment.id));
+    assert.deepEqual(database.getShipment(shipment.id), before, `${owner} failure preserves local shipment`);
+    assert.equal(database.getShipmentRegistration(shipment.id).state, "submitted", "receipt failure preserves no-resubmit fence and rolls back registered");
+    const sent = network.calls.filter(call => call.operation === "SetOrder" && call.id === shipment.id).length;
+    assert.equal(sent, 1);
+    raw.exec("DROP TRIGGER test_receipt_fail");
+    const recovered = await fixtureShippingService(() => database, network, secrets, logs).registerShipment(shipment.id);
+    assert.equal(recovered.status, "draft");
+    assert.equal(recovered.externalReference, shipment.id);
+    assert.equal(database.getShipmentRegistration(shipment.id).state, "registered");
+    assert.equal(network.calls.filter(call => call.operation === "SetOrder" && call.id === shipment.id).length, sent, "retry reconciles without a duplicate provider registration");
+  }
+
   const pending = newShipment();
   const beforeOrder = database.getCommerceOrder(pending.orderId);
   network.state.lostSet = true;

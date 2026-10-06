@@ -6,6 +6,7 @@ import { join } from "node:path";
 import process from "node:process";
 
 const require = createRequire(import.meta.url);
+const { synchronizeFinanceSourceInTransaction } = require("../apps/desktop-app/dist-electron/finance.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 
 const appPath = join(process.cwd(), "apps", "desktop-app");
@@ -31,7 +32,8 @@ function verifyFinanceFoundation(databasePath) {
   const today = now.slice(0, 10);
 
   try {
-    sqlite.exec("PRAGMA foreign_keys = ON");
+    sqlite.exec("PRAGMA foreign_keys = ON; BEGIN IMMEDIATE");
+    const sync = (source, id) => synchronizeFinanceSourceInTransaction(sqlite, source, id);
 
     const reservationColumns = sqlite.prepare("PRAGMA table_info(reservations)").all();
     assert.ok(reservationColumns.some((column) => column.name === "agreed_total_minor"));
@@ -67,12 +69,14 @@ function verifyFinanceFoundation(databasePath) {
         note, created_at, updated_at
       ) VALUES (?, ?, 'open', ?, '', 250.50, 0, 250.50, '', ?, ?)
     `).run("finance_smoke_order", "finance_smoke_table", now, now, now);
+    sync("restaurant_order", "finance_smoke_order");
 
     sqlite.prepare(`
       UPDATE table_orders
       SET status = 'paid', closed_at = ?, updated_at = ?
       WHERE id = ?
     `).run(now, now, "finance_smoke_order");
+    sync("restaurant_order", "finance_smoke_order");
 
     const restaurantEntry = sqlite.prepare(`
       SELECT direction, amount_minor, currency, category, source_type, source_id
@@ -98,6 +102,7 @@ function verifyFinanceFoundation(databasePath) {
       SET note = 'Tekrar güncellendi', updated_at = ?
       WHERE id = ?
     `).run(new Date(Date.now() + 1000).toISOString(), "finance_smoke_order");
+    sync("restaurant_order", "finance_smoke_order");
 
     assert.equal(
       sqlite.prepare(`
@@ -115,6 +120,7 @@ function verifyFinanceFoundation(databasePath) {
       SET status = 'cancelled', updated_at = ?
       WHERE id = ?
     `).run(cancelledAt, "finance_smoke_order");
+    sync("restaurant_order", "finance_smoke_order");
     assert.equal(
       sqlite.prepare(`
         SELECT deleted_at
@@ -131,6 +137,7 @@ function verifyFinanceFoundation(databasePath) {
       SET status = 'paid', closed_at = ?, updated_at = ?
       WHERE id = ?
     `).run(repaidAt, repaidAt, "finance_smoke_order");
+    sync("restaurant_order", "finance_smoke_order");
     assert.equal(
       sqlite.prepare(`
         SELECT deleted_at
@@ -162,6 +169,7 @@ function verifyFinanceFoundation(databasePath) {
         note, created_at, updated_at, deleted_at, sync_status
       ) VALUES (?, ?, 100000, 'TRY', 'cash', ?, 'Kapora', ?, ?, '', 'local_only')
     `).run("finance_smoke_payment_1", "finance_smoke_reservation", now, now, now);
+    sync("pension_payment", "finance_smoke_payment_1");
 
     assert.equal(
       sqlite.prepare("SELECT payment_status FROM reservations WHERE id = ?").get("finance_smoke_reservation").payment_status,
@@ -187,6 +195,7 @@ function verifyFinanceFoundation(databasePath) {
         note, created_at, updated_at, deleted_at, sync_status
       ) VALUES (?, ?, 350000, 'TRY', 'card', ?, 'Kalan ödeme', ?, ?, '', 'local_only')
     `).run("finance_smoke_payment_2", "finance_smoke_reservation", now, now, now);
+    sync("pension_payment", "finance_smoke_payment_2");
 
     assert.equal(
       sqlite.prepare("SELECT payment_status FROM reservations WHERE id = ?").get("finance_smoke_reservation").payment_status,
@@ -211,6 +220,7 @@ function verifyFinanceFoundation(databasePath) {
       SET deleted_at = ?, updated_at = ?
       WHERE id = ?
     `).run(deletedAt, deletedAt, "finance_smoke_payment_2");
+    sync("pension_payment", "finance_smoke_payment_2");
 
     assert.equal(
       sqlite.prepare("SELECT payment_status FROM reservations WHERE id = ?").get("finance_smoke_reservation").payment_status,
@@ -250,7 +260,9 @@ function verifyFinanceFoundation(databasePath) {
       sqlite.prepare("SELECT amount_minor FROM finance_entries WHERE id = ?").get("finance_smoke_expense").amount_minor,
       125000
     );
+    sqlite.exec("COMMIT");
   } finally {
+    if (sqlite.isTransaction) sqlite.exec("ROLLBACK");
     sqlite.close();
   }
 }

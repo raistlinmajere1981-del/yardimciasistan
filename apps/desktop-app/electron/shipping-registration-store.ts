@@ -31,3 +31,12 @@ export function markShipmentRegistrationSubmitted(db: DatabaseSync, shipmentId: 
     )`)
     .run(new Date().toISOString(), shipmentId).changes === 1;
 }
+
+/** Receipt attachment and the shipment write share the caller's transaction.
+ * Registration identity is immutable, including the provider account/environment. */
+export function confirmShipmentRegistrationInTransaction(db: DatabaseSync, input: Omit<ShipmentRegistration, "state">, now: string): boolean {
+  if (!db.isTransaction) throw new Error("Shipment receipt requires a transaction.");
+  return db.prepare(`UPDATE commerce_shipment_registrations SET state = 'registered', updated_at = ?
+    WHERE shipment_id = ? AND provider_id = ? AND integration_code = ? AND account_fingerprint = ?`)
+    .run(now, input.shipmentId, input.providerId, input.integrationCode, input.accountFingerprint).changes === 1;
+}
