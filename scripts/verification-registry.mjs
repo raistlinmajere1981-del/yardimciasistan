@@ -15,6 +15,7 @@ const SMOKE_FILES = [
   "scripts/smoke-showcase-website.mjs",
   "scripts/smoke-marketing-media-native.mjs",
   "scripts/smoke-marketing-studio.mjs",
+  "scripts/smoke-marketing-share.mjs",
   "scripts/smoke-marketing-website.mjs",
   "scripts/smoke-marketing-ui.mjs",
   "scripts/smoke-messaging-dispatch.mjs",

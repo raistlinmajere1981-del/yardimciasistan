@@ -43,7 +43,10 @@ function checkRevision(expected: unknown, current: number) {
 export function saveMarketingContent(db: DatabaseSync, input: MarketingContentInput, source: "manual" | "ai" = "manual"): MarketingContentDetail {
   return transaction(db, () => {
     const old = input.id ? getMarketingContent(db, input.id) : undefined;
-    if (old) checkRevision(input.expectedRevision, old.content.revision);
+    if (old) {
+      checkRevision(input.expectedRevision, old.content.revision);
+      if (db.prepare("SELECT 1 FROM marketing_share_targets WHERE content_id=?").get(old.content.id)) throw new MarketingError("share_submitted", "İşleme alınmış paylaşımı değiştirmek için yeni paylaşım oluşturun.");
+    }
     const title = marketingText(input.title, 240, true), text = marketingText(input.masterText, 12000);
     if (!["announcement", "promotion"].includes(input.purpose) || !["draft", "ready", "archived"].includes(input.status)) throw new MarketingError("invalid_input", "İçerik türü/durumu geçersiz.");
     if (!Array.isArray(input.variants) || input.variants.length > 4 || new Set(input.variants.map(v => v.channel)).size !== input.variants.length) throw new MarketingError("invalid_input", "Kanal varyantları geçersiz.");

@@ -13,7 +13,7 @@ export function campaignFixture(options = {}) {
   const http = options.http ?? providerFixture(), secrets = secretFixture(), logs = [];
   const single = serviceFixture(() => db, http, secrets, logs);
   db.initialize();
-  const setup = { businessName: 'Campaign Fixture', profileId: 'market', profileOptions: [C.MESSAGING_CAMPAIGNS, C.WHOLESALE], phone: '', whatsapp: '', email: '', address: '',
+  const setup = { businessName: 'Campaign Fixture', profileId: 'market', profileOptions: [C.MARKETING_STUDIO, C.MESSAGING_CAMPAIGNS, C.WHOLESALE], phone: '', whatsapp: '', email: '', address: '',
     webModuleUrl: 'https://example.test', syncSecret: 'fixture-campaign-secret', autoSyncEnabled: false, aiEnabled: false,
     aiProvider: 'openai_compatible', aiService: 'openai', aiProjectName: '', aiModel: '', aiBaseUrl: 'https://api.openai.com/v1', aiTimeoutSeconds: 30,
     aiApiKey: '', clearAiApiKey: false, servicePreferences: { whatsapp: false, android: false }, initialCounts: { rooms: 0, tables: 0 }, tableCategories: [] };
@@ -29,7 +29,7 @@ export function campaignFixture(options = {}) {
     listTemplates: () => single.listTemplates()
   };
   const service = new exports.MessagingCampaignService(() => db, catalog);
-  return { get db() { return db; }, reopen: (beforeOpen) => { db.close(); beforeOpen?.(); db = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dir }); db.initialize(); }, http, secrets, single, service, catalog, setup, logs,
+  return { get db() { return db; }, marketingChannels: () => require('../../apps/desktop-app/dist-electron/marketing/channel-registry.js').createMarketingChannelRegistry(db), reopen: (beforeOpen) => { db.close(); beforeOpen?.(); db = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dir }); db.initialize(); }, http, secrets, single, service, catalog, setup, logs,
     dispose: () => { db.close(); rmSync(dir, { recursive: true, force: true }); } };
 }
 let phoneSequence = 0;

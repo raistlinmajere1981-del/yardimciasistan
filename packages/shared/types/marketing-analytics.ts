@@ -31,10 +31,10 @@ export interface MarketingPublicationAnalytics {
 }
 export interface MarketingAnalyticsSnapshot {
   range: MarketingAnalyticsRange; measuredAt: string;
-  summary: { activeCampaigns: number | null; completedCampaigns: number | null; accepted: number | null; delivered: number | null; read: number | null; failed: number | null; published: number | null };
+  summary: { published: number | null; accepted: number | null; usedChannels: number | null };
   channels: MarketingAnalyticsChannel[];
-  trends: Array<{ date: string; accepted: number | null; failed: number | null; published: number | null }>;
-  recentCampaigns: MarketingCampaignAnalytics[]; recentPublications: MarketingPublicationAnalytics[];
+  trends: Array<{ date: string; accepted: number | null; published: number | null }>;
+  recentResults: Array<{ kind: "campaign"; result: MarketingCampaignAnalytics } | { kind: "publication"; result: MarketingPublicationAnalytics }>;
 }
 export interface MarketingAnalyticsBridge {
   getMarketingAnalytics(range: MarketingAnalyticsRangeInput, opened?: boolean): Promise<MarketingResult<MarketingAnalyticsSnapshot>>;

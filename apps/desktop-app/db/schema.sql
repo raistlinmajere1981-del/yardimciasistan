@@ -2828,6 +2828,16 @@ CREATE TABLE marketing_contents (
   status TEXT NOT NULL CHECK(status IN ('draft','ready','archived')), revision INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+-- Editorial share options and links only; actual publication/delivery/schedule state stays canonical.
+CREATE TABLE marketing_shares (
+  content_id TEXT PRIMARY KEY REFERENCES marketing_contents(id), options_json TEXT NOT NULL
+);
+CREATE TABLE marketing_share_targets (
+  content_id TEXT NOT NULL REFERENCES marketing_shares(content_id),
+  channel TEXT NOT NULL CHECK(channel IN ('website','instagram','whatsapp','sms')),
+  target_type TEXT NOT NULL CHECK(target_type IN ('public_publication','audience_campaign')),
+  target_id TEXT NOT NULL, PRIMARY KEY(content_id,channel)
+);
 CREATE TABLE marketing_content_variants (
   content_id TEXT NOT NULL REFERENCES marketing_contents(id), channel TEXT NOT NULL CHECK(channel IN ('website','whatsapp','sms','instagram')),
   title TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, media_asset_id TEXT REFERENCES media_assets(id), metadata_json TEXT NOT NULL,

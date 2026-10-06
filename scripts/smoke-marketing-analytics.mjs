@@ -40,12 +40,24 @@ try {
   assert.equal(metric(website, 'active_publications').value, 1); assert.equal(metric(website, 'published').value, 1); assert.equal(metric(website, 'failed').value, 0); assert.equal(metric(website, 'failed').availability, 'available');
   assert(!website.metrics.some(m => ['views','clicks','impressions'].includes(m.metric)));
   assert.equal(metric(ig, 'published').value, 1); assert.equal(metric(ig, 'failed').value, 1);
-  assert.equal(data.summary.accepted, 6); assert.equal(data.summary.delivered, 4); assert.equal(data.summary.read, 1); assert.equal(data.summary.failed, 3); assert.equal(data.summary.published, 2);
-  assert.equal(data.trends.reduce((s, t) => s + t.accepted, 0), 6); assert.equal(data.trends.reduce((s, t) => s + t.failed, 0), 3); assert.equal(data.trends.reduce((s, t) => s + t.published, 0), 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(data.summary)), { published: 2, accepted: 6, usedChannels: 4 });
+  assert(!('failed' in data.summary)); // Failures from different units are not added into one result.
+  assert.equal(data.recentResults.length, 5);
+  assert(data.recentResults.every(row => row.result.status !== 'draft'));
+  assert(data.recentResults.every((row, i) => !i || data.recentResults[i-1].result.createdAt >= row.result.createdAt));
+  // Saved drafts are not used channels or recent results; an observed publication count can be zero.
+  const originalInstagram = f.sql.prepare("SELECT id,status,published_at FROM marketing_publications WHERE channel='instagram'").all();
+  f.sql.prepare("UPDATE marketing_publications SET status='draft',published_at='' WHERE channel='instagram'").run();
+  const draftsOnly = f.serviceAnalytics.snapshot({preset:'7d'});
+  assert.equal(draftsOnly.summary.usedChannels, 3);
+  assert.equal(metric(draftsOnly.channels.find(c=>c.channel==='instagram'), 'published').value, 0);
+  assert(!draftsOnly.recentResults.some(row=>row.result.channel==='instagram'));
+  for (const row of originalInstagram) f.sql.prepare('UPDATE marketing_publications SET status=?,published_at=? WHERE id=?').run(row.status,row.published_at,row.id);
+  assert.equal(data.trends.reduce((s, t) => s + t.accepted, 0), 6); assert.equal(data.trends.reduce((s, t) => s + t.published, 0), 2);
   const unsupportedSms = new f.MarketingAnalyticsService(() => f.db, { now: f.now, smsDelivered: false }).snapshot({ preset: '7d' }).channels.find(c => c.channel === 'sms');
   assert.equal(metric(unsupportedSms, 'delivered').value, null); assert.equal(metric(unsupportedSms, 'delivered').availability, 'unsupported'); assert.equal(unsupportedSms.deliveryRate, null); assert.equal(metric(unsupportedSms, 'accepted').value, 3);
   const noData = f.serviceAnalytics.snapshot({ preset: 'custom', startDate: '2029-12-01', endDate: '2029-12-02', timezone: 'UTC' });
-  assert.equal(noData.summary.accepted, null); assert.equal(metric(noData.channels[0], 'active_publications').value, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(noData.summary)), {published: null, accepted: null, usedChannels: null}); assert.equal(noData.recentResults.length, 0); assert.equal(metric(noData.channels[0], 'active_publications').value, 1);
   assert.equal(metric(noData.channels.find(c => c.channel === 'whatsapp'), 'accepted').availability, 'no_data');
   for (const [preset, length] of [['7d',7],['30d',30],['90d',90]]) assert.equal(f.serviceAnalytics.snapshot({ preset, timezone: 'UTC' }).trends.length, length);
   for (const range of [{ preset: 'custom', startDate: '2030-02-30', endDate: '2030-03-01' }, { preset: 'custom', startDate: '2028-01-01', endDate: '2030-01-01' }, { preset: '7d', timezone: 'PRIVATE_BAD_ZONE' }]) assert.throws(() => f.serviceAnalytics.snapshot(range), /tarih aralığı/);
@@ -56,7 +68,7 @@ try {
   f.sql.prepare("UPDATE messaging_campaign_recipients SET created_at=? WHERE campaign_id=?").run(start.startAt, id); assert.equal(metric(f.serviceAnalytics.snapshot(query).channels.find(c => c.channel === 'whatsapp'), 'accepted').value, 3);
   f.sql.prepare("UPDATE messaging_campaign_recipients SET created_at=? WHERE campaign_id=?").run(start.endAt, id); const boundary=f.serviceAnalytics.snapshot(query); assert.equal(metric(boundary.channels.find(c => c.channel === 'whatsapp'), 'accepted').value, null);
   // A campaign created inside the range but prepared outside it still has lifetime counts in recent entries.
-  const recent=boundary.recentCampaigns.find(c=>c.id===id); assert.equal(metric(recent,'accepted').value,3); assert.equal(metric(recent,'audience').value,5);
+  const recent=boundary.recentResults.find(row=>row.kind==='campaign' && row.result.id===id).result; assert.equal(metric(recent,'accepted').value,3); assert.equal(metric(recent,'audience').value,5);
   f.sql.prepare("UPDATE messaging_campaign_recipients SET created_at=? WHERE campaign_id=?").run(f.now().toISOString(), id);
   for (const [date, hours] of [['2030-03-10',23],['2030-11-03',25]]) { const range = f.serviceAnalytics.snapshot({ preset: 'custom', startDate: date, endDate: date, timezone: 'America/New_York' }).range; assert.equal((Date.parse(range.endAt)-Date.parse(range.startAt))/3600000, hours); }
   // Default production contract: no verified Insights grant, and no provider request on reads.
@@ -64,6 +76,8 @@ try {
   f.provider(true); detail = f.serviceAnalytics.publication(f.instagramAnalytics.id); assert.equal(metric(detail, 'views').availability, 'no_data'); assert.equal(detail.canRefresh, true);
   const a = f.serviceAnalytics.refreshPublication(detail.id); await assert.rejects(f.serviceAnalytics.refreshPublication(detail.id), /doğrulanmış|dakika/); detail = await a;
   assert.equal(metric(detail, 'views').value, 42); assert.equal(metric(detail, 'likes').value, 0); assert.equal(metric(detail, 'likes').availability, 'available'); assert.equal(metric(detail, 'views').freshness, 'fresh');
+  const observed = f.serviceAnalytics.snapshot({preset:'7d'}).recentResults.find(row=>row.kind==='publication' && row.result.id===detail.id).result;
+  assert.equal(metric(observed,'views').value,42); assert.equal(metric(observed,'likes').value,0); assert.equal(metric(observed,'views').freshness,'fresh');
   assert.equal(f.fetchCount, 1); f.serviceAnalytics.snapshot({ preset: '7d' }); assert.equal(f.fetchCount, 1);
   f.advanceAnalytics(16*60000); detail = f.serviceAnalytics.publication(detail.id); assert.equal(metric(detail, 'views').freshness, 'stale');
   f.fail(true); detail = await f.serviceAnalytics.refreshPublication(detail.id); assert.equal(metric(detail, 'views').value, 42); assert.equal(metric(detail, 'views').availability, 'refresh_failed'); assert.equal(metric(detail, 'views').freshness, 'stale');

@@ -1,6 +1,8 @@
 # Calendar Workspace — Stage 8G
 
-Status: closed and verified on `refactor/calendar-workspace-v2`.
+Status: Stage 8G closed; extended by D-044 (2026-10-06).
+
+The main Calendar now includes MarketingSchedule occurrences and execution results in day/week/month views. `useMarketingCalendar` reads the existing schedule service through the gated bridge; opening an item delegates to the sole `MarketingScheduleDialog`. It owns no scheduling persistence or execution engine. See [Marketing sharing workspace](marketing-sharing-workspace.md). The Stage 8G notes below describe the original reservation/task boundary.
 
 ## Ownership
 

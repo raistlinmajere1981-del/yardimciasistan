@@ -1329,3 +1329,37 @@ and a restore to an earlier hash. No session is recreated and no Web runtime res
 See [Desktop restore reconciliation v1](DESKTOP_RESTORE_RECONCILIATION_V1.md) for the
 state machine, ownership matrix, coverage and recovery limitations. Normal first import,
 normal capability reactivation and v3 exact receipts/order fencing are unchanged.
+
+## D-044 — Marketing sharing workspace and main Calendar
+
+**Status:** Accepted (2026-10-06), implementing the requested product redesign.
+
+Marketing has one work page plus separate read-only Analytics. Content → active channels
+→ explicit publish is the main flow. Drafts, recent shares and currently active Website
+content are projections on that page. The canonical share workspace owns authoring,
+AI candidate acceptance, ordered media, audience and channel-specific details through
+explicit subflows in one modal boundary. Channel/time selections do not insert/remove
+forms. Provider/account configuration remains exclusively in staged Services Settings.
+The old Studio/Campaigns/Publications/Media/Marketing Calendar page modes and standalone
+Campaigns route are retired; canonical domain records and services remain in use.
+
+`marketing_shares` stores only editorial draft options linked to MarketingContent.
+`marketing_share_targets` links each selected channel to the canonical Publication or
+Campaign. `MarketingShareService` coordinates those services, never sends directly,
+resolves recipients in the renderer, or introduces another provider/scheduler engine.
+Target creation and reference attachment commit atomically before external work. Submit
+marks content ready and freezes the submitted share. Replays use existing targets;
+paused/cancelled campaigns and existing schedules are never silently replaced/resumed.
+Website live edits continue through the revisioned publication operation. Instagram
+uncertainty and D3 consent/dispatch fences remain authoritative. Partial channel outcomes
+remain visible; acceptance, delivery, sync confirmation and scheduling are distinct.
+
+Main Calendar projects the existing MarketingSchedule occurrences and execution outcomes
+alongside reservations/tasks in day, week and month views. Opening an event uses the one
+Schedule workspace, including typed recurrence, frozen revision updates, pause/resume,
+cancel and execution history. Marketing owns no second calendar presentation.
+
+The schema is current-only, with no historical migrations. Existing databases created
+before this schema require the repository's explicit clean reset workflow. No user data
+is automatically discarded. Presentation/source-geometry smoke revisions are deferred;
+functional checks follow the new flow.

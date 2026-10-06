@@ -6,6 +6,7 @@ import * as marketingProviderStore from "./marketing/provider-configuration-stor
 import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets";
 import * as marketingAssetStore from "./marketing/asset-store";
 import * as marketingStore from "./marketing/store";
+import * as marketingShareStore from "./marketing/share-store";
 import * as messagingStore from "./business-messaging/store";
 import type { DispatchResult } from "./messaging-campaigns/dispatch-contract";
 import * as campaignDispatchStore from "./messaging-campaigns/dispatch-store";
@@ -1022,6 +1023,10 @@ export class DesktopDatabase {
   getInstagramConfiguration() { return marketingProviderStore.instagramConfiguration(this.db); }
   getStoredMarketingProvider(provider: "iletimerkezi" | "instagram_api") { return marketingProviderStore.storedMarketingProvider(this.db, provider); }
   listMarketingContents() { return marketingStore.listMarketingContents(this.db); }
+  getMarketingShare(id: string) { return marketingShareStore.getMarketingShare(this.db, id); }
+  listMarketingShares() { return marketingShareStore.listMarketingShares(this.db); }
+  saveMarketingShare(input: Parameters<typeof marketingShareStore.saveMarketingShare>[1]) { return marketingShareStore.saveMarketingShare(this.db, input); }
+  prepareMarketingShareTargets(...args: Parameters<typeof marketingShareStore.prepareMarketingShareTargets> extends [unknown, ...infer Rest] ? Rest : never) { return marketingShareStore.prepareMarketingShareTargets(this.db, ...args); }
   saveMarketingContent(input: Parameters<typeof marketingStore.saveMarketingContent>[1], source: "manual" | "ai" = "manual") { return marketingStore.saveMarketingContent(this.db, input, source); }
   listMediaAssets() { return marketingAssetStore.listMediaAssets(this.db); }
   getMediaAsset(id: string) { return marketingAssetStore.getMediaAsset(this.db, id); }

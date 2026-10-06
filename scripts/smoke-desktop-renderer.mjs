@@ -458,8 +458,8 @@ try {
   await expect(settings.locator(".settings-profile-options")).toBeVisible();
   await expect(settings.getByText("Ek özellikler")).toBeVisible();
   await expect(settings.locator(".settings-profile-option")).toHaveCount(7);
-  await expect(settings.getByText("Kampanyalar", { exact: true })).toBeVisible();
-  await expect(settings.getByText("Pazarlama / İçerik Stüdyosu", { exact: true })).toBeVisible();
+  await expect(settings.getByText("Pazarlama için WhatsApp / SMS gönderimleri", { exact: true })).toBeVisible();
+  await expect(settings.getByText("Pazarlama", { exact: true })).toBeVisible();
   await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode|messaging\.campaigns|marketing\.studio/)).toHaveCount(0);
   expect(await settings.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await sectionNav.getByRole("tab", { name: "İşletme Düzeni", exact: true }).click();

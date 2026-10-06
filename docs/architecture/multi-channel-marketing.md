@@ -1,5 +1,7 @@
 # D5 multi-channel operations
 
+The current presentation and share orchestration follow [D-044 sharing workspace](marketing-sharing-workspace.md). D5 remains authoritative for provider, consent and delivery behavior; earlier Studio/Campaigns/Media/Calendar page modes are retired.
+
 D-039 in the Domain Decision Register owns the behavior. Website and Instagram are
 public publishing; WhatsApp and SMS use existing audience campaigns/outbox. All writes
 start from explicit user actions in Marketing. AI has no publication/dispatch path.

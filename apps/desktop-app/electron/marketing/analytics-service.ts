@@ -93,7 +93,6 @@ export class MarketingAnalyticsService {
     this.gate(); const now = this.now(), range = resolveAnalyticsRange(input, now), facts = this.database().readMarketingAnalyticsRecords(range.startAt, range.endAt);
     if (!this.audienceEnabled()) { facts.campaigns = []; facts.recipients = []; }
     const registry = createMarketingChannelRegistry(this.database());
-    const publications = facts.publications.slice(0, 8).map(p => this.publicationProjection(p));
     const channels = MARKETING_CHANNELS.map(channel => {
       const definition = registry.find(c => c.id === channel)!, rows = facts.publications.filter(p => p.channel === channel);
       const metrics = channel === "whatsapp" || channel === "sms" ? this.delivery(channel, facts.recipients)
@@ -112,11 +111,22 @@ export class MarketingAnalyticsService {
     for (let date = range.startDate; date <= range.endDate; date = analyticsDateOffset(date, 1)) {
       const recipients = facts.recipients.filter(r => analyticsDay(r.createdAt, range.timezone) === date);
       const count = (name: MarketingMetricName) => { const value = ["whatsapp", "sms"].flatMap(channel => this.delivery(channel as "whatsapp" | "sms", recipients).filter(m => m.metric === name && m.value !== null).map(m => m.value!)); return total(name) === null ? null : value.reduce((a, b) => a + b, 0); };
-      trends.push({ date, accepted: count("accepted"), failed: total("failed") === null ? null : (count("failed") ?? 0) + facts.publications.filter(p => p.status === "failed" && analyticsDay(p.createdAt, range.timezone) === date).length,
+      trends.push({ date, accepted: count("accepted"),
         published: total("published") === null ? null : facts.publications.filter(p => (p.publishedAt || p.status === "published") && analyticsDay(p.createdAt, range.timezone) === date).length });
     }
     if (opened === true) desktopLog.info({ scope: "marketing.analytics", event: "marketing.analytics.opened", message: "Pazarlama analitiği açıldı.", meta: { days: trends.length } });
-    return { range, measuredAt: now.toISOString(), summary: { activeCampaigns: facts.campaigns.length ? facts.campaigns.filter(c => ["prepared", "running", "paused"].includes(c.status)).length : null, completedCampaigns: facts.campaigns.length ? facts.campaigns.filter(c => c.status === "completed").length : null, accepted: total("accepted"), delivered: total("delivered"), read: total("read"), failed: total("failed"), published: total("published") }, channels, trends, recentCampaigns: facts.campaigns.slice(0, 8).map(c => this.campaign(c.id)), recentPublications: publications.slice(0, 8) };
+    // A channel was used when a message was attempted/accepted or a publication progressed beyond draft.
+    // This is a count of channels, never a comparison of recipient counts and publication counts.
+    const usedChannels = channels.filter(c => c.metrics.some(m => ["attempted", "accepted", "published", "publishing", "failed"].includes(m.metric) && m.value !== null && m.value > 0)).length;
+    const recentTargets = [
+      ...facts.campaigns.filter(c => c.preparedAt).map(c => ({ kind: "campaign" as const, result: c })),
+      ...facts.publications.filter(p => p.status !== "draft").map(p => ({ kind: "publication" as const, result: p }))
+    ].sort((a, b) => b.result.createdAt.localeCompare(a.result.createdAt) || a.result.id.localeCompare(b.result.id)).slice(0, 8);
+    const recentResults: MarketingAnalyticsSnapshot["recentResults"] = recentTargets.map(target => target.kind === "campaign"
+      ? { kind: target.kind, result: this.campaignProjection(target.result, this.database().readMarketingAnalyticsRecords("", "", { type: "campaign", id: target.result.id })) }
+      : { kind: target.kind, result: this.publicationProjection(target.result) });
+    const hasActivityData = channels.some(c => c.metrics.some(m => ["attempted", "accepted", "published", "publishing", "failed"].includes(m.metric) && m.value !== null));
+    return { range, measuredAt: now.toISOString(), summary: { published: total("published"), accepted: total("accepted"), usedChannels: hasActivityData ? usedChannels : null }, channels, trends, recentResults };
   }
   campaign(id: string): MarketingCampaignAnalytics {
     this.gate(); if (!this.audienceEnabled()) throw new MarketingError("capability_disabled", "Kampanyalar bu işletmede etkin değil.");

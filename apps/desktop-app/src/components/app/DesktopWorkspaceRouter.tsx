@@ -5,7 +5,6 @@ import {
   BUSINESS_CAPABILITIES as C,
   getReservationDomain,
   isReservationTypeAvailable,
-  type MessagingCampaign
 } from "@yardimci-asistan/shared";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
@@ -47,7 +46,6 @@ import { SettingsWorkspace } from "../settings/SettingsWorkspace";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
 import { MarketingPage } from "../../pages/MarketingPage";
-import { CampaignsPage } from "../../pages/CampaignsPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
 import { useCalendarPageController } from "../calendar/calendar-page-state";
 import { usePensionPageController } from "../pension/pension-page-state";
@@ -201,7 +199,6 @@ export function DesktopWorkspaceRouter({
   });
   const [selectedKbsCustomerId, setSelectedKbsCustomerId] = useState("");
   useMarketingScheduleStatus(enabledCapabilities.includes(C.MARKETING_STUDIO),setStatusMessage);
-  const [marketingScheduleEntry,setMarketingScheduleEntry]=useState<MessagingCampaign>();
   const [marketView, setMarketView] = usePageViewState<MarketView>("market.view", "quickSale");
   const [kbsEgmSessionRequest, setKbsEgmSessionRequest] = useState(0);
   const [kbsSessionRetryNotificationId, setKbsSessionRetryNotificationId] = useState("");
@@ -388,6 +385,9 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "calendar" ? (
         <OperationCalendarPage
+          marketingEnabled={enabledCapabilities.includes(C.MARKETING_STUDIO)}
+          onMessage={setStatusMessage}
+          registerPageLeaveGuard={registerPageLeaveGuard}
           controller={calendarController}
           data={surfaceData}
           accommodationReservationsEnabled={accommodationReservationsEnabled}
@@ -517,9 +517,8 @@ export function DesktopWorkspaceRouter({
           inventoryEnabled={inventoryEnabled}
         />
       ) : activePage === "marketing" ? (
-        <MarketingPage scheduleEntry={marketingScheduleEntry} onScheduleEntryConsumed={()=>setMarketingScheduleEntry(undefined)} enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} campaignsEnabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} onSettings={() => requestPageChange("settings")} />
-      ) : activePage === "campaigns" ? (
-        <CampaignsPage onPlan={enabledCapabilities.includes(C.MARKETING_STUDIO)?campaign=>{setMarketingScheduleEntry(campaign);requestPageChange("marketing");}:undefined} enabled={enabledCapabilities.includes(C.MESSAGING_CAMPAIGNS)} registerPageLeaveGuard={registerPageLeaveGuard} />
+        <MarketingPage enabled={enabledCapabilities.includes(C.MARKETING_STUDIO)} registerPageLeaveGuard={registerPageLeaveGuard} onMessage={setStatusMessage} onCalendar={() => requestPageChange("calendar")} />
+
       ) : activePage === "market" ? (
         <MarketPage
           customers={dashboardData.customers}

@@ -11,7 +11,7 @@ export function useMarketingScheduleStatus(enabled:boolean,setStatusMessage:(mes
         const result=await bridge!.getMarketingSchedules();
         if(!live || ticket!==version || !result.ok)return;
         const failures=result.value.schedules.flatMap(d=>d.executions.filter(e=>e.status==="failed"));
-        if(failures.some(e=>!seen.has(e.id)))setStatusMessage("Pazarlama planı çalışması başarısız. Pazarlama → Takvim’den son çalışma sonucunu kontrol edin.");
+        if(failures.some(e=>!seen.has(e.id)))setStatusMessage("Pazarlama planı çalışması başarısız. Ana Takvim’den son çalışma sonucunu kontrol edin.");
         for(const e of failures)seen.add(e.id);
       } catch { /* Session lock uses the normal unlock flow; do not replace global feedback. */ }
     }

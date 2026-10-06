@@ -1,13 +1,18 @@
+import type { MarketingShareService } from "../marketing/share-service";
+import { MessagingCampaignError } from "../messaging-campaigns/validation";
 import { ipcMain } from "electron";
-import type { MarketingResult, MarketingContentInput, MarketingPublicationInput, MarketingAiInput } from "@yardimci-asistan/shared";
+import type { MarketingResult, MarketingContentInput, MarketingPublicationInput, MarketingAiInput, MarketingShareInput } from "@yardimci-asistan/shared";
 import type { MarketingStudioService } from "../marketing/service";
 import { MarketingError } from "../marketing/validation";
-export function registerMarketingIpc(options:{service:MarketingStudioService;assertUnlocked:()=>void}) {
+export function registerMarketingIpc(options:{service:MarketingStudioService;shares:MarketingShareService;assertUnlocked:()=>void}) {
   async function operation<T>(action:()=>T|Promise<T>):Promise<MarketingResult<T>> {
     options.assertUnlocked();
     try {const value=await action();options.assertUnlocked();return {ok:true,value};}
-    catch(error) {return {ok:false,code:error instanceof MarketingError?error.code:"operation_failed",message:error instanceof MarketingError?error.message:"Pazarlama işlemi tamamlanamadı."};}
+    catch(error) {return {ok:false,code:(error instanceof MarketingError || error instanceof MessagingCampaignError)?error.code:"operation_failed",message:(error instanceof MarketingError || error instanceof MessagingCampaignError)?error.message:"Pazarlama işlemi tamamlanamadı."};}
   }
+  ipcMain.handle("marketing:share",(_event,id:string)=>operation(()=>options.shares.get(id)));
+  ipcMain.handle("marketing:saveShare",(_event,input:MarketingShareInput)=>operation(()=>options.shares.save(input)));
+  ipcMain.handle("marketing:submitShare",(_event,id:string,revision:number)=>operation(()=>options.shares.submit(id,revision)));
   const s=options.service;
   ipcMain.handle("marketing:channels",()=>operation(()=>s.channels()));
   ipcMain.handle("marketing:studio",()=>operation(()=>s.snapshot()));

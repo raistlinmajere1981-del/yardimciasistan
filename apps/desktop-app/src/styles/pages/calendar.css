@@ -446,3 +446,7 @@
     min-width: 840px;
   }
 }
+.operation-calendar-marketing-link { color: inherit; background: transparent; border: 0; padding: var(--space-1); text-align: start; cursor: pointer; min-height: var(--interaction-target-min); font: inherit; }
+.operation-calendar-marketing-link:hover { color: var(--color-accent); background: var(--color-accent-soft); border-radius: var(--radius-control); }
+.operation-calendar-item.item-marketing { border-left-color: var(--color-accent); }
+.operation-calendar-month-item.item-marketing .operation-calendar-month-item-dot { background: var(--color-accent); }

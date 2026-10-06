@@ -43,7 +43,7 @@ export function MarketingEntityAnalytics({ kind, id, revision }: { kind: "campai
     finally { if (ticket === epoch.current) setBusy(false); }
   }
   return <section className="marketing-analytics-detail" aria-label={kind === "campaign" ? "Kampanya analitiği" : "Yayın analitiği"} aria-busy={busy}>
-    <h3>Analitik</h3><p className="muted">{kind === "campaign" ? "Kampanyanın tüm hazırlanan kitlesi · güncel yerel durum. Kabul, teslim ve okunma ayrı sinyallerdir." : "Yayının tüm yaşam süresi · seçili genel tarih aralığından bağımsız."}</p>
+    <h3>Paylaşım sonuçları</h3><p className="muted">{kind === "campaign" ? "Hazırlanan tüm alıcıların güncel sonuçları. Gönderilen mesaj servise ulaşmıştır; teslim ve okunma ayrıca doğrulanır." : "Yayının tüm yaşam süresi · seçili genel tarih aralığından bağımsız."}</p>
     {message && <p role="status">{message}</p>}
     {data ? <AnalyticsMetricList metrics={data.metrics} label={kind === "campaign" ? "Kampanya metrikleri" : "Yayın metrikleri"}/> : !message && <p>Henüz analitik veri yok.</p>}
     {publication && <p>Durum: {publication.status === "published" ? "Yayınlandı" : publication.status === "publishing" ? "Yayın onayı bekleniyor" : publication.status === "failed" ? "Başarısız" : publication.status === "unpublished" ? "Yayından kaldırıldı" : "Taslak"} · Yayın zamanı: {publication.publishedAt ? new Date(publication.publishedAt).toLocaleString("tr-TR") : "—"} · Son güncelleme: {new Date(publication.updatedAt).toLocaleString("tr-TR")}</p>}

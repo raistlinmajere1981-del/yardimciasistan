@@ -8,8 +8,8 @@ const C = BUSINESS_CAPABILITIES;
 
 const CAPABILITY_LABELS: Partial<Record<BusinessCapability, string>> = {
   [C.REQUESTS]: "Talepler",
-  [C.MARKETING_STUDIO]: "Pazarlama / İçerik Stüdyosu",
-  [C.MESSAGING_CAMPAIGNS]: "Kampanyalar",
+  [C.MARKETING_STUDIO]: "Pazarlama",
+  [C.MESSAGING_CAMPAIGNS]: "Pazarlama için WhatsApp / SMS gönderimleri",
   [C.ACCOMMODATION_RESERVATIONS]: "Oda rezervasyonları",
   [C.FOOD_RESERVATIONS]: "Masa rezervasyonları",
   [C.QR_MENU]: "QR Menü",

@@ -46,6 +46,7 @@ export { normalizeTableCategoryInputs, normalizeTableCategoryName, tableCategory
 export * from "./types/business-messaging";
 export * from "./types/messaging-campaigns";
 export * from "./types/marketing";
+export * from "./types/marketing-share";
 
 export * from "./types/marketing-providers";
 export * from "./types/marketing-schedules";

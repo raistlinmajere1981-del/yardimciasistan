@@ -9,6 +9,7 @@ import { registerMarketingProviderIpc } from "./ipc/marketing-provider-ipc";
 import { SmsMessagingService } from "./business-messaging/sms-service";
 import { createMarketingProviderSecretWrites } from "./marketing/provider-secrets";
 import { MarketingMediaService } from "./marketing/media-service";
+import { MarketingShareService } from "./marketing/share-service";
 import { MarketingStudioService } from "./marketing/service";
 import { MarketingWebsitePublicationService } from "./marketing/website-publication";
 import { registerMarketingIpc } from "./ipc/marketing-ipc";
@@ -530,6 +531,7 @@ const marketingSchedulerService = new MarketingSchedulerService(getDatabase, mar
   onChanged: notifyMarketingSchedulesChanged
 });
 const marketingScheduleService = new MarketingScheduleService(getDatabase, () => { notifyMarketingSchedulesChanged(); marketingSchedulerService.wake(); });
+const marketingShareService = new MarketingShareService(getDatabase, marketingStudioService, messagingCampaignService, marketingScheduleService, () => businessMessagingService.listTemplates());
 function notifyMarketingSchedulesChanged() {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send("marketingSchedules:changed");
@@ -551,7 +553,7 @@ function registerIpcHandlers() {
   registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingScheduleIpc({ service: marketingScheduleService, assertUnlocked: assertAppSessionUnlocked });
-  registerMarketingIpc({ service: marketingStudioService, assertUnlocked: assertAppSessionUnlocked });
+  registerMarketingIpc({ service: marketingStudioService, shares: marketingShareService, assertUnlocked: assertAppSessionUnlocked });
   registerMessagingCampaignsIpc({ service: messagingCampaignService, assertUnlocked: assertAppSessionUnlocked });
   registerBusinessMessagingIpc({ service: businessMessagingService, assertUnlocked: assertAppSessionUnlocked, onChanged: notifyBusinessMessagingChanged });
   const notifyShipmentsChanged = (orderId: string) => {

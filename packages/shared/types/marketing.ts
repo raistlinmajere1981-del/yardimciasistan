@@ -62,6 +62,7 @@ export interface MarketingStudioSnapshot {
   contents: MarketingContentDetail[]; assets: MarketingAssetView[]; publications: MarketingPublication[];
   campaigns?: import("./messaging-campaigns").MessagingCampaignDetail[];
   channels: MarketingChannelRegistry; aiCapabilities: MarketingAiCapability[];
+  shares?: Array<{contentId: string; channels: MarketingChannel[]; submitted: boolean}>;
 }
 export interface MarketingWebsiteProjection {
   version: 1; enabled: boolean; publications: Array<{

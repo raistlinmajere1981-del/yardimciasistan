@@ -13,11 +13,10 @@ import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { pensionNavigationContribution } from "../components/pension/pension-navigation";
 import { restaurantNavigationContribution } from "../components/restaurant/restaurant-navigation";
-import { campaignNavigationContribution } from "../components/messaging-campaigns/campaign-navigation";
 import { runtimeHasCapability } from "./capabilities";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 
-export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "campaigns" | "marketing" | "reports" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "marketing" | "reports" | "settings";
 
 /** Customer-work subview id; a view state, not a DesktopPage route. */
 export type CustomerWorkTab = "requests" | "customers" | "kbs" | "prepared";
@@ -63,7 +62,7 @@ const calendarContribution = {
   pageId: "calendar",
   icon: CalendarDays,
   order: 75,
-  condition: { allOf: [C.CALENDAR] },
+  condition: { anyOf: [C.CALENDAR, C.MARKETING_STUDIO] },
   contentScroll: "workspace",
   presentation: { label: "Takvim", title: "Takvim" }
 } satisfies NavigationContribution;
@@ -118,7 +117,6 @@ const navigationContributions = [
     condition: { allOf: [C.MARKETING_STUDIO] },
     presentation: {label: "Pazarlama", title: "Pazarlama"}
   },
-  campaignNavigationContribution,
   menuContribution,
   reportsContribution,
   settingsContribution
@@ -138,8 +136,7 @@ export function buildNavigationFromContributions(
   contributions: readonly NavigationContribution[]
 ): NavigationItem[] {
   return [...contributions]
-    .filter((contribution) => matchesCapabilityCondition(capabilities, contribution.condition)
-      && !(contribution.pageId === "campaigns" && runtimeHasCapability(capabilities, C.MARKETING_STUDIO)))
+    .filter((contribution) => matchesCapabilityCondition(capabilities, contribution.condition))
     .sort((left, right) => left.order - right.order)
     .map((contribution) => {
       const presentation = resolvePresentation(contribution, capabilities);

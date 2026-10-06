@@ -19,7 +19,7 @@ export class MarketingStudioService {
     if (!channel.enabled || !channel.configured) throw new MarketingError("channel_unconfigured","Website servisi yapılandırılmamış.");
   }
   channels() {this.gate();return createMarketingChannelRegistry(this.database());}
-  snapshot() {this.gate();return {contents:this.database().listMarketingContents(),assets:this.media.list(),publications:this.database().listMarketingPublications(),campaigns:hasBusinessCapability(this.database().getEnabledBusinessCapabilities(),C.MESSAGING_CAMPAIGNS)&&hasBusinessCapability(this.database().getEnabledBusinessCapabilities(),C.CUSTOMERS)?this.database().listMessagingCampaigns().map(c=>this.database().getMessagingCampaignDetail(c.id)):[],channels:createMarketingChannelRegistry(this.database()),aiCapabilities:this.ai.capabilities()};}
+  snapshot() {this.gate();return {shares:this.database().listMarketingShares(),contents:this.database().listMarketingContents(),assets:this.media.list(),publications:this.database().listMarketingPublications(),campaigns:hasBusinessCapability(this.database().getEnabledBusinessCapabilities(),C.MESSAGING_CAMPAIGNS)&&hasBusinessCapability(this.database().getEnabledBusinessCapabilities(),C.CUSTOMERS)?this.database().listMessagingCampaigns().map(c=>this.database().getMessagingCampaignDetail(c.id)):[],channels:createMarketingChannelRegistry(this.database()),aiCapabilities:this.ai.capabilities()};}
   saveContent(input:MarketingContentInput) {
     this.gate();const value=this.database().saveMarketingContent(input,input.source==="ai"?"ai":"manual");
     if (!input.id) desktopLog.info({scope:"marketing",event:"marketing.content.created",message:"Pazarlama içeriği oluşturuldu.",meta:{contentId:value.content.id}});

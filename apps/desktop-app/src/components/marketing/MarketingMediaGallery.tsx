@@ -8,13 +8,13 @@ export function MarketingMediaGallery({assets,selected,onChange,maxImages,disabl
     <ol className="marketing-selected-media">{selected.map((id,index)=>{
       const asset=assets.find(a=>a.id===id);return <li key={id}>
         {asset?.previewUrl && <img src={asset.previewUrl} alt={asset.altText || `Görsel ${index+1}`} />}
-        <span>Görsel {index+1}{asset?.archivedAt?" · Arşivlenmiş":""}</span>
+        <span>Görsel {index+1}{asset?.archivedAt?" · Yeni seçimlerde gizli":""}</span>
         <ActionButton variant="secondary" disabled={disabled || index===0} aria-label={`Görsel ${index+1} yukarı`} onClick={()=>move(index,-1)}>↑</ActionButton>
         <ActionButton variant="secondary" disabled={disabled || index===selected.length-1} aria-label={`Görsel ${index+1} aşağı`} onClick={()=>move(index,1)}>↓</ActionButton>
         <ActionButton variant="secondary" disabled={disabled} aria-label={`Görsel ${index+1} çıkar`} onClick={()=>onChange(selected.filter(value=>value!==id))}>Çıkar</ActionButton>
       </li>;
     })}</ol>
-    <SearchSelect ariaLabel="Medya seç" value="" placeholder="Görsel ekle" clearable={false} disabled={disabled || selected.length >= maxImages}
+    <SearchSelect ariaLabel="Görsel ekle" value="" placeholder="Görsel ekle" clearable={false} disabled={disabled || selected.length >= maxImages}
       onChange={id => onChange([...selected, id])} options={assets.filter(asset => !asset.archivedAt && !selected.includes(asset.id)).map(asset => ({
         id: asset.id, label: asset.altText || `${asset.source === "ai" ? "AI" : "Yüklenen"} görsel`, description: `${asset.source === "ai" ? "AI" : "Yüklenen"} · ${asset.width} × ${asset.height}`, keywords: asset.id,
         leading: <img src={asset.previewUrl} alt="" />

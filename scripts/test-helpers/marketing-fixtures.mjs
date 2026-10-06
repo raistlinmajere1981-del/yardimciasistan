@@ -40,5 +40,5 @@ export function marketingFixture({ enabled = true, ai = false } = {}) {
   const service=new (load('service.js').MarketingStudioService)(()=>foundation.db,media,()=>{schedules++;});
   const publisher=new (load('website-publication.js').MarketingWebsitePublicationService)(()=>foundation.db,media);
   const uploadPath=join(foundation.db.userDataPath,'upload.png');writeFileSync(uploadPath,imageBytes);
-  return {...foundation,get db(){return foundation.db;},service,media,publisher,logs,calls,state,load,uploadPath,get schedules(){return schedules;}};
+  return {...foundation,campaigns:foundation.service,loadMarketing:file=>load(file+".js"),get db(){return foundation.db;},service,media,publisher,logs,calls,state,load,uploadPath,get schedules(){return schedules;}};
 }

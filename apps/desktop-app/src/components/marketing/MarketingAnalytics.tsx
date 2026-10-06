@@ -1,30 +1,49 @@
-import { DataListItem } from "../ui/DataList";
-import { Panel } from "../ui/Panel";
 import { useEffect, useRef, useState } from "react";
-import type { MarketingAnalyticsRangeInput, MarketingAnalyticsSnapshot } from "@yardimci-asistan/shared";
+import { ChartNoAxesCombined, CircleHelp, Globe, Send } from "lucide-react";
+import type { MarketingAnalyticsRangeInput, MarketingAnalyticsSnapshot, MarketingMetricName } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
+import { DataListItem } from "../ui/DataList";
+import { DatePicker } from "../ui/DateTimePicker";
+import { MetricCard } from "../ui/MetricCard";
+import { Panel } from "../ui/Panel";
+import { StatusBadge } from "../ui/StatusBadge";
+import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { AnalyticsMetricList, analyticsAvailabilityLabels } from "./MarketingAnalyticsMetrics";
+import { channelNames } from "./share-draft";
 
-const campaignStatuses = {draft:"Taslak",prepared:"Hazırlandı",running:"Gönderim sürüyor",paused:"Duraklatıldı",cancelled:"İptal edildi",completed:"Tamamlandı"};
-const publicationStatuses = {draft:"Taslak",publishing:"Yayın onayı bekleniyor",published:"Yayınlandı",unpublished:"Kaldırıldı",failed:"Başarısız"};
-const channelNames = { website: "Website", whatsapp: "WhatsApp", sms: "SMS", instagram: "Instagram" };
+const campaignStatuses = { draft: "Taslak", prepared: "Gönderime hazır", running: "Gönderiliyor", paused: "Duraklatıldı", cancelled: "İptal edildi", completed: "Gönderim işlemi bitti" };
+const publicationStatuses = { draft: "Taslak", publishing: "Yayın onayı bekleniyor", published: "Yayınlandı", unpublished: "Kaldırıldı", failed: "Yayınlanamadı" };
+const channelMetrics: Record<string, MarketingMetricName[]> = {
+  website: ["published", "publishing", "failed"], instagram: ["published", "publishing", "failed"],
+  whatsapp: ["accepted", "delivered", "read", "failed"], sms: ["accepted", "delivered", "failed"]
+};
 function count(value: number | null) { return value === null ? "—" : value.toLocaleString("tr-TR"); }
-function rate(value: number | null) { return value === null ? "—" : `${(value * 100).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}%`; }
+function date(value: string) { return new Date(`${value}T12:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" }); }
+
+/** Each series has its own scale: publications and messages have different units. */
 function AnalyticsTrends({ data }: { data: MarketingAnalyticsSnapshot }) {
-  const max = Math.max(1, ...data.trends.flatMap(t => [t.accepted ?? 0, t.failed ?? 0, t.published ?? 0]));
-  const width = Math.max(420, data.trends.length * 8);
-  return <section aria-label="Analitik trendleri"><h3>Sonuç trendi</h3>
-    <p className="muted">Hazırlanan alıcının / oluşturulan yayının gününe göre güncel sonuçlar. Günlük gönderim olay sayısı değildir.</p>
-    {data.trends.every(t=>t.accepted===null && t.failed===null && t.published===null) && <p>Bu aralıkta henüz trend verisi yok.</p>}
-    <figure className="marketing-analytics-chart"><figcaption>Kabul edilen · Başarısız · Yayınlanan</figcaption>
-      <svg viewBox={`0 0 ${width} 120`} aria-hidden="true" focusable="false">{data.trends.map((t, i) => <g key={t.date}>{(["accepted", "failed", "published"] as const).map((key, j) => t[key] === null ? null : <rect key={key} className={`marketing-analytics-bar-${key}`} x={i * width / data.trends.length + j * 2} y={110 - t[key] / max * 100} width={2} height={t[key] / max * 100}/>)}</g>)}</svg>
-    </figure>
-    <details><summary>Günlük değerleri tablo olarak göster</summary><div className="marketing-analytics-table"><table><caption>Hazırlama / oluşturma gününe göre sonuçlar</caption><thead><tr><th scope="col">Tarih</th><th scope="col">Kabul</th><th scope="col">Başarısız</th><th scope="col">Yayınlanan</th></tr></thead><tbody>{data.trends.map(t => <tr key={t.date}><th scope="row">{t.date}</th><td>{count(t.accepted)}</td><td>{count(t.failed)}</td><td>{count(t.published)}</td></tr>)}</tbody></table></div></details>
-    <h3>Kanal sonuçları</h3><div className="marketing-analytics-table"><table><caption>Kanal bazında doğrulanmış kabul / yayın</caption><thead><tr><th scope="col">Kanal</th><th scope="col">Kabul</th><th scope="col">Teslim</th><th scope="col">Yayın</th></tr></thead><tbody>{data.channels.map(c => <tr key={c.channel}><th scope="row">{channelNames[c.channel]}</th>{(["accepted", "delivered", "published"] as const).map(name => <td key={name}>{count(c.metrics.find(m => m.metric === name)?.value ?? null)}</td>)}</tr>)}</tbody></table></div>
-  </section>;
+  const series = [{ key: "published", label: "Onaylanan yayın", detail: "Website + Instagram" }, { key: "accepted", label: "Gönderilen mesaj", detail: "WhatsApp + SMS · gönderim servisine ulaşan" }] as const;
+  return <Panel as="section" className="marketing-analytics-results" aria-label="Zaman içindeki sonuçlar">
+    <header><h3>Zaman içindeki sonuçlar</h3><p className="muted">Seçilen günlerde hazırlanan gönderimlerin ve oluşturulan yayınların bugünkü sonuçları.</p></header>
+    <div className="marketing-analytics-trends">{series.map(({ key, label, detail }) => {
+      const observedMaximum = Math.max(0, ...data.trends.map(t => t[key] ?? 0));
+      const maximum = Math.max(1, observedMaximum);
+      const step = 600 / data.trends.length;
+      const available = data.trends.some(t => t[key] !== null);
+      return <figure className="marketing-analytics-chart" key={key}>
+        <figcaption><strong>{label}</strong><span className="muted">{detail}</span></figcaption>
+        {available ? <><div className="marketing-analytics-axis"><small>Günlük en yüksek: {count(observedMaximum)}</small></div>
+          <svg viewBox="0 0 600 110" preserveAspectRatio="none" aria-hidden="true" focusable="false">{data.trends.map((t, i) => t[key] === null ? null : <rect key={t.date} className="marketing-analytics-bar" x={i * step + step * .15} y={105 - t[key] / maximum * 100} width={step * .7} height={t[key] / maximum * 100}/>)}</svg>
+          <div className="marketing-analytics-axis"><small>{date(data.range.startDate)}</small><small>{date(data.range.endDate)}</small></div></>
+          : <div className="marketing-card-empty"><p>Bu aralıkta {key === "published" ? "yayın" : "gönderim"} verisi yok.</p></div>}
+      </figure>;
+    })}</div>
+    {data.trends.some(t => t.accepted !== null || t.published !== null) && <details className="record-disclosure"><summary>Günlük değerleri tablo olarak göster</summary><div className="marketing-analytics-table"><table><caption>Hazırlama / oluşturma gününe göre sonuçlar</caption><thead><tr><th scope="col">Tarih</th><th scope="col">Onaylanan yayın</th><th scope="col">Gönderilen mesaj</th></tr></thead><tbody>{data.trends.map(t => <tr key={t.date}><th scope="row">{t.date}</th><td>{count(t.published)}</td><td>{count(t.accepted)}</td></tr>)}</tbody></table></div></details>}
+  </Panel>;
 }
+
 export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }: { range: MarketingAnalyticsRangeInput; onRange: (range: MarketingAnalyticsRangeInput) => void; onCampaign: (id: string) => void; onPublication: (id: string) => void }) {
-  const [data, setData] = useState<MarketingAnalyticsSnapshot | null>(null), [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [refreshVersion, setRefreshVersion] = useState(0);
+  const [data, setData] = useState<MarketingAnalyticsSnapshot | null>(null), [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [refreshVersion, setRefreshVersion] = useState(0), [help, setHelp] = useState(false);
   const [custom, setCustom] = useState(range.preset === "custom"), [startDate, setStartDate] = useState(range.preset === "custom" ? range.startDate : ""), [endDate, setEndDate] = useState(range.preset === "custom" ? range.endDate : "");
   const epoch = useRef(0), opened = useRef(false);
   useEffect(() => {
@@ -36,39 +55,61 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
         const result = await bridge.getMarketingAnalytics(range, !opened.current); opened.current = true;
         if (!active || ticket !== epoch.current) return;
         if (!result.ok) throw new Error(result.message); setData(result.value); setMessage("");
-      } catch { if (active && ticket === epoch.current) setMessage("Analitik verisi alınamadı. Tarih aralığını kontrol edip yeniden deneyin."); }
+      } catch { if (active && ticket === epoch.current) { setData(null); setMessage("Sonuçlar alınamadı. Tarih aralığını kontrol edip yeniden deneyin."); } }
       finally { if (active && ticket === epoch.current) setBusy(false); }
     }
-    void load();
+    setData(null); setMessage(""); void load();
     const campaign = bridge?.onMessagingCampaignsChanged?.(() => void load()), provider = bridge?.onBusinessMessagingChanged?.(() => void load()), schedule = bridge?.onMarketingSchedulesChanged?.(() => void load());
-    // Read local canonical records only. External metrics are refreshed explicitly in publication detail.
     return () => { active = false; epoch.current++; campaign?.(); provider?.(); schedule?.(); };
   }, [range, refreshVersion]);
-  const summary = data?.summary;
   return <section className="marketing-analytics" aria-label="Pazarlama analitiği" aria-busy={busy}>
-    <div className="marketing-actions"><label className="form-field">Tarih aralığı<select aria-label="Tarih aralığı" value={custom ? "custom" : range.preset} onChange={e => { const preset = e.target.value as MarketingAnalyticsRangeInput["preset"]; setCustom(preset === "custom"); if (preset !== "custom") onRange({ preset }); }}><option value="7d">Son 7 gün</option><option value="30d">Son 30 gün</option><option value="90d">Son 90 gün</option><option value="custom">Özel aralık</option></select></label>
-      {custom && <><label className="form-field">Başlangıç tarihi<input aria-label="Başlangıç tarihi" type="date" lang="tr-TR" value={startDate} onChange={e => setStartDate(e.target.value)}/></label><label className="form-field">Bitiş tarihi<input aria-label="Bitiş tarihi" type="date" lang="tr-TR" value={endDate} onChange={e => setEndDate(e.target.value)}/></label><ActionButton variant="secondary" disabled={!startDate || !endDate || busy} onClick={() => onRange({ preset: "custom", startDate, endDate })}>Aralığı uygula</ActionButton></>}
-      <ActionButton variant="secondary" disabled={busy} onClick={() => setRefreshVersion(v => v + 1)}>Yerel verileri yenile</ActionButton>
+    <header className="marketing-analytics-heading"><div><h2>Paylaşımlarınızın sonuçları</h2><p className="muted">Yayınlarınızı ve müşterilerinize gönderdiğiniz mesajları bir arada izleyin.</p></div><ActionButton variant="quiet" onClick={() => setHelp(true)}><CircleHelp size={16}/>Ölçümler nasıl okunur?</ActionButton></header>
+    <div className="marketing-actions marketing-analytics-filters"><label className="form-field form-field--fluid">Tarih aralığı<select aria-label="Tarih aralığı" value={custom ? "custom" : range.preset} disabled={busy} onChange={e => {
+      const preset = e.target.value as MarketingAnalyticsRangeInput["preset"]; setCustom(preset === "custom");
+      if (preset !== "custom") onRange({ preset });
+      else { setStartDate(startDate || data?.range.startDate || ""); setEndDate(endDate || data?.range.endDate || ""); }
+    }}><option value="7d">Son 7 gün</option><option value="30d">Son 30 gün</option><option value="90d">Son 90 gün</option><option value="custom">Özel aralık</option></select></label>
+      {custom && <><label className="form-field form-field--fluid">Başlangıç tarihi<DatePicker ariaLabel="Başlangıç tarihi" presets={[]} clearable={false} value={startDate} onChange={setStartDate}/></label><label className="form-field form-field--fluid">Bitiş tarihi<DatePicker ariaLabel="Bitiş tarihi" presets={[]} clearable={false} value={endDate} onChange={setEndDate}/></label><ActionButton variant="secondary" disabled={!startDate || !endDate || busy} onClick={() => onRange({ preset: "custom", startDate, endDate })}>Aralığı uygula</ActionButton></>}
+      <ActionButton variant="secondary" disabled={busy} onClick={() => setRefreshVersion(v => v + 1)}>Sonuçları yenile</ActionButton>
     </div>
     {message && <p role="alert">{message}</p>}
-    {!data && !message && <p role="status">Analitik yükleniyor…</p>}
-    {data && summary && <>
-      <details className="record-disclosure"><summary>Ölçümler nasıl okunur?</summary><div className="record-disclosure__body">
-      <p className="muted">{data.range.startDate} – {data.range.endDate} · {data.range.timezone}. Hazırlanan alıcılar ve oluşturulan kampanya/yayınlar bu aralığa göre seçilir. Sonuçlar güncel yerel durumdur. Aktif Website yayınları şu anki onaylı durumu gösterir.</p>
-      <p className="muted">— veri mevcut değil; 0 ölçülmüş sıfırdır. Toplamlar mevcut sinyalleri içerir. Kabul, teslim ve okunma birbirinden ayrıdır.</p>
-      </div></details>
-      <dl className="campaign-counts marketing-analytics-summary" aria-label="Analitik genel özet">{([["Aktif kampanya", summary.activeCampaigns], ["Bitmiş kampanya", summary.completedCampaigns], ["Kabul edilen", summary.accepted], ["Teslim edilen", summary.delivered], ["Okunan", summary.read], ["Başarısız", summary.failed], ["Yayınlanan içerik", summary.published]] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{count(value)}</dd>{value === null && <small>Henüz veri yok</small>}</div>)}</dl>
-      <div className="marketing-analytics-channels">{data.channels.map(c => <Panel as="section" surfaceRole="communication" className="marketing-editor" aria-label={`${channelNames[c.channel]} analitiği`} key={c.channel}><h3>{channelNames[c.channel]}</h3>
-        <p className="muted">{c.serviceState === "ready" ? "Servis yapılandırılmış" : c.serviceState === "unconfigured" ? "Servis yapılandırılmamış" : "Servis kapalı"}</p>
-        <AnalyticsMetricList metrics={c.metrics.filter(m => !["audience", "eligible", "prepared", "pending", "read"].includes(m.metric) || m.metric === "read" && c.channel === "whatsapp")} label={`${channelNames[c.channel]} metrikleri`}/>
-        {(c.channel === "whatsapp" || c.channel === "sms") && <p>Teslim oranı (teslim / kabul): {rate(c.deliveryRate)}{c.channel === "whatsapp" ? ` · Okunma oranı (okunan / teslim): ${rate(c.readRate)}` : ""}</p>}
-        {c.channel === "website" && <p>Ziyaret verisi toplanmıyor.</p>}
-        {c.channel === "instagram" && <p>{c.providerCapabilities.some(m => m.availability === "available") ? "Etkileşim ölçümleri yayın ayrıntısında; yayın yaşam süresini kapsar. Erişim farklı yayınlar arasında toplanmaz." : `Etkileşim: ${analyticsAvailabilityLabels[c.serviceState === "ready" ? (c.providerCapabilities.find(m=>["permission_denied","permission_unverified"].includes(m.availability))?.availability ?? c.providerCapabilities[0]?.availability ?? "unsupported") : c.serviceState]}.`}</p>}
-      </Panel>)}</div>
+    {!data && !message && <p role="status">Sonuçlar yükleniyor…</p>}
+    {data && <>
+      <p className="muted marketing-analytics-period">{date(data.range.startDate)} – {date(data.range.endDate)} · {data.range.timezone} · Bu aralıkta hazırlanan gönderimler ve oluşturulan yayınlar</p>
+      <div className="marketing-analytics-summary" aria-label="Analitik genel özet">
+        <MetricCard title="Onaylanan yayın" value={count(data.summary.published)} detail={data.summary.published === null ? "Bu aralıkta yayın verisi yok" : "Website + Instagram · kanal başına yayın"} tone="neutral" icon={Globe}/>
+        <MetricCard title="Gönderilen mesaj" value={count(data.summary.accepted)} detail={data.summary.accepted === null ? "Bu aralıkta gönderim verisi yok" : "WhatsApp + SMS · gönderim servisine ulaştı"} tone="neutral" icon={Send}/>
+        <MetricCard title="Kullanılan kanal" value={count(data.summary.usedChannels)} detail={data.summary.usedChannels === null ? "Bu aralıkta kullanım verisi yok" : "Yayın veya gönderim yapılan kanallar"} tone="neutral" icon={ChartNoAxesCombined}/>
+      </div>
       <AnalyticsTrends data={data}/>
-      <section aria-label="Son kampanyalar"><h3>Son kampanyalar</h3><p className="muted">Bu aralıkta oluşturulan kampanyalar · satır sayıları tüm hazırlanan kitleyi kapsar.</p>{!data.recentCampaigns.length && <p>Bu aralıkta henüz kampanya yok.</p>}{data.recentCampaigns.map(c => <DataListItem twoLine key={c.id} title={`${channelNames[c.channel]} kampanyası`} meta={`${new Date(c.createdAt).toLocaleDateString("tr-TR")} · ${campaignStatuses[c.status]} · ${count(c.metrics.find(m => m.metric === "accepted")?.value ?? null)} kabul`} actions={<ActionButton variant="secondary" onClick={() => onCampaign(c.id)}>Kampanyayı aç</ActionButton>} />)}</section>
-      <section aria-label="Son yayınlar"><h3>Son yayınlar</h3>{!data.recentPublications.length && <p>Bu aralıkta henüz yayın yok.</p>}{data.recentPublications.map(p => <DataListItem twoLine key={p.id} title={`${channelNames[p.channel]} yayını`} meta={`${new Date(p.createdAt).toLocaleDateString("tr-TR")} · ${publicationStatuses[p.status]}`} actions={<ActionButton variant="secondary" onClick={() => onPublication(p.id)}>Yayını aç</ActionButton>} />)}</section>
-      <small>Yerel okuma: {new Date(data.measuredAt).toLocaleString("tr-TR")}</small>
+      <section aria-label="Kanal sonuçları" className="marketing-analytics-results"><header><h3>Kanal sonuçları</h3><p className="muted">Her kanal kendi ölçümleriyle gösterilir. Yayın ve mesaj sayıları farklı şeyleri ölçer.</p></header>
+        <div className="marketing-analytics-channels">{data.channels.map(c => {
+          const metrics = c.metrics.filter(m => channelMetrics[c.channel].includes(m.metric));
+          return <Panel as="section" className="marketing-analytics-channel" key={c.channel} aria-label={`${channelNames[c.channel]} analitiği`}>
+          <h3>{channelNames[c.channel]}</h3>
+          {metrics.some(m => m.value !== null) ? <AnalyticsMetricList metrics={metrics} label={`${channelNames[c.channel]} metrikleri`}/>
+            : <p aria-label={`${channelNames[c.channel]} metrikleri`}>Bu aralıkta {c.channel === "website" || c.channel === "instagram" ? "yayın" : "gönderim"} verisi yok.</p>}
+          {(c.channel === "whatsapp" || c.channel === "sms") && <p className="muted">Gönderilen, servisin aldığı mesajdır. Teslim bilgisi {c.channel === "whatsapp" ? "ve okunma bilgisi" : ""} ayrıca doğrulanır.</p>}
+          {c.channel === "website" && <p className="muted">Ziyaret verisi toplanmıyor.</p>}
+          {c.channel === "instagram" && <p className="muted">{c.serviceState === "ready" && c.providerCapabilities.some(m => m.availability === "available") ? "Varsa görüntülenme ve etkileşim ölçümleri yayın ayrıntısında gösterilir." : "Görüntülenme ve etkileşim verisi alınamıyor. " + analyticsAvailabilityLabels[c.serviceState === "ready" ? (c.providerCapabilities.find(m => ["permission_denied", "permission_unverified"].includes(m.availability))?.availability ?? c.providerCapabilities[0]?.availability ?? "unsupported") : c.serviceState] + "."}</p>}
+        </Panel>; })}</div>
+      </section>
+      <Panel as="section" className="marketing-analytics-results" aria-label="Son sonuçlar"><header><h3>Son sonuçlar</h3><p className="muted">Bu aralıkta oluşturulan paylaşımlar · her paylaşımın tüm süresindeki güncel durumu.</p></header>
+        {!data.recentResults.length && <div className="marketing-card-empty"><Send size={30}/><strong>Bu aralıkta henüz sonuç yok.</strong><p>Farklı bir tarih aralığı seçerek önceki paylaşımlarınızı görebilirsiniz.</p></div>}
+        {data.recentResults.map(row => {
+          const result = row.result;
+          const status = row.kind === "campaign" ? campaignStatuses[row.result.status] : publicationStatuses[row.result.status];
+          const measurements = result.metrics.filter(m => ["accepted", "delivered", "read", "failed", "views", "likes"].includes(m.metric) && m.value !== null);
+          return <DataListItem twoLine key={result.id} title={`${channelNames[result.channel]} ${row.kind === "campaign" ? "gönderimi" : "yayını"}`} meta={<>{new Date(result.createdAt).toLocaleDateString("tr-TR")} · <StatusBadge tone="neutral">{status}</StatusBadge>{measurements.length > 0 && <AnalyticsMetricList metrics={measurements} label={`${channelNames[result.channel]} paylaşım sonucu`}/>}</>} actions={<ActionButton variant="quiet" onClick={() => row.kind === "campaign" ? onCampaign(result.id) : onPublication(result.id)}>Sonucu aç</ActionButton>}/>;
+        })}
+        <p className="muted">İçeriklerin başarısını karşılaştırmak için ortak bir etkileşim ölçümü bulunmuyor.</p>
+      </Panel>
+      <small className="muted">Son kontrol: {new Date(data.measuredAt).toLocaleString("tr-TR")}</small>
     </>}
+    {help && <WorkspaceFrame presentation="centered" className="marketing-task-workspace" title="Ölçümler nasıl okunur?" closeLabel="Açıklamayı kapat" onClose={() => setHelp(false)}><div className="form-stack">
+      <section><h3>Tarih aralığı neyi seçer?</h3><p>Seçilen günlerde hazırlanan mesaj gönderimleri ve oluşturulan yayınlar gösterilir. Sayılar onların bugünkü sonuçlarıdır; o gün gerçekleşen olayların sayısı değildir. Grafikler de hazırlama ve oluşturma gününü kullanır. Sonuç ayrıntısı, paylaşımın tüm süresini kapsar.</p></section>
+      <section><h3>Yayın ile mesaj arasındaki fark</h3><p>Website ve Instagram için kanalın onayladığı yayınlar sayılır. Aynı içerik iki kanalda yayınlanırsa iki yayın sayılır. Sonradan kaldırılan bir yayın da daha önce onaylanan yayın sayısına dahildir.</p><p>WhatsApp ve SMS için gönderim servisine ulaşan mesajlar sayılır. Bu, müşteriye teslim edildiği veya okunduğu anlamına gelmez. Daha sonra başarısız olan bir mesaj, gönderilen ve başarısız sayılarında birlikte yer alabilir. Gönderim işleminin bitmesi de tüm mesajların teslim edildiğini göstermez.</p></section>
+      <section><h3>Eksik veri neden sıfır değil?</h3><p>— ölçümün bulunmadığını belirtir. 0 ise kayıtların doğruladığı sıfırdır. Website ziyaretleri ölçülmez; SMS okunma bilgisi sağlamaz. Instagram yayın bağlantısı tek başına etkileşim ölçümlerine erişim sağlamaz.</p><p>Instagram ayrıntısındaki ölçümler varsa yayının tüm süresini kapsar. Eski bir ölçüm, ölçüldüğü zamanla birlikte gösterilir. Farklı kanalların erişimi veya etkileşimi toplanmaz; güvenilir bir içerik başarı sıralaması üretilmez.</p></section>
+    </div></WorkspaceFrame>}
   </section>;
 }

@@ -44,7 +44,6 @@
 @import "./layout/responsive.css" layer(layout);
 @import "./pages/ai.css" layer(pages);
 @import "./pages/calendar.css" layer(pages);
-@import "./pages/campaigns.css" layer(pages);
 @import "./pages/customers.css" layer(pages);
 @import "./pages/dashboard.css" layer(pages);
 @import "./pages/devices.css" layer(pages);

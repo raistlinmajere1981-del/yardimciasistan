@@ -71,5 +71,5 @@ export function multichannelFixture() {
     await campaigns.prepareCampaign(campaign.id);return {campaign,customer,content};
   }
   function publication() {const asset=f.media.importBytes(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ioAAAAASUVORK5CYII=','base64'),'upload');const content=f.service.saveContent(editorialInput());return f.db.saveMarketingPublication({contentId:content.content.id,channel:'instagram',placement:'homepage_feature',title:'IG Fixture',text:'CAPTION_PRIVATE',mediaAssetIds:[asset.id]});}
-  return {...f,get db(){return f.db;},load,sms,instagram,campaigns,state,calls,logs,tick,smsCampaign,publication,advance:ms=>{timestamp+=ms;},dispose:async()=>{await worker.suspendAndDrain();await instagram.drain();f.dispose();}};
+  return {...f,get db(){return f.db;},load,loadMarketing:file=>load(`marketing/${file}`),sms,instagram,campaigns,state,calls,logs,tick,smsCampaign,publication,advance:ms=>{timestamp+=ms;},dispose:async()=>{await worker.suspendAndDrain();await instagram.drain();f.dispose();}};
 }

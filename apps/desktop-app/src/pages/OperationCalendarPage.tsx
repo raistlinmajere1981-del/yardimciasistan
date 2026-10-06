@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -18,10 +18,15 @@ import { DatePicker } from "../components/ui/DateTimePicker";
 import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 import { ChoiceChips } from "../components/ui/ChoiceChips";
 
+import { useMarketingCalendar, type MarketingCalendarEntry } from "../components/calendar/use-marketing-calendar";
+import { MarketingScheduleDialog } from "../components/marketing/MarketingScheduleDialog";
+import type { RegisterPageLeaveGuard } from "../app/page-navigation-guard";
+
 type ReservationRecord = DesktopDashboardData["reservations"][number];
 type DailyTaskRecord = DesktopDashboardData["dailyTasks"][number];
 
 type CalendarItem =
+  | {key: string; kind: "marketing"; title: string; meta: string; detail: string; time: string; marketing: MarketingCalendarEntry}
   | {
       key: string;
       kind: "arrival" | "departure" | "restaurant";
@@ -42,6 +47,9 @@ type CalendarItem =
     };
 
 interface OperationCalendarPageProps {
+  marketingEnabled?: boolean;
+  onMessage?: (message: string) => void;
+  registerPageLeaveGuard?: RegisterPageLeaveGuard;
   controller: ReturnType<typeof useCalendarPageController>;
   data: DesktopDashboardData;
   accommodationReservationsEnabled: boolean;
@@ -60,7 +68,10 @@ export function OperationCalendarPage({
   foodReservationsEnabled,
   tasksEnabled,
   onOpenReservation,
-  onCompleteTask
+  onCompleteTask,
+  marketingEnabled = false,
+  onMessage,
+  registerPageLeaveGuard
 }: OperationCalendarPageProps) {
   const { viewMode, setViewMode, selectedDate, setSelectedDate } = controller;
 
@@ -69,6 +80,9 @@ export function OperationCalendarPage({
     if (viewMode === "week") return buildWeekDates(selectedDate);
     return buildMonthDates(selectedDate);
   }, [selectedDate, viewMode]);
+  const marketing = useMarketingCalendar(marketingEnabled, visibleDates);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const selectedPlan = marketing.schedules.find(d => d.schedule.id === selectedPlanId);
   const dayEntries = useMemo(
     () => visibleDates.map((date) => ({
       date,
@@ -76,10 +90,11 @@ export function OperationCalendarPage({
         date,
         data,
         accommodationReservationsEnabled,
-        foodReservationsEnabled
+        foodReservationsEnabled,
+        marketing.entries
       )
     })),
-    [accommodationReservationsEnabled, data, foodReservationsEnabled, visibleDates]
+    [accommodationReservationsEnabled, data, foodReservationsEnabled, visibleDates, marketing.entries]
   );
   const summary = useMemo(() => {
     const summaryEntries = viewMode === "month"
@@ -87,6 +102,7 @@ export function OperationCalendarPage({
       : dayEntries;
     const items = summaryEntries.flatMap((entry) => entry.items);
     return {
+      marketing: items.filter(item => item.kind === "marketing").length,
       arrivals: items.filter((item) => item.kind === "arrival").length,
       departures: items.filter((item) => item.kind === "departure").length,
       restaurant: items.filter((item) => item.kind === "restaurant").length,
@@ -111,7 +127,7 @@ export function OperationCalendarPage({
           </div>
           <div>
             <strong>{viewMode === "month" ? formatMonthTitle(selectedDate) : formatRangeTitle(visibleDates)}</strong>
-            <span>{(accommodationReservationsEnabled || foodReservationsEnabled) && tasksEnabled
+            <span>{marketingEnabled ? "Rezervasyonlar, günlük işler ve paylaşım planları tek takvimde." : (accommodationReservationsEnabled || foodReservationsEnabled) && tasksEnabled
               ? "Etkin rezervasyon alanları ve günlük işler tek görünümde."
               : accommodationReservationsEnabled || foodReservationsEnabled
                 ? "Etkin rezervasyon alanları tek görünümde."
@@ -154,10 +170,12 @@ export function OperationCalendarPage({
         </div>
       </div>
 
+      {marketing.message && <p role="alert">{marketing.message}</p>}
       <div className="operation-calendar-summary" aria-label="Takvim özeti">
         {accommodationReservationsEnabled && <StatusBadge tone="info">{summary.arrivals} giriş</StatusBadge>}
         {accommodationReservationsEnabled && <StatusBadge tone="neutral">{summary.departures} çıkış</StatusBadge>}
         {foodReservationsEnabled && <StatusBadge tone="success">{summary.restaurant} restoran rezervasyonu</StatusBadge>}
+        {marketingEnabled && <StatusBadge tone="info">{summary.marketing} paylaşım planı</StatusBadge>}
         {tasksEnabled && <StatusBadge tone="warning">{summary.pendingTasks} bekleyen iş</StatusBadge>}
       </div>
 
@@ -197,7 +215,7 @@ export function OperationCalendarPage({
                           <div className={`operation-calendar-month-item item-${item.kind}`} key={item.key}>
                             <span className="operation-calendar-month-item-dot" aria-hidden="true" />
                             <span>{item.time || getCalendarItemLabel(item)}</span>
-                            <strong>{item.title}</strong>
+                            <strong>{item.kind === "marketing" ? <button type="button" className="operation-calendar-marketing-link" onClick={() => setSelectedPlanId(item.marketing.scheduleId)}>{item.title}</button> : item.title}</strong>
                           </div>
                         ))}
                         {items.length > 3 && <span className="operation-calendar-month-more">+{items.length - 3} kayıt</span>}
@@ -235,6 +253,7 @@ export function OperationCalendarPage({
                         tables={data.tables}
                         onOpenReservation={onOpenReservation}
                         onCompleteTask={onCompleteTask}
+                        onOpenMarketingPlan={setSelectedPlanId}
                       />
                     ))
                   )}
@@ -245,6 +264,7 @@ export function OperationCalendarPage({
         </div>
       )}
       </section>
+      {selectedPlan && <MarketingScheduleDialog key={selectedPlan.schedule.id} detail={selectedPlan} onClose={() => setSelectedPlanId("")} onReload={marketing.reload} onMessage={onMessage} registerPageLeaveGuard={registerPageLeaveGuard}/>}
     </PageWorkSurface>
   );
 }
@@ -254,8 +274,10 @@ function CalendarItemRow({
   rooms,
   tables,
   onOpenReservation,
-  onCompleteTask
+  onCompleteTask,
+  onOpenMarketingPlan
 }: {
+  onOpenMarketingPlan: (id: string) => void;
   item: CalendarItem;
   rooms: DesktopDashboardData["rooms"];
   tables: DesktopDashboardData["tables"];
@@ -275,7 +297,7 @@ function CalendarItemRow({
       </div>
       <strong className="operation-calendar-item-title">{item.title}</strong>
       <span className="operation-calendar-item-meta">
-        {item.kind === "task"
+        {(item.kind === "task" || item.kind === "marketing")
           ? item.meta
           : [
               item.meta,
@@ -286,7 +308,7 @@ function CalendarItemRow({
       </span>
       {item.detail && <p>{item.detail}</p>}
       <div className="operation-calendar-item-actions">
-        {item.kind === "task" ? (
+        {item.kind === "marketing" ? <ActionButton variant="secondary" size="sm" onClick={() => onOpenMarketingPlan(item.marketing.scheduleId)}>Planı aç</ActionButton> : item.kind === "task" ? (
           item.task.status === "pending" && (
             <ActionButton size="sm" type="button" onClick={() => onCompleteTask(item.task.id)}>
               <CheckCircle2 size={14} aria-hidden="true" />
@@ -307,9 +329,10 @@ function buildCalendarItems(
   date: string,
   data: DesktopDashboardData,
   accommodationReservationsEnabled: boolean,
-  foodReservationsEnabled: boolean
+  foodReservationsEnabled: boolean,
+  marketingEntries: MarketingCalendarEntry[] = []
 ): CalendarItem[] {
-  const items: CalendarItem[] = [];
+  const items: CalendarItem[] = marketingEntries.filter(e => e.date === date).map(e => ({key: `marketing:${e.scheduleId}:${e.time}:${e.outcome}`, kind: "marketing", title: e.title, meta: e.meta, detail: e.detail, time: e.time, marketing: e}));
 
   for (const reservation of data.reservations) {
     if (hiddenReservationStatuses.has(reservation.status)) continue;
@@ -381,6 +404,7 @@ function buildCalendarItems(
 }
 
 function getCalendarItemTone(item: CalendarItem): StatusTone {
+  if (item.kind === "marketing") return item.marketing.outcome === "failed" ? "danger" : item.marketing.outcome === "succeeded" ? "success" : item.marketing.outcome === "skipped" ? "warning" : "info";
   if (item.kind === "task") return item.task.status === "done" ? "success" : "warning";
   if (item.kind === "arrival") return "info";
   if (item.kind === "departure") return "neutral";
@@ -388,6 +412,7 @@ function getCalendarItemTone(item: CalendarItem): StatusTone {
 }
 
 function getCalendarItemLabel(item: CalendarItem) {
+  if (item.kind === "marketing") return {active:"Paylaşım planı",paused:"Plan duraklatıldı",completed:"Plan tamamlandı",cancelled:"Plan iptal edildi",pending:"Yayın bekleniyor",claimed:"Yayın işleniyor",succeeded:"Plan çalıştı",skipped:"Plan atlandı",failed:"Plan başarısız"}[item.marketing.outcome];
   if (item.kind === "task") return item.task.status === "done" ? "İş tamamlandı" : "Günlük iş";
   if (item.kind === "arrival") return "Giriş";
   if (item.kind === "departure") return "Çıkış";
@@ -395,6 +420,7 @@ function getCalendarItemLabel(item: CalendarItem) {
 }
 
 function getCalendarItemIcon(item: CalendarItem) {
+  if (item.kind === "marketing") return <CalendarDays size={15}/>;
   if (item.kind === "arrival") return <LogIn size={15} />;
   if (item.kind === "departure") return <LogOut size={15} />;
   if (item.kind === "restaurant") return <UtensilsCrossed size={15} />;
@@ -402,7 +428,7 @@ function getCalendarItemIcon(item: CalendarItem) {
 }
 
 function calendarItemOrder(kind: CalendarItem["kind"]) {
-  const order: Record<CalendarItem["kind"], number> = { departure: 0, arrival: 1, restaurant: 2, task: 3 };
+  const order: Record<CalendarItem["kind"], number> = { departure: 0, arrival: 1, restaurant: 2, task: 3, marketing: 4 };
   return order[kind];
 }
 

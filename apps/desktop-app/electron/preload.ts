@@ -1,4 +1,4 @@
-import type { BusinessMessagingBridge, MarketingAnalyticsBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
+import type { BusinessMessagingBridge, MarketingShareBridge, MarketingAnalyticsBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge } from "@yardimci-asistan/shared";
 import type { DataMaintenanceConfirmation } from "./data-maintenance-confirmation";
 import type {
   KbsConnectionTestResult,
@@ -194,7 +194,7 @@ type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 
-export interface DesktopBridge extends MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
+export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsBridge, BusinessMessagingBridge, MessagingCampaignBridge, MarketingScheduleBridge, MarketingBridge, MarketingProviderBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
   getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
@@ -413,6 +413,9 @@ const bridge: DesktopBridge = {
   getMarketingCampaignAnalytics: (id) => invokeWhenUnlocked("marketingAnalytics:campaign", id),
   getMarketingPublicationAnalytics: (id) => invokeWhenUnlocked("marketingAnalytics:publication", id),
   refreshMarketingPublicationMetrics: (id) => invokeWhenUnlocked("marketingAnalytics:refreshPublication", id),
+  getMarketingShare: (id) => invokeWhenUnlocked("marketing:share", id),
+  saveMarketingShare: (input) => invokeWhenUnlocked("marketing:saveShare", input),
+  submitMarketingShare: (id, revision) => invokeWhenUnlocked("marketing:submitShare", id, revision),
   getMarketingChannels: () => invokeWhenUnlocked("marketing:channels"),
   getMarketingStudio: () => invokeWhenUnlocked("marketing:studio"),
   saveMarketingContent: (input) => invokeWhenUnlocked("marketing:saveContent", input),

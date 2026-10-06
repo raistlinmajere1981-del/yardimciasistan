@@ -1,5 +1,7 @@
 # D7 — Unified Marketing Analytics
 
+The separate Analytics view and canonical result workspaces now follow [D-044 sharing workspace](marketing-sharing-workspace.md). Metric semantics and this read-only service boundary remain unchanged.
+
 The accepted domain decision is D-041 in `DOMAIN_DECISIONS_V1.md`.
 `MarketingAnalyticsService` owns read-only aggregation, date selection, totals, trends
 and optional provider observations. It uses `DesktopDatabase` and a whitelisted fact
@@ -103,12 +105,32 @@ zero. Production has no external refresh button while Insights access is unverif
 
 ## UI, privacy and diagnostics
 
-Pazarlama navigation is İçerik Stüdyosu / Kampanyalar / Yayınlar / Medya / Takvim / Analitik.
-Analitik has a range selector, summary, four channel cards, light SVG trends with an
-accessible daily table, channel result table and recent campaign/publication entries.
-Entries open existing canonical workspaces; their analytics are read-only sections.
-No nested modal, new chart library, tracker, cookies, attribution or customer analytics.
-Appearance v2 semantic tokens and ActionButton are reused; channels stack on narrow screens.
+Pazarlama exposes Çalışma Alanı and Analitik. Analytics is one read-only results page,
+using shared MetricCard, Panel, ActionButton, StatusBadge, DatePicker and WorkspaceFrame.
+The three headline values are confirmed Website/Instagram publications (one per channel,
+not unique content), accepted WhatsApp/SMS messages (provider receipt, not delivery), and
+channels used by attempted/accepted messages or publishing/published/failed publications.
+Channel-use zero requires actual local observations; an empty interval remains null.
+Active/completed campaign counts and cross-unit combined failure/delivery/read totals have
+been removed from the overview contract. Failure and delivery/read remain in their own
+channel and canonical entity results. No channel setup or Settings actions appear here.
+
+Two daily series use independent scales for publication and recipient units, with an
+accessible daily table. Each channel shows a small relevant metric set rather than its
+internal operation counters. A single service-sorted, bounded recentResults list replaces
+the separate campaign/publication lists; drafts are excluded. Lifetime recipient facts
+are read only after selecting the eight recent targets, including preparation outside the
+creation interval. No fabricated best-content ranking is shown: the current channels
+lack a common engagement measurement. Available publication-lifetime observations remain
+visible with their measurement time/freshness and are refreshed only in canonical detail.
+
+The meaning of date cohorts, accepted versus delivered, zero versus unavailable, and
+publication-lifetime measurements is explained in an optional help overlay. A range
+change or failed read cannot retain results from another interval under the new filter.
+Entries open existing canonical workspaces; their analytics remain read-only sections.
+No new chart library, tracker, cookies, attribution or customer analytics is introduced.
+Appearance v2 semantic tokens are reused; cards and independent charts stack on narrow
+screens without a separate visual system.
 
 Analytics IPC/service payloads never contain Customer names, phone numbers, message
 bodies, titles, template parameters, credentials, staging tokens or provider responses.
