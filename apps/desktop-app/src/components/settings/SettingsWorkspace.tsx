@@ -72,7 +72,7 @@ interface PendingPageTransition {
 type PendingTransition = PendingCategoryTransition | PendingPageTransition;
 
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
-  const [active, setActive] = usePageViewState<SettingsCategoryId>("settings.category", "business");
+  const [storedActive, setActive] = usePageViewState<SettingsCategoryId>("settings.category", "business");
   const [query, setQuery] = usePageViewState("settings.search", "");
   const [focusTarget, setFocusTarget] = useState("");
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
@@ -87,6 +87,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const visibleCategories = initialized
     ? settingsCategories
     : settingsCategories.filter((item) => item.id === "business");
+  const category = visibleCategories.find((item) => item.id === storedActive)
+    ?? settingsCategories[0];
+  const active = category.id;
+  useEffect(() => {
+    if (storedActive !== active) setActive(active);
+  }, [active, setActive, storedActive]);
   const profile = useBusinessPublicProfileSettings({
     businessAddress: drafts.canonical.address,
     enabledCapabilities: capabilities,
@@ -110,7 +116,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     onConfiguredChange: props.onAppPasswordConfiguredChange ?? (() => undefined)
   });
 
-  const category = settingsCategories.find((item) => item.id === active)!;
   const setupCategory = active === "business" || active === "services" ? active : null;
   const hasSetupSection = setupCategory
     ? settingsSections.some((section) =>
@@ -400,7 +405,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   });
                 }}
               >
-                {settingsCategories.find((item) => item.id === result.category)!.title} · {result.title}
+                {settingsCategories.find((item) => item.id === result.category)?.title ?? "Ayarlar"} · {result.title}
               </button>
             )) : <p role="status">Ayar bulunamadı.</p>}
           </div>

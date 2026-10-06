@@ -121,7 +121,19 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
                     <div
                       className={`room-management-row interactive-surface interactive-surface--record${selected ? " is-media-selected is-selected" : ""}`}
                       key={room.key}
-                      onClick={() => setMediaRoomKey(room.key)}
+                      role="button"
+                      tabIndex={saving || loading ? -1 : 0}
+                      aria-label={`${identity} medyalarını seç`}
+                      aria-pressed={selected}
+                      aria-disabled={saving || loading}
+                      onClick={() => { if (!saving && !loading) setMediaRoomKey(room.key); }}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget || saving || loading || event.repeat) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setMediaRoomKey(room.key);
+                        }
+                      }}
                     >
                       <input
                         className="room-management-out-of-service"

@@ -9,6 +9,7 @@ import type {
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import type { WorkspacePresentation } from "../workspace/workspace-intent";
 import { SupportReportDialog } from "./SupportReportDialog";
+import { ActionButton } from "../ui/ActionButton";
 
 interface DiagnosticsViewerProps {
   onClose: () => void;
@@ -34,6 +35,8 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
   const [message, setMessage] = useState("Log oturumları yükleniyor...");
   const [copyMessage, setCopyMessage] = useState("");
   const [supportReportOpen, setSupportReportOpen] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
+  const [copyAction, setCopyAction] = useState<"visible" | "session" | "context" | "">("");
 
   const selectedSession = sessions.find((session) => session.sessionId === sessionId) ?? null;
   const isCurrentSession = Boolean(selectedSession?.current);
@@ -212,11 +215,17 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
 
   async function handleCopyVisible() {
     if (!result) return;
-    await copyText(exportEvents(result.session, visibleEvents), `${visibleEvents.length} görünür kayıt kopyalandı.`);
+    setCopyAction("visible");
+    try {
+      await copyText(exportEvents(result.session, visibleEvents), `${visibleEvents.length} görünür kayıt kopyalandı.`);
+    } finally {
+      setCopyAction("");
+    }
   }
 
   async function handleCopySession() {
     if (!sessionId) return;
+    setCopyAction("session");
     setCopyMessage("Tüm oturum hazırlanıyor...");
     try {
       const full = await readAllSessionEvents(sessionId);
@@ -227,11 +236,14 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       await copyText(exportEvents(full.session, full.events), `Tüm oturum kopyalandı · ${full.events.length} kayıt.`);
     } catch {
       setCopyMessage("Tüm oturum kopyalanamadı.");
+    } finally {
+      setCopyAction("");
     }
   }
 
   async function handleCopyContext() {
     if (!sessionId || !selectedEvent) return;
+    setCopyAction("context");
     setCopyMessage("Hata bağlamı hazırlanıyor...");
     try {
       const full = await readAllSessionEvents(sessionId);
@@ -251,6 +263,8 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       await copyText(exportEvents(full.session, context), `Seçili kayıt çevresi kopyalandı · ${context.length} kayıt.`);
     } catch {
       setCopyMessage("Hata bağlamı kopyalanamadı.");
+    } finally {
+      setCopyAction("");
     }
   }
 
@@ -265,35 +279,39 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       closeLabel="Log görünümünü kapat"
       bodyScroll="panes"
       actions={<>
-        <button
-          className="action-button action-button-secondary action-button-sm"
+        <ActionButton
+          variant="secondary"
+          size="sm"
+          busy={state === "loading" || refreshBusy}
+          busyLabel="Yenileniyor…"
           type="button"
           onClick={() => {
-            void refreshSessions(sessionId);
-            void refreshEvents(sessionId);
+            setRefreshBusy(true);
+            void Promise.all([refreshSessions(sessionId), refreshEvents(sessionId)]).finally(() => setRefreshBusy(false));
           }}
         >
           <RefreshCw size={15} aria-hidden="true" />
           Yenile
-        </button>
-        <button
-          className="action-button action-button-primary action-button-sm"
+        </ActionButton>
+        <ActionButton
+          size="sm"
           type="button"
           onClick={() => setSupportReportOpen(true)}
         >
           <Bug size={15} aria-hidden="true" />
           Hata Bildir
-        </button>
+        </ActionButton>
         {isCurrentSession && (
-          <button
-            className="action-button action-button-secondary action-button-sm"
+          <ActionButton
+            variant="secondary"
+            size="sm"
             type="button"
             onClick={() => setPaused((current) => !current)}
             aria-pressed={paused}
           >
             {paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
             {paused ? "Canlı Takip" : "Duraklat"}
-          </button>
+          </ActionButton>
         )}
       </>}
       navigation={
@@ -337,16 +355,16 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       footer={
         <div className="diagnostics-footer">
           <div className="diagnostics-copy-actions">
-            <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopyVisible()} disabled={!result}>
+            <ActionButton variant="secondary" size="sm" type="button" onClick={() => void handleCopyVisible()} disabled={!result || Boolean(copyAction)} busy={copyAction === "visible"} busyLabel="Kopyalanıyor…">
               <Clipboard size={15} aria-hidden="true" />
               Görünenleri Kopyala
-            </button>
-            <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopySession()} disabled={!sessionId}>
+            </ActionButton>
+            <ActionButton variant="secondary" size="sm" type="button" onClick={() => void handleCopySession()} disabled={!sessionId || Boolean(copyAction)} busy={copyAction === "session"} busyLabel="Tüm oturum hazırlanıyor...">
               Tüm Oturumu Kopyala
-            </button>
-            <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopyContext()} disabled={!selectedEvent}>
+            </ActionButton>
+            <ActionButton variant="secondary" size="sm" type="button" onClick={() => void handleCopyContext()} disabled={!selectedEvent || Boolean(copyAction)} busy={copyAction === "context"} busyLabel="Hata bağlamı hazırlanıyor...">
               Bu Kaydın Bağlamını Kopyala
-            </button>
+            </ActionButton>
           </div>
           <span role="status" aria-live="polite">{copyMessage || `${visibleEvents.length} / ${result?.events.length ?? 0} kayıt görünür`}</span>
         </div>

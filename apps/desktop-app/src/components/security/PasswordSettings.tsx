@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type FormEvent } from "react";
 import { KeyRound, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import type { SettingsOperationResult } from "../../app/settings-save";
 import { reportAppStatus } from "../../app/runtime-state";
+import { ActionButton } from "../ui/ActionButton";
 
 interface PasswordSettingsProps {
   configured: boolean;
@@ -252,20 +253,21 @@ export function PasswordSettings({ controller }: { controller: ReturnType<typeof
             </label>
           </div>
           <div className="form-actions">
-            <button className="action-button" type="submit" disabled={!hasPasswordDraft || Boolean(busyAction)}>{busyAction === "save" ? "Kaydediliyor…" : "Şifreyi Kaydet"}</button>
+            <ActionButton type="submit" disabled={!hasPasswordDraft || Boolean(busyAction)} busy={busyAction === "save"} busyLabel="Kaydediliyor…">Şifreyi Kaydet</ActionButton>
           </div>
           {configured && <div className="form-actions password-settings-actions">
-              <button className="setup-secondary password-remove-button action-button action-button-danger" type="button" onClick={removePassword} disabled={Boolean(busyAction)}>
+              <ActionButton className="setup-secondary password-remove-button" variant="danger" type="button" onClick={removePassword} disabled={Boolean(busyAction)} busy={busyAction === "remove"} busyLabel={<><Trash2 size={16} aria-hidden="true" />Kaldırılıyor</>}>
                 <Trash2 size={16} aria-hidden="true" />
-                {busyAction === "remove" ? "Kaldırılıyor" : "Şifreyi Kaldır"}
-              </button>
+                Şifreyi Kaldır
+              </ActionButton>
           </div>}
         </form>
 
         {configured && (
           <div className="password-settings-recovery">
-            <button
-              className="action-button action-button-ghost password-settings-link"
+            <ActionButton
+              variant="ghost"
+              className="password-settings-link"
               type="button"
               aria-expanded={recoveryOpen}
               onClick={() => setRecoveryOpen((current) => !current)}
@@ -273,7 +275,7 @@ export function PasswordSettings({ controller }: { controller: ReturnType<typeof
             >
               <RotateCcw size={15} aria-hidden="true" />
               Şifremi Unuttum
-            </button>
+            </ActionButton>
             {recoveryOpen && (
               <form onSubmit={resetPassword}>
                 <label className="form-field form-field--medium">
@@ -287,9 +289,9 @@ export function PasswordSettings({ controller }: { controller: ReturnType<typeof
                     disabled={Boolean(busyAction)}
                   />
                 </label>
-                <button className="action-button action-button-secondary" type="submit" disabled={Boolean(busyAction)}>
-                  {busyAction === "reset" ? "Kontrol ediliyor" : "Şifreyi Sıfırla"}
-                </button>
+                <ActionButton variant="secondary" type="submit" disabled={Boolean(busyAction)} busy={busyAction === "reset"} busyLabel="Kontrol ediliyor">
+                  Şifreyi Sıfırla
+                </ActionButton>
               </form>
             )}
           </div>

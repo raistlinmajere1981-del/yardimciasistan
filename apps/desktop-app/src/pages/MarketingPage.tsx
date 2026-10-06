@@ -45,7 +45,9 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage, onCal
     catch(e) {if(mounted.current) setMessage(e instanceof Error ? e.message : "İçerik açılamadı.");}
     finally {opening.current = false; if(mounted.current) setLoading(false);}
   }
-  if(!enabled) return <p>Pazarlama bu işletmede etkin değil.</p>;
+  if(!enabled) return <FeatureWorkspacePage label="Pazarlama" bodyLabel="Pazarlama çalışma alanı" layout="fill">
+    <div className="panel empty-state"><strong>Pazarlama bu işletmede etkin değil.</strong></div>
+  </FeatureWorkspacePage>;
   const drafts = snapshot?.contents.filter(c => c.content.status !== "archived" && !snapshot.shares?.some(s => s.contentId === c.content.id && s.submitted) && !snapshot.publications.some(p => p.contentId === c.content.id) && !snapshot.campaigns?.some(d => d.campaign.contentId === c.content.id)) || [];
   const activeWebsite = snapshot?.publications.filter(p => p.channel === "website" && (p.desiredPublished || Boolean(p.publishedAt) && p.status !== "unpublished")) || [];
   const recent = [

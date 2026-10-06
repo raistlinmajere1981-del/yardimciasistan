@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageViewStateProvider, usePageViewState } from "../../apps/desktop-app/src/app/page-view-state";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
 import { defaultDashboardData, defaultSetupData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
@@ -376,4 +377,23 @@ function Fixture() {
     </AppShell>
   </BusinessCapabilityRuntimeProvider>;
 }
-createRoot(document.getElementById("root")!).render(<Fixture />);
+function StoredCategory() {
+  const [category] = usePageViewState("settings.category", "business");
+  return <output aria-label="Stored settings category">{category}</output>;
+}
+
+function SeededFixture() {
+  const [, setCategory] = usePageViewState("settings.category", "business");
+  const [ready, setReady] = useState(false);
+  const [reading, setReading] = useState(false);
+  useEffect(() => {
+    const seed = new URLSearchParams(window.location.search).get("category");
+    if (seed) setCategory(seed);
+    setReady(true);
+  }, []);
+  window.readStoredSettingsCategory = () => setReading(true);
+  return ready ? reading ? <StoredCategory /> : <Fixture /> : null;
+}
+createRoot(document.getElementById("root")!).render(<PageViewStateProvider>
+  {new URLSearchParams(window.location.search).has("category") ? <SeededFixture /> : <Fixture />}
+</PageViewStateProvider>);

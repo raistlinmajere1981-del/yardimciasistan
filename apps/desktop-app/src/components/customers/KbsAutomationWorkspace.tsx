@@ -42,6 +42,7 @@ export function KbsAutomationWorkspace({
   const [egmSessionOpen, setEgmSessionOpen] = useState(false);
   const [egmSessionMessage, setEgmSessionMessage] = useState("");
   const [egmSessionError, setEgmSessionError] = useState("");
+  const [egmSessionBusy, setEgmSessionBusy] = useState(false);
   const egmWebviewRef = useRef<KbsWebViewElement | null>(null);
   const registeredWebviewId = useRef<number | null>(null);
   const credentialsAttempted = useRef(false);
@@ -68,6 +69,7 @@ export function KbsAutomationWorkspace({
     const webview = egmWebviewRef.current;
     if (!webview) return;
     let active = true;
+    let pendingDrives = 0;
 
     const unregister = () => {
       const id = registeredWebviewId.current;
@@ -92,39 +94,53 @@ export function KbsAutomationWorkspace({
     };
 
     const drive = async () => {
-      register();
+      pendingDrives++;
+      let preparingCredentials = false;
+      setEgmSessionBusy(true);
       setEgmSessionError("");
-      const inspected = await window.yardimciDesktop!.inspectEgmKbsSession();
-      if (!active) return;
+      try {
+        register();
+        const inspected = await window.yardimciDesktop!.inspectEgmKbsSession();
+        if (!active) return;
 
-      if (inspected.state === "authenticated") {
-        setEgmSessionMessage(inspected.message);
-        const retryId = pendingSessionRetryId.current;
-        if (retryId && !sessionRetryAttempted.current) {
-          sessionRetryAttempted.current = true;
-          pendingSessionRetryId.current = "";
-          consumeRetryRef.current?.();
-          const retryResult = await sendRef.current(retryId);
-          if (!active) return;
-          setEgmSessionMessage(retryResult?.message || inspected.message);
-        }
-        return;
-      }
-      if (inspected.state === "otp_required") {
-        setEgmSessionMessage("EGMSEC uygulamasındaki geçici şifreyi bu sayfaya girin. Doğrulama tamamlandığında aynı oturum sonraki bildirimlerde kullanılacak.");
-        return;
-      }
-      if (inspected.state === "login_required") {
-        if (credentialsAttempted.current) {
-          setEgmSessionMessage("EGM KBS giriş formu yeniden göründü. Kayıtlı bilgileri kontrol edin veya bu sayfadan giriş yapın.");
+        if (inspected.state === "authenticated") {
+          setEgmSessionMessage(inspected.message);
+          const retryId = pendingSessionRetryId.current;
+          if (retryId && !sessionRetryAttempted.current) {
+            sessionRetryAttempted.current = true;
+            pendingSessionRetryId.current = "";
+            consumeRetryRef.current?.();
+            const retryResult = await sendRef.current(retryId);
+            if (!active) return;
+            setEgmSessionMessage(retryResult?.message || inspected.message);
+          }
           return;
         }
-        credentialsAttempted.current = true;
-        const result = await window.yardimciDesktop!.prepareStoredEgmKbsLogin();
-        if (active) setEgmSessionMessage(result.message);
-        return;
+        if (inspected.state === "otp_required") {
+          setEgmSessionMessage("EGMSEC uygulamasındaki geçici şifreyi bu sayfaya girin. Doğrulama tamamlandığında aynı oturum sonraki bildirimlerde kullanılacak.");
+          return;
+        }
+        if (inspected.state === "login_required") {
+          if (credentialsAttempted.current) {
+            setEgmSessionMessage("EGM KBS giriş formu yeniden göründü. Kayıtlı bilgileri kontrol edin veya bu sayfadan giriş yapın.");
+            return;
+          }
+          credentialsAttempted.current = true;
+          preparingCredentials = true;
+          const result = await window.yardimciDesktop!.prepareStoredEgmKbsLogin();
+          if (active) setEgmSessionMessage(result.message);
+          return;
+        }
+        setEgmSessionMessage(inspected.message);
+      } catch {
+        if (!active) return;
+        if (preparingCredentials) credentialsAttempted.current = false;
+        setEgmSessionMessage("");
+        setEgmSessionError("EGM KBS oturumu hazırlanamadı. Yeniden yükleyip tekrar deneyin.");
+      } finally {
+        pendingDrives--;
+        if (active) setEgmSessionBusy(pendingDrives > 0);
       }
-      setEgmSessionMessage(inspected.message);
     };
 
     const onAttach = () => register();
@@ -132,6 +148,8 @@ export function KbsAutomationWorkspace({
     const onFail = (event: Event) => {
       const detail = event as Event & { errorCode?: number; errorDescription?: string };
       if (detail.errorCode === -3) return;
+      setEgmSessionBusy(false);
+      setEgmSessionMessage("");
       setEgmSessionError(detail.errorDescription
         ? "EGM KBS sayfası yüklenemedi: " + detail.errorDescription
         : "EGM KBS sayfası yüklenemedi.");
@@ -250,7 +268,7 @@ export function KbsAutomationWorkspace({
         </div>
       </div>
 
-      {egmSessionOpen && overview.provider === "egm" && <div className="panel kbs-operations-session" data-surface-role="integration">
+      {egmSessionOpen && overview.provider === "egm" && <div className="panel kbs-operations-session" data-surface-role="integration" aria-busy={egmSessionBusy}>
         <div className="page-toolbar compact">
           <div className="page-toolbar__copy">
             <strong>EGM KBS oturumu</strong>

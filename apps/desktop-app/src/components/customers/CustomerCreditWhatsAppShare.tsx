@@ -128,7 +128,7 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
       <p>Mesaj otomatik gönderilmez. WhatsApp açıldığında son kontrol ve gönderim sizde kalır.</p>
       <div className="action-row">
         <ActionButton variant="secondary" disabled={busy || !draft.message.trim()} onClick={() => void copy()}>Kopyala</ActionButton>
-        <ActionButton variant="secondary" disabled={disabled || busy || !draft.message.trim()} onClick={() => void prepare()}>{busy ? "Hazırlanıyor…" : "WhatsApp'a Hazırla"}</ActionButton>
+        <ActionButton variant="secondary" disabled={disabled || busy || !draft.message.trim()} busy={busy} busyLabel="Hazırlanıyor…" onClick={() => void prepare()}>WhatsApp'a Hazırla</ActionButton>
         <ActionButton variant="ghost" disabled={busy} onClick={close}>Vazgeç</ActionButton>
       </div>
     </div>}

@@ -74,6 +74,8 @@ try {
     };
     const record = (kind, input) => { window.__designCalls.push({ kind, input }); return { ok: true, message: 'Kaydedildi.', dashboardData: dashboard, savedId: input.id || 'stage2-customer' }; };
     window.yardimciDesktop = {
+      getBusinessMessagingConfiguration: async () => ({ providerId: 'whatsapp_cloud', enabled: false, wabaId: '', phoneNumberId: '', hasSecret: false, configured: false }),
+      onBusinessMessagingChanged: () => () => {},
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
       commerce: { listProducts: async () => [], listCategories: async () => [], getCustomerCreditAccount: async id => ({ customer: { ...dashboard.customers.find(customer => customer.id === id), businessId: 'fixture', deletedAt: '' }, balances: [{ currency: 'TRY', amountMinor: 45000 }], entries: [] }) },
       deleteCustomer: async id => { window.__designCalls.push({ kind: "delete-customer", input: id }); return { ok: false, message: "Aktif konaklaması olan müşteri silinemez." }; },

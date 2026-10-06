@@ -101,7 +101,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
       return { ok: true, changed: true, message: result.message };
     } catch {
       const message = "Google yorumları ayarları kaydedilemedi.";
-      setFeedback({ error: false, warning: false, message: "" });
+      setFeedback({ error: true, warning: false, message });
       return { ok: false, message };
     } finally {
       saveInFlight.current = false;
