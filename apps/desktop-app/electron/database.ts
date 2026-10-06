@@ -36,6 +36,7 @@ import { assignHospitalityStay, enterReservedHospitalityStay, checkInHospitality
 import { KbsDeliveryService } from "./kbs-delivery-service.js";
 import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
 import { createDesktopDashboardData } from "./desktop-dashboard-service.js";
+import { reportReservationCapabilitySqlClause, reportTaskCapabilitySqlClause } from "./database/report-utils.js";
 import { getReservationById } from "./database/reservation-store.js";
 import { getDailyTaskById } from "./database/daily-task-store.js";
 import { assignReservationRoom } from "./stay-reservation-service.js";
@@ -848,13 +849,15 @@ export class DesktopDatabase {
   }
 
   getAppLockNotificationCount(): number {
+    const enabled = new Set(this.getEnabledBusinessCapabilities());
+    const requestsEnabled = enabled.has(BUSINESS_CAPABILITIES.CUSTOMERS) && enabled.has(BUSINESS_CAPABILITIES.REQUESTS);
     const row = this.db
       .prepare(`
         SELECT
           (
-            (SELECT COUNT(*) FROM requests WHERE status = 'new' AND deleted_at = '')
-            + (SELECT COUNT(*) FROM reservations WHERE status = 'pending' AND deleted_at = '')
-            + (SELECT COUNT(*) FROM daily_tasks WHERE status = 'pending' AND deleted_at = '')
+            (SELECT COUNT(*) FROM requests WHERE status = 'new' AND deleted_at = '' AND ?)
+            + (SELECT COUNT(*) FROM reservations WHERE status = 'pending' AND deleted_at = '' ${reportReservationCapabilitySqlClause(enabled)})
+            + (SELECT COUNT(*) FROM daily_tasks WHERE status = 'pending' AND deleted_at = '' ${reportTaskCapabilitySqlClause(enabled)})
             + (
               SELECT COUNT(DISTINCT tables.id)
               FROM tables
@@ -863,6 +866,7 @@ export class DesktopDatabase {
                 AND table_orders.status = 'payment'
               WHERE tables.deleted_at = ''
                 AND tables.is_active = 1
+                AND ?
                 AND (tables.status = 'bill_waiting' OR table_orders.id IS NOT NULL)
             )
             + (
@@ -872,7 +876,7 @@ export class DesktopDatabase {
             )
           ) AS count
       `)
-      .get() as { count?: number } | undefined;
+      .get(requestsEnabled ? 1 : 0, enabled.has(BUSINESS_CAPABILITIES.FOOD_ORDERS) ? 1 : 0) as { count?: number } | undefined;
     return Math.max(0, Number(row?.count ?? 0));
   }
 

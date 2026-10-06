@@ -38,7 +38,8 @@ export function buildDesktopNotifications(
   const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   if (!enabled.has(BUSINESS_CAPABILITIES.NOTIFICATIONS)) return notifications;
 
-  for (const request of hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.CUSTOMERS) ? data.requests : []) {
+  for (const request of hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.CUSTOMERS)
+      && hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.REQUESTS) ? data.requests : []) {
     if (request.status !== "new") continue;
     notifications.push({
       key: `request:${request.id}:new`,

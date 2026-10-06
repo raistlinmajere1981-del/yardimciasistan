@@ -130,6 +130,8 @@ export function CustomerWorkRoute({
               kbsOverview={surfaceData.kbsOverview}
               aiEnabled={features.ai}
               wholesaleEnabled={features.wholesale}
+              staysEnabled={features.accommodation.stays}
+              reservationsEnabled={features.accommodation.reservations || features.food.reservations}
               onSave={handleSaveCustomer}
               onAnalyzeIdentity={handleAnalyzeIdentityImage}
               onDelete={handleDeleteCustomer}

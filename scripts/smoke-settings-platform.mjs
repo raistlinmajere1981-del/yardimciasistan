@@ -18,7 +18,7 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
 
-  await page.route('**/settings-platform-test', async route => {
+  await page.route('**/settings-platform-test*', async route => {
     const html = await server.transformIndexHtml(
       '/settings-platform-test',
       '<html><body><div id="root"></div><script type="module" src="/@fs/' +
@@ -43,6 +43,56 @@ try {
   await expect(page.getByRole('tabpanel')).toHaveCount(1);
   await expect(page.locator('.settings-category-workspace')).toHaveCount(1);
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
+
+  // Room settings have their own surface; pension-only must never offer a blank table surface.
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=pension`);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
+  await expect(page.getByRole('button', { name: 'İşletme Düzeni · Masa yönetimi', exact: true })).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await select('İşletme Düzeni');
+  await expect(page.locator('#settings-operations')).toHaveCount(0);
+  await expect(page.locator('#settings-rooms')).toBeVisible();
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=restaurant`);
+  await select('İşletme Düzeni');
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
+  await expect(page.getByRole('button', { name: 'İşletme Düzeni · Masa yönetimi', exact: true })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
+  await expect(page.locator('#settings-operations')).toBeVisible();
+
+  // Persisted runtime capability, not the profile preset, controls this resource/search surface.
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=market&tables=on`);
+  await select('İşletme Düzeni');
+  await expect(page.locator('#settings-operations')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
+  await expect(page.getByRole('button', { name: 'İşletme Düzeni · Masa yönetimi', exact: true })).toBeVisible();
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=restaurant&tables=off`);
+  await select('İşletme Düzeni');
+  await expect(page.locator('#settings-operations')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
+  await expect(page.getByRole('button', { name: 'İşletme Düzeni · Masa yönetimi', exact: true })).toHaveCount(0);
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test`);
+
+  // A preset round-trip is not an explicit edit of the operator's existing OFF selection.
+  await page.evaluate(() => window.refreshSettings({ profileId: 'pension', profileOptions: ['accommodation.reservations'] }));
+  const requestOption = page.getByLabel('Talepler', { exact: true });
+  await expect(requestOption).not.toBeChecked();
+  await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('market');
+  await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('pension');
+  await expect(requestOption).not.toBeChecked();
+  await page.getByLabel('Firma adı', { exact: true }).fill('Round-trip Firma');
+  await save();
+  expect((await setupCalls()).at(-1).input.profileOptions).not.toContain('customer.requests');
+  // Actual checkbox edits survive a profile round-trip; discard resets that transient selection.
+  await requestOption.check();
+  await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('market');
+  await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('pension');
+  await expect(requestOption).toBeChecked();
+  await discard();
+  await expect(requestOption).not.toBeChecked();
+  await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('market');
+  await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('pension');
+  await expect(requestOption).not.toBeChecked();
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test`);
 
   // First-run setup intentionally exposes only Business; the remaining categories appear after the first save.
   await page.evaluate(() => window.refreshSettings({ setupRequired: true }));

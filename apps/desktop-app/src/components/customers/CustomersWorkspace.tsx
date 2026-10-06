@@ -20,6 +20,8 @@ interface CustomersWorkspaceProps {
   kbsOverview: DesktopDashboardData["kbsOverview"];
   aiEnabled: boolean;
   wholesaleEnabled?: boolean;
+  staysEnabled?: boolean;
+  reservationsEnabled?: boolean;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => void | Promise<unknown>;
@@ -34,6 +36,8 @@ export function CustomersWorkspace({
   kbsOverview,
   aiEnabled,
   wholesaleEnabled = false,
+  staysEnabled = false,
+  reservationsEnabled = false,
   onSave,
   onAnalyzeIdentity,
   onDelete,
@@ -45,8 +49,8 @@ export function CustomersWorkspace({
   const [createOpen, setCreateOpen] = useState(false);
   const [pendingCustomerId, setPendingCustomerId] = useState("");
   const hasDealerCustomers = wholesaleEnabled && customers.some((customer) => Boolean(customer.commercialProfile));
-  const hasStayCustomers = stays.length > 0;
-  const hasReservationCustomers = reservations.length > 0;
+  const hasStayCustomers = staysEnabled && stays.length > 0;
+  const hasReservationCustomers = reservationsEnabled && reservations.length > 0;
 
   const rows = useMemo(() => customers.map((customer) => {
     const customerStays = stays.filter((stay) => stayHasCustomer(stay, customer.id));
@@ -104,7 +108,8 @@ export function CustomersWorkspace({
     if (filter === "dealers" && !hasDealerCustomers) setFilter("all");
     if (filter === "staying" && !hasStayCustomers) setFilter("all");
     if (filter === "reserved" && !hasReservationCustomers) setFilter("all");
-  }, [filter, hasDealerCustomers, hasReservationCustomers, hasStayCustomers]);
+    if ((filter === "kbs_pending" || filter === "kbs_failed") && !kbsOverview.enabled) setFilter("all");
+  }, [filter, hasDealerCustomers, hasReservationCustomers, hasStayCustomers, kbsOverview.enabled]);
 
   useEffect(() => {
     if (createOpen || !pendingCustomerId) return;
@@ -128,7 +133,7 @@ export function CustomersWorkspace({
           onChange={(event) => setSearchText(event.target.value)}
           placeholder={wholesaleEnabled
             ? "Ad, telefon, firma, vergi no veya etiket"
-            : stays.length > 0
+            : hasStayCustomers
               ? "Ad, telefon, kimlik, etiket veya oda"
               : "Ad, telefon, kimlik veya etiket"}
         />

@@ -305,7 +305,7 @@ export function saveSetupData(
   }
 
   const now = new Date().toISOString();
-  const existingBusiness = db.prepare("SELECT id, created_at FROM business WHERE deleted_at = '' LIMIT 1").get() as { id?: string; created_at?: string } | undefined;
+  const existingBusiness = db.prepare("SELECT id, profile_id, created_at FROM business WHERE deleted_at = '' LIMIT 1").get() as { id?: string; profile_id?: string; created_at?: string } | undefined;
   const businessId = existingBusiness?.id || createId("business_");
   const settingsId = String(existingSettings?.id ?? "") || "settings_primary";
   const createdAt = existingBusiness?.created_at || now;
@@ -460,6 +460,7 @@ export function saveSetupData(
     replaceBusinessCapabilitiesInTransaction(db, {
       businessId,
       profileId: input.profileId,
+      previousProfileId: Number(existingSettings?.setup_completed ?? 0) === 1 ? existingBusiness?.profile_id : undefined,
       selectedOptionalCapabilities: input.profileOptions
         ?? getBusinessProfile(input.profileId).defaultOptionalCapabilities,
       whatsappEnabled: input.servicePreferences.whatsapp,

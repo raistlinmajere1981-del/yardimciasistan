@@ -27,7 +27,7 @@ const layoutSettingsDefinition = {
   title: "Masa yönetimi",
   keywords: "masa kategorileri salon bahçe kapasite sigara manzara detay medya fotoğraf video işletme düzeni",
   persistence: "resource",
-  visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ACCOMMODATION_ROOMS) || caps.includes(C.FOOD_TABLES)
+  condition: { allOf: [C.FOOD_TABLES] }
 } satisfies SettingsSectionDefinition;
 
 export const dealerPortalDefinition = {

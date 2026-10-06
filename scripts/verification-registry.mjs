@@ -56,6 +56,8 @@ const SMOKE_FILES = [
   "scripts/smoke-business-public-profile.mjs",
   "scripts/smoke-calendar-workspace.mjs",
   "scripts/smoke-capability-runtime.mjs",
+  "scripts/smoke-capability-settings-source.mjs",
+  "scripts/smoke-customer-capability-filters.mjs",
   "scripts/smoke-capability-surface-consistency.mjs",
   "scripts/smoke-clean-start.mjs",
   "scripts/smoke-commerce-foundation.mjs",

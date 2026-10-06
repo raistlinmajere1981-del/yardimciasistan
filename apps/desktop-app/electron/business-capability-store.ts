@@ -83,6 +83,8 @@ export function readEnabledBusinessCapabilities(database: DatabaseSync): Busines
 export interface ReplaceBusinessCapabilitiesInput {
   businessId: string;
   profileId: string;
+  /** Absent for first setup; initialization's placeholder rows are not operator overrides. */
+  previousProfileId?: string;
   selectedOptionalCapabilities: BusinessCapability[];
   whatsappEnabled: boolean;
   androidEnabled: boolean;
@@ -103,17 +105,55 @@ export function replaceBusinessCapabilitiesInTransaction(
     ...(input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),
     ...(input.aiEnabled ? [BUSINESS_CAPABILITIES.AI] : [])
   ];
-  const resolved = new Set<BusinessCapability>(expandBusinessCapabilities([
+  const selected = new Set<BusinessCapability>([
     ...CORE_BUSINESS_CAPABILITIES,
     ...profile.requiredCapabilities,
     ...selectedOptional,
     ...serviceCapabilities
-  ]));
-  const systemCapabilities = new Set<BusinessCapability>(CORE_BUSINESS_CAPABILITIES);
-  const userCapabilities = new Set<BusinessCapability>([
-    ...selectedOptional,
-    ...serviceCapabilities
   ]);
+  const profileDefaults = new Set(profile.defaultCapabilities);
+  const serviceCapabilitiesSet = new Set<BusinessCapability>([
+    BUSINESS_CAPABILITIES.WHATSAPP, BUSINESS_CAPABILITIES.ANDROID, BUSINESS_CAPABILITIES.AI
+  ]);
+  const existing = new Map((input.previousProfileId === undefined ? [] : database.prepare(`
+    SELECT capability_id, is_enabled, source FROM business_capabilities WHERE business_id = ?
+  `).all(input.businessId) as Array<{ capability_id: string; is_enabled: number; source: string }>)
+    .map((row) => [row.capability_id, { enabled: row.is_enabled === 1, source: row.source }]));
+  const profileChanged = input.previousProfileId !== undefined
+    && normalizeBusinessType(input.previousProfileId) !== profile.id;
+  const overrides = new Map<BusinessCapability, boolean>();
+
+  for (const capability of KNOWN_CAPABILITIES) {
+    if (SYSTEM_CAPABILITIES.has(capability) || !businessProfileSupportsCapability(profile.id, capability)) continue;
+    const previous = existing.get(capability);
+    const controlled = allowedOptional.has(capability) || serviceCapabilitiesSet.has(capability);
+    if (!controlled) {
+      if (previous?.source === "user") overrides.set(capability, previous.enabled);
+      continue;
+    }
+    const enabled = selected.has(capability);
+    // A changed profile supplies a new preset selection, not changes to every old
+    // checkbox. Existing explicit overrides survive unless the new selection
+    // itself differs from that preset. Services do not belong to profile presets.
+    const baselineEnabled = previous && (!profileChanged || serviceCapabilitiesSet.has(capability))
+      ? previous.enabled
+      : profileDefaults.has(capability);
+    if (enabled !== baselineEnabled) {
+      overrides.set(capability, enabled);
+    } else if (previous?.source === "user") {
+      overrides.set(capability, previous.enabled);
+    }
+  }
+
+  for (const [capability, enabled] of overrides) {
+    if (enabled) selected.add(capability);
+    else selected.delete(capability);
+  }
+  const resolved = new Set(expandBusinessCapabilities(selected));
+  // Dependency expansion must not silently undo an explicit OFF override.
+  for (const [capability, enabled] of overrides) {
+    if (!enabled) resolved.delete(capability);
+  }
 
   const statement = database.prepare(`
     INSERT INTO business_capabilities (
@@ -126,9 +166,9 @@ export function replaceBusinessCapabilitiesInTransaction(
   `);
 
   for (const capability of KNOWN_CAPABILITIES) {
-    const source = systemCapabilities.has(capability)
+    const source: BusinessCapabilitySource = SYSTEM_CAPABILITIES.has(capability)
       ? "system"
-      : userCapabilities.has(capability)
+      : overrides.has(capability)
         ? "user"
         : "profile";
     statement.run(
@@ -141,6 +181,7 @@ export function replaceBusinessCapabilitiesInTransaction(
     );
   }
 
+  assertValidCapabilityState(database, input.businessId);
   return [...resolved].sort();
 }
 

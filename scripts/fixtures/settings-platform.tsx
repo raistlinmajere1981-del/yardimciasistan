@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { getBusinessProfileSelectionCapabilities } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
 import { defaultDashboardData, defaultSetupData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
 import { useSetupController } from "../../apps/desktop-app/src/app/use-setup-controller";
 import { settingsCapabilities } from "../../apps/desktop-app/src/app/settings-registry";
@@ -26,7 +26,13 @@ function FixtureStatusHost() {
 }
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
-let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
+let canonical = { ...defaultSetupData, profileId: new URLSearchParams(window.location.search).get("profile") ?? defaultSetupData.profileId, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
+function runtimeCapabilities(capabilities: BusinessCapability[]) {
+  const override = new URLSearchParams(window.location.search).get("tables");
+  if (override === "on") return [...new Set([...capabilities, C.FOOD_TABLES])];
+  if (override === "off") return capabilities.filter(capability => ![C.FOOD_TABLES, C.FOOD_ORDERS, C.FOOD_RESERVATIONS].includes(capability));
+  return capabilities;
+}
 let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"], socialLinks: [] };
 let layout = {
   capabilities: { rooms: true, tables: true },
@@ -164,7 +170,7 @@ window.yardimciDesktop = {
   },
   getDashboardData: async () => defaultDashboardData,
   getBusinessLayout: async () => {
-    const enabled = getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions);
+    const enabled = runtimeCapabilities(getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions));
     return structuredClone({
       ...layout,
       capabilities: {
@@ -348,7 +354,7 @@ function Fixture() {
   useEffect(() => { applyUiPreferences(preferences); saveUiPreferences(preferences); }, [preferences]);
   window.refreshSettings = patch => { canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
   window.persistedSettings = () => canonical;
-  const capabilities = settingsCapabilities(toSetupForm(setup.setupData));
+  const capabilities = runtimeCapabilities(settingsCapabilities(toSetupForm(setup.setupData)));
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { profileId: setup.setupData.profileId, enabledCapabilities: capabilities }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}>
