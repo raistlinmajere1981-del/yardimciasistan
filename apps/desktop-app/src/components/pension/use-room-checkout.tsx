@@ -67,39 +67,19 @@ export function useRoomCheckout({ room, stay, data, folioEnabled, onDashboard }:
       });
       if (!approved) return;
 
-      const checkout = await window.yardimciDesktop!.checkoutStay(stay.id);
+      const checkout = await window.yardimciDesktop!.checkoutStayWithSettlement({
+        stayId: stay.id, roomId: room.id, settleCurrent: choices.settleCurrent,
+        previousFolioIds: choices.includePrevious ? previousFolios.map(folio => folio.id) : [],
+        paymentMethod: choices.paymentMethod
+      });
       if (!checkout.ok) {
         reportAppStatus("error", checkout.message);
         return;
       }
       onDashboard(checkout.dashboardData);
 
-      const targets = [
-        ...(choices.settleCurrent && currentFolio?.remainingMinor ? [currentFolio] : []),
-        ...(choices.includePrevious ? previousFolios : [])
-      ];
-      const errors: string[] = [];
-      for (const folio of targets) {
-        const payment = await window.yardimciDesktop!.addRoomFolioPayment({
-          folioId: folio.id,
-          amountMinor: folio.remainingMinor,
-          paymentMethod: choices.paymentMethod
-        });
-        if (!payment.ok) {
-          errors.push(`${folio.customerName}: ${payment.message}`);
-          continue;
-        }
-        const closed = await window.yardimciDesktop!.checkoutRoomFolio({ folioId: folio.id });
-        if (!closed.ok) errors.push(`${folio.customerName}: ${closed.message}`);
-      }
-
-      if (errors.length > 0) {
-        reportAppStatus("error", `Çıkış tamamlandı; bazı tahsilatlar tamamlanamadı. ${errors.join(" · ")}`);
-      } else if (targets.length > 0) {
-        reportAppStatus("success", "Misafir çıkışı tamamlandı; seçilen hesaplar tahsil edilip kapatıldı.");
-      } else {
-        reportAppStatus("success", checkout.message);
-      }
+      const partial = checkout.settlements.some(step => !step.result.ok || step.result.closure !== "closed");
+      reportAppStatus(partial ? "error" : "success", checkout.message);
     } catch {
       reportAppStatus("error", "Çıkış işlemi sonucu doğrulanamadı. Hesap ve oda durumunu kontrol edin.");
     } finally {

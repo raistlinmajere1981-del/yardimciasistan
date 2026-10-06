@@ -35,6 +35,11 @@ import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
 import { createDesktopDashboardData } from "./desktop-dashboard-service.js";
 import { getReservationById } from "./database/reservation-store.js";
 import { getDailyTaskById } from "./database/daily-task-store.js";
+import { assignReservationRoom } from "./stay-reservation-service.js";
+import { collectRoomFolioPayment, checkoutStayWithSettlement, type CheckoutStayOperationInput, type DesktopCheckoutStayOperationResult } from "./room-settlement-operation.js";
+import type { AddRoomFolioPaymentInput } from "./room-folio.js";
+import type { AssignReservationRoomInput } from "./database-types.js";
+export type { AssignReservationRoomInput } from "./database-types.js";
 import type { KbsProviderAdapter } from "./kbs-provider-adapter.js";
 import { addStayGuest, changeStayPrimary, checkoutStayGuest, moveStayRoom } from "./stay-guest-service.js";
 import type { StayGuestInput, CheckoutStayGuestInput, MoveStayRoomInput } from "./database-types.js";
@@ -594,6 +599,15 @@ export class DesktopDatabase {
     return this.updateCustomerRoomStayStatus({ stayId, status: "checked_out" });
   }
 
+  checkoutStayWithSettlement(input: CheckoutStayOperationInput): DesktopCheckoutStayOperationResult {
+    const result = checkoutStayWithSettlement(this.db, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
+  }
+
+  collectRoomFolioPayment(input: AddRoomFolioPaymentInput) {
+    return collectRoomFolioPayment(this.db, input);
+  }
+
   updateCustomerRoomStayStatus(input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult {
     if (input.status === "checked_in") return this.checkInStay(input.stayId);
     const result = updateStoredCustomerRoomStayStatus(this.db, input);
@@ -772,6 +786,11 @@ export class DesktopDatabase {
       return result;
     }
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  assignReservationRoom(input: AssignReservationRoomInput): DesktopStatusUpdateResult {
+    const result = assignReservationRoom(this.db, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
   }
 
   updateReservationStatus(input: UpdateReservationStatusInput): DesktopStatusUpdateResult {

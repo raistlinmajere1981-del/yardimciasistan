@@ -132,6 +132,9 @@ import type {
   UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
 import type { AutomaticSyncCycleResult, AutomaticSyncStatus } from "./sync-coordinator";
+import type { AssignReservationRoomInput } from "./database-types";
+import type { CheckoutStayOperationInput, DesktopCheckoutStayOperationResult, RoomPaymentOperationResult } from "./room-settlement-operation";
+import type { CompleteMarketSaleResult } from "./market-sale-operation";
 import type {
   AppLockActionResult,
   AppLockStatus,
@@ -236,6 +239,7 @@ export interface DesktopBridge extends MarketingAnalyticsBridge, BusinessMessagi
   setRoomFolioDiscount: (input: SetRoomFolioDiscountInput) => Promise<DesktopRoomFolioMutationResult>;
   removeRoomFolioItem: (itemId: string) => Promise<DesktopRoomFolioMutationResult>;
   addRoomFolioPayment: (input: AddRoomFolioPaymentInput) => Promise<DesktopRoomFolioMutationResult>;
+  collectRoomFolioPayment: (input: AddRoomFolioPaymentInput) => Promise<RoomPaymentOperationResult>;
   voidRoomFolioPayment: (paymentId: string) => Promise<DesktopRoomFolioMutationResult>;
   checkoutRoomFolio: (input: CheckoutRoomFolioInput) => Promise<DesktopRoomFolioMutationResult>;
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
@@ -311,6 +315,7 @@ export interface DesktopBridge extends MarketingAnalyticsBridge, BusinessMessagi
   createStayFromReservation: (input: CreateStayFromReservationInput) => Promise<DesktopCustomerMutationResult>;
   checkInStay: (stayId: string) => Promise<DesktopCustomerMutationResult>;
   checkoutStay: (stayId: string) => Promise<DesktopCustomerMutationResult>;
+  checkoutStayWithSettlement: (input: CheckoutStayOperationInput) => Promise<DesktopCheckoutStayOperationResult>;
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => Promise<DesktopCustomerMutationResult>;
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => Promise<DesktopIdentityImageAnalyzeResult>;
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => Promise<DesktopStatusUpdateResult>;
@@ -330,6 +335,7 @@ export interface DesktopBridge extends MarketingAnalyticsBridge, BusinessMessagi
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => Promise<DesktopTableOrderResult>;
   recalculateTableOrderTotal: (orderId: string) => Promise<DesktopTableOrderResult>;
   saveManualReservation: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
+  assignReservationRoom: (input: AssignReservationRoomInput) => Promise<DesktopStatusUpdateResult>;
   saveManualRestaurantReservation: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   updateReservationStatus: (input: UpdateReservationStatusInput) => Promise<DesktopStatusUpdateResult>;
   saveDailyTask: (input: SaveDailyTaskInput) => Promise<DesktopStatusUpdateResult>;
@@ -482,6 +488,7 @@ const bridge: DesktopBridge = {
   setRoomFolioDiscount: (input: SetRoomFolioDiscountInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:setDiscount", input),
   removeRoomFolioItem: (itemId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:removeItem", itemId),
   addRoomFolioPayment: (input: AddRoomFolioPaymentInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addPayment", input),
+  collectRoomFolioPayment: (input: AddRoomFolioPaymentInput) => invokeWhenUnlocked<RoomPaymentOperationResult>("roomFolio:collectPayment", input),
   voidRoomFolioPayment: (paymentId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:voidPayment", paymentId),
   checkoutRoomFolio: (input: CheckoutRoomFolioInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:checkout", input),
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => {
@@ -540,6 +547,7 @@ const bridge: DesktopBridge = {
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:clearOverride", capability),
   applyBusinessProfile: (profileId: string, preserveUserOverrides = true) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:applyProfile", profileId, preserveUserOverrides),
   commerce: {
+    completeMarketSale: (input) => invokeCommerceMutation<CompleteMarketSaleResult>("commerce:sale:completeMarket", input),
     getSnapshot: () => invokeWhenUnlocked<CommerceStoreSnapshot>("commerce:getSnapshot"),
     listCategories: (options) => invokeWhenUnlocked<CatalogCategory[]>("commerce:category:list", options),
     getCategory: (categoryId) => invokeWhenUnlocked<CatalogCategory | null>("commerce:category:get", categoryId),
@@ -630,6 +638,7 @@ const bridge: DesktopBridge = {
   createStayFromReservation: (input: CreateStayFromReservationInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:createStayFromReservation", input),
   checkInStay: (stayId: string) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkInStay", stayId),
   checkoutStay: (stayId: string) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkoutStay", stayId),
+  checkoutStayWithSettlement: (input: CheckoutStayOperationInput) => invokeWhenUnlocked<DesktopCheckoutStayOperationResult>("customer:checkoutStayWithSettlement", input),
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => ipcRenderer.invoke("customer:updateRoomStayStatus", input),
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => ipcRenderer.invoke("customer:analyzeIdentityImage", input),
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => ipcRenderer.invoke("whatsapp:markMessageSent", input),
@@ -649,6 +658,7 @@ const bridge: DesktopBridge = {
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => ipcRenderer.invoke("tableOrder:close", { orderId, status }),
   recalculateTableOrderTotal: (orderId: string) => ipcRenderer.invoke("tableOrder:recalculate", orderId),
   saveManualReservation: (input: SaveManualReservationInput) => ipcRenderer.invoke("reservation:saveManual", input),
+  assignReservationRoom: (input: AssignReservationRoomInput) => invokeWhenUnlocked<DesktopStatusUpdateResult>("reservation:assignRoom", input),
   saveManualRestaurantReservation: (input: SaveManualRestaurantReservationInput) => ipcRenderer.invoke("reservation:saveManualRestaurant", input),
   updateReservationStatus: (input: UpdateReservationStatusInput) => ipcRenderer.invoke("reservation:updateStatus", input),
   saveDailyTask: (input: SaveDailyTaskInput) => ipcRenderer.invoke("dailyTask:save", input),

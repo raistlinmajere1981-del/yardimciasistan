@@ -16,6 +16,7 @@ import {
 } from "../../app/barcode-input";
 import type { DesktopCustomer } from "../../../electron/database";
 import type { DesktopCommerceBridge } from "../../../electron/commerce-ipc-contract";
+import type { CompleteMarketSaleResult } from "../../../electron/market-sale-operation";
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 import { MoneyInput } from "../ui/MoneyInput";
@@ -397,7 +398,7 @@ export function MarketQuickSaleWorkspace({
     const creditCustomerId = isCredit ? selectedCustomer!.id : "";
     const creditCustomerName = isCredit ? selectedCustomer!.fullName : "";
     const salePaymentMethod = paymentMethod;
-    let sale: CommerceSale;
+    let operation: CompleteMarketSaleResult;
     try {
       const saleInput = {
         items: cartLines.map((line) => ({
@@ -407,15 +408,16 @@ export function MarketQuickSaleWorkspace({
         discountTotal: discount,
         source: "desktop-market-quick-sale"
       };
-      sale = isCredit
-        ? await bridge.createCustomerCreditSale({ ...saleInput, customerId: creditCustomerId })
-        : await bridge.createPaidSale({ ...saleInput, paymentMethod: salePaymentMethod });
+      operation = await bridge.completeMarketSale({ ...saleInput,
+        settlement: isCredit ? "credit" : "paid", customerId: creditCustomerId,
+        paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id });
     } catch (error) {
       onStateChange("error", customerCreditError(error, "Satış tamamlanamadı."));
       finishSale();
       return;
     }
 
+    const sale = operation.sale;
     recordSale(sale, creditCustomerName);
     if (sale.status === "credit") notifyCustomerCreditChanged(creditCustomerId);
     clearSale();
@@ -430,14 +432,15 @@ export function MarketQuickSaleWorkspace({
       }
 
       if (draftToReview) {
-        try {
-          await bridge.markCartDraftReviewed(draftToReview.id);
-          await onCartDraftReviewed?.(draftToReview.id);
+        if (operation.draftReview === "reviewed") {
           clearReviewRecoveryDraft(draftToReview.id);
+          try { await onCartDraftReviewed?.(draftToReview.id); } catch {
+            onStateChange("success", "Satış ve telefon sepeti kapanışı kaydedildi ancak görünüm yenilenemedi.");
+          }
           onStateChange("success", sale.status === "credit"
             ? "Veresiye satış kaydedildi ve telefon sepeti kapatıldı."
             : "Satış tamamlandı ve telefon sepeti kapatıldı.");
-        } catch {
+        } else {
           setReviewRecoveryDraft(draftToReview);
           onStateChange("success", sale.status === "credit"
             ? "Veresiye satış kaydedildi ancak telefon sepeti kapatılamadı."

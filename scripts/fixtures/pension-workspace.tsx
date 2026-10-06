@@ -43,13 +43,18 @@ function Fixture() {
     if (result.ok) setData(result.dashboardData);
     return result;
   };
+  const assign = async input => {
+    const result = await window.yardimciDesktop.assignReservationRoom(input);
+    if (result.ok) setData(result.dashboardData);
+    return result;
+  };
 
   return <WorkspaceNavigationProvider definitions={workspaceDefinitions} page={page} onReturnPage={setPage}>
-    <FixtureShell page={page} setPage={setPage} data={data} setData={setData} capabilities={capabilities} pension={pension} save={save} />
+    <FixtureShell page={page} setPage={setPage} data={data} setData={setData} capabilities={capabilities} pension={pension} save={save} assign={assign} />
   </WorkspaceNavigationProvider>;
 }
 
-function FixtureShell({ page, setPage, data, setData, capabilities, pension, save }) {
+function FixtureShell({ page, setPage, data, setData, capabilities, pension, save, assign }) {
   const navigation = useWorkspaceNavigation();
   const roomSessionActive = page === "pension" && Boolean(navigation.hospitalitySessions.pension);
 
@@ -107,6 +112,7 @@ function FixtureShell({ page, setPage, data, setData, capabilities, pension, sav
         customers={data.customers}
         whatsappEnabled={false}
         onSaveManual={save}
+        onAssignRoom={assign}
         onSaveCustomer={async () => ({ ok: false, message: "fixture" })}
         onUpdateStatus={() => {}}
         onOpenWhatsApp={() => {}}

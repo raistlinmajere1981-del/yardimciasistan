@@ -7,9 +7,8 @@ import { useInsideModalSurface } from "../ui/ModalSurface";
 import { MoneyInput } from "../ui/MoneyInput";
 import { formatDateRange, minorMoney, minorToInput, parseMoneyToMinor } from "../pension/folio-format";
 
-export function RoomReceivablePaymentDialog({ folio, closeWhenSettled, onClose, onSaved }: {
+export function RoomReceivablePaymentDialog({ folio, onClose, onSaved }: {
   folio: DesktopRoomFolio;
-  closeWhenSettled: boolean;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
@@ -25,15 +24,11 @@ export function RoomReceivablePaymentDialog({ folio, closeWhenSettled, onClose, 
       setError("Geçerli bir tahsilat tutarı girin.");
       return;
     }
-    if (amountMinor > folio.remainingMinor) {
-      setError("Tahsilat kalan borçtan büyük olamaz.");
-      return;
-    }
 
     setSaving(true);
     setError("");
     try {
-      const payment = await window.yardimciDesktop!.addRoomFolioPayment({
+      const payment = await window.yardimciDesktop!.collectRoomFolioPayment({
         folioId: folio.id,
         amountMinor,
         paymentMethod
@@ -43,18 +38,14 @@ export function RoomReceivablePaymentDialog({ folio, closeWhenSettled, onClose, 
         return;
       }
 
-      let closeWarning = "";
-      if (closeWhenSettled && amountMinor === folio.remainingMinor) {
-        const closed = await window.yardimciDesktop!.checkoutRoomFolio({ folioId: folio.id });
-        if (!closed.ok) closeWarning = `Tahsilat alındı; hesap kapanışı doğrulanamadı. ${closed.message}`;
+      reportAppStatus(payment.closure === "failed" ? "error" : "success",
+        `${payment.message}${payment.closureMessage ? ` ${payment.closureMessage}` : ""}`);
+      try { await onSaved(); } catch {
+        reportAppStatus("error", "Tahsilat kaydedildi ancak görünüm yenilenemedi. Güncel hesabı kontrol edin.");
       }
-
-      reportAppStatus(closeWarning ? "error" : "success",
-        closeWarning || (amountMinor === folio.remainingMinor ? "Borç tamamen tahsil edildi." : "Tahsilat kaydedildi."));
-      await onSaved();
       onClose();
     } catch {
-      setError("Tahsilat kaydedilemedi. Yeniden deneyin.");
+      setError("Tahsilat sonucu doğrulanamadı. Yeniden ödeme yapmadan önce güncel hesabı kontrol edin.");
     } finally {
       setSaving(false);
     }

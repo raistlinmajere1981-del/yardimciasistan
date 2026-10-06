@@ -1,16 +1,15 @@
 import { useState } from "react";
-import type { DesktopDashboardData, DesktopStatusUpdateResult, SaveManualReservationInput } from "../../../electron/database";
+import type { DesktopDashboardData, DesktopStatusUpdateResult, AssignReservationRoomInput } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
 import { SearchSelect } from "../ui/SearchSelect";
 
 type Reservation = DesktopDashboardData["reservations"][number];
-// Both entry points preserve booking metadata and call the existing assignment mutation.
+// Only user intent crosses the bridge; persisted metadata stays backend-owned.
 export function assignReservationRoom(reservation: Reservation, roomId: string,
-  save: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult> = input => window.yardimciDesktop!.saveManualReservation(input)
+  save: (input: AssignReservationRoomInput) => Promise<DesktopStatusUpdateResult> = input => window.yardimciDesktop!.assignReservationRoom(input)
 ): Promise<DesktopStatusUpdateResult> {
-  return save({ reservationId: reservation.id, customerId: reservation.customerId, roomId: roomId || undefined,
-    startDate: reservation.startDate, endDate: reservation.endDate, guestCount: reservation.guestCount, notes: reservation.notes });
+  return save({ reservationId: reservation.id, roomId });
 }
 
 function ReservationRoomAssignment({ reservations, rooms, reservationId, roomId, fixed, onChange }: {
@@ -61,7 +60,7 @@ function ReservationRoomAssignment({ reservations, rooms, reservationId, roomId,
 
 export function ReservationAssignmentDialog({ reservation, rooms, onSave, onClose }: {
   reservation: Reservation; rooms: DesktopDashboardData["rooms"];
-  onSave: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>; onClose: () => void;
+  onSave: (input: AssignReservationRoomInput) => Promise<DesktopStatusUpdateResult>; onClose: () => void;
 }) {
   const [roomId, setRoomId] = useState(reservation.roomIds[0] ?? "");
   const [busy, setBusy] = useState(false);

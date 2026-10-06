@@ -1022,12 +1022,18 @@ export interface UpdateReservationStatusInput {
 
 export interface SaveManualReservationInput {
   reservationId?: string;
+  expectedUpdatedAt?: string;
   customerId: string;
   roomId?: string;
   startDate: string;
   endDate: string;
   guestCount: number;
   notes: string;
+}
+
+export interface AssignReservationRoomInput {
+  reservationId: string;
+  roomId: string;
 }
 
 export interface SaveManualRestaurantReservationInput {

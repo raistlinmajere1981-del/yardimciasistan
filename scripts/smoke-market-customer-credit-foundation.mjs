@@ -277,8 +277,8 @@ try {
   assert.equal(moneyToMinor(salesAfter.today_sales_total), 10030);
   assert.equal(raw.prepare("SELECT status FROM commerce_sales WHERE id = ?").get(creditSale.id).status, "credit");
   const quickSaleSource = readFileSync(join(appPath, "src/components/market/MarketQuickSaleWorkspace.tsx"), "utf8");
-  assert.ok(quickSaleSource.includes("bridge.createPaidSale("));
-  assert.ok(quickSaleSource.includes("bridge.createCustomerCreditSale("));
+  assert.ok(quickSaleSource.includes("bridge.completeMarketSale("));
+  assert.ok(quickSaleSource.includes('settlement: isCredit ? "credit" : "paid"'));
 
   assert.equal(database.deleteCustomer(customerId).ok, false);
   assert.match(database.deleteCustomer(customerId).message, /açık veresiye borcu/i);

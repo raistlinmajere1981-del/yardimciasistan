@@ -35,20 +35,7 @@ function withCreditDatabase<T>(
     db.exec("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;");
     db.exec(mutation ? "BEGIN IMMEDIATE" : "BEGIN");
     try {
-      const business = db.prepare(`
-        SELECT id, profile_id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1
-      `).get() as Row | undefined;
-      const businessId = String(business?.id ?? "");
-      if (!businessId) throw new Error("Aktif işletme bulunamadı.");
-      if (!businessProfileSupportsCapability(String(business?.profile_id ?? ""), C.CUSTOMER_CREDIT)) {
-        throw new Error("Veresiye / Müşteri Hesabı yalnızca Market / Perakende işletmelerinde kullanılabilir.");
-      }
-      const enabled = new Set((db.prepare(`
-        SELECT capability_id FROM business_capabilities WHERE business_id = ? AND is_enabled = 1
-      `).all(businessId) as Row[]).map((row) => String(row.capability_id)));
-      if (expandBusinessCapabilities([C.CUSTOMER_CREDIT]).some((capability) => !enabled.has(capability))) {
-        throw new Error("Veresiye / Müşteri Hesabı ve gerekli işletme yetenekleri etkin değil.");
-      }
+      const businessId = assertCustomerCreditBusinessInTransaction(db);
       const result = operation(db, businessId);
       db.exec("COMMIT");
       return result;
@@ -59,6 +46,21 @@ function withCreditDatabase<T>(
   } finally {
     db.close();
   }
+}
+
+export function assertCustomerCreditBusinessInTransaction(db: DatabaseSync): string {
+  const business = db.prepare("SELECT id, profile_id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1").get() as Row | undefined;
+  const businessId = String(business?.id ?? "");
+  if (!businessId) throw new Error("Aktif işletme bulunamadı.");
+  if (!businessProfileSupportsCapability(String(business?.profile_id ?? ""), C.CUSTOMER_CREDIT)) {
+    throw new Error("Veresiye / Müşteri Hesabı yalnızca Market / Perakende işletmelerinde kullanılabilir.");
+  }
+  const enabled = new Set((db.prepare("SELECT capability_id FROM business_capabilities WHERE business_id = ? AND is_enabled = 1")
+    .all(businessId) as Row[]).map(row => String(row.capability_id)));
+  if (expandBusinessCapabilities([C.CUSTOMER_CREDIT]).some(capability => !enabled.has(capability))) {
+    throw new Error("Veresiye / Müşteri Hesabı ve gerekli işletme yetenekleri etkin değil.");
+  }
+  return businessId;
 }
 
 function requireCustomer(db: DatabaseSync, businessId: string, customerId: string, active = true): CustomerCreditCustomer {
@@ -253,19 +255,16 @@ export function recordCustomerCreditSaleInTransaction(
 }
 
 export function createCustomerCreditSale(databasePath: string, input: CreateCustomerCreditSaleInput): CommerceSale {
-  return withCreditDatabase(databasePath, true, (db, businessId) => {
-    const customer = requireCustomer(db, businessId, input.customerId);
-    const now = new Date().toISOString();
-    const sale = createCommerceSaleInTransaction(db, input, "credit", now);
-    recordCustomerCreditSaleInTransaction(db, businessId, {
-      customerId: customer.id,
-      sale,
-      now,
-      note: input.note,
-      source: input.source
-    });
-    return sale;
-  });
+  return withCreditDatabase(databasePath, true, db => createCustomerCreditSaleInTransaction(db, input, new Date().toISOString()));
+}
+
+/** Caller owns the transaction; retains the same profile/capability/customer gates. */
+export function createCustomerCreditSaleInTransaction(db: DatabaseSync, input: CreateCustomerCreditSaleInput, now: string): CommerceSale {
+  const businessId = assertCustomerCreditBusinessInTransaction(db);
+  const customer = requireCustomer(db, businessId, input.customerId);
+  const sale = createCommerceSaleInTransaction(db, input, "credit", now);
+  recordCustomerCreditSaleInTransaction(db, businessId, { customerId: customer.id, sale, now, note: input.note, source: input.source });
+  return sale;
 }
 
 function requireAvailableDebt(db: DatabaseSync, businessId: string, customerId: string, currency: string, amount: number) {

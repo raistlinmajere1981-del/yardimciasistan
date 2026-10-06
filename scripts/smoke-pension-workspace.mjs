@@ -63,6 +63,8 @@ try {
   await expect(modal).toBeVisible();
   await button('Atamayı Kaydet').click();
   await expect(modal).toHaveCount(0);
+  expect(Object.keys((await page.evaluate(() => window.fixtureCalls.find(call => call.kind === 'assignment'))).input).sort())
+    .toEqual(['reservationId', 'roomId']);
   expect(await page.evaluate(() => window.fixtureState().dashboard.customerRoomStays.length)).toBe(0);
   await page.getByLabel('Rezervasyon yönetimi').getByRole('button', { name: 'Giriş Yap', exact: true }).first().click();
   await expect(workspace.getByRole('tab')).toHaveCount(0);

@@ -163,6 +163,16 @@ try {
     });
 
     const commerce = {
+      completeMarketSale: async (input) => {
+        const sale = input.settlement === "credit"
+          ? await commerce.createCustomerCreditSale(input) : await commerce.createPaidSale(input);
+        let draftReview = "not_requested";
+        if (input.sourceDraftId) {
+          try { await commerce.markCartDraftReviewed(input.sourceDraftId); draftReview = "reviewed"; }
+          catch { draftReview = "failed"; }
+        }
+        return { sale, draftReview, replayed: false };
+      },
       listProducts: async () => [product],
       listCategories: async () => [],
       getProductImageDataUrl: async () => "",

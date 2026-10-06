@@ -98,7 +98,7 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 252, "all production invoke registrations must execute");
+assert.equal(handlers.size, 256, "all production invoke registrations must execute");
 const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: { getURL: () => "fixture" } }, ...args));
 const lockFree = new Set(["appLock:getStatus", "appLock:lock", "appLock:unlock", "appLock:updatePassword",
   "appLock:resetWithWebSecurityKey", "diagnostics:writeRendererEvent", "sync:getStatus", "update:getStatus"]);
@@ -115,7 +115,10 @@ for (const channel of handlers.keys()) {
 const representatives = [
   ["finance:saveManualEntry", {}], ["roomFolio:addPayment", {}], ["customer:save", {}],
   ["reservation:updateStatus", { reservationId: "reservation", status: "approved" }],
-  ["tableOrder:open", "table"], ["ai:testConnection", {}], ["report:generateAiComment", {}]
+  ["tableOrder:open", "table"], ["ai:testConnection", {}], ["report:generateAiComment", {}],
+  ["roomFolio:collectPayment", { folioId: "folio" }],
+  ["customer:checkoutStayWithSettlement", { stayId: "stay", roomId: "room", settleCurrent: true, previousFolioIds: [] }],
+  ["reservation:assignRoom", { reservationId: "reservation", roomId: "room" }], ["commerce:sale:completeMarket", {}]
 ];
 for (const [channel, input] of representatives) {
   await invoke("appLock:unlock", "");
@@ -136,15 +139,18 @@ runInNewContext(readFileSync(resolve(root, "preload.js"), "utf8"), { exports: {}
       }
       return invoke(channel, ...args);
     } } }) });
-for (const method of ["saveManualFinanceEntry", "addRoomFolioPayment"]) {
+for (const method of ["saveManualFinanceEntry", "addRoomFolioPayment", "collectRoomFolioPayment", "assignReservationRoom", "checkoutStayWithSettlement"]) {
   await invoke("appLock:unlock", "");
   beforeHandler = undefined;
   await assert.rejects(bridge[method]({}), /Uygulama kilitli/);
   assert.notEqual(beforeHandler, undefined, "actual preload must execute its preflight");
   assert.equal(calls.length, beforeHandler, "preflight→handler lock change must not reach operation");
 }
+await invoke("appLock:unlock", "");
+await assert.rejects(bridge.commerce.completeMarketSale({}), /Uygulama kilitli/);
+assert.equal(calls.length, beforeHandler, "market operation: no mutation across the preload/main race");
 // One-way attachment must fail closed without throwing an uncaught main event error.
 const beforeAttach = calls.length;
 events.get("kbs:registerWebview")({ sender: { getURL: () => "fixture" } }, 1);
 assert.equal(calls.length, beforeAttach);
-console.log("Production IPC lock: 244 protected invokes, real roots/session authority, unlocked delegation and preload TOCTOU passed.");
+console.log("Production IPC lock: 248 protected invokes, real roots/session authority, unlocked delegation and preload TOCTOU passed.");

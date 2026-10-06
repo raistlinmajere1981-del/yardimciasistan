@@ -78,6 +78,7 @@ export interface MarketBarcodeFastPullState {
  * guarded commerce runtime rather than repository/store functions.
  */
 export interface DesktopCommerceBridge {
+  completeMarketSale: (input: import("./market-sale-operation").CompleteMarketSaleInput) => Promise<import("./market-sale-operation").CompleteMarketSaleResult>;
   getSnapshot: () => Promise<CommerceStoreSnapshot>;
 
   listCategories: (options?: ListCatalogCategoriesOptions) => Promise<CatalogCategory[]>;

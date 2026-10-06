@@ -4,6 +4,7 @@ import type {
   DesktopStatusUpdateResult,
   SaveDailyTaskInput,
   SaveManualReservationInput,
+  AssignReservationRoomInput,
   SaveManualRestaurantReservationInput
 } from "../../electron/database";
 import type { SyncState } from "./runtime-state";
@@ -62,6 +63,18 @@ export function useOperationController({
 
     setDashboardData(result.dashboardData);
     setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
+  }
+
+  async function handleAssignReservationRoom(input: AssignReservationRoomInput): Promise<DesktopStatusUpdateResult> {
+    setSyncState("loading");
+    setStatusMessage("Oda ataması kaydediliyor...");
+    const result = window.yardimciDesktop
+      ? await window.yardimciDesktop.assignReservationRoom(input)
+      : { ok: false as const, message: "Oda ataması kaydedilemedi. Uygulamayı yeniden başlatın." };
+    if (result.ok) setDashboardData(result.dashboardData);
+    setSyncState(result.ok ? "success" : "error");
     setStatusMessage(result.message);
     return result;
   }
@@ -185,6 +198,7 @@ export function useOperationController({
   return {
     handleUpdateTableStatus,
     handleSaveManualReservation,
+    handleAssignReservationRoom,
     handleSaveManualRestaurantReservation,
     handleUpdateReservationStatus,
     handleSaveDailyTask,

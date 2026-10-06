@@ -27,6 +27,12 @@ export function registerReservationIpcHandlers(options: {
     return finalizeOperationMutation(getDatabase().saveManualReservation(input));
   });
 
+  ipcMain.handle("reservation:assignRoom", (_event, input: import("../database").AssignReservationRoomInput): DesktopStatusUpdateResult => {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS, "Pansiyon rezervasyonları bu işletmede etkin değil.");
+    return finalizeOperationMutation(getDatabase().assignReservationRoom(input));
+  });
+
   ipcMain.handle("reservation:saveManualRestaurant", (_event, input: SaveManualRestaurantReservationInput): DesktopStatusUpdateResult => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_RESERVATIONS, "Restoran rezervasyonları bu işletmede etkin değil.");

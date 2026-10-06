@@ -263,6 +263,16 @@ try {
         };
         return { ok: true, message: "Ödeme alındı ve kasaya işlendi.", data: clone(roomData), folioId: folio.id };
       },
+      collectRoomFolioPayment: async input => {
+        const result = await window.yardimciDesktop.addRoomFolioPayment(input);
+        if (!result.ok) return result;
+        const folio = roomData.folios.find(item => item.id === input.folioId);
+        if (folio.remainingMinor === 0 && !roomData.activeStays.some(stay => stay.id === folio.stayId)) {
+          await window.yardimciDesktop.checkoutRoomFolio({ folioId: folio.id });
+        }
+        return { ok: true, message: folio.remainingMinor === 0 ? "Borç tamamen tahsil edildi." : "Tahsilat kaydedildi.",
+          amountMinor: input.amountMinor, remainingMinor: folio.remainingMinor, closure: folio.status === "closed" ? "closed" : "open" };
+      },
       checkoutRoomFolio: async ({ folioId }) => {
         window.__financeStats.folioCloseCalls += 1;
         const folio = roomData.folios.find(item => item.id === folioId);

@@ -245,6 +245,7 @@ interface ReservationsWorkspaceProps {
   whatsappEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onSaveManual: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
+  onAssignRoom: (input: import("../../../electron/database").AssignReservationRoomInput) => Promise<DesktopStatusUpdateResult>;
   onUpdateStatus: (reservationId: string, status: string) => void;
   onOpenWhatsApp: (reservation: DesktopDashboardData["reservations"][number]) => void;
 }
@@ -256,6 +257,7 @@ export function ReservationsWorkspace({
   whatsappEnabled,
   onSaveCustomer,
   onSaveManual,
+  onAssignRoom,
   onUpdateStatus,
   onOpenWhatsApp
 }: ReservationsWorkspaceProps) {
@@ -434,7 +436,7 @@ export function ReservationsWorkspace({
           ))
         )}
       </section>
-      {assignment && <ReservationAssignmentDialog reservation={assignment} rooms={rooms} onSave={onSaveManual} onClose={() => setAssignment(null)} />}
+      {assignment && <ReservationAssignmentDialog reservation={assignment} rooms={rooms} onSave={onAssignRoom} onClose={() => setAssignment(null)} />}
       <ManualReservationEditor
         open={manualEditorOpen}
         customers={customers}

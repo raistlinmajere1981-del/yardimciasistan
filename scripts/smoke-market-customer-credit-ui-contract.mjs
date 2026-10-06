@@ -13,6 +13,7 @@ import { createServer } from "vite";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const runtime = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { completeMarketSale } = require("../apps/desktop-app/dist-electron/market-sale-operation.js");
 const { applyBusinessProfileCapabilities, readBusinessCapabilitySnapshot, setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const appPath = join(process.cwd(), "apps/desktop-app");
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-m82-ui-"));
@@ -83,6 +84,7 @@ try {
   let delayPayment = false;
   let releasePayment;
   const methods = {
+    completeMarketSale,
     listProducts: runtime.listRuntimeCatalogProducts,
     listCategories: runtime.listRuntimeCatalogCategories,
     createPaidSale: runtime.createRuntimePaidSale,
@@ -126,9 +128,14 @@ try {
     if (method === "consumePendingBarcodeScans") { const result = barcodeEvents; barcodeEvents = []; return result; }
     if (method === "markCartDraftReviewed" && failReview) throw new Error("Kaynak sepet kapatılamadı.");
     if (method === "getCustomerCreditAccount" && failRead) { failRead = false; throw new Error("Hesap bilgileri alınamadı. Yeniden deneyin."); }
-    if (method === "createCustomerCreditSale" && failSale) { failSale = false; throw new Error("Yetersiz stok."); }
+    if (method === "completeMarketSale" && failSale) { failSale = false; throw new Error("Yetersiz stok."); }
     if (method === "recordCustomerCreditPayment" && delayPayment) await new Promise((resolve) => { releasePayment = resolve; });
     assert.ok(methods[method], `Unexpected bridge call: ${method}`);
+    if (method === "completeMarketSale" && failReview) {
+      raw.exec(`CREATE TRIGGER ui_fail_review BEFORE UPDATE OF status ON commerce_sale_drafts WHEN NEW.status='reviewed'
+        BEGIN SELECT RAISE(ABORT, 'injected review failure'); END`);
+      try { return methods[method](path, ...args); } finally { raw.exec("DROP TRIGGER ui_fail_review"); }
+    }
     return methods[method](path, ...args);
   });
   await page.addInitScript(({ dashboard, snapshot, methodNames, roomDebtCustomerId }) => {
@@ -171,11 +178,23 @@ try {
       }]
     };
     const cloneRoomData = () => structuredClone(roomFolioData);
+    window.__m82RoomDebtIncrease = () => { roomFolioData.folios[0].remainingMinor += 5000; };
+    window.__m82RoomPayments = [];
     window.yardimciDesktop = {
       commerce: Object.fromEntries(methodNames.map((method) => [method, invoke(method)])),
       deleteCustomer: invoke("deleteCustomer"),
       saveCustomer: invoke("saveCustomer"),
       getRoomFolioData: async () => cloneRoomData(),
+      collectRoomFolioPayment: async ({ folioId, amountMinor, paymentMethod }) => {
+        window.__m82RoomPayments.push({ folioId, amountMinor, paymentMethod });
+        const folio = roomFolioData.folios.find(item => item.id === folioId);
+        if (amountMinor > folio.remainingMinor) return { ok: false, message: "Tahsilat kalan borçtan büyük olamaz." };
+        folio.remainingMinor -= amountMinor;
+        folio.paidTotalMinor += amountMinor;
+        if (folio.remainingMinor === 0) folio.status = "closed";
+        return { ok: true, message: folio.remainingMinor ? "Tahsilat kaydedildi." : "Borç tamamen tahsil edildi.",
+          amountMinor, remainingMinor: folio.remainingMinor, closure: folio.status === "closed" ? "closed" : "open" };
+      },
       addRoomFolioPayment: async ({ folioId, amountMinor, paymentMethod }) => {
         const folio = roomFolioData.folios.find((item) => item.id === folioId);
         if (!folio || folio.status !== "open") return { ok: false, message: "Açık oda hesabı bulunamadı." };
@@ -276,8 +295,9 @@ try {
   assert.equal(balance(), 53000);
   assert.equal(count("finance_entries"), financesBefore);
   assert.ok(calls.filter((call) => call.method === "listProducts").length > catalogReadsBefore, "Successful sale reloads catalog.");
-  const salePayload = calls.filter((call) => call.method === "createCustomerCreditSale").at(-1).args[0];
-  assert.deepEqual(Object.keys(salePayload).sort(), ["customerId", "discountTotal", "items", "source"]);
+  const salePayload = calls.filter((call) => call.method === "completeMarketSale").at(-1).args[0];
+  assert.equal(salePayload.settlement, "credit");
+  assert.deepEqual(Object.keys(salePayload).sort(), ["customerId", "discountTotal", "items", "paymentMethod", "settlement", "source", "sourceDraftId"]);
   assert.deepEqual(salePayload.items, [{ productId: product.id, quantity: 1 }]);
 
   for (const method of ["cash", "card", "transfer", "other"]) {
@@ -285,7 +305,7 @@ try {
     await quick.getByLabel("Ödeme yöntemi").selectOption(method);
     await quick.getByRole("button", { name: "Ödemeyi Al ve Satışı Tamamla" }).click();
     await expect(quick.locator(".market-sale-cart-line")).toHaveCount(0);
-    assert.equal(calls.filter((call) => call.method === "createPaidSale").at(-1).args[0].paymentMethod, method);
+    assert.equal(calls.filter((call) => call.method === "completeMarketSale").at(-1).args[0].paymentMethod, method);
   }
   assert.equal(balance(), 53000);
 
@@ -309,6 +329,19 @@ try {
   await expect(page.locator("dialog.customer-workspace-frame")).toHaveCount(1);
   await inlineRoomPayment.getByRole("button", { name: "Vazgeç", exact: true }).click();
   await expect(inlineRoomPayment).toHaveCount(0);
+
+  // Collection result, not the pre-submit remaining snapshot, owns auto-close.
+  await roomReceivables.getByRole("button", { name: "Tahsil Et", exact: true }).click();
+  await page.evaluate(() => window.__m82RoomDebtIncrease());
+  await inlineRoomPayment.getByRole("button", { name: "Tahsilatı Kaydet", exact: true }).click();
+  await expect(inlineRoomPayment).toHaveCount(0);
+  await expect(roomReceivables).toContainText("₺50,00");
+  await expect(topbarStatus).toContainText("Tahsilat kaydedildi.");
+  assert.equal((await page.evaluate(() => window.__m82RoomPayments))[0].amountMinor, 300000);
+  await roomReceivables.getByRole("button", { name: "Tahsil Et", exact: true }).click();
+  await inlineRoomPayment.getByRole("button", { name: "Tahsilatı Kaydet", exact: true }).click();
+  await expect(roomReceivables.getByRole("button", { name: "Tahsil Et", exact: true })).toHaveCount(0);
+  await expect(topbarStatus).toContainText("Borç tamamen tahsil edildi.");
 
   const panel = page.getByRole("region", { name: "Veresiye hesabı" });
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");

@@ -105,6 +105,28 @@ export function registerCustomerIpcHandlers(options: {
     return finalizeCheckoutMutation(getDatabase().checkoutStay(stayId));
   });
 
+  ipcMain.handle("customer:checkoutStayWithSettlement", async (_event, input: import("../room-settlement-operation").CheckoutStayOperationInput) => {
+    assertStayAccess();
+    if (input?.settleCurrent || input?.previousFolioIds?.length) {
+      assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO, "Oda hesabı bu işletmede etkin değil.");
+    }
+    const result = getDatabase().checkoutStayWithSettlement(input);
+    if (result.ok && result.dashboardData) {
+      const finalized = await finalizeCheckoutMutation({ ok: true, message: result.message, savedId: result.savedId, dashboardData: result.dashboardData });
+      if (finalized.ok) return { ...result, message: finalized.message, dashboardData: finalized.dashboardData };
+    }
+    return result;
+  });
+
+  ipcMain.handle("roomFolio:collectPayment", (_event, input: import("../room-folio").AddRoomFolioPaymentInput) => {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO, "Oda hesabı bu işletmede etkin değil.");
+    const result = getDatabase().collectRoomFolioPayment(input);
+    if (result.ok) finalizeCustomerMutation({ ok: true, message: result.message, savedId: input.folioId,
+      dashboardData: getDatabase().getDashboardData() });
+    return result;
+  });
+
   ipcMain.handle(
     "customer:updateRoomStayStatus",
     async (_event, input: UpdateCustomerRoomStayStatusInput): Promise<DesktopCustomerMutationResult> => {

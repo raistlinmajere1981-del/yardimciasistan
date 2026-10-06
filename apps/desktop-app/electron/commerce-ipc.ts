@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerce-ipc-contract";
 import { desktopLog } from "./desktop-logger";
+import { completeMarketSale } from "./market-sale-operation";
 import {
   archiveExternalProductImage,
   archiveManualProductImage,
@@ -49,6 +50,7 @@ import {
 } from "./commerce-runtime";
 
 const EXPECTED_COMMERCE_REJECTIONS: Array<{ code: string; pattern: RegExp }> = [
+  { code: "invalid_market_sale", pattern: /^(?:Telefon sepeti|Telefon sepetinin|Satış ödeme seçimi|Satış işlemleri)/ },
   { code: "insufficient_stock", pattern: /^Yetersiz stok\./ },
   { code: "inventory_conflict", pattern: /^Stok bu sayımdan sonra değişti\./ },
   { code: "invalid_inventory_operation", pattern: /^(?:Stok işlemi için ürün bulunamadı\.|Bu ürün stok takibine kapalı\.|Stok konumu bulunamadı\.|Geçersiz stok hareketi:|Stok hareketi sıfırdan farklı olmalı\.|Sayım miktarı )/ },
@@ -219,6 +221,9 @@ export function registerCommerceIpcHandlers(options: {
 
   ipcMain.handle("commerce:sale:createPaid", (_event, input: Parameters<DesktopCommerceBridge["createPaidSale"]>[0]) =>
     mutateForIpc("commerce:sale:createPaid", () => createRuntimePaidSale(databasePath(), input))
+  );
+  ipcMain.handle("commerce:sale:completeMarket", (_event, input: Parameters<DesktopCommerceBridge["completeMarketSale"]>[0]) =>
+    mutateForIpc("commerce:sale:completeMarket", () => completeMarketSale(databasePath(), input))
   );
 
   ipcMain.handle("commerce:price:resolve", (_event, input: Parameters<DesktopCommerceBridge["resolveProductPrice"]>[0]) =>

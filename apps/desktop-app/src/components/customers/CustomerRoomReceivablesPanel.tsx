@@ -54,7 +54,6 @@ export function CustomerRoomReceivablesPanel({ customerId }: { customerId: strin
       </div>}
     {selected && <RoomReceivablePaymentDialog
       folio={selected}
-      closeWhenSettled={!activeStayIds.has(selected.stayId)}
       onClose={() => setSelected(null)}
       onSaved={reload}
     />}

@@ -30,6 +30,7 @@ interface ManualReservationEditorProps {
 }
 
 interface ManualReservationFormState {
+  expectedUpdatedAt?: string;
   customerId: string;
   roomId: string;
   startDate: string;
@@ -52,6 +53,7 @@ function createInitialForm(
 ): ManualReservationFormState {
   if (reservation) {
     return {
+      expectedUpdatedAt: reservation.updatedAt,
       customerId: reservation.customerId,
       roomId: reservation.roomIds[0] ?? "",
       startDate: reservation.startDate,
@@ -109,6 +111,7 @@ export function ManualReservationEditor({
     setState("loading");
     const result = await onSave({
       reservationId: reservation?.id,
+      expectedUpdatedAt: form.expectedUpdatedAt,
       customerId: form.customerId,
       roomId: form.roomId || undefined,
       startDate: form.startDate,

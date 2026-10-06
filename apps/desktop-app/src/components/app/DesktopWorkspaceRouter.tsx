@@ -149,6 +149,7 @@ export function DesktopWorkspaceRouter({
   } = customerController;
   const {
     handleSaveManualReservation,
+    handleAssignReservationRoom,
     handleSaveManualRestaurantReservation,
     handleUpdateTableStatus,
     handleUpdateReservationStatus,
@@ -408,6 +409,7 @@ export function DesktopWorkspaceRouter({
               whatsappEnabled={customerMessagingEnabled}
               onSaveCustomer={handleSaveCustomer}
               onSaveManual={handleSaveManualReservation}
+              onAssignRoom={handleAssignReservationRoom}
               onUpdateStatus={handleUpdateReservationStatus}
               onOpenWhatsApp={openReservationWhatsApp}
             />

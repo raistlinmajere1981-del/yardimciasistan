@@ -4,6 +4,7 @@ import { refreshRoomStatusFromStays, enforceActiveStayRoomStatus } from "./room-
 import { createId } from "@yardimci-asistan/shared";
 import type {
   AssignCustomerRoomInput,
+  AssignReservationRoomInput,
   CreateStayFromReservationInput,
   SaveManualReservationInput,
   UpdateCustomerRoomStayStatusInput,
@@ -360,7 +361,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
 }
 
 export function saveManualReservation(db: DatabaseSync, input: SaveManualReservationInput,
-  context: DomainMutationContext & { newReservationId?: string; allowExtraCapacity?: boolean } = {}): { ok: true; message: string } | { ok: false; message: string } {
+  context: DomainMutationContext & { newReservationId?: string; allowExtraCapacity?: boolean; assignmentOnly?: boolean } = {}): { ok: true; message: string } | { ok: false; message: string } {
   const reservationId = String(input?.reservationId ?? "").trim();
   const customerId = String(input?.customerId ?? "").trim();
   const roomId = String(input?.roomId ?? "").trim();
@@ -390,6 +391,9 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
     : undefined;
   if (reservationId && !existingReservation) {
     return { ok: false, message: "Düzenlenecek rezervasyon bulunamadı." };
+  }
+  if (existingReservation && input.expectedUpdatedAt !== undefined && input.expectedUpdatedAt !== existingReservation.updated_at) {
+    return { ok: false, message: "Rezervasyon bu form açıldıktan sonra değişti. Güncel kaydı yeniden açın." };
   }
 
   const isEditing = Boolean(existingReservation);
@@ -460,7 +464,11 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
     }
   }
 
-  const now = context.now ?? new Date().toISOString();
+  const timestamp = context.now ?? new Date().toISOString();
+  // Distinct edits in one millisecond still invalidate an open full-edit form.
+  const previousTimestamp = Date.parse(String(existingReservation?.updated_at ?? ""));
+  const now = existingReservation && context.now === undefined && Date.parse(timestamp) <= previousTimestamp
+    ? new Date(previousTimestamp + 1).toISOString() : timestamp;
   const savedReservationId = reservationId || context.newReservationId || createId("reservation_");
   const customerName = String(customer.full_name ?? "").trim() || "Misafir";
   const roomIds = roomId ? [roomId] : [];
@@ -474,7 +482,11 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
       const nextChildCount = isManualReservation
         ? 0
         : Number(existingReservation.child_count ?? 0);
-      db
+      if (context.assignmentOnly) {
+        db.prepare("UPDATE reservations SET room_ids_json = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+          .run(JSON.stringify(roomIds), now, savedReservationId);
+      } else {
+        const update = db
         .prepare(`
             UPDATE reservations
             SET start_date = ?,
@@ -486,7 +498,7 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
                 notes = ?,
                 updated_at = ?,
                 sync_status = 'local_only'
-            WHERE id = ? AND deleted_at = ''
+            WHERE id = ? AND deleted_at = '' AND (? IS NULL OR updated_at = ?)
           `)
         .run(
           startDate,
@@ -497,8 +509,15 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
           JSON.stringify(roomIds),
           notes,
           now,
-          savedReservationId
+          savedReservationId,
+          input.expectedUpdatedAt ?? null,
+          input.expectedUpdatedAt ?? null
         );
+        if (update.changes === 0) {
+          db.exec("ROLLBACK TO room_reservation; RELEASE room_reservation");
+          return { ok: false, message: "Rezervasyon bu form açıldıktan sonra değişti. Güncel kaydı yeniden açın." };
+        }
+      }
 
       if (previousRoomId && previousRoomId !== roomId) {
         const otherRows = db
@@ -582,6 +601,21 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
         ? "Rezervasyon oluşturuldu ve oda ayrıldı."
         : "Rezervasyon oluşturuldu. Odayı daha sonra atayabilirsiniz."
   };
+}
+
+/** Assignment intent reads metadata under the write lock and reuses booking validation. */
+export function assignReservationRoom(db: DatabaseSync, input: AssignReservationRoomInput) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const row = db.prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
+      .get(String(input?.reservationId ?? "").trim()) as Record<string, unknown> | undefined;
+    if (!row) { db.exec("ROLLBACK"); return { ok: false as const, message: "Düzenlenecek rezervasyon bulunamadı." }; }
+    const result = saveManualReservation(db, { reservationId: String(row.id), customerId: String(row.customer_id),
+      roomId: String(input?.roomId ?? ""), startDate: String(row.start_date), endDate: String(row.end_date),
+      guestCount: Number(row.guest_count), notes: String(row.notes) }, { assignmentOnly: true });
+    db.exec(result.ok ? "COMMIT" : "ROLLBACK");
+    return result;
+  } catch (error) { db.exec("ROLLBACK"); throw error; }
 }
 
 export function updateReservationStatus(db: DatabaseSync, input: UpdateReservationStatusInput, context: DomainMutationContext = {}): { ok: true; message: string } | { ok: false; message: string } {

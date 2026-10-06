@@ -178,6 +178,15 @@ CREATE TABLE commerce_sale_drafts (
   updated_at TEXT NOT NULL
 );
 
+-- A phone inbox draft may create at most one sale. Review remains independent
+-- inbox state; this durable link survives a failed review or lost IPC response.
+CREATE TABLE commerce_cart_draft_sales (
+  draft_id TEXT PRIMARY KEY REFERENCES commerce_sale_drafts(id),
+  sale_id TEXT NOT NULL UNIQUE REFERENCES commerce_sales(id),
+  request_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE commerce_sale_items (
   id TEXT PRIMARY KEY,
   sale_id TEXT NOT NULL,

@@ -427,6 +427,9 @@ export function loadMarketCartDraftForQuickSaleRecord(
     if (detail.draft.status !== "pending") {
       throw new Error("Sepet taslağı daha önce kapatılmış.");
     }
+    if (database.prepare("SELECT 1 FROM commerce_cart_draft_sales WHERE draft_id = ?").get(draftId)) {
+      throw new Error("Bu telefon sepetinin satışı zaten kaydedildi. Sepeti kapatmayı yeniden deneyin.");
+    }
 
     const rows = database.prepare(`
       SELECT

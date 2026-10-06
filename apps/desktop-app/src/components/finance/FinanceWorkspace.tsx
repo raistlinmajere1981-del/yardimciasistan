@@ -266,7 +266,6 @@ export function FinanceWorkspace({
 
       {selectedReceivable && <RoomReceivablePaymentDialog
         folio={selectedReceivable}
-        closeWhenSettled={!roomData.activeStays.some(stay => stay.id === selectedReceivable.stayId)}
         onClose={() => setSelectedReceivable(null)}
         onSaved={async () => {
           await Promise.all([controller.refreshRoomData(), controller.refreshFinanceData()]);
@@ -484,4 +483,3 @@ function paymentMethodLabel(method: FinancePaymentMethod): string {
 function categoryLabel(category: string, categories: DesktopFinanceCategory[]): string {
   return categories.find((item) => item.id === category)?.name ?? "Kasa hareketi";
 }
-

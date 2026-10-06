@@ -121,7 +121,8 @@ try {
     getCustomerCreditAccount: "commerce:customerCredit:get", listCustomerCreditEntries: "commerce:customerCredit:entries",
     prepareCustomerCreditWhatsApp: "commerce:customerCredit:prepareWhatsApp", recordCustomerCreditPayment: "commerce:customerCredit:payment",
     addCustomerCreditAdjustment: "commerce:customerCredit:adjustment", createCustomerCreditSale: "commerce:customerCredit:sale",
-    listProducts: "commerce:product:list", listCategories: "commerce:category:list", createPaidSale: "commerce:sale:createPaid"
+    listProducts: "commerce:product:list", listCategories: "commerce:category:list", createPaidSale: "commerce:sale:createPaid",
+    completeMarketSale: "commerce:sale:completeMarket"
   };
   const scannerMethods = ["setBarcodeScanMode", "consumePendingBarcodeScans"];
   await page.exposeFunction("__m83Call", async (method, args) => {

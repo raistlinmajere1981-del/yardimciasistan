@@ -88,6 +88,7 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
       if (window.fixtureDelayReads) return new Promise((resolve, reject) => window.fixtureReads.push({ resolve: (patch = {}) => resolve({ ...snapshot, ...patch }), reject }));
       return snapshot;
     },
+    assignReservationRoom: async input => { record('assignment', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); booking.roomIds = input.roomId ? [input.roomId] : []; return success(booking.id); },
     saveManualReservation: async input => { record('assignment', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); booking.roomIds = input.roomId ? [input.roomId] : []; return success(booking.id); },
     createStayFromReservation: async input => { record('linked', input); const booking = dashboard.reservations.find(item => item.id === input.reservationId); return makeStay({ roomId: input.roomId, customerId: input.primaryCustomerId ?? booking.customerId, guestCustomerIds: input.guestCustomerIds ?? [input.primaryCustomerId ?? booking.customerId], checkInDate: booking.startDate, checkOutDate: booking.endDate, guestCount: booking.guestCount, notes: booking.notes, status: input.status === 'checked_in' ? 'checked_in' : 'planned' }, booking.id); },
     assignCustomerRoom: async input => { record('manual', input); return makeStay(input); },
@@ -151,6 +152,20 @@ export function installPensionWorkspaceFixture({ dashboard, variant = 'all' }) {
       return success(stay.id, 'Misafir konaklamaya eklendi.');
     },
     checkoutStay: async stayId => { record('checkout', stayId); const stay = dashboard.customerRoomStays.find(item => item.id === stayId); stay.status = 'checked_out'; stay.checkedOutAt = stamp(); stay.updatedAt = stamp(); dashboard.rooms.find(item => item.id === stay.roomId).status = 'cleaning'; const folio = folios.find(item => item.stayId === stayId); if (folio?.remainingMinor === 0) folio.status = 'closed'; return success(stayId, 'Misafir çıkışı tamamlandı. Oda temizlik bekliyor.'); },
+    checkoutStayWithSettlement: async input => {
+      const departure = await window.yardimciDesktop.checkoutStay(input.stayId);
+      const current = folios.find(folio => folio.stayId === input.stayId && folio.status === 'open');
+      const targets = [...new Set([...(input.settleCurrent && current ? [current.id] : []), ...input.previousFolioIds])];
+      const settlements = [];
+      for (const folioId of targets) {
+        const folio = folios.find(item => item.id === folioId);
+        const amountMinor = folio.remainingMinor;
+        const result = await window.yardimciDesktop.addRoomFolioPayment({ folioId, amountMinor, paymentMethod: input.paymentMethod });
+        if (result.ok) folio.status = 'closed';
+        settlements.push({ folioId, result: result.ok ? { ok: true, amountMinor, remainingMinor: 0, closure: 'closed' } : result });
+      }
+      return { ...departure, settlements, message: targets.length ? 'Misafir çıkışı tamamlandı; seçilen hesaplar tahsil edilip kapatıldı.' : departure.message };
+    },
     addRoomFolioPayment: async input => {
       record('payment', input);
       if (window.fixtureDelayPayment) await new Promise(resolve => { window.fixtureReleasePayment = resolve; });
