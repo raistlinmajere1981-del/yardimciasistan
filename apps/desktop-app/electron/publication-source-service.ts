@@ -1,4 +1,4 @@
-import { activatePublicationSource, type SyncCoreConfig } from "@yardimci-asistan/sync-core";
+import { activatePublicationSource, readRestoreSyncState, type SyncCoreConfig } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase } from "./database";
 
 /** Bootstrap only. A replacement requires an explicit CAS activation with the
@@ -8,6 +8,23 @@ export async function ensurePublicationSource(database: DesktopDatabase, config:
   const target = config.baseUrl.trim().replace(/\/+$/, "");
   database.ensurePublicationTarget(target);
   const clientId = database.getSyncRuntimeStatus().clientId;
+  let restore = database.getRestoreReconciliationStatus();
+  if (restore && restore.state !== "complete") {
+    if (restore.target && restore.target !== target) return { ok: false as const, message: "Restore senkron hedefi değişti; bekleyen reconciliation korunuyor.", error: "restore_target_changed" };
+    if (restore.state === "activation_pending") {
+      if (restore.expectedEpoch === null) {
+        const remote = await readRestoreSyncState(config);
+        if (!remote.ok) return remote;
+        database.saveRestoreActivationExpectation(restore.operationId, target, remote.source_epoch, remote.requests_through, remote.orders_through);
+        restore = database.getRestoreReconciliationStatus()!;
+      }
+      if (restore.target !== target) return { ok: false as const, message: "Restore senkron hedefi değişti; bekleyen reconciliation korunuyor.", error: "restore_target_changed" };
+      const activated = await activatePublicationSource({ ...config, clientId, expectedEpoch: restore.expectedEpoch!, activationKey: `${restore.operationId}:activate` });
+      if (!activated.ok) return activated;
+      database.finishRestoreActivation(restore.operationId, target, activated.source_epoch);
+      return { ok: true as const, clientId, sourceEpoch: activated.source_epoch };
+    }
+  }
   const epoch = database.getPublicationSourceEpoch(target);
   if (epoch) return { ok: true as const, sourceEpoch: epoch, clientId };
   const result = await activatePublicationSource({ ...config, clientId, expectedEpoch: 0, activationKey: `${clientId}:activate:0` });

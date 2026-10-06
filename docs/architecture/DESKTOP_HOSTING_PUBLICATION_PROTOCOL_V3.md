@@ -3,6 +3,10 @@
 Baseline-only schema contract; there is no migration or revisionless publication path.
 Hosting is tenant-scoped by its deployment database and authenticated sync secret.
 
+Explicit backup restore uses the existing CAS activation and exact publication lifecycle:
+see [Desktop restore reconciliation v1](DESKTOP_RESTORE_RECONCILIATION_V1.md) and D-043.
+Its registry-wide republish never reuses backup frozen payloads or resets Web submission history.
+
 ## Revalidated inventory
 
 | Hosting name | Previous lifecycle | Canonical intent owner |

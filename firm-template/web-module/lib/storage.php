@@ -90,6 +90,7 @@ function ya_storage_reset_runtime(): array
     $tables = [
         'business_messaging_status_queue',
         'dealer_sessions',
+        'dealer_consumed_invites',
         'dealer_catalogs',
         'dealer_access',
         'web_requests',
@@ -198,15 +199,16 @@ function ya_storage_all_requests(): array
     return array_values(array_filter(array_map('ya_storage_request_from_row', $rows), 'is_array'));
 }
 
-function ya_storage_pull_requests(int $limit, bool $includeSynced, ?int $afterSeq): array
+function ya_storage_pull_requests(int $limit, bool $includeSynced, ?int $afterSeq, ?int $replayThroughSeq = null): array
 {
     $database = ya_storage_open();
     $limit = max(1, min($limit, 200));
     if ($afterSeq !== null) {
         $statement = $database->prepare(
-            'SELECT seq, payload_json FROM web_requests WHERE seq > :after_seq ORDER BY seq ASC LIMIT :limit'
+            'SELECT seq, payload_json FROM web_requests WHERE seq > :after_seq' . ($replayThroughSeq === null ? '' : ' AND seq <= :replay_through') . ' ORDER BY seq ASC LIMIT :limit'
         );
         $statement->bindValue(':after_seq', max(0, $afterSeq), PDO::PARAM_INT);
+        if ($replayThroughSeq !== null) $statement->bindValue(':replay_through', $replayThroughSeq, PDO::PARAM_INT);
     } elseif ($includeSynced) {
         $statement = $database->prepare(
             'SELECT seq, payload_json FROM web_requests ORDER BY seq ASC LIMIT :limit'
@@ -321,18 +323,24 @@ function ya_storage_web_order_from_row(mixed $row): array
     return $payload;
 }
 
-function ya_storage_pull_web_orders(int $limit, int $afterSeq): array
+function ya_storage_pull_web_orders(int $limit, int $afterSeq, ?int $replayThroughSeq = null): array
 {
     $limit = max(1, min($limit, 200));
     $statement = ya_storage_open()->prepare(
-        "SELECT seq, payload_json FROM web_orders WHERE seq > :after_seq AND imported_at = '' ORDER BY seq ASC LIMIT :limit"
+        'SELECT seq, payload_json, imported_at FROM web_orders WHERE seq > :after_seq'
+        . ($replayThroughSeq === null ? " AND imported_at = ''" : ' AND seq <= :replay_through') . ' ORDER BY seq ASC LIMIT :limit'
     );
     $statement->bindValue(':after_seq', max(0, $afterSeq), PDO::PARAM_INT);
+    if ($replayThroughSeq !== null) $statement->bindValue(':replay_through', $replayThroughSeq, PDO::PARAM_INT);
     $statement->bindValue(':limit', $limit + 1, PDO::PARAM_INT);
     $statement->execute();
     $rows = $statement->fetchAll();
     $hasMore = count($rows) > $limit;
-    $orders = array_map('ya_storage_web_order_from_row', array_slice($rows, 0, $limit));
+    $orders = array_map(static function(array $row) use ($replayThroughSeq): array {
+        $order = ya_storage_web_order_from_row($row);
+        if ($replayThroughSeq !== null) $order['previouslyAcknowledged'] = $row['imported_at'] !== '';
+        return $order;
+    }, array_slice($rows, 0, $limit));
     return [
         'orders' => $orders,
         'next_cursor' => $orders === [] ? max(0, $afterSeq) : $orders[count($orders) - 1]['syncSeq'],
@@ -855,9 +863,14 @@ function ya_storage_create_schema(PDO $database): void
           enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
           invite_hash TEXT NOT NULL DEFAULT '',
           invite_expires_at INTEGER NOT NULL DEFAULT 0,
-          consumed_at INTEGER NOT NULL DEFAULT 0
+          consumed_at INTEGER NOT NULL DEFAULT 0,
+          source_epoch INTEGER NOT NULL DEFAULT 0
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_dealer_invite_hash ON dealer_access(invite_hash) WHERE invite_hash <> '';
+        CREATE TABLE IF NOT EXISTS dealer_consumed_invites (
+          invite_hash TEXT PRIMARY KEY,
+          consumed_at INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS dealer_catalogs (
           dealer_access_id TEXT PRIMARY KEY REFERENCES dealer_access(access_id),
           access_revision INTEGER NOT NULL,

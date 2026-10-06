@@ -125,10 +125,9 @@ try {
     assert.equal(database.getDealerWebAccess(id).enabled, false);
     database.changeDealerWebAccess(id, "enable");
     const beforeRestore = database.getDealerWebAccess(id).accessRevision;
-    database.invalidateRestoredDealerAccess();
-    assert.equal(database.getDealerWebAccess(id).enabled, false);
-    assert.ok(database.getDealerWebAccess(id).accessRevision > beforeRestore);
-    database.changeDealerWebAccess(id, "enable");
+    database.beginRestoreReconciliation("fixture-restore-dealer", "desktop-restore-dealer");
+    assert.equal(database.getDealerWebAccess(id).enabled, true, "restore preserves canonical access intent; hosting sessions are epoch-fenced on normal apply");
+    assert.equal(database.getDealerWebAccess(id).accessRevision, beforeRestore, "restore does not invent a wall-clock access revision");
     raw.prepare("DELETE FROM customer_commercial_profiles WHERE customer_id = ?").run(id);
     assert.equal(database.getDealerWebAccess(id).enabled, false);
     const job = database.getPendingSyncJobs().find((job) => job.jobType === "dealer_access_publish");

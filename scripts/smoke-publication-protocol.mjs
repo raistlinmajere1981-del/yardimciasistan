@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import http from "node:http";
+import { verifyRestoreReconciliation } from "./test-helpers/restore-reconciliation.mjs";
 
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
@@ -246,6 +247,7 @@ try {
   assert.equal(replacements.filter((r) => r.ok).length, 1, "CAS replacement has only one winner");
   assert.equal((await core.resetHostingRuntime(config)).ok, true);
   assert.equal((await activate("source-A", 0)).ok, false, "runtime reset never unfences retired sources");
+  await verifyRestoreReconciliation({ config, hosting });
   console.log("publication protocol: ordering, conflicts, fencing, retry, ack mismatch, manual lifecycle, menu race, private config, authoritative availability and fail-safe limits PASS");
 } finally {
   globalThis.fetch = nativeFetch;

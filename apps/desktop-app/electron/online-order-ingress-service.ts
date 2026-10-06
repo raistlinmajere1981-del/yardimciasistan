@@ -14,13 +14,13 @@ function record(value: unknown): Record<string, unknown> {
 /** Validates only ingress data; canonical pricing and persistence own order rules. */
 export class OnlineOrderIngressService {
   constructor(private readonly database: Pick<DesktopDatabase,
-    "getEnabledBusinessCapabilities" | "createCommerceOrder"> & Partial<Pick<DesktopDatabase, "createDealerWebOrder">>) {}
+    "getEnabledBusinessCapabilities" | "createCommerceOrder"> & Partial<Pick<DesktopDatabase, "createDealerWebOrder" | "replayRetainedWebOrder">>) {}
 
-  importOrder(input: WebOrderEnvelope, afterSeq = 0) {
+  importOrder(input: WebOrderEnvelope, afterSeq = 0, restoreReplay = false) {
     const dealer = input?.kind === "dealer";
     // Dealer capability/access gates belong to the canonical transaction, so a revoked
     // generation has a durable rejection outcome even while guest ingress remains enabled.
-    if (!dealer && !hasBusinessCapability(this.database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+    if (!restoreReplay && !dealer && !hasBusinessCapability(this.database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
       throw new Error("Online satış bu işletmede etkin değil.");
     }
     const envelope = record(input);
@@ -46,6 +46,14 @@ export class OnlineOrderIngressService {
     const deliverySnapshot = normalizeCommerceOrderDeliverySnapshot(envelope.delivery);
     const note = envelope.note === undefined ? "" : envelope.note;
     if (typeof note !== "string" || [...note].length > 2000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(note)) return invalidEnvelope();
+    if (restoreReplay) {
+      if (!this.database.replayRetainedWebOrder || typeof envelope.previouslyAcknowledged !== "boolean"
+          || (envelope.kind !== undefined && envelope.kind !== "guest" && envelope.kind !== "dealer")) return invalidEnvelope();
+      if (this.database.replayRetainedWebOrder(input)) return;
+      if (!dealer && !hasBusinessCapability(this.database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.ONLINE_SALES)) {
+        throw new Error("Online satış bu işletmede etkin değil.");
+      }
+    }
     if (dealer) {
       if (envelope.buyer !== undefined || typeof envelope.dealerAccessId !== "string" || !/^[a-f0-9-]{36}$/.test(envelope.dealerAccessId)
           || !Number.isSafeInteger(envelope.accessRevision) || Number(envelope.accessRevision) < 1

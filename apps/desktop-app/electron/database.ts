@@ -25,6 +25,7 @@ import { listRuntimeShipmentsForOrder, getRuntimeShipment, createRuntimeShipment
 import type { CreateCommerceOrderInput } from "./commerce-order-store";
 import { DatabaseSync } from "node:sqlite";
 import { getPublicRoomAvailabilityInput } from "./database/public-room-availability-store";
+import { beginRestoreReconciliation, getRestoreReconciliationStatus, saveRestoreActivationExpectation, finishRestoreActivation, finishRestoreReplay, replayRetainedWebOrder } from "./database/restore-reconciliation-store";
 import {
   getKbsOverview,
   markHospitalityNotificationSentExternally,
@@ -292,6 +293,13 @@ export class DesktopDatabase {
   getEnabledBusinessCapabilities(): BusinessCapability[] {
     return readEnabledBusinessCapabilities(this.db);
   }
+
+  beginRestoreReconciliation(operationId: string, clientId: string, currentDatabasePath?: string) { beginRestoreReconciliation(this.db, operationId, clientId, currentDatabasePath); }
+  getRestoreReconciliationStatus() { return getRestoreReconciliationStatus(this.db); }
+  saveRestoreActivationExpectation(operationId: string, target: string, epoch: number, requests: number, orders: number) { saveRestoreActivationExpectation(this.db, operationId, target, epoch, requests, orders); }
+  finishRestoreActivation(operationId: string, target: string, epoch: number) { finishRestoreActivation(this.db, operationId, target, epoch); }
+  finishRestoreReplay(kind: "requests" | "orders") { finishRestoreReplay(this.db, kind); }
+  replayRetainedWebOrder(envelope: import("@yardimci-asistan/sync-core").WebOrderEnvelope) { return replayRetainedWebOrder(this.db, envelope); }
 
   getPublicRoomAvailabilityInput() {
     return getPublicRoomAvailabilityInput(this.db);
@@ -897,8 +905,8 @@ export class DesktopDatabase {
     ensureStoredPublicationTarget(this.db, target);
   }
 
-  completeSyncJob(jobKey: string, sourceRevision: number) {
-    completeStoredSyncJob(this.db, jobKey, sourceRevision);
+  completeSyncJob(jobKey: string, sourceRevision: number, sourceEpoch?: number) {
+    completeStoredSyncJob(this.db, jobKey, sourceRevision, sourceEpoch);
   }
 
   failSyncJob(jobKey: string, sourceRevision: number, errorMessage: string, nextAttemptAt: string) {
@@ -941,12 +949,6 @@ export class DesktopDatabase {
   deleteCommerceProductPublication(productId: string) {
     this.assertProductPublicationCapability();
     deleteCommerceProductPublication(this.db, productId);
-  }
-
-  invalidateRestoredDealerAccess() {
-    this.db.prepare(`UPDATE commerce_dealer_web_access SET enabled = 0, access_revision = MAX(access_revision + 1, ?),
-      invite_hash = '', invite_issued_at = '', invite_expires_at = '', revoked_at = ?, updated_at = ?`)
-      .run(Date.now(), new Date().toISOString(), new Date().toISOString());
   }
 
   getDealerWebAccess(customerId: string) {

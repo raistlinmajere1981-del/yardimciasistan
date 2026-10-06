@@ -1,7 +1,6 @@
 import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { getSyncCapabilities, resetHostingRuntime } from "@yardimci-asistan/sync-core";
 import { DesktopDatabase } from "./database";
@@ -9,8 +8,7 @@ import { inspectDesktopDatabaseCompatibility } from "./desktop-database-compatib
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
 import {
   resolveDatabasePath,
-  resolveDataRoot,
-  resolvePendingMaintenanceMarkerPath
+  resolveDataRoot
 } from "./data-paths.js";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
@@ -97,19 +95,6 @@ app.on("before-quit", () => {
 // Worker receipts must flush before the diagnostic session is finalized. Keep its existing end reason.
 app.on("will-quit", () => finalizeDesktopLogging("before-quit"));
 
-type PendingMaintenanceKind = "restore" | "reset" | "";
-
-function readPendingMaintenanceKind(): PendingMaintenanceKind {
-  const markerPath = resolvePendingMaintenanceMarkerPath(userDataPath());
-  if (!fs.existsSync(markerPath)) return "";
-  try {
-    const parsed = JSON.parse(fs.readFileSync(markerPath, "utf8")) as { kind?: unknown };
-    return parsed.kind === "restore" || parsed.kind === "reset" ? parsed.kind : "";
-  } catch {
-    return "";
-  }
-}
-
 function shouldDeferPendingMaintenanceToCleanStart(): boolean {
   if (process.argv.includes("--clean-start")) return true;
 
@@ -146,67 +131,6 @@ function installDevelopmentRelaunchBridge() {
   });
 }
 
-function prepareRestoredStateForFullRepublish() {
-  const restoredUserDataPath = userDataPath();
-  const restoredDatabasePath = resolveDatabasePath(restoredUserDataPath);
-  if (!fs.existsSync(restoredDatabasePath)) return;
-
-  // The restore boundary already validated the current database schema. Open
-  // it once so the normal startup path can rebuild any durable runtime state.
-  const restoredDatabase = new DesktopDatabase({
-    appPath: app.getAppPath(),
-    userDataPath: restoredUserDataPath,
-    backupPath: resolveProjectBackupPath(restoredUserDataPath)
-  });
-  try {
-    restoredDatabase.initialize();
-  } finally {
-    restoredDatabase.close();
-  }
-
-  // A restore can rewind the local outbox source revision while hosting still
-  // remembers a newer revision from the same desktop client. Rotate the desktop
-  // sync identity so the restored point-in-time state is allowed to become the
-  // new authoritative publication. Request cursors are intentionally retained:
-  // genuinely new web requests received after the backup can still be pulled.
-  const raw = new DatabaseSync(restoredDatabasePath);
-  const now = new Date().toISOString();
-  try {
-    raw.prepare(`
-      UPDATE sync_runtime
-      SET last_attempt_at = '', last_success_at = '', last_error = '',
-          consecutive_failures = 0, updated_at = ?
-      WHERE id = 'primary'
-    `).run(now);
-  } finally {
-    raw.close();
-  }
-
-  // Re-open once so DesktopDatabase generates the new client id, then queue
-  // durable publications according to the persisted capability set. The normal
-  // SyncCoordinator will push these on startup, making Web and Android converge
-  // to the restored SQLite state.
-  const database = new DesktopDatabase({
-    appPath: app.getAppPath(),
-    userDataPath: restoredUserDataPath,
-    backupPath: resolveProjectBackupPath(restoredUserDataPath)
-  });
-  try {
-    database.initialize();
-    if (hasPersistedBusinessCapability(restoredDatabasePath, BUSINESS_CAPABILITIES.QR_MENU)) {
-      database.queueSyncJob("menu_publish", now);
-    }
-    // The projected snapshot is also the hosted capability manifest; when
-    // Android is disabled it deliberately publishes data/permission tombstones.
-    database.queueSyncJob("android_snapshot", now);
-    database.queueSyncJob("online_catalog_publish", now);
-    database.invalidateRestoredDealerAccess();
-    database.queueSyncJob("dealer_access_publish", now);
-  } finally {
-    database.close();
-  }
-}
-
 installDevelopmentRelaunchBridge();
 
 // The packaged Windows process doubles as the lightweight launcher. A verified
@@ -221,7 +145,6 @@ if (applyPendingDesktopUpdateAtStartup(userDataPath())) {
 // long-lived SQLite connection. This keeps WAL state and live database handles
 // out of destructive maintenance operations.
 const deferPendingMaintenance = shouldDeferPendingMaintenanceToCleanStart();
-const pendingMaintenanceKind = deferPendingMaintenance ? "" : readPendingMaintenanceKind();
 if (deferPendingMaintenance) {
   desktopLog.warn({
     scope: "startup",
@@ -230,18 +153,6 @@ if (deferPendingMaintenance) {
   });
 } else {
   applyPendingDataMaintenanceAtStartup(userDataPath());
-  if (pendingMaintenanceKind === "restore") {
-    try {
-      prepareRestoredStateForFullRepublish();
-    } catch (error) {
-      desktopLog.error({
-        scope: "restore",
-        event: "restore.republish.failed",
-        message: "Geri yükleme sonrası tam yayın hazırlanamadı.",
-        error
-      });
-    }
-  }
 }
 const mainProcessReady = import("./main");
 

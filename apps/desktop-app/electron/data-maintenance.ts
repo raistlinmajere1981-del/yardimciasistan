@@ -2,6 +2,8 @@ import { requestDataMaintenanceConfirmation, type DataMaintenanceConfirmation } 
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { randomUUID } from "node:crypto";
+import { beginRestoreReconciliation } from "./database/restore-reconciliation-store";
 import { app, ipcMain, session, shell } from "electron";
 import { desktopLog } from "./desktop-logger";
 import {
@@ -711,6 +713,12 @@ async function prepareRestore(userDataPath: string, backupId: string, confirm: (
     fs.copyFileSync(sourcePath, paths.stagedRestorePath);
     validateYardimciDatabase(paths.stagedRestorePath);
 
+    // Commit recovery with the staged DB before the relaunch marker. No network.
+    const staged = new DatabaseSync(paths.stagedRestorePath);
+    try {
+      beginRestoreReconciliation(staged, `restore-${randomUUID()}`, `desktop-${randomUUID()}`, paths.databasePath);
+    } finally { staged.close(); }
+
     const sourceManifest = readBackupManifest(backupFolderPath);
     fs.mkdirSync(paths.stagedRestoreAssetsPath, { recursive: true });
     const sourceAssetsPath = path.join(backupFolderPath, ASSET_DIRECTORY);
@@ -733,6 +741,8 @@ async function prepareRestore(userDataPath: string, backupId: string, confirm: (
         : "Seçilen yedek geri yükleniyor; uygulama yeniden başlatılıyor."
     };
   } catch (error) {
+    if (suspended) desktopLog.error({ scope: "restore", event: "restore.republish.failed",
+      message: "Geri yükleme ve tam yayın hazırlığı tamamlanamadı.", error });
     if (suspended) options.afterMaintenanceAbort?.();
     removeIfExists(paths.markerPath);
     removeIfExists(paths.stagedRestorePath);

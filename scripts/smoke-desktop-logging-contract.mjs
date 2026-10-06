@@ -95,7 +95,7 @@ assert.match(commerceIpc, /mutateForIpc\("commerce:sale:createPaid"/);
 assert.match(syncCoordinator, /product-data\.image-archive\.failed/);
 assert.match(dataMaintenance, /restore\.pending\.apply\.failed/);
 assert.match(dataMaintenance, /reset\.preferences\.clear\.failed/);
-assert.match(entry, /restore\.republish\.failed/);
+assert.match(dataMaintenance, /restore\.republish\.failed/);
 assert.match(updateService, /update\.check\.failed/);
 assert.match(updateService, /update\.download\.failed/);
 assert.match(updateService, /update\.install\.failed/);

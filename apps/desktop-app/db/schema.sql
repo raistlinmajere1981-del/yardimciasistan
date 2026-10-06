@@ -934,6 +934,32 @@ CREATE TABLE sync_runtime (
   updated_at TEXT NOT NULL
 );
 
+-- Explicit restore only. Local canonical restore can complete while Web recovery waits.
+CREATE TABLE sync_restore_reconciliation (
+  id TEXT PRIMARY KEY CHECK (id = 'primary'),
+  operation_id TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('activation_pending', 'reconciliation_pending', 'complete')),
+  target TEXT NOT NULL DEFAULT '',
+  expected_epoch INTEGER,
+  source_epoch INTEGER NOT NULL DEFAULT 0,
+  requests_through INTEGER NOT NULL DEFAULT 0,
+  orders_through INTEGER NOT NULL DEFAULT 0,
+  requests_complete INTEGER NOT NULL DEFAULT 0,
+  orders_complete INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  completed_at TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE sync_restore_publications (
+  job_key TEXT PRIMARY KEY,
+  applied_revision INTEGER NOT NULL DEFAULT 0
+);
+-- Retained Web-origin ingress pricing/outcomes, not post-backup operational decisions.
+-- Private recovery material is never a publication, renderer payload or diagnostic record.
+CREATE TABLE sync_restore_order_snapshots (
+  web_order_id TEXT PRIMARY KEY,
+  snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json))
+);
+
 -- Local database identity, independent of business/setup data. Populated by initialize().
 CREATE TABLE desktop_sync_identity (
   id TEXT PRIMARY KEY CHECK (id = 'primary'),

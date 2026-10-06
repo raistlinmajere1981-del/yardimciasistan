@@ -1,6 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
 import { encodePublicationPayload, decodePublicationPayload } from "../publication-payload-codec.js";
+import { DESKTOP_PUBLICATIONS } from "../desktop-publication-registry";
+import { getRestoreReconciliationStatus, finishRestoreReconciliationIfReady } from "./restore-reconciliation-store";
 import type {
   DesktopSyncJob,
   DesktopSyncJobType,
@@ -29,6 +31,7 @@ export function getSyncRuntimeStatus(db: DatabaseSync): DesktopSyncRuntimeStatus
     .prepare("SELECT COUNT(*) AS count, MIN(NULLIF(next_attempt_at, '')) AS next_retry_at FROM sync_outbox")
     .get() as { count?: number; next_retry_at?: string } | undefined;
   return {
+    restoreReconciliation: getRestoreReconciliationStatus(db),
     enabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
     clientId: String(identity?.client_id ?? ""),
     requestCursor: Number(runtime?.request_cursor ?? 0),
@@ -128,7 +131,7 @@ export function prepareSyncPublication<T>(db: DatabaseSync, jobType: DesktopSync
     } | undefined;
     if ((!job && (refresh || !stored || stored.content_hash !== hash))
         || (job && stored?.source_revision === job.source_revision && stored.content_hash !== hash
-          && !["menu", "android_snapshot", "online_catalog", "dealer_access", "marketing_website"].includes(jobKey))) {
+          && DESKTOP_PUBLICATIONS[jobType].publisher !== "outbox")) {
       queueSyncJob(db, jobType);
       job = db.prepare('SELECT source_revision FROM sync_outbox WHERE job_key = ?').get(jobKey) as { source_revision: number };
     }
@@ -146,10 +149,15 @@ export function prepareSyncPublication<T>(db: DatabaseSync, jobType: DesktopSync
   } catch (error) { db.exec('ROLLBACK'); throw error; }
 }
 
-export function completeSyncJob(db: DatabaseSync, jobKey: string, sourceRevision: number) {
-  db
-    .prepare("DELETE FROM sync_outbox WHERE job_key = ? AND source_revision = ?")
-    .run(jobKey, sourceRevision);
+export function completeSyncJob(db: DatabaseSync, jobKey: string, sourceRevision: number, sourceEpoch?: number) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = db.prepare("DELETE FROM sync_outbox WHERE job_key = ? AND source_revision = ?").run(jobKey, sourceRevision);
+    if (result.changes && sourceEpoch) db.prepare("UPDATE sync_restore_publications SET applied_revision = ? WHERE job_key = ? AND EXISTS (SELECT 1 FROM sync_restore_reconciliation WHERE state = 'reconciliation_pending' AND source_epoch = ?)")
+      .run(sourceRevision, jobKey, sourceEpoch);
+    finishRestoreReconciliationIfReady(db);
+    db.exec("COMMIT");
+  } catch (error) { db.exec("ROLLBACK"); throw error; }
 }
 
 export function failSyncJob(db: DatabaseSync, jobKey: string, sourceRevision: number, errorMessage: string, nextAttemptAt: string) {

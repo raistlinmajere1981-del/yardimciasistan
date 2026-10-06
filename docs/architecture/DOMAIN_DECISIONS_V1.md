@@ -627,8 +627,9 @@ and monotonically increasing access revisions. Wholesale owns the staged
 `dealerPortalEnabled` subfeature configuration (default OFF); this is neither a new
 sector/capability nor an alias of Online Sales. Disabling Wholesale/portal, removing or
 inactivating a dealer profile, or deleting its Customer invalidates access and clears
-invites. Re-enabling a capability never restores old access. Restore invalidates restored
-access generations before publication.
+invites. Re-enabling a capability never restores old access. Explicit backup restore
+preserves the backed-up desired access under a new publication epoch; normal hosting
+apply invalidates previous-epoch sessions and retains consumed-invite history (D-043).
 
 The web module owns only a sanitized private access projection, one-time claim consumption
 and server-side transport sessions. It never owns or receives the canonical Customer list.
@@ -1292,3 +1293,39 @@ Provider-native exactly-once semantics, lost receipts after local write failure 
 future verified negative-reconciliation/resubmit operation remain explicit limitations.
 Configuration, notification creation, provider automation and other hospitality operations
 are unchanged. Current schema only; no migration or backward compatibility is introduced.
+
+## D-043 — Explicit local backup restore reconciles ownership, not remote history
+
+**Status:** ACCEPTED (2026-10-06), implementing the requested restore correctness contract.
+
+The backed-up Desktop desired state remains canonical. Restore stages a durable recovery
+record, fresh publication identity, the entire static publication registry and retained
+Web-origin canonical ingress price snapshots in one SQLite transaction before committing
+the relaunch marker. Existing v3 authenticated CAS activation advances the epoch; this
+is not publication-driven takeover. Previous authority is permanently fenced. Local
+restore completion is separate from activation/publication/inbound reconciliation completion.
+The existing coordinator resumes the explicit recovery even with passive auto-sync OFF.
+An installed but unconfigured AI provider projects disabled effective availability during
+restore; local capability/config intent remains unchanged. An unreadable stored credential
+blocks pending reconciliation instead of authorizing secret loss.
+
+Web submission history, idempotency receipts and consumed invites are not rolled back.
+Explicit bounded restore replay uses the new active source, not global ACK deletion.
+Request upsert preserves restored local owner decisions; missing identities reappear.
+Previously imported guest/dealer orders replay the retained **canonical Desktop** price,
+buyer/delivery and item snapshots, never client prices or the restored current catalog's
+price. Missing orders reappear as placed intent, without replaying post-backup confirmation,
+fulfillment, Sale, inventory, payment or Shipment. Existing restored decisions/tombstones
+and terminal rejection outcomes win. Missing canonical price evidence blocks retryably;
+it cannot authorize repricing, silent skipping or acknowledging away historical intent.
+Not-yet-imported inbox records retain D-026/D-034 first-import validation/pricing rules.
+
+Dealer access/catalog desired state uses normal transactional projection apply. Access
+revision checks are scoped to the publication epoch; a restored lower access revision
+can be authoritative without a timestamp revision hack. Normal apply revokes old-epoch
+sessions, and consumed invite hashes remain unusable even after later invite rotations
+and a restore to an earlier hash. No session is recreated and no Web runtime reset occurs.
+
+See [Desktop restore reconciliation v1](DESKTOP_RESTORE_RECONCILIATION_V1.md) for the
+state machine, ownership matrix, coverage and recovery limitations. Normal first import,
+normal capability reactivation and v3 exact receipts/order fencing are unchanged.

@@ -1,4 +1,5 @@
 import type { MarketingWebsitePublicationService } from "./marketing/website-publication";
+import { DESKTOP_PUBLICATIONS } from "./desktop-publication-registry";
 import { OnlineOrderIngressService } from "./online-order-ingress-service";
 import { DealerWebOrderAccessRejected } from "./dealer-web-order-rejection";
 import {
@@ -143,7 +144,7 @@ export class SyncCoordinator {
     }, NORMAL_PULL_INTERVAL_MS);
     this.outboxTimer = setInterval(() => {
       const runtime = this.options.database.getSyncRuntimeStatus();
-      if (runtime.enabled
+      if ((runtime.enabled || this.restorePending())
           && Date.now() >= this.nextPassiveRunAt
           && this.options.database.getPendingSyncJobs().length > 0) {
         if (!this.inFlight && !this.debounceTimer) {
@@ -253,7 +254,7 @@ export class SyncCoordinator {
 
   getStatus(): AutomaticSyncStatus {
     const runtime = this.options.database.getSyncRuntimeStatus();
-    if (!runtime.enabled && this.phase !== "syncing") {
+    if (!runtime.enabled && !this.restorePending() && this.phase !== "syncing") {
       return { ...runtime, phase: "disabled", message: "Otomatik senkron kapalı." };
     }
     return { ...runtime, phase: this.phase, message: this.message };
@@ -317,7 +318,7 @@ export class SyncCoordinator {
   private async runCycle(force: boolean): Promise<AutomaticSyncCycleResult> {
     const runtime = this.options.database.getSyncRuntimeStatus();
     const empty = { pulledRequests: 0, pulledActions: 0, appliedActions: 0, failedActions: 0, publishedJobs: 0 };
-    if (!runtime.enabled && !force) {
+    if (!runtime.enabled && !force && !this.restorePending()) {
       this.phase = "disabled";
       this.message = "Otomatik senkron kapalı.";
       return this.result(true, this.message, empty);
@@ -426,7 +427,10 @@ export class SyncCoordinator {
     }
 
     let dashboardChanged = false;
-    if (requestsEnabled) {
+    const restore = this.options.database.getRestoreReconciliationStatus();
+    const replayRequests = restore?.state === "reconciliation_pending" && !restore.requestsComplete;
+    const replayOrders = restore?.state === "reconciliation_pending" && !restore.ordersComplete;
+    if (requestsEnabled || replayRequests) {
       const requestResult = await this.pullRequestPages(transport);
       counts.pulledRequests = requestResult.count;
       dashboardChanged ||= requestResult.count > 0;
@@ -436,7 +440,7 @@ export class SyncCoordinator {
     }
 
     if (this.webOrdersSupported
-        && (hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)
+        && (replayOrders || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES)
           || hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.WHOLESALE))) {
       const orderResult = await this.pullWebOrderPages(transport);
       dashboardChanged ||= orderResult.count > 0;
@@ -453,7 +457,7 @@ export class SyncCoordinator {
       errors.push(actionResult.error);
     }
 
-    if (requestsEnabled) {
+    if (requestsEnabled || replayRequests) {
       const acknowledgementError = await this.acknowledgeImportedRequests(transport);
       if (acknowledgementError) {
         errors.push(acknowledgementError);
@@ -505,7 +509,7 @@ export class SyncCoordinator {
       this.options.database.recordAutomaticSyncSuccess();
       this.nextPassiveRunAt = 0;
       this.phase = "success";
-      this.message = buildSuccessMessage(counts);
+      this.message = this.restorePending() ? "Yerel geri yükleme tamamlandı; Web reconciliation bekliyor." : buildSuccessMessage(counts);
       desktopLog.info({
         scope: "sync",
         event: "sync.cycle.completed",
@@ -546,9 +550,12 @@ export class SyncCoordinator {
     let cursor = this.options.database.getSyncRuntimeStatus().webOrderCursor;
     let count = 0;
     let errorMessage = "";
+    const restore = this.options.database.getRestoreReconciliationStatus();
+    const replayThroughSeq = restore?.state === "reconciliation_pending" && !restore.ordersComplete ? restore.ordersThrough : undefined;
+    let replayExhausted = false;
     try {
       for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
-        const result = await transport.pullWebOrders({ afterSeq: cursor, limit: 100 });
+        const result = await transport.pullWebOrders({ afterSeq: cursor, limit: 100, replayThroughSeq });
         if (!result.ok) {
           this.logSyncFailure("web-orders-pull", result, { page, cursor });
           errorMessage = result.message;
@@ -556,7 +563,7 @@ export class SyncCoordinator {
         }
         for (const envelope of result.orders) {
           try {
-            ingress.importOrder(envelope, cursor);
+            ingress.importOrder(envelope, cursor, replayThroughSeq !== undefined);
             count += 1;
           } catch (error) {
             if (!(error instanceof DealerWebOrderAccessRejected) || envelope.kind !== "dealer") throw error;
@@ -568,7 +575,10 @@ export class SyncCoordinator {
           cursor = envelope.syncSeq;
           this.options.database.recordWebOrderCursor(cursor);
         }
-        if (!result.has_more) break;
+        if (!result.has_more) {
+          replayExhausted = true;
+          break;
+        }
       }
     } catch (error) {
       errorMessage = "Web siparişi içe aktarılamadı. Yeniden denenecek.";
@@ -605,14 +615,17 @@ export class SyncCoordinator {
         meta: { importedCount: count, cursor }
       });
     }
+    if (replayThroughSeq !== undefined && replayExhausted && !errorMessage) this.options.database.finishRestoreReplay("orders");
     return { count, error: errorMessage };
   }
 
   private async pullRequestPages(transport: SyncTransport): Promise<{ count: number; error: string }> {
     let count = 0;
     let cursor = this.options.database.getSyncRuntimeStatus().requestCursor;
+    const restore = this.options.database.getRestoreReconciliationStatus();
+    const replayThroughSeq = restore?.state === "reconciliation_pending" && !restore.requestsComplete ? restore.requestsThrough : undefined;
     for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
-      const result = await transport.pullRequests({ afterSeq: cursor, limit: 100 });
+      const result = await transport.pullRequests({ afterSeq: cursor, limit: 100, replayThroughSeq });
       if (!result.ok) {
         this.options.database.recordSyncEvent({
           direction: "pull",
@@ -633,6 +646,11 @@ export class SyncCoordinator {
       count += result.requests.length;
       cursor = result.next_cursor;
       if (!result.has_more) {
+        if (replayThroughSeq !== undefined) {
+          const error = await this.acknowledgeImportedRequests(transport);
+          if (error) return { count, error };
+          this.options.database.finishRestoreReplay("requests");
+        }
         break;
       }
     }
@@ -974,10 +992,9 @@ export class SyncCoordinator {
     let published = 0;
     for (const job of jobs) {
       // Derived/config publishers above share this outbox but own preparation.
-      if (["room_catalog_publish", "table_catalog_publish", "ai_catalog_publish", "business_context_publish",
-        "public_room_availability_publish", "ai_settings_publish", "google_reviews_settings_publish"].includes(job.jobType)) continue;
+      if (DESKTOP_PUBLICATIONS[job.jobType].publisher !== "outbox") continue;
       if (job.jobType === "menu_publish"
-          && !hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.QR_MENU)) {
+          && !hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.QR_MENU) && !this.restorePending()) {
         this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
         continue;
       }
@@ -1016,7 +1033,9 @@ export class SyncCoordinator {
       }
       const config = this.options.getSyncConfig();
       const result = job.jobType === "menu_publish"
-        ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.getQrMenuPublication(),
+        ? await publishDesktopProjection(this.options.database, config, job.jobType,
+            hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.QR_MENU) ? this.options.database.getQrMenuPublication()
+              : { ...this.options.database.getQrMenuPublication(), enabled: false, categories: [], items: [] },
             (identity, menu) => pushMenu({ ...config, ...identity, menu }),
             { nextAttemptAt: calculateNextAttempt(job.attemptCount), acknowledge: (sent) => this.options.database.markMenuPublished(sent) })
         : job.jobType === "online_catalog_publish"
@@ -1090,6 +1109,11 @@ export class SyncCoordinator {
 
   private deferPassiveRetry(failureCount: number) {
     this.nextPassiveRunAt = Date.now() + calculateRetryDelayMs(failureCount);
+  }
+
+  private restorePending() {
+    const restore = this.options.database.getRestoreReconciliationStatus();
+    return Boolean(restore && restore.state !== "complete");
   }
 
   private emitStatus(): AutomaticSyncStatus {

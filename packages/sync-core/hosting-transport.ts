@@ -93,7 +93,8 @@ export async function pullRequests(options: PullRequestsOptions): Promise<PullRe
     limit: options.limit ?? 50,
     include_synced: options.includeSynced ?? false,
     ...(options.afterSeq === undefined ? {} : { after_seq: Math.max(0, Math.trunc(options.afterSeq)) }),
-    ...(options.clientId ? { client_id: options.clientId } : {})
+    ...(options.clientId ? { client_id: options.clientId } : {}),
+    ...(options.replayThroughSeq === undefined ? {} : { replay_through_seq: options.replayThroughSeq, source_epoch: options.sourceEpoch })
   });
 }
 
@@ -102,7 +103,8 @@ export async function pullWebOrders(options: PullWebOrdersOptions): Promise<Pull
     action: "pull_web_orders",
     client_id: options.clientId,
     after_seq: Math.max(0, Math.trunc(options.afterSeq)),
-    limit: options.limit ?? 50
+    limit: options.limit ?? 50,
+    ...(options.replayThroughSeq === undefined ? {} : { replay_through_seq: options.replayThroughSeq, source_epoch: options.sourceEpoch })
   });
   if (!result.ok) return result;
   // Check the whole page before exposing it to an importer. An out-of-order
@@ -163,6 +165,17 @@ export async function activatePublicationSource(options: SyncCoreConfig & { clie
   if (result.ok && (result.source_client_id !== options.clientId || result.source_epoch !== options.expectedEpoch + 1
       || result.activation_key !== options.activationKey)) {
     return { ok: false as const, message: "Publication source onayı doğrulanamadı.", error: "source_ack_mismatch" };
+  }
+  return result;
+}
+
+/** Authenticated read, used only by an explicit local restore. It does not
+ * activate a source or reset Web-owned history/acknowledgements.
+ */
+export async function readRestoreSyncState(options: SyncCoreConfig) {
+  const result = await syncRequest<{ ok: true; message: string; source_epoch: number; requests_through: number; orders_through: number }>(options, { action: "restore_sync_state" });
+  if (result.ok && ![result.source_epoch, result.requests_through, result.orders_through].every(value => Number.isSafeInteger(value) && value >= 0)) {
+    return { ok: false as const, message: "Restore senkron sınırları doğrulanamadı.", error: "restore_state_invalid" };
   }
   return result;
 }
@@ -442,7 +455,9 @@ export class PhpHostingSyncTransport implements SyncTransport {
       ...this.config,
       clientId: this.config.clientId,
       afterSeq: input.afterSeq,
-      limit: input.limit
+      limit: input.limit,
+      replayThroughSeq: input.replayThroughSeq,
+      sourceEpoch: this.config.sourceEpoch
     });
   }
 

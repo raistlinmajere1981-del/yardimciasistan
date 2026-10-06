@@ -29,7 +29,7 @@ export function campaignFixture(options = {}) {
     listTemplates: () => single.listTemplates()
   };
   const service = new exports.MessagingCampaignService(() => db, catalog);
-  return { get db() { return db; }, reopen: () => { db.close(); db = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dir }); db.initialize(); }, http, secrets, single, service, catalog, setup, logs,
+  return { get db() { return db; }, reopen: (beforeOpen) => { db.close(); beforeOpen?.(); db = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dir }); db.initialize(); }, http, secrets, single, service, catalog, setup, logs,
     dispose: () => { db.close(); rmSync(dir, { recursive: true, force: true }); } };
 }
 let phoneSequence = 0;

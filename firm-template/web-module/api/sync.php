@@ -44,6 +44,15 @@ if (!$isAuthorized) {
 }
 
 try {
+    if ($action === 'restore_sync_state') {
+        $db = ya_storage_open();
+        $db->beginTransaction();
+        $state = ['source_epoch' => (int)$db->query('SELECT COALESCE(MAX(epoch), 0) FROM publication_sources')->fetchColumn(),
+            'requests_through' => (int)$db->query('SELECT COALESCE(MAX(seq), 0) FROM web_requests')->fetchColumn(),
+            'orders_through' => (int)$db->query('SELECT COALESCE(MAX(seq), 0) FROM web_orders')->fetchColumn()];
+        $db->commit();
+        ya_sync_response(200, ['ok' => true, 'message' => 'Restore replay bounds.', ...$state]);
+    }
     if ($action === 'activate_publication_source') {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') ya_sync_response(405, ['ok' => false]);
         $activation = ya_storage_activate_source(ya_sync_require_client_id($payload),
@@ -591,7 +600,7 @@ function ya_sync_pull_web_orders(array $payload): void
     if ($afterSeq < 0) {
         ya_sync_response(422, ['ok' => false, 'message' => 'Sipariş cursor bilgisi geçersiz.']);
     }
-    $pulled = ya_storage_pull_web_orders(ya_sync_int($payload['limit'] ?? 50, 50), $afterSeq);
+    $pulled = ya_storage_pull_web_orders(ya_sync_int($payload['limit'] ?? 50, 50), $afterSeq, ya_sync_restore_replay_bound($payload));
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'Web siparişleri alındı.',
@@ -628,7 +637,7 @@ function ya_sync_pull_requests(array $payload): void
     $afterSeq = array_key_exists('after_seq', $payload)
         ? max(0, ya_sync_int($payload['after_seq'], 0))
         : null;
-    $pulled = ya_storage_pull_requests($limit, $includeSynced, $afterSeq);
+    $pulled = ya_storage_pull_requests($limit, $includeSynced, $afterSeq, ya_sync_restore_replay_bound($payload));
     $requests = array_map('ya_sync_public_request', $pulled['requests']);
 
     $now = date(DATE_ATOM);
@@ -646,6 +655,19 @@ function ya_sync_pull_requests(array $payload): void
         'has_more' => $pulled['has_more'],
         'server_revision' => ya_storage_server_revision()
     ]);
+}
+
+function ya_sync_restore_replay_bound(array $payload): ?int
+{
+    if (!array_key_exists('replay_through_seq', $payload)) return null;
+    $through = $payload['replay_through_seq'];
+    $source = ya_storage_open()->query('SELECT epoch, client_id FROM publication_sources ORDER BY epoch DESC LIMIT 1')->fetch();
+    if (!is_int($through) || $through < 0 || !is_array($source)
+        || $source['client_id'] !== ya_sync_require_client_id($payload)
+        || (int)$source['epoch'] !== ($payload['source_epoch'] ?? null)) {
+        throw new YaStorageConflictException('restore_replay_source_fenced');
+    }
+    return $through;
 }
 
 function ya_sync_mark_requests_synced(array $payload): void
@@ -3529,7 +3551,7 @@ function ya_sync_publish_dealer_access(array $payload): void
     try { $projection = ya_dealer_projection($payload['dealer_access']); }
     catch (InvalidArgumentException) { ya_sync_response(422, ['ok' => false, 'message' => 'Bayi erişim yayını geçersiz.']); }
     $publication = ya_sync_apply_publication($payload, 'dealer_access_private', $projection, $payload['dealer_access'],
-        date(DATE_ATOM), static fn(PDO $db) => ya_dealer_apply_projection($db, $projection));
+        date(DATE_ATOM), static fn(PDO $db) => ya_dealer_apply_projection($db, $projection, (int)$payload['source_epoch']));
     ya_sync_response(200, ['ok' => true, 'message' => 'Bayi erişimi yayınlandı.',
         ...$publication,
         'published_at' => $publication['published_at'], 'source_revision' => $publication['source_revision'],

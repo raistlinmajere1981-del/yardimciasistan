@@ -2,6 +2,7 @@ import type { PublicationIdentity, PublicationReceipt, SyncCoreConfig, SyncFailu
 import type { DesktopDatabase } from "./database";
 import type { DesktopSyncJobType } from "./database-types";
 import { ensurePublicationSource, publicationIdempotencyKey } from "./publication-source-service";
+import { DESKTOP_PUBLICATIONS } from "./desktop-publication-registry";
 
 /** All Desktop writers share durable preparation/retry/completion. Transport
  * callbacks must use sync-core's exact receipt validation, not raw HTTP success.
@@ -25,14 +26,14 @@ export async function publishDesktopProjection<T, R extends PublicationReceipt &
   }, prepared.value) : source;
   if (result.ok && source.ok && (result.source_client_id !== source.clientId || result.source_epoch !== source.sourceEpoch
       || result.source_revision !== prepared.sourceRevision || result.accepted !== true
-      || result.publication_name !== (prepared.jobKey === "dealer_access" ? "dealer_access_private" : prepared.jobKey)
+      || result.publication_name !== DESKTOP_PUBLICATIONS[jobType].name
       || result.idempotency_key !== publicationIdempotencyKey(source.clientId, source.sourceEpoch, prepared.jobKey, prepared.sourceRevision)
       || !/^[a-f0-9]{64}$/.test(result.payload_hash ?? ""))) {
     result = { ok: false, message: "Publication apply onayı doğrulanamadı.", error: "publication_ack_mismatch" };
   }
   if (result.ok) {
     options.acknowledge?.(prepared.value, result);
-    database.completeSyncJob(prepared.jobKey, prepared.sourceRevision);
+    database.completeSyncJob(prepared.jobKey, prepared.sourceRevision, result.source_epoch);
   } else {
     database.failSyncJob(prepared.jobKey, prepared.sourceRevision, result.message, options.nextAttemptAt ?? new Date(Date.now() + 5_000).toISOString());
   }

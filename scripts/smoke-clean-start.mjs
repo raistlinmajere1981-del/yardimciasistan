@@ -151,7 +151,7 @@ try {
   const mainEntrySource = readFileSync("apps/desktop-app/electron/main-entry.ts", "utf8");
   assert.match(mainEntrySource, /shouldDeferPendingMaintenanceToCleanStart/);
   assert.match(mainEntrySource, /startup\.maintenance\.deferred-for-clean-start/);
-  assert.match(mainEntrySource, /deferPendingMaintenance \? "" : readPendingMaintenanceKind\(\)/);
+  assert.match(mainEntrySource, /if \(deferPendingMaintenance\)\s*\{[\s\S]*?\}\s*else\s*\{\s*applyPendingDataMaintenanceAtStartup\(userDataPath\(\)\)/);
 
   const startDevSource = readFileSync("apps/desktop-app/scripts/start-dev.mjs", "utf8");
   assert.match(startDevSource, /const electronArgs = process\.argv\.slice\(2\)/);

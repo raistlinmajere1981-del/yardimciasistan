@@ -51,28 +51,31 @@ function ya_dealer_projection(array $input): array
 }
 
 /** Called inside the existing versioned publication transaction, only for an accepted new revision. */
-function ya_dealer_apply_projection(PDO $db, array $projection): void
+function ya_dealer_apply_projection(PDO $db, array $projection, int $sourceEpoch = 0): void
 {
     $find = $db->prepare('SELECT * FROM dealer_access WHERE access_id = ?');
     foreach ($projection['dealers'] as $row) {
         $find->execute([$row['access_id']]); $current = $find->fetch();
-        if ($current && ($row['access_revision'] < (int)$current['access_revision']
-            || $row['customer_ref'] !== $current['customer_ref']
+        if ($current && ($row['customer_ref'] !== $current['customer_ref']
+            || ((int)$current['source_epoch'] === $sourceEpoch && ($row['access_revision'] < (int)$current['access_revision']
             || ($row['access_revision'] === (int)$current['access_revision']
-                && $row['enabled'] && ($row['invite_hash'] !== $current['invite_hash'] || !(bool)$current['enabled'])))) {
+                 && $row['enabled'] && ($row['invite_hash'] !== $current['invite_hash'] || !(bool)$current['enabled'])))))) {
             throw new YaStorageConflictException('stale_dealer_revision');
         }
     }
     // Missing/disabled rows are tombstones, not authority to resurrect a session.
+    $db->exec("INSERT OR IGNORE INTO dealer_consumed_invites(invite_hash, consumed_at) SELECT invite_hash, consumed_at FROM dealer_access WHERE consumed_at > 0 AND invite_hash <> ''");
+    $db->prepare('UPDATE dealer_sessions SET revoked_at = ? WHERE revoked_at = 0 AND EXISTS
+        (SELECT 1 FROM dealer_access a WHERE a.access_id = dealer_sessions.dealer_access_id AND a.source_epoch <> ?)')->execute([time(), $sourceEpoch]);
     $db->exec('UPDATE dealer_access SET enabled = 0');
     $upsert = $db->prepare('INSERT INTO dealer_access
-        (access_id, customer_ref, display_name, access_revision, enabled, invite_hash, invite_expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(access_id) DO UPDATE SET
+        (access_id, customer_ref, display_name, access_revision, enabled, invite_hash, invite_expires_at, source_epoch, consumed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT consumed_at FROM dealer_consumed_invites WHERE invite_hash = ?), 0)) ON CONFLICT(access_id) DO UPDATE SET
         display_name = excluded.display_name, access_revision = excluded.access_revision,
         enabled = excluded.enabled, invite_hash = excluded.invite_hash, invite_expires_at = excluded.invite_expires_at,
-        consumed_at = CASE WHEN dealer_access.access_revision <> excluded.access_revision THEN 0 ELSE dealer_access.consumed_at END');
+        source_epoch = excluded.source_epoch, consumed_at = excluded.consumed_at');
     foreach ($projection['dealers'] as $row) $upsert->execute([$row['access_id'], $row['customer_ref'], $row['display_name'],
-        $row['access_revision'], (int)$row['enabled'], $row['invite_hash'], $row['invite_expires_at']]);
+        $row['access_revision'], (int)$row['enabled'], $row['invite_hash'], $row['invite_expires_at'], $sourceEpoch, $row['invite_hash']]);
     $db->exec('DELETE FROM dealer_catalogs');
     $catalogInsert = $db->prepare('INSERT INTO dealer_catalogs (dealer_access_id, access_revision, catalog_revision, payload_json) VALUES (?, ?, ?, ?)');
     foreach ($projection['catalogs'] as $catalog) $catalogInsert->execute([$catalog['access_id'], $catalog['access_revision'],
@@ -104,6 +107,7 @@ function ya_dealer_claim(string $token): ?string
             return null;
         }
         $db->prepare('UPDATE dealer_access SET consumed_at = ? WHERE access_id = ?')->execute([time(), $access['access_id']]);
+        $db->prepare('INSERT OR IGNORE INTO dealer_consumed_invites(invite_hash, consumed_at) VALUES (?, ?)')->execute([$access['invite_hash'], time()]);
         $session = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         // Replace any existing cookie's session: never adopt a supplied session id.
         $existing = $_COOKIE['ya_dealer_session'] ?? '';

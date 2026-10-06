@@ -28,15 +28,28 @@ export async function publishSavedAiSettings(
     };
   // Optional provider configuration can be absent even while the AI capability
   // is installed. Retain intent until configured; don't fail unrelated sync.
-  if (!refresh && desired.enabled && (!desired.apiKey || !desired.baseUrl || !desired.model)) return null;
+  if (!refresh && desired.enabled && (!desired.apiKey || !desired.baseUrl || !desired.model)) {
+    const restore = database.getRestoreReconciliationStatus();
+    if (!restore || restore.state === "complete") return null;
+    // An explicitly restored unconfigured provider is unavailable, not permission
+    // to keep a newer remote provider active. Preserve local desired config. An
+    // unreadable EXISTING key is different: retain the job rather than clear it.
+    if (setup.aiApiKeyConfigured && !desired.apiKey) return { ok: false, message: "Geri yüklenen AI anahtarı okunamıyor; reconciliation bekliyor.", error: "restore_ai_secret_unavailable" };
+    desired.enabled = false;
+    desired.apiKey = "";
+  }
   const result = await publishDesktopProjection(database, syncConfig, "ai_settings_publish", desired,
     (identity, frozen) => pushAiSettings({ ...syncConfig, ...identity, aiSettings: frozen }),
     { refresh, acknowledge: (sent, receipt) => {
       // In-flight mutations retain pending metadata as well as their newer job.
       const current = database.getSetupData();
+      const currentCapabilityEnabled = hasBusinessCapability(database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.AI);
+      const restore = database.getRestoreReconciliationStatus();
+      const effectiveEnabled = currentCapabilityEnabled && (!(restore && restore.state !== "complete")
+        || Boolean(current.aiBaseUrl && current.aiModel && getEffectiveAiApiKey(database, current.aiService)));
       if (current.aiProvider === sent.provider && current.aiService === sent.service && current.aiBaseUrl === sent.baseUrl
           && current.aiModel === sent.model && normalizeAiTimeoutSeconds(current.aiTimeoutSeconds) === sent.timeoutSeconds
-          && hasBusinessCapability(database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.AI) === sent.enabled
+          && effectiveEnabled === sent.enabled
           && (!sent.enabled || getEffectiveAiApiKey(database, current.aiService) === sent.apiKey)) database.markAiSettingsPublished(receipt.published_at);
     } });
   if (!result) return null;

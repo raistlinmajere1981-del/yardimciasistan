@@ -46,6 +46,8 @@ export interface PublicationReceipt {
 }
 
 export interface PullRequestsOptions extends SyncCoreConfig {
+  replayThroughSeq?: number;
+  sourceEpoch?: number;
   limit?: number;
   includeSynced?: boolean;
   afterSeq?: number;
@@ -54,6 +56,7 @@ export interface PullRequestsOptions extends SyncCoreConfig {
 
 /** Hosting inbox record; canonical business ownership remains in commerce.orders. */
 interface WebOrderEnvelopeBase {
+  previouslyAcknowledged?: boolean;
   id: string;
   items: Array<{ productId: string; quantity: number }>;
   delivery: CommerceOrderDeliverySnapshot;
@@ -67,6 +70,8 @@ export type WebOrderEnvelope = WebOrderEnvelopeBase & (
 );
 
 export interface PullWebOrdersOptions extends SyncCoreConfig {
+  replayThroughSeq?: number;
+  sourceEpoch?: number;
   clientId: string;
   afterSeq: number;
   limit?: number;
@@ -872,6 +877,7 @@ export type SyncCapabilitiesResult = SyncCapabilitiesSuccess | SyncFailure;
 export type ResetHostingRuntimeResult = ResetHostingRuntimeSuccess | SyncFailure;
 
 export interface PullCursorInput {
+  replayThroughSeq?: number;
   afterSeq: number;
   limit?: number;
 }
@@ -972,7 +978,7 @@ export {
   resetHostingRuntime
 } from "./hosting-transport";
 
-export { activatePublicationSource, pushAvailability, pushGoogleReviewsSettings } from "./hosting-transport";
+export { activatePublicationSource, readRestoreSyncState, pushAvailability, pushGoogleReviewsSettings } from "./hosting-transport";
 
 export {
   ANDROID_ACTION_PERMISSION_MAP,
