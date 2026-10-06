@@ -13,6 +13,19 @@ const {
   output: serverOutput
 } = await startDesktopRendererServer();
 
+async function expectRegisteredHospitalityNavigation(page) {
+  const registered = await page.evaluate(async () => {
+    const { buildNavigation } = await import("/src/app/navigation.ts");
+    return buildNavigation(await window.yardimciDesktop.getBusinessCapabilitySnapshot())
+      .map(({ id, label }) => ({ id, label }));
+  });
+  // This fixture is Pension + Restaurant, not retail. Generic commerce
+  // dependencies must not resurrect the deliberately removed Sales entry.
+  expect(registered.map(item => item.id)).not.toContain("market");
+  await expect(page.locator("#desktop-sidebar .nav-item")).toHaveText(registered.map(item => item.label));
+  await expect(page.locator("#desktop-sidebar").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
+}
+
 try {
   const browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -625,7 +638,7 @@ try {
   await settingsLeaveGuard.getByRole("button", { name: "Değişiklikleri geri al ve geç", exact: true }).click();
   await expect(settingsLeaveGuard).toHaveCount(0);
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.locator(".nav-item")).toHaveCount(9);
+  await expectRegisteredHospitalityNavigation(page);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
   await expect(page.getByText("Web eşitleme adresi")).toHaveCount(0);
   await expect(page.getByText("Yerel kayıt dosyası")).toHaveCount(0);
@@ -1096,6 +1109,14 @@ try {
       },
       checkInStay: async stayId => window.yardimciDesktop.updateCustomerRoomStayStatus({ stayId, status: "checked_in" }),
       checkoutStay: async stayId => window.yardimciDesktop.updateCustomerRoomStayStatus({ stayId, status: "checked_out" }),
+      checkoutStayWithSettlement: async ({ stayId, roomId, settleCurrent, previousFolioIds }) => {
+        const stay = currentDashboardData.customerRoomStays.find(item => item.id === stayId);
+        if (stay?.roomId !== roomId || settleCurrent || previousFolioIds.length) {
+          throw new Error("This no-folio fixture only supports departure in the persisted room.");
+        }
+        const result = await window.yardimciDesktop.updateCustomerRoomStayStatus({ stayId, status: "checked_out" });
+        return result.ok ? { ...result, settlements: [] } : result;
+      },
       updateCustomerRoomStayStatus: async ({ stayId, status }) => {
         const stay = currentDashboardData.customerRoomStays.find((item) => item.id === stayId);
         const now = "2026-07-28T12:20:00+03:00";
@@ -2105,7 +2126,7 @@ try {
   await expect(compactPage.getByRole("tab", { name: "Hazır Mesaj" })).toHaveAttribute("aria-selected", "true");
 
   await compactPage.reload({ waitUntil: "domcontentloaded" });
-  await expect(compactPage.locator(".nav-item")).toHaveCount(9);
+  await expectRegisteredHospitalityNavigation(compactPage);
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Ayarlar", exact: true })).toHaveAttribute("aria-current", "page");
   expect(await compactPage.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);

@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import process from "node:process";
+import { createServer } from "vite";
+import { BUSINESS_CAPABILITIES as C, expandBusinessCapabilities, getBusinessProfile } from "@yardimci-asistan/shared";
 
 const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
 
 const intent = read("apps/desktop-app/src/components/workspace/workspace-intent.ts");
-const navigation = read("apps/desktop-app/src/app/navigation.ts");
 const page = read("apps/desktop-app/src/pages/MarketPage.tsx");
 const workspace = read("apps/desktop-app/src/components/market/MarketOrdersWorkspace.tsx");
 const marketCss = read("apps/desktop-app/src/styles/pages/market.css");
@@ -19,7 +20,30 @@ const preload = read("apps/desktop-app/electron/preload.ts");
 const integratedSmoke = read("scripts/smoke-commerce-wholesale-orders-ui.mjs");
 
 assert.match(intent, /"orders"/);
-assert.match(navigation, /condition:\s*\{ anyOf: \[C\.CATALOG, C\.SALES, C\.ORDERS/);
+// Exercise the production contribution registry, not its source formatting.
+// Shared commerce capabilities also serve hospitality; they are not retail entry signals.
+const server = await createServer({ root: resolve("apps/desktop-app"),
+  configFile: resolve("apps/desktop-app/vite.renderer.config.ts"), server: { middlewareMode: true } });
+try {
+  const { buildNavigation } = await server.ssrLoadModule("/src/app/navigation.ts");
+  const salesEntry = (enabledCapabilities, profileId = "market") => buildNavigation({ profileId, enabledCapabilities })
+    .filter(item => item.id === "market");
+  for (const profileId of ["pension", "restaurant", "pension_restaurant"]) {
+    assert.deepEqual(salesEntry(getBusinessProfile(profileId).defaultCapabilities, profileId), [],
+      `${profileId}: default hospitality capabilities must not expose the retail Sales surface`);
+  }
+  for (const capabilities of [[], [C.CATALOG], [C.SALES], [C.ORDERS], [C.CATALOG, C.SALES, C.ORDERS]]) {
+    assert.deepEqual(salesEntry(expandBusinessCapabilities(capabilities)), [],
+      "Generic catalog/sale/order dependencies alone must not expose retail navigation");
+  }
+  for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS, C.WHOLESALE, C.ONLINE_SALES]) {
+    const entries = salesEntry(expandBusinessCapabilities([capability]));
+    assert.equal(entries.length, 1, `${capability}: the Sales route must remain reachable`);
+    assert.equal(entries[0].label, "Satış");
+  }
+  assert.equal(salesEntry(getBusinessProfile("market").defaultCapabilities).length, 1,
+    "The persisted Market profile defaults must expose Sales");
+} finally { await server.close(); }
 assert.match(page, /id:\s*"orders"[\s\S]*label:\s*"Siparişler"/);
 assert.match(page, /enabled:\s*ordersEnabled && wholesaleEnabled/);
 assert.match(page, /<MarketOrdersWorkspace/);
