@@ -26,6 +26,25 @@ export interface SyncCoreConfig {
   fetchImpl?: typeof fetch;
 }
 
+export interface PublicationIdentity {
+  clientId: string;
+  sourceEpoch: number;
+  sourceRevision: number;
+  idempotencyKey: string;
+}
+
+export interface PublicationReceipt {
+  publication_name: string;
+  source_client_id: string;
+  source_epoch: number;
+  source_revision: number;
+  idempotency_key: string;
+  payload_hash: string;
+  accepted: true;
+  deduplicated: boolean;
+  server_revision: number;
+}
+
 export interface PullRequestsOptions extends SyncCoreConfig {
   limit?: number;
   includeSynced?: boolean;
@@ -90,7 +109,7 @@ export interface AcknowledgeRequestsOptions extends SyncCoreConfig {
   throughSeq: number;
 }
 
-export interface DealerAccessPublicationSuccess {
+export interface DealerAccessPublicationSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
@@ -100,14 +119,14 @@ export interface DealerAccessPublicationSuccess {
 }
 export type DealerAccessPublicationResult = DealerAccessPublicationSuccess | SyncFailure;
 
-export interface PushOnlineCatalogOptions extends SyncCoreConfig {
+export interface PushOnlineCatalogOptions extends SyncCoreConfig, PublicationIdentity {
   clientId: string;
   catalog: CommerceOnlineCatalog;
   sourceRevision: number;
   idempotencyKey: string;
 }
 
-export interface PushOnlineCatalogSuccess {
+export interface PushOnlineCatalogSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
@@ -119,18 +138,12 @@ export interface PushOnlineCatalogSuccess {
 
 export type PushOnlineCatalogResult = PushOnlineCatalogSuccess | SyncFailure;
 
-export interface PushMenuOptions extends SyncCoreConfig {
+export interface PushMenuOptions extends SyncCoreConfig, PublicationIdentity {
   menu: PublishedQrMenu;
-  clientId?: string;
-  sourceRevision?: number;
-  idempotencyKey?: string;
 }
 
-export interface PushAndroidSnapshotOptions extends SyncCoreConfig {
+export interface PushAndroidSnapshotOptions extends SyncCoreConfig, PublicationIdentity {
   snapshot: AndroidOperationsSnapshot;
-  clientId?: string;
-  sourceRevision?: number;
-  idempotencyKey?: string;
 }
 
 export interface SyncCapabilitiesOptions extends SyncCoreConfig {}
@@ -146,26 +159,26 @@ export interface AiConnectionSettings {
   timeoutSeconds: number;
 }
 
-export interface PushAiSettingsOptions extends SyncCoreConfig {
+export interface PushAiSettingsOptions extends SyncCoreConfig, PublicationIdentity {
   aiSettings: AiConnectionSettings;
 }
 
-export interface PushBusinessContextOptions extends SyncCoreConfig {
+export interface PushBusinessContextOptions extends SyncCoreConfig, PublicationIdentity {
   clientId: string;
   context: BusinessWebContext;
 }
 
-export interface PushRoomCatalogOptions extends SyncCoreConfig {
+export interface PushRoomCatalogOptions extends SyncCoreConfig, PublicationIdentity {
   clientId: string;
   catalog: RoomPublicCatalog;
 }
 
-export interface PushTableCatalogOptions extends SyncCoreConfig {
+export interface PushTableCatalogOptions extends SyncCoreConfig, PublicationIdentity {
   clientId: string;
   catalog: TablePublicCatalog;
 }
 
-export interface PushAiCatalogOptions extends SyncCoreConfig {
+export interface PushAiCatalogOptions extends SyncCoreConfig, PublicationIdentity {
   clientId: string;
   catalog: BusinessAiCatalog;
 }
@@ -767,27 +780,21 @@ export interface MarkRequestsSyncedSuccess {
   total_records: number;
 }
 
-export interface PushMenuSuccess {
+export interface PushMenuSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
   updated_at: ISODateTimeString;
   category_count: number;
   item_count: number;
-  source_revision?: number;
-  server_revision?: number;
-  deduplicated?: boolean;
 }
 
-export interface PushAndroidSnapshotSuccess {
+export interface PushAndroidSnapshotSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
   updated_at: ISODateTimeString;
   task_count: number;
-  source_revision?: number;
-  server_revision?: number;
-  deduplicated?: boolean;
 }
 
 export interface SyncCapabilitiesSuccess {
@@ -808,7 +815,7 @@ export interface ResetHostingRuntimeSuccess {
   server_revision: number;
 }
 
-export interface PushAiSettingsSuccess {
+export interface PushAiSettingsSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
@@ -821,44 +828,32 @@ export interface PushAiSettingsSuccess {
   has_api_key: boolean;
 }
 
-export interface PushBusinessContextSuccess {
+export interface PushBusinessContextSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
   profile_id: string;
-  source_revision?: number;
-  server_revision?: number;
-  deduplicated?: boolean;
 }
 
-export interface PushRoomCatalogSuccess {
+export interface PushRoomCatalogSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
   room_count: number;
-  source_revision?: number;
-  server_revision?: number;
-  deduplicated?: boolean;
 }
 
-export interface PushTableCatalogSuccess {
+export interface PushTableCatalogSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
   table_count: number;
-  source_revision?: number;
-  server_revision?: number;
-  deduplicated?: boolean;
 }
 
-export interface PushAiCatalogSuccess {
+export interface PushAiCatalogSuccess extends PublicationReceipt {
   ok: true;
   message: string;
   published_at: ISODateTimeString;
   item_count: number;
-  source_revision?: number;
-  server_revision?: number;
-  deduplicated?: boolean;
 }
 
 export type PullRequestsResult = PullRequestsSuccess | SyncFailure;
@@ -952,6 +947,7 @@ export interface SyncTransport {
 
 export interface PhpHostingSyncTransportConfig extends SyncCoreConfig {
   clientId: string;
+  sourceEpoch: number;
 }
 
 export {
@@ -975,6 +971,8 @@ export {
   pushTableCatalog,
   resetHostingRuntime
 } from "./hosting-transport";
+
+export { activatePublicationSource, pushAvailability, pushGoogleReviewsSettings } from "./hosting-transport";
 
 export {
   ANDROID_ACTION_PERMISSION_MAP,

@@ -1,4 +1,5 @@
 import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
+import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -53,7 +54,7 @@ await new Promise((resolve, reject) => {
   aiServer.once("error", reject);
   aiServer.listen(aiPort, "127.0.0.1", resolve);
 });
-const aiSettingsFile = join(webModuleRoot, "data", "ai-settings.local.php");
+const aiSettingsFile = join(webModuleRoot, "config", "ai.local.php");
 writeFileSync(aiSettingsFile, "<?php\nreturn ['enabled' => false];\n");
 
 const port = await getFreePort();
@@ -181,9 +182,10 @@ try {
   assert.equal(trackedMenuSave.ok, true);
   const trackedMenuItemId = trackedMenuSave.savedId;
 
+  await activateFixtureSource(baseUrl, syncSecret, database.getSyncRuntimeStatus().clientId);
   const bootstrapSnapshot = await syncApi({
     action: "publish_android_snapshot",
-    client_id: "android-action-bootstrap-smoke",
+    client_id: database.getSyncRuntimeStatus().clientId,
     source_revision: 1,
     idempotency_key: "android-action-bootstrap-smoke-1",
     snapshot: createSnapshot(database)
@@ -269,7 +271,7 @@ try {
   const runtime = database.getSyncRuntimeStatus();
   assert.ok(runtime.requestCursor > 0);
   assert.equal(runtime.acknowledgedCursor, runtime.requestCursor);
-  assert.equal(runtime.pendingJobs, 0);
+  assert.ok(database.getPendingSyncJobs().every((job) => job.jobKey === "ai_settings"), "only unconfigured provider intent may remain");
   assert.equal(runtime.consecutiveFailures, 0);
 
   const menuResponse = await fetch(`${baseUrl}/api/menu.php`);
@@ -862,7 +864,7 @@ return [
     () => {
       const automaticRuntime = database.getSyncRuntimeStatus();
       return automaticRuntime.acknowledgedCursor === 2
-        && automaticRuntime.pendingJobs === 0
+         && database.getPendingSyncJobs().every((job) => job.jobKey === "ai_settings")
         && automaticRuntime.consecutiveFailures === 0;
     },
     6_000,
@@ -896,8 +898,8 @@ return [
 
   const publicationPayload = {
     action: "publish_menu",
-    client_id: "desktop-api-smoke",
-    source_revision: 10,
+    client_id: database.getSyncRuntimeStatus().clientId,
+    source_revision: 100000,
     idempotency_key: "menu-api-smoke-revision-10",
     menu: { categories: [], items: [], updated_at: new Date().toISOString() }
   };
@@ -909,7 +911,7 @@ return [
   assert.equal((await repeatedPublication.json()).deduplicated, true);
   const stalePublication = await syncApi({
     ...publicationPayload,
-    source_revision: 9,
+    source_revision: 99999,
     idempotency_key: "menu-api-smoke-revision-9"
   });
   assert.equal(stalePublication.status, 409);
@@ -955,8 +957,8 @@ return [
   };
   const stalePermissionPublication = await syncApi({
     action: "publish_android_snapshot",
-    client_id: "android-stale-capability-boundary-smoke",
-    source_revision: 1,
+    client_id: database.getSyncRuntimeStatus().clientId,
+    source_revision: 100000,
     idempotency_key: "android-stale-capability-boundary-smoke-1",
     snapshot: stalePermissionSnapshot
   });
@@ -1158,7 +1160,7 @@ async function getAndroidAction(actionId) {
 }
 
 async function syncApi(payload) {
-  return postJson(`${baseUrl}/api/sync.php`, payload, true);
+  return postJson(`${baseUrl}/api/sync.php`, publicationEnvelope(payload), true);
 }
 
 function postJson(url, payload, authenticated) {
@@ -1176,7 +1178,7 @@ function assertCapabilitiesShape() {
   return {
     ok: true,
     message: "Senkron özellikleri alındı.",
-    protocol_version: 2,
+    protocol_version: 3,
     storage: "sqlite",
     features: [
       "marketing_website_publications",
@@ -1192,6 +1194,8 @@ function assertCapabilitiesShape() {
       "android_device_sightings",
       "android_device_permissions",
       "versioned_publications",
+      "exact_publication_receipts",
+      "publication_source_epochs",
       "idempotent_publications",
       "server_revision",
       "runtime_reset"

@@ -1078,7 +1078,9 @@ export interface RecordSyncEventInput {
   status?: number;
 }
 
-export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish" | "dealer_access_publish" | "marketing_website_publish";
+export type DesktopSyncJobType = "menu_publish" | "android_snapshot" | "online_catalog_publish" | "dealer_access_publish" | "marketing_website_publish"
+  | "room_catalog_publish" | "table_catalog_publish" | "business_context_publish" | "ai_catalog_publish"
+  | "public_room_availability_publish" | "ai_settings_publish" | "google_reviews_settings_publish";
 
 export interface DesktopSyncJob {
   jobKey: string;

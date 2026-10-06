@@ -3,6 +3,7 @@ import { pushAiSettings, type PushAiSettingsResult } from "@yardimci-asistan/syn
 import type { DesktopDatabase } from "./database";
 import { normalizeAiTimeoutSeconds } from "./ai-config";
 import { getEffectiveAiApiKey } from "./ai-secret-service";
+import { publishDesktopProjection } from "./desktop-publication-service";
 
 export interface AiSettingsSyncConfig {
   baseUrl: string;
@@ -11,13 +12,12 @@ export interface AiSettingsSyncConfig {
 
 export async function publishSavedAiSettings(
   database: DesktopDatabase,
-  syncConfig: AiSettingsSyncConfig
-): Promise<PushAiSettingsResult> {
+  syncConfig: AiSettingsSyncConfig,
+  refresh = true
+): Promise<PushAiSettingsResult | null> {
   const setup = database.getSetupData();
   const aiCapabilityEnabled = hasBusinessCapability(database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.AI);
-  const result = await pushAiSettings({
-    ...syncConfig,
-    aiSettings: {
+  const desired = {
       enabled: aiCapabilityEnabled,
       provider: setup.aiProvider || "openai_compatible",
       service: setup.aiService || "custom",
@@ -25,27 +25,21 @@ export async function publishSavedAiSettings(
       model: setup.aiModel,
       apiKey: aiCapabilityEnabled ? getEffectiveAiApiKey(database, setup.aiService) : "",
       timeoutSeconds: normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds)
-    }
-  });
-
-  if (result.ok) {
-    try {
-      database.markAiSettingsPublished(result.published_at);
-    } catch {
-      const invalidResponse: PushAiSettingsResult = {
-        ok: false,
-        message: "Web modülü AI ayarını aldı ancak yayın zamanı doğrulanamadı. Web modülünü güncelleyip tekrar deneyin."
-      };
-      database.recordSyncEvent({
-        direction: "push",
-        entityType: "ai_settings",
-        ok: false,
-        recordCount: 0,
-        message: invalidResponse.message
-      });
-      return invalidResponse;
-    }
-  }
+    };
+  // Optional provider configuration can be absent even while the AI capability
+  // is installed. Retain intent until configured; don't fail unrelated sync.
+  if (!refresh && desired.enabled && (!desired.apiKey || !desired.baseUrl || !desired.model)) return null;
+  const result = await publishDesktopProjection(database, syncConfig, "ai_settings_publish", desired,
+    (identity, frozen) => pushAiSettings({ ...syncConfig, ...identity, aiSettings: frozen }),
+    { refresh, acknowledge: (sent, receipt) => {
+      // In-flight mutations retain pending metadata as well as their newer job.
+      const current = database.getSetupData();
+      if (current.aiProvider === sent.provider && current.aiService === sent.service && current.aiBaseUrl === sent.baseUrl
+          && current.aiModel === sent.model && normalizeAiTimeoutSeconds(current.aiTimeoutSeconds) === sent.timeoutSeconds
+          && hasBusinessCapability(database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.AI) === sent.enabled
+          && (!sent.enabled || getEffectiveAiApiKey(database, current.aiService) === sent.apiKey)) database.markAiSettingsPublished(receipt.published_at);
+    } });
+  if (!result) return null;
 
   database.recordSyncEvent({
     direction: "push",

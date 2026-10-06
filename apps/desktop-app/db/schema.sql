@@ -891,7 +891,7 @@ CREATE TABLE stock_image_imports (
 
 CREATE TABLE sync_outbox (
   job_key TEXT PRIMARY KEY,
-  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish', 'marketing_website_publish')),
+  job_type TEXT NOT NULL CHECK (job_type IN ('menu_publish', 'android_snapshot', 'online_catalog_publish', 'dealer_access_publish', 'marketing_website_publish', 'room_catalog_publish', 'table_catalog_publish', 'business_context_publish', 'ai_catalog_publish', 'public_room_availability_publish', 'ai_settings_publish', 'google_reviews_settings_publish')),
   source_revision INTEGER NOT NULL DEFAULT 1,
   attempt_count INTEGER NOT NULL DEFAULT 0,
   next_attempt_at TEXT NOT NULL DEFAULT '',
@@ -906,8 +906,23 @@ CREATE TABLE sync_outbox_revisions (
   updated_at TEXT NOT NULL
 );
 
+-- Last prepared immutable body survives job deletion; desired projections are
+-- reconstructed from canonical state on each cycle after a crash/restart.
+CREATE TABLE sync_publication_payloads (
+  job_key TEXT PRIMARY KEY,
+  source_revision INTEGER NOT NULL,
+  payload TEXT NOT NULL,
+  content_hash TEXT NOT NULL
+);
+
+CREATE TABLE sync_publication_sources (
+  target TEXT PRIMARY KEY,
+  source_epoch INTEGER NOT NULL CHECK (source_epoch > 0)
+);
+
 CREATE TABLE sync_runtime (
   id TEXT PRIMARY KEY,
+  publication_target TEXT NOT NULL DEFAULT '',
   request_cursor INTEGER NOT NULL DEFAULT 0,
   web_order_cursor INTEGER NOT NULL DEFAULT 0,
   web_order_acknowledged_cursor INTEGER NOT NULL DEFAULT 0,
@@ -2008,6 +2023,66 @@ BEGIN
   VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
   ON CONFLICT(job_key) DO UPDATE SET
     source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+-- Sensitive config intent is invalidated atomically with canonical settings.
+-- Ack-only timestamps are deliberately absent from these trigger column lists.
+CREATE TRIGGER trg_sync_ai_profile_insert AFTER INSERT ON ai_service_profiles
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_sync_ai_profile_update AFTER UPDATE OF base_url, model, timeout_seconds, api_key_encrypted ON ai_service_profiles
+WHEN NEW.base_url != OLD.base_url OR NEW.model != OLD.model OR NEW.timeout_seconds != OLD.timeout_seconds OR NEW.api_key_encrypted != OLD.api_key_encrypted
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_sync_ai_settings_update AFTER UPDATE OF ai_provider, ai_service ON settings
+WHEN NEW.ai_provider != OLD.ai_provider OR NEW.ai_service != OLD.ai_service
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_sync_google_settings_update AFTER UPDATE OF google_reviews_enabled, google_place_id, google_places_api_key_encrypted ON settings
+WHEN NEW.google_reviews_enabled != OLD.google_reviews_enabled OR NEW.google_place_id != OLD.google_place_id OR NEW.google_places_api_key_encrypted != OLD.google_places_api_key_encrypted
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('google_reviews_settings', 'google_reviews_settings_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_sync_ai_capability_insert AFTER INSERT ON business_capabilities
+WHEN NEW.capability_id = 'service.ai' AND EXISTS (SELECT 1 FROM sync_publication_payloads WHERE job_key = 'ai_settings')
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_sync_ai_capability_update AFTER UPDATE OF is_enabled ON business_capabilities
+WHEN NEW.capability_id = 'service.ai' AND NEW.is_enabled != OLD.is_enabled
+  AND EXISTS (SELECT 1 FROM sync_publication_payloads WHERE job_key = 'ai_settings')
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_sync_ai_capability_delete AFTER DELETE ON business_capabilities
+WHEN OLD.capability_id = 'service.ai' AND EXISTS (SELECT 1 FROM sync_publication_payloads WHERE job_key = 'ai_settings')
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('ai_settings', 'ai_settings_publish', OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
 

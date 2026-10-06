@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -35,6 +36,7 @@ server.stderr.on("data", (chunk) => { serverOutput += chunk.toString(); });
 
 try {
   await waitForUrl(`${baseUrl}/api/menu.php`);
+  await activateFixtureSource(baseUrl, syncSecret, desktopId);
 
   const disabledPublication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
@@ -375,7 +377,7 @@ function postJson(url, payload, extraHeaders = {}) {
       "Content-Type": "application/json",
       ...extraHeaders
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(publicationEnvelope(payload))
   });
 }
 

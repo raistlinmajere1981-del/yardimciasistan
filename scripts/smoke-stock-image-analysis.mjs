@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { activateFixtureSource, publicationFixtureFetch } from "./test-helpers/publication-protocol.mjs";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -140,6 +141,7 @@ const baseUrl = `http://127.0.0.1:${phpPort}`;
 
 try {
   await waitForUrl(`${baseUrl}/api/stock-image-analysis.php`);
+  await activateFixtureSource(baseUrl, secret, "stock-image-smoke");
   const candidates = [
     { id: "item-cola", name: "Kola", category: "İçecekler", current_stock: 10, stock_unit: "piece" },
     { id: "item-soda", name: "Soda", category: "İçecekler", current_stock: 5, stock_unit: "piece" },
@@ -147,7 +149,7 @@ try {
   ];
   const pngBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
-  const snapshotPublication = await fetch(`${baseUrl}/api/sync.php`, {
+  const snapshotPublication = await publicationFixtureFetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": secret },
     body: JSON.stringify({

@@ -3,9 +3,7 @@ declare(strict_types=1);
 
 const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
-const YA_AI_SETTINGS_FILE = YA_BASE_DIR . '/data/ai-settings.local.php';
 const YA_AI_CONVERSATIONS_FILE = YA_BASE_DIR . '/data/ai-conversations.json';
-const YA_GOOGLE_REVIEWS_SETTINGS_FILE = YA_BASE_DIR . '/data/google-reviews.local.php';
 const YA_GOOGLE_REVIEWS_CACHE_FILE = YA_BASE_DIR . '/data/google-reviews-cache.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
@@ -46,6 +44,12 @@ if (!$isAuthorized) {
 }
 
 try {
+    if ($action === 'activate_publication_source') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') ya_sync_response(405, ['ok' => false]);
+        $activation = ya_storage_activate_source(ya_sync_require_client_id($payload),
+            ya_sync_int($payload['expected_epoch'] ?? -1, -1), ya_sync_string($payload['activation_key'] ?? ''));
+        ya_sync_response(200, ['ok' => true, 'message' => 'Publication source activated.', ...$activation]);
+    }
     if ($action === 'capabilities') {
         ya_sync_capabilities();
     }
@@ -153,7 +157,9 @@ try {
 } catch (YaStorageConflictException $error) {
     ya_sync_response(409, [
         'ok' => false,
-        'message' => 'Daha eski bir yayın güncel verinin üzerine yazılamaz.',
+        'message' => $error->getMessage() === 'stale_publication_revision'
+            ? 'Daha eski bir yayın güncel verinin üzerine yazılamaz.'
+            : 'Yayın kaynağı veya exact publication kimliği doğrulanamadı.',
         'error' => $error->getMessage()
     ]);
 } catch (Throwable $error) {
@@ -186,12 +192,6 @@ function ya_sync_reset_runtime(): void
     // These files are generated from desktop settings and must not survive a
     // full reset. The deployment identity and sync secret in config/business.json
     // are deliberately preserved so the same installation can be configured again.
-    if (is_file(YA_AI_SETTINGS_FILE)) {
-        @unlink(YA_AI_SETTINGS_FILE);
-    }
-    if (is_file(YA_GOOGLE_REVIEWS_SETTINGS_FILE)) {
-        @unlink(YA_GOOGLE_REVIEWS_SETTINGS_FILE);
-    }
     if (is_file(YA_GOOGLE_REVIEWS_CACHE_FILE)) {
         @unlink(YA_GOOGLE_REVIEWS_CACHE_FILE);
     }
@@ -964,22 +964,16 @@ function ya_sync_publish_menu(array $payload): void
         'updated_at' => $now
     ];
 
-    $publication = ya_storage_publish(
-        'menu',
-        $publishedMenu,
-        $clientId,
-        array_key_exists('source_revision', $payload) ? ya_sync_int($payload['source_revision'], 0) : null,
-        ya_sync_string($payload['idempotency_key'] ?? ''),
-        $now
-    );
-    ya_sync_update_state([
-        'last_menu_publish_at' => $now
-    ]);
+    $publication = ya_sync_apply_publication($payload, 'menu', $publishedMenu, $menu, $now,
+        static function(PDO $db) use ($now): void {
+            ya_sync_update_state(['last_menu_publish_at' => $now]);
+        });
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'Menü yayınlandı.',
-        'published_at' => $now,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'updated_at' => $now,
         'category_count' => count($categories),
         'item_count' => count($items),
@@ -1002,22 +996,16 @@ function ya_sync_publish_android_snapshot(array $payload): void
     $clientId = ya_sync_require_client_id($payload);
     $now = date(DATE_ATOM);
     $publishedSnapshot = ya_sync_sanitize_android_snapshot($snapshot, $now);
-    $publication = ya_storage_publish(
-        'android_snapshot',
-        $publishedSnapshot,
-        $clientId,
-        array_key_exists('source_revision', $payload) ? ya_sync_int($payload['source_revision'], 0) : null,
-        ya_sync_string($payload['idempotency_key'] ?? ''),
-        $now
-    );
-    ya_sync_update_state([
-        'last_android_snapshot_at' => $now
-    ]);
+    $publication = ya_sync_apply_publication($payload, 'android_snapshot', $publishedSnapshot, $snapshot, $now,
+        static function(PDO $db) use ($now): void {
+            ya_sync_update_state(['last_android_snapshot_at' => $now]);
+        });
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'Android özeti yayınlandı.',
-        'published_at' => $now,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'updated_at' => $publishedSnapshot['updated_at'],
         'task_count' => count($publishedSnapshot['daily_tasks']),
         'source_revision' => $publication['source_revision'],
@@ -1080,19 +1068,13 @@ function ya_sync_publish_ai_catalog(array $payload): void
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'items' => $items
     ];
-    $publication = ya_storage_publish(
-        'ai_catalog',
-        $catalog,
-        $clientId,
-        null,
-        '',
-        $now
-    );
+    $publication = ya_sync_apply_publication($payload, 'ai_catalog', $catalog, $candidate, $now);
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'AI ürün kaynağı yayınlandı.',
-        'published_at' => $now,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'item_count' => count($items),
         'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'],
@@ -1116,9 +1098,10 @@ function ya_sync_publish_online_catalog(array $payload): void
     }
     $clientId = ya_sync_require_client_id($payload);
     $now = date(DATE_ATOM);
-    $publication = ya_storage_publish('online_catalog', $catalog, $clientId, $revision, $key, $now);
+    $publication = ya_sync_apply_publication($payload, 'online_catalog', $catalog, $candidate, $now);
     ya_sync_response(200, [
         'ok' => true, 'message' => 'Online ürün kataloğu yayınlandı.',
+        ...$publication,
         'published_at' => $publication['published_at'],
         'product_count' => count($catalog['products']),
         'source_revision' => $publication['source_revision'],
@@ -1188,15 +1171,16 @@ function ya_sync_publish_room_catalog(array $payload): void
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'rooms' => $rooms
     ];
-    $publication = ya_storage_publish('room_catalog', $catalog, $clientId, null, '', $now);
-    if (($catalog['enabled'] ?? true) === true) {
+    $publication = ya_sync_apply_publication($payload, 'room_catalog', $catalog, $candidate, $now);
+    if (!$publication['deduplicated'] && ($catalog['enabled'] ?? true) === true) {
         ya_sync_prune_room_media($rooms);
     }
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'Oda kataloğu yayınlandı.',
-        'published_at' => $now,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'room_count' => count($rooms),
         'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'],
@@ -1327,15 +1311,16 @@ function ya_sync_publish_table_catalog(array $payload): void
         'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
         'tables' => $tables
     ];
-    $publication = ya_storage_publish('table_catalog', $catalog, $clientId, null, '', $now);
-    if (($catalog['enabled'] ?? false) === true) {
+    $publication = ya_sync_apply_publication($payload, 'table_catalog', $catalog, $candidate, $now);
+    if (!$publication['deduplicated'] && ($catalog['enabled'] ?? false) === true) {
         ya_sync_prune_table_media($tables);
     }
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'Masa kataloğu yayınlandı.',
-        'published_at' => $now,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'table_count' => count($tables),
         'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'],
@@ -1460,19 +1445,13 @@ function ya_sync_publish_business_context(array $payload): void
         'updated_at' => $now
     ];
 
-    $publication = ya_storage_publish(
-        'business_context',
-        $publishedContext,
-        $clientId,
-        null,
-        '',
-        $now
-    );
+    $publication = ya_sync_apply_publication($payload, 'business_context', $publishedContext, $candidate, $now);
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'İşletme AI bağlamı yayınlandı.',
-        'published_at' => $now,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'profile_id' => $profileId,
         'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'],
@@ -1601,14 +1580,15 @@ function ya_sync_publish_google_reviews_settings(array $payload): void
     ];
     $publishedAt = date(DATE_ATOM);
 
-    ya_sync_write_php_array_atomic(YA_GOOGLE_REVIEWS_SETTINGS_FILE, $settings);
+    $publication = ya_sync_apply_private_config($payload, 'google_reviews_settings', $settings, $candidate, $publishedAt);
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => $enabled
             ? 'Google yorumları ayarları web modülüne uygulandı.'
             : 'Google yorumları web modülünde kapatıldı.',
-        'published_at' => $publishedAt,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'enabled' => $enabled,
         'place_id_configured' => $placeId !== '',
         'has_api_key' => $settings['api_key'] !== ''
@@ -1718,15 +1698,13 @@ function ya_sync_publish_ai_settings(array $payload): void
     ];
     $publishedAt = date(DATE_ATOM);
 
-    ya_sync_write_php_array_atomic(YA_AI_SETTINGS_FILE, $settings);
-    ya_sync_update_state([
-        'last_ai_settings_publish_at' => $publishedAt
-    ]);
+    $publication = ya_sync_apply_private_config($payload, 'ai_settings', $settings, $candidate, $publishedAt);
 
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'AI ayarları web modülüne uygulandı.',
-        'published_at' => $publishedAt,
+        ...$publication,
+        'published_at' => $publication['published_at'],
         'enabled' => $settings['enabled'],
         'provider' => $settings['provider'],
         'service' => $settings['service'],
@@ -3434,60 +3412,6 @@ function ya_sync_load_json(string $path, mixed $fallback): mixed
     return $data === null ? $fallback : $data;
 }
 
-function ya_sync_write_php_array_atomic(string $path, array $data): void
-{
-    $directory = dirname($path);
-    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException('data_directory_missing');
-    }
-
-    if (!is_writable($directory)) {
-        throw new RuntimeException('data_directory_not_writable');
-    }
-
-    $temporaryPath = tempnam($directory, '.ai-settings.');
-    if ($temporaryPath === false) {
-        throw new RuntimeException('ai_settings_temp_file_failed');
-    }
-
-    $realDirectory = realpath($directory);
-    $realTemporaryDirectory = realpath(dirname($temporaryPath));
-    if ($realDirectory === false || $realTemporaryDirectory === false || $realDirectory !== $realTemporaryDirectory) {
-        if (is_file($temporaryPath)) {
-            unlink($temporaryPath);
-        }
-        throw new RuntimeException('ai_settings_temp_location_invalid');
-    }
-
-    try {
-        if (!chmod($temporaryPath, 0600)) {
-            throw new RuntimeException('ai_settings_permissions_failed');
-        }
-
-        $contents = implode("\n", [
-            '<?php',
-            'declare(strict_types=1);',
-            '',
-            'return ' . var_export($data, true) . ';',
-            ''
-        ]);
-        $bytesWritten = file_put_contents($temporaryPath, $contents, LOCK_EX);
-        if ($bytesWritten === false || $bytesWritten !== strlen($contents)) {
-            throw new RuntimeException('ai_settings_write_failed');
-        }
-
-        if (!rename($temporaryPath, $path)) {
-            throw new RuntimeException('ai_settings_publish_failed');
-        }
-
-        $temporaryPath = '';
-    } finally {
-        if ($temporaryPath !== '' && is_file($temporaryPath)) {
-            unlink($temporaryPath);
-        }
-    }
-}
-
 function ya_sync_update_state(array $changes): void
 {
     ya_storage_update_state(array_merge($changes, [
@@ -3604,9 +3528,10 @@ function ya_sync_publish_dealer_access(array $payload): void
     }
     try { $projection = ya_dealer_projection($payload['dealer_access']); }
     catch (InvalidArgumentException) { ya_sync_response(422, ['ok' => false, 'message' => 'Bayi erişim yayını geçersiz.']); }
-    $publication = ya_storage_publish('dealer_access_private', $projection, ya_sync_require_client_id($payload), $revision, $key,
+    $publication = ya_sync_apply_publication($payload, 'dealer_access_private', $projection, $payload['dealer_access'],
         date(DATE_ATOM), static fn(PDO $db) => ya_dealer_apply_projection($db, $projection));
     ya_sync_response(200, ['ok' => true, 'message' => 'Bayi erişimi yayınlandı.',
+        ...$publication,
         'published_at' => $publication['published_at'], 'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'], 'deduplicated' => $publication['deduplicated']]);
 }
@@ -3620,7 +3545,22 @@ function ya_sync_publish_marketing_website(array $payload): void
     }
     try { $projection = ya_marketing_projection($payload['marketing']); }
     catch (InvalidArgumentException $error) { ya_sync_response(422, ['ok' => false, 'message' => 'Pazarlama yayın verisi geçersiz.']); }
-    $publication = ya_storage_publish('marketing_website', $projection, ya_sync_require_client_id($payload), $revision, $key, date(DATE_ATOM));
+    $publication = ya_sync_apply_publication($payload, 'marketing_website', $projection, $payload['marketing'], date(DATE_ATOM));
     ya_sync_response(200, array_merge(['ok' => true, 'message' => 'Website pazarlama yayını eşitlendi.'], $publication));
 }
 
+function ya_sync_apply_publication(array $envelope, string $name, array $projection, array $candidate, string $now, ?callable $apply = null): array
+{
+    [$epoch, $hash] = ya_storage_publication_identity($envelope, $candidate);
+    return ya_storage_publish($name, $projection, ya_sync_require_client_id($envelope), $envelope['source_revision'],
+        $envelope['idempotency_key'], $now, $epoch, $hash, $apply);
+}
+
+function ya_sync_apply_private_config(array $envelope, string $name, array $settings, array $candidate, string $now): array
+{
+    return ya_sync_apply_publication($envelope, $name, [], $candidate, $now, static function(PDO $db) use ($name, $settings, $now): void {
+        $db->prepare('INSERT INTO private_publication_config(name, config_json) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET config_json = excluded.config_json')
+            ->execute([$name, ya_storage_encode($settings)]);
+        if ($name === 'ai_settings') ya_sync_update_state(['last_ai_settings_publish_at' => $now]);
+    });
+}

@@ -8,6 +8,7 @@ import {
 } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase } from "./database";
 import { getWebSyncConfig } from "./sync-config";
+import { publishDesktopProjection } from "./desktop-publication-service";
 
 export async function pullRequestsFromWeb(
   database: DesktopDatabase,
@@ -107,23 +108,13 @@ export async function pushMenuToWeb(database: DesktopDatabase): Promise<PushMenu
     return result;
   }
 
-  const pendingJob = database.getPendingSyncJobs()
-    .find((job) => job.jobType === "menu_publish");
-  const result = await pushMenu({
-    ...getWebSyncConfig(setup),
-    clientId,
-    ...(pendingJob ? {
-      sourceRevision: pendingJob.sourceRevision,
-      idempotencyKey: `${clientId}:${pendingJob.jobKey}:${pendingJob.sourceRevision}`
-    } : {}),
-    menu: database.getQrMenuPublication()
-  });
+  const config = getWebSyncConfig(setup);
+  const result = await publishDesktopProjection(database, config, "menu_publish", database.getQrMenuPublication(),
+    (identity, menu) => pushMenu({ ...config, ...identity, menu }),
+    { refresh: true, acknowledge: (sent) => database.markMenuPublished(sent) });
+  if (!result) return { ok: false, message: "Menü yayın niyeti hazırlanamadı." };
 
   if (result.ok) {
-    if (pendingJob) {
-      database.completeSyncJob(pendingJob.jobKey, pendingJob.sourceRevision);
-    }
-    database.markMenuPublished();
     database.recordSyncEvent({
       direction: "push",
       entityType: "menu",

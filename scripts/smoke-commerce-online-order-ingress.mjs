@@ -60,7 +60,7 @@ globalThis.fetch = async (url, init) => {
     if (!supported) result.payload.features = result.payload.features.filter((feature) => feature !== "web_orders_v1");
     return new Response(JSON.stringify(result.payload), { status: result.status });
   }
-  if (body.action === "publish_online_catalog" || body.action === "pull_web_orders" || body.action === "acknowledge_web_orders") {
+  if (body.action.startsWith("publish_") || body.action === "activate_publication_source" || body.action === "pull_web_orders" || body.action === "acknowledge_web_orders") {
     if (body.action === "acknowledge_web_orders" && rejectAck) {
       return new Response(JSON.stringify({ ok: false, message: "ack retry" }), { status: 503 });
     }
@@ -236,6 +236,11 @@ try {
   }
   setBusinessCapability(database.databasePath, { capability: "commerce.orders", enabled: true });
   setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+  const newClientId = database.getSyncRuntimeStatus().clientId;
+  const replacement = syncApi({ action: "activate_publication_source", client_id: newClientId,
+    expected_epoch: 1, activation_key: `${newClientId}:replace:1` });
+  assert.equal(replacement.payload.ok, true);
+  database.savePublicationSourceEpoch(setupInput.webModuleUrl, replacement.payload.source_epoch);
   const resetResult = await coordinator().runNow();
   assert.equal(resetResult.ok, true, `empty inbox succeeds without historical product ids: ${JSON.stringify(resetResult)}`);
   assert.equal(database.getSyncRuntimeStatus().webOrderCursor, 0);

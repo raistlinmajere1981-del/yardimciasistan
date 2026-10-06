@@ -931,16 +931,16 @@ function publishCurrentAndroidSnapshot() {
 
 async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {
   const database = getDatabase();
-  return publishSavedAiSettings(
+  return await publishSavedAiSettings(
     database,
     getWebSyncConfig(database.getSetupData())
-  );
+  ) ?? { ok: false, message: "AI ayar yayın niyeti hazırlanamadı." };
 }
 
 async function publishGoogleReviewsSettingsFromMain() {
   const database = getDatabase();
   return publishGoogleReviewsSettings(
-    database.databasePath,
+    database,
     getWebSyncConfig(database.getSetupData()),
     database.getSyncRuntimeStatus().clientId
   );
@@ -948,8 +948,8 @@ async function publishGoogleReviewsSettingsFromMain() {
 
 async function publishBusinessAiContextFromMain(): Promise<PushBusinessContextResult> {
   const database = getDatabase();
-  return publishBusinessAiContext(
+  return await publishBusinessAiContext(
     database,
     getWebSyncConfig(database.getSetupData())
-  );
+  ) ?? { ok: false, message: "İşletme bağlam yayın niyeti hazırlanamadı." };
 }

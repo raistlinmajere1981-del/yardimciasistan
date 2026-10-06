@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -29,6 +30,7 @@ function storage(code) {
 }
 const clearGuard = () => storage("if ($db->query(\"SELECT 1 FROM sqlite_master WHERE name = 'public_request_guard_events'\")->fetchColumn()) $db->exec('DELETE FROM public_request_guard_events');");
 async function sync(payload) {
+  payload = publicationEnvelope(payload);
   const response = await fetch(`${baseUrl}/api/sync.php`, { method: "POST", headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": secret }, body: JSON.stringify(payload) });
   assert.equal(response.status, 200, await response.clone().text());
   return response.json();
@@ -38,6 +40,7 @@ const publishedProduct = { product_id: "published-product", name: "Published pro
   currency: "TRY", tax_rate: 20, image_url: "", availability: "available", sort_order: 0 };
 async function publish(enabled, extraProducts = [], methods = ["pickup"]) {
   revision += 1;
+  if (revision === 1) await activateFixtureSource(baseUrl, secret, "desktop-a3");
   return sync({ action: "publish_online_catalog", client_id: "desktop-a3", source_revision: revision, idempotency_key: `catalog-${revision}`,
     online_catalog: { version: 1, enabled, delivery_methods: enabled ? methods : [], updated_at: new Date().toISOString(), products: enabled ? [publishedProduct, ...extraProducts] : [] } });
 }

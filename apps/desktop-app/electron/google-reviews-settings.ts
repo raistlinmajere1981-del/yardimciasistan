@@ -1,5 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import { safeStorage } from "electron";
+import type { DesktopDatabase } from "./database";
+import { pushGoogleReviewsSettings } from "@yardimci-asistan/sync-core";
+import { publishDesktopProjection } from "./desktop-publication-service";
 
 export interface GoogleReviewsSettings {
   enabled: boolean;
@@ -115,10 +118,12 @@ export async function testGoogleReviewsConnection(
 }
 
 export async function publishGoogleReviewsSettings(
-  databasePath: string,
+  database: DesktopDatabase,
   syncConfig: { baseUrl: string; syncSecret: string },
-  clientId: string
+  clientId: string,
+  refresh = true
 ): Promise<GoogleReviewsPublishResult> {
+  const databasePath = database.databasePath;
   const stored = readStoredSettings(databasePath);
   const baseUrl = syncConfig.baseUrl.trim().replace(/\/+$/, "");
   const syncSecret = syncConfig.syncSecret.trim();
@@ -131,38 +136,18 @@ export async function publishGoogleReviewsSettings(
     return { ok: false, message: "Google yorumları açık ancak Place ID veya API anahtarı okunamıyor." };
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
-    const response = await fetch(`${baseUrl}/api/sync.php?action=publish_google_reviews_settings`, {
-      method: "POST",
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "X-YA-Sync-Secret": syncSecret
-      },
-      body: JSON.stringify({
-        action: "publish_google_reviews_settings",
-        client_id: clientId,
-        google_reviews: {
-          enabled: stored.enabled,
-          place_id: stored.placeId,
-          api_key: apiKey
-        }
-      }),
-      signal: controller.signal
-    });
-    const payload = await response.json().catch(() => null) as { ok?: boolean; message?: string; published_at?: string } | null;
-    if (!response.ok || payload?.ok !== true) {
-      return {
-        ok: false,
-        status: response.status,
-        message: String(payload?.message || `Google yorumları web modülüne gönderilemedi (HTTP ${response.status}).`)
-      };
-    }
-
-    const publishedAt = String(payload.published_at ?? "").trim();
-    markPublished(databasePath, publishedAt);
+    const desired = { enabled: stored.enabled, place_id: stored.placeId, api_key: apiKey };
+    const payload = await publishDesktopProjection(database, syncConfig, "google_reviews_settings_publish", desired,
+      (identity, settings) => pushGoogleReviewsSettings({ ...syncConfig, ...identity, settings }),
+      { refresh, acknowledge: (sent, receipt) => {
+        const current = readStoredSettings(databasePath);
+        if (current.enabled === sent.enabled && current.placeId === sent.place_id
+            && (!sent.enabled || decryptApiKey(current.encryptedApiKey) === sent.api_key)) markPublished(databasePath, receipt.published_at);
+      } });
+    if (!payload) return { ok: true, message: "Google yorumları yayını güncel." };
+    if (!payload.ok) return payload;
+    const publishedAt = payload.published_at;
     return {
       ok: true,
       message: String(payload.message || "Google yorumları ayarları web modülüne uygulandı."),
@@ -175,8 +160,6 @@ export async function publishGoogleReviewsSettings(
         ? "Google yorumları web yayını zaman aşımına uğradı."
         : "Google yorumları ayarları gönderilirken web modülüne ulaşılamadı."
     };
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

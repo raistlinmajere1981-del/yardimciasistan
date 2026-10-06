@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import { spawn } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -37,6 +38,7 @@ server.stderr.on("data", (chunk) => { serverOutput += chunk.toString(); });
 
 try {
   await waitForUrl(`${baseUrl}/api/menu.php`);
+  await activateFixtureSource(baseUrl, syncSecret, "approval-smoke-desktop");
 
   await publishSnapshot(1, {});
 
@@ -255,7 +257,7 @@ function syncApi(payload) {
       "Content-Type": "application/json",
       "X-YA-Sync-Secret": syncSecret
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(publicationEnvelope(payload))
   });
 }
 

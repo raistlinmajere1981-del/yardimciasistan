@@ -56,17 +56,21 @@ $publication = ya_availability_sync_sanitize_publication(
 
 try {
     $publishedAt = date(DATE_ATOM);
+    [$epoch, $hash] = ya_storage_publication_identity($payload, $payload['availability'] ?? []);
     $result = ya_public_room_availability_store_publication(
         $publication,
         $clientId,
-        $publishedAt
+        $publishedAt, $payload['source_revision'], $payload['idempotency_key'], $epoch, $hash
     );
     ya_availability_sync_response(200, [
         'ok' => true,
         'message' => 'Canlı oda müsaitliği güncellendi.',
-        'published_at' => $publishedAt,
+        ...$result,
+        'published_at' => $result['published_at'],
         'server_revision' => (int) ($result['server_revision'] ?? ya_storage_server_revision())
     ]);
+} catch (YaStorageConflictException $error) {
+    ya_availability_sync_response(409, ['ok' => false, 'message' => 'Publication protocol conflict.', 'error' => $error->getMessage()]);
 } catch (Throwable $error) {
     $storageUnavailable = $error->getMessage() === 'pdo_sqlite_missing';
     ya_availability_sync_response($storageUnavailable ? 503 : 500, [

@@ -6,6 +6,10 @@ import {
   pushAiCatalog,
   pushRoomCatalog,
   pushTableCatalog,
+  pushAvailability,
+  pushMenu,
+  pushAndroidSnapshot,
+  pushOnlineCatalog,
   type AndroidOperationsSnapshot,
   type AndroidSyncAction,
   type SyncCapabilitiesSuccess,
@@ -29,6 +33,11 @@ import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
 import { logWebFailure, safeWebTarget } from "./web-diagnostics";
 import { archiveExternalProductImage } from "./product-data-service";
 import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
+import { publishDesktopProjection } from "./desktop-publication-service";
+import { ensurePublicationSource } from "./publication-source-service";
+import { publishBusinessAiContext } from "./business-ai-context-service";
+import { publishSavedAiSettings } from "./ai-settings-publish-service";
+import { publishGoogleReviewsSettings } from "./google-reviews-settings";
 
 const NORMAL_PULL_INTERVAL_MS = 15_000;
 const MARKET_BARCODE_FAST_PULL_INTERVAL_MS = 1_500;
@@ -89,11 +98,6 @@ export interface SyncCoordinatorOptions {
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
 
-interface AvailabilityHeartbeatResponse {
-  ok?: boolean;
-  message?: string;
-}
-
 export class SyncCoordinator {
   private pullTimer: NodeJS.Timeout | null = null;
   private marketBarcodeFastPullTimer: NodeJS.Timeout | null = null;
@@ -112,11 +116,8 @@ export class SyncCoordinator {
   private marketBarcodeFastPullActive = false;
   private availabilityHeartbeatSupported: boolean | null = null;
   private aiCatalogSupported: boolean | null = null;
-  private lastAiCatalogPayload = "";
   private roomCatalogSupported: boolean | null = null;
-  private lastRoomCatalogPayload = "";
   private tableCatalogSupported: boolean | null = null;
-  private lastTableCatalogPayload = "";
   private suspendedForMaintenance = false;
   private activeOperationId = "";
   private activeCycleStartedAt = 0;
@@ -128,11 +129,8 @@ export class SyncCoordinator {
     this.suspendedForMaintenance = false;
     this.stop();
     this.aiCatalogSupported = null;
-    this.lastAiCatalogPayload = "";
     this.roomCatalogSupported = null;
-    this.lastRoomCatalogPayload = "";
     this.tableCatalogSupported = null;
-    this.lastTableCatalogPayload = "";
     this.emitStatus();
     this.initialTimer = setTimeout(() => {
       this.initialTimer = null;
@@ -357,18 +355,28 @@ export class SyncCoordinator {
     });
 
     const runtimeFetch = globalThis.fetch;
+    this.phase = "syncing";
+    this.message = "Web, masaüstü ve Android verileri eşitleniyor...";
+    this.options.database.recordSyncAttempt();
+    this.emitStatus();
+    const boundedConfig = { ...config, ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {}) };
+    const source = await ensurePublicationSource(this.options.database, boundedConfig);
+    if (!source.ok) {
+      this.options.database.recordAutomaticSyncFailure(source.message);
+      this.deferPassiveRetry(runtime.consecutiveFailures);
+      this.phase = classifyFailurePhase(source);
+      this.message = source.message;
+      return this.result(false, source.message, empty);
+    }
     const transport = new PhpHostingSyncTransport({
       ...config,
       clientId,
+      sourceEpoch: source.sourceEpoch,
       ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
     });
     const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
     const androidEnabled = hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ANDROID);
     const requestsEnabled = hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.REQUESTS);
-    this.phase = "syncing";
-    this.message = "Web, masaüstü ve Android verileri eşitleniyor...";
-    this.options.database.recordSyncAttempt();
-    this.emitStatus();
 
     const counts = { ...empty };
     const errors: string[] = [];
@@ -379,7 +387,7 @@ export class SyncCoordinator {
         && androidEnabled
         && !supportsAndroidDevicePermissionSync(capabilities);
       if (!capabilities.ok
-          || capabilities.protocol_version < 2
+           || capabilities.protocol_version < 3
           || capabilities.storage !== "sqlite"
           || missingAndroidCapabilities) {
         const message = !capabilities.ok
@@ -452,7 +460,7 @@ export class SyncCoordinator {
       }
     }
 
-    const availabilityError = await this.publishAvailabilityHeartbeat(config, clientId, enabledCapabilities);
+    const availabilityError = await this.publishAvailabilityHeartbeat(config, enabledCapabilities);
     if (availabilityError) {
       errors.push(availabilityError);
     }
@@ -467,9 +475,22 @@ export class SyncCoordinator {
       errors.push(tableCatalogError);
     }
 
-    const aiCatalogError = await this.publishAiCatalogIfChanged(config, clientId);
+    const aiCatalogError = await this.publishAiCatalogIfChanged(config);
     if (aiCatalogError) {
       errors.push(aiCatalogError);
+    }
+
+    const context = await publishBusinessAiContext(this.options.database, boundedConfig, false);
+    if (context && !context.ok) errors.push(context.message);
+    // AI configuration is reconstructed after a settings mutation; an untouched,
+    // unconfigured install is not an automatic provider activation operation.
+    if (this.options.database.getPendingSyncJobs().some((job) => job.jobType === "ai_settings_publish")) {
+      const settings = await publishSavedAiSettings(this.options.database, boundedConfig, false);
+      if (settings && !settings.ok) errors.push(settings.message);
+    }
+    if (this.options.database.getPendingSyncJobs().some((job) => job.jobType === "google_reviews_settings_publish")) {
+      const reviews = await publishGoogleReviewsSettings(this.options.database, boundedConfig, clientId, false);
+      if (!reviews.ok) errors.push(reviews.message);
     }
 
     const publicationResult = await this.publishOutbox(transport);
@@ -722,7 +743,6 @@ export class SyncCoordinator {
 
   private async publishAvailabilityHeartbeat(
     config: { baseUrl: string; syncSecret: string },
-    clientId: string,
     enabledCapabilities: readonly BusinessCapability[]
   ): Promise<string> {
     if (this.availabilityHeartbeatSupported === false) {
@@ -736,23 +756,18 @@ export class SyncCoordinator {
       return message;
     }
 
-    const endpoint = `${config.baseUrl.trim().replace(/\/$/, "")}/api/availability-sync.php`;
     const availability = createPublicRoomAvailabilityPublication(
       this.options.database.getDashboardData(),
       enabledCapabilities
     );
 
     try {
-      const response = await createSyncFetchWithTimeout(runtimeFetch)(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-YA-Sync-Secret": config.syncSecret
-        },
-        body: JSON.stringify({ client_id: clientId, availability })
-      });
+      const boundedConfig = { ...config, fetchImpl: createSyncFetchWithTimeout(runtimeFetch) };
+      const result = await publishDesktopProjection(this.options.database, boundedConfig, "public_room_availability_publish", availability,
+        (identity, frozen) => pushAvailability({ ...boundedConfig, ...identity, availability: frozen }), { refresh: true });
+      if (!result) return "";
 
-      if (response.status === 404) {
+      if (!result.ok && result.status === 404) {
         // Older hosting packages do not have the availability endpoint. Keep
         // existing sync healthy until the web module is upgraded.
         this.availabilityHeartbeatSupported = false;
@@ -761,17 +776,14 @@ export class SyncCoordinator {
           event: "sync.availability.unsupported",
           message: "Canlı müsaitlik endpoint'i bu hosting sürümünde yok.",
           operationId: this.activeOperationId,
-          meta: { target: safeWebTarget(endpoint), status: 404 }
+          meta: { target: safeWebTarget(config.baseUrl), status: 404 }
         });
         return "";
       }
 
-      const result = (await response.json().catch(() => null)) as AvailabilityHeartbeatResponse | null;
-      if (!response.ok || result?.ok !== true) {
-        const message = String(result?.message || `Canlı müsaitlik yayını tamamlanamadı (HTTP ${response.status}).`);
-        this.logSyncFailure("availability", { status: response.status, message }, {
-          endpoint: safeWebTarget(endpoint)
-        });
+      if (!result.ok) {
+        const message = result.message;
+        this.logSyncFailure("availability", result);
         return message;
       }
 
@@ -783,7 +795,7 @@ export class SyncCoordinator {
         message,
         error: error instanceof Error ? error.message : String(error)
       }, {
-        endpoint: safeWebTarget(endpoint)
+        endpoint: safeWebTarget(config.baseUrl)
       });
       return message;
     }
@@ -814,20 +826,15 @@ export class SyncCoordinator {
       }
     }
 
-    const payload = JSON.stringify(catalog);
-    if (payload === this.lastRoomCatalogPayload) return "";
 
     const runtimeFetch = globalThis.fetch;
-    const result = await pushRoomCatalog({
-      ...config,
-      clientId,
-      catalog,
-      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
-    });
+    const boundedConfig = { ...config, ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {}) };
+    const result = await publishDesktopProjection(this.options.database, boundedConfig, "room_catalog_publish", catalog,
+      (identity, frozen) => pushRoomCatalog({ ...boundedConfig, ...identity, catalog: frozen }));
+    if (!result) return "";
 
     if (result.ok) {
       this.roomCatalogSupported = true;
-      this.lastRoomCatalogPayload = payload;
       this.options.database.recordSyncEvent({
         direction: "push",
         entityType: "room_catalog",
@@ -881,20 +888,15 @@ export class SyncCoordinator {
       }
     }
 
-    const payload = JSON.stringify(catalog);
-    if (payload === this.lastTableCatalogPayload) return "";
 
     const runtimeFetch = globalThis.fetch;
-    const result = await pushTableCatalog({
-      ...config,
-      clientId,
-      catalog,
-      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
-    });
+    const boundedConfig = { ...config, ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {}) };
+    const result = await publishDesktopProjection(this.options.database, boundedConfig, "table_catalog_publish", catalog,
+      (identity, frozen) => pushTableCatalog({ ...boundedConfig, ...identity, catalog: frozen }));
+    if (!result) return "";
 
     if (result.ok) {
       this.tableCatalogSupported = true;
-      this.lastTableCatalogPayload = payload;
       this.options.database.recordSyncEvent({
         direction: "push",
         entityType: "table_catalog",
@@ -923,27 +925,19 @@ export class SyncCoordinator {
     return result.message;
   }
 
-  private async publishAiCatalogIfChanged(
-    config: { baseUrl: string; syncSecret: string },
-    clientId: string
-  ): Promise<string> {
+  private async publishAiCatalogIfChanged(config: { baseUrl: string; syncSecret: string }): Promise<string> {
     if (this.aiCatalogSupported === false) return "";
 
     const catalog = this.options.createAiCatalog?.() ?? { version: 1, updatedAt: "", items: [] };
-    const payload = JSON.stringify(catalog);
-    if (payload === this.lastAiCatalogPayload) return "";
 
     const runtimeFetch = globalThis.fetch;
-    const result = await pushAiCatalog({
-      ...config,
-      clientId,
-      catalog,
-      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
-    });
+    const boundedConfig = { ...config, ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {}) };
+    const result = await publishDesktopProjection(this.options.database, boundedConfig, "ai_catalog_publish", catalog,
+      (identity, frozen) => pushAiCatalog({ ...boundedConfig, ...identity, catalog: frozen }));
+    if (!result) return "";
 
     if (result.ok) {
       this.aiCatalogSupported = true;
-      this.lastAiCatalogPayload = payload;
       this.options.database.recordSyncEvent({
         direction: "push",
         entityType: "ai_catalog",
@@ -979,6 +973,9 @@ export class SyncCoordinator {
     const errors: string[] = [];
     let published = 0;
     for (const job of jobs) {
+      // Derived/config publishers above share this outbox but own preparation.
+      if (["room_catalog_publish", "table_catalog_publish", "ai_catalog_publish", "business_context_publish",
+        "public_room_availability_publish", "ai_settings_publish", "google_reviews_settings_publish"].includes(job.jobType)) continue;
       if (job.jobType === "menu_publish"
           && !hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.QR_MENU)) {
         this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
@@ -1000,46 +997,41 @@ export class SyncCoordinator {
         const config = this.options.getSyncConfig();
         const prepared = publisher && transport.publishMarketingWebsite
           ? await publisher.prepare(config, clientId) : { ok: false as const, message: "Web modülü pazarlama yayınına hazır değil." };
-        const result = prepared.ok ? await transport.publishMarketingWebsite!({sourceRevision: job.sourceRevision,
-          idempotencyKey: `${clientId}:${job.jobKey}:${job.sourceRevision}`, value: prepared.projection}) : prepared;
-        if (result.ok && prepared.ok && result.source_revision === job.sourceRevision) {
-          publisher!.acknowledge(prepared.sent, result.published_at, this.activeOperationId);
-          this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
+        const result = prepared.ok ? await publishDesktopProjection(this.options.database, config, job.jobType,
+          { projection: prepared.projection, sent: prepared.sent },
+          (identity, frozen) => transport.publishMarketingWebsite!({ sourceRevision: identity.sourceRevision,
+            idempotencyKey: identity.idempotencyKey, value: frozen.projection }),
+          { expectedRevision: job.sourceRevision, nextAttemptAt: calculateNextAttempt(job.attemptCount),
+            acknowledge: (sent, receipt) => publisher!.acknowledge(sent.sent, receipt.published_at, this.activeOperationId) }) : prepared;
+        if (!result) continue;
+        if (result.ok && prepared.ok) {
           this.options.onDashboardChanged(); published += 1;
         } else {
           publisher?.fail(prepared.ok ? prepared.sent : "sent" in prepared ? prepared.sent ?? [] : []);
           const message = result.ok ? "Website revision onayı doğrulanamadı." : result.message;
-          this.options.database.failSyncJob(job.jobKey, job.sourceRevision, message, calculateNextAttempt(job.attemptCount));
+          if (!prepared.ok) this.options.database.failSyncJob(job.jobKey, job.sourceRevision, message, calculateNextAttempt(job.attemptCount));
           errors.push(message);
         }
         continue;
       }
-      const idempotencyKey = `${clientId}:${job.jobKey}:${job.sourceRevision}`;
+      const config = this.options.getSyncConfig();
       const result = job.jobType === "menu_publish"
-        ? await transport.publishMenu({
-            sourceRevision: job.sourceRevision,
-            idempotencyKey,
-            value: this.options.database.getQrMenuPublication()
-          })
+        ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.getQrMenuPublication(),
+            (identity, menu) => pushMenu({ ...config, ...identity, menu }),
+            { nextAttemptAt: calculateNextAttempt(job.attemptCount), acknowledge: (sent) => this.options.database.markMenuPublished(sent) })
         : job.jobType === "online_catalog_publish"
-          ? await transport.publishOnlineCatalog({
-              sourceRevision: job.sourceRevision,
-              idempotencyKey,
-              value: this.options.database.createCommerceOnlineCatalog()
-            })
+          ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createCommerceOnlineCatalog(),
+              (identity, catalog) => pushOnlineCatalog({ ...config, ...identity, catalog }),
+              { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
         : job.jobType === "dealer_access_publish"
-          ? await transport.publishDealerAccess!({ sourceRevision: job.sourceRevision, idempotencyKey,
-              value: this.options.database.createDealerAccessProjection() })
-        : await transport.publishAndroidSnapshot({
-            sourceRevision: job.sourceRevision,
-            idempotencyKey,
-            value: this.options.createAndroidSnapshot()
-          });
+          ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createDealerAccessProjection(),
+              (identity, value) => transport.publishDealerAccess!({ sourceRevision: identity.sourceRevision, idempotencyKey: identity.idempotencyKey, value }),
+              { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
+        : await publishDesktopProjection(this.options.database, config, job.jobType, this.options.createAndroidSnapshot(),
+            (identity, snapshot) => pushAndroidSnapshot({ ...config, ...identity, snapshot }),
+            { nextAttemptAt: calculateNextAttempt(job.attemptCount) });
+      if (!result) continue;
       if (result.ok) {
-        this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
-        if (job.jobType === "menu_publish") {
-          this.options.database.markMenuPublished();
-        }
         this.options.database.recordSyncEvent({
           direction: "push",
           entityType: job.jobType === "menu_publish" ? "menu"
@@ -1055,7 +1047,6 @@ export class SyncCoordinator {
         attemptCount: job.attemptCount,
         nextAttemptAt
       });
-      this.options.database.failSyncJob(job.jobKey, job.sourceRevision, result.message, nextAttemptAt);
       this.options.database.recordSyncEvent({
         direction: "push",
         entityType: job.jobType === "menu_publish" ? "menu"

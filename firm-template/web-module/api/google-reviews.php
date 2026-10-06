@@ -5,7 +5,6 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 const YA_BASE_DIR = __DIR__ . '/..';
-const YA_GOOGLE_REVIEWS_SETTINGS_FILE = YA_BASE_DIR . '/data/google-reviews.local.php';
 const YA_GOOGLE_REVIEWS_MAX = 5;
 
 require_once YA_BASE_DIR . '/lib/google-reviews.php';
@@ -35,23 +34,9 @@ ya_google_reviews_respond(
 
 function ya_google_reviews_load_settings(): array
 {
-    if (!is_file(YA_GOOGLE_REVIEWS_SETTINGS_FILE)) {
-        return ['enabled' => false, 'place_id' => '', 'api_key' => ''];
-    }
-
-    try {
-        $settings = require YA_GOOGLE_REVIEWS_SETTINGS_FILE;
-        if (!is_array($settings)) {
-            return ['enabled' => false, 'place_id' => '', 'api_key' => ''];
-        }
-        return [
-            'enabled' => ($settings['enabled'] ?? false) === true,
-            'place_id' => trim((string)($settings['place_id'] ?? '')),
-            'api_key' => trim((string)($settings['api_key'] ?? ''))
-        ];
-    } catch (Throwable) {
-        return ['enabled' => false, 'place_id' => '', 'api_key' => ''];
-    }
+    require_once YA_BASE_DIR . '/lib/storage.php';
+    $published = ya_storage_private_config('google_reviews_settings');
+    return $published ?? ['enabled' => false, 'place_id' => '', 'api_key' => ''];
 }
 
 function ya_google_reviews_respond(array $payload): never

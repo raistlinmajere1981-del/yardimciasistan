@@ -66,6 +66,7 @@ export async function testWebConnection(
   });
 
   const transport = new PhpHostingSyncTransport({
+    sourceEpoch: 0, // Capability probe only; connection tests must not activate a source.
     baseUrl,
     syncSecret,
     clientId: WEB_CONNECTION_TEST_CLIENT_ID,

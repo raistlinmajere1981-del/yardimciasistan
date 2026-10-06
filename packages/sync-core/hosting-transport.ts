@@ -64,6 +64,8 @@ import type {
   SyncCoreConfig,
   SyncFailure,
   SyncTransport,
+  PublicationReceipt,
+  PublicationIdentity,
   VersionedPublication,
   WebOrderAcknowledgement
 } from "./index";
@@ -148,12 +150,46 @@ export async function acknowledgeRequests(options: AcknowledgeRequestsOptions): 
   });
 }
 
+function publicationIdentity(options: PublicationIdentity) {
+  return { client_id: options.clientId, source_epoch: options.sourceEpoch,
+    source_revision: options.sourceRevision, idempotency_key: options.idempotencyKey };
+}
+
+export async function activatePublicationSource(options: SyncCoreConfig & { clientId: string; expectedEpoch: number; activationKey: string }) {
+  const result = await syncRequest<{ ok: true; message: string; source_client_id: string; source_epoch: number; activation_key: string }>(options, {
+    action: "activate_publication_source", client_id: options.clientId,
+    expected_epoch: options.expectedEpoch, activation_key: options.activationKey
+  });
+  if (result.ok && (result.source_client_id !== options.clientId || result.source_epoch !== options.expectedEpoch + 1
+      || result.activation_key !== options.activationKey)) {
+    return { ok: false as const, message: "Publication source onayı doğrulanamadı.", error: "source_ack_mismatch" };
+  }
+  return result;
+}
+
+export async function pushAvailability(options: SyncCoreConfig & PublicationIdentity & { availability: unknown }) {
+  return syncRequest<PublicationReceipt & { ok: true; message: string; published_at: string }>(options, {
+    action: "publish_public_room_availability", ...publicationIdentity(options), availability: options.availability
+  }, "availability-sync.php");
+}
+
+export async function pushGoogleReviewsSettings(options: SyncCoreConfig & PublicationIdentity & { settings: { enabled: boolean; place_id: string; api_key: string } }): Promise<(PublicationReceipt & { ok: true; message: string; published_at: string }) | SyncFailure> {
+  const result = await syncRequest<PublicationReceipt & { ok: true; message: string; published_at: string }>(options, {
+    action: "publish_google_reviews_settings", ...publicationIdentity(options), google_reviews: options.settings
+  });
+  if (!result.ok) return { ...result, message: redactSecret(result.message, options.settings.api_key),
+    error: result.error ? redactSecret(result.error, options.settings.api_key) : undefined };
+  return { ok: true as const, publication_name: result.publication_name, source_client_id: result.source_client_id,
+    source_epoch: result.source_epoch, source_revision: result.source_revision, idempotency_key: result.idempotency_key,
+    payload_hash: result.payload_hash, accepted: result.accepted, deduplicated: result.deduplicated,
+    server_revision: result.server_revision, published_at: result.published_at,
+    message: redactSecret(result.message, options.settings.api_key) };
+}
+
 export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Promise<PushOnlineCatalogResult> {
   return syncRequest<PushOnlineCatalogSuccess>(options, {
     action: "publish_online_catalog",
-    client_id: options.clientId,
-    source_revision: options.sourceRevision,
-    idempotency_key: options.idempotencyKey,
+    ...publicationIdentity(options),
     online_catalog: {
       version: options.catalog.version,
       enabled: options.catalog.enabled,
@@ -172,20 +208,16 @@ export async function pushOnlineCatalog(options: PushOnlineCatalogOptions): Prom
 export async function pushMenu(options: PushMenuOptions): Promise<PushMenuResult> {
   return syncRequest<PushMenuSuccess>(options, {
     action: "publish_menu",
-    menu: options.menu,
-    ...(options.clientId ? { client_id: options.clientId } : {}),
-    ...(options.sourceRevision === undefined ? {} : { source_revision: Math.max(0, Math.trunc(options.sourceRevision)) }),
-    ...(options.idempotencyKey ? { idempotency_key: options.idempotencyKey } : {})
+    ...publicationIdentity(options),
+    menu: options.menu
   });
 }
 
 export async function pushAndroidSnapshot(options: PushAndroidSnapshotOptions): Promise<PushAndroidSnapshotResult> {
   return syncRequest<PushAndroidSnapshotSuccess>(options, {
     action: "publish_android_snapshot",
-    snapshot: options.snapshot,
-    ...(options.clientId ? { client_id: options.clientId } : {}),
-    ...(options.sourceRevision === undefined ? {} : { source_revision: Math.max(0, Math.trunc(options.sourceRevision)) }),
-    ...(options.idempotencyKey ? { idempotency_key: options.idempotencyKey } : {})
+    ...publicationIdentity(options),
+    snapshot: options.snapshot
   });
 }
 
@@ -208,6 +240,7 @@ export async function markAndroidActionResult(options: MarkAndroidActionResultOp
 export async function pushAiCatalog(options: PushAiCatalogOptions): Promise<PushAiCatalogResult> {
   return syncRequest<PushAiCatalogSuccess>(options, {
     action: "publish_ai_catalog",
+    ...publicationIdentity(options),
     client_id: options.clientId,
     ai_catalog: {
       version: options.catalog.version,
@@ -234,6 +267,7 @@ export async function pushAiCatalog(options: PushAiCatalogOptions): Promise<Push
 export async function pushRoomCatalog(options: PushRoomCatalogOptions): Promise<PushRoomCatalogResult> {
   return syncRequest<PushRoomCatalogSuccess>(options, {
     action: "publish_room_catalog",
+    ...publicationIdentity(options),
     client_id: options.clientId,
     room_catalog: {
       version: options.catalog.version,
@@ -268,6 +302,7 @@ export async function pushRoomCatalog(options: PushRoomCatalogOptions): Promise<
 export async function pushTableCatalog(options: PushTableCatalogOptions): Promise<PushTableCatalogResult> {
   return syncRequest<PushTableCatalogSuccess>(options, {
     action: "publish_table_catalog",
+    ...publicationIdentity(options),
     client_id: options.clientId,
     table_catalog: {
       version: options.catalog.version,
@@ -298,6 +333,7 @@ export async function pushTableCatalog(options: PushTableCatalogOptions): Promis
 export async function pushBusinessContext(options: PushBusinessContextOptions): Promise<PushBusinessContextResult> {
   return syncRequest<PushBusinessContextSuccess>(options, {
     action: "publish_business_context",
+    ...publicationIdentity(options),
     client_id: options.clientId,
     business_context: {
       version: options.context.version,
@@ -341,6 +377,7 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
 
   const result = await syncRequest<PushAiSettingsSuccess>(options, {
     action: "publish_ai_settings",
+    ...publicationIdentity(options),
     ai_settings: {
       enabled: options.aiSettings.enabled,
       provider: options.aiSettings.provider,
@@ -371,6 +408,15 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
   }
 
   return {
+    publication_name: result.publication_name,
+    source_client_id: result.source_client_id,
+    source_epoch: result.source_epoch,
+    source_revision: result.source_revision,
+    idempotency_key: result.idempotency_key,
+    payload_hash: result.payload_hash,
+    accepted: result.accepted,
+    deduplicated: result.deduplicated,
+    server_revision: result.server_revision,
     ok: true,
     message: redactSecret(result.message, options.aiSettings.apiKey),
     published_at: publishedAt,
@@ -432,6 +478,7 @@ export class PhpHostingSyncTransport implements SyncTransport {
   publishMarketingWebsite(input: VersionedPublication<MarketingWebsiteProjection>): Promise<DealerAccessPublicationResult> {
     return syncRequest<DealerAccessPublicationSuccess>(this.config, {
       action: "publish_marketing_website", client_id: this.config.clientId,
+      source_epoch: this.config.sourceEpoch,
       source_revision: input.sourceRevision, idempotency_key: input.idempotencyKey,
       marketing: input.value
     });
@@ -440,6 +487,7 @@ export class PhpHostingSyncTransport implements SyncTransport {
   publishDealerAccess(input: VersionedPublication<DealerAccessProjection>): Promise<DealerAccessPublicationResult> {
     return syncRequest<DealerAccessPublicationSuccess>(this.config, {
       action: "publish_dealer_access", client_id: this.config.clientId,
+      source_epoch: this.config.sourceEpoch,
       source_revision: input.sourceRevision, idempotency_key: input.idempotencyKey,
       dealer_access: input.value
     });
@@ -475,7 +523,8 @@ export class PhpHostingSyncTransport implements SyncTransport {
 
 async function syncRequest<SuccessResult extends { ok: true }>(
   config: SyncCoreConfig,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  endpoint = "sync.php"
 ): Promise<SuccessResult | SyncFailure> {
   const validationError = validateConfig(config);
   if (validationError) {
@@ -491,14 +540,27 @@ async function syncRequest<SuccessResult extends { ok: true }>(
   }
 
   try {
-    const endpointUrl = createSyncEndpointUrl(config.baseUrl);
+    const publication = publicationFields[String(body.action)];
+    if (publication) {
+      if (typeof body.client_id !== "string" || !/^[A-Za-z0-9._:-]{6,120}$/.test(body.client_id)
+          || !Number.isSafeInteger(body.source_epoch) || Number(body.source_epoch) < 1
+          || !Number.isSafeInteger(body.source_revision) || Number(body.source_revision) < 1
+          || typeof body.idempotency_key !== "string" || !body.idempotency_key) {
+        return { ok: false, message: "Publication kimliği eksik veya geçersiz.", error: "invalid_publication_identity" };
+      }
+      body.publication_body = JSON.stringify(body[publication.field]);
+      const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(body.publication_body)));
+      body.payload_hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+    const endpointUrl = `${config.baseUrl.trim().replace(/\/+$/, "")}/api/${endpoint}`;
     const response = await fetcher(endpointUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-YA-Sync-Secret": config.syncSecret
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000)
     });
     const payload = await readJsonResponse(response);
 
@@ -506,21 +568,46 @@ async function syncRequest<SuccessResult extends { ok: true }>(
       return {
         ok: false,
         status: response.status,
-        message: typeof payload?.message === "string"
+        ...(typeof payload?.error === "string" ? { error: redactSecret(payload.error, config.syncSecret) } : {}),
+        message: redactSecret(typeof payload?.message === "string"
           ? payload.message
-          : describeInvalidSyncResponse(response.status, endpointUrl)
+          : describeInvalidSyncResponse(response.status, endpointUrl), config.syncSecret)
       };
     }
 
+    if (publication && (payload.publication_name !== publication.name || payload.source_client_id !== body.client_id
+        || payload.source_epoch !== body.source_epoch || payload.source_revision !== body.source_revision
+        || payload.idempotency_key !== body.idempotency_key || payload.payload_hash !== body.payload_hash
+        || payload.accepted !== true || typeof payload.deduplicated !== "boolean"
+        || !Number.isSafeInteger(payload.server_revision) || Number(payload.server_revision) < 0
+        || typeof payload.published_at !== "string" || !Number.isFinite(Date.parse(payload.published_at)))) {
+      return { ok: false, message: "Publication apply onayı doğrulanamadı.", error: "publication_ack_mismatch" };
+    }
+    if (typeof payload.message === "string") payload.message = redactSecret(payload.message, config.syncSecret);
     return payload as SuccessResult;
   } catch (error) {
     return {
       ok: false,
       message: describeSyncConnectionFailure(config.baseUrl),
-      error: describeError(error)
+      error: redactSecret(describeError(error), config.syncSecret)
     };
   }
 }
+
+const publicationFields: Record<string, { name: string; field: string }> = {
+  publish_menu: { name: "menu", field: "menu" },
+  publish_android_snapshot: { name: "android_snapshot", field: "snapshot" },
+  publish_online_catalog: { name: "online_catalog", field: "online_catalog" },
+  publish_dealer_access: { name: "dealer_access_private", field: "dealer_access" },
+  publish_marketing_website: { name: "marketing_website", field: "marketing" },
+  publish_room_catalog: { name: "room_catalog", field: "room_catalog" },
+  publish_table_catalog: { name: "table_catalog", field: "table_catalog" },
+  publish_ai_catalog: { name: "ai_catalog", field: "ai_catalog" },
+  publish_business_context: { name: "business_context", field: "business_context" },
+  publish_ai_settings: { name: "ai_settings", field: "ai_settings" },
+  publish_public_room_availability: { name: "public_room_availability", field: "availability" },
+  publish_google_reviews_settings: { name: "google_reviews_settings", field: "google_reviews" }
+};
 
 function describeSyncConnectionFailure(baseUrl: string) {
   const target = getSafeSyncTarget(baseUrl);
@@ -644,4 +731,3 @@ function redactSecret(value: unknown, secret: string) {
 
   return text.split(normalizedSecret).join("[gizlendi]");
 }
-

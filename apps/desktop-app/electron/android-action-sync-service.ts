@@ -11,6 +11,7 @@ import {
 import type { DesktopDatabase, DesktopDashboardData } from "./database";
 import { createAndroidOperationsSnapshot } from "./android-operations-snapshot";
 import { getWebSyncConfig } from "./sync-config";
+import { publishDesktopProjection } from "./desktop-publication-service";
 
 export interface AndroidActionProcessSummary {
   pulled: number;
@@ -73,11 +74,10 @@ export class AndroidActionSyncService {
       this.database,
       this.database.getDashboardData()
     );
-    const result = await pushAndroidSnapshot({
-      ...getWebSyncConfig(setup),
-      clientId: this.database.getSyncRuntimeStatus().clientId,
-      snapshot
-    });
+    const config = getWebSyncConfig(setup);
+    const result = await publishDesktopProjection(this.database, config, "android_snapshot", snapshot,
+      (identity, frozen) => pushAndroidSnapshot({ ...config, ...identity, snapshot: frozen }), { refresh: true });
+    if (!result) return { ok: false, message: "Android yayın niyeti hazırlanamadı." };
 
     this.database.recordSyncEvent({
       direction: "push",

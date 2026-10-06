@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { activateFixtureSource } from "./test-helpers/publication-protocol.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
@@ -31,7 +32,7 @@ const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", hosting], { stdio:
 let serverOutput = ""; let browser;
 server.stdout.on("data", (chunk) => { serverOutput += chunk; });
 server.stderr.on("data", (chunk) => { serverOutput += chunk; });
-const transport = new PhpHostingSyncTransport({ baseUrl, syncSecret: secret, clientId: "desktop-dealer-test" });
+const transport = new PhpHostingSyncTransport({ baseUrl, syncSecret: secret, clientId: "desktop-dealer-test", sourceEpoch: 1 });
 function storage(code) {
   const result = spawnSync("php", ["-r", `require $argv[1]; $db = ya_storage_open(); ${code}`, join(hosting, "lib/storage.php")], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
@@ -40,16 +41,20 @@ function storage(code) {
 const clearGuard = () => storage("if ($db->query(\"SELECT 1 FROM sqlite_master WHERE name = 'public_request_guard_events'\")->fetchColumn()) $db->exec('DELETE FROM public_request_guard_events');");
 const accessId = randomUUID(); const customerRef = randomUUID();
 let sourceRevision = 0; let accessRevision = Date.now();
+const sentProjections = new Map();
 let token = randomBytes(32).toString("base64url"); const tokens = [token];
 let row = { access_id: accessId, customer_ref: customerRef, display_name: "Bayi <Şirket>", access_revision: accessRevision,
   enabled: true, invite_hash: createHash("sha256").update(token).digest("hex"), invite_expires_at: Math.floor(Date.now() / 1000) + 3600 };
 async function publish({ rotate = false, enabled = true, expire = false, rows, extra = {} } = {}) {
+  if (sourceRevision === 0) await activateFixtureSource(baseUrl, secret, "desktop-dealer-test");
   if (rotate) { token = randomBytes(32).toString("base64url"); tokens.push(token); accessRevision += 1; }
   row = { ...row, access_revision: accessRevision, enabled, invite_hash: enabled ? createHash("sha256").update(token).digest("hex") : "",
     invite_expires_at: expire ? Math.floor(Date.now() / 1000) - 1 : Math.floor(Date.now() / 1000) + 3600, ...extra };
   sourceRevision += 1;
+  const value = { version: 1, enabled, dealers: structuredClone(rows ?? [row]) };
+  sentProjections.set(sourceRevision, value);
   const result = await transport.publishDealerAccess({ sourceRevision, idempotencyKey: `dealer:${sourceRevision}`,
-    value: { version: 1, enabled, dealers: rows ?? [row] } });
+    value });
   assert.equal(result.ok, true, result.message);
   return result;
 }
@@ -93,7 +98,7 @@ try {
   genericFailure(await post("claim", { invite_token: token }));
   await publish(); // A newer source publication with unchanged access revision cannot unconsume an invite.
   genericFailure(await post("claim", { invite_token: token }));
-  const receiptReplay = await transport.publishDealerAccess({ sourceRevision: 1, idempotencyKey: "dealer:1", value: { version: 1, enabled: true, dealers: [row] } }); assert.equal(receiptReplay.deduplicated, true);
+  const receiptReplay = await transport.publishDealerAccess({ sourceRevision: 1, idempotencyKey: "dealer:1", value: sentProjections.get(1) }); assert.equal(receiptReplay.deduplicated, true);
   assert.equal((await session(cookie)).status, 200);
   const persisted = storage("echo json_encode(['access' => $db->query('SELECT * FROM dealer_access')->fetchAll(), 'sessions' => $db->query('SELECT * FROM dealer_sessions')->fetchAll()]);");
   assert.equal(persisted.sessions[0].session_hash, createHash("sha256").update(sessionToken).digest("hex"));
@@ -181,6 +186,15 @@ try {
   });
 
     assert.equal(setup.ok, true, setup.message);
+    // Explicit generation replacement between the transport-only fixture and
+    // the canonical Desktop phase; an arbitrary first POST cannot take over.
+    const clientId = database.getSyncRuntimeStatus().clientId;
+    const activationResponse = await fetch(`${baseUrl}/api/sync.php`, { method: "POST", headers: {
+      "Content-Type": "application/json", "X-YA-Sync-Secret": secret
+    }, body: JSON.stringify({ action: "activate_publication_source", client_id: clientId, expected_epoch: 1, activation_key: `${clientId}:replace:1` }) });
+    const activation = await activationResponse.json();
+    assert.equal(activation.source_epoch, 2);
+    database.savePublicationSourceEpoch(baseUrl, 2);
     const customer = database.saveCustomer({ fullName: "Canonical dealer", phone: "+905550004321", email: "", notes: "PRIVATE_CUSTOMER_NOTES_SENTINEL", tags: [],
       commercialProfile: { companyName: "Canonical company", dealerStatus: "active", priceGroup: "dealer_a" } });
     assert.equal(customer.ok, true, customer.message);

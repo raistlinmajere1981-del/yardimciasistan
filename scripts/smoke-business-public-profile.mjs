@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { exactFixtureReceipt } from "./test-helpers/publication-protocol.mjs";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -165,8 +166,11 @@ try {
   const originalFetch = globalThis.fetch;
   const published = [];
   globalThis.fetch = async (_url, init) => {
-    published.push(JSON.parse(init.body).business_context);
-    return new Response(JSON.stringify({ ok: true, message: "ok", published_at: new Date().toISOString(), profile_id: "pension_restaurant" }), { status: 200 });
+    const body = JSON.parse(init.body);
+    if (body.action === "activate_publication_source") return Response.json({ ok: true,
+      source_client_id: body.client_id, source_epoch: body.expected_epoch + 1, activation_key: body.activation_key });
+    published.push(body.business_context);
+    return Response.json({ ok: true, ...exactFixtureReceipt(body), message: "ok", profile_id: "pension_restaurant" });
   };
   try {
     for (const mode of ["manual", "google_maps_embed"]) {

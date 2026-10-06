@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -1922,13 +1923,13 @@ async function publishSnapshot(baseUrl, snapshot, label) {
       "Content-Type": "application/json",
       "X-YA-Sync-Secret": syncSecret
     },
-    body: JSON.stringify({
+    body: JSON.stringify(publicationEnvelope({
       action: "publish_android_snapshot",
-      client_id: "android-ui-permission-smoke",
+      client_id: "android-phone-test",
       source_revision: snapshotRevision,
       idempotency_key: `android-ui-permission-smoke-${snapshotRevision}`,
       snapshot
-    })
+    }))
   });
   const result = await response.json();
   if (!response.ok || !result.ok) {

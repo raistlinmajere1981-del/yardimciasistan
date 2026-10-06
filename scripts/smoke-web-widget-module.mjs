@@ -1,4 +1,5 @@
 import { chromium, expect } from "@playwright/test";
+import { activateFixtureSource, publicationFixtureFetch } from "./test-helpers/publication-protocol.mjs";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -31,7 +32,7 @@ for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-w
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
 }
 writeFileSync(conversationsFile, "[]\n");
-writeFileSync(join(webModuleRoot, "data", "ai-settings.local.php"), "<?php return ['enabled' => false];\n");
+writeFileSync(join(webModuleRoot, "config", "ai.local.php"), "<?php return ['enabled' => false];\n");
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
@@ -50,6 +51,7 @@ server.stderr.on("data", (chunk) => {
 
 try {
   await waitForUrl(`${baseUrl}/widget.js`);
+  await activateFixtureSource(baseUrl, syncSecret, "desktop-widget-module-smoke");
 
   const publicBusinessBeforeSyncResponse = await fetch(`${baseUrl}/api/business.php`);
   expect(publicBusinessBeforeSyncResponse.status).toBe(200);
@@ -57,7 +59,7 @@ try {
   expect(publicBusinessBeforeSync.business.profile_id).toBe("pension_restaurant");
   expect(publicBusinessBeforeSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
 
-  const capabilityPublication = await fetch(`${baseUrl}/api/sync.php`, {
+  const capabilityPublication = await publicationFixtureFetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
     body: JSON.stringify({
@@ -310,7 +312,7 @@ try {
   expect(requests).toHaveLength(1);
   expect(requests[0].id).toBe(requestResult.request_id);
 
-  const aiDisabledPublication = await fetch(`${baseUrl}/api/sync.php`, {
+  const aiDisabledPublication = await publicationFixtureFetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
     body: JSON.stringify({
@@ -350,7 +352,7 @@ try {
   await expect(aiDisabledPage.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Yardımcısı");
   await aiDisabledPage.close();
 
-  const requestsDisabledPublication = await fetch(`${baseUrl}/api/sync.php`, {
+  const requestsDisabledPublication = await publicationFixtureFetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
     body: JSON.stringify({

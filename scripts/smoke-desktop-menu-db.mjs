@@ -514,7 +514,7 @@ try {
   assert.ok(dashboardData.summary.availableMenuItems >= 6);
 
   const publishedEventCount = database.countEventsByType("menu.published");
-  database.markMenuPublished();
+  database.markMenuPublished(database.getQrMenuPublication());
   assert.equal(database.countEventsByType("menu.published"), publishedEventCount + 1);
 
   const completedSyncCount = database.countEventsByType("sync.completed");

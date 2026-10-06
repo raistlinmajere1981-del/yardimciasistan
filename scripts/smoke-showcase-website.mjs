@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { activateFixtureSource } from './test-helpers/publication-protocol.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -20,7 +21,7 @@ assert.equal(existsSync('test-site/landing/demo'), false);
 const port = await new Promise(resolvePort => { const server = http.createServer(); server.listen(0, '127.0.0.1', () => { const p = server.address().port; server.close(() => resolvePort(p)); }); });
 const base = `http://127.0.0.1:${port}`, config = { baseUrl: `${base}/yardimci-asistan`, syncSecret: secret };
 const php = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', root], { stdio: 'ignore' });
-const clientId = f.db.getSyncRuntimeStatus().clientId, transport = new PhpHostingSyncTransport({ ...config, clientId });
+const clientId = f.db.getSyncRuntimeStatus().clientId, transport = new PhpHostingSyncTransport({ ...config, clientId, sourceEpoch: 1 });
 const coordinator = new SyncCoordinator({ database: f.db, marketingWebsite: f.publisher, getSyncConfig: () => config, createAndroidSnapshot: () => ({}), onDashboardChanged: () => {}, onStatusChanged: () => {} });
 let browser;
 const clearOthers = () => { for (const job of f.db.getPendingSyncJobs()) if (job.jobType !== 'marketing_website_publish') f.db.completeSyncJob(job.jobKey, job.sourceRevision); };
@@ -28,12 +29,15 @@ const push = async () => { clearOthers(); const result = await coordinator.publi
 // Real storage publications, isolated from a customer's runtime. Leaf endpoint regressions have their own registered smokes.
 const seed = (name, value, revision = 1) => {
   const file = join(root, 'seed.json'); writeFileSync(file, JSON.stringify(value));
-  const result = spawnSync('php', ['-r', 'require $argv[1]; ya_storage_publish($argv[2], json_decode(file_get_contents($argv[3]),true), "showcase-seed", (int)$argv[4], $argv[2].":".$argv[4], date(DATE_ATOM));', join(moduleRoot, 'lib/storage.php'), name, file, String(revision)], { encoding: 'utf8' });
+  const result = spawnSync('php', ['-r', 'require $argv[1]; $json=file_get_contents($argv[3]); ya_storage_publish($argv[2], json_decode($json,true), $argv[5], (int)$argv[4], $argv[2].":".$argv[4], date(DATE_ATOM), 1, hash("sha256",$json));', join(moduleRoot, 'lib/storage.php'), name, file, String(revision), clientId], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
 };
 try {
   for (let n = 0; n < 50; n++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(r => setTimeout(r, 100)); }
   const capabilities = await transport.getCapabilities();
+  await activateFixtureSource(config.baseUrl, secret, clientId);
+  f.db.savePublicationSourceEpoch(config.baseUrl, 1);
+  f.db.ensurePublicationTarget(config.baseUrl);
   assert.ok(!capabilities.features.includes('website_navigation'));
   await push(); assert.equal(f.db.getSyncRuntimeStatus().enabled, false);
   browser = await launchChromiumForSmoke(chromium); const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });

@@ -157,7 +157,7 @@ async function assertSyncReachesTransport(database) {
     const coordinator = new SyncCoordinator({
       database,
       getSyncConfig: () => ({ baseUrl: setup.webModuleUrl, syncSecret: setup.syncSecret }),
-      createAndroidSnapshot: () => { throw new Error("Offline smoke must stop at capabilities."); },
+      createAndroidSnapshot: () => { throw new Error("Offline smoke must stop at source activation."); },
       onDashboardChanged: () => {},
       onStatusChanged: () => {}
     });
@@ -165,7 +165,7 @@ async function assertSyncReachesTransport(database) {
     assert.equal(result.ok, false);
     assert.notEqual(result.message, "Masaüstü senkron kimliği oluşturulamadı.");
     assert.ok(calls.length > 0, "A fresh Market database must reach the transport even while offline.");
-    assert.ok(calls.every((call) => call.body.action === "capabilities"));
+    assert.ok(calls.every((call) => call.body.action === "activate_publication_source"));
     assert.ok(database.getSyncRuntimeStatus().lastAttemptAt);
   } finally {
     globalThis.fetch = originalFetch;

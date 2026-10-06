@@ -19,18 +19,71 @@ const {
   markAndroidActionResult,
   markRequestsSynced,
   pullAndroidActions,
-  pushAiCatalog,
-  pushAiSettings,
-  pushBusinessContext,
-  pushRoomCatalog,
-  pushTableCatalog,
-  pushAndroidSnapshot,
-  pushMenu,
+  pushAiCatalog: rawPushAiCatalog,
+  pushAiSettings: rawPushAiSettings,
+  pushBusinessContext: rawPushBusinessContext,
+  pushRoomCatalog: rawPushRoomCatalog,
+  pushTableCatalog: rawPushTableCatalog,
+  pushAndroidSnapshot: rawPushAndroidSnapshot,
+  pushMenu: rawPushMenu,
+  pushGoogleReviewsSettings,
   pullRequests,
   resetHostingRuntime,
   PhpHostingSyncTransport,
   resolveAndroidActionPermission
 } = require("../dist");
+
+const fixtureIdentity = { clientId: "desktop-fixture", sourceEpoch: 1, sourceRevision: 1, idempotencyKey: "fixture:1" };
+function fixtureReceipt(body) {
+  return { accepted: true, publication_name: body.action.slice(8), source_client_id: body.client_id,
+    source_epoch: body.source_epoch, source_revision: body.source_revision, idempotency_key: body.idempotency_key,
+    payload_hash: body.payload_hash, server_revision: 1, deduplicated: false, published_at: "2026-10-06T00:00:00Z" };
+}
+// These unit fixtures exercise field allowlists/network handling with a valid
+// hosting receipt. Protocol failure tests below use the raw production entry.
+function publicationFixture(send) {
+  return (options) => send({ ...fixtureIdentity, ...options, fetchImpl: async (url, init) => {
+    const response = await options.fetchImpl(url, init);
+    const body = await response.json();
+    return Response.json(body.ok ? { ...fixtureReceipt(JSON.parse(init.body)), ...body } : body, { status: response.status });
+  } });
+}
+const pushMenu = publicationFixture(rawPushMenu), pushAndroidSnapshot = publicationFixture(rawPushAndroidSnapshot),
+  pushAiCatalog = publicationFixture(rawPushAiCatalog), pushAiSettings = publicationFixture(rawPushAiSettings),
+  pushBusinessContext = publicationFixture(rawPushBusinessContext), pushRoomCatalog = publicationFixture(rawPushRoomCatalog),
+  pushTableCatalog = publicationFixture(rawPushTableCatalog);
+
+test("publication transport rejects every mismatched receipt field and revisionless calls", async () => {
+  const options = { ...fixtureIdentity, baseUrl: "https://example.test", syncSecret: "fixture-secret",
+    menu: { enabled: false, categories: [], items: [], updated_at: "2026-10-06T00:00:00Z" } };
+  for (const field of ["publication_name", "source_client_id", "source_epoch", "source_revision", "idempotency_key", "payload_hash", "accepted", "deduplicated", "server_revision", "published_at"]) {
+    const result = await rawPushMenu({ ...options, fetchImpl: async (_url, init) => {
+      const receipt = fixtureReceipt(JSON.parse(init.body));
+      receipt[field] = field === "accepted" ? false : field === "server_revision" ? "bad" : field === "deduplicated" ? "bad" : "mismatch";
+      return Response.json({ ok: true, ...receipt });
+    } });
+    assert.equal(result.ok, false, field); assert.equal(result.error, "publication_ack_mismatch", field);
+  }
+  let called = false;
+  const missing = await rawPushMenu({ ...options, sourceEpoch: undefined, fetchImpl: async () => { called = true; return Response.json({ ok: true }); } });
+  assert.equal(missing.ok, false); assert.equal(called, false);
+});
+
+test("private Google publication allowlists receipts and redacts provider/sync secrets on every outcome", async () => {
+  const apiKey = "places-private-sentinel", syncSecret = "sync-private-sentinel";
+  for (const outcome of ["success", "rejection", "network"]) {
+    const result = await pushGoogleReviewsSettings({ ...fixtureIdentity, baseUrl: "https://example.test", syncSecret,
+      settings: { enabled: true, place_id: "place-test", api_key: apiKey }, fetchImpl: async (_url, init) => {
+        if (outcome === "network") throw new Error(`${apiKey} ${syncSecret}`);
+        const body = JSON.parse(init.body);
+        return Response.json({ ...fixtureReceipt(body), ok: outcome === "success", api_key: apiKey,
+          message: `${apiKey} ${syncSecret}`, error: `${apiKey} ${syncSecret}` }, { status: outcome === "success" ? 200 : 503 });
+      } });
+    assert.equal(result.ok, outcome === "success");
+    assert.equal(JSON.stringify(result).includes(apiKey), false, outcome);
+    assert.equal(JSON.stringify(result).includes(syncSecret), false, outcome);
+  }
+});
 
 test("local companion protocol contract keeps discovery identity independent from address", () => {
   assert.equal(LOCAL_COMPANION_PROTOCOL_VERSION, 1);
@@ -718,6 +771,7 @@ test("pushAiSettings sends the complete snake_case settings and strips the API k
 
   assert.equal(result.ok, true);
   assert.deepEqual(result, {
+    ...fixtureReceipt(calls[0].body),
     ok: true,
     message: "AI ayarları yayınlandı. [gizlendi]",
     published_at: "2026-07-12T16:30:00+03:00",
@@ -936,6 +990,7 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
   };
 
   const result = await pushBusinessContext({
+    sourceRevision: 3,
     baseUrl: "https://firma.example/yardimci-asistan",
     syncSecret: "sync-secret",
     clientId: "desktop-1",
@@ -1189,10 +1244,10 @@ test("web order transport rejects invalid page cursors and ordering before impor
 test("online catalog publication uses the versioned transport and a public field allowlist", async () => {
   const calls = [];
   const transport = new PhpHostingSyncTransport({
-    baseUrl: "https://example.test/module", syncSecret: "online-catalog-secret", clientId: "desktop-catalog",
+    baseUrl: "https://example.test/module", syncSecret: "online-catalog-secret", clientId: "desktop-catalog", sourceEpoch: 1,
     fetchImpl: async (_url, init) => {
       calls.push(JSON.parse(init.body));
-      return Response.json({ ok: true, product_count: 1, source_revision: 4, server_revision: 9, deduplicated: false });
+      return Response.json({ ...fixtureReceipt(calls.at(-1)), ok: true, product_count: 1, source_revision: 4, server_revision: 9, deduplicated: false });
     }
   });
   await transport.publishOnlineCatalog({ sourceRevision: 4, idempotencyKey: "desktop-catalog:online_catalog:4", value: {
@@ -1202,7 +1257,11 @@ test("online catalog publication uses the versioned transport and a public field
       purchasePrice: 10, dealerPriceA: 15, barcode: "private-barcode", internalNotes: "private"
     }]
   }});
-  assert.deepEqual(calls[0], {
+  const { source_epoch, publication_body, payload_hash, ...catalogRequest } = calls[0];
+  assert.equal(source_epoch, 1);
+  assert.equal(publication_body, JSON.stringify(calls[0].online_catalog));
+  assert.match(payload_hash, /^[a-f0-9]{64}$/);
+  assert.deepEqual(catalogRequest, {
     action: "publish_online_catalog", client_id: "desktop-catalog", source_revision: 4,
     idempotency_key: "desktop-catalog:online_catalog:4", online_catalog: {
       version: 1, enabled: true, delivery_methods: ["pickup", "shipping"], updated_at: "2026-10-04T00:00:00Z", products: [{

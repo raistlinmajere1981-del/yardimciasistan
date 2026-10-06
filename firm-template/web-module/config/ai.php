@@ -18,8 +18,7 @@ $config = [
 ];
 
 $configFiles = [
-    __DIR__ . '/ai.local.php',
-    dirname(__DIR__) . '/data/ai-settings.local.php'
+    __DIR__ . '/ai.local.php'
 ];
 
 foreach ($configFiles as $configFile) {
@@ -27,10 +26,7 @@ foreach ($configFiles as $configFile) {
         continue;
     }
 
-    // Masaüstü AI ayarlarını hosting çalışırken güncelleyebilir. Bazı PHP/opcache
-    // kurulumları aynı process içinde değişen dosyayı revalidate süresi dolana kadar
-    // eski bytecode ile çalıştırır. Runtime ayar dosyası küçük ve seyrek değiştiği
-    // için her okumada açıkça invalidate etmek yeni ayarı hemen görünür kılar.
+    // Host-local defaults can change while PHP/opcache remains running.
     if (function_exists('opcache_invalidate')) {
         @opcache_invalidate($configFile, true);
     }
@@ -42,4 +38,6 @@ foreach ($configFiles as $configFile) {
     }
 }
 
-return $config;
+require_once dirname(__DIR__) . '/lib/storage.php';
+$publishedConfig = ya_storage_private_config('ai_settings');
+return $publishedConfig === null ? $config : array_merge($config, $publishedConfig);

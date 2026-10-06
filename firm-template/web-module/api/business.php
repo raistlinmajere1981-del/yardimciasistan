@@ -158,18 +158,9 @@ function ya_business_publication_enabled(string $name, bool $legacyDefault): boo
 
 function ya_business_google_reviews_enabled(): bool
 {
-    $path = YA_BASE_DIR . '/data/google-reviews.local.php';
-    if (!is_file($path)) return false;
-
-    try {
-        $settings = require $path;
-        return is_array($settings)
-            && ($settings['enabled'] ?? false) === true
-            && trim((string)($settings['place_id'] ?? '')) !== ''
-            && trim((string)($settings['api_key'] ?? '')) !== '';
-    } catch (Throwable) {
-        return false;
-    }
+    $published = ya_storage_private_config('google_reviews_settings');
+    return ($published['enabled'] ?? false) === true
+        && ($published['place_id'] ?? '') !== '' && ($published['api_key'] ?? '') !== '';
 }
 
 function ya_business_public_capabilities(): ?array

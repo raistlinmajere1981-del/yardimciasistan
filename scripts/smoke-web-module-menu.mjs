@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
+import { activateFixtureSource, publicationFixturePost } from "./test-helpers/publication-protocol.mjs";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
@@ -11,7 +12,7 @@ const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-web-module-"));
 const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
-const aiSettingsFile = join(webModuleRoot, "data", "ai-settings.local.php");
+const aiSettingsFile = join(webModuleRoot, "data", "ai-settings.local.php"); // Assert obsolete writer output stays absent.
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
 businessConfig.sync_secret = "change-this-secret";
@@ -86,6 +87,8 @@ try {
 
   browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await activateFixtureSource(baseUrl, businessConfig.sync_secret, "desktop-web-menu-smoke");
+  const syncPost = publicationFixturePost(page.request, "desktop-web-menu-smoke");
 
   const emptyResponse = await page.request.get(`${baseUrl}/api/menu.php`);
   expect(emptyResponse.status()).toBe(200);
@@ -96,7 +99,7 @@ try {
   expect(emptyReviews.headers()["cache-control"]).toContain("no-store");
   expect(await emptyReviews.json()).toMatchObject({ available: false, reason: "not_configured" });
 
-  const invalidGoogleTest = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const invalidGoogleTest = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "test_google_reviews_settings",
@@ -108,7 +111,7 @@ try {
   expect(await invalidGoogleTest.json()).toMatchObject({ ok: false });
 
   const googleSecret = "smoke-google-key-not-secret";
-  const googlePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const googlePublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_google_reviews_settings",
@@ -123,7 +126,7 @@ try {
   expect(googlePublish.status()).toBe(200);
   const googlePublishBody = await googlePublish.text();
   expect(googlePublishBody).not.toContain(googleSecret);
-  expect(readFileSync(join(webModuleRoot, "data", "google-reviews.local.php"), "utf8")).toContain(googleSecret);
+  expect(readPrivateConfig("google_reviews_settings").api_key).toBe(googleSecret);
 
   const businessWithReviews = await page.request.get(`${baseUrl}/api/business.php`);
   expect(businessWithReviews.status()).toBe(200);
@@ -131,7 +134,7 @@ try {
   expect(businessWithReviewsBody).not.toContain(googleSecret);
   expect(JSON.parse(businessWithReviewsBody)).toMatchObject({ business: { google_reviews_enabled: true } });
 
-  const googleDisable = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const googleDisable = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_google_reviews_settings",
@@ -154,7 +157,7 @@ try {
   expect(disabledReviews.status()).toBe(200);
   expect(await disabledReviews.json()).toMatchObject({ available: false, reason: "not_configured" });
 
-  const fixturePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const fixturePublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_menu",
@@ -198,7 +201,7 @@ try {
   expect(menu.items.some((item) => item.id === "item_unavailable_sahlep")).toBe(false);
   expect(menu.categories.some((category) => category.id === "cat_hidden")).toBe(false);
 
-  const publishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const publishResponse = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_menu",
@@ -347,7 +350,7 @@ try {
     },
     updated_at: "2026-07-18T10:00:00+03:00"
   };
-  const androidStockSnapshotResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const androidStockSnapshotResponse = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_android_snapshot",
@@ -360,7 +363,7 @@ try {
   });
   expect(androidStockSnapshotResponse.ok()).toBe(true);
 
-  const hiddenQrMenuPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const hiddenQrMenuPublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_menu",
@@ -384,7 +387,7 @@ try {
   expect(hiddenQrBusiness.ok()).toBe(true);
   expect((await hiddenQrBusiness.json()).business.public_surfaces).not.toContain("qr_menu");
 
-  const visibleQrMenuPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const visibleQrMenuPublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_menu",
@@ -407,7 +410,7 @@ try {
   expect(visibleQrBusiness.ok()).toBe(true);
   expect((await visibleQrBusiness.json()).business.public_surfaces).toContain("qr_menu");
 
-  const qrModuleDisabledSnapshot = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const qrModuleDisabledSnapshot = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_android_snapshot",
@@ -430,7 +433,7 @@ try {
   expect(qrModuleDisabledBusiness.ok()).toBe(true);
   expect((await qrModuleDisabledBusiness.json()).business.public_surfaces).not.toContain("qr_menu");
 
-  const qrModuleEnabledSnapshot = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const qrModuleEnabledSnapshot = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_android_snapshot",
@@ -532,7 +535,7 @@ try {
     code: "ai_capability_disabled"
   });
 
-  const aiEnabledSnapshotResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const aiEnabledSnapshotResponse = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_android_snapshot",
@@ -592,7 +595,7 @@ try {
     api_key: mockAiApiKey,
     timeout_seconds: 10
   };
-  const headerlessAiPublishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const headerlessAiPublishResponse = await syncPost(`${baseUrl}/api/sync.php`, {
     data: {
       action: "publish_ai_settings",
       sync_secret: "change-this-secret",
@@ -609,7 +612,7 @@ try {
   });
   expect(getAiPublishResponse.status()).toBe(405);
 
-  const invalidUrlAiPublishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const invalidUrlAiPublishResponse = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: {
       "X-YA-Sync-Secret": "change-this-secret"
     },
@@ -625,7 +628,7 @@ try {
   expect(await invalidUrlAiPublishResponse.text()).not.toContain(mockAiApiKey);
   expect(existsSync(aiSettingsFile)).toBe(false);
 
-  const aiPublishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const aiPublishResponse = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: {
       "X-YA-Sync-Secret": "change-this-secret"
     },
@@ -649,10 +652,11 @@ try {
     has_api_key: true
   });
   expect(aiPublishResult.api_key).toBeUndefined();
-  expect(statSync(aiSettingsFile).mode & 0o777).toBe(0o600);
+  expect(readPrivateConfig("ai_settings").api_key).toBe(mockAiApiKey);
+  expect(statSync(join(webModuleRoot, "data", "yardimci-asistan.sqlite")).mode & 0o777).toBe(0o600);
 
   const directAiSettingsResponse = await page.request.get(`${baseUrl}/data/ai-settings.local.php`);
-  expect(await directAiSettingsResponse.text()).toBe("");
+  expect(directAiSettingsResponse.status()).toBe(404);
 
   const liveChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: {
@@ -676,7 +680,7 @@ try {
     store: false
   });
 
-  const businessContextPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const businessContextPublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_business_context",
@@ -749,7 +753,7 @@ try {
   });
   expect(roomMediaUploadResult.url).toMatch(/\/media\/rooms\/room_101\/room_media_smoke_cover\.png$/);
 
-  const roomCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const roomCatalogPublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_room_catalog",
@@ -816,7 +820,7 @@ try {
   expect(publishedRoomMedia.headers()["content-type"]).toContain("image/png");
 
 
-  const roomCatalogDisabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const roomCatalogDisabled = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_room_catalog",
@@ -841,7 +845,7 @@ try {
   // reuse the already-published URL without another upload.
   expect((await page.request.get(`${baseUrl}${roomMediaUploadResult.url}`)).ok()).toBe(true);
 
-  const roomCatalogReenabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const roomCatalogReenabled = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_room_catalog",
@@ -923,7 +927,7 @@ try {
       }]
     }]
   };
-  const tableCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const tableCatalogPublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_table_catalog",
@@ -957,7 +961,7 @@ try {
   });
   expect((await page.request.get(`${baseUrl}${tableMediaUploadResult.url}`)).ok()).toBe(true);
 
-  const tableCatalogDisabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const tableCatalogDisabled = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_table_catalog",
@@ -980,7 +984,7 @@ try {
   });
   expect((await page.request.get(`${baseUrl}${tableMediaUploadResult.url}`)).ok()).toBe(true);
 
-  const tableCatalogReenabled = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const tableCatalogReenabled = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_table_catalog",
@@ -993,7 +997,7 @@ try {
   });
   expect(tableCatalogReenabled.ok()).toBe(true);
 
-  const aiCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+  const aiCatalogPublish = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_ai_catalog",
@@ -1199,8 +1203,7 @@ try {
   expect(aiConversation.request_id).toBe(aiRequestResult.request_id);
   expect(aiConversation.status).toBe("converted_to_request");
 
-  writeFileSync(aiSettingsFile, `<?php
-return ${toPhpArray({
+  const seedGemini = spawnSync("php", ["-r", `require $argv[1]; ya_storage_open()->prepare("UPDATE private_publication_config SET config_json = ? WHERE name = 'ai_settings'")->execute([ya_storage_encode(${toPhpArray({
     enabled: true,
     provider: "openai_compatible",
     service: "gemini",
@@ -1208,8 +1211,8 @@ return ${toPhpArray({
     model: "gemini-smoke",
     api_key: mockAiApiKey,
     timeout_seconds: 10
-  })};
-`);
+  })})]);`, join(webModuleRoot, "lib/storage.php")], { encoding: "utf8" });
+  expect(seedGemini.status).toBe(0);
   const geminiChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: { message: "Merhaba, Gemini authorization key testi" }
   });
@@ -1324,6 +1327,12 @@ function delay(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function readPrivateConfig(name) {
+  const result = spawnSync("php", ["-r", "require $argv[1]; echo json_encode(ya_storage_private_config($argv[2]));", join(webModuleRoot, "lib/storage.php"), name], { encoding: "utf8" });
+  expect(result.status).toBe(0);
+  return JSON.parse(result.stdout);
 }
 
 function toPhpArray(value) {

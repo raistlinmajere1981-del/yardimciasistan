@@ -882,6 +882,16 @@ export class DesktopDatabase {
     queueStoredSyncJob(this.db, jobType, timestamp);
   }
 
+  getPublicationSourceEpoch(target: string) { return getStoredPublicationSourceEpoch(this.db, target); }
+  savePublicationSourceEpoch(target: string, epoch: number) { saveStoredPublicationSourceEpoch(this.db, target, epoch); }
+  prepareSyncPublication<T>(jobType: DesktopSyncJobType, value: T, refresh = false, expectedRevision?: number) {
+    return prepareStoredSyncPublication(this.db, jobType, value, refresh, expectedRevision);
+  }
+
+  ensurePublicationTarget(target: string) {
+    ensureStoredPublicationTarget(this.db, target);
+  }
+
   completeSyncJob(jobKey: string, sourceRevision: number) {
     completeStoredSyncJob(this.db, jobKey, sourceRevision);
   }
@@ -1199,20 +1209,37 @@ export class DesktopDatabase {
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
-  markMenuPublished() {
+  markMenuPublished(sent: PublishedQrMenu) {
     const now = new Date().toISOString();
-    this.db.prepare("UPDATE menu_categories SET sync_status = 'synced', updated_at = ? WHERE deleted_at = ''").run(now);
-    this.db.prepare("UPDATE menu_items SET sync_status = 'synced', updated_at = ? WHERE deleted_at = ''").run(now);
-    insertDatabaseEvent(this.db, {
-      type: "menu.published",
-      entityType: "menu",
-      entityId: "qr_menu",
-      payload: {
-        category_count: this.getScalarCount("SELECT COUNT(*) as count FROM menu_categories WHERE deleted_at = ''"),
-        item_count: this.getScalarCount("SELECT COUNT(*) as count FROM menu_items WHERE deleted_at = ''")
-      },
-      now
-    });
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = this.getQrMenuPublication();
+      // Ack is evidence about sent row versions, never about all current rows.
+      for (const category of sent.categories) {
+        if (JSON.stringify(current.categories.find((row) => row.id === category.id)) !== JSON.stringify(category)) continue;
+        this.db.prepare("UPDATE menu_categories SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
+          .run(category.id, category.updated_at);
+      }
+      for (const item of sent.items) {
+        if (JSON.stringify(current.items.find((row) => row.id === item.id)) !== JSON.stringify(item)) continue;
+        this.db.prepare("UPDATE menu_items SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
+          .run(item.id, item.updated_at);
+      }
+      insertDatabaseEvent(this.db, {
+        type: "menu.published",
+        entityType: "menu",
+        entityId: "qr_menu",
+        payload: {
+          category_count: sent.categories.length,
+          item_count: sent.items.length
+        },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   recordSyncEvent(input: RecordSyncEventInput) {
@@ -1301,6 +1328,10 @@ import {
   getSyncRuntimeStatus as getStoredSyncRuntimeStatus,
   getPendingSyncJobs as getStoredPendingSyncJobs,
   queueSyncJob as queueStoredSyncJob,
+  getPublicationSourceEpoch as getStoredPublicationSourceEpoch,
+  savePublicationSourceEpoch as saveStoredPublicationSourceEpoch,
+  prepareSyncPublication as prepareStoredSyncPublication,
+  ensurePublicationTarget as ensureStoredPublicationTarget,
   completeSyncJob as completeStoredSyncJob,
   failSyncJob as failStoredSyncJob,
   recordSyncAttempt as recordStoredSyncAttempt,

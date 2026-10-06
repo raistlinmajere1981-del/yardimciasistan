@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { activateFixtureSource, publicationEnvelope } from './test-helpers/publication-protocol.mjs';
 import { spawn } from 'node:child_process';
 import { cpSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,14 +15,17 @@ cpSync('firm-template/web-module',root,{recursive:true});
 writeFileSync(join(root,'config/business.json'),JSON.stringify({sync_secret:secret,allowed_origins:[]}));
 const port=await new Promise(resolve=>{const server=http.createServer();server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p));});});
 const baseUrl=`http://127.0.0.1:${port}`,php=spawn('php',['-S',`127.0.0.1:${port}`,'-t',root],{stdio:'ignore'});
-const config={baseUrl,syncSecret:secret},clientId=f.db.getSyncRuntimeStatus().clientId,transport=new PhpHostingSyncTransport({...config,clientId});
+const config={baseUrl,syncSecret:secret},clientId=f.db.getSyncRuntimeStatus().clientId,transport=new PhpHostingSyncTransport({...config,clientId,sourceEpoch:1});
 let browser;
 const coordinator=new SyncCoordinator({database:f.db,marketingWebsite:f.publisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{},onStatusChanged:()=>{}});
 const push=async()=>{const result=await coordinator.publishOutbox(transport);assert.equal(result.errors.length,0,JSON.stringify(result.errors));return result;};
-const post=payload=>fetch(`${baseUrl}/api/sync.php`,{method:'POST',headers:{'Content-Type':'application/json','X-YA-Sync-Secret':secret},body:JSON.stringify(payload)});
+const post=payload=>fetch(`${baseUrl}/api/sync.php`,{method:'POST',headers:{'Content-Type':'application/json','X-YA-Sync-Secret':secret},body:JSON.stringify(publicationEnvelope(payload))});
 try {
   for(let n=0;n<50;n++){try{if((await fetch(`${baseUrl}/api/marketing.php`)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
   assert.equal((await transport.getCapabilities()).features.includes('marketing_website_publications'),true);
+  await activateFixtureSource(baseUrl,secret,clientId);
+  f.db.savePublicationSourceEpoch(baseUrl,1);
+  f.db.ensurePublicationTarget(baseUrl);
   assert.deepEqual((await fetch(`${baseUrl}/api/marketing.php`).then(r=>r.json())).publications,[]);
   assert.equal((await fetch(`${baseUrl}/api/sync.php?action=publish_marketing_website`,{headers:{'X-YA-Sync-Secret':secret}})).status,405);
   assert.equal((await fetch(`${baseUrl}/api/marketing-media.php`,{method:'POST'})).status,401);
@@ -33,6 +37,7 @@ try {
   for(const job of f.db.getPendingSyncJobs())if(job.jobType!=='marketing_website_publish')f.db.completeSyncJob(job.jobKey,job.sourceRevision);
   const job=f.db.getPendingSyncJobs().find(j=>j.jobType==='marketing_website_publish');
   const prepared=await f.publisher.prepare(config,clientId);assert.equal(prepared.ok,true,prepared.message);
+  f.db.prepareSyncPublication('marketing_website_publish',{projection:prepared.projection,sent:prepared.sent});
   const source={sourceRevision:job.sourceRevision,idempotencyKey:`${clientId}:${job.jobKey}:${job.sourceRevision}`,value:prepared.projection};
   const first=await transport.publishMarketingWebsite(source);assert.equal(first.ok,true,first.message);assert.equal(first.source_revision,job.sourceRevision);
   const duplicate=await transport.publishMarketingWebsite(source);assert.equal(duplicate.ok,true);assert.equal(duplicate.deduplicated,true);assert.equal(duplicate.server_revision,first.server_revision);
@@ -45,7 +50,8 @@ try {
   assert.equal(Object.hasOwn(publicItems[0],'businessId'),false);assert.equal(Object.hasOwn(publicItems[0],'contentId'),false);
   f.state.webUrl=baseUrl;assert.equal((await f.service.testWebsite()).connected,true);
   const malicious={...prepared.projection,secret:'PRIVATE',publications:prepared.projection.publications.map(p=>({...p,aiGenerationMetadata:{prompt:'PRIVATE'},images:p.images.map(i=>({...i,storageRef:'/PRIVATE'}))}))};
-  const sanitized=await post({action:'publish_marketing_website',client_id:'sanitization_probe',source_revision:1,idempotency_key:'sanitized',marketing:malicious});
+  f.db.queueSyncJob('marketing_website_publish'); // The sanitizer probe consumes a real source revision.
+  const sanitized=await post({action:'publish_marketing_website',client_id:clientId,source_revision:job.sourceRevision+1,idempotency_key:'sanitized',marketing:malicious});
   assert.equal(sanitized.status,200);assert.ok(!JSON.stringify(await fetch(`${baseUrl}/api/marketing.php`).then(r=>r.json())).includes('PRIVATE'));
   const bad={...prepared.projection,publications:prepared.projection.publications.map(p=>({...p,images:[{...p.images[0],url:'https://evil.example/pixel',sortOrder:0}]}))};
   assert.equal((await post({action:'publish_marketing_website',client_id:clientId,source_revision:999,idempotency_key:'unsafe-url',marketing:bad})).status,422);

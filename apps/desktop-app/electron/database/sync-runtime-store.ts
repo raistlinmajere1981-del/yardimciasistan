@@ -1,4 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
+import { createHash } from "node:crypto";
+import { encodePublicationPayload, decodePublicationPayload } from "../publication-payload-codec.js";
 import type {
   DesktopSyncJob,
   DesktopSyncJobType,
@@ -63,8 +65,7 @@ export function getPendingSyncJobs(db: DatabaseSync, now = new Date().toISOStrin
 }
 
 export function queueSyncJob(db: DatabaseSync, jobType: DesktopSyncJobType, timestamp = new Date().toISOString()) {
-  const jobKey = jobType === "marketing_website_publish" ? "marketing_website" : jobType === "menu_publish" ? "menu"
-    : jobType === "online_catalog_publish" ? "online_catalog" : jobType === "dealer_access_publish" ? "dealer_access" : "android_snapshot";
+  const jobKey = jobType.replace(/_publish$/, "");
   db
     .prepare(`
         INSERT INTO sync_outbox (
@@ -79,6 +80,70 @@ export function queueSyncJob(db: DatabaseSync, jobType: DesktopSyncJobType, time
           updated_at = excluded.updated_at
       `)
     .run(jobKey, jobType, timestamp, timestamp);
+}
+
+export function getPublicationSourceEpoch(db: DatabaseSync, target: string): number {
+  return Number((db.prepare('SELECT source_epoch FROM sync_publication_sources WHERE target = ?').get(target) as { source_epoch: number } | undefined)?.source_epoch ?? 0);
+}
+
+export function savePublicationSourceEpoch(db: DatabaseSync, target: string, epoch: number) {
+  db.prepare('INSERT INTO sync_publication_sources(target, source_epoch) VALUES (?, ?) ON CONFLICT(target) DO UPDATE SET source_epoch = MAX(source_epoch, excluded.source_epoch)').run(target, epoch);
+}
+
+export function ensurePublicationTarget(db: DatabaseSync, target: string) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const current = db.prepare("SELECT publication_target FROM sync_runtime WHERE id = 'primary'").get() as { publication_target: string };
+    if (current.publication_target !== target) {
+      const payloads = db.prepare('SELECT job_key FROM sync_publication_payloads').all() as { job_key: string }[];
+      for (const { job_key: key } of payloads) {
+        queueSyncJob(db, (key === 'android_snapshot' ? key : `${key}_publish`) as DesktopSyncJobType);
+      }
+      db.prepare("UPDATE sync_runtime SET publication_target = ? WHERE id = 'primary'").run(target);
+    }
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+/** One allocator, one immutable body per revision. The comparison is persisted,
+ * not an in-memory cache. Canonical readers reconstitute missing derived intent.
+ * refresh means "publish now"; a pending retry keeps its identity/body.
+ */
+export function prepareSyncPublication<T>(db: DatabaseSync, jobType: DesktopSyncJobType, value: T, refresh = false, expectedRevision?: number) {
+  const jobKey = jobType.replace(/_publish$/, "");
+  const json = JSON.stringify(value);
+  const content = { ...(value as object) } as Record<string, unknown>;
+  delete content.updatedAt;
+  delete content.updated_at;
+  delete content.generated_at;
+  const hash = createHash('sha256').update(JSON.stringify(content)).digest('hex');
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    let job = db.prepare('SELECT source_revision FROM sync_outbox WHERE job_key = ?').get(jobKey) as { source_revision: number } | undefined;
+    // Async media/projection preparation may have raced a domain mutation. Never
+    // attach an older prepared body to the newer invalidation it did not observe.
+    if (expectedRevision !== undefined && job?.source_revision !== expectedRevision) { db.exec('COMMIT'); return null; }
+    const stored = db.prepare('SELECT * FROM sync_publication_payloads WHERE job_key = ?').get(jobKey) as {
+      source_revision: number; payload: string; content_hash: string;
+    } | undefined;
+    if ((!job && (refresh || !stored || stored.content_hash !== hash))
+        || (job && stored?.source_revision === job.source_revision && stored.content_hash !== hash
+          && !["menu", "android_snapshot", "online_catalog", "dealer_access", "marketing_website"].includes(jobKey))) {
+      queueSyncJob(db, jobType);
+      job = db.prepare('SELECT source_revision FROM sync_outbox WHERE job_key = ?').get(jobKey) as { source_revision: number };
+    }
+    if (!job) { db.exec('COMMIT'); return null; }
+    let frozen = value;
+    if (stored?.source_revision === job.source_revision) {
+      frozen = JSON.parse(decodePublicationPayload(stored.payload)) as T;
+    } else {
+      db.prepare('INSERT INTO sync_publication_payloads(job_key, source_revision, payload, content_hash) VALUES (?, ?, ?, ?) ON CONFLICT(job_key) DO UPDATE SET source_revision = excluded.source_revision, payload = excluded.payload, content_hash = excluded.content_hash')
+        .run(jobKey, job.source_revision, encodePublicationPayload(jobKey, json), hash);
+    }
+    if (refresh) db.prepare("UPDATE sync_outbox SET next_attempt_at = '' WHERE job_key = ? AND source_revision = ?").run(jobKey, job.source_revision);
+    db.exec('COMMIT');
+    return { jobKey, sourceRevision: job.source_revision, value: frozen };
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
 }
 
 export function completeSyncJob(db: DatabaseSync, jobKey: string, sourceRevision: number) {

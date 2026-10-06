@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -36,13 +37,12 @@ globalThis.fetch = async (url, init) => {
   if (!String(url).endsWith("/api/sync.php")) return new Response("{}", { status: 404 });
   const body = JSON.parse(init.body);
   calls.push(body);
-  if (["capabilities", "publish_online_catalog", "pull_web_orders"].includes(body.action)) {
+  if (["capabilities", "activate_publication_source", "pull_web_orders"].includes(body.action) || body.action.startsWith("publish_")) {
     if (body.action === "publish_online_catalog" && failPublication) return Response.json({ ok: false, message: "retry" }, { status: 503 });
     const result = endpoint("sync.php", body);
     if (body.action === "capabilities" && !supportsCatalog) result.payload.features = result.payload.features.filter((feature) => feature !== "online_catalog_v1");
     return Response.json(result.payload, { status: result.status });
   }
-  if (body.action === "publish_android_snapshot") return Response.json({ ok: true });
   return new Response("{}", { status: 404 });
 };
 const coordinator = new SyncCoordinator({ database, getSyncConfig: () => ({ baseUrl: "https://catalog.example.test", syncSecret: secret }),
@@ -123,7 +123,7 @@ try {
   assert.equal(published.products[0].product_id, product.id);
   const request = calls.find((call) => call.action === "publish_online_catalog");
   assert.ok(request.source_revision > 0);
-  assert.equal(request.idempotency_key, `${database.getSyncRuntimeStatus().clientId}:online_catalog:${request.source_revision}`);
+  assert.equal(request.idempotency_key, `${database.getSyncRuntimeStatus().clientId}:${request.source_epoch}:online_catalog:${request.source_revision}`);
   assert.equal(endpoint("sync.php", request).payload.deduplicated, true);
   assert.equal(endpoint("catalog.php", {}, "GET", false, `"ya-online-catalog-${published.server_revision}"`).status, 304);
   assert.equal(endpoint("sync.php", { ...request, source_revision: request.source_revision - 1, idempotency_key: "stale-publication" }).status, request.source_revision > 1 ? 409 : 422);
@@ -149,14 +149,16 @@ try {
   }
 
   // Defense in depth: injected private fields never enter hosting storage or public output.
-  const dirty = { ...request, source_revision: request.source_revision + 100, idempotency_key: "public-allowlist-test",
-    online_catalog: { ...request.online_catalog, internal_notes: "secret", delivery_settings: { carrier: "secret" }, products: request.online_catalog.products.map((p) => ({ ...p, barcode: "secret", purchase_price: 9, dealer_price: 12, supplier: "secret" })) } };
+  database.queueSyncJob("online_catalog_publish");
+  const probeRevision = database.getPendingSyncJobs().find((job) => job.jobKey === "online_catalog").sourceRevision;
+  const dirty = publicationEnvelope({ ...request, source_revision: probeRevision, idempotency_key: "public-allowlist-test",
+    online_catalog: { ...request.online_catalog, internal_notes: "secret", delivery_settings: { carrier: "secret" }, products: request.online_catalog.products.map((p) => ({ ...p, barcode: "secret", purchase_price: 9, dealer_price: 12, supplier: "secret" })) } });
   assert.equal(endpoint("sync.php", dirty).status, 200);
   published = readCatalog().payload;
   assert.equal(JSON.stringify(published).includes("secret"), false);
   assert.deepEqual(Object.keys(published.products[0]).sort(), Object.keys(request.online_catalog.products[0]).sort());
-  // Use a separate source id so the transport-injection test cannot conflict with Desktop's revision line.
-  endpoint("sync.php", { ...dirty, client_id: "desktop-test-injection", source_revision: 1, idempotency_key: "injection-source" });
+  assert.equal(endpoint("sync.php", { ...dirty, client_id: "desktop-test-injection", source_revision: 1, idempotency_key: "injection-source" }).status, 409,
+    "an arbitrary source cannot replace the activated Desktop");
   database.saveCommerceProductPublication({ productId: product.id, isPublished: false });
   assert.deepEqual(database.createCommerceOnlineCatalog().products, []);
   assert.equal((await coordinator.runNow()).ok, true);
@@ -169,6 +171,7 @@ try {
   failPublication = true;
   assert.equal((await coordinator.runNow()).ok, false);
   const pending = raw.prepare("SELECT * FROM sync_outbox WHERE job_key = 'online_catalog'").get();
+  assert.equal(pending.attempt_count, 1, "one failed POST increments retry bookkeeping exactly once");
   assert.ok(pending.source_revision > beforePriceRevision, "revision remains monotonic after completed jobs");
   failPublication = false;
   raw.exec("UPDATE sync_outbox SET next_attempt_at = '' WHERE job_key = 'online_catalog'");

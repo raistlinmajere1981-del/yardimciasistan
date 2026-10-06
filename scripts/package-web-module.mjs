@@ -202,7 +202,7 @@ function validateSource() {
 
   const aiConfig = readFileSync(join(sourceRoot, "config", "ai.php"), "utf8");
   assert.ok(aiConfig.includes("getenv('YARDIMCI_ASISTAN_AI_API_KEY')"), "config/ai.php API anahtarını ortam değişkeninden okumalı.");
-  assert.ok(aiConfig.includes("data/ai-settings.local.php"), "config/ai.php masaüstünden yayınlanan korumalı AI ayarını okumalı.");
+  assert.ok(aiConfig.includes("ya_storage_private_config('ai_settings')"), "config/ai.php atomik özel AI publication ayarını okumalı.");
   assert.ok(aiConfig.includes("public-request-guard.php") && aiConfig.includes("ya_public_guard_enforce('chat')"), "Web AI public abuse guard üzerinden geçmeli.");
 
   const requestEndpoint = readFileSync(join(sourceRoot, "api", "request.php"), "utf8");

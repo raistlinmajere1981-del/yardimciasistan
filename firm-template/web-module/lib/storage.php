@@ -33,6 +33,8 @@ function ya_storage_open(): PDO
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false
         ]);
+        // Set permissions before SQLite creates WAL/SHM files containing private config.
+        if (!@chmod(YA_STORAGE_DATABASE_FILE, 0600)) throw new RuntimeException('private_storage_permissions_failed');
         $database->exec('PRAGMA foreign_keys = ON');
         $database->exec('PRAGMA busy_timeout = 5000');
         $journalMode = strtolower((string) $database->query('PRAGMA journal_mode = WAL')->fetchColumn());
@@ -40,8 +42,8 @@ function ya_storage_open(): PDO
             $database->exec('PRAGMA journal_mode = DELETE');
         }
         ya_storage_create_schema($database);
-        if (is_file(YA_STORAGE_DATABASE_FILE)) {
-            @chmod(YA_STORAGE_DATABASE_FILE, 0600);
+        foreach ([YA_STORAGE_DATABASE_FILE, YA_STORAGE_DATABASE_FILE . '-wal', YA_STORAGE_DATABASE_FILE . '-shm'] as $privateFile) {
+            if (is_file($privateFile) && !@chmod($privateFile, 0600)) throw new RuntimeException('private_storage_permissions_failed');
         }
         return $database;
     } catch (Throwable $error) {
@@ -57,7 +59,7 @@ function ya_storage_capabilities(): array
 {
     ya_storage_open();
     return [
-        'protocol_version' => 2,
+        'protocol_version' => 3,
         'storage' => 'sqlite',
         'features' => [
             'marketing_website_publications',
@@ -73,6 +75,8 @@ function ya_storage_capabilities(): array
             'android_device_sightings',
             'android_device_permissions',
             'versioned_publications',
+            'exact_publication_receipts',
+            'publication_source_epochs',
             'idempotent_publications',
             'server_revision',
             'runtime_reset'
@@ -95,6 +99,7 @@ function ya_storage_reset_runtime(): array
         'android_device_sightings',
         'publications',
         'publication_receipts',
+        'private_publication_config',
         'sync_clients',
         'sync_meta',
         // These tables are created lazily by their own subsystems and may not
@@ -608,27 +613,80 @@ function ya_storage_get_android_action(string $actionId): ?array
     return is_array($row) ? ya_storage_android_action_from_row($row) : null;
 }
 
+/** Explicit authenticated compare-and-swap activation; publication POSTs never activate sources.
+ * The hosting database is tenant-scoped. Epoch history deliberately survives runtime reset.
+ */
+function ya_storage_activate_source(string $clientId, int $expectedEpoch, string $activationKey): array
+{
+    $database = ya_storage_open();
+    if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/D', $clientId) !== 1 || $expectedEpoch < 0 || $activationKey === '') {
+        throw new YaStorageConflictException('invalid_source_activation');
+    }
+    $database->exec('BEGIN IMMEDIATE');
+    try {
+        $current = $database->query('SELECT * FROM publication_sources ORDER BY epoch DESC LIMIT 1')->fetch();
+        $previous = $database->prepare('SELECT * FROM publication_sources WHERE activation_key = ?');
+        $previous->execute([$activationKey]);
+        $receipt = $previous->fetch();
+        if (is_array($receipt)) {
+            if ($receipt['client_id'] !== $clientId || (int)$receipt['epoch'] !== $expectedEpoch + 1
+                || (int)($current['epoch'] ?? 0) !== (int)$receipt['epoch']) {
+                throw new YaStorageConflictException('source_activation_conflict');
+            }
+            $epoch = (int)$receipt['epoch'];
+        } else {
+            if ((int)($current['epoch'] ?? 0) !== $expectedEpoch) throw new YaStorageConflictException('source_epoch_conflict');
+            $retired = $database->prepare('SELECT 1 FROM publication_sources WHERE client_id = ?');
+            $retired->execute([$clientId]);
+            if ($retired->fetchColumn() !== false) throw new YaStorageConflictException('source_retired');
+            $epoch = $expectedEpoch + 1;
+            $database->prepare('INSERT INTO publication_sources(epoch, client_id, activation_key) VALUES (?, ?, ?)')
+                ->execute([$epoch, $clientId, $activationKey]);
+        }
+        $database->exec('COMMIT');
+        return ['source_client_id' => $clientId, 'source_epoch' => $epoch, 'activation_key' => $activationKey];
+    } catch (Throwable $error) {
+        $database->exec('ROLLBACK');
+        throw $error;
+    }
+}
+
 function ya_storage_publish(
     string $name,
     array $payload,
     string $clientId,
-    ?int $sourceRevision,
+    int $sourceRevision,
     string $idempotencyKey,
     string $now,
-    ?callable $applyInTransaction = null
+    int $sourceEpoch,
+    string $payloadHash,
+    ?callable $applyInTransaction = null,
+    bool $bumpServerRevision = true
 ): array {
     $database = ya_storage_open();
-    $clientId = ya_storage_normalize_client_id($clientId);
+    if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/D', $clientId) !== 1 || $sourceRevision < 1 || $sourceEpoch < 1
+        || $idempotencyKey === '' || strlen($idempotencyKey) > 240 || preg_match('/^[a-f0-9]{64}$/D', $payloadHash) !== 1) {
+        throw new YaStorageConflictException('invalid_publication_identity');
+    }
     $database->exec('BEGIN IMMEDIATE');
     try {
-        if ($idempotencyKey !== '') {
+        $source = $database->query('SELECT epoch, client_id FROM publication_sources ORDER BY epoch DESC LIMIT 1')->fetch();
+        if (!is_array($source) || $source['client_id'] !== $clientId || (int)$source['epoch'] !== $sourceEpoch) {
+            throw new YaStorageConflictException('publication_source_fenced');
+        }
+        // Validate identity before returning historic receipts, including retired epochs.
+        {
             $receipt = $database->prepare(
-                'SELECT response_json FROM publication_receipts WHERE idempotency_key = :key AND publication_name = :name'
+                'SELECT * FROM publication_receipts WHERE idempotency_key = :key AND publication_name = :name'
             );
             $receipt->execute([':key' => $idempotencyKey, ':name' => $name]);
-            $storedReceipt = $receipt->fetchColumn();
-            if (is_string($storedReceipt) && $storedReceipt !== '') {
-                $response = ya_storage_decode($storedReceipt, []);
+            $storedReceipt = $receipt->fetch();
+            if (is_array($storedReceipt)) {
+                if ($storedReceipt['source_client_id'] !== $clientId || (int)$storedReceipt['source_epoch'] !== $sourceEpoch
+                    || (int)$storedReceipt['source_revision'] !== $sourceRevision || !hash_equals($storedReceipt['payload_hash'], $payloadHash)) {
+                    throw new YaStorageConflictException('publication_receipt_conflict');
+                }
+                $response = ya_storage_decode($storedReceipt['response_json'], []);
                 if (is_array($response)) {
                     $response['deduplicated'] = true;
                 }
@@ -638,39 +696,48 @@ function ya_storage_publish(
         }
 
         $currentStatement = $database->prepare(
-            'SELECT source_client_id, source_revision, server_revision FROM publications WHERE name = :name'
+            'SELECT * FROM publications WHERE name = :name'
         );
         $currentStatement->execute([':name' => $name]);
         $current = $currentStatement->fetch();
         $currentSourceRevision = is_array($current) ? (int) ($current['source_revision'] ?? 0) : 0;
-        $effectiveSourceRevision = $sourceRevision ?? ($currentSourceRevision + 1);
+        $revisionReceipt = $database->prepare('SELECT payload_hash FROM publication_receipts WHERE publication_name = ? AND source_epoch = ? AND source_revision = ? LIMIT 1');
+        $revisionReceipt->execute([$name, $sourceEpoch, $sourceRevision]);
+        $previousHash = $revisionReceipt->fetchColumn();
+        if (is_string($previousHash) && !hash_equals($previousHash, $payloadHash)) {
+            throw new YaStorageConflictException('publication_payload_conflict');
+        }
+        $effectiveSourceRevision = $sourceRevision;
         if (is_array($current)
-            && ya_storage_string($current['source_client_id'] ?? '') === $clientId
+            && (int)$current['source_epoch'] === $sourceEpoch
             && $effectiveSourceRevision < $currentSourceRevision) {
             throw new YaStorageConflictException('stale_publication_revision');
         }
 
         if (is_array($current)
-            && ya_storage_string($current['source_client_id'] ?? '') === $clientId
+            && (int)$current['source_epoch'] === $sourceEpoch
             && $effectiveSourceRevision === $currentSourceRevision) {
+            if (!hash_equals($current['payload_hash'], $payloadHash)) throw new YaStorageConflictException('publication_payload_conflict');
             $response = [
                 'accepted' => true,
                 'deduplicated' => true,
                 'source_revision' => $currentSourceRevision,
                 'server_revision' => (int) ($current['server_revision'] ?? 0),
-                'published_at' => $now
+                'published_at' => $current['updated_at']
             ];
         } else {
             if ($applyInTransaction !== null) $applyInTransaction($database);
-            $serverRevision = ya_storage_bump_revision($database, 'server_revision');
+            $serverRevision = $bumpServerRevision ? ya_storage_bump_revision($database, 'server_revision') : ya_storage_server_revision();
             $upsert = $database->prepare(<<<'SQL'
                 INSERT INTO publications (
-                  name, source_client_id, source_revision, server_revision, payload_json, updated_at
+                  name, source_client_id, source_epoch, source_revision, payload_hash, server_revision, payload_json, updated_at
                 ) VALUES (
-                  :name, :source_client_id, :source_revision, :server_revision, :payload_json, :updated_at
+                  :name, :source_client_id, :source_epoch, :source_revision, :payload_hash, :server_revision, :payload_json, :updated_at
                 )
                 ON CONFLICT(name) DO UPDATE SET
                   source_client_id = excluded.source_client_id,
+                  source_epoch = excluded.source_epoch,
+                  payload_hash = excluded.payload_hash,
                   source_revision = excluded.source_revision,
                   server_revision = excluded.server_revision,
                   payload_json = excluded.payload_json,
@@ -679,6 +746,8 @@ function ya_storage_publish(
             $upsert->execute([
                 ':name' => $name,
                 ':source_client_id' => $clientId,
+                ':source_epoch' => $sourceEpoch,
+                ':payload_hash' => $payloadHash,
                 ':source_revision' => $effectiveSourceRevision,
                 ':server_revision' => $serverRevision,
                 ':payload_json' => ya_storage_encode($payload),
@@ -693,17 +762,23 @@ function ya_storage_publish(
             ];
         }
 
-        if ($idempotencyKey !== '') {
+        $response += ['publication_name' => $name, 'source_client_id' => $clientId,
+            'source_epoch' => $sourceEpoch, 'idempotency_key' => $idempotencyKey, 'payload_hash' => $payloadHash];
+        {
             $receiptInsert = $database->prepare(<<<'SQL'
                 INSERT INTO publication_receipts (
-                  idempotency_key, publication_name, response_json, created_at
+                  idempotency_key, publication_name, source_client_id, source_epoch, source_revision, payload_hash, response_json, created_at
                 ) VALUES (
-                  :idempotency_key, :publication_name, :response_json, :created_at
+                  :idempotency_key, :publication_name, :source_client_id, :source_epoch, :source_revision, :payload_hash, :response_json, :created_at
                 ) ON CONFLICT(idempotency_key, publication_name) DO NOTHING
             SQL);
             $receiptInsert->execute([
                 ':idempotency_key' => $idempotencyKey,
                 ':publication_name' => $name,
+                ':source_client_id' => $clientId,
+                ':source_epoch' => $sourceEpoch,
+                ':source_revision' => $sourceRevision,
+                ':payload_hash' => $payloadHash,
                 ':response_json' => ya_storage_encode($response),
                 ':created_at' => $now
             ]);
@@ -719,7 +794,7 @@ function ya_storage_publish(
 function ya_storage_get_publication(string $name, array $fallback): array
 {
     $statement = ya_storage_open()->prepare(
-        'SELECT payload_json, source_client_id, source_revision, server_revision, updated_at FROM publications WHERE name = :name'
+        'SELECT payload_json, source_client_id, source_epoch, source_revision, server_revision, updated_at FROM publications WHERE name = :name'
     );
     $statement->execute([':name' => $name]);
     $row = $statement->fetch();
@@ -729,6 +804,7 @@ function ya_storage_get_publication(string $name, array $fallback): array
     $payload = ya_storage_decode($row['payload_json'] ?? '{}', $fallback);
     $payload['_publication'] = [
         'source_client_id' => ya_storage_string($row['source_client_id'] ?? ''),
+        'source_epoch' => (int)$row['source_epoch'],
         'source_revision' => (int) ($row['source_revision'] ?? 0),
         'server_revision' => (int) ($row['server_revision'] ?? 0),
         'updated_at' => ya_storage_string($row['updated_at'] ?? '')
@@ -852,6 +928,8 @@ function ya_storage_create_schema(PDO $database): void
         CREATE TABLE IF NOT EXISTS publications (
           name TEXT PRIMARY KEY,
           source_client_id TEXT NOT NULL,
+          source_epoch INTEGER NOT NULL CHECK (source_epoch > 0),
+          payload_hash TEXT NOT NULL,
           source_revision INTEGER NOT NULL,
           server_revision INTEGER NOT NULL,
           payload_json TEXT NOT NULL,
@@ -861,9 +939,25 @@ function ya_storage_create_schema(PDO $database): void
         CREATE TABLE IF NOT EXISTS publication_receipts (
           idempotency_key TEXT NOT NULL,
           publication_name TEXT NOT NULL,
+          source_client_id TEXT NOT NULL,
+          source_epoch INTEGER NOT NULL,
+          source_revision INTEGER NOT NULL,
+          payload_hash TEXT NOT NULL,
           response_json TEXT NOT NULL,
           created_at TEXT NOT NULL,
           PRIMARY KEY (idempotency_key, publication_name)
+        );
+        CREATE INDEX IF NOT EXISTS publication_receipts_revision ON publication_receipts(publication_name, source_epoch, source_revision);
+
+        CREATE TABLE IF NOT EXISTS publication_sources (
+          epoch INTEGER PRIMARY KEY CHECK (epoch > 0),
+          client_id TEXT NOT NULL UNIQUE,
+          activation_key TEXT NOT NULL UNIQUE
+        );
+        -- Sensitive desired config is not a public projection. Same SQLite transaction as its receipt.
+        CREATE TABLE IF NOT EXISTS private_publication_config (
+          name TEXT PRIMARY KEY,
+          config_json TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS sync_clients (
@@ -1008,4 +1102,28 @@ function ya_storage_string(mixed $value): string
 
 final class YaStorageConflictException extends RuntimeException
 {
+}
+
+/** Hash the exact immutable wire body, not a sanitized projection with server timestamps. */
+function ya_storage_publication_identity(array $envelope, array $candidate): array
+{
+    $json = $envelope['publication_body'] ?? null;
+    $hash = $envelope['payload_hash'] ?? null;
+    $epoch = $envelope['source_epoch'] ?? null;
+    $revision = $envelope['source_revision'] ?? null;
+    $key = $envelope['idempotency_key'] ?? null;
+    if (!is_string($json) || !is_string($hash) || !hash_equals(hash('sha256', $json), $hash)
+        || json_decode($json, true) !== $candidate || !is_int($epoch) || $epoch < 1
+        || !is_int($revision) || $revision < 1 || !is_string($key) || $key === '') {
+        throw new YaStorageConflictException('invalid_publication_identity');
+    }
+    return [$epoch, $hash];
+}
+
+function ya_storage_private_config(string $name): ?array
+{
+    $statement = ya_storage_open()->prepare('SELECT config_json FROM private_publication_config WHERE name = ?');
+    $statement->execute([$name]);
+    $json = $statement->fetchColumn();
+    return is_string($json) ? ya_storage_decode($json, []) : null;
 }

@@ -46,7 +46,7 @@ export function registerGoogleReviewsSettingsIpcHandlers(options: {
       if (!local.ok) return local;
 
       const publication = await publishGoogleReviewsSettings(
-        database.databasePath,
+        database,
         getWebSyncConfig(database.getSetupData()),
         database.getSyncRuntimeStatus().clientId
       );

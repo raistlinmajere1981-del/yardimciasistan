@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { networkInterfaces } from "node:os";
@@ -163,6 +164,7 @@ async function seedAndroidFixture(approvedDeviceIds, baseUrl) {
     rmSync(path, { force: true });
   }
   const androidSnapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
+  await activateFixtureSource(baseUrl, syncSecret, "android-phone-test");
   androidSnapshot.androidPermissions = Object.fromEntries(approvedDeviceIds.map((deviceId) => [
     deviceId,
     {
@@ -177,13 +179,13 @@ async function seedAndroidFixture(approvedDeviceIds, baseUrl) {
       "Content-Type": "application/json",
       "X-YA-Sync-Secret": syncSecret
     },
-    body: JSON.stringify({
+    body: JSON.stringify(publicationEnvelope({
       action: "publish_android_snapshot",
       client_id: "android-phone-test",
       source_revision: 1,
       idempotency_key: "android-phone-test:1",
       snapshot: androidSnapshot
-    })
+    }))
   });
   const result = await response.json();
   if (!response.ok || !result.ok) {

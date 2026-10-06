@@ -11,6 +11,7 @@ import {
 import type { DesktopDatabase } from "./database";
 import { getBusinessPublicProfile } from "./business-public-profile";
 import type { AiSettingsSyncConfig } from "./ai-settings-publish-service";
+import { publishDesktopProjection } from "./desktop-publication-service";
 
 export function createCurrentBusinessAiContext(database: DesktopDatabase): BusinessAiContext {
   const setup = database.getSetupData();
@@ -28,19 +29,18 @@ export function createCurrentBusinessAiContext(database: DesktopDatabase): Busin
 
 export async function publishBusinessAiContext(
   database: DesktopDatabase,
-  syncConfig: AiSettingsSyncConfig
-): Promise<PushBusinessContextResult> {
+  syncConfig: AiSettingsSyncConfig,
+  refresh = true
+): Promise<PushBusinessContextResult | null> {
   const profile = getBusinessPublicProfile(database.databasePath);
   const context: BusinessWebContext = {
     ...createCurrentBusinessAiContext(database),
     mapDisplayMode: profile.mapDisplayMode,
     googleMapsEmbedUrl: normalizeGoogleMapsEmbedUrl(profile.googleMapsEmbedUrl)
   };
-  const result = await pushBusinessContext({
-    ...syncConfig,
-    clientId: database.getSyncRuntimeStatus().clientId,
-    context
-  });
+  const result = await publishDesktopProjection(database, syncConfig, "business_context_publish", context,
+    (identity, frozen) => pushBusinessContext({ ...syncConfig, ...identity, context: frozen }), { refresh });
+  if (!result) return null;
 
   database.recordSyncEvent({
     direction: "push",
