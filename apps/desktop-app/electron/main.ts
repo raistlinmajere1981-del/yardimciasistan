@@ -496,7 +496,7 @@ const marketingAnalyticsService = new MarketingAnalyticsService(getDatabase, { a
 const marketingMediaService = new MarketingMediaService(getDatabase, () => getDatabase().userDataPath);
 const instagramPublicationService = new InstagramPublicationService(getDatabase, marketingMediaService, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()) });
 const marketingWebsiteService = new MarketingWebsitePublicationService(getDatabase, marketingMediaService);
-const marketingStudioService = new MarketingStudioService(getDatabase, marketingMediaService, () => {
+function publishPendingMarketingWebsiteIntent() {
   // Explicit user publication actions work even when passive automatic sync is disabled.
   const coordinator = getSyncCoordinator();
   void coordinator.runNow().then(() => {
@@ -505,7 +505,8 @@ const marketingStudioService = new MarketingStudioService(getDatabase, marketing
       void coordinator.runNow();
     }
   });
-}, instagramPublicationService);
+}
+const marketingStudioService = new MarketingStudioService(getDatabase, marketingMediaService, publishPendingMarketingWebsiteIntent, instagramPublicationService);
 const messagingCampaignService = new MessagingCampaignService(getDatabase, {
   assertAvailable: (channel, providerId) => {
     if (channel === "sms" && providerId === "iletimerkezi") { if (!smsMessagingService.getConfiguration().configured) throw new MessagingCampaignError("unconfigured", "SMS servis ayarlarını tamamlayın."); return; }
@@ -676,8 +677,13 @@ export function markLocalCompanionSnapshotDirty(): number {
   return localCompanionServer?.markSnapshotDirty() ?? 0;
 }
 
-export function scheduleAutomaticSyncSoon() {
+export function scheduleAutomaticSyncSoon(capabilitiesChanged = false) {
   if (!maintenanceSyncSuspended) {
+    if (capabilitiesChanged && getDatabase().getPendingSyncJobs().some(job => job.jobType === "marketing_website_publish" && job.attemptCount === 0)) {
+      // Capability withdrawal/reactivation is an explicit visibility mutation,
+      // even when the operator disabled passive automatic sync.
+      publishPendingMarketingWebsiteIntent();
+    }
     syncCoordinator?.scheduleSoon();
   }
 }

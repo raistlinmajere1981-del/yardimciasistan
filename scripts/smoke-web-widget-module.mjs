@@ -248,9 +248,19 @@ try {
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
 
+  let lostSubmission;
+  await page.route(`${baseUrl}/api/request.php`,async route=>{
+    lostSubmission=route.request().postDataJSON();
+    const accepted=await route.fetch();expect(accepted.status()).toBe(201);
+    await route.abort('failed'); // commit happened, browser never receives it
+  },{times:1});
+  await page.locator('.ya-widget-form button[type="submit"]').click();
+  await expect(page.locator('.ya-widget-form button[type="submit"]')).toBeEnabled();
+  expect(lostSubmission.idempotency_key).toMatch(/^[a-f0-9]{32}$/);
   const requestResponsePromise = page.waitForResponse((response) => response.url() === `${baseUrl}/api/request.php` && response.request().method() === "POST");
   await page.locator('.ya-widget-form button[type="submit"]').click();
   const requestResponse = await requestResponsePromise;
+  expect(requestResponse.request().postDataJSON().idempotency_key).toBe(lostSubmission.idempotency_key);
   expect(requestResponse.status()).toBe(201);
   const requestResult = await requestResponse.json();
   expect(requestResult.ok).toBe(true);

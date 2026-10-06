@@ -33,7 +33,10 @@ if ($expectedSecret === '' || $providedSecret === '' || !hash_equals($expectedSe
     ]);
 }
 
-$raw = (string) file_get_contents('php://input');
+$raw = (string) file_get_contents('php://input', false, null, 0, YA_AVAILABILITY_SYNC_MAX_BODY_BYTES + 1);
+if (strlen($raw) > YA_AVAILABILITY_SYNC_MAX_BODY_BYTES) {
+    ya_availability_sync_response(413, ['ok' => false, 'message' => 'Canlı müsaitlik yayını çok büyük.']);
+}
 $payload = json_decode($raw, true);
 if (!is_array($payload)) {
     ya_availability_sync_response(400, [
@@ -50,11 +53,10 @@ if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $clientId) !== 1) {
     ]);
 }
 
-$publication = ya_availability_sync_sanitize_publication(
-    is_array($payload['availability'] ?? null) ? $payload['availability'] : []
-);
-
 try {
+    $publication = ya_availability_sync_sanitize_publication(
+        is_array($payload['availability'] ?? null) ? $payload['availability'] : []
+    );
     $publishedAt = date(DATE_ATOM);
     [$epoch, $hash] = ya_storage_publication_identity($payload, $payload['availability'] ?? []);
     $result = ya_public_room_availability_store_publication(
@@ -69,6 +71,8 @@ try {
         'published_at' => $result['published_at'],
         'server_revision' => (int) ($result['server_revision'] ?? ya_storage_server_revision())
     ]);
+} catch (InvalidArgumentException $error) {
+    ya_availability_sync_response(422, ['ok' => false, 'error' => $error->getMessage(), 'message' => 'Canlı müsaitlik yayını eksik veya çok büyük.']);
 } catch (YaStorageConflictException $error) {
     ya_availability_sync_response(409, ['ok' => false, 'message' => 'Publication protocol conflict.', 'error' => $error->getMessage()]);
 } catch (Throwable $error) {
@@ -83,17 +87,23 @@ try {
 
 function ya_availability_sync_sanitize_publication(array $publication): array
 {
+    if (($publication['schema_version'] ?? null) !== 1 || !is_bool($publication['enabled'] ?? null)
+        || !is_array($publication['rooms'] ?? null) || !is_array($publication['blocks'] ?? null)
+        || !array_is_list($publication['rooms']) || !array_is_list($publication['blocks'])
+        || count($publication['rooms']) > 500 || count($publication['blocks']) > 5000) {
+        throw new InvalidArgumentException('availability_projection_limit');
+    }
     $enabled = ya_availability_sync_bool($publication['enabled'] ?? false);
     $generatedAt = substr(ya_availability_sync_string($publication['generated_at'] ?? ''), 0, 80);
     $rooms = [];
     $roomIds = [];
 
     if ($enabled) {
-        $sourceRooms = is_array($publication['rooms'] ?? null) ? array_slice($publication['rooms'], 0, 500) : [];
+        $sourceRooms = $publication['rooms'];
         foreach ($sourceRooms as $room) {
-            if (!is_array($room)) continue;
-            $id = substr(ya_availability_sync_string($room['id'] ?? ''), 0, 160);
-            if ($id === '' || isset($roomIds[$id])) continue;
+            if (!is_array($room)) throw new InvalidArgumentException('invalid_availability_room');
+            $id = ya_availability_sync_string($room['id'] ?? '');
+            if ($id === '' || strlen($id) > 160 || isset($roomIds[$id])) throw new InvalidArgumentException('invalid_availability_room');
             $status = ya_availability_sync_string($room['status'] ?? 'out_of_service');
             if (!in_array($status, ['available', 'reserved', 'occupied', 'cleaning', 'maintenance', 'out_of_service'], true)) {
                 $status = 'out_of_service';
@@ -110,10 +120,10 @@ function ya_availability_sync_sanitize_publication(array $publication): array
     }
 
     $blocks = [];
-    if ($enabled && $roomIds !== []) {
-        $sourceBlocks = is_array($publication['blocks'] ?? null) ? array_slice($publication['blocks'], 0, 5000) : [];
+    if ($enabled) {
+        $sourceBlocks = $publication['blocks'];
         foreach ($sourceBlocks as $block) {
-            if (!is_array($block)) continue;
+            if (!is_array($block)) throw new InvalidArgumentException('invalid_availability_block');
             $roomId = ya_availability_sync_string($block['room_id'] ?? '');
             $startDate = ya_availability_sync_string($block['start_date'] ?? '');
             $endDate = ya_availability_sync_string($block['end_date'] ?? '');
@@ -121,7 +131,7 @@ function ya_availability_sync_sanitize_publication(array $publication): array
                 || !ya_availability_sync_valid_date($startDate)
                 || !ya_availability_sync_valid_date($endDate)
                 || $endDate <= $startDate) {
-                continue;
+                throw new InvalidArgumentException('invalid_availability_block');
             }
             $blocks[] = [
                 'room_id' => $roomId,

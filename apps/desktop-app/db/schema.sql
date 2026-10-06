@@ -2835,6 +2835,38 @@ CREATE TABLE marketing_publication_media (
 );
 CREATE INDEX idx_marketing_contents_business ON marketing_contents(business_id, updated_at);
 CREATE INDEX idx_marketing_publications_business ON marketing_publications(business_id, channel);
+
+-- Capability bounds effective Web visibility; editorial desired_published is retained.
+CREATE TRIGGER trg_marketing_capability_insert AFTER INSERT ON business_capabilities
+WHEN NEW.capability_id = 'marketing.studio'
+  AND (EXISTS (SELECT 1 FROM marketing_publications WHERE channel = 'website')
+    OR EXISTS (SELECT 1 FROM sync_publication_payloads WHERE job_key = 'marketing_website'))
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('marketing_website', 'marketing_website_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_marketing_capability_update AFTER UPDATE OF is_enabled ON business_capabilities
+WHEN NEW.capability_id = 'marketing.studio' AND NEW.is_enabled != OLD.is_enabled
+  AND (EXISTS (SELECT 1 FROM marketing_publications WHERE channel = 'website')
+    OR EXISTS (SELECT 1 FROM sync_publication_payloads WHERE job_key = 'marketing_website'))
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('marketing_website', 'marketing_website_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_marketing_capability_delete AFTER DELETE ON business_capabilities
+WHEN OLD.capability_id = 'marketing.studio'
+  AND (EXISTS (SELECT 1 FROM marketing_publications WHERE channel = 'website')
+    OR EXISTS (SELECT 1 FROM sync_publication_payloads WHERE job_key = 'marketing_website'))
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('marketing_website', 'marketing_website_publish', OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
 CREATE INDEX idx_media_assets_business ON media_assets(business_id, archived_at);
 -- Retain every in-flight intent's files until a matching acknowledgement supersedes it.
 CREATE TABLE marketing_publication_pending_media (

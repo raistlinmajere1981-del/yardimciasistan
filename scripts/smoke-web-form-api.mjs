@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
+import { DatabaseSync } from "node:sqlite";
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
@@ -149,7 +153,61 @@ try {
   assert.equal(oversizedResponse.status, 413, "Aşırı büyük public payload erken reddedilmeli");
   assert.equal((await oversizedResponse.json()).code, "payload_too_large");
 
-  console.log(`web-form-api-ok: ${records.length} requests saved, abuse and payload guards verified`);
+  const php = code => {
+    const result=spawnSync('php',['-r',`require $argv[1]; ${code}`,join(webModuleRoot,'lib/public-request-submission.php')],{encoding:'utf8'});
+    assert.equal(result.status,0,result.stderr);return result.stdout;
+  };
+  const resetGuard=()=>php('ya_storage_open()->exec("DELETE FROM public_request_guard_events");');
+  resetGuard();
+  const intent={idempotency_key:'public-request-key-A',request_type:'pension_reservation',customer_name:'Replay Guest',
+    customer_phone:'0555 111 22 33',start_date:'2030-07-18',end_date:'2030-07-20',guest_count:2,message:'Quiet room'};
+  assert.equal((await postRequest({...intent,idempotency_key:null})).status,422,'key is mandatory');
+  await postRequest(intent); // discard successful response (lost response)
+  const retry=await (await postRequest(intent)).json();
+  const normalized=await (await postRequest({...intent,customer_phone:'+90 (555) 111 22 33',customer_name:'  Replay   Guest ',
+    date_text:'different localized display',whatsapp_message:'transport noise',message:'Quiet room\r\n'})).json();
+  assert.deepEqual(normalized,retry,'normalized retry returns exact original receipt');
+  const conflict=await postRequest({...intent,message:'Different request'});assert.equal(conflict.status,409);
+  assert.equal((await conflict.json()).code,'idempotency_conflict');
+  resetGuard();
+  const concurrent=await Promise.all(Array.from({length:4},async()=>{const r=await postRequest(intent);assert.equal(r.status,201);return r.json();}));
+  for(const result of concurrent)assert.deepEqual(result,retry);
+  assert.equal(Number(php(`echo ya_storage_open()->query("SELECT COUNT(*) FROM web_requests WHERE id='${retry.request_id}'")->fetchColumn();`)),1);
+  const distinct=await (await postRequest({...intent,idempotency_key:'public-request-key-B'})).json();
+  assert.notEqual(distinct.request_id,retry.request_id,'new key permits a new logical submission');
+  const before=php('echo json_encode([ya_storage_open()->query("SELECT COUNT(*) FROM web_requests")->fetchColumn(),ya_storage_open()->query("SELECT COUNT(*) FROM web_request_submission_receipts")->fetchColumn()]);');
+  php(`ya_storage_open()->exec("CREATE TRIGGER fail_request_receipt BEFORE INSERT ON web_request_submission_receipts BEGIN SELECT RAISE(ABORT, 'injected'); END");`);
+  assert.equal((await postRequest({...intent,idempotency_key:'public-request-key-rollback'})).status,500);
+  assert.equal(php('echo json_encode([ya_storage_open()->query("SELECT COUNT(*) FROM web_requests")->fetchColumn(),ya_storage_open()->query("SELECT COUNT(*) FROM web_request_submission_receipts")->fetchColumn()]);'),before,'queue insert rolls back with failed receipt');
+  php('ya_storage_open()->exec("DROP TRIGGER fail_request_receipt");');
+  assert.equal((await postRequest({...intent,idempotency_key:'public-request-key-rollback'})).status,201);
+
+  // Separate PHP processes contend for the SQLite write lock, not merely the
+  // development HTTP server's single request loop.
+  const canonical=JSON.parse(php(`echo ya_storage_open()->query("SELECT payload_json FROM web_requests WHERE id='${retry.request_id}'")->fetchColumn();`));
+  const contender=()=>new Promise((resolve,reject)=>{
+    const worker=spawn('php',['-r',`require $argv[1]; $r=json_decode($argv[2],true); $r['id']='request_'.bin2hex(random_bytes(16)); echo json_encode(ya_public_request_submit('public-request-concurrent', $r, ['ok'=>true,'request_id'=>$r['id']], ''));`,join(webModuleRoot,'lib/public-request-submission.php'),JSON.stringify(canonical)]);
+    let output='',errors='';worker.stdout.on('data',b=>output+=b);worker.stderr.on('data',b=>errors+=b);
+    worker.on('error',reject);worker.on('exit',code=>code===0?resolve(JSON.parse(output)):reject(new Error(errors)));
+  });
+  const workers=await Promise.all([contender(),contender(),contender()]);
+  for(const result of workers)assert.deepEqual(result,workers[0]);
+  const require=createRequire(import.meta.url),{DesktopDatabase}=require('../apps/desktop-app/dist-electron/database.js');
+  const desktop=new DesktopDatabase({appPath:join(process.cwd(),'apps/desktop-app'),userDataPath:join(tempRoot,'desktop')});
+  desktop.initialize();assert.equal(desktop.saveInitialSetup(createSmokeSetupInput({businessName:'Request ingress',phone:'',whatsapp:'',webModuleUrl:baseUrl,syncSecret,servicePreferences:{whatsapp:false,android:false}})).ok,true);
+  const pull=async()=>{const r=await fetch(`${baseUrl}/api/sync.php`,{method:'POST',headers:{'Content-Type':'application/json','X-YA-Sync-Secret':syncSecret},body:JSON.stringify({action:'pull_requests',after_seq:0,limit:100})});return (await r.json()).requests;};
+  const ingress=await pull();assert.equal(ingress.filter(r=>r.id===retry.request_id).length,1);
+  const local=new DatabaseSync(desktop.databasePath);
+  try {
+    desktop.upsertRequests(ingress);
+    local.prepare("UPDATE requests SET status='waiting_owner', priority='high', assigned_to='owner', ai_summary='local decision' WHERE id=?").run(retry.request_id);
+    desktop.upsertRequests(await pull()); // ack loss / replay
+    assert.equal(local.prepare('SELECT COUNT(*) AS n FROM requests WHERE id=?').get(retry.request_id).n,1);
+    const row=local.prepare('SELECT status,priority,assigned_to,ai_summary FROM requests WHERE id=?').get(retry.request_id);
+    assert.deepEqual({...row},{status:'waiting_owner',priority:'high',assigned_to:'owner',ai_summary:'local decision'});
+  } finally {local.close();desktop.close();}
+
+  console.log('web-form-api-ok: guards, normalized exact-receipt retry, conflicts, concurrent writers, transaction rollback and Desktop owner-preserving replay');
 } catch (error) {
   if (serverOutput.trim()) {
     console.error(serverOutput.trim());
@@ -166,7 +224,7 @@ async function postRequest(data) {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify({idempotency_key:randomUUID(),...data})
   });
 }
 

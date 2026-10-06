@@ -757,7 +757,7 @@ export class SyncCoordinator {
     }
 
     const availability = createPublicRoomAvailabilityPublication(
-      this.options.database.getDashboardData(),
+      this.options.database.getPublicRoomAvailabilityInput(),
       enabledCapabilities
     );
 

@@ -24,6 +24,7 @@ import { hasBusinessCapability, type SaveCommerceProductPublicationInput } from 
 import { listRuntimeShipmentsForOrder, getRuntimeShipment, createRuntimeShipmentForOrder, updateRuntimeShipmentStatus, createRuntimeOrder } from "./commerce-runtime";
 import type { CreateCommerceOrderInput } from "./commerce-order-store";
 import { DatabaseSync } from "node:sqlite";
+import { getPublicRoomAvailabilityInput } from "./database/public-room-availability-store";
 import {
   getKbsOverview,
   markHospitalityNotificationSentExternally,
@@ -290,6 +291,10 @@ export class DesktopDatabase {
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
     return readEnabledBusinessCapabilities(this.db);
+  }
+
+  getPublicRoomAvailabilityInput() {
+    return getPublicRoomAvailabilityInput(this.db);
   }
 
   getDashboardData(): DesktopDashboardData {

@@ -997,6 +997,17 @@ live instances. Live edits queue a new revision, keeping the last acknowledged s
 and its media guarded until ack. Unpublish is also a revisioned tombstone. A failed
 attempt retains the durable intent and retries using the existing sync outbox.
 
+Marketing capability OFF means the feature is out of use, not merely read-only.
+It atomically invalidates the Website aggregate and publishes a newer ordered
+`enabled:false, publications:[]` projection. Web visibility is owned by that
+projection alone; there is no independent Android-manifest marketing gate.
+Editorial `desired_published` and instance revisions are retained. Capability ON
+invalidates the aggregate again and restores retained Website publication intent
+through the normal media preparation/publication/exact-ack lifecycle. Withdrawal
+does not falsely acknowledge editorial instances as published or unpublished.
+Remote visibility changes after hosting accepts the withdrawal; offline Desktop
+retains the durable job and cannot synchronously revoke a remote disconnected site.
+
 Explicit user publication actions request a forced cycle even when passive auto-sync
 is disabled; failures retain the same durable job. Desktop is authoritative. Existing sync coordinator, durable outbox, monotonic source
 revision ledger, idempotency receipt and ack semantics carry a sanitized aggregate

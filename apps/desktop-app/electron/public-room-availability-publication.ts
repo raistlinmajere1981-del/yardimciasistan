@@ -3,7 +3,13 @@ import {
   hasBusinessCapability,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
-import type { DesktopDashboardData } from "./database";
+import type { DesktopRoom, DesktopReservation, DesktopCustomerRoomStay } from "./database-types";
+
+export interface PublicRoomAvailabilityInput {
+  rooms: Pick<DesktopRoom, "id" | "name" | "number" | "capacity" | "status" | "isActive">[];
+  reservations: Pick<DesktopReservation, "status" | "startDate" | "endDate" | "roomIds">[];
+  customerRoomStays: Pick<DesktopCustomerRoomStay, "status" | "roomId" | "checkInDate" | "checkOutDate">[];
+}
 
 interface PublicRoomAvailabilityRoom {
   id: string;
@@ -36,7 +42,7 @@ const STAY_BLOCKING_STATUSES = new Set(["planned", "checked_in"]);
  * metadata are intentionally excluded from this contract.
  */
 export function createPublicRoomAvailabilityPublication(
-  dashboard: DesktopDashboardData,
+  input: PublicRoomAvailabilityInput,
   capabilities: readonly BusinessCapability[],
   now = new Date()
 ): PublicRoomAvailabilityPublication {
@@ -56,7 +62,7 @@ export function createPublicRoomAvailabilityPublication(
     };
   }
 
-  const rooms = dashboard.rooms
+  const rooms = input.rooms
     .filter((room) => room.isActive)
     .map((room) => ({
       id: room.id,
@@ -69,7 +75,7 @@ export function createPublicRoomAvailabilityPublication(
   const roomIds = new Set(rooms.map((room) => room.id));
   const blocks: PublicRoomAvailabilityBlock[] = [];
 
-  for (const reservation of dashboard.reservations) {
+  for (const reservation of input.reservations) {
     if (!RESERVATION_BLOCKING_STATUSES.has(reservation.status)) continue;
     const startDate = normalizeDate(reservation.startDate || reservation.endDate);
     const endDate = normalizeDate(reservation.endDate || reservation.startDate);
@@ -80,7 +86,7 @@ export function createPublicRoomAvailabilityPublication(
     }
   }
 
-  for (const stay of dashboard.customerRoomStays) {
+  for (const stay of input.customerRoomStays) {
     if (!STAY_BLOCKING_STATUSES.has(stay.status) || !roomIds.has(stay.roomId)) continue;
     const startDate = normalizeDate(stay.checkInDate);
     const endDate = normalizeDate(stay.checkOutDate) || "9999-12-31";

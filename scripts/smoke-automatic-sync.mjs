@@ -193,6 +193,7 @@ try {
   assert.equal(bootstrapSnapshot.status, 200);
 
   const requestResponse = await postJson(`${baseUrl}/api/request.php`, {
+    idempotency_key: "automatic-sync-request-1",
     request_type: "pension_reservation",
     customer_name: "Otomatik Web Misafiri",
     customer_phone: "0555 444 33 22",
@@ -843,6 +844,7 @@ return [
   )), true);
 
   const automaticRequestResponse = await postJson(`${baseUrl}/api/request.php`, {
+    idempotency_key: "automatic-sync-request-2",
     request_type: "restaurant_reservation",
     customer_name: "Zamanlayıcı Misafiri",
     customer_phone: "0555 222 11 00",

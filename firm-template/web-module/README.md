@@ -122,6 +122,12 @@ Müşteri adı, telefon, not, rezervasyon kimliği, konaklama kimliği ve diğer
 PII bu payload'a dahil edilmez. Bu heartbeat Android snapshot'ından ayrıdır ve global
 operasyon `server_revision` değerini artırmaz.
 
+Availability girdisi dashboard listesi değil, canonical DB'deki aktif odalar ve
+bu odaların tüm pending/approved rezervasyonları ile planned/checked-in Stay
+aralıklarıdır. Presentation limitleri authority yolunda kullanılmaz. Hosting 500
+oda veya 5000 blok sınırını aşan yayını 422 ile reddeder; sessiz kesme yapmaz ve
+önceki state/freshness/receipt'i değiştirmez.
+
 `api/availability.php` yalnız `POST` kabul eder ve public chat hız sınırını kullanır.
 Doğal dilde tarih aralığı ve kişi sayısı deterministik olarak çözümlenir; eksik alanlar
 tahmin edilmez, kullanıcıdan istenir. Tarih çakışmaları yarı açık aralık mantığıyla
@@ -131,6 +137,23 @@ Masaüstü otomatik senkron açıkken heartbeat normal senkron döngüsünde yen
 Publication veya masaüstünde üretilen veri 15 dakikadan eskiyse endpoint fail-closed
 davranır ve kesin müsaitlik iddiası üretmez. Bu yol rezervasyon oluşturmaz, güncellemez
 ve silmez; yalnız güncel müsaitliği okur.
+
+### Public talep retry sözleşmesi
+
+`POST api/request.php` gövdesinde client tarafından üretilmiş `idempotency_key`
+zorunludur (16–128 ASCII harf/rakam, `_` veya `-`). Bir logical submission'ın tüm
+retry'ları aynı key'i taşır. Aynı key + normalize edilmiş aynı intent, ilk kabulün
+aynı `request_id` ve response'unu döndürür; farklı intent 409 `idempotency_conflict`
+olur. Yeni key yeni taleptir. Request ID hâlâ server-generated'dır. Request kuyruğu
+ve receipt aynı SQLite transaction'ında yazılır. Mevcut capability/abuse guard'ları
+korunur; rate limit idempotency yerine geçmez. Widget/form key'i başarısız retry
+boyunca memory'de tutar; otomatik page-reload retry sözleşmesi yoktur.
+
+Marketing capability OFF, editorial `desired_published` tercihini silmeden ordered
+`enabled:false, publications:[]` withdrawal yayınlar. Web görünürlüğünün tek gate'i
+marketing projection'dır. ON, korunmuş editorial intent'i normal publication yolunda
+yeniden yayınlar. Offline durumda withdrawal job'ı kalıcı olarak bekler; remote
+görünürlük hosting withdrawal'ı kabul ettiğinde kapanır.
 
 Odaklı sözleşme testleri Pilot Core içinde şu smoke'larla çalışır:
 

@@ -95,6 +95,7 @@ function ya_storage_reset_runtime(): array
         'web_requests',
         'web_orders',
         'web_order_submission_receipts',
+        'web_request_submission_receipts',
         'android_actions',
         'android_device_sightings',
         'publications',
@@ -885,6 +886,13 @@ function ya_storage_create_schema(PDO $database): void
           imported_at TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_web_requests_sync_seq ON web_requests(sync_status, seq);
+
+        CREATE TABLE IF NOT EXISTS web_request_submission_receipts (
+          key_hash TEXT PRIMARY KEY,
+          request_hash TEXT NOT NULL,
+          response_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
 
         CREATE TABLE IF NOT EXISTS web_orders (
           seq INTEGER PRIMARY KEY AUTOINCREMENT,

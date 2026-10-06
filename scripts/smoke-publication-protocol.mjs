@@ -11,6 +11,8 @@ const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.
 const { pushMenuToWeb } = require("../apps/desktop-app/dist-electron/sync-request-menu-service.js");
 const { AndroidActionSyncService } = require("../apps/desktop-app/dist-electron/android-action-sync-service.js");
 const core = require("../packages/sync-core/dist/index.js");
+const {createPublicRoomAvailabilityPublication}=require('../apps/desktop-app/dist-electron/public-room-availability-publication.js');
+const {publishDesktopProjection}=require('../apps/desktop-app/dist-electron/desktop-publication-service.js');
 const root = mkdtempSync("/tmp/opencode/publication-protocol-");
 const hosting = join(root, "web-module");
 cpSync("firm-template/web-module", hosting, { recursive: true });
@@ -94,6 +96,69 @@ try {
     assert.equal((await send({ ...identity, sourceEpoch: undefined, ...a })).ok, false, name);
   }
   raw = new DatabaseSync(database.databasePath);
+  // Authoritative availability is independent of both dashboard bounded lists.
+  const now=new Date().toISOString();
+  raw.prepare("INSERT INTO rooms(id,name,number,capacity,status,created_at,updated_at) VALUES ('authority-room-1','Authority 1','101',2,'available',?,?),('authority-room-2','Authority 2','102',2,'available',?,?)").run(now,now,now,now);
+  const insertBooking=raw.prepare("INSERT INTO reservations(id,reservation_type,status,title,start_date,end_date,room_ids_json,created_at,updated_at) VALUES (?,'room',?,'private title',?,?,?, ?,?)");
+  for(let i=0;i<85;i++)insertBooking.run(`authority-old-${i}`,'approved','2029-01-01','2029-01-02',JSON.stringify(['authority-room-1']),now,now);
+  insertBooking.run('authority-conflict','approved','2030-07-20','2030-07-22',JSON.stringify(['authority-room-1']),now,now);
+  insertBooking.run('authority-cancelled','cancelled','2030-07-20','2030-07-24',JSON.stringify(['authority-room-2']),now,now);
+  raw.prepare("INSERT INTO customers(id,full_name,phone,created_at,updated_at) VALUES ('authority-customer','Private Guest','+905550001234',?,?)").run(now,now);
+  const insertStay=raw.prepare("INSERT INTO customer_room_stays(id,customer_id,room_id,status,check_in_date,check_out_date,created_at,updated_at) VALUES (?,?,?,?,?, ?,?,?)");
+  for(let i=0;i<501;i++){
+    raw.prepare("INSERT INTO customers(id,full_name,phone,created_at,updated_at) VALUES (?,'Private Guest',?, ?,?)").run(`authority-customer-${i}`,`+90556${String(i).padStart(7,'0')}`,now,now);
+    insertStay.run(`authority-stay-old-${i}`,`authority-customer-${i}`,'authority-room-2','planned','2031-01-01','2031-01-02',now,now);
+  }
+  insertStay.run('authority-stay-checked-out','authority-customer','authority-room-2','checked_out','2030-07-20','2030-07-24',now,now);
+  insertStay.run('authority-stay','authority-customer','authority-room-1','planned','2030-07-22','2030-07-24',now,now);
+  raw.exec("UPDATE rooms SET status='available' WHERE id='authority-room-2'"); // canonical room readiness after the checked-out stay
+  const bounded=database.getDashboardData();
+  assert.equal(bounded.reservations.some(r=>r.id==='authority-conflict'),false);
+  assert.equal(bounded.customerRoomStays.some(s=>s.id==='authority-stay'),false);
+  const authoritative=database.getPublicRoomAvailabilityInput();
+  assert.equal(authoritative.reservations.length,86);assert.equal(authoritative.customerRoomStays.length,502);
+  const availability=createPublicRoomAvailabilityPublication(authoritative,database.getEnabledBusinessCapabilities());
+  assert.ok(availability.blocks.some(b=>b.room_id==='authority-room-1'&&b.start_date==='2030-07-20'&&b.end_date==='2030-07-24'));
+  assert.equal(JSON.stringify(availability).includes('Private Guest'),false);
+  for(let i=0;i<11;i++)database.queueSyncJob('public_room_availability_publish'); // above earlier hosting fixture rev10
+  let availabilityWire;
+  const lostAvailability=await publishDesktopProjection(database,config,'public_room_availability_publish',availability,async(identity,frozen)=>{
+    availabilityWire={...config,...identity,availability:frozen};
+    const result=await core.pushAvailability(availabilityWire);assert.equal(result.ok,true,result.message);
+    return {ok:false,message:'lost response'};
+  },{refresh:true});
+  assert.equal(lostAvailability.ok,false);
+  const persisted=database.prepareSyncPublication('public_room_availability_publish',availability,true);
+  const retriedAvailability=await publishDesktopProjection(database,config,'public_room_availability_publish',{...availability,generated_at:new Date().toISOString()},
+    (identity,frozen)=>{assert.deepEqual(frozen,availabilityWire.availability);assert.equal(identity.sourceRevision,availabilityWire.sourceRevision);
+      assert.equal(identity.idempotencyKey,availabilityWire.idempotencyKey);return core.pushAvailability({...config,...identity,availability:frozen});},{refresh:true});
+  assert.equal(retriedAvailability.ok,true,retriedAvailability.message);assert.equal(retriedAvailability.deduplicated,true);
+  assert.equal(retriedAvailability.source_revision,persisted.sourceRevision);
+  assert.equal(database.prepareSyncPublication('public_room_availability_publish',{...availability,generated_at:new Date().toISOString()}),null,'timestamp-only body coalesces outside heartbeat');
+  const query=async(start,end)=>{const r=await nativeFetch(`${baseUrl}/api/availability.php`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start_date:start,end_date:end,guest_count:2})});return r.json();};
+  const blocked=await query('2030-07-20','2030-07-21');assert.equal(blocked.ok,true);
+  assert.equal(blocked.available_rooms.some(r=>r.number==='101'),false,'conflict beyond first 80 blocks Web');
+  assert.equal(blocked.available_rooms.some(r=>r.number==='102'),true,'cancelled reservation/checked-out stay does not block another room');
+  const stayBlocked=await query('2030-07-23','2030-07-24');assert.equal(stayBlocked.available_rooms.some(r=>r.number==='101'),false);
+  const free=await query('2030-07-24','2030-07-25');assert.equal(free.available_rooms.some(r=>r.number==='101'),true);
+  const state=()=>{const result=spawnSync('php',['-r',`require $argv[1]; echo json_encode([ya_storage_get_publication('public_room_availability',[]),ya_storage_server_revision(),ya_storage_open()->query("SELECT COUNT(*) FROM publication_receipts WHERE publication_name='public_room_availability'")->fetchColumn()]);`,join(hosting,'lib/storage.php')],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout;};
+  const beforeLimit=state();
+  for(const oversized of [
+    {...availability,rooms:Array.from({length:501},(_,i)=>({...availability.rooms[0],id:`oversize-${i}`}))},
+    {...availability,blocks:Array.from({length:5001},()=>availability.blocks[0])}
+  ]) {
+    const rejected=await core.pushAvailability({...availabilityWire,sourceRevision:999,idempotencyKey:'availability-limit',availability:oversized});
+    assert.equal(rejected.ok,false);assert.equal(rejected.status,422);assert.equal(state(),beforeLimit,'limit rejection changes no payload, freshness, revision or receipt');
+  }
+  const disabledAvailability=createPublicRoomAvailabilityPublication(authoritative,[]);
+  const withdrawn=await publishDesktopProjection(database,config,'public_room_availability_publish',disabledAvailability,
+    (identity,frozen)=>core.pushAvailability({...config,...identity,availability:frozen}),{refresh:true});
+  assert.equal(withdrawn.ok,true);assert.ok(withdrawn.source_revision>retriedAvailability.source_revision);
+  const disabledState=state();
+  assert.equal((await core.pushAvailability(availabilityWire)).deduplicated,true,'historic receipt replay does not re-apply');
+  assert.equal((await core.pushAvailability({...availabilityWire,idempotencyKey:'late-availability'})).ok,false,'late unapplied revision is fenced');
+  assert.equal(state(),disabledState,'old replay changes neither disabled state nor freshness');
+  assert.equal((await query('2030-07-20','2030-07-21')).code,'availability_not_supported');
   const saved = database.saveMenuCategory({ name: "S", description: "", is_active: true, sort_order: 0 });
   assert.equal(saved.ok, true);
   let sentBody;
@@ -181,7 +246,7 @@ try {
   assert.equal(replacements.filter((r) => r.ok).length, 1, "CAS replacement has only one winner");
   assert.equal((await core.resetHostingRuntime(config)).ok, true);
   assert.equal((await activate("source-A", 0)).ok, false, "runtime reset never unfences retired sources");
-  console.log("publication protocol: ordering, conflicts, fencing, retry, ack mismatch, manual lifecycle, menu race, private config PASS");
+  console.log("publication protocol: ordering, conflicts, fencing, retry, ack mismatch, manual lifecycle, menu race, private config, authoritative availability and fail-safe limits PASS");
 } finally {
   globalThis.fetch = nativeFetch;
   raw?.close();

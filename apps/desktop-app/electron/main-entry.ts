@@ -290,7 +290,7 @@ void mainProcessReady.then(async ({
       } finally {
         database.close();
       }
-      scheduleAutomaticSyncSoon();
+      scheduleAutomaticSyncSoon(capabilitiesChanged);
     };
 
     registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked, userDataPath });

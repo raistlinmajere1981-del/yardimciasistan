@@ -3,11 +3,16 @@ import type { DesktopDatabase } from "../database";
 import type { MarketingMediaService } from "./media-service";
 import { uploadPublicResourceMediaFile } from "../public-resource-media-publication";
 import { desktopLog } from "../desktop-logger";
+import { BUSINESS_CAPABILITIES, hasBusinessCapability } from "@yardimci-asistan/shared";
 
 export class MarketingWebsitePublicationService {
   constructor(private readonly database:()=>DesktopDatabase,private readonly media:MarketingMediaService) {}
   async prepare(config:{baseUrl:string;syncSecret:string},clientId:string): Promise<{ok:true;projection:MarketingWebsiteProjection;sent:MarketingPublication[]} | {ok:false;message:string;status?:number;sent?:MarketingPublication[]}> {
-    const db=this.database(),sent=db.listMarketingPublications().filter(p=>p.channel==="website" && p.status!=="draft");
+    const db=this.database();
+    if (!hasBusinessCapability(db.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.MARKETING_STUDIO)) {
+      return {ok:true,sent:[],projection:{version:1,enabled:false,publications:[]}};
+    }
+    const sent=db.listMarketingPublications().filter(p=>p.channel==="website" && p.status!=="draft");
     const assets=new Map(sent.filter(p=>p.desiredPublished).flatMap(p=>p.mediaAssetIds).map(id=>[id,db.getMediaAsset(id)]));
     const urls=new Map<string,string>();
     for (const asset of assets.values()) {

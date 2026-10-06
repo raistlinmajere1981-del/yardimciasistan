@@ -72,6 +72,7 @@ const requiredFiles = [
   "lib/online-order.php",
   "lib/google-reviews.php",
   "lib/public-request-guard.php",
+  "lib/public-request-submission.php",
   "lib/public-room-availability.php",
   "lib/public-room-availability-intent.php",
   "lib/public-room-availability-storage.php",

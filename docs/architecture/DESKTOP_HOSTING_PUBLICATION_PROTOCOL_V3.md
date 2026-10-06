@@ -124,11 +124,56 @@ not a failure of unrelated automatic sync; its durable intent waits for configur
 Explicit publication still reports invalid configuration. Metadata acknowledgement
 does not clear a newer local settings mutation.
 
+## Availability authority and completeness
+
+`DesktopDatabase.getPublicRoomAvailabilityInput()` delegates to the domain-owned
+availability store, not Dashboard. One SQLite statement reads active, non-deleted
+Rooms, pending/approved Reservations assigned to those Rooms and planned/checked-in
+Stays on those Rooms. Only projection fields are read, without customer identities,
+notes or prices. No presentation LIMIT is used. The public contract permits arbitrary
+date queries, so no new horizon policy is imposed: all relevant blocking ranges are
+included (not all historical statuses). Existing range/merge/status semantics remain
+in `createPublicRoomAvailabilityPublication`.
+
+Hosting rejects more than 500 rooms or 5000 blocks with 422 before apply; malformed
+room/block entries are rejected rather than dropped. No projection, freshness or
+receipt changes on rejection. The previous complete state remains and its normal
+freshness expiry still applies. Heartbeats use `publishDesktopProjection` and frozen
+durable retries; semantic comparison ignores only `generated_at`. A fresh completed
+heartbeat may allocate a revision to renew freshness, not a second ordering lifecycle.
+
+## Marketing capability lifecycle
+
+Capability mutation triggers atomically invalidate `marketing_website` with a newer
+source revision and reset retry backoff. OFF prepares an empty disabled projection,
+without media uploads or editorial acknowledgements. Existing frozen enabled jobs
+cannot attach to the newer invalidation; asynchronous preparation carries its expected
+revision. Web uses the ordered projection's `enabled` state as its sole visibility
+authority. Retained editorial intent is republished on ON; explicit unpublish remains
+a separate editorial change. Old unapplied revisions are rejected, historic receipts
+are no-op replays and never re-apply their old enabled body.
+
+## Public request creation ingress
+
+`api/request.php` requires a client-generated `idempotency_key` (16–128 ASCII letters,
+digits, `_` or `-`), separate from its server-generated canonical request ID. The key
+is SHA-256 hashed. Intent fingerprinting uses a tenant-local private HMAC-SHA-256 key
+and normalized type/source/business, contact, structured dates/time, guest counts,
+message and resource context. Generated WhatsApp copy, timestamps, IDs and sourcePath
+are excluded; localized date display is ignored when structured dates exist. Raw
+fingerprint material and keys are not logged.
+
+`web_requests` creation and `web_request_submission_receipts` lookup/insert share one
+`BEGIN IMMEDIATE` transaction. Same key/intent returns the original exact result/ID;
+changed intent is 409; a new key creates a new request. Concurrent submissions serialize,
+and failed receipt insertion rolls back the queue insert. Desktop import ownership and
+same-ID replay behavior are unchanged. Both browser request callers keep a key in a
+per-form WeakMap through retry and discard it on successful completion; changed form
+intent gets a new key. No automatic reload retry or browser persistence is introduced.
+
 ## Deliberately not changed
 
-Availability producer limits and hosting truncation; Marketing capability-off
-withdrawal; public request submission idempotency; restore full payload set and
-post-restore Marketing/AI reconciliation; QR semantics; resource catalog visibility;
+Restore full payload set and post-restore Marketing/AI reconciliation; QR semantics; resource catalog visibility;
 AI knowledge limits; coordinator decomposition; navigation and domain ownership.
 
 ## Regression evidence

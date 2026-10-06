@@ -4,6 +4,7 @@
   var ROOT = "#yardimci-asistan-widget";
   var STYLE_ID = "yardimci-asistan-direct-request-style";
   var submitting = false;
+  var submissionIntents = new WeakMap();
   var script = document.currentScript;
   var config = {
     businessName: script && script.dataset.businessName || "Yardımcı Asistan",
@@ -111,6 +112,12 @@
       return;
     }
 
+    var intent = JSON.stringify(Object.assign({}, payload, { customer_phone: phone.replace(/\D/g, ""), whatsapp_message: "" }));
+    var previous = submissionIntents.get(form);
+    var key = previous && previous.intent === intent ? previous.key
+      : Array.from(crypto.getRandomValues(new Uint8Array(16)), function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
+    submissionIntents.set(form, { intent: intent, key: key });
+    payload.idempotency_key = key;
     submitting = true;
     setBusy(form, true);
     showStatus("Talebiniz işletmeye iletiliyor...");
@@ -124,6 +131,7 @@
       if (!response.ok || !result || result.ok !== true || !result.request_id) {
         throw new Error(result && result.message || "Talep işletmeye iletilemedi.");
       }
+      submissionIntents.delete(form);
       hideStatus();
       renderSuccess(form, result.whatsapp_message || payload.whatsapp_message);
     } catch (error) {

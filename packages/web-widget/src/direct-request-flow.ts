@@ -7,6 +7,7 @@ import {
 type RequestType = "pension_reservation" | "restaurant_reservation";
 
 interface RequestPayload {
+  idempotency_key?: string;
   request_type: RequestType;
   customer_name: string;
   customer_phone: string;
@@ -45,6 +46,7 @@ interface WidgetApi {
 
 const ROOT_SELECTOR = "#yardimci-asistan-widget";
 const STYLE_ID = "yardimci-asistan-direct-request-style";
+const submissionIntents = new WeakMap<HTMLFormElement, { intent: string; key: string }>();
 let installed = false;
 let submitting = false;
 let runtimeConfig: RuntimeConfig = {
@@ -173,6 +175,12 @@ async function submitRequest(form: HTMLFormElement) {
     return;
   }
 
+  const intent = JSON.stringify({ ...payload, customer_phone: normalizedPhone.e164, whatsapp_message: "" });
+  const previous = submissionIntents.get(form);
+  const key = previous?.intent === intent ? previous.key
+    : Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  submissionIntents.set(form, { intent, key });
+  payload.idempotency_key = key;
   submitting = true;
   hideStatus();
   setFormBusy(form, true);
@@ -188,6 +196,7 @@ async function submitRequest(form: HTMLFormElement) {
       throw new Error(result?.message || "Talep işletmeye iletilemedi.");
     }
 
+    submissionIntents.delete(form);
     hideStatus();
     renderSuccess(form, result.whatsapp_message || payload.whatsapp_message);
   } catch (error) {

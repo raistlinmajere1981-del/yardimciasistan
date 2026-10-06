@@ -6,6 +6,7 @@ const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/public-request-guard.php';
+require_once YA_BASE_DIR . '/lib/public-request-submission.php';
 
 $businessConfig = ya_load_business_config();
 ya_apply_cors($businessConfig);
@@ -88,7 +89,15 @@ $request = [
 ];
 
 try {
-    ya_storage_insert_request($request);
+    $result = ya_public_request_submit($payload['idempotency_key'] ?? null, $request, [
+        'ok' => true,
+        'message' => 'Talep kaydedildi.',
+        'request_id' => $request['id'],
+        'whatsapp_message' => $whatsappMessage,
+        'whatsapp_phone' => $phone['whatsapp']
+    ], ya_string($businessConfig['business_id'] ?? ''));
+} catch (YaPublicRequestRejection $error) {
+    ya_json_response($error->status, ['ok' => false, 'code' => $error->responseCode, 'message' => $error->getMessage()]);
 } catch (Throwable $error) {
     $storageUnavailable = $error->getMessage() === 'pdo_sqlite_missing';
     ya_json_response($storageUnavailable ? 503 : 500, [
@@ -99,13 +108,7 @@ try {
     ]);
 }
 
-ya_json_response(201, [
-    'ok' => true,
-    'message' => 'Talep kaydedildi.',
-    'request_id' => $request['id'],
-    'whatsapp_message' => $whatsappMessage,
-    'whatsapp_phone' => $phone['whatsapp']
-]);
+ya_json_response(201, $result);
 
 function ya_request_feature_enabled(array $businessConfig): bool
 {
