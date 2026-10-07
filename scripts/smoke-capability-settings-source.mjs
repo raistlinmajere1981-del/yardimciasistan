@@ -40,27 +40,27 @@ await test("profile default remains profile-owned after unrelated/no-op Settings
   expectEntry(C.ACCOMMODATION_RESERVATIONS, false, "profile");
 }));
 
-await test("explicit ON equal to the current default survives no-op save and both profile-switch paths", () => scenario(({ database, save, expectEntry }) => {
+await test("explicit ON equal to the current default survives no-op save, never a profile change", () => scenario(({ database, save, expectEntry }) => {
   setBusinessCapability(database.databasePath, { capability: C.REQUESTS, enabled: true });
   save();
   expectEntry(C.REQUESTS, true, "user");
   save({ profileId: "market", profileOptions: getBusinessProfile("market").defaultOptionalCapabilities });
-  expectEntry(C.REQUESTS, true, "user");
+  expectEntry(C.REQUESTS, false, "profile");
   applyBusinessProfileCapabilities(database.databasePath, "restaurant");
-  expectEntry(C.REQUESTS, true, "user");
+  expectEntry(C.REQUESTS, true, "profile");
   save();
-  expectEntry(C.REQUESTS, true, "user");
+  expectEntry(C.REQUESTS, true, "profile");
 }));
 
-await test("explicit OFF survives a no-op save even when the next profile default is OFF", () => scenario(({ database, save, expectEntry }) => {
+await test("explicit OFF survives a no-op save, never a profile change", () => scenario(({ database, save, expectEntry }) => {
   setBusinessCapability(database.databasePath, { capability: C.REQUESTS, enabled: false });
   save();
   expectEntry(C.REQUESTS, false, "user");
   applyBusinessProfileCapabilities(database.databasePath, "market");
   save();
-  expectEntry(C.REQUESTS, false, "user");
+  expectEntry(C.REQUESTS, false, "profile");
   applyBusinessProfileCapabilities(database.databasePath, "restaurant");
-  expectEntry(C.REQUESTS, false, "user");
+  expectEntry(C.REQUESTS, true, "profile");
 }));
 
 await test("Settings checkbox changes create ON/OFF overrides, including a change back to the default", () => scenario(({ database, save, expectEntry }) => {
@@ -69,7 +69,7 @@ await test("Settings checkbox changes create ON/OFF overrides, including a chang
   save({ profileOptions: [C.REQUESTS, C.ACCOMMODATION_RESERVATIONS] });
   expectEntry(C.REQUESTS, true, "user");
   applyBusinessProfileCapabilities(database.databasePath, "market");
-  expectEntry(C.REQUESTS, true, "user");
+  expectEntry(C.REQUESTS, false, "profile");
   clearBusinessCapabilityOverride(database.databasePath, C.REQUESTS);
   expectEntry(C.REQUESTS, false, "profile");
   save({ profileOptions: [...database.getSetupData().profileOptions, C.REQUESTS] });

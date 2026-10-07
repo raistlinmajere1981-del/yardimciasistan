@@ -4,6 +4,7 @@ import {
   CORE_BUSINESS_CAPABILITIES,
   businessProfileSupportsCapability,
   getBusinessProfile,
+  getBusinessProfileSelectionCapabilities,
   getEnabledBusinessCapabilityDependents,
   expandBusinessCapabilities,
   normalizeBusinessType,
@@ -11,6 +12,7 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import { queueSyncJob } from "./database/sync-runtime-store";
+import { resetProfileServiceActivationsInTransaction } from "./profile-service-activation";
 
 type BusinessCapabilitySource = "system" | "profile" | "user";
 
@@ -98,45 +100,45 @@ export function replaceBusinessCapabilitiesInTransaction(
   input: ReplaceBusinessCapabilitiesInput
 ): BusinessCapability[] {
   const profile = getBusinessProfile(input.profileId);
+  const profileChanged = input.previousProfileId !== undefined
+    && normalizeBusinessType(input.previousProfileId) !== profile.id;
   const allowedOptional = new Set(profile.optionalCapabilities);
-  const selectedOptional = [...new Set(input.selectedOptionalCapabilities)]
+  const selectedOptional = [...new Set(profileChanged ? profile.defaultOptionalCapabilities : input.selectedOptionalCapabilities)]
     .filter((capability) => allowedOptional.has(capability));
   const serviceCapabilities: BusinessCapability[] = [
-    ...(input.whatsappEnabled ? [BUSINESS_CAPABILITIES.WHATSAPP] : []),
-    ...(input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),
-    ...(input.aiEnabled ? [BUSINESS_CAPABILITIES.AI] : [])
+    ...(!profileChanged && input.whatsappEnabled ? [BUSINESS_CAPABILITIES.WHATSAPP] : []),
+    ...(!profileChanged && input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),
+    ...(!profileChanged && input.aiEnabled ? [BUSINESS_CAPABILITIES.AI] : [])
   ];
   const selected = new Set<BusinessCapability>([
-    ...CORE_BUSINESS_CAPABILITIES,
-    ...profile.requiredCapabilities,
-    ...selectedOptional,
+    ...getBusinessProfileSelectionCapabilities(profile.id, selectedOptional),
     ...serviceCapabilities
+  ]);
+  const explicitSelection = new Set<BusinessCapability>([
+    ...profile.requiredCapabilities, ...selectedOptional, ...serviceCapabilities
   ]);
   const profileDefaults = new Set(profile.defaultCapabilities);
   const serviceCapabilitiesSet = new Set<BusinessCapability>([
     BUSINESS_CAPABILITIES.WHATSAPP, BUSINESS_CAPABILITIES.ANDROID, BUSINESS_CAPABILITIES.AI
   ]);
-  const existing = new Map((input.previousProfileId === undefined ? [] : database.prepare(`
+  const existing = new Map((input.previousProfileId === undefined || profileChanged ? [] : database.prepare(`
     SELECT capability_id, is_enabled, source FROM business_capabilities WHERE business_id = ?
   `).all(input.businessId) as Array<{ capability_id: string; is_enabled: number; source: string }>)
     .map((row) => [row.capability_id, { enabled: row.is_enabled === 1, source: row.source }]));
-  const profileChanged = input.previousProfileId !== undefined
-    && normalizeBusinessType(input.previousProfileId) !== profile.id;
   const overrides = new Map<BusinessCapability, boolean>();
 
   for (const capability of KNOWN_CAPABILITIES) {
     if (SYSTEM_CAPABILITIES.has(capability) || !businessProfileSupportsCapability(profile.id, capability)) continue;
+    if (profileChanged) continue;
     const previous = existing.get(capability);
     const controlled = allowedOptional.has(capability) || serviceCapabilitiesSet.has(capability);
     if (!controlled) {
       if (previous?.source === "user") overrides.set(capability, previous.enabled);
       continue;
     }
-    const enabled = selected.has(capability);
-    // A changed profile supplies a new preset selection, not changes to every old
-    // checkbox. Existing explicit overrides survive unless the new selection
-    // itself differs from that preset. Services do not belong to profile presets.
-    const baselineEnabled = previous && (!profileChanged || serviceCapabilitiesSet.has(capability))
+    const enabled = explicitSelection.has(capability);
+    // Only edits of the current profile create overrides. A no-op preserves authority.
+    const baselineEnabled = previous
       ? previous.enabled
       : profileDefaults.has(capability);
     if (enabled !== baselineEnabled) {
@@ -183,6 +185,7 @@ export function replaceBusinessCapabilitiesInTransaction(
   }
 
   assertValidCapabilityState(database, input.businessId);
+  if (profileChanged) resetProfileServiceActivationsInTransaction(database, input.businessId, input.now);
   queueSyncJob(database, "android_snapshot", input.now);
   queueSyncJob(database, "menu_publish", input.now);
   return [...resolved].sort();
@@ -246,10 +249,8 @@ export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCa
 }
 
 /**
- * Applies a profile as a preset. User overrides survive by default for composable
- * capabilities, while explicitly profile-scoped capabilities (currently customer
- * credit) are forced off when the target profile does not support them. Before
- * commit the resulting set is dependency-validated.
+ * Applies the same canonical transition as Setup. Changed profiles always recompute;
+ * preserveUserOverrides applies only when explicitly reapplying the CURRENT profile.
  */
 export function applyBusinessProfileCapabilities(
   databasePath: string,
@@ -258,7 +259,6 @@ export function applyBusinessProfileCapabilities(
 ): BusinessCapabilitySnapshot {
   const profileId = normalizeBusinessType(profileIdInput);
   const profile = getBusinessProfile(profileId);
-  const profileDefaults = new Set(profile.defaultCapabilities);
   const preserveUserOverrides = options.preserveUserOverrides !== false;
   const database = openDatabase(databasePath);
 
@@ -276,43 +276,19 @@ export function applyBusinessProfileCapabilities(
         WHERE id = ? AND deleted_at = ''
       `).run(profileId, now, businessId);
 
-      const existingRows = database.prepare(`
-        SELECT capability_id, source
-        FROM business_capabilities
-        WHERE business_id = ?
-      `).all(businessId) as Array<{ capability_id?: unknown; source?: unknown }>;
-      const existingSources = new Map(
-        existingRows.map((row) => [String(row.capability_id ?? ""), String(row.source ?? "")])
-      );
-
-      for (const capability of KNOWN_CAPABILITIES) {
-        const system = SYSTEM_CAPABILITIES.has(capability);
-        const profileAllows = businessProfileSupportsCapability(profileId, capability);
-        if (!system && profileAllows && preserveUserOverrides && existingSources.get(capability) === "user") {
-          continue;
-        }
-        const enabled = system || (profileAllows && profileDefaults.has(capability));
-        database.prepare(`
-          INSERT INTO business_capabilities (
-            business_id, capability_id, is_enabled, source, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(business_id, capability_id) DO UPDATE SET
-            is_enabled = excluded.is_enabled,
-            source = excluded.source,
-            updated_at = excluded.updated_at
-        `).run(
-          businessId,
-          capability,
-          enabled ? 1 : 0,
-          system ? "system" : "profile",
-          now,
-          now
-        );
-      }
-
-      assertValidCapabilityState(database, businessId);
-      queueSyncJob(database, "android_snapshot", now);
-      queueSyncJob(database, "menu_publish", now);
+      const current = readEnabledCapabilities(database, businessId);
+      const sameProfile = resolveProfileId(business) === profile.id;
+      replaceBusinessCapabilitiesInTransaction(database, {
+        businessId, profileId,
+        previousProfileId: preserveUserOverrides || !sameProfile ? resolveProfileId(business) : undefined,
+        selectedOptionalCapabilities: sameProfile && preserveUserOverrides
+          ? profile.optionalCapabilities.filter(capability => current.has(capability))
+          : profile.defaultOptionalCapabilities,
+        whatsappEnabled: sameProfile && preserveUserOverrides && current.has(BUSINESS_CAPABILITIES.WHATSAPP),
+        androidEnabled: sameProfile && preserveUserOverrides && current.has(BUSINESS_CAPABILITIES.ANDROID),
+        aiEnabled: sameProfile && preserveUserOverrides && current.has(BUSINESS_CAPABILITIES.AI),
+        now
+      });
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");

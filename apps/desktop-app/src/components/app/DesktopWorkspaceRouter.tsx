@@ -115,7 +115,7 @@ export function DesktopWorkspaceRouter({
     dashboardData,
     setDashboardData,
     businessCapabilities,
-    loadBusinessCapabilities,
+    saveSetupWithCapabilityRefresh,
     automaticSyncStatus,
     pullRequests
   } = desktopSyncController;
@@ -334,15 +334,7 @@ export function DesktopWorkspaceRouter({
   }
 
   async function handleSaveSetup(input: import("../../../electron/database").SaveInitialSetupInput) {
-    const result = await saveSetup(input, setDashboardData);
-    if (result.ok) {
-      try {
-        await loadBusinessCapabilities();
-      } catch {
-        return { ...result, refreshWarning: "Ayarlar kaydedildi; işletme yetenekleri yenilenemedi. Sayfayı yeniden açın." };
-      }
-    }
-    return result;
+    return saveSetupWithCapabilityRefresh(() => saveSetup(input, setDashboardData));
   }
 
   return (

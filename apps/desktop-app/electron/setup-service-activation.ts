@@ -7,10 +7,12 @@ import { normalizeArasShippingInput } from "./shipping-configuration-store";
 import { normalizeMessagingConfiguration } from "./business-messaging/store";
 import { validateSmsConfiguration, validateInstagramConfiguration } from "./marketing/provider-configuration-store";
 import { serviceConfigFingerprint, validateServiceActivation, type TestedSettingsService } from "./service-settings-validation";
+import { normalizeProfileTransitionInput } from "./profile-service-activation";
 
 /** Settings activation policy only. Domain credential parsing/testing stays in each provider. */
 export function validateSetupServiceActivation(db: DesktopDatabase, input: SaveInitialSetupInput): string | null {
   const current = db.getSetupData();
+  input = normalizeProfileTransitionInput(input, current);
   let shipping = input.arasShipping ?? current.arasShipping;
   try {
     if (input.arasShipping) shipping = normalizeArasShippingInput(input.arasShipping);

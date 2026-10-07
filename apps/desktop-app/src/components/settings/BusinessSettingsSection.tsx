@@ -3,7 +3,8 @@ import { createProfileOptionDefaults, type SetupFormState } from "../../app/setu
 import type { SetupFieldsProps } from "./setup-fields";
 import { BusinessProfileOptionEditor } from "./BusinessCapabilitySettings";
 
-export function BusinessSettingsSection({ form, onFormChange }: SetupFieldsProps) {
+export function BusinessSettingsSection({ form, onFormChange, persistedProfileId }: SetupFieldsProps & { persistedProfileId: string }) {
+  const profileChanged = form.profileId !== persistedProfileId;
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
   };
@@ -39,9 +40,13 @@ export function BusinessSettingsSection({ form, onFormChange }: SetupFieldsProps
             </label>
             <BusinessProfileOptionEditor
               profileId={form.profileId}
-              selectedCapabilities={form.profileOptions}
+              selectedCapabilities={profileChanged ? createProfileOptionDefaults(form.profileId) : form.profileOptions}
+              disabled={profileChanged}
               onChange={(profileOptions) => update("profileOptions", profileOptions)}
             />
+            {profileChanged && <p className="settings-profile-transition-warning" role="status">
+              İşletme tipi değiştirildi. Kaydettiğinizde yeni işletme tipinin varsayılan özellikleri uygulanacak.
+            </p>}
           </div>
           <div className="form-row">
             <label className="form-field form-field--short">

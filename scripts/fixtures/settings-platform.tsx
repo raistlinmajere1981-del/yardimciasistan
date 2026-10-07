@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { PageViewStateProvider, usePageViewState } from "../../apps/desktop-app/src/app/page-view-state";
 import { createRoot } from "react-dom/client";
-import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, getBusinessProfile, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
+import { normalizeProfileTransitionInput } from "../../apps/desktop-app/electron/profile-service-activation";
 import { defaultDashboardData, defaultSetupData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
 import { useSetupController } from "../../apps/desktop-app/src/app/use-setup-controller";
 import { settingsCapabilities } from "../../apps/desktop-app/src/app/settings-registry";
@@ -28,6 +29,7 @@ function FixtureStatusHost() {
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, profileId: new URLSearchParams(window.location.search).get("profile") ?? defaultSetupData.profileId, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
+canonical.profileOptions = [...getBusinessProfile(canonical.profileId).defaultOptionalCapabilities];
 if (new URLSearchParams(window.location.search).get("wholesale") === "on") canonical.profileOptions = [C.WHOLESALE];
 function runtimeCapabilities(capabilities: BusinessCapability[]) {
   const override = new URLSearchParams(window.location.search).get("tables");
@@ -134,6 +136,7 @@ window.yardimciDesktop = {
     window.settingsCalls.push({ kind: "setup", input });
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
+    input = normalizeProfileTransitionInput(input, canonical);
     const arasShipping = input.arasShipping ? {
       ...canonical.arasShipping, enabled: input.onlineSalesDeliveryEnabled && input.onlineSalesDelivery.shippingEnabled, environment: input.arasShipping.environment,
       username: input.arasShipping.username, customerCode: input.arasShipping.customerCode,
@@ -379,6 +382,7 @@ function Fixture() {
   window.refreshSettings = patch => { canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
   window.persistedSettings = () => canonical;
   const capabilities = runtimeCapabilities(settingsCapabilities(toSetupForm(setup.setupData)));
+  window.fixtureRuntimeCapabilities = () => [...capabilities];
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { profileId: setup.setupData.profileId, enabledCapabilities: capabilities }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}>

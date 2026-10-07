@@ -88,11 +88,13 @@ try {
   await page.getByLabel('Firma adı', { exact: true }).fill('Round-trip Firma');
   await save();
   expect((await setupCalls()).at(-1).input.profileOptions).not.toContain('customer.requests');
-  // Actual checkbox edits survive a profile round-trip; discard resets that transient selection.
+  // Leaving the current profile discards transient checkbox edits, not a hidden package.
   await requestOption.check();
   await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('market');
   await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('pension');
-  await expect(requestOption).toBeChecked();
+  await expect(requestOption).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeDisabled();
+  await requestOption.check();
   await discard();
   await expect(requestOption).not.toBeChecked();
   await page.getByRole('combobox', { name: /Sektör tipi/ }).selectOption('market');

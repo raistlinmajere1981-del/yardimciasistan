@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import type { DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
-import { createSetupInput, toSetupForm, type SetupFormState } from "./setup-model";
+import { createSetupInput, toSetupForm, createProfileOptionDefaults, type SetupFormState } from "./setup-model";
 import {
   copyCategory,
   isCategoryDirty,
@@ -28,7 +28,6 @@ export function useSettingsDrafts(
   const baselineRef = useRef(initial);
   const sourceRef = useRef(setupData);
   const savingRef = useRef(false);
-  const profileOptionsRef = useRef(new Map([[initial.profileId, initial.profileOptions]]));
   const [feedback, setFeedback] = useState<Partial<Record<StagedSettingsCategoryId, CategoryFeedback>>>({});
   const [busy, setBusy] = useState(false);
 
@@ -36,11 +35,9 @@ export function useSettingsDrafts(
     const previous = draftRef.current;
     let value = typeof next === "function" ? next(previous) : next;
     if (value.profileId !== previous.profileId) {
-      // Visiting another preset must not erase the selection when the operator
-      // returns to an already-visited profile within this Business draft.
-      profileOptionsRef.current.set(previous.profileId, previous.profileOptions);
-      const remembered = profileOptionsRef.current.get(value.profileId);
-      if (remembered) value = { ...value, profileOptions: [...remembered] };
+      value = { ...value, profileOptions: value.profileId === canonicalRef.current.profileId
+        ? [...canonicalRef.current.profileOptions]
+        : createProfileOptionDefaults(value.profileId) };
     }
     draftRef.current = value;
     setForm(value);
@@ -71,7 +68,6 @@ export function useSettingsDrafts(
 
     for (const category of stagedSettingsCategories) {
       if (!isCategoryDirty(nextDraft, nextBaseline, category)) {
-        if (category === "business") profileOptionsRef.current.clear();
         nextDraft = copyCategory(nextDraft, fresh, category);
         nextBaseline = copyCategory(nextBaseline, fresh, category);
       }
@@ -84,7 +80,6 @@ export function useSettingsDrafts(
   }, []);
 
   const replaceWithCommittedSnapshot = useCallback((next: DesktopSetupData) => {
-    profileOptionsRef.current.clear();
     const fresh = toSetupForm(next);
     canonicalRef.current = fresh;
     baselineRef.current = fresh;
@@ -107,7 +102,6 @@ export function useSettingsDrafts(
 
   function discard(category: StagedSettingsCategoryId) {
     if (savingRef.current) return;
-    if (category === "business") profileOptionsRef.current.clear();
 
     const next = copyCategory(draftRef.current, canonicalRef.current, category);
     baselineRef.current = copyCategory(baselineRef.current, canonicalRef.current, category);

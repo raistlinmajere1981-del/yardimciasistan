@@ -19,6 +19,16 @@
   gap: var(--space-4);
 }
 
+.settings-profile-options:disabled .settings-profile-option-list {
+  opacity: 0.58;
+}
+
+.settings-profile-transition-warning {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  margin: 0;
+}
+
 .settings-panel,
 .settings-service-card {
   min-width: 0;

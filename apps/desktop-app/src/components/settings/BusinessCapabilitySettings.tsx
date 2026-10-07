@@ -26,18 +26,21 @@ interface BusinessProfileOptionEditorProps {
   profileId: string;
   selectedCapabilities: BusinessCapability[];
   onChange: (capabilities: BusinessCapability[]) => void;
+  disabled?: boolean;
 }
 
 export function BusinessProfileOptionEditor({
   profileId,
   selectedCapabilities,
-  onChange
+  onChange,
+  disabled = false
 }: BusinessProfileOptionEditorProps) {
   const profile = getBusinessProfile(profileId);
   const selected = new Set(selectedCapabilities);
   const options = profile.optionalCapabilities;
 
   const setOption = (capability: BusinessCapability, enabled: boolean) => {
+    if (disabled) return;
     const next = new Set(selected);
     if (enabled) {
       next.add(capability);
@@ -48,7 +51,7 @@ export function BusinessProfileOptionEditor({
   };
 
   return (
-    <fieldset id="settings-options" tabIndex={-1} className="settings-profile-options">
+    <fieldset id="settings-options" tabIndex={-1} className="settings-profile-options" disabled={disabled}>
       <legend>Ek özellikler</legend>
       {options.length === 0 ? (
         <p>Bu sektör için ek özellik bulunmuyor.</p>

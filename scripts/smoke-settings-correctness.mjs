@@ -121,6 +121,12 @@ try {
     assert.equal(validate({ ...setup, [field]: configuration }), null);
     assert.match(validate({ ...setup, [field]: { ...configuration, ...change } }), /test edin/);
   }
+  const beforeProfileValidation = db.getSetupData();
+  assert.equal(validate({ ...setup, profileId: "pension", aiEnabled: true,
+    onlineSalesDeliveryEnabled: true, onlineSalesDelivery: { pickupEnabled: false, shippingEnabled: true },
+    whatsappCloud: { enabled: true, wabaId: "", phoneNumberId: "", accessToken: "" } }), null,
+  "profile transition validates effective OFF activations, not inherited usage or stale activation evidence");
+  assert.deepEqual(db.getSetupData(), beforeProfileValidation, "validation/preview cannot persist a transition");
   const aiRuntime = {};
   const aiRequire = createRequire(resolve("apps/desktop-app/dist-electron/marketing/ai-service.js"));
   runInNewContext(readFileSync(resolve("apps/desktop-app/dist-electron/marketing/ai-service.js"), "utf8"), { exports: aiRuntime, require: name =>

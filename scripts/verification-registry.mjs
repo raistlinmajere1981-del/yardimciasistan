@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-profile-transition.mjs",
+  "scripts/smoke-profile-transition-ui.mjs",
   "scripts/smoke-sales-correctness.mjs",
   "scripts/smoke-sales-workspace-ui.mjs",
   "scripts/smoke-settings-correctness.mjs",
@@ -318,6 +320,7 @@ const SMOKE_CHECKS = SMOKE_FILES
 const SETTINGS_CHECKS = new Set([
   "typecheck", "typecheck-electron", "unit-tests", "version-contract-tests", "version-check", "verification-registry-tests",
   "settings-correctness", "settings-ui-correctness", "settings-platform", "workspace-platform", "sector-feature-contributions",
+  "profile-transition", "profile-transition-ui",
   "capability-runtime", "capability-settings-source", "capability-surface-consistency", "business-capabilities",
   "business-location-geocode", "business-public-profile", "setup-profile-contract", "schema-authority",
   "commerce-online-catalog", "commerce-dealer-orders", "commerce-aras-provider", "commerce-aras-ui", "business-messaging-provider", "kbs-domain"
@@ -331,8 +334,18 @@ const SALES_WORKSPACE_CHECKS = new Set([
   "business-capabilities", "capability-runtime", "capability-surface-consistency", "market-profile-registry", "sector-feature-contributions",
   "menu-reorder-contract", "desktop-menu-db", "workspace-platform", "verification-registry-tests", "schema-authority"
 ]);
+const PROFILE_TRANSITION_CHECKS = new Set([
+  "profile-transition", "profile-transition-ui", "business-capabilities", "setup-profile-contract",
+  "capability-settings-source", "settings-correctness", "settings-ui-correctness", "settings-platform",
+  "capability-runtime", "capability-surface-consistency", "workspace-platform", "sector-feature-contributions",
+  "commerce-online-catalog", "commerce-dealer-access", "commerce-dealer-orders", "commerce-aras-provider",
+  "business-messaging-provider", "kbs-domain", "market-product-data-contract", "birthday-foundation",
+  "publication-protocol", "sync-publication-correctness", "marketing-website", "unit-tests",
+  "typecheck", "typecheck-electron", "lint-strict", "knip-strict", "verification-registry-tests", "git-diff-check"
+]);
 export const VERIFICATION_CHECKS = [...BASE_CHECKS, ...SMOKE_CHECKS].map(item => ({ ...item, domains: [...new Set([
-  ...item.domains, ...(SETTINGS_CHECKS.has(item.id) ? ["settings"] : []), ...(SALES_WORKSPACE_CHECKS.has(item.id) ? ["sales-workspace"] : [])
+  ...item.domains, ...(SETTINGS_CHECKS.has(item.id) ? ["settings"] : []), ...(SALES_WORKSPACE_CHECKS.has(item.id) ? ["sales-workspace"] : []),
+  ...(PROFILE_TRANSITION_CHECKS.has(item.id) ? ["profile-transition-correctness"] : [])
 ])] }));
 
 export const PRESET_LAYERS = {

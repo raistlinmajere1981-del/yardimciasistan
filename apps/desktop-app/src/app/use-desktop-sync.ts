@@ -6,6 +6,7 @@ import type { DesktopDashboardData, DesktopSetupData } from "../../electron/data
 import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
 import { defaultDashboardData } from "./bootstrap-defaults";
 import { defaultAutomaticSyncStatus, type AppAccessPhase, type SyncState } from "./runtime-state";
+import type { SettingsSetupSaveResult } from "./settings-save";
 
 interface UseDesktopSyncOptions {
   accessPhase: AppAccessPhase;
@@ -32,6 +33,7 @@ export function useDesktopSync({
   const [businessCapabilities, setBusinessCapabilities] = useState<BusinessCapabilitySnapshot | null>(null);
   const capabilityGeneration = useRef(0);
   const capabilityMutations = useRef(0);
+  const setupGeneration = useRef(0);
   const [businessCapabilityState, setBusinessCapabilityState] = useState<SyncState>("idle");
   const [businessCapabilityMessage, setBusinessCapabilityMessage] = useState("İşletme yetenekleri profil varsayımlarını kullanıyor.");
   const [automaticSyncStatus, setAutomaticSyncStatus] = useState<AutomaticSyncStatus>(defaultAutomaticSyncStatus);
@@ -61,6 +63,29 @@ export function useDesktopSync({
     const snapshot = await bridge.getBusinessCapabilitySnapshot();
     if (!duringMutation && capabilityMutations.current === 0 && generation === capabilityGeneration.current) setBusinessCapabilities(snapshot);
     return snapshot;
+  }, []);
+
+  const saveSetupWithCapabilityRefresh = useCallback(async (
+    save: () => Promise<SettingsSetupSaveResult>
+  ): Promise<SettingsSetupSaveResult> => {
+    const generation = ++capabilityGeneration.current;
+    setupGeneration.current += 1;
+    capabilityMutations.current += 1;
+    try {
+      const result = await save();
+      if (!result.ok) return result;
+      // One canonical refresh after commit. Pre-save reads cannot restore the old
+      // profile, including while this save awaits web I/O. Fail closed on refresh failure.
+      try {
+        const snapshot = await window.yardimciDesktop?.getBusinessCapabilitySnapshot();
+        if (!snapshot) throw new Error("İşletme yetenekleri okunamadı.");
+        if (generation === capabilityGeneration.current) setBusinessCapabilities(snapshot);
+      } catch {
+        if (generation === capabilityGeneration.current) setBusinessCapabilities(null);
+        return { ...result, refreshWarning: "Ayarlar kaydedildi; işletme yetenekleri yenilenemedi. Sayfayı yeniden açın." };
+      }
+      return result;
+    } finally { capabilityMutations.current -= 1; }
   }, []);
 
   const setRuntimeBusinessCapability = useCallback(async (capability: BusinessCapability, enabled: boolean) => {
@@ -146,12 +171,13 @@ export function useDesktopSync({
       }
     };
 
+    const initialSetupGeneration = setupGeneration.current;
     void Promise.all([
       bridge.getBootstrapData(),
       loadInitialCapabilitySnapshot()
     ])
       .then(([data, capabilitySnapshot]) => {
-        if (!active) return;
+        if (!active || initialSetupGeneration !== setupGeneration.current) return;
         if (!capabilitySnapshot) {
           throw new Error("İşletme yetenekleri okunamadı.");
         }
@@ -268,6 +294,7 @@ export function useDesktopSync({
     businessCapabilityState,
     businessCapabilityMessage,
     loadBusinessCapabilities,
+    saveSetupWithCapabilityRefresh,
     setRuntimeBusinessCapability,
     clearRuntimeBusinessCapabilityOverride,
     automaticSyncStatus,

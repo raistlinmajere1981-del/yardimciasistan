@@ -1407,3 +1407,38 @@ canonical location and the inactive saved map configuration remain intact.
 
 Schema changes extend the current clean-install schema only. No migration or automatic
 reset/data deletion is introduced; older databases require the existing explicit workflow.
+
+## D-046 — Business profile change recomputes, never merges
+
+**Status:** ACCEPTED (2026-10-07), implementing the requested transition correctness contract.
+
+The active persisted profile and its active capability rows are the only business-profile
+authority. Explicit overrides belong to the current profile, not to a remembered package.
+A different profile always starts from the shared registry's dependency-normalized defaults;
+old overrides and optional selections never survive or return on a later profile visit.
+Current-profile no-op saves preserve source semantics: core is system-owned, defaults and
+dependency-derived capabilities are profile-owned, explicit ON/OFF is user-owned, and clearing
+an override restores profile authority. Explicit post-transition hybrid composition remains valid.
+
+Settings profile selection is draft-only. While it differs from the persisted profile, optional
+controls show the new canonical defaults read-only, with a warning. Revert restores persisted
+selections without writes or publications; visiting drafts has no per-profile preference cache.
+Initialized Settings services and application navigation use the persisted runtime snapshot,
+never reconstruct feature authority from a draft or profile name.
+
+Setup's existing SQLite transaction commits identity/profile, capability replacement, service
+activation reset and existing durable publication invalidations together. The direct profile
+application path delegates to the same capability/activation transition owner. Any failure rolls
+back the whole transition and its publication intent. Renderer performs no split profile writes;
+a generation-fenced canonical refresh prevents old reads from reopening previous surfaces.
+
+Profile-dependent activation resets OFF: Android, AI, WhatsApp Web/Cloud, SMS, Instagram,
+product data, birthday automation, dealer portal, delivery/shipping and KBS. Provider accounts,
+encrypted credentials, delivery choices and other configuration remain stored. Web transport
+URL/secret, automatic sync, local transport configuration, Appearance and update preferences are
+profile-independent and are not reset. Profile defaults remain exclusively in the shared registry;
+the canonical dependency resolver owns requirements such as purchasing -> inventory.
+
+Local commit and remote convergence remain distinct: existing publication/outbox owners retry
+offline withdrawals, and already-submitted external work is not undone by a profile change.
+No service framework, publication protocol or historical migration path is introduced.

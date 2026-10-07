@@ -651,9 +651,8 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   }
   notifyBusinessMessagingChanged();
   markLocalCompanionSnapshotDirty();
-  getDatabase().queueSyncJob("android_snapshot");
   reconcileLocalCompanionAdvertisement();
-  getSyncCoordinator().scheduleSoon();
+  scheduleAutomaticSyncSoon(true);
 
   const [aiWebSync, businessContextWebSync] = await Promise.all([
     publishSavedAiSettingsFromMain(),

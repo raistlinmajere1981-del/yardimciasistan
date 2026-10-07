@@ -4,6 +4,7 @@ import { getMessagingConfiguration, getStoredMessagingConfiguration, normalizeMe
 import type { MessagingSecretWrite } from "./business-messaging/secret-service";
 import { getArasShippingConfiguration, getStoredArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
 import { validateServiceActivation } from "./service-settings-validation";
+import { normalizeProfileTransitionInput } from "./profile-service-activation";
 import type { DatabaseSync } from "node:sqlite";
 import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import {
@@ -146,6 +147,7 @@ export function saveSetupData(
   messagingSecretWrite: MessagingSecretWrite = { mode: "keep" },
   marketingSecretWrites: MarketingProviderSecretWrites = {}
 ): StoredSetupSaveResult {
+  input = normalizeProfileTransitionInput(input, getSetupData(db, new Set(readEnabledBusinessCapabilities(db))));
   const businessName = input.businessName.trim();
   const syncSecret = input.syncSecret.trim();
   const webModuleUrl = normalizeUrl(input.webModuleUrl);
@@ -372,7 +374,7 @@ export function saveSetupData(
     existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
   const aiLastPublishedAt = aiSettingsChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
 
-  db.exec("BEGIN");
+  db.exec("BEGIN IMMEDIATE");
   try {
     db
       .prepare(`
@@ -512,6 +514,11 @@ export function saveSetupData(
       now
     });
 
+    if (Number(existingSettings?.online_sales_pickup_enabled ?? 1) !== Number(onlineSalesDelivery.pickupEnabled)
+        || Number(existingSettings?.online_sales_delivery_enabled ?? 1) !== Number(deliveryEnabled)
+        || Number(existingSettings?.online_sales_shipping_enabled ?? 0) !== Number(onlineSalesDelivery.shippingEnabled)) {
+      queueSyncJob(db, "online_catalog_publish", now);
+    }
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -519,11 +526,6 @@ export function saveSetupData(
   }
 
   const enabledCapabilities = new Set(readEnabledBusinessCapabilities(db));
-  if (Number(existingSettings?.online_sales_pickup_enabled ?? 1) !== Number(onlineSalesDelivery.pickupEnabled)
-      || Number(existingSettings?.online_sales_delivery_enabled ?? 1) !== Number(deliveryEnabled)
-      || Number(existingSettings?.online_sales_shipping_enabled ?? 0) !== Number(onlineSalesDelivery.shippingEnabled)) {
-    queueSyncJob(db, "online_catalog_publish", now);
-  }
 
   return {
     ok: true,

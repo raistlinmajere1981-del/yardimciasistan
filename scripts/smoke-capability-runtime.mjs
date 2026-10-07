@@ -91,13 +91,18 @@ try {
   });
   assert.equal(marketWithFolio.enabledCapabilities.includes(C.ACCOMMODATION_FOLIO), true);
 
-  const restaurantHybrid = applyBusinessProfileCapabilities(databasePath, "restaurant");
-  assert.equal(restaurantHybrid.profileId, "restaurant");
-  assert.equal(restaurantHybrid.enabledCapabilities.includes(C.FOOD_TABLES), true);
-  assert.equal(restaurantHybrid.enabledCapabilities.includes(C.RETAIL_BARCODE), false);
-  assert.equal(restaurantHybrid.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), true);
-  assert.equal(restaurantHybrid.enabledCapabilities.includes(C.ACCOMMODATION_STAYS), true);
-  assert.equal(restaurantHybrid.enabledCapabilities.includes(C.ACCOMMODATION_FOLIO), true);
+  const restaurant = applyBusinessProfileCapabilities(databasePath, "restaurant");
+  assert.equal(restaurant.profileId, "restaurant");
+  assert.equal(restaurant.enabledCapabilities.includes(C.FOOD_TABLES), true);
+  assert.equal(restaurant.enabledCapabilities.includes(C.RETAIL_BARCODE), false);
+  assert.equal(restaurant.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), false);
+  assert.equal(restaurant.enabledCapabilities.includes(C.ACCOMMODATION_STAYS), false);
+  assert.equal(restaurant.enabledCapabilities.includes(C.ACCOMMODATION_FOLIO), false);
+
+  // Hybrids still work when explicitly configured AFTER the transition.
+  setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_ROOMS, enabled: true });
+  setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_STAYS, enabled: true });
+  setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_FOLIO, enabled: true });
 
   assert.throws(
     () => clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_ROOMS),

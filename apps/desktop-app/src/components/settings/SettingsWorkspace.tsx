@@ -83,8 +83,10 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
   const drafts = useSettingsDrafts(props.setupData, props.onSave);
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
-  const capabilities = settingsCapabilities(drafts.canonical);
   const initialized = !props.setupData.setupRequired;
+  const capabilities = initialized
+    ? runtimeCapabilities?.enabledCapabilities ?? []
+    : settingsCapabilities(drafts.canonical);
   const visibleCategories = visibleSettingsCategories(initialized, runtimeCapabilities);
   const category = visibleCategories.find((item) => item.id === storedActive)
     ?? settingsCategories[0];
@@ -98,7 +100,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     enabled: initialized
   });
   const googleReviews = useGoogleReviewsSettings(initialized);
-  const kbs = useKbsSettings(initialized && capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS));
+  const kbs = useKbsSettings(initialized && capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS), drafts.canonical.profileId);
   const layout = useBusinessLayoutSettings({
     enabled: initialized,
     onDashboardRefresh: props.onDashboardRefresh
@@ -424,7 +426,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           {active === "business" && (
             <>
               <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
-                <BusinessSettingsSection form={drafts.form} onFormChange={drafts.setDraft} />
+                <BusinessSettingsSection form={drafts.form} onFormChange={drafts.setDraft} persistedProfileId={drafts.canonical.profileId} />
               </fieldset>
               <StagedSettingsContributionSlot
                 category="business"

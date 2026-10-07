@@ -47,7 +47,7 @@ function toDraft(settings: KbsSettings): KbsDraft {
   };
 }
 
-export function useKbsSettings(enabled: boolean) {
+export function useKbsSettings(enabled: boolean, persistedProfileId = "") {
   const [settings, setSettings] = useState<KbsSettings>(EMPTY_SETTINGS);
   const [draft, setDraft] = useState<KbsDraft>(() => toDraft(EMPTY_SETTINGS));
   const [loading, setLoading] = useState(enabled);
@@ -76,7 +76,7 @@ export function useKbsSettings(enabled: boolean) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [enabled]);
+  }, [enabled, persistedProfileId]);
 
   const dirty = draft.enabled !== settings.enabled
     || draft.provider !== settings.provider

@@ -176,18 +176,17 @@ function createBusinessProfile(
 ): BusinessProfileDefinition {
   const allowedOptional = new Set(optionalCapabilities);
   const normalizedDefaults = defaultOptionalCapabilities.filter((capability) => allowedOptional.has(capability));
+  const defaultCapabilities = expandBusinessCapabilities(uniqueCapabilities(
+    CORE_BUSINESS_CAPABILITIES, requiredCapabilities, normalizedDefaults
+  ));
   return {
     id,
     label,
     description,
     requiredCapabilities: [...requiredCapabilities],
     optionalCapabilities: [...optionalCapabilities],
-    defaultOptionalCapabilities: [...normalizedDefaults],
-    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
-      CORE_BUSINESS_CAPABILITIES,
-      requiredCapabilities,
-      normalizedDefaults
-    ))
+    defaultOptionalCapabilities: optionalCapabilities.filter(capability => defaultCapabilities.includes(capability)),
+    defaultCapabilities
   };
 }
 
