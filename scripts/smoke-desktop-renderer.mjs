@@ -873,34 +873,79 @@ try {
 
   await expect(page.locator(".menu-management-grid")).toBeVisible();
 
-  // Menu quick-create and link both land in the shared Product Workspace, never a second editor.
+  // Menu quick-create is one natural task and lands in Product Workspace.
   const countProducts = () => page.evaluate(async () => (await window.yardimciDesktop.commerce.listProducts()).length);
+  const countMenuEntries = () => page.evaluate(async () => (await window.yardimciDesktop.getDashboardData()).menu.items.length);
   const productsBeforeCreate = await countProducts();
+  const entriesBeforeCreate = await countMenuEntries();
+  const selectedMenuCategoryId = await page.locator(".menu-category-row.is-selected").getAttribute("data-sort-id");
+  const selectedMenuCategoryName = await page.locator(".menu-category-row.is-selected .menu-category-row__main strong").textContent();
   await productHeading.getByRole("button", { name: "Ürün ekle", exact: true }).click();
-  const createMenuProduct = page.getByRole("dialog", { name: "Yeni menü ürünü", exact: true });
+  const createMenuProduct = page.getByRole("dialog", { name: "Yeni ürün", exact: true });
   await expect(createMenuProduct).toBeVisible();
+  await expect(createMenuProduct.getByLabel("Menü kategorisi", { exact: true })).toContainText(selectedMenuCategoryName);
+  await expect(createMenuProduct.getByLabel("Ürün kaynağı")).toHaveCount(0);
+  await expect(createMenuProduct.getByLabel("Mevcut ürün", { exact: true })).toHaveCount(0);
+  await expect(createMenuProduct.getByText("Menüde mevcut", { exact: true })).toHaveCount(0);
+  await expect(createMenuProduct).not.toContainText(/canonical|shared|ortak ürün|Mevcut ürünü menüye ekle|Yeni ortak ürün oluştur/i);
+  const createPrice = createMenuProduct.getByLabel("Satış fiyatı", { exact: true });
+  const createPriceError = createMenuProduct.getByRole("alert").filter({ hasText: "Satış fiyatı için geçerli bir tutar girin" });
+  await expect(createPriceError).toHaveCount(0);
+  await createPrice.focus();
+  await createMenuProduct.getByLabel("Ürün adı", { exact: true }).focus();
+  await expect(createPriceError).toBeVisible();
+  await createMenuProduct.getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await productHeading.getByRole("button", { name: "Ürün ekle", exact: true }).click();
+  await expect(createPriceError).toHaveCount(0);
+  await createMenuProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(createPriceError).toBeVisible();
+  expect(await countProducts()).toBe(productsBeforeCreate);
+  expect(await countMenuEntries()).toBe(entriesBeforeCreate);
   await createMenuProduct.getByLabel("Ürün adı", { exact: true }).fill("UI ortak ürün");
-  await createMenuProduct.getByLabel("Satış fiyatı", { exact: true }).fill("42");
+  await createPrice.fill("42");
+  await expect(createPriceError).toHaveCount(0);
+  await expect(createMenuProduct.getByLabel("Menü fiyatı", { exact: true })).toHaveValue("");
+  await page.evaluate(() => {
+    const save = window.yardimciDesktop.saveMenuProductEntry;
+    window.__failMenuCreate = true;
+    window.yardimciDesktop.saveMenuProductEntry = async input => {
+      window.__menuCreateInput = structuredClone(input);
+      if (window.__failMenuCreate) return { ok: false, message: "Test kayıt hatası" };
+      return save(input);
+    };
+  });
+  await createMenuProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(createMenuProduct).toBeVisible();
+  expect(await countProducts()).toBe(productsBeforeCreate);
+  expect(await countMenuEntries()).toBe(entriesBeforeCreate);
+  await page.evaluate(() => { window.__failMenuCreate = false; });
   await createMenuProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   const createdProductWorkspace = page.getByRole("dialog", { name: "UI ortak ürün", exact: true });
   await expect(createdProductWorkspace.getByLabel("Menü sunumu", { exact: true })).toBeVisible();
   await expect(createdProductWorkspace.getByLabel("Ürün adı", { exact: true })).toHaveValue("UI ortak ürün");
   await expect(page.getByRole("dialog")).toHaveCount(1);
   expect(await countProducts()).toBe(productsBeforeCreate + 1);
+  expect(await countMenuEntries()).toBe(entriesBeforeCreate + 1);
+  const createInput = await page.evaluate(() => window.__menuCreateInput);
+  expect(createInput.category_id).toBe(selectedMenuCategoryId);
+  expect(createInput.product.salePrice).toBe(42);
+  expect(createInput.product_id).toBeUndefined();
+  expect(createInput.price_override).toBeNull();
+  expect(createInput.is_available).toBe(true);
+  await expect(createdProductWorkspace.getByText("Menüde mevcut", { exact: true })).toBeVisible();
   await createdProductWorkspace.getByRole("button", { name: "Menüden kaldır", exact: true }).click();
   await createdProductWorkspace.getByRole("region", { name: "Menüden kaldır", exact: true })
     .getByRole("button", { name: "Menüden kaldır", exact: true }).click();
   await expect(createdProductWorkspace.getByLabel("Menü sunumu", { exact: true })).toHaveCount(0);
   expect(await countProducts()).toBe(productsBeforeCreate + 1);
+  expect(await countMenuEntries()).toBe(entriesBeforeCreate);
   await createdProductWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await productHeading.getByRole("button", { name: "Ürün ekle", exact: true }).click();
   await expect(createMenuProduct).toBeVisible();
-  await createMenuProduct.getByLabel("Ürün kaynağı").selectOption("link");
-  await chooseSearchSelect(createMenuProduct, "Mevcut ürün", { value: "product-smoke-created" });
-  await createMenuProduct.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
-  await expect(createdProductWorkspace.getByLabel("Menü sunumu", { exact: true })).toBeVisible();
+  await expect(createPrice).toHaveValue("");
+  await expect(createPriceError).toHaveCount(0);
+  await createMenuProduct.getByRole("button", { name: "Vazgeç", exact: true }).click();
   expect(await countProducts()).toBe(productsBeforeCreate + 1);
-  await createdProductWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
 
   await page.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);

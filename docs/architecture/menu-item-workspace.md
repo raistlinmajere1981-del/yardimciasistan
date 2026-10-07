@@ -12,7 +12,13 @@ This supersedes the Stage 8C presentation/persistence contract; there is no Menu
 - `MenuProductEntryFields` owns only the channel relation. Its separate explicit save/reset
   lifecycle participates in the workspace dirty/busy guard; it does not own Product identity.
 - New Product creation reuses `ProductFormFields`; the backend commits Product + Menu entry
-  atomically. Existing Product linking requires no duplicate Product row. After save, the
+  atomically. The “Yeni ürün” dialog prefills the selected Menu category and exposes no
+  Product source/link selector or internal identity terminology. Availability remains editable
+  in Product Workspace; new entries are available by default. Price validation is silent until
+  the sale price is touched or save is attempted.
+  Existing Product linking remains supported by the domain operation without duplicate rows;
+  it is not part of this dialog, and Menu currently has no separate unlinked-product picker.
+  After save, the
   create dialog unmounts before the Product Workspace opens.
 - Restaurant contexts hide unrelated retail/purchasing fields, not canonical data or domain
   authority. CATALOG/SALES/INVENTORY dependencies do not enable Restaurant Sales navigation.

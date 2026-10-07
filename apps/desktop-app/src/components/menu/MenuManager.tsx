@@ -23,7 +23,6 @@ import { MenuProductEntryFields } from "./MenuProductEntryFields";
 import { ProductFormFields } from "../market/ProductFormFields";
 import { emptyProductForm, productFormToSaveInput, validateProductFormPrices } from "../../app/product-model";
 import type { CatalogProduct, CatalogCategory } from "@yardimci-asistan/shared";
-import { SearchSelect } from "../ui/SearchSelect";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton } from "../ui/DataList";
 import { FormDialog } from "../ui/FormDialog";
@@ -93,7 +92,7 @@ export function MenuManager({
   const [newCategoryForm, setNewCategoryForm] = useState<CategoryFormState>(() => emptyCategoryForm(nextSortOrder(dashboardData.menu.categories)));
   const [itemCreateOpen, setItemCreateOpen] = useState(false);
   const [pendingItemId, setPendingItemId] = useState("");
-  const [createKind, setCreateKind] = useState<"new" | "link">("new");
+  const [priceValidationVisible, setPriceValidationVisible] = useState(false);
   const [productForm, setProductForm] = useState(() => ({ ...emptyProductForm(false), purchasePrice: "0" }));
   const [manualImageDataUrl, setManualImageDataUrl] = useState("");
   const [createMessage, setCreateMessage] = useState("");
@@ -170,10 +169,9 @@ export function MenuManager({
   function startItemCreate() {
     onNewItem();
     setProductForm({ ...emptyProductForm(false), purchasePrice: "0" });
-    setCreateKind("new");
+    setPriceValidationVisible(false);
     setManualImageDataUrl("");
     setCreateMessage("");
-    void onCatalogReload();
     setItemCreateOpen(true);
   }
 
@@ -440,7 +438,7 @@ export function MenuManager({
 
       {itemCreateOpen && (
         <FormDialog
-          title="Yeni menü ürünü"
+          title="Yeni ürün"
           onClose={() => {
             if (menuEditState !== "loading") setItemCreateOpen(false);
           }}
@@ -449,10 +447,10 @@ export function MenuManager({
           onSubmit={async (event) => {
             event.preventDefault();
             if (menuEditState === "loading") return;
-            const error = createKind === "new" ? validateProductFormPrices(productForm) : !itemForm.product_id ? "Menüye eklenecek ürünü seçin." : null;
-            if (error) { setCreateMessage(error); return; }
-            const result = await onSaveItem(createKind === "new" ? { ...productFormToSaveInput(productForm),
-              ...(manualImageDataUrl ? { manualImageDataUrl } : {}) } : undefined);
+            setPriceValidationVisible(true);
+            if (validateProductFormPrices(productForm)) return;
+            const result = await onSaveItem({ ...productFormToSaveInput(productForm),
+              ...(manualImageDataUrl ? { manualImageDataUrl } : {}) });
             if (!result?.ok) return;
             setPendingItemId(result.savedId);
             setItemCreateOpen(false);
@@ -481,16 +479,16 @@ export function MenuManager({
           )}
         >
           <div className="menu-item-create-form">
-            <label className="form-field">Ürün kaynağı<select disabled={menuEditState === "loading"} value={createKind} onChange={event => setCreateKind(event.target.value === "link" ? "link" : "new")}>
-              <option value="new">Yeni ortak ürün oluştur</option><option value="link">Mevcut ürünü menüye ekle</option>
-            </select></label>
-            {createKind === "link" ? <SearchSelect disabled={menuEditState === "loading"} ariaLabel="Mevcut ürün" value={itemForm.product_id} onChange={product_id => onItemFormChange({ ...itemForm, product_id })}
-              options={products.filter(product => product.isActive && !dashboardData.menu.items.some(item => item.product_id === product.id)).map(product => ({ id: product.id, label: product.name }))} />
-              : <ProductFormFields form={productForm} categories={catalogCategories} inventoryEnabled={inventoryEnabled}
-                disabled={menuEditState === "loading"}
-                productDataEnabled={false} retailFieldsEnabled={false} purchasingEnabled={false} onChange={setProductForm}
-                localImageDataUrl={manualImageDataUrl} onManualImageSelected={setManualImageDataUrl} onImageClear={() => setManualImageDataUrl("")}
-                onStateChange={(_state, message) => setCreateMessage(message)} />}
+            <section className="form-stack" aria-label="Ürün bilgileri">
+              <h3>Ürün bilgileri</h3>
+              <ProductFormFields form={productForm} categories={catalogCategories} inventoryEnabled={inventoryEnabled}
+                 disabled={menuEditState === "loading"}
+                 salePriceError={priceValidationVisible ? validateProductFormPrices(productForm) : null}
+                 onSalePriceBlur={() => setPriceValidationVisible(true)}
+                 productDataEnabled={false} retailFieldsEnabled={false} purchasingEnabled={false} onChange={setProductForm}
+                 localImageDataUrl={manualImageDataUrl} onManualImageSelected={setManualImageDataUrl} onImageClear={() => setManualImageDataUrl("")}
+                 onStateChange={(_state, message) => setCreateMessage(message)} />
+            </section>
             {createMessage && <p role="status">{createMessage}</p>}
             <MenuProductEntryFields
               form={itemForm}
@@ -498,6 +496,7 @@ export function MenuManager({
               qrMenuEnabled={qrMenuEnabled}
               inventoryEnabled={inventoryEnabled}
               disabled={menuEditState === "loading"}
+              showAvailability={false}
               onChange={onItemFormChange}
             />
           </div>

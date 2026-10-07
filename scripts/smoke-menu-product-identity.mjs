@@ -25,6 +25,12 @@ try {
     const category = ok(database.saveMenuCategory({ name: "Drinks", description: "", is_active: true, sort_order: 10 })).savedId;
     const entryInput = { category_id: category, price_override: null, is_available: true, is_featured: false,
       allergens: [], tags: [], stock_consumption_quantity: 0.25, hide_when_out_of_stock: true, sort_order: 10 };
+    const creationCounts = () => ["catalog_products", "menu_product_entries"].map(table => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
+    const beforeCreationFailure = creationCounts();
+    db.exec("CREATE TRIGGER test_desktop_menu_entry_failure BEFORE INSERT ON menu_product_entries BEGIN SELECT RAISE(ABORT, 'injected menu entry failure'); END;");
+    assert.equal(database.saveMenuProductEntry({ ...entryInput, product: { name: "Failed desktop product", salePrice: 42 } }).ok, false);
+    assert.deepEqual(creationCounts(), beforeCreationFailure, "Desktop Product + Menu creation must roll back both rows on entry insertion failure.");
+    db.exec("DROP TRIGGER test_desktop_menu_entry_failure");
     const created = ok(database.saveMenuProductEntry({ ...entryInput, product: { name: "Shared drink", salePrice: 20, unit: "l", trackInventory: true, minimumQuantity: 2 } }));
     const entryId = created.savedId;
     const projection = () => database.getPublishedMenu().items.find(entry => entry.id === entryId);
@@ -32,12 +38,17 @@ try {
     const editProduct = patch => commerce.saveCatalogProduct(database.databasePath,
       { ...commerce.listCatalogProducts(database.databasePath).find(product => product.id === productId), ...patch });
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM menu_product_entries").get().n, 1);
+    assert.equal(projection().category_id, category);
+    assert.equal(db.prepare("SELECT price_override FROM menu_product_entries WHERE id = ?").get(entryId).price_override, null);
     assert.equal(projection().price, 20);
     assert.equal(projection().stock_min_quantity, 2);
     assert.equal(database.saveMenuProductEntry({ ...entryInput, product_id: productId }).ok, false);
     const countBefore = db.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n;
+    const entriesBeforeInvalidPrice = db.prepare("SELECT COUNT(*) AS n FROM menu_product_entries").get().n;
     assert.equal(database.saveMenuProductEntry({ ...entryInput, price_override: -1, product: { name: "Must roll back", salePrice: 1 } }).ok, false);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n, countBefore);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM menu_product_entries").get().n, entriesBeforeInvalidPrice);
 
     commerce.setInventoryCount(database.databasePath, { productId, countedQuantity: 10 });
     const stock = () => commerce.getInventoryBalance(database.databasePath, productId).quantity;

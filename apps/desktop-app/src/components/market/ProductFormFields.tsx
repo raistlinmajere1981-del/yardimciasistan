@@ -1,6 +1,6 @@
 import { SearchSelect } from "../ui/SearchSelect";
 import { Image as ImageIcon, Sparkles, Trash2, Upload } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   normalizeBarcodeIdentity,
   type CatalogCategory,
@@ -38,6 +38,8 @@ export function ProductFormFields({
   onImageClear,
   onExternalImageSelected,
   statusFields,
+  salePriceError,
+  onSalePriceBlur,
   onChange,
   onStateChange
 }: {
@@ -57,10 +59,13 @@ export function ProductFormFields({
   onImageClear?: () => void;
   onExternalImageSelected?: () => void;
   statusFields?: ReactNode;
+  salePriceError?: string | null;
+  onSalePriceBlur?: () => void;
   onChange: (form: ProductFormState) => void;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
   const bridge = window.yardimciDesktop?.commerce;
+  const salePriceErrorId = useId();
   const [lookupBusy, setLookupBusy] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState(localImageDataUrl);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -218,7 +223,10 @@ export function ProductFormFields({
       </label>}
       {retailFieldsEnabled && <label className="market-field">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => onChange({ ...form, categoryId })} options={categories.filter(category => category.isActive).map(category => ({ id: category.id, label: category.name }))} /></label>}
       <label className="market-field">Birim<select disabled={disabled} value={form.unit} onChange={(event) => onChange({ ...form, unit: event.target.value as ProductFormState["unit"] })}>{Object.entries(PRODUCT_UNIT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-      <label className="market-field">{wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"}<MoneyInput aria-label={wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"} disabled={disabled} value={form.salePrice} onChange={(salePrice) => onChange({ ...form, salePrice })} /></label>
+      <label className="market-field">{wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"}<MoneyInput aria-label={wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"} disabled={disabled} value={form.salePrice}
+        onBlur={onSalePriceBlur} aria-invalid={salePriceError ? true : undefined} aria-describedby={salePriceError ? salePriceErrorId : undefined}
+        onChange={(salePrice) => onChange({ ...form, salePrice })} />
+        {salePriceError && <small id={salePriceErrorId} role="alert">{salePriceError}</small>}</label>
       {wholesaleEnabled && <>
         <label className="market-field">Bayi A fiyatı<MoneyInput aria-label="Bayi A fiyatı" disabled={disabled} value={form.dealerPriceA} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceA) => onChange({ ...form, dealerPriceA })} /></label>
         <label className="market-field">Bayi B fiyatı<MoneyInput aria-label="Bayi B fiyatı" disabled={disabled} value={form.dealerPriceB} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceB) => onChange({ ...form, dealerPriceB })} /></label>
