@@ -71,8 +71,9 @@ const marketContribution = {
   pageId: "market",
   icon: Store,
   order: 50,
+  // Catalog, sales and inventory are shared foundations (also supplied by
+  // hospitality). Only retail/dealer/channel surfaces grant workspace entry.
   condition: { anyOf: [
-    { allOf: [C.CATALOG, C.SALES] },
     { allOf: [C.CATALOG, C.ORDERS, C.WHOLESALE] },
     { allOf: [C.CATALOG, C.RETAIL_BARCODE] },
     { allOf: [C.CATALOG, C.RETAIL_PURCHASING] },

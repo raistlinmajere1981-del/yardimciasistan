@@ -222,16 +222,16 @@ try {
   // Late pre-save snapshots must never reopen navigation after a capability mutation.
   const race = await browser.newPage();
   await race.addInitScript(() => {
-    window.__caps = { businessId: "fixture", profileId: "market", capabilities: [], enabledCapabilities: ["commerce.catalog", "commerce.sales"] };
+    window.__caps = { businessId: "fixture", profileId: "market", capabilities: [], enabledCapabilities: ["commerce.catalog", "commerce.sales", "commerce.inventory", "retail.barcode"] };
     window.__pendingCaps = [];
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => {
         const captured = window.__caps;
         return window.__delayCaps ? new Promise(done => window.__pendingCaps.push(() => done(captured))) : captured;
       },
-      setBusinessCapability: async () => {
+      setBusinessCapability: async (capability) => {
         if (window.__delayMutation) await new Promise(done => { window.__finishMutation = done; });
-        window.__caps = { ...window.__caps, enabledCapabilities: [] }; return window.__caps;
+        window.__caps = { ...window.__caps, enabledCapabilities: window.__caps.enabledCapabilities.filter(item => item !== capability) }; return window.__caps;
       }
     };
   });
@@ -246,7 +246,7 @@ try {
   await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
   await race.evaluate(() => window.__pendingCaps.splice(0).forEach(done => done()));
   await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
-  await race.evaluate(() => { window.__delayCaps = false; window.__caps = { ...window.__caps, enabledCapabilities: ["commerce.catalog", "commerce.sales"] }; });
+  await race.evaluate(() => { window.__delayCaps = false; window.__caps = { ...window.__caps, enabledCapabilities: ["commerce.catalog", "commerce.sales", "commerce.inventory", "retail.barcode"] }; });
   await race.getByRole("button", { name: "Capabilities yenile", exact: true }).click();
   await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toBeVisible();
   await race.evaluate(() => { window.__delayMutation = true; });

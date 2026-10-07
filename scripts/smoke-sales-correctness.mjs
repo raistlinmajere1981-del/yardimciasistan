@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { createServer } from "vite";
 
 const require = createRequire(import.meta.url);
-const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
+const { BUSINESS_CAPABILITIES: C, getBusinessProfile, expandBusinessCapabilities } = require("../packages/shared/dist/index.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { completeMarketSale } = require("../apps/desktop-app/dist-electron/market-sale-operation.js");
 const { saveRuntimeCatalogProduct, listRuntimeCatalogProducts, saveRuntimeCatalogCategory, listRuntimeCatalogCategories, setRuntimeInventoryCount, getRuntimeInventoryBalance, listRuntimeInventoryMovements, getCustomerCreditAccount } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
@@ -20,8 +20,21 @@ try {
   ({ buildNavigation } = await server.ssrLoadModule("/src/app/navigation.ts"));
   const sales = (enabledCapabilities) => buildNavigation({ enabledCapabilities }).some(item => item.id === "market");
   check("hospitality-only", () => assert.equal(sales([C.FOOD_MENU, C.FOOD_TABLES, C.ACCOMMODATION_ROOMS]), false));
-  check("retail without barcode", () => assert.equal(sales([C.CATALOG, C.SALES]), true));
+  check("shared commerce foundations cannot grant Sales entry", () => assert.equal(sales([C.CATALOG, C.SALES, C.INVENTORY]), false));
+  check("inventory alone cannot grant Sales entry", () => assert.equal(sales(expandBusinessCapabilities([C.INVENTORY])), false));
+  for (const profileId of ["pension", "restaurant", "pension_restaurant"]) {
+    check(`${profileId} canonical defaults + inventory`, () => assert.equal(
+      sales(expandBusinessCapabilities([...getBusinessProfile(profileId).defaultCapabilities, C.INVENTORY])), false));
+  }
+  check("retail", () => assert.equal(sales(getBusinessProfile("market").defaultCapabilities), true));
+  check("retail without barcode retains purchasing/supplier surfaces", () => assert.equal(
+    sales(getBusinessProfile("market").defaultCapabilities.filter(capability => capability !== C.RETAIL_BARCODE)), true));
   check("wholesale", () => assert.equal(sales([C.CATALOG, C.ORDERS, C.WHOLESALE]), true));
+  for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS, C.ONLINE_SALES]) {
+    check(`${capability} with catalog grants an actual retail/channel surface`, () => assert.equal(sales(expandBusinessCapabilities([C.CATALOG, capability])), true));
+  }
+  check("shared catalog/products alone cannot grant Sales entry", () => assert.equal(sales([C.CATALOG]), false));
+  check("orders without the implemented wholesale/channel surfaces cannot grant entry", () => assert.equal(sales([C.CATALOG, C.ORDERS]), false));
   check("stale tools cannot expose inaccessible Sales", () => assert.equal(sales([C.RETAIL_LABELS, C.RETAIL_SUPPLIERS]), false));
   check("runtime removal", () => assert.equal(sales([]), false));
 } finally { await server.close(); }
@@ -112,16 +125,20 @@ try {
     check("profile switch and persisted capability navigation", () => {
       for (const profile of ["pension", "pension_restaurant", "restaurant"]) {
         applyBusinessProfileCapabilities(database.databasePath, profile, { preserveUserOverrides: false });
-        setBusinessCapability(database.databasePath, { capability: C.SALES, enabled: false });
-        setBusinessCapability(database.databasePath, { capability: C.INVENTORY, enabled: false });
-        setBusinessCapability(database.databasePath, { capability: C.CATALOG, enabled: false });
+        // Keep the real hospitality defaults, including shared SALES where supplied.
+        // Inventory requires catalog; adding both must still not grant Sales entry.
+        setBusinessCapability(database.databasePath, { capability: C.CATALOG, enabled: true });
+        setBusinessCapability(database.databasePath, { capability: C.INVENTORY, enabled: true });
         assert.equal(buildNavigation(readBusinessCapabilitySnapshot(database.databasePath)).some(item => item.id === "market"), false, profile);
+        assert.equal(readBusinessCapabilitySnapshot(database.databasePath).enabledCapabilities.includes(C.INVENTORY), true);
         const reopened = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dataDir });
         try { reopened.initialize(); assert.equal(buildNavigation(readBusinessCapabilitySnapshot(reopened.databasePath)).some(item => item.id === "market"), false); } finally { reopened.close(); }
-        setBusinessCapability(database.databasePath, { capability: C.CATALOG, enabled: true });
         setBusinessCapability(database.databasePath, { capability: C.ORDERS, enabled: true });
         setBusinessCapability(database.databasePath, { capability: C.WHOLESALE, enabled: true });
         assert.equal(buildNavigation(readBusinessCapabilitySnapshot(database.databasePath)).some(item => item.id === "market"), true);
+        setBusinessCapability(database.databasePath, { capability: C.WHOLESALE, enabled: false });
+        assert.equal(buildNavigation(readBusinessCapabilitySnapshot(database.databasePath)).some(item => item.id === "market"), false,
+          "removing the entry surface hides Sales without disabling shared inventory");
       }
     });
   } finally { db.close(); }

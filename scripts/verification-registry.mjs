@@ -343,9 +343,14 @@ const PROFILE_TRANSITION_CHECKS = new Set([
   "publication-protocol", "sync-publication-correctness", "marketing-website", "unit-tests",
   "typecheck", "typecheck-electron", "lint-strict", "knip-strict", "verification-registry-tests", "git-diff-check"
 ]);
+const SALES_NAVIGATION_CHECKS = new Set([
+  "sales-correctness", "sales-workspace-ui", "profile-transition-ui", "business-capabilities", "capability-runtime",
+  "capability-surface-consistency", "sector-feature-contributions", "typecheck", "typecheck-electron", "verification-registry-tests"
+]);
 export const VERIFICATION_CHECKS = [...BASE_CHECKS, ...SMOKE_CHECKS].map(item => ({ ...item, domains: [...new Set([
   ...item.domains, ...(SETTINGS_CHECKS.has(item.id) ? ["settings"] : []), ...(SALES_WORKSPACE_CHECKS.has(item.id) ? ["sales-workspace"] : []),
-  ...(PROFILE_TRANSITION_CHECKS.has(item.id) ? ["profile-transition-correctness"] : [])
+  ...(PROFILE_TRANSITION_CHECKS.has(item.id) ? ["profile-transition-correctness"] : []),
+  ...(SALES_NAVIGATION_CHECKS.has(item.id) ? ["sales-navigation"] : [])
 ])] }));
 
 export const PRESET_LAYERS = {

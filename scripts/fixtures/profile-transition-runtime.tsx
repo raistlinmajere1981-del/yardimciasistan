@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { getBusinessProfile } from "@yardimci-asistan/shared";
+import { getBusinessProfile, type BusinessCapability } from "@yardimci-asistan/shared";
 import { useDesktopSync } from "../../apps/desktop-app/src/app/use-desktop-sync";
 import { buildNavigation } from "../../apps/desktop-app/src/app/navigation";
 import { defaultDashboardData, defaultSetupData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
@@ -22,6 +22,11 @@ Object.assign(window, {
       if (holdRead) { holdRead = false; await new Promise<void>(resolve => { pendingRead = resolve; }); }
       return captured;
     },
+    setBusinessCapability: async (capability: BusinessCapability, enabled: boolean) => {
+      current = { ...current, enabledCapabilities: current.enabledCapabilities.filter(candidate => candidate !== capability) };
+      if (enabled) current.enabledCapabilities.push(capability);
+      return structuredClone(current);
+    },
     getBootstrapData: async () => ({ setup: { ...defaultSetupData, profileId: "pension" }, syncSettings: {} }),
     getDashboardData: async () => defaultDashboardData
   },
@@ -37,6 +42,7 @@ function Fixture() {
   const sync = useDesktopSync({ accessPhase: "unlocked", setSyncState, setStatusMessage, onBootstrapSetup: () => undefined });
   Object.assign(window, {
     readCapabilities: sync.loadBusinessCapabilities,
+    changeRuntimeCapability: sync.setRuntimeBusinessCapability,
     saveProfile: (profileId: string, fail = false) => sync.saveSetupWithCapabilityRefresh(async () => {
       await new Promise<void>(resolve => { finishSave = resolve; });
       if (fail) return { ok: false, message: "Injected save failure" };

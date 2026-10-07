@@ -37,7 +37,7 @@ function NavigationRace() {
   const runtime = useDesktopSync({ accessPhase: "locked", setSyncState: () => {}, setStatusMessage: () => {}, onBootstrapSetup: () => {} });
   return <>
     <button onClick={() => void runtime.loadBusinessCapabilities()}>Capabilities yenile</button>
-    <button onClick={() => void runtime.setRuntimeBusinessCapability(C.SALES, false)}>Satışı kapat</button>
+    <button onClick={() => void runtime.setRuntimeBusinessCapability(C.RETAIL_BARCODE, false)}>Satışı kapat</button>
     <nav aria-label="Runtime navigation">{buildNavigation(runtime.businessCapabilities).map(item => <button key={item.id}>{item.label}</button>)}</nav>
   </>;
 }

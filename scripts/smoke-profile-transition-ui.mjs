@@ -95,7 +95,9 @@ try {
   await visit("?runtime");
   const runtime = page.getByLabel("Runtime profile", { exact: true });
   const nav = page.getByLabel("Runtime navigation", { exact: true });
+  const expectSales = visible => expect.poll(async () => (await nav.textContent()).split(",").includes("market")).toBe(visible);
   await expect(runtime).toHaveText("pension");
+  await expectSales(false);
   await page.evaluate(() => { window.holdCapabilityRead(); window.oldRead = window.readCapabilities(); });
   await page.evaluate(() => { window.saving = window.saveProfile("market"); });
   await expect(runtime).toHaveText("pension");
@@ -103,14 +105,28 @@ try {
   await expect(runtime).toHaveText("pension");
   await page.evaluate(() => { window.finishProfileSave(); });
   await expect(runtime).toHaveText("market");
+  await expectSales(true);
   await expect(nav).not.toContainText("pension");
   // The older read returns AFTER a successful canonical refresh as well.
   await page.evaluate(() => { window.holdCapabilityRead(); window.oldRead = window.readCapabilities(); window.saving = window.saveProfile("restaurant"); });
   await page.evaluate(() => { window.finishProfileSave(); });
   await expect(runtime).toHaveText("restaurant");
+  await expectSales(false);
   await page.evaluate(async () => { window.releaseCapabilityRead(); await window.oldRead; });
   await expect(runtime).toHaveText("restaurant");
+  await expectSales(false);
   await expect(nav).not.toContainText("pension");
+  // A capability removal also fences a previously captured eligible Sales response.
+  await page.evaluate(async () => {
+    await window.changeRuntimeCapability("commerce.orders", true);
+    await window.changeRuntimeCapability("commerce.wholesale", true);
+  });
+  await expectSales(true);
+  await page.evaluate(() => { window.holdCapabilityRead(); window.oldRead = window.readCapabilities(); });
+  await page.evaluate(async () => { await window.changeRuntimeCapability("commerce.wholesale", false); });
+  await expectSales(false);
+  await page.evaluate(async () => { window.releaseCapabilityRead(); await window.oldRead; });
+  await expectSales(false);
   await page.evaluate(() => { window.saving = window.saveProfile("market", true); });
   await page.evaluate(() => { window.finishProfileSave(); });
   await expect(runtime).toHaveText("restaurant");
