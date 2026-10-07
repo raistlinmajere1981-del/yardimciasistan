@@ -63,6 +63,7 @@ function inactiveSnapshot(
     tables: [],
     menu: { categories: [], items: [], updated_at: menuUpdatedAt },
     admin_menu: { categories: [], items: [], updated_at: adminMenuUpdatedAt },
+    menu_product_candidates: [],
     deleted_request_ids: [],
     trackedStockItems: [],
     appliedStockImageHashes: [],
@@ -126,6 +127,7 @@ export function projectLocalAndroidSnapshotForDevice(
   return {
     ...source,
     customers: customerManagementAllowed ? source.customers : [],
+    menu_product_candidates: permissions.has("menu.edit") ? source.menu_product_candidates ?? [] : [],
     customer_room_stays: customerManagementAllowed ? source.customer_room_stays : [],
     room_folios: roomFolioAllowed ? source.room_folios : [],
     androidPermissions: {

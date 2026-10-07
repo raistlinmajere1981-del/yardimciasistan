@@ -79,6 +79,7 @@ export interface CatalogProduct {
   unit: CommerceUnit;
   taxRate: number;
   trackInventory: boolean;
+  minimumQuantity?: number;
   isActive: boolean;
   imageAssetPath: string;
   imageSourceUrl: string;

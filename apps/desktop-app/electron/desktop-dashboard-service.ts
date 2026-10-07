@@ -45,7 +45,7 @@ export function createDesktopDashboardData(
     db,
     getActiveResourceReservationTitles(db, "table")
   );
-  const menu = getPublishedMenu(db);
+  const menu = getPublishedMenu(db, true);
 
   return {
     revision: ++dashboardRevision,
@@ -108,11 +108,12 @@ export function createDesktopDashboardData(
         db,
         `
           SELECT COUNT(*) as count
-          FROM menu_items
+          FROM menu_product_entries
+          JOIN catalog_products ON catalog_products.id = menu_product_entries.product_id AND catalog_products.is_active = 1 AND catalog_products.deleted_at = ''
           INNER JOIN menu_categories
-            ON menu_categories.id = menu_items.category_id
-          WHERE menu_items.is_available = 1
-            AND menu_items.deleted_at = ''
+            ON menu_categories.id = menu_product_entries.category_id
+          WHERE menu_product_entries.is_available = 1
+            AND menu_product_entries.deleted_at = ''
             AND menu_categories.is_active = 1
             AND menu_categories.deleted_at = ''
         `

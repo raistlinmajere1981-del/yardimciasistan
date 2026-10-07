@@ -128,13 +128,13 @@ function parseAddTableOrderItemInput(value: unknown): AddTableOrderItemInput | n
   const record = toUnknownRecord(value);
   return record
     && typeof record.orderId === "string"
-    && typeof record.menuItemId === "string"
+    && typeof record.menuEntryId === "string"
     && typeof record.quantity === "number"
     && Number.isFinite(record.quantity)
     && typeof record.note === "string"
     ? {
         orderId: record.orderId,
-        menuItemId: record.menuItemId,
+        menuEntryId: record.menuEntryId,
         quantity: record.quantity,
         note: record.note
       }

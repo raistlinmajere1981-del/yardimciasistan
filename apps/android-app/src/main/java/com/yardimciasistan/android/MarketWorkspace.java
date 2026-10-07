@@ -80,13 +80,6 @@ final class MarketWorkspace {
   private static final String PURPOSE_PRODUCT_CREATE = "product_create";
   private static final String PURPOSE_CASH = "cash";
 
-  private static final String[] UNIT_VALUES = {
-      "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
-  };
-  private static final String[] UNIT_LABELS = {
-      "Adet", "Kilogram", "Gram", "Litre", "Mililitre", "Paket", "Kutu", "Metre", "Diğer"
-  };
-
   private final Context context;
   private final Listener listener;
   private final ComponentActivity activity;
@@ -1022,39 +1015,18 @@ final class MarketWorkspace {
       page.addView(preview);
     }
 
-    EditText name = labeledInput(page, "Ürün adı", "Örn. Test Kola 330 ml");
-    bind(name, productCreateName, value -> productCreateName = value);
+    CatalogProductCreateFields.name(page, productCreateName, value -> productCreateName = value);
     EditText brand = labeledInput(page, "Marka (isteğe bağlı)", "");
     bind(brand, productCreateBrand, value -> productCreateBrand = value);
     EditText sku = labeledInput(page, "SKU (isteğe bağlı)", "");
     bind(sku, productCreateSku, value -> productCreateSku = value);
 
-    addFieldLabel(page, "Birim");
-    Spinner unit = new Spinner(context);
-    ArrayList<UnitChoice> unitChoices = new ArrayList<>();
-    int unitSelection = 0;
-    for (int index = 0; index < UNIT_VALUES.length; index += 1) {
-      unitChoices.add(new UnitChoice(UNIT_VALUES[index], UNIT_LABELS[index]));
-      if (UNIT_VALUES[index].equals(productCreateUnit)) unitSelection = index;
-    }
-    ArrayAdapter<UnitChoice> unitAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, unitChoices);
-    unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    unit.setAdapter(unitAdapter);
-    unit.setSelection(unitSelection);
-    unit.setBackground(UiKit.rounded(context, UiKit.SURFACE, UiKit.BORDER, 11));
-    unit.setLayoutParams(fieldParams(50));
-    unit.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
-      UnitChoice choice = (UnitChoice) unit.getSelectedItem();
-      productCreateUnit = choice == null ? "piece" : choice.value;
-    }));
-    page.addView(unit);
+    CatalogProductCreateFields.unit(page, productCreateUnit, value -> productCreateUnit = value);
 
     EditText purchase = labeledInput(page, "Alış fiyatı (isteğe bağlı)", "0,00");
     purchase.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
     bind(purchase, productCreatePurchasePrice, value -> productCreatePurchasePrice = value);
-    EditText sale = labeledInput(page, "Satış fiyatı (isteğe bağlı)", "0,00");
-    sale.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    bind(sale, productCreateSalePrice, value -> productCreateSalePrice = value);
+    CatalogProductCreateFields.salePrice(page, productCreateSalePrice, value -> productCreateSalePrice = value);
     EditText category = labeledInput(page, "Kategori (isteğe bağlı)", "");
     bind(category, productCreateCategory, value -> productCreateCategory = value);
     EditText note = labeledMultiline(page, "Not", "Ürün açıklaması / not");
@@ -1653,15 +1625,4 @@ final class MarketWorkspace {
     @Override public String toString() { return label; }
   }
 
-  private static final class UnitChoice {
-    final String value;
-    final String label;
-
-    UnitChoice(String value, String label) {
-      this.value = value;
-      this.label = label;
-    }
-
-    @Override public String toString() { return label; }
-  }
 }

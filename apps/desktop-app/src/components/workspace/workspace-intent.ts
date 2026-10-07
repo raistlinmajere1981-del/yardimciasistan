@@ -32,27 +32,18 @@ export interface CustomerWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-type MenuItemWorkspaceMode = "details";
-
-export interface MenuItemWorkspaceIntent {
-  entityType: "menu-item";
-  entityId: string;
-  mode?: MenuItemWorkspaceMode;
-  action?: undefined;
-  returnContext?: WorkspaceReturnContext;
-}
-
 export type ProductWorkspaceMode = "details" | "history";
 
 export interface ProductWorkspaceIntent {
   entityType: "product";
   entityId: string;
+  menuEntryId?: string;
   mode?: ProductWorkspaceMode;
   action?: undefined;
   returnContext?: WorkspaceReturnContext;
 }
 
-export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent | CustomerWorkspaceIntent | MenuItemWorkspaceIntent | ProductWorkspaceIntent;
+export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent | CustomerWorkspaceIntent | ProductWorkspaceIntent;
 
 export type WorkspaceModeUpdate = {
   [Entity in WorkspaceIntent["entityType"]]: Pick<Extract<WorkspaceIntent, { entityType: Entity }>, "entityType" | "mode" | "action">

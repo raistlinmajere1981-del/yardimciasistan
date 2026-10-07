@@ -186,15 +186,40 @@ The Restaurant pilot may redesign the presentation but must not invent split pay
 
 ---
 
-## D-011 — Menu Item and Catalog Product remain distinct
+## D-011 — Menu and Online Sales share one canonical Catalog Product
 
-**Status:** ACCEPTED
+**Status:** ACCEPTED (domain consolidation, 2026-10-07)
 
-They have different persistence and stock/business semantics.
+`catalog_products` owns product identity, description, images, currency, base sale/purchase
+pricing, unit, stock tracking and minimum quantity. Menu is a channel relation in
+`menu_product_entries`; Online Sales remains a publication of the same product id.
 
-Shared presentation controls such as pickers, quantity controls or product-summary components are allowed.
+Menu owns category, order, availability, featured, allergens/tags, nullable price override,
+hide-when-out-of-stock and inventory consumption per ordered portion. Menu categories and
+catalog categories remain separate. Price fallback to canonical sale price is backend-owned.
 
-Merging their data models is outside the UI/platform program.
+Every stock write delegates to `applyInventoryMovementInTransaction`; no Menu balance or
+movement authority exists. Table/Folio lines freeze product identity, monetary/name snapshots,
+consumption and inventory location. Quantity changes/removal restore only the exact frozen
+delta. Table-to-Folio transfer remains monetary-only, never a second stock consumption.
+
+Product consolidation does not consolidate financial accounts: `room_folios`,
+`room_folio_payments` and `room_folio_totals` retain hospitality ownership;
+`table_orders` retains Restaurant bill ownership; `customer_credit_entries` remains
+the separate retail/customer-credit system. Existing finance-entry projections are
+not a replacement account model. Historical labels, unit prices, quantities, totals
+and currency remain snapshots (Folio currency remains owned by its account).
+Table-to-Folio transfer preserves duplicate-transfer/idempotency guards. Checkout
+with remaining debt leaves the Room Folio open, even after the Stay departs.
+
+Menu removal unlinks the channel, never deletes the Product. Product deletion rejects open
+table/folio dependencies; otherwise it soft-deletes the Product and withdraws its channels.
+Tracking/unit edits reject outstanding frozen consumption. Menu and Commerce open the same
+Product Workspace and reuse its creation fields. Shared capabilities do not open Restaurant
+Sales navigation; retail/wholesale visibility keeps its independent gate.
+
+This is a current-schema domain project, not a historical migration or a UI-only merge.
+There is no old `menu_items` conversion, compatibility API, runtime backfill or legacy DDL.
 
 ---
 

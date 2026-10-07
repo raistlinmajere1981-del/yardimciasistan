@@ -328,7 +328,8 @@ try {
     menu: { categories: [], items: [], updated_at: "2026-07-18T10:00:00+03:00" },
     trackedStockItems: [
       {
-        menu_item_id: "item_stock_snapshot_001",
+        product_id: "product_stock_snapshot_001",
+        menu_entry_id: "item_stock_snapshot_001",
         name: "Snapshot Stok Ürünü",
         category: "Smoke Test",
         price: 12,
@@ -466,7 +467,8 @@ try {
   const androidStockSummary = await androidStockSummaryResponse.json();
   expect(androidStockSummary.trackedStockItems).toEqual([
     {
-      menu_item_id: "item_stock_snapshot_001",
+      product_id: "product_stock_snapshot_001",
+      menu_entry_id: "item_stock_snapshot_001",
       name: "Snapshot Stok Ürünü",
       category: "Smoke Test",
       price: 12,
@@ -493,7 +495,7 @@ try {
         action_id: `android_stock_action_${index}_0001`,
         action_type: actionType,
         device_id: "android-stock-web-smoke",
-        payload: { menu_item_id: "item_stock_snapshot_001", quantity: 1, quantity_change: 1, note: "Smoke" }
+        payload: { product_id: "product_stock_snapshot_001", quantity: 1, quantity_change: 1, note: "Smoke" }
       }
     });
     expect(enqueueStockAction.ok()).toBe(true);
@@ -510,7 +512,7 @@ try {
       payload: {
         import_id: "stock_import_web_queue_disabled",
         image_hash: "b".repeat(64),
-        lines: [{ menu_item_id: "item_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
+        lines: [{ product_id: "product_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
       }
     }
   });
@@ -563,7 +565,7 @@ try {
       payload: {
         import_id: "stock_import_web_queue_0001",
         image_hash: "b".repeat(64),
-        lines: [{ menu_item_id: "item_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
+        lines: [{ product_id: "product_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
       }
     }
   });

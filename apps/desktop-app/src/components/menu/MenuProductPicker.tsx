@@ -34,7 +34,7 @@ export function MenuProductPicker({ menu, webModuleUrl, enabled, inventoryEnable
     const activeCategoryIds = new Set(activeCategories.map(category => category.id));
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase("tr-TR");
     return menu.items
-      .filter(item => item.is_available && activeCategoryIds.has(item.category_id))
+      .filter(item => item.is_available && item.product_is_active !== false && activeCategoryIds.has(item.category_id))
       .filter(item => selectedCategoryId === "all" || item.category_id === selectedCategoryId)
       .filter(item => !normalizedQuery || `${item.name} ${item.description} ${categoryNames.get(item.category_id) ?? ""}`
         .toLocaleLowerCase("tr-TR").includes(normalizedQuery))
@@ -99,7 +99,7 @@ export function MenuProductPicker({ menu, webModuleUrl, enabled, inventoryEnable
 export function countActiveMenuItems(menu: PublishedQrMenu, enabled: boolean): number {
   if (!enabled) return 0;
   const activeCategoryIds = new Set(menu.categories.filter(category => category.is_active).map(category => category.id));
-  return menu.items.filter(item => item.is_available && activeCategoryIds.has(item.category_id)).length;
+  return menu.items.filter(item => item.is_available && item.product_is_active !== false && activeCategoryIds.has(item.category_id)).length;
 }
 
 export function isMenuItemOutOfStock(menuItemId: string, menu: PublishedQrMenu, inventoryEnabled = true): boolean {
@@ -119,7 +119,7 @@ function menuStockConsumption(value: number | undefined): number {
 function formatMenuStock(quantity: number | null | undefined, unit: string | undefined): string {
   if (quantity == null) return "Stok takibi yok";
   if (quantity <= 0) return "Stokta yok";
-  return `Stok: ${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 }).format(quantity)} ${unit === "gram" ? "g" : "adet"}`;
+  return `Stok: ${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 }).format(quantity)} ${unit === "piece" ? "adet" : unit}`;
 }
 
 function formatMenuMoney(value: number, currency: string): string {

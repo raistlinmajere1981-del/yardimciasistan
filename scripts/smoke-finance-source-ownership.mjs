@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import { globSync, readFileSync } from "node:fs";
@@ -49,11 +50,11 @@ for (const source of ["pension_payment", "room_folio_payment", "restaurant_order
     } else if (source === "restaurant_order") {
       seedSmokeBusinessLayout(path, { tableCategories: [{ name: "Restaurant", tableCount: 1 }] });
       const categoryId = ok(database.saveMenuCategory({ name: "Food", description: "", is_active: true, sort_order: 1 })).savedId;
-      const menuItemId = ok(database.saveMenuItem({ category_id: categoryId, name: "Meal", description: "", price: 10, currency: "TRY", image_url: "", is_available: true,
+      const menuEntryId = ok(saveMenuProductFixture(database, { category_id: categoryId, name: "Meal", description: "", price: 10, currency: "TRY", image_url: "", is_available: true,
         is_featured: false, allergens: [], tags: [], sort_order: 1 })).savedId;
       const tableId = db.prepare("SELECT id FROM tables LIMIT 1").get().id;
       const orderId = ok(database.openTableOrder(tableId)).order.id;
-      ok(database.addTableOrderItem({ orderId, menuItemId, quantity: 1, note: "" }));
+      ok(database.addTableOrderItem({ orderId, menuEntryId, quantity: 1, note: "" }));
       operation = () => database.closeTableOrder({ orderId, status: "paid" });
       table = "table_orders"; failureEvent = "UPDATE OF status";
     } else {
@@ -66,6 +67,14 @@ for (const source of ["pension_payment", "room_folio_payment", "restaurant_order
     }
     const snapshot = () => [table, "finance_entries", "reservations", "tables", "sync_outbox", "events"]
       .map(name => db.prepare(`SELECT * FROM ${name} ORDER BY rowid`).all());
+    const separateAccountTables = {
+      room_folio_payment: ["table_orders", "table_order_items", "customer_credit_entries", "customer_credit_balances"],
+      restaurant_order: ["room_folios", "room_folio_items", "room_folio_payments", "room_folio_totals", "customer_credit_entries", "customer_credit_balances"],
+      customer_credit_payment: ["room_folios", "room_folio_items", "room_folio_payments", "room_folio_totals", "table_orders", "table_order_items"]
+    };
+    const separateAccounts = () => (separateAccountTables[source] ?? [])
+      .map(name => db.prepare(`SELECT * FROM ${name}`).all());
+    const separateBefore = separateAccounts();
     const fails = () => {
       try { assert.equal(operation().ok, false); } catch (error) { assert.match(error.message, /injected_/); }
     };
@@ -77,6 +86,7 @@ for (const source of ["pension_payment", "room_folio_payment", "restaurant_order
     fails(); assert.deepEqual(snapshot(), before, `${source}: source failure creates no ledger`);
     db.exec("DROP TRIGGER test_source_fail");
     ok(operation());
+    assert.deepEqual(separateAccounts(), separateBefore, `${source}: payments/bills must not mutate another domain's account`);
     const entry = db.prepare("SELECT * FROM finance_entries WHERE source_type=?").get(source);
     assert.ok(entry); assert.equal(entry.amount_minor, 1000);
     assert.equal(finance.getData().recentEntries.filter(e => e.sourceType === source).length, 1);

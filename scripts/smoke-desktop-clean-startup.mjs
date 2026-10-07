@@ -35,7 +35,7 @@ try {
       assert.equal(Number(scalar(sqlite, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")), 0);
       assert.equal(Number(scalar(sqlite, "SELECT COUNT(*) FROM tables WHERE deleted_at = ''")), 0);
       assert.equal(Number(scalar(sqlite, "SELECT COUNT(*) FROM menu_categories WHERE deleted_at = ''")), 0);
-      assert.equal(Number(scalar(sqlite, "SELECT COUNT(*) FROM menu_items WHERE deleted_at = ''")), 0);
+      assert.equal(Number(scalar(sqlite, "SELECT COUNT(*) FROM menu_product_entries WHERE deleted_at = ''")), 0);
       assert.equal(String(scalar(sqlite, "PRAGMA integrity_check")), "ok");
     } finally {
       sqlite.close();

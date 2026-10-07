@@ -27,6 +27,8 @@ export function ProductFormFields({
   inventoryEnabled,
   productDataEnabled,
   wholesaleEnabled = false,
+  retailFieldsEnabled = true,
+  purchasingEnabled = true,
   disabled = false,
   mode = "all",
   localImageDataUrl = "",
@@ -44,6 +46,8 @@ export function ProductFormFields({
   inventoryEnabled: boolean;
   productDataEnabled: boolean;
   wholesaleEnabled?: boolean;
+  retailFieldsEnabled?: boolean;
+  purchasingEnabled?: boolean;
   disabled?: boolean;
   mode?: "all" | "details" | "media";
   localImageDataUrl?: string;
@@ -189,14 +193,14 @@ export function ProductFormFields({
       <h3>Durum / Kullanım</h3>
       <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.isActive} onChange={event => onChange({ ...form, isActive: event.target.checked })} /> Aktif ürün</label>
       <label className="market-check"><input disabled={disabled || !inventoryEnabled} type="checkbox" checked={form.trackInventory} onChange={event => onChange({ ...form, trackInventory: event.target.checked })} /> Stok takibi</label>
-      <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.quickAccessEnabled} onChange={event => onChange({ ...form, quickAccessEnabled: event.target.checked })} /> Hızlı erişim</label>
+      {retailFieldsEnabled && <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.quickAccessEnabled} onChange={event => onChange({ ...form, quickAccessEnabled: event.target.checked })} /> Hızlı erişim</label>}
       {statusFields}
     </section>}
     {showDetails && <div className="market-form-grid">
       <label className="market-field market-field-wide">Ürün adı<input disabled={disabled} value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} /></label>
       <label className="market-field">Marka<input disabled={disabled} value={form.brand} onChange={(event) => onChange({ ...form, brand: event.target.value })} /></label>
-      <label className="market-field">SKU<input disabled={disabled} value={form.sku} onChange={(event) => onChange({ ...form, sku: event.target.value })} /></label>
-      <label className="market-field market-field-wide">
+      {retailFieldsEnabled && <label className="market-field">SKU<input disabled={disabled} value={form.sku} onChange={(event) => onChange({ ...form, sku: event.target.value })} /></label>}
+      {retailFieldsEnabled && <label className="market-field market-field-wide">
         Barkod
         <span className="market-inline-field">
           <input disabled={disabled} value={form.barcode} onChange={(event) => onChange({ ...form, barcode: normalizeBarcodeIdentity(event.target.value, 80) })} />
@@ -211,15 +215,15 @@ export function ProductFormFields({
             <Sparkles size={15} aria-hidden="true" /> Ürün Bilgilerini Ara
           </ActionButton>}
         </span>
-      </label>
-      <label className="market-field">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => onChange({ ...form, categoryId })} options={categories.filter(category => category.isActive).map(category => ({ id: category.id, label: category.name }))} /></label>
+      </label>}
+      {retailFieldsEnabled && <label className="market-field">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => onChange({ ...form, categoryId })} options={categories.filter(category => category.isActive).map(category => ({ id: category.id, label: category.name }))} /></label>}
       <label className="market-field">Birim<select disabled={disabled} value={form.unit} onChange={(event) => onChange({ ...form, unit: event.target.value as ProductFormState["unit"] })}>{Object.entries(PRODUCT_UNIT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       <label className="market-field">{wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"}<MoneyInput aria-label={wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"} disabled={disabled} value={form.salePrice} onChange={(salePrice) => onChange({ ...form, salePrice })} /></label>
       {wholesaleEnabled && <>
         <label className="market-field">Bayi A fiyatı<MoneyInput aria-label="Bayi A fiyatı" disabled={disabled} value={form.dealerPriceA} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceA) => onChange({ ...form, dealerPriceA })} /></label>
         <label className="market-field">Bayi B fiyatı<MoneyInput aria-label="Bayi B fiyatı" disabled={disabled} value={form.dealerPriceB} placeholder="Perakende fiyatı kullan" onChange={(dealerPriceB) => onChange({ ...form, dealerPriceB })} /></label>
       </>}
-      <label className="market-field">Alış fiyatı<MoneyInput aria-label="Alış fiyatı" disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>
+      {purchasingEnabled && <label className="market-field">Alış fiyatı<MoneyInput aria-label="Alış fiyatı" disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>}
       <label className="market-field">Para birimi<input disabled={disabled} value={form.currency} maxLength={3} onChange={(event) => onChange({ ...form, currency: event.target.value.toUpperCase() })} /></label>
       <label className="market-field">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value })} /></label>
       {inventoryEnabled && form.trackInventory && <label className="market-field">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>}

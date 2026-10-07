@@ -54,7 +54,7 @@ import type {
   DesktopSetupSaveResult,
   SaveInitialSetupInput,
   SaveMenuCategoryInput,
-  SaveMenuItemInput,
+  SaveMenuProductEntryInput,
   ReorderMenuRecordsInput,
   DesktopMenuSaveResult,
   CreateManualRequestInput,
@@ -324,7 +324,7 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   listTableOrders: () => Promise<DesktopTableOrder[]>;
   getActiveTableOrder: (tableId: string) => Promise<DesktopTableOrder | null>;
   openTableOrder: (tableId: string) => Promise<DesktopTableOrderResult>;
-  addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) => Promise<DesktopTableOrderResult>;
+  addTableOrderItem: (orderId: string, menuEntryId: string, quantity: number, note: string) => Promise<DesktopTableOrderResult>;
   updateTableOrderItemQuantity: (itemId: string, quantity: number) => Promise<DesktopTableOrderResult>;
   updateTableOrderItemNote: (itemId: string, note: string) => Promise<DesktopTableOrderResult>;
   updateTableOrderDiscount: (orderId: string, discountTotal: number) => Promise<DesktopTableOrderResult>;
@@ -360,10 +360,10 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   getQrMenuWebPublication: () => Promise<{ enabled: boolean }>;
   setQrMenuWebPublication: (enabled: boolean) => Promise<{ ok: boolean; message: string; enabled: boolean }>;
   saveMenuCategory: (input: SaveMenuCategoryInput) => Promise<DesktopMenuSaveResult>;
-  saveMenuItem: (input: SaveMenuItemInput) => Promise<DesktopMenuSaveResult>;
+  saveMenuProductEntry: (input: SaveMenuProductEntryInput) => Promise<DesktopMenuSaveResult>;
   reorderMenuRecords: (input: ReorderMenuRecordsInput) => Promise<DesktopStatusUpdateResult>;
   deleteMenuCategory: (categoryId: string) => Promise<DesktopStatusUpdateResult>;
-  deleteMenuItem: (itemId: string) => Promise<DesktopStatusUpdateResult>;
+  deleteMenuProductEntry: (entryId: string) => Promise<DesktopStatusUpdateResult>;
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => Promise<DesktopStockImageAnalyzeResult>;
   cancelStockImageAnalysis: (importId: string) => Promise<boolean>;
   applyStockImageImport: (input: ApplyStockImageImportInput) => Promise<DesktopStockImageApplyResult>;
@@ -646,7 +646,7 @@ const bridge: DesktopBridge = {
   listTableOrders: () => ipcRenderer.invoke("tableOrder:list"),
   getActiveTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:getActive", tableId),
   openTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:open", tableId),
-  addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) => ipcRenderer.invoke("tableOrder:addItem", { orderId, menuItemId, quantity, note }),
+  addTableOrderItem: (orderId: string, menuEntryId: string, quantity: number, note: string) => invokeWhenUnlocked<DesktopTableOrderResult>("tableOrder:addItem", { orderId, menuEntryId, quantity, note }),
   updateTableOrderItemQuantity: (itemId: string, quantity: number) => ipcRenderer.invoke("tableOrder:updateItemQuantity", { itemId, quantity }),
   updateTableOrderItemNote: (itemId: string, note: string) => ipcRenderer.invoke("tableOrder:updateItemNote", { itemId, note }),
   updateTableOrderDiscount: (orderId: string, discountTotal: number) => ipcRenderer.invoke("tableOrder:updateDiscount", { orderId, discountTotal }),
@@ -694,10 +694,10 @@ const bridge: DesktopBridge = {
   getQrMenuWebPublication: () => ipcRenderer.invoke("menu:getWebPublication"),
   setQrMenuWebPublication: (enabled: boolean) => ipcRenderer.invoke("menu:setWebPublication", enabled),
   saveMenuCategory: (input: SaveMenuCategoryInput) => ipcRenderer.invoke("menu:saveCategory", input),
-  saveMenuItem: (input: SaveMenuItemInput) => ipcRenderer.invoke("menu:saveItem", input),
+  saveMenuProductEntry: (input: SaveMenuProductEntryInput) => invokeWhenUnlocked<DesktopMenuSaveResult>("menu:saveEntry", input),
   reorderMenuRecords: (input: ReorderMenuRecordsInput) => ipcRenderer.invoke("menu:reorder", input),
   deleteMenuCategory: (categoryId: string) => ipcRenderer.invoke("menu:deleteCategory", categoryId),
-  deleteMenuItem: (itemId: string) => ipcRenderer.invoke("menu:deleteItem", itemId),
+  deleteMenuProductEntry: (entryId: string) => invokeWhenUnlocked<DesktopStatusUpdateResult>("menu:removeEntry", entryId),
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => ipcRenderer.invoke("stockImage:analyze", input),
   cancelStockImageAnalysis: (importId: string) => ipcRenderer.invoke("stockImage:cancel", importId),
   applyStockImageImport: (input: ApplyStockImageImportInput) => ipcRenderer.invoke("stockImage:apply", input),

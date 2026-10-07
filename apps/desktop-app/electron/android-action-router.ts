@@ -44,7 +44,7 @@ import {
 } from "./database/request-store.js";
 import {
   deleteMenuCategoryInTransaction,
-  deleteMenuItemInTransaction
+  deleteMenuProductEntryInTransaction
 } from "./database/menu-store.js";
 import { deleteMessageInTransaction } from "./database/prepared-message-store.js";
 import { deleteCustomerInTransaction } from "./database/customer-deletion-service.js";
@@ -53,6 +53,10 @@ import {
   applyStockImageImportInTransaction
 } from "./database/stock-image-store.js";
 import { queueSyncJob } from "./database/sync-runtime-store.js";
+import { getPublishedMenu } from "./database/menu-store.js";
+import { saveMenuProductEntryInTransaction } from "./database/menu-product-entry-store.js";
+import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
+import type { SaveMenuProductEntryInput } from "./database-types.js";
 
 export function routeAndroidActionInTransaction(
   db: DatabaseSync,
@@ -179,6 +183,9 @@ export function routeAndroidActionInTransaction(
       return applyAndroidTableOrderClose(db, action, now, "paid");
     case "table_order_cancel":
       return applyAndroidTableOrderClose(db, action, now, "cancelled");
+    case "menu_entry_create":
+    case "menu_entry_update":
+      return applyAndroidMenuEntrySave(db, action, now, enabledCapabilities);
     case "menu_category_delete":
       return deleteMenuCategoryInTransaction(
         db,
@@ -188,9 +195,9 @@ export function routeAndroidActionInTransaction(
         insertEvent
       );
     case "menu_item_delete":
-      return deleteMenuItemInTransaction(
+      return deleteMenuProductEntryInTransaction(
         db,
-        androidPayloadString(action.payload, "menu_item_id"),
+        androidPayloadString(action.payload, "menu_entry_id"),
         now,
         action,
         insertEvent
@@ -228,6 +235,30 @@ export function routeAndroidActionInTransaction(
     default:
       return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
   }
+}
+
+function applyAndroidMenuEntrySave(db: DatabaseSync, action: AndroidSyncAction, now: string, capabilities: BusinessCapability[]): AndroidActionMutationResult {
+  const updating = action.action_type === "menu_entry_update";
+  const entryId = androidPayloadString(action.payload, "menu_entry_id");
+  const existing = updating ? getPublishedMenu(db, true).items.find(entry => entry.id === entryId) : undefined;
+  if (updating && !existing) return { ok: false, message: "Menü ürünü bulunamadı." };
+  if (existing) {
+    const conflict = getAndroidVersionConflict(action.payload, "expected_updated_at", existing.updated_at, "Menü ürünü");
+    if (conflict) return conflict;
+  }
+  const input = action.payload as unknown as SaveMenuProductEntryInput;
+  if (!capabilities.includes(C.INVENTORY) && ((input.product && input.product.trackInventory !== false) || Number(input.stock_consumption_quantity ?? 1) !== Number(existing?.stock_consumption_quantity ?? 1))) {
+    return { ok: false, message: "Stok alanları bu işletmede etkin değil." };
+  }
+  if (Boolean(input.hide_when_out_of_stock) !== Boolean(existing?.hide_when_out_of_stock)
+      && (!capabilities.includes(C.INVENTORY) || !capabilities.includes(C.QR_MENU))) return { ok: false, message: "Stokta yokken QR menüden gizleme bu işletmede etkin değil." };
+  try {
+    const result = saveMenuProductEntryInTransaction(db, { ...input, id: updating ? entryId : undefined,
+      product_id: updating ? existing!.product_id : input.product_id }, nextMutationTimestamp(existing?.updated_at, now));
+    insertAndroidActionEvent(db, action, updating ? "menu.entry_updated" : "menu.entry_created", "menu_product_entry", result.savedId,
+      { product_id: getPublishedMenu(db, true).items.find(entry => entry.id === result.savedId)?.product_id }, now);
+    return result;
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Menü ürünü kaydedilemedi." }; }
 }
 
 function applyAndroidTableStatus(

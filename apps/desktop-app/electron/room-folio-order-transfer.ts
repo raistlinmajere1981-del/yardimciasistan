@@ -104,9 +104,9 @@ export function transferTableOrderToRoomFolio(
       // zaten düşürülmüştür; oda folyosuna yalnız parasal toplam taşınır.
       db.prepare(`
         INSERT INTO room_folio_items (
-          id, folio_id, kind, menu_item_id, label, unit_price_minor, quantity,
+          id, folio_id, kind, product_id, label, unit_price_minor, quantity,
           line_total_minor, note, created_at, updated_at, deleted_at, sync_status
-        ) VALUES (?, ?, 'manual_charge', '', ?, ?, 1, ?, ?, ?, ?, '', 'local_only')
+        ) VALUES (?, ?, 'manual_charge', NULL, ?, ?, 1, ?, ?, ?, ?, '', 'local_only')
       `).run(folioItemId, folioId, label, amountMinor, amountMinor, note, now, now);
 
       db.prepare(`

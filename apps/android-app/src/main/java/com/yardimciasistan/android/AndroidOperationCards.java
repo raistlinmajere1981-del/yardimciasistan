@@ -510,6 +510,13 @@ final class AndroidOperationCards {
     return card;
   }
 
+  View menuProductCreateCard() {
+    LinearLayout card = UiKit.card(activity);
+    card.addView(UiKit.text(activity, "Ortak ürün oluşturun veya mevcut ürünü menüye bağlayın.", 13, UiKit.MUTED, Typeface.NORMAL));
+    card.addView(UiKit.outlineButton(activity, "Menüye ürün ekle", view -> MenuEntryPresentationDialog.showCreate(activity, data, listener::sendAction)));
+    return card;
+  }
+
   View adminMenuCategoryCard(OperationData.MenuCategory category) {
     LinearLayout card = UiKit.card(activity);
     LinearLayout top = UiKit.row(activity);
@@ -582,21 +589,23 @@ final class AndroidOperationCards {
     top.addView(identity);
     top.addView(UiKit.badge(
         activity,
-        item.available ? "Satışta" : "Pasif",
-        item.available ? UiKit.SUCCESS : UiKit.MUTED
+        item.available && item.productActive ? "Satışta" : "Pasif",
+        item.available && item.productActive ? UiKit.SUCCESS : UiKit.MUTED
     ));
     card.addView(top);
 
+    if (data.hasPermission("menu.edit")) card.addView(UiKit.outlineButton(activity, "Menü sunumunu düzenle",
+        view -> MenuEntryPresentationDialog.show(activity, data, item, listener::sendAction)));
     Button delete = UiKit.dangerButton(
         activity,
-        "Ürünü Sil",
+        "Menüden kaldır",
         view -> listener.confirm(
-            "Menü ürününü sil",
-            item.name + " menüden silinsin mi?",
+            "Menüden kaldır",
+            item.name + " menüden kaldırılsın mı? Ortak ürün ve diğer satış kanalları korunur.",
             () -> listener.sendAction(
                 "menu_item_delete",
                 payload(
-                    "menu_item_id", item.id,
+                    "menu_entry_id", item.id,
                     "expected_updated_at", item.updatedAt
                 ),
                 "Menü ürünü silinmek üzere gönderildi."

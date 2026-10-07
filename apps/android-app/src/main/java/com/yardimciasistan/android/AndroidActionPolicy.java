@@ -42,6 +42,9 @@ final class AndroidActionPolicy {
 
     String type = actionType == null ? "" : actionType;
     JSONObject payload = actionPayload == null ? new JSONObject() : actionPayload;
+    if ("menu_entry_create".equals(type) || "menu_entry_update".equals(type)) {
+      return data.hasBusinessCapability("food_service.menu") && data.hasBusinessCapability("commerce.catalog");
+    }
 
     String marketPermission = MarketUiRules.requiredPermissionForAction(type);
     if (marketPermission != null) {
@@ -141,6 +144,9 @@ final class AndroidActionPolicy {
       case "menu_category_delete":
       case "menu_item_delete":
         return "menu.delete";
+      case "menu_entry_create":
+      case "menu_entry_update":
+        return "menu.edit";
       case "message_delete":
         return "message.delete";
       case "customer_request_approve":

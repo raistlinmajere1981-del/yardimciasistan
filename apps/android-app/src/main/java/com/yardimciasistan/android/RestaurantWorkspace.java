@@ -27,6 +27,7 @@ final class RestaurantWorkspace {
     View createStockCard(OperationData.TrackedStockItem item);
     View createAdminCategoryCard(OperationData.MenuCategory category);
     View createAdminMenuItemCard(OperationData.MenuItem item);
+    View createMenuProductCreateCard();
   }
 
   private final ComponentActivity activity;
@@ -244,11 +245,12 @@ final class RestaurantWorkspace {
         new CounterValue("Ürün", data.adminMenuItems.size(), UiKit.ACCENT, "")
     }));
     page.addView(emptyCard(
-        "Yönetici silme alanı",
-        "Kategori silmek o kategoriye bağlı tüm ürünleri de siler. Her işlem ayrıca onay ister."
+        "Menü sunumu yönetimi",
+        "Kategori kaldırmak yalnız menü ilişkilerini kaldırır. Ortak ürünler, stok ve diğer satış kanalları korunur. Her kaldırma işlemi ayrıca onay ister."
     ));
 
     page.addView(sectionLabel("Kategoriler"));
+    if (data.hasPermission("menu.edit")) page.addView(listener.createMenuProductCreateCard());
     if (data.adminCategories.isEmpty()) {
       page.addView(emptyCard("Kategori yok", "Silinebilecek menü kategorisi bulunmuyor."));
     }

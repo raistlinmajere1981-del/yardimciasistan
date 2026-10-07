@@ -159,7 +159,7 @@ export function useMenuController({
     return saveCategoryForm(categoryForm, true);
   }
 
-  async function saveItemForm(form: ItemFormState): Promise<DesktopMenuSaveResult> {
+  async function saveItemForm(form: ItemFormState, product?: import("../../electron/commerce-store").SaveCatalogProductInput): Promise<DesktopMenuSaveResult> {
     const bridge = window.yardimciDesktop;
     if (!bridge) {
       return { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
@@ -170,7 +170,7 @@ export function useMenuController({
       return { ok: false, message: priceError };
     }
 
-    const result = await bridge.saveMenuItem(itemFormToSaveInput(form));
+    const result = await bridge.saveMenuProductEntry({ ...itemFormToSaveInput(form), ...(product ? { product, product_id: undefined } : {}) });
     if (!result.ok) {
       return result;
     }
@@ -184,7 +184,7 @@ export function useMenuController({
     return result;
   }
 
-  async function saveItem(): Promise<DesktopMenuSaveResult> {
+  async function saveItem(product?: import("../../electron/commerce-store").SaveCatalogProductInput): Promise<DesktopMenuSaveResult> {
     setMenuEditState("loading");
     setMenuEditMessage("");
     const priceError = validateItemFormPrice(itemForm);
@@ -193,7 +193,7 @@ export function useMenuController({
       setMenuEditMessage(priceError);
       return { ok: false, message: priceError };
     }
-    const result = await saveItemForm(itemForm);
+    const result = await saveItemForm(itemForm, product);
     setMenuEditState(result.ok ? "success" : "error");
     setMenuEditMessage("");
     reportAppStatus(result.ok ? "success" : "error", result.message);
@@ -297,7 +297,7 @@ export function useMenuController({
       return { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
     }
 
-    const result = await bridge.deleteMenuItem(itemId);
+    const result = await bridge.deleteMenuProductEntry(itemId);
     if (!result.ok) {
       reportAppStatus("error", result.message);
       return result;

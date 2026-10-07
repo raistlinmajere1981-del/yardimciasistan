@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -54,7 +55,7 @@ try {
   const reportCategoryId = reportCategory.savedId;
 
   function createReportItem(name, price) {
-    const result = database.saveMenuItem({
+    const result = saveMenuProductFixture(database, {
       category_id: reportCategoryId,
       name,
       description: "Rapor smoke ürünü",
@@ -65,6 +66,7 @@ try {
       is_featured: false,
       allergens: [],
       tags: ["smoke"],
+      stock_quantity: 0,
       sort_order: 10
     });
     assert.equal(result.ok, true);
@@ -226,13 +228,13 @@ function seedReportData(databasePath, today, ids) {
     sqlite.exec(`
       DELETE FROM table_order_items;
       DELETE FROM table_orders;
-      DELETE FROM menu_stock_movements;
+      DELETE FROM inventory_movements;
       DELETE FROM requests;
       DELETE FROM reservations;
       DELETE FROM daily_tasks;
       UPDATE tables SET status = 'available';
-      UPDATE menu_items
-      SET stock_quantity = NULL, stock_min_quantity = NULL, stock_consumption_quantity = 1;
+      UPDATE catalog_products SET track_inventory = 0, minimum_quantity = 0;
+      UPDATE menu_product_entries SET stock_consumption_quantity = 1;
     `);
 
     insertOrder(sqlite, {
@@ -310,7 +312,7 @@ function seedReportData(databasePath, today, ids) {
       ["report_line_payment", itemB, "Snapshot Limonata", 888, 100, 888, "served"]
     ]);
     sqlite.prepare("UPDATE tables SET status = 'bill_waiting' WHERE id = ?").run(tableB);
-    sqlite.prepare("UPDATE menu_items SET name = ?, price = ? WHERE id = ?")
+    sqlite.prepare("UPDATE catalog_products SET name = ?, sale_price = ? WHERE id = (SELECT product_id FROM menu_product_entries WHERE id = ?)")
       .run("Sonradan Değişen Kahve", 999, itemA);
 
     insertReservation(sqlite, "report_res_approved", "approved", "room", today, shiftDate(today, 2), shiftDate(today, 5));
@@ -330,16 +332,12 @@ function seedReportData(databasePath, today, ids) {
     insertTask(sqlite, "report_task_completed", "completed", today, today);
     insertTask(sqlite, "report_task_overdue", "pending", today, shiftDate(today, -2));
 
-    sqlite.prepare(`
-      UPDATE menu_items
-      SET stock_quantity = ?, stock_min_quantity = ?, stock_consumption_quantity = ?, stock_unit = 'piece'
-      WHERE id = ?
-    `).run(0, 2, 1, itemA);
-    sqlite.prepare(`
-      UPDATE menu_items
-      SET stock_quantity = ?, stock_min_quantity = ?, stock_consumption_quantity = ?, stock_unit = 'piece'
-      WHERE id = ?
-    `).run(2, 3, 1, itemB);
+    for (const [entryId, quantity, minimum] of [[itemA, 0, 2], [itemB, 2, 3]]) {
+      const product = sqlite.prepare("SELECT p.id, p.business_id FROM catalog_products p JOIN menu_product_entries e ON e.product_id = p.id WHERE e.id = ?").get(entryId);
+      sqlite.prepare("UPDATE catalog_products SET track_inventory = 1, minimum_quantity = ?, unit = 'piece' WHERE id = ?").run(minimum, product.id);
+      const locationId = sqlite.prepare("SELECT id FROM inventory_locations WHERE business_id = ? AND is_primary = 1").get(product.business_id).id;
+      sqlite.prepare("INSERT INTO inventory_balances (product_id, location_id, quantity, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(product_id, location_id) DO UPDATE SET quantity = excluded.quantity").run(product.id, locationId, quantity, atNoon(today));
+    }
     insertMovement(sqlite, "report_stock_remove", itemA, "remove", -5, 5, 0, "desktop", today);
     insertMovement(sqlite, "report_stock_image", itemB, "image_import_add", 10, 0, 10, "stock_image_import", today);
     insertMovement(sqlite, "report_stock_android", itemB, "add", 3, 10, 13, "android", today);
@@ -378,10 +376,11 @@ function insertOrder(sqlite, order, items) {
   for (const [id, menuItemId, productName, unitPrice, quantity, lineTotal, status] of items) {
     sqlite.prepare(`
       INSERT INTO table_order_items (
-        id, order_id, menu_item_id, product_name, unit_price, quantity, line_total,
+        id, order_id, product_id, menu_entry_id, product_name, unit_price, quantity, line_total,
         note, status, created_at, updated_at, currency
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, 'TRY')
-    `).run(id, order.id, menuItemId, productName, unitPrice, quantity, lineTotal, status, timestamp, timestamp);
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, 'TRY')
+    `).run(id, order.id, sqlite.prepare("SELECT product_id FROM menu_product_entries WHERE id = ?").get(menuItemId).product_id,
+      menuItemId, productName, unitPrice, quantity, lineTotal, status, timestamp, timestamp);
   }
 }
 
@@ -412,18 +411,21 @@ function insertTask(sqlite, id, status, createdDate, dueDate) {
   `).run(id, `Smoke iş ${id}`, status, dueDate, timestamp, timestamp);
 }
 
-function insertMovement(sqlite, id, menuItemId, type, change, before, after, sourceType, createdDate) {
+function insertMovement(sqlite, id, menuItemId, type, change, _before, after, sourceType, createdDate) {
+  const product = sqlite.prepare("SELECT p.id, p.business_id FROM catalog_products p JOIN menu_product_entries e ON e.product_id = p.id WHERE e.id = ?").get(menuItemId);
+  const locationId = sqlite.prepare("SELECT id FROM inventory_locations WHERE business_id = ? AND is_primary = 1").get(product.business_id).id;
   sqlite.prepare(`
-    INSERT INTO menu_stock_movements (
-      id, menu_item_id, type, quantity_change, quantity_before, quantity_after,
-      source_type, source_id, actor_source, actor_device_id, note, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'Rapor smoke', ?)
+    INSERT INTO inventory_movements (
+      id, business_id, product_id, location_id, movement_type, quantity_delta, quantity_after,
+      reference_type, reference_id, actor_source, note, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Rapor smoke', ?)
   `).run(
     id,
-    menuItemId,
-    type,
+    product.business_id,
+    product.id,
+    locationId,
+    type === "image_import_add" ? "purchase" : "adjust",
     change,
-    before,
     after,
     sourceType,
     `${sourceType}_source`,

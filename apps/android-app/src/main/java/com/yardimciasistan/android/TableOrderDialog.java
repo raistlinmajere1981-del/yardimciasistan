@@ -326,7 +326,7 @@ final class TableOrderDialog {
         UiKit.addAction(actions, minus, activity);
 
         Button plus = UiKit.outlineButton(activity, "+", view -> listener.onUpdateItemQuantity(item, item.quantity + 1));
-        OperationData.MenuItem currentMenuItem = data.menuItemById(item.menuItemId);
+        OperationData.MenuItem currentMenuItem = data.menuItemById(item.menuEntryId);
         plus.setEnabled(currentMenuItem == null || !currentMenuItem.outOfStock());
         UiKit.addAction(actions, plus, activity);
       }

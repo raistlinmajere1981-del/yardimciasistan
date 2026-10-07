@@ -81,8 +81,8 @@ const provider = http.createServer(async (request, response) => {
     lines: [
       {
         raw_text: "COCA COLA 330 ML 24 AD",
-        matched_menu_item_id: "item-cola",
-        matched_menu_item_name: "Provider adını değiştiremez",
+        matched_product_id: "item-cola",
+        matched_product_name: "Provider adını değiştiremez",
         suggested_quantity: 24,
         source_quantity_text: "24 AD",
         confidence: "high",
@@ -90,8 +90,8 @@ const provider = http.createServer(async (request, response) => {
       },
       {
         raw_text: "MADEN SUYU 1 KOLI",
-        matched_menu_item_id: "item-soda",
-        matched_menu_item_name: "Soda",
+        matched_product_id: "item-soda",
+        matched_product_name: "Soda",
         suggested_quantity: 999,
         source_quantity_text: "1 KOLI",
         confidence: "medium",
@@ -99,8 +99,8 @@ const provider = http.createServer(async (request, response) => {
       },
       {
         raw_text: "NAKLİYE BEDELİ 2",
-        matched_menu_item_id: "invented-item",
-        matched_menu_item_name: "İcat edilen ürün",
+        matched_product_id: "invented-item",
+        matched_product_name: "İcat edilen ürün",
         suggested_quantity: 2,
         source_quantity_text: "2",
         confidence: "low",
@@ -108,8 +108,8 @@ const provider = http.createServer(async (request, response) => {
       },
       {
         raw_text: "KAŞARLI KÖFTE 3 KG",
-        matched_menu_item_id: "item-meatball",
-        matched_menu_item_name: "Kaşarlı Köfte",
+        matched_product_id: "item-meatball",
+        matched_product_name: "Kaşarlı Köfte",
         suggested_quantity: 3,
         source_quantity_text: "3 KG",
         confidence: "high",
@@ -145,7 +145,7 @@ try {
   const candidates = [
     { id: "item-cola", name: "Kola", category: "İçecekler", current_stock: 10, stock_unit: "piece" },
     { id: "item-soda", name: "Soda", category: "İçecekler", current_stock: 5, stock_unit: "piece" },
-    { id: "item-meatball", name: "Kaşarlı Köfte", category: "Ana Yemekler", current_stock: 4500, stock_unit: "gram" }
+    { id: "item-meatball", name: "Kaşarlı Köfte", category: "Ana Yemekler", current_stock: 4500, stock_unit: "g" }
   ];
   const pngBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
@@ -161,14 +161,15 @@ try {
         customer_room_stays: [],
         menu: { categories: [], items: [], updated_at: "2026-07-22T12:00:00+03:00" },
         trackedStockItems: candidates.map((item) => ({
-          menu_item_id: item.id,
+          product_id: item.id,
+          menu_entry_id: `entry-${item.id}`,
           name: item.name,
           category: item.category,
           price: 10,
           stock_quantity: item.current_stock,
           stock_min_quantity: 1,
           stock_unit: item.stock_unit,
-          stock_consumption_quantity: item.stock_unit === "gram" ? 200 : 1,
+          stock_consumption_quantity: item.stock_unit === "g" ? 200 : 1,
           hide_when_out_of_stock: false,
           stock_status: "in_stock"
         })),
@@ -235,21 +236,21 @@ try {
   assert.equal(payload.analysis.document.supplier_name, "Smoke Tedarik");
   assert.deepEqual(payload.analysis.lines[0], {
     raw_text: "COCA COLA 330 ML 24 AD",
-    matched_menu_item_id: "item-cola",
-    matched_menu_item_name: "Kola",
+    matched_product_id: "item-cola",
+    matched_product_name: "Kola",
     suggested_quantity: 24,
     source_quantity_text: "24 AD",
     confidence: "high",
     needs_review_reason: null
   });
-  assert.equal(payload.analysis.lines[1].matched_menu_item_id, "item-soda");
+  assert.equal(payload.analysis.lines[1].matched_product_id, "item-soda");
   assert.equal(payload.analysis.lines[1].suggested_quantity, null, "Koli must never be guessed into units");
   assert.match(payload.analysis.lines[1].needs_review_reason, /Koli, paket, ağırlık veya hacim/i);
-  assert.equal(payload.analysis.lines[2].matched_menu_item_id, null, "Ids outside the candidate allowlist must be removed");
-  assert.equal(payload.analysis.lines[2].matched_menu_item_name, null);
-  assert.equal(payload.analysis.lines[3].matched_menu_item_id, "item-meatball");
+  assert.equal(payload.analysis.lines[2].matched_product_id, null, "Ids outside the candidate allowlist must be removed");
+  assert.equal(payload.analysis.lines[2].matched_product_name, null);
+  assert.equal(payload.analysis.lines[3].matched_product_id, "item-meatball");
   assert.equal(payload.analysis.lines[3].suggested_quantity, 3000, "Kilograms must be normalized to grams for gram-tracked products");
-  assert.equal(providerRequests.at(-1).messages[1].content.find((part) => part.type === "text")?.text.includes('"stock_unit":"gram"'), true);
+  assert.equal(providerRequests.at(-1).messages[1].content.find((part) => part.type === "text")?.text.includes('"stock_unit":"g"'), true);
   assert.ok(providerRequests.at(-1).messages[1].content.some((part) => part.type === "image_url"));
 
   const identityMissingAuth = await analyzeIdentity({ bytes: pngBytes, mime: "image/png", includeAuth: false });
@@ -356,7 +357,7 @@ async function analyze({ bytes, mime, candidates, includeAuth = true, source = "
   form.append("device_id", deviceId);
   form.append("import_id", importId);
   form.append("image_hash", imageHash || createHash("sha256").update(bytes).digest("hex"));
-  form.append("menu_items", JSON.stringify(candidates));
+  form.append("products", JSON.stringify(candidates));
   form.append("image", new Blob([bytes], { type: mime }), "document.bin");
   return fetch(`${baseUrl}/api/stock-image-analysis.php`, {
     method: "POST",

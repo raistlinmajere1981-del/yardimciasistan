@@ -337,15 +337,15 @@ final class AndroidPresentation {
 
   static String stockNumber(double value) {
     if (Math.rint(value) == value) return String.valueOf((long) value);
-    return String.format(new Locale("tr", "TR"), "%.2f", value).replaceAll("0+$", "").replaceAll("[,\\.]$", "");
+    return String.format(new Locale("tr", "TR"), "%.4f", value).replaceAll("0+$", "").replaceAll("[,\\.]$", "");
   }
 
   static String stockUnitLabel(String unit) {
-    return "gram".equals(unit) ? "gram" : "adet";
+    return "piece".equals(unit) ? "adet" : unit;
   }
 
   static String stockQuantity(double value, String unit) {
-    return stockNumber(value) + ("gram".equals(unit) ? " g" : " adet");
+    return stockNumber(value) + " " + stockUnitLabel(unit);
   }
 
   static int pendingActionCount(List<OperationData.ActionRecord> actions) {

@@ -19,7 +19,11 @@ import {
   type CategoryFormState,
   type ItemFormState
 } from "./menu-model";
-import { MenuItemFormFields } from "./MenuItemFormFields";
+import { MenuProductEntryFields } from "./MenuProductEntryFields";
+import { ProductFormFields } from "../market/ProductFormFields";
+import { emptyProductForm, productFormToSaveInput, validateProductFormPrices } from "../../app/product-model";
+import type { CatalogProduct, CatalogCategory } from "@yardimci-asistan/shared";
+import { SearchSelect } from "../ui/SearchSelect";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton } from "../ui/DataList";
 import { FormDialog } from "../ui/FormDialog";
@@ -32,6 +36,9 @@ import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 type SyncState = "idle" | "loading" | "success" | "error";
 
 interface MenuManagerProps {
+  products: CatalogProduct[];
+  catalogCategories: CatalogCategory[];
+  onCatalogReload: () => Promise<void>;
   dashboardData: DesktopDashboardData;
   qrMenuEnabled: boolean;
   inventoryEnabled: boolean;
@@ -46,7 +53,7 @@ interface MenuManagerProps {
   onSelectItem: (item: PublishedMenuItem) => void;
   onNewItem: () => void;
   onSaveCategoryForm: (form: CategoryFormState, selectSaved?: boolean) => Promise<DesktopMenuSaveResult>;
-  onSaveItem: () => Promise<DesktopMenuSaveResult | undefined>;
+  onSaveItem: (product?: import("../../../electron/commerce-store").SaveCatalogProductInput) => Promise<DesktopMenuSaveResult | undefined>;
   onReorderCategories: (orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onReorderItems: (categoryId: string, orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onDeleteCategoryById: (categoryId: string) => Promise<void>;
@@ -55,6 +62,9 @@ interface MenuManagerProps {
 }
 
 export function MenuManager({
+  products,
+  catalogCategories,
+  onCatalogReload,
   dashboardData,
   qrMenuEnabled,
   inventoryEnabled,
@@ -83,6 +93,10 @@ export function MenuManager({
   const [newCategoryForm, setNewCategoryForm] = useState<CategoryFormState>(() => emptyCategoryForm(nextSortOrder(dashboardData.menu.categories)));
   const [itemCreateOpen, setItemCreateOpen] = useState(false);
   const [pendingItemId, setPendingItemId] = useState("");
+  const [createKind, setCreateKind] = useState<"new" | "link">("new");
+  const [productForm, setProductForm] = useState(() => ({ ...emptyProductForm(false), purchasePrice: "0" }));
+  const [manualImageDataUrl, setManualImageDataUrl] = useState("");
+  const [createMessage, setCreateMessage] = useState("");
 
   const sortedCategories = useMemo(
     () => [...dashboardData.menu.categories].sort(compareMenuRecords),
@@ -129,21 +143,25 @@ export function MenuManager({
 
   useEffect(() => {
     if (itemCreateOpen || !pendingItemId) return;
+    const entry = dashboardData.menu.items.find(item => item.id === pendingItemId);
+    if (!entry?.product_id) return;
     if (navigation.openWorkspace({
-      entityType: "menu-item",
-      entityId: pendingItemId,
+      entityType: "product",
+      entityId: entry.product_id,
+      menuEntryId: entry.id,
       mode: "details",
       returnContext: { page: "menu", entityId: pendingItemId }
     })) {
       setPendingItemId("");
     }
-  }, [itemCreateOpen, navigation, pendingItemId]);
+  }, [dashboardData.menu.items, itemCreateOpen, navigation, pendingItemId]);
 
   function openItem(item: PublishedMenuItem) {
     onSelectItem(item);
     navigation.openWorkspace({
-      entityType: "menu-item",
-      entityId: item.id,
+      entityType: "product",
+      entityId: item.product_id!,
+      menuEntryId: item.id,
       mode: "details",
       returnContext: { page: "menu", entityId: item.id }
     });
@@ -151,6 +169,11 @@ export function MenuManager({
 
   function startItemCreate() {
     onNewItem();
+    setProductForm({ ...emptyProductForm(false), purchasePrice: "0" });
+    setCreateKind("new");
+    setManualImageDataUrl("");
+    setCreateMessage("");
+    void onCatalogReload();
     setItemCreateOpen(true);
   }
 
@@ -194,7 +217,7 @@ export function MenuManager({
                 webModuleUrl={dashboardData.webModuleUrl}
                 onPreview={onPreview}
                 utilityAction={stockImageImportEnabled
-                  ? <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
+                  ? <StockImageImportWorkspace products={products} onApplied={onDashboardDataChanged} />
                   : undefined}
               />
             )}
@@ -398,6 +421,7 @@ export function MenuManager({
                     meta={(selectedCategoryId ? "" : findMenuCategoryName(item.category_id, dashboardData.menu.categories) + " · ") + formatCurrency(item.price, item.currency) + " · " + (item.is_available ? "Mevcut" : "Kapalı") + (item.is_featured ? " · Öne çıkan" : "")}
                     trailing={(
                       <span className="menu-product-row__trailing">
+                        {item.product_is_active === false && <StatusBadge tone="neutral">Ortak ürün pasif</StatusBadge>}
                         {inventoryEnabled && stockBadge && <StatusBadge tone={stockBadge.tone}>{stockBadge.label}</StatusBadge>}
                         {inventoryEnabled && qrMenuEnabled && isQrHiddenByStock(item) && <StatusBadge tone="neutral">QR menüde gizli</StatusBadge>}
                         {item.is_featured && <Star className="menu-product-row__star" size={16} aria-hidden="true" />}
@@ -424,10 +448,15 @@ export function MenuManager({
           dismissOnBackdrop
           onSubmit={async (event) => {
             event.preventDefault();
-            const result = await onSaveItem();
+            if (menuEditState === "loading") return;
+            const error = createKind === "new" ? validateProductFormPrices(productForm) : !itemForm.product_id ? "Menüye eklenecek ürünü seçin." : null;
+            if (error) { setCreateMessage(error); return; }
+            const result = await onSaveItem(createKind === "new" ? { ...productFormToSaveInput(productForm),
+              ...(manualImageDataUrl ? { manualImageDataUrl } : {}) } : undefined);
             if (!result?.ok) return;
             setPendingItemId(result.savedId);
             setItemCreateOpen(false);
+            try { await onCatalogReload(); } catch { setCreateMessage("Ürün kaydedildi; katalog görünümü yenilenemedi."); }
           }}
           footer={(
             <>
@@ -452,12 +481,23 @@ export function MenuManager({
           )}
         >
           <div className="menu-item-create-form">
-            <MenuItemFormFields
-              mode="all"
+            <label className="form-field">Ürün kaynağı<select disabled={menuEditState === "loading"} value={createKind} onChange={event => setCreateKind(event.target.value === "link" ? "link" : "new")}>
+              <option value="new">Yeni ortak ürün oluştur</option><option value="link">Mevcut ürünü menüye ekle</option>
+            </select></label>
+            {createKind === "link" ? <SearchSelect disabled={menuEditState === "loading"} ariaLabel="Mevcut ürün" value={itemForm.product_id} onChange={product_id => onItemFormChange({ ...itemForm, product_id })}
+              options={products.filter(product => product.isActive && !dashboardData.menu.items.some(item => item.product_id === product.id)).map(product => ({ id: product.id, label: product.name }))} />
+              : <ProductFormFields form={productForm} categories={catalogCategories} inventoryEnabled={inventoryEnabled}
+                disabled={menuEditState === "loading"}
+                productDataEnabled={false} retailFieldsEnabled={false} purchasingEnabled={false} onChange={setProductForm}
+                localImageDataUrl={manualImageDataUrl} onManualImageSelected={setManualImageDataUrl} onImageClear={() => setManualImageDataUrl("")}
+                onStateChange={(_state, message) => setCreateMessage(message)} />}
+            {createMessage && <p role="status">{createMessage}</p>}
+            <MenuProductEntryFields
               form={itemForm}
               dashboardData={dashboardData}
               qrMenuEnabled={qrMenuEnabled}
               inventoryEnabled={inventoryEnabled}
+              disabled={menuEditState === "loading"}
               onChange={onItemFormChange}
             />
           </div>
@@ -465,8 +505,8 @@ export function MenuManager({
       )}
 
       {pendingCategoryDelete && <ConfirmDialog tone="danger" title="Kategoriyi sil"
-        description={`“${pendingCategoryDelete.name}” kategorisi ve bağlı ${pendingCategoryProductCount} ürün silinecek.`}
-        details="Bu işlem geri alınamaz." confirmLabel="Kategoriyi sil" busy={menuEditState === "loading"}
+        description={`“${pendingCategoryDelete.name}” kategorisi ve bağlı ${pendingCategoryProductCount} menü ilişkisi kaldırılacak.`}
+        details="Ortak ürünler, stok ve diğer satış kanalları korunur." confirmLabel="Kategoriyi sil" busy={menuEditState === "loading"}
         onCancel={() => setPendingCategoryDeleteId("")}
         onConfirm={() => {
           const categoryId = pendingCategoryDelete.id;

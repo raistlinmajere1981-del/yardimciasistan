@@ -198,7 +198,10 @@ commerce_order_items
 customer_commercial_profiles
 ```
 
-Bu tablolar restoranın mevcut `menu_items`, `tables`, `table_orders` yapısından bağımsızdır. Amaç food-service ve retail domain'lerinin commerce kavramlarını paylaşabilmesi, birbirine sıkı bağlanmamasıdır.
+Menü ve Online Satış aynı `catalog_products` kimliğini kullanır (D-011). Menü sunumu
+`menu_product_entries` kanal ilişkisidir; `menu_categories` ve `catalog_categories`
+ayrı kalır. Restoranın `tables`/`table_orders` operasyonları, kanonik stok hareketlerini
+kullanır; ayrı menü stok otoritesi yoktur.
 
 Store/runtime sınırları:
 

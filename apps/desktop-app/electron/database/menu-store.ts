@@ -12,6 +12,9 @@ import type { AndroidActionMutationResult } from "./android-utils.js";
 import { getAndroidVersionConflict, nextMutationTimestamp } from "./android-utils.js";
 import { insertDeletionEvent } from "./deletion-store.js";
 import { queueSyncJob } from "./sync-runtime-store.js";
+import { resolveMenuProductPrice } from "../menu-product-price.js";
+import { readProductImageAsset } from "../product-image-reader.js";
+import { publicImageUrl } from "../commerce-online-catalog-publication.js";
 import type { DeletionAndroidEventSink } from "./deletion-store.js";
 import {
   normalizeMenuStockUnit,
@@ -20,7 +23,7 @@ import {
   nullableString
 } from "./stock-utils.js";
 
-export function getPublishedMenu(db: DatabaseSync): PublishedQrMenu {
+export function getPublishedMenu(db: DatabaseSync, includeInactiveProducts = false): PublishedQrMenu {
   const categories = db
     .prepare(`
         SELECT id, name, description, is_active, sort_order, created_at, updated_at
@@ -33,34 +36,30 @@ export function getPublishedMenu(db: DatabaseSync): PublishedQrMenu {
   const items = db
     .prepare(`
         SELECT
-          id,
-          category_id,
-          name,
-          description,
-          price,
-          currency,
-          image_url,
-          is_available,
-          is_featured,
-          allergens_json,
-          tags_json,
-          stock_quantity,
-          stock_min_quantity,
-          stock_unit,
-          stock_consumption_quantity,
-          hide_when_out_of_stock,
-          stock_note,
-          sort_order,
-          created_at,
-          updated_at
-        FROM menu_items
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, name ASC
+          e.*, p.name, p.description, p.sale_price, p.currency, p.is_active AS product_is_active, p.image_source_url AS image_url, p.image_asset_path,
+          p.unit AS stock_unit,
+          CASE WHEN p.track_inventory = 1 THEN COALESCE(b.quantity, 0) ELSE NULL END AS stock_quantity,
+          CASE WHEN p.track_inventory = 1 THEN p.minimum_quantity ELSE NULL END AS stock_min_quantity,
+          MAX(e.updated_at, p.updated_at, COALESCE(b.updated_at, '')) AS updated_at
+        FROM menu_product_entries e
+        JOIN catalog_products p ON p.id = e.product_id AND p.deleted_at = ''
+        LEFT JOIN inventory_locations l ON l.business_id = p.business_id AND l.is_primary = 1 AND l.deleted_at = ''
+        LEFT JOIN inventory_balances b ON b.product_id = p.id AND b.location_id = l.id
+        WHERE e.deleted_at = '' AND (? = 1 OR p.is_active = 1)
+        ORDER BY e.sort_order ASC, p.name ASC
       `)
-    .all() as Array<Record<string, unknown>>;
+    .all(includeInactiveProducts ? 1 : 0) as Array<Record<string, unknown>>;
 
   const updatedAtRows = [...categories, ...items].map((row) => String(row.updated_at ?? "")).filter(Boolean);
+  // Include withdrawals and canonical deactivation even when the public projection is empty.
+  const withdrawn = db.prepare(`SELECT MAX(updated_at) AS updated_at FROM (
+    SELECT updated_at FROM menu_categories UNION ALL SELECT updated_at FROM menu_product_entries
+    UNION ALL SELECT p.updated_at FROM catalog_products p JOIN menu_product_entries e ON e.product_id = p.id
+    UNION ALL SELECT b.updated_at FROM inventory_balances b JOIN menu_product_entries e ON e.product_id = b.product_id AND e.deleted_at = ''
+  )`).get();
+  if (withdrawn?.updated_at) updatedAtRows.push(String(withdrawn.updated_at));
   const updatedAt = updatedAtRows.sort().at(-1) ?? new Date().toISOString();
+  const databasePath = String(db.prepare("PRAGMA database_list").all().find(row => row.name === "main")?.file ?? "");
 
   return {
     categories: categories.map((row) => ({
@@ -74,12 +73,15 @@ export function getPublishedMenu(db: DatabaseSync): PublishedQrMenu {
     })),
     items: items.map((row) => ({
       id: String(row.id ?? ""),
+      product_id: String(row.product_id ?? ""),
+      ...(includeInactiveProducts ? { product_is_active: Number(row.product_is_active) === 1 } : {}),
+      price_override: nullableNumber(row.price_override),
       category_id: String(row.category_id ?? ""),
       name: String(row.name ?? ""),
       description: String(row.description ?? ""),
-      price: Number(row.price ?? 0),
+      price: resolveMenuProductPrice({ sale_price: row.sale_price }, { price_override: row.price_override }),
       currency: String(row.currency ?? "TRY"),
-      image_url: String(row.image_url ?? ""),
+      image_url: readProductImageAsset(databasePath, String(row.image_asset_path ?? "")) || publicImageUrl(row.image_url),
       is_available: Number(row.is_available ?? 0) === 1,
       is_featured: Number(row.is_featured ?? 0) === 1,
       allergens: parseStoredStringArray(row.allergens_json),
@@ -96,6 +98,17 @@ export function getPublishedMenu(db: DatabaseSync): PublishedQrMenu {
     })),
     updated_at: updatedAt
   };
+}
+
+export function getMenuProductCandidates(db: DatabaseSync) {
+  return db.prepare(`SELECT p.id, p.name, p.unit, p.sale_price, p.currency FROM catalog_products p
+    JOIN business b ON b.id = p.business_id AND b.deleted_at = ''
+    WHERE p.deleted_at = '' AND p.is_active = 1
+      AND NOT EXISTS (SELECT 1 FROM menu_product_entries e WHERE e.product_id = p.id AND e.deleted_at = '')
+    ORDER BY p.name, p.id LIMIT 500`).all().map(row => ({
+      product_id: String(row.id), name: String(row.name), unit: normalizeMenuStockUnit(row.unit),
+      sale_price: Number(row.sale_price), currency: String(row.currency)
+    }));
 }
 
 export function getQrMenuWebPublicationEnabled(db: DatabaseSync): boolean {
@@ -127,7 +140,7 @@ export function getQrMenuPublication(db: DatabaseSync): PublishedQrMenu & { enab
   return {
     ...menu,
     enabled: getQrMenuWebPublicationEnabled(db),
-    items: menu.items.filter((item) => !(
+    items: menu.items.filter((item) => item.is_available && menu.categories.some(category => category.id === item.category_id && category.is_active) && !(
       item.stock_quantity !== null
       && item.hide_when_out_of_stock
       && item.stock_quantity < item.stock_consumption_quantity
@@ -188,7 +201,7 @@ export function reorderMenuRecords(
     return { ok: false, message: "Sıralama listesinde yinelenen kayıt var." };
   }
 
-  const table = input.kind === "categories" ? "menu_categories" : "menu_items";
+  const table = input.kind === "categories" ? "menu_categories" : "menu_product_entries";
   const categoryId = String(input.categoryId ?? "").trim();
   if (input.kind === "items" && !categoryId) {
     return { ok: false, message: "Ürün sıralaması için kategori seçilmemiş." };
@@ -196,7 +209,7 @@ export function reorderMenuRecords(
 
   const currentRows = input.kind === "categories"
     ? db.prepare("SELECT id FROM menu_categories WHERE deleted_at = '' ORDER BY sort_order ASC, name ASC").all() as Array<{ id?: string }>
-    : db.prepare("SELECT id FROM menu_items WHERE deleted_at = '' AND category_id = ? ORDER BY sort_order ASC, name ASC").all(categoryId) as Array<{ id?: string }>;
+    : db.prepare("SELECT e.id FROM menu_product_entries e JOIN catalog_products p ON p.id = e.product_id AND p.deleted_at = '' AND p.is_active = 1 WHERE e.deleted_at = '' AND e.category_id = ? ORDER BY e.sort_order ASC, p.name ASC").all(categoryId) as Array<{ id?: string }>;
   const currentIds = currentRows.map((row) => String(row.id ?? "")).filter(Boolean);
 
   if (
@@ -261,7 +274,7 @@ export function deleteMenuCategoryInTransaction(
   const updatedAt = nextMutationTimestamp(category.updated_at, now);
   const itemResult = db
     .prepare(`
-        UPDATE menu_items
+        UPDATE menu_product_entries
         SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
         WHERE category_id = ? AND deleted_at = ''
       `)
@@ -281,7 +294,7 @@ export function deleteMenuCategoryInTransaction(
   };
 }
 
-export function deleteMenuItemInTransaction(
+export function deleteMenuProductEntryInTransaction(
   db: DatabaseSync,
   itemId: string,
   now: string,
@@ -292,7 +305,7 @@ export function deleteMenuItemInTransaction(
     return { ok: false, message: "Silinecek menü ürünü seçilmemiş." };
   }
   const item = db
-    .prepare("SELECT name, category_id, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
+    .prepare("SELECT p.name, e.category_id, MAX(e.updated_at, p.updated_at, COALESCE(b.updated_at, '')) AS updated_at FROM menu_product_entries e JOIN catalog_products p ON p.id = e.product_id LEFT JOIN inventory_locations l ON l.business_id = p.business_id AND l.is_primary = 1 AND l.deleted_at = '' LEFT JOIN inventory_balances b ON b.product_id = p.id AND b.location_id = l.id WHERE e.id = ? AND e.deleted_at = ''")
     .get(itemId) as { name?: string; category_id?: string; updated_at?: string } | undefined;
   if (!item) {
     return { ok: false, message: "Menü ürünü masaüstü kayıtlarında bulunamadı." };
@@ -306,11 +319,11 @@ export function deleteMenuItemInTransaction(
 
   const updatedAt = nextMutationTimestamp(item.updated_at, now);
   db
-    .prepare("UPDATE menu_items SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
+    .prepare("UPDATE menu_product_entries SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
     .run(updatedAt, updatedAt, itemId);
   insertDeletionEvent(db, androidAction, insertAndroidEvent, "menu.item_deleted", "menu_item", itemId, {
     name: String(item.name ?? ""),
     category_id: String(item.category_id ?? "")
   }, now);
-  return { ok: true, message: androidAction ? "Menü ürünü telefondan silindi." : "Ürün silindi." };
+  return { ok: true, message: androidAction ? "Ürün telefondan menüden kaldırıldı." : "Ürün menüden kaldırıldı." };
 }

@@ -120,7 +120,7 @@ Current important distinctions:
 - Reservation → Room assignment is not the same mutation as Customer → Room / Stay creation.
 - Stay checkout is not currently equivalent to Folio checkout.
 - Customer credit is not Room Folio debt.
-- Menu Item is not Catalog Product.
+- Menu Product Entry is a channel relation of Catalog Product (D-011), not a second product.
 - Product is not Stock Movement, Purchase or Sale.
 - Table is not TableOrder.
 
@@ -594,7 +594,8 @@ Customer Credit
   customer ledger
 ```
 
-Menu Item and Catalog Product remain separate until a dedicated domain-model project explicitly changes that decision.
+Menu and Online Sales project the same Catalog Product identity under D-011. Their channel
+configuration and categories remain separate; inventory has one canonical owner.
 
 ---
 
@@ -670,7 +671,7 @@ Diagnostics must remain shareable without secrets or unnecessary customer PII.
 | Customer Work | Customer Workspace |
 | Requests | Request Workspace |
 | Restaurant / Floor | Table Workspace |
-| Menu | Menu Item Workspace |
+| Menu | Product Workspace (Menu channel fields) |
 | Market / Products | Product Workspace |
 | Market / Quick Sale | Sale Workspace |
 | Market / Inventory | Inventory Workspace |
@@ -684,7 +685,7 @@ This map can grow, but a new workspace requires a real entity/operational owners
 
 ## 19. Non-goals
 
-This architecture does not require rewriting all Electron IPC, converting the whole app to a generic state library, a plugin marketplace, a generic command bus, a generic data-grid everywhere, merging Menu Item and Catalog Product, converting every dialog to a full page, removing all drawers or making every feature geometrically identical.
+This architecture does not require rewriting all Electron IPC, converting the whole app to a generic state library, a plugin marketplace, a generic command bus, a generic data-grid everywhere, converting every dialog to a full page, removing all drawers or making every feature geometrically identical. Product/channel consolidation is governed explicitly by D-011, not inferred from visual similarity.
 
 The project shares grammar, state rules, primitives and ownership—not identical screens.
 

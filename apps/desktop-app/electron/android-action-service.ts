@@ -5,7 +5,7 @@ import type { ApplyAndroidActionResult, DesktopAndroidActionFailure } from "./da
 import { insertDatabaseEvent } from "./database/event-store.js";
 import { updateRequestStatus } from "./database/request-store.js";
 import { saveCustomer } from "./database/customer-store.js";
-import { mutateMenuStockInTransaction as mutateStoredMenuStock } from "./database/menu-stock-store.js";
+import { applyInventoryMovementInTransaction, setInventoryCountInTransaction } from "./commerce-store.js";
 import { assignHospitalityStay, checkInHospitalityStay } from "./hospitality-entry-service.js";
 import { updateCustomerRoomStayStatus, updateReservationStatus } from "./stay-reservation-service.js";
 import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
@@ -168,9 +168,9 @@ export function applyAndroidDailyTaskStatus(db: DatabaseSync, action: AndroidSyn
 }
 
 export function applyAndroidMenuStockAction(db: DatabaseSync, action: AndroidSyncAction, mode: "add" | "set" | "adjust", now: string): AndroidActionMutationResult {
-  const menuItemId = androidPayloadString(action.payload, "menu_item_id");
+  const productId = androidPayloadString(action.payload, "product_id");
   const note = androidPayloadString(action.payload, "note").slice(0, 500);
-  if (!menuItemId) return { ok: false, message: "Stoku güncellenecek menü ürünü seçilmemiş." };
+  if (!productId) return { ok: false, message: "Stoku güncellenecek menü ürünü seçilmemiş." };
   let quantityChange: number | undefined;
   let quantityAfter: number | undefined;
   if (mode === "set") {
@@ -183,9 +183,15 @@ export function applyAndroidMenuStockAction(db: DatabaseSync, action: AndroidSyn
     quantityChange = normalizeSignedStockNumber(action.payload.quantity_change) ?? undefined;
     if (quantityChange === undefined || quantityChange === 0) return { ok: false, message: "Stok farkı sıfırdan farklı bir sayı olmalı." };
   }
-  const result = mutateStoredMenuStock(db, { menuItemId, type: mode, quantityChange, quantityAfter, allowStartTracking: mode === "set", sourceType: "android", sourceId: action.id, actorDeviceId: action.device_id, note, now });
-  if (!result.ok) return result;
-  insertAndroidActionEvent(db, action, "menu.stock_changed", "menu_item", menuItemId, { movement_type: mode, quantity_before: result.quantityBefore, quantity_after: result.quantityAfter }, now);
+  const product = db.prepare("SELECT business_id FROM catalog_products WHERE id = ? AND deleted_at = ''").get(productId);
+  if (!product) return { ok: false, message: "Ürün bulunamadı." };
+  try {
+    if (mode === "set") setInventoryCountInTransaction(db, { productId, countedQuantity: quantityAfter!,
+      referenceType: "android", referenceId: action.id, actorSource: "android", note }, now);
+    else applyInventoryMovementInTransaction(db, String(product.business_id), { productId, type: "adjust",
+      quantityDelta: quantityChange!, referenceType: "android", referenceId: action.id, actorSource: "android", note }, now);
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Stok güncellenemedi." }; }
+  insertAndroidActionEvent(db, action, "inventory.stock_changed", "catalog_product", productId, { movement_type: mode }, now);
   return { ok: true, message: "Menü ürünü stoku telefondan güncellendi." };
 }
 

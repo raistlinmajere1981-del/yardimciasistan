@@ -279,6 +279,7 @@ final class AndroidWorkspaceCoordinator {
           public View createAdminMenuItemCard(OperationData.MenuItem item) {
             return cards.adminMenuItemCard(item);
           }
+          @Override public View createMenuProductCreateCard() { return cards.menuProductCreateCard(); }
         },
         bottomPaddingDp
     );

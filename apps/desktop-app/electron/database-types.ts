@@ -374,7 +374,7 @@ interface DesktopReportDailyRevenue {
 }
 
 interface DesktopReportStockConsumption {
-  menuItemId: string;
+  productId: string;
   name: string;
   quantity: number;
   unit: MenuStockUnit;
@@ -382,13 +382,13 @@ interface DesktopReportStockConsumption {
 
 export interface DesktopReportStockMovement {
   id: string;
-  menuItemId: string;
+  productId: string;
   itemName: string;
-  type: MenuStockMovementType;
+  type: import("@yardimci-asistan/shared").InventoryMovementType;
   quantityChange: number;
   quantityAfter: number;
   unit: MenuStockUnit;
-  sourceType: MenuStockSourceType;
+  sourceType: string;
   sourceLabel: string;
   note: string;
   createdAt: string;
@@ -631,53 +631,20 @@ export interface ReorderMenuRecordsInput {
   categoryId?: string;
 }
 
-export interface SaveMenuItemInput {
+export interface SaveMenuProductEntryInput {
   id?: string;
+  product_id?: string;
+  /** Only new-product creation; edits use the shared canonical Product Workspace. */
+  product?: import("./commerce-store").SaveCatalogProductInput;
   category_id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-  image_url: string;
+  price_override: number | null;
   is_available: boolean;
   is_featured: boolean;
   allergens: string[];
   tags: string[];
-  stock_quantity: number | null;
-  stock_min_quantity: number | null;
-  stock_unit: MenuStockUnit;
   stock_consumption_quantity: number;
   hide_when_out_of_stock: boolean;
-  stock_note: string | null;
   sort_order: number;
-}
-
-export type MenuStockMovementType =
-  | "add"
-  | "remove"
-  | "set"
-  | "adjust"
-  | "image_import_add"
-  | "order_add"
-  | "order_update"
-  | "order_remove"
-  | "order_cancel";
-
-export type MenuStockSourceType = "desktop" | "android" | "table_order" | "room_folio" | "stock_image_import";
-
-export interface DesktopMenuStockMovement {
-  id: string;
-  menuItemId: string;
-  type: MenuStockMovementType;
-  quantityChange: number;
-  quantityBefore: number;
-  quantityAfter: number;
-  sourceType: MenuStockSourceType;
-  sourceId: string;
-  actorSource: StockImageImportSource;
-  actorDeviceId: string;
-  note: string;
-  createdAt: string;
 }
 
 export type DesktopMenuSaveResult =
@@ -943,7 +910,8 @@ export type TableOrderItemStatus = "open" | "preparing" | "served" | "cancelled"
 export interface DesktopTableOrderItem {
   id: string;
   orderId: string;
-  menuItemId: string;
+  productId: string;
+  menuEntryId: string;
   productName: string;
   unitPrice: number;
   currency: string;
@@ -984,7 +952,7 @@ export interface DesktopPaymentWaitingTableOrder {
 
 export interface AddTableOrderItemInput {
   orderId: string;
-  menuItemId: string;
+  menuEntryId: string;
   quantity: number;
   note: string;
 }

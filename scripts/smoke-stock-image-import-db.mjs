@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -7,6 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 const require = createRequire(import.meta.url);
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
 const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { listInventoryMovements } = require("../apps/desktop-app/dist-electron/commerce-store.js");
 const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-stock-import-db-");
 
 try {
@@ -33,7 +35,7 @@ try {
   const stockCategoryId = categoryResult.savedId;
 
   function createStockItem(name, unit, consumption) {
-    const result = database.saveMenuItem({
+    const result = saveMenuProductFixture(database, {
       category_id: stockCategoryId,
       name,
       description: "Stok smoke ürünü",
@@ -58,15 +60,15 @@ try {
 
   const firstId = createStockItem("Stok Adet Ürünü", "piece", 1);
   const secondId = createStockItem("Stok Adet Ürünü 2", "piece", 1);
-  const gramId = createStockItem("Stok Gram Ürünü", "gram", 200);
+  const gramId = createStockItem("Stok Gram Ürünü", "g", 200);
   const menuById = new Map(database.getDashboardData().menu.items.map((item) => [item.id, item]));
   const first = menuById.get(firstId);
   const second = menuById.get(secondId);
   const gramItem = menuById.get(gramId);
   assert.ok(first && second && gramItem);
-  assert.equal(database.saveMenuItem(trackedInput(first, 0, true)).ok, true);
-  assert.equal(database.saveMenuItem(trackedInput(second, 5, false)).ok, true);
-  assert.equal(database.saveMenuItem(trackedInput(gramItem, 1000, false)).ok, true);
+  assert.equal(saveMenuProductFixture(database, trackedInput(first, 0, true)).ok, true);
+  assert.equal(saveMenuProductFixture(database, trackedInput(second, 5, false)).ok, true);
+  assert.equal(saveMenuProductFixture(database, trackedInput(gramItem, 1000, false)).ok, true);
   const firstName = first.name;
   const secondName = second.name;
   const hash = "a".repeat(64);
@@ -88,8 +90,8 @@ try {
     lines: [
       {
         raw_text: `${firstName} 24 AD`,
-        matched_menu_item_id: first.id,
-        matched_menu_item_name: firstName,
+        matched_product_id: first.product_id,
+        matched_product_name: firstName,
         suggested_quantity: 24,
         source_quantity_text: "24 AD",
         confidence: "high",
@@ -97,8 +99,8 @@ try {
       },
       {
         raw_text: `${secondName} 1 KOLI`,
-        matched_menu_item_id: second.id,
-        matched_menu_item_name: secondName,
+        matched_product_id: second.product_id,
+        matched_product_name: secondName,
         suggested_quantity: 999,
         source_quantity_text: "1 KOLI",
         confidence: "medium",
@@ -106,8 +108,8 @@ try {
       },
       {
         raw_text: `${gramItem.name} 3 KG`,
-        matched_menu_item_id: gramItem.id,
-        matched_menu_item_name: gramItem.name,
+        matched_product_id: gramItem.product_id,
+        matched_product_name: gramItem.name,
         suggested_quantity: 3,
         source_quantity_text: "3 KG",
         confidence: "high",
@@ -115,8 +117,8 @@ try {
       },
       {
         raw_text: `${gramItem.name} 2.500 GR`,
-        matched_menu_item_id: gramItem.id,
-        matched_menu_item_name: gramItem.name,
+        matched_product_id: gramItem.product_id,
+        matched_product_name: gramItem.name,
         suggested_quantity: 2500,
         source_quantity_text: "2.500 GR",
         confidence: "high",
@@ -136,9 +138,9 @@ try {
     importId,
     imageHash: hash,
     lines: [
-      { menu_item_id: first.id, quantity: 24, raw_text: `${firstName} 24 AD`, confidence: "high" },
-      { menu_item_id: second.id, quantity: 24, raw_text: `${secondName} 1 KOLI · kullanıcı 24 girdi`, confidence: "medium" },
-      { menu_item_id: gramItem.id, quantity: 3000, raw_text: `${gramItem.name} 3 KG`, confidence: "high" }
+      { product_id: first.product_id, quantity: 24, raw_text: `${firstName} 24 AD`, confidence: "high" },
+      { product_id: second.product_id, quantity: 24, raw_text: `${secondName} 1 KOLI · kullanıcı 24 girdi`, confidence: "medium" },
+      { product_id: gramItem.product_id, quantity: 3000, raw_text: `${gramItem.name} 3 KG`, confidence: "high" }
     ]
   });
   assert.equal(applied.ok, true);
@@ -148,10 +150,10 @@ try {
   assert.equal(stock(database, second.id), 29);
   assert.equal(stock(database, gramItem.id), gramStockBeforeImport + 3000);
   assert.equal(database.getQrMenuPublication().items.some((item) => item.id === first.id), true, "0 → positive stock must republish a hidden item");
-  const imageMovements = database.getMenuStockMovements().filter((movement) => movement.sourceId === importId);
+  const imageMovements = listInventoryMovements(database.databasePath).filter((movement) => movement.referenceId === importId);
   assert.equal(imageMovements.length, 3);
-  assert.equal(imageMovements.every((movement) => movement.type === "image_import_add"), true);
-  assert.equal(imageMovements.every((movement) => movement.sourceType === "stock_image_import"), true);
+  assert.equal(imageMovements.every((movement) => movement.type === "purchase"), true);
+  assert.equal(imageMovements.every((movement) => movement.referenceType === "stock_image_import"), true);
   assert.equal(imageMovements.every((movement) => movement.actorSource === "desktop"), true);
   assert.deepEqual(database.getAppliedStockImageHashes(), [hash]);
   assert.equal(database.getPendingSyncJobs().some((job) => job.jobType === "menu_publish"), true);
@@ -160,7 +162,7 @@ try {
   const repeatedImport = database.applyStockImageImport({
     importId,
     imageHash: hash,
-    lines: [{ menu_item_id: first.id, quantity: 1, raw_text: "repeat", confidence: "high" }]
+    lines: [{ product_id: first.product_id, quantity: 1, raw_text: "repeat", confidence: "high" }]
   });
   assert.equal(repeatedImport.ok, false);
   assert.match(repeatedImport.message, /daha önce uygulanmış/i);
@@ -175,7 +177,7 @@ try {
   const blockedDuplicate = database.applyStockImageImport({
     importId: duplicateId,
     imageHash: hash,
-    lines: [{ menu_item_id: first.id, quantity: 1, raw_text: "duplicate", confidence: "high" }]
+    lines: [{ product_id: first.product_id, quantity: 1, raw_text: "duplicate", confidence: "high" }]
   });
   assert.equal(blockedDuplicate.ok, false);
   assert.match(blockedDuplicate.message, /daha önce stok girişinde/i);
@@ -183,7 +185,7 @@ try {
     importId: duplicateId,
     imageHash: hash,
     duplicateWarningAcknowledged: true,
-    lines: [{ menu_item_id: first.id, quantity: 1, raw_text: "duplicate approved", confidence: "high" }]
+    lines: [{ product_id: first.product_id, quantity: 1, raw_text: "duplicate approved", confidence: "high" }]
   });
   assert.equal(approvedDuplicate.ok, true);
   assert.equal(stock(database, first.id), 25);
@@ -193,18 +195,18 @@ try {
   database.createStockImageImport({ importId: atomicId, source: "desktop", imageHash: atomicHash });
   database.completeStockImageAnalysis(atomicId, emptyAnalysis());
   const beforeAtomic = stock(database, first.id);
-  const beforeMovementCount = database.getMenuStockMovements().length;
+  const beforeMovementCount = listInventoryMovements(database.databasePath).length;
   const atomicFailure = database.applyStockImageImport({
     importId: atomicId,
     imageHash: atomicHash,
     lines: [
-      { menu_item_id: first.id, quantity: 3, raw_text: "valid row", confidence: "high" },
-      { menu_item_id: "not-tracked-item", quantity: 2, raw_text: "invalid row", confidence: "low" }
+      { product_id: first.product_id, quantity: 3, raw_text: "valid row", confidence: "high" },
+      { product_id: "not-tracked-item", quantity: 2, raw_text: "invalid row", confidence: "low" }
     ]
   });
   assert.equal(atomicFailure.ok, false);
   assert.equal(stock(database, first.id), beforeAtomic, "An invalid row must roll back every stock change");
-  assert.equal(database.getMenuStockMovements().length, beforeMovementCount, "An invalid row must roll back every movement");
+  assert.equal(listInventoryMovements(database.databasePath).length, beforeMovementCount, "An invalid row must roll back every movement");
 
   const adminDeviceId = "android-stock-import-admin";
   registerAndApproveDevice(database, adminDeviceId);
@@ -212,7 +214,7 @@ try {
   const androidHash = "c".repeat(64);
   const androidImportId = "stock_import_android_smoke_001";
   const androidAction = action("android_stock_import_action_001", adminDeviceId, androidImportId, androidHash, [
-    { menu_item_id: first.id, quantity: 2, raw_text: `${firstName} 2 AD`, confidence: "high" }
+    { product_id: first.product_id, quantity: 2, raw_text: `${firstName} 2 AD`, confidence: "high" }
   ]);
   setBusinessCapability(database.databasePath, { capability: C.AI, enabled: false });
   assert.equal(database.getSetupData().aiEnabled, false);
@@ -223,10 +225,10 @@ try {
   const androidResult = database.applyAndroidAction(androidAction);
   assert.equal(androidResult.ok, true, androidResult.message);
   assert.equal(stock(database, first.id), beforeAtomic + 2);
-  const androidMovement = database.getMenuStockMovements().find((movement) => movement.sourceId === androidImportId);
+  const androidMovement = listInventoryMovements(database.databasePath).find((movement) => movement.referenceId === androidImportId);
   assert.ok(androidMovement);
   assert.equal(androidMovement.actorSource, "android");
-  assert.equal(androidMovement.actorDeviceId, adminDeviceId);
+  assert.equal(androidMovement.referenceType, "stock_image_import");
   assert.equal(database.applyAndroidAction({ ...androidAction, id: "android_stock_import_action_002" }).ok, false, "A different action id cannot reapply the same import_id");
 
   const staffDeviceId = "android-stock-import-staff";
@@ -237,7 +239,7 @@ try {
     staffDeviceId,
     "stock_import_android_staff_001",
     "d".repeat(64),
-    [{ menu_item_id: first.id, quantity: 9, raw_text: "forbidden", confidence: "high" }]
+    [{ product_id: first.product_id, quantity: 9, raw_text: "forbidden", confidence: "high" }]
   ));
   assert.equal(forbidden.ok, false);
   assert.match(forbidden.message, /yetkisi yok/i);

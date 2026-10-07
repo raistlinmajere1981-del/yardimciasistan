@@ -31,7 +31,7 @@ export function applyAndroidTableOrderAddItem(db: DatabaseSync, action: AndroidS
     }
     orderId = dependentOrderId;
   } else return { ok: false, message: "Ürün eklemek için açık adisyon veya uygulanmış adisyon açma işlemi gerekli." };
-  const menuItemId = androidPayloadString(action.payload, "menu_item_id");
+  const menuItemId = androidPayloadString(action.payload, "menu_entry_id");
   const quantity = normalizeOrderQuantity(androidPayloadNumber(action.payload, "quantity", 1));
   if (!orderId || !menuItemId || !quantity) return { ok: false, message: "Ürün, adisyon veya adet bilgisi geçersiz." };
   const order = db.prepare("SELECT table_id, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')").get(orderId) as { table_id: string; updated_at: string } | undefined;
@@ -40,7 +40,7 @@ export function applyAndroidTableOrderAddItem(db: DatabaseSync, action: AndroidS
   if (tableId && tableId !== order.table_id) return { ok: false, message: "Ürün ile adisyonun masa bilgisi eşleşmiyor." };
   const conflict = getAndroidVersionConflict(action.payload, "expected_order_updated_at", order.updated_at, "Adisyon");
   if (conflict) return conflict;
-  const result = addTableOrderItem(db, { orderId, menuItemId, quantity, note: "" }, {
+  const result = addTableOrderItem(db, { orderId, menuEntryId: menuItemId, quantity, note: "" }, {
     now: nextMutationTimestamp(order.updated_at, now), androidAction: action, newItemId: createAndroidEntityId("table_order_item_", action.id)
   });
   return result.ok ? { ok: true, message: "Ürün telefondan adisyona eklendi." } : result;

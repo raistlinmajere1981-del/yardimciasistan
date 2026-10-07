@@ -11,12 +11,12 @@ import {
   type ProductLookupResponse
 } from "@yardimci-asistan/shared";
 import {
-  resolveProductAssetAbsoluteFromRelative,
   resolveProductAssetAbsolutePath,
   resolveProductAssetRelativePath
 } from "./data-paths.js";
 import { attachCatalogProductImageInTransaction, type SaveCatalogProductInput, type CatalogProductImageMutation } from "./commerce-store";
 import { desktopLog } from "./desktop-logger";
+import { readProductImageAsset } from "./product-image-reader.js";
 
 const OPEN_FOOD_FACTS_PROVIDER: ProductDataProviderId = "open_food_facts";
 const OPEN_FOOD_FACTS_API = "https://world.openfoodfacts.org/api/v2/product";
@@ -430,13 +430,5 @@ export function getProductImageDataUrl(databasePath: string, productId: string):
   } finally {
     database.close();
   }
-  if (!relativePath) return "";
-
-  const absolutePath = resolveProductAssetAbsoluteFromRelative(path.dirname(databasePath), relativePath);
-  if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) return "";
-  const bytes = fs.readFileSync(absolutePath);
-  if (!bytes.length || bytes.length > IMAGE_MAX_BYTES) return "";
-  const extension = path.extname(absolutePath).toLowerCase();
-  const mime = extension === ".png" ? "image/png" : extension === ".webp" ? "image/webp" : "image/jpeg";
-  return `data:${mime};base64,${bytes.toString("base64")}`;
+  return readProductImageAsset(databasePath, relativePath);
 }

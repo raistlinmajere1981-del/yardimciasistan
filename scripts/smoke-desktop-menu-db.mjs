@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { saveMenuProductFixture, fixtureInventoryMovements, fixtureProductId } from "./test-helpers/menu-product-fixture.mjs";
 import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -55,7 +56,7 @@ try {
   if (process.argv.includes("--table-orders-only")) {
     const category = database.saveMenuCategory({ name: "Order pilot", description: "", is_active: true, sort_order: 1 });
     assert.equal(category.ok, true);
-    const item = database.saveMenuItem({ category_id: category.savedId, name: "Smoke Ürün", description: "", price: 42,
+    const item = saveMenuProductFixture(database, { category_id: category.savedId, name: "Smoke Ürün", description: "", price: 42,
       currency: "TRY", image_url: "", is_available: true, is_featured: false, allergens: [], tags: [], sort_order: 1 });
     assert.equal(item.ok, true);
     assertTableOrderFlow(database, { appPath, dataDir, categoryId: category.savedId, menuItemId: item.savedId });
@@ -65,7 +66,7 @@ try {
   assert.ok(database.getDashboardData().menu.items.length > 0);
   const initialTrackedItems = database.getDashboardData().menu.items.filter((item) => item.stock_quantity !== null);
   assert.equal(initialTrackedItems.length, 10, "The smoke menu must expose ten stock-tracked test items.");
-  assert.equal(initialTrackedItems.filter((item) => item.stock_unit === "gram").length, 2);
+   assert.equal(initialTrackedItems.filter((item) => item.stock_unit === "g").length, 2);
   assert.equal(initialTrackedItems.find((item) => item.id === "smoke_item_006")?.stock_consumption_quantity, 200);
 
   const initialSetup = database.getSetupData();
@@ -489,7 +490,7 @@ try {
   });
   assert.equal(categoryResult.ok, true);
 
-  const itemResult = database.saveMenuItem({
+  const itemResult = saveMenuProductFixture(database, {
     category_id: categoryResult.savedId,
     name: "Smoke Ürün",
     description: "DB smoke test ürünü.",
@@ -571,14 +572,14 @@ function seedSmokeMenu(database) {
     { id: "smoke_item_003", name: "Smoke Ürün 3", unit: "adet", quantity: 30, consumption: 1 },
     { id: "smoke_item_004", name: "Smoke Ürün 4", unit: "adet", quantity: 25, consumption: 1 },
     { id: "smoke_item_005", name: "Smoke Ürün 5", unit: "adet", quantity: 20, consumption: 1 },
-    { id: "smoke_item_006", name: "Smoke Gram Ürün", unit: "gram", quantity: 5000, consumption: 200 },
-    { id: "smoke_item_007", name: "Smoke Gram Ürün 2", unit: "gram", quantity: 3000, consumption: 100 },
+    { id: "smoke_item_006", name: "Smoke Gram Ürün", unit: "g", quantity: 5000, consumption: 200 },
+    { id: "smoke_item_007", name: "Smoke Gram Ürün 2", unit: "g", quantity: 3000, consumption: 100 },
     { id: "smoke_item_008", name: "Smoke Ürün 8", unit: "adet", quantity: 15, consumption: 1 },
     { id: "smoke_item_009", name: "Smoke Ürün 9", unit: "adet", quantity: 12, consumption: 1 },
     { id: "smoke_item_010", name: "Smoke Ürün 10", unit: "adet", quantity: 10, consumption: 1 }
   ];
   tracked.forEach((item, index) => {
-    const created = database.saveMenuItem({
+    const created = saveMenuProductFixture(database, {
       id: item.id,
       category_id: categoryIds[index % categoryIds.length],
       name: item.name,
@@ -592,7 +593,7 @@ function seedSmokeMenu(database) {
       tags: ["smoke"],
       stock_quantity: item.quantity,
       stock_min_quantity: 2,
-      stock_unit: item.unit,
+      stock_unit: item.unit === "adet" ? "piece" : item.unit,
       stock_consumption_quantity: item.consumption,
       sort_order: index + 1
     });
@@ -613,7 +614,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
 
   const added = database.addTableOrderItem({
     orderId: opened.order.id,
-    menuItemId,
+    menuEntryId: menuItemId,
     quantity: 1,
     note: "İlk snapshot"
   });
@@ -623,7 +624,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
   assert.equal(added.order.items[0].currency, "TRY");
   const firstItemId = added.order.items[0].id;
 
-  const renamedMenuItem = database.saveMenuItem({
+  const renamedMenuItem = saveMenuProductFixture(database, {
     id: menuItemId,
     category_id: categoryId,
     name: "Yeni Smoke Ürün",
@@ -640,7 +641,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
   assert.equal(renamedMenuItem.ok, true);
   const addedAfterRename = database.addTableOrderItem({
     orderId: opened.order.id,
-    menuItemId,
+    menuEntryId: menuItemId,
     quantity: 1,
     note: ""
   });
@@ -648,7 +649,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
   assert.deepEqual(addedAfterRename.order.items.map((item) => item.productName), ["Smoke Ürün", "Yeni Smoke Ürün"]);
   assert.equal(addedAfterRename.order.total, 84);
 
-  const repricedMenuItem = database.saveMenuItem({
+  const repricedMenuItem = saveMenuProductFixture(database, {
     id: menuItemId,
     category_id: categoryId,
     name: "Yeni Smoke Ürün",
@@ -667,7 +668,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
   assert.ok(orderAfterMenuReprice);
   assert.deepEqual(orderAfterMenuReprice.items.map((item) => item.unitPrice), [42, 42]);
   assert.equal(orderAfterMenuReprice.total, 84);
-  assert.equal(database.saveMenuItem({
+  assert.equal(saveMenuProductFixture(database, {
     id: menuItemId,
     category_id: categoryId,
     name: "Yeni Smoke Ürün",
@@ -682,7 +683,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
     sort_order: 10
   }).ok, true);
 
-  const foreignCurrencyItem = database.saveMenuItem({
+  const foreignCurrencyItem = saveMenuProductFixture(database, {
     category_id: categoryId,
     name: "Dövizli Smoke Ürün",
     description: "Karma para birimi koruması.",
@@ -698,7 +699,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
   assert.equal(foreignCurrencyItem.ok, true);
   const mixedCurrencyResult = database.addTableOrderItem({
     orderId: opened.order.id,
-    menuItemId: foreignCurrencyItem.savedId,
+    menuEntryId: foreignCurrencyItem.savedId,
     quantity: 1,
     note: ""
   });
@@ -738,7 +739,7 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
   }
   const rejectedClosedMutation = database.addTableOrderItem({
     orderId: opened.order.id,
-    menuItemId,
+    menuEntryId: menuItemId,
     quantity: 1,
     note: ""
   });
@@ -1051,7 +1052,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.match(failedBatchParent.message, /değişmiş/i);
   const rejectedBatchChild = database.applyAndroidAction(androidAction("android_action_order_child_conflict_001", "table_order_add_item", {
     table_id: "table_002",
-    menu_item_id: menuItemId,
+    menu_entry_id: menuItemId,
     quantity: 1,
     depends_on_action_id: failedBatchParentId
   }));
@@ -1097,7 +1098,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
 
   const addResult = database.applyAndroidAction(androidAction("android_action_order_item_001", "table_order_add_item", {
     table_id: "table_001",
-    menu_item_id: menuItemId,
+    menu_entry_id: menuItemId,
     quantity: 2,
     depends_on_action_id: openActionId
   }));
@@ -1164,7 +1165,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
 
   const replacementAddResult = database.applyAndroidAction(androidAction("android_action_order_item_002", "table_order_add_item", {
     order_id: openedOrder.id,
-    menu_item_id: menuItemId,
+    menu_entry_id: menuItemId,
     quantity: 1
   }));
   assert.equal(replacementAddResult.ok, true);
@@ -1202,7 +1203,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   const staleOrderAddResult = database.applyAndroidAction(androidAction("android_action_order_stale_id_001", "table_order_add_item", {
     order_id: openedOrder.id,
     table_id: "table_001",
-    menu_item_id: menuItemId,
+    menu_entry_id: menuItemId,
     quantity: 1
   }));
   assert.equal(staleOrderAddResult.ok, false);
@@ -1258,13 +1259,13 @@ function assertStockTrackingFlow(database, categoryId) {
     stock_note: null,
     sort_order: 80
   };
-  const created = database.saveMenuItem(baseInput);
+  const created = saveMenuProductFixture(database, baseInput);
   assert.equal(created.ok, true);
   const itemId = created.savedId;
   assert.equal(created.dashboardData.menu.items.find((item) => item.id === itemId)?.stock_quantity, null);
-  assert.equal(database.getMenuStockMovements(itemId).length, 0);
+  assert.equal(fixtureInventoryMovements(database, itemId).length, 0);
 
-  const zeroVisible = database.saveMenuItem({
+  const zeroVisible = saveMenuProductFixture(database, {
     ...baseInput,
     id: itemId,
     stock_quantity: 0,
@@ -1275,7 +1276,7 @@ function assertStockTrackingFlow(database, categoryId) {
   assert.equal(zeroVisible.dashboardData.menu.items.find((item) => item.id === itemId)?.stock_quantity, 0);
   assert.equal(database.getQrMenuPublication().items.some((item) => item.id === itemId), true);
 
-  const zeroHidden = database.saveMenuItem({
+  const zeroHidden = saveMenuProductFixture(database, {
     ...baseInput,
     id: itemId,
     stock_quantity: 0,
@@ -1286,7 +1287,7 @@ function assertStockTrackingFlow(database, categoryId) {
   assert.equal(zeroHidden.dashboardData.menu.items.some((item) => item.id === itemId), true);
   assert.equal(database.getQrMenuPublication().items.some((item) => item.id === itemId), false);
 
-  const stocked = database.saveMenuItem({
+  const stocked = saveMenuProductFixture(database, {
     ...baseInput,
     id: itemId,
     stock_quantity: 5,
@@ -1298,7 +1299,7 @@ function assertStockTrackingFlow(database, categoryId) {
 
   const opened = database.openTableOrder(stockTableId);
   assert.equal(opened.ok, true);
-  const added = database.addTableOrderItem({ orderId: opened.order.id, menuItemId: itemId, quantity: 2, note: "" });
+  const added = database.addTableOrderItem({ orderId: opened.order.id, menuEntryId: itemId, quantity: 2, note: "" });
   assert.equal(added.ok, true);
   assert.equal(stockQuantity(database, itemId), 3);
   assert.equal(added.dashboardData.menu.items.find((item) => item.id === itemId)?.stock_quantity, 3);
@@ -1318,40 +1319,40 @@ function assertStockTrackingFlow(database, categoryId) {
 
   const cancelOrder = database.openTableOrder(stockTableId);
   assert.equal(cancelOrder.ok, true);
-  assert.equal(database.addTableOrderItem({ orderId: cancelOrder.order.id, menuItemId: itemId, quantity: 3, note: "" }).ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: cancelOrder.order.id, menuEntryId: itemId, quantity: 3, note: "" }).ok, true);
   assert.equal(stockQuantity(database, itemId), 2);
   assert.equal(database.closeTableOrder({ orderId: cancelOrder.order.id, status: "cancelled" }).ok, true);
   assert.equal(stockQuantity(database, itemId), 5);
 
   const paidOrder = database.openTableOrder(stockTableId);
   assert.equal(paidOrder.ok, true);
-  assert.equal(database.addTableOrderItem({ orderId: paidOrder.order.id, menuItemId: itemId, quantity: 2, note: "" }).ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: paidOrder.order.id, menuEntryId: itemId, quantity: 2, note: "" }).ok, true);
   assert.equal(stockQuantity(database, itemId), 3);
   assert.equal(database.closeTableOrder({ orderId: paidOrder.order.id, status: "paid" }).ok, true);
   assert.equal(stockQuantity(database, itemId), 3, "Paid orders must not restore stock.");
 
   const insufficientOrder = database.openTableOrder(stockTableId);
   assert.equal(insufficientOrder.ok, true);
-  const insufficient = database.addTableOrderItem({ orderId: insufficientOrder.order.id, menuItemId: itemId, quantity: 4, note: "" });
+  const insufficient = database.addTableOrderItem({ orderId: insufficientOrder.order.id, menuEntryId: itemId, quantity: 4, note: "" });
   assert.equal(insufficient.ok, false);
   assert.equal(insufficient.message, "Bu ürün stokta yeterli değil.");
   assert.equal(stockQuantity(database, itemId), 3);
   assert.equal(database.getActiveTableOrder(stockTableId).items.length, 0);
   assert.equal(database.closeTableOrder({ orderId: insufficientOrder.order.id, status: "cancelled" }).ok, true);
 
-  const untracked = database.saveMenuItem({ ...baseInput, name: "Takipsiz Smoke Ürün", sort_order: 90 });
+  const untracked = saveMenuProductFixture(database, { ...baseInput, name: "Takipsiz Smoke Ürün", sort_order: 90 });
   assert.equal(untracked.ok, true);
   const untrackedOrder = database.openTableOrder(stockTableId);
   assert.equal(untrackedOrder.ok, true);
-  assert.equal(database.addTableOrderItem({ orderId: untrackedOrder.order.id, menuItemId: untracked.savedId, quantity: 2, note: "" }).ok, true);
-  assert.equal(database.getMenuStockMovements(untracked.savedId).length, 0);
+  assert.equal(database.addTableOrderItem({ orderId: untrackedOrder.order.id, menuEntryId: untracked.savedId, quantity: 2, note: "" }).ok, true);
+  assert.equal(fixtureInventoryMovements(database, untracked.savedId).length, 0);
   assert.equal(database.closeTableOrder({ orderId: untrackedOrder.order.id, status: "cancelled" }).ok, true);
-  assert.equal(database.getMenuStockMovements(untracked.savedId).length, 0);
+  assert.equal(fixtureInventoryMovements(database, untracked.savedId).length, 0);
 
   const deniedManual = database.applyAndroidAction(androidAction(
     "android_stock_denied_001",
     "menu_stock_add",
-    { menu_item_id: itemId, quantity: 1, note: "Yetkisiz deneme" },
+    { product_id: fixtureProductId(database, itemId), quantity: 1, note: "Yetkisiz deneme" },
     "android-stock-smoke"
   ));
   assert.equal(deniedManual.ok, false);
@@ -1360,7 +1361,7 @@ function assertStockTrackingFlow(database, categoryId) {
   const deniedManualAfterApproval = database.applyAndroidAction(androidAction(
     "android_stock_denied_001",
     "menu_stock_add",
-    { menu_item_id: itemId, quantity: 1, note: "Yetkisiz deneme" },
+    { product_id: fixtureProductId(database, itemId), quantity: 1, note: "Yetkisiz deneme" },
     "android-stock-smoke"
   ));
   assert.equal(deniedManualAfterApproval.ok, false);
@@ -1372,7 +1373,7 @@ function assertStockTrackingFlow(database, categoryId) {
   const allowedManual = database.applyAndroidAction(androidAction(
     "android_stock_set_001",
     "menu_stock_set",
-    { menu_item_id: itemId, quantity: 10, note: "Sayım sonucu" },
+    { product_id: fixtureProductId(database, itemId), quantity: 10, note: "Sayım sonucu" },
     "android-stock-smoke"
   ));
   assert.equal(allowedManual.ok, true);
@@ -1380,7 +1381,7 @@ function assertStockTrackingFlow(database, categoryId) {
   const allowedAdd = database.applyAndroidAction(androidAction(
     "android_stock_add_001",
     "menu_stock_add",
-    { menu_item_id: itemId, quantity: 2, note: "Teslimat" },
+    { product_id: fixtureProductId(database, itemId), quantity: 2, note: "Teslimat" },
     "android-stock-smoke"
   ));
   assert.equal(allowedAdd.ok, true);
@@ -1388,18 +1389,18 @@ function assertStockTrackingFlow(database, categoryId) {
   const allowedAdjust = database.applyAndroidAction(androidAction(
     "android_stock_adjust_001",
     "menu_stock_adjust",
-    { menu_item_id: itemId, quantity_change: -3, note: "Fire düzeltmesi" },
+    { product_id: fixtureProductId(database, itemId), quantity_change: -3, note: "Fire düzeltmesi" },
     "android-stock-smoke"
   ));
   assert.equal(allowedAdjust.ok, true);
   assert.equal(stockQuantity(database, itemId), 9);
 
-  const movementTypes = database.getMenuStockMovements(itemId).map((movement) => movement.type);
-  for (const type of ["add", "set", "adjust", "order_add", "order_update", "order_remove", "order_cancel"]) {
+  const movementTypes = fixtureInventoryMovements(database, itemId).map((movement) => movement.type);
+  for (const type of ["count", "adjust", "sale", "return_in"]) {
     assert.equal(movementTypes.includes(type), true, `Missing stock movement type: ${type}`);
   }
-  assert.ok(database.getMenuStockMovements(itemId).some((movement) =>
-    movement.sourceType === "android" && movement.actorDeviceId === "android-stock-smoke" && movement.note === "Sayım sonucu"
+  assert.ok(fixtureInventoryMovements(database, itemId).some((movement) =>
+    movement.actorSource === "android" && movement.referenceId === "android_stock_set_001" && movement.note === "Sayım sonucu"
   ));
 
   const gramItemId = "smoke_item_006";
@@ -1407,7 +1408,7 @@ function assertStockTrackingFlow(database, categoryId) {
   assert.equal(gramStockBefore, 5000);
   const gramOrder = database.openTableOrder(stockTableId);
   assert.equal(gramOrder.ok, true);
-  const gramAdded = database.addTableOrderItem({ orderId: gramOrder.order.id, menuItemId: gramItemId, quantity: 2, note: "" });
+  const gramAdded = database.addTableOrderItem({ orderId: gramOrder.order.id, menuEntryId: gramItemId, quantity: 2, note: "" });
   assert.equal(gramAdded.ok, true);
   assert.equal(stockQuantity(database, gramItemId), 4600, "Two portions must consume 2 × 200 grams.");
   const gramOrderItemId = gramAdded.order.items[0].id;
@@ -1419,12 +1420,12 @@ function assertStockTrackingFlow(database, categoryId) {
 
   const gramCancelOrder = database.openTableOrder(stockTableId);
   assert.equal(gramCancelOrder.ok, true);
-  assert.equal(database.addTableOrderItem({ orderId: gramCancelOrder.order.id, menuItemId: gramItemId, quantity: 2, note: "" }).ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: gramCancelOrder.order.id, menuEntryId: gramItemId, quantity: 2, note: "" }).ok, true);
   assert.equal(stockQuantity(database, gramItemId), 4600);
   assert.equal(database.closeTableOrder({ orderId: gramCancelOrder.order.id, status: "cancelled" }).ok, true);
   assert.equal(stockQuantity(database, gramItemId), 5000, "Cancelling the order must restore the consumed grams.");
 
-  const stopped = database.saveMenuItem({ ...baseInput, id: itemId, stock_quantity: null });
+  const stopped = saveMenuProductFixture(database, { ...baseInput, id: itemId, stock_quantity: null });
   assert.equal(stopped.ok, true);
   assert.equal(stockQuantity(database, itemId), null);
 }

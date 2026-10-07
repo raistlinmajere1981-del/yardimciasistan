@@ -76,7 +76,7 @@ export function DesktopAppView({
   } = appLockController;
   const marketController = useMarketController({
     businessCapabilities: desktopSyncController.businessCapabilities,
-    active: appAccessPhase === "unlocked" && activePage === "market",
+    active: appAccessPhase === "unlocked" && (activePage === "market" || activePage === "menu"),
     enabled: appAccessPhase === "unlocked",
     productDataEnabled: setupController.setupData.productData.enabled
   });

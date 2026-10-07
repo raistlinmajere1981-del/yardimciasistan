@@ -93,7 +93,8 @@ Canonical workspace tanımları static aggregate ile bağlanır. Feature-owned �
 - Pension → Room Workspace definition
 - Restaurant → Table Workspace definition
 
-Customer, Product ve Menu Item workspace'leri de aynı platform contract'ını kullanır.
+Customer ve Product workspace'leri aynı platform contract'ını kullanır. Menü ürünleri
+ayrı bir editör yerine Product Workspace'i menü kanal bağlamıyla açar (D-011).
 
 Workspace intent entityType/entityId/mode/action/return context taşır. Presentation
 centered/full-canvas olabilir; presentation değişimi aynı mounted state'i korur.

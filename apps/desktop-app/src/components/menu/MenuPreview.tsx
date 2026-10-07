@@ -88,7 +88,7 @@ function MenuPreviewCanvas({
   const activeCategoryIds = useMemo(() => new Set(categories.map((category) => category.id)), [categories]);
   const items = useMemo(
     () => menu.items
-      .filter((item) => item.is_available && activeCategoryIds.has(item.category_id) && (!(qrMenuEnabled && inventoryEnabled) || !isQrHiddenByStock(item)))
+      .filter((item) => item.is_available && item.product_is_active !== false && activeCategoryIds.has(item.category_id) && (!(qrMenuEnabled && inventoryEnabled) || !isQrHiddenByStock(item)))
       .sort(compareMenuRecords),
     [activeCategoryIds, inventoryEnabled, menu.items, qrMenuEnabled]
   );

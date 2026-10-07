@@ -53,7 +53,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, inventoryEna
                   {selectedOrder?.items.map((item) => (
                     <article className="restaurant-order-line" key={item.id}>
                       <div className="restaurant-order-line__main">
-                        <MenuProductImage item={menuItemsById.get(item.menuItemId)} webModuleUrl={webModuleUrl} className="restaurant-order-line__image" />
+                        <MenuProductImage item={menuItemsById.get(item.menuEntryId)} webModuleUrl={webModuleUrl} className="restaurant-order-line__image" />
                         <div className="restaurant-order-line__copy">
                           <strong>{item.productName}</strong>
                           <span>{formatMoney(item.unitPrice, item.currency)}</span>
@@ -65,7 +65,7 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, inventoryEna
                         <IconButton
                           size="sm"
                           onClick={() => void controller.quantity(item.id, item.quantity + 1)}
-                          disabled={item.quantity >= 999 || Boolean(busyAction) || isMenuItemOutOfStock(item.menuItemId, menu, inventoryEnabled)}
+                          disabled={item.quantity >= 999 || Boolean(busyAction) || isMenuItemOutOfStock(item.menuEntryId, menu, inventoryEnabled)}
                           aria-label={`${item.productName} adetini artır`}
                         ><Plus size={14} aria-hidden="true" /></IconButton>
                       </div>
@@ -110,4 +110,3 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, inventoryEna
     <Fragment key="context">{accountPanel}</Fragment>
   </>;
 }
-

@@ -494,7 +494,7 @@ export function ReportsPage({
             ) : (
               <ul className="report-ranked-list">
                 {report.stock.topConsumed.map((item, index) => (
-                  <li key={item.menuItemId}>
+                  <li key={item.productId}>
                     <span>{index + 1}</span>
                     <strong>{item.name}</strong>
                     <small>{stockQuantity(item.quantity, item.unit)}</small>
@@ -712,7 +712,7 @@ function count(value: number): string {
 }
 
 function stockQuantity(value: number, unit: string): string {
-  return `${count(value)} ${unit === "gram" ? "g" : "adet"}`;
+  return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 4 }).format(value)} ${unit === "piece" ? "adet" : unit}`;
 }
 
 function signedStockQuantity(value: number, unit: string): string {

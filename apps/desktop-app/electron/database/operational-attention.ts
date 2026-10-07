@@ -112,15 +112,14 @@ export function getOperationalAttention(
     ? db
       .prepare(`
           SELECT
-            name,
-            stock_quantity,
-            stock_min_quantity,
-            stock_consumption_quantity,
-            stock_unit
-          FROM menu_items
-          WHERE deleted_at = ''
-            AND stock_quantity IS NOT NULL
-          ORDER BY name COLLATE NOCASE ASC
+            p.name, COALESCE(b.quantity, 0) AS stock_quantity, p.minimum_quantity AS stock_min_quantity,
+            COALESCE(e.stock_consumption_quantity, 1) AS stock_consumption_quantity, p.unit AS stock_unit
+          FROM catalog_products p
+          LEFT JOIN menu_product_entries e ON e.product_id = p.id AND e.deleted_at = ''
+          LEFT JOIN inventory_locations l ON l.business_id = p.business_id AND l.is_primary = 1 AND l.deleted_at = ''
+          LEFT JOIN inventory_balances b ON b.product_id = p.id AND b.location_id = l.id
+          WHERE p.deleted_at = '' AND p.is_active = 1 AND p.track_inventory = 1
+          ORDER BY p.name COLLATE NOCASE ASC
         `)
       .all() as Array<Record<string, unknown>>
     : [];

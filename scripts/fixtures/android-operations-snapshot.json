@@ -238,6 +238,10 @@
     "items": [
       {
         "id": "item_breakfast_001",
+        "product_id": "product_breakfast_001",
+        "price_override": null,
+        "stock_unit": "piece",
+        "stock_consumption_quantity": 1,
         "category_id": "cat_breakfast",
         "name": "Serpme Kahvaltı",
         "description": "İki kişilik serpme kahvaltı",
@@ -258,6 +262,10 @@
       },
       {
         "id": "item_drink_001",
+        "product_id": "product_drink_001",
+        "price_override": null,
+        "stock_unit": "piece",
+        "stock_consumption_quantity": 1,
         "category_id": "cat_drinks",
         "name": "Türk Kahvesi",
         "description": "Lokum ile servis edilir",
@@ -278,6 +286,10 @@
       },
       {
         "id": "item_drink_002",
+        "product_id": "product_drink_002",
+        "price_override": null,
+        "stock_unit": "piece",
+        "stock_consumption_quantity": 1,
         "category_id": "cat_drinks",
         "name": "Ev Limonatası",
         "description": "Taze naneli",
@@ -301,7 +313,10 @@
   },
   "trackedStockItems": [
     {
-      "menu_item_id": "item_breakfast_001",
+      "product_id": "product_breakfast_001",
+      "menu_entry_id": "item_breakfast_001",
+      "stock_unit": "piece",
+      "stock_consumption_quantity": 1,
       "name": "Serpme Kahvaltı",
       "category": "Kahvaltı",
       "price": 450,
@@ -311,7 +326,10 @@
       "stock_status": "in_stock"
     },
     {
-      "menu_item_id": "item_drink_002",
+      "product_id": "product_drink_002",
+      "menu_entry_id": "item_drink_002",
+      "stock_unit": "piece",
+      "stock_consumption_quantity": 1,
       "name": "Ev Limonatası",
       "category": "İçecekler",
       "price": 120,
@@ -335,7 +353,8 @@
         {
           "id": "table_order_item_android_demo_001",
           "order_id": "table_order_android_demo_001",
-          "menu_item_id": "item_breakfast_001",
+          "product_id": "product_breakfast_001",
+          "menu_entry_id": "item_breakfast_001",
           "product_name": "Serpme Kahvaltı",
           "unit_price": 450,
           "currency": "TRY",

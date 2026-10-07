@@ -138,7 +138,7 @@ final class HostingSyncClient {
         writeMultipartField(output, boundary, "device_id", identity.deviceId);
         writeMultipartField(output, boundary, "import_id", importId);
         writeMultipartField(output, boundary, "image_hash", image.imageHash);
-        writeMultipartField(output, boundary, "menu_items", menuItems.toString());
+        writeMultipartField(output, boundary, "products", menuItems.toString());
         output.writeBytes("--" + boundary + "\r\n");
         output.writeBytes("Content-Disposition: form-data; name=\"image\"; filename=\"stock-document.jpg\"\r\n");
         output.writeBytes("Content-Type: " + image.mimeType + "\r\n\r\n");

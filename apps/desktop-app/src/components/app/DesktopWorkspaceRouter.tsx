@@ -470,6 +470,9 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "menu" ? (
         <MenuManager
+          products={marketController.products}
+          catalogCategories={marketController.categories}
+          onCatalogReload={marketController.reloadCatalog}
           dashboardData={surfaceData}
           qrMenuEnabled={runtimeFeatures.qrMenu}
           inventoryEnabled={inventoryEnabled}

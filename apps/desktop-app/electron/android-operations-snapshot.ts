@@ -28,14 +28,11 @@ export function createAndroidOperationsSnapshot(
   const activeMenuCategoryIds = new Set(
     activeMenuCategories.map((category) => category.id)
   );
-  const menuCategoryNames = new Map(
-    dashboardData.menu.categories.map((category) => [category.id, category.name])
-  );
   const androidMenu = {
     categories: activeMenuCategories,
     items: dashboardData.menu.items.filter(
       (item) =>
-        item.is_available && activeMenuCategoryIds.has(item.category_id)
+        item.is_available && item.product_is_active !== false && activeMenuCategoryIds.has(item.category_id)
     ),
     updated_at: dashboardData.menu.updated_at
   };
@@ -236,25 +233,9 @@ export function createAndroidOperationsSnapshot(
       })),
     menu: androidMenu,
     admin_menu: dashboardData.menu,
+    menu_product_candidates: database.getMenuProductCandidates(),
     deleted_request_ids: database.getDeletedRequestIds(),
-    trackedStockItems: dashboardData.menu.items
-      .filter((item) => item.stock_quantity !== null)
-      .map((item) => ({
-        menu_item_id: item.id,
-        name: item.name,
-        category: menuCategoryNames.get(item.category_id) ?? "Menü",
-        price: item.price,
-        stock_quantity: item.stock_quantity ?? 0,
-        stock_min_quantity: item.stock_min_quantity,
-        stock_unit: item.stock_unit,
-        stock_consumption_quantity: item.stock_consumption_quantity,
-        hide_when_out_of_stock: item.hide_when_out_of_stock,
-        stock_status: getMenuStockStatus(
-          item.stock_quantity ?? 0,
-          item.stock_min_quantity,
-          item.stock_consumption_quantity
-        )
-      })),
+    trackedStockItems: database.getTrackedStockProducts(),
     appliedStockImageHashes: database.getAppliedStockImageHashes(100),
     table_orders: activeTableOrders.map((order) => ({
       id: order.id,
@@ -267,7 +248,8 @@ export function createAndroidOperationsSnapshot(
       items: order.items.map((item) => ({
         id: item.id,
         order_id: item.orderId,
-        menu_item_id: item.menuItemId,
+        product_id: item.productId,
+        menu_entry_id: item.menuEntryId,
         product_name: item.productName,
         unit_price: item.unitPrice,
         currency: item.currency,
@@ -312,20 +294,6 @@ export function createAndroidOperationsSnapshot(
     database.getEnabledBusinessCapabilities(),
     today
   );
-}
-
-function getMenuStockStatus(
-  quantity: number,
-  minimum: number | null,
-  consumptionQuantity = 1
-): "out_of_stock" | "low_stock" | "in_stock" {
-  if (quantity < consumptionQuantity) {
-    return "out_of_stock";
-  }
-  if (minimum !== null && quantity <= minimum) {
-    return "low_stock";
-  }
-  return "in_stock";
 }
 
 function formatLocalDateKey(date: Date): string {

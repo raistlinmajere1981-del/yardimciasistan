@@ -55,7 +55,7 @@ import {
   BUSINESS_CAPABILITIES,
   type BusinessCapability,
   type StockImageAnalysis,
-  type StockImageMenuCandidate
+  type StockImageProductCandidate
 } from "@yardimci-asistan/shared";
 import type {
   AndroidReportPresetKey,
@@ -110,9 +110,8 @@ import type {
   SaveInitialSetupInput,
   DesktopSetupSaveResult,
   SaveMenuCategoryInput,
-  SaveMenuItemInput,
+  SaveMenuProductEntryInput,
   ReorderMenuRecordsInput,
-  DesktopMenuStockMovement,
   DesktopMenuSaveResult,
   CreateStockImageImportInput,
   ApplyStockImageImportInput,
@@ -185,9 +184,8 @@ export type {
   SaveInitialSetupInput,
   DesktopSetupSaveResult,
   SaveMenuCategoryInput,
-  SaveMenuItemInput,
+  SaveMenuProductEntryInput,
   ReorderMenuRecordsInput,
-  DesktopMenuStockMovement,
   DesktopMenuSaveResult,
   CreateStockImageImportInput,
   ApplyStockImageImportInput,
@@ -648,14 +646,14 @@ export class DesktopDatabase {
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
-  deleteMenuItem(itemIdInput: string): DesktopStatusUpdateResult {
+  deleteMenuProductEntry(itemIdInput: string): DesktopStatusUpdateResult {
     const itemId = itemIdInput.trim();
     if (!itemId) {
       return { ok: false, message: "Silinecek ürün seçilmeli." };
     }
     const result = runStoredDesktopDeletion(
       this.db,
-      () => deleteStoredMenuItemInTransaction(this.db, itemId, new Date().toISOString()),
+      () => deleteStoredMenuProductEntryInTransaction(this.db, itemId, new Date().toISOString()),
       "Ürün silindi."
     );
     if (!result.ok) {
@@ -1142,9 +1140,11 @@ export class DesktopDatabase {
     };
   }
 
-  getPublishedMenu(): PublishedQrMenu {
-    return getStoredPublishedMenu(this.db);
+  getPublishedMenu(includeInactiveProducts = false): PublishedQrMenu {
+    return getStoredPublishedMenu(this.db, includeInactiveProducts);
   }
+  getMenuProductCandidates() { return getStoredMenuProductCandidates(this.db); }
+  getTrackedStockProducts() { return getStoredTrackedStockProducts(this.db); }
 
   getDeletedRequestIds(): string[] {
     return getStoredDeletedRequestIds(this.db);
@@ -1164,11 +1164,7 @@ export class DesktopDatabase {
     setStoredQrMenuWebPublicationEnabled(this.db, enabled);
   }
 
-  getMenuStockMovements(menuItemId = ""): DesktopMenuStockMovement[] {
-    return getStoredMenuStockMovements(this.db, menuItemId);
-  }
-
-  getTrackedStockCandidates(): StockImageMenuCandidate[] {
+  getTrackedStockCandidates(): StockImageProductCandidate[] {
     return getStoredTrackedStockCandidates(this.db);
   }
 
@@ -1248,7 +1244,7 @@ export class DesktopDatabase {
       }
       for (const item of sent.items) {
         if (JSON.stringify(current.items.find((row) => row.id === item.id)) !== JSON.stringify(item)) continue;
-        this.db.prepare("UPDATE menu_items SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
+        this.db.prepare("UPDATE menu_product_entries SET sync_status = 'synced' WHERE id = ? AND updated_at = ? AND deleted_at = ''")
           .run(item.id, item.updated_at);
       }
       insertDatabaseEvent(this.db, {
@@ -1311,8 +1307,8 @@ export class DesktopDatabase {
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
-  saveMenuItem(input: SaveMenuItemInput): DesktopMenuSaveResult {
-    const result = saveStoredMenuItem(this.db, input);
+  saveMenuProductEntry(input: SaveMenuProductEntryInput, image?: import("./commerce-store").CatalogProductImageMutation): DesktopMenuSaveResult {
+    const result = saveStoredMenuProductEntry(this.db, input, image);
     if (!result.ok) {
       return result;
     }
@@ -1393,19 +1389,17 @@ import {
 
 import {
   getPublishedMenu as getStoredPublishedMenu,
+  getMenuProductCandidates as getStoredMenuProductCandidates,
   getQrMenuPublication as getStoredQrMenuPublication,
   getQrMenuWebPublicationEnabled as getStoredQrMenuWebPublicationEnabled,
   setQrMenuWebPublicationEnabled as setStoredQrMenuWebPublicationEnabled,
   saveMenuCategory as saveStoredMenuCategory,
   reorderMenuRecords as reorderStoredMenuRecords,
   deleteMenuCategoryInTransaction as deleteStoredMenuCategoryInTransaction,
-  deleteMenuItemInTransaction as deleteStoredMenuItemInTransaction,
+  deleteMenuProductEntryInTransaction as deleteStoredMenuProductEntryInTransaction,
 } from "./database/menu-store.js";
 
-import {
-  getMenuStockMovements as getStoredMenuStockMovements,
-  saveMenuItem as saveStoredMenuItem,
-} from "./database/menu-stock-store.js";
+import { saveMenuProductEntry as saveStoredMenuProductEntry } from "./database/menu-product-entry-store.js";
 
 import {
   listTableOrders as listStoredTableOrders,
@@ -1497,6 +1491,7 @@ import { readEnabledBusinessCapabilities } from "./business-capability-store.js"
 
 import {
   getTrackedStockCandidates as getStoredTrackedStockCandidates,
+  getTrackedStockProducts as getStoredTrackedStockProducts,
   getAppliedStockImageHashes as getStoredAppliedStockImageHashes,
   createStockImageImport as createStoredStockImageImport,
   completeStockImageAnalysis as completeStoredStockImageAnalysis,

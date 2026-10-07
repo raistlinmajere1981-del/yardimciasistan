@@ -61,6 +61,7 @@ try {
   assert.deepEqual(pending.tables, [], "Onaysız cihaz masa verisini görmemeli");
   assert.deepEqual(pending.menu.categories, [], "Onaysız cihaz menü snapshot'ını görmemeli");
   assert.deepEqual(pending.admin_menu.categories, [], "Onaysız cihaz yönetici menüsünü görmemeli");
+  assert.deepEqual(pending.menu_product_candidates ?? [], []);
   assert.deepEqual(pending.table_orders, [], "Onaysız cihaz adisyon verisini görmemeli");
   assert.deepEqual(pending.messages, [], "Onaysız cihaz hazır mesajları görmemeli");
   assert.deepEqual(pending.finance, [], "Onaysız cihaz finans verisini görmemeli");
@@ -93,6 +94,12 @@ try {
   assert.equal(approved.tables.length, 1);
   assert.equal(approved.operations.total_rooms, 1);
   assert.equal(approved.summary.total_requests, 1);
+  assert.deepEqual(approved.menu_product_candidates, [], "Menu linking candidates require menu.edit permission, not only device approval.");
+
+  await publishSnapshot(3, { [deviceId]: { role: "admin", is_active: true, permissions: ["menu.edit"] } });
+  const editor = await (await syncApi({ action: "android_summary", device_id: deviceId, device_name: "Menu editor", app_version: "smoke" })).json();
+  assert.deepEqual(editor.menu_product_candidates, [{ product_id: "product-unlinked", name: "Existing product", unit: "l", sale_price: 12, currency: "TRY" }],
+    "Hosting link discovery must expose only canonical identity/name/unit/price/currency, never purchase prices or private images/metadata.");
 
   console.log("android-device-approval-hosting-smoke-ok: inactive device sees no operational snapshot, approved device does");
 } catch (error) {
@@ -120,7 +127,8 @@ async function publishSnapshot(sourceRevision, androidPermissions) {
         "service.android",
         "accommodation.rooms",
         "food_service.tables",
-        "food_service.menu"
+        "food_service.menu",
+        "commerce.catalog"
       ],
       summary: {
         pending_daily_tasks: 1,
@@ -202,6 +210,8 @@ async function publishSnapshot(sourceRevision, androidPermissions) {
         }],
         items: [{
           id: "item_approval_smoke",
+          product_id: "product_tea_smoke",
+          price_override: null,
           category_id: "category_approval_smoke",
           name: "Çay",
           description: "",
@@ -228,6 +238,8 @@ async function publishSnapshot(sourceRevision, androidPermissions) {
         items: [],
         updated_at: "2036-08-17T09:00:00Z"
       },
+      menu_product_candidates: [{ product_id: "product-unlinked", name: "Existing product", unit: "l", sale_price: 12, currency: "TRY",
+        purchase_price: 5, sku: "private-sku", image_url: "https://private.example.com/image?token=private", source_metadata: { private: true } }],
       deleted_request_ids: [],
       trackedStockItems: [],
       appliedStockImageHashes: [],

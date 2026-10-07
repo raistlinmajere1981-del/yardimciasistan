@@ -99,6 +99,7 @@ const SMOKE_FILES = [
   "scripts/smoke-desktop-lock.mjs",
   "scripts/smoke-desktop-logging-contract.mjs",
   "scripts/smoke-desktop-menu-db.mjs",
+  "scripts/smoke-menu-product-identity.mjs",
   "scripts/smoke-menu-reorder-contract.mjs",
   "scripts/smoke-desktop-package.mjs",
   "scripts/smoke-desktop-renderer.mjs",
@@ -539,6 +540,22 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
+  const productIdentityChecks = new Set([
+    "menu-product-identity", "desktop-menu-db", "menu-reorder-contract", "schema-authority", "storage-correctness",
+    "domain-mutation-ownership", "room-folio-service", "room-folio-table-order-transfer", "finance-source-ownership",
+    "record-deletions", "reports-db", "automatic-sync", "commerce-foundation", "commerce-online-catalog",
+    "commerce-product-media", "commerce-ipc-contract", "commerce-runtime", "sales-correctness",
+    "market-android-foundation", "android-permission-matrix", "stock-image-import-db", "stock-image-analysis",
+    "web-module-menu", "business-capabilities", "workspace-platform", "capability-surface-consistency",
+    "desktop-renderer", "local-companion-server", "publication-protocol", "sync-publication-correctness",
+    "hospitality-domain", "hospitality-guests", "table-customer", "android-hosting-contract", "android-device-approval-hosting"
+  ]);
+  if (productIdentityChecks.has(name)) return [...smokeDomainsForGeneralOwnership(file), "product-identity"];
+  return smokeDomainsForGeneralOwnership(file);
+}
+
+function smokeDomainsForGeneralOwnership(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   if (name === "publication-protocol") return ["web", "android", "commerce", "marketing", "platform"];
   if (name === "sync-publication-correctness") return ["web", "android", "platform"];

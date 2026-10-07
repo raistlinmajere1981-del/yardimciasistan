@@ -52,7 +52,7 @@ export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, 
           tags: fallback?.tags ?? [],
           stock_quantity: item.stockQuantity,
           stock_min_quantity: fallback?.stock_min_quantity ?? null,
-          stock_unit: item.stockUnit === "gram" ? "gram" : "piece",
+          stock_unit: item.stockUnit,
           stock_consumption_quantity: item.stockConsumptionQuantity,
           hide_when_out_of_stock: fallback?.hide_when_out_of_stock ?? false,
           stock_note: fallback?.stock_note ?? null,
@@ -76,10 +76,10 @@ export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, 
   function addMenuItem(item: PublishedMenuItem) {
     const source = roomMenuItem(item);
     if (!source || !canAddMenuItem(item)) return;
-    const existing = folio.items.find(line => line.kind === "menu" && line.menuItemId === source.id && !line.note.trim());
+    const existing = folio.items.find(line => line.kind === "menu" && line.menuEntryId === source.id && !line.note.trim());
     return controller.mutate(() => existing
       ? window.yardimciDesktop!.updateRoomFolioItemQuantity({ itemId: existing.id, quantity: existing.quantity + 1 })
-      : window.yardimciDesktop!.addRoomFolioMenuItem({ folioId: folio.id, menuItemId: source.id, quantity: 1 }), "adjustments");
+      : window.yardimciDesktop!.addRoomFolioMenuItem({ folioId: folio.id, menuEntryId: source.id, quantity: 1 }), "adjustments");
   }
 
   return <section className="operation-section form-stack" aria-label="Hesaba ekle">

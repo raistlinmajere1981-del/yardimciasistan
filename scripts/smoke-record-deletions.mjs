@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -90,7 +91,7 @@ function assertDesktopMenuDeletion(database) {
   const firstItem = createItem(database, category.id, "Tek Ürün Silme");
   const secondItem = createItem(database, category.id, "Kategoriyle Silme");
 
-  const itemResult = database.deleteMenuItem(firstItem.id);
+  const itemResult = database.deleteMenuProductEntry(firstItem.id);
   assert.equal(itemResult.ok, true);
   assert.equal(itemResult.dashboardData.menu.items.some((item) => item.id === firstItem.id), false);
   assert.equal(itemResult.dashboardData.menu.items.some((item) => item.id === secondItem.id), true);
@@ -172,7 +173,7 @@ function assertAndroidAdminOnlyDeletion(database) {
   assert.equal(database.applyAndroidAction(androidAction(
     "android_menu_item_delete_001",
     "menu_item_delete",
-    { menu_item_id: firstItem.id }
+    { menu_entry_id: firstItem.id }
   )).ok, true);
   assert.equal(database.getDashboardData().menu.items.some((item) => item.id === firstItem.id), false);
   assert.equal(database.applyAndroidAction(androidAction(
@@ -202,7 +203,7 @@ function registerAndApproveDevice(database, deviceId) {
 function assertSoftDeleteRows(database) {
   const sqlite = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
-    for (const table of ["requests", "customers", "menu_categories", "menu_items", "whatsapp_messages"]) {
+    for (const table of ["requests", "customers", "menu_categories", "menu_product_entries", "whatsapp_messages"]) {
       const row = sqlite.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE deleted_at != ''`).get();
       assert.ok(Number(row.count) > 0, `${table} must contain a soft-deleted row`);
     }
@@ -246,7 +247,7 @@ function createCategory(database, name) {
 }
 
 function createItem(database, categoryId, name) {
-  const result = database.saveMenuItem({
+  const result = saveMenuProductFixture(database, {
     category_id: categoryId,
     name,
     description: "Silme smoke ürünü",

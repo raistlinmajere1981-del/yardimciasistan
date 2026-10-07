@@ -2,6 +2,7 @@ import { requestDataMaintenanceConfirmation, type DataMaintenanceConfirmation } 
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { readProductImageAsset } from "./product-image-reader";
 import { randomUUID } from "node:crypto";
 import { beginRestoreReconciliation } from "./database/restore-reconciliation-store";
 import { app, ipcMain, session, shell } from "electron";
@@ -175,10 +176,10 @@ function validateYardimciDatabase(filePath: string) {
     const requiredRows = database.prepare(`
       SELECT name
       FROM sqlite_master
-      WHERE type = 'table' AND name IN ('business', 'settings', 'menu_items', 'business_capabilities', 'desktop_sync_identity', 'android_local_credentials', 'ai_service_profiles')
+      WHERE type = 'table' AND name IN ('business', 'settings', 'catalog_products', 'menu_product_entries', 'business_capabilities', 'desktop_sync_identity', 'android_local_credentials', 'ai_service_profiles')
     `).all() as Array<{ name?: unknown }>;
     const requiredTables = new Set(requiredRows.map((row) => String(row.name ?? "")));
-    if (!["business", "settings", "menu_items", "business_capabilities", "desktop_sync_identity", "android_local_credentials", "ai_service_profiles"]
+    if (!["business", "settings", "catalog_products", "menu_product_entries", "business_capabilities", "desktop_sync_identity", "android_local_credentials", "ai_service_profiles"]
       .every((table) => requiredTables.has(table))) {
       throw new Error("Seçilen dosya Yardımcı Asistan yedeği olarak doğrulanamadı.");
     }
@@ -232,19 +233,19 @@ function sanitizeFileName(value: string) {
   return cleaned || "urun";
 }
 
-function extractQrMenuImages(databasePath: string, outputDirectory: string) {
+function extractQrMenuImages(databasePath: string, assetDatabasePath: string, outputDirectory: string) {
   const database = new DatabaseSync(databasePath);
   try {
     const rows = database.prepare(`
-      SELECT id, name, image_url
-      FROM menu_items
-      WHERE deleted_at = '' AND image_url LIKE 'data:image/%'
-      ORDER BY sort_order ASC, name ASC
-    `).all() as Array<{ id?: unknown; name?: unknown; image_url?: unknown }>;
+      SELECT e.id, p.name, p.image_asset_path
+      FROM catalog_products p JOIN menu_product_entries e ON e.product_id = p.id AND e.deleted_at = ''
+      WHERE p.deleted_at = '' AND p.image_asset_path <> ''
+      ORDER BY e.sort_order ASC, p.name ASC
+    `).all() as Array<{ id?: unknown; name?: unknown; image_asset_path?: unknown }>;
 
     const files: BackupManifest["qrMenuImages"]["files"] = [];
     for (const row of rows) {
-      const imageUrl = String(row.image_url ?? "");
+      const imageUrl = readProductImageAsset(assetDatabasePath, String(row.image_asset_path ?? ""));
       const match = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(imageUrl);
       if (!match) continue;
 
@@ -387,7 +388,7 @@ function createBackupPackageFromDatabase(options: {
     }
 
     validateYardimciDatabase(outputDatabasePath);
-    const imageFiles = extractQrMenuImages(outputDatabasePath, path.join(tempFolderPath, QR_IMAGE_DIRECTORY));
+    const imageFiles = extractQrMenuImages(outputDatabasePath, options.sourceDatabasePath, path.join(tempFolderPath, QR_IMAGE_DIRECTORY));
     const assetFileCount = copyDurableAssets(options.paths.assetsPath, path.join(tempFolderPath, ASSET_DIRECTORY));
     const manifest: BackupManifest = {
       format: "yardimci-asistan-backup-v2",

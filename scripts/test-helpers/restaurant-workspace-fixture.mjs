@@ -167,13 +167,13 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
       calls.push({ kind: 'add', id }); const order = orderFor(id), product = dashboard.menu.items.find(item => item.id === menuId);
       if (!capabilities.menuEnabled || (capabilities.inventoryEnabled && product.stock_quantity < 1)) return { ok: false, message: 'Stok yok.' };
       if (capabilities.inventoryEnabled) product.stock_quantity--;
-      order.items.push({ id: `item-${order.id}-${order.items.length}`, orderId: id, menuItemId: menuId, productName: product.name,
+      order.items.push({ id: `item-${order.id}-${order.items.length}`, orderId: id, productId: product.product_id ?? menuId, menuEntryId: menuId, productName: product.name,
         unitPrice: product.price, currency: 'TRY', quantity: 1, lineTotal: product.price, note: '', status: 'open' });
       return result(order);
     },
     updateTableOrderItemQuantity: async (id, quantity) => {
       calls.push({ kind: 'quantity', id, quantity }); const order = itemOrder(id), item = order.items.find(item => item.id === id);
-      if (capabilities.inventoryEnabled) dashboard.menu.items.find(product => product.id === item.menuItemId).stock_quantity += item.quantity - quantity;
+      if (capabilities.inventoryEnabled) dashboard.menu.items.find(product => product.id === item.menuEntryId).stock_quantity += item.quantity - quantity;
       item.quantity = quantity; return result(order);
     },
     updateTableOrderItemNote: async (id, note) => {
@@ -191,7 +191,7 @@ export function installRestaurantWorkspaceFixture({ dashboard, variant }) {
     removeTableOrderItem: async id => {
       calls.push({ kind: 'remove', id }); const order = itemOrder(id);
       const removed = order.items.find(item => item.id === id);
-      if (capabilities.inventoryEnabled) dashboard.menu.items.find(product => product.id === removed.menuItemId).stock_quantity += removed.quantity;
+      if (capabilities.inventoryEnabled) dashboard.menu.items.find(product => product.id === removed.menuEntryId).stock_quantity += removed.quantity;
       order.items = order.items.filter(item => item.id !== id); return result(order);
     },
     updateTableOrderStatus: async (id, status) => { calls.push({ kind: 'status', id, status }); const order = orderFor(id); order.status = status; return result(order); },

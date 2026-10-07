@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import { createRequire } from 'node:module';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -54,9 +55,9 @@ try {
   const opened = database.openTableOrder(tableId);
   assert.equal(opened.ok, true, opened.message);
   const category = database.saveMenuCategory({ name: 'İçecek', description: '', is_active: true, sort_order: 1 });
-  const item = database.saveMenuItem({ category_id: category.savedId, name: 'Çay', description: '', price: 25, currency: 'TRY',
+  const item = saveMenuProductFixture(database, { category_id: category.savedId, name: 'Çay', description: '', price: 25, currency: 'TRY',
     image_url: '', is_available: true, is_featured: false, allergens: [], tags: [], sort_order: 1 });
-  assert.equal(database.addTableOrderItem({ orderId: opened.order.id, menuItemId: item.savedId, quantity: 2, note: 'Korunan not' }).ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: opened.order.id, menuEntryId: item.savedId, quantity: 2, note: 'Korunan not' }).ok, true);
   const beforeRelations = relations();
   for (const customerId of [customerIds[1], '', customerIds[0]]) {
     raw.prepare("UPDATE tables SET updated_at = '2000-01-01', sync_status = 'synced' WHERE id = ?").run(tableId);

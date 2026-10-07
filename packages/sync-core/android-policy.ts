@@ -457,6 +457,8 @@ export const ANDROID_ACTION_TYPES = [
   "table_order_close_paid",
   "table_order_cancel",
   "menu_category_delete",
+  "menu_entry_create",
+  "menu_entry_update",
   "menu_item_delete",
   "message_delete",
   "menu_stock_add",
@@ -512,6 +514,8 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   table_order_close_paid: "table_order.close_paid",
   table_order_cancel: "table_order.cancel",
   menu_category_delete: "menu.delete",
+  menu_entry_create: "menu.edit",
+  menu_entry_update: "menu.edit",
   menu_item_delete: "menu.delete",
   message_delete: "message.delete",
   menu_stock_add: "menu.stock_update",
@@ -535,5 +539,4 @@ export function resolveAndroidActionPermission(
   }
   return null;
 }
-
 

@@ -154,6 +154,7 @@ export function projectAndroidOperationsSnapshot(
     tables,
     menu,
     admin_menu: adminMenu,
+    menu_product_candidates: has(C.FOOD_MENU) && has(C.CATALOG) ? source.menu_product_candidates ?? [] : [],
     deleted_request_ids: requestsEnabled ? source.deleted_request_ids : [],
     trackedStockItems,
     appliedStockImageHashes,

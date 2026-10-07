@@ -572,6 +572,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'tables' => $androidSnapshot['tables'],
         'menu' => $androidSnapshot['menu'],
         'admin_menu' => $androidSnapshot['admin_menu'],
+        'menu_product_candidates' => in_array('menu.edit', $permissionList, true) ? ($androidSnapshot['menu_product_candidates'] ?? []) : [],
         'trackedStockItems' => $androidSnapshot['trackedStockItems'],
         'appliedStockImageHashes' => $androidSnapshot['appliedStockImageHashes'],
         'table_orders' => $androidSnapshot['table_orders'],
@@ -1846,6 +1847,8 @@ function ya_sync_android_action_types(): array
         'market_cart_draft_create',
         'market_barcode_scan',
         'menu_category_delete',
+        'menu_entry_create',
+        'menu_entry_update',
         'menu_item_delete',
         'message_delete'
     ];
@@ -1904,6 +1907,8 @@ function ya_sync_android_action_permission(string $actionType, array $payload): 
         'table_order_close_paid' => 'table_order.close_paid',
         'table_order_cancel' => 'table_order.cancel',
         'menu_category_delete' => 'menu.delete',
+        'menu_entry_create' => 'menu.edit',
+        'menu_entry_update' => 'menu.edit',
         'menu_item_delete' => 'menu.delete',
         'message_delete' => 'message.delete',
         'menu_stock_add' => 'menu.stock_update',
@@ -2014,6 +2019,8 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
         'table_order_close_paid' => ['food_service.orders'],
         'table_order_cancel' => ['food_service.orders'],
         'menu_category_delete' => ['food_service.menu'],
+        'menu_entry_create' => ['food_service.menu', 'commerce.catalog'],
+        'menu_entry_update' => ['food_service.menu', 'commerce.catalog'],
         'menu_item_delete' => ['food_service.menu'],
         'menu_stock_add' => ['food_service.menu', 'commerce.inventory'],
         'menu_stock_set' => ['food_service.menu', 'commerce.inventory'],
@@ -2261,6 +2268,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'appliedStockImageHashes' => ya_sync_sanitize_stock_image_hashes($snapshot['appliedStockImageHashes'] ?? []),
         'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
         'messages' => ya_sync_sanitize_android_messages($snapshot['messages'] ?? []),
+        'menu_product_candidates' => ya_sync_sanitize_menu_product_candidates($snapshot['menu_product_candidates'] ?? []),
         'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
         'finance' => ya_sync_sanitize_android_finance($snapshot['finance'] ?? []),
         'reports' => ya_sync_sanitize_android_reports($snapshot['reports'] ?? []),
@@ -3113,7 +3121,8 @@ function ya_sync_sanitize_android_table_orders(mixed $records): array
             $items[] = [
                 'id' => $itemId,
                 'order_id' => $id,
-                'menu_item_id' => ya_sync_string($item['menu_item_id'] ?? ''),
+                'product_id' => ya_sync_string($item['product_id'] ?? ''),
+                'menu_entry_id' => ya_sync_string($item['menu_entry_id'] ?? ''),
                 'product_name' => ya_sync_string($item['product_name'] ?? 'Ürün') ?: 'Ürün',
                 'unit_price' => max(0, ya_sync_float($item['unit_price'] ?? 0, 0)),
                 'currency' => ya_sync_string($item['currency'] ?? 'TRY') ?: 'TRY',
@@ -3235,6 +3244,8 @@ function ya_sync_sanitize_menu_items(mixed $records, array $categoryIds, string 
 
         $itemsById[$id] = [
             'id' => $id,
+            'product_id' => ya_sync_string($record['product_id'] ?? ''),
+            'price_override' => ya_sync_nullable_nonnegative_float($record['price_override'] ?? null),
             'category_id' => $categoryId,
             'name' => $name,
             'description' => ya_sync_string($record['description'] ?? ''),
@@ -3248,6 +3259,7 @@ function ya_sync_sanitize_menu_items(mixed $records, array $categoryIds, string 
             'stock_quantity' => $stockQuantity,
             'stock_min_quantity' => $stockMinQuantity,
             'stock_unit' => $stockUnit,
+            ...(array_key_exists('product_is_active', $record) ? ['product_is_active' => ya_sync_bool($record['product_is_active'])] : []),
             'stock_consumption_quantity' => $stockConsumptionQuantity,
             'hide_when_out_of_stock' => ya_sync_bool($record['hide_when_out_of_stock'] ?? false),
             'stock_note' => $stockNote === '' ? null : $stockNote,
@@ -3271,7 +3283,7 @@ function ya_sync_sanitize_tracked_stock_items(mixed $records): array
         if (!is_array($record)) {
             continue;
         }
-        $menuItemId = ya_sync_string($record['menu_item_id'] ?? '');
+        $menuItemId = ya_sync_string($record['product_id'] ?? '');
         $name = ya_sync_string($record['name'] ?? '');
         $quantity = ya_sync_nullable_nonnegative_float($record['stock_quantity'] ?? null);
         if ($menuItemId === '' || $name === '' || $quantity === null) {
@@ -3286,7 +3298,8 @@ function ya_sync_sanitize_tracked_stock_items(mixed $records): array
                 : ($minimum !== null && $quantity <= $minimum ? 'low_stock' : 'in_stock');
         }
         $itemsById[$menuItemId] = [
-            'menu_item_id' => $menuItemId,
+            'product_id' => $menuItemId,
+            'menu_entry_id' => ya_sync_string($record['menu_entry_id'] ?? ''),
             'name' => $name,
             'category' => ya_sync_string($record['category'] ?? 'Menü') ?: 'Menü',
             'price' => max(0, ya_sync_float($record['price'] ?? 0, 0)),
@@ -3506,9 +3519,25 @@ function ya_sync_positive_float(mixed $value, float $fallback): float
     return is_finite($number) && $number > 0 ? $number : $fallback;
 }
 
+function ya_sync_sanitize_menu_product_candidates(mixed $records): array
+{
+    if (!is_array($records)) return [];
+    $result = [];
+    foreach (array_slice($records, 0, 500) as $record) {
+        if (!is_array($record)) continue;
+        $id = ya_sync_string($record['product_id'] ?? '');
+        $name = ya_sync_string($record['name'] ?? '');
+        if ($id === '' || $name === '') continue;
+        $result[] = ['product_id' => $id, 'name' => $name, 'unit' => ya_sync_stock_unit($record['unit'] ?? 'piece'),
+            'sale_price' => max(0, (float) ($record['sale_price'] ?? 0)), 'currency' => ya_sync_string($record['currency'] ?? 'TRY')];
+    }
+    return $result;
+}
+
 function ya_sync_stock_unit(mixed $value): string
 {
-    return ya_sync_string($value) === 'gram' ? 'gram' : 'piece';
+    $unit = ya_sync_string($value);
+    return in_array($unit, ['piece', 'kg', 'g', 'l', 'ml', 'pack', 'box', 'meter', 'other'], true) ? $unit : 'piece';
 }
 
 function ya_sync_commerce_unit(mixed $value): string

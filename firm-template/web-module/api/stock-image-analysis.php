@@ -53,7 +53,7 @@ if ($source === 'android' && !ya_stock_endpoint_android_authorized($deviceId)) {
     ya_stock_endpoint_response(403, ['ok' => false, 'code' => 'stock_permission_denied', 'message' => 'Bu cihazın stok güncelleme yetkisi yok.']);
 }
 
-$candidatePayload = json_decode(ya_stock_image_string($_POST['menu_items'] ?? ''), true);
+$candidatePayload = json_decode(ya_stock_image_string($_POST['products'] ?? ''), true);
 $menuItems = ya_stock_image_sanitize_candidates($candidatePayload);
 if ($source === 'android') {
     $menuItems = ya_stock_endpoint_authoritative_android_candidates($menuItems);
@@ -130,7 +130,7 @@ try {
                     } else {
                         $analysis = ya_stock_image_sanitize_analysis($result['analysis'] ?? [], $menuItems);
                         $matchedLineCount = count(array_filter($analysis['lines'], static function (array $line): bool {
-                            return $line['matched_menu_item_id'] !== null;
+                            return $line['matched_product_id'] !== null;
                         }));
                         $responseStatus = 200;
                         $responsePayload = [
@@ -178,7 +178,7 @@ function ya_stock_endpoint_authoritative_android_candidates(array $provided): ar
     $tracked = ya_stock_image_sanitize_candidates(array_map(static function (mixed $item): array {
         $record = is_array($item) ? $item : [];
         return [
-            'id' => $record['menu_item_id'] ?? '',
+            'id' => $record['product_id'] ?? '',
             'name' => $record['name'] ?? '',
             'category' => $record['category'] ?? 'Menü',
             'current_stock' => $record['stock_quantity'] ?? null,

@@ -182,7 +182,7 @@ export function androidActionRelatedId(action: AndroidSyncAction): string {
   const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
     ? action.payload as Record<string, unknown>
     : {};
-  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "customer_id", "folio_id", "room_id", "task_id", "item_id", "menu_item_id", "category_id", "message_id"]) {
+  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "customer_id", "folio_id", "room_id", "task_id", "item_id", "product_id", "menu_entry_id", "category_id", "message_id"]) {
     const value = String(payload[key] ?? "").trim();
     if (value) {
       return value;

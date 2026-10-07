@@ -33,7 +33,7 @@ public final class StockRulesSmoke {
 
     OperationData.MenuItem gramPortion = new OperationData.MenuItem();
     gramPortion.id = "gram-portion";
-    gramPortion.stockUnit = "gram";
+    gramPortion.stockUnit = "g";
     gramPortion.stockConsumptionQuantity = 200d;
     gramPortion.stockQuantity = 199d;
     assertTrue(gramPortion.outOfStock(), "stock below one 200 gram portion must not be orderable");
@@ -49,7 +49,7 @@ public final class StockRulesSmoke {
     assertEquals("low_stock", low.derivedStatus(), "minimum threshold status");
     assertEquals("in_stock", in.derivedStatus(), "positive stock status");
     data.trackedStockItems.add(low);
-    assertSame(low, data.trackedStockByMenuItemId("low"), "tracked stock list lookup");
+    assertSame(low, data.trackedStockByProductId("low"), "tracked stock list lookup");
 
     data.permissions.add("menu.stock_update");
     assertTrue(data.hasPermission("menu.stock_update"), "explicit update permission should enable manual stock actions");
@@ -69,7 +69,7 @@ public final class StockRulesSmoke {
 
   private static OperationData.TrackedStockItem stock(String id, double quantity, Double minimum) {
     OperationData.TrackedStockItem item = new OperationData.TrackedStockItem();
-    item.menuItemId = id;
+    item.productId = id;
     item.stockQuantity = quantity;
     item.stockMinQuantity = minimum;
     return item;

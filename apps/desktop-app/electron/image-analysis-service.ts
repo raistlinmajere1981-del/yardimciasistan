@@ -64,7 +64,7 @@ export async function analyzeDesktopStockImage(
     form.append("source", "desktop");
     form.append("import_id", input.importId);
     form.append("image_hash", imageHash);
-    form.append("menu_items", JSON.stringify(menuItems));
+    form.append("products", JSON.stringify(menuItems));
     form.append("image", new Blob([input.bytes], { type: input.mimeType }), input.fileName);
     const response = await fetch(endpoint, {
       method: "POST",

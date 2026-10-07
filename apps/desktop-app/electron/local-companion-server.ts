@@ -195,6 +195,7 @@ function summaryResponse(
     tables: snapshot.tables,
     menu: snapshot.menu,
     admin_menu: snapshot.admin_menu,
+    menu_product_candidates: profile?.permissions.includes("menu.edit") ? snapshot.menu_product_candidates ?? [] : [],
     trackedStockItems: snapshot.trackedStockItems,
     appliedStockImageHashes: snapshot.appliedStockImageHashes,
     table_orders: snapshot.table_orders,

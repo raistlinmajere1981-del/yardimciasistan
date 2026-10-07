@@ -4,7 +4,7 @@ import type {
   StockImageAnalysisLine,
   StockImageApplyLine,
   StockImageConfidence,
-  StockImageMenuCandidate
+  StockImageProductCandidate
 } from "@yardimci-asistan/shared";
 
 export const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
@@ -35,7 +35,8 @@ export function normalizePositiveStockNumber(value: unknown): number | null {
 }
 
 export function normalizeMenuStockUnit(value: unknown): MenuStockUnit {
-  return value === "gram" ? "gram" : "piece";
+  const units = ["piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"];
+  return units.includes(String(value)) ? value as MenuStockUnit : "piece";
 }
 
 export function normalizeSignedStockNumber(value: unknown): number | null {
@@ -92,7 +93,7 @@ function normalizeStockImageText(value: unknown, limit: number): string | null {
   return text || null;
 }
 
-export function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates: StockImageMenuCandidate[]): StockImageAnalysis {
+export function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates: StockImageProductCandidate[]): StockImageAnalysis {
   const source = value && typeof value === "object" && !Array.isArray(value)
     ? value as unknown as Record<string, unknown>
     : {};
@@ -111,7 +112,7 @@ export function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates
     if (!rawText) {
       continue;
     }
-    const requestedId = normalizeStockImageText(line.matched_menu_item_id, 160);
+    const requestedId = normalizeStockImageText(line.matched_product_id, 160);
     const candidate = requestedId ? candidateById.get(requestedId) : undefined;
     const sourceQuantityText = normalizeStockImageText(line.source_quantity_text, 200);
     const rawQuantity = Number(line.suggested_quantity);
@@ -119,26 +120,26 @@ export function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates
       ? rawQuantity
       : null;
     const quantityText = sourceQuantityText || rawText;
-    const gramQuantity = candidate?.stock_unit === "gram" ? parseGramQuantity(quantityText) : null;
+    const measuredQuantity = candidate && candidate.stock_unit !== "piece" ? parseMeasuredStockQuantity(quantityText, candidate.stock_unit) : null;
     const ambiguousQuantity = hasAmbiguousStockUnit(quantityText, candidate?.stock_unit ?? "piece");
-    const suggestedQuantity = candidate?.stock_unit === "gram" ? gramQuantity : integerQuantity;
+    const suggestedQuantity = candidate && candidate.stock_unit !== "piece" ? measuredQuantity : integerQuantity;
     let reason = normalizeStockImageText(line.needs_review_reason, 500);
     if (requestedId && !candidate) {
       reason = reason || "Önerilen ürün mevcut stok takipli menü listesinde değil.";
     }
     if (ambiguousQuantity) {
-      reason = candidate?.stock_unit === "gram"
+      reason = candidate?.stock_unit === "g"
         ? "Miktar gram veya kilogram olarak açıkça okunamadı."
         : "Koli, paket, ağırlık veya hacim bilgisi açık bir adede dönüştürülemedi.";
     } else if (suggestedQuantity === null) {
-      reason = reason || (candidate?.stock_unit === "gram"
+      reason = reason || (candidate?.stock_unit === "g"
         ? "Açık gram veya kilogram bilgisi bulunamadı."
         : "Açık adet bilgisi bulunamadı.");
     }
     lines.push({
       raw_text: rawText,
-      matched_menu_item_id: candidate?.id ?? null,
-      matched_menu_item_name: candidate?.name ?? null,
+      matched_product_id: candidate?.id ?? null,
+      matched_product_name: candidate?.name ?? null,
       suggested_quantity: ambiguousQuantity ? null : suggestedQuantity,
       source_quantity_text: sourceQuantityText,
       confidence: normalizeStockImageConfidence(line.confidence),
@@ -161,21 +162,27 @@ function hasAmbiguousStockUnit(value: string, stockUnit: MenuStockUnit): boolean
     .replace(/ı/g, "i")
     .replace(/\b\d+\s*['’]?\s*(?:li|lı|lu|lü|lik|lık|luk|lük)\s+paket\b/giu, "")
     .replace(/\s+/g, " ");
-  if (stockUnit === "gram") {
-    return /\b(?:koli|paket|lt|litre|adet|ad|tane)\b/iu.test(normalized) || parseGramQuantity(normalized) === null;
-  }
+  if (stockUnit !== "piece") return parseMeasuredStockQuantity(normalized, stockUnit) === null;
   return /\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|gr|gram|lt|litre)\b/iu.test(normalized);
 }
 
-function parseGramQuantity(value: string): number | null {
+function parseMeasuredStockQuantity(value: string, unit: MenuStockUnit): number | null {
   const normalized = value.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
-  const match = normalized.match(/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g)\b/iu);
+  const match = normalized.match(/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g|ml|mililitre|lt|litre|l|paket|pack|koli|kutu|box|metre|meter|m)\b/iu);
   if (!match) {
     return null;
   }
   const quantity = parseTurkishDocumentNumber(match[1]);
-  const grams = ["kg", "kilogram", "kilo"].includes(match[2]) ? quantity * 1000 : quantity;
-  return Number.isInteger(grams) && grams > 0 && grams <= 100_000 ? grams : null;
+  const source = match[2];
+  const mass = ["kg", "kilogram", "kilo", "gr", "gram", "g"].includes(source);
+  const volume = ["ml", "mililitre", "lt", "litre", "l"].includes(source);
+  let result: number | null = null;
+  if (mass && (unit === "g" || unit === "kg")) result = quantity * (["kg", "kilogram", "kilo"].includes(source) ? 1000 : 1) / (unit === "kg" ? 1000 : 1);
+  if (volume && (unit === "ml" || unit === "l")) result = quantity * (["ml", "mililitre"].includes(source) ? 1 : 1000) / (unit === "l" ? 1000 : 1);
+  if (unit === "pack" && ["paket", "pack"].includes(source)) result = quantity;
+  if (unit === "box" && ["koli", "kutu", "box"].includes(source)) result = quantity;
+  if (unit === "meter" && ["metre", "meter", "m"].includes(source)) result = quantity;
+  return result !== null && Number.isFinite(result) && result > 0 && result <= 100_000 ? Math.round(result * 10000) / 10000 : null;
 }
 
 function parseTurkishDocumentNumber(value: string): number {
@@ -198,14 +205,14 @@ export function normalizeStockImageApplyLines(value: unknown): StockImageApplyLi
       return null;
     }
     const line = rawLine as Record<string, unknown>;
-    const menuItemId = normalizeStockImageText(line.menu_item_id, 160);
+    const productId = normalizeStockImageText(line.product_id, 160);
     const rawText = normalizeStockImageText(line.raw_text, 1000);
     const quantity = Number(line.quantity);
-    if (!menuItemId || !rawText || !Number.isInteger(quantity) || quantity <= 0 || quantity > 100_000) {
+    if (!productId || !rawText || !Number.isFinite(quantity) || quantity <= 0 || quantity > 100_000 || Math.round(quantity * 10000) / 10000 !== quantity) {
       return null;
     }
     lines.push({
-      menu_item_id: menuItemId,
+      product_id: productId,
       quantity,
       raw_text: rawText,
       confidence: normalizeStockImageConfidence(line.confidence)

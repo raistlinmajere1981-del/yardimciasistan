@@ -152,6 +152,7 @@ CREATE TABLE catalog_products (
   unit TEXT NOT NULL DEFAULT 'piece',
   tax_rate REAL NOT NULL DEFAULT 0,
   track_inventory INTEGER NOT NULL DEFAULT 1 CHECK (track_inventory IN (0, 1)),
+  minimum_quantity REAL NOT NULL DEFAULT 0 CHECK (minimum_quantity >= 0),
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   image_asset_path TEXT NOT NULL DEFAULT '',
   image_source_url TEXT NOT NULL DEFAULT '',
@@ -512,7 +513,6 @@ CREATE TABLE inventory_balances (
   product_id TEXT NOT NULL,
   location_id TEXT NOT NULL,
   quantity REAL NOT NULL DEFAULT 0,
-  minimum_quantity REAL NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (product_id, location_id)
 );
@@ -548,7 +548,7 @@ CREATE TABLE inventory_locations (
 CREATE TABLE inventory_movements (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
-  product_id TEXT NOT NULL,
+  product_id TEXT NOT NULL REFERENCES catalog_products(id),
   location_id TEXT NOT NULL,
   movement_type TEXT NOT NULL,
   quantity_delta REAL NOT NULL,
@@ -586,50 +586,29 @@ CREATE TABLE menu_categories (
   sync_status TEXT NOT NULL DEFAULT 'local_only'
 );
 
-CREATE TABLE menu_items (
+CREATE TABLE menu_product_entries (
   id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL REFERENCES catalog_products(id),
   category_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  price REAL NOT NULL DEFAULT 0,
-  currency TEXT NOT NULL DEFAULT 'TRY',
-  image_url TEXT NOT NULL DEFAULT '',
-  is_available INTEGER NOT NULL DEFAULT 1,
-  is_featured INTEGER NOT NULL DEFAULT 0,
+  is_available INTEGER NOT NULL DEFAULT 1 CHECK (is_available IN (0, 1)),
+  is_featured INTEGER NOT NULL DEFAULT 0 CHECK (is_featured IN (0, 1)),
+  price_override REAL NULL CHECK (price_override IS NULL OR price_override >= 0),
   allergens_json TEXT NOT NULL DEFAULT '[]',
   tags_json TEXT NOT NULL DEFAULT '[]',
+  hide_when_out_of_stock INTEGER NOT NULL DEFAULT 0 CHECK (hide_when_out_of_stock IN (0, 1)),
+  stock_consumption_quantity REAL NOT NULL DEFAULT 1 CHECK (stock_consumption_quantity > 0),
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT NOT NULL DEFAULT '',
-  sync_status TEXT NOT NULL DEFAULT 'local_only'
-, stock_quantity REAL NULL
-  CHECK (stock_quantity IS NULL OR stock_quantity >= 0), stock_min_quantity REAL NULL
-  CHECK (stock_min_quantity IS NULL OR stock_min_quantity >= 0), hide_when_out_of_stock INTEGER NOT NULL DEFAULT 0
-  CHECK (hide_when_out_of_stock IN (0, 1)), stock_note TEXT NULL, stock_unit TEXT NOT NULL DEFAULT 'piece'
-  CHECK (stock_unit IN ('piece', 'gram')), stock_consumption_quantity REAL NOT NULL DEFAULT 1
-  CHECK (stock_consumption_quantity > 0));
-
-CREATE TABLE "menu_stock_movements" (
-  id TEXT PRIMARY KEY,
-  menu_item_id TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN (
-    'add', 'remove', 'set', 'adjust', 'image_import_add',
-    'order_add', 'order_update', 'order_remove', 'order_cancel'
-  )),
-  quantity_change REAL NOT NULL,
-  quantity_before REAL NOT NULL CHECK (quantity_before >= 0),
-  quantity_after REAL NOT NULL CHECK (quantity_after >= 0),
-  source_type TEXT NOT NULL CHECK (source_type IN (
-    'desktop', 'android', 'table_order', 'room_folio', 'stock_image_import'
-  )),
-  source_id TEXT NULL,
-  actor_source TEXT NOT NULL CHECK (actor_source IN ('desktop', 'android')),
-  actor_device_id TEXT NULL,
-  note TEXT NULL,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
+  sync_status TEXT NOT NULL DEFAULT 'local_only',
+  FOREIGN KEY (category_id) REFERENCES menu_categories(id)
 );
+
+CREATE UNIQUE INDEX idx_menu_product_entries_active_product
+  ON menu_product_entries(product_id) WHERE deleted_at = '';
+CREATE INDEX idx_menu_product_entries_category_order
+  ON menu_product_entries(category_id, sort_order);
 
 CREATE TABLE pension_payments (
   id TEXT PRIMARY KEY,
@@ -731,7 +710,10 @@ CREATE TABLE room_folio_items (
   id TEXT PRIMARY KEY,
   folio_id TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('menu', 'manual_charge', 'discount')),
-  menu_item_id TEXT NOT NULL DEFAULT '',
+  product_id TEXT NULL REFERENCES catalog_products(id),
+  menu_entry_id TEXT NULL REFERENCES menu_product_entries(id),
+  inventory_quantity_per_item REAL NOT NULL DEFAULT 0 CHECK (inventory_quantity_per_item >= 0),
+  inventory_location_id TEXT NULL REFERENCES inventory_locations(id),
   label TEXT NOT NULL,
   unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 1000),
@@ -877,16 +859,16 @@ CREATE TABLE stock_image_import_lines (
   id TEXT PRIMARY KEY,
   import_id TEXT NOT NULL,
   raw_text TEXT NOT NULL,
-  matched_menu_item_id TEXT NULL,
-  suggested_quantity INTEGER NULL CHECK (suggested_quantity IS NULL OR suggested_quantity > 0),
-  approved_quantity INTEGER NULL CHECK (approved_quantity IS NULL OR approved_quantity > 0),
+  matched_product_id TEXT NULL,
+  suggested_quantity REAL NULL CHECK (suggested_quantity IS NULL OR suggested_quantity > 0),
+  approved_quantity REAL NULL CHECK (approved_quantity IS NULL OR approved_quantity > 0),
   source_quantity_text TEXT NULL,
   confidence TEXT NOT NULL CHECK (confidence IN ('high', 'medium', 'low')),
   status TEXT NOT NULL CHECK (status IN ('proposed', 'approved', 'ignored', 'needs_review')),
   note TEXT NULL,
   created_at TEXT NOT NULL,
   FOREIGN KEY (import_id) REFERENCES stock_image_imports(import_id) ON DELETE CASCADE,
-  FOREIGN KEY (matched_menu_item_id) REFERENCES menu_items(id)
+  FOREIGN KEY (matched_product_id) REFERENCES catalog_products(id)
 );
 
 CREATE TABLE stock_image_imports (
@@ -988,7 +970,10 @@ CREATE TABLE desktop_sync_identity (
 CREATE TABLE table_order_items (
   id TEXT PRIMARY KEY,
   order_id TEXT NOT NULL,
-  menu_item_id TEXT NOT NULL,
+  product_id TEXT NOT NULL REFERENCES catalog_products(id),
+  menu_entry_id TEXT NULL REFERENCES menu_product_entries(id),
+  inventory_quantity_per_item REAL NOT NULL DEFAULT 0 CHECK (inventory_quantity_per_item >= 0),
+  inventory_location_id TEXT NULL REFERENCES inventory_locations(id),
   product_name TEXT NOT NULL,
   unit_price REAL NOT NULL CHECK (unit_price >= 0),
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
@@ -998,8 +983,7 @@ CREATE TABLE table_order_items (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL, currency TEXT NOT NULL DEFAULT 'TRY'
   CHECK (currency GLOB '[A-Z][A-Z][A-Z]'),
-  FOREIGN KEY (order_id) REFERENCES table_orders(id) ON DELETE CASCADE,
-  FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)
+  FOREIGN KEY (order_id) REFERENCES table_orders(id) ON DELETE CASCADE
 );
 
 CREATE TABLE table_orders (
@@ -1244,15 +1228,6 @@ CREATE INDEX idx_inventory_movements_reference
 CREATE INDEX idx_market_barcode_scans_business_pending
   ON market_barcode_scan_events (business_id, status, scanned_at, received_at, id);
 
-CREATE INDEX idx_menu_stock_movements_item_created
-  ON menu_stock_movements(menu_item_id, created_at DESC);
-
-CREATE INDEX idx_menu_stock_movements_report_created_source
-  ON menu_stock_movements(created_at, source_type);
-
-CREATE INDEX idx_menu_stock_movements_source
-  ON menu_stock_movements(source_type, source_id, created_at DESC);
-
 CREATE INDEX idx_pension_payments_paid_at
   ON pension_payments(paid_at DESC)
   WHERE deleted_at = '';
@@ -1313,8 +1288,8 @@ CREATE INDEX idx_stock_image_imports_created
 CREATE INDEX idx_stock_image_imports_hash_status
   ON stock_image_imports(image_hash, status, created_at DESC);
 
-CREATE INDEX idx_table_order_items_menu_item_id
-  ON table_order_items(menu_item_id);
+CREATE INDEX idx_table_order_items_product_id
+  ON table_order_items(product_id);
 
 CREATE INDEX idx_table_order_items_order_id
   ON table_order_items(order_id);
@@ -1820,8 +1795,8 @@ BEGIN
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
 
-CREATE TRIGGER trg_sync_menu_items_insert
-AFTER INSERT ON menu_items WHEN NEW.sync_status != 'synced'
+CREATE TRIGGER trg_sync_menu_product_entries_insert
+AFTER INSERT ON menu_product_entries WHEN NEW.sync_status != 'synced'
 BEGIN
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('menu', 'menu_publish', 1, NEW.updated_at, NEW.updated_at)
@@ -1835,8 +1810,8 @@ BEGIN
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
 
-CREATE TRIGGER trg_sync_menu_items_update
-AFTER UPDATE ON menu_items WHEN NEW.sync_status != 'synced'
+CREATE TRIGGER trg_sync_menu_product_entries_update
+AFTER UPDATE ON menu_product_entries WHEN NEW.sync_status != 'synced'
 BEGIN
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
   VALUES ('menu', 'menu_publish', 1, NEW.updated_at, NEW.updated_at)
@@ -1851,6 +1826,42 @@ BEGIN
 END;
 
 -- Sensitive config intent is invalidated atomically with canonical settings.
+CREATE TRIGGER trg_menu_catalog_product_update AFTER UPDATE ON catalog_products
+WHEN EXISTS (SELECT 1 FROM menu_product_entries WHERE product_id = NEW.id AND deleted_at = '')
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('menu', 'menu_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+  INSERT INTO sync_outbox(job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_menu_inventory_balance_insert AFTER INSERT ON inventory_balances
+WHEN EXISTS (SELECT 1 FROM menu_product_entries WHERE product_id = NEW.product_id AND deleted_at = '')
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('menu', 'menu_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+  INSERT INTO sync_outbox(job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+CREATE TRIGGER trg_menu_inventory_balance_update AFTER UPDATE ON inventory_balances
+WHEN EXISTS (SELECT 1 FROM menu_product_entries WHERE product_id = NEW.product_id AND deleted_at = '')
+BEGIN
+  INSERT INTO sync_outbox(job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('menu', 'menu_publish', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+  INSERT INTO sync_outbox(job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
 -- Ack-only timestamps are deliberately absent from these trigger column lists.
 CREATE TRIGGER trg_sync_ai_profile_insert AFTER INSERT ON ai_service_profiles
 BEGIN

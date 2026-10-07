@@ -1,6 +1,7 @@
 import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import assert from "node:assert/strict";
+import { saveMenuProductFixture, fixtureProductId } from "./test-helpers/menu-product-fixture.mjs";
 import { spawn } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -136,7 +137,7 @@ try {
   });
   assert.equal(categoryResult.ok, true, categoryResult.message);
 
-  const itemResult = database.saveMenuItem({
+  const itemResult = saveMenuProductFixture(database, {
     category_id: categoryResult.savedId,
     name: "Senkron Stok Ürünü",
     description: "Automatic sync smoke fixture",
@@ -159,7 +160,7 @@ try {
 
   const trackedMenuItemBefore = database.getDashboardData().menu.items.find((item) => item.id === itemResult.savedId);
   assert.ok(trackedMenuItemBefore);
-  const trackedMenuSave = database.saveMenuItem({
+  const trackedMenuSave = saveMenuProductFixture(database, {
     id: trackedMenuItemBefore.id,
     category_id: trackedMenuItemBefore.category_id,
     name: trackedMenuItemBefore.name,
@@ -181,6 +182,7 @@ try {
   });
   assert.equal(trackedMenuSave.ok, true);
   const trackedMenuItemId = trackedMenuSave.savedId;
+  const trackedProductId = fixtureProductId(database, trackedMenuItemId);
 
   await activateFixtureSource(baseUrl, syncSecret, database.getSyncRuntimeStatus().clientId);
   const bootstrapSnapshot = await syncApi({
@@ -349,9 +351,10 @@ try {
   assert.equal(staffReportAi.status, 403, "Staff report AI access must fail closed.");
   assert.equal((await staffReportAi.json()).message, "Bu cihazın raporlara erişim yetkisi yok.");
   assert.deepEqual(
-    androidData.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId),
+    androidData.trackedStockItems.find((item) => item.product_id === trackedProductId),
     {
-      menu_item_id: trackedMenuItemId,
+      product_id: trackedProductId,
+      menu_entry_id: trackedMenuItemId,
       name: trackedMenuItemBefore.name,
       category: dashboard.menu.categories.find((category) => category.id === trackedMenuItemBefore.category_id)?.name,
       price: trackedMenuItemBefore.price,
@@ -449,7 +452,7 @@ try {
   await assertQueued(await enqueueAndroidAction(addActionId, "table_order_add_item", {
     order_id: order.id,
     table_id: table.id,
-    menu_item_id: menuItem.id,
+    menu_entry_id: menuItem.id,
     quantity: 2,
     expected_order_updated_at: order.updatedAt
   }));
@@ -463,14 +466,14 @@ try {
   assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 0);
   const outOfStockSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
   const outOfStockSummary = await outOfStockSummaryResponse.json();
-  assert.equal(outOfStockSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_quantity, 0);
-  assert.equal(outOfStockSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_status, "out_of_stock");
+  assert.equal(outOfStockSummary.trackedStockItems.find((item) => item.product_id === trackedProductId)?.stock_quantity, 0);
+  assert.equal(outOfStockSummary.trackedStockItems.find((item) => item.product_id === trackedProductId)?.stock_status, "out_of_stock");
   const outOfStockMenu = await (await fetch(`${baseUrl}/api/menu.php`)).json();
   assert.equal(outOfStockMenu.items.some((item) => item.id === trackedMenuItemId), false);
 
   const forbiddenStockActionId = "android_permission_stock_staff_0001";
   const forbiddenStockResponse = await enqueueAndroidAction(forbiddenStockActionId, "menu_stock_add", {
-    menu_item_id: trackedMenuItemId,
+    product_id: trackedProductId,
     quantity: 1,
     note: "Personel yetki testi"
   });
@@ -484,7 +487,7 @@ try {
     image_hash: "b".repeat(64),
     duplicate_warning_acknowledged: false,
     lines: [{
-      menu_item_id: trackedMenuItemId,
+      product_id: trackedProductId,
       quantity: 2,
       raw_text: "2 adet personel yetki testi",
       confidence: "high"
@@ -731,7 +734,7 @@ return [
 
   const adminStockActionId = "android_permission_stock_admin_0001";
   await assertQueued(await enqueueAndroidAction(adminStockActionId, "menu_stock_add", {
-    menu_item_id: trackedMenuItemId,
+    product_id: trackedProductId,
     quantity: 5,
     note: "Yönetici stok ekleme testi"
   }));
@@ -741,8 +744,8 @@ return [
   assert.equal(adminStockCycle.publishedJobs, 2);
   assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 5);
   const replenishedSummary = await (await syncApi({ action: "android_summary", device_id: "android-auto-smoke" })).json();
-  assert.equal(replenishedSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_quantity, 5);
-  assert.equal(replenishedSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_status, "in_stock");
+  assert.equal(replenishedSummary.trackedStockItems.find((item) => item.product_id === trackedProductId)?.stock_quantity, 5);
+  assert.equal(replenishedSummary.trackedStockItems.find((item) => item.product_id === trackedProductId)?.stock_status, "in_stock");
   const replenishedMenu = await (await fetch(`${baseUrl}/api/menu.php`)).json();
   assert.equal(replenishedMenu.items.some((item) => item.id === trackedMenuItemId), true);
 
@@ -753,7 +756,7 @@ return [
     image_hash: imageImportHash,
     duplicate_warning_acknowledged: false,
     lines: [{
-      menu_item_id: trackedMenuItemId,
+      product_id: trackedProductId,
       quantity: 3,
       raw_text: "3 adet yönetici görsel stok testi",
       confidence: "high"
@@ -766,7 +769,7 @@ return [
   assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 8);
   const imageImportSummary = await (await syncApi({ action: "android_summary", device_id: "android-auto-smoke" })).json();
   assert.equal(imageImportSummary.appliedStockImageHashes.includes(imageImportHash), true);
-  assert.equal(imageImportSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_quantity, 8);
+  assert.equal(imageImportSummary.trackedStockItems.find((item) => item.product_id === trackedProductId)?.stock_quantity, 8);
 
   const invalidImageImportActionId = "android_stock_image_atomic_0001";
   await assertQueued(await enqueueAndroidAction(invalidImageImportActionId, "menu_stock_image_import_apply", {
@@ -775,13 +778,13 @@ return [
     duplicate_warning_acknowledged: false,
     lines: [
       {
-        menu_item_id: trackedMenuItemId,
+        product_id: trackedProductId,
         quantity: 4,
         raw_text: "4 adet geçerli satır",
         confidence: "high"
       },
       {
-        menu_item_id: "invented_untracked_menu_item",
+        product_id: "invented_untracked_product",
         quantity: 1,
         raw_text: "1 adet geçersiz satır",
         confidence: "low"
@@ -1088,7 +1091,8 @@ function createSnapshot(databaseInstance) {
     trackedStockItems: data.menu.items
       .filter((item) => item.stock_quantity !== null)
       .map((item) => ({
-        menu_item_id: item.id,
+        product_id: item.product_id,
+        menu_entry_id: item.id,
         name: item.name,
         category: categoryNames.get(item.category_id) ?? "Menü",
         price: item.price,
@@ -1115,7 +1119,8 @@ function createSnapshot(databaseInstance) {
       items: order.items.map((item) => ({
         id: item.id,
         order_id: item.orderId,
-        menu_item_id: item.menuItemId,
+        product_id: item.productId,
+        menu_entry_id: item.menuEntryId,
         product_name: item.productName,
         unit_price: item.unitPrice,
         currency: item.currency,

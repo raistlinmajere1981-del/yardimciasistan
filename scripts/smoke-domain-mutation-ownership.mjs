@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import { createRequire } from "node:module";
 import { globSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
@@ -71,7 +72,7 @@ function setup(database, profileId) {
     assert.equal(movement.reference_id, purchase.order.id);
     assert.equal(movement.actor_source, "android");
     assert.equal(movement.unit_cost, 4);
-    db.prepare("UPDATE inventory_balances SET minimum_quantity = 2 WHERE product_id = ?").run(product.id);
+    db.prepare("UPDATE catalog_products SET minimum_quantity = 2 WHERE id = ?").run(product.id);
     const sale = sell(2);
     assert.equal(commerce.getInventoryBalance(path, product.id).quantity, 3.5);
     assert.equal(commerce.getInventoryBalance(path, product.id).minimumQuantity, 2);
@@ -214,15 +215,16 @@ function setup(database, profileId) {
     // Table-order stock/currency/state invariants and receipt atomicity use the same operation.
     setBusinessCapability(database.databasePath, { capability: C.INVENTORY, enabled: true });
     const category = ok(database.saveMenuCategory({ name: "Shared orders", description: "", is_active: true, sort_order: 1 }));
-    const menu = ok(database.saveMenuItem({ category_id: category.savedId, name: "Shared item", description: "", price: 20, currency: "TRY", image_url: "", is_available: true, is_featured: false, allergens: [], tags: [], sort_order: 1, stock_quantity: 10 }));
+    const menu = ok(saveMenuProductFixture(database, { category_id: category.savedId, name: "Shared item", description: "", price: 20, currency: "TRY", image_url: "", is_available: true, is_featured: false, allergens: [], tags: [], sort_order: 1, stock_quantity: 10 }));
+    const stock = () => database.getPublishedMenu().items.find(entry => entry.id === menu.savedId).stock_quantity;
     const desktopOrder = ok(database.openTableOrder(tables[0].id));
-    ok(database.addTableOrderItem({ orderId: desktopOrder.order.id, menuItemId: menu.savedId, quantity: 1, note: "" }));
+    ok(database.addTableOrderItem({ orderId: desktopOrder.order.id, menuEntryId: menu.savedId, quantity: 1, note: "" }));
     ok(apply("phone_order", "table_order_open", { table_id: tables[1].id }));
     const orderId = createAndroidEntityId("table_order_", "phone_order");
-    const itemPayload = { table_id: tables[1].id, depends_on_action_id: "phone_order", menu_item_id: menu.savedId, quantity: 1 };
+    const itemPayload = { table_id: tables[1].id, depends_on_action_id: "phone_order", menu_entry_id: menu.savedId, quantity: 1 };
     ok(apply("phone_item", "table_order_add_item", itemPayload));
     assert.equal(db.prepare("SELECT total FROM table_orders WHERE id = ?").get(orderId).total, desktopOrder.order.total + 20);
-    assert.equal(db.prepare("SELECT stock_quantity FROM menu_items WHERE id = ?").get(menu.savedId).stock_quantity, 8);
+    assert.equal(stock(), 8);
     assert.equal(ok(apply("phone_item", "table_order_add_item", itemPayload)).alreadyApplied, true);
     const itemId = createAndroidEntityId("table_order_item_", "phone_item");
     ok(apply("phone_quantity", "table_order_update_item_quantity", { item_id: itemId, quantity: 2 }));
@@ -230,12 +232,12 @@ function setup(database, profileId) {
     db.exec(`CREATE TRIGGER test_order_receipt_failure BEFORE INSERT ON android_action_receipts WHEN NEW.id = 'order_receipt_failure' BEGIN SELECT RAISE(ABORT, 'receipt_failure'); END;`);
     assert.equal(apply("order_receipt_failure", "table_order_update_item_quantity", { item_id: itemId, quantity: 3 }).ok, false);
     assert.equal(db.prepare("SELECT total FROM table_orders WHERE id = ?").get(orderId).total, 40);
-    assert.equal(db.prepare("SELECT stock_quantity FROM menu_items WHERE id = ?").get(menu.savedId).stock_quantity, 7);
+    assert.equal(stock(), 7);
     db.exec("DROP TRIGGER test_order_receipt_failure");
     assert.equal(apply("stock_insufficient", "table_order_update_item_quantity", { item_id: itemId, quantity: 100 }).ok, false);
     assert.equal(apply("table_guard", "table_status_update", { table_id: tables[1].id, status: "available" }).ok, false);
     ok(apply("phone_cancel", "table_order_cancel", { order_id: orderId }));
-    assert.equal(db.prepare("SELECT stock_quantity FROM menu_items WHERE id = ?").get(menu.savedId).stock_quantity, 9);
+    assert.equal(stock(), 9);
     assert.equal(db.prepare("SELECT status FROM tables WHERE id = ?").get(tables[1].id).status, "available");
     // Finance uses configured active categories, rather than an independent Android whitelist.
     ok(finance.saveCategory({ direction: "expense", name: "Shared custom category" }));

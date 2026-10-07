@@ -5,8 +5,7 @@ import type {
   DesktopReportData,
   DesktopReportPeriod,
   DesktopReportPreset,
-  DesktopReportRangeInput,
-  MenuStockSourceType
+  DesktopReportRangeInput
 } from "../database-types.js";
 import { normalizeStockPrecision } from "./stock-utils.js";
 
@@ -138,7 +137,7 @@ export function formatLocalIsoDate(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function reportStockSourceLabel(sourceType: MenuStockSourceType): string {
+export function reportStockSourceLabel(sourceType: string): string {
   if (sourceType === "room_folio") return "Oda hesabı";
   if (sourceType === "android") {
     return "Android manuel";
@@ -154,7 +153,7 @@ export function reportStockSourceLabel(sourceType: MenuStockSourceType): string 
 
 export function formatReportStockQuantity(value: number, unit: MenuStockUnit): string {
   const amount = normalizeStockPrecision(value).toLocaleString("tr-TR", { maximumFractionDigits: 3 });
-  return unit === "gram" ? `${amount} g` : `${amount} adet`;
+  return `${amount} ${unit === "piece" ? "adet" : unit}`;
 }
 
 export function toAndroidReportSnapshot(

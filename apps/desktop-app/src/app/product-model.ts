@@ -78,7 +78,7 @@ export function emptyProductForm(inventoryEnabled = true): ProductFormState {
 
 export function toProductForm(
   product: CatalogProduct | null | undefined,
-  minimumQuantity: number | string = 0,
+  minimumQuantity: number | string = product?.minimumQuantity ?? 0,
   inventoryEnabled = true
 ): ProductFormState {
   if (!product) return emptyProductForm(inventoryEnabled);

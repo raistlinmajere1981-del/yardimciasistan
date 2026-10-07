@@ -180,8 +180,8 @@ function ya_stock_image_system_instruction(): string
     return implode("\n", [
         'Fatura veya fiş görselinden yalnız ürün satırlarını çıkaran güvenli bir stok taslak yardımcısısın.',
         'Yalnız kullanıcı mesajındaki izinli menü ürünü id değerlerini kullan. Yeni ürün veya id üretme.',
-        'Emin olmadığın eşleşmede matched_menu_item_id null olsun.',
-        'Her ürünün stock_unit alanına uy: piece için adet, gram için gram cinsinden suggested_quantity döndür.',
+        'Emin olmadığın eşleşmede matched_product_id null olsun.',
+        'Her ürünün canonical stock_unit alanına uy: piece, kg, g, l, ml, pack, box, meter, other. Suggested_quantity bu birimdedir; birimler arası tahmini ambalaj dönüşümü yapma.',
         'Gram ürünlerinde açık kg veya kilo miktarını 1000 ile çarparak grama dönüştür; örneğin 3 KG = 3000 gram.',
         'Adet ürünlerinde koli, paket, kg, kilo, gram, litre veya lt bilgisini tahminle adede çevirme.',
         'Açık ve uygun bir miktar yoksa suggested_quantity null olsun.',
@@ -202,8 +202,8 @@ function ya_stock_image_prompt(array $menuItems): string
         ],
         'lines' => [[
             'raw_text' => 'Belgedeki ürün satırı',
-            'matched_menu_item_id' => null,
-            'matched_menu_item_name' => null,
+            'matched_product_id' => null,
+            'matched_product_name' => null,
             'suggested_quantity' => null,
             'source_quantity_text' => null,
             'confidence' => 'low',
@@ -272,7 +272,7 @@ function ya_stock_image_sanitize_analysis(mixed $value, array $menuItems): array
         if ($rawText === null) {
             continue;
         }
-        $requestedId = ya_stock_image_nullable_text($rawLine['matched_menu_item_id'] ?? null, 160);
+        $requestedId = ya_stock_image_nullable_text($rawLine['matched_product_id'] ?? null, 160);
         $matchedItem = $requestedId !== null ? ($itemsById[$requestedId] ?? null) : null;
         $sourceQuantityText = ya_stock_image_nullable_text($rawLine['source_quantity_text'] ?? null, 200);
         $quantityValue = $rawLine['suggested_quantity'] ?? null;
@@ -282,8 +282,8 @@ function ya_stock_image_sanitize_analysis(mixed $value, array $menuItems): array
             : null;
         $stockUnit = is_array($matchedItem) ? ya_stock_image_stock_unit($matchedItem['stock_unit'] ?? 'piece') : 'piece';
         $quantityText = $sourceQuantityText ?? $rawText;
-        if ($stockUnit === 'gram') {
-            $quantity = ya_stock_image_parse_gram_quantity($quantityText);
+        if ($stockUnit !== 'piece') {
+            $quantity = ya_stock_image_parse_measured_quantity($quantityText, $stockUnit);
         }
         $ambiguous = ya_stock_image_has_ambiguous_unit($quantityText, $stockUnit);
         $reason = ya_stock_image_nullable_text($rawLine['needs_review_reason'] ?? null, 500);
@@ -292,18 +292,18 @@ function ya_stock_image_sanitize_analysis(mixed $value, array $menuItems): array
         }
         if ($ambiguous) {
             $quantity = null;
-            $reason = $stockUnit === 'gram'
+            $reason = $stockUnit === 'g'
                 ? 'Miktar gram veya kilogram olarak açıkça okunamadı.'
                 : 'Koli, paket, ağırlık veya hacim bilgisi açık bir adede dönüştürülemedi.';
         } elseif ($quantity === null) {
-            $reason ??= $stockUnit === 'gram'
+            $reason ??= $stockUnit === 'g'
                 ? 'Açık gram veya kilogram bilgisi bulunamadı.'
                 : 'Açık adet bilgisi bulunamadı.';
         }
         $lines[] = [
             'raw_text' => $rawText,
-            'matched_menu_item_id' => is_array($matchedItem) ? ya_stock_image_string($matchedItem['id'] ?? '') : null,
-            'matched_menu_item_name' => is_array($matchedItem) ? ya_stock_image_string($matchedItem['name'] ?? '') : null,
+            'matched_product_id' => is_array($matchedItem) ? ya_stock_image_string($matchedItem['id'] ?? '') : null,
+            'matched_product_name' => is_array($matchedItem) ? ya_stock_image_string($matchedItem['name'] ?? '') : null,
             'suggested_quantity' => $quantity,
             'source_quantity_text' => $sourceQuantityText,
             'confidence' => ya_stock_image_confidence($rawLine['confidence'] ?? null),
@@ -325,17 +325,14 @@ function ya_stock_image_has_ambiguous_unit(string $value, string $stockUnit): bo
 {
     $normalized = mb_strtolower($value, 'UTF-8');
     $normalized = preg_replace('/\b\d+\s*[\'’]?\s*(?:li|lı|lu|lü|lik|lık|luk|lük)\s+paket\b/ui', '', $normalized) ?? $normalized;
-    if ($stockUnit === 'gram') {
-        return preg_match('/\b(?:koli|paket|lt|litre|adet|ad|tane)\b/ui', $normalized) === 1
-            || ya_stock_image_parse_gram_quantity($normalized) === null;
-    }
+    if ($stockUnit !== 'piece') return ya_stock_image_parse_measured_quantity($normalized, $stockUnit) === null;
     return preg_match('/\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|gr|gram|g|lt|litre)\b/ui', $normalized) === 1;
 }
 
-function ya_stock_image_parse_gram_quantity(string $value): ?int
+function ya_stock_image_parse_measured_quantity(string $value, string $unit): ?float
 {
     $normalized = mb_strtolower($value, 'UTF-8');
-    if (preg_match('/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g)\b/ui', $normalized, $matches) !== 1) {
+    if (preg_match('/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g|ml|mililitre|lt|litre|l|paket|pack|koli|kutu|box|metre|meter|m)\b/ui', $normalized, $matches) !== 1) {
         return null;
     }
     $text = $matches[1];
@@ -349,15 +346,22 @@ function ya_stock_image_parse_gram_quantity(string $value): ?int
         return null;
     }
     $quantity = (float) $text;
-    $grams = in_array($matches[2], ['kg', 'kilogram', 'kilo'], true) ? $quantity * 1000 : $quantity;
-    return is_finite($grams) && $grams === (float) (int) $grams && $grams > 0 && $grams <= 100000
-        ? (int) $grams
-        : null;
+    $source = $matches[2];
+    $result = null;
+    if (in_array($unit, ['g', 'kg'], true) && in_array($source, ['kg', 'kilogram', 'kilo', 'gr', 'gram', 'g'], true))
+        $result = $quantity * (in_array($source, ['kg', 'kilogram', 'kilo'], true) ? 1000 : 1) / ($unit === 'kg' ? 1000 : 1);
+    if (in_array($unit, ['ml', 'l'], true) && in_array($source, ['ml', 'mililitre', 'lt', 'litre', 'l'], true))
+        $result = $quantity * (in_array($source, ['ml', 'mililitre'], true) ? 1 : 1000) / ($unit === 'l' ? 1000 : 1);
+    if ($unit === 'pack' && in_array($source, ['paket', 'pack'], true)) $result = $quantity;
+    if ($unit === 'box' && in_array($source, ['koli', 'kutu', 'box'], true)) $result = $quantity;
+    if ($unit === 'meter' && in_array($source, ['metre', 'meter', 'm'], true)) $result = $quantity;
+    return $result !== null && is_finite($result) && $result > 0 && $result <= 100000 ? round($result, 4) : null;
 }
 
 function ya_stock_image_stock_unit(mixed $value): string
 {
-    return ya_stock_image_string($value) === 'gram' ? 'gram' : 'piece';
+    $unit = ya_stock_image_string($value);
+    return in_array($unit, ['piece', 'kg', 'g', 'l', 'ml', 'pack', 'box', 'meter', 'other'], true) ? $unit : 'piece';
 }
 
 function ya_stock_image_decode_provider_analysis(mixed $content): array

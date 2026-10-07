@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { saveMenuProductFixture, fixtureProductId } from "./test-helpers/menu-product-fixture.mjs";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,7 +13,7 @@ const { DesktopRoomFolioService } = require("../apps/desktop-app/dist-electron/r
 const { DesktopFinanceService } = require("../apps/desktop-app/dist-electron/finance.js");
 const { saveBusinessLayout } = require("../apps/desktop-app/dist-electron/business-layout.js");
 const { saveBusinessPublicProfile, getBusinessPublicProfile } = require("../apps/desktop-app/dist-electron/business-public-profile.js");
-const { mutateMenuStockInTransaction } = require("../apps/desktop-app/dist-electron/database/menu-stock-store.js");
+const { applyInventoryMovementInTransaction, saveCatalogProduct } = require("../apps/desktop-app/dist-electron/commerce-store.js");
 const { pullRequestsFromWeb } = require("../apps/desktop-app/dist-electron/sync-request-menu-service.js");
 const { BUSINESS_CAPABILITIES } = require("@yardimci-asistan/shared");
 const root = mkdtempSync(join(tmpdir(), "yardimci-storage-correctness-"));
@@ -194,26 +195,27 @@ try {
     ON CONFLICT(business_id, capability_id) DO UPDATE SET is_enabled = 1`).run(BUSINESS_CAPABILITIES.INVENTORY, now, now);
   const category = database.saveMenuCategory({ name: "Storage menu", description: "", is_active: true, sort_order: 1 });
   ok(category);
-  const item = database.saveMenuItem({ category_id: category.savedId, name: "Tracked item", description: "", price: 10,
+  const item = saveMenuProductFixture(database, { category_id: category.savedId, name: "Tracked item", description: "", price: 10,
     currency: "TRY", image_url: "", is_available: true, is_featured: false, allergens: [], tags: [], sort_order: 1,
     stock_quantity: 10, stock_consumption_quantity: 0.5, stock_unit: "piece" });
   ok(item);
-  const stock = () => db.prepare("SELECT stock_quantity FROM menu_items WHERE id = ?").get(item.savedId).stock_quantity;
-  const movements = () => db.prepare("SELECT * FROM menu_stock_movements WHERE menu_item_id = ? AND source_type = 'room_folio' ORDER BY rowid").all(item.savedId);
-  const added = folios.addMenuItem({ folioId, menuItemId: item.savedId, quantity: 2 });
+  const productId = fixtureProductId(database, item.savedId);
+  const stock = () => db.prepare("SELECT CASE WHEN p.track_inventory = 1 THEN b.quantity ELSE NULL END AS quantity FROM catalog_products p LEFT JOIN inventory_balances b ON b.product_id = p.id WHERE p.id = ?").get(productId).quantity;
+  const movements = () => db.prepare("SELECT * FROM inventory_movements WHERE product_id = ? AND reference_type = 'room_folio' ORDER BY rowid").all(productId);
+  const added = folios.addMenuItem({ folioId, menuEntryId: item.savedId, quantity: 2 });
   ok(added);
-  const lineId = added.data.folios.find(f => f.id === folioId).items.find(i => i.menuItemId === item.savedId).id;
+  const lineId = added.data.folios.find(f => f.id === folioId).items.find(i => i.menuEntryId === item.savedId).id;
   assert.equal(stock(), 9);
   ok(folios.updateItemQuantity({ itemId: lineId, quantity: 4 }));
   assert.equal(stock(), 8);
   ok(folios.updateItemQuantity({ itemId: lineId, quantity: 1 }));
   assert.equal(stock(), 9.5);
   assert.equal(folios.updateItemQuantity({ itemId: lineId, quantity: 100 }).ok, false);
-  assert.equal(folios.addMenuItem({ folioId, menuItemId: item.savedId, quantity: 100 }).ok, false);
+  assert.equal(folios.addMenuItem({ folioId, menuEntryId: item.savedId, quantity: 100 }).ok, false);
   assert.equal(stock(), 9.5);
   assert.equal(db.prepare("SELECT quantity FROM room_folio_items WHERE id = ?").get(lineId).quantity, 1);
   const movementsBefore = movements();
-  db.exec(`CREATE TRIGGER test_stock_movement_failure BEFORE INSERT ON menu_stock_movements
+  db.exec(`CREATE TRIGGER test_stock_movement_failure BEFORE INSERT ON inventory_movements
     BEGIN SELECT RAISE(ABORT, 'test_movement_write'); END;`);
   assert.equal(folios.updateItemQuantity({ itemId: lineId, quantity: 2 }).ok, false);
   assert.equal(stock(), 9.5);
@@ -221,28 +223,27 @@ try {
   assert.equal(db.prepare("SELECT quantity FROM room_folio_items WHERE id = ?").get(lineId).quantity, 1);
   assert.equal(folios.removeItem(lineId).ok, false);
   assert.equal(stock(), 9.5);
-  assert.equal(folios.addMenuItem({ folioId, menuItemId: item.savedId, quantity: 1 }).ok, false);
+  assert.equal(folios.addMenuItem({ folioId, menuEntryId: item.savedId, quantity: 1 }).ok, false);
   assert.equal(stock(), 9.5);
   db.exec("DROP TRIGGER test_stock_movement_failure");
   ok(folios.removeItem(lineId));
   assert.equal(stock(), 10);
-  assert.deepEqual(movements().map(m => [m.type, m.quantity_change]), [
-    ["order_add", -1], ["order_update", -1], ["order_update", 1.5], ["order_remove", 0.5]
+  assert.deepEqual(movements().map(m => [m.movement_type, m.quantity_delta]), [
+    ["sale", -1], ["sale", -1], ["return_in", 1.5], ["return_in", 0.5]
   ]);
   for (const movement of movements()) {
-    assert.equal(movement.source_type, "room_folio");
+    assert.equal(movement.reference_type, "room_folio");
     assert.equal(movement.actor_source, "desktop");
-    assert.equal(movement.source_id, folioId);
-    assert.equal(movement.actor_device_id, null);
+    assert.equal(movement.reference_id, lineId);
   }
   db.exec("BEGIN");
-  ok(mutateMenuStockInTransaction(db, { menuItemId: item.savedId, type: "order_add", quantityChange: -2,
-    sourceType: "table_order", sourceId: "test_table_order", actorSource: "desktop", actorDeviceId: "", note: "", now }));
+  applyInventoryMovementInTransaction(db, db.prepare("SELECT business_id FROM catalog_products WHERE id = ?").get(productId).business_id,
+    { productId, type: "sale", quantityDelta: -1, referenceType: "table_order", referenceId: "test_table_order", actorSource: "desktop" }, now);
   assert.equal(stock(), 9);
   db.exec("ROLLBACK");
   assert.equal(stock(), 10, "Canonical primitive participates in the caller's transaction");
-  db.prepare("UPDATE menu_items SET stock_quantity = NULL WHERE id = ?").run(item.savedId);
-  ok(folios.addMenuItem({ folioId, menuItemId: item.savedId, quantity: 1 }));
+  saveCatalogProduct(database.databasePath, { id: productId, name: "Tracked item", trackInventory: false });
+  ok(folios.addMenuItem({ folioId, menuEntryId: item.savedId, quantity: 1 }));
   assert.equal(stock(), null, "Untracked menu items still work in folios");
   assert.equal(movements().length, 4);
   assert.equal(db.prepare("PRAGMA integrity_check").get().integrity_check, "ok");

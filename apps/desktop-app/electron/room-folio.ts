@@ -2,9 +2,11 @@ import { synchronizeFinanceSourceInTransaction } from "./finance";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
-import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
-import { mutateMenuStockInTransaction } from "./database/menu-stock-store.js";
+import { getPublishedMenu } from "./database/menu-store.js";
+import { snapshotProductConsumption, applyProductConsumptionInTransaction } from "./product-inventory-consumption.js";
 import { updateStayDatesInTransaction } from "./stay-reservation-service.js";
+import type { CommerceUnit } from "@yardimci-asistan/shared";
+import { normalizeMenuStockUnit } from "./database/stock-utils.js";
 
 export type RoomFolioPaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
 type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
@@ -25,6 +27,7 @@ interface DesktopRoomFolioMenuCategory {
 
 interface DesktopRoomFolioMenuItem {
   id: string;
+  productId: string;
   categoryId: string;
   categoryName: string;
   name: string;
@@ -33,14 +36,15 @@ interface DesktopRoomFolioMenuItem {
   currency: string;
   stockQuantity: number | null;
   stockConsumptionQuantity: number;
-  stockUnit: string;
+  stockUnit: CommerceUnit;
 }
 
 interface DesktopRoomFolioItem {
   id: string;
   folioId: string;
   kind: RoomFolioItemKind;
-  menuItemId: string;
+  productId: string;
+  menuEntryId: string;
   label: string;
   unitPriceMinor: number;
   quantity: number;
@@ -130,7 +134,7 @@ export interface UpdateRoomFolioDetailsInput {
 
 export interface AddRoomFolioMenuItemInput {
   folioId: string;
-  menuItemId: string;
+  menuEntryId: string;
   quantity: number;
 }
 
@@ -292,26 +296,9 @@ export class DesktopRoomFolioService {
         ORDER BY sort_order, name
       `).all() as Array<Record<string, unknown>>;
 
-      const menuRows = db.prepare(`
-        SELECT
-          items.id,
-          items.category_id,
-          categories.name AS category_name,
-          items.name,
-          items.description,
-          items.price,
-          items.currency,
-          items.stock_quantity,
-          items.stock_consumption_quantity,
-          items.stock_unit
-        FROM menu_items AS items
-        JOIN menu_categories AS categories
-          ON categories.id = items.category_id
-          AND categories.deleted_at = ''
-          AND categories.is_active = 1
-        WHERE items.deleted_at = '' AND items.is_available = 1
-        ORDER BY categories.sort_order, items.sort_order, items.name
-      `).all() as Array<Record<string, unknown>>;
+      const menu = getPublishedMenu(db);
+      const menuRows = menu.items.filter(item => item.is_available && categoryRows.some(category => category.id === item.category_id))
+        .map(item => ({ ...item, category_name: categoryRows.find(category => category.id === item.category_id)?.name }));
 
       return {
         generatedAt: new Date().toISOString(),
@@ -504,7 +491,7 @@ export class DesktopRoomFolioService {
 
   addMenuItem(input: AddRoomFolioMenuItemInput): DesktopRoomFolioMutationResult {
     const folioId = cleanText(input?.folioId, 180);
-    const menuItemId = cleanText(input?.menuItemId, 180);
+    const menuItemId = cleanText(input?.menuEntryId, 180);
     const quantity = positiveInteger(input?.quantity, 1000);
     if (!folioId || !menuItemId || quantity === null) {
       return { ok: false, message: "Menü ürünü eklenemedi." };
@@ -512,23 +499,30 @@ export class DesktopRoomFolioService {
 
     const db = this.openDatabase();
     try {
+      db.exec("BEGIN IMMEDIATE");
       if (!this.requireOpenFolio(db, folioId)) return { ok: false, message: "Oda adisyonu kapalı." };
-      const menu = this.getMenuStockRow(db, menuItemId);
+      const menuProjection = getPublishedMenu(db);
+      const menu = menuProjection.items.find(item => item.id === menuItemId && item.is_available
+        && menuProjection.categories.some(category => category.id === item.category_id && category.is_active));
       if (!menu) return { ok: false, message: "Menü ürünü bulunamadı veya satışa kapalı." };
       const itemId = `room_folio_item_${randomUUID()}`;
       const unitPriceMinor = Math.max(0, Math.round(Number(menu.price ?? 0) * 100));
       const lineTotalMinor = unitPriceMinor * quantity;
       const now = new Date().toISOString();
 
-      db.exec("BEGIN");
       try {
-        this.applyMenuStockDelta(db, menu, quantity, "order_add", folioId, now);
+        const consumption = snapshotProductConsumption(db, menu.product_id!, menu.stock_consumption_quantity, now);
+        const stock = applyProductConsumptionInTransaction(db, consumption, -quantity, {
+          referenceType: "room_folio", referenceId: itemId, actorSource: "desktop", note: "Oda adisyonu", now
+        });
+        if (!stock.ok) throw new Error(stock.message);
         db.prepare(`
           INSERT INTO room_folio_items (
-            id, folio_id, kind, menu_item_id, label, unit_price_minor, quantity,
+            id, folio_id, kind, product_id, menu_entry_id, inventory_quantity_per_item, inventory_location_id, label, unit_price_minor, quantity,
             line_total_minor, note, created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, 'menu', ?, ?, ?, ?, ?, '', ?, ?, '', 'local_only')
-        `).run(itemId, folioId, menuItemId, text(menu.name), unitPriceMinor, quantity, lineTotalMinor, now, now);
+          ) VALUES (?, ?, 'menu', ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, '', 'local_only')
+        `).run(itemId, folioId, consumption.product_id, menuItemId, consumption.inventory_quantity_per_item,
+          consumption.inventory_location_id, text(menu.name), unitPriceMinor, quantity, lineTotalMinor, now, now);
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
@@ -537,6 +531,7 @@ export class DesktopRoomFolioService {
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Menü ürünü oda hesabına eklenemedi.") };
     } finally {
+      if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
     return { ok: true, message: "Menü ürünü oda hesabına eklendi.", data: this.getData(), folioId };
@@ -550,6 +545,7 @@ export class DesktopRoomFolioService {
     const db = this.openDatabase();
     let folioId = "";
     try {
+      db.exec("BEGIN IMMEDIATE");
       const item = db.prepare(`
         SELECT * FROM room_folio_items WHERE id = ? AND deleted_at = ''
       `).get(itemId) as Record<string, unknown> | undefined;
@@ -563,15 +559,16 @@ export class DesktopRoomFolioService {
       if (prospectiveTotal < totals.paidTotalMinor) {
         return { ok: false, message: "Ürün adedi azaltılırsa hesap alınan ödemenin altına düşüyor." };
       }
-      const menu = this.getMenuStockRow(db, text(item.menu_item_id));
-      if (!menu) return { ok: false, message: "Menü ürünü artık bulunamıyor." };
       const quantityDelta = quantity - oldQuantity;
       const now = new Date().toISOString();
 
-      db.exec("BEGIN");
       try {
         if (quantityDelta !== 0) {
-          this.applyMenuStockDelta(db, menu, quantityDelta, "order_update", folioId, now);
+          const stock = applyProductConsumptionInTransaction(db, {
+            product_id: text(item.product_id), inventory_quantity_per_item: Number(item.inventory_quantity_per_item),
+            inventory_location_id: item.inventory_location_id ? text(item.inventory_location_id) : null
+          }, -quantityDelta, { referenceType: "room_folio", referenceId: itemId, actorSource: "desktop", note: "Oda adisyonu", now });
+          if (!stock.ok) throw new Error(stock.message);
         }
         db.prepare(`
           UPDATE room_folio_items
@@ -586,6 +583,7 @@ export class DesktopRoomFolioService {
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Ürün adedi güncellenemedi.") };
     } finally {
+      if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
     return { ok: true, message: "Ürün adedi güncellendi.", data: this.getData(), folioId };
@@ -611,9 +609,9 @@ export class DesktopRoomFolioService {
       const now = new Date().toISOString();
       db.prepare(`
         INSERT INTO room_folio_items (
-          id, folio_id, kind, menu_item_id, label, unit_price_minor, quantity,
+          id, folio_id, kind, product_id, label, unit_price_minor, quantity,
           line_total_minor, note, created_at, updated_at, deleted_at, sync_status
-        ) VALUES (?, ?, ?, '', ?, ?, 1, ?, ?, ?, ?, '', 'local_only')
+        ) VALUES (?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?, '', 'local_only')
       `).run(
         `room_folio_item_${randomUUID()}`,
         folioId,
@@ -667,9 +665,9 @@ export class DesktopRoomFolioService {
         if (amountMinor > 0) {
           db.prepare(`
             INSERT INTO room_folio_items (
-              id, folio_id, kind, menu_item_id, label, unit_price_minor, quantity,
+              id, folio_id, kind, product_id, label, unit_price_minor, quantity,
               line_total_minor, note, created_at, updated_at, deleted_at, sync_status
-            ) VALUES (?, ?, 'discount', '', 'İndirim', ?, 1, ?, '', ?, ?, '', 'local_only')
+            ) VALUES (?, ?, 'discount', NULL, 'İndirim', ?, 1, ?, '', ?, ?, '', 'local_only')
           `).run(
             `room_folio_item_${randomUUID()}`,
             folioId,
@@ -705,6 +703,7 @@ export class DesktopRoomFolioService {
     const db = this.openDatabase();
     let folioId = "";
     try {
+      db.exec("BEGIN IMMEDIATE");
       const item = db.prepare(`SELECT * FROM room_folio_items WHERE id = ? AND deleted_at = ''`).get(itemId) as Record<string, unknown> | undefined;
       if (!item) return { ok: false, message: "Hesap kalemi bulunamadı." };
       folioId = text(item.folio_id);
@@ -716,13 +715,13 @@ export class DesktopRoomFolioService {
       }
       const now = new Date().toISOString();
 
-      db.exec("BEGIN");
       try {
-        if (text(item.kind) === "menu" && text(item.menu_item_id)) {
-          const menu = this.getMenuStockRow(db, text(item.menu_item_id));
-          if (menu) {
-            this.applyMenuStockDelta(db, menu, -Math.max(1, Number(item.quantity) || 1), "order_remove", folioId, now);
-          }
+        if (text(item.kind) === "menu" && text(item.product_id)) {
+          const stock = applyProductConsumptionInTransaction(db, {
+            product_id: text(item.product_id), inventory_quantity_per_item: Number(item.inventory_quantity_per_item),
+            inventory_location_id: item.inventory_location_id ? text(item.inventory_location_id) : null
+          }, Number(item.quantity), { referenceType: "room_folio", referenceId: itemId, actorSource: "desktop", note: "Oda adisyonu", now });
+          if (!stock.ok) throw new Error(stock.message);
         }
         db.prepare(`
           UPDATE room_folio_items
@@ -737,6 +736,7 @@ export class DesktopRoomFolioService {
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Hesap kalemi çıkarılamadı.") };
     } finally {
+      if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
     return { ok: true, message: "Hesap kalemi çıkarıldı.", data: this.getData(), folioId };
@@ -807,7 +807,7 @@ export class DesktopRoomFolioService {
   private mapFolio(db: DatabaseSync, row: Record<string, unknown>): DesktopRoomFolio {
     const folioId = text(row.id);
     const items = db.prepare(`
-      SELECT id, folio_id, kind, menu_item_id, label, unit_price_minor, quantity,
+      SELECT id, folio_id, kind, product_id, menu_entry_id, label, unit_price_minor, quantity,
              line_total_minor, note, created_at
       FROM room_folio_items
       WHERE folio_id = ? AND deleted_at = ''
@@ -871,31 +871,6 @@ export class DesktopRoomFolioService {
     };
   }
 
-  private getMenuStockRow(db: DatabaseSync, menuItemId: string): Record<string, unknown> | null {
-    return (db.prepare(`
-      SELECT id, name, price, currency, stock_quantity, stock_consumption_quantity, stock_unit
-      FROM menu_items
-      WHERE id = ? AND deleted_at = '' AND is_available = 1
-    `).get(menuItemId) as Record<string, unknown> | undefined) ?? null;
-  }
-
-  private applyMenuStockDelta(
-    db: DatabaseSync,
-    menu: Record<string, unknown>,
-    quantityDelta: number,
-    movementType: "order_add" | "order_update" | "order_remove",
-    sourceId: string,
-    now: string
-  ) {
-    if (!isInventoryTrackingEnabled(db)) return;
-    const result = mutateMenuStockInTransaction(db, {
-      menuItemId: text(menu.id), type: movementType, quantityChange: -quantityDelta,
-      sourceType: "room_folio", sourceId, actorSource: "desktop", actorDeviceId: "",
-      note: "Oda adisyonu", now
-    });
-    if (!result.ok) throw new Error(result.message);
-  }
-
   private openDatabase() {
     const db = new DatabaseSync(this.databasePath);
     db.exec("PRAGMA foreign_keys = ON;");
@@ -939,6 +914,7 @@ function mapMenuItem(row: Record<string, unknown>): DesktopRoomFolioMenuItem {
   return {
     id: text(row.id),
     categoryId: text(row.category_id),
+    productId: text(row.product_id),
     categoryName: text(row.category_name),
     name: text(row.name),
     description: text(row.description),
@@ -946,7 +922,7 @@ function mapMenuItem(row: Record<string, unknown>): DesktopRoomFolioMenuItem {
     currency: normalizeCurrency(row.currency),
     stockQuantity: row.stock_quantity === null || row.stock_quantity === undefined ? null : Math.max(0, Number(row.stock_quantity) || 0),
     stockConsumptionQuantity: Math.max(0.000001, Number(row.stock_consumption_quantity) || 1),
-    stockUnit: text(row.stock_unit) || "piece"
+    stockUnit: normalizeMenuStockUnit(row.stock_unit)
   };
 }
 
@@ -956,7 +932,8 @@ function mapFolioItem(row: Record<string, unknown>): DesktopRoomFolioItem {
     id: text(row.id),
     folioId: text(row.folio_id),
     kind: kindText === "discount" ? "discount" : kindText === "manual_charge" ? "manual_charge" : "menu",
-    menuItemId: text(row.menu_item_id),
+    productId: text(row.product_id),
+    menuEntryId: text(row.menu_entry_id),
     label: text(row.label),
     unitPriceMinor: safeMinor(row.unit_price_minor),
     quantity: Math.max(1, Number(row.quantity) || 1),

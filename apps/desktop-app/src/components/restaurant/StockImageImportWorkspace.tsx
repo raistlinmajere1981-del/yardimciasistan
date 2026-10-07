@@ -2,7 +2,7 @@ import { SearchSelect } from "../ui/SearchSelect";
 import { observeNexaAi } from "../../app/nexa-activity";
 import { Camera, FileImage, Plus, RotateCw, Sparkles, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { StockImageAnalysis, StockImageConfidence } from "@yardimci-asistan/shared";
+import type { CatalogProduct, StockImageAnalysis, StockImageConfidence } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
@@ -12,14 +12,14 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 interface StockImageImportWorkspaceProps {
-  menu: DesktopDashboardData["menu"];
+  products: CatalogProduct[];
   onApplied: (data: DesktopDashboardData) => void;
 }
 
 interface ReviewLine {
   id: string;
   rawText: string;
-  menuItemId: string;
+  productId: string;
   quantity: string;
   confidence: StockImageConfidence;
   reason: string;
@@ -28,7 +28,7 @@ interface ReviewLine {
 
 type WorkspaceStage = "image" | "analyzing" | "review" | "success";
 
-export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportWorkspaceProps) {
+export function StockImageImportWorkspace({ products, onApplied }: StockImageImportWorkspaceProps) {
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<WorkspaceStage>("image");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -47,7 +47,8 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisAttemptRef = useRef(0);
-  const trackedItems = useMemo(() => menu.items.filter((item) => item.stock_quantity !== null), [menu.items]);
+  const trackedItems = useMemo(() => products.filter(product => product.isActive && product.trackInventory)
+    .map(product => ({ id: product.id, name: product.name, stock_unit: product.unit })), [products]);
   const dialogRef = useDialogFocus(open);
 
   useEffect(() => {
@@ -194,7 +195,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
       setReviewLines(result.analysis.lines.map((line) => ({
         id: crypto.randomUUID(),
         rawText: line.raw_text,
-        menuItemId: line.matched_menu_item_id ?? "",
+        productId: line.matched_product_id ?? "",
         quantity: line.suggested_quantity === null ? "" : String(line.suggested_quantity),
         confidence: line.confidence,
         reason: line.needs_review_reason ?? "",
@@ -245,7 +246,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
     setReviewLines((current) => [...current, {
       id: crypto.randomUUID(),
       rawText: "Manuel eklenen satır",
-      menuItemId: "",
+      productId: "",
       quantity: "",
       confidence: "low",
       reason: "Ürün ve miktar kullanıcı tarafından girilmeli.",
@@ -274,7 +275,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
       imageHash,
       duplicateWarningAcknowledged: duplicateAcknowledged,
       lines: applicableLines.map((line) => ({
-        menu_item_id: line.menuItemId,
+        product_id: line.productId,
         quantity: Number(line.quantity),
         raw_text: line.rawText,
         confidence: line.confidence
@@ -333,7 +334,20 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
                 {duplicateWarning && <label className="stock-image-duplicate-warning"><input type="checkbox" checked={duplicateAcknowledged} onChange={(event) => setDuplicateAcknowledged(event.target.checked)} /><span><strong>Bu görsel daha önce stok girişinde kullanılmış olabilir.</strong> Yönetici olarak yine de uygulamak istediğimi onaylıyorum.</span></label>}
                 <div className="stock-image-table" role="table" aria-label="AI stok eşleştirme taslağı">
                   <div className="stock-image-table-head" role="row"><span>Faturada okunan</span><span>Menü karşılığı</span><span>Eklenecek miktar</span><span>Güven</span><span>İşlem</span></div>
-                  {reviewLines.map((line) => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}><div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div><label><span className="stock-image-mobile-label">Menü karşılığı</span><SearchSelect ariaLabel={`Menü karşılığı ${line.rawText}`} disabled={line.ignored} value={line.menuItemId} placeholder="Eşleşme yok" onChange={menuItemId => updateLine(line.id, { menuItemId })} options={trackedItems.map(item => ({ id: item.id, label: item.name, description: stockUnitLabel(item.stock_unit) }))} /></label><label><span className="stock-image-mobile-label">Eklenecek miktar</span><input aria-label={`Eklenecek miktar (${stockUnitLabel(trackedItems.find((item) => item.id === line.menuItemId)?.stock_unit ?? "piece")})`} disabled={line.ignored} type="number" min="1" step="1" inputMode="numeric" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: event.target.value })} placeholder="Boş" /></label><StatusBadge className="stock-confidence" tone={stockConfidenceTone(line.confidence)}>{confidenceLabel(line.confidence)}</StatusBadge><ActionButton variant="ghost" size="sm" onClick={() => updateLine(line.id, { ignored: !line.ignored })}>{line.ignored ? <><Undo2 size={15} /> Geri al</> : "Yok say"}</ActionButton></div>)}
+                  {reviewLines.map(line => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}>
+                    <div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div>
+                    <label><span className="stock-image-mobile-label">Ürün karşılığı</span>
+                      <SearchSelect ariaLabel={`Ürün karşılığı ${line.rawText}`} disabled={line.ignored} value={line.productId} placeholder="Eşleşme yok"
+                        onChange={productId => updateLine(line.id, { productId })} options={trackedItems.map(item => ({ id: item.id, label: item.name, description: stockUnitLabel(item.stock_unit) }))} />
+                    </label>
+                    <label><span className="stock-image-mobile-label">Eklenecek miktar</span>
+                      <input aria-label={`Eklenecek miktar (${stockUnitLabel(trackedItems.find(item => item.id === line.productId)?.stock_unit ?? "piece")})`}
+                        disabled={line.ignored} type="number" min="0.0001" step="0.0001" inputMode="decimal" value={line.quantity}
+                        onChange={event => updateLine(line.id, { quantity: event.target.value })} placeholder="Boş" />
+                    </label>
+                    <StatusBadge className="stock-confidence" tone={stockConfidenceTone(line.confidence)}>{confidenceLabel(line.confidence)}</StatusBadge>
+                    <ActionButton variant="ghost" size="sm" onClick={() => updateLine(line.id, { ignored: !line.ignored })}>{line.ignored ? <><Undo2 size={15} /> Geri al</> : "Yok say"}</ActionButton>
+                  </div>)}
                   {reviewLines.length === 0 && <p className="stock-image-no-lines">Eşleşen satır bulunamadı. Manuel bir satır ekleyebilirsiniz.</p>}
                 </div>
                 <ActionButton className="stock-image-add-line" variant="secondary" size="sm" onClick={addManualLine}><Plus size={16} /> Manuel satır ekle</ActionButton>
@@ -351,7 +365,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
 
 function isValidReviewLine(line: ReviewLine): boolean {
   const quantity = Number(line.quantity);
-  return Boolean(line.menuItemId) && Number.isInteger(quantity) && quantity > 0 && quantity <= 100_000;
+  return Boolean(line.productId) && Number.isFinite(quantity) && quantity > 0 && quantity <= 100_000 && Math.round(quantity * 10000) / 10000 === quantity;
 }
 
 function confidenceLabel(confidence: StockImageConfidence): string {
@@ -366,20 +380,18 @@ function stockConfidenceTone(confidence: StockImageConfidence) {
   return "danger" as const;
 }
 
-function stockUnitLabel(unit: "piece" | "gram"): string {
-  return unit === "gram" ? "gram" : "adet";
+function stockUnitLabel(unit: string): string {
+  return unit === "piece" ? "adet" : unit;
 }
 
-function formatStockTotals(lines: ReviewLine[], items: DesktopDashboardData["menu"]["items"]): string {
+function formatStockTotals(lines: ReviewLine[], items: Array<{ id: string; stock_unit: string }>): string {
   const totals = lines.reduce((result, line) => {
-    const unit = items.find((item) => item.id === line.menuItemId)?.stock_unit ?? "piece";
-    result[unit] += Number(line.quantity) || 0;
+    const unit = items.find((item) => item.id === line.productId)?.stock_unit ?? "piece";
+    result[unit] = (result[unit] ?? 0) + (Number(line.quantity) || 0);
     return result;
-  }, { piece: 0, gram: 0 });
-  return [
-    totals.piece > 0 ? `${totals.piece} adet` : "",
-    totals.gram > 0 ? `${new Intl.NumberFormat("tr-TR").format(totals.gram)} g` : ""
-  ].filter(Boolean).join(" + ") || "0";
+  }, {} as Record<string, number>);
+  return Object.entries(totals).filter(([, quantity]) => quantity > 0)
+    .map(([unit, quantity]) => `${new Intl.NumberFormat("tr-TR").format(quantity)} ${stockUnitLabel(unit)}`).join(" + ") || "0";
 }
 
 function stopCameraStream(stream: MediaStream | null) {

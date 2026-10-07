@@ -10,6 +10,7 @@ export type IdPrefix =
   | "table_"
   | "cat_"
   | "item_"
+  | "menu_entry_"
   | "product_"
   | "inventory_location_"
   | "inventory_movement_"
@@ -50,6 +51,7 @@ export const ID_PREFIXES: readonly IdPrefix[] = [
   "table_",
   "cat_",
   "item_",
+  "menu_entry_",
   "product_",
   "inventory_location_",
   "inventory_movement_",

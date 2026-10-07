@@ -1,50 +1,40 @@
-# Menu Item Workspace — Stage 8C
+# Menu channel in Product Workspace
 
-Status: implementation on `refactor/menu-item-workspace-v2`; local verification is required before closure.
+Status: current-schema consolidation under [D-011](DOMAIN_DECISIONS_V1.md#d-011--menu-and-online-sales-share-one-canonical-catalog-product).
+This supersedes the Stage 8C presentation/persistence contract; there is no Menu Item entity editor.
 
 ## Ownership
 
-- The Menu page is the operational lens for category filtering, category maintenance, item discovery, stock-image import and new-item entry.
-- Existing menu items open the canonical Menu Item Workspace.
-- Menu Item remains distinct from Catalog Product. This stage does not merge Market/Product persistence or stock operations.
-- Category maintenance stays on the Menu page because it has one bounded editor family and no competing entity editor.
+- Menu remains a Page for category maintenance, product discovery, linking/creation,
+  ordering, QR preview and stock-image import.
+- Existing entries open Product Workspace using canonical `product_id` and contextual
+  `menuEntryId`. Product details, images and inventory use the same shared controls as Commerce.
+- `MenuProductEntryFields` owns only the channel relation. Its separate explicit save/reset
+  lifecycle participates in the workspace dirty/busy guard; it does not own Product identity.
+- New Product creation reuses `ProductFormFields`; the backend commits Product + Menu entry
+  atomically. Existing Product linking requires no duplicate Product row. After save, the
+  create dialog unmounts before the Product Workspace opens.
+- Restaurant contexts hide unrelated retail/purchasing fields, not canonical data or domain
+  authority. CATALOG/SALES/INVENTORY dependencies do not enable Restaurant Sales navigation.
 
-## Workspace form
+## Persistence and operations
 
-Existing menu items use the same canonical one-page form composition as the new-item dialog:
-
-```text
-Ürün bilgileri + görsel
-Stok (capability-gated)
-```
-
-There are no separate Bilgiler / Stok / Görsel tabs. The entire item draft stays mounted in one workspace, so users can edit product details, image and stock without changing modes. Centered/full-canvas presentation preserves the same draft. Dirty or saving state blocks close and entity replacement.
-
-The one-page editor uses an asymmetric 12-column layout at workspace widths: core identity fields form a compact top row, description owns the wider reading area, image controls occupy the right rail, and stock metrics share one operational row. Container queries collapse the same canonical form cleanly inside the narrower new-item dialog without duplicating form markup.
-
-The new-item flow reuses the same field components and canonical form conversion. After the first save, the dialog unmounts before the created entity opens in Menu Item Workspace, preserving the single-modal contract.
-
-Stock tracking is an explicit form state rather than an implicit “quantity is blank” convention. New items start with stock tracking enabled and a zero quantity; disabling tracking collapses the stock panel and persists the canonical untracked state with a null stock quantity.
-
-Create and edit flows both keep the current image preview at the top-right of the product-information panel with adjacent file-select and clear actions. Image preparation and persistence still use the existing canonical menu image field.
-
-Menu order is owned by the menu lists, not by numeric form fields. Categories are drag-reordered globally. Products are drag-reordered within their own category; the “Tüm kategoriler” view groups products by category and still allows same-category drag ordering without permitting accidental cross-category moves. Reorder persistence renumbers the affected records atomically in 10-step positions and marks them pending for the existing menu sync path.
-
-## Operations
-
-The menu controller exposes domain-oriented item operations:
-
-- `saveItemForm(form)`
-- `deleteItemById(itemId)`
-
-Existing preload, IPC and SQLite contracts are unchanged.
+- `saveMenuProductEntry` / `menu:saveEntry` create or update `menu_product_entries`.
+- `deleteMenuProductEntry` / `menu:removeEntry` unlink Menu only.
+- Nullable `price_override` falls back to canonical `sale_price` in the backend.
+- Category/order/availability/featured/allergens/tags/hide policy/consumption belong to Menu.
+- Stock counts and consumption delegate to canonical inventory. Table/Folio consumption and
+  location are frozen with monetary/name snapshots; transfer never consumes twice.
+- Images are read from the canonical immutable Product archive, not duplicated in a Menu field.
+- Menu order remains category-local drag/keyboard reorder; inactive Products remain manageable
+  in the admin projection but cannot be sold or publicly published.
+- Public QR `id` remains the Menu entry identity. Android current contracts distinguish
+  `product_id` and `menu_entry_id`; no historical conversion or compatibility API is provided.
 
 ## Verification
 
-Run locally:
-
-```fish
-npm run verify:check -- workspace-platform
-npm run verify:domain -- commerce
-npm run verify:pre-main
+```bash
+npm run verify:domain -- product-identity
+npm run verify:check -- desktop-renderer
+npm run verify:check -- build-android-debug
 ```

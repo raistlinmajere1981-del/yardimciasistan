@@ -102,7 +102,7 @@ final class OperationMutationDialogs {
         Typeface.NORMAL
     ));
 
-    int quickAddQuantity = "gram".equals(item.stockUnit) ? 1000 : 1;
+    int quickAddQuantity = "g".equals(item.stockUnit) ? 1000 : 1;
     Button add = UiKit.button(
         activity,
         "+" + stockQuantity(quickAddQuantity, item.stockUnit) + " Ekle",
@@ -111,7 +111,7 @@ final class OperationMutationDialogs {
           listener.sendAction(
               "menu_stock_add",
               payload(
-                  "menu_item_id", item.menuItemId,
+                  "product_id", item.productId,
                   "quantity", quickAddQuantity,
                   "note", "Android hızlı stok ekleme"
               ),
@@ -282,7 +282,7 @@ final class OperationMutationDialogs {
         listener.sendAction(
             actionType,
             payload(
-                "menu_item_id", item.menuItemId,
+                "product_id", item.productId,
                 quantityKey, parsed,
                 "note", note.getText().toString().trim()
             ),

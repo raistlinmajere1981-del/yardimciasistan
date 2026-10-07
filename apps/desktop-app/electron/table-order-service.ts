@@ -19,7 +19,8 @@ import {
   recalculateTableOrderTotalInTransaction,
   restoreCancelledOrderStockInTransaction
 } from "./database/table-order-store.js";
-import { mutateMenuStockInTransaction as mutateStoredMenuStock } from "./database/menu-stock-store.js";
+import { getPublishedMenu } from "./database/menu-store.js";
+import { snapshotProductConsumption, applyProductConsumptionInTransaction } from "./product-inventory-consumption.js";
 import { normalizeStatus } from "./database/request-utils.js";
 import {
   createTableOrderId,
@@ -30,7 +31,6 @@ import {
 } from "./database/stock-utils.js";
 import { nextMutationTimestamp } from "./database/android-utils.js";
 import { synchronizeFinanceSourceInTransaction } from "./finance.js";
-import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 
 interface TableOrderMutationContext extends DomainMutationContext { newOrderId?: string; newItemId?: string }
 
@@ -121,7 +121,7 @@ export function openTableOrder(db: DatabaseSync, tableId: string, context: Table
 
 export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInput, context: TableOrderMutationContext = {}): DesktopTableOrderResult {
   const orderId = input.orderId.trim();
-  const menuItemId = input.menuItemId.trim();
+  const menuItemId = input.menuEntryId.trim();
   const quantity = normalizeOrderQuantity(input.quantity);
   const note = String(input.note ?? "").trim().slice(0, 500);
   if (!orderId || !menuItemId || !quantity) {
@@ -137,19 +137,9 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
       return { ok: false, message: "Ürün yalnızca aktif bir adisyona eklenebilir." };
     }
 
-    const menuItem = db
-      .prepare(`
-          SELECT menu_items.id, menu_items.name, menu_items.price, menu_items.currency
-          FROM menu_items
-          INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
-          WHERE menu_items.id = ?
-            AND menu_items.is_available = 1
-            AND menu_items.deleted_at = ''
-            AND menu_categories.is_active = 1
-            AND menu_categories.deleted_at = ''
-          LIMIT 1
-        `)
-      .get(menuItemId) as { id?: string; name?: string; price?: number; currency?: string } | undefined;
+    const menu = getPublishedMenu(db);
+    const menuItem = menu.items.find(item => item.id === menuItemId && item.is_available
+      && menu.categories.some(category => category.id === item.category_id && category.is_active));
     if (!menuItem?.id) {
       db.exec(tx.rollback);
       return { ok: false, message: "Yalnızca aktif ve mevcut menü ürünleri siparişe eklenebilir." };
@@ -158,6 +148,7 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
     const productName = String(menuItem.name ?? "Ürün").trim() || "Ürün";
     const unitPrice = roundMoney(Number(menuItem.price ?? 0));
     const currency = normalizeTableOrderCurrency(menuItem.currency);
+    const consumption = snapshotProductConsumption(db, menuItem.product_id!, menuItem.stock_consumption_quantity, now);
     const orderCurrency = db
       .prepare(`
           SELECT currency
@@ -181,7 +172,10 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
           SELECT id, quantity, updated_at
           FROM table_order_items
           WHERE order_id = ?
-            AND menu_item_id = ?
+            AND product_id = ?
+            AND menu_entry_id = ?
+            AND inventory_quantity_per_item = ?
+            AND inventory_location_id IS ?
             AND product_name = ?
             AND unit_price = ?
             AND currency = ?
@@ -190,7 +184,8 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
           ORDER BY created_at DESC
           LIMIT 1
         `)
-      .get(orderId, menuItemId, productName, unitPrice, currency, note) as { id?: string; quantity?: number; updated_at?: string } | undefined;
+      .get(orderId, consumption.product_id, menuItemId, consumption.inventory_quantity_per_item, consumption.inventory_location_id,
+        productName, unitPrice, currency, note) as { id?: string; quantity?: number; updated_at?: string } | undefined;
 
     const itemId = existingItem?.id || context.newItemId || createTableOrderId("table_order_item_");
     if (existingItem?.id) {
@@ -199,14 +194,11 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
         db.exec(tx.rollback);
         return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
       }
-      if (isInventoryTrackingEnabled(db)) {
-        const stockResult = mutateStoredMenuStock(db, {
-          menuItemId,
-          type: "order_add",
-          quantityChange: -quantity,
-          sourceType: "table_order",
-          sourceId: orderId,
-          actorDeviceId: context.androidAction?.device_id ?? "",
+      {
+        const stockResult = applyProductConsumptionInTransaction(db, consumption, -quantity, {
+          referenceType: "table_order",
+          referenceId: orderId,
+          actorSource: context.androidAction ? "android" : "desktop",
           note: `${productName} adisyona eklendi.`,
           now
         });
@@ -219,14 +211,11 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
         .run(nextQuantity, roundMoney(unitPrice * nextQuantity), context.androidAction ? nextMutationTimestamp(existingItem.updated_at, now) : now, itemId);
     } else {
-      if (isInventoryTrackingEnabled(db)) {
-        const stockResult = mutateStoredMenuStock(db, {
-          menuItemId,
-          type: "order_add",
-          quantityChange: -quantity,
-          sourceType: "table_order",
-          sourceId: orderId,
-          actorDeviceId: context.androidAction?.device_id ?? "",
+      {
+        const stockResult = applyProductConsumptionInTransaction(db, consumption, -quantity, {
+          referenceType: "table_order",
+          referenceId: orderId,
+          actorSource: context.androidAction ? "android" : "desktop",
           note: `${productName} adisyona eklendi.`,
           now
         });
@@ -240,7 +229,7 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
             INSERT INTO table_order_items (
               id,
               order_id,
-              menu_item_id,
+              product_id, menu_entry_id, inventory_quantity_per_item, inventory_location_id,
               product_name,
               unit_price,
               currency,
@@ -250,12 +239,15 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
               status,
               created_at,
               updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
           `)
         .run(
           itemId,
           orderId,
+          consumption.product_id,
           menuItemId,
+          consumption.inventory_quantity_per_item,
+          consumption.inventory_location_id,
           productName,
           unitPrice,
           currency,
@@ -272,7 +264,7 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
       androidAction: context.androidAction,
       entityType: "table_order",
       entityId: orderId,
-      payload: { item_id: itemId, menu_item_id: menuItemId, product_name: productName, quantity, unit_price: unitPrice, currency },
+      payload: { item_id: itemId, product_id: consumption.product_id, menu_entry_id: menuItemId, product_name: productName, quantity, unit_price: unitPrice, currency },
       now
     });
     db.exec(tx.commit);
@@ -304,14 +296,14 @@ export function updateTableOrderItemQuantity(db: DatabaseSync, input: UpdateTabl
     orderId = String(item.order_id);
     const previousQuantity = Number(item.quantity ?? 0);
     if (quantity !== previousQuantity) {
-      if (isInventoryTrackingEnabled(db)) {
-        const stockResult = mutateStoredMenuStock(db, {
-          menuItemId: String(item.menu_item_id ?? ""),
-          type: "order_update",
-          quantityChange: previousQuantity - quantity,
-          sourceType: "table_order",
-          sourceId: orderId,
-          actorDeviceId: context.androidAction?.device_id ?? "",
+      {
+        const stockResult = applyProductConsumptionInTransaction(db, {
+          product_id: String(item.product_id), inventory_quantity_per_item: Number(item.inventory_quantity_per_item),
+          inventory_location_id: item.inventory_location_id ? String(item.inventory_location_id) : null
+        }, previousQuantity - quantity, {
+          referenceType: "table_order",
+          referenceId: orderId,
+          actorSource: context.androidAction ? "android" : "desktop",
           note: "Adisyon ürün adedi değiştirildi.",
           now
         });
@@ -389,14 +381,14 @@ export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string, cont
       return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
     }
     orderId = String(item.order_id);
-    if (isInventoryTrackingEnabled(db)) {
-      const stockResult = mutateStoredMenuStock(db, {
-        menuItemId: String(item.menu_item_id ?? ""),
-        type: "order_remove",
-        quantityChange: Number(item.quantity ?? 0),
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: context.androidAction?.device_id ?? "",
+    {
+      const stockResult = applyProductConsumptionInTransaction(db, {
+        product_id: String(item.product_id), inventory_quantity_per_item: Number(item.inventory_quantity_per_item),
+        inventory_location_id: item.inventory_location_id ? String(item.inventory_location_id) : null
+      }, Number(item.quantity ?? 0), {
+        referenceType: "table_order",
+        referenceId: orderId,
+        actorSource: context.androidAction ? "android" : "desktop",
         note: "Ürün adisyondan silindi.",
         now
       });
@@ -560,7 +552,7 @@ export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusI
       db.exec(tx.rollback);
       return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
     }
-    if (status === "cancelled" && isInventoryTrackingEnabled(db)) {
+    if (status === "cancelled") {
       const stockRestore = restoreCancelledOrderStockInTransaction(db, orderId, context.androidAction?.device_id ?? "", now);
       if (!stockRestore.ok) {
         db.exec(tx.rollback);

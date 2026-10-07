@@ -68,7 +68,7 @@ export function createAndroidMarketSnapshotSource(
         products.image_source_url,
         products.data_source,
         COALESCE(balance.quantity, 0) AS current_quantity,
-        COALESCE(balance.minimum_quantity, 0) AS minimum_quantity,
+        products.minimum_quantity AS minimum_quantity,
         COALESCE(balance.updated_at, '') AS inventory_updated_at
       FROM catalog_products AS products
       LEFT JOIN inventory_locations AS location
@@ -127,7 +127,7 @@ export function createAndroidMarketSnapshotSource(
         AND products.is_active = 1
         AND products.track_inventory = 1
         AND products.deleted_at = ''
-        AND COALESCE(balance.quantity, 0) <= COALESCE(balance.minimum_quantity, 0)
+        AND COALESCE(balance.quantity, 0) <= products.minimum_quantity
     `).get(businessId) as { count?: unknown } | undefined;
 
     const recentStockAdjustments = (database.prepare(`

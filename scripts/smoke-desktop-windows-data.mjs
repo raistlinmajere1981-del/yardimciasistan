@@ -24,7 +24,7 @@ try {
     0,
     "Current-only veritabanında schema_migrations tablosu olmamalı."
   );
-  for (const table of ["business", "settings", "rooms", "tables", "menu_categories", "menu_items"]) {
+  for (const table of ["business", "settings", "rooms", "tables", "menu_categories", "menu_product_entries"]) {
     assert.equal(
       Number(scalar(database, `SELECT COUNT(*) FROM ${table}`)),
       0,

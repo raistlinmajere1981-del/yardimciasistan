@@ -19,6 +19,10 @@ import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { ProductFormFields } from "./ProductFormFields";
+import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
+import { MenuProductEntryFields } from "../menu/MenuProductEntryFields";
+import { toItemForm, type ItemFormState } from "../menu/menu-model";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 
 type WorkspaceState = "idle" | "loading" | "success" | "error";
 
@@ -30,6 +34,12 @@ export function ProductWorkspace({
   productDataEnabled,
   wholesaleEnabled = false,
   onlineSalesEnabled = false,
+  retailFieldsEnabled = true,
+  purchasingEnabled = true,
+  menuData,
+  qrMenuEnabled = false,
+  onSaveMenuEntry,
+  onRemoveMenuEntry,
   busy,
   onReload,
   onProductSaved,
@@ -42,6 +52,12 @@ export function ProductWorkspace({
   productDataEnabled: boolean;
   wholesaleEnabled?: boolean;
   onlineSalesEnabled?: boolean;
+  retailFieldsEnabled?: boolean;
+  purchasingEnabled?: boolean;
+  menuData?: DesktopDashboardData;
+  qrMenuEnabled?: boolean;
+  onSaveMenuEntry?: (form: ItemFormState) => Promise<DesktopMenuSaveResult | undefined>;
+  onRemoveMenuEntry?: (entryId: string) => Promise<DesktopStatusUpdateResult | undefined>;
   busy: boolean;
   onReload: () => Promise<void>;
   onProductSaved: (product: CatalogProduct) => void;
@@ -74,16 +90,31 @@ export function ProductWorkspace({
   const beginPublicationRequest = useRequestGeneration();
   const beginResourceRequest = useRequestGeneration();
   const beginSaveRequest = useRequestGeneration();
+  const beginMenuRequest = useRequestGeneration();
+  const menuEntry = menuData?.menu.items.find(item => item.product_id === intent.entityId && (!intent.menuEntryId || item.id === intent.menuEntryId));
+  const [menuForm, setMenuForm] = useState(() => toItemForm(menuEntry, menuData?.menu.categories[0]?.id ?? ""));
+  const [menuBaseline, setMenuBaseline] = useState(menuForm);
+  const [menuBusy, setMenuBusy] = useState(false);
+  const [menuMessage, setMenuMessage] = useState("");
+  const [removeMenuConfirm, setRemoveMenuConfirm] = useState(false);
+  const menuDirty = JSON.stringify(menuForm) !== JSON.stringify(menuBaseline);
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline) || imageDraftMode !== "keep";
+  const stockDraftDirty = Boolean(countedQuantity.trim() || countNote.trim());
+  const mutationBusy = busy || menuBusy || publicationBusy || stockBusy || saveState === "loading";
   const effectiveImageDataUrl = imageDraftMode === "manual"
     ? manualImageDataUrl
     : imageDraftMode === "keep"
       ? localImageDataUrl
       : "";
   const closeBlocked = useWorkspaceCloseGuard({
-    busy: busy || publicationBusy || stockBusy || resourceState === "loading" || saveState === "loading",
-    dirty
+    busy: mutationBusy || resourceState === "loading",
+    dirty: dirty || menuDirty || stockDraftDirty
   });
+  useEffect(() => {
+    if (menuDirty || menuBusy) return;
+    const next = toItemForm(menuEntry, menuData?.menu.categories[0]?.id ?? "");
+    setMenuForm(next); setMenuBaseline(next);
+  }, [menuEntry, menuData?.menu.categories, menuDirty, menuBusy]);
 
   useEffect(() => {
     const isCurrent = beginPublicationRequest();
@@ -105,7 +136,7 @@ export function ProductWorkspace({
   }, [beginPublicationRequest, bridge, onlineSalesEnabled, product?.id]);
 
   async function savePublication(published: boolean) {
-    if (!bridge || !product || !onlineSalesEnabled || publicationBusy || !publicationLoaded) return;
+    if (!bridge || !product || !onlineSalesEnabled || mutationBusy || !publicationLoaded) return;
     const isCurrent = beginPublicationRequest();
     setPublicationBusy(true);
     setPublicationMessage("");
@@ -119,13 +150,40 @@ export function ProductWorkspace({
     } finally { if (isCurrent()) setPublicationBusy(false); }
   }
 
+  async function saveMenuPresentation() {
+    if (!menuEntry || !onSaveMenuEntry || mutationBusy) return;
+    const isCurrent = beginMenuRequest();
+    setMenuBusy(true); setMenuMessage("");
+    try {
+      const result = await onSaveMenuEntry(menuForm);
+      if (!isCurrent()) return;
+      if (!result?.ok) { setMenuMessage(result?.message ?? "Menü sunumu kaydedilemedi."); return; }
+      const next = toItemForm(result.dashboardData.menu.items.find(item => item.id === result.savedId), menuForm.category_id);
+      setMenuForm(next); setMenuBaseline(next); setMenuMessage(result.message);
+    } catch { if (isCurrent()) setMenuMessage("Menü sunumu kaydedilemedi."); }
+    finally { if (isCurrent()) setMenuBusy(false); }
+  }
+
+  async function removeMenuEntry() {
+    if (!menuEntry || !onRemoveMenuEntry || mutationBusy) return;
+    const isCurrent = beginMenuRequest();
+    setMenuBusy(true);
+    try {
+      const result = await onRemoveMenuEntry(menuEntry.id);
+      if (!isCurrent()) return;
+      setMenuMessage(result?.message ?? "Menü ilişkisi kaldırılamadı.");
+      if (result?.ok) { setRemoveMenuConfirm(false); setMenuBaseline(menuForm); }
+    } catch { if (isCurrent()) setMenuMessage("Menü ilişkisi kaldırılamadı."); }
+    finally { if (isCurrent()) setMenuBusy(false); }
+  }
+
   const loadProductResources = useCallback(async () => {
     if (!product || !bridge) return;
     const isCurrent = beginResourceRequest();
     setResourceState("loading");
     let nextBalance: InventoryBalance | null = null;
     let nextMovements: InventoryMovement[] = [];
-    let minimumQuantity = 0;
+    let minimumQuantity = product.minimumQuantity;
 
     if (inventoryEnabled && product.trackInventory) {
       try {
@@ -183,7 +241,7 @@ export function ProductWorkspace({
   }, [loadProductResources, loadedProductId, product]);
 
   async function saveProduct() {
-    if (!bridge || !product || busy || publicationBusy || stockBusy || resourceState === "loading" || saveState === "loading") return;
+    if (!bridge || !product || mutationBusy || stockDraftDirty || resourceState !== "success") return;
     const priceError = validateProductFormPrices(form);
     if (priceError) {
       setSaveState("error");
@@ -279,7 +337,7 @@ export function ProductWorkspace({
   }
 
   async function updateStock() {
-    if (!bridge || !product || !balance || dirty || busy || stockBusy || saveState === "loading") return;
+    if (!bridge || !product || !balance || dirty || mutationBusy) return;
     const quantity = Number(countedQuantity.trim().replace(",", "."));
     if (!countedQuantity.trim() || !Number.isFinite(quantity) || quantity < 0) { setStockMessage("Geçerli, negatif olmayan bir stok miktarı girin."); return; }
     const isCurrent = beginStockRequest();
@@ -325,7 +383,7 @@ export function ProductWorkspace({
   return <WorkspaceFrame
       title={product.name}
       context={[product.brand, product.sku || product.barcode].filter(Boolean).join(" · ") || "Katalog ürünü"}
-      actions={inventoryEnabled && <ActionButton variant="secondary" disabled={dirty || stockBusy || saveState === "loading" || resourceState !== "success"} onClick={() => {
+      actions={inventoryEnabled && <ActionButton variant="secondary" disabled={dirty || menuDirty || stockDraftDirty || mutationBusy || resourceState !== "success"} onClick={() => {
         navigation.updateWorkspaceMode({ entityType: "product", mode: history ? "details" : "history" });
         if (!history) void refreshStockHistory();
       }}><History size={16} aria-hidden="true" />{history ? "← Ürüne dön" : "Stok Hareketleri"}</ActionButton>}
@@ -338,14 +396,14 @@ export function ProductWorkspace({
       footer={!history && <>
         <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
         <div className="action-row">
-          <ActionButton variant="secondary" type="button" disabled={busy || publicationBusy || stockBusy || saveState === "loading" || !dirty} onClick={() => {
+          <ActionButton variant="secondary" type="button" disabled={mutationBusy || !dirty} onClick={() => {
             setForm(baseline);
             setImageDraftMode("keep");
             setManualImageDataUrl("");
             setSaveState("idle");
             setSaveMessage("");
           }}>Değişiklikleri Geri Al</ActionButton>
-          <ActionButton type="button" disabled={busy || publicationBusy || stockBusy || saveState === "loading" || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
+          <ActionButton type="button" disabled={mutationBusy || stockDraftDirty || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
             <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
           </ActionButton>
         </div>
@@ -354,9 +412,10 @@ export function ProductWorkspace({
       {!history ? <div className="form-stack">
         {inventoryEnabled && product.trackInventory && <section className="market-product-stock-update" aria-label="Stok güncelleme">
           <strong>Mevcut stok: {balance?.quantity ?? "—"} {product.unit}</strong>
-          <label className="market-field">Yeni stok miktarı<input inputMode="decimal" aria-label="Yeni stok miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={dirty || stockBusy || !balance} /></label>
-          <label className="market-field">Stok açıklaması<input value={countNote} onChange={event => setCountNote(event.target.value)} disabled={dirty || stockBusy || !balance} /></label>
-          <ActionButton variant="secondary" disabled={dirty || stockBusy || !balance || !countedQuantity.trim()} onClick={() => void updateStock()}>Stok Güncelle / Düzelt</ActionButton>
+          <label className="market-field">Yeni stok miktarı<input inputMode="decimal" aria-label="Yeni stok miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
+          <label className="market-field">Stok açıklaması<input value={countNote} onChange={event => setCountNote(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
+          <ActionButton variant="secondary" disabled={dirty || mutationBusy || !balance || !countedQuantity.trim()} onClick={() => void updateStock()}>Stok Güncelle / Düzelt</ActionButton>
+          <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={() => { setCountedQuantity(""); setCountNote(""); }}>Sayım taslağını temizle</ActionButton>
           {dirty && <small>Stok güncellemeden önce ürün değişikliklerini kaydedin veya geri alın.</small>}
           {stockMessage && <p role="status">{stockMessage}</p>}
         </section>}
@@ -367,10 +426,12 @@ export function ProductWorkspace({
             inventoryEnabled={inventoryEnabled}
             productDataEnabled={productDataEnabled}
             wholesaleEnabled={wholesaleEnabled}
-            disabled={busy || stockBusy || resourceState !== "success" || saveState === "loading"}
+            retailFieldsEnabled={retailFieldsEnabled}
+            purchasingEnabled={purchasingEnabled}
+            disabled={mutationBusy || stockDraftDirty || resourceState !== "success"}
             mode="all"
             statusFields={onlineSalesEnabled ? <>
-              <label className="market-check"><input type="checkbox" checked={isPublished} disabled={busy || publicationBusy || !publicationLoaded || saveState === "loading" || stockBusy} onChange={event => void savePublication(event.target.checked)} /> Web satışında yayınla</label>
+              <label className="market-check"><input type="checkbox" checked={isPublished} disabled={mutationBusy || !publicationLoaded} onChange={event => void savePublication(event.target.checked)} /> Web satışında yayınla</label>
               {publicationMessage && <p role="status">{publicationMessage}</p>}
             </> : null}
             localImageDataUrl={effectiveImageDataUrl}
@@ -389,6 +450,19 @@ export function ProductWorkspace({
             onChange={setForm}
             onStateChange={onStateChange}
           />}
+        {menuEntry && menuData && <section className="form-stack">
+          <MenuProductEntryFields form={menuForm} dashboardData={menuData} inventoryEnabled={inventoryEnabled}
+            qrMenuEnabled={qrMenuEnabled} disabled={mutationBusy} onChange={setMenuForm} />
+          <div className="action-row">
+            <ActionButton variant="secondary" disabled={!menuDirty || mutationBusy} onClick={() => { setMenuForm(menuBaseline); setMenuMessage(""); }}>Menü değişikliklerini geri al</ActionButton>
+            <ActionButton disabled={!menuDirty || mutationBusy} onClick={() => void saveMenuPresentation()}>Menü Sunumunu Kaydet</ActionButton>
+            <ActionButton variant="danger" disabled={dirty || menuDirty || mutationBusy} onClick={() => setRemoveMenuConfirm(true)}>Menüden kaldır</ActionButton>
+          </div>
+          {menuMessage && <p role="status">{menuMessage}</p>}
+          {removeMenuConfirm && <ConfirmDialog embedded tone="danger" title="Menüden kaldır"
+            description="Yalnız menü ilişkisi kaldırılır. Ortak ürün, stok ve online satış korunur." confirmLabel="Menüden kaldır"
+            busy={menuBusy} onCancel={() => setRemoveMenuConfirm(false)} onConfirm={() => void removeMenuEntry()} />}
+        </section>}
       </div> : <section className="form-stack" aria-label="Stok hareketleri">
               <header className="market-panel-heading market-panel-heading-row"><h3>Son stok hareketleri</h3><ActionButton variant="secondary" disabled={stockBusy} onClick={() => void refreshStockHistory()}>Yenile</ActionButton></header>
               {historyError && <p role="alert">{historyError}</p>}

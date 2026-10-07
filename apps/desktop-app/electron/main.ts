@@ -58,7 +58,7 @@ import {
   type DesktopDashboardData,
   type DesktopSetupSaveResult,
   type SaveInitialSetupInput,
-  type SaveMenuItemInput,
+  type SaveMenuProductEntryInput,
   type DesktopMenuSaveResult,
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
@@ -178,11 +178,11 @@ function assertDesktopRequestType(requestType: string) {
   }
 }
 
-function assertMenuItemSubfeatureMutation(input: SaveMenuItemInput) {
+function assertMenuItemSubfeatureMutation(input: SaveMenuProductEntryInput) {
   const capabilities = new Set(enabledBusinessCapabilities());
   const itemId = input.id?.trim();
   const existing = itemId
-    ? getDatabase().getPublishedMenu().items.find((item) => item.id === itemId)
+    ? getDatabase().getPublishedMenu(true).items.find((item) => item.id === itemId)
     : undefined;
   const baseline = existing ?? {
     stock_quantity: null,
@@ -192,11 +192,8 @@ function assertMenuItemSubfeatureMutation(input: SaveMenuItemInput) {
     hide_when_out_of_stock: false,
     stock_note: null
   };
-  const stockChanged = !nullableNumberEqual(input.stock_quantity, baseline.stock_quantity)
-    || !nullableNumberEqual(input.stock_min_quantity, baseline.stock_min_quantity)
-    || input.stock_unit !== baseline.stock_unit
-    || Number(input.stock_consumption_quantity) !== Number(baseline.stock_consumption_quantity)
-    || String(input.stock_note ?? "").trim() !== String(baseline.stock_note ?? "").trim();
+  const stockChanged = Number(input.stock_consumption_quantity ?? 1) !== Number(baseline.stock_consumption_quantity)
+    || Boolean(input.product && input.product.trackInventory !== false);
   if (stockChanged && !capabilities.has(C.INVENTORY)) {
     throw new Error("Stok alanları bu işletmede etkin değil.");
   }
@@ -204,13 +201,6 @@ function assertMenuItemSubfeatureMutation(input: SaveMenuItemInput) {
       && (!capabilities.has(C.INVENTORY) || !capabilities.has(C.QR_MENU))) {
     throw new Error("Stokta yokken QR menüden gizleme bu işletmede etkin değil.");
   }
-}
-
-function nullableNumberEqual(left: unknown, right: unknown): boolean {
-  const leftEmpty = left === null || left === undefined;
-  const rightEmpty = right === null || right === undefined;
-  if (leftEmpty || rightEmpty) return leftEmpty && rightEmpty;
-  return Number.isFinite(Number(left)) && Number(left) === Number(right);
 }
 
 function assertDesktopReservationType(

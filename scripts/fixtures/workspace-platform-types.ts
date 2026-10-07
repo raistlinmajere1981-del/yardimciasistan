@@ -21,16 +21,11 @@ function intentContracts(intent: WorkspaceIntent) {
     const _customer = intent.customerId;
     return { mode };
   }
-  if (intent.entityType === "menu-item") {
-    const mode: "details" | "stock" | "media" | undefined = intent.mode;
-    // @ts-expect-error Menu Item cannot acquire the Room-specific payload.
-    const _customer = intent.customerId;
-    return { mode };
-  }
   const mode: "details" | "history" | undefined = intent.mode;
+  const menuEntryId: string | undefined = intent.menuEntryId;
   // @ts-expect-error Product cannot acquire the Room-specific payload.
   const _customer = intent.customerId;
-  return { mode };
+  return { mode, menuEntryId };
 }
 
 export const validReturns: WorkspaceReturnContext[] = [
@@ -46,7 +41,7 @@ export const wrongAction: WorkspaceIntent = { entityType: "room", entityId: "1",
 export const wrongMode: WorkspaceModeUpdate = { entityType: "room", mode: "order" };
 // @ts-expect-error Customer cannot request a Room action.
 export const wrongCustomerAction: WorkspaceIntent = { entityType: "customer", entityId: "1", action: "payment" };
-// @ts-expect-error Menu Item cannot request a Customer mode.
+// @ts-expect-error Removed Menu Item entity must not recreate a parallel workspace.
 export const wrongMenuMode: WorkspaceModeUpdate = { entityType: "menu-item", mode: "history" };
 // @ts-expect-error Product cannot request a Customer editor mode.
 export const wrongProductMode: WorkspaceModeUpdate = { entityType: "product", mode: "main" };

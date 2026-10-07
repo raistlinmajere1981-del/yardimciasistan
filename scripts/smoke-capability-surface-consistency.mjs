@@ -44,7 +44,7 @@ const frameSource = source("apps/desktop-app/src/components/app/DesktopAppFrame.
 const menuManagerSource = source("apps/desktop-app/src/components/menu/MenuManager.tsx");
 const qrMenuPanelSource = source("apps/desktop-app/src/components/menu/QrMenuPanel.tsx");
 const menuIpcSource = source("apps/desktop-app/electron/ipc/menu-ipc.ts");
-const menuItemFormFieldsSource = source("apps/desktop-app/src/components/menu/MenuItemFormFields.tsx");
+const menuProductEntryFieldsSource = source("apps/desktop-app/src/components/menu/MenuProductEntryFields.tsx");
 const menuPreviewSource = source("apps/desktop-app/src/components/menu/MenuPreview.tsx");
 const roomAccountSource = source("apps/desktop-app/src/components/pension/RoomAccount.tsx");
 const roomAccountAdjustmentsSource = source("apps/desktop-app/src/components/pension/RoomAccountAdjustments.tsx");
@@ -147,30 +147,15 @@ assert.match(
   /menu-category-row__main menu-category-row__select[\s\S]{0,220}aria-label=\{category\.name\}[\s\S]{0,260}onSelectCategory\(category\)/,
   "the category content surface must remain directly selectable"
 );
-assert.match(
-  menuItemFormFieldsSource,
-  /menu-item-field-description[\s\S]{0,180}<input[^>]*value=\{form\.description\}/,
-  "product description must stay a compact single-line field"
-);
-assert.match(
-  menuItemFormFieldsSource,
-  /menu-stock-note[\s\S]{0,180}<input[^>]*value=\{form\.stock_note\}/,
-  "stock note must stay a compact single-line field"
-);
 assert.doesNotMatch(
-  menuItemFormFieldsSource,
-  /<textarea[^>]*(?:form\.description|form\.stock_note)/,
-  "compact product workspace fields must not regress to textareas"
+  menuProductEntryFieldsSource,
+  /form\.(?:name|description|image_url|stock_quantity|stock_unit)/,
+  "Menu fields must not own a second canonical product or stock draft"
 );
 assert.match(
   menuCssSource,
   /\.menu-image-preview-frame > img\s*\{[\s\S]{0,180}object-fit:\s*contain/,
   "product image preview must show the full image instead of cropping it"
-);
-assert.match(
-  menuCssSource,
-  /\.menu-item-image-editor\s*\{[\s\S]{0,220}grid-column:\s*10 \/ span 3[\s\S]{0,140}grid-row:\s*1 \/ span 4/,
-  "product image editor must remain in the upper-right column"
 );
 assertHandlerGuard(menuIpcSource, "menu:setWebPublication", "assertCapability(BUSINESS_CAPABILITIES.QR_MENU");
 assert.match(
@@ -185,7 +170,7 @@ assert.match(
   "an already-open QR menu page must leave the hidden publication instead of showing an error shell"
 );
 assert.match(menuManagerSource, /stockImageImportEnabled\s*\?[\s\S]{0,220}<StockImageImportWorkspace/);
-assert.match(menuItemFormFieldsSource, /showStock\s*=\s*inventoryEnabled\s*&&[\s\S]{0,160}mode === "stock"/);
+assert.match(menuProductEntryFieldsSource, /inventoryEnabled && <label/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
 const normalizedRoomAccountSource = roomAccountSource.replace(/\s+/g, " ");
 assert.match(

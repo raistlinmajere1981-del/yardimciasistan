@@ -1007,7 +1007,8 @@ reservations
 rooms
 tables
 menu_categories
-menu_items
+catalog_products
+menu_product_entries
 ai_conversations
 whatsapp_messages
 daily_tasks
@@ -1043,7 +1044,7 @@ sync_status
 6. rooms
 7. tables
 8. menu_categories
-9. menu_items
+9. catalog_products / menu_product_entries
 10. whatsapp_messages
 11. ai_conversations
 12. events
@@ -1088,7 +1089,8 @@ rooms
 tables
 reservations
 menu_categories
-menu_items
+catalog_products
+menu_product_entries
 ```
 
 Bunlar tamamlandığında temel sistem çalışabilir.

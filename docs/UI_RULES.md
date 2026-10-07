@@ -20,7 +20,7 @@ Yardımcı Asistan küçük işletme sahibinin günlük işini hızlandırmalıd
 Masaüstünde dört temel kavram vardır:
 
 - **Page** — operasyon alanı; ör. Pansiyon, Restoran, Market, Mesajlar.
-- **Entity Workspace** — tek varlığın canonical çalışma alanı; ör. Room, Customer, Table, Product, Menu Item.
+- **Entity Workspace** — tek varlığın canonical çalışma alanı; ör. Room, Customer, Table, Product. Menü aynı Product Workspace'in kanal bağlamıdır (D-011).
 - **Operation/Subflow** — gerçek iş eylemi; ör. ödeme, oda atama, sipariş kapatma.
 - **Projection** — Dashboard/Calendar/kart/listeler gibi özet ve launcher yüzeyleri.
 

@@ -26,7 +26,7 @@ const TOKEN = "yal_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 function baseSnapshot() {
   return {
-    business_capabilities: ["service.android", "core.reports", "core.finance"],
+    business_capabilities: ["service.android", "core.reports", "core.finance", "food_service.menu", "commerce.catalog"],
     local_network_enabled: true,
     summary: {
       pending_daily_tasks: 0,
@@ -54,6 +54,7 @@ function baseSnapshot() {
     tables: [],
     menu: { categories: [], items: [], updated_at: "" },
     admin_menu: { categories: [], items: [], updated_at: "" },
+    menu_product_candidates: [{ product_id: "product-unlinked", name: "Existing product", unit: "l", sale_price: 12, currency: "TRY" }],
     deleted_request_ids: [],
     trackedStockItems: [],
     appliedStockImageHashes: [],
@@ -67,6 +68,7 @@ function baseSnapshot() {
           "customer.manage",
           "finance.view",
           "room_folio.view",
+          "menu.edit",
           "market.product.view"
         ]
       },
@@ -116,6 +118,7 @@ function assertProjection() {
   assert.equal(staff.finance.today_income_minor, 0);
   assert.deepEqual(staff.reports, {});
   assert.deepEqual(staff.market.products, []);
+  assert.deepEqual(staff.menu_product_candidates, []);
 
   const admin = projectLocalAndroidSnapshotForDevice(source, "device-admin");
   assert.equal(Object.keys(admin.androidPermissions).length, 1);
@@ -124,12 +127,14 @@ function assertProjection() {
   assert.equal(admin.customer_room_stays.length, 1);
   assert.equal(admin.room_folios.length, 1);
   assert.equal(admin.finance.today_income_minor, 1000);
+  assert.deepEqual(admin.menu_product_candidates, source.menu_product_candidates);
 
   const unknown = projectLocalAndroidSnapshotForDevice(source, "device-unknown");
   assert.equal(unknown.androidPermissions["device-unknown"].is_active, false);
   assert.deepEqual(unknown.requests, []);
   assert.deepEqual(unknown.rooms, []);
   assert.deepEqual(unknown.market.products, []);
+  assert.deepEqual(unknown.menu_product_candidates, []);
 }
 
 function createPairingTicket({

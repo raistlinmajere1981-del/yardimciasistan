@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
@@ -50,11 +51,11 @@ try {
 
   const tableId = database.getDashboardData().tables[0].id;
   const category = ok(database.saveMenuCategory({ name: "Menu", description: "", is_active: true, sort_order: 0 }));
-  const item = ok(database.saveMenuItem({ category_id: category.savedId, name: "Yemek", description: "", price: 100, currency: "TRY",
+  const item = ok(saveMenuProductFixture(database, { category_id: category.savedId, name: "Yemek", description: "", price: 100, currency: "TRY",
     image_url: "", is_available: true, is_featured: false, allergens: [], tags: [], sort_order: 0 }));
   ok(database.assignTableCustomer({ tableId, customerId: second }));
   const order = ok(database.openTableOrder(tableId)).order;
-  ok(database.addTableOrderItem({ orderId: order.id, menuItemId: item.savedId, quantity: 1, note: "" }));
+  ok(database.addTableOrderItem({ orderId: order.id, menuEntryId: item.savedId, quantity: 1, note: "" }));
   const transfer = { folioId, tableOrderId: order.id };
   ok(transferTableOrderToRoomFolio(database.databasePath, transfer));
   ok(transferTableOrderToRoomFolio(database.databasePath, transfer));
@@ -87,7 +88,7 @@ try {
   assert.equal(folio().status, "open");
   assert.equal(count("room_folio_payments"), paymentsBefore, "Physical departure must not invent a payment");
   const secondOrder = ok(database.openTableOrder(tableId)).order;
-  ok(database.addTableOrderItem({ orderId: secondOrder.id, menuItemId: item.savedId, quantity: 1, note: "" }));
+  ok(database.addTableOrderItem({ orderId: secondOrder.id, menuEntryId: item.savedId, quantity: 1, note: "" }));
   fail(transferTableOrderToRoomFolio(database.databasePath, { folioId, tableOrderId: secondOrder.id }));
 
   // Prove complete rollback even when financial initialization fails after guest creation.

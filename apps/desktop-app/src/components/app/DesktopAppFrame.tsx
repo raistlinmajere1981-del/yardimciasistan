@@ -30,7 +30,7 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
-import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
+import { customerWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
 import { HospitalityWorkspaceHost, WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
 interface DesktopAppFrameProps {
@@ -312,14 +312,14 @@ function DesktopAppFrameContent({
             onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
             onDelete: customerController.handleDeleteCustomer
           }} />
-          <WorkspaceHost definition={menuItemWorkspaceDefinition} context={{
-            data: surfaceData,
-            qrMenuEnabled,
-            inventoryEnabled,
-            onSave: menuController.saveItemForm,
-            onDelete: menuController.deleteItemById
-          }} />
           <WorkspaceHost definition={productWorkspaceDefinition} context={{
+            menuData: menuEnabled ? surfaceData : undefined,
+            qrMenuEnabled,
+            onSaveMenuEntry: menuController.saveItemForm,
+            onRemoveMenuEntry: menuController.deleteItemById,
+            retailFieldsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.RETAIL_BARCODE)
+              || runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHOLESALE),
+            purchasingEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.RETAIL_PURCHASING),
             onlineSalesEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ONLINE_SALES),
             products: marketController.products,
             categories: marketController.categories,
@@ -327,7 +327,7 @@ function DesktopAppFrameContent({
             wholesaleEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHOLESALE),
             productDataEnabled: marketController.productDataEnabled,
             busy: marketController.dataState === "loading",
-            onReload: marketController.reloadCatalog,
+            onReload: async () => { await marketController.reloadCatalog(); await desktopSyncController.loadDashboardData(); },
             onProductSaved: marketController.upsertProduct,
             onStateChange: marketController.handleStateChange
           }} />

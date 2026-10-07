@@ -1103,7 +1103,7 @@ public final class MainActivity extends ComponentActivity {
       actions.add(openAction);
       actions.add(new AndroidActionDispatcher.Command("table_order_add_item", payload(
           "table_id", table.id,
-          "menu_item_id", item.id,
+          "menu_entry_id", item.id,
           "quantity", 1,
           "depends_on_action_id", openAction.id
       )));
@@ -1112,7 +1112,7 @@ public final class MainActivity extends ComponentActivity {
       sendAction("table_order_add_item", payload(
           "order_id", order.id,
           "table_id", table.id,
-          "menu_item_id", item.id,
+          "menu_entry_id", item.id,
           "quantity", 1,
           "expected_order_updated_at", order.updatedAt
       ), item.name + " adisyona eklenmek üzere gönderildi.");

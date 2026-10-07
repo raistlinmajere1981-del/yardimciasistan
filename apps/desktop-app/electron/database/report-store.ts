@@ -5,9 +5,7 @@ import type { AndroidReportPresetKey, AndroidReportSnapshot } from "@yardimci-as
 import type {
   DesktopReportData,
   DesktopReportRangeInput,
-  DesktopReportStockMovement,
-  MenuStockMovementType,
-  MenuStockSourceType
+  DesktopReportStockMovement
 } from "../database-types.js";
 import {
   normalizeMenuStockUnit,
@@ -219,27 +217,27 @@ export function getReportData(db: DatabaseSync, input: DesktopReportRangeInput, 
   const topConsumed = (db
     .prepare(`
         SELECT
-          menu_items.id AS menu_item_id,
-          menu_items.name AS name,
-          menu_items.stock_unit AS unit,
+          catalog_products.id AS product_id,
+          catalog_products.name AS name,
+          catalog_products.unit AS unit,
           COALESCE(ROUND(SUM(
-            CASE WHEN menu_stock_movements.quantity_change < 0
-              THEN -menu_stock_movements.quantity_change
+            CASE WHEN inventory_movements.quantity_delta < 0
+              THEN -inventory_movements.quantity_delta
               ELSE 0
             END
-          ), 3), 0) AS consumed
-        FROM menu_stock_movements
-        INNER JOIN menu_items ON menu_items.id = menu_stock_movements.menu_item_id
-        WHERE menu_items.deleted_at = ''
-          AND date(menu_stock_movements.created_at, 'localtime') BETWEEN ? AND ?
-        GROUP BY menu_items.id, menu_items.name, menu_items.stock_unit
+          ), 4), 0) AS consumed
+        FROM inventory_movements
+        INNER JOIN catalog_products ON catalog_products.id = inventory_movements.product_id
+        WHERE catalog_products.deleted_at = ''
+          AND date(inventory_movements.created_at, 'localtime') BETWEEN ? AND ?
+        GROUP BY catalog_products.id, catalog_products.name, catalog_products.unit
         HAVING consumed > 0
         ORDER BY consumed DESC, name COLLATE NOCASE ASC
         LIMIT 5
       `)
     .all(startDate, endDate) as Array<Record<string, unknown>>)
     .map((row) => ({
-      menuItemId: String(row.menu_item_id ?? ""),
+      productId: String(row.product_id ?? ""),
       name: String(row.name ?? "Ürün"),
       quantity: normalizeStockPrecision(Number(row.consumed ?? 0)),
       unit: normalizeMenuStockUnit(row.unit)
@@ -248,8 +246,8 @@ export function getReportData(db: DatabaseSync, input: DesktopReportRangeInput, 
   const manualMovementCount = getScalarCount(db, 
     `
         SELECT COUNT(*) AS count
-        FROM menu_stock_movements
-        WHERE source_type IN ('desktop', 'android')
+        FROM inventory_movements
+        WHERE reference_type IN ('desktop', 'android', 'inventory_count', 'product_workspace_count')
           AND date(created_at, 'localtime') BETWEEN ? AND ?
       `,
     startDate,
@@ -258,8 +256,8 @@ export function getReportData(db: DatabaseSync, input: DesktopReportRangeInput, 
   const imageMovementCount = getScalarCount(db, 
     `
         SELECT COUNT(*) AS count
-        FROM menu_stock_movements
-        WHERE source_type = 'stock_image_import'
+        FROM inventory_movements
+        WHERE reference_type = 'stock_image_import'
           AND date(created_at, 'localtime') BETWEEN ? AND ?
       `,
     startDate,
@@ -368,34 +366,34 @@ function getReportStockMovements(
   mode: "manual" | "image" | "all"
 ): DesktopReportStockMovement[] {
   const sourceClause = mode === "manual"
-    ? "AND menu_stock_movements.source_type IN ('desktop', 'android')"
+    ? "AND inventory_movements.reference_type IN ('desktop', 'android', 'inventory_count', 'product_workspace_count')"
     : mode === "image"
-      ? "AND menu_stock_movements.source_type = 'stock_image_import'"
+      ? "AND inventory_movements.reference_type = 'stock_image_import'"
       : "";
   const limit = mode === "all" ? 8 : 6;
   const rows = db
     .prepare(`
         SELECT
-          menu_stock_movements.*,
-          menu_items.name AS item_name,
-          menu_items.stock_unit AS stock_unit
-        FROM menu_stock_movements
-        INNER JOIN menu_items ON menu_items.id = menu_stock_movements.menu_item_id
-        WHERE date(menu_stock_movements.created_at, 'localtime') BETWEEN ? AND ?
+          inventory_movements.*,
+          catalog_products.name AS item_name,
+          catalog_products.unit AS stock_unit
+        FROM inventory_movements
+        INNER JOIN catalog_products ON catalog_products.id = inventory_movements.product_id
+        WHERE date(inventory_movements.created_at, 'localtime') BETWEEN ? AND ?
           ${sourceClause}
-        ORDER BY menu_stock_movements.created_at DESC, menu_stock_movements.id DESC
+        ORDER BY inventory_movements.created_at DESC, inventory_movements.id DESC
         LIMIT ${limit}
       `)
     .all(startDate, endDate) as Array<Record<string, unknown>>;
 
   return rows.map((row) => {
-    const sourceType = String(row.source_type ?? "desktop") as MenuStockSourceType;
+    const sourceType = String(row.reference_type ?? "desktop");
     return {
       id: String(row.id ?? ""),
-      menuItemId: String(row.menu_item_id ?? ""),
+      productId: String(row.product_id ?? ""),
       itemName: String(row.item_name ?? "Ürün"),
-      type: String(row.type ?? "adjust") as MenuStockMovementType,
-      quantityChange: normalizeStockPrecision(Number(row.quantity_change ?? 0)),
+      type: String(row.movement_type ?? "adjust") as DesktopReportStockMovement["type"],
+      quantityChange: normalizeStockPrecision(Number(row.quantity_delta ?? 0)),
       quantityAfter: normalizeStockPrecision(Number(row.quantity_after ?? 0)),
       unit: normalizeMenuStockUnit(row.stock_unit),
       sourceType,

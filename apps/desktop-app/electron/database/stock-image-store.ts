@@ -4,14 +4,16 @@ import type {
   StockImageAnalysis,
   StockImageApplyLine,
   StockImageImportSource,
-  StockImageMenuCandidate
+  StockImageProductCandidate
 } from "@yardimci-asistan/shared";
 import type {
   ApplyStockImageImportInput,
   CreateStockImageImportInput
 } from "../database-types.js";
 import { insertDatabaseEvent } from "./event-store.js";
-import { mutateMenuStockInTransaction as mutateStoredMenuStock } from "./menu-stock-store.js";
+import { applyInventoryMovementInTransaction } from "../commerce-store.js";
+import { resolveMenuProductPrice } from "../menu-product-price.js";
+import type { AndroidTrackedStockItem } from "@yardimci-asistan/sync-core";
 import { queueSyncJob as queueStoredSyncJob } from "./sync-runtime-store.js";
 import {
   isSha256Hex,
@@ -33,25 +35,36 @@ export interface ApplyStockImageImportTransactionInput {
   now: string;
 }
 
-export function getTrackedStockCandidates(db: DatabaseSync): StockImageMenuCandidate[] {
-  const rows = db
-    .prepare(`
-        SELECT menu_items.id, menu_items.name, menu_items.stock_quantity, menu_items.stock_unit,
-          menu_categories.name AS category
-        FROM menu_items
-        INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
-        WHERE menu_items.deleted_at = ''
-          AND menu_categories.deleted_at = ''
-          AND menu_items.stock_quantity IS NOT NULL
-        ORDER BY menu_categories.sort_order ASC, menu_items.sort_order ASC, menu_items.name ASC
-      `)
-    .all() as Array<Record<string, unknown>>;
+export function getTrackedStockCandidates(db: DatabaseSync): StockImageProductCandidate[] {
+  return getTrackedStockProducts(db).map(product => ({ id: product.product_id, name: product.name, category: product.category,
+    current_stock: product.stock_quantity, stock_unit: product.stock_unit }));
+}
+
+export function getTrackedStockProducts(db: DatabaseSync): AndroidTrackedStockItem[] {
+  const rows = db.prepare(`SELECT p.id, p.name, p.unit AS stock_unit, p.sale_price, p.minimum_quantity,
+    COALESCE(b.quantity, 0) AS stock_quantity, e.id AS menu_entry_id, e.price_override,
+    COALESCE(e.stock_consumption_quantity, 1) AS stock_consumption_quantity, COALESCE(e.hide_when_out_of_stock, 0) AS hide_when_out_of_stock,
+    COALESCE(mc.name, cc.name, 'Katalog') AS category
+    FROM catalog_products p JOIN business business ON business.id = p.business_id AND business.deleted_at = ''
+    LEFT JOIN menu_product_entries e ON e.product_id = p.id AND e.deleted_at = ''
+    LEFT JOIN menu_categories mc ON mc.id = e.category_id AND mc.deleted_at = ''
+    LEFT JOIN catalog_categories cc ON cc.id = p.category_id AND cc.deleted_at = ''
+    LEFT JOIN inventory_locations l ON l.business_id = p.business_id AND l.is_primary = 1 AND l.deleted_at = ''
+    LEFT JOIN inventory_balances b ON b.product_id = p.id AND b.location_id = l.id
+    WHERE p.deleted_at = '' AND p.is_active = 1 AND p.track_inventory = 1 ORDER BY p.sort_order, p.name`).all();
   return rows.map((row) => ({
-    id: String(row.id ?? ""),
+    product_id: String(row.id ?? ""),
+    menu_entry_id: String(row.menu_entry_id ?? ""),
     name: String(row.name ?? ""),
-    category: String(row.category ?? "Menü"),
-    current_stock: Number(row.stock_quantity ?? 0),
-    stock_unit: normalizeMenuStockUnit(row.stock_unit)
+    category: String(row.category),
+    price: resolveMenuProductPrice({ sale_price: row.sale_price }, { price_override: row.price_override }),
+    stock_quantity: Number(row.stock_quantity ?? 0),
+    stock_min_quantity: Number(row.minimum_quantity),
+    stock_unit: normalizeMenuStockUnit(row.stock_unit),
+    stock_consumption_quantity: Number(row.stock_consumption_quantity),
+    hide_when_out_of_stock: Number(row.hide_when_out_of_stock) === 1,
+    stock_status: Number(row.stock_quantity) < Number(row.stock_consumption_quantity) ? "out_of_stock"
+      : Number(row.stock_quantity) <= Number(row.minimum_quantity) ? "low_stock" : "in_stock"
   }));
 }
 
@@ -121,12 +134,12 @@ export function completeStockImageAnalysis(db: DatabaseSync, importIdValue: stri
     db.prepare("DELETE FROM stock_image_import_lines WHERE import_id = ?").run(importId);
     const insertLine = db.prepare(`
         INSERT INTO stock_image_import_lines (
-          id, import_id, raw_text, matched_menu_item_id, suggested_quantity,
+          id, import_id, raw_text, matched_product_id, suggested_quantity,
           approved_quantity, source_quantity_text, confidence, status, note, created_at
         ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
       `);
     for (const line of sanitized.lines) {
-      const needsReview = line.matched_menu_item_id === null
+      const needsReview = line.matched_product_id === null
         || line.suggested_quantity === null
         || line.confidence === "low"
         || Boolean(line.needs_review_reason);
@@ -134,7 +147,7 @@ export function completeStockImageAnalysis(db: DatabaseSync, importIdValue: stri
         `stock_image_import_line_${randomUUID()}`,
         importId,
         line.raw_text,
-        line.matched_menu_item_id,
+        line.matched_product_id,
         line.suggested_quantity,
         line.source_quantity_text,
         line.confidence,
@@ -243,7 +256,7 @@ export function applyStockImageImportInTransaction(db: DatabaseSync, input: Appl
 
   const candidates = new Map(getTrackedStockCandidates(db).map((candidate) => [candidate.id, candidate]));
   for (const line of lines) {
-    if (!candidates.has(line.menu_item_id)) {
+    if (!candidates.has(line.product_id)) {
       return { ok: false, message: "Satırlardan biri artık mevcut veya stok takipli bir menü ürünü değil." };
     }
   }
@@ -253,7 +266,7 @@ export function applyStockImageImportInTransaction(db: DatabaseSync, input: Appl
     .run(input.importId);
   const insertApprovedLine = db.prepare(`
       INSERT INTO stock_image_import_lines (
-        id, import_id, raw_text, matched_menu_item_id, suggested_quantity,
+        id, import_id, raw_text, matched_product_id, suggested_quantity,
         approved_quantity, source_quantity_text, confidence, status, note, created_at
       ) VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, 'approved', NULL, ?)
     `);
@@ -263,25 +276,18 @@ export function applyStockImageImportInTransaction(db: DatabaseSync, input: Appl
       `stock_image_import_line_${randomUUID()}`,
       input.importId,
       line.raw_text.slice(0, 1000),
-      line.menu_item_id,
+      line.product_id,
       line.quantity,
       line.confidence,
       input.now
     );
-    const result = mutateStoredMenuStock(db, {
-      menuItemId: line.menu_item_id,
-      type: "image_import_add",
-      quantityChange: line.quantity,
-      sourceType: "stock_image_import",
-      sourceId: input.importId,
-      actorSource: input.source,
-      actorDeviceId: input.actorDeviceId,
+    const product = db.prepare("SELECT business_id FROM catalog_products WHERE id = ?").get(line.product_id)!;
+    applyInventoryMovementInTransaction(db, String(product.business_id), {
+      productId: line.product_id,
+      type: "purchase", quantityDelta: line.quantity,
+      referenceType: "stock_image_import", referenceId: input.importId, actorSource: input.source,
       note: line.raw_text.slice(0, 500),
-      now: input.now
-    });
-    if (!result.ok) {
-      return result;
-    }
+    }, input.now);
     totalQuantity += line.quantity;
   }
   const update = db

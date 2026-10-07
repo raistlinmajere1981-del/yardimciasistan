@@ -50,7 +50,15 @@ export function setCatalogProductQuickAccess(databasePath: string, productId: st
 
 export function deleteCatalogProduct(databasePath: string, productId: string): void {
   mutateCatalogPresentation(databasePath, (db, businessId, now) => {
+    if (db.prepare(`SELECT 1 FROM table_order_items i JOIN table_orders o ON o.id = i.order_id
+      WHERE i.product_id = ? AND i.status <> 'cancelled' AND o.status IN ('open', 'preparing', 'served', 'payment')
+      UNION ALL SELECT 1 FROM room_folio_items i JOIN room_folios f ON f.id = i.folio_id
+      WHERE i.product_id = ? AND i.deleted_at = '' AND f.status = 'open' LIMIT 1`).get(productId, productId)) {
+      throw new Error("Açık adisyon veya oda hesabındaki ürün silinemez.");
+    }
     const result = db.prepare("UPDATE catalog_products SET is_active = 0, deleted_at = ?, updated_at = ? WHERE id = ? AND business_id = ? AND deleted_at = ''").run(now, now, productId, businessId);
     if (!result.changes) throw new Error("Düzenlenecek ürün bulunamadı.");
+    db.prepare("UPDATE menu_product_entries SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE product_id = ? AND deleted_at = ''").run(now, now, productId);
+    db.prepare("UPDATE commerce_product_publications SET is_published = 0, updated_at = ? WHERE product_id = ? AND business_id = ?").run(now, productId, businessId);
   });
 }

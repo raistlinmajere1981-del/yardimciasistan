@@ -204,7 +204,12 @@ export interface PublishedMenuCategory {
 }
 
 export interface PublishedMenuItem {
+  /** Admin projections retain inactive canonical products so their channel can be managed. */
+  product_is_active?: boolean;
+  /** Channel entry identity. Internal snapshots also carry canonical product_id. */
   id: string;
+  product_id?: string;
+  price_override?: number | null;
   category_id: string;
   name: string;
   description: string;
@@ -473,6 +478,8 @@ export interface AndroidOperationsSnapshot {
   tables: AndroidSnapshotTable[];
   menu: PublishedQrMenu;
   admin_menu: PublishedQrMenu;
+  /** Safe canonical discovery for Menu linking; no purchasing/private product metadata. */
+  menu_product_candidates?: Array<{ product_id: string; name: string; unit: MenuStockUnit; sale_price: number; currency: string }>;
   deleted_request_ids: string[];
   trackedStockItems: AndroidTrackedStockItem[];
   appliedStockImageHashes: string[];
@@ -609,7 +616,8 @@ export interface AndroidSnapshotTable {
 export interface AndroidSnapshotTableOrderItem {
   id: string;
   order_id: string;
-  menu_item_id: string;
+  product_id: string;
+  menu_entry_id: string;
   product_name: string;
   unit_price: number;
   currency: string;
@@ -644,7 +652,8 @@ export interface AndroidSnapshotMessage {
 export type AndroidStockStatus = "out_of_stock" | "low_stock" | "in_stock";
 
 export interface AndroidTrackedStockItem {
-  menu_item_id: string;
+  product_id: string;
+  menu_entry_id: string;
   name: string;
   category: string;
   price: number;

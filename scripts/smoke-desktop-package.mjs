@@ -135,7 +135,7 @@ function assertPackagedDatabase(databasePath) {
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM settings WHERE deleted_at = ''")), 0);
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")), 0);
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM tables WHERE deleted_at = ''")), 0);
-    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM menu_items WHERE deleted_at = ''")), 0);
+    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM menu_product_entries WHERE deleted_at = ''")), 0);
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM requests WHERE deleted_at = ''")), 0);
   } finally {
     database.close();

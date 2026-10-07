@@ -49,7 +49,7 @@ export function seedOperationsCardScene({ kind, dense = false }) {
     const orders = tables.flatMap((table, index) => [1, 2, 5].includes(index % 6) ? [{
       id: `order-${index}`, tableId: table.id, tableName: table.name, status: index % 6 === 2 ? 'payment' : index % 6 === 1 ? 'preparing' : 'open',
       openedAt: `${today}T09:15:00Z`, updatedAt: today, createdAt: today, closedAt: '', subtotal: 450, total: 450,
-      discountTotal: 0, note: '', itemCount: 3, items: [{ id: `item-${index}`, orderId: `order-${index}`, menuItemId: 'menu-a', productName: 'Çay',
+      discountTotal: 0, note: '', itemCount: 3, items: [{ id: `item-${index}`, orderId: `order-${index}`, productId: 'product-a', menuEntryId: 'menu-a', productName: 'Çay',
         quantity: 3, unitPrice: 150, lineTotal: 450, currency: 'TRY', note: '', status: 'open' }]
     }] : []);
     window.fixtureSetOrders(orders);

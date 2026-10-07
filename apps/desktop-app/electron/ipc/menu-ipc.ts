@@ -1,19 +1,20 @@
 import { ipcMain } from "electron";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
+import { prepareProductImageForSave } from "../product-data-service";
 import type {
   DesktopDatabase,
   DesktopMenuSaveResult,
   DesktopStatusUpdateResult,
   ReorderMenuRecordsInput,
   SaveMenuCategoryInput,
-  SaveMenuItemInput
+  SaveMenuProductEntryInput
 } from "../database";
 
 export function registerMenuIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
-  assertMenuItemSubfeatureMutation: (input: SaveMenuItemInput) => void;
+  assertMenuItemSubfeatureMutation: (input: SaveMenuProductEntryInput) => void;
   finalizeMutation: <T extends DesktopMenuSaveResult | DesktopStatusUpdateResult>(result: T) => T;
   scheduleSync: () => void;
 }) {
@@ -56,11 +57,17 @@ export function registerMenuIpcHandlers(options: {
     return finalizeMutation(getDatabase().saveMenuCategory(input));
   });
 
-  ipcMain.handle("menu:saveItem", (_event, input: SaveMenuItemInput): DesktopMenuSaveResult => {
+  ipcMain.handle("menu:saveEntry", async (_event, input: SaveMenuProductEntryInput): Promise<DesktopMenuSaveResult> => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertMenuItemSubfeatureMutation(input);
-    return finalizeMutation(getDatabase().saveMenuItem(input));
+    const database = getDatabase();
+    const image = input.product ? await prepareProductImageForSave(database.databasePath, input.product) : undefined;
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    assertMenuItemSubfeatureMutation(input);
+    if (getDatabase() !== database) return { ok: false, message: "Ürün veritabanı değişti; yeniden yükleyin." };
+    return finalizeMutation(database.saveMenuProductEntry(input, image));
   });
 
   ipcMain.handle("menu:reorder", (_event, input: ReorderMenuRecordsInput): DesktopStatusUpdateResult => {
@@ -75,9 +82,9 @@ export function registerMenuIpcHandlers(options: {
     return finalizeMutation(getDatabase().deleteMenuCategory(String(categoryId ?? "")));
   });
 
-  ipcMain.handle("menu:deleteItem", (_event, itemId: unknown): DesktopStatusUpdateResult => {
+  ipcMain.handle("menu:removeEntry", (_event, itemId: unknown): DesktopStatusUpdateResult => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
-    return finalizeMutation(getDatabase().deleteMenuItem(String(itemId ?? "")));
+    return finalizeMutation(getDatabase().deleteMenuProductEntry(String(itemId ?? "")));
   });
 }

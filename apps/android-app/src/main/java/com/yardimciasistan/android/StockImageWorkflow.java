@@ -27,6 +27,8 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.yardimciasistan.android.AndroidPresentation.*;
@@ -287,7 +289,7 @@ final class StockImageWorkflow {
     for (OperationData.TrackedStockItem item : data.trackedStockItems) {
       try {
         JSONObject candidate = new JSONObject();
-        candidate.put("id", item.menuItemId);
+        candidate.put("id", item.productId);
         candidate.put("name", item.name);
         candidate.put("category", item.category);
         candidate.put("current_stock", item.stockQuantity);
@@ -443,8 +445,7 @@ final class StockImageWorkflow {
 
     refreshSummary[0] = () -> {
       int valid = 0;
-      int pieceTotal = 0;
-      int gramTotal = 0;
+      Map<String, Double> unitTotals = new LinkedHashMap<>();
       int review = 0;
       OperationData currentData = listener.currentData();
 
@@ -452,27 +453,26 @@ final class StockImageWorkflow {
         if (line.ignored) {
           continue;
         }
-        int quantity = line.quantity();
-        if (!line.menuItemId.isEmpty() && quantity > 0) {
+        double quantity = line.quantity();
+        if (!line.productId.isEmpty() && quantity > 0) {
           valid += 1;
           OperationData.TrackedStockItem item =
-              trackedStockItem(currentData, line.menuItemId);
-          if (item != null && "gram".equals(item.stockUnit)) {
-            gramTotal += quantity;
-          } else {
-            pieceTotal += quantity;
-          }
+              trackedStockItem(currentData, line.productId);
+          String unit = item == null ? "piece" : item.stockUnit;
+          unitTotals.put(unit, unitTotals.getOrDefault(unit, 0.0) + quantity);
         } else {
           review += 1;
         }
       }
 
-      String totals = (pieceTotal > 0 ? pieceTotal + " adet" : "")
-          + (pieceTotal > 0 && gramTotal > 0 ? " + " : "")
-          + (gramTotal > 0 ? stockNumber(gramTotal) + " g" : "");
+      StringBuilder totals = new StringBuilder();
+      for (Map.Entry<String, Double> total : unitTotals.entrySet()) {
+        if (totals.length() > 0) totals.append(" + ");
+        totals.append(stockQuantity(total.getValue(), total.getKey()));
+      }
       summary.setText(
           valid + " satır · "
-              + (totals.isEmpty() ? "0" : totals)
+               + (totals.length() == 0 ? "0" : totals.toString())
               + " · "
               + review
               + " kontrol gerekli"
@@ -489,13 +489,13 @@ final class StockImageWorkflow {
     apply.setOnClickListener(view -> {
       JSONArray approvedLines = new JSONArray();
       for (ReviewLine line : lines) {
-        int quantity = line.quantity();
-        if (line.ignored || line.menuItemId.isEmpty() || quantity <= 0) {
+        double quantity = line.quantity();
+        if (line.ignored || line.productId.isEmpty() || quantity <= 0) {
           continue;
         }
         try {
           JSONObject approved = new JSONObject();
-          approved.put("menu_item_id", line.menuItemId);
+          approved.put("product_id", line.productId);
           approved.put("quantity", quantity);
           approved.put("raw_text", line.rawText);
           approved.put("confidence", line.confidence);
@@ -596,7 +596,7 @@ final class StockImageWorkflow {
               + " · "
               + stockUnitLabel(item.stockUnit)
       );
-      if (item.menuItemId.equals(line.menuItemId)) {
+      if (item.productId.equals(line.productId)) {
         selectedIndex = index + 1;
       }
     }
@@ -630,9 +630,9 @@ final class StockImageWorkflow {
               long id
           ) {
             OperationData currentData = listener.currentData();
-            line.menuItemId = position <= 0
+            line.productId = position <= 0
                 ? ""
-                : currentData.trackedStockItems.get(position - 1).menuItemId;
+                : currentData.trackedStockItems.get(position - 1).productId;
             if (refreshSummary[0] != null) {
               refreshSummary[0].run();
             }
@@ -640,7 +640,7 @@ final class StockImageWorkflow {
 
           @Override
           public void onNothingSelected(android.widget.AdapterView<?> parent) {
-            line.menuItemId = "";
+            line.productId = "";
             if (refreshSummary[0] != null) {
               refreshSummary[0].run();
             }
@@ -656,7 +656,7 @@ final class StockImageWorkflow {
     quantityRow.setLayoutParams(quantityRowParams);
 
     EditText quantity = UiKit.input(activity, "Eklenecek miktar");
-    quantity.setInputType(InputType.TYPE_CLASS_NUMBER);
+    quantity.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
     quantity.setText(line.quantityText);
     quantity.setLayoutParams(
         new LinearLayout.LayoutParams(0, UiKit.dp(activity, 48), 1f)
@@ -739,17 +739,17 @@ final class StockImageWorkflow {
         continue;
       }
 
-      String menuItemId = source.optString("matched_menu_item_id", "").trim();
-      if (!isTrackedStockItem(data, menuItemId)) {
-        menuItemId = "";
+      String productId = source.optString("matched_product_id", "").trim();
+      if (!isTrackedStockItem(data, productId)) {
+        productId = "";
       }
 
       String quantity = "";
       Object suggested = source.opt("suggested_quantity");
       if (suggested instanceof Number) {
         double value = ((Number) suggested).doubleValue();
-        if (value == Math.rint(value) && value > 0 && value <= 100000) {
-          quantity = String.valueOf((int) value);
+        if (Double.isFinite(value) && value > 0 && value <= 100000) {
+          quantity = String.valueOf(value);
         }
       }
 
@@ -760,7 +760,7 @@ final class StockImageWorkflow {
 
       lines.add(new ReviewLine(
           rawText,
-          menuItemId,
+          productId,
           quantity,
           confidence,
           source.optString("needs_review_reason", "").trim()
@@ -769,9 +769,9 @@ final class StockImageWorkflow {
     return lines;
   }
 
-  private boolean isTrackedStockItem(OperationData data, String menuItemId) {
+  private boolean isTrackedStockItem(OperationData data, String productId) {
     for (OperationData.TrackedStockItem item : data.trackedStockItems) {
-      if (item.menuItemId.equals(menuItemId)) {
+      if (item.productId.equals(productId)) {
         return true;
       }
     }
@@ -780,10 +780,10 @@ final class StockImageWorkflow {
 
   private OperationData.TrackedStockItem trackedStockItem(
       OperationData data,
-      String menuItemId
+      String productId
   ) {
     for (OperationData.TrackedStockItem item : data.trackedStockItems) {
-      if (item.menuItemId.equals(menuItemId)) {
+      if (item.productId.equals(productId)) {
         return item;
       }
     }
@@ -831,7 +831,7 @@ final class StockImageWorkflow {
 
   private static final class ReviewLine {
     final String rawText;
-    String menuItemId;
+    String productId;
     String quantityText;
     final String confidence;
     final String reason;
@@ -839,22 +839,22 @@ final class StockImageWorkflow {
 
     ReviewLine(
         String rawText,
-        String menuItemId,
+        String productId,
         String quantityText,
         String confidence,
         String reason
     ) {
       this.rawText = rawText;
-      this.menuItemId = menuItemId;
+      this.productId = productId;
       this.quantityText = quantityText;
       this.confidence = confidence;
       this.reason = reason;
     }
 
-    int quantity() {
+    double quantity() {
       try {
-        int value = Integer.parseInt(quantityText.trim());
-        return value > 0 && value <= 100000 ? value : 0;
+        double value = Double.parseDouble(quantityText.trim().replace(',', '.'));
+        return Double.isFinite(value) && value > 0 && value <= 100000 && Math.round(value * 10000) / 10000.0 == value ? value : 0;
       } catch (Exception ignored) {
         return 0;
       }

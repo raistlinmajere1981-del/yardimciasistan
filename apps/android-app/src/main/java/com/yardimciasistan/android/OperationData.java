@@ -145,6 +145,7 @@ final class OperationData {
   final List<MenuItem> menuItems = new ArrayList<>();
   final List<MenuCategory> adminCategories = new ArrayList<>();
   final List<MenuItem> adminMenuItems = new ArrayList<>();
+  final List<JSONObject> menuProductCandidates = new ArrayList<>();
   final List<TrackedStockItem> trackedStockItems = new ArrayList<>();
   final Set<String> appliedStockImageHashes = new HashSet<>();
   final List<TableOrder> tableOrders = new ArrayList<>();
@@ -264,6 +265,11 @@ final class OperationData {
     }
     addRecords(array(adminMenu, "categories"), data.adminCategories, MenuCategory::fromJson);
     addRecords(array(adminMenu, "items"), data.adminMenuItems, MenuItem::fromJson);
+    JSONArray menuCandidates = array(root, "menu_product_candidates");
+    for (int index = 0; index < menuCandidates.length(); index++) {
+      JSONObject candidate = menuCandidates.optJSONObject(index);
+      if (candidate != null) data.menuProductCandidates.add(candidate);
+    }
 
     data.applyPermissionProfile(root.optJSONObject("androidPermissions"), deviceId);
 
@@ -537,9 +543,9 @@ final class OperationData {
     return null;
   }
 
-  TrackedStockItem trackedStockByMenuItemId(String menuItemId) {
+  TrackedStockItem trackedStockByProductId(String productId) {
     for (TrackedStockItem item : trackedStockItems) {
-      if (menuItemId.equals(item.menuItemId)) {
+      if (productId.equals(item.productId)) {
         return item;
       }
     }
@@ -1094,12 +1100,19 @@ final class OperationData {
 
   static final class MenuItem {
     String id = "";
+    String productId = "";
+    Double priceOverride;
     String categoryId = "";
     String name = "Ürün";
     String description = "";
     double price;
     String currency = "TRY";
     boolean available = true;
+    boolean productActive = true;
+    boolean featured;
+    JSONArray allergens = new JSONArray();
+    JSONArray tags = new JSONArray();
+    int sortOrder;
     Double stockQuantity;
     Double stockMinQuantity;
     String stockUnit = "piece";
@@ -1110,15 +1123,22 @@ final class OperationData {
     static MenuItem fromJson(JSONObject source) {
       MenuItem record = new MenuItem();
       record.id = value(source, "id", "");
+      record.productId = value(source, "product_id", "");
+      record.priceOverride = nullableDecimal(source, "price_override");
       record.categoryId = value(source, "category_id", "");
       record.name = value(source, "name", "Ürün");
       record.description = value(source, "description", "");
       record.price = decimal(source, "price");
       record.currency = value(source, "currency", "TRY");
       record.available = source.optBoolean("is_available", true);
+      record.productActive = source.optBoolean("product_is_active", true);
+      record.featured = source.optBoolean("is_featured", false);
+      record.allergens = source.optJSONArray("allergens") == null ? new JSONArray() : source.optJSONArray("allergens");
+      record.tags = source.optJSONArray("tags") == null ? new JSONArray() : source.optJSONArray("tags");
+      record.sortOrder = source.optInt("sort_order", 0);
       record.stockQuantity = nullableDecimal(source, "stock_quantity");
       record.stockMinQuantity = nullableDecimal(source, "stock_min_quantity");
-      record.stockUnit = "gram".equals(value(source, "stock_unit", "piece")) ? "gram" : "piece";
+      record.stockUnit = value(source, "stock_unit", "piece");
       record.stockConsumptionQuantity = positiveDecimal(source, "stock_consumption_quantity", 1);
       record.hideWhenOutOfStock = source.optBoolean("hide_when_out_of_stock", false);
       record.updatedAt = value(source, "updated_at", "");
@@ -1131,7 +1151,8 @@ final class OperationData {
   }
 
   static final class TrackedStockItem {
-    String menuItemId = "";
+    String productId = "";
+    String menuEntryId = "";
     String name = "Ürün";
     String category = "Menü";
     double price;
@@ -1144,13 +1165,14 @@ final class OperationData {
 
     static TrackedStockItem fromJson(JSONObject source) {
       TrackedStockItem record = new TrackedStockItem();
-      record.menuItemId = value(source, "menu_item_id", "");
+      record.productId = value(source, "product_id", "");
+      record.menuEntryId = value(source, "menu_entry_id", "");
       record.name = value(source, "name", "Ürün");
       record.category = value(source, "category", "Menü");
       record.price = decimal(source, "price");
       record.stockQuantity = decimal(source, "stock_quantity");
       record.stockMinQuantity = nullableDecimal(source, "stock_min_quantity");
-      record.stockUnit = "gram".equals(value(source, "stock_unit", "piece")) ? "gram" : "piece";
+      record.stockUnit = value(source, "stock_unit", "piece");
       record.stockConsumptionQuantity = positiveDecimal(source, "stock_consumption_quantity", 1);
       record.hideWhenOutOfStock = source.optBoolean("hide_when_out_of_stock", false);
       record.stockStatus = value(source, "stock_status", record.derivedStatus());
@@ -1176,7 +1198,8 @@ final class OperationData {
   static final class TableOrderItem {
     String id = "";
     String orderId = "";
-    String menuItemId = "";
+    String productId = "";
+    String menuEntryId = "";
     String productName = "Ürün";
     double unitPrice;
     String currency = "TRY";
@@ -1189,7 +1212,8 @@ final class OperationData {
       TableOrderItem record = new TableOrderItem();
       record.id = value(source, "id", "");
       record.orderId = value(source, "order_id", "");
-      record.menuItemId = value(source, "menu_item_id", "");
+      record.productId = value(source, "product_id", "");
+      record.menuEntryId = value(source, "menu_entry_id", "");
       record.productName = value(source, "product_name", "Ürün");
       record.unitPrice = decimal(source, "unit_price");
       record.currency = value(source, "currency", "TRY");

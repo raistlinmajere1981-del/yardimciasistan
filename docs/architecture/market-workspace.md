@@ -7,7 +7,8 @@ Status: closed and verified on `refactor/market-workspace-v2`.
 - The Market page remains the operational lens for Quick Sale, Products, Phone Carts, Inventory, Purchasing and Labels.
 - Existing catalog products open the canonical Product Workspace.
 - The Products mode owns discovery, categories and compact new-product entry; it no longer contains a second persistent Product editor.
-- Product remains distinct from Menu Item, Stock Movement, Purchase and Sale.
+- Product is shared by Menu and Online Sales under D-011. Menu is a channel relation;
+  Stock Movement, Purchase and Sale remain distinct operations/entities.
 - Existing commerce IPC, runtime, store, SQLite schema and transaction boundaries remain authoritative.
 
 ## Product Workspace

@@ -117,7 +117,7 @@ This changes definition ownership, not runtime ownership:
 - Table Workspace remains hosted by Restaurant where its order/context lifetime already belongs
 - host context remains explicit
 - no resolver or service container was added
-- Customer, Menu Item and Product definitions remain central until evidence justifies moving them
+- Customer and Product definitions remain central until evidence justifies moving them; Menu contributes channel fields to Product (D-011)
 
 The canonical entity workspace is still reused from multiple entry points; contributions do not create feature-specific editors.
 

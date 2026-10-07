@@ -229,6 +229,7 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
     unit: normalizeUnit(row.unit),
     taxRate: Number(row.tax_rate ?? 0),
     trackInventory: Number(row.track_inventory ?? 0) === 1,
+    minimumQuantity: Number(row.minimum_quantity ?? 0),
     isActive: Number(row.is_active ?? 0) === 1,
     imageAssetPath: String(row.image_asset_path ?? ""),
     imageSourceUrl: String(row.image_source_url ?? ""),
@@ -331,10 +332,10 @@ export function resolveInventoryLocation(
 
 function getInventoryBalanceRow(database: DatabaseSync, productId: string, locationId: string) {
   return database.prepare(`
-    SELECT quantity, minimum_quantity, updated_at
-    FROM inventory_balances
-    WHERE product_id = ? AND location_id = ?
-  `).get(productId, locationId) as Record<string, unknown> | undefined;
+    SELECT COALESCE(b.quantity, 0) AS quantity, p.minimum_quantity, COALESCE(b.updated_at, '') AS updated_at
+    FROM catalog_products p LEFT JOIN inventory_balances b ON b.product_id = p.id AND b.location_id = ?
+    WHERE p.id = ?
+  `).get(locationId, productId) as Record<string, unknown> | undefined;
 }
 
 function mapInventoryBalance(
@@ -376,14 +377,13 @@ export function applyInventoryMovementInTransaction(
     throw new Error(`Yetersiz stok. Mevcut: ${quantityBefore}.`);
   }
 
-  const minimumQuantity = Math.max(0, roundQuantity(Number(before?.minimum_quantity ?? 0)));
   database.prepare(`
-    INSERT INTO inventory_balances (product_id, location_id, quantity, minimum_quantity, updated_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO inventory_balances (product_id, location_id, quantity, updated_at)
+    VALUES (?, ?, ?, ?)
     ON CONFLICT(product_id, location_id) DO UPDATE SET
       quantity = excluded.quantity,
       updated_at = excluded.updated_at
-  `).run(productId, locationId, quantityAfter, minimumQuantity, now);
+  `).run(productId, locationId, quantityAfter, now);
 
   const movementId = createId("inventory_movement_");
   const unitCost = Math.max(0, roundMoney(Number(input.unitCost ?? 0)));
@@ -500,6 +500,14 @@ export function saveCatalogProductInTransaction(
   if (image && image.productId !== id) throw new Error("Ürün görsel kimliği eşleşmedi.");
   const existing = getProductRow(database, businessId, id);
   if (input.id && !existing) throw new Error("Düzenlenecek ürün bulunamadı.");
+  if (existing && ((input.trackInventory !== false) !== (Number(existing.track_inventory) === 1)
+      || normalizeUnit(input.unit) !== existing.unit)) {
+    const openConsumption = database.prepare(`SELECT 1 FROM table_order_items i JOIN table_orders o ON o.id = i.order_id
+      WHERE i.product_id = ? AND i.status <> 'cancelled' AND i.inventory_quantity_per_item > 0 AND o.status IN ('open', 'preparing', 'served', 'payment')
+      UNION ALL SELECT 1 FROM room_folio_items i JOIN room_folios f ON f.id = i.folio_id
+      WHERE i.product_id = ? AND i.deleted_at = '' AND i.inventory_quantity_per_item > 0 AND f.status = 'open' LIMIT 1`).get(id, id);
+    if (openConsumption) throw new Error("Açık adisyon veya oda hesabında tüketimi bulunan ürünün stok takibi/birimi değiştirilemez.");
+  }
 
   const brand = input.brand === undefined
     ? String(existing?.brand ?? "").trim().slice(0, 160)
@@ -558,10 +566,10 @@ export function saveCatalogProductInTransaction(
       INSERT INTO catalog_products (
         id, business_id, category_id, name, brand, sku, barcode, description,
         sale_price, dealer_price_a, dealer_price_b, purchase_price, currency, unit, tax_rate,
-        track_inventory, is_active, image_asset_path, image_source_url,
+        track_inventory, minimum_quantity, is_active, image_asset_path, image_source_url,
         data_source, source_product_url, data_license, image_license, source_fetched_at,
         created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
       ON CONFLICT(id) DO UPDATE SET
         category_id = excluded.category_id,
         name = excluded.name,
@@ -577,6 +585,7 @@ export function saveCatalogProductInTransaction(
         unit = excluded.unit,
         tax_rate = excluded.tax_rate,
         track_inventory = excluded.track_inventory,
+        minimum_quantity = excluded.minimum_quantity,
         is_active = excluded.is_active,
         image_asset_path = excluded.image_asset_path,
         image_source_url = excluded.image_source_url,
@@ -590,7 +599,7 @@ export function saveCatalogProductInTransaction(
     `).run(
       id, businessId, categoryId, name, brand, sku, barcode, description,
       salePrice, dealerPriceA, dealerPriceB, purchasePrice, currency, unit, taxRate,
-      trackInventory ? 1 : 0, isActive ? 1 : 0,
+      trackInventory ? 1 : 0, Math.max(0, roundQuantity(Number(input.minimumQuantity ?? existing?.minimum_quantity ?? 0))), isActive ? 1 : 0,
       imageAssetPath, imageSourceUrl, dataSource, sourceProductUrl,
       dataLicense, imageLicense, sourceFetchedAt,
       String(existing?.created_at ?? now), now
@@ -607,14 +616,11 @@ export function saveCatalogProductInTransaction(
 
     if (trackInventory) {
       const locationId = ensurePrimaryLocation(database, businessId, now);
-      const minimumQuantity = Math.max(0, roundQuantity(Number(input.minimumQuantity ?? 0)));
       database.prepare(`
-        INSERT INTO inventory_balances (product_id, location_id, quantity, minimum_quantity, updated_at)
-        VALUES (?, ?, 0, ?, ?)
-        ON CONFLICT(product_id, location_id) DO UPDATE SET
-          minimum_quantity = excluded.minimum_quantity,
-          updated_at = excluded.updated_at
-      `).run(id, locationId, minimumQuantity, now);
+        INSERT INTO inventory_balances (product_id, location_id, quantity, updated_at)
+        VALUES (?, ?, 0, ?)
+        ON CONFLICT(product_id, location_id) DO NOTHING
+      `).run(id, locationId, now);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";

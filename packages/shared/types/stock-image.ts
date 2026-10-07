@@ -3,7 +3,7 @@ import type { MenuStockUnit } from "./menu";
 export type StockImageImportSource = "desktop" | "android";
 export type StockImageConfidence = "high" | "medium" | "low";
 
-export interface StockImageMenuCandidate {
+export interface StockImageProductCandidate {
   id: string;
   name: string;
   category: string;
@@ -20,8 +20,8 @@ export interface StockImageDocumentAnalysis {
 
 export interface StockImageAnalysisLine {
   raw_text: string;
-  matched_menu_item_id: string | null;
-  matched_menu_item_name: string | null;
+  matched_product_id: string | null;
+  matched_product_name: string | null;
   suggested_quantity: number | null;
   source_quantity_text: string | null;
   confidence: StockImageConfidence;
@@ -34,7 +34,7 @@ export interface StockImageAnalysis {
 }
 
 export interface StockImageApplyLine {
-  menu_item_id: string;
+  product_id: string;
   quantity: number;
   raw_text: string;
   confidence: StockImageConfidence;

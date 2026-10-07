@@ -1,6 +1,8 @@
-import type { CurrencyCode, TimestampedRecord } from "./common";
+import type { TimestampedRecord } from "./common";
+import type { CommerceUnit } from "./commerce";
 
-export type MenuStockUnit = "piece" | "gram";
+/** Read projection of the canonical product unit, never menu-owned storage. */
+export type MenuStockUnit = CommerceUnit;
 
 export interface MenuCategory extends TimestampedRecord {
   name: string;
@@ -9,22 +11,15 @@ export interface MenuCategory extends TimestampedRecord {
   sort_order: number;
 }
 
-export interface MenuItem extends TimestampedRecord {
+export interface MenuProductEntry extends TimestampedRecord {
+  product_id: string;
   category_id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: CurrencyCode;
-  image_url: string;
+  price_override: number | null;
   is_available: boolean;
   is_featured: boolean;
   allergens: string[];
   tags: string[];
-  stock_quantity: number | null;
-  stock_min_quantity: number | null;
-  stock_unit: MenuStockUnit;
   stock_consumption_quantity: number;
   hide_when_out_of_stock: boolean;
-  stock_note: string | null;
   sort_order: number;
 }

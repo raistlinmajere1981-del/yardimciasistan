@@ -30,7 +30,7 @@ const catalog = db => db.prepare("SELECT type, name, sql FROM sqlite_master WHER
 const tableExists = (db, name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
 
 function assertRemovedObjects(db) {
-  for (const name of ["sync_records", "notifications"]) assert.equal(tableExists(db, name), false, `${name} must not be recreated`);
+  for (const name of ["sync_records", "notifications", "menu_items", "menu_stock_movements"]) assert.equal(tableExists(db, name), false, `${name} must not be recreated`);
   for (const [table, removed] of [
     ["pension_payments", ["stay_id"]], ["sync_outbox", ["claim_token", "claimed_at"]],
     ["birthday_message_deliveries", ["claim_token", "claimed_at"]]
@@ -57,9 +57,9 @@ withMemorySchema(schemaSql, db => {
   assert.equal(db.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
   // Actual enforcement, not just catalog names: a missing actor and invalid FK fail.
-  const movement = db.prepare(`INSERT INTO menu_stock_movements
-    (id, menu_item_id, type, quantity_change, quantity_before, quantity_after, source_type, actor_source, created_at)
-    VALUES (?, 'missing-menu', 'add', 1, 0, 1, 'desktop', ?, ?)`);
+   const movement = db.prepare(`INSERT INTO inventory_movements
+     (id, business_id, product_id, location_id, movement_type, quantity_delta, quantity_after, actor_source, created_at)
+     VALUES (?, 'missing-business', 'missing-product', 'missing-location', 'adjust', 1, 1, ?, ?)`);
   assert.throws(() => movement.run("not-null", null, now.toISOString()), /NOT NULL/);
   assert.throws(() => movement.run("foreign-key", "desktop", now.toISOString()), /FOREIGN KEY/);
   db.prepare("INSERT INTO customers (id, full_name, phone, created_at, updated_at) VALUES ('guest', 'Guest', '', ?, ?)").run(now.toISOString(), now.toISOString());
@@ -73,9 +73,9 @@ withMemorySchema(schemaSql, db => {
 
 // Drift with all table/column names still present must be rejected. No giant DDL snapshots.
 for (const [from, to, expected] of [
-  ["actor_source TEXT NOT NULL CHECK", "actor_source TEXT CHECK", "table:menu_stock_movements"],
+  ["actor_source TEXT NOT NULL DEFAULT 'desktop'", "actor_source TEXT DEFAULT 'desktop'", "table:inventory_movements"],
   ["birthday_message_enabled INTEGER NOT NULL DEFAULT 1", "birthday_message_enabled INTEGER NOT NULL DEFAULT 0", "table:customers"],
-  ["FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)", "FOREIGN KEY (menu_item_id) REFERENCES menu_categories(id)", "table:menu_stock_movements"],
+  ["product_id TEXT NOT NULL REFERENCES catalog_products(id),\n  category_id", "product_id TEXT NOT NULL REFERENCES menu_categories(id),\n  category_id", "table:menu_product_entries"],
   ["UNIQUE (customer_id, birthday_year),", "", "table:birthday_message_deliveries"]
 ]) {
   const changed = schemaSql.replace(from, to);

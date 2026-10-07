@@ -21,7 +21,8 @@ Do not solve classification ambiguity by adding another editor.
 If an entity already has a Workspace, open it through Workspace navigation instead of
 creating a feature-local editor.
 
-Current canonical examples include Customer, Room, Table, Product and Menu Item.
+Current canonical examples include Customer, Room, Table and Product. Menu opens Product
+Workspace with Menu channel context; it does not own another product editor (D-011).
 
 Presentation may be centered or full-canvas. Presentation is not a second workspace and
 must not destroy the mounted entity draft/state.

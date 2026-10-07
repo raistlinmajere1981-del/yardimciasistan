@@ -50,14 +50,14 @@ function createReportFixture() {
     },
     stock: {
       topConsumed: [
-        { menuItemId: "item_coffee", name: "Türk Kahvesi", quantity: 8, unit: "piece" }
+        { productId: "product_coffee", name: "Türk Kahvesi", quantity: 8, unit: "piece" }
       ],
       manualMovementCount: 2,
       imageMovementCount: 1,
       manualMovements: [
         {
           id: "movement_manual",
-          menuItemId: "item_coffee",
+          productId: "product_coffee",
           itemName: "Türk Kahvesi",
           type: "add",
           quantityChange: 10,
@@ -72,7 +72,7 @@ function createReportFixture() {
       imageMovements: [
         {
           id: "movement_image",
-          menuItemId: "item_lemonade",
+          productId: "product_lemonade",
           itemName: "Ev Yapımı Limonata",
           type: "image_import_add",
           quantityChange: 12,
@@ -481,6 +481,8 @@ function createDashboardConversionFixture() {
       items: [
         {
           id: "item_local_preview",
+          product_id: "product_local_preview",
+          price_override: null,
           category_id: "category_local_preview",
           name: "Yerel Serpme Kahvaltı",
           description: "Yalnızca uygulamadaki güncel kayıttan gelen ürün.",
@@ -503,6 +505,8 @@ function createDashboardConversionFixture() {
         },
         {
           id: "item_gram_preview",
+          product_id: "product_gram_preview",
+          price_override: null,
           category_id: "category_local_preview",
           name: "Kaşarlı Köfte",
           description: "200 gramlık porsiyon, stok gram üzerinden izlenir.",
@@ -515,7 +519,7 @@ function createDashboardConversionFixture() {
           tags: ["köfte", "gram"],
           stock_quantity: 6000,
           stock_min_quantity: 1200,
-          stock_unit: "gram",
+          stock_unit: "g",
           stock_consumption_quantity: 200,
           hide_when_out_of_stock: true,
           stock_note: "Bir porsiyonda 200 g kullanılır.",
@@ -525,6 +529,8 @@ function createDashboardConversionFixture() {
         },
         {
           id: "item_hidden_preview",
+          product_id: "product_hidden_preview",
+          price_override: null,
           category_id: "category_local_preview",
           name: "Gizli Menü Ürünü",
           description: "Mevcut olmadığı için önizlemede gösterilmemeli.",
@@ -644,6 +650,13 @@ function createCompactUiFixture() {
   }));
   const items = Array.from({ length: 10 }, (_, index) => ({
     id: `compact_item_${index + 1}`,
+    product_id: `compact_product_${index + 1}`,
+    price_override: null,
+    stock_quantity: null,
+    stock_min_quantity: null,
+    stock_unit: "piece",
+    stock_consumption_quantity: 1,
+    hide_when_out_of_stock: false,
     category_id: categories[index % categories.length].id,
     name: `Menü Ürünü ${index + 1}`,
     description: "Uzun ürün açıklaması kendi alanında kaydırılabilir kalır.",

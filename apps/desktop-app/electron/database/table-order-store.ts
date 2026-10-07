@@ -9,7 +9,7 @@ import type {
 } from "../database-types.js";
 import type { AndroidActionMutationResult } from "./android-utils.js";
 import { androidPayloadString } from "./android-utils.js";
-import { mutateMenuStockInTransaction } from "./menu-stock-store.js";
+import { applyInventoryMovementInTransaction } from "../commerce-store.js";
 import { nextMutationTimestamp } from "./android-utils.js";
 import { normalizeStockPrecision, normalizeTableOrderCurrency, roundMoney } from "./stock-utils.js";
 import { synchronizeFinanceSourceInTransaction } from "../finance.js";
@@ -129,32 +129,24 @@ export function recalculateTableOrderTotal(db: DatabaseSync, orderId: string): D
 export function restoreCancelledOrderStockInTransaction(db: DatabaseSync, orderId: string, actorDeviceId: string, now: string): AndroidActionMutationResult {
   const balances = db
     .prepare(`
-        SELECT menu_item_id, COALESCE(SUM(quantity_change), 0) AS quantity_balance
-        FROM menu_stock_movements
-        WHERE source_type = 'table_order'
-          AND source_id = ?
-          AND type IN ('order_add', 'order_update', 'order_remove')
-        GROUP BY menu_item_id
+        SELECT product_id, location_id, business_id, COALESCE(SUM(quantity_delta), 0) AS quantity_balance
+        FROM inventory_movements
+        WHERE reference_type = 'table_order' AND reference_id = ?
+        GROUP BY product_id, location_id, business_id
       `)
-    .all(orderId) as Array<{ menu_item_id?: string; quantity_balance?: number }>;
+    .all(orderId) as Array<{ product_id: string; location_id: string; business_id: string; quantity_balance: number }>;
   for (const balance of balances) {
     const outstandingQuantity = normalizeStockPrecision(-Number(balance.quantity_balance ?? 0));
     if (outstandingQuantity <= 0) {
       continue;
     }
-    const result = mutateMenuStockInTransaction(db, {
-      menuItemId: String(balance.menu_item_id ?? ""),
-      type: "order_cancel",
-      quantityChange: outstandingQuantity,
-      sourceType: "table_order",
-      sourceId: orderId,
-      actorDeviceId,
+    applyInventoryMovementInTransaction(db, balance.business_id, {
+      productId: balance.product_id, locationId: balance.location_id,
+      type: "return_in", quantityDelta: outstandingQuantity,
+      referenceType: "table_order", referenceId: orderId,
+      actorSource: actorDeviceId ? "android" : "desktop",
       note: "Adisyon iptal edildi; ayrılan stok geri eklendi.",
-      now
-    });
-    if (!result.ok) {
-      return result;
-    }
+    }, now);
   }
   return { ok: true, message: "İptal edilen adisyonun stoku geri eklendi." };
 }
@@ -232,7 +224,8 @@ function getTableOrderItems(db: DatabaseSync, orderId: string): DesktopTableOrde
   return rows.map((row) => ({
     id: String(row.id ?? ""),
     orderId: String(row.order_id ?? ""),
-    menuItemId: String(row.menu_item_id ?? ""),
+    productId: String(row.product_id ?? ""),
+    menuEntryId: String(row.menu_entry_id ?? ""),
     productName: String(row.product_name ?? "Ürün"),
     unitPrice: roundMoney(Number(row.unit_price ?? 0)),
     currency: normalizeTableOrderCurrency(row.currency),
@@ -254,7 +247,9 @@ export function getMutableTableOrderItem(db: DatabaseSync, itemId: string): Reco
     .prepare(`
         SELECT
           table_order_items.order_id,
-          table_order_items.menu_item_id,
+          table_order_items.product_id,
+          table_order_items.inventory_quantity_per_item,
+          table_order_items.inventory_location_id,
           table_order_items.unit_price,
           table_order_items.quantity,
           table_order_items.updated_at

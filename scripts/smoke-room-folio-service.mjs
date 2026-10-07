@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
@@ -12,6 +13,7 @@ const { DesktopRoomFolioService } = require("../apps/desktop-app/dist-electron/r
 const { saveBusinessLayout } = require("../apps/desktop-app/dist-electron/business-layout.js");
 const { synchronizeFinanceSourceInTransaction } = require("../apps/desktop-app/dist-electron/finance.js");
 const { DesktopFinanceService } = require("../apps/desktop-app/dist-electron/finance.js");
+const { listCatalogProducts, saveCatalogProduct, getInventoryBalance } = require("../apps/desktop-app/dist-electron/commerce-store.js");
 
 const appPath = join(process.cwd(), "apps", "desktop-app");
 const dataDir = join(process.cwd(), "artifacts", "room-folio-service-smoke", String(Date.now()));
@@ -67,7 +69,7 @@ try {
     sort_order: 10
   });
   assert.equal(folioCategory.ok, true);
-  const folioItem = database.saveMenuItem({
+  const folioItem = saveMenuProductFixture(database, {
     category_id: folioCategory.savedId,
     name: "Folio Test Ürünü",
     description: "Folio smoke ürünü",
@@ -78,6 +80,9 @@ try {
     is_featured: false,
     allergens: [],
     tags: ["smoke"],
+    stock_quantity: 10,
+    stock_unit: "l",
+    stock_consumption_quantity: 0.125,
     sort_order: 10
   });
   assert.equal(folioItem.ok, true);
@@ -215,19 +220,41 @@ try {
   assert.ok(menuItem, "Smoke test needs at least one sellable menu item.");
   const menuStockBefore = menuItem.stockQuantity;
 
-  const menuAdded = service.addMenuItem({ folioId: opened.folioId, menuItemId: menuItem.id, quantity: 1 });
+  const menuAdded = service.addMenuItem({ folioId: opened.folioId, menuEntryId: menuItem.id, quantity: 1 });
   assert.equal(menuAdded.ok, true);
   folio = menuAdded.data.folios.find((item) => item.id === opened.folioId);
   assert.ok(folio);
-  const menuLine = folio.items.find((item) => item.menuItemId === menuItem.id);
+  const menuLine = folio.items.find((item) => item.menuEntryId === menuItem.id);
   assert.ok(menuLine);
   assert.equal(menuLine.lineTotalMinor, menuItem.priceMinor);
+  assert.equal(menuLine.productId, menuItem.productId);
+  assert.equal(menuLine.label, menuItem.name);
+  assert.equal(menuLine.unitPriceMinor, menuItem.priceMinor);
+  assert.equal(menuLine.quantity, 1);
+  assert.equal(folio.currency, "TRY");
 
   if (menuStockBefore !== null) {
     const updatedMenu = menuAdded.data.menuItems.find((item) => item.id === menuItem.id);
     assert.ok(updatedMenu);
     assert.equal(updatedMenu.stockQuantity, menuStockBefore - menuItem.stockConsumptionQuantity);
   }
+
+  const product = listCatalogProducts(database.databasePath).find(item => item.id === menuItem.productId);
+  saveCatalogProduct(database.databasePath, { ...product, name: "Later canonical label", salePrice: 999, currency: "USD" });
+  const entry = database.getPublishedMenu().items.find(item => item.id === menuItem.id);
+  assert.equal(database.saveMenuProductEntry({ ...entry, product_id: product.id, stock_consumption_quantity: 0.5, price_override: 77 }).ok, true);
+  const historicalFolio = service.getData().folios.find(item => item.id === opened.folioId);
+  assert.deepEqual(historicalFolio.items.find(item => item.id === menuLine.id), menuLine,
+    "Product/channel edits must not rewrite folio line name, price, quantity or total snapshots.");
+  assert.equal(historicalFolio.currency, "TRY", "Folio currency is not a live Product projection.");
+  const doubled = service.updateItemQuantity({ itemId: menuLine.id, quantity: 2 });
+  assert.equal(doubled.ok, true, doubled.message);
+  assert.equal(getInventoryBalance(database.databasePath, product.id).quantity, menuStockBefore - 0.25,
+    "Folio quantity edits must use frozen consumption, not the current Menu policy.");
+  assert.equal(doubled.data.folios.find(item => item.id === opened.folioId).items.find(item => item.id === menuLine.id).lineTotalMinor, menuItem.priceMinor * 2);
+  assert.equal(service.updateItemQuantity({ itemId: menuLine.id, quantity: 1 }).ok, true);
+  assert.equal(database.deleteMenuProductEntry(menuItem.id).ok, true);
+  assert.ok(listCatalogProducts(database.databasePath).find(item => item.id === product.id));
 
   const manualAdded = service.addManualItem({
     folioId: opened.folioId,
@@ -329,9 +356,8 @@ try {
   const menuRemoved = service.removeItem(menuLine.id);
   assert.equal(menuRemoved.ok, true);
   if (menuStockBefore !== null) {
-    const restoredMenu = menuRemoved.data.menuItems.find((item) => item.id === menuItem.id);
-    assert.ok(restoredMenu);
-    assert.equal(restoredMenu.stockQuantity, menuStockBefore);
+    assert.equal(getInventoryBalance(database.databasePath, menuItem.productId).quantity, menuStockBefore,
+      "Unlinking a Menu entry must not prevent exact canonical stock restoration for a historical Folio line.");
   }
 
   const checkedOut = service.checkout({ folioId: opened.folioId });
@@ -340,10 +366,13 @@ try {
   assert.ok(closedFolio);
   assert.equal(closedFolio.status, "open");
   assert.ok(closedFolio.remainingMinor > 0, "Outstanding receivable must remain after checkout.");
+  assert.deepEqual(closedFolio.payments, persistedPayments);
 
   const sqliteCheckout = new DatabaseSync(database.databasePath);
   const stayAfter = sqliteCheckout.prepare(`SELECT status FROM customer_room_stays WHERE id = ?`).get("room_folio_smoke_stay");
   const roomAfter = sqliteCheckout.prepare(`SELECT status FROM rooms WHERE id = ?`).get(room.id);
+  assert.equal(sqliteCheckout.prepare("SELECT COUNT(*) AS n FROM customer_credit_entries").get().n, 0,
+    "Hospitality charges/payments/checkout must not be converted to retail credit.");
   sqliteCheckout.close();
   assert.equal(stayAfter.status, "checked_out");
   assert.equal(roomAfter.status, "cleaning");
