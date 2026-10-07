@@ -532,11 +532,9 @@ const hybridProjection = projectAndroidOperationsSnapshot(fullSnapshot, pensionR
 assert.equal(hybridProjection.rooms.length > 0, true);
 assert.deepEqual(hybridProjection.tables, []);
 assert.equal(hybridProjection.reservations.some((reservation) => reservation.reservation_type === "table"), false);
-assert.match(
-  navigationSource,
-  /pageId:\s*"market"[\s\S]{0,220}condition:\s*\{\s*anyOf:\s*\[C\.RETAIL_BARCODE,[^\]]*C\.WHOLESALE,[^\]]*C\.ONLINE_SALES\]/,
-  "Satış navigation is owned by retail/commerce surface capabilities, not generic catalog/sales capabilities"
-);
+// Executable retail/manual-sale/wholesale/runtime and persisted navigation cases
+// live in sales-correctness and sales-workspace-ui; don't freeze the old tool-only gate.
+assert.doesNotMatch(navigationSource, /profileId\s*===|profile\s*===/, "Navigation must not introduce profile-name gates.");
 for (const profileId of ["pension_restaurant", "pension", "restaurant"]) {
   const capabilities = getBusinessProfile(profileId).defaultCapabilities;
   assert.equal(capabilities.includes(C.RETAIL_BARCODE), false, `${profileId} must not expose the retail Satış surface`);

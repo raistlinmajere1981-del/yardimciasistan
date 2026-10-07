@@ -26,7 +26,10 @@ export function useMarketController({
   const bridge = window.yardimciDesktop?.commerce;
   const catalogEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CATALOG);
   const customerCreditEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT);
-  const quickSaleSession = useMarketQuickSaleSession({ customerCreditEnabled });
+  const quickSaleSession = useMarketQuickSaleSession({ customerCreditEnabled,
+    customerSelectionEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
+    pricingContext: businessCapabilities?.enabledCapabilities.join("|") ?? "" });
+  const refreshSalePrices = quickSaleSession.refreshPrices;
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<MarketAsyncState>("idle");
@@ -75,7 +78,8 @@ export function useMarketController({
     const retainedProducts = [...pinnedProducts.current.values()].filter((product) => !nextIds.has(product.id));
     setProducts([...nextProducts, ...retainedProducts]);
     setCategories(nextCategories);
-  }, [bridge, catalogEnabled]);
+    refreshSalePrices();
+  }, [bridge, catalogEnabled, refreshSalePrices]);
 
   useEffect(() => {
     if (!enabled) {

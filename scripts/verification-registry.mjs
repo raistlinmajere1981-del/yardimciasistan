@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-sales-correctness.mjs",
+  "scripts/smoke-sales-workspace-ui.mjs",
   "scripts/smoke-settings-correctness.mjs",
   "scripts/smoke-settings-ui-correctness.mjs",
   "scripts/smoke-desktop-ui-correctness.mjs",
@@ -320,8 +322,18 @@ const SETTINGS_CHECKS = new Set([
   "business-location-geocode", "business-public-profile", "setup-profile-contract", "schema-authority",
   "commerce-online-catalog", "commerce-dealer-orders", "commerce-aras-provider", "commerce-aras-ui", "business-messaging-provider", "kbs-domain"
 ]);
-export const VERIFICATION_CHECKS = [...BASE_CHECKS, ...SMOKE_CHECKS].map(item => SETTINGS_CHECKS.has(item.id)
-  ? { ...item, domains: [...new Set([...item.domains, "settings"])] } : item);
+const SALES_WORKSPACE_CHECKS = new Set([
+  "sales-correctness", "sales-workspace-ui", "typecheck", "typecheck-electron", "lint-strict", "knip-strict", "design-audit-strict",
+  "market-quick-sale-contract", "market-quick-sale-session", "market-sale-runtime", "market-barcode-input-contract",
+  "market-live-scanner-contract", "market-product-data-contract", "commerce-product-media", "commerce-foundation", "commerce-runtime",
+  "commerce-ipc-contract", "commerce-orders", "commerce-order-fulfillment", "commerce-wholesale-pricing", "commerce-wholesale-order-flow",
+  "market-customer-credit-foundation", "market-customer-credit-ui-contract", "commerce-online-catalog-ui",
+  "business-capabilities", "capability-runtime", "capability-surface-consistency", "market-profile-registry", "sector-feature-contributions",
+  "menu-reorder-contract", "desktop-menu-db", "workspace-platform", "verification-registry-tests", "schema-authority"
+]);
+export const VERIFICATION_CHECKS = [...BASE_CHECKS, ...SMOKE_CHECKS].map(item => ({ ...item, domains: [...new Set([
+  ...item.domains, ...(SETTINGS_CHECKS.has(item.id) ? ["settings"] : []), ...(SALES_WORKSPACE_CHECKS.has(item.id) ? ["sales-workspace"] : [])
+])] }));
 
 export const PRESET_LAYERS = {
   dev: ["dev"],

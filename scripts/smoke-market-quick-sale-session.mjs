@@ -163,6 +163,7 @@ try {
     });
 
     const commerce = {
+      resolveProductPrice: async ({ productId, customerId = "" }) => ({ productId, customerId, unitPrice: 30, currency: "TRY", requestedGroup: "retail", appliedGroup: "retail", fallbackToRetail: false, dealerEligible: false }),
       completeMarketSale: async (input) => {
         const sale = input.settlement === "credit"
           ? await commerce.createCustomerCreditSale(input) : await commerce.createPaidSale(input);
@@ -287,19 +288,19 @@ try {
   const quick = () => page.locator(".market-quick-sale-layout");
   const productRow = () => quick().getByRole("button", { name: /Test Ürünü/ }).first();
   const quantity = () => quick().getByRole("spinbutton", { name: "Test Ürünü miktarı", exact: true });
-  const payment = () => quick().getByLabel("Ödeme yöntemi");
+  const payment = () => quick().getByRole("group", { name: "Ödeme yöntemi", exact: true });
   const discount = () => quick().getByLabel("İndirim");
 
   await expect(quick()).toBeVisible();
   await expect(productRow()).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__m8bStats.modeCalls.at(-1))).toBe(true);
-  await expect(page.locator(".market-phone-device")).toContainText("Hazır");
+  await expect(page.getByLabel("Telefon barkod kanalı")).toContainText("hazır");
 
   // Session state survives a Market mode change.
   await productRow().click();
   await quantity().fill("2");
   await discount().fill("5");
-  await payment().selectOption("card");
+  await payment().getByRole("button", { name: "Kart", exact: true }).click();
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await expect(quick()).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__m8bStats.modeCalls.at(-1))).toBe(false);
@@ -317,7 +318,7 @@ try {
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
   await expect(quantity()).toHaveValue("2");
   await expect(discount()).toHaveValue("5");
-  await expect(payment()).toHaveValue("card");
+  await expect(payment().getByRole("button", { name: "Kart", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   // A phone batch stops after an unknown barcode handoff; later events never touch the hidden cart.
   const findBeforeBatch = await page.evaluate(() => window.__m8bStats.findCalls);
@@ -335,7 +336,7 @@ try {
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
   await expect(quantity()).toHaveValue("2");
   await expect(discount()).toHaveValue("5");
-  await expect(payment()).toHaveValue("card");
+  await expect(payment().getByRole("button", { name: "Kart", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   // A delayed local lookup cannot mutate the hidden cart after Quick Sale unmounts.
   await quick().locator(".market-barcode-panel select").selectOption("simulator");
@@ -376,13 +377,13 @@ try {
 
   // Credit capability normalization happens even while Quick Sale is unmounted.
   await productRow().click();
-  await payment().selectOption("credit");
+  await payment().getByRole("button", { name: "Veresiye", exact: true }).click();
   await chooseSearchSelect(quick(), "Müşteri", {value:"customer-1"});
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await page.evaluate(() => window.__m8bToggleCredit(false));
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
-  await expect(payment()).toHaveValue("cash");
-  await expect(quick().getByLabel("Müşteri", { exact: true })).toHaveCount(0);
+  await expect(payment().getByRole("button", { name: "Nakit", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(quick().getByLabel("Müşteri", { exact: true })).toBeVisible();
 
   // Draft source + recovery are persistent session state; retry never resubmits the sale.
   await tabs.getByRole("button", { name: /Telefon Sepetleri/ }).click();

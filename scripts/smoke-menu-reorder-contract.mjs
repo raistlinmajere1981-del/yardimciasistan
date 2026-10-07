@@ -1,13 +1,19 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import ts from "typescript";
 
 const manager = await readFile("apps/desktop-app/src/components/menu/MenuManager.tsx", "utf8");
 const css = await readFile("apps/desktop-app/src/styles/pages/menu.css", "utf8");
 
-assert.match(manager, /draggingRef\.current = nextDragging/);
-assert.match(manager, /const activeDrag = draggingRef\.current \?\? dragging/);
-assert.match(manager, /setDragImage\(/);
-assert.match(manager, /kind === "item" && !selectedCategoryId/);
+const reorder = await readFile("apps/desktop-app/src/components/ui/use-record-reorder.ts", "utf8");
+const compiled = ts.transpileModule(reorder, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const exports = {};
+new Function("require", "exports", compiled)(() => ({}), exports);
+assert.deepEqual(exports.moveRecordId(["a", "b", "c"], "a", "c", "after"), ["b", "c", "a"]);
+assert.deepEqual(exports.moveRecordId(["a", "b", "c"], "c", "a", "before"), ["c", "a", "b"]);
+assert.equal(exports.moveRecordId(["a", "b"], "missing", "a", "after"), null);
+assert.match(manager, /useRecordReorder/);
+assert.match(reorder, /setDragImage\(/);
 assert.match(manager, /draggable=\{!reorderBusy && Boolean\(selectedCategoryId\)\}/);
 assert.match(manager, /Sıralamak için kategori seçin/);
 assert.match(manager, /handleDragOver\(event, "category", category\.id\)/);

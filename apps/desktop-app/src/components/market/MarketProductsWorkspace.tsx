@@ -1,6 +1,6 @@
 import { SearchSelect } from "../ui/SearchSelect";
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
-import { Plus, Save, Search } from "lucide-react";
+import { GripVertical, Plus, Save, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
@@ -24,13 +24,16 @@ import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
 import { ProductFormFields } from "./ProductFormFields";
+import { useRecordReorder } from "../ui/use-record-reorder";
+import { ChoiceChips } from "../ui/ChoiceChips";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { IconButton } from "../ui/IconButton";
 
 interface CategoryFormState {
   id: string;
   parentId: string;
   name: string;
   code: string;
-  sortOrder: string;
   isActive: boolean;
 }
 
@@ -52,7 +55,7 @@ interface MarketProductsWorkspaceProps {
 }
 
 function emptyCategoryForm(): CategoryFormState {
-  return { id: "", parentId: "", name: "", code: "", sortOrder: "0", isActive: true };
+  return { id: "", parentId: "", name: "", code: "", isActive: true };
 }
 
 function money(value: number, currency = "TRY") {
@@ -91,13 +94,32 @@ export function MarketProductsWorkspace({
   const [saveMessage, setSaveMessage] = useState("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
   const [pendingProductId, setPendingProductId] = useState("");
   const beginCreateRequest = useRequestGeneration();
+  const [listMode, setListMode] = usePageViewState<"products" | "quickAccess">("market.products.listMode", "products");
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ kind: "products" | "categories"; id: string; name: string } | null>(null);
+  const quickProducts = useMemo(() => products.filter(product => product.quickAccessEnabled).sort((a, b) => (a.quickAccessOrder ?? 0) - (b.quickAccessOrder ?? 0)), [products]);
+  async function mutate(operation: () => Promise<void>, message: string) {
+    if (busy || mutationBusy) return;
+    setMutationBusy(true);
+    try { await operation(); await onReload(); onStateChange("success", message); }
+    catch (error) { onStateChange("error", error instanceof Error ? error.message : "Katalog güncellenemedi."); }
+    finally { setMutationBusy(false); }
+  }
+  const reorder = useRecordReorder<"products" | "categories" | "quickAccess">({
+    canDrag: () => !busy && !mutationBusy && !search.trim(),
+    getIds: kind => (kind === "categories" ? categories : kind === "quickAccess" ? quickProducts : products).map(record => record.id),
+    onReorder: async (kind, ids) => { if (bridge) await mutate(() => bridge.reorderCatalog(kind, ids), "Katalog sırası kaydedildi."); }
+  });
+  function sortClass(kind: "products" | "categories" | "quickAccess", id: string) {
+    return `menu-sortable-record${reorder.dragging?.kind === kind && reorder.dragging.id === id ? " is-dragging" : ""}${reorder.dropTarget?.kind === kind && reorder.dropTarget.id === id ? ` is-drop-${reorder.dropTarget.position}` : ""}`;
+  }
 
-  const filteredProducts = useMemo(() => products.filter((product) => {
+  const filteredProducts = useMemo(() => (listMode === "quickAccess" ? quickProducts : products).filter((product) => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     if (!needle) return true;
     return [product.name, product.brand, product.sku, product.barcode]
       .some((value) => String(value ?? "").toLocaleLowerCase("tr-TR").includes(needle));
-  }), [products, search]);
+  }), [listMode, products, quickProducts, search]);
 
   useEffect(() => {
     if (!productLookupRequest) return;
@@ -147,7 +169,6 @@ export function MarketProductsWorkspace({
       parentId: category.parentId,
       name: category.name,
       code: category.code,
-      sortOrder: String(category.sortOrder),
       isActive: category.isActive
     });
   }
@@ -161,7 +182,6 @@ export function MarketProductsWorkspace({
         parentId: categoryForm.parentId,
         name: categoryForm.name,
         code: categoryForm.code,
-        sortOrder: Number(categoryForm.sortOrder),
         isActive: categoryForm.isActive
       });
       setCategoryForm(emptyCategoryForm());
@@ -246,17 +266,23 @@ export function MarketProductsWorkspace({
             <Search size={16} aria-hidden="true" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad, marka, SKU veya barkod ara" />
           </label>
+          <ChoiceChips ariaLabel="Ürün listesi" value={listMode} onChange={setListMode} options={[{ id: "products", label: "Tüm ürünler" }, { id: "quickAccess", label: "Hızlı Erişim" }]} />
           <div ref={pageScroll} className="market-list">
             {filteredProducts.map((product) => (
-              <DataListButton
-                className="market-list-row"
-                key={product.id}
-                onClick={() => openProduct(product)}
-                leading={<MarketProductThumbnail product={product} className="market-list-product-thumb" />}
-                title={product.name}
-                meta={<span>{product.brand ? `${product.brand} · ` : ""}{product.sku || "SKU yok"} · {product.barcode || "Barkod yok"}</span>}
-                trailing={<span className="market-list-value">{money(product.salePrice, product.currency)}</span>}
-              />
+              <article className={`market-catalog-record ${sortClass(listMode, product.id)}`} key={product.id}
+                data-sort-kind={listMode} data-sort-id={product.id}
+                onDragOver={event => reorder.handleDragOver(event, listMode, product.id)} onDrop={event => void reorder.handleDrop(event, listMode, product.id)}>
+                <IconButton type="button" className="menu-drag-handle-hitbox" aria-label={`${product.name} sırasını değiştir`} title="Sürükleyin veya yukarı/aşağı okları kullanın" {...reorder.handleProps(listMode, product.id)}><GripVertical size={16} aria-hidden="true" /></IconButton>
+                <DataListButton className="market-list-row" onClick={() => { if (!reorder.suppressRowClickRef.current) openProduct(product); }}
+                  leading={<MarketProductThumbnail product={product} className="market-list-product-thumb" />} title={product.name}
+                  meta={<span>{money(product.salePrice, product.currency)} · {product.sku || product.barcode || "Kod yok"}</span>}
+                  trailing={<StatusBadge tone={product.isActive ? "success" : "neutral"}>{product.isActive ? "Aktif" : "Pasif"}</StatusBadge>} />
+                <div className="market-record-actions">
+                  <ActionButton variant="secondary" onClick={() => openProduct(product)}>Düzenle</ActionButton>
+                  <ActionButton variant="secondary" disabled={busy || mutationBusy} onClick={() => { if (bridge) void mutate(() => bridge.setProductQuickAccess(product.id, !product.quickAccessEnabled), "Hızlı erişim tercihi kaydedildi."); }}>{product.quickAccessEnabled ? "Hızlı erişimden çıkar" : "Hızlı erişime ekle"}</ActionButton>
+                  <ActionButton variant="danger" disabled={busy || mutationBusy} onClick={() => setPendingDelete({ kind: "products", id: product.id, name: product.name })}>Sil</ActionButton>
+                </div>
+              </article>
             ))}
             {filteredProducts.length === 0 && <p className="market-muted">Eşleşen ürün yok.</p>}
           </div>
@@ -270,32 +296,37 @@ export function MarketProductsWorkspace({
           <div className="market-category-layout market-category-layout--single">
             <div className="market-list compact">
               {categories.map((category) => (
-                <button
-                  type="button"
-                  className="market-list-row interactive-surface interactive-surface--record"
-                  key={category.id}
-                  aria-pressed={categoryForm.id === category.id}
-                  onClick={() => editCategory(category)}
-                >
+                <article className={`market-catalog-record ${sortClass("categories", category.id)}`} key={category.id}
+                  data-sort-kind="categories" data-sort-id={category.id}
+                  onDragOver={event => reorder.handleDragOver(event, "categories", category.id)} onDrop={event => void reorder.handleDrop(event, "categories", category.id)}>
+                  <IconButton type="button" className="menu-drag-handle-hitbox" aria-label={`${category.name} sırasını değiştir`} title="Sürükleyin veya yukarı/aşağı okları kullanın" {...reorder.handleProps("categories", category.id)}><GripVertical size={16} aria-hidden="true" /></IconButton>
+                  <button type="button" className="market-list-row interactive-surface interactive-surface--record" aria-pressed={categoryForm.id === category.id} onClick={() => editCategory(category)}>
                   <span><strong>{category.name}</strong><small>{category.code || "Kod yok"}{category.parentId ? " · alt kategori" : " · ana kategori"}</small></span>
                   <StatusBadge tone={category.isActive ? "success" : "neutral"}>{category.isActive ? "Aktif" : "Pasif"}</StatusBadge>
-                </button>
+                  </button>
+                  <div className="market-record-actions"><ActionButton variant="secondary" onClick={() => editCategory(category)}>Düzenle</ActionButton><ActionButton variant="danger" onClick={() => setPendingDelete({ kind: "categories", id: category.id, name: category.name })}>Sil</ActionButton></div>
+                </article>
               ))}
             </div>
             <div className="market-form-grid">
               <label className="market-field">Kategori adı<input value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} /></label>
               <label className="market-field">Kod<input value={categoryForm.code} onChange={(event) => setCategoryForm((current) => ({ ...current, code: event.target.value }))} /></label>
               <label className="market-field">Üst kategori<SearchSelect ariaLabel="Üst kategori" value={categoryForm.parentId} placeholder="Ana kategori" onChange={parentId => setCategoryForm(current => ({ ...current, parentId }))} options={categories.filter(category => category.id !== categoryForm.id).map(category => ({ id: category.id, label: category.name }))} /></label>
-              <label className="market-field">Sıra<input type="number" value={categoryForm.sortOrder} onChange={(event) => setCategoryForm((current) => ({ ...current, sortOrder: event.target.value }))} /></label>
               <label className="market-check"><input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif kategori</label>
               <div className="market-form-actions market-field-wide">
                 <ActionButton type="button" busy={busy} onClick={() => void saveCategory()}><Save size={16} aria-hidden="true" /> Kategoriyi Kaydet</ActionButton>
-                {categoryForm.id && <ActionButton variant="danger" type="button" onClick={() => void deleteCategory(categoryForm.id)}>Kategoriyi Kaldır</ActionButton>}
               </div>
             </div>
           </div>
         </section>
       </div>
+
+      {pendingDelete && <ConfirmDialog tone="danger" title={pendingDelete.kind === "products" ? "Ürünü sil" : "Kategoriyi sil"} description={`“${pendingDelete.name}” kaldırılacak.`} confirmLabel="Sil" busy={mutationBusy || busy} onCancel={() => setPendingDelete(null)} onConfirm={() => {
+        const record = pendingDelete;
+        setPendingDelete(null);
+        if (record.kind === "categories") void deleteCategory(record.id);
+        else if (bridge) void mutate(() => bridge.deleteProduct(record.id), "Ürün kaldırıldı.");
+      }} />}
 
       {createOpen && <FormDialog
         title="Yeni ürün ekle"
@@ -318,6 +349,7 @@ export function MarketProductsWorkspace({
             inventoryEnabled={inventoryEnabled}
             productDataEnabled={productDataEnabled}
             wholesaleEnabled={wholesaleEnabled}
+            statusFields={onlineSalesEnabled ? <label className="market-check"><input type="checkbox" checked={onlineSalesPublished} disabled={busy || saveState === "loading"} onChange={event => setOnlineSalesPublished(event.target.checked)} /> Web satışında yayınla</label> : null}
             disabled={busy || saveState === "loading"}
             mode="all"
             localImageDataUrl={imageDraftMode === "manual" ? manualImageDataUrl : ""}
@@ -338,10 +370,6 @@ export function MarketProductsWorkspace({
             onChange={setProductForm}
             onStateChange={onStateChange}
           />
-          {onlineSalesEnabled && <label className="market-check">
-            <input type="checkbox" checked={onlineSalesPublished} disabled={busy || saveState === "loading"}
-              onChange={(event) => setOnlineSalesPublished(event.target.checked)} /> Web satışında yayınla
-          </label>}
         </div>
       </FormDialog>}
     </>

@@ -27,7 +27,7 @@ function intentContracts(intent: WorkspaceIntent) {
     const _customer = intent.customerId;
     return { mode };
   }
-  const mode: "details" | "stock" | "media" | undefined = intent.mode;
+  const mode: "details" | "history" | undefined = intent.mode;
   // @ts-expect-error Product cannot acquire the Room-specific payload.
   const _customer = intent.customerId;
   return { mode };
@@ -48,8 +48,8 @@ export const wrongMode: WorkspaceModeUpdate = { entityType: "room", mode: "order
 export const wrongCustomerAction: WorkspaceIntent = { entityType: "customer", entityId: "1", action: "payment" };
 // @ts-expect-error Menu Item cannot request a Customer mode.
 export const wrongMenuMode: WorkspaceModeUpdate = { entityType: "menu-item", mode: "history" };
-// @ts-expect-error Product cannot request a Customer mode.
-export const wrongProductMode: WorkspaceModeUpdate = { entityType: "product", mode: "history" };
+// @ts-expect-error Product cannot request a Customer editor mode.
+export const wrongProductMode: WorkspaceModeUpdate = { entityType: "product", mode: "main" };
 // @ts-expect-error Pension views cannot contain Floor.
 export const wrongPensionView: WorkspaceReturnContext = { page: "pension", view: "floor" };
 // @ts-expect-error Restaurant views cannot contain Rooms.

@@ -70,6 +70,10 @@ export interface CatalogProduct {
   salePrice: number;
   dealerPriceA?: number | null;
   dealerPriceB?: number | null;
+  /** Catalog presentation metadata; never a second product identity. */
+  sortOrder?: number;
+  quickAccessEnabled?: boolean;
+  quickAccessOrder?: number;
   purchasePrice: number;
   currency: string;
   unit: CommerceUnit;

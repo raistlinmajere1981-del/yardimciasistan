@@ -125,6 +125,8 @@
   min-height: var(--control-height-lg);
   cursor: grab;
   touch-action: none;
+  min-width: var(--interaction-target-min);
+  min-height: var(--interaction-target-min);
 }
 
 .menu-drag-handle-hitbox:active {

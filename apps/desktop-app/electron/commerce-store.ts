@@ -15,6 +15,7 @@ import {
 import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
 import { saveCommerceProductPublication } from "./commerce-product-publication-store.js";
 import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
+import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service.js";
 
 const COMMERCE_UNITS = new Set<CommerceUnit>([
   "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
@@ -43,6 +44,7 @@ export interface SaveCatalogProductInput {
   salePrice?: number;
   dealerPriceA?: number | null;
   dealerPriceB?: number | null;
+  quickAccessEnabled?: boolean;
   purchasePrice?: number;
   currency?: string;
   unit?: CommerceUnit;
@@ -107,6 +109,7 @@ export interface InventoryCountResult {
 }
 
 export interface CreateCommerceSaleInput {
+  customerId?: string;
   paymentMethod?: string;
   source?: string;
   locationId?: string;
@@ -218,6 +221,9 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
     salePrice: roundMoney(Number(row.sale_price ?? 0)),
     dealerPriceA: row.dealer_price_a == null ? null : roundMoney(Number(row.dealer_price_a)),
     dealerPriceB: row.dealer_price_b == null ? null : roundMoney(Number(row.dealer_price_b)),
+    sortOrder: Number(row.sort_order ?? 0),
+    quickAccessEnabled: Number(row.quick_access_enabled ?? 0) === 1,
+    quickAccessOrder: Number(row.quick_access_order ?? 0),
     purchasePrice: roundMoney(Number(row.purchase_price ?? 0)),
     currency: normalizeCurrency(row.currency),
     unit: normalizeUnit(row.unit),
@@ -453,7 +459,7 @@ export function listCatalogProducts(
       SELECT *
       FROM catalog_products
       WHERE ${conditions.join(" AND ")}
-      ORDER BY is_active DESC, name COLLATE NOCASE ASC
+      ORDER BY sort_order ASC, name COLLATE NOCASE ASC, id ASC
       LIMIT ?
     `).all(...params) as Array<Record<string, unknown>>).map(mapProduct);
   } finally {
@@ -545,6 +551,7 @@ export function saveCatalogProductInTransaction(
   const trackInventory = input.trackInventory !== false;
   const isActive = input.isActive !== false;
   const categoryId = String(input.categoryId ?? "").trim();
+  if (input.quickAccessEnabled !== undefined && typeof input.quickAccessEnabled !== "boolean") throw new Error("Hızlı erişim tercihi geçersiz.");
 
   try {
     database.prepare(`
@@ -588,6 +595,15 @@ export function saveCatalogProductInTransaction(
       dataLicense, imageLicense, sourceFetchedAt,
       String(existing?.created_at ?? now), now
     );
+
+    if (input.quickAccessEnabled !== undefined) {
+      const nextOrder = Number((database.prepare("SELECT COALESCE(MAX(quick_access_order), -1) + 1 AS value FROM catalog_products WHERE business_id = ? AND quick_access_enabled = 1 AND deleted_at = ''").get(businessId) as { value: number }).value);
+      database.prepare("UPDATE catalog_products SET quick_access_enabled = ?, quick_access_order = CASE WHEN quick_access_enabled = 0 AND ? = 1 THEN ? ELSE quick_access_order END WHERE id = ?")
+        .run(input.quickAccessEnabled ? 1 : 0, input.quickAccessEnabled ? 1 : 0, nextOrder, id);
+    }
+
+    if (!existing) database.prepare("UPDATE catalog_products SET sort_order = (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM catalog_products WHERE business_id = ? AND id <> ? AND deleted_at = '') WHERE id = ?")
+      .run(businessId, id, id);
 
     if (trackInventory) {
       const locationId = ensurePrimaryLocation(database, businessId, now);
@@ -824,6 +840,7 @@ export function createCommerceSaleInTransaction(
 
   const saleId = createId("sale_");
   const inventoryEnabled = isInventoryTrackingEnabled(database);
+  const wholesaleEnabled = readEnabledBusinessCapabilities(database).includes(BUSINESS_CAPABILITIES.WHOLESALE);
   const locationId = inventoryEnabled
     ? String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now)
     : "";
@@ -841,6 +858,8 @@ export function createCommerceSaleInTransaction(
     const row = getProductRow(database, businessId, String(item.productId ?? "").trim());
     if (!row || Number(row.is_active ?? 0) !== 1) throw new Error("Satış ürünlerinden biri aktif değil veya bulunamadı.");
     const product = mapProduct(row);
+    const resolvedPrice = resolveCommerceProductPriceInDatabase(database, businessId, { productId: product.id, customerId: input.customerId }, wholesaleEnabled);
+    product.salePrice = resolvedPrice.unitPrice;
     moneyToMinor(product.salePrice);
     if (currency && product.currency !== currency) throw new Error("Tek satışta birden fazla para birimi kullanılamaz.");
     currency = product.currency;

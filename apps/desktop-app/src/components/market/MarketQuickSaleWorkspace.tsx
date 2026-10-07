@@ -24,12 +24,16 @@ import { ActionButton } from "../ui/ActionButton";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
 import type { CartDraftQuickSaleRequest, MarketQuickSaleSession } from "../../app/use-market-quick-sale-session";
 import { useRequestGeneration } from "../workspace/use-request-generation";
+import { ChoiceChips } from "../ui/ChoiceChips";
+import { MarketSaleQuantityInput } from "./MarketSaleQuantityInput";
+import { readSaleProductViewPreference, saveSaleProductViewPreference, type SaleProductViewPreference, type SaleProductViewPreset } from "../../ui-preferences";
 
 type BarcodeMode = "keyboard-wedge" | "simulator";
 
 interface MarketQuickSaleWorkspaceProps {
   customers?: DesktopCustomer[];
   customerCreditEnabled?: boolean;
+  customerSelectionEnabled?: boolean;
   products: CatalogProduct[];
   categories: CatalogCategory[];
   session: MarketQuickSaleSession;
@@ -120,6 +124,7 @@ function releasePhoneScanner(bridge: DesktopCommerceBridge, lease: number) {
 export function MarketQuickSaleWorkspace({
   customers = [],
   customerCreditEnabled = false,
+  customerSelectionEnabled = customerCreditEnabled,
   products,
   categories,
   session,
@@ -141,6 +146,8 @@ export function MarketQuickSaleWorkspace({
   const [scanning, setScanning] = useState(false);
   const [phoneBarcodeReady, setPhoneBarcodeReady] = useState(false);
   const [lastScanDevice, setLastScanDevice] = useState("");
+  const [productView, setProductView] = useState(readSaleProductViewPreference);
+  const [catalogPrices, setCatalogPrices] = useState<{ customerId: string; prices: Map<string, number> } | null>(null);
   const localScanInFlight = useRef(false);
   const interactionBlocked = useRef(false);
   const mountedRef = useRef(true);
@@ -171,9 +178,12 @@ export function MarketQuickSaleWorkspace({
     recordSale,
     applyLoadedDraft
   } = session;
+  const { pricesReady, priceError, prepareSaleOperation, refreshPrices } = session;
   const isCredit = paymentMethod === "credit";
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
   const draftLoading = Boolean(cartDraftRequest && loadedDraftRequestId.current !== cartDraftRequest.requestId);
+
+  useEffect(() => { refreshPrices(); }, [refreshPrices, selectedCustomer?.updatedAt]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -188,6 +198,18 @@ export function MarketQuickSaleWorkspace({
     () => products.filter((product) => product.isActive),
     [products]
   );
+
+  useEffect(() => {
+    if (!bridge?.resolveProductPrice) return;
+    let current = true;
+    setCatalogPrices(null);
+    void Promise.all(activeProducts.map(product => bridge.resolveProductPrice({ productId: product.id, customerId })))
+      .then(prices => { if (current) setCatalogPrices({ customerId, prices: new Map(prices.map(price => [price.productId, price.unitPrice])) }); })
+      .catch(() => { if (current) setCatalogPrices(null); });
+    return () => { current = false; };
+  }, [activeProducts, bridge, customerId, selectedCustomer?.updatedAt, session.pricingContext]);
+
+  function changeProductView(next: SaleProductViewPreference) { setProductView(next); saveSaleProductViewPreference(next); }
   const cartCurrency = cart
     .map((line) => line.product.currency)
     .find((value): value is string => Boolean(value)) ?? "";
@@ -195,17 +217,17 @@ export function MarketQuickSaleWorkspace({
   const filteredProducts = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     return activeProducts.filter((product) => {
-      if (categoryId && product.categoryId !== categoryId) return false;
+      if (categoryId === "quickAccess" ? !product.quickAccessEnabled : categoryId && product.categoryId !== categoryId) return false;
       if (cartCurrency && product.currency !== cartCurrency) return false;
       if (!needle) return true;
       return [product.name, product.sku, product.barcode]
         .some((value) => value.toLocaleLowerCase("tr-TR").includes(needle));
-    });
+    }).sort((a, b) => categoryId === "quickAccess" ? (a.quickAccessOrder ?? 0) - (b.quickAccessOrder ?? 0) : 0);
   }, [activeProducts, cartCurrency, categoryId, search]);
 
   const cartLines = cart;
   const subtotal = roundMoney(cartLines.reduce(
-    (sum, line) => sum + (line.product.salePrice * line.quantity),
+    (sum, line) => sum + roundMoney((line.price?.customerId === customerId ? line.price.unitPrice : 0) * line.quantity),
     0
   ));
   const discountMajor = discountTotal.trim() === "" ? 0 : parseMoneyToMajor(discountTotal);
@@ -373,7 +395,7 @@ export function MarketQuickSaleWorkspace({
   }
 
   async function completeSale() {
-    if (busy) return;
+    if (busy || !pricesReady) return;
     if (!bridge) {
       onStateChange("error", "Satış kaydı kullanılamıyor. Uygulamayı yeniden başlatın.");
       return;
@@ -409,8 +431,9 @@ export function MarketQuickSaleWorkspace({
         source: "desktop-market-quick-sale"
       };
       operation = await bridge.completeMarketSale({ ...saleInput,
-        settlement: isCredit ? "credit" : "paid", customerId: creditCustomerId,
-        paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id });
+        settlement: isCredit ? "credit" : "paid", customerId,
+        paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id,
+        operationId: prepareSaleOperation({ ...saleInput, settlement: isCredit ? "credit" : "paid", customerId, paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id }) });
     } catch (error) {
       onStateChange("error", customerCreditError(error, "Satış tamamlanamadı."));
       finishSale();
@@ -470,37 +493,20 @@ export function MarketQuickSaleWorkspace({
   return (
     <div className="market-quick-sale-layout">
       <section className="market-panel market-sale-catalog">
-        <header className="market-panel-heading">
-          <span>Satış</span>
-          <h2>Ürün Ekle</h2>
-          <p>Ürün seçin, arayın veya etkinse barkod girişini kullanın.</p>
-        </header>
-
-        {barcodeEnabled && (
-          <div className="market-barcode-stack">
-            <section className={`market-phone-barcode-panel${phoneBarcodeReady ? " is-active" : ""}`} aria-label="Telefon barkod kanalı">
-              <div>
-                <span><Smartphone size={17} aria-hidden="true" /><strong>Telefon Kamerası</strong></span>
-                <small>
-                  Hızlı Satış açıkken telefondaki Kasa Barkod Modu otomatik dinlenir; masaüstünde ayrıca mod açmanız gerekmez.
-                  Tarama ürünü bu sepete ekler, ödeme yine masaüstünde tamamlanır.
-                </small>
-              </div>
-              <small className="market-phone-device">
-                {phoneBarcodeReady ? "Hazır" : "Bağlanıyor…"}
-                {lastScanDevice ? ` · Son cihaz: ${lastScanDevice}` : ""}
-              </small>
-            </section>
-
+        <div className="market-sale-toolbar">
+          <label className="market-search-field"><Search size={16} aria-hidden="true" /><input aria-label="Ürün ara" value={search} onChange={event => setSearch(event.target.value)} placeholder="Ürün ara" /></label>
+          {barcodeEnabled && <>
             <section className="market-barcode-panel" aria-label="Barkod girişi">
-              <div className="market-barcode-heading">
-                <span><Barcode size={17} aria-hidden="true" /><strong>USB / Test Barkod Girişi</strong></span>
-                <select value={barcodeMode} onChange={(event) => setBarcodeMode(event.target.value as BarcodeMode)} disabled={disabled || scanning}>
-                  <option value="keyboard-wedge">USB Klavye Okuyucu</option>
-                  <option value="simulator">Simülatör</option>
+              <label className="market-barcode-heading"><Barcode size={17} aria-hidden="true" />
+                <select aria-label="Barkod kaynağı" value={barcodeMode} onChange={event => setBarcodeMode(event.target.value as BarcodeMode)} disabled={disabled || scanning}>
+                  <option value="keyboard-wedge">USB okuyucu</option><option value="simulator">Test barkodu</option>
                 </select>
-              </div>
-              {barcodeMode === "simulator" && (
+              </label>
+            </section>
+            <span className="market-phone-status" role="status" aria-label="Telefon barkod kanalı" title={lastScanDevice ? `Son cihaz: ${lastScanDevice}` : undefined}><Smartphone size={16} aria-hidden="true" />Telefon {phoneBarcodeReady ? "hazır" : "bağlanıyor…"}</span>
+          </>}
+        </div>
+        {barcodeEnabled && barcodeMode === "simulator" && (
                 <div className="market-barcode-simulator">
                   <input
                     value={simulatedBarcode}
@@ -515,31 +521,19 @@ export function MarketQuickSaleWorkspace({
                     Barkodu Gönder
                   </ActionButton>
                 </div>
-              )}
-            </section>
-          </div>
         )}
-
-        <div className="market-sale-filters">
-          <label className="market-search-field">
-            <Search size={16} aria-hidden="true" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Ürün ara"
-            />
-          </label>
-          <label className="market-field">
-            Kategori
-            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-              <option value="">Tümü</option>
-              {categories.filter((category) => category.isActive).map((category) => (
-                <option value={category.id} key={category.id}>{category.name}</option>
-              ))}
-            </select>
-          </label>
+        <div className="market-sale-browse-tools">
+          <ChoiceChips ariaLabel="Ürün kategorileri" className="market-category-chips" value={categoryId} onChange={setCategoryId} options={[{ id: "", label: "Tümü" }, { id: "quickAccess", label: "Hızlı Erişim" }, ...categories.filter(category => category.isActive).map(category => ({ id: category.id, label: category.name }))]} />
+          <label className="market-field">Ürün görünümü<select aria-label="Ürün görünümü" value={productView.preset} onChange={event => changeProductView({ ...productView, preset: event.target.value as SaleProductViewPreset })}>
+            <option value="comfortable">Rahat</option><option value="balanced">Dengeli</option><option value="dense">Yoğun</option><option value="list">Liste</option><option value="custom">Özel</option>
+          </select></label>
         </div>
-        <div className="market-sale-product-grid">
+        {productView.preset === "custom" && <div className="market-sale-custom-view" aria-label="Özel ürün görünümü">
+          <label className="market-field">Sütun<select aria-label="Ürün sütun sayısı" value={productView.columns} onChange={event => changeProductView({ ...productView, columns: Number(event.target.value) })}>{[2, 3, 4, 5, 6].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+          <label className="market-check"><input type="checkbox" checked={productView.showImages} onChange={event => changeProductView({ ...productView, showImages: event.target.checked })} /> Görsel göster</label>
+          <label className="market-check"><input type="checkbox" checked={productView.emphasizePrice} onChange={event => changeProductView({ ...productView, emphasizePrice: event.target.checked })} /> Fiyatı vurgula</label>
+        </div>}
+        <div className={`market-sale-product-grid market-sale-product-grid--${productView.preset}${productView.preset === "custom" && !productView.emphasizePrice ? " market-sale-product-grid--quiet-price" : ""}`} data-columns={productView.columns}>
           {filteredProducts.map((product) => (
             <button
               type="button"
@@ -548,12 +542,12 @@ export function MarketQuickSaleWorkspace({
               onClick={() => addProduct(product)}
               disabled={disabled}
             >
-              <MarketProductThumbnail product={product} className="market-sale-product-thumb" />
+              {(productView.preset !== "custom" || productView.showImages) && <MarketProductThumbnail product={product} className="market-sale-product-thumb" />}
               <span>
                 <strong>{product.name}</strong>
                 <small>{product.sku || product.barcode || "Kod yok"}</small>
               </span>
-              <b>{money(product.salePrice, product.currency)}</b>
+              <b>{catalogPrices?.customerId === customerId && catalogPrices.prices.has(product.id) ? money(catalogPrices.prices.get(product.id)!, product.currency) : "—"}</b>
             </button>
           ))}
           {filteredProducts.length === 0 && (
@@ -595,19 +589,19 @@ export function MarketQuickSaleWorkspace({
                 <MarketProductThumbnail product={line.product} className="market-sale-cart-thumb" />
                 <span>
                   <strong>{line.product.name}</strong>
-                  <small>{money(line.product.salePrice, line.product.currency)} / {unitLabels[line.product.unit]}</small>
+                  <small>{pricesReady ? money(line.price!.unitPrice, line.price!.currency) : "—"} / {unitLabels[line.product.unit]}</small>
                 </span>
               </div>
               <div className="market-sale-quantity">
                 <ActionButton variant="secondary" fullWidth type="button" aria-label={`${line.product.name} miktarını azalt`} onClick={() => setQuantity(line.product.id, line.quantity - 1)} disabled={disabled}>
                   <Minus size={15} aria-hidden="true" />
                 </ActionButton>
-                <input type="number" min="0.0001" step="0.0001" aria-label={`${line.product.name} miktarı`} value={line.quantity} onChange={(event) => setQuantity(line.product.id, Number(event.target.value))} disabled={disabled} />
+                <MarketSaleQuantityInput name={line.product.name} quantity={line.quantity} unit={line.product.unit} onChange={quantity => setQuantity(line.product.id, quantity)} disabled={disabled} />
                 <ActionButton variant="secondary" fullWidth type="button" aria-label={`${line.product.name} miktarını artır`} onClick={() => setQuantity(line.product.id, line.quantity + 1)} disabled={disabled}>
                   <Plus size={15} aria-hidden="true" />
                 </ActionButton>
               </div>
-              <strong>{money(line.product.salePrice * line.quantity, line.product.currency)}</strong>
+              <strong>{pricesReady ? money(line.price!.unitPrice * line.quantity, line.price!.currency) : "—"}</strong>
             </div>
           ))}
           {cartLines.length === 0 && (
@@ -618,32 +612,26 @@ export function MarketQuickSaleWorkspace({
           )}
         </div>
 
-        <div className="market-sale-payment">
-          <label className="market-field">
-            Ödeme yöntemi
-            <select aria-label="Ödeme yöntemi" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} disabled={disabled}>
-              <option value="cash">Nakit</option>
-              <option value="card">Kart</option>
-              <option value="transfer">Havale / EFT</option>
-              <option value="other">Diğer</option>
-              {customerCreditEnabled && <option value="credit">Veresiye</option>}
-            </select>
-          </label>
-          <label className="market-field">
-            İndirim
-            <MoneyInput value={discountTotal} onChange={setDiscountTotal} disabled={disabled} />
-          </label>
-        </div>
-        {!discountValid && <p role="alert" className="market-muted">İndirim için geçerli bir tutar girin (örn. 125,50).</p>}
+        <div className="market-sale-checkout-fields">
+          <div className="market-sale-payment">
+            <ChoiceChips ariaLabel="Ödeme yöntemi" value={paymentMethod} onChange={setPaymentMethod} disabled={disabled} options={[...Object.entries(paymentMethodLabels).map(([id, label]) => ({ id, label })), ...(customerCreditEnabled ? [{ id: "credit", label: "Veresiye" }] : [])]} />
+            <label className="market-field">
+              İndirim
+              <MoneyInput value={discountTotal} onChange={setDiscountTotal} disabled={disabled} />
+            </label>
+          </div>
+          {!discountValid && <p role="alert" className="market-muted">İndirim için geçerli bir tutar girin (örn. 125,50).</p>}
 
-        {customerCreditEnabled && isCredit && (
-          <CustomerPicker customers={customers} value={customerId} onChange={setCustomerId} disabled={disabled} />
-        )}
+          {customerSelectionEnabled && (
+            <CustomerPicker compact currency={currency} showDebt={isCredit && customerCreditEnabled} customers={customers} value={customerId} onChange={setCustomerId} disabled={disabled} />
+          )}
+          {priceError && <p role="alert">{priceError}</p>}
 
-        <div className="market-sale-totals">
-          <span><small>Ara toplam</small><strong>{money(subtotal, currency)}</strong></span>
-          <span><small>İndirim</small><strong>-{money(discount, currency)}</strong></span>
-          <span className="market-sale-grand-total"><small>{isCredit ? "Veresiye tutarı" : "Ödenecek"}</small><strong>{money(previewTotal, currency)}</strong></span>
+          <div className="market-sale-totals">
+            <span><small>Ara toplam</small><strong>{pricesReady ? money(subtotal, currency) : "Fiyatlar güncelleniyor…"}</strong></span>
+            <span><small>İndirim</small><strong>-{money(discount, currency)}</strong></span>
+            <span className="market-sale-grand-total"><small>{isCredit ? "Yeni veresiye tutarı" : "Ödenecek"}</small><strong>{pricesReady ? money(previewTotal, currency) : "—"}</strong></span>
+          </div>
         </div>
 
         <ActionButton
@@ -653,7 +641,7 @@ export function MarketQuickSaleWorkspace({
           busyLabel="Satış işleniyor…"
           type="button"
           onClick={() => void completeSale()}
-          disabled={disabled || !discountValid || cartLines.length === 0 || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))}
+          disabled={disabled || !pricesReady || !discountValid || cartLines.length === 0 || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))}
         >
           <WalletCards size={18} aria-hidden="true" />
           {isCredit ? "Satışı Veresiye Kaydet" : "Ödemeyi Al ve Satışı Tamamla"}

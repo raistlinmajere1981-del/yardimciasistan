@@ -26,6 +26,7 @@ export interface ProductFormState {
   minimumQuantity: string;
   trackInventory: boolean;
   isActive: boolean;
+  quickAccessEnabled: boolean;
   imageSourceUrl: string;
   dataSource: string;
   sourceProductUrl: string;
@@ -65,6 +66,7 @@ export function emptyProductForm(inventoryEnabled = true): ProductFormState {
     minimumQuantity: "0",
     trackInventory: inventoryEnabled,
     isActive: true,
+    quickAccessEnabled: false,
     imageSourceUrl: "",
     dataSource: "",
     sourceProductUrl: "",
@@ -98,6 +100,7 @@ export function toProductForm(
     minimumQuantity: String(minimumQuantity),
     trackInventory: product.trackInventory,
     isActive: product.isActive,
+    quickAccessEnabled: product.quickAccessEnabled ?? false,
     imageSourceUrl: product.imageSourceUrl ?? "",
     dataSource: product.dataSource ?? "",
     sourceProductUrl: product.sourceProductUrl ?? "",
@@ -140,6 +143,7 @@ export function productFormToSaveInput(form: ProductFormState) {
     minimumQuantity: Number(form.minimumQuantity),
     trackInventory: form.trackInventory,
     isActive: form.isActive,
+    quickAccessEnabled: form.quickAccessEnabled,
     imageSourceUrl: form.imageSourceUrl,
     dataSource: form.dataSource,
     sourceProductUrl: form.sourceProductUrl,

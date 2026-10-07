@@ -3,6 +3,32 @@ export type UiDensity = "comfortable" | "compact";
 export type UiAccent = "coral" | "blue" | "green";
 export type UiFont = "plex" | "system";
 export type UiMotion = "system" | "full" | "reduced";
+export type SaleProductViewPreset = "comfortable" | "balanced" | "dense" | "list" | "custom";
+export interface SaleProductViewPreference {
+  preset: SaleProductViewPreset;
+  columns: number;
+  showImages: boolean;
+  emphasizePrice: boolean;
+}
+const SALE_VIEW_STORAGE_KEY = "yardimci-asistan.sale-product-view";
+const DEFAULT_SALE_VIEW: SaleProductViewPreference = { preset: "balanced", columns: 4, showImages: true, emphasizePrice: true };
+
+export function readSaleProductViewPreference(): SaleProductViewPreference {
+  try {
+    const record = JSON.parse(window.localStorage.getItem(SALE_VIEW_STORAGE_KEY) ?? "null") as Partial<SaleProductViewPreference> | null;
+    if (!record) return { ...DEFAULT_SALE_VIEW };
+    return {
+      preset: ["comfortable", "balanced", "dense", "list", "custom"].includes(String(record.preset)) ? record.preset! : "balanced",
+      columns: Number.isInteger(record.columns) && Number(record.columns) >= 2 && Number(record.columns) <= 6 ? Number(record.columns) : 4,
+      showImages: typeof record.showImages === "boolean" ? record.showImages : true,
+      emphasizePrice: typeof record.emphasizePrice === "boolean" ? record.emphasizePrice : true
+    };
+  } catch { return { ...DEFAULT_SALE_VIEW }; }
+}
+
+export function saveSaleProductViewPreference(preference: SaleProductViewPreference) {
+  try { window.localStorage.setItem(SALE_VIEW_STORAGE_KEY, JSON.stringify(preference)); } catch { /* Storage disabled: retain the session preference. */ }
+}
 
 export interface UiPreferences {
   version: 2;

@@ -133,7 +133,7 @@ export function listCatalogCategories(
       SELECT *
       FROM catalog_categories
       WHERE ${conditions.join(" AND ")}
-      ORDER BY is_active DESC, sort_order ASC, name COLLATE NOCASE ASC
+      ORDER BY sort_order ASC, name COLLATE NOCASE ASC, id ASC
       LIMIT ?
     `).all(...params) as Array<Record<string, unknown>>).map(mapCategory);
   } finally {
@@ -168,7 +168,6 @@ export function saveCatalogCategory(
     const id = String(input.id ?? "").trim() || createId("cat_");
     const parentId = String(input.parentId ?? "").trim();
     const code = String(input.code ?? "").trim().slice(0, 80);
-    const sortOrder = normalizeSortOrder(input.sortOrder);
     const isActive = input.isActive !== false;
     const now = new Date().toISOString();
 
@@ -176,6 +175,9 @@ export function saveCatalogCategory(
     try {
       const existing = getCategoryRow(database, businessId, id);
       if (input.id && !existing) throw new Error("Düzenlenecek kategori bulunamadı.");
+      const sortOrder = input.sortOrder === undefined
+        ? Number(existing?.sort_order ?? (database.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM catalog_categories WHERE business_id = ? AND deleted_at = ''").get(businessId) as { value: number }).value)
+        : normalizeSortOrder(input.sortOrder);
       assertValidParentChain(database, businessId, id, parentId);
 
       database.prepare(`

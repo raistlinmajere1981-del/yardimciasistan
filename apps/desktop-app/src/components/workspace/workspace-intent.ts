@@ -42,7 +42,7 @@ export interface MenuItemWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-export type ProductWorkspaceMode = "details" | "stock" | "media";
+export type ProductWorkspaceMode = "details" | "history";
 
 export interface ProductWorkspaceIntent {
   entityType: "product";

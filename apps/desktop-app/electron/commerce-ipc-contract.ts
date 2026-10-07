@@ -82,6 +82,9 @@ export interface DesktopCommerceBridge {
   listCategories: (options?: ListCatalogCategoriesOptions) => Promise<CatalogCategory[]>;
   saveCategory: (input: SaveCatalogCategoryInput) => Promise<CatalogCategory>;
   deleteCategory: (categoryId: string) => Promise<DeleteCatalogCategoryResult>;
+  reorderCatalog: (kind: import("./commerce-catalog-presentation-store").CatalogOrderKind, orderedIds: string[]) => Promise<void>;
+  setProductQuickAccess: (productId: string, enabled: boolean) => Promise<void>;
+  deleteProduct: (productId: string) => Promise<void>;
 
   listProducts: (options?: ListCatalogProductsOptions) => Promise<CatalogProduct[]>;
   getProductPublication: (productId: string) => Promise<CommerceProductPublication | null>;

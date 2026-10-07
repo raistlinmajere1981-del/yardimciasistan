@@ -1,6 +1,6 @@
 import { SearchSelect } from "../ui/SearchSelect";
 import { Image as ImageIcon, Sparkles, Trash2, Upload } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   normalizeBarcodeIdentity,
   type CatalogCategory,
@@ -35,6 +35,7 @@ export function ProductFormFields({
   onManualImageSelected,
   onImageClear,
   onExternalImageSelected,
+  statusFields,
   onChange,
   onStateChange
 }: {
@@ -51,6 +52,7 @@ export function ProductFormFields({
   onManualImageSelected?: (dataUrl: string) => void;
   onImageClear?: () => void;
   onExternalImageSelected?: () => void;
+  statusFields?: ReactNode;
   onChange: (form: ProductFormState) => void;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
@@ -182,7 +184,14 @@ export function ProductFormFields({
     }
   }
 
-  return <>
+  return <div className="market-product-fields">
+    {showDetails && <section className="market-product-status" aria-label="Durum / Kullanım">
+      <h3>Durum / Kullanım</h3>
+      <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.isActive} onChange={event => onChange({ ...form, isActive: event.target.checked })} /> Aktif ürün</label>
+      <label className="market-check"><input disabled={disabled || !inventoryEnabled} type="checkbox" checked={form.trackInventory} onChange={event => onChange({ ...form, trackInventory: event.target.checked })} /> Stok takibi</label>
+      <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.quickAccessEnabled} onChange={event => onChange({ ...form, quickAccessEnabled: event.target.checked })} /> Hızlı erişim</label>
+      {statusFields}
+    </section>}
     {showDetails && <div className="market-form-grid">
       <label className="market-field market-field-wide">Ürün adı<input disabled={disabled} value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} /></label>
       <label className="market-field">Marka<input disabled={disabled} value={form.brand} onChange={(event) => onChange({ ...form, brand: event.target.value })} /></label>
@@ -215,8 +224,6 @@ export function ProductFormFields({
       <label className="market-field">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value })} /></label>
       {inventoryEnabled && form.trackInventory && <label className="market-field">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>}
       <label className="market-field market-field-wide">Açıklama<textarea disabled={disabled} value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} /></label>
-      <label className="market-check"><input disabled={disabled || !inventoryEnabled} type="checkbox" checked={form.trackInventory} onChange={(event) => onChange({ ...form, trackInventory: event.target.checked })} /> Stok takip et</label>
-      <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.isActive} onChange={(event) => onChange({ ...form, isActive: event.target.checked })} /> Aktif ürün</label>
     </div>}
 
     {showMedia && <div className="form-stack market-product-media">
@@ -261,5 +268,5 @@ export function ProductFormFields({
         {form.sourceFetchedAt && <small>Alınma: {new Date(form.sourceFetchedAt).toLocaleString("tr-TR")}</small>}
       </aside>}
     </div>}
-  </>;
+  </div>;
 }

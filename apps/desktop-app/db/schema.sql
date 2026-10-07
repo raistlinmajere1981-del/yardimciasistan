@@ -144,6 +144,9 @@ CREATE TABLE catalog_products (
   sale_price REAL NOT NULL DEFAULT 0,
   dealer_price_a REAL NULL CHECK (dealer_price_a IS NULL OR dealer_price_a >= 0),
   dealer_price_b REAL NULL CHECK (dealer_price_b IS NULL OR dealer_price_b >= 0),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  quick_access_enabled INTEGER NOT NULL DEFAULT 0 CHECK (quick_access_enabled IN (0, 1)),
+  quick_access_order INTEGER NOT NULL DEFAULT 0,
   purchase_price REAL NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'TRY',
   unit TEXT NOT NULL DEFAULT 'piece',
@@ -188,6 +191,15 @@ CREATE TABLE commerce_sale_drafts (
 -- inbox state; this durable link survives a failed review or lost IPC response.
 CREATE TABLE commerce_cart_draft_sales (
   draft_id TEXT PRIMARY KEY REFERENCES commerce_sale_drafts(id),
+  sale_id TEXT NOT NULL UNIQUE REFERENCES commerce_sales(id),
+  request_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- A desktop checkout intent survives IPC retries without duplicating stock/debt.
+CREATE TABLE commerce_market_sale_receipts (
+  operation_id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES business(id),
   sale_id TEXT NOT NULL UNIQUE REFERENCES commerce_sales(id),
   request_hash TEXT NOT NULL,
   created_at TEXT NOT NULL

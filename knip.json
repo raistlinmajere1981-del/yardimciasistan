@@ -6,10 +6,10 @@
   "workspaces": {
     ".": {
       "entry": [
-        "scripts/**/*.{js,mjs,cjs,ts}"
+        "scripts/**/*.{js,mjs,cjs,ts,tsx}"
       ],
       "project": [
-        "scripts/**/*.{js,mjs,cjs,ts}"
+        "scripts/**/*.{js,mjs,cjs,ts,tsx}"
       ]
     },
     "apps/admin-control-center": {

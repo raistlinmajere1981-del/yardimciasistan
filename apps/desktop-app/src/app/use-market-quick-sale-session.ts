@@ -9,6 +9,7 @@ import type {
 export interface MarketQuickSaleCartLine {
   product: CatalogProduct;
   quantity: number;
+  price?: { customerId: string; unitPrice: number; currency: string };
 }
 
 export interface CartDraftQuickSaleRequest {
@@ -21,9 +22,13 @@ function roundQuantity(value: number) {
 }
 
 export function useMarketQuickSaleSession({
-  customerCreditEnabled
+  customerCreditEnabled,
+  customerSelectionEnabled = customerCreditEnabled,
+  pricingContext = ""
 }: {
   customerCreditEnabled: boolean;
+  customerSelectionEnabled?: boolean;
+  pricingContext?: string;
 }) {
   const [cart, setCart] = useState<MarketQuickSaleCartLine[]>([]);
   const cartRef = useRef<MarketQuickSaleCartLine[]>([]);
@@ -41,16 +46,58 @@ export function useMarketQuickSaleSession({
   const cartDraftRequestRef = useRef<CartDraftQuickSaleRequest | null>(null);
   const loadedDraftRequestId = useRef<number | null>(null);
   const draftRequestSequence = useRef(0);
+  const priceGeneration = useRef(0);
+  const [priceState, setPriceState] = useState<"loading" | "ready" | "error">("ready");
+  const [priceError, setPriceError] = useState("");
+  const [priceRevision, setPriceRevision] = useState(0);
+  const checkoutIntent = useRef<{ fingerprint: string; operationId: string } | null>(null);
 
   useEffect(() => {
     if (customerCreditEnabled) return;
     setPaymentMethod((current) => current === "credit" ? "cash" : current);
-    setCustomerId("");
   }, [customerCreditEnabled]);
+
+  useEffect(() => {
+    if (!customerSelectionEnabled) setCustomerId("");
+  }, [customerSelectionEnabled]);
 
   const replaceCart = useCallback((next: MarketQuickSaleCartLine[]) => {
     cartRef.current = next;
     setCart(next);
+  }, []);
+
+  const productPriceKey = cart.map(line => `${line.product.id}:${line.product.updatedAt}`).join("|");
+  useEffect(() => {
+    const generation = ++priceGeneration.current;
+    const products = cartRef.current.map(line => line.product);
+    if (!products.length) { setPriceState("ready"); setPriceError(""); return; }
+    const bridge = window.yardimciDesktop?.commerce;
+    setPriceState("loading");
+    setPriceError("");
+    if (!bridge?.resolveProductPrice) { setPriceState("error"); setPriceError("Satış fiyatları okunamadı."); return; }
+    void Promise.all(products.map(product => bridge.resolveProductPrice({ productId: product.id, customerId })))
+      .then(prices => {
+        if (generation !== priceGeneration.current) return;
+        const byId = new Map(prices.map(price => [price.productId, price]));
+        replaceCart(cartRef.current.map(line => {
+          const price = byId.get(line.product.id);
+          return price ? { ...line, price: { customerId, unitPrice: price.unitPrice, currency: price.currency } } : line;
+        }));
+        setPriceState("ready");
+      }).catch(error => {
+        if (generation !== priceGeneration.current) return;
+        setPriceState("error");
+        setPriceError(error instanceof Error ? error.message : "Satış fiyatları okunamadı.");
+      });
+    return () => { priceGeneration.current += 1; };
+  }, [customerId, pricingContext, priceRevision, productPriceKey, replaceCart]);
+  const pricesReady = priceState === "ready" && cart.every(line => line.price?.customerId === customerId);
+  const refreshPrices = useCallback(() => { setPriceState("loading"); setPriceRevision(current => current + 1); }, []);
+
+  const prepareSaleOperation = useCallback((input: object) => {
+    const fingerprint = JSON.stringify(input);
+    if (checkoutIntent.current?.fingerprint !== fingerprint) checkoutIntent.current = { fingerprint, operationId: crypto.randomUUID() };
+    return checkoutIntent.current.operationId;
   }, []);
 
   const addProduct = useCallback((product: CatalogProduct) => {
@@ -87,6 +134,7 @@ export function useMarketQuickSaleSession({
     setCustomerId("");
     setSourceDraft(null);
     setDraftLoadWarnings([]);
+    checkoutIntent.current = null;
   }, [replaceCart]);
 
   const startSale = useCallback(() => {
@@ -146,6 +194,12 @@ export function useMarketQuickSaleSession({
   return {
     cart,
     cartRef,
+    pricingContext,
+    refreshPrices,
+    pricesReady,
+    priceState,
+    priceError,
+    prepareSaleOperation,
     discountTotal,
     setDiscountTotal,
     paymentMethod,

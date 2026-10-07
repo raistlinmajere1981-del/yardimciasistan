@@ -131,6 +131,7 @@ export function MarketPage({
         <MarketQuickSaleWorkspace
           customers={customers}
           customerCreditEnabled={customerCreditEnabled}
+          customerSelectionEnabled={runtimeHasCapability(snapshot, C.CUSTOMERS)}
           products={products}
           categories={categories}
           session={quickSaleSession}

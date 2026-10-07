@@ -1,5 +1,6 @@
 import { usePageViewScroll } from "../../app/page-view-state";
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRecordReorder } from "../ui/use-record-reorder";
 import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
@@ -82,11 +83,6 @@ export function MenuManager({
   const [newCategoryForm, setNewCategoryForm] = useState<CategoryFormState>(() => emptyCategoryForm(nextSortOrder(dashboardData.menu.categories)));
   const [itemCreateOpen, setItemCreateOpen] = useState(false);
   const [pendingItemId, setPendingItemId] = useState("");
-  const [dragging, setDragging] = useState<{ kind: "category" | "item"; id: string } | null>(null);
-  const draggingRef = useRef<{ kind: "category" | "item"; id: string } | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ kind: "category" | "item"; id: string; position: "before" | "after" } | null>(null);
-  const [reorderBusy, setReorderBusy] = useState(false);
-  const suppressRowClickRef = useRef(false);
 
   const sortedCategories = useMemo(
     () => [...dashboardData.menu.categories].sort(compareMenuRecords),
@@ -107,6 +103,17 @@ export function MenuManager({
   }, [dashboardData.menu.items, selectedCategoryId, sortedCategories]);
   const categoryScroll = usePageViewScroll("menu.categories.scroll", sortedCategories.length);
   const productScroll = usePageViewScroll(`menu.products.scroll.${selectedCategoryId}`, visibleItems.length);
+  const { dragging, dropTarget, reorderBusy, suppressRowClickRef, handleDragStart, handleDragOver, handleDrop, finishDrag,
+    handleKeyDown, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel } = useRecordReorder<"category" | "item">({
+    canDrag: (kind, id) => kind === "category" ? editingCategoryId !== id : Boolean(selectedCategoryId),
+    getIds: (kind, id) => kind === "category" ? sortedCategories.map(record => record.id) : dashboardData.menu.items
+      .filter(record => record.category_id === dashboardData.menu.items.find(item => item.id === id)?.category_id)
+      .sort(compareMenuRecords).map(record => record.id),
+    onReorder: async (kind, ids, sourceId) => {
+      if (kind === "category") await onReorderCategories(ids);
+      else { const item = dashboardData.menu.items.find(record => record.id === sourceId); if (item) await onReorderItems(item.category_id, ids); }
+    }
+  });
 
   const pendingCategoryDelete = dashboardData.menu.categories.find((category) => category.id === pendingCategoryDeleteId);
   const pendingCategoryProductCount = pendingCategoryDelete
@@ -171,116 +178,6 @@ export function MenuManager({
     setNewCategoryForm(emptyCategoryForm(nextSortOrder(result.dashboardData.menu.categories)));
   }
 
-  function handleDragStart(event: DragEvent<HTMLElement>, kind: "category" | "item", id: string) {
-    if (
-      reorderBusy
-      || (kind === "category" && editingCategoryId === id)
-      || (kind === "item" && !selectedCategoryId)
-    ) {
-      event.preventDefault();
-      return;
-    }
-
-    const nextDragging = { kind, id } as const;
-    draggingRef.current = nextDragging;
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-yardimci-menu-sort", JSON.stringify(nextDragging));
-    event.dataTransfer.setData("text/plain", id);
-
-    const record = event.currentTarget.closest(".menu-sortable-record") as HTMLElement | null;
-    if (record) {
-      const rect = record.getBoundingClientRect();
-      event.dataTransfer.setDragImage(
-        record,
-        Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
-        Math.max(0, Math.min(rect.height, event.clientY - rect.top))
-      );
-    }
-
-    suppressRowClickRef.current = false;
-    setDragging(nextDragging);
-    setDropTarget(null);
-  }
-
-  function handleDragOver(event: DragEvent<HTMLElement>, kind: "category" | "item", id: string) {
-    const activeDrag = draggingRef.current ?? dragging;
-    if (!activeDrag || activeDrag.kind !== kind || activeDrag.id === id) return;
-
-    if (kind === "item") {
-      const sourceItem = dashboardData.menu.items.find((item) => item.id === activeDrag.id);
-      const targetItem = dashboardData.menu.items.find((item) => item.id === id);
-      if (!sourceItem || !targetItem || sourceItem.category_id !== targetItem.category_id) {
-        setDropTarget(null);
-        return;
-      }
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    const rect = event.currentTarget.getBoundingClientRect();
-    const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
-    setDropTarget((current) => (
-      current?.kind === kind && current.id === id && current.position === position
-        ? current
-        : { kind, id, position }
-    ));
-  }
-
-  async function handleDrop(event: DragEvent<HTMLElement>, kind: "category" | "item", targetId: string) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const activeDrag = draggingRef.current ?? dragging;
-    draggingRef.current = null;
-    if (!activeDrag || activeDrag.kind !== kind || activeDrag.id === targetId || reorderBusy) {
-      setDragging(null);
-      setDropTarget(null);
-      return;
-    }
-
-    const sourceItem = kind === "item"
-      ? dashboardData.menu.items.find((item) => item.id === activeDrag.id)
-      : undefined;
-    const targetItem = kind === "item"
-      ? dashboardData.menu.items.find((item) => item.id === targetId)
-      : undefined;
-    if (kind === "item" && (!sourceItem || !targetItem || sourceItem.category_id !== targetItem.category_id)) {
-      setDragging(null);
-      setDropTarget(null);
-      return;
-    }
-
-    const sourceIds = kind === "category"
-      ? sortedCategories.map((record) => record.id)
-      : dashboardData.menu.items
-        .filter((record) => record.category_id === sourceItem?.category_id)
-        .sort(compareMenuRecords)
-        .map((record) => record.id);
-    const position = dropTarget?.kind === kind && dropTarget.id === targetId ? dropTarget.position : "before";
-    const orderedIds = moveId(sourceIds, activeDrag.id, targetId, position);
-
-    setDragging(null);
-    setDropTarget(null);
-    if (!orderedIds || orderedIds.every((id, index) => id === sourceIds[index])) return;
-
-    setReorderBusy(true);
-    try {
-      if (kind === "category") await onReorderCategories(orderedIds);
-      else if (sourceItem) await onReorderItems(sourceItem.category_id, orderedIds);
-    } finally {
-      setReorderBusy(false);
-    }
-  }
-
-  function finishDrag() {
-    draggingRef.current = null;
-    suppressRowClickRef.current = true;
-    setDragging(null);
-    setDropTarget(null);
-    window.setTimeout(() => {
-      suppressRowClickRef.current = false;
-    }, 0);
-  }
 
   return (
     <>
@@ -355,6 +252,8 @@ export function MenuManager({
                 return <article
                   className={`menu-category-row menu-sortable-record${selectedCategoryId === category.id ? " is-selected" : ""}${dragging?.kind === "category" && dragging.id === category.id ? " is-dragging" : ""}${dropTarget?.kind === "category" && dropTarget.id === category.id ? ` is-drop-${dropTarget.position}` : ""}`}
                   key={category.id}
+                  data-sort-kind="category"
+                  data-sort-id={category.id}
                   onDragOver={(event) => handleDragOver(event, "category", category.id)}
                   onDrop={(event) => void handleDrop(event, "category", category.id)}
                 >
@@ -363,8 +262,15 @@ export function MenuManager({
                     draggable={!reorderBusy}
                     onDragStart={(event) => handleDragStart(event, "category", category.id)}
                     onDragEnd={finishDrag}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${category.name} sırasını değiştir`}
+                    onKeyDown={event => handleKeyDown(event, "category", category.id)}
+                    onPointerDown={event => handlePointerDown(event, "category", category.id)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerCancel}
                     onClick={(event) => event.stopPropagation()}
-                    aria-hidden="true"
                   >
                     <GripVertical className="menu-drag-handle" size={16} />
                   </span>
@@ -458,6 +364,8 @@ export function MenuManager({
                   <DataListButton
                     className={`menu-record menu-sortable-record${dragging?.kind === "item" && dragging.id === item.id ? " is-dragging" : ""}${dropTarget?.kind === "item" && dropTarget.id === item.id ? ` is-drop-${dropTarget.position}` : ""}`}
                     key={item.id}
+                    data-sort-kind="item"
+                    data-sort-id={item.id}
                     onDragOver={(event) => handleDragOver(event, "item", item.id)}
                     onDrop={(event) => void handleDrop(event, "item", item.id)}
                     onClick={() => {
@@ -472,9 +380,16 @@ export function MenuManager({
                         draggable={!reorderBusy && Boolean(selectedCategoryId)}
                         onDragStart={(event) => handleDragStart(event, "item", item.id)}
                         onDragEnd={finishDrag}
+                        role="button"
+                        tabIndex={selectedCategoryId ? 0 : -1}
+                        aria-label={`${item.name} sırasını değiştir`}
+                        onKeyDown={event => handleKeyDown(event, "item", item.id)}
+                        onPointerDown={event => handlePointerDown(event, "item", item.id)}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerCancel}
                         onClick={(event) => event.stopPropagation()}
                         title={selectedCategoryId ? "Sürükleyerek sırala" : "Ürün sıralamak için önce bir kategori seçin"}
-                        aria-hidden="true"
                       >
                         <GripVertical className="menu-drag-handle" size={16} />
                       </span>
@@ -560,23 +475,6 @@ export function MenuManager({
         }} />}
     </>
   );
-}
-
-function moveId(
-  ids: string[],
-  sourceId: string,
-  targetId: string,
-  position: "before" | "after"
-): string[] | null {
-  const sourceIndex = ids.indexOf(sourceId);
-  const targetIndex = ids.indexOf(targetId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceId === targetId) return null;
-
-  const next = ids.filter((id) => id !== sourceId);
-  const targetIndexAfterRemoval = next.indexOf(targetId);
-  const insertIndex = position === "after" ? targetIndexAfterRemoval + 1 : targetIndexAfterRemoval;
-  next.splice(Math.max(0, insertIndex), 0, sourceId);
-  return next;
 }
 
 function MenuProductThumbnail({ item, webModuleUrl }: {

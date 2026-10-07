@@ -71,7 +71,15 @@ const marketContribution = {
   pageId: "market",
   icon: Store,
   order: 50,
-  condition: { anyOf: [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS, C.WHOLESALE, C.ONLINE_SALES] },
+  condition: { anyOf: [
+    { allOf: [C.CATALOG, C.SALES] },
+    { allOf: [C.CATALOG, C.ORDERS, C.WHOLESALE] },
+    { allOf: [C.CATALOG, C.RETAIL_BARCODE] },
+    { allOf: [C.CATALOG, C.RETAIL_PURCHASING] },
+    { allOf: [C.CATALOG, C.RETAIL_SUPPLIERS] },
+    { allOf: [C.CATALOG, C.RETAIL_LABELS] },
+    { allOf: [C.CATALOG, C.ORDERS, C.ONLINE_SALES] }
+  ] },
   contentScroll: "workspace",
   presentation: { label: "Satış", title: "Satış" }
 } satisfies NavigationContribution;

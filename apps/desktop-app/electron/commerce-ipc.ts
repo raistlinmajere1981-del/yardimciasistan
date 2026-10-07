@@ -3,6 +3,7 @@ import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { CommerceIpcMutationResult, DesktopCommerceBridge } from "./commerce-ipc-contract";
 import { desktopLog } from "./desktop-logger";
 import { completeMarketSale } from "./market-sale-operation";
+import { deleteCatalogProduct, reorderCatalogRecords, setCatalogProductQuickAccess } from "./commerce-catalog-presentation-store";
 import {
   previewExternalProductImage
 } from "./product-data-service";
@@ -44,7 +45,8 @@ import {
 } from "./commerce-runtime";
 
 const EXPECTED_COMMERCE_REJECTIONS: Array<{ code: string; pattern: RegExp }> = [
-  { code: "invalid_market_sale", pattern: /^(?:Telefon sepeti|Telefon sepetinin|Satış ödeme seçimi|Satış işlemleri)/ },
+  { code: "invalid_market_sale", pattern: /^(?:Telefon sepeti|Telefon sepetinin|Satış ödeme seçimi|Satış işlemleri|Satış işlem anahtarı)/ },
+  { code: "invalid_catalog_presentation", pattern: /^(?:Katalog sıralama|Hızlı erişim tercihi)/ },
   { code: "insufficient_stock", pattern: /^Yetersiz stok\./ },
   { code: "inventory_conflict", pattern: /^Stok bu sayımdan sonra değişti\./ },
   { code: "invalid_inventory_operation", pattern: /^(?:Stok işlemi için ürün bulunamadı\.|Bu ürün stok takibine kapalı\.|Stok konumu bulunamadı\.|Geçersiz stok hareketi:|Stok hareketi sıfırdan farklı olmalı\.|Sayım miktarı )/ },
@@ -111,6 +113,15 @@ export function registerCommerceIpcHandlers(options: {
 
   ipcMain.handle("commerce:category:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listCategories"]>[0]) =>
     read(() => listRuntimeCatalogCategories(databasePath(), optionsArg))
+  );
+  ipcMain.handle("commerce:catalog:reorder", (_event, kind: Parameters<DesktopCommerceBridge["reorderCatalog"]>[0], orderedIds: string[]) =>
+    mutateForIpc("commerce:catalog:reorder", () => reorderCatalogRecords(databasePath(), kind, orderedIds))
+  );
+  ipcMain.handle("commerce:product:quickAccess", (_event, productId: string, enabled: boolean) =>
+    mutateForIpc("commerce:product:quickAccess", () => setCatalogProductQuickAccess(databasePath(), productId, enabled))
+  );
+  ipcMain.handle("commerce:product:delete", (_event, productId: string) =>
+    mutateForIpc("commerce:product:delete", () => deleteCatalogProduct(databasePath(), productId))
   );
   ipcMain.handle("commerce:category:save", (_event, input: Parameters<DesktopCommerceBridge["saveCategory"]>[0]) =>
     mutateForIpc("commerce:category:save", () => saveRuntimeCatalogCategory(databasePath(), input))

@@ -30,6 +30,8 @@ export function useDesktopSync({
   const onDashboardLoadedRef = useRef(onDashboardLoaded);
   const [dashboardData, setDashboardData] = useDashboardSnapshot(defaultDashboardData);
   const [businessCapabilities, setBusinessCapabilities] = useState<BusinessCapabilitySnapshot | null>(null);
+  const capabilityGeneration = useRef(0);
+  const capabilityMutations = useRef(0);
   const [businessCapabilityState, setBusinessCapabilityState] = useState<SyncState>("idle");
   const [businessCapabilityMessage, setBusinessCapabilityMessage] = useState("İşletme yetenekleri profil varsayımlarını kullanıyor.");
   const [automaticSyncStatus, setAutomaticSyncStatus] = useState<AutomaticSyncStatus>(defaultAutomaticSyncStatus);
@@ -54,8 +56,10 @@ export function useDesktopSync({
     if (!bridge?.getBusinessCapabilitySnapshot) {
       return undefined;
     }
+    const duringMutation = capabilityMutations.current > 0;
+    const generation = duringMutation ? capabilityGeneration.current : ++capabilityGeneration.current;
     const snapshot = await bridge.getBusinessCapabilitySnapshot();
-    setBusinessCapabilities(snapshot);
+    if (!duringMutation && capabilityMutations.current === 0 && generation === capabilityGeneration.current) setBusinessCapabilities(snapshot);
     return snapshot;
   }, []);
 
@@ -69,17 +73,21 @@ export function useDesktopSync({
 
     setBusinessCapabilityState("loading");
     setBusinessCapabilityMessage(`${capability} ${enabled ? "açılıyor" : "kapatılıyor"}...`);
+    const generation = ++capabilityGeneration.current;
+    capabilityMutations.current += 1;
     try {
       const snapshot = await bridge.setBusinessCapability(capability, enabled);
+      if (generation !== capabilityGeneration.current) return undefined;
       setBusinessCapabilities(snapshot);
       setBusinessCapabilityState("success");
       setBusinessCapabilityMessage(`${capability} ${enabled ? "etkinleştirildi" : "kapatıldı"}.`);
       return snapshot;
     } catch (error) {
+      if (generation !== capabilityGeneration.current) return undefined;
       setBusinessCapabilityState("error");
       setBusinessCapabilityMessage(error instanceof Error ? error.message : "İşletme yeteneği güncellenemedi.");
       return undefined;
-    }
+    } finally { capabilityMutations.current -= 1; }
   }, []);
 
   const clearRuntimeBusinessCapabilityOverride = useCallback(async (capability: BusinessCapability) => {
@@ -92,17 +100,21 @@ export function useDesktopSync({
 
     setBusinessCapabilityState("loading");
     setBusinessCapabilityMessage(`${capability} profil varsayımına döndürülüyor...`);
+    const generation = ++capabilityGeneration.current;
+    capabilityMutations.current += 1;
     try {
       const snapshot = await bridge.clearBusinessCapabilityOverride(capability);
+      if (generation !== capabilityGeneration.current) return undefined;
       setBusinessCapabilities(snapshot);
       setBusinessCapabilityState("success");
       setBusinessCapabilityMessage(`${capability} profil varsayımına döndürüldü.`);
       return snapshot;
     } catch (error) {
+      if (generation !== capabilityGeneration.current) return undefined;
       setBusinessCapabilityState("error");
       setBusinessCapabilityMessage(error instanceof Error ? error.message : "İşletme yeteneği sıfırlanamadı.");
       return undefined;
-    }
+    } finally { capabilityMutations.current -= 1; }
   }, []);
 
   useEffect(() => {
@@ -186,6 +198,7 @@ export function useDesktopSync({
 
     return () => {
       active = false;
+      capabilityGeneration.current += 1;
       unsubscribeDashboard?.();
       unsubscribeSync?.();
     };
