@@ -20,6 +20,7 @@ import type {
 } from "../../electron/business-layout";
 import type { SettingsOperationResult } from "./settings-save";
 import { reportAppStatus } from "./runtime-state";
+import { useRequestGeneration } from "../components/workspace/use-request-generation";
 
 export interface BusinessLayoutRoomDraft {
   key: string;
@@ -74,9 +75,12 @@ function nextLocalKey(prefix: string) {
 
 export function useBusinessLayoutSettings(options: {
   enabled: boolean;
+  capabilities: BusinessLayoutSnapshot["capabilities"];
   onDashboardRefresh?: () => Promise<unknown>;
 }) {
   const { enabled, onDashboardRefresh } = options;
+  const { rooms, tables } = options.capabilities;
+  const beginLoad = useRequestGeneration();
   const [draft, setDraftState] = useState<BusinessLayoutDraft>(() => emptyDraft());
   const draftRef = useRef(draft);
   const baselineRef = useRef(draft);
@@ -98,6 +102,7 @@ export function useBusinessLayoutSettings(options: {
   }, []);
 
   const load = useCallback(async () => {
+    const isCurrent = beginLoad();
     if (!enabled) {
       const next = emptyDraft();
       baselineRef.current = next;
@@ -120,26 +125,29 @@ export function useBusinessLayoutSettings(options: {
     setLoading(true);
     try {
       const snapshot = await bridge.getBusinessLayout();
+      if (!isCurrent()) return;
       const [roomMediaState, tableMediaState] = await Promise.all([
-        snapshot.capabilities.rooms
+        rooms
           ? bridge.getRoomMediaDraftState?.() ?? Promise.resolve({ dirty: false })
           : Promise.resolve({ dirty: false }),
-        snapshot.capabilities.tables
+        tables
           ? bridge.getTableMediaDraftState?.() ?? Promise.resolve({ dirty: false })
           : Promise.resolve({ dirty: false })
       ]);
-      applyCanonical(snapshot);
+      if (!isCurrent()) return;
+      applyCanonical({ ...snapshot, capabilities: { rooms, tables } });
       setRoomMediaDirty(roomMediaState.dirty);
       setTableMediaDirty(tableMediaState.dirty);
       setState("idle");
       setMessage("");
     } catch (error) {
+      if (!isCurrent()) return;
       setState("error");
       setMessage(error instanceof Error && error.message ? error.message : "İşletme düzeni yüklenemedi.");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [applyCanonical, enabled]);
+  }, [applyCanonical, beginLoad, enabled, rooms, tables]);
 
   useEffect(() => {
     void load();

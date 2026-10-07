@@ -38,8 +38,6 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     }
   }, [draft.tables, mediaTableKey]);
 
-  if (!draft.capabilities.tables) return null;
-
   const tableCountTotal = draft.tableCategories.reduce((total, category) => {
     const count = Number(category.tableCount);
     return total + (Number.isFinite(count) && count > 0 ? count : 0);

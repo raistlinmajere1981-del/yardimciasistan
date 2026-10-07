@@ -13,6 +13,8 @@ import { useBusinessLayoutSettings } from "../../app/use-business-layout-setting
 import { useAndroidDevicePermissionSettings } from "../../app/use-android-device-permission-settings";
 import {
   isSettingsSectionVisible,
+  layoutSettingsDefinition,
+  roomSettingsDefinition,
   searchSettings,
   settingsCapabilities,
   settingsCategories,
@@ -88,6 +90,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     ? runtimeCapabilities?.enabledCapabilities ?? []
     : settingsCapabilities(drafts.canonical);
   const visibleCategories = visibleSettingsCategories(initialized, runtimeCapabilities);
+  const roomsEnabled = isSettingsSectionVisible(roomSettingsDefinition, capabilities, initialized, runtimeCapabilities);
+  const tablesEnabled = isSettingsSectionVisible(layoutSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const category = visibleCategories.find((item) => item.id === storedActive)
     ?? settingsCategories[0];
   const active = category.id;
@@ -103,6 +107,10 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const kbs = useKbsSettings(initialized && capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS), drafts.canonical.profileId);
   const layout = useBusinessLayoutSettings({
     enabled: initialized,
+    capabilities: {
+      rooms: roomsEnabled,
+      tables: tablesEnabled
+    },
     onDashboardRefresh: props.onDashboardRefresh
   });
   const appearance = useAppearanceSettings(props.uiPreferences, props.onUiPreferencesChange);
@@ -167,7 +175,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         const setupResult = await drafts.save("business");
         if (!setupResult.ok) return setupResult;
         changed ||= setupResult.changed;
-        if (setupResult.changed) await layout.refresh();
       }
       if (profile.dirty) {
         const profileResult = await profile.save();
@@ -460,8 +467,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
           {active === "operations" && (
             <>
-              {initialized && <LayoutSettingsSection controller={layout} />}
-              {initialized && <RoomManagementSection controller={layout} />}
+              {tablesEnabled && <LayoutSettingsSection controller={layout} />}
+              {roomsEnabled && <RoomManagementSection controller={layout} />}
             </>
           )}
 

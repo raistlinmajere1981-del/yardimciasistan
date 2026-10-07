@@ -25,18 +25,27 @@ export interface SettingsSectionDefinition {
 export function visibleSettingsCategories(initialized: boolean, snapshot?: BusinessCapabilitySnapshot | null) {
   return settingsCategories.filter(category => {
     if (!initialized) return category.id === "business";
-    return category.id !== "operations" || matchesCapabilityCondition(snapshot, {
-      anyOf: [C.ACCOMMODATION_ROOMS, C.FOOD_TABLES]
-    });
+    return category.id !== "operations" || settingsSections.some(section =>
+      section.category === category.id
+      && isSettingsSectionVisible(section, snapshot?.enabledCapabilities ?? [], initialized, snapshot)
+    );
   });
 }
-const layoutSettingsDefinition = {
+export const layoutSettingsDefinition = {
   id: "settings-operations",
   category: "operations",
   title: "Masa yönetimi",
   keywords: "masa kategorileri salon bahçe kapasite sigara manzara detay medya fotoğraf video işletme düzeni",
   persistence: "resource",
-  condition: { allOf: [C.FOOD_TABLES] }
+  condition: { allOf: [C.FOOD_TABLES] },
+  visible: (_, initialized) => initialized
+} satisfies SettingsSectionDefinition;
+
+export const roomSettingsDefinition = {
+  id: "settings-rooms", category: "operations", title: "Oda Yönetimi",
+  keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama",
+  persistence: "resource", condition: { allOf: [C.ACCOMMODATION_ROOMS] },
+  visible: (_, initialized) => initialized
 } satisfies SettingsSectionDefinition;
 
 export const dealerPortalDefinition = {
@@ -76,7 +85,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   onlineSalesDeliveryDefinition,
   dealerPortalDefinition,
   whatsappCloudDefinition,
-  { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", condition: { allOf: [C.ACCOMMODATION_ROOMS] }, visible: (_, initialized) => initialized },
+  roomSettingsDefinition,
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },
   { id: "settings-kbs", category: "services", title: "Kimlik Bildirim Sistemi", keywords: "kbs emniyet jandarma kimlik bildirim tesis kodu egmsec konaklayan", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },

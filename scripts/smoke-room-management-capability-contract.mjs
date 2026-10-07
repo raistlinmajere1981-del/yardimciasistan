@@ -11,21 +11,12 @@ const section = (text, start, end) => {
   return text.slice(startIndex, endIndex);
 };
 
-const roomManagementSource = source("apps/desktop-app/src/components/settings/RoomManagementSection.tsx");
 const businessLayoutSource = source("apps/desktop-app/electron/business-layout.ts");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
 const roomProfileSource = source("apps/desktop-app/electron/room-profile.ts");
 
-assert.match(
-  roomManagementSource,
-  /const roomsEnabled = draft\.capabilities\.rooms/,
-  "room settings must consume the persisted BusinessLayout room capability"
-);
-assert.match(
-  roomManagementSource,
-  /if \(!roomsEnabled\) return null;/,
-  "room settings must disappear when accommodation.rooms is disabled"
-);
+// Settings visibility is exercised behaviorally by settings-ui-correctness and
+// settings-platform. The registry owns that gate, not the room resource component.
 
 const layoutProjection = section(
   businessLayoutSource,

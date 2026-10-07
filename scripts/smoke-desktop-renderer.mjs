@@ -2648,10 +2648,6 @@ try {
   await setupPage.getByLabel("WhatsApp", { exact: true }).fill("+905550000000");
   await setupPage.getByRole("button", { name: "Kaydet", exact: true }).click();
   await expect(setupPage.getByRole("tab", { name: /^İşletme(?: ·|$)/ })).not.toContainText("Değişiklik var");
-  // Existing Settings first-run refresh can reset the layout through its disabled closure.
-  // Keep this unrelated issue separate; reopen Settings against the canonical saved setup.
-  await setupPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
-  await setupPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Smoke Pansiyon");
   await setupPage.getByRole("tab", { name: "İşletme Düzeni", exact: true }).click();
   await expect(setupPage.getByRole("heading", { name: "Oda Yönetimi", exact: true })).toBeVisible();

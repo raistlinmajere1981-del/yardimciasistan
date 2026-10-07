@@ -29,6 +29,8 @@ function FixtureStatusHost() {
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, profileId: new URLSearchParams(window.location.search).get("profile") ?? defaultSetupData.profileId, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
+const firstRun = new URLSearchParams(window.location.search).get("firstRun") === "on";
+if (firstRun) canonical = { ...canonical, setupRequired: true, businessName: "" };
 canonical.profileOptions = [...getBusinessProfile(canonical.profileId).defaultOptionalCapabilities];
 if (new URLSearchParams(window.location.search).get("wholesale") === "on") canonical.profileOptions = [C.WHOLESALE];
 function runtimeCapabilities(capabilities: BusinessCapability[]) {
@@ -64,6 +66,7 @@ let layout = {
   tableCategories: [{ name: "Salon", tableCount: 2 }],
   publication: { rooms: true, tables: false }
 };
+if (firstRun) layout = { ...layout, rooms: [], tables: [], tableCategories: [], publication: { rooms: false, tables: false } };
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
 let mediaSeq = 0;
 let mediaCanonical: Array<Record<string, unknown>> = [];
@@ -261,7 +264,7 @@ window.yardimciDesktop = {
       };
     }
 
-    const enabled = getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions);
+    const enabled = runtimeCapabilities(getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions));
     return {
       ok: true,
       message: "İşletme düzeni kaydedildi.",
@@ -375,18 +378,20 @@ window.yardimciDesktop = {
 function Fixture() {
   const setup = useSetupController();
   const [ready, setReady] = useState(false);
+  const [workspaceKey, setWorkspaceKey] = useState(0);
   const [preferences, setPreferences] = useState(readUiPreferences);
   const [dashboard, setDashboard] = useState(() => ({ ...defaultDashboardData, androidDevices: structuredClone(androidDevices) }));
   useEffect(() => { setup.applyBootstrapSetup(canonical, false); setReady(true); }, []);
   useEffect(() => { applyUiPreferences(preferences); saveUiPreferences(preferences); }, [preferences]);
   window.refreshSettings = patch => { canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
   window.persistedSettings = () => canonical;
+  window.reopenSettings = () => setWorkspaceKey(key => key + 1);
   const capabilities = runtimeCapabilities(settingsCapabilities(toSetupForm(setup.setupData)));
   window.fixtureRuntimeCapabilities = () => [...capabilities];
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { profileId: setup.setupData.profileId, enabledCapabilities: capabilities }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}>
-      {ready && <SettingsWorkspace setupData={setup.setupData} dashboardData={dashboard}
+      {ready && <SettingsWorkspace key={workspaceKey} setupData={setup.setupData} dashboardData={dashboard}
         onSave={input => setup.saveSetup(input, setDashboard)}
         uiPreferences={preferences}
         onUiPreferencesChange={setPreferences}

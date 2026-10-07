@@ -36,7 +36,6 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
   const [mediaRoomKey, setMediaRoomKey] = useState("");
   const { draft, loading, saving, mediaRevision, updateRoom, addRoom, removeRoom, updatePublication, reportMediaDirty } = controller;
   const rooms = draft.rooms;
-  const roomsEnabled = draft.capabilities.rooms;
 
   const editingRoom = useMemo(
     () => rooms.find((room) => room.key === editingKey) ?? null,
@@ -56,8 +55,6 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
       setMediaRoomKey(rooms[0].key);
     }
   }, [mediaRoomKey, rooms]);
-
-  if (!roomsEnabled) return null;
 
   return (
     <>
