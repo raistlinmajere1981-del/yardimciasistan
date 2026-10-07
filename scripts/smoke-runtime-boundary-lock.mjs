@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { runInNewContext } from "node:vm";
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 
 // Execute the complete compiled production composition roots and registration
 // modules. Only platform/operation dependencies are replaced; no source slicing
@@ -12,12 +13,16 @@ const root = resolve("apps/desktop-app/dist-electron");
 const shared = require("@yardimci-asistan/shared");
 const handlers = new Map(), events = new Map(), modules = new Map(), immediate = [];
 const calls = [];
+const durable = createTemporaryDesktopDatabase("sync-finalize-intent-");
+durable.database.initialize();
 const dashboard = { revision: 1, kbsOverview: { enabled: false }, hospitalityNotifications: [] };
 const result = () => ({ ok: true, message: "fixture", dashboardData: dashboard });
 const record = (name) => (..._args) => { calls.push(name); return result(); };
 const read = (name, value) => () => { calls.push(name); return value; };
 const setup = { setupRequired: true, servicePreferences: {}, webModuleUrl: "", syncSecret: "" };
 const database = new Proxy({}, { get: (_target, key) => {
+  if (key === "queueSyncJob") return (type) => { calls.push(`database.queueSyncJob:${type}`); durable.database.queueSyncJob(type); };
+  if (key === "getPendingSyncJobs") return (...args) => durable.database.getPendingSyncJobs(...args);
   if (key === "databasePath" || key === "userDataPath" || key === "backupPath") return "/tmp/opencode/runtime-boundary-fixture";
   if (key === "getAppLockPasswordVerifier") return () => "";
   if (key === "getAppLockNotificationCount") return () => 0;
@@ -154,3 +159,22 @@ const beforeAttach = calls.length;
 events.get("kbs:registerWebview")({ sender: { getURL: () => "fixture" } }, 1);
 assert.equal(calls.length, beforeAttach);
 console.log("Production IPC lock: 244 protected invokes, real roots/session authority, unlocked delegation and preload TOCTOU passed.");
+
+// Execute production finalize wiring; only domain operations are fixtures above.
+// The publication effect uses the real durable outbox, not a fake queue counter.
+try {
+  await invoke("appLock:unlock", "");
+  const drain = () => {
+    for (const job of durable.database.getPendingSyncJobs("9999")) durable.database.completeSyncJob(job.jobKey, job.sourceRevision);
+  };
+  const mutations = [
+    ["customer:save", {}], ["reservation:saveManual", {}],
+    ["dailyTask:save", { title: "task", taskType: "manual_pension" }],
+    ["menu:saveCategory", { name: "menu" }], ["androidDevice:setActive", "phone", true], ["request:delete", "request"]
+  ];
+  for (const [channel, ...args] of mutations) {
+    drain();
+    assert.equal((await invoke(channel, ...args)).ok, true, channel);
+    assert.ok(durable.database.getPendingSyncJobs().some(job => job.jobType === "android_snapshot"), `${channel}: successful finalize must create durable snapshot intent`);
+  }
+} finally { durable.cleanup(); }

@@ -476,14 +476,10 @@ export function saveSetupData(
   }
 
   const enabledCapabilities = new Set(readEnabledBusinessCapabilities(db));
-  if (enabledCapabilities.has(BUSINESS_CAPABILITIES.QR_MENU)) {
-    queueSyncJob(db, "menu_publish", now);
-  }
   if (Number(existingSettings?.online_sales_pickup_enabled ?? 1) !== Number(onlineSalesDelivery.pickupEnabled)
       || Number(existingSettings?.online_sales_shipping_enabled ?? 0) !== Number(onlineSalesDelivery.shippingEnabled)) {
     queueSyncJob(db, "online_catalog_publish", now);
   }
-  queueSyncJob(db, "android_snapshot", now);
 
   return {
     ok: true,

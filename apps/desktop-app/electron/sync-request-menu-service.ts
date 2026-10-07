@@ -1,14 +1,13 @@
 import {
   markRequestsSynced,
   pullRequests,
-  pushMenu,
   type MarkRequestsSyncedResult,
   type PullRequestsResult,
   type PushMenuResult
 } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase } from "./database";
 import { getWebSyncConfig } from "./sync-config";
-import { publishDesktopProjection } from "./desktop-publication-service";
+import type { SyncCoordinator } from "./sync-coordinator";
 
 export async function pullRequestsFromWeb(
   database: DesktopDatabase,
@@ -89,8 +88,7 @@ export async function markRequestsSyncedOnWeb(
   return result;
 }
 
-export async function pushMenuToWeb(database: DesktopDatabase): Promise<PushMenuResult> {
-  const setup = database.getSetupData();
+export async function pushMenuToWeb(database: DesktopDatabase, coordinator: SyncCoordinator): Promise<PushMenuResult> {
   const runtime = database.getSyncRuntimeStatus();
   const clientId = runtime.clientId.trim();
 
@@ -108,11 +106,7 @@ export async function pushMenuToWeb(database: DesktopDatabase): Promise<PushMenu
     return result;
   }
 
-  const config = getWebSyncConfig(setup);
-  const result = await publishDesktopProjection(database, config, "menu_publish", database.getQrMenuPublication(),
-    (identity, menu) => pushMenu({ ...config, ...identity, menu }),
-    { refresh: true, acknowledge: (sent) => database.markMenuPublished(sent) });
-  if (!result) return { ok: false, message: "Menü yayın niyeti hazırlanamadı." };
+  const result = await coordinator.publishMenuNow();
 
   if (result.ok) {
     database.recordSyncEvent({

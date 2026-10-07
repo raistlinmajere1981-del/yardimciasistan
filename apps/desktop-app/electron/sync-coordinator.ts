@@ -15,6 +15,8 @@ import {
   type AndroidSyncAction,
   type SyncCapabilitiesSuccess,
   type SyncFailure,
+  type PushMenuResult,
+  type PushAndroidSnapshotResult,
   type SyncTransport
 } from "@yardimci-asistan/sync-core";
 import {
@@ -27,6 +29,7 @@ import {
 } from "@yardimci-asistan/shared";
 import {
   DesktopDatabase,
+  type DesktopSyncJob,
   type DesktopSyncRuntimeStatus
 } from "./database";
 import { findCatalogProductByBarcode } from "./commerce-store";
@@ -106,6 +109,9 @@ export class SyncCoordinator {
   private initialTimer: NodeJS.Timeout | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
   private inFlight: Promise<AutomaticSyncCycleResult> | null = null;
+  // Serialization only. Intent, frozen bodies, retries and exact completion are
+  // owned by the durable outbox; losing this map cannot lose publication work.
+  private readonly outboxPublicationsInFlight = new Map<string, { sourceRevision: number; promise: Promise<unknown> }>();
   private phase: AutomaticSyncPhase = "idle";
   private message = "Otomatik senkron hazır.";
   private capabilitiesTarget = "";
@@ -179,6 +185,7 @@ export class SyncCoordinator {
         // run() already normalizes failures; maintenance only needs the cycle to finish.
       }
     }
+    await Promise.allSettled([...this.outboxPublicationsInFlight.values()].map(item => item.promise));
     // A mutation may have tried to schedule work while the previous cycle was draining.
     this.stop();
   }
@@ -262,6 +269,61 @@ export class SyncCoordinator {
 
   runNow(): Promise<AutomaticSyncCycleResult> {
     return this.run(true);
+  }
+
+  async publishMenuNow(): Promise<PushMenuResult> {
+    const config = this.options.getSyncConfig();
+    this.options.database.ensurePublicationTarget(config.baseUrl.trim().replace(/\/+$/, ""));
+    this.options.database.prepareSyncPublication("menu_publish", this.options.database.getQrMenuPublication(), true);
+    const job = this.options.database.getPendingSyncJobs().find(item => item.jobType === "menu_publish");
+    if (!job || this.suspendedForMaintenance) return { ok: false, message: "Menü yayın niyeti hazırlanamadı." };
+    return await this.publishMenuJob(job) ?? { ok: false, message: "Menü yayın niyeti hazırlanamadı." };
+  }
+
+  async publishAndroidSnapshotNow(): Promise<PushAndroidSnapshotResult> {
+    const config = this.options.getSyncConfig();
+    const snapshot = this.options.createAndroidSnapshot();
+    this.options.database.ensurePublicationTarget(config.baseUrl.trim().replace(/\/+$/, ""));
+    this.options.database.prepareSyncPublication("android_snapshot", snapshot, true);
+    const job = this.options.database.getPendingSyncJobs().find(item => item.jobType === "android_snapshot");
+    if (!job || this.suspendedForMaintenance) return { ok: false, message: "Android yayın niyeti hazırlanamadı." };
+    const result: PushAndroidSnapshotResult = await this.publishAndroidSnapshotJob(job) ?? { ok: false, message: "Android yayın niyeti hazırlanamadı." };
+    this.options.database.recordSyncEvent({ direction: "push", entityType: "android_snapshot", ok: result.ok,
+      recordCount: result.ok ? result.task_count + snapshot.requests.length + snapshot.rooms.length + snapshot.tables.length : 0,
+      message: result.message, status: result.ok ? undefined : result.status });
+    return result;
+  }
+
+  private async publishSerializedOutboxJob<R>(job: DesktopSyncJob, publish: (current: DesktopSyncJob) => Promise<R | null>): Promise<R | null> {
+    const active = this.outboxPublicationsInFlight.get(job.jobKey);
+    if (active) {
+      const result = await active.promise as R | null;
+      const newer = this.options.database.getPendingSyncJobs().find(item => item.jobKey === job.jobKey && item.sourceRevision > active.sourceRevision);
+      return newer ? this.publishSerializedOutboxJob(newer, publish) : result;
+    }
+    if (this.suspendedForMaintenance) return null;
+    const publication = publish(job).finally(() => { this.outboxPublicationsInFlight.delete(job.jobKey); });
+    this.outboxPublicationsInFlight.set(job.jobKey, { sourceRevision: job.sourceRevision, promise: publication });
+    return publication;
+  }
+
+  private publishMenuJob(job: DesktopSyncJob): Promise<PushMenuResult | null> {
+    return this.publishSerializedOutboxJob(job, current => {
+      const config = this.options.getSyncConfig();
+      return publishDesktopProjection(this.options.database, config, "menu_publish", this.options.database.getQrMenuPublication(),
+        (identity, menu) => pushMenu({ ...config, ...identity, menu }),
+        { expectedRevision: current.sourceRevision, nextAttemptAt: calculateNextAttempt(current.attemptCount),
+          acknowledge: sent => this.options.database.markMenuPublished(sent) });
+    });
+  }
+
+  private publishAndroidSnapshotJob(job: DesktopSyncJob): Promise<PushAndroidSnapshotResult | null> {
+    return this.publishSerializedOutboxJob(job, current => {
+      const config = this.options.getSyncConfig();
+      return publishDesktopProjection(this.options.database, config, "android_snapshot", this.options.createAndroidSnapshot(),
+        (identity, snapshot) => pushAndroidSnapshot({ ...config, ...identity, snapshot }),
+        { expectedRevision: current.sourceRevision, nextAttemptAt: calculateNextAttempt(current.attemptCount) });
+    });
   }
 
   private run(force: boolean): Promise<AutomaticSyncCycleResult> {
@@ -986,18 +1048,12 @@ export class SyncCoordinator {
 
   private async publishOutbox(transport: SyncTransport): Promise<{ published: number; errors: string[] }> {
     const jobs = this.options.database.getPendingSyncJobs();
-    const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
     const clientId = this.options.database.getSyncRuntimeStatus().clientId;
     const errors: string[] = [];
     let published = 0;
     for (const job of jobs) {
       // Derived/config publishers above share this outbox but own preparation.
       if (DESKTOP_PUBLICATIONS[job.jobType].publisher !== "outbox") continue;
-      if (job.jobType === "menu_publish"
-          && !hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.QR_MENU) && !this.restorePending()) {
-        this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
-        continue;
-      }
       if (job.jobType === "online_catalog_publish" && !this.onlineCatalogSupported) {
         // Retain the durable invalidation without turning the outbox scan into a hot loop.
         this.options.database.failSyncJob(job.jobKey, job.sourceRevision,
@@ -1033,11 +1089,7 @@ export class SyncCoordinator {
       }
       const config = this.options.getSyncConfig();
       const result = job.jobType === "menu_publish"
-        ? await publishDesktopProjection(this.options.database, config, job.jobType,
-            hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.QR_MENU) ? this.options.database.getQrMenuPublication()
-              : { ...this.options.database.getQrMenuPublication(), enabled: false, categories: [], items: [] },
-            (identity, menu) => pushMenu({ ...config, ...identity, menu }),
-            { nextAttemptAt: calculateNextAttempt(job.attemptCount), acknowledge: (sent) => this.options.database.markMenuPublished(sent) })
+        ? await this.publishMenuJob(job)
         : job.jobType === "online_catalog_publish"
           ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createCommerceOnlineCatalog(),
               (identity, catalog) => pushOnlineCatalog({ ...config, ...identity, catalog }),
@@ -1046,9 +1098,7 @@ export class SyncCoordinator {
           ? await publishDesktopProjection(this.options.database, config, job.jobType, this.options.database.createDealerAccessProjection(),
               (identity, value) => transport.publishDealerAccess!({ sourceRevision: identity.sourceRevision, idempotencyKey: identity.idempotencyKey, value }),
               { nextAttemptAt: calculateNextAttempt(job.attemptCount) })
-        : await publishDesktopProjection(this.options.database, config, job.jobType, this.options.createAndroidSnapshot(),
-            (identity, snapshot) => pushAndroidSnapshot({ ...config, ...identity, snapshot }),
-            { nextAttemptAt: calculateNextAttempt(job.attemptCount) });
+        : await this.publishAndroidSnapshotJob(job);
       if (!result) continue;
       if (result.ok) {
         this.options.database.recordSyncEvent({

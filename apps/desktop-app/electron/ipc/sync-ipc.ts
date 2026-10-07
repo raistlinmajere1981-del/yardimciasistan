@@ -63,7 +63,7 @@ export function registerSyncIpcHandlers(options: {
   ipcMain.handle("sync:pushMenu", async (): Promise<PushMenuResult> => {
     options.assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.QR_MENU, "QR menü yayını bu işletmede etkin değil.");
-    return pushMenuToWeb(getDatabase());
+    return pushMenuToWeb(getDatabase(), getCoordinator());
   });
 
   ipcMain.handle("sync:pushAndroidSnapshot", async (): Promise<PushAndroidSnapshotResult> => {

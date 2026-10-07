@@ -35,7 +35,6 @@ export function registerMenuIpcHandlers(options: {
     }
     try {
       getDatabase().setQrMenuWebPublicationEnabled(enabled);
-      getDatabase().queueSyncJob("menu_publish");
       scheduleSync();
       return {
         ok: true,

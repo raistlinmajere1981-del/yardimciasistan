@@ -1143,7 +1143,9 @@ export class DesktopDatabase {
   }
 
   getQrMenuPublication(): PublishedQrMenu & { enabled: boolean } {
-    return getStoredQrMenuPublication(this.db);
+    const menu = getStoredQrMenuPublication(this.db);
+    return menu.enabled && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.QR_MENU)
+      ? menu : { ...menu, enabled: false, categories: [], items: [] };
   }
 
   getQrMenuWebPublicationEnabled(): boolean {

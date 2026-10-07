@@ -10,6 +10,7 @@ import {
   validateBusinessCapabilitySet,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
+import { queueSyncJob } from "./database/sync-runtime-store";
 
 type BusinessCapabilitySource = "system" | "profile" | "user";
 
@@ -182,6 +183,8 @@ export function replaceBusinessCapabilitiesInTransaction(
   }
 
   assertValidCapabilityState(database, input.businessId);
+  queueSyncJob(database, "android_snapshot", input.now);
+  queueSyncJob(database, "menu_publish", input.now);
   return [...resolved].sort();
 }
 
@@ -308,6 +311,8 @@ export function applyBusinessProfileCapabilities(
       }
 
       assertValidCapabilityState(database, businessId);
+      queueSyncJob(database, "android_snapshot", now);
+      queueSyncJob(database, "menu_publish", now);
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");
@@ -370,6 +375,8 @@ export function setBusinessCapability(
       `).run(businessId, input.capability, input.enabled ? 1 : 0, now, now);
 
       assertValidCapabilityState(database, businessId);
+      queueSyncJob(database, "android_snapshot", now);
+      if (input.capability === BUSINESS_CAPABILITIES.QR_MENU) queueSyncJob(database, "menu_publish", now);
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");
@@ -415,6 +422,8 @@ export function clearBusinessCapabilityOverride(
       `).run(businessId, capability, profileDefaults.has(capability) ? 1 : 0, now, now);
 
       assertValidCapabilityState(database, businessId);
+      queueSyncJob(database, "android_snapshot", now);
+      if (capability === BUSINESS_CAPABILITIES.QR_MENU) queueSyncJob(database, "menu_publish", now);
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");

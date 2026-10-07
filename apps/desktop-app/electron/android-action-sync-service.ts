@@ -4,14 +4,10 @@ import {
 } from "@yardimci-asistan/shared";
 import {
   markAndroidActionResult,
-  pullAndroidActions,
-  pushAndroidSnapshot,
-  type PushAndroidSnapshotResult
+  pullAndroidActions
 } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase, DesktopDashboardData } from "./database";
-import { createAndroidOperationsSnapshot } from "./android-operations-snapshot";
 import { getWebSyncConfig } from "./sync-config";
-import { publishDesktopProjection } from "./desktop-publication-service";
 
 export interface AndroidActionProcessSummary {
   pulled: number;
@@ -34,17 +30,12 @@ export class AndroidActionSyncService {
     (dashboardData: DesktopDashboardData) => void;
 
   private inFlight: Promise<AndroidActionProcessSummary> | null = null;
-  private snapshotPublishPending = true;
 
   constructor(options: AndroidActionSyncServiceOptions) {
     this.database = options.database;
     this.isSuspended = options.isSuspended;
     this.markLocalSnapshotDirty = options.markLocalSnapshotDirty;
     this.notifyDashboardChanged = options.notifyDashboardChanged;
-  }
-
-  markSnapshotPublishPending() {
-    this.snapshotPublishPending = true;
   }
 
   currentInFlight() {
@@ -66,35 +57,6 @@ export class AndroidActionSyncService {
         this.inFlight = null;
       });
     return this.inFlight;
-  }
-
-  async publishSnapshot(): Promise<PushAndroidSnapshotResult> {
-    const setup = this.database.getSetupData();
-    const snapshot = createAndroidOperationsSnapshot(
-      this.database,
-      this.database.getDashboardData()
-    );
-    const config = getWebSyncConfig(setup);
-    const result = await publishDesktopProjection(this.database, config, "android_snapshot", snapshot,
-      (identity, frozen) => pushAndroidSnapshot({ ...config, ...identity, snapshot: frozen }), { refresh: true });
-    if (!result) return { ok: false, message: "Android yayın niyeti hazırlanamadı." };
-
-    this.database.recordSyncEvent({
-      direction: "push",
-      entityType: "android_snapshot",
-      ok: result.ok,
-      recordCount: result.ok
-        ? result.task_count
-          + snapshot.requests.length
-          + snapshot.rooms.length
-          + snapshot.tables.length
-        : 0,
-      message: result.message,
-      status: result.ok ? undefined : result.status
-    });
-
-    this.snapshotPublishPending = !result.ok;
-    return result;
   }
 
   private canUseSync(allowPlaceholderSecret: boolean) {
@@ -190,11 +152,7 @@ export class AndroidActionSyncService {
     ) {
       this.markLocalSnapshotDirty();
       this.notifyDashboardChanged(this.database.getDashboardData());
-      this.snapshotPublishPending = true;
-    }
-
-    if (this.snapshotPublishPending) {
-      await this.publishSnapshot();
+      this.database.queueSyncJob("android_snapshot");
     }
 
     return summary;

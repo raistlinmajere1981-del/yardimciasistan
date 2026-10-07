@@ -11,6 +11,7 @@ import { normalizeInteger } from "./request-utils.js";
 import type { AndroidActionMutationResult } from "./android-utils.js";
 import { getAndroidVersionConflict, nextMutationTimestamp } from "./android-utils.js";
 import { insertDeletionEvent } from "./deletion-store.js";
+import { queueSyncJob } from "./sync-runtime-store.js";
 import type { DeletionAndroidEventSink } from "./deletion-store.js";
 import {
   normalizeMenuStockUnit,
@@ -106,11 +107,18 @@ export function getQrMenuWebPublicationEnabled(db: DatabaseSync): boolean {
 
 export function setQrMenuWebPublicationEnabled(db: DatabaseSync, enabled: boolean): void {
   const now = new Date().toISOString();
-  const result = db.prepare(
-    "UPDATE business SET publish_qr_menu_web = ?, updated_at = ?, sync_status = 'local_only' WHERE deleted_at = ''"
-  ).run(enabled ? 1 : 0, now);
-  if (Number(result.changes) < 1) {
-    throw new Error("QR Menü web görünürlüğü kaydedilemedi.");
+  db.exec("SAVEPOINT qr_menu_visibility");
+  try {
+    const result = db.prepare(
+      "UPDATE business SET publish_qr_menu_web = ?, updated_at = ?, sync_status = 'local_only' WHERE deleted_at = ''"
+    ).run(enabled ? 1 : 0, now);
+    if (Number(result.changes) < 1) throw new Error("QR Menü web görünürlüğü kaydedilemedi.");
+    queueSyncJob(db, "menu_publish", now);
+    db.exec("RELEASE qr_menu_visibility");
+  } catch (error) {
+    db.exec("ROLLBACK TO qr_menu_visibility");
+    db.exec("RELEASE qr_menu_visibility");
+    throw error;
   }
 }
 

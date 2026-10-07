@@ -424,7 +424,7 @@ if (!hasSingleInstanceLock) {
         });
         if (result.ok) {
           notifyDesktopDashboardChanged(getDatabase().getDashboardData());
-          getAndroidActionSyncService().markSnapshotPublishPending();
+          getDatabase().queueSyncJob("android_snapshot");
           getSyncCoordinator().scheduleSoon();
         }
         return result;
@@ -433,7 +433,7 @@ if (!hasSingleInstanceLock) {
         const result = getDatabase().applyAndroidAction(action);
         getDatabase().recordAndroidActionResult(action, result);
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
-        getAndroidActionSyncService().markSnapshotPublishPending();
+        getDatabase().queueSyncJob("android_snapshot");
         getSyncCoordinator().scheduleSoon();
         return result;
       }
@@ -576,7 +576,14 @@ function registerIpcHandlers() {
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability,
     enabledBusinessCapabilities,
-    afterSuccessfulPull: () => processAndroidActionQueue(true),
+    afterSuccessfulPull: async () => {
+      // Request import uses the same durable database invalidation as automatic
+      // pull. Keep ingress separate; publication only runs the coordinator outbox.
+      markLocalCompanionSnapshotDirty();
+      notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+      await processAndroidActionQueue(true);
+      return getSyncCoordinator().publishAndroidSnapshotNow();
+    },
     publishAndroidSnapshot: publishCurrentAndroidSnapshot,
     publishAiSettings: publishSavedAiSettingsFromMain,
     publishBusinessAiContext: () => {
@@ -642,7 +649,7 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   }
   notifyBusinessMessagingChanged();
   markLocalCompanionSnapshotDirty();
-  getAndroidActionSyncService().markSnapshotPublishPending();
+  getDatabase().queueSyncJob("android_snapshot");
   reconcileLocalCompanionAdvertisement();
   getSyncCoordinator().scheduleSoon();
 
@@ -721,7 +728,7 @@ export function resumeAutomaticSyncAfterMaintenanceAbort() {
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    getAndroidActionSyncService().markSnapshotPublishPending();
+    getDatabase().queueSyncJob("android_snapshot");
     notifyDesktopDashboardChanged(getDatabase().getDashboardData());
     getSyncCoordinator().scheduleSoon();
   }
@@ -731,7 +738,7 @@ function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResul
 function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    getAndroidActionSyncService().markSnapshotPublishPending();
+    getDatabase().queueSyncJob("android_snapshot");
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
@@ -741,7 +748,7 @@ function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): De
 function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    getAndroidActionSyncService().markSnapshotPublishPending();
+    getDatabase().queueSyncJob("android_snapshot");
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
@@ -751,7 +758,7 @@ function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): Deskt
 function finalizeDesktopMenuMutation<T extends DesktopMenuSaveResult | DesktopStatusUpdateResult>(result: T): T {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    getAndroidActionSyncService().markSnapshotPublishPending();
+    getDatabase().queueSyncJob("android_snapshot");
     notifyDesktopDashboardChanged(result.dashboardData);
     if (hasBusinessCapability(enabledBusinessCapabilities(), C.QR_MENU)) {
       getDatabase().queueSyncJob("menu_publish");
@@ -764,7 +771,7 @@ function finalizeDesktopMenuMutation<T extends DesktopMenuSaveResult | DesktopSt
 function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult): DesktopCustomerMutationResult {
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
-    getAndroidActionSyncService().markSnapshotPublishPending();
+    getDatabase().queueSyncJob("android_snapshot");
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
@@ -833,7 +840,7 @@ function finalizeStockImageApply(result: DesktopStockImageApplyResult): DesktopS
   if (result.ok) {
     markLocalCompanionSnapshotDirty();
     notifyDesktopDashboardChanged(result.dashboardData);
-    getAndroidActionSyncService().markSnapshotPublishPending();
+    getDatabase().queueSyncJob("android_snapshot");
     if (hasBusinessCapability(enabledBusinessCapabilities(), C.QR_MENU)) {
       getDatabase().queueSyncJob("menu_publish");
     }
@@ -936,7 +943,7 @@ function notifySyncStatusChanged(status: AutomaticSyncStatus) {
 }
 
 function publishCurrentAndroidSnapshot() {
-  return getAndroidActionSyncService().publishSnapshot();
+  return getSyncCoordinator().publishAndroidSnapshotNow();
 }
 
 async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {

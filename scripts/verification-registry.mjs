@@ -1,6 +1,7 @@
 const SMOKE_FILES = [
   "scripts/smoke-desktop-ui-correctness.mjs",
   "scripts/smoke-publication-protocol.mjs",
+  "scripts/smoke-sync-publication-correctness.mjs",
   "scripts/smoke-ux-consolidation.mjs",
   "scripts/smoke-nexa-assets.mjs",
   "scripts/smoke-desktop-nexa.mjs",
@@ -478,7 +479,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
-  if (file === "scripts/smoke-publication-protocol.mjs") return ["build-desktop", "php-lint"];
+  if (file === "scripts/smoke-publication-protocol.mjs" || file === "scripts/smoke-sync-publication-correctness.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-nexa-assets.mjs") return [];
   if (file === "scripts/smoke-web-nexa.mjs") return ["build-packages"];
   if (file === "scripts/smoke-marketing-log-privacy.mjs") return ["php-lint"];
@@ -500,6 +501,7 @@ function smokeRequires(file) {
 function smokeDomains(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   if (name === "publication-protocol") return ["web", "android", "commerce", "marketing", "platform"];
+  if (name === "sync-publication-correctness") return ["web", "android", "platform"];
 
   if (name === "nexa-assets") return ["desktop", "web", "platform"];
   if (name === "storage-correctness") return ["hospitality", "finance", "web", "platform"];

@@ -172,10 +172,9 @@ void mainProcessReady.then(async ({
     const databasePath = () => resolveDatabasePath(userDataPath());
 
     const publishCommittedMutation = (capabilitiesChanged = false) => {
-      // Short-lived domain services cannot reach main.ts's in-memory
-      // SyncCoordinator directly. Domain mutations only affect the Android
-      // publication while that service is active; setup/restore separately
-      // queue the tombstone that clears stale hosted data when it is disabled.
+      // Capability/setup owners commit their snapshot and menu intents with
+      // canonical state. Other short-lived domain services use this finalize
+      // path to invalidate the active Android projection and wake the outbox.
       markLocalCompanionSnapshotDirty();
       const database = new DesktopDatabase({
         appPath: app.getAppPath(),
@@ -184,13 +183,9 @@ void mainProcessReady.then(async ({
       });
       try {
         database.initialize();
-        if (capabilitiesChanged
-            || hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.ANDROID)) {
+        if (!capabilitiesChanged
+            && hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.ANDROID)) {
           database.queueSyncJob("android_snapshot");
-        }
-        if (capabilitiesChanged
-            && hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.QR_MENU)) {
-          database.queueSyncJob("menu_publish");
         }
         const dashboard = database.getDashboardData();
         for (const window of BrowserWindow.getAllWindows()) {
