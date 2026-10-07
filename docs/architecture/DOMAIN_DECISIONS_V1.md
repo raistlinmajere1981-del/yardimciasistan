@@ -1363,3 +1363,47 @@ The schema is current-only, with no historical migrations. Existing databases cr
 before this schema require the repository's explicit clean reset workflow. No user data
 is automatically discarded. Presentation/source-geometry smoke revisions are deferred;
 functional checks follow the new flow.
+
+## D-045 — Settings activation evidence and independent presentation choices
+
+**Status:** Accepted (2026-10-07), implementing the requested live-test correctness pass.
+
+Optional services may save disabled with incomplete configuration. Enabled services require
+their existing provider-owned required fields; a service with an explicit connection test
+also requires main-owned successful-test evidence for the same effective configuration.
+Evidence is a fingerprint receipt, not a renderer flag, a second credential store or a live
+availability guarantee. Endpoint, credentials, account/environment and AI model choices
+invalidate a mismatched receipt. Runtime failures never rewrite the desired enabled state.
+This supersedes D-035's enabled/unconfigured **normal save** allowance; runtime/configuration
+reads may still report unconfigured or disconnected after a previously valid activation.
+KBS retains its existing test semantics: EGM readiness is not authenticated portal login,
+and Jandarma endpoint reachability is not proof of account authorization.
+
+The required Web transport retains its bootstrap lifecycle. Normal saves with automatic
+sync enabled require successful evidence for the effective transport configuration.
+Delivery has one staged enabled preference in the existing Setup transaction. When enabled,
+at least one method is required and shipping reuses provider-owned readiness. Disabling
+delivery withdraws guest ordering and dealer catalogs through existing publication owners;
+it does not revoke dealer identity, cancel existing orders or dispatch/cancel shipments.
+
+The live-test refinement presents one **Teslimat ve Gönderim** owner with pickup/shipping
+methods. Provider configuration lives beneath shipping, not as an independent business
+feature toggle. The existing Aras `enabled` persistence field is derived in the Setup
+transaction from delivery enabled + shipping selected; callers cannot independently
+activate it. Credentials readiness and successful-test evidence are separate from that
+activation. Shipping off permits stored incomplete/untested provider configuration; turning
+shipping on requires complete credentials and matching main-owned test evidence. Tests
+may run on draft credentials without activating the provider. Runtime failures preserve
+configuration and desired delivery state. Static shipping registry metadata and typed field
+adapters are the addition seam for future providers; no runtime registry or migration is added.
+Settings exposes only the draft Web connection test, leaving Marketing publication's
+runtime validation and its existing backend/bridge contract intact.
+
+AI profiles independently own assistant model and optional image-generation model. Empty
+image choice preserves automatic capable-profile selection; an override uses the existing
+provider/model capability metadata. No renderer AI provider execution is introduced.
+Web map publication contains only the selected Google embed or manual coordinates;
+canonical location and the inactive saved map configuration remain intact.
+
+Schema changes extend the current clean-install schema only. No migration or automatic
+reset/data deletion is introduced; older databases require the existing explicit workflow.

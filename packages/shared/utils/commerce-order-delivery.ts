@@ -29,10 +29,10 @@ export function normalizeCommerceOrderDeliverySnapshot(input: unknown): Commerce
   return { method: "shipping", address };
 }
 
-export function normalizeOnlineSalesDeliverySettings(input: unknown): OnlineSalesDeliverySettings {
+export function normalizeOnlineSalesDeliverySettings(input: unknown, enabled = true): OnlineSalesDeliverySettings {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Online satış teslimat ayarları geçersiz.");
   const value = input as Record<string, unknown>;
-  if (typeof value.pickupEnabled !== "boolean" || typeof value.shippingEnabled !== "boolean" || (!value.pickupEnabled && !value.shippingEnabled)) {
+  if (typeof value.pickupEnabled !== "boolean" || typeof value.shippingEnabled !== "boolean" || (enabled && !value.pickupEnabled && !value.shippingEnabled)) {
     throw new Error("En az bir online satış teslimat yöntemi açık olmalı.");
   }
   return { pickupEnabled: value.pickupEnabled, shippingEnabled: value.shippingEnabled };

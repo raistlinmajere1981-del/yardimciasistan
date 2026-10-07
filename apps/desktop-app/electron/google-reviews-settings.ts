@@ -3,6 +3,7 @@ import { safeStorage } from "electron";
 import type { DesktopDatabase } from "./database";
 import { pushGoogleReviewsSettings } from "@yardimci-asistan/sync-core";
 import { publishDesktopProjection } from "./desktop-publication-service";
+import { serviceConfigFingerprint, readServiceVerification, recordServiceVerification, validateServiceActivation } from "./service-settings-validation";
 
 export interface GoogleReviewsSettings {
   enabled: boolean;
@@ -74,6 +75,10 @@ export function saveGoogleReviewsSettings(
 
   const db = new DatabaseSync(databasePath);
   try {
+    const fingerprint = serviceConfigFingerprint({ placeId, apiKey: input.apiKey.trim() || (input.clearApiKey ? "" : decryptApiKey(current.encryptedApiKey)) });
+    const activationError = validateServiceActivation({ label: "Google Yorumları", enabled: input.enabled,
+      configured: Boolean(placeId && keyUpdate.encryptedValue), fingerprint, verifiedFingerprint: readServiceVerification(db, "google_reviews") });
+    if (activationError) return { ok: false, message: activationError };
     const now = new Date().toISOString();
     db.prepare(`
       UPDATE settings
@@ -114,7 +119,13 @@ export async function testGoogleReviewsConnection(
     return { ok: false, message: "Bağlantıyı denemek için Places API anahtarı gerekli." };
   }
 
-  return testGoogleReviewsViaWebModule(apiKey, placeId, syncConfig, clientId);
+  const result = await testGoogleReviewsViaWebModule(apiKey, placeId, syncConfig, clientId);
+  if (result.ok) {
+    const db = new DatabaseSync(databasePath);
+    try { recordServiceVerification(db, "google_reviews", serviceConfigFingerprint({ placeId, apiKey })); }
+    finally { db.close(); }
+  }
+  return result;
 }
 
 export async function publishGoogleReviewsSettings(

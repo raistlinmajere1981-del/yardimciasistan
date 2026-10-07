@@ -1,4 +1,6 @@
 export * from "./types/business";
+export * from "./utils/version-comparison";
+export * from "./utils/ai-model-capabilities";
 export * from "./types/business-ai-context";
 export * from "./types/business-ai-policy";
 export * from "./types/business-web-context";

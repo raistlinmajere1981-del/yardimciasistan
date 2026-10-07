@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-settings-correctness.mjs",
+  "scripts/smoke-settings-ui-correctness.mjs",
   "scripts/smoke-desktop-ui-correctness.mjs",
   "scripts/smoke-publication-protocol.mjs",
   "scripts/smoke-sync-publication-correctness.mjs",
@@ -231,7 +233,7 @@ const BASE_CHECKS = [
     phase: 15, presets: ["full"], domains: ["desktop", "hospitality", "finance", "commerce", "android", "business-messaging"]
   }),
   check("unit-tests", "Tüm workspace birim testleri", "npm", ["test"], {
-    phase: 20, presets: ["full"], domains: ["platform"]
+    phase: 20, presets: ["full"], domains: ["platform"], requires: ["build-packages"]
   }),
   check("build-packages", "Ortak paketleri derle", "npm", ["run", "build:packages"], {
     phase: 25, presets: ["full"], domains: ["platform"]
@@ -311,7 +313,15 @@ const SMOKE_CHECKS = SMOKE_FILES
     return check(smokeId(file), smokeLabel(file), command, args, options);
   });
 
-export const VERIFICATION_CHECKS = [...BASE_CHECKS, ...SMOKE_CHECKS];
+const SETTINGS_CHECKS = new Set([
+  "typecheck", "typecheck-electron", "unit-tests", "version-contract-tests", "version-check", "verification-registry-tests",
+  "settings-correctness", "settings-ui-correctness", "settings-platform", "workspace-platform", "sector-feature-contributions",
+  "capability-runtime", "capability-settings-source", "capability-surface-consistency", "business-capabilities",
+  "business-location-geocode", "business-public-profile", "setup-profile-contract", "schema-authority",
+  "commerce-online-catalog", "commerce-dealer-orders", "commerce-aras-provider", "commerce-aras-ui", "business-messaging-provider", "kbs-domain"
+]);
+export const VERIFICATION_CHECKS = [...BASE_CHECKS, ...SMOKE_CHECKS].map(item => SETTINGS_CHECKS.has(item.id)
+  ? { ...item, domains: [...new Set([...item.domains, "settings"])] } : item);
 
 export const PRESET_LAYERS = {
   dev: ["dev"],

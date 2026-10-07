@@ -133,7 +133,9 @@ try {
   for (const event of ['connection.test', 'template.list', 'send.started', 'send.succeeded', 'send.failed', 'webhook.status']) assert.ok(logs.some((row) => row.event === `business-messaging.${event}`));
   secrets.setAvailable(false); assert.equal(service.getConfiguration().configured, false); secrets.setAvailable(true);
   const clear = secrets.createMessagingSecretWrite({ ...configuration, clearAccessToken: true });
-  db.saveInitialSetup({ ...setup, whatsappCloud: { ...configuration, accessToken: '', clearAccessToken: true } }, undefined, undefined, undefined, clear);
+  assert.equal(db.saveInitialSetup({ ...setup, whatsappCloud: { ...configuration, accessToken: '', clearAccessToken: true } }, undefined, undefined, undefined, clear).ok, false,
+    'cannot persist enabled configuration without its required secret');
+  assert.equal(db.saveInitialSetup({ ...setup, whatsappCloud: { ...configuration, enabled: false, accessToken: '', clearAccessToken: true } }, undefined, undefined, undefined, clear).ok, true);
   assert.equal(service.getConfiguration().hasSecret, false);
   // Actual IPC handlers enforce the session gate before service reads/mutations.
   const handlers = new Map(), ipcExports = {}; let locked = true, notified = 0;

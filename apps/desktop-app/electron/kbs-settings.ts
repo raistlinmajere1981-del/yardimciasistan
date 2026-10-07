@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { safeStorage } from "electron";
+import { serviceConfigFingerprint, readServiceVerification, recordServiceVerification, validateServiceActivation } from "./service-settings-validation";
 
 export type KbsProvider = "egm" | "jandarma";
 
@@ -83,6 +84,11 @@ export function saveKbsSettings(databasePath: string, input: SaveKbsSettingsInpu
   if (!passwordUpdate.ok) return passwordUpdate;
   const db = new DatabaseSync(databasePath);
   try {
+    const credentials = resolveKbsRuntimeCredentials(databasePath, normalized);
+    const activationError = validateServiceActivation({ label: "Kimlik Bildirim Sistemi", enabled: normalized.enabled,
+      configured: credentials.ok, fingerprint: credentials.ok ? serviceConfigFingerprint({ ...credentials.credentials }) : "unconfigured",
+      verifiedFingerprint: readServiceVerification(db, "kbs") });
+    if (activationError) return { ok: false, message: activationError };
     const now = new Date().toISOString();
     db.exec("BEGIN IMMEDIATE");
     db.prepare(`
@@ -169,7 +175,14 @@ export async function testKbsConnection(
   if (!resolved.ok) return resolved;
   const normalized = normalizeInput(input);
 
+  const recordSuccess = () => {
+    const db = new DatabaseSync(databasePath);
+    try { recordServiceVerification(db, "kbs", serviceConfigFingerprint({ ...resolved.credentials })); }
+    finally { db.close(); }
+  };
+
   if (normalized.provider === "egm") {
+    recordSuccess();
     return {
       ok: true,
       provider: "egm",
@@ -195,6 +208,7 @@ export async function testKbsConnection(
         message: `Jandarma KBS web servisine ulaşılamadı (HTTP ${response.status}).`
       };
     }
+    recordSuccess();
     return {
       ok: true,
       provider: "jandarma",

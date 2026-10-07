@@ -6,6 +6,7 @@ import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
 import { normalizeArasShippingInput } from "./shipping-configuration-store";
 import { decryptShippingSecret } from "./shipping-secret-service";
+import { serviceConfigFingerprint } from "./service-settings-validation";
 import { ArasShippingProviderAdapter, type ArasCredentials } from "./shipping/aras-shipping-provider";
 import { normalizeShippingProviderError, ShippingProviderError } from "./shipping/shipping-provider-error";
 
@@ -17,22 +18,30 @@ export class ShippingProviderService {
   getConfiguration() {
     const db = this.getDatabase();
     const config = db.getArasShippingConfiguration();
-    return { ...config, configured: config.configured && Boolean(decryptShippingSecret(db.getEncryptedShippingPassword())) };
+    const password = decryptShippingSecret(db.getEncryptedShippingPassword());
+    const configured = config.configured && Boolean(password);
+    const verified = configured && db.getServiceSettingsVerification("aras") === serviceConfigFingerprint({
+      environment: config.environment, username: config.username, customerCode: config.customerCode, password
+    });
+    return { ...config, configured: config.enabled && configured && verified, verified };
   }
   private credentials(input?: ArasShippingConfigurationInput): ArasCredentials {
     const db = this.getDatabase();
     const stored = db.getArasShippingConfiguration();
-    const config = input ? normalizeArasShippingInput(input) : stored;
-    const password = input?.password || (input?.clearPassword ? "" : decryptShippingSecret(db.getEncryptedShippingPassword()));
-    if (!config.enabled || !config.username || !config.customerCode || !password) throw new ShippingProviderError("unconfigured", "Kargo sağlayıcısı yapılandırılmamış. Servisler ayarlarını tamamlayın.");
+    const normalized = input ? normalizeArasShippingInput(input) : undefined;
+    const config = normalized ?? stored;
+    const password = normalized?.clearPassword ? "" : normalized?.password || decryptShippingSecret(db.getEncryptedShippingPassword());
+    if ((!input && !config.enabled) || !config.username || !config.customerCode || !password) throw new ShippingProviderError("unconfigured", "Kargo sağlayıcısı yapılandırılmamış. Servisler ayarlarını tamamlayın.");
     return { environment: config.environment, username: config.username, customerCode: config.customerCode, password };
   }
   async testConnection(input?: ArasShippingConfigurationInput): Promise<ShippingConnectionTestResult> {
     const operationId = createDiagnosticOperationId("shipping-test");
     let result: ShippingConnectionTestResult;
     try {
-      const adapter = new ArasShippingProviderAdapter(this.credentials(input), () => false, this.httpOptions);
+      const credentials = this.credentials(input);
+      const adapter = new ArasShippingProviderAdapter(credentials, () => false, this.httpOptions);
       await adapter.testConnection();
+      this.getDatabase().recordServiceSettingsVerification("aras", { ...credentials });
       result = { ok: true, providerId: ARAS_SHIPPING_PROVIDER.id, message: "Kargo hesabının bağlantısı ve sorgu yanıtları doğrulandı.", testedAt: new Date().toISOString() };
     } catch (caught) {
       const error = normalizeShippingProviderError(caught);

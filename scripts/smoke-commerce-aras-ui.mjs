@@ -65,7 +65,9 @@ try {
   await expect(section).toContainText(`${provider.name} yapılandırılmamış`);
   assert.equal(http.calls.length, 0);
   const config = { ...testCredentials, enabled: true };
-  database.saveInitialSetup({ ...setup, arasShipping: { ...config, password: "" } }, undefined, undefined, secrets.createShippingSecretWrite(config));
+  assert.equal((await service.testConnection(config)).ok, true);
+  database.saveInitialSetup({ ...setup, onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: true },
+    arasShipping: { ...config, password: "" } }, undefined, undefined, secrets.createShippingSecretWrite(config));
   await page.evaluate(() => window.__woEmitShippingConfiguration());
   await expect(register).toBeEnabled();
   await register.click();
@@ -101,11 +103,14 @@ try {
   await settingsPage.evaluate(() => window.refreshSettings({ profileId: "market", profileOptions: ["commerce.wholesale"] }));
   await settingsPage.getByRole("tab", { name: /^Servisler/ }).click();
   const settingsSection = settingsPage.getByRole("region", { name: provider.name, exact: true });
-  await expect(settingsSection.getByText("Kapalı", { exact: true }).first()).toBeVisible();
+  const deliverySettings = settingsPage.locator("#settings-online-delivery");
+  await expect(deliverySettings).toContainText("Teslimat ve Gönderim");
+  await expect(settingsSection).toHaveCount(0);
   const connectionTest = settingsSection.getByRole("button", { name: "Bağlantıyı test et", exact: true });
   await expect(connectionTest).toHaveCount(0);
   async function fillConfiguration() {
-    await settingsSection.getByRole("checkbox", { name: `${provider.name} servisi`, exact: true }).check();
+    await deliverySettings.getByLabel("Kargo ile gönderim", { exact: true }).check();
+    await expect(settingsSection.getByRole("checkbox", { name: `${provider.name} servisi`, exact: true })).toHaveCount(0);
     await settingsSection.getByLabel("Müşteri kodu", { exact: true }).fill("fixture-account");
     await settingsSection.getByLabel("Kullanıcı adı", { exact: true }).fill("fixture-user");
     await settingsSection.getByLabel("Şifre", { exact: true }).fill("fixture-write-only-password");
@@ -119,12 +124,14 @@ try {
   await expect(settingsSection.getByRole("status")).toContainText("Fixture kargo bağlantısı doğrulandı.");
   assert.equal(await settingsPage.evaluate(() => window.settingsCalls.filter((call) => call.kind === "setup").length), 0);
   await settingsPage.getByRole("button", { name: "Kaydet", exact: true }).click();
-  await expect(settingsSection.getByText("Etkin · Yapılandırılmış", { exact: true })).toBeVisible();
+  await expect(settingsSection.getByText("Hazır", { exact: true })).toBeVisible();
   await expect(settingsSection.getByLabel("Şifre", { exact: true })).toHaveValue("");
   const savedConfig = await settingsPage.evaluate(() => window.yardimciDesktop.getSetupData());
   assert.ok(!JSON.stringify(savedConfig).includes("fixture-write-only-password"));
   assert.equal(savedConfig.arasShipping.hasSecret, true);
   await settingsSection.getByLabel("Ortam", { exact: true }).selectOption("production");
+  await expect(settingsSection.getByText("Test edilmedi", { exact: true })).toBeVisible();
+  await connectionTest.click();
   await settingsPage.getByRole("button", { name: "Kaydet", exact: true }).click();
   const calls = await settingsPage.evaluate(() => window.settingsCalls.filter((call) => call.kind === "setup"));
   assert.equal(calls.at(-1).input.arasShipping.password, "");

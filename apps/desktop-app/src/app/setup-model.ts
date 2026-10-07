@@ -21,6 +21,7 @@ export interface AiServiceFormDraft {
   googleCurl: string;
   baseUrl: string;
   model: string;
+  imageModel: string;
   modelOptions: DesktopAiModelOption[];
   apiKey: string;
   storedApiKeyConfigured: boolean;
@@ -47,6 +48,7 @@ export interface SetupFormState {
   aiGoogleCurl: string;
   aiBaseUrl: string;
   aiModel: string;
+  aiImageModel: string;
   aiModelOptions: DesktopAiModelOption[];
   aiApiKey: string;
   aiStoredApiKeyConfigured: boolean;
@@ -66,6 +68,7 @@ export interface SetupFormState {
   arasShipping: ArasShippingConfigurationInput & { hasSecret: boolean; configured: boolean };
   dealerPortalEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
+  onlineSalesDeliveryEnabled: boolean;
 }
 
 export const aiServicePresets = [
@@ -110,6 +113,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiGoogleCurl: activeAiDraft.googleCurl,
     aiBaseUrl: activeAiDraft.baseUrl,
     aiModel: activeAiDraft.model,
+    aiImageModel: activeAiDraft.imageModel,
     aiModelOptions: activeAiDraft.modelOptions,
     aiApiKey: activeAiDraft.apiKey,
     aiStoredApiKeyConfigured: activeAiDraft.storedApiKeyConfigured,
@@ -124,6 +128,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     arasShipping: { ...(setupData.arasShipping ?? defaultSetupData.arasShipping), password: "", clearPassword: false },
     dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
     onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? defaultSetupData.onlineSalesDelivery) },
+    onlineSalesDeliveryEnabled: setupData.onlineSalesDeliveryEnabled ?? true,
     productDataEnabled: setupData.productData.enabled,
     productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,
@@ -147,6 +152,7 @@ function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<
       projectName: profile?.projectName ?? (isActiveService ? setupData.aiProjectName : ""),
       baseUrl: profile?.baseUrl || (isActiveService ? setupData.aiBaseUrl : preset.baseUrl) || "",
       model: profile?.model ?? (isActiveService ? setupData.aiModel : ""),
+      imageModel: profile?.imageModel ?? (isActiveService ? setupData.aiImageModel ?? "" : ""),
       modelOptions: profile?.modelOptions ?? (
         isActiveService && setupData.aiModel
           ? [{ id: setupData.aiModel, label: setupData.aiModel }]
@@ -165,6 +171,7 @@ export function createDefaultAiServiceDraft(service: DesktopAiService): AiServic
     googleCurl: "",
     baseUrl: preset?.baseUrl ?? "",
     model: "",
+    imageModel: "",
     modelOptions: [],
     apiKey: "",
     storedApiKeyConfigured: false,
@@ -179,6 +186,7 @@ export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
     googleCurl: form.aiGoogleCurl,
     baseUrl: form.aiBaseUrl,
     model: form.aiModel,
+    imageModel: form.aiImageModel,
     modelOptions: form.aiModelOptions,
     apiKey: form.aiApiKey,
     storedApiKeyConfigured: form.aiStoredApiKeyConfigured,
@@ -203,6 +211,7 @@ function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInit
       projectName: draft.projectName,
       baseUrl: draft.baseUrl,
       model: draft.model,
+      imageModel: draft.imageModel,
       modelOptions: draft.modelOptions,
       timeoutSeconds: Number(draft.timeoutSeconds),
       apiKey: draft.apiKey,
@@ -243,6 +252,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       aiProjectName: setupForm.aiProjectName,
       aiBaseUrl: setupForm.aiBaseUrl,
       aiModel: setupForm.aiModel,
+      aiImageModel: setupForm.aiImageModel,
       aiModelOptions: setupForm.aiModelOptions,
       aiApiKey: setupForm.aiApiKey,
       clearAiApiKey: setupForm.clearAiApiKey,
@@ -252,11 +262,12 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       instagram: { enabled: setupForm.instagram.enabled, accountId: setupForm.instagram.accountId, accessToken: setupForm.instagram.accessToken, clearAccessToken: setupForm.instagram.clearAccessToken },
       whatsappCloud: { enabled: setupForm.whatsappCloud.enabled, wabaId: setupForm.whatsappCloud.wabaId,
         phoneNumberId: setupForm.whatsappCloud.phoneNumberId, accessToken: setupForm.whatsappCloud.accessToken, clearAccessToken: setupForm.whatsappCloud.clearAccessToken },
-      arasShipping: { enabled: setupForm.arasShipping.enabled, environment: setupForm.arasShipping.environment,
+      arasShipping: { enabled: setupForm.onlineSalesDeliveryEnabled && setupForm.onlineSalesDelivery.shippingEnabled, environment: setupForm.arasShipping.environment,
         customerCode: setupForm.arasShipping.customerCode, username: setupForm.arasShipping.username,
         password: setupForm.arasShipping.password, clearPassword: setupForm.arasShipping.clearPassword },
       dealerPortalEnabled: setupForm.dealerPortalEnabled,
       onlineSalesDelivery: setupForm.onlineSalesDelivery,
+      onlineSalesDeliveryEnabled: setupForm.onlineSalesDeliveryEnabled,
       productData: {
         enabled: setupForm.productDataEnabled,
         provider: setupForm.productDataProvider,

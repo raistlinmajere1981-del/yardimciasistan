@@ -1,17 +1,22 @@
 import { useState } from "react";
+import { useSettingsConnectionTest } from "../../app/use-settings-connection-test";
 import { INSTAGRAM_API_VERSION, type MarketingProviderConnectionResult } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "../../app/setup-model";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { ActionButton } from "../ui/ActionButton";
 export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["sms"];busy:boolean;onChange:(draft:SetupFormState["sms"])=>void}) {
-  const [testing,setTesting]=useState(false),[result,setResult]=useState<MarketingProviderConnectionResult|null>(null),[senders,setSenders]=useState<string[]>([]);
-  const change=(patch:Partial<typeof draft>)=>{setResult(null);onChange({...draft,...patch});};
+  const connection=useSettingsConnectionTest<MarketingProviderConnectionResult>(draft);
+  const {testing,result}=connection;
+  const [senders,setSenders]=useState<string[]>([]);
+  const change=(patch:Partial<typeof draft>)=>{connection.clear();onChange({...draft,...patch});};
   const complete=Boolean(draft.senderId && (draft.apiKey || draft.hasApiKey&&!draft.clearApiKey) && (draft.apiHash || draft.hasApiHash&&!draft.clearApiHash));
   async function test(refresh=false) {
-    const bridge=window.yardimciDesktop;if(!bridge)return;setTesting(true);
-    try { if(refresh){const value=await bridge.listSmsSenderIds(draft);if(value.ok)setSenders(value.value);else setResult({ok:false,message:value.message,testedAt:new Date().toISOString()});}
-      else {const value=await bridge.testSmsConnection(draft);setResult(value);if(value.senderIds)setSenders(value.senderIds);} }
-    catch{setResult({ok:false,message:"Bağlantı testi tamamlanamadı.",testedAt:new Date().toISOString()});}finally{setTesting(false);}
+    const bridge=window.yardimciDesktop;if(!bridge)return;
+    await connection.run(async () => {
+      try { if(refresh){const value=await bridge.listSmsSenderIds(draft);if(value.ok)setSenders(value.value);return {ok:value.ok,message:value.ok?"Başlık listesi yenilendi.":value.message,testedAt:new Date().toISOString()};}
+        const value=await bridge.testSmsConnection(draft);if(value.senderIds)setSenders(value.senderIds);return value;
+      } catch{return {ok:false,message:"Bağlantı testi tamamlanamadı.",testedAt:new Date().toISOString()};}
+    });
   }
   return <ServiceSettingsCard id="settings-marketing-sms" title="SMS / İleti Merkezi" enabled={draft.enabled} disabled={busy||testing}
     status={!draft.enabled?"Kapalı":complete?"Etkin · Yapılandırılmış":"Etkin · Yapılandırılmamış"} onEnabledChange={enabled=>change({enabled})}>
@@ -30,10 +35,11 @@ export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["
   </ServiceSettingsCard>;
 }
 export function InstagramSettingsSection({draft,busy,onChange}:{draft:SetupFormState["instagram"];busy:boolean;onChange:(draft:SetupFormState["instagram"])=>void}) {
-  const [testing,setTesting]=useState(false),[result,setResult]=useState<MarketingProviderConnectionResult|null>(null);
-  const change=(patch:Partial<typeof draft>)=>{setResult(null);onChange({...draft,...patch});};
+  const connection=useSettingsConnectionTest<MarketingProviderConnectionResult>(draft);
+  const {testing,result}=connection;
+  const change=(patch:Partial<typeof draft>)=>{connection.clear();onChange({...draft,...patch});};
   const complete=Boolean(draft.accountId && (draft.accessToken || draft.hasSecret&&!draft.clearAccessToken));
-  async function test(){const bridge=window.yardimciDesktop;if(!bridge)return;setTesting(true);try{setResult(await bridge.testInstagramConnection(draft));}catch{setResult({ok:false,message:"Bağlantı testi tamamlanamadı.",testedAt:new Date().toISOString()});}finally{setTesting(false);}}
+  async function test(){const bridge=window.yardimciDesktop;if(!bridge)return;await connection.run(async()=>{try{return await bridge.testInstagramConnection(draft);}catch{return {ok:false,message:"Bağlantı testi tamamlanamadı.",testedAt:new Date().toISOString()};}});}
   return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram" enabled={draft.enabled} disabled={busy||testing} onEnabledChange={enabled=>change({enabled})}
     status={!draft.enabled?"Kapalı":complete?"Etkin · Yapılandırılmış":"Etkin · Yapılandırılmamış"}>
     <label className="form-field">Instagram hesap / User ID<input aria-label="Instagram User ID" inputMode="numeric" maxLength={40} value={draft.accountId} onChange={e=>change({accountId:e.target.value})}/></label>

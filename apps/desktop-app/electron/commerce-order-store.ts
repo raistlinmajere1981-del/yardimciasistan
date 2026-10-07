@@ -254,8 +254,8 @@ export function createCommerceOrder(
         }
         dealerCustomerId = String(dealer.customer_id);
         const delivery = normalizeCommerceOrderDeliverySnapshot(input.deliverySnapshot);
-        const settings = database.prepare("SELECT online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = ''").get(businessId)!;
-        if (Number(settings[delivery.method === "pickup" ? "online_sales_pickup_enabled" : "online_sales_shipping_enabled"]) !== 1) {
+        const settings = database.prepare("SELECT online_sales_delivery_enabled, online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = ''").get(businessId)!;
+        if (Number(settings.online_sales_delivery_enabled) !== 1 || Number(settings[delivery.method === "pickup" ? "online_sales_pickup_enabled" : "online_sales_shipping_enabled"]) !== 1) {
           throw new Error("Bayi teslimat yöntemi kapalı.");
         }
       }

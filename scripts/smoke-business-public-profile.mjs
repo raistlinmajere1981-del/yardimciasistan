@@ -177,9 +177,11 @@ try {
       assert.equal(saveBusinessPublicProfile(database.databasePath, { ...beforeMapSwitch, mapDisplayMode: mode, googleMapsEmbedUrl: embedUrl }).ok, true);
       assert.equal((await publishBusinessAiContext(database, { baseUrl: "https://example.test/yardimci-asistan", syncSecret: "test" })).ok, true);
       assert.equal(published.at(-1).mapDisplayMode, mode);
-      assert.equal(published.at(-1).googleMapsEmbedUrl, embedUrl);
-      assert.equal(published.at(-1).latitude, beforeMapSwitch.latitude);
-      assert.equal(published.at(-1).longitude, beforeMapSwitch.longitude);
+      assert.equal(published.at(-1).googleMapsEmbedUrl, mode === "google_maps_embed" ? embedUrl : "");
+      assert.equal(published.at(-1).latitude, mode === "manual" ? beforeMapSwitch.latitude : null);
+      assert.equal(published.at(-1).longitude, mode === "manual" ? beforeMapSwitch.longitude : null);
+      assert.equal(getBusinessPublicProfile(database.databasePath).latitude, beforeMapSwitch.latitude);
+      assert.equal(getBusinessPublicProfile(database.databasePath).googleMapsEmbedUrl, embedUrl);
     }
   } finally { globalThis.fetch = originalFetch; }
   console.log("business-public-profile-smoke-ok: default/manual/google persistence, URL validation, coordinate preservation and website publication verified");

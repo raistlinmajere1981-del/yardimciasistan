@@ -19,7 +19,8 @@
       const lat = latitude.toFixed(6), lon = longitude.toFixed(6);
       const google = business.mapDisplayMode === "google_maps_embed" ? googleEmbedUrl(business.googleMapsEmbedUrl) : "";
       const bbox = [longitude - .009, latitude - .006, longitude + .009, latitude + .006].map(value => value.toFixed(6)).join("%2C");
-      const src = google || (hasPoint ? `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lon}` : "");
+       const manual = business.mapDisplayMode !== "google_maps_embed";
+       const src = manual ? (hasPoint ? `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lon}` : "") : google;
       root.querySelectorAll("[data-business-map-frame]").forEach(node => {
         if (src) node.src = src; else node.removeAttribute("src");
         node.hidden = !src;
@@ -30,12 +31,12 @@
         node.style.border = "0";
       });
       root.querySelectorAll("[data-business-map-placeholder]").forEach(node => { node.hidden = !!src; });
-      root.querySelectorAll("[data-business-map-attribution]").forEach(node => { node.hidden = !hasPoint || !!google; });
+       root.querySelectorAll("[data-business-map-attribution]").forEach(node => { node.hidden = !manual || !hasPoint; });
       root.querySelectorAll("[data-business-map-link]").forEach(node => {
-        node.hidden = !hasPoint;
+         node.hidden = !manual || !hasPoint;
         if (hasPoint) node.href = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}`;
       });
-      if (hasPoint) root.querySelectorAll("[data-business-directions-button]").forEach(node => { node.setAttribute("data-ya-address", `${lat},${lon}`); });
+       root.querySelectorAll("[data-business-directions-button]").forEach(node => { node.setAttribute("data-ya-address", manual && hasPoint ? `${lat},${lon}` : business.address || ""); });
     }
   };
 })();

@@ -1,4 +1,5 @@
 import { Download, RefreshCw, RotateCcw } from "lucide-react";
+import { compareVersions } from "@yardimci-asistan/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopUpdateStatus } from "../../../electron/desktop-update-service";
 import type { SettingsOperationResult } from "../../app/settings-save";
@@ -76,8 +77,9 @@ export function useUpdateSettings(enabled: boolean) {
   }, [enabled]);
 
   const busy = action !== null || status?.phase === "checking" || status?.phase === "downloading";
-  const updateAvailable = status?.phase === "available";
-  const updateReady = status?.phase === "ready";
+  const newerRemote = Boolean(status?.latestVersion && compareVersions(status.latestVersion, status.currentVersion) > 0);
+  const updateAvailable = status?.phase === "available" && newerRemote;
+  const updateReady = status?.phase === "ready" && newerRemote;
 
   const validatePreferences = useCallback(() => {
     if (baseUrl === baselineBaseUrlRef.current && autoCheckEnabled === baselineAutoCheckRef.current) return null;
@@ -244,7 +246,7 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
         {status && (
           <span>
             {status.currentVersion}
-            {status.latestVersion && status.latestVersion !== status.currentVersion
+             {status.latestVersion && compareVersions(status.latestVersion, status.currentVersion) > 0
               ? ` → ${status.latestVersion}`
               : ""}
           </span>

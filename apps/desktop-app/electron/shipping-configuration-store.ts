@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { ARAS_SHIPPING_PROVIDER, emptyArasShippingConfiguration,
+import { ARAS_SHIPPING_PROVIDER, emptyArasShippingConfiguration, isArasShippingConfigurationReady,
   type ArasShippingConfiguration, type ArasShippingConfigurationInput
 } from "@yardimci-asistan/shared";
 
@@ -23,10 +23,14 @@ export function getArasShippingConfiguration(db: DatabaseSync): ArasShippingConf
   const row = getStoredArasShippingConfiguration(db);
   if (!row) return emptyArasShippingConfiguration();
   const hasSecret = String(row.password_encrypted).startsWith(secretPrefix);
+  const delivery = db.prepare("SELECT online_sales_delivery_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = '' LIMIT 1")
+    .get(String(row.business_id));
+  // Delivery owns activation, including reads before the next normal Settings save.
+  const enabled = Number(delivery?.online_sales_delivery_enabled) === 1 && Number(delivery?.online_sales_shipping_enabled) === 1;
   return { providerId: ARAS_SHIPPING_PROVIDER.id, providerName: ARAS_SHIPPING_PROVIDER.name,
-    enabled: Number(row.enabled) === 1, environment: row.environment === "production" ? "production" : "test",
+    enabled, environment: row.environment === "production" ? "production" : "test",
     customerCode: String(row.customer_code), username: String(row.username), hasSecret,
-    configured: Number(row.enabled) === 1 && Boolean(row.customer_code && row.username && hasSecret) };
+    configured: isArasShippingConfigurationReady({ enabled, customerCode: String(row.customer_code), username: String(row.username), hasSecret }) };
 }
 
 export function getStoredArasShippingConfiguration(db: DatabaseSync) {

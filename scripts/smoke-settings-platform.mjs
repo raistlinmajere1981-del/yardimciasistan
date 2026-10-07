@@ -66,10 +66,16 @@ try {
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
   await expect(page.getByRole('button', { name: 'İşletme Düzeni · Masa yönetimi', exact: true })).toBeVisible();
   await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=restaurant&tables=off`);
-  await select('İşletme Düzeni');
+  await expect(tab('İşletme Düzeni')).toHaveCount(0);
   await expect(page.locator('#settings-operations')).toHaveCount(0);
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
   await expect(page.getByRole('button', { name: 'İşletme Düzeni · Masa yönetimi', exact: true })).toHaveCount(0);
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test`);
+
+  for (const profileId of ['market', 'market&wholesale=on']) {
+    await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=${profileId}`);
+    await expect(tab('İşletme Düzeni')).toHaveCount(0);
+  }
   await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test`);
 
   // A preset round-trip is not an explicit edit of the operator's existing OFF selection.
@@ -157,6 +163,15 @@ try {
   expect((await setupCalls()).length).toBe(deliverySetupCount);
   await deliverySettings.getByLabel('Kargo ile gönderim', { exact: true }).check();
   await save();
+  await expect(deliverySettings.getByRole('alert')).toContainText('kargo sağlayıcısının');
+  expect((await setupCalls()).length).toBe(deliverySetupCount);
+  const shippingSettings = page.locator('#settings-shipping-provider');
+  await expect(shippingSettings.getByRole('checkbox', { name: 'Aras Kargo servisi' })).toHaveCount(0);
+  await shippingSettings.getByLabel('Müşteri kodu', { exact: true }).fill('fixture-code');
+  await shippingSettings.getByLabel('Kullanıcı adı', { exact: true }).fill('fixture-user');
+  await shippingSettings.getByLabel('Şifre', { exact: true }).fill('fixture-password');
+  await shippingSettings.getByRole('button', { name: 'Bağlantıyı test et', exact: true }).click();
+  await save();
   expect((await setupCalls()).at(-1).input.onlineSalesDelivery).toEqual({ pickupEnabled: false, shippingEnabled: true });
   await expect(tab('Servisler')).not.toContainText('Değişiklik var');
   await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [], onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false } }));
@@ -198,9 +213,9 @@ try {
 
   await page.evaluate(() => window.refreshSettings({ profileOptions: ['commerce.wholesale'] }));
   await expect(page.locator('#settings-online-delivery')).toBeVisible();
-  await expect(page.locator('#settings-online-delivery')).toContainText('Bayi Sipariş Teslimatı');
+  await expect(page.locator('#settings-online-delivery')).toContainText('Teslimat ve Gönderim');
   const dealerPortal = page.locator('#settings-dealer-portal');
-  const dealerToggle = dealerPortal.getByRole('checkbox', { name: 'Bayi portalını etkinleştir', exact: true });
+  const dealerToggle = dealerPortal.getByRole('checkbox', { name: 'Bayi Web Erişimi servisi', exact: true });
   const dealerSetupCount = (await setupCalls()).length;
   await expect(dealerPortal).toBeVisible();
   await expect(dealerToggle).not.toBeChecked();
@@ -214,25 +229,32 @@ try {
   await dealerToggle.uncheck(); await save();
   expect((await setupCalls()).at(-1).input.dealerPortalEnabled).toBe(false);
 
+  await page.evaluate(() => window.refreshSettings({ arasShipping: { ...window.persistedSettings().arasShipping,
+    enabled: false, customerCode: '', username: '', hasSecret: false, configured: false } }));
   const arasService = page.locator('#settings-shipping-provider');
-  const arasToggle = arasService.getByRole('checkbox', { name: 'Aras Kargo servisi', exact: true });
+  const shippingMethod = deliverySettings.getByLabel('Kargo ile gönderim', { exact: true });
   const arasSetupBefore = (await setupCalls()).length;
-  await expect(arasService.locator('.settings-service-card-body')).toHaveCount(0);
-  await arasToggle.check();
-  await expect(arasService.getByText('Etkin · Yapılandırılmamış', { exact: true })).toBeVisible();
+  await expect(arasService).toHaveCount(0);
+  await shippingMethod.check();
+  await expect(arasService.getByText('Yapılandırılmadı', { exact: true })).toBeVisible();
   for (const label of ['Müşteri kodu', 'Kullanıcı adı', 'Şifre', 'Ortam']) await expect(arasService.getByLabel(label, { exact: true })).toBeVisible();
   await expect(arasService.getByRole('button', { name: 'Bağlantıyı test et', exact: true })).toBeDisabled();
   expect((await setupCalls()).length).toBe(arasSetupBefore);
   await discard();
-  await expect(arasToggle).not.toBeChecked();
-  await expect(arasService.locator('.settings-service-card-body')).toHaveCount(0);
-  await arasToggle.check();
+  await expect(shippingMethod).not.toBeChecked();
+  await expect(arasService).toHaveCount(0);
+  await shippingMethod.check();
+  await arasService.getByLabel('Müşteri kodu', { exact: true }).fill('fixture-code');
+  await arasService.getByLabel('Kullanıcı adı', { exact: true }).fill('fixture-user');
+  await arasService.getByLabel('Şifre', { exact: true }).fill('fixture-password');
+  await arasService.getByRole('button', { name: 'Bağlantıyı test et', exact: true }).click();
+  await expect(arasService.getByRole('status')).toContainText('Fixture kargo bağlantısı doğrulandı.');
   await save();
   expect((await setupCalls()).at(-1).input.arasShipping.enabled).toBe(true);
-  await arasToggle.uncheck();
-  await expect(arasService.locator('.settings-service-card-body')).toHaveCount(0);
+  await shippingMethod.uncheck();
+  await expect(arasService).toHaveCount(0);
   await discard();
-  await expect(arasToggle).toBeChecked();
+  await expect(shippingMethod).toBeChecked();
   await expect(arasService.getByLabel('Müşteri kodu', { exact: true })).toBeVisible();
 
   for (const width of [1440, 600]) {
@@ -241,19 +263,21 @@ try {
       const aras = document.querySelector('#settings-shipping-provider');
       const product = document.querySelector('#settings-product-data');
       const fields = [...aras.querySelectorAll('.form-grid > label')].map(node => node.getBoundingClientRect());
-      const previous = aras.parentElement.previousElementSibling.getBoundingClientRect();
+      const delivery = document.querySelector('#settings-online-delivery');
+      const previous = delivery.parentElement.previousElementSibling.getBoundingClientRect();
       const productRect = product.getBoundingClientRect();
       const nextRect = product.nextElementSibling.getBoundingClientRect();
       return {
         columns: Math.abs(fields[0].top - fields[1].top) < 1 ? 2 : 1,
         headerFields: [...aras.querySelectorAll('.settings-service-card-header input:not([type="checkbox"]), .settings-service-card-header select')].length,
-        targets: [aras, product].every(card => card.querySelector('.settings-service-card-header .settings-service-toggle').getBoundingClientRect().height >= 44),
+        targets: [delivery, product].every(card => card.querySelector('.settings-service-card-header .settings-service-toggle').getBoundingClientRect().height >= 44),
         controls: [...aras.querySelectorAll('.form-grid input, .form-grid select')].every(node => node.getBoundingClientRect().height >= 44),
-        separateCards: aras.getBoundingClientRect().top > previous.bottom && nextRect.top > productRect.bottom,
+        providerUnderDelivery: delivery.contains(aras),
+        separateCards: delivery.getBoundingClientRect().top > previous.bottom && nextRect.top > productRect.bottom,
         bodyX: document.querySelector('.settings-category-body').scrollWidth <= document.querySelector('.settings-category-body').clientWidth + 1
       };
     });
-    expect(geometry, `service card layout ${width}`).toEqual({ columns: width > 760 ? 2 : 1, headerFields: 0, targets: true, controls: true, separateCards: true, bodyX: true });
+    expect(geometry, `service card layout ${width}`).toEqual({ columns: width > 760 ? 2 : 1, headerFields: 0, targets: true, controls: true, providerUnderDelivery: true, separateCards: true, bodyX: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.evaluate(() => window.refreshSettings({ profileId: 'pension_restaurant', profileOptions: [] }));
@@ -736,23 +760,23 @@ try {
 
   // Website map selection uses the existing Business staged save/discard lifecycle.
   await select('İşletme');
-  await expect(page.getByLabel('Harita gösterimi', { exact: true })).toHaveValue('manual');
+  await expect(page.getByRole('tab', { name: 'Manuel harita', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByLabel('Google Maps embed bağlantısı', { exact: true })).toHaveCount(0);
-  await page.getByLabel('Harita gösterimi', { exact: true }).selectOption('google_maps_embed');
+  await page.getByRole('tab', { name: 'Google Maps', exact: true }).click();
   await page.getByLabel('Google Maps embed bağlantısı', { exact: true }).fill('https://evil.test/maps/embed?pb=x');
   const profileCallCount = await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').length);
   await save();
   await expect(page.locator('.global-message-bar')).toContainText('Google Maps embed bağlantısı geçerli');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').length)).toBe(profileCallCount);
   await discard();
-  await expect(page.getByLabel('Harita gösterimi', { exact: true })).toHaveValue('manual');
-  await page.getByLabel('Harita gösterimi', { exact: true }).selectOption('google_maps_embed');
+  await expect(page.getByRole('tab', { name: 'Manuel harita', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Google Maps', exact: true }).click();
   const embedUrl = 'https://www.google.com/maps/embed?pb=!1m18!2m3';
   await page.getByLabel('Google Maps embed bağlantısı', { exact: true }).fill(embedUrl);
   await save();
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.mapDisplayMode)).toBe('google_maps_embed');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.googleMapsEmbedUrl)).toBe(embedUrl);
-  await page.getByLabel('Harita gösterimi', { exact: true }).selectOption('manual');
+  await page.getByRole('tab', { name: 'Manuel harita', exact: true }).click();
   await save();
   await expect.poll(() => page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.mapDisplayMode)).toBe('manual');
   expect(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'profile').at(-1).input.googleMapsEmbedUrl)).toBe(embedUrl);
@@ -846,7 +870,7 @@ try {
       await expect(page.getByRole('tabpanel')).toHaveCount(1);
       const geometry = await page.evaluate(() => {
         const body = document.querySelector('.settings-category-body');
-        const nav = document.querySelector('[role="tablist"]');
+        const nav = document.querySelector('[role="tablist"][aria-label="Ayar kategorileri"]');
         const top = nav.getBoundingClientRect().top;
         body.scrollTop = body.scrollHeight;
         return {
@@ -864,7 +888,7 @@ try {
         scroll: 'auto',
         navStable: true
       });
-      await expect(page.getByRole('tablist')).toBeInViewport();
+      await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' })).toBeInViewport();
       await expect(guard()).toHaveCount(0);
     }
   }

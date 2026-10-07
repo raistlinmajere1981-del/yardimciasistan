@@ -1,4 +1,5 @@
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
+import { imageGenerationModelOptions, supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
@@ -118,6 +119,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
       aiGoogleCurl: targetDraft.googleCurl,
       aiBaseUrl: targetDraft.baseUrl,
       aiModel: targetDraft.model,
+      aiImageModel: targetDraft.imageModel,
       aiModelOptions: targetDraft.modelOptions,
       aiApiKey: targetDraft.apiKey,
       aiStoredApiKeyConfigured: targetDraft.storedApiKeyConfigured,
@@ -221,7 +223,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               Model adı
               {form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
                 <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
-                  {form.aiModelOptions.map((model) => (
+                  {form.aiModelOptions.filter(model => !supportsImageGenerationModel(form.aiService, model.id)).map((model) => (
                     <option value={model.id} key={model.id}>{model.label}</option>
                   ))}
                 </select>
@@ -235,6 +237,14 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                     : `${form.aiModelOptions.length} görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.`
                   : "Bağlantıyı Dene ile görsel destekli, güncel modeller otomatik alınır."}</small>
               )}
+            </label>
+            <label className="form-field form-field--medium">
+              Görsel üretim modeli
+              <select aria-label="Görsel üretim modeli" value={form.aiImageModel} onChange={(event) => update("aiImageModel", event.target.value)}>
+                <option value="">Otomatik / Uygun modeli seç</option>
+                {imageGenerationModelOptions(form.aiService, [form.aiImageModel, form.aiModel, ...form.aiModelOptions.map(model => model.id)]).map(model =>
+                  <option key={model} value={model}>{model}</option>)}
+              </select>
             </label>
             <label className="form-field form-field--short">
               Yanıt bekleme süresi (saniye)

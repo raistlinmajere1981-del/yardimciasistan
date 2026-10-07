@@ -14,6 +14,8 @@ export interface ArasShippingConfiguration {
   username: string;
   hasSecret: boolean;
   configured: boolean;
+  /** Main-owned evidence for the effective stored credentials, not live availability. */
+  verified?: boolean;
 }
 export interface ArasShippingConfigurationInput {
   enabled: boolean;
@@ -26,6 +28,14 @@ export interface ArasShippingConfigurationInput {
 export function emptyArasShippingConfiguration(): ArasShippingConfiguration {
   return { providerId: ARAS_SHIPPING_PROVIDER.id, providerName: ARAS_SHIPPING_PROVIDER.name,
     enabled: false, environment: "test", customerCode: "", username: "", hasSecret: false, configured: false };
+}
+
+/** Credentials readiness is independent of delivery activation; not a remote test. */
+export function isArasShippingConfigurationReady(config: Pick<ArasShippingConfiguration, "enabled" | "customerCode" | "username"> & {
+  hasSecret?: boolean; password?: string; clearPassword?: boolean;
+}): boolean {
+  return Boolean(config.customerCode.trim() && config.username.trim()
+    && (config.password?.trim() || (config.hasSecret && !config.clearPassword)));
 }
 export interface ShippingConnectionTestResult {
   ok: boolean;

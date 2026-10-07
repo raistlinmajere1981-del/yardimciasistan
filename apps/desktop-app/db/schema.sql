@@ -2,12 +2,18 @@
 -- Historical database upgrades are intentionally unsupported; reset to this schema.
 
 -- TABLES
+CREATE TABLE service_settings_verifications (
+  service TEXT PRIMARY KEY,
+  fingerprint TEXT NOT NULL,
+  tested_at TEXT NOT NULL
+);
 
 CREATE TABLE ai_service_profiles (
   service TEXT PRIMARY KEY,
   project_name TEXT NOT NULL DEFAULT '',
   base_url TEXT NOT NULL DEFAULT '',
   model TEXT NOT NULL DEFAULT '',
+  image_model TEXT NOT NULL DEFAULT '',
   model_options_json TEXT NOT NULL DEFAULT '[]',
   timeout_seconds INTEGER NOT NULL DEFAULT 30,
   api_key_encrypted TEXT NOT NULL DEFAULT '',
@@ -843,7 +849,8 @@ CREATE TABLE settings (
   product_data_include_images INTEGER NOT NULL DEFAULT 1 CHECK (product_data_include_images IN (0, 1)),
   dealer_portal_enabled INTEGER NOT NULL DEFAULT 0 CHECK (dealer_portal_enabled IN (0, 1)),
   online_sales_pickup_enabled INTEGER NOT NULL DEFAULT 1 CHECK (online_sales_pickup_enabled IN (0, 1)),
-  online_sales_shipping_enabled INTEGER NOT NULL DEFAULT 0 CHECK (online_sales_shipping_enabled IN (0, 1) AND (online_sales_pickup_enabled = 1 OR online_sales_shipping_enabled = 1)),
+  online_sales_delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK (online_sales_delivery_enabled IN (0, 1)),
+  online_sales_shipping_enabled INTEGER NOT NULL DEFAULT 0 CHECK (online_sales_shipping_enabled IN (0, 1) AND (online_sales_delivery_enabled = 0 OR online_sales_pickup_enabled = 1 OR online_sales_shipping_enabled = 1)),
   setup_completed INTEGER NOT NULL DEFAULT 0 CHECK (setup_completed IN (0, 1)),
   app_password_verifier TEXT NOT NULL DEFAULT '',
   app_password_updated_at TEXT NOT NULL DEFAULT '',
@@ -2445,8 +2452,8 @@ BEGIN
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
 
-CREATE TRIGGER trg_dealer_catalog_delivery AFTER UPDATE OF online_sales_pickup_enabled, online_sales_shipping_enabled ON settings
-WHEN (NEW.online_sales_pickup_enabled <> OLD.online_sales_pickup_enabled OR NEW.online_sales_shipping_enabled <> OLD.online_sales_shipping_enabled)
+CREATE TRIGGER trg_dealer_catalog_delivery AFTER UPDATE OF online_sales_delivery_enabled, online_sales_pickup_enabled, online_sales_shipping_enabled ON settings
+WHEN (NEW.online_sales_delivery_enabled <> OLD.online_sales_delivery_enabled OR NEW.online_sales_pickup_enabled <> OLD.online_sales_pickup_enabled OR NEW.online_sales_shipping_enabled <> OLD.online_sales_shipping_enabled)
   AND EXISTS (SELECT 1 FROM commerce_dealer_web_access WHERE business_id = NEW.business_id)
 BEGIN
   INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)

@@ -129,7 +129,11 @@ try {
   assert.equal(endpoint("sync.php", { ...request, source_revision: request.source_revision - 1, idempotency_key: "stale-publication" }).status, request.source_revision > 1 ? 409 : 422);
 
   const setupBeforeDelivery = database.getSetupData();
-  const saveDelivery = (onlineSalesDelivery) => database.saveInitialSetup({ ...setupBeforeDelivery, onlineSalesDelivery });
+  assert.equal(database.saveInitialSetup({ ...setupBeforeDelivery, onlineSalesDelivery: { pickupEnabled: false, shippingEnabled: true } }).ok, false,
+    "shipping requires a ready provider before activation");
+  const saveDelivery = (onlineSalesDelivery) => database.saveInitialSetup({ ...setupBeforeDelivery, onlineSalesDelivery,
+    arasShipping: { enabled: true, environment: "test", customerCode: "fixture", username: "fixture", password: "" } },
+    undefined, undefined, { mode: "replace", encryptedValue: "safe-storage:v1:fixture-ciphertext" });
   assert.deepEqual(setupBeforeDelivery.onlineSalesDelivery, { pickupEnabled: true, shippingEnabled: false });
   assert.throws(() => raw.exec("UPDATE settings SET online_sales_pickup_enabled = 0, online_sales_shipping_enabled = 0"), /CHECK/);
   assert.equal(saveDelivery({ pickupEnabled: false, shippingEnabled: false }).ok, false);

@@ -23,7 +23,10 @@ export class SmsMessagingService {
   async listSenderIds(input?: SmsConfigurationInput) { return new IletiMerkeziSmsProviderAdapter(this.credentials(input), this.options).listSenderIds(); }
   async testConnection(input?: SmsConfigurationInput): Promise<MarketingProviderConnectionResult> {
     let result: MarketingProviderConnectionResult;
-    try { const value = await new IletiMerkeziSmsProviderAdapter(this.credentials(input), this.options).testConnection(); result = { ok: true, ...value, testedAt: new Date().toISOString(), message: "İleti Merkezi bağlantısı ve onaylı başlık doğrulandı." }; }
+    try { const credentials = this.credentials(input);
+      const value = await new IletiMerkeziSmsProviderAdapter(credentials, this.options).testConnection();
+      this.database().recordServiceSettingsVerification("sms", { ...credentials });
+      result = { ok: true, ...value, testedAt: new Date().toISOString(), message: "İleti Merkezi bağlantısı ve onaylı başlık doğrulandı." }; }
     catch (error) { result = { ok: false, testedAt: new Date().toISOString(), message: error instanceof MarketingProviderError ? error.message : "SMS ayarlarını kontrol edin." }; }
     desktopLog.info({ scope: "marketing", event: "marketing.channel.connection_test", message: "SMS bağlantısı denendi.", meta: { channel: "sms", connected: result.ok } }); return result;
   }

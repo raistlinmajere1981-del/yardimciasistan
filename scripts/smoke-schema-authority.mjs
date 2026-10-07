@@ -154,6 +154,8 @@ try {
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM stay_guests WHERE stay_id = ? AND status = 'checked_in'").get(stay.savedId).n, 1);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM hospitality_notifications").get().n, 0);
     assert.equal(kbs.getKbsSettings(path).enabled, false);
+    ok(await kbs.testKbsConnection(path, { enabled: true, provider: "egm", facilityCode: "123456", username: "fixture",
+      authorizedIdentityNumber: "10000000146", password: "fixture-not-a-real-secret", clearPassword: false }));
     ok(kbs.saveKbsSettings(path, { enabled: true, provider: "egm", facilityCode: "123456", username: "fixture",
       authorizedIdentityNumber: "10000000146", password: "fixture-not-a-real-secret", clearPassword: false }));
     assert.equal(kbs.getKbsSettings(path).passwordConfigured, true);

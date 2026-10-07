@@ -7,7 +7,8 @@ import { publicImageUrl } from "./commerce-online-catalog-publication";
 /** Called in the access publication read snapshot. Active catalog products are the dealer channel. */
 export function createDealerCatalogs(db: DatabaseSync, access: DealerAccessProjection): DealerCatalogProjection[] {
   if (!access.enabled) return [];
-  const settings = db.prepare("SELECT business_id, online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE deleted_at = '' LIMIT 1").get()!;
+  const settings = db.prepare("SELECT business_id, online_sales_delivery_enabled, online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE deleted_at = '' LIMIT 1").get()!;
+  if (Number(settings.online_sales_delivery_enabled) !== 1) return [];
   const businessId = String(settings.business_id);
   const publication = db.prepare("SELECT source_revision FROM sync_outbox_revisions WHERE job_key = 'dealer_access'").get();
   const publicationRevision = Number(publication?.source_revision ?? 0);

@@ -1,21 +1,24 @@
-import { useState } from "react";
+import { useSettingsConnectionTest } from "../../app/use-settings-connection-test";
+import type { BusinessMessagingConnectionResult } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "../../app/setup-model";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { ActionButton } from "../ui/ActionButton";
 export function WhatsAppBusinessSettingsSection({ draft, busy, onChange }: {
   draft: SetupFormState["whatsappCloud"]; busy: boolean; onChange: (draft: SetupFormState["whatsappCloud"]) => void;
 }) {
-  const [testing, setTesting] = useState(false), [message, setMessage] = useState("");
-  const change = (patch: Partial<typeof draft>) => { setMessage(""); onChange({ ...draft, ...patch }); };
+  const connection = useSettingsConnectionTest<BusinessMessagingConnectionResult>(draft);
+  const { testing } = connection, message = connection.result?.message ?? "";
+  const change = (patch: Partial<typeof draft>) => { connection.clear(); onChange({ ...draft, ...patch }); };
   const complete = Boolean(draft.wabaId && draft.phoneNumberId && (draft.accessToken || (draft.hasSecret && !draft.clearAccessToken)));
   async function test() {
     const bridge = window.yardimciDesktop; if (!bridge) return;
-    setTesting(true);
-    try { const result = await bridge.testBusinessMessagingConnection({ enabled: draft.enabled, wabaId: draft.wabaId, phoneNumberId: draft.phoneNumberId, accessToken: draft.accessToken, clearAccessToken: draft.clearAccessToken }); setMessage(result.message); }
-    catch { setMessage("Bağlantı testi tamamlanamadı."); } finally { setTesting(false); }
+    await connection.run(async () => {
+      try { return await bridge.testBusinessMessagingConnection({ enabled: draft.enabled, wabaId: draft.wabaId, phoneNumberId: draft.phoneNumberId, accessToken: draft.accessToken, clearAccessToken: draft.clearAccessToken }); }
+      catch { return { ok: false, providerId: "whatsapp_cloud", message: "Bağlantı testi tamamlanamadı.", testedAt: new Date().toISOString() }; }
+    });
   }
   return <ServiceSettingsCard id="settings-whatsapp-business" title="WhatsApp Business" enabled={draft.enabled}
-    status={complete ? "Etkin · Yapılandırılmış" : "Etkin · Yapılandırılmamış"} disabled={busy || testing} onEnabledChange={(enabled) => change({ enabled })}>
+    status={!draft.enabled ? "Kapalı" : complete ? "Etkin · Yapılandırılmış" : "Etkin · Yapılandırılmamış"} disabled={busy || testing} onEnabledChange={(enabled) => change({ enabled })}>
     <div className="form-grid">
       <label className="form-field">WABA ID<input aria-label="WABA ID" value={draft.wabaId} maxLength={40} inputMode="numeric" onChange={(event) => change({ wabaId: event.target.value })} /></label>
       <label className="form-field">Phone Number ID<input aria-label="Phone Number ID" value={draft.phoneNumberId} maxLength={40} inputMode="numeric" onChange={(event) => change({ phoneNumberId: event.target.value })} /></label>

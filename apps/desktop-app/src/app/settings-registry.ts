@@ -1,4 +1,4 @@
-import { ARAS_SHIPPING_PROVIDER, BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 import type { SetupFormState } from "./setup-model";
@@ -21,6 +21,15 @@ export interface SettingsSectionDefinition {
   condition?: CapabilityCondition;
   visible?: (capabilities: readonly BusinessCapability[], initialized: boolean) => boolean;
 }
+
+export function visibleSettingsCategories(initialized: boolean, snapshot?: BusinessCapabilitySnapshot | null) {
+  return settingsCategories.filter(category => {
+    if (!initialized) return category.id === "business";
+    return category.id !== "operations" || matchesCapabilityCondition(snapshot, {
+      anyOf: [C.ACCOMMODATION_ROOMS, C.FOOD_TABLES]
+    });
+  });
+}
 const layoutSettingsDefinition = {
   id: "settings-operations",
   category: "operations",
@@ -37,15 +46,9 @@ export const dealerPortalDefinition = {
 } as const satisfies SettingsSectionDefinition;
 
 export const onlineSalesDeliveryDefinition = {
-  id: "settings-online-delivery", category: "services", title: "Online Satış Teslimatı",
-  keywords: "online satış bayi web sipariş işletmeden teslim pickup kargo shipping teslimat",
+  id: "settings-online-delivery", category: "services", title: "Teslimat ve Gönderim",
+  keywords: "online satış bayi web sipariş işletmeden teslim pickup kargo shipping teslimat aras sağlayıcı bağlantı müşteri kodu şifre",
   persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ONLINE_SALES) || caps.includes(C.WHOLESALE)
-} as const satisfies SettingsSectionDefinition;
-
-export const arasShippingDefinition = {
-  id: "settings-shipping-provider", category: "services", title: ARAS_SHIPPING_PROVIDER.name,
-  keywords: "kargo gönderim shipping sağlayıcı bağlantı müşteri kodu şifre",
-  persistence: "staged", visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ORDERS)
 } as const satisfies SettingsSectionDefinition;
 
 export const whatsappCloudDefinition = {
@@ -72,9 +75,8 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   layoutSettingsDefinition,
   onlineSalesDeliveryDefinition,
   dealerPortalDefinition,
-  arasShippingDefinition,
   whatsappCloudDefinition,
-  { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
+  { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay medya fotoğraf video panorama", persistence: "resource", condition: { allOf: [C.ACCOMMODATION_ROOMS] }, visible: (_, initialized) => initialized },
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },
   { id: "settings-kbs", category: "services", title: "Kimlik Bildirim Sistemi", keywords: "kbs emniyet jandarma kimlik bildirim tesis kodu egmsec konaklayan", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
@@ -82,7 +84,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-product-data", category: "services", title: "Ürün Verisi", keywords: "barkod open food facts sağlayıcı görseller otomatik ara", persistence: "staged", visible: caps => caps.includes(C.RETAIL_BARCODE) },
   { id: "settings-web", category: "services", title: "Web Modülü", keywords: "eşitleme adres güvenlik anahtarı otomatik", persistence: "staged" },
   { id: "settings-web-test", category: "services", title: "Web Bağlantısını Dene", keywords: "bağlantı test", persistence: "action" },
-  { id: "settings-ai", category: "services", title: "AI Yardımcı", keywords: "openai gemini google studio groq openrouter model api anahtarı zaman aşımı", persistence: "staged" },
+  { id: "settings-ai", category: "services", title: "AI Yardımcı", keywords: "openai gemini google studio groq openrouter metin görsel üretim modeli otomatik api anahtarı zaman aşımı", persistence: "staged" },
   { id: "settings-ai-test", category: "services", title: "AI Bağlantısını Dene", keywords: "model test", persistence: "action" },
   { id: "settings-appearance", category: "application", title: "Görünüm", keywords: "renk düzeni tema sistem koyu açık yoğunluk ölçek vurgu yazı tipi hareket", persistence: "resource" },
   { id: "settings-updates", category: "application", title: "Güncelleme tercihleri", keywords: "sunucu otomatik kontrol", persistence: "resource", visible: (_, initialized) => initialized },

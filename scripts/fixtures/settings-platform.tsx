@@ -28,6 +28,7 @@ function FixtureStatusHost() {
 
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, profileId: new URLSearchParams(window.location.search).get("profile") ?? defaultSetupData.profileId, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
+if (new URLSearchParams(window.location.search).get("wholesale") === "on") canonical.profileOptions = [C.WHOLESALE];
 function runtimeCapabilities(capabilities: BusinessCapability[]) {
   const override = new URLSearchParams(window.location.search).get("tables");
   if (override === "on") return [...new Set([...capabilities, C.FOOD_TABLES])];
@@ -111,28 +112,50 @@ window.requestSettingsPageLeave = () => {
 
 window.settingsCalls = [];
 window.failSetup = false;
+let shippingPassword = "", shippingVerification = "";
+const shippingSignature = (input: typeof canonical.arasShipping & { password?: string; clearPassword?: boolean }) =>
+  JSON.stringify([input.environment, input.customerCode, input.username, input.clearPassword ? "" : input.password || shippingPassword]);
 let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false };
 let kbsSettings = { enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false };
 window.yardimciDesktop = {
   getSetupData: async () => structuredClone(canonical),
+  testWebConnection: async input => { window.settingsCalls.push({ kind: "web-test", input }); return { ok: true, message: "Fixture web bağlantısı doğrulandı." }; },
   commerce: {
-    testShippingProviderConnection: async () => { window.settingsCalls.push({ kind: "shipping-test" }); return { ok: true, providerId: canonical.arasShipping.providerId, message: "Fixture kargo bağlantısı doğrulandı.", testedAt: new Date().toISOString() }; }
+    getShippingProviderConfiguration: async () => ({ ...canonical.arasShipping,
+      verified: Boolean(shippingVerification && shippingVerification === shippingSignature(canonical.arasShipping)) }),
+    testShippingProviderConnection: async input => {
+      window.settingsCalls.push({ kind: "shipping-test" });
+      if (!window.failShippingTest) shippingVerification = shippingSignature(input);
+      return { ok: !window.failShippingTest, providerId: canonical.arasShipping.providerId,
+        message: window.failShippingTest ? "Fixture bağlantı hatası" : "Fixture kargo bağlantısı doğrulandı.", testedAt: new Date().toISOString() };
+    }
   },
   saveInitialSetup: async input => {
     window.settingsCalls.push({ kind: "setup", input });
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
     const arasShipping = input.arasShipping ? {
-      ...canonical.arasShipping, enabled: input.arasShipping.enabled, environment: input.arasShipping.environment,
+      ...canonical.arasShipping, enabled: input.onlineSalesDeliveryEnabled && input.onlineSalesDelivery.shippingEnabled, environment: input.arasShipping.environment,
       username: input.arasShipping.username, customerCode: input.arasShipping.customerCode,
       hasSecret: input.arasShipping.clearPassword ? false : Boolean(input.arasShipping.password) || canonical.arasShipping.hasSecret,
       configured: input.arasShipping.enabled && Boolean(input.arasShipping.username && input.arasShipping.customerCode
         && (input.arasShipping.password || (canonical.arasShipping.hasSecret && !input.arasShipping.clearPassword)))
     } : canonical.arasShipping;
+    if (input.arasShipping?.clearPassword) shippingPassword = "";
+    else if (input.arasShipping?.password) shippingPassword = input.arasShipping.password;
     canonical = { ...canonical, ...input, arasShipping, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured };
     return { ok: true, message: "Kaydedildi", setupData: structuredClone(canonical), dashboardData: { ...defaultDashboardData, androidDevices: structuredClone(androidDevices) } };
   },
   getBusinessPublicProfile: async () => profile,
+  geocodeBusinessAddress: async address => {
+    window.settingsCalls.push({ kind: "geocode", address });
+    return { ok: true, results: [{ id: "fixture-point", label: address, latitude: 39, longitude: 32 }] };
+  },
+  testAiConnection: async input => {
+    window.settingsCalls.push({ kind: "ai-test", input });
+    return { ok: true, message: "Fixture AI bağlantısı doğrulandı.", model: input.model || "gemini-3-flash",
+      models: [{ id: input.model || "gemini-3-flash", label: input.model || "gemini-3-flash" }, { id: "gemini-3-pro-image-preview", label: "Gemini Image" }] };
+  },
   saveBusinessPublicProfile: async input => { window.settingsCalls.push({ kind: "profile", input }); if (window.failProfile) return { ok: false, message: "Profil hatası" }; profile = input; return { ok: true, message: "Müşteri bilgileri kaydedildi", profile }; },
   getGoogleReviewsSettings: async () => structuredClone(googleReviews),
   saveGoogleReviewsSettings: async input => {

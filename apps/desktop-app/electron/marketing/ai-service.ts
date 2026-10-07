@@ -11,7 +11,7 @@ export function resolveMarketingAi(db: DesktopDatabase, capability: MarketingAiC
   const profiles=[...setup.aiProfiles].sort((a,b)=>Number(b.service===setup.aiService)-Number(a.service===setup.aiService));
   for (const profile of profiles) {
     if (!profile.apiKeyConfigured || !profile.baseUrl) continue;
-    const model=capability==="image_generation"?imageModelForProfile(profile.service,[profile.model,...profile.modelOptions.map(m=>m.id)]):profile.model;
+    const model=capability==="image_generation"?(profile.imageModel || imageModelForProfile(profile.service,[profile.model,...profile.modelOptions.map(m=>m.id)])):profile.model;
     if (!model) continue;
     const key=getEffectiveAiApiKey(db,profile.service); if (!key) continue;
     return {enabled:true,provider:"openai_compatible",service:profile.service,baseUrl:profile.baseUrl,model,apiKey:key,timeoutMs:profile.timeoutSeconds*1000};

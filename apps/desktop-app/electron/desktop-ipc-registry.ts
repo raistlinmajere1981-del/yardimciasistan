@@ -28,6 +28,7 @@ import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
+import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 import { registerRequestIpcHandlers } from "./ipc/request-ipc";
 import { registerWhatsAppIpcHandlers } from "./ipc/whatsapp-ipc";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
@@ -130,6 +131,7 @@ export function registerDesktopIpcHandlers(
     finalizeOperationMutation,
     assertTaskScope
   } = dependencies;
+  registerWebConnectionIpcHandlers({ getDatabase, assertUnlocked });
 
   registerAppLockIpcHandlers(getAppLockService());
 

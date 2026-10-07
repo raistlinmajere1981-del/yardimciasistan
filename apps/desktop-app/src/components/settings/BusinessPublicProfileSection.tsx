@@ -21,6 +21,7 @@ import type { SettingsOperationResult } from "../../app/settings-save";
 import { BusinessLocationMapPicker } from "./BusinessLocationMapPicker";
 import { TimePicker } from "../ui/DateTimePicker";
 import { ActionButton } from "../ui/ActionButton";
+import { SegmentedControl } from "../ui/SegmentedControl";
 
 interface BusinessPublicProfileDraft {
   mapDisplayMode: BusinessMapDisplayMode;
@@ -80,8 +81,10 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
   const initialDraftRef = useRef<BusinessPublicProfileDraft | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const latitudeInputRef = useRef<HTMLInputElement>(null);
+  const lookupGeneration = useRef(0);
 
   useEffect(() => {
+    ++lookupGeneration.current;
     if (!enabled) return;
     let active = true;
     const load = async () => {
@@ -115,9 +118,10 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
 
   useEffect(() => {
     setAddressLookupState("idle");
+    ++lookupGeneration.current;
     setAddressLookupMessage("");
     setAddressCandidates([]);
-  }, [businessAddress]);
+  }, [businessAddress, draft.mapDisplayMode]);
 
   const selectedFeatures = useMemo(() => new Set(draft.features), [draft.features]);
   const mapLatitude = parseMapCoordinate(draft.latitude, -90, 90);
@@ -202,15 +206,17 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
     }
     if (!normalizedBusinessAddress) {
       setAddressLookupState("error");
-      setAddressLookupMessage("Önce İşletmem bölümündeki Adres alanını doldurun.");
+      setAddressLookupMessage("Önce işletme adresini girin.");
       return;
     }
 
+    const request = ++lookupGeneration.current;
     setAddressLookupState("loading");
     setAddressLookupMessage("Adres Türkiye içinde aranıyor...");
     setAddressCandidates([]);
     try {
       const result = await bridge.geocodeBusinessAddress(normalizedBusinessAddress);
+      if (request !== lookupGeneration.current) return;
       if (!result.ok) {
         setAddressLookupState("error");
         setAddressLookupMessage(result.message);
@@ -225,6 +231,7 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
       setAddressLookupState("success");
       setAddressLookupMessage("En uygun sonucu seçin; seçim koordinatları doldurur fakat siz kaydedene kadar kalıcı olmaz.");
     } catch {
+      if (request !== lookupGeneration.current) return;
       setAddressLookupState("error");
       setAddressLookupMessage("Adres araması tamamlanamadı. İnternet bağlantısını kontrol edin veya noktayı elle seçin.");
     }
@@ -233,15 +240,17 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
   const selectAddressCandidate = (candidate: BusinessLocationGeocodeCandidate) => {
     selectMapPoint(candidate.latitude, candidate.longitude);
     setAddressLookupState("success");
-    setAddressLookupMessage("Seçilen adres haritada işaretlendi. Gerekirse pini elle düzeltip Müşteri Bilgilerini Kaydet düğmesine basın.");
+    setAddressLookupMessage("Seçilen adres haritada işaretlendi. Gerekirse pini elle düzeltip Kaydet düğmesine basın.");
   };
 
   const buildInput = useCallback((): { ok: true; input: SaveBusinessPublicProfileInput } | { ok: false; message: string } => {
-    const coordinates = parseCoordinates(draft.latitude, draft.longitude);
+    const coordinates = draft.mapDisplayMode === "manual"
+      ? parseCoordinates(draft.latitude, draft.longitude)
+      : parseCoordinates(initialDraftRef.current?.latitude ?? "", initialDraftRef.current?.longitude ?? "");
     if (!coordinates.ok) return coordinates;
 
-    if ((draft.googleMapsEmbedUrl.trim() && !normalizeGoogleMapsEmbedUrl(draft.googleMapsEmbedUrl))
-      || (draft.mapDisplayMode === "google_maps_embed" && !normalizeGoogleMapsEmbedUrl(draft.googleMapsEmbedUrl))) {
+    const googleMapsEmbedUrl = draft.mapDisplayMode === "google_maps_embed" ? draft.googleMapsEmbedUrl.trim() : initialDraftRef.current?.googleMapsEmbedUrl ?? "";
+    if (draft.mapDisplayMode === "google_maps_embed" && !normalizeGoogleMapsEmbedUrl(googleMapsEmbedUrl)) {
       return { ok: false, message: "Google Maps embed bağlantısı geçerli bir HTTPS yerleştirme URL'si olmalı." };
     }
     const socialLinks: BusinessSocialLink[] = [];
@@ -263,7 +272,7 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
       ok: true,
       input: {
         mapDisplayMode: draft.mapDisplayMode,
-        googleMapsEmbedUrl: draft.googleMapsEmbedUrl.trim(),
+        googleMapsEmbedUrl,
         description: draft.description,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
@@ -372,36 +381,24 @@ export function BusinessPublicProfileSection({
       ) : (
         <div className="business-public-profile-body">
           <div className="business-public-profile-map-point">
-            <h3>Website haritası</h3>
-            <small>Harita gösterimi yalnız website üzerindeki kaynağı seçer.</small>
-            <label>
-              Harita gösterimi
-              <select aria-label="Harita gösterimi" value={draft.mapDisplayMode} disabled={loading || saving} onChange={(event) => update("mapDisplayMode", event.target.value as BusinessMapDisplayMode)}>
-                <option value="manual">Manuel</option>
-                <option value="google_maps_embed">Google Maps</option>
-              </select>
-            </label>
-            {draft.mapDisplayMode === "google_maps_embed" && <label>
-              Google Maps embed bağlantısı
-              <input aria-label="Google Maps embed bağlantısı" aria-describedby="business-map-embed-help" type="url" maxLength={4096} value={draft.googleMapsEmbedUrl} disabled={loading || saving} onChange={(event) => update("googleMapsEmbedUrl", event.target.value)} />
-              <small id="business-map-embed-help">Google Maps'teki Haritayı paylaş / Yerleştirme bağlantısını kullanın.</small>
+            <h3>Konum</h3>
+            <SegmentedControl<BusinessMapDisplayMode> ariaLabel="Harita yöntemi" value={draft.mapDisplayMode}
+              options={[{ id: "google_maps_embed", label: "Google Maps" }, { id: "manual", label: "Manuel harita" }]}
+              onChange={(value) => update("mapDisplayMode", value)} />
+            {draft.mapDisplayMode === "google_maps_embed" && <label className="form-field form-field--long">
+              <span>Google Maps embed bağlantısı</span>
+              <input aria-label="Google Maps embed bağlantısı" type="url" maxLength={4096} value={draft.googleMapsEmbedUrl} disabled={loading || saving} onChange={(event) => update("googleMapsEmbedUrl", event.target.value)} />
             </label>}
           </div>
-          <details className="business-public-profile-map-point record-disclosure" open={draft.mapDisplayMode === "manual"}>
-            <summary>İşletme konumu</summary>
-            <small>İşletmenin adres ve koordinatlarıdır. Manuel website haritası bu konumu kullanır; Google Maps seçimi konum bilgilerini değiştirmez.</small>
+          {draft.mapDisplayMode === "manual" && <div className="business-public-profile-map-point">
             <div className="business-public-profile-address-lookup">
-              <div>
-                <strong>Adrese göre haritada bul</strong>
-                <span>{normalizedBusinessAddress || "İşletmem bölümünde henüz adres girilmedi."}</span>
-              </div>
               <button
                 className="setup-secondary action-button action-button-secondary"
                 type="button"
                 disabled={addressLookupState === "loading" || !normalizedBusinessAddress}
                 onClick={() => void lookupBusinessAddress()}
               >
-                {addressLookupState === "loading" ? "Adres aranıyor" : "Adresi Haritada Bul"}
+                {addressLookupState === "loading" ? "Adres aranıyor" : "Adresten bul"}
               </button>
             </div>
 
@@ -462,7 +459,7 @@ export function BusinessPublicProfileSection({
               </label>
             </div>
             {coordinateError && <small className="business-public-profile-field-error" role="status">{coordinateError}</small>}
-          </details>
+          </div>}
 
           <label className="form-field form-field--fluid form-field--span">
             İşletme açıklaması

@@ -1105,6 +1105,14 @@ export class DesktopDatabase {
     return getStoredEncryptedAiApiKey(this.db, service);
   }
 
+  getServiceSettingsVerification(service: TestedSettingsService): string {
+    return readServiceVerification(this.db, service);
+  }
+
+  recordServiceSettingsVerification(service: TestedSettingsService, config: Record<string, unknown>): void {
+    recordServiceVerification(this.db, service, serviceConfigFingerprint(config));
+  }
+
   markAiSettingsPublished(timestamp: string): DesktopSetupData {
     markStoredAiSettingsPublished(this.db, timestamp);
     return getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities()));
@@ -1495,3 +1503,4 @@ import {
   failStockImageImport as failStoredStockImageImport,
   applyStockImageImport as applyStoredStockImageImport,
 } from "./database/stock-image-store.js";
+import { readServiceVerification, recordServiceVerification, serviceConfigFingerprint, type TestedSettingsService } from "./service-settings-validation";

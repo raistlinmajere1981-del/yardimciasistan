@@ -12,7 +12,6 @@ import {
 } from "./data-paths.js";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
-import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 import { registerBusinessCapabilityIpcHandlers } from "./business-capability-ipc";
 import { registerBusinessLayoutIpcHandlers } from "./business-layout-ipc";
 import { registerCommerceIpcHandlers } from "./commerce-ipc";
@@ -307,6 +306,5 @@ void mainProcessReady.then(async ({
       onMutation: publishCommittedMutation
     });
 
-    registerWebConnectionIpcHandlers({ assertUnlocked: assertAppSessionUnlocked });
   });
 });

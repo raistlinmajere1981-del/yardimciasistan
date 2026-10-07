@@ -1,7 +1,8 @@
 import type { AIProviderConfig } from "../types";
+import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
 export interface GeneratedImage { bytes: Uint8Array; mimeType: "image/png"; providerId: string; modelId: string }
 export function imageModelForProfile(service: string, models: readonly string[]): string | undefined {
-  const configured = models.find(model => service === "gemini" ? /^gemini-[\w.-]*image[\w.-]*$/.test(model) : /^gpt-image-[\w.-]+$/.test(model));
+  const configured = models.find(model => supportsImageGenerationModel(service, model));
   if (configured && ["openai", "custom", "gemini"].includes(service)) return configured;
   // An existing configured OpenAI account can use its image endpoint independently of its chat model.
   if (service === "openai") return "gpt-image-1";

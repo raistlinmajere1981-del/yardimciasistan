@@ -97,6 +97,8 @@ try {
   secrets.setAvailable(false);
   assert.throws(() => secrets.createShippingSecretWrite(config), /güvenli/);
   secrets.setAvailable(true);
+  assert.equal((await service.testConnection(config)).ok, true);
+  setup.onlineSalesDelivery = { pickupEnabled: true, shippingEnabled: true };
   const saved = database.saveInitialSetup({ ...setup, arasShipping: { ...config, password: "" } }, undefined, undefined, write);
   assert.equal(saved.ok, true);
   assert.equal(saved.setupData.arasShipping.configured, true);
@@ -226,7 +228,12 @@ try {
   for (const event of ["shipping.provider.create.started", "shipping.provider.create.succeeded", "shipping.provider.create.failed", "shipping.provider.status.refresh.started", "shipping.provider.status.refresh.succeeded", "shipping.provider.status.refresh.failed"]) assert.ok(logs.some((record) => record.event === event), event);
   const logText = JSON.stringify(logs);
   for (const sensitive of [config.password, config.username, "Receiver", "Private", "05550000000", "receiver-secret", "draft-only-test-password", "<soap:", "ResultMessage"]) assert.ok(!logText.includes(sensitive), `Logs leaked ${sensitive}`);
-  const clear = database.saveInitialSetup({ ...setup, arasShipping: { ...config, password: "", clearPassword: true } }, undefined, undefined, { mode: "clear" });
+  const rejectedClear = database.saveInitialSetup({ ...setup, arasShipping: { ...config, password: "", clearPassword: true } }, undefined, undefined, { mode: "clear" });
+  assert.equal(rejectedClear.ok, false);
+  assert.equal(database.getSetupData().arasShipping.hasSecret, true, "failed save retains encrypted credentials");
+  const clear = database.saveInitialSetup({ ...setup, onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },
+    arasShipping: { ...config, enabled: false, password: "", clearPassword: true } }, undefined, undefined, { mode: "clear" });
+  assert.equal(clear.ok, true, clear.message);
   assert.equal(clear.setupData.arasShipping.hasSecret, false);
   assert.equal(clear.setupData.arasShipping.configured, false);
 

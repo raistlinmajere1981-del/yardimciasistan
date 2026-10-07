@@ -1,13 +1,16 @@
-import { smsConfiguration, instagramConfiguration, validateSmsConfiguration, validateInstagramConfiguration, saveMarketingProviderConfigurations } from "./marketing/provider-configuration-store";
+import { smsConfiguration, instagramConfiguration, validateSmsConfiguration, validateInstagramConfiguration, saveMarketingProviderConfigurations, storedMarketingProvider } from "./marketing/provider-configuration-store";
 import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets";
-import { getMessagingConfiguration, normalizeMessagingConfiguration, saveMessagingConfiguration } from "./business-messaging/store";
+import { getMessagingConfiguration, getStoredMessagingConfiguration, normalizeMessagingConfiguration, saveMessagingConfiguration } from "./business-messaging/store";
 import type { MessagingSecretWrite } from "./business-messaging/secret-service";
-import { getArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
+import { getArasShippingConfiguration, getStoredArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
+import { validateServiceActivation } from "./service-settings-validation";
 import type { DatabaseSync } from "node:sqlite";
+import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import {
   BUSINESS_CAPABILITIES,
   createId,
   normalizeOnlineSalesDeliverySettings,
+  isArasShippingConfigurationReady,
   getBusinessProfile,
   normalizeBirthdaySettings,
   normalizeBusinessType,
@@ -100,6 +103,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiService,
     aiProjectName: activeAiProfile?.projectName ?? "",
     aiModel: activeAiProfile?.model ?? "",
+    aiImageModel: activeAiProfile?.imageModel ?? "",
     aiBaseUrl: activeAiProfile?.baseUrl ?? "",
     aiTimeoutSeconds: activeAiProfile?.timeoutSeconds ?? 30,
     aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? false,
@@ -109,6 +113,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     sms: smsConfiguration(db), instagram: instagramConfiguration(db),
     whatsappCloud: getMessagingConfiguration(db),
     dealerPortalEnabled: Number(settings?.dealer_portal_enabled ?? 0) === 1,
+    onlineSalesDeliveryEnabled: Number(settings?.online_sales_delivery_enabled ?? 1) === 1,
     onlineSalesDelivery: {
       pickupEnabled: Number(settings?.online_sales_pickup_enabled ?? 1) === 1,
       shippingEnabled: Number(settings?.online_sales_shipping_enabled ?? 0) === 1
@@ -148,28 +153,57 @@ export function saveSetupData(
   const aiService = normalizeAiService(input.aiService);
   const aiProjectName = String(input.aiProjectName ?? "").trim();
   const aiModel = input.aiModel.trim();
+  const aiImageModel = String(input.aiImageModel ?? "").trim();
+  if (aiImageModel && !supportsImageGenerationModel(input.aiService, aiImageModel)) {
+    return { ok: false, message: "Seçilen görsel üretim modeli bu sağlayıcıda desteklenmiyor." };
+  }
   const aiBaseUrl = normalizeAiBaseUrl(input.aiBaseUrl);
   const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
   const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
   const existingSettings = db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+  const effectiveSecret = (write: { mode: string; encryptedValue?: string } | undefined, old: string, clear?: boolean) =>
+    clear || write?.mode === "clear" ? "" : write?.mode === "replace" ? write.encryptedValue ?? "" : old;
+  let shipping = input.arasShipping ?? getArasShippingConfiguration(db);
+  try {
+    if (input.arasShipping) shipping = normalizeArasShippingInput(input.arasShipping);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Kargo ayarları geçersiz." };
+  }
   try { if (input.sms) validateSmsConfiguration(input.sms); if (input.instagram) validateInstagramConfiguration(input.instagram); }
   catch { return { ok: false, message: "SMS / Instagram servis ayarları geçersiz." }; }
   if (input.whatsappCloud) {
     try { normalizeMessagingConfiguration(input.whatsappCloud); }
     catch { return { ok: false, message: "WhatsApp Business ayarları geçersiz." }; }
   }
-  if (input.arasShipping) {
-    try { normalizeArasShippingInput(input.arasShipping); }
-    catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Kargo ayarları geçersiz." }; }
+  const shippingReady = isArasShippingConfigurationReady({ ...shipping, hasSecret: Boolean(effectiveSecret(shippingSecretWrite,
+    String(getStoredArasShippingConfiguration(db)?.password_encrypted ?? ""), input.arasShipping?.clearPassword)), password: "" });
+  const requiredServices = [
+    ...(input.whatsappCloud ? [{ label: "WhatsApp Business", enabled: input.whatsappCloud.enabled,
+      configured: Boolean(input.whatsappCloud.wabaId && input.whatsappCloud.phoneNumberId && effectiveSecret(messagingSecretWrite,
+        String(getStoredMessagingConfiguration(db)?.access_token_encrypted ?? ""), input.whatsappCloud.clearAccessToken)) }] : []),
+    ...(input.sms ? [{ label: "SMS / İleti Merkezi", enabled: input.sms.enabled, configured: Boolean(input.sms.senderId
+      && effectiveSecret(marketingSecretWrites.apiKey, String(storedMarketingProvider(db, "iletimerkezi")?.secret_one_encrypted ?? ""), input.sms.clearApiKey)
+      && effectiveSecret(marketingSecretWrites.apiHash, String(storedMarketingProvider(db, "iletimerkezi")?.secret_two_encrypted ?? ""), input.sms.clearApiHash)) }] : []),
+    ...(input.instagram ? [{ label: "Instagram", enabled: input.instagram.enabled, configured: Boolean(input.instagram.accountId
+      && effectiveSecret(marketingSecretWrites.instagramToken, String(storedMarketingProvider(db, "instagram_api")?.secret_one_encrypted ?? ""), input.instagram.clearAccessToken)) }] : [])
+  ];
+  for (const service of requiredServices) {
+    const error = validateServiceActivation(service);
+    if (error) return { ok: false, message: error };
   }
   let onlineSalesDelivery;
   try {
-    onlineSalesDelivery = normalizeOnlineSalesDeliverySettings(input.onlineSalesDelivery ?? {
+    const deliveryDraft = input.onlineSalesDelivery ?? {
       pickupEnabled: Number(existingSettings?.online_sales_pickup_enabled ?? 1) === 1,
       shippingEnabled: Number(existingSettings?.online_sales_shipping_enabled ?? 0) === 1
-    });
+    };
+    onlineSalesDelivery = normalizeOnlineSalesDeliverySettings(deliveryDraft, input.onlineSalesDeliveryEnabled ?? Number(existingSettings?.online_sales_delivery_enabled ?? 1) === 1);
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Online satış teslimat ayarları geçersiz." };
+  }
+  const deliveryEnabled = input.onlineSalesDeliveryEnabled ?? Number(existingSettings?.online_sales_delivery_enabled ?? 1) === 1;
+  if (deliveryEnabled && onlineSalesDelivery.shippingEnabled && !shippingReady) {
+    return { ok: false, message: "Kargo ile gönderim için bir kargo sağlayıcısının hesap ayarlarını tamamlayın ve bağlantıyı test edin." };
   }
   const productDataSettings = {
     enabled: input.productData?.enabled ?? Number(existingSettings?.product_data_enabled ?? 0) === 1,
@@ -244,6 +278,7 @@ export function saveSetupData(
     projectName: string;
     baseUrl: string;
     model: string;
+    imageModel: string;
     modelOptions: DesktopAiModelOption[];
     timeoutSeconds: number;
     encryptedApiKey: string;
@@ -264,6 +299,8 @@ export function saveSetupData(
       .get(service) as Record<string, unknown> | undefined;
     const projectName = String(profileInput.projectName ?? "").trim();
     const model = String(profileInput.model ?? "").trim();
+    const imageModel = String(profileInput.imageModel ?? "").trim();
+    if (imageModel && !supportsImageGenerationModel(service, imageModel)) return { ok: false, message: "Seçilen görsel üretim modeli bu sağlayıcıda desteklenmiyor." };
     const normalizedBaseUrl = normalizeAiBaseUrl(profileInput.baseUrl);
     const baseUrl = normalizedBaseUrl || AI_SERVICE_DEFAULT_BASE_URLS[service];
     const timeoutSeconds = normalizeAiTimeout(profileInput.timeoutSeconds);
@@ -294,6 +331,7 @@ export function saveSetupData(
       projectName,
       baseUrl,
       model,
+      imageModel,
       modelOptions: normalizeAiModelOptions(
         profileInput.modelOptions === undefined ? existingProfile?.model_options_json : profileInput.modelOptions,
         model
@@ -421,21 +459,25 @@ export function saveSetupData(
     db.prepare("UPDATE settings SET local_network_enabled = ?, updated_at = ? WHERE id = ?")
       .run(input.localNetworkEnabled === false ? 0 : 1, now, settingsId);
 
-    db.prepare("UPDATE settings SET online_sales_pickup_enabled = ?, online_sales_shipping_enabled = ? WHERE id = ?")
-      .run(onlineSalesDelivery.pickupEnabled ? 1 : 0, onlineSalesDelivery.shippingEnabled ? 1 : 0, settingsId);
+    db.prepare("UPDATE settings SET online_sales_delivery_enabled = ?, online_sales_pickup_enabled = ?, online_sales_shipping_enabled = ? WHERE id = ?")
+      .run(deliveryEnabled ? 1 : 0, onlineSalesDelivery.pickupEnabled ? 1 : 0, onlineSalesDelivery.shippingEnabled ? 1 : 0, settingsId);
 
     db.prepare("UPDATE settings SET dealer_portal_enabled = ? WHERE id = ?")
       .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);
 
     saveMarketingProviderConfigurations(db, businessId, input.sms, input.instagram, marketingSecretWrites);
     if (input.whatsappCloud) saveMessagingConfiguration(db, businessId, input.whatsappCloud, messagingSecretWrite);
-    if (input.arasShipping) saveArasShippingConfigurationInTransaction(db, businessId, input.arasShipping, shippingSecretWrite);
+    // Legacy provider activation is a projection of delivery intent, never an independent Settings switch.
+    saveArasShippingConfigurationInTransaction(db, businessId, {
+      ...shipping, enabled: deliveryEnabled && onlineSalesDelivery.shippingEnabled
+    }, shippingSecretWrite);
 
     upsertAiServiceProfileInTransaction(db, {
       service: storedAiService,
       projectName: aiProjectName,
       baseUrl: storedAiBaseUrl,
       model: aiModel,
+      imageModel: aiImageModel,
       modelOptionsJson: JSON.stringify(storedAiModelOptions),
       timeoutSeconds: storedAiTimeoutSeconds,
       apiKeyEncrypted: storedEncryptedAiApiKey,
@@ -449,6 +491,7 @@ export function saveSetupData(
         projectName: profile.projectName,
         baseUrl: profile.baseUrl,
         model: profile.model,
+        imageModel: profile.imageModel,
         modelOptionsJson: JSON.stringify(profile.modelOptions),
         timeoutSeconds: profile.timeoutSeconds,
         apiKeyEncrypted: profile.encryptedApiKey,
@@ -477,6 +520,7 @@ export function saveSetupData(
 
   const enabledCapabilities = new Set(readEnabledBusinessCapabilities(db));
   if (Number(existingSettings?.online_sales_pickup_enabled ?? 1) !== Number(onlineSalesDelivery.pickupEnabled)
+      || Number(existingSettings?.online_sales_delivery_enabled ?? 1) !== Number(deliveryEnabled)
       || Number(existingSettings?.online_sales_shipping_enabled ?? 0) !== Number(onlineSalesDelivery.shippingEnabled)) {
     queueSyncJob(db, "online_catalog_publish", now);
   }

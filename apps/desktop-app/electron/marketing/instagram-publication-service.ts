@@ -24,7 +24,10 @@ export class InstagramPublicationService {
   }
   async testConnection(input?: InstagramConfigurationInput): Promise<MarketingProviderConnectionResult> {
     let result: MarketingProviderConnectionResult;
-    try { const profile = await new InstagramPublishingProviderAdapter(this.credentials(input),this.options).testConnection(); result = { ok:true, ...profile, testedAt:new Date().toISOString(), message:`Instagram @${profile.username} profesyonel hesabı doğrulandı.` }; }
+    try { const credentials = this.credentials(input);
+      const profile = await new InstagramPublishingProviderAdapter(credentials,this.options).testConnection();
+      this.database().recordServiceSettingsVerification("instagram", { ...credentials });
+      result = { ok:true, ...profile, testedAt:new Date().toISOString(), message:`Instagram @${profile.username} profesyonel hesabı doğrulandı.` }; }
     catch (error) { result = { ok:false, testedAt:new Date().toISOString(), message:error instanceof MarketingProviderError ? error.message : "Instagram ayarlarını kontrol edin." }; }
     desktopLog.info({ scope:"marketing", event:"marketing.channel.connection_test", message:"Instagram bağlantısı denendi.", meta:{channel:"instagram",connected:result.ok} });return result;
   }

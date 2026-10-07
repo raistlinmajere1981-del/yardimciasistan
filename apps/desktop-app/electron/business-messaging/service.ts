@@ -33,7 +33,9 @@ export class BusinessMessagingService {
   }
   async testConnection(input?: WhatsAppCloudConfigurationInput): Promise<BusinessMessagingConnectionResult> {
     let result: BusinessMessagingConnectionResult;
-    try { const phone = await new WhatsAppCloudProviderAdapter(this.credentials(input), this.httpOptions).testConnection();
+    try { const credentials = this.credentials(input);
+      const phone = await new WhatsAppCloudProviderAdapter(credentials, this.httpOptions).testConnection();
+      this.getDatabase().recordServiceSettingsVerification("whatsapp_cloud", credentials);
       result = { ok: true, providerId: "whatsapp_cloud", ...phone, message: "WhatsApp Business hesabı ve telefon bağlantısı doğrulandı.", testedAt: new Date().toISOString() };
     } catch (error) { result = { ok: false, providerId: "whatsapp_cloud", message: normalizeBusinessMessagingError(error).message, testedAt: new Date().toISOString() }; }
     this.log("connection.test", result.ok); return result;

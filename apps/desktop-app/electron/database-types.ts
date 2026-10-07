@@ -493,6 +493,7 @@ export interface DesktopAiServiceProfile {
   projectName: string;
   baseUrl: string;
   model: string;
+  imageModel?: string;
   modelOptions: DesktopAiModelOption[];
   timeoutSeconds: number;
   apiKeyConfigured: boolean;
@@ -504,6 +505,7 @@ export interface SaveAiServiceProfileInput {
   projectName: string;
   baseUrl: string;
   model: string;
+  imageModel?: string;
   modelOptions?: DesktopAiModelOption[];
   timeoutSeconds: number;
   apiKey: string;
@@ -541,6 +543,7 @@ export interface DesktopSetupData {
   aiService: DesktopAiService;
   aiProjectName: string;
   aiModel: string;
+  aiImageModel?: string;
   aiBaseUrl: string;
   aiTimeoutSeconds: number;
   aiApiKeyConfigured: boolean;
@@ -553,6 +556,7 @@ export interface DesktopSetupData {
   arasShipping: import("@yardimci-asistan/shared").ArasShippingConfiguration;
   dealerPortalEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
+  onlineSalesDeliveryEnabled?: boolean;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;
@@ -577,6 +581,7 @@ export interface SaveInitialSetupInput {
   aiService: string;
   aiProjectName: string;
   aiModel: string;
+  aiImageModel?: string;
   aiModelOptions?: DesktopAiModelOption[];
   aiBaseUrl: string;
   aiTimeoutSeconds: number;
@@ -590,6 +595,7 @@ export interface SaveInitialSetupInput {
   arasShipping?: import("@yardimci-asistan/shared").ArasShippingConfigurationInput;
   dealerPortalEnabled?: boolean;
   onlineSalesDelivery?: OnlineSalesDeliverySettings;
+  onlineSalesDeliveryEnabled?: boolean;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;

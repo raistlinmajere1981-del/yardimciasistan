@@ -32,12 +32,7 @@ export async function publishBusinessAiContext(
   syncConfig: AiSettingsSyncConfig,
   refresh = true
 ): Promise<PushBusinessContextResult | null> {
-  const profile = getBusinessPublicProfile(database.databasePath);
-  const context: BusinessWebContext = {
-    ...createCurrentBusinessAiContext(database),
-    mapDisplayMode: profile.mapDisplayMode,
-    googleMapsEmbedUrl: normalizeGoogleMapsEmbedUrl(profile.googleMapsEmbedUrl)
-  };
+  const context = createCurrentBusinessWebContext(database);
   const result = await publishDesktopProjection(database, syncConfig, "business_context_publish", context,
     (identity, frozen) => pushBusinessContext({ ...syncConfig, ...identity, context: frozen }), { refresh });
   if (!result) return null;
@@ -52,4 +47,17 @@ export async function publishBusinessAiContext(
   });
 
   return result;
+}
+
+/** Web projection uses only the chosen map source; canonical location remains intact. */
+export function createCurrentBusinessWebContext(database: DesktopDatabase): BusinessWebContext {
+  const profile = getBusinessPublicProfile(database.databasePath);
+  const context = createCurrentBusinessAiContext(database);
+  return {
+    ...context,
+    latitude: profile.mapDisplayMode === "manual" ? context.latitude : null,
+    longitude: profile.mapDisplayMode === "manual" ? context.longitude : null,
+    mapDisplayMode: profile.mapDisplayMode,
+    googleMapsEmbedUrl: profile.mapDisplayMode === "google_maps_embed" ? normalizeGoogleMapsEmbedUrl(profile.googleMapsEmbedUrl) : ""
+  };
 }

@@ -6,6 +6,7 @@ import {
   verifyGoogleAiStudioVisionModel,
   type AICompletionFailureReason
 } from "@yardimci-asistan/ai-core";
+import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import type { DesktopDatabase } from "./database";
 import { normalizeAiTimeoutSeconds } from "./ai-config";
 import { getEffectiveAiApiKey } from "./ai-secret-service";
@@ -20,6 +21,7 @@ export interface AiConnectionTestInput {
   projectName: string;
   baseUrl: string;
   model: string;
+  imageModel?: string;
   apiKey: string;
   useStoredApiKey: boolean;
   timeoutSeconds: number;
@@ -39,6 +41,7 @@ export async function testAiConnection(
   const baseUrl = normalizeAiConnectionUrl(input?.baseUrl);
   let model = String(input?.model ?? "").trim();
   let models: Array<{ id: string; label: string }> = [];
+  let imageModels: Array<{ id: string; label: string }> = [];
 
   if (provider !== "openai_compatible") {
     return {
@@ -110,6 +113,7 @@ export async function testAiConnection(
         ? `${item.displayName} (${item.id})`
         : item.id
     }));
+    imageModels = modelListResult.imageModels.map(item => ({ id: item.id, label: item.displayName || item.id }));
     const rankedIds = rankGoogleAiStudioModels(models.map((item) => item.id));
     models.sort((left, right) => rankedIds.indexOf(left.id) - rankedIds.indexOf(right.id));
     if (!models.some((item) => item.id === model)) {
@@ -193,13 +197,18 @@ export async function testAiConnection(
     };
   }
 
+  if (input.imageModel && !supportsImageGenerationModel(service, input.imageModel)) return { ok: false, message: "Görsel üretim modeli bu sağlayıcıda desteklenmiyor." };
+  database.recordServiceSettingsVerification("ai", {
+    provider, service, projectName, baseUrl, model: result.model || model,
+    imageModel: input.imageModel ?? "", apiKey, timeoutSeconds
+  });
   return {
     ok: true,
     message: service === "gemini"
       ? `${projectName || "Google AI Studio"} bağlantısında ${model} modeliyle görsel girişi doğrulandı; ${models.length} uygun Gemini modeli bulundu. Kullanmak için ayarları kaydedin.`
       : `${getAiServiceLabel(service)} bağlantısı çalışıyor.`,
     model: result.model || model,
-    models
+    models: [...models, ...imageModels]
   };
 }
 

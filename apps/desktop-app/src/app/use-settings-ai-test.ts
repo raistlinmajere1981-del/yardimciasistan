@@ -1,5 +1,5 @@
 import { observeNexaAi } from "./nexa-activity";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import type { SetupFormState } from "./setup-model";
 import { useRequestGeneration } from "../components/workspace/use-request-generation";
@@ -8,8 +8,11 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
   const beginTest = useRequestGeneration();
   const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
+  const signature = aiTestSignature(setupForm);
+  const acceptedSignature = useRef("");
 
   useEffect(() => {
+    if (signature === acceptedSignature.current) return;
     beginTest();
     setAiConnectionTestState("idle");
     setAiConnectionTestMessage(
@@ -17,9 +20,10 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
         ? "Bu sağlayıcının kayıtlı bağlantısı kullanılabilir."
         : "Bağlantı henüz denenmedi."
     );
-  }, [beginTest, setupForm.aiService, setupForm.aiStoredApiKeyConfigured]);
+  }, [beginTest, signature, setupForm.aiStoredApiKeyConfigured]);
 
   function invalidate() {
+    acceptedSignature.current = "";
     beginTest();
     setAiConnectionTestState("idle");
     setAiConnectionTestMessage(
@@ -30,6 +34,7 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
   }
 
   async function testAiConnection() {
+    acceptedSignature.current = signature;
     const isCurrent = beginTest();
     setAiConnectionTestState("loading");
     setAiConnectionTestMessage("AI servisine bağlanılıyor...");
@@ -42,6 +47,7 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     }
 
     let baseUrl = setupForm.aiBaseUrl;
+    let projectName = setupForm.aiProjectName;
     let model = setupForm.aiModel;
     let apiKey = setupForm.clearAiApiKey ? "" : setupForm.aiApiKey;
     if (setupForm.aiService === "gemini" && setupForm.aiGoogleCurl.trim()) {
@@ -53,8 +59,11 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
       }
 
       baseUrl = parsed.baseUrl;
+      projectName ||= "Google AI Studio";
       model = "";
       apiKey = parsed.apiKey;
+      acceptedSignature.current = aiTestSignature({ ...setupForm, aiProjectName: setupForm.aiProjectName || "Google AI Studio",
+        aiGoogleCurl: "", aiBaseUrl: baseUrl, aiModel: "", aiApiKey: apiKey, clearAiApiKey: false });
       setSetupForm((current) => ({
         ...current,
         aiProjectName: current.aiProjectName || "Google AI Studio",
@@ -70,9 +79,10 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     const result = await observeNexaAi(() => bridge.testAiConnection({
       provider: setupForm.aiProvider,
       service: setupForm.aiService,
-      projectName: setupForm.aiProjectName,
+      projectName,
       baseUrl,
       model,
+      imageModel: setupForm.aiImageModel,
       apiKey,
       useStoredApiKey: !setupForm.clearAiApiKey && setupForm.aiStoredApiKeyConfigured && apiKey.trim() === "",
       timeoutSeconds: Number(setupForm.aiTimeoutSeconds)
@@ -82,6 +92,9 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     setAiConnectionTestState(result.ok ? "success" : "error");
     setAiConnectionTestMessage(result.message);
     if (result.ok) {
+      acceptedSignature.current = aiTestSignature({ ...setupForm,
+        aiProjectName: projectName,
+        aiGoogleCurl: "", aiBaseUrl: baseUrl, aiApiKey: apiKey, clearAiApiKey: false, aiModel: result.model });
       setSetupForm((current) => ({
         ...current,
         aiModel: result.model,
@@ -102,4 +115,9 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
   }
 
   return { aiConnectionTestState, aiConnectionTestMessage, testAiConnection, invalidate };
+}
+
+function aiTestSignature(form: SetupFormState) {
+  return JSON.stringify([form.aiService, form.aiProvider, form.aiProjectName, form.aiBaseUrl, form.aiModel,
+    form.aiImageModel, form.aiApiKey, form.clearAiApiKey, form.aiStoredApiKeyConfigured, form.aiTimeoutSeconds, form.aiGoogleCurl]);
 }

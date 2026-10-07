@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createUpdateSafetyBackup } from "./data-maintenance";
 import { desktopLog } from "./desktop-logger";
+import { compareVersions } from "@yardimci-asistan/shared";
 
 const DEFAULT_UPDATE_BASE_URL = "https://yardimciasistan.alwaysdata.net/updates/stable";
 
@@ -326,30 +327,6 @@ function getStatus(userDataPath: string): DesktopUpdateStatus {
 
 function isValidVersion(value: string): boolean {
   return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(String(value || "").trim());
-}
-
-function parseVersion(value: string) {
-  const match = String(value || "").trim().match(/^(\d+)\.(\d+)\.(\d+)(?:-([^+]+))?(?:\+.+)?$/);
-  if (!match) return null;
-  return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
-    prerelease: match[4] || ""
-  };
-}
-
-function compareVersions(left: string, right: string): number {
-  const a = parseVersion(left);
-  const b = parseVersion(right);
-  if (!a || !b) return left.localeCompare(right);
-  for (const key of ["major", "minor", "patch"] as const) {
-    if (a[key] !== b[key]) return a[key] > b[key] ? 1 : -1;
-  }
-  if (a.prerelease === b.prerelease) return 0;
-  if (!a.prerelease) return 1;
-  if (!b.prerelease) return -1;
-  return a.prerelease.localeCompare(b.prerelease, undefined, { numeric: true });
 }
 
 function manifestUrlFor(baseUrl: string): string {

@@ -613,6 +613,8 @@ function registerIpcHandlers() {
 
 async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> {
   assertAppSessionUnlocked();
+  const activationError = validateSetupServiceActivation(getDatabase(), input);
+  if (activationError) return { ok: false, message: activationError };
   const secretUpdate = createAiApiKeyUpdate(input);
   if (!secretUpdate.ok) {
     return secretUpdate;
@@ -970,3 +972,4 @@ async function publishBusinessAiContextFromMain(): Promise<PushBusinessContextRe
     getWebSyncConfig(database.getSetupData())
   ) ?? { ok: false, message: "İşletme bağlam yayın niyeti hazırlanamadı." };
 }
+import { validateSetupServiceActivation } from "./setup-service-activation";

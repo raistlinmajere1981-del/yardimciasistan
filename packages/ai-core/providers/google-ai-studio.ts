@@ -1,5 +1,6 @@
 import type { AICompletionFailure, AICompletionResult, AIMessage, AIProviderConfig } from "../types";
 import { classifyAIProviderFailure, parseRetryAfterSeconds } from "./failure-classification";
+import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
 
 export interface GoogleAiStudioModel {
   id: string;
@@ -14,7 +15,7 @@ export interface GoogleAiStudioChatOptions extends AIProviderConfig {
 }
 
 export type GoogleAiStudioModelListResult =
-  | { ok: true; models: GoogleAiStudioModel[] }
+  | { ok: true; models: GoogleAiStudioModel[]; imageModels: GoogleAiStudioModel[] }
   | { ok: false; message: string; status?: number };
 
 export interface GoogleAiStudioVisionCheckOptions {
@@ -401,21 +402,23 @@ export async function listGoogleAiStudioModels(
         inputTokenLimit: normalizeTokenLimit(model.inputTokenLimit),
         outputTokenLimit: normalizeTokenLimit(model.outputTokenLimit)
       }))
-      .filter((model) => model.id && isGoogleAiStudioVisionModel(model));
+      .filter((model) => model.id && (isGoogleAiStudioVisionModel(model) || supportsImageGenerationModel("gemini", model.id)));
     const uniqueModels = new Map<string, GoogleAiStudioModel>();
     for (const model of compatibleModels) {
       if (!uniqueModels.has(model.id)) {
         uniqueModels.set(model.id, model);
       }
     }
-    const models = [...uniqueModels.values()]
+    const catalog = [...uniqueModels.values()];
+    const imageModels = catalog.filter(model => supportsImageGenerationModel("gemini", model.id));
+    const models = catalog.filter(model => isGoogleAiStudioVisionModel(model))
       .sort((left, right) => left.displayName.localeCompare(right.displayName, "tr"));
 
     if (models.length === 0) {
       return { ok: false, message: "Bu API anahtarı için görsel ve metin işleyebilen güncel Gemini modeli bulunamadı." };
     }
 
-    return { ok: true, models };
+    return { ok: true, models, imageModels };
   } catch (error) {
     const timedOut = error instanceof Error && error.name === "AbortError";
     return {

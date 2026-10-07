@@ -1,6 +1,8 @@
 import { SmsSettingsSection, InstagramSettingsSection } from "../components/settings/MarketingChannelsSettingsSection";
 import { WhatsAppBusinessSettingsSection } from "../components/settings/WhatsAppBusinessSettingsSection";
 import { ArasShippingSettingsSection } from "../components/settings/ArasShippingSettingsSection";
+import { ServiceSettingsCard } from "../components/settings/ServiceSettingsCard";
+import { COMMERCE_SHIPPING_PROVIDERS, isArasShippingConfigurationReady } from "@yardimci-asistan/shared";
 import type { ReactNode, SetStateAction } from "react";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
@@ -9,7 +11,6 @@ import {
   isSettingsSectionVisible,
   onlineSalesDeliveryDefinition,
   dealerPortalDefinition,
-  arasShippingDefinition,
   whatsappCloudDefinition, smsProviderDefinition, instagramProviderDefinition,
   type SettingsSectionDefinition,
   type StagedSettingsCategoryId
@@ -38,6 +39,18 @@ type StagedSettingsContributions = {
   readonly [C in StagedSettingsCategoryId]: readonly SettingsSectionContribution<C>[];
 };
 
+// Static provider-specific field adapters under one delivery owner; no runtime discovery.
+const shippingProviderSettings = {
+  aras: {
+    isConfigured: (draft: Readonly<CategoryDraft<"services">>) => isArasShippingConfigurationReady(draft.arasShipping),
+    render: ({ draft, onChange, busy }: StagedSectionProps<"services">) => <ArasShippingSettingsSection
+      draft={draft.arasShipping} busy={busy} onChange={arasShipping => onChange({ arasShipping })} />
+  }
+} satisfies Record<keyof typeof COMMERCE_SHIPPING_PROVIDERS, {
+  isConfigured: (draft: Readonly<CategoryDraft<"services">>) => boolean;
+  render: (props: StagedSectionProps<"services">) => ReactNode;
+}>;
+
 const stagedSettingsContributions = {
   business: [],
   services: [{
@@ -52,29 +65,32 @@ const stagedSettingsContributions = {
   }, {
     definition: dealerPortalDefinition,
     render: ({ draft, onChange, busy }) => (
-      <section id="settings-dealer-portal" tabIndex={-1} className="settings-service-card">
-        <div className="settings-service-card-head"><div><h3>Bayi Web Erişimi</h3><p>Aktif bayilere tek kullanımlık davet ile web erişimi verin.</p></div></div>
-        <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.dealerPortalEnabled}
-          onChange={(event) => onChange({ dealerPortalEnabled: event.target.checked })} /><span>Bayi portalını etkinleştir</span></label>
-      </section>
+      <ServiceSettingsCard id="settings-dealer-portal" title="Bayi Web Erişimi" enabled={draft.dealerPortalEnabled}
+        disabled={busy} onEnabledChange={dealerPortalEnabled => onChange({ dealerPortalEnabled })}>
+        <p>Aktif bayilere Müşteri kartından tek kullanımlık davet ile web erişimi verin.</p>
+      </ServiceSettingsCard>
     )
   }, {
-    definition: arasShippingDefinition,
-    render: ({ draft, onChange, busy }) => <ArasShippingSettingsSection draft={draft.arasShipping}
-      busy={busy} onChange={(arasShipping) => onChange({ arasShipping })} />
-  }, {
     definition: onlineSalesDeliveryDefinition,
-    render: ({ draft, onChange, busy, configurationCapabilities }) => (
-      <section id="settings-online-delivery" tabIndex={-1} className="settings-service-card is-enabled">
-        <div className="settings-service-card-header"><div><strong>{configurationCapabilities.includes("channel.online_sales") ? "Online Satış Teslimatı" : "Bayi Sipariş Teslimatı"}</strong><span>En az bir teslimat yöntemi açık olmalı.</span></div></div>
-        <div className="settings-service-card-body">
+    render: (props) => {
+      const { draft, onChange, busy } = props;
+      return (
+      <ServiceSettingsCard id="settings-online-delivery" title="Teslimat ve Gönderim"
+        enabled={draft.onlineSalesDeliveryEnabled} disabled={busy} onEnabledChange={onlineSalesDeliveryEnabled => onChange({ onlineSalesDeliveryEnabled })}>
+        <small>En az bir teslimat yöntemi açık olmalı. Kapalıyken web siparişi alınmaz.</small>
         <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.onlineSalesDelivery.pickupEnabled}
           onChange={(event) => onChange({ onlineSalesDelivery: { ...draft.onlineSalesDelivery, pickupEnabled: event.target.checked } })} /><span>İşletmeden teslim</span></label>
         <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.onlineSalesDelivery.shippingEnabled}
           onChange={(event) => onChange({ onlineSalesDelivery: { ...draft.onlineSalesDelivery, shippingEnabled: event.target.checked } })} /><span>Kargo ile gönderim</span></label>
-        </div>
-      </section>
-    )
+        {draft.onlineSalesDelivery.shippingEnabled && <section aria-label="Kargo firmaları / sağlayıcılar" className="form-stack">
+          <h3>Kargo firmaları / sağlayıcılar</h3>
+          {Object.values(COMMERCE_SHIPPING_PROVIDERS).map(provider =>
+            <div key={provider.id}>{shippingProviderSettings[provider.id].render(props)}</div>)}
+          {!Object.values(COMMERCE_SHIPPING_PROVIDERS).some(provider => shippingProviderSettings[provider.id].isConfigured(draft)) &&
+            <p role="alert">Kargo ile gönderim için bir kargo sağlayıcısının hesap ayarlarını tamamlayın ve bağlantıyı test edin.</p>}
+        </section>}
+      </ServiceSettingsCard>
+    ); }
   }]
 } satisfies StagedSettingsContributions;
 

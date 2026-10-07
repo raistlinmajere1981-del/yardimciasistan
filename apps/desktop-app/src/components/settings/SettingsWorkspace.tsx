@@ -16,6 +16,7 @@ import {
   searchSettings,
   settingsCapabilities,
   settingsCategories,
+  visibleSettingsCategories,
   settingsSections,
   type SettingsCategoryId
 } from "../../app/settings-registry";
@@ -84,9 +85,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
   const capabilities = settingsCapabilities(drafts.canonical);
   const initialized = !props.setupData.setupRequired;
-  const visibleCategories = initialized
-    ? settingsCategories
-    : settingsCategories.filter((item) => item.id === "business");
+  const visibleCategories = visibleSettingsCategories(initialized, runtimeCapabilities);
   const category = visibleCategories.find((item) => item.id === storedActive)
     ?? settingsCategories[0];
   const active = category.id;
@@ -94,7 +93,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     if (storedActive !== active) setActive(active);
   }, [active, setActive, storedActive]);
   const profile = useBusinessPublicProfileSettings({
-    businessAddress: drafts.canonical.address,
+    businessAddress: drafts.form.address,
     enabledCapabilities: capabilities,
     enabled: initialized
   });
@@ -461,7 +460,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
             <>
               {initialized && <LayoutSettingsSection controller={layout} />}
               {initialized && <RoomManagementSection controller={layout} />}
-              {!hasCategorySaveSection && !layout.loading && <p>Bu sektör için oda veya masa düzeni bulunmuyor.</p>}
             </>
           )}
 
