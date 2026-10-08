@@ -29,7 +29,7 @@ export function RoomStayDates({ folio, controller, disabled, onDirty }: {
       plannedCheckOutDate: draft.end,
       nightlyPriceMinor: folio.nightlyPriceMinor,
       lodgingManualOverride: folio.lodgingManualOverride,
-      lodgingTotalMinor: folio.lodgingManualOverride ? folio.lodgingTotalMinor : undefined
+      ...(folio.lodgingManualOverride ? { lodgingTotalMinor: folio.lodgingTotalMinor } : {})
     }), "details");
     if (result?.ok) {
       setEdits(null);
@@ -53,7 +53,7 @@ export function RoomStayDates({ folio, controller, disabled, onDirty }: {
       <DatePicker
         ariaLabel="Çıkış tarihi"
         value={draft.end}
-        min={draft.start || undefined}
+        {...(draft.start ? { min: draft.start } : {})}
         disabled={disabled}
         onChange={end => update({ ...draft, end })}
       />

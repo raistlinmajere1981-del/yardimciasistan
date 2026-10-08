@@ -21,6 +21,7 @@ export function MarketingScheduleDialog({detail, initial, onClose, onReload, onM
   useEffect(() => {let live = true; void window.yardimciDesktop!.getMarketingStudio().then(r => {if(live) setStudio(resultValue(r));}).catch(e => {if(live) setMessage(e.message);}); return () => {live = false; invalidateEpoch();};}, [invalidateEpoch]);
   useEffect(() => registerPageLeaveGuard?.((_destination, next) => {if(working.current)return false; if(!dirty)return true; setPending(() => next); return false;}), [dirty, registerPageLeaveGuard]);
   function close() {if(working.current)return; if(dirty) setPending(() => onClose); else onClose();}
+  const publication = studio?.publications.find(p => p.id === draft.targetId);
   async function operation(transition?: "pause" | "resume" | "cancel") {
     if(working.current)return; working.current = true; setBusy(true); setMessage(""); const ticket = ++epoch.current;
     try {
@@ -32,6 +33,6 @@ export function MarketingScheduleDialog({detail, initial, onClose, onReload, onM
   return <WorkspaceFrame title={current ? current.schedule.name : "Paylaşımı planla"} context="Pazarlama planı · Ana Takvim" presentation="centered" className="marketing-management-workspace" onClose={close} closeBlocked={busy}
     overlay={pending ? <ConfirmDialog withinModal tone="warning" title="Plan değişiklikleri kaydedilmedi" confirmLabel="Değişiklikleri bırak" cancelLabel="Düzenlemeye dön" onCancel={() => setPending(null)} onConfirm={() => {const next = pending; setPending(null); next();}}/> : cancel && <ConfirmDialog withinModal tone="danger" title="Gelecek yayın planı iptal edilsin mi?" description="Yayınlanmış içerik veya başlamış gönderimler geri alınmaz." confirmLabel="Planı iptal et" busy={busy} onCancel={() => setCancel(false)} onConfirm={() => operation("cancel")}/>}>
     <p role="status">{message}</p>
-    <MarketingScheduleWorkspace draft={draft} onChange={setDraft} detail={current} channels={studio?.channels || []} publication={studio?.publications.find(p => p.id === draft.targetId)} busy={busy} onSave={() => void operation()} onTransition={action => {if(dirty) {setMessage("Önce değişiklikleri kaydedin."); return;} if(action === "cancel") setCancel(true); else void operation(action);}} onClose={close}/>
+    <MarketingScheduleWorkspace draft={draft} onChange={setDraft} {...(current === undefined ? {} : { detail: current })} channels={studio?.channels || []} {...(publication === undefined ? {} : { publication })} busy={busy} onSave={() => void operation()} onTransition={action => {if(dirty) {setMessage("Önce değişiklikleri kaydedin."); return;} if(action === "cancel") setCancel(true); else void operation(action);}} onClose={close}/>
   </WorkspaceFrame>;
 }

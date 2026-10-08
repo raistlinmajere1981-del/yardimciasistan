@@ -22,14 +22,14 @@ export function readScriptConfig(): Partial<WidgetConfig> {
   const script = document.currentScript as HTMLScriptElement | null;
   const dataset = script?.dataset ?? {};
   const scriptConfig = removeEmptyValues({
-    businessName: dataset.businessName,
-    whatsappPhone: dataset.whatsappPhone,
-    apiBaseUrl: dataset.apiBaseUrl,
-    logoUrl: dataset.logoUrl,
-    primaryColor: dataset.primaryColor,
-    accentColor: dataset.accentColor,
-    address: dataset.address,
-    mapUrl: dataset.mapUrl
+    ...(dataset.businessName === undefined ? {} : { businessName: dataset.businessName }),
+    ...(dataset.whatsappPhone === undefined ? {} : { whatsappPhone: dataset.whatsappPhone }),
+    ...(dataset.apiBaseUrl === undefined ? {} : { apiBaseUrl: dataset.apiBaseUrl }),
+    ...(dataset.logoUrl === undefined ? {} : { logoUrl: dataset.logoUrl }),
+    ...(dataset.primaryColor === undefined ? {} : { primaryColor: dataset.primaryColor }),
+    ...(dataset.accentColor === undefined ? {} : { accentColor: dataset.accentColor }),
+    ...(dataset.address === undefined ? {} : { address: dataset.address }),
+    ...(dataset.mapUrl === undefined ? {} : { mapUrl: dataset.mapUrl })
   });
   const profileId = normalizeBusinessProfileId(dataset.profileId);
   if (profileId) {

@@ -50,10 +50,12 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, inventoryEna
                   {selectedOrder && selectedOrder.items.length === 0 && (
                     <p className="restaurant-order-empty">Henüz ürün yok.</p>
                   )}
-                  {selectedOrder?.items.map((item) => (
+                  {selectedOrder?.items.map((item) => {
+                    const menuItem = menuItemsById.get(item.menuEntryId);
+                    return (
                     <article className="restaurant-order-line" key={item.id}>
                       <div className="restaurant-order-line__main">
-                        <MenuProductImage item={menuItemsById.get(item.menuEntryId)} webModuleUrl={webModuleUrl} className="restaurant-order-line__image" />
+                        <MenuProductImage {...(menuItem === undefined ? {} : { item: menuItem })} webModuleUrl={webModuleUrl} className="restaurant-order-line__image" />
                         <div className="restaurant-order-line__copy">
                           <strong>{item.productName}</strong>
                           <span>{formatMoney(item.unitPrice, item.currency)}</span>
@@ -98,7 +100,8 @@ export function TableOrderEditor({ menu, webModuleUrl, menuEnabled, inventoryEna
                       </ActionButton>}
                       <ActionButton className="restaurant-order-line__remove" variant="danger" size="sm" onClick={() => void controller.removeItem(item.id)} disabled={Boolean(busyAction)} aria-label={`${item.productName} satırını sil`}><Trash2 size={15} aria-hidden="true" /></ActionButton>
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {selectedOrder && <div className="restaurant-ticket-total"><span>Adisyon toplamı</span><strong>{formatMoney(selectedOrder.total, getOrderCurrency(selectedOrder))}</strong></div>}

@@ -254,8 +254,10 @@ export function ProductWorkspace({
     setSaveMessage("");
     let saved: CatalogProduct;
     try {
+      const { id: productId, ...productFields } = productFormToSaveInput(form);
       saved = await bridge.saveProduct({
-        ...productFormToSaveInput(form),
+        ...productFields,
+        ...(productId ? { id: productId } : {}),
         ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
         ...(imageDraftMode === "clear" ? { clearImage: true } : {})
       });

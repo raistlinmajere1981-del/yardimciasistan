@@ -42,7 +42,7 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage, onCal
   }, [enabled, reload, invalidateMarketingEpoch]);
   async function openContent(id: string, publication?: MarketingPublication) {
     if(opening.current)return; opening.current = true; setLoading(true); setMessage("");
-    try {const detail = resultValue(await window.yardimciDesktop!.getMarketingShare(id)); if(mounted.current) setSurface({kind: "share", initial: detail, publication});}
+    try {const detail = resultValue(await window.yardimciDesktop!.getMarketingShare(id)); if(mounted.current) setSurface({kind: "share", initial: detail, ...(publication === undefined ? {} : { publication })});}
     catch(e) {if(mounted.current) setMessage(e instanceof Error ? e.message : "İçerik açılamadı.");}
     finally {opening.current = false; if(mounted.current) setLoading(false);}
   }
@@ -77,13 +77,13 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage, onCal
         </div>
       </>}
     </div>
-    {snapshot && surface?.kind === "share" && <MarketingShareWorkspace key={surface.publication?.id || surface.initial?.content.content.id || "new"} snapshot={snapshot} initial={surface.initial} publication={surface.publication} onClose={() => setSurface(null)} onReload={reload} onMessage={onMessage} registerPageLeaveGuard={registerPageLeaveGuard} onCalendar={onCalendar}/>}
-    {snapshot && surface && ["website","drafts","publications"].includes(surface.kind) && <MarketingRecordManager kind={surface.kind as "website" | "drafts" | "publications"} snapshot={snapshot} publications={surface.kind === "website" ? activeWebsite : surface.kind === "publications" ? snapshot.publications : []} contents={surface.kind === "drafts" ? drafts : []} selectedId={"selectedId" in surface ? surface.selectedId : undefined} onClose={() => setSurface(null)} onEditContent={id => void openContent(id)} onEditPublication={p => void openContent(p.contentId, p)} onReload={reload} onMessage={onMessage}/>}
+    {snapshot && surface?.kind === "share" && <MarketingShareWorkspace key={surface.publication?.id || surface.initial?.content.content.id || "new"} snapshot={snapshot} {...(surface.initial === undefined ? {} : { initial: surface.initial })} {...(surface.publication === undefined ? {} : { publication: surface.publication })} onClose={() => setSurface(null)} onReload={reload} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })} {...(onCalendar === undefined ? {} : { onCalendar })}/>}
+    {snapshot && surface && ["website","drafts","publications"].includes(surface.kind) && <MarketingRecordManager kind={surface.kind as "website" | "drafts" | "publications"} snapshot={snapshot} publications={surface.kind === "website" ? activeWebsite : surface.kind === "publications" ? snapshot.publications : []} contents={surface.kind === "drafts" ? drafts : []} {...("selectedId" in surface && surface.selectedId !== undefined ? { selectedId: surface.selectedId } : {})} onClose={() => setSurface(null)} onEditContent={id => void openContent(id)} onEditPublication={p => void openContent(p.contentId, p)} onReload={reload} {...(onMessage === undefined ? {} : { onMessage })}/>}
     {snapshot && surface?.kind === "recent" && <WorkspaceFrame presentation="centered" className="marketing-management-workspace" title="Tüm paylaşımlar" context="Yayın ve gönderim durumlarını izleyin." onClose={() => setSurface(null)}><section className="form-stack">{recent.map(recentRow)}{!recent.length && <p>Henüz paylaşım yok.</p>}</section></WorkspaceFrame>}
     {surface?.kind === "delivery" && <MarketingDeliveryWorkspace id={surface.id} channels={snapshot?.channels || []} onClose={() => setSurface(null)} onReload={reload} onPlan={detail => {
       const c = detail.campaign, existing = plans?.schedules.find(p => p.schedule.targetId === c.id && ["active","paused"].includes(p.schedule.status)), options = newShare().options;
-      setSurface({kind: "schedule", detail: existing, initial: {name: c.name, targetType: "audience_campaign", targetId: c.id, channel: c.channel, scheduleType: "once", timezone: options.timezone, startsLocal: options.startsLocal, missedRunPolicy: "run_once_when_resumed"}});
+      setSurface({kind: "schedule", ...(existing === undefined ? {} : { detail: existing }), initial: {name: c.name, targetType: "audience_campaign", targetId: c.id, channel: c.channel, scheduleType: "once", timezone: options.timezone, startsLocal: options.startsLocal, missedRunPolicy: "run_once_when_resumed"}});
     }}/>}
-    {surface?.kind === "schedule" && <MarketingScheduleDialog detail={surface.detail} initial={surface.initial} onClose={() => setSurface(null)} onReload={reload} onMessage={onMessage} registerPageLeaveGuard={registerPageLeaveGuard}/>}
+    {surface?.kind === "schedule" && <MarketingScheduleDialog {...(surface.detail === undefined ? {} : { detail: surface.detail })} {...(surface.initial === undefined ? {} : { initial: surface.initial })} onClose={() => setSurface(null)} onReload={reload} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })}/>}
   </FeatureWorkspacePage>;
 }

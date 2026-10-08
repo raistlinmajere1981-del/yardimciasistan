@@ -29,7 +29,8 @@ export function applyProductConsumptionInTransaction(db: DatabaseSync, snapshot:
   if (!product) throw new Error("Stok işlemi için ürün bulunamadı.");
   try {
     applyInventoryMovementInTransaction(db, String(product.business_id), {
-      productId: snapshot.product_id, locationId: snapshot.inventory_location_id ?? undefined,
+      productId: snapshot.product_id,
+      ...(snapshot.inventory_location_id ? { locationId: snapshot.inventory_location_id } : {}),
       type: delta < 0 ? "sale" : "return_in", quantityDelta: delta,
       referenceType: context.referenceType, referenceId: context.referenceId,
       actorSource: context.actorSource, note: context.note

@@ -283,9 +283,9 @@ export function writeRendererDiagnostic(inputValue: unknown): DesktopDiagnosticE
     event: String(input.event ?? "renderer.message"),
     message: String(input.message ?? ""),
     operationId: typeof input.operationId === "string" ? input.operationId : "",
-    meta: input.meta && typeof input.meta === "object" && !Array.isArray(input.meta)
-      ? input.meta as Record<string, unknown>
-      : undefined,
+    ...(input.meta && typeof input.meta === "object" && !Array.isArray(input.meta)
+      ? { meta: input.meta as Record<string, unknown> }
+      : {}),
     error: input.error
   });
 }

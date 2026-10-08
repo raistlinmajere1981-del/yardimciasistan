@@ -146,8 +146,9 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, e
       if (!transient) returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       const sameEntity = transient?.intent.entityType === intent.entityType && transient.intent.entityId === intent.entityId;
       if (!sameEntity) transientOnReturn.current = options?.onReturn;
+      const nextReturnContext = sameEntity ? transient!.intent.returnContext : { page, ...intent.returnContext };
       setTransient({
-        intent: { ...intent, returnContext: sameEntity ? transient!.intent.returnContext : { page, ...intent.returnContext } },
+        intent: { ...intent, ...(nextReturnContext === undefined ? {} : { returnContext: nextReturnContext }) },
         presentation: sameEntity ? transient!.presentation : definition.defaultPresentation
       });
       writeRendererDiagnostic({

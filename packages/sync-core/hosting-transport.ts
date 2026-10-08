@@ -191,7 +191,7 @@ export async function pushGoogleReviewsSettings(options: SyncCoreConfig & Public
     action: "publish_google_reviews_settings", ...publicationIdentity(options), google_reviews: options.settings
   });
   if (!result.ok) return { ...result, message: redactSecret(result.message, options.settings.api_key),
-    error: result.error ? redactSecret(result.error, options.settings.api_key) : undefined };
+    ...(result.error ? { error: redactSecret(result.error, options.settings.api_key) } : {}) };
   return { ok: true as const, publication_name: result.publication_name, source_client_id: result.source_client_id,
     source_epoch: result.source_epoch, source_revision: result.source_revision, idempotency_key: result.idempotency_key,
     payload_hash: result.payload_hash, accepted: result.accepted, deduplicated: result.deduplicated,
@@ -406,7 +406,7 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
     return {
       ...result,
       message: redactSecret(result.message, options.aiSettings.apiKey),
-      error: result.error ? redactSecret(result.error, options.aiSettings.apiKey) : undefined
+      ...(result.error ? { error: redactSecret(result.error, options.aiSettings.apiKey) } : {})
     };
   }
 
@@ -455,8 +455,8 @@ export class PhpHostingSyncTransport implements SyncTransport {
       ...this.config,
       clientId: this.config.clientId,
       afterSeq: input.afterSeq,
-      limit: input.limit,
-      replayThroughSeq: input.replayThroughSeq,
+      ...(input.limit === undefined ? {} : { limit: input.limit }),
+      ...(input.replayThroughSeq === undefined ? {} : { replayThroughSeq: input.replayThroughSeq }),
       sourceEpoch: this.config.sourceEpoch
     });
   }
@@ -478,7 +478,7 @@ export class PhpHostingSyncTransport implements SyncTransport {
   }
 
   pullAndroidActions(input: PullActionsInput = {}): Promise<PullAndroidActionsResult> {
-    return pullAndroidActions({ ...this.config, limit: input.limit });
+    return pullAndroidActions({ ...this.config, ...(input.limit === undefined ? {} : { limit: input.limit }) });
   }
 
   completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult> {
@@ -486,7 +486,7 @@ export class PhpHostingSyncTransport implements SyncTransport {
       ...this.config,
       actionId: input.actionId,
       status: input.status,
-      errorMessage: input.errorMessage
+      ...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })
     });
   }
 

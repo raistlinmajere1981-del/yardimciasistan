@@ -211,7 +211,8 @@ function projectDashboardForAi(
       task.taskType,
       task.relatedType,
       relatedReservation?.reservationType ?? "",
-      { roomIds: relatedReservation?.roomIds, tableIds: relatedReservation?.tableIds }
+      { ...(relatedReservation?.roomIds !== undefined ? { roomIds: relatedReservation.roomIds } : {}),
+        ...(relatedReservation?.tableIds !== undefined ? { tableIds: relatedReservation.tableIds } : {}) }
     );
   });
   const stays = enabled.has(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS) ? source.customerRoomStays : [];

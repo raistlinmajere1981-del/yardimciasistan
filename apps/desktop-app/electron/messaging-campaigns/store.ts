@@ -95,10 +95,10 @@ function counts(audience: AudienceMember[]): MessagingAudienceCounts {
 export function previewMessagingSegment(db: DatabaseSync, id: string, channel: MessagingChannel) { assertCampaignCapabilities(db); return counts(resolveAudience(db, id, channel)); }
 function campaign(row: Row): MessagingCampaign {
   return { id: String(row.id), businessId: String(row.business_id), name: String(row.name), purpose: "marketing", channel: row.channel as MessagingChannel,
-    providerId: row.provider_id ? row.provider_id as MessagingCampaign["providerId"] : undefined, segmentId: String(row.segment_id), templateName: String(row.template_name),
+    ...(row.provider_id ? { providerId: row.provider_id as NonNullable<MessagingCampaign["providerId"]> } : {}), segmentId: String(row.segment_id), templateName: String(row.template_name),
     templateLanguage: String(row.template_language), bindings: JSON.parse(String(row.bindings_json)), status: row.status as MessagingCampaign["status"],
     preparedAt: String(row.prepared_at), cancelledAt: String(row.cancelled_at), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
-    contentId: row.content_id ? String(row.content_id) : undefined, contentRevision: row.content_revision ? Number(row.content_revision) : undefined, text: String(row.text ?? ""),
+    ...(row.content_id ? { contentId: String(row.content_id) } : {}), ...(row.content_revision ? { contentRevision: Number(row.content_revision) } : {}), text: String(row.text ?? ""),
     templateSnapshot: row.template_snapshot_json ? JSON.parse(String(row.template_snapshot_json)) : null,
     preparationCounts: row.preparation_counts_json ? JSON.parse(String(row.preparation_counts_json)) : null };
 }
@@ -148,8 +148,11 @@ export function prepareMessagingCampaign(db: DatabaseSync, id: string, template:
     if (value.status === "prepared") return getMessagingCampaignDetail(db, id);
     if (value.status !== "draft") invalid("not_draft", "Yalnız taslak kampanya hazırlanabilir.");
     if (!value.providerId) invalid("missing_provider", "Hazırlamak için sağlayıcı seçin.");
-    const input = validateCampaignInput({ name: value.name, purpose: value.purpose, channel: value.channel, providerId: value.providerId,
-      segmentId: value.segmentId, templateName: value.templateName, templateLanguage: value.templateLanguage, bindings: value.bindings, text: value.text, contentId: value.contentId, contentRevision: value.contentRevision });
+    const input = validateCampaignInput({ name: value.name, purpose: value.purpose, channel: value.channel,
+      ...(value.providerId !== undefined ? { providerId: value.providerId } : {}),
+      segmentId: value.segmentId, templateName: value.templateName, templateLanguage: value.templateLanguage, bindings: value.bindings,
+      ...(value.text !== undefined ? { text: value.text } : {}), ...(value.contentId !== undefined ? { contentId: value.contentId } : {}),
+      ...(value.contentRevision !== undefined ? { contentRevision: value.contentRevision } : {}) });
     if (input.channel === "whatsapp") { if (!template) invalid("missing_template", "Onaylı şablon artık kullanılamıyor."); validateCampaignTemplate(input, template); }
     else validateSmsText(input.text);
     const audience = resolveAudience(db, value.segmentId, value.channel), summary = counts(audience), now = new Date().toISOString();

@@ -27,7 +27,7 @@ export class BusinessMessagingStatusSyncService {
             || typeof row.timestamp !== 'string' || (row.messageId !== undefined && (typeof row.messageId !== 'string' || row.messageId.length > 100))) throw new Error("invalid_status");
           const result = db.applyBusinessMessageStatus(row);
           desktopLog.info({ scope: "business-messaging", event: "business-messaging.webhook.status", message: "WhatsApp Business durumu işlendi.",
-            operationId: result?.id, meta: { providerId: "whatsapp_cloud", matched: Boolean(result), status: row.status } });
+            ...(result?.id !== undefined ? { operationId: result.id } : {}), meta: { providerId: "whatsapp_cloud", matched: Boolean(result), status: row.status } });
           ack.push(row.seq);
         }
         if (ack.length) { this.onChanged(); await this.request(url, config.syncSecret, { ack }); }

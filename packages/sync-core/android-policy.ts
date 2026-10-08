@@ -372,8 +372,8 @@ export function androidActionAllowedByCapabilities(
   }
   if (["reservation_approve", "reservation_reject", "reservation_cancel"].includes(actionType)) {
     return isReservationTypeAvailable(enabled, context.reservationType ?? "", {
-      roomIds: context.reservationRoomIds,
-      tableIds: context.reservationTableIds
+      ...(context.reservationRoomIds === undefined ? {} : { roomIds: context.reservationRoomIds }),
+      ...(context.reservationTableIds === undefined ? {} : { tableIds: context.reservationTableIds })
     });
   }
   if (actionType.startsWith("daily_task_")) {

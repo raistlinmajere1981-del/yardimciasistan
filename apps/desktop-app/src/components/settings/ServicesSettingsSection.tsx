@@ -122,15 +122,15 @@ export function ServicesSettingsSection({
                     state={androidDeviceState}
                                   installState={androidInstallState}
                                   installSnapshot={androidInstallSnapshot}
-                    onRefreshInstallDevices={onRefreshAndroidInstallDevices}
-                    onInstallApp={onInstallAndroidApp}
-                    onProvisionApp={onProvisionAndroidApp}
-                    onSetRole={onSetAndroidDeviceRole}
-                    permissionGroupsByDevice={androidPermissionGroups}
-                    onPermissionGroupsChange={onAndroidPermissionGroupsChange}
-                    onSetActive={onSetAndroidDeviceActive}
-                    onResetPermissions={onResetAndroidDevicePermissions}
-                    onRevoke={onRevokeAndroidDevice}
+                    {...(onRefreshAndroidInstallDevices === undefined ? {} : { onRefreshInstallDevices: onRefreshAndroidInstallDevices })}
+                    {...(onInstallAndroidApp === undefined ? {} : { onInstallApp: onInstallAndroidApp })}
+                    {...(onProvisionAndroidApp === undefined ? {} : { onProvisionApp: onProvisionAndroidApp })}
+                    {...(onSetAndroidDeviceRole === undefined ? {} : { onSetRole: onSetAndroidDeviceRole })}
+                    {...(androidPermissionGroups === undefined ? {} : { permissionGroupsByDevice: androidPermissionGroups })}
+                    {...(onAndroidPermissionGroupsChange === undefined ? {} : { onPermissionGroupsChange: onAndroidPermissionGroupsChange })}
+                    {...(onSetAndroidDeviceActive === undefined ? {} : { onSetActive: onSetAndroidDeviceActive })}
+                    {...(onResetAndroidDevicePermissions === undefined ? {} : { onResetPermissions: onResetAndroidDevicePermissions })}
+                    {...(onRevokeAndroidDevice === undefined ? {} : { onRevoke: onRevokeAndroidDevice })}
                   />
                 )}
               </div>

@@ -219,7 +219,7 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
 
     insertDatabaseEvent(db, {
       type: existing ? "reservation.updated" : "reservation.created",
-      androidAction: context.androidAction,
+      ...(context.androidAction !== undefined ? { androidAction: context.androidAction } : {}),
       entityType: "reservation",
       entityId: reservationId,
       payload: {

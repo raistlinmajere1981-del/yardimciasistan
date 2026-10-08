@@ -42,7 +42,7 @@ export function validateCampaignInput(value: MessagingCampaignInput): MessagingC
   const smsText = value.channel === "sms" ? validateSmsText(value.text) : undefined;
   if (value.channel === "sms" && (value.bindings.length || value.templateName || value.templateLanguage)) invalid("invalid_campaign", "SMS yalnız düz metin kullanır.");
   if (value.contentId !== undefined) { boundedText(value.contentId, 100, true); if (!Number.isSafeInteger(value.contentRevision) || value.contentRevision! < 1) invalid("invalid_campaign", "İçerik sürümü geçersiz."); }
-  return { contentId: value.contentId, contentRevision: value.contentRevision, ...(smsText ? { text: smsText } : {}), name: boundedText(value.name, 120, true), purpose: "marketing", channel: value.channel, providerId: value.providerId,
+  return { ...(value.contentId !== undefined ? { contentId: value.contentId } : {}), ...(value.contentRevision !== undefined ? { contentRevision: value.contentRevision } : {}), ...(smsText ? { text: smsText } : {}), name: boundedText(value.name, 120, true), purpose: "marketing", channel: value.channel, ...(value.providerId !== undefined ? { providerId: value.providerId } : {}),
     segmentId: boundedText(value.segmentId, 100, true), templateName: boundedText(value.templateName, 512, value.channel === "whatsapp"),
     templateLanguage: boundedText(value.templateLanguage, 40, value.channel === "whatsapp"), bindings: value.bindings };
 }

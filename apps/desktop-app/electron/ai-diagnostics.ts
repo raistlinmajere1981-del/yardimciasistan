@@ -21,7 +21,7 @@ export function logAiOperationStarted(operation: string, config: AIProviderConfi
     scope: "ai",
     event: `ai.${operation}.started`,
     message: "AI işlemi başlatıldı.",
-    operationId,
+    ...(operationId !== undefined ? { operationId } : {}),
     meta: {
       operation,
       provider: config.provider,
@@ -46,7 +46,7 @@ export function logAiOperationCompleted(
       scope: "ai",
       event: `ai.${operation}.completed`,
       message: "AI işlemi tamamlandı.",
-      operationId,
+      ...(operationId !== undefined ? { operationId } : {}),
       meta: {
         operation,
         provider: outcome.provider || config.provider,
@@ -71,7 +71,7 @@ export function logAiOperationCompleted(
     scope: "ai",
     event: `ai.${operation}.failed`,
     message: "AI işlemi tamamlanamadı.",
-    operationId,
+    ...(operationId !== undefined ? { operationId } : {}),
     meta: {
       operation,
       provider: outcome.provider || config.provider,

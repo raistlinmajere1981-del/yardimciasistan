@@ -264,7 +264,7 @@ export function OperationCalendarPage({
         </div>
       )}
       </section>
-      {selectedPlan && <MarketingScheduleDialog key={selectedPlan.schedule.id} detail={selectedPlan} onClose={() => setSelectedPlanId("")} onReload={marketing.reload} onMessage={onMessage} registerPageLeaveGuard={registerPageLeaveGuard}/>}
+      {selectedPlan && <MarketingScheduleDialog key={selectedPlan.schedule.id} detail={selectedPlan} onClose={() => setSelectedPlanId("")} onReload={marketing.reload} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })}/>}
     </PageWorkSurface>
   );
 }

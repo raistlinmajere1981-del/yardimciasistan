@@ -313,7 +313,7 @@ function DesktopAppFrameContent({
             onDelete: customerController.handleDeleteCustomer
           }} />
           <WorkspaceHost definition={productWorkspaceDefinition} context={{
-            menuData: menuEnabled ? surfaceData : undefined,
+            ...(menuEnabled ? { menuData: surfaceData } : {}),
             qrMenuEnabled,
             onSaveMenuEntry: menuController.saveItemForm,
             onRemoveMenuEntry: menuController.deleteItemById,

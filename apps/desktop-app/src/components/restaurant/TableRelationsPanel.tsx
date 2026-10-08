@@ -114,7 +114,7 @@ export function TableRelationsPanel({
         options={data.customers.map(item => ({
           id: item.id,
           label: item.fullName,
-          description: item.phone || item.email || undefined,
+          ...((item.phone || item.email) ? { description: item.phone || item.email } : {}),
           keywords: [item.phone, item.email, ...(item.tags ?? [])].filter(Boolean).join(" ")
         }))}
       />

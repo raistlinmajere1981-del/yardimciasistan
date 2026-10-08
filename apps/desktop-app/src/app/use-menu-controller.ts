@@ -125,7 +125,7 @@ export function useMenuController({
     }
 
     const result = await bridge.saveMenuCategory({
-      id: form.id || undefined,
+      ...(form.id ? { id: form.id } : {}),
       name: form.name,
       description: form.description,
       is_active: form.is_active,
@@ -170,7 +170,11 @@ export function useMenuController({
       return { ok: false, message: priceError };
     }
 
-    const result = await bridge.saveMenuProductEntry({ ...itemFormToSaveInput(form), ...(product ? { product, product_id: undefined } : {}) });
+    const entry = itemFormToSaveInput(form);
+    const { product_id: linkedProductId, ...entryRest } = entry;
+    const result = await bridge.saveMenuProductEntry(product
+      ? { ...entryRest, product }
+      : { ...entryRest, ...(linkedProductId === undefined ? {} : { product_id: linkedProductId }) });
     if (!result.ok) {
       return result;
     }

@@ -54,7 +54,7 @@ export function useRoomCheckout({ room, stay, data, folioEnabled, onDashboard }:
           <RoomCheckoutSettlementOptions
             roomLabel={room.number ? `Oda ${room.number}` : room.name}
             stay={stay}
-            currentFolio={currentFolio}
+            {...(currentFolio === undefined ? {} : { currentFolio })}
             previousFolios={previousFolios}
             onSettleCurrent={value => { choices.settleCurrent = value; }}
             onIncludePrevious={value => { choices.includePrevious = value; }}
@@ -115,7 +115,7 @@ function RoomCheckoutSettlementOptions({ roomLabel, stay, currentFolio, previous
   const takingPayment = settleCurrent || includePrevious;
 
   return <div className="form-stack">
-    <RoomCheckoutConfirmationDetails roomLabel={roomLabel} stay={stay} account={currentFolio} showResult={false} />
+    <RoomCheckoutConfirmationDetails roomLabel={roomLabel} stay={stay} {...(currentFolio === undefined ? {} : { account: currentFolio })} showResult={false} />
     {(currentRemaining > 0 || previousFolios.length > 0) && <fieldset className="form-stack" aria-label="Çıkış tahsilatı">
       {currentRemaining > 0 && <label className="form-check">
         <input type="checkbox" checked={settleCurrent} onChange={event => {

@@ -12,7 +12,7 @@ export interface CampaignTemplateCatalog {
 export class MessagingCampaignService {
   constructor(private readonly getDatabase: () => DesktopDatabase, private readonly catalog: CampaignTemplateCatalog, private readonly onChanged: () => void = () => {}) {}
   private log(event: string, meta: Record<string, string | number>, operationId?: string) {
-    desktopLog.info({ scope: "messaging", event: `messaging.${event}`, message: "Pazarlama niyeti işlemi kaydedildi.", operationId, meta });
+    desktopLog.info({ scope: "messaging", event: `messaging.${event}`, message: "Pazarlama niyeti işlemi kaydedildi.", ...(operationId !== undefined ? { operationId } : {}), meta });
   }
   getPreference(customerId: string, channel: MessagingChannel, purpose: "marketing") { return this.getDatabase().getCustomerMessagingPreference(customerId, channel, purpose); }
   savePreference(input: SaveMessagingPreferenceInput) {

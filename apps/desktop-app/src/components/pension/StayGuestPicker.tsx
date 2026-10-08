@@ -17,7 +17,9 @@ export function StayGuestPicker({ data, selectedIds, onSelect, disabled }: {
       options={data.customers.filter(customer => !selectedIds.includes(customer.id)).map(customer => ({
         id: customer.id,
         label: customer.fullName,
-        description: active.includes(customer.id) ? "Aktif konaklaması var" : customer.phone || undefined,
+        ...(active.includes(customer.id)
+          ? { description: "Aktif konaklaması var" }
+          : customer.phone ? { description: customer.phone } : {}),
         disabled: active.includes(customer.id)
       }))}
       onChange={id => { if (id) onSelect(id); }}

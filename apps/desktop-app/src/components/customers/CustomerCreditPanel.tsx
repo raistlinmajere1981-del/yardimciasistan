@@ -51,7 +51,7 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
         {!form && !account.customer.deletedAt && <ActionButton variant="ghost" size="sm" disabled={loading} onClick={() => setForm("adjustment")}>Düzeltme</ActionButton>}
         {form && <CustomerCreditForm account={account} mode={form} loading={loading} onSavingChange={setSaving} onClose={closeForm} onSaved={(text) => { reportAppStatus("success", text); closeForm(); }} />}
         <CustomerCreditHistory account={account} />
-        {whatsappEnabled && !account.customer.deletedAt && !form && <CustomerCreditWhatsAppShare account={account} disabled={loading || saving} readFresh={reload} onPrepared={onPreparedWhatsApp} />}
+        {whatsappEnabled && !account.customer.deletedAt && !form && <CustomerCreditWhatsAppShare account={account} disabled={loading || saving} readFresh={reload} {...(onPreparedWhatsApp === undefined ? {} : { onPrepared: onPreparedWhatsApp })} />}
       </div>}
     </>}
   </section>;

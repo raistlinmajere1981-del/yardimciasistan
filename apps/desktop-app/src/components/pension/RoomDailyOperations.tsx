@@ -14,8 +14,8 @@ export function RoomCheckoutAction({ model, disabled, data, folioEnabled, onDash
   onDashboard: (data: DesktopDashboardData) => void;
 }) {
   const checkout = useRoomCheckout({
-    room: model.room,
-    stay: model.currentStay,
+    ...(model.room === undefined ? {} : { room: model.room }),
+    ...(model.currentStay === undefined ? {} : { stay: model.currentStay }),
     data,
     folioEnabled,
     onDashboard

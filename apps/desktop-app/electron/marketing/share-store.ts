@@ -41,7 +41,11 @@ export function saveMarketingShare(db: DatabaseSync, input: MarketingShareInput)
     if (input.content.id && getMarketingShare(db, input.content.id).targets.length) throw new MarketingError("share_submitted", "Bu paylaşım işleme alındı. Yeni paylaşım oluşturun; web içeriğini yayındaki içerikler alanından düzenleyin.");
     const selected = options(input.options);
     const variants = MARKETING_CHANNELS.map(channel => input.content.variants.find(v => v.channel === channel) ?? {channel, text: "", title: "", metadata: {version: 1 as const, adaptation: "manual" as const}});
-    const editorial = {...input.content, variants: variants.map(v => v.channel === "instagram" ? {...v, mediaAssetId: input.content.mediaAssetIds[0]} : v)};
+    const editorial = {...input.content, variants: variants.map(v => {
+      if (v.channel !== "instagram") return v;
+      const mediaAssetId = input.content.mediaAssetIds[0];
+      return { ...v, ...(mediaAssetId !== undefined ? { mediaAssetId } : {}) };
+    })};
     const content = saveMarketingContent(db, editorial, input.content.source === "ai" ? "ai" : "manual");
     db.prepare("INSERT INTO marketing_shares VALUES(?,?) ON CONFLICT(content_id) DO UPDATE SET options_json=excluded.options_json").run(content.content.id, JSON.stringify(selected));
     return getMarketingShare(db, content.content.id);

@@ -28,8 +28,8 @@ export function getDesktopTaskDomain(
     task.relatedType,
     reservation?.reservationType,
     {
-      roomIds: reservation?.roomIds,
-      tableIds: reservation?.tableIds
+      ...(reservation?.roomIds === undefined ? {} : { roomIds: reservation.roomIds }),
+      ...(reservation?.tableIds === undefined ? {} : { tableIds: reservation.tableIds })
     }
   );
 }

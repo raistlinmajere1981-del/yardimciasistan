@@ -25,7 +25,7 @@ export class CampaignDispatchService {
   }
   private now() { return (this.options.now ?? (() => new Date()))(); }
   private log(event: string, meta: Record<string, string | number>, operationId?: string) {
-    desktopLog[event === "message.failed" ? "error" : event === "message.retry_scheduled" ? "warn" : "info"]({ scope: "messaging", event: `messaging.dispatch.${event}`, message: "Kontrollü kampanya gönderimi güncellendi.", operationId, meta });
+    desktopLog[event === "message.failed" ? "error" : event === "message.retry_scheduled" ? "warn" : "info"]({ scope: "messaging", event: `messaging.dispatch.${event}`, message: "Kontrollü kampanya gönderimi güncellendi.", ...(operationId !== undefined ? { operationId } : {}), meta });
   }
   start() { this.active = true; this.wake(); }
   wake() {

@@ -337,39 +337,44 @@ export function useBusinessLayoutSettings(options: {
       if (layoutChanged) {
         const current = draftRef.current;
         const input: SaveBusinessLayoutInput = {
-          rooms: current.capabilities.rooms
-            ? current.rooms.map((room) => ({
-                id: room.id || undefined,
-                clientKey: room.id ? undefined : room.key,
-                name: room.name,
-                number: room.number,
-                capacity: room.capacity,
-                bedInfo: room.bedInfo,
-                floor: room.floor,
-                features: room.features,
-                description: room.description,
-                priceNote: room.priceNote,
-                nightlyPriceMinor: parseMoneyToMinor(room.price) ?? 0,
-                currency: room.currency,
-                outOfService: room.outOfService
-              }))
-            : undefined,
-          tables: current.capabilities.tables && tableDetailsChanged
-            ? current.tables.map((table) => ({
-                id: table.id,
-                capacity: table.capacity,
-                description: table.description,
-                features: table.features,
-                smokingPolicy: table.smokingPolicy
-              }))
-            : undefined,
-          tableCategories: current.capabilities.tables
-            ? current.tableCategories.map((category) => ({
-                sourceName: category.sourceName,
-                name: category.name,
-                tableCount: Number(category.tableCount)
-              }))
-            : undefined,
+          ...(current.capabilities.rooms
+            ? {
+                rooms: current.rooms.map((room) => ({
+                  ...(room.id ? { id: room.id } : { clientKey: room.key }),
+                  name: room.name,
+                  number: room.number,
+                  capacity: room.capacity,
+                  bedInfo: room.bedInfo,
+                  floor: room.floor,
+                  features: room.features,
+                  description: room.description,
+                  priceNote: room.priceNote,
+                  nightlyPriceMinor: parseMoneyToMinor(room.price) ?? 0,
+                  currency: room.currency,
+                  outOfService: room.outOfService
+                }))
+              }
+            : {}),
+          ...(current.capabilities.tables && tableDetailsChanged
+            ? {
+                tables: current.tables.map((table) => ({
+                  id: table.id,
+                  capacity: table.capacity,
+                  description: table.description,
+                  features: table.features,
+                  smokingPolicy: table.smokingPolicy
+                }))
+              }
+            : {}),
+          ...(current.capabilities.tables
+            ? {
+                tableCategories: current.tableCategories.map((category) => ({
+                  sourceName: category.sourceName,
+                  name: category.name,
+                  tableCount: Number(category.tableCount)
+                }))
+              }
+            : {}),
           publication: {
             ...(current.capabilities.rooms ? { rooms: current.publication.rooms } : {}),
             ...(current.capabilities.tables ? { tables: current.publication.tables } : {})

@@ -99,7 +99,7 @@ export class AndroidActionSyncService {
         entityType: "android_action",
         ok: false,
         message: pullResult.message,
-        status: pullResult.status
+        ...(pullResult.status !== undefined ? { status: pullResult.status } : {})
       });
       return summary;
     }
@@ -131,7 +131,7 @@ export class AndroidActionSyncService {
           entityType: "android_action_result",
           ok: false,
           message: markResult.message,
-          status: markResult.status
+          ...(markResult.status !== undefined ? { status: markResult.status } : {})
         });
       }
     }

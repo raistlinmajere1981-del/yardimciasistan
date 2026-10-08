@@ -85,7 +85,7 @@ export async function testAiConnection(
     });
     if (!modelListResult.ok) {
       const classification = classifyAIProviderFailure({
-        status: modelListResult.status,
+        ...(modelListResult.status !== undefined ? { status: modelListResult.status } : {}),
         message: modelListResult.message
       });
       desktopLog.warn({
@@ -189,11 +189,11 @@ export async function testAiConnection(
   }
 
   if (!result || !result.ok) {
+    const failedModel = (attemptedModels.at(-1) || modelCandidates[0]) ?? "";
     return {
       ok: false,
-      message: formatAiConnectionFailure((attemptedModels.at(-1) || modelCandidates[0]) ?? "", result, attemptedModels),
-      model: service === "gemini" ? attemptedModels.at(-1) : undefined,
-      models: service === "gemini" ? models : undefined
+      message: formatAiConnectionFailure(failedModel, result, attemptedModels),
+      ...(service === "gemini" ? { model: failedModel, models } : {})
     };
   }
 

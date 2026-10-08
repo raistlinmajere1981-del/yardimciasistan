@@ -62,7 +62,7 @@ export function updateRoomStatus(
     db.prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, roomId);
     insertDatabaseEvent(db, {
       type: "room.status_changed",
-      androidAction,
+      ...(androidAction !== undefined ? { androidAction } : {}),
       entityType: "room",
       entityId: roomId,
       payload: {

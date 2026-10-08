@@ -224,7 +224,7 @@ function readAvailabilityScriptConfig(): Partial<AvailabilityRuntimeConfig> {
   const scripts = Array.from(document.scripts).reverse();
   const script = (document.currentScript as HTMLScriptElement | null)
     ?? scripts.find((candidate) => candidate.dataset.apiBaseUrl !== undefined || /widget(?:-core)?\.js(?:$|\?)/.test(candidate.src));
-  return pickAvailabilityRuntimeConfig({ apiBaseUrl: script?.dataset.apiBaseUrl });
+  return pickAvailabilityRuntimeConfig({ ...(script?.dataset.apiBaseUrl === undefined ? {} : { apiBaseUrl: script.dataset.apiBaseUrl }) });
 }
 
 function pickAvailabilityRuntimeConfig(input: Partial<AvailabilityRuntimeConfig>): Partial<AvailabilityRuntimeConfig> {

@@ -30,8 +30,9 @@ export function getSyncRuntimeStatus(db: DatabaseSync): DesktopSyncRuntimeStatus
   const pending = db
     .prepare("SELECT COUNT(*) AS count, MIN(NULLIF(next_attempt_at, '')) AS next_retry_at FROM sync_outbox")
     .get() as { count?: number; next_retry_at?: string } | undefined;
+  const restoreReconciliation = getRestoreReconciliationStatus(db);
   return {
-    restoreReconciliation: getRestoreReconciliationStatus(db),
+    ...(restoreReconciliation !== undefined ? { restoreReconciliation } : {}),
     enabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
     clientId: String(identity?.client_id ?? ""),
     requestCursor: Number(runtime?.request_cursor ?? 0),

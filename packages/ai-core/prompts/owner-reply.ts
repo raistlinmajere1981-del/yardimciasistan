@@ -128,13 +128,13 @@ export async function generateOwnerReplySuggestion(input: OwnerReplyInput, confi
     return {
       ...fallbackSuggestion,
       provider: result.provider,
-      model: result.model,
+      ...(result.model !== undefined ? { model: result.model } : {}),
       fallback: true,
       providerMessage: result.message,
-      providerReason: result.reason,
-      providerStatus: result.status,
-      providerCode: result.providerCode,
-      retryAfterSeconds: result.retryAfterSeconds
+      ...(result.reason !== undefined ? { providerReason: result.reason } : {}),
+      ...(result.status !== undefined ? { providerStatus: result.status } : {}),
+      ...(result.providerCode !== undefined ? { providerCode: result.providerCode } : {}),
+      ...(result.retryAfterSeconds !== undefined ? { retryAfterSeconds: result.retryAfterSeconds } : {})
     };
   }
 
@@ -142,7 +142,7 @@ export async function generateOwnerReplySuggestion(input: OwnerReplyInput, confi
   return {
     ...parsedSuggestion,
     provider: result.provider,
-    model: result.model,
+    ...(result.model !== undefined ? { model: result.model } : {}),
     fallback: parsedSuggestion.fallback === true
   };
 }

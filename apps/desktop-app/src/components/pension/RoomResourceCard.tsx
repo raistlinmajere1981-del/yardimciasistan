@@ -23,12 +23,13 @@ export function RoomResourceCard({ room, summary, data, capabilities, onDashboar
   const selected = navigation.hospitalitySessions.pension?.intent.entityType === "room"
     && navigation.hospitalitySessions.pension.intent.entityId === room.id;
   const model = getRoomCardModel(room, summary, capabilities, roomToday());
+  const currentStay = model.current[0];
   const [statusBusy, setStatusBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const running = useRef(false);
   const checkout = useRoomCheckout({
     room,
-    stay: model.current[0],
+    ...(currentStay === undefined ? {} : { stay: currentStay }),
     data,
     folioEnabled: capabilities.folioEnabled,
     onDashboard

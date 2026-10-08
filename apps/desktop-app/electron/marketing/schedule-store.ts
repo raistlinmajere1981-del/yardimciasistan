@@ -28,7 +28,7 @@ export function marketingScheduleDetail(db: DatabaseSync,id: string): MarketingS
   const schedule=getMarketingSchedule(db,id);
   const frozen=schedule.targetRevision?db.prepare("SELECT snapshot_json FROM marketing_publication_revisions WHERE publication_id=? AND revision=?").get(schedule.targetId,schedule.targetRevision):undefined;
   const snapshot=frozen?JSON.parse(String(frozen.snapshot_json)):undefined;
-  const targetSummary=snapshot?{name:String(snapshot.title),revision:schedule.targetRevision,mediaCount:snapshot.mediaAssetIds.length}:{name:getMessagingCampaign(db,schedule.targetId).name};
+  const targetSummary=snapshot?{name:String(snapshot.title),...(schedule.targetRevision !== undefined ? { revision: schedule.targetRevision } : {}),mediaCount:snapshot.mediaAssetIds.length}:{name:getMessagingCampaign(db,schedule.targetId).name};
   return {schedule,targetSummary,executions:db.prepare("SELECT * FROM marketing_schedule_executions WHERE schedule_id=? ORDER BY planned_at DESC LIMIT 40").all(id).map(executionRow)};
 }
 export function listMarketingSchedules(db: DatabaseSync): MarketingScheduleDetail[] {

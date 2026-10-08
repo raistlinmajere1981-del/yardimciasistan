@@ -38,9 +38,13 @@ export function getMessagingCustomer(db: DatabaseSync, id: string) {
   return row ? { id: String(row.id), phone: String(row.phone) } : null;
 }
 function project(row: Record<string, unknown>): BusinessMessage {
-  return { id: String(row.id), businessId: String(row.business_id), customerId: row.customer_id ? String(row.customer_id) : undefined,
-    purpose: row.purpose as BusinessMessage["purpose"], campaignId: row.campaign_id ? String(row.campaign_id) : undefined, campaignRecipientId: row.campaign_recipient_id ? String(row.campaign_recipient_id) : undefined,
-    relatedEntityType: row.related_entity_type ? String(row.related_entity_type) : undefined, relatedEntityId: row.related_entity_id ? String(row.related_entity_id) : undefined,
+  return { id: String(row.id), businessId: String(row.business_id),
+    ...(row.customer_id ? { customerId: String(row.customer_id) } : {}),
+    ...(row.purpose === "operational" || row.purpose === "marketing" ? { purpose: row.purpose } : {}),
+    ...(row.campaign_id ? { campaignId: String(row.campaign_id) } : {}),
+    ...(row.campaign_recipient_id ? { campaignRecipientId: String(row.campaign_recipient_id) } : {}),
+    ...(row.related_entity_type ? { relatedEntityType: String(row.related_entity_type) } : {}),
+    ...(row.related_entity_id ? { relatedEntityId: String(row.related_entity_id) } : {}),
     providerId: row.provider_id as BusinessMessage["providerId"], recipient: String(row.recipient), messageKind: row.message_kind as BusinessMessage["messageKind"],
     templateName: String(row.template_name), templateLanguage: String(row.template_language), providerMessageId: String(row.provider_message_id),
     status: String(row.status) as BusinessMessageStatus, failureCode: String(row.failure_code), failureMessage: String(row.failure_message),

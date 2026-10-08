@@ -95,7 +95,7 @@ export function openTableOrder(db: DatabaseSync, tableId: string, context: Table
     updateTableStatusForOrder(db, normalizedTableId, "occupied", id, now, context.androidAction);
     insertDatabaseEvent(db, {
       type: "table_order.opened",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "table_order",
       entityId: id,
       payload: { table_id: normalizedTableId },
@@ -261,7 +261,7 @@ export function addTableOrderItem(db: DatabaseSync, input: AddTableOrderItemInpu
     recalculateTableOrderTotalInTransaction(db, orderId, now);
     insertDatabaseEvent(db, {
       type: "table_order.item_added",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "table_order",
       entityId: orderId,
       payload: { item_id: itemId, product_id: consumption.product_id, menu_entry_id: menuItemId, product_name: productName, quantity, unit_price: unitPrice, currency },
@@ -321,7 +321,7 @@ export function updateTableOrderItemQuantity(db: DatabaseSync, input: UpdateTabl
     recalculateTableOrderTotalInTransaction(db, orderId, now);
     insertDatabaseEvent(db, {
       type: "table_order.item_quantity_changed",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "table_order",
       entityId: orderId,
       payload: { item_id: itemId, quantity },
@@ -402,7 +402,7 @@ export function removeTableOrderItem(db: DatabaseSync, itemIdInput: string, cont
     recalculateTableOrderTotalInTransaction(db, orderId, now);
     insertDatabaseEvent(db, {
       type: "table_order.item_removed",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "table_order",
       entityId: orderId,
       payload: { item_id: normalizedItemId },
@@ -519,7 +519,7 @@ export function updateTableOrderStatus(db: DatabaseSync, input: UpdateTableOrder
     );
     insertDatabaseEvent(db, {
       type: "table_order.status_changed",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "table_order",
       entityId: orderId,
       payload: { old_status: String(current.status ?? ""), new_status: status },
@@ -576,7 +576,7 @@ export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusI
     updateTableStatusForOrder(db, String(current.table_id ?? ""), "available", orderId, now, context.androidAction);
     insertDatabaseEvent(db, {
       type: status === "paid" ? "table_order.paid" : "table_order.cancelled",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "table_order",
       entityId: orderId,
       payload: { old_status: String(current.status ?? ""), status },
@@ -637,5 +637,5 @@ export function updateTableStatusForOrder(
     source: "table_order",
     order_id: orderId
   };
-  insertDatabaseEvent(db, { type: "table.status_changed", entityType: "table", entityId: tableId, payload, now, androidAction });
+  insertDatabaseEvent(db, { type: "table.status_changed", entityType: "table", entityId: tableId, payload, now, ...(androidAction ? { androidAction } : {}) });
 }

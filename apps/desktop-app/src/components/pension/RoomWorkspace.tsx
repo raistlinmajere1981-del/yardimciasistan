@@ -37,8 +37,12 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
   const navigation = useWorkspaceNavigation();
   const model = getRoomWorkspaceModel(data, intent.entityId, staysEnabled, reservationsEnabled);
   // Current account always follows the actual checked-in stay. Prior-account intents focus their own context below.
-  const account = useRoomFolioController(intent.entityId, folioEnabled, model.refreshKey, { stayId: model.currentStay?.id,
-    folioId: model.currentStay ? model.operations?.accounts.find(item => item.stayId === model.currentStay!.id)?.folioId : undefined });
+  const currentStayId = model.currentStay?.id;
+  const currentFolioId = model.currentStay ? model.operations?.accounts.find(item => item.stayId === model.currentStay!.id)?.folioId : undefined;
+  const account = useRoomFolioController(intent.entityId, folioEnabled, model.refreshKey, {
+    ...(currentStayId === undefined ? {} : { stayId: currentStayId }),
+    ...(currentFolioId === undefined ? {} : { folioId: currentFolioId })
+  });
   const operations = useRoomStayOperations(model, account, onDashboard);
   const [dirtyForms, setDirtyForms] = useState<Record<string, boolean>>({});
   const [draftEpoch, setDraftEpoch] = useState(0);
@@ -153,7 +157,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
         />}
         <RoomStayPanel model={model} data={data} intent={intent} operations={operations} disabled={busy} staysEnabled={staysEnabled}
           quickCustomerId={quickCustomerId} onQuickCustomerHandled={() => setQuickCustomerId("")}
-          onCreateCustomer={customersEnabled ? () => setQuickAction("customer") : undefined}
+          {...(customersEnabled ? { onCreateCustomer: () => setQuickAction("customer") } : {})}
           onDirty={value => setDirty("stay", value)} />
       </OperationPanel>
       <OperationPanel title="Oda İşlemleri" id="room-operations">
@@ -163,7 +167,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
           onDirty={(key, value) => setDirty(key, value)} />}
       </OperationPanel>
       <OperationPanel title="Hesap" id="room-account" surfaceRole="finance">
-        {folioEnabled ? <RoomAccount controller={account} currentStayId={model.currentStay?.id} focusFolioId={intent.folioId} ambiguous={Boolean(model.state && model.state.occupancy.stayIds.length > 1)} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />
+        {folioEnabled ? <RoomAccount controller={account} {...(model.currentStay?.id === undefined ? {} : { currentStayId: model.currentStay.id })} {...(intent.folioId === undefined ? {} : { focusFolioId: intent.folioId })} ambiguous={Boolean(model.state && model.state.occupancy.stayIds.length > 1)} menuEnabled={menuEnabled} disabled={busy || account.loading} onDirty={(key, value) => setDirty(key, value)} />
           : <p>Oda hesabı yönetimi bu işletmede etkin değil.</p>}
       </OperationPanel>
     </div>

@@ -39,7 +39,7 @@ export async function pullRequestsFromWeb(
           entityType: "request",
           ok: false,
           message: markResult.message,
-          status: markResult.status
+          ...(markResult.status !== undefined ? { status: markResult.status } : {})
         });
       }
     }
@@ -55,7 +55,7 @@ export async function pullRequestsFromWeb(
       entityType: "request",
       ok: false,
       message: result.message,
-      status: result.status
+      ...(result.status !== undefined ? { status: result.status } : {})
     });
   }
 
@@ -82,7 +82,7 @@ export async function markRequestsSyncedOnWeb(
     ok: result.ok,
     recordCount: result.ok ? result.updated_count : 0,
     message: result.ok ? result.message : result.message,
-    status: result.ok ? undefined : result.status
+    ...(!result.ok && result.status !== undefined ? { status: result.status } : {})
   });
 
   return result;
@@ -121,7 +121,7 @@ export async function pushMenuToWeb(database: DesktopDatabase, coordinator: Sync
       entityType: "menu",
       ok: false,
       message: result.message,
-      status: result.status
+      ...(result.status !== undefined ? { status: result.status } : {})
     });
   }
 

@@ -92,9 +92,13 @@ export function RestaurantPage({
           <div className="resource-grid">
             {visibleTables
               .filter((table) => (table.area.trim() || "Genel") === name)
-              .map(table => <TableResourceCard key={table.id} table={table} summary={summaries.get(table.id)}
-                capabilities={{ ordersEnabled, reservationsEnabled, menuEnabled }} onDashboard={onDashboardDataChanged}
-                onUpdateTableStatus={onUpdateTableStatus} imageSrc={coverPreviews[table.id]} />)}
+              .map(table => {
+                const summary = summaries.get(table.id);
+                const imageSrc = coverPreviews[table.id];
+                return <TableResourceCard key={table.id} table={table} {...(summary === undefined ? {} : { summary })}
+                  capabilities={{ ordersEnabled, reservationsEnabled, menuEnabled }} onDashboard={onDashboardDataChanged}
+                  onUpdateTableStatus={onUpdateTableStatus} {...(imageSrc === undefined ? {} : { imageSrc })} />;
+              })}
           </div>
         </details>
       ))}

@@ -290,7 +290,7 @@ export class SyncCoordinator {
     const result: PushAndroidSnapshotResult = await this.publishAndroidSnapshotJob(job) ?? { ok: false, message: "Android yayın niyeti hazırlanamadı." };
     this.options.database.recordSyncEvent({ direction: "push", entityType: "android_snapshot", ok: result.ok,
       recordCount: result.ok ? result.task_count + snapshot.requests.length + snapshot.rooms.length + snapshot.tables.length : 0,
-      message: result.message, status: result.ok ? undefined : result.status });
+      message: result.message, ...(result.ok || result.status === undefined ? {} : { status: result.status }) });
     return result;
   }
 
@@ -617,7 +617,7 @@ export class SyncCoordinator {
     let replayExhausted = false;
     try {
       for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
-        const result = await transport.pullWebOrders({ afterSeq: cursor, limit: 100, replayThroughSeq });
+        const result = await transport.pullWebOrders({ afterSeq: cursor, limit: 100, ...(replayThroughSeq === undefined ? {} : { replayThroughSeq }) });
         if (!result.ok) {
           this.logSyncFailure("web-orders-pull", result, { page, cursor });
           errorMessage = result.message;
@@ -687,14 +687,14 @@ export class SyncCoordinator {
     const restore = this.options.database.getRestoreReconciliationStatus();
     const replayThroughSeq = restore?.state === "reconciliation_pending" && !restore.requestsComplete ? restore.requestsThrough : undefined;
     for (let page = 0; page < MAX_PULL_PAGES; page += 1) {
-      const result = await transport.pullRequests({ afterSeq: cursor, limit: 100, replayThroughSeq });
+      const result = await transport.pullRequests({ afterSeq: cursor, limit: 100, ...(replayThroughSeq === undefined ? {} : { replayThroughSeq }) });
       if (!result.ok) {
         this.options.database.recordSyncEvent({
           direction: "pull",
           entityType: "request",
           ok: false,
           message: result.message,
-          status: result.status
+          ...(result.status === undefined ? {} : { status: result.status })
         });
         this.logSyncFailure("requests-pull", result, { page, cursor });
         return { count, error: result.message };
@@ -892,8 +892,8 @@ export class SyncCoordinator {
       const preparation = await this.options.prepareRoomCatalog?.(config, clientId);
       if (preparation && !preparation.ok) {
         this.logSyncFailure("room-catalog-prepare", {
-          status: preparation.status,
-          message: preparation.message
+          message: preparation.message,
+          ...(preparation.status === undefined ? {} : { status: preparation.status })
         });
         if ([400, 404, 405].includes(preparation.status ?? 0)) {
           this.roomCatalogSupported = false;
@@ -938,7 +938,7 @@ export class SyncCoordinator {
       ok: false,
       recordCount: 0,
       message: result.message,
-      status: result.status
+      ...(result.status === undefined ? {} : { status: result.status })
     });
     return result.message;
   }
@@ -954,8 +954,8 @@ export class SyncCoordinator {
       const preparation = await this.options.prepareTableCatalog?.(config, clientId);
       if (preparation && !preparation.ok) {
         this.logSyncFailure("table-catalog-prepare", {
-          status: preparation.status,
-          message: preparation.message
+          message: preparation.message,
+          ...(preparation.status === undefined ? {} : { status: preparation.status })
         });
         if ([400, 404, 405].includes(preparation.status ?? 0)) {
           this.tableCatalogSupported = false;
@@ -1000,7 +1000,7 @@ export class SyncCoordinator {
       ok: false,
       recordCount: 0,
       message: result.message,
-      status: result.status
+      ...(result.status === undefined ? {} : { status: result.status })
     });
     return result.message;
   }
@@ -1041,7 +1041,7 @@ export class SyncCoordinator {
       ok: false,
       recordCount: 0,
       message: result.message,
-      status: result.status
+      ...(result.status === undefined ? {} : { status: result.status })
     });
     return result.message;
   }
@@ -1122,7 +1122,7 @@ export class SyncCoordinator {
             : job.jobType === "online_catalog_publish" ? "online_catalog" : job.jobType === "dealer_access_publish" ? "dealer_access" : "android_snapshot",
         ok: false,
         message: result.message,
-        status: result.status
+        ...(result.status === undefined ? {} : { status: result.status })
       });
       errors.push(result.message);
     }

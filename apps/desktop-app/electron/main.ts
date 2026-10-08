@@ -263,7 +263,7 @@ if (process.platform === "linux" && process.env.XDG_SESSION_TYPE?.toLowerCase() 
 function createMainWindow() {
   return createDesktopMainWindow({
     isDev,
-    devServerUrl: process.env.VITE_DEV_SERVER_URL,
+    ...(process.env.VITE_DEV_SERVER_URL !== undefined ? { devServerUrl: process.env.VITE_DEV_SERVER_URL } : {}),
     allowExternalUrl: (url) =>
       !isWhatsAppUrl(url)
       || hasBusinessCapability(enabledBusinessCapabilities(), C.WHATSAPP),
@@ -626,10 +626,10 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   const localResult = getDatabase().saveInitialSetup({
     ...input,
     aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
-    arasShipping: input.arasShipping ? { ...input.arasShipping, password: "" } : undefined,
-    sms: input.sms ? { ...input.sms, apiKey: "", apiHash: "" } : undefined,
-    instagram: input.instagram ? { ...input.instagram, accessToken: "" } : undefined,
-    whatsappCloud: input.whatsappCloud ? { ...input.whatsappCloud, accessToken: "" } : undefined,
+    ...(input.arasShipping ? { arasShipping: { ...input.arasShipping, password: "" } } : {}),
+    ...(input.sms ? { sms: { ...input.sms, apiKey: "", apiHash: "" } } : {}),
+    ...(input.instagram ? { instagram: { ...input.instagram, accessToken: "" } } : {}),
+    ...(input.whatsappCloud ? { whatsappCloud: { ...input.whatsappCloud, accessToken: "" } } : {}),
     aiProfiles: profileSecretUpdates.profiles
   }, secretUpdate.update, profileSecretUpdates.updates, shippingSecretWrite, messagingSecretWrite, marketingSecretWrites);
   if (!localResult.ok) {

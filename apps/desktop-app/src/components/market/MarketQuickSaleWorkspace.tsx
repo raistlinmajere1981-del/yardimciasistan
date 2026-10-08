@@ -432,7 +432,7 @@ export function MarketQuickSaleWorkspace({
       };
       operation = await bridge.completeMarketSale({ ...saleInput,
         settlement: isCredit ? "credit" : "paid", customerId,
-        paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id,
+        paymentMethod: salePaymentMethod, ...(draftToReview?.id ? { sourceDraftId: draftToReview.id } : {}),
         operationId: prepareSaleOperation({ ...saleInput, settlement: isCredit ? "credit" : "paid", customerId, paymentMethod: salePaymentMethod, sourceDraftId: draftToReview?.id }) });
     } catch (error) {
       onStateChange("error", customerCreditError(error, "Satış tamamlanamadı."));

@@ -133,8 +133,8 @@ export function WorkspaceFrame({ title, context, actions, headerSummary, navigat
         footer={footer}
         overlay={overlay}
         presentation={presentation}
-        onPresentationChange={onPresentationChange}
-        closeBlocked={modal.closeBlocked}
+        {...(onPresentationChange === undefined ? {} : { onPresentationChange })}
+        {...(modal.closeBlocked === undefined ? {} : { closeBlocked: modal.closeBlocked })}
         closeLabel={closeLabel}
         bodyScroll={bodyScroll}
         onClose={() => modal.onClose("close-button")}

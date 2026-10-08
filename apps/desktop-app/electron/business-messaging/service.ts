@@ -29,7 +29,7 @@ export class BusinessMessagingService {
   }
   private log(event: string, ok: boolean, operationId?: string, code?: string, error?: BusinessMessagingError) {
     desktopLog[ok ? "info" : event === "send.failed" ? "error" : "warn"]({ scope: "business-messaging", event: `business-messaging.${event}`,
-      message: "WhatsApp Business işlemi.", operationId, ...(error ? { error } : {}), meta: { providerId: "whatsapp_cloud", ok, ...(code ? { code } : {}) } });
+      message: "WhatsApp Business işlemi.", ...(operationId !== undefined ? { operationId } : {}), ...(error ? { error } : {}), meta: { providerId: "whatsapp_cloud", ok, ...(code ? { code } : {}) } });
   }
   async testConnection(input?: WhatsAppCloudConfigurationInput): Promise<BusinessMessagingConnectionResult> {
     let result: BusinessMessagingConnectionResult;
@@ -128,13 +128,15 @@ export class BusinessMessagingService {
         if (!error.disposition?.rejected) return { kind: "retry", category: "submission_uncertain" };
         if (error.disposition.retry !== "none") {
           if (!db.releaseRejectedCampaignMessage(id, token)) return { kind: "retry", category: "submission_uncertain" };
-          return { kind: "retry", category: error.disposition.retry, retryAfterMs: error.disposition.retryAfterMs };
+          return { kind: "retry", category: error.disposition.retry,
+            ...(error.disposition.retryAfterMs !== undefined ? { retryAfterMs: error.disposition.retryAfterMs } : {}) };
         }
         return { kind: "failed", category: error.code };
       }
       // Metadata I/O is read-only; its transient errors can safely be retried.
       if (["network", "timeout"].includes(error.code) || (error.disposition && error.disposition.retry !== "none")) return {
-        kind: "retry", category: error.disposition?.retry === "rate_limit" ? "rate_limit" : "transient", retryAfterMs: error.disposition?.retryAfterMs
+        kind: "retry", category: error.disposition?.retry === "rate_limit" ? "rate_limit" : "transient",
+        ...(error.disposition?.retryAfterMs !== undefined ? { retryAfterMs: error.disposition.retryAfterMs } : {})
       };
       return { kind: "failed", category: error.code };
     }

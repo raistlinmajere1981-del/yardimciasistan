@@ -253,8 +253,8 @@ function applyAndroidMenuEntrySave(db: DatabaseSync, action: AndroidSyncAction, 
   if (Boolean(input.hide_when_out_of_stock) !== Boolean(existing?.hide_when_out_of_stock)
       && (!capabilities.includes(C.INVENTORY) || !capabilities.includes(C.QR_MENU))) return { ok: false, message: "Stokta yokken QR menüden gizleme bu işletmede etkin değil." };
   try {
-    const result = saveMenuProductEntryInTransaction(db, { ...input, id: updating ? entryId : undefined,
-      product_id: updating ? existing!.product_id : input.product_id }, nextMutationTimestamp(existing?.updated_at, now));
+    const result = saveMenuProductEntryInTransaction(db, { ...input,
+      ...(updating ? { id: entryId, product_id: existing!.product_id } : {}) }, nextMutationTimestamp(existing?.updated_at, now));
     insertAndroidActionEvent(db, action, updating ? "menu.entry_updated" : "menu.entry_created", "menu_product_entry", result.savedId,
       { product_id: getPublishedMenu(db, true).items.find(entry => entry.id === result.savedId)?.product_id }, now);
     return result;

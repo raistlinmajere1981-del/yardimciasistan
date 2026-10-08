@@ -801,9 +801,9 @@ export function setInventoryCountInTransaction(
     locationId,
     type: "count",
     quantityDelta,
-    unitCost: input.unitCost,
+    ...(input.unitCost !== undefined ? { unitCost: input.unitCost } : {}),
     referenceType: input.referenceType || "inventory_count",
-    referenceId: input.referenceId,
+    ...(input.referenceId !== undefined ? { referenceId: input.referenceId } : {}),
     note: input.note || `Fiziksel sayım: ${countedQuantity}`,
     actorSource: input.actorSource || "desktop"
   }, now);
@@ -864,7 +864,8 @@ export function createCommerceSaleInTransaction(
     const row = getProductRow(database, businessId, String(item.productId ?? "").trim());
     if (!row || Number(row.is_active ?? 0) !== 1) throw new Error("Satış ürünlerinden biri aktif değil veya bulunamadı.");
     const product = mapProduct(row);
-    const resolvedPrice = resolveCommerceProductPriceInDatabase(database, businessId, { productId: product.id, customerId: input.customerId }, wholesaleEnabled);
+    const resolvedPrice = resolveCommerceProductPriceInDatabase(database, businessId, { productId: product.id,
+      ...(input.customerId !== undefined ? { customerId: input.customerId } : {}) }, wholesaleEnabled);
     product.salePrice = resolvedPrice.unitPrice;
     moneyToMinor(product.salePrice);
     if (currency && product.currency !== currency) throw new Error("Tek satışta birden fazla para birimi kullanılamaz.");

@@ -41,7 +41,7 @@ export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatus
     }
     insertDatabaseEvent(db, {
       type: "request.status_changed",
-      androidAction: context.androidAction,
+      ...(context.androidAction !== undefined ? { androidAction: context.androidAction } : {}),
       entityType: "request",
       entityId: requestId,
       payload: {

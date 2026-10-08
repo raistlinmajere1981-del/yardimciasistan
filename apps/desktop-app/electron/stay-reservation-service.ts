@@ -80,7 +80,7 @@ function createReservationStayInTransaction(db: DatabaseSync, input: CreateStayF
     customerId: input.primaryCustomerId || String(reservation.customer_id), roomId,
     checkInDate: String(reservation.start_date), checkOutDate: String(reservation.end_date),
     guestCount: input.guestCustomerIds?.length ?? Number(reservation.guest_count), notes: String(reservation.notes),
-    guestCustomerIds: input.guestCustomerIds,
+    ...(input.guestCustomerIds !== undefined ? { guestCustomerIds: input.guestCustomerIds } : {}),
     status: input?.status === "checked_in" ? "checked_in" : "planned"
   }, reservationId);
 }
@@ -143,7 +143,7 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
   const capacityFailure = nominalCapacityFailure(room, guestCount, context.allowExtraCapacity);
   if (capacityFailure) return { ok: false, message: capacityFailure };
   const dateValidation = validateStayDatesInTransaction(db, {
-    roomId, customerId, checkInDate, checkOutDate, reservationId: reservationId || undefined
+    roomId, customerId, checkInDate, checkOutDate, ...(reservationId ? { reservationId } : {})
   });
   if (!dateValidation.ok) return dateValidation;
 
@@ -181,7 +181,7 @@ function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, re
     refreshRoomStatusFromStays(db, roomId, now, false);
     insertDatabaseEvent(db, {
       type: "customer.room_assigned",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "customer_room_stay",
       entityId: id,
       payload: {
@@ -264,7 +264,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
     return { ok: false, message: "Konaklama kaydı bulunamadı." };
   }
   if (status === "checked_out") {
-    try { return checkoutHospitalityStay(db, { stayId }, { now: context.now, android: context.androidAction ? { actionId: context.androidAction.id, deviceId: context.androidAction.device_id } : undefined }); }
+    try { return checkoutHospitalityStay(db, { stayId }, { ...(context.now !== undefined ? { now: context.now } : {}), ...(context.androidAction ? { android: { actionId: context.androidAction.id, deviceId: context.androidAction.device_id } } : {}) }); }
     catch { return { ok: false, message: "Konaklama durumu güncellenemedi." }; }
   }
   const previousStatus = String(stay.status ?? "");
@@ -332,7 +332,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
     );
     insertDatabaseEvent(db, {
       type: "customer.room_stay_status_changed",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "customer_room_stay",
       entityId: stayId,
       payload: {
@@ -571,7 +571,7 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
 
     insertDatabaseEvent(db, {
       type: isEditing ? "reservation.updated" : "reservation.created",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "reservation",
       entityId: savedReservationId,
       payload: {
@@ -691,7 +691,7 @@ export function updateReservationStatus(db: DatabaseSync, input: UpdateReservati
 
     insertDatabaseEvent(db, {
       type: "reservation.status_changed",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "reservation",
       entityId: reservationId,
       payload: {

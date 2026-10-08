@@ -260,7 +260,7 @@ export function applyBusinessProfileCapabilities(
       const sameProfile = resolveProfileId(business) === profile.id;
       replaceBusinessCapabilitiesInTransaction(database, {
         businessId, profileId,
-        previousProfileId: preserveUserOverrides || !sameProfile ? resolveProfileId(business) : undefined,
+        ...(preserveUserOverrides || !sameProfile ? { previousProfileId: resolveProfileId(business) } : {}),
         selectedOptionalCapabilities: sameProfile && preserveUserOverrides
           ? (database.prepare("SELECT capability_id FROM business_capabilities WHERE business_id = ? AND is_selected = 1").all(businessId) as Array<{ capability_id: string }>)
             .map(row => row.capability_id as BusinessCapability).filter(capability => profile.optionalCapabilities.includes(capability))

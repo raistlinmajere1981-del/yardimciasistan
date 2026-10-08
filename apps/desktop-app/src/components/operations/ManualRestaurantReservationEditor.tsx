@@ -91,7 +91,7 @@ export function ManualRestaurantReservationEditor({
     try {
       const result = await onSave({
         customerId: form.customerId,
-        tableId: form.tableId || undefined,
+        ...(form.tableId ? { tableId: form.tableId } : {}),
         date: form.date,
         time: form.time,
         guestCount: form.guestCount,
@@ -117,12 +117,15 @@ export function ManualRestaurantReservationEditor({
         onChange={(customerId) => setForm((current) => ({ ...current, customerId }))}
         placeholder={customers.length === 0 ? "Henüz müşteri kaydı yok" : "Müşteri seçin"}
         searchPlaceholder="Müşteri adı veya telefon ara"
-        options={customers.map((customer) => ({
-          id: customer.id,
-          label: customer.fullName,
-          description: customer.phone || customer.email || undefined,
-          keywords: `${customer.phone || ""} ${customer.email || ""}`
-        }))}
+        options={customers.map((customer) => {
+          const contact = customer.phone || customer.email;
+          return {
+            id: customer.id,
+            label: customer.fullName,
+            ...(contact ? { description: contact } : {}),
+            keywords: `${customer.phone || ""} ${customer.email || ""}`
+          };
+        })}
       />
       <small>{selectedCustomer ? "Kayıtlı müşteri seçildi." : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}</small>
     </div>

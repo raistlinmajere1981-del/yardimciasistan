@@ -331,10 +331,11 @@ function readScriptConfig(): Partial<RuntimeConfig> {
   const scripts = Array.from(document.scripts).reverse();
   const script = (document.currentScript as HTMLScriptElement | null)
     ?? scripts.find((candidate) => candidate.dataset.apiBaseUrl !== undefined || /widget(?:-core)?\.js(?:$|\?)/.test(candidate.src));
+  const dataset = script?.dataset;
   return pickRuntimeConfig({
-    businessName: script?.dataset.businessName,
-    whatsappPhone: script?.dataset.whatsappPhone,
-    apiBaseUrl: script?.dataset.apiBaseUrl
+    ...(dataset?.businessName === undefined ? {} : { businessName: dataset.businessName }),
+    ...(dataset?.whatsappPhone === undefined ? {} : { whatsappPhone: dataset.whatsappPhone }),
+    ...(dataset?.apiBaseUrl === undefined ? {} : { apiBaseUrl: dataset.apiBaseUrl })
   });
 }
 

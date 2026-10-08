@@ -32,10 +32,10 @@ export function applyAndroidReservationAction({ db, action, now }: AndroidReserv
     return { ok: false, message: room ? "Geçerli giriş-çıkış tarihi ve 1-99 arasında kişi sayısı gerekli." : "Geçerli tarih, saat ve 1-99 arasında kişi sayısı gerekli." };
   }
   const result = room ? saveManualReservation(db, {
-    reservationId: editing ? reservationId : undefined, customerId, roomId: androidPayloadString(action.payload, "room_id"), startDate, endDate, guestCount, notes
+    ...(editing ? { reservationId } : {}), customerId, roomId: androidPayloadString(action.payload, "room_id"), startDate, endDate, guestCount, notes
   }, context) : saveManualRestaurantReservation(db, {
     customerId, tableId: androidPayloadString(action.payload, "table_id"), date: startDate, time, guestCount, notes
-  }, { ...context, reservationId: editing ? reservationId : undefined });
+  }, { ...context, ...(editing ? { reservationId } : {}) });
   return result.ok ? { ok: true, message: room ? editing ? "Pansiyon rezervasyonu telefondan güncellendi." : "Pansiyon rezervasyonu telefondan oluşturuldu."
     : editing ? "Restoran rezervasyonu telefondan güncellendi." : "Restoran rezervasyonu telefondan oluşturuldu." } : result;
 }

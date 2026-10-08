@@ -178,7 +178,7 @@ export function MarketProductsWorkspace({
     onStateChange("loading", "Kategori kaydediliyor…");
     try {
       const saved = await bridge.saveCategory({
-        id: categoryForm.id || undefined,
+        ...(categoryForm.id ? { id: categoryForm.id } : {}),
         parentId: categoryForm.parentId,
         name: categoryForm.name,
         code: categoryForm.code,
@@ -218,8 +218,11 @@ export function MarketProductsWorkspace({
     setSaveMessage("");
     let saved: CatalogProduct;
     try {
+      const productInput = productFormToSaveInput(productForm);
+      const { id: productId, ...productRest } = productInput;
       saved = await bridge.saveProduct({
-        ...productFormToSaveInput(productForm),
+        ...productRest,
+        ...(productId === undefined ? {} : { id: productId }),
         ...(onlineSalesEnabled ? { onlineSalesPublished } : {}),
         ...(imageDraftMode === "manual" && manualImageDataUrl ? { manualImageDataUrl } : {}),
         ...(imageDraftMode === "clear" ? { clearImage: true } : {})
@@ -354,7 +357,7 @@ export function MarketProductsWorkspace({
             mode="all"
             localImageDataUrl={imageDraftMode === "manual" ? manualImageDataUrl : ""}
             lookupSeed={productLookupRequest}
-            onLookupSeedLoaded={onProductLookupLoaded}
+            {...(onProductLookupLoaded === undefined ? {} : { onLookupSeedLoaded: onProductLookupLoaded })}
             onManualImageSelected={(dataUrl) => {
               setManualImageDataUrl(dataUrl);
               setImageDraftMode("manual");

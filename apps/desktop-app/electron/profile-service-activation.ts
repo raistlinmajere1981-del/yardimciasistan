@@ -27,10 +27,11 @@ export function normalizeProfileTransitionInput(
     effective.profileOptions ?? getBusinessProfile(effective.profileId).defaultOptionalCapabilities);
   if (effective.servicePreferences.whatsapp) capabilities.push(C.WHATSAPP);
   const available = (service: Parameters<typeof isBusinessServiceAvailable>[0]) => isBusinessServiceAvailable(service, capabilities);
+  const onlineSalesDeliveryEnabled = available("delivery") && (effective.onlineSalesDeliveryEnabled ?? current.onlineSalesDeliveryEnabled);
   return {
     ...effective,
     dealerPortalEnabled: available("dealerPortal") && (effective.dealerPortalEnabled ?? current.dealerPortalEnabled),
-    onlineSalesDeliveryEnabled: available("delivery") && (effective.onlineSalesDeliveryEnabled ?? current.onlineSalesDeliveryEnabled),
+    ...(onlineSalesDeliveryEnabled !== undefined ? { onlineSalesDeliveryEnabled } : {}),
     productData: { ...(effective.productData ?? current.productData),
       enabled: available("productData") && (effective.productData ?? current.productData).enabled },
     birthdaySettings: { ...(effective.birthdaySettings ?? current.birthdaySettings),

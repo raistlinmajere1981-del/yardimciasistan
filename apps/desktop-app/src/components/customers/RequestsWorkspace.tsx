@@ -478,7 +478,7 @@ export function RequestsWorkspace({
                   <DatePicker
                     ariaLabel="Çıkış tarihi"
                     value={manualRequestForm.endDate}
-                    min={manualRequestForm.startDate || undefined}
+                    {...(manualRequestForm.startDate ? { min: manualRequestForm.startDate } : {})}
                     presets={manualRequestForm.startDate ? [1, 2, 7, 10].map((days) => ({
                       label: `${days} gün`,
                       value: addDays(manualRequestForm.startDate, days)

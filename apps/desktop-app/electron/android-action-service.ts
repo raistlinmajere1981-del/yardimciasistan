@@ -143,7 +143,7 @@ export function applyAndroidCustomerSave(db: DatabaseSync, action: AndroidSyncAc
   const conflict = updating ? getAndroidVersionConflict(action.payload, "expected_updated_at", existing?.updated_at, "Müşteri") : null;
   if (conflict) return conflict;
   const result = saveCustomer(db, {
-    id: updating ? customerId : undefined, fullName: androidPayloadString(action.payload, "full_name"), phone: androidPayloadString(action.payload, "phone"),
+    ...(updating ? { id: customerId } : {}), fullName: androidPayloadString(action.payload, "full_name"), phone: androidPayloadString(action.payload, "phone"),
     email: androidPayloadString(action.payload, "email"), notes: androidPayloadString(action.payload, "notes"), tags: androidPayloadStringArray(action.payload, "tags"),
     identityType: androidPayloadString(action.payload, "identity_type"), identityNumber: androidPayloadString(action.payload, "identity_number"),
     nationality: androidPayloadString(action.payload, "nationality"), birthDate: androidPayloadString(action.payload, "birth_date"), gender: androidPayloadString(action.payload, "gender"),

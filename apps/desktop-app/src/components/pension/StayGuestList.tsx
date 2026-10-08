@@ -51,14 +51,14 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
       details: <>{lastGuest && <RoomCheckoutConfirmationDetails
         roomLabel={stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}
         stay={stay}
-        account={account}
+        {...(account === undefined ? {} : { account })}
       />}
         {openOrders.length > 0 && <p role="alert">Bu misafire bağlı {openOrders.length} açık restoran adisyonu var. Aktarımı çıkıştan önce tamamlayın.</p>}</>
     })) return;
     const ok = await operations.mutate("stay", () => window.yardimciDesktop!.checkoutStayGuest({
       stayId: stay.id,
       customerId,
-      nextPrimaryCustomerId: nextPrimary || undefined
+      ...(nextPrimary ? { nextPrimaryCustomerId: nextPrimary } : {})
     }));
     if (ok) {
       setSelectedSlot(-1);

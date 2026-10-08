@@ -110,10 +110,10 @@ export function ManualReservationEditor({
     event.preventDefault();
     setState("loading");
     const result = await onSave({
-      reservationId: reservation?.id,
-      expectedUpdatedAt: form.expectedUpdatedAt,
+      ...(reservation?.id === undefined ? {} : { reservationId: reservation.id }),
+      ...(form.expectedUpdatedAt === undefined ? {} : { expectedUpdatedAt: form.expectedUpdatedAt }),
       customerId: form.customerId,
-      roomId: form.roomId || undefined,
+      ...(form.roomId ? { roomId: form.roomId } : {}),
       startDate: form.startDate,
       endDate: form.endDate,
       guestCount: form.guestCount,
@@ -138,12 +138,15 @@ export function ManualReservationEditor({
           onChange={(customerId) => setForm((current) => ({ ...current, customerId }))}
           placeholder={customers.length === 0 ? "Henüz müşteri kaydı yok" : "Müşteri seçin"}
           searchPlaceholder="Müşteri adı veya telefon ara"
-          options={customers.map((customer) => ({
-            id: customer.id,
-            label: customer.fullName,
-            description: customer.phone || customer.email || undefined,
-            keywords: `${customer.phone || ""} ${customer.email || ""}`
-          }))}
+          options={customers.map((customer) => {
+            const contact = customer.phone || customer.email;
+            return {
+              id: customer.id,
+              label: customer.fullName,
+              ...(contact ? { description: contact } : {}),
+              keywords: `${customer.phone || ""} ${customer.email || ""}`
+            };
+          })}
         />
         <small>
           {isEditing
@@ -179,7 +182,7 @@ export function ManualReservationEditor({
         <DatePicker
           ariaLabel="Çıkış tarihi"
           disabled={!detailsEditable}
-          min={form.startDate || undefined}
+          {...(form.startDate ? { min: form.startDate } : {})}
           value={form.endDate}
           presets={form.startDate ? [1, 2, 7, 10].map((days) => ({
             label: `${days} gün`,

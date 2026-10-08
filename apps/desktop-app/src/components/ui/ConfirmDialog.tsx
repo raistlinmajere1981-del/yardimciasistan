@@ -54,5 +54,5 @@ export function ConfirmDialog({ embedded = false, withinModal = false, tone = "i
   </div>;
   if (embedded) return <section className={`confirm-dialog confirm-dialog--embedded confirm-dialog--${tone}`} aria-labelledby={`${id}-title`}>{content}</section>;
   return <ModalSurface className={`confirm-dialog confirm-dialog--${tone}`} labelledBy={`${id}-title`}
-    describedBy={description ? `${id}-description` : undefined} onClose={onCancel} closeBlocked={busy} dismissOnBackdrop>{content}</ModalSurface>;
+    {...(description ? { describedBy: `${id}-description` } : {})} onClose={onCancel} closeBlocked={busy} dismissOnBackdrop>{content}</ModalSurface>;
 }

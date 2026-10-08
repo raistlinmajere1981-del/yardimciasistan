@@ -345,7 +345,7 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
 
     insertDatabaseEvent(db, {
       type: requestedId ? "customer.updated" : "customer.created",
-      androidAction: context.androidAction,
+      ...(context.androidAction !== undefined ? { androidAction: context.androidAction } : {}),
       entityType: "customer",
       entityId: id,
       payload: {

@@ -80,7 +80,7 @@ export class MarketingShareService {
           if (options.timing === "scheduled") {
             const existing = this.database().listMarketingSchedules().find(d => d.schedule.targetId === target.targetId);
             const plan = existing ?? this.schedules.save({name: content.content.title, targetType: target.targetType, targetId: target.targetId, channel: target.channel,
-              expectedTargetRevision: target.targetType === "public_publication" ? this.database().getMarketingPublication(target.targetId).revision : undefined,
+              ...(target.targetType === "public_publication" ? { expectedTargetRevision: this.database().getMarketingPublication(target.targetId).revision } : {}),
               scheduleType: "once", timezone: options.timezone, startsLocal: options.startsLocal, missedRunPolicy: "run_once_when_resumed"});
             if (plan.schedule.status !== "active") throw new MarketingError("schedule_stopped", plan.schedule.status === "completed" ? "Plan tamamlandı. Çalışma sonucunu ana Takvim’de inceleyin." : "Plan duraklatılmış veya iptal edilmiş. Ana Takvim’deki planı inceleyin.");
             outcomes.push({...target, state: "scheduled", scheduleId: plan.schedule.id, message: "Plan ana Takvim’e kaydedildi."});

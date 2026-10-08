@@ -258,7 +258,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
           key={customer.id}
           customerId={customerId}
           whatsappEnabled={whatsappEnabled}
-          onPreparedWhatsApp={onPreparedCreditWhatsApp ? (message) => leaveFor(() => onPreparedCreditWhatsApp(message)) : undefined}
+          {...(onPreparedCreditWhatsApp === undefined ? {} : { onPreparedWhatsApp: (message) => leaveFor(() => onPreparedCreditWhatsApp(message)) })}
         />}
 
         <section className="panel customer-operation-card form-stack" aria-label="Hızlı işlemler">

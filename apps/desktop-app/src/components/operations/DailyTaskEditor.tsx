@@ -66,7 +66,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
             event.preventDefault();
             setState("loading");
             const result = await onSave({
-              id: task?.id,
+              ...(task?.id ? { id: task.id } : {}),
               title: form.title,
               description: form.description,
               taskType,

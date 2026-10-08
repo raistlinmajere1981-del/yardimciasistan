@@ -38,7 +38,7 @@ export function validateItemFormPrice(form: ItemFormState): string | null {
 }
 function splitCommaList(value: string) { return value.split(",").map(item => item.trim()).filter(Boolean); }
 export function itemFormToSaveInput(form: ItemFormState): SaveMenuProductEntryInput {
-  return { id: form.id || undefined, product_id: form.product_id || undefined, category_id: form.category_id,
+  return { ...(form.id ? { id: form.id } : {}), ...(form.product_id ? { product_id: form.product_id } : {}), category_id: form.category_id,
     price_override: form.price_override.trim() ? parseMoneyToMajor(form.price_override) : null,
     is_available: form.is_available, is_featured: form.is_featured, allergens: splitCommaList(form.allergens),
     tags: splitCommaList(form.tags), stock_consumption_quantity: Number(form.stock_consumption_quantity.replace(",", ".")),

@@ -20,7 +20,7 @@ export function RoomAccountAdjustments({ folio, controller, menu, webModuleUrl, 
     const categoryFallback = new Map(menu.categories.map(category => [category.id, category]));
     const itemFallback = new Map(menu.items.map(item => [item.id, item]));
     return {
-      enabled: menu.enabled,
+      ...(menu.enabled === undefined ? {} : { enabled: menu.enabled }),
       updated_at: controller.data.generatedAt || menu.updated_at,
       categories: controller.data.menuCategories.map((category, index) => {
         const fallback = categoryFallback.get(category.id);

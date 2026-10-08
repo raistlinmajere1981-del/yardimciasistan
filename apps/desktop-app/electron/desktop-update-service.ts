@@ -299,7 +299,7 @@ function buildStatus(userDataPath: string, overrides: Partial<DesktopUpdateStatu
     notes: persisted.latestNotes,
     installSupported: installSupported(),
     pendingVersion: pending?.targetVersion ?? "",
-    lastResult: persisted.lastResult,
+    ...(persisted.lastResult !== undefined ? { lastResult: persisted.lastResult } : {}),
     ...overrides
   };
 }
@@ -896,7 +896,7 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
     const installingState: InstallingDesktopUpdate = {
       ...pending,
       installStartedAt: new Date().toISOString(),
-      safetyBackupFolderName: safetyBackup?.folderName
+      ...(safetyBackup?.folderName !== undefined ? { safetyBackupFolderName: safetyBackup.folderName } : {})
     };
     writeJsonAtomic(paths.installing, installingState);
 

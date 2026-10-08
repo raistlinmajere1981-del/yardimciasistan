@@ -265,7 +265,9 @@ export function createCustomerCreditSaleInTransaction(db: DatabaseSync, input: C
   const businessId = assertCustomerCreditBusinessInTransaction(db);
   const customer = requireCustomer(db, businessId, input.customerId);
   const sale = createCommerceSaleInTransaction(db, input, "credit", now);
-  recordCustomerCreditSaleInTransaction(db, businessId, { customerId: customer.id, sale, now, note: input.note, source: input.source });
+  recordCustomerCreditSaleInTransaction(db, businessId, { customerId: customer.id, sale, now,
+    ...(input.note !== undefined ? { note: input.note } : {}),
+    ...(input.source !== undefined ? { source: input.source } : {}) });
   return sale;
 }
 

@@ -737,7 +737,7 @@ async function prepareRestore(userDataPath: string, backupId: string, confirm: (
       ok: true,
       restartScheduled: true,
       sourceBackupFolderName: backup.folderName,
-      safetyBackupFolderName: safetyBackup?.folderName,
+      ...(safetyBackup?.folderName !== undefined ? { safetyBackupFolderName: safetyBackup.folderName } : {}),
       message: safetyBackup
         ? `Mevcut veriler ${safetyBackup.folderName} klasöründe güvenceye alındı; seçilen yedek geri yükleniyor.`
         : "Seçilen yedek geri yükleniyor; uygulama yeniden başlatılıyor."
@@ -804,7 +804,7 @@ async function prepareReset(
     return {
       ok: true,
       restartScheduled: true,
-      safetyBackupFolderName: safetyBackup?.folderName,
+      ...(safetyBackup?.folderName !== undefined ? { safetyBackupFolderName: safetyBackup.folderName } : {}),
       message: safetyBackup
         ? `Mevcut veriler ${safetyBackup.folderName} klasöründe güvenceye alındı; ${webResetApplied ? "bağlı web çalışma verileri de temizlendi ve " : ""}uygulama temiz başlangıç için yeniden başlatılıyor.`
         : `${webResetApplied ? "Bağlı web çalışma verileri temizlendi; " : ""}uygulama temiz başlangıç için yeniden başlatılıyor.`

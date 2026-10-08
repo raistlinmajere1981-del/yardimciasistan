@@ -17,7 +17,7 @@ export function getMarketingContent(db: DatabaseSync, id: string): MarketingCont
   if (!row) throw new MarketingError("not_found", "İçerik bulunamadı.");
   const variants = db.prepare("SELECT * FROM marketing_content_variants WHERE content_id=? ORDER BY channel").all(id).map((v): MarketingContentVariant => ({
     contentId: id, channel: v.channel as MarketingContentVariant["channel"], title: String(v.title), text: String(v.text),
-    mediaAssetId: v.media_asset_id ? String(v.media_asset_id) : undefined, metadata: JSON.parse(String(v.metadata_json)), createdAt: String(v.created_at), updatedAt: String(v.updated_at)
+    ...(v.media_asset_id ? { mediaAssetId: String(v.media_asset_id) } : {}), metadata: JSON.parse(String(v.metadata_json)), createdAt: String(v.created_at), updatedAt: String(v.updated_at)
   }));
   const media = db.prepare("SELECT * FROM marketing_content_media WHERE content_id=? ORDER BY sort_order").all(id).map((m) => ({
     contentId: id, mediaAssetId: String(m.media_asset_id), sortOrder: Number(m.sort_order), role: m.role as "primary" | "gallery"

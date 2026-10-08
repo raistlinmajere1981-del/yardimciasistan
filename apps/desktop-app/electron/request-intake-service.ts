@@ -392,7 +392,7 @@ export function convertRequestToReservation(
 
     insertDatabaseEvent(db, {
       type: "request.converted_to_reservation",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "request",
       entityId: id,
       payload: {
@@ -404,7 +404,7 @@ export function convertRequestToReservation(
     });
     insertDatabaseEvent(db, {
       type: "reservation.approved",
-      androidAction: context.androidAction,
+      ...(context.androidAction ? { androidAction: context.androidAction } : {}),
       entityType: "reservation",
       entityId: reservationId,
       payload: {

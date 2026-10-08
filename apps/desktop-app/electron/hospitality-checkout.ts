@@ -71,7 +71,7 @@ function checkoutInTransaction(db: DatabaseSync, target: CheckoutTarget, now: st
       },
       now,
       actorType: origin.android ? "android" : "desktop",
-      actorId: origin.android?.deviceId
+      ...(origin.android?.deviceId !== undefined ? { actorId: origin.android.deviceId } : {})
     });
   }
   return {

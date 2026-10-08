@@ -60,7 +60,7 @@ export async function publishSavedAiSettings(
     ok: result.ok,
     recordCount: result.ok ? 1 : 0,
     message: result.message,
-    status: result.ok ? undefined : result.status
+    ...(!result.ok && result.status !== undefined ? { status: result.status } : {})
   });
 
   return result;

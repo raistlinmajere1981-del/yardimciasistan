@@ -10,7 +10,7 @@ import { reconcile, type DispatchClaim, type DispatchResult } from "./dispatch-c
 function item(row: Record<string, unknown>): MessagingOutboxItem {
   return { id: String(row.id), businessId: String(row.business_id), campaignId: String(row.campaign_id), campaignRecipientId: String(row.campaign_recipient_id),
     customerId: String(row.customer_id), channel: row.channel as MessagingOutboxItem["channel"], providerId: row.provider_id as MessagingOutboxItem["providerId"],
-    businessMessageId: row.business_message_id ? String(row.business_message_id) : undefined, status: row.status as MessagingOutboxItem["status"],
+    ...(row.business_message_id ? { businessMessageId: String(row.business_message_id) } : {}), status: row.status as MessagingOutboxItem["status"],
     claimToken: String(row.claim_token), claimedAt: String(row.claimed_at), operationKey: String(row.operation_key), attemptCount: Number(row.attempt_count),
     nextAttemptAt: String(row.next_attempt_at), lastError: String(row.last_error), createdAt: String(row.created_at), updatedAt: String(row.updated_at) };
 }

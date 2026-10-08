@@ -449,7 +449,9 @@ export function MenuManager({
             if (menuEditState === "loading") return;
             setPriceValidationVisible(true);
             if (validateProductFormPrices(productForm)) return;
-            const result = await onSaveItem({ ...productFormToSaveInput(productForm),
+            const { id: productId, ...productFields } = productFormToSaveInput(productForm);
+            const result = await onSaveItem({ ...productFields,
+              ...(productId ? { id: productId } : {}),
               ...(manualImageDataUrl ? { manualImageDataUrl } : {}) });
             if (!result?.ok) return;
             setPendingItemId(result.savedId);

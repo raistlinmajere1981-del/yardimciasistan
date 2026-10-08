@@ -395,13 +395,17 @@ export async function listGoogleAiStudioModels(
 
     const compatibleModels = (payload?.models ?? [])
       .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
-      .map((model) => ({
-        id: String(model.baseModelId || model.name || "").replace(/^models\//, "").trim(),
-        displayName: String(model.displayName || model.baseModelId || model.name || "").trim(),
-        description: String(model.description || "").trim(),
-        inputTokenLimit: normalizeTokenLimit(model.inputTokenLimit),
-        outputTokenLimit: normalizeTokenLimit(model.outputTokenLimit)
-      }))
+      .map((model) => {
+        const inputTokenLimit = normalizeTokenLimit(model.inputTokenLimit);
+        const outputTokenLimit = normalizeTokenLimit(model.outputTokenLimit);
+        return {
+          id: String(model.baseModelId || model.name || "").replace(/^models\//, "").trim(),
+          displayName: String(model.displayName || model.baseModelId || model.name || "").trim(),
+          description: String(model.description || "").trim(),
+          ...(inputTokenLimit !== undefined ? { inputTokenLimit } : {}),
+          ...(outputTokenLimit !== undefined ? { outputTokenLimit } : {})
+        };
+      })
       .filter((model) => model.id && (isGoogleAiStudioVisionModel(model) || supportsImageGenerationModel("gemini", model.id)));
     const uniqueModels = new Map<string, GoogleAiStudioModel>();
     for (const model of compatibleModels) {

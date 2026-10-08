@@ -326,7 +326,7 @@ export function ReportsPage({
                   <DatePicker
                     ariaLabel="Başlangıç tarihi"
                     value={customStart}
-                    max={customEnd || undefined}
+                    {...(customEnd ? { max: customEnd } : {})}
                     presets={[]}
                     onChange={(value) => updateCustomRange(value, customEnd)}
                   />
@@ -336,7 +336,7 @@ export function ReportsPage({
                   <DatePicker
                     ariaLabel="Bitiş tarihi"
                     value={customEnd}
-                    min={customStart || undefined}
+                    {...(customStart ? { min: customStart } : {})}
                     presets={[]}
                     onChange={(value) => updateCustomRange(customStart, value)}
                   />

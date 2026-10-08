@@ -13,7 +13,7 @@ export function WhatsAppBusinessSettingsSection({ draft, busy, onChange }: {
   async function test() {
     const bridge = window.yardimciDesktop; if (!bridge) return;
     await connection.run(async () => {
-      try { return await bridge.testBusinessMessagingConnection({ enabled: draft.enabled, wabaId: draft.wabaId, phoneNumberId: draft.phoneNumberId, accessToken: draft.accessToken, clearAccessToken: draft.clearAccessToken }); }
+      try { return await bridge.testBusinessMessagingConnection({ enabled: draft.enabled, wabaId: draft.wabaId, phoneNumberId: draft.phoneNumberId, ...(draft.accessToken === undefined ? {} : { accessToken: draft.accessToken }), ...(draft.clearAccessToken === undefined ? {} : { clearAccessToken: draft.clearAccessToken }) }); }
       catch { return { ok: false, providerId: "whatsapp_cloud", message: "Bağlantı testi tamamlanamadı.", testedAt: new Date().toISOString() }; }
     });
   }

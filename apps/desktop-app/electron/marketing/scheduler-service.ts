@@ -43,7 +43,8 @@ export class MarketingSchedulerService {
         this.options.onChanged?.();
       }
     } catch {
-      desktopLog.error({scope:"marketing.schedule",event:"marketing.schedule.execution.failed",message:"Pazarlama planları işlenemedi.",operationId,meta:{category:"scheduler_storage_failed"}});
+      desktopLog.error({scope:"marketing.schedule",event:"marketing.schedule.execution.failed",message:"Pazarlama planları işlenemedi.",
+        ...(operationId !== undefined ? {operationId} : {}),meta:{category:"scheduler_storage_failed"}});
     }
   }
   private log(status:string,scheduleId:string,operationId:string,category?:string) {

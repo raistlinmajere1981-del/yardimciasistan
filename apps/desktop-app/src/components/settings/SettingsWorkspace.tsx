@@ -109,13 +109,13 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       rooms: roomsEnabled,
       tables: tablesEnabled
     },
-    onDashboardRefresh: props.onDashboardRefresh
+    ...(props.onDashboardRefresh === undefined ? {} : { onDashboardRefresh: props.onDashboardRefresh })
   });
   const appearance = useAppearanceSettings(props.uiPreferences, props.onUiPreferencesChange);
   const androidPermissions = useAndroidDevicePermissionSettings({
     devices: props.dashboardData?.androidDevices ?? [],
     enabled: initialized && props.setupData.servicePreferences.android,
-    onDashboardRefresh: props.onDashboardRefresh
+    ...(props.onDashboardRefresh === undefined ? {} : { onDashboardRefresh: props.onDashboardRefresh })
   });
   const updates = useUpdateSettings(initialized);
   const password = usePasswordSettings({

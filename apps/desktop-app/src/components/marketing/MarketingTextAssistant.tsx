@@ -19,7 +19,7 @@ export function MarketingTextAssistant({text, channel, capabilities, onApply, on
     if (busy) return;
     setBusy(true); onBusy(true); setError("");
     try {
-      const value = resultValue(await observeNexaAi(() => window.yardimciDesktop!.generateMarketingAi({capability, channel, text, instructions}), "response", () => active.current));
+      const value = resultValue(await observeNexaAi(() => window.yardimciDesktop!.generateMarketingAi({capability, ...(channel === undefined ? {} : { channel }), text, instructions}), "response", () => active.current));
       if (active.current) setCandidate(value.text || "");
     } catch (e) { if (active.current) setError(e instanceof Error ? e.message : "Metin oluşturulamadı."); }
     finally { if (active.current) { setBusy(false); onBusy(false); } }

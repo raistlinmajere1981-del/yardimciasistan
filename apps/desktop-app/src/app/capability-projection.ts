@@ -79,7 +79,10 @@ export function projectDesktopDashboardData(
       task.taskType,
       task.relatedType,
       relatedReservation?.reservationType ?? "",
-      { roomIds: relatedReservation?.roomIds, tableIds: relatedReservation?.tableIds }
+      {
+        ...(relatedReservation?.roomIds === undefined ? {} : { roomIds: relatedReservation.roomIds }),
+        ...(relatedReservation?.tableIds === undefined ? {} : { tableIds: relatedReservation.tableIds })
+      }
     );
   });
   const menu = enabled.has(C.FOOD_MENU)

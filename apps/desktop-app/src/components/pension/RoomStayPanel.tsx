@@ -161,7 +161,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     {confirmDialog}
     {model.conflict && <p role="alert">Oda kayıtlarında çakışma var. Yeni girişten önce kayıtları kontrol edin.</p>}
     {active.map(stay => <section className="operation-section form-stack" key={stay.id}>
-      <StayGuestList stay={stay} data={data} operations={operations} disabled={disabled} onDirty={onDirty} onCreateCustomer={onCreateCustomer} />
+      <StayGuestList stay={stay} data={data} operations={operations} disabled={disabled} onDirty={onDirty} {...(onCreateCustomer === undefined ? {} : { onCreateCustomer })} />
     </section>)}
     {staysEnabled && !active.length && room.isActive && <form className="operation-section form-stack" aria-label="Misafir girişi"
       onSubmit={event => { event.preventDefault(); void enter(); }}>
@@ -180,7 +180,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
         {!selected && <div className="operation-fields room-entry-dates">
           <div className="form-field"><span>Giriş</span><DatePicker ariaLabel="Giriş tarihi" value={draft.checkInDate}
             onChange={value => { setDraft({ ...draft, checkInDate: value }); markEntry(true); }} /></div>
-          <div className="form-field"><span>Çıkış</span><DatePicker ariaLabel="Çıkış tarihi" value={draft.checkOutDate} min={draft.checkInDate || undefined}
+          <div className="form-field"><span>Çıkış</span><DatePicker ariaLabel="Çıkış tarihi" value={draft.checkOutDate} {...(draft.checkInDate ? { min: draft.checkInDate } : {})}
             presets={draft.checkInDate ? [1, 2, 7].map(days => ({ label: `${days} gün`, value: addDays(draft.checkInDate, days) })) : []}
             onChange={value => { setDraft({ ...draft, checkOutDate: value }); markEntry(true); }} /></div>
         </div>}

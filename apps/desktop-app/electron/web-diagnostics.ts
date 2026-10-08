@@ -68,7 +68,7 @@ export function logWebFailure(input: {
     scope: input.scope || "web",
     event: input.event,
     message: input.message,
-    operationId: input.operationId,
+    ...(input.operationId !== undefined ? { operationId: input.operationId } : {}),
     meta: {
       reason,
       status: input.failure.status ?? 0,

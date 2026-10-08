@@ -510,7 +510,9 @@ export function saveSetupData(
     replaceBusinessCapabilitiesInTransaction(db, {
       businessId,
       profileId: input.profileId,
-      previousProfileId: Number(existingSettings?.setup_completed ?? 0) === 1 ? existingBusiness?.profile_id : undefined,
+      ...(Number(existingSettings?.setup_completed ?? 0) === 1 && existingBusiness?.profile_id !== undefined
+        ? { previousProfileId: existingBusiness.profile_id }
+        : {}),
       selectedOptionalCapabilities: input.profileOptions
         ?? getBusinessProfile(input.profileId).defaultOptionalCapabilities,
       whatsappEnabled: input.servicePreferences.whatsapp,

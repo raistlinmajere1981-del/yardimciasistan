@@ -100,7 +100,7 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
     onStateChange("loading", "Tedarikçi kaydediliyor…");
     try {
       const saved = await bridge.saveSupplier({
-        id: supplierForm.id || undefined,
+        ...(supplierForm.id ? { id: supplierForm.id } : {}),
         name: supplierForm.name,
         phone: supplierForm.phone,
         email: supplierForm.email,
@@ -139,7 +139,7 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
     onStateChange("loading", "Alım stoğa işleniyor…");
     try {
       const result = await bridge.receivePurchase({
-        supplierId: purchaseSupplierId || undefined,
+        ...(purchaseSupplierId ? { supplierId: purchaseSupplierId } : {}),
         notes: purchaseNotes,
         source: "desktop-market",
         items

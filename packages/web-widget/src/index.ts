@@ -1483,14 +1483,14 @@ function ensureExternalActionBinding() {
     open({
       intent,
       context: {
-        resourceType: trigger.dataset.yaResourceType,
-        resourceId: trigger.dataset.yaResourceId,
-        resourceName: trigger.dataset.yaResourceName,
-        imageUrl: trigger.dataset.yaImageUrl,
+        ...(trigger.dataset.yaResourceType === undefined ? {} : { resourceType: trigger.dataset.yaResourceType }),
+        ...(trigger.dataset.yaResourceId === undefined ? {} : { resourceId: trigger.dataset.yaResourceId }),
+        ...(trigger.dataset.yaResourceName === undefined ? {} : { resourceName: trigger.dataset.yaResourceName }),
+        ...(trigger.dataset.yaImageUrl === undefined ? {} : { imageUrl: trigger.dataset.yaImageUrl }),
         sourcePath: trigger.dataset.yaSourcePath || window.location.pathname,
-        question: trigger.dataset.yaQuestion,
-        address: trigger.dataset.yaAddress,
-        mapUrl: trigger.dataset.yaMapUrl
+        ...(trigger.dataset.yaQuestion === undefined ? {} : { question: trigger.dataset.yaQuestion }),
+        ...(trigger.dataset.yaAddress === undefined ? {} : { address: trigger.dataset.yaAddress }),
+        ...(trigger.dataset.yaMapUrl === undefined ? {} : { mapUrl: trigger.dataset.yaMapUrl })
       }
     });
   });

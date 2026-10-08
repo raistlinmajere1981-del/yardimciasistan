@@ -29,7 +29,7 @@ export async function generateOpenAICompatibleChat(options: OpenAICompatibleChat
     return {
       ok: false,
       provider: "openai_compatible",
-      service: options.service,
+      ...(options.service !== undefined ? { service: options.service } : {}),
       model: options.model,
       message: "AI bağlantı aracı bulunamadı.",
       reason: "configuration",
@@ -66,18 +66,17 @@ export async function generateOpenAICompatibleChat(options: OpenAICompatibleChat
         providerCode,
         message
       });
+      const retryAfterSeconds = parseRetryAfterSeconds(response.headers.get("retry-after"));
       return {
         ok: false,
         provider: "openai_compatible",
-        service: options.service,
+        ...(options.service !== undefined ? { service: options.service } : {}),
         model: options.model,
         status: response.status,
         message,
         reason: classification.reason,
         ...(classification.providerCode ? { providerCode: classification.providerCode } : {}),
-        ...(parseRetryAfterSeconds(response.headers.get("retry-after")) !== undefined
-          ? { retryAfterSeconds: parseRetryAfterSeconds(response.headers.get("retry-after")) }
-          : {}),
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
         fallbackAnswer: ""
       };
     }
@@ -87,7 +86,7 @@ export async function generateOpenAICompatibleChat(options: OpenAICompatibleChat
       return {
         ok: false,
         provider: "openai_compatible",
-        service: options.service,
+        ...(options.service !== undefined ? { service: options.service } : {}),
         model: options.model,
         message: "AI cevabı boş döndü.",
         reason: "provider_error",
@@ -111,7 +110,7 @@ export async function generateOpenAICompatibleChat(options: OpenAICompatibleChat
     return {
       ok: false,
       provider: "openai_compatible",
-      service: options.service,
+      ...(options.service !== undefined ? { service: options.service } : {}),
       model: options.model,
       message: timedOut ? "AI yanıtı zaman aşımına uğradı." : "AI bağlantısı sırasında sorun oldu.",
       error: errorMessage,
@@ -137,7 +136,7 @@ function validateOptions(options: OpenAICompatibleChatOptions): AICompletionFail
     return {
       ok: false,
       provider: "openai_compatible",
-      service: options.service,
+      ...(options.service !== undefined ? { service: options.service } : {}),
       model: options.model,
       message: "AI base URL gerekli.",
       reason: "configuration",
@@ -149,7 +148,7 @@ function validateOptions(options: OpenAICompatibleChatOptions): AICompletionFail
     return {
       ok: false,
       provider: "openai_compatible",
-      service: options.service,
+      ...(options.service !== undefined ? { service: options.service } : {}),
       model: options.model,
       message: "AI model adı gerekli.",
       reason: "configuration",
@@ -161,7 +160,7 @@ function validateOptions(options: OpenAICompatibleChatOptions): AICompletionFail
     return {
       ok: false,
       provider: "openai_compatible",
-      service: options.service,
+      ...(options.service !== undefined ? { service: options.service } : {}),
       model: options.model,
       message: "AI API anahtarı gerekli.",
       reason: "configuration",
@@ -173,7 +172,7 @@ function validateOptions(options: OpenAICompatibleChatOptions): AICompletionFail
     return {
       ok: false,
       provider: "openai_compatible",
-      service: options.service,
+      ...(options.service !== undefined ? { service: options.service } : {}),
       model: options.model,
       message: "AI mesaj listesi boş.",
       reason: "configuration",

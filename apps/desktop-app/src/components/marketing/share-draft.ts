@@ -13,7 +13,7 @@ export function contentDraft(detail: MarketingContentDetail): MarketingContentIn
   return {id: detail.content.id, expectedRevision: detail.content.revision, title: detail.content.title, purpose: detail.content.purpose,
     masterText: detail.content.masterText, status: detail.content.status, source: detail.content.source,
     variants: MARKETING_CHANNELS.map(channel => {const v = detail.variants.find(v => v.channel === channel);
-      return {channel, title: v?.title || "", text: v?.text || "", metadata: v?.metadata || {version: 1, adaptation: "manual"}, mediaAssetId: v?.mediaAssetId};}),
+      return {channel, title: v?.title || "", text: v?.text || "", metadata: v?.metadata || {version: 1, adaptation: "manual"}, ...(v?.mediaAssetId ? { mediaAssetId: v.mediaAssetId } : {})};}),
     mediaAssetIds: detail.media.map(m => m.mediaAssetId)};
 }
 export function resultValue<T>(result: {ok: true; value: T} | {ok: false; message: string}): T {
