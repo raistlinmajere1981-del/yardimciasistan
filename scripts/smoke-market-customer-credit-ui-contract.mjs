@@ -300,7 +300,8 @@ try {
   assert.ok(calls.filter((call) => call.method === "listProducts").length > catalogReadsBefore, "Successful sale reloads catalog.");
   const salePayload = calls.filter((call) => call.method === "completeMarketSale").at(-1).args[0];
   assert.equal(salePayload.settlement, "credit");
-  assert.deepEqual(Object.keys(salePayload).sort(), ["customerId", "discountTotal", "items", "operationId", "paymentMethod", "settlement", "source", "sourceDraftId"]);
+  assert.deepEqual(Object.keys(salePayload).sort(), ["customerId", "discountTotal", "items", "operationId", "paymentMethod", "settlement", "source"]);
+  assert.ok(!("sourceDraftId" in salePayload), "Draftless quick sale must not link a cart draft.");
   assert.deepEqual(salePayload.items, [{ productId: product.id, quantity: 1 }]);
 
   for (const method of ["cash", "card", "transfer", "other"]) {
@@ -485,6 +486,8 @@ try {
   failReview = true;
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-review-recovery")).toContainText("Veresiye satış kaydedildi");
+  const draftSalePayload = calls.filter((call) => call.method === "completeMarketSale").at(-1).args[0];
+  assert.equal(draftSalePayload.sourceDraftId, draft.draft.id, "Draft-loaded sale must link the reviewed cart draft.");
   const salesBeforeRetry = count("commerce_sales");
   failReview = false;
   await quick.getByRole("button", { name: "Taslağı Kapat", exact: true }).click();
