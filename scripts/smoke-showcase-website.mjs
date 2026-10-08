@@ -54,7 +54,7 @@ try {
   mkdirSync(join(root, 'downloads')); for (const link of await page.locator('.download-card').evaluateAll(nodes => nodes.map(n => n.getAttribute('href')))) { writeFileSync(join(root, link), 'test-download'); assert.equal((await fetch(base + link)).status, 200); }
   const surfaces = [
     ['room_catalog', 'rooms', '/odalar/'], ['table_catalog', 'restaurant', '/restoran/'],
-    ['menu', 'qr_menu', '/qr-menu/'], ['online_catalog', 'store', '/yardimci-asistan/magaza/']
+    ['menu', 'qr_menu', '/qr-menu/'], ['online_catalog', 'store', '/magaza/']
   ];
   const assertSurfaces = async (visible) => {
     await page.goto(base);
@@ -66,6 +66,9 @@ try {
     }
   };
   await assertSurfaces(false);
+  await page.goto(base + '/magaza/');
+  await expect(page.locator('#catalog-state')).toContainText('online sipariş almıyor');
+  await expect(page.locator('.site-header')).toBeVisible();
   // Android disabled/empty capabilities cannot hide independently enabled Web publications.
   seed('android_snapshot', { enabled: false, business_capabilities: [] });
   seed('room_catalog', { enabled: true, rooms: [{ id: 'showcase-room', name: 'Örnek oda', capacity: 2, media: [], features: [] }] });
@@ -79,7 +82,61 @@ try {
   await page.goto(base + '/restoran/'); await expect(page.locator('.table-card')).toContainText('Örnek masa');
   await page.goto(base + '/restoran/masa/?id=showcase-table'); await expect(page.locator('[data-table-name]')).toContainText('Örnek masa');
   await page.goto(base + '/qr-menu/'); await expect(page.locator('.qr-menu-item')).toContainText('Çay');
-  await page.goto(base + '/yardimci-asistan/magaza/'); await expect(page.getByRole('article')).toContainText('Örnek ürün');
+  const commerceRequests = [];
+  page.on('request', request => {
+    if (/\/api\/(catalog|order)\.php/.test(request.url())) commerceRequests.push(new URL(request.url()).pathname);
+  });
+  await page.goto(base + '/magaza/'); await expect(page.getByRole('article')).toContainText('Örnek ürün');
+  await expect(page.locator('.site-header')).toBeVisible();
+  await expect(page.locator('.site-footer')).toBeAttached();
+  await expect(page.locator('[data-site-nav] a[href="/magaza/"]')).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('main')).toHaveCount(1);
+  await expect(page.locator('#yardimci-asistan-widget [data-ya-open]')).toBeVisible();
+  mkdirSync('artifacts/showcase', { recursive: true });
+  for (const width of [320, 375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `store overflow ${width}`);
+    // Adding/removing storefront CSS must leave host chrome and widget styles intact.
+    const chromeStyles = () => page.evaluate(() => Array.from(document.querySelectorAll('.site-header, .site-header *, .site-footer, .site-footer *, #yardimci-asistan-widget, #yardimci-asistan-widget *')).map(node => {
+      const style = getComputedStyle(node);
+      return ['display', 'position', 'color', 'backgroundColor', 'font', 'padding', 'borderRadius', 'width', '--ocean', '--radius'].map(key => style.getPropertyValue(key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)));
+    }));
+    const styled = await chromeStyles();
+    await page.locator('link[href="/yardimci-asistan/magaza/storefront.css"]').evaluate(node => { node.sheet.disabled = true; });
+    assert.deepEqual(await chromeStyles(), styled, `store CSS must not change host/widget ${width}`);
+    await page.locator('link[href="/yardimci-asistan/magaza/storefront.css"]').evaluate(node => { node.sheet.disabled = false; });
+    assert.equal(await page.locator('#products-title').evaluate(node => getComputedStyle(node).fontSize), '24px');
+    assert.equal(await page.locator('.product-card').evaluate(node => getComputedStyle(node).paddingTop), '0px');
+    if (width < 960) {
+      await expect(page.locator('[data-site-nav]')).toBeHidden();
+      await page.locator('[data-menu-toggle]').click();
+      await expect(page.locator('[data-site-nav] a[href="/magaza/"]')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-site-nav]')).toBeHidden();
+      await expect(page.locator('.cart-access')).toBeVisible();
+    }
+    await page.screenshot({ path: `artifacts/showcase/store-${width}.png`, fullPage: true });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Sepete ekle', exact: true }).click();
+  await page.getByRole('button', { name: 'İletişim bilgilerini gir' }).click();
+  await page.getByLabel('Ad / ad-soyad').fill('Showcase Guest');
+  await page.getByLabel('Telefon', { exact: false }).fill('+90 555 123 4567');
+  const orderResponse = page.waitForResponse(response => response.url() === base + '/yardimci-asistan/api/order.php' && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Siparişi gönder', exact: true }).click();
+  assert.equal((await orderResponse).status(), 201);
+  await expect(page.locator('#success')).toBeVisible();
+  assert.ok(commerceRequests.includes('/yardimci-asistan/api/catalog.php'));
+  assert.ok(commerceRequests.includes('/yardimci-asistan/api/order.php'));
+  assert.ok(commerceRequests.every(path => path.startsWith('/yardimci-asistan/api/')));
+  // Both routes share the same module-scoped cart, while generic hosting keeps its own shell.
+  await page.getByRole('button', { name: 'Yeni sipariş başlat' }).click();
+  await page.getByRole('button', { name: 'Sepete ekle', exact: true }).click();
+  await page.goto(base + '/yardimci-asistan/magaza/');
+  await expect(page.getByRole('article')).toContainText('Örnek ürün');
+  await expect(page.locator('#cart-lines')).toContainText('Örnek ürün');
+  await expect(page.locator('.site-header, .site-footer, #yardimci-asistan-widget')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Temizle', exact: true }).click();
   await page.goto(base + '/iletisim/'); await expect(page.locator('[data-business-phone]').first()).toContainText('+90 555'); await expect(page.locator('[data-business-map-frame]')).toBeVisible();
   const mapFrame = page.locator('[data-business-map-frame]');
   await expect(mapFrame).toHaveAttribute('src', /openstreetmap.org\/export\/embed/);
@@ -124,7 +181,7 @@ try {
   seed('business_context', canonical, ++mapRevision);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(base);
-  await page.reload(); for (const path of ['/odalar/', '/restoran/', '/qr-menu/', '/yardimci-asistan/magaza/']) await expect(page.locator(`[data-site-nav] a[href="${path}"]`)).toHaveCount(1);
+  await page.reload(); for (const path of ['/odalar/', '/restoran/', '/qr-menu/', '/magaza/']) await expect(page.locator(`[data-site-nav] a[href="${path}"]`)).toHaveCount(1);
   assert.equal(await page.locator('[data-site-nav] a').first().getAttribute('href'), '/');
   // A stale snapshot claiming all capabilities cannot reopen withdrawn Web surfaces.
   seed('android_snapshot', { enabled: true, business_capabilities: ['service.android', 'accommodation.rooms', 'food_service.tables', 'channel.qr_menu', 'channel.online_sales'] }, 2);
@@ -150,7 +207,7 @@ try {
   const onlinePublish = await transport.publishOnlineCatalog({ value: onlineCatalog, sourceRevision: 4, idempotencyKey: 'showcase-store-on-4' });
   assert.equal(onlinePublish.ok, true, onlinePublish.message);
   await assertSurfaces(true);
-  await page.goto(base + '/yardimci-asistan/magaza/');
+  await page.goto(base + '/magaza/');
   await expect(page.getByRole('article')).toContainText('Canonical showcase product');
   await expect(page.getByRole('status').filter({ hasText: 'online sipariş almıyor' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sepete ekle' })).toBeDisabled();
@@ -165,8 +222,8 @@ try {
   const onlineWithdrawal = await transport.publishOnlineCatalog({ value: f.db.createCommerceOnlineCatalog(), sourceRevision: 6, idempotencyKey: 'showcase-store-off-6' });
   assert.equal(onlineWithdrawal.ok, true, onlineWithdrawal.message);
   await page.goto(base);
-  await expect(page.locator('[data-site-nav] a[href="/yardimci-asistan/magaza/"]')).toHaveCount(0);
-  await expect(page.locator('.demo-surface-card a[href="/yardimci-asistan/magaza/"]')).toHaveCount(0);
+  await expect(page.locator('[data-site-nav] a[href="/magaza/"]')).toHaveCount(0);
+  await expect(page.locator('.demo-surface-card a[href="/magaza/"]')).toHaveCount(0);
   assert.equal((await (await page.request.get(base + '/yardimci-asistan/api/business.php')).json()).business.public_surfaces.includes('store'), false);
   const a = f.media.importBytes(imageBytes, 'upload'), b = f.media.importBytes(imageBytes, 'upload'), c = f.media.importBytes(imageBytes, 'upload');
   const content = f.service.saveContent(editorialInput());
@@ -177,7 +234,7 @@ try {
   for (const route of ['/', '/duyurular/']) { await page.goto(base + route); await expect(page.locator('.ya-marketing-text')).toHaveText('Yeni metin'); const urls = await page.locator('.ya-marketing-gallery img').evaluateAll(nodes => nodes.map(n => n.src)); assert.ok(urls[0].includes(b.id)); assert.ok(urls[1].includes(c.id)); }
   publication = f.db.listMarketingPublications()[0]; f.service.unpublish(publication.id, publication.revision); await push();
   for (const route of ['/', '/duyurular/']) { await page.goto(base + route); await expect(page.locator('[data-marketing-surface]')).toBeHidden(); await expect(page.locator('.ya-marketing-card')).toHaveCount(0); }
-  for (const route of ['/odalar/', '/odalar/oda/', '/restoran/', '/restoran/masa/', '/yorumlar/', '/iletisim/', '/kullanim-kilavuzu/', '/yardimci-asistan/magaza/', '/yardimci-asistan/duyurular/']) { const response = await page.goto(base + route); assert.equal(response.status(), 200); await expect(page.locator('#demo-sync-secret')).toHaveCount(0); assert.ok(!(await response.text()).includes(secret)); }
+  for (const route of ['/odalar/', '/odalar/oda/', '/restoran/', '/restoran/masa/', '/yorumlar/', '/iletisim/', '/kullanim-kilavuzu/', '/magaza/', '/yardimci-asistan/magaza/', '/yardimci-asistan/duyurular/']) { const response = await page.goto(base + route); assert.equal(response.status(), 200); await expect(page.locator('#demo-sync-secret')).toHaveCount(0); assert.ok(!(await response.text()).includes(secret)); }
   await page.goto(base + '/kurulum/'); await expect(page.locator('#demo-sync-secret')).toHaveValue(secret);
   await page.goto(base); for (const width of [375, 768, 1440]) { await page.setViewportSize({ width, height: 1000 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow ${width}`); }
   await page.setViewportSize({ width: 375, height: 900 }); await page.locator('[data-menu-toggle]').click(); await expect(page.locator('[data-site-nav]')).toBeVisible(); await page.keyboard.press('Escape'); await expect(page.locator('[data-site-nav]')).toBeHidden();

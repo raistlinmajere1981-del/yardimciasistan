@@ -1,8 +1,12 @@
 /* Public display/cart draft only. Catalog and order API remain authoritative. */
 (() => {
   'use strict';
-  const $ = (id) => document.getElementById(id);
-  const scope = new URL('../', window.location.href).pathname;
+  const root = document.querySelector('.ya-storefront');
+  const $ = (id) => root.querySelector(`#${id}`);
+  // Hosts can set data-api-base; the default follows the module asset, not the page route.
+  const script = document.currentScript;
+  const apiBase = new URL(script.dataset.apiBase || '../api/', script.src);
+  const scope = new URL('../', apiBase).pathname;
   const cartKey = `ya:storefront:${scope}:cart:v1`;
   const attemptKey = `ya:storefront:${scope}:attempt:v1`;
   const units = { piece: 'adet', kg: 'kg', g: 'g', l: 'l', ml: 'ml', pack: 'paket', box: 'kutu', meter: 'metre', other: 'birim' };
@@ -165,7 +169,7 @@
     $('catalog-state').hidden = false; $('catalog-state').textContent = 'Ürünler yükleniyor…'; $('product-grid').setAttribute('aria-busy', 'true');
     renderProducts(); renderCart();
     try {
-      const response = await fetch(new URL('api/catalog.php', new URL('../', location.href)), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+      const response = await fetch(new URL('catalog.php', apiBase), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
       const result = await response.json();
       if (!response.ok || result.ok !== true || typeof result.enabled !== 'boolean' || !Array.isArray(result.products)
           || !Array.isArray(result.delivery_methods) || (result.enabled && (result.delivery_methods.length > 2
@@ -241,7 +245,7 @@
     if (busy || Date.now() < retryUntil) return;
     // An unresolved attempt must replay exactly; no new key or semantic edits.
     if (!pending?.payload) {
-      if ((!pending && !validCart()) || document.querySelector('.quantity-controls [aria-invalid="true"]') || !cart.length) { message('Sepetteki ürünleri ve miktarları kontrol edin.'); return; }
+      if ((!pending && !validCart()) || root.querySelector('.quantity-controls [aria-invalid="true"]') || !cart.length) { message('Sepetteki ürünleri ve miktarları kontrol edin.'); return; }
       const contact = validateBuyer(); if (!contact) return;
       if (!pending && !deliveryMethods.includes(deliveryMethod)) { message('Teslimat yöntemini kontrol edin.'); return; }
       const delivery = validateDelivery(); if (!delivery) return;
@@ -255,7 +259,7 @@
     }
     busy = true; message(''); renderProducts(); renderCart();
     try {
-      const response = await fetch(new URL('api/order.php', new URL('../', location.href)), { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(new URL('order.php', apiBase), { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(pending.payload), signal: AbortSignal.timeout(20000) });
       const result = await response.json();
       if (response.status === 201 && result.ok === true && typeof result.order_id === 'string') {

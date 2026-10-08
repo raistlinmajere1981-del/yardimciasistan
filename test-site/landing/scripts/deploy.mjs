@@ -10,6 +10,7 @@
  *   www/odalar/
  *   www/restoran/
  *   www/qr-menu/
+ *   www/magaza/
  *   www/yorumlar/
  *   www/iletisim/
  *   www/duyurular/, www/kurulum/, www/kullanim-kilavuzu/
@@ -103,7 +104,7 @@ const localFavicon = join(repoRoot, "favicon.png");
 const localAssets = join(repoRoot, "assets");
 const localSite = repoRoot;
 const localRelease = join(repoRoot, "release.json");
-const publicRouteDirs = ["odalar", "restoran", "qr-menu", "yorumlar", "iletisim", "duyurular", "kurulum", "kullanim-kilavuzu"];
+const publicRouteDirs = ["odalar", "restoran", "qr-menu", "magaza", "yorumlar", "iletisim", "duyurular", "kurulum", "kullanim-kilavuzu"];
 const requiredLocal = [
   localIndex,
   localFavicon,
@@ -347,7 +348,7 @@ sshRun(
   `cd ${remoteWww} && ` +
     `for f in index.php index.html favicon.png release.json; do [ -f "$f" ] && cp -p "$f" ${remoteBackup}/ || true; done && ` +
     `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ` +
-    `for d in inc odalar restoran qr-menu yorumlar iletisim duyurular kurulum kullanim-kilavuzu demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
+    `for d in inc odalar restoran qr-menu magaza yorumlar iletisim duyurular kurulum kullanim-kilavuzu demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
     `ls -la ${remoteBackup}/`
 );
 
@@ -634,7 +635,7 @@ async function smoke(base, secret, webModuleBase) {
   if (root.text.includes('type="module"') || root.text.includes('Canlı Sistem')) fail("Eski landing hâlâ aktif.");
   console.log("Kök: yeni showcase, demo anahtarı config ile aynı.");
 
-  for (const path of ["/odalar/", "/odalar/oda/", "/qr-menu/", "/yorumlar/", "/iletisim/", "/restoran/", "/restoran/masa/", "/kurulum/", "/kullanim-kilavuzu/", "/duyurular/"]) {
+  for (const path of ["/odalar/", "/odalar/oda/", "/qr-menu/", "/magaza/", "/yorumlar/", "/iletisim/", "/restoran/", "/restoran/masa/", "/kurulum/", "/kullanim-kilavuzu/", "/duyurular/"]) {
     const page = await get(path);
     if (page.response.status !== 200) fail(`Public-site route HTTP smoke basarisiz: ${path} -> ${page.response.status}`);
   }

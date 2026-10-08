@@ -27,6 +27,7 @@ const phpFiles = [
   "firm-template/web-module/api/dealer/catalog.php",
   "firm-template/web-module/api/dealer/order.php",
   "firm-template/web-module/magaza/index.php",
+  "firm-template/web-module/magaza/storefront.php",
   "firm-template/web-module/api/request.php",
   "firm-template/web-module/api/order.php",
   "firm-template/web-module/api/catalog.php",

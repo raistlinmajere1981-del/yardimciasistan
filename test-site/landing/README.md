@@ -9,7 +9,7 @@ Tek aktif site kaynağı bu dizindir; React/Vite bundle veya ayrı `/demo` uygul
 - `inc/header.php`, `inc/footer.php`, `inc/site.php`: ortak PHP shell ve publication okunması.
 - `assets/css`, `assets/js`: responsive site, oda/masa/QR menü ve normalize Google yorumları.
 - `assets/showcase/workspace.webp`: mevcut uygulama ekranından seçilmiş statik hero. `site_hero_image()` ileride medya seçimini bağlamak için tek sahiplik noktasıdır.
-- `/odalar/`, `/odalar/oda/?id=…`, `/restoran/`, `/restoran/masa/?id=…`, `/qr-menu/`, `/yorumlar/`, `/iletisim/` mevcut yüzeyleri korur.
+- `/odalar/`, `/odalar/oda/?id=…`, `/restoran/`, `/restoran/masa/?id=…`, `/qr-menu/`, `/magaza/`, `/yorumlar/`, `/iletisim/` mevcut yüzeyleri korur.
 - `/duyurular/`: D4 marketing yayınının tümünü ortak renderer ile gösterir; ana sayfa ilk üç yayını gösterir.
 - `/kurulum/`: Windows x64/x86, Android, demo bağlantısı ve kısa kurulum adımları.
 - `/kullanim-kilavuzu/`: sonraki ekran görüntülü bölümlere uygun sidebar/content shell.
@@ -60,3 +60,5 @@ npm run verify:check -- package-web-module
 
 Showcase smoke gerçek PHP/SQLite ve Desktop publication servisleriyle menü, availability, demo-only secret,
 çoklu görsel, edit/reorder/remove/add/unpublish, route'lar, mobil menü ve reduced-motion davranışını doğrular.
+
+Mağaza host sayfası `/magaza/`, ortak site header/footer içinde web modülünün `magaza/storefront.php`, CSS ve JS yüzeyini kullanır. `data-api-base="/yardimci-asistan/api/"` catalog/order sahibini açıkça belirtir; generic `/yardimci-asistan/magaza/` standalone kalır. Host ve modül kodu birlikte güncellenmelidir.

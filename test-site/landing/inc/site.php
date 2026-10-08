@@ -81,7 +81,7 @@ function site_navigation(): array
         ['id'=>'rooms','label'=>'Odalar','path'=>'/odalar/','availability'=>'rooms'],
         ['id'=>'restaurant','label'=>'Restoran','path'=>'/restoran/','availability'=>'restaurant'],
         ['id'=>'qr_menu','label'=>'QR Menü','path'=>'/qr-menu/','availability'=>'qr_menu'],
-        ['id'=>'store','label'=>'Mağaza','path'=>'/yardimci-asistan/magaza/','availability'=>'store'],
+        ['id'=>'store','label'=>'Mağaza','path'=>'/magaza/','availability'=>'store'],
         ['id'=>'announcements','label'=>'Kampanyalar','path'=>'/duyurular/','availability'=>'announcements'],
         ['id'=>'reviews','label'=>'Yorumlar','path'=>'/yorumlar/','availability'=>'reviews'],
         ['id'=>'contact','label'=>'İletişim','path'=>'/iletisim/','availability'=>'always'],
