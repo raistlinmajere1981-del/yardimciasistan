@@ -62,7 +62,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
 
   return (
     <FormDialog title={task ? "Günlük işi düzenle" : "Yeni günlük iş ekle"} onClose={onClose} closeBlocked={state === "loading"}
-          onSubmit={async (event) => {
+          onSubmit={(event) => void (async () => {
             event.preventDefault();
             setState("loading");
             const result = await onSave({
@@ -78,7 +78,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
               return;
             }
             onClose();
-          }}
+          })()}
       footer={<div className="form-actions">
             <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
               Vazgeç

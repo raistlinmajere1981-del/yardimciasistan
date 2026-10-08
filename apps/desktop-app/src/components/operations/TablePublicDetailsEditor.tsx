@@ -86,7 +86,7 @@ export function TablePublicDetailsEditor({ open, table, onClose, onSave }: Table
       }}
       closeBlocked={saving}
       dismissOnBackdrop
-      onSubmit={async (event) => {
+      onSubmit={(event) => void (async () => {
         event.preventDefault();
         if (!validCapacity || saving) return;
         setSaving(true);
@@ -101,7 +101,7 @@ export function TablePublicDetailsEditor({ open, table, onClose, onSave }: Table
         });
         setSaving(false);
         if (result.ok) onClose();
-      }}
+      })()}
       footer={(
         <>
           {!validCapacity && (

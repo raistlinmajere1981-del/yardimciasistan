@@ -111,14 +111,14 @@ export function CustomerWorkRoute({
               manualRequestState={manualRequestState}
               onSelectRequest={setSelectedRequestId}
               onManualRequestFormChange={setManualRequestForm}
-              onCreateManualRequest={handleCreateManualRequest}
+              onCreateManualRequest={() => void handleCreateManualRequest()}
               onWhatsApp={openWhatsApp}
-              onConvert={handleConvertRequestToReservation}
-              onSuggest={handleCreateOwnerReplySuggestion}
-              onRewrite={handleRewriteRequestReply}
-              onUpdateStatus={handleUpdateRequestStatus}
+              onConvert={(request) => void handleConvertRequestToReservation(request)}
+              onSuggest={(request) => void handleCreateOwnerReplySuggestion(request)}
+              onRewrite={(request, instructions) => void handleRewriteRequestReply(request, instructions)}
+              onUpdateStatus={(request, status) => void handleUpdateRequestStatus(request, status)}
               onOpenReservation={onOpenRequestReservation}
-              onDelete={handleDeleteRequest}
+              onDelete={(request) => void handleDeleteRequest(request)}
             />
           )}
           customers={(
@@ -184,7 +184,7 @@ export function CustomerWorkRoute({
                     onOpenExternal={openSelectedWhatsAppExternal}
                     onOpenWeb={onOpenWeb}
                     onMessageSent={handleWhatsAppMessageSent}
-                    onDeleteMessage={handleDeleteWhatsAppMessage}
+                    onDeleteMessage={(request) => void handleDeleteWhatsAppMessage(request)}
                   />
                 )}
                 webMode={(onReturnToSafe) => (
@@ -200,7 +200,7 @@ export function CustomerWorkRoute({
                     onOpenExternal={openSelectedWhatsAppExternal}
                     onReturnToSafe={onReturnToSafe}
                     onMessageSent={handleWhatsAppMessageSent}
-                    onDeleteMessage={handleDeleteWhatsAppMessage}
+                    onDeleteMessage={(request) => void handleDeleteWhatsAppMessage(request)}
                   />
                 )}
               />

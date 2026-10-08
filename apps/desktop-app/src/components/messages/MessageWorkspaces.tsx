@@ -262,7 +262,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           </p>
 
           <div className="whatsapp-web-control-actions">
-            <ActionButton variant="ghost" size="sm" type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
+            <ActionButton variant="ghost" size="sm" type="button" onClick={() => void copyPreparedMessage()} disabled={!selectedMessage}>
               <Copy size={15} aria-hidden="true" />
               Hazır Mesajı Kopyala
             </ActionButton>
@@ -282,7 +282,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               variant="secondary"
               size="sm"
               type="button"
-              onClick={markMessageSentManually}
+              onClick={() => void markMessageSentManually()}
               disabled={!selectedRequest || !selectedMessage}
               busy={markState === "loading"}
               busyLabel="Kaydediliyor…"
@@ -365,7 +365,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           <textarea className="prepared-whatsapp-message" readOnly value={selectedMessage} aria-label="Hazır WhatsApp mesajı" />
         </label>
         <div className="message-primary-actions">
-          <ActionButton variant="secondary" size="sm" type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
+          <ActionButton variant="secondary" size="sm" type="button" onClick={() => void copyPreparedMessage()} disabled={!selectedMessage}>
             <Copy size={16} aria-hidden="true" />
             Hazır Mesajı Kopyala
           </ActionButton>

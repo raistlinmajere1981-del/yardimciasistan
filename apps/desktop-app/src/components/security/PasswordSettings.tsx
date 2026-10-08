@@ -256,7 +256,7 @@ export function PasswordSettings({ controller }: { controller: ReturnType<typeof
             <ActionButton type="submit" disabled={!hasPasswordDraft || Boolean(busyAction)} busy={busyAction === "save"} busyLabel="Kaydediliyor…">Şifreyi Kaydet</ActionButton>
           </div>
           {configured && <div className="form-actions password-settings-actions">
-              <ActionButton className="setup-secondary password-remove-button" variant="danger" type="button" onClick={removePassword} disabled={Boolean(busyAction)} busy={busyAction === "remove"} busyLabel={<><Trash2 size={16} aria-hidden="true" />Kaldırılıyor</>}>
+              <ActionButton className="setup-secondary password-remove-button" variant="danger" type="button" onClick={() => void removePassword()} disabled={Boolean(busyAction)} busy={busyAction === "remove"} busyLabel={<><Trash2 size={16} aria-hidden="true" />Kaldırılıyor</>}>
                 <Trash2 size={16} aria-hidden="true" />
                 Şifreyi Kaldır
               </ActionButton>
@@ -277,7 +277,7 @@ export function PasswordSettings({ controller }: { controller: ReturnType<typeof
               Şifremi Unuttum
             </ActionButton>
             {recoveryOpen && (
-              <form onSubmit={resetPassword}>
+              <form onSubmit={(event) => void resetPassword(event)}>
                 <label className="form-field form-field--medium">
                   Web güvenlik anahtarı
                   <input

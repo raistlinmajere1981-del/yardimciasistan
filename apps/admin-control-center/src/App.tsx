@@ -289,7 +289,7 @@ function Overview({
                 <button
                   className="text-button"
                   disabled={!installation.siteUrl}
-                  onClick={() => installation.siteUrl && window.adminControlCenter.openExternal(installation.siteUrl)}
+                  onClick={() => void (installation.siteUrl && window.adminControlCenter.openExternal(installation.siteUrl))}
                 >
                   Aç
                 </button>
@@ -422,7 +422,7 @@ function Installations({
                 <button
                   className="button button--secondary"
                   disabled={!selected.siteUrl}
-                  onClick={() => selected.siteUrl && window.adminControlCenter.openExternal(selected.siteUrl)}
+                  onClick={() => void (selected.siteUrl && window.adminControlCenter.openExternal(selected.siteUrl))}
                 >
                   <Globe2 size={16} />
                   Siteyi Aç
@@ -430,7 +430,7 @@ function Installations({
                 <button
                   className="button button--secondary"
                   disabled={!selected.webModuleUrl}
-                  onClick={() => selected.webModuleUrl && window.adminControlCenter.openExternal(selected.webModuleUrl)}
+                  onClick={() => void (selected.webModuleUrl && window.adminControlCenter.openExternal(selected.webModuleUrl))}
                 >
                   <ExternalLink size={16} />
                   Web Modülü
@@ -838,7 +838,7 @@ function Release({
                   <strong>{channel.liveVersion ? `v${channel.liveVersion}` : "—"}</strong>
                   {channel.durationMs !== null ? <small>{channel.durationMs} ms</small> : null}
                 </div>
-                <button className="text-button" onClick={() => window.adminControlCenter.openExternal(channel.manifestUrl)}>
+                <button className="text-button" onClick={() => void window.adminControlCenter.openExternal(channel.manifestUrl)}>
                   Manifest
                 </button>
               </div>
@@ -874,7 +874,7 @@ function Release({
                 <button
                   className="text-button"
                   disabled={!installation.versionEndpoint}
-                  onClick={() => installation.versionEndpoint && window.adminControlCenter.openExternal(installation.versionEndpoint)}
+                  onClick={() => void (installation.versionEndpoint && window.adminControlCenter.openExternal(installation.versionEndpoint))}
                 >
                   Endpoint
                 </button>
@@ -2199,7 +2199,7 @@ function System({ data }: { data: OverviewSnapshot }) {
                     <button
                       className="text-button"
                       disabled={!item.homepage}
-                      onClick={() => item.homepage && window.adminControlCenter.openExternal(item.homepage)}
+                      onClick={() => void (item.homepage && window.adminControlCenter.openExternal(item.homepage))}
                     >
                       Detay
                     </button>

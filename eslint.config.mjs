@@ -81,5 +81,37 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn"
     }
+  },
+  {
+    // Diagnostic only (uncommitted): measure floating/misused promises.
+    // Scoped to tsconfig-covered sources; scripts/tests fixtures live
+    // outside every project and would otherwise fail parsing.
+    // The Vite-served smoke fixture below is intentionally outside all
+    // tsconfigs (mirrors scripts/fixtures/*); it keeps the remaining
+    // rules but skips type-aware ones.
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
+    ignores: ["apps/desktop-app/scripts/**"],
+    languageOptions: {
+      parserOptions: {
+        // NOTE: projectService only discovers tsconfig.json names, so the
+        // tsconfig.electron.json projects would be invisible to it.
+        project: [
+          "./apps/admin-control-center/tsconfig.json",
+          "./apps/admin-control-center/tsconfig.electron.json",
+          "./apps/desktop-app/tsconfig.json",
+          "./apps/desktop-app/tsconfig.electron.json",
+          "./packages/shared/tsconfig.json",
+          "./packages/sync-core/tsconfig.json",
+          "./packages/ai-core/tsconfig.json",
+          "./packages/whatsapp-bridge/tsconfig.json",
+          "./packages/web-widget/tsconfig.json"
+        ],
+        tsconfigRootDir: import.meta.dirname
+      }
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/no-misused-promises": "warn"
+    }
   }
 );

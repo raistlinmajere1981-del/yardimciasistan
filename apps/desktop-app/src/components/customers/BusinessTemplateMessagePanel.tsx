@@ -10,6 +10,7 @@ export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChang
   const [parameters, setParameters] = useState<string[][]>([]), [message, setMessage] = useState<BusinessMessage | null>(null), [error, setError] = useState("");
   const [configurationState, setConfigurationState] = useState<"loading" | "ready" | "error">("loading");
   const configurationRequest = useRef(0);
+  const invalidateConfigurationRequest = useCallback(() => { ++configurationRequest.current; }, []);
   const refreshConfiguration = useCallback(async () => {
     const request = ++configurationRequest.current;
     setConfigurationState("loading");
@@ -27,8 +28,8 @@ export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChang
   useEffect(() => {
     void refreshConfiguration();
     const off = window.yardimciDesktop?.onBusinessMessagingChanged?.(() => { void refreshConfiguration(); });
-    return () => { configurationRequest.current++; off?.(); };
-  }, [refreshConfiguration]);
+    return () => { invalidateConfigurationRequest(); off?.(); };
+  }, [refreshConfiguration, invalidateConfigurationRequest]);
   const messageId = message?.id;
   useEffect(() => {
     if (!messageId || !window.yardimciDesktop) return;

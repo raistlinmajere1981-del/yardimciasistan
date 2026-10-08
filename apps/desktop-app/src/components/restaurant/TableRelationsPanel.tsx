@@ -145,9 +145,9 @@ export function TableRelationsPanel({
             .filter(room => room.isActive && room.status === "available")
             .map(room => ({ id: room.id, label: room.number ? `Oda ${room.number}` : room.name }))}
         />
-        <ActionButton variant="secondary" size="sm" disabled={disabled || !entryRoomId} onClick={async () => {
+        <ActionButton variant="secondary" size="sm" disabled={disabled || !entryRoomId} onClick={() => void (async () => {
           if (await controller.run(async () => true)) setEntryRequested(true);
-        }}>Konaklama Başlat</ActionButton>
+        })()}>Konaklama Başlat</ActionButton>
       </> : <span className="table-relation-empty">Odayla ilişkilendirmek için müşteri seçin.</span>}
     </div>}
 

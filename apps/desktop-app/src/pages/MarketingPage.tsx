@@ -25,6 +25,7 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage, onCal
   const [analyticsRange, setAnalyticsRange] = usePageViewState<MarketingAnalyticsRangeInput>("marketing.analytics.range", {preset: "30d"});
   const [surface, setSurface] = useState<Surface | null>(null), [loading, setLoading] = useState(false), [message, setMessage] = useState("");
   const epoch = useRef(0), mounted = useRef(true), opening = useRef(false);
+  const invalidateMarketingEpoch = useCallback(() => { ++epoch.current; }, []);
   const reload = useCallback(async () => {
     const ticket = ++epoch.current, bridge = window.yardimciDesktop!;
     const [studio, calendar] = await Promise.all([bridge.getMarketingStudio(), bridge.getMarketingSchedules?.()]);
@@ -37,8 +38,8 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage, onCal
     const refresh = () => void reload().catch(() => {});
     const disposeCampaign = bridge.onMessagingCampaignsChanged?.(refresh), disposeSchedules = bridge.onMarketingSchedulesChanged?.(refresh), disposeProviders = bridge.onBusinessMessagingChanged?.(refresh);
     const timer = setInterval(refresh, 5000);
-    return () => {mounted.current = false; epoch.current++; clearInterval(timer); disposeCampaign?.(); disposeSchedules?.(); disposeProviders?.();};
-  }, [enabled, reload]);
+    return () => {mounted.current = false; invalidateMarketingEpoch(); clearInterval(timer); disposeCampaign?.(); disposeSchedules?.(); disposeProviders?.();};
+  }, [enabled, reload, invalidateMarketingEpoch]);
   async function openContent(id: string, publication?: MarketingPublication) {
     if(opening.current)return; opening.current = true; setLoading(true); setMessage("");
     try {const detail = resultValue(await window.yardimciDesktop!.getMarketingShare(id)); if(mounted.current) setSurface({kind: "share", initial: detail, publication});}

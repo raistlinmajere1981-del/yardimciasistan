@@ -124,6 +124,8 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+}, (error) => {
+  console.error("Admin uygulaması hazır hale gelemedi:", error);
 });
 
 app.on("window-all-closed", () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MarketingChannelRegistry, MessagingCampaignDetail } from "@yardimci-asistan/shared";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { ActionButton } from "../ui/ActionButton";
@@ -13,11 +13,12 @@ export function MarketingDeliveryWorkspace({id, channels, onClose, onReload, onP
   const [detail, setDetail] = useState<MessagingCampaignDetail | null>(null), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const [cancel, setCancel] = useState(false), [analytics, setAnalytics] = useState(false);
   const epoch = useRef(0), working = useRef(false);
+  const invalidateEpoch = useCallback(() => { ++epoch.current; }, []);
   useEffect(() => {let live = true; const bridge = window.yardimciDesktop!;
     const load = async () => {const ticket = ++epoch.current; try {const current = resultValue(await bridge.getMessagingCampaign(id)); if(live && ticket === epoch.current) setDetail(current);} catch(e) {if(live) setMessage(e instanceof Error ? e.message : "Gönderim okunamadı.");}};
     void load(); const dispose = bridge.onMessagingCampaignsChanged?.(() => void load());
-    return () => {live = false; epoch.current++; dispose?.();};
-  }, [id]);
+    return () => {live = false; invalidateEpoch(); dispose?.();};
+  }, [id, invalidateEpoch]);
   async function action(kind: "prepare" | "start" | "pause" | "resume" | "cancel") {
     if(working.current)return; working.current = true; setBusy(true); setMessage(""); const ticket = ++epoch.current;
     try {const b = window.yardimciDesktop!; const op = {prepare: b.prepareMessagingCampaign, start: b.startMessagingCampaign, pause: b.pauseMessagingCampaign, resume: b.resumeMessagingCampaign, cancel: b.cancelMessagingCampaign}[kind];

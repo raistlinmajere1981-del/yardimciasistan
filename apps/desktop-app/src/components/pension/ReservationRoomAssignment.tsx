@@ -67,12 +67,12 @@ export function ReservationAssignmentDialog({ reservation, rooms, onSave, onClos
   const [message, setMessage] = useState("");
   const dirty = roomId !== (reservation.roomIds[0] ?? "");
   return <FormDialog title="Rezervasyona oda ata" onClose={onClose} closeBlocked={busy || dirty}
-    onSubmit={async event => {
+    onSubmit={(event) => void (async () => {
       event.preventDefault(); setBusy(true);
       try { const result = await assignReservationRoom(reservation, roomId, onSave);
         if (result.ok) onClose(); else setMessage(result.message);
       } catch { setMessage("Oda ataması kaydedilemedi."); } finally { setBusy(false); }
-    }} footer={<><ActionButton variant="secondary" disabled={busy} onClick={onClose}>{dirty ? "Değişiklikleri Bırak" : "Vazgeç"}</ActionButton>
+    })()} footer={<><ActionButton variant="secondary" disabled={busy} onClick={onClose}>{dirty ? "Değişiklikleri Bırak" : "Vazgeç"}</ActionButton>
       <ActionButton type="submit" disabled={busy}>Atamayı Kaydet</ActionButton></>}>
     <fieldset disabled={busy}><ReservationRoomAssignment reservations={[reservation]} rooms={rooms} fixed="reservation"
       reservationId={reservation.id} roomId={roomId} onChange={(_, value) => setRoomId(value)} /></fieldset>

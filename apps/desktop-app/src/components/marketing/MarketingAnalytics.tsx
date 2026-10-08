@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChartNoAxesCombined, CircleHelp, Globe, Send } from "lucide-react";
 import type { MarketingAnalyticsRangeInput, MarketingAnalyticsSnapshot, MarketingMetricName } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
@@ -46,6 +46,7 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
   const [data, setData] = useState<MarketingAnalyticsSnapshot | null>(null), [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [refreshVersion, setRefreshVersion] = useState(0), [help, setHelp] = useState(false);
   const [custom, setCustom] = useState(range.preset === "custom"), [startDate, setStartDate] = useState(range.preset === "custom" ? range.startDate : ""), [endDate, setEndDate] = useState(range.preset === "custom" ? range.endDate : "");
   const epoch = useRef(0), opened = useRef(false);
+  const invalidateAnalyticsEpoch = useCallback(() => { ++epoch.current; }, []);
   useEffect(() => {
     const bridge = window.yardimciDesktop; let active = true;
     async function load() {
@@ -60,8 +61,8 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
     }
     setData(null); setMessage(""); void load();
     const campaign = bridge?.onMessagingCampaignsChanged?.(() => void load()), provider = bridge?.onBusinessMessagingChanged?.(() => void load()), schedule = bridge?.onMarketingSchedulesChanged?.(() => void load());
-    return () => { active = false; epoch.current++; campaign?.(); provider?.(); schedule?.(); };
-  }, [range, refreshVersion]);
+    return () => { active = false; invalidateAnalyticsEpoch(); campaign?.(); provider?.(); schedule?.(); };
+  }, [range, refreshVersion, invalidateAnalyticsEpoch]);
   return <section className="marketing-analytics" aria-label="Pazarlama analitiği" aria-busy={busy}>
     <header className="marketing-analytics-heading"><div><h2>Paylaşımlarınızın sonuçları</h2><p className="muted">Yayınlarınızı ve müşterilerinize gönderdiğiniz mesajları bir arada izleyin.</p></div><ActionButton variant="quiet" onClick={() => setHelp(true)}><CircleHelp size={16}/>Ölçümler nasıl okunur?</ActionButton></header>
     <div className="marketing-actions marketing-analytics-filters"><label className="form-field form-field--fluid">Tarih aralığı<select aria-label="Tarih aralığı" value={custom ? "custom" : range.preset} disabled={busy} onChange={e => {

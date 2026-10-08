@@ -165,13 +165,13 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                   className="setup-ai-delete-key"
                   type="button"
                   disabled={form.clearAiApiKey}
-                  onClick={async () => {
+                  onClick={() => void (async () => {
                     if (await confirm({ title: "Kayıtlı anahtarı sil", tone: "danger", confirmLabel: "Anahtarı Sil",
                       description: "Bu sağlayıcının kayıtlı AI anahtarı silinsin mi?",
                       details: "Anahtar, bu ayar alanı kaydedildiğinde silinecek ve AI Yardımcı kapatılacak." })) {
                       onFormChange({ ...form, clearAiApiKey: true, aiEnabled: false });
                     }
-                  }}
+                  })()}
                 >
                   <Trash2 size={15} aria-hidden="true" />
                   {form.clearAiApiKey ? "Anahtar silinecek" : "Kayıtlı Anahtarı Sil"}

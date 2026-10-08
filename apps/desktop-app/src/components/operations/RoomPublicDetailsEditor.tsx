@@ -106,7 +106,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
       }}
       closeBlocked={state === "loading"}
       dismissOnBackdrop
-      onSubmit={async (event) => {
+      onSubmit={(event) => void (async () => {
         event.preventDefault();
         if (!canSave) return;
 
@@ -130,7 +130,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
         }
 
         onClose();
-      }}
+      })()}
       footer={(
         <>
           {!validCapacity && (

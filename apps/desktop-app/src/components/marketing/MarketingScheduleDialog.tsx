@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MarketingScheduleDetail, MarketingScheduleInput, MarketingStudioSnapshot } from "@yardimci-asistan/shared";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
@@ -12,12 +12,13 @@ export function MarketingScheduleDialog({detail, initial, onClose, onReload, onM
   const [studio, setStudio] = useState<MarketingStudioSnapshot | null>(null), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const [pending, setPending] = useState<(() => void) | null>(null), [cancel, setCancel] = useState(false);
   const working = useRef(false), epoch = useRef(0);
+  const invalidateEpoch = useCallback(() => { ++epoch.current; }, []);
   const dirty = JSON.stringify(draft) !== baseline;
   useEffect(() => {
     if (!detail || dirty || busy || current && detail.schedule.revision < current.schedule.revision || JSON.stringify(detail) === JSON.stringify(current)) return;
     const next = scheduleDraft(detail); setCurrent(detail); setDraft(next); setBaseline(JSON.stringify(next));
   }, [detail, dirty, busy, current]);
-  useEffect(() => {let live = true; void window.yardimciDesktop!.getMarketingStudio().then(r => {if(live) setStudio(resultValue(r));}).catch(e => {if(live) setMessage(e.message);}); return () => {live = false; epoch.current++;};}, []);
+  useEffect(() => {let live = true; void window.yardimciDesktop!.getMarketingStudio().then(r => {if(live) setStudio(resultValue(r));}).catch(e => {if(live) setMessage(e.message);}); return () => {live = false; invalidateEpoch();};}, [invalidateEpoch]);
   useEffect(() => registerPageLeaveGuard?.((_destination, next) => {if(working.current)return false; if(!dirty)return true; setPending(() => next); return false;}), [dirty, registerPageLeaveGuard]);
   function close() {if(working.current)return; if(dirty) setPending(() => onClose); else onClose();}
   async function operation(transition?: "pause" | "resume" | "cancel") {

@@ -42,8 +42,8 @@ export function ConfirmDialog({ embedded = false, withinModal = false, tone = "i
     </div>
     <footer className="confirm-dialog__actions" aria-busy={busy}>
       <ActionButton variant="ghost" disabled={busy} onClick={onCancel} data-modal-initial-focus data-dialog-close>{cancelLabel}</ActionButton>
-      {secondaryLabel && onSecondary && <ActionButton variant="secondary" disabled={busy} onClick={onSecondary}>{secondaryLabel}</ActionButton>}
-      <ActionButton variant={tone === "danger" ? "danger" : "primary"} disabled={busy} onClick={onConfirm}>{confirmLabel}</ActionButton>
+      {secondaryLabel && onSecondary && <ActionButton variant="secondary" disabled={busy} onClick={() => void onSecondary()}>{secondaryLabel}</ActionButton>}
+      <ActionButton variant={tone === "danger" ? "danger" : "primary"} disabled={busy} onClick={() => void onConfirm()}>{confirmLabel}</ActionButton>
     </footer>
   </>;
   if (withinModal) return <div className="confirm-dialog-layer">

@@ -255,12 +255,12 @@ export function ManualReservationEditor({
   </div>;
 
   if (embedded) {
-    return <WorkspaceFormOverlay title={title} onClose={onClose} closeBlocked={state === "loading"} onSubmit={submitReservation} footer={actions}>
+    return <WorkspaceFormOverlay title={title} onClose={onClose} closeBlocked={state === "loading"} onSubmit={(event) => void submitReservation(event)} footer={actions}>
       {fields}
     </WorkspaceFormOverlay>;
   }
 
-  return <FormDialog title={title} onClose={onClose} closeBlocked={state === "loading"} onSubmit={submitReservation} footer={actions}>
+  return <FormDialog title={title} onClose={onClose} closeBlocked={state === "loading"} onSubmit={(event) => void submitReservation(event)} footer={actions}>
     {fields}
   </FormDialog>;
 }

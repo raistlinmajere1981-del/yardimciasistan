@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MarketingCampaignAnalytics, MarketingPublicationAnalytics } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 import { AnalyticsMetricList } from "./MarketingAnalyticsMetrics";
@@ -8,6 +8,7 @@ export function MarketingEntityAnalytics({ kind, id, revision }: { kind: "campai
   const [data, setData] = useState<MarketingCampaignAnalytics | MarketingPublicationAnalytics | null>(null);
   const [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [clock, setClock] = useState(Date.now);
   const epoch = useRef(0);
+  const invalidateEpoch = useCallback(() => { ++epoch.current; }, []);
   useEffect(() => {
     const bridge = window.yardimciDesktop;
     let active = true;
@@ -25,8 +26,8 @@ export function MarketingEntityAnalytics({ kind, id, revision }: { kind: "campai
     setData(null); setMessage(""); setBusy(false); void load();
     const campaign = bridge?.onMessagingCampaignsChanged?.(() => void load());
     const provider = bridge?.onBusinessMessagingChanged?.(() => void load());
-    return () => { active = false; epoch.current++; campaign?.(); provider?.(); };
-  }, [kind, id, revision]);
+    return () => { active = false; invalidateEpoch(); campaign?.(); provider?.(); };
+  }, [kind, id, revision, invalidateEpoch]);
   const publication = data && "canRefresh" in data ? data : null;
   useEffect(() => {
     if (!publication?.canRefresh || !publication.nextRefreshAt) return;

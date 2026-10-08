@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
@@ -45,6 +45,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
   const history = ordersEnabled && intent.mode === "history";
   const surface = useRef<HTMLDivElement>(null);
   const historyRead = useRef(0);
+  const invalidateHistory = useCallback(() => { ++historyRead.current; }, []);
   const [historyError, setHistoryError] = useState("");
   const [historyFilter, setHistoryFilter] = useState<"all" | "paid" | "cancelled">("all");
   const [quickAction, setQuickAction] = useState<"customer" | "reservation" | null>(null);
@@ -71,8 +72,8 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
     void window.yardimciDesktop!.listTableOrders().then(next => {
       if (request === historyRead.current) setOrders(next);
     }).catch(() => { if (request === historyRead.current) setHistoryError("Adisyon geçmişi okunamadı."); });
-    return () => { historyRead.current++; };
-  }, [history, ordersEnabled, data.revision]);
+    return () => { invalidateHistory(); };
+  }, [history, ordersEnabled, data.revision, invalidateHistory]);
   async function requestReturn() {
     if (controller.busy) return;
     if (controller.loading || !controller.loaded) { navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); return; }

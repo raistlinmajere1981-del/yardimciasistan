@@ -381,7 +381,7 @@ export function AndroidDevicesSection({
                   size="sm"
                   aria-label={`${device.deviceName || "Android Telefon"} (${compactAndroidDeviceId(device.deviceId)}) cihazını geri yükle`}
                   type="button"
-                  onClick={() => restoreDevice(device)}
+                  onClick={() => void restoreDevice(device)}
                   disabled={busy || !onSetActive}
                 >
                   Geri Yükle

@@ -98,6 +98,6 @@ export function CustomerCreateEditor({
     </div>;
 
   return withinWorkspace
-    ? <WorkspaceFormOverlay title="Yeni müşteri ekle" onClose={onClose} closeBlocked={saveState === "loading"} onSubmit={submit} footer={footer}>{body}</WorkspaceFormOverlay>
-    : <FormDialog title="Yeni müşteri ekle" onClose={onClose} closeBlocked={saveState === "loading"} dismissOnBackdrop onSubmit={submit} footer={footer}>{body}</FormDialog>;
+    ? <WorkspaceFormOverlay title="Yeni müşteri ekle" onClose={onClose} closeBlocked={saveState === "loading"} onSubmit={(event) => void submit(event)} footer={footer}>{body}</WorkspaceFormOverlay>
+    : <FormDialog title="Yeni müşteri ekle" onClose={onClose} closeBlocked={saveState === "loading"} dismissOnBackdrop onSubmit={(event) => void submit(event)} footer={footer}>{body}</FormDialog>;
 }

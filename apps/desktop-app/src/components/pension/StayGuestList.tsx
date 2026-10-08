@@ -170,7 +170,7 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
                 }))}
             />
           </div>
-          <ActionButton variant="secondary" disabled={disabled || !nextRoom} onClick={async () => {
+          <ActionButton variant="secondary" disabled={disabled || !nextRoom} onClick={() => void (async () => {
           if (!await confirm({
             title: "Odayı değiştir",
             description: "Ortak hesap ve anlaşılmış fiyat korunur. Eski oda temizlik bekler.",
@@ -181,7 +181,7 @@ export function StayGuestList({ stay, data, operations, disabled, onDirty, onCre
             setNextRoom("");
             onDirty(false);
           }
-          }}>Odayı Değiştir</ActionButton>
+          })()}>Odayı Değiştir</ActionButton>
         </div>
       </div>
     </section>}

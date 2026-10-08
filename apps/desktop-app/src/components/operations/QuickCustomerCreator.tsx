@@ -130,7 +130,7 @@ export function QuickCustomerCreator({
           size="sm"
           type="button"
           disabled={disabled || state === "loading" || !fullName.trim()}
-          onClick={async () => {
+          onClick={() => void (async () => {
             setState("loading");
             let result: DesktopCustomerMutationResult;
             try { result = await onSave(createQuickCustomerInput(fullName, phone)); }
@@ -150,7 +150,7 @@ export function QuickCustomerCreator({
             setFullName("");
             setPhone("");
             setState("success");
-          }}
+          })()}
         >
           <Save size={15} aria-hidden="true" />
           {state === "loading" ? "Kaydediliyor" : "Kaydet ve Seç"}

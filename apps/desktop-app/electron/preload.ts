@@ -668,14 +668,16 @@ const bridge: DesktopBridge = {
   deleteLocalBackup: (backupId: string) => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:deleteBackup", backupId),
   restoreLocalBackup: (backupId: string) => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:restoreBackup", backupId),
   onDataMaintenanceConfirmation: (listener) => {
-    const handler = async (_event: Electron.IpcRendererEvent, requestId: string, request: DataMaintenanceConfirmation) => {
-      let approved = false;
-      try {
-        approved = await listener(request);
-        const status: AppLockStatus = await ipcRenderer.invoke("appLock:getStatus");
-        approved = approved && !status.locked;
-      } catch { approved = false; }
-      ipcRenderer.send("dataMaintenance:confirmationResponse", requestId, approved);
+    const handler = (_event: Electron.IpcRendererEvent, requestId: string, request: DataMaintenanceConfirmation) => {
+      void (async () => {
+        let approved = false;
+        try {
+          approved = await listener(request);
+          const status: AppLockStatus = await ipcRenderer.invoke("appLock:getStatus");
+          approved = approved && !status.locked;
+        } catch { approved = false; }
+        ipcRenderer.send("dataMaintenance:confirmationResponse", requestId, approved);
+      })();
     };
     ipcRenderer.on("dataMaintenance:confirmationRequested", handler);
     return () => ipcRenderer.removeListener("dataMaintenance:confirmationRequested", handler);

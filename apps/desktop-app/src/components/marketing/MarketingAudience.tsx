@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MessagingAudienceCounts, MessagingSegment, MessagingSegmentRule, SaveMessagingSegmentInput } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 import { SearchSelect } from "../ui/SearchSelect";
@@ -10,7 +10,8 @@ export function MarketingAudience({value, channels, onChange, onBusy}: {value: s
   const [preview, setPreview] = useState<Array<{channel: string; counts: MessagingAudienceCounts}>>([]);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const epoch = useRef(0), active = useRef(true), working = useRef(false);
-  useEffect(() => {active.current = true; void window.yardimciDesktop!.listMessagingSegments().then(r => {if (active.current) setAudiences(resultValue(r));}).catch(e => {if(active.current) setError(e.message);}); return () => {active.current = false; epoch.current++;};}, []);
+  const invalidateEpoch = useCallback(() => { ++epoch.current; }, []);
+  useEffect(() => {active.current = true; void window.yardimciDesktop!.listMessagingSegments().then(r => {if (active.current) setAudiences(resultValue(r));}).catch(e => {if(active.current) setError(e.message);}); return () => {active.current = false; invalidateEpoch();};}, [invalidateEpoch]);
   const update = (field: MessagingSegmentRule["field"], value: string) => {
     const rules = draft.filterDefinition.rules.filter(r => r.field !== field);
     if (value) rules.push(field === "phone" ? {field, operator: value as "present" | "absent"} : {field, operator: "eq", value} as MessagingSegmentRule);

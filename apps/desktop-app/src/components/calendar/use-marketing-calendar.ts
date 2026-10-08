@@ -9,6 +9,7 @@ export function useMarketingCalendar(enabled: boolean, dates: string[]) {
   const months = [...new Set(dates.map(d => d.slice(0,7)))].sort().join(",");
   const [snapshot, setSnapshot] = useState<MarketingScheduleSnapshot | null>(null), [message, setMessage] = useState("");
   const epoch = useRef(0), mounted = useRef(true);
+  const invalidateCalendarEpoch = useCallback(() => { ++epoch.current; }, []);
   const reload = useCallback(async () => {
     if(!enabled || !window.yardimciDesktop?.getMarketingSchedules)return;
     const ticket = ++epoch.current;
@@ -22,8 +23,8 @@ export function useMarketingCalendar(enabled: boolean, dates: string[]) {
   useEffect(() => {mounted.current = true; if(!enabled) {setSnapshot(null); return;}
     const load = () => void reload().catch(e => {if(mounted.current) setMessage(e instanceof Error ? e.message : "Pazarlama planları alınamadı.");});
     load(); const dispose = window.yardimciDesktop?.onMarketingSchedulesChanged?.(load);
-    return () => {mounted.current = false; epoch.current++; dispose?.();};
-  }, [enabled, reload]);
+    return () => {mounted.current = false; invalidateCalendarEpoch(); dispose?.();};
+  }, [enabled, reload, invalidateCalendarEpoch]);
   const entries = new Map<string, MarketingCalendarEntry>();
   const add = (d: MarketingScheduleDetail, instant: string, outcome: MarketingCalendarEntry["outcome"], error = "") => {
     const date = new Date(instant); if(!Number.isFinite(date.getTime()))return;

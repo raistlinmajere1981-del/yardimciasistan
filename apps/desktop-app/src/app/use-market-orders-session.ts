@@ -45,6 +45,7 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
   enabledRef.current = enabled;
   const reloadGeneration = useRef(0);
   const detailGeneration = useRef(0);
+  const invalidateOrderGenerations = useCallback(() => { ++reloadGeneration.current; ++detailGeneration.current; }, []);
   const selectedIdRef = useRef("");
   const openingOrderRef = useRef(false);
   const stateChangeRef = useRef(onStateChange);
@@ -117,12 +118,11 @@ export function useMarketOrdersSession({ enabled, onStateChange }: {
     const unsubscribe = bridge.onOrdersChanged?.(() => { void reloadOrders(true); });
     return () => {
       enabledRef.current = false;
-      ++reloadGeneration.current;
-      ++detailGeneration.current;
+      invalidateOrderGenerations();
       openingOrderRef.current = false;
       unsubscribe?.();
     };
-  }, [bridge, enabled, reloadOrders]);
+  }, [bridge, enabled, reloadOrders, invalidateOrderGenerations]);
 
   const shipmentOrderId = selectedOrder?.order.deliverySnapshot.method === "shipping" ? selectedOrder.order.id : "";
   const shipmentOrderRef = useRef(shipmentOrderId);

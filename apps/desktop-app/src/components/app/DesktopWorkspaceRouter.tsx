@@ -358,13 +358,13 @@ export function DesktopWorkspaceRouter({
             requestPageChange("customerWork");
           }}
           onOpenReservation={openDashboardReservation}
-          onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
+          onCompleteTask={(taskId) => void handleUpdateDailyTaskStatus(taskId, "done")}
           dailyAiState={dashboardAi.state}
           dailyAiMessage={dashboardAi.message}
           dailyAiContent={dashboardAi.content}
           dailyAiFallback={dashboardAi.fallback}
           onGenerateDailyAi={() => void dashboardAi.generateDailyEvaluation()}
-          onPrepareBirthday={prepareBirthdayWhatsApp}
+          onPrepareBirthday={(customerId) => void prepareBirthdayWhatsApp(customerId)}
           birthdayPreparingId={birthdayPreparingId}
           formatRequestType={formatRequestType}
           formatRequestStatus={formatRequestStatus}
@@ -384,7 +384,7 @@ export function DesktopWorkspaceRouter({
           foodReservationsEnabled={foodReservationsEnabled}
           tasksEnabled={tasksEnabled}
           onOpenReservation={openDashboardReservation}
-          onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
+          onCompleteTask={(taskId) => void handleUpdateDailyTaskStatus(taskId, "done")}
         />
       ) : activePage === "customerWork" ? null : activePage === "pension" ? (
         <PensionPage
@@ -400,7 +400,7 @@ export function DesktopWorkspaceRouter({
               onSaveCustomer={handleSaveCustomer}
               onSaveManual={handleSaveManualReservation}
               onAssignRoom={handleAssignReservationRoom}
-              onUpdateStatus={handleUpdateReservationStatus}
+              onUpdateStatus={(reservationId, status) => void handleUpdateReservationStatus(reservationId, status)}
               onOpenWhatsApp={openReservationWhatsApp}
             />
           ) : null}
@@ -428,7 +428,7 @@ export function DesktopWorkspaceRouter({
               tasks={surfaceData.dailyTasks.filter((task) => isAccommodationTask(task, surfaceData.reservations))}
               onSave={handleSaveDailyTask}
               onDelete={handleDeleteDailyTask}
-              onUpdateStatus={handleUpdateDailyTaskStatus}
+              onUpdateStatus={(taskId, status) => void handleUpdateDailyTaskStatus(taskId, status)}
             />
           )}
         />
@@ -452,7 +452,7 @@ export function DesktopWorkspaceRouter({
               whatsappEnabled={customerMessagingEnabled}
               onSave={handleSaveManualRestaurantReservation}
               onSaveCustomer={handleSaveCustomer}
-              onUpdateStatus={handleUpdateReservationStatus}
+              onUpdateStatus={(reservationId, status) => void handleUpdateReservationStatus(reservationId, status)}
               onOpenWhatsApp={openReservationWhatsApp}
             />
           ) : null}
@@ -462,7 +462,7 @@ export function DesktopWorkspaceRouter({
               tasks={surfaceData.dailyTasks.filter((task) => isRestaurantTask(task, surfaceData.reservations))}
               onSave={handleSaveDailyTask}
               onDelete={handleDeleteDailyTask}
-              onUpdateStatus={handleUpdateDailyTaskStatus}
+              onUpdateStatus={(taskId, status) => void handleUpdateDailyTaskStatus(taskId, status)}
             />
           )}
         />
@@ -490,7 +490,7 @@ export function DesktopWorkspaceRouter({
           onReorderItems={handleReorderMenuItems}
           onDeleteCategoryById={handleDeleteMenuCategoryById}
           onDashboardDataChanged={setDashboardData}
-          onPreview={openMenuPreview}
+          onPreview={() => void openMenuPreview()}
         />
       ) : activePage === "reports" ? (
         <ReportsPage
@@ -526,13 +526,13 @@ export function DesktopWorkspaceRouter({
           androidDeviceState={androidDeviceState}
           androidInstallState={androidInstallState}
           androidInstallSnapshot={androidInstallSnapshot}
-          onRefreshAndroidInstallDevices={refreshAndroidInstallDevices}
-          onInstallAndroidApp={handleInstallAndroidApp}
-          onProvisionAndroidApp={handleProvisionAndroidApp}
+          onRefreshAndroidInstallDevices={() => void refreshAndroidInstallDevices()}
+          onInstallAndroidApp={(serial) => void handleInstallAndroidApp(serial)}
+          onProvisionAndroidApp={(serial) => void handleProvisionAndroidApp(serial)}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
           onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
           onResetAndroidDevicePermissions={handleResetAndroidDevicePermissions}
-          onRevokeAndroidDevice={handleRevokeAndroidDevice}
+          onRevokeAndroidDevice={(device) => void handleRevokeAndroidDevice(device)}
           onSave={handleSaveSetup}
           onAppPasswordConfiguredChange={handleAppPasswordConfiguredChange}
           uiPreferences={uiPreferences}

@@ -215,13 +215,13 @@ export function ManualRestaurantReservationEditor({
   </>;
 
   if (embedded) {
-    return <WorkspaceFormOverlay title="Yeni masa rezervasyonu" onClose={onClose} closeBlocked={busy} onSubmit={submitReservation} footer={actions}>
+    return <WorkspaceFormOverlay title="Yeni masa rezervasyonu" onClose={onClose} closeBlocked={busy} onSubmit={(event) => void submitReservation(event)} footer={actions}>
       {fields}
       {feedback}
     </WorkspaceFormOverlay>;
   }
 
-  return <FormDialog title="Yeni masa rezervasyonu" onClose={onClose} closeBlocked={busy} footer={actions} onSubmit={submitReservation}>
+  return <FormDialog title="Yeni masa rezervasyonu" onClose={onClose} closeBlocked={busy} footer={actions} onSubmit={(event) => void submitReservation(event)}>
     {fields}
     {feedback}
   </FormDialog>;

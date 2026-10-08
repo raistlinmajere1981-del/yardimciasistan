@@ -444,7 +444,7 @@ export function MenuManager({
           }}
           closeBlocked={menuEditState === "loading"}
           dismissOnBackdrop
-          onSubmit={async (event) => {
+          onSubmit={(event) => void (async () => {
             event.preventDefault();
             if (menuEditState === "loading") return;
             setPriceValidationVisible(true);
@@ -455,7 +455,7 @@ export function MenuManager({
             setPendingItemId(result.savedId);
             setItemCreateOpen(false);
             try { await onCatalogReload(); } catch { setCreateMessage("Ürün kaydedildi; katalog görünümü yenilenemedi."); }
-          }}
+          })()}
           footer={(
             <>
               {menuEditMessage && menuEditMessage !== "Yeni ürün." && (

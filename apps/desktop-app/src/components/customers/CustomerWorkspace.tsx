@@ -273,7 +273,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
             >
               <MessageCircle size={16} aria-hidden="true" />WhatsApp'tan Yaz
             </ActionButton>}
-            <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={async () => {
+            <ActionButton variant="danger" size="sm" type="button" disabled={closeBlocked} onClick={() => void (async () => {
               try {
                 const result = await onDelete(customer);
                 if (result?.ok) navigation.closeWorkspace();
@@ -281,7 +281,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
               } catch (error) {
                 reportAppStatus("error", customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin."));
               }
-            }}>
+            })()}>
               <Trash2 size={16} aria-hidden="true" />Müşteriyi Sil
             </ActionButton>
           </div>

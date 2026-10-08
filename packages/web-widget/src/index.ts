@@ -785,7 +785,7 @@ function bindEvents(root: HTMLElement) {
   bindWhatsAppControls(root);
   bindDirectionsControls(root);
 
-  root.querySelector<HTMLFormElement>("[data-ya-ai-form]")?.addEventListener("submit", handleAiSubmit);
+  root.querySelector<HTMLFormElement>("[data-ya-ai-form]")?.addEventListener("submit", (event) => void handleAiSubmit(event));
   root.querySelector<HTMLFormElement>("[data-ya-whatsapp-form]")?.addEventListener("submit", handleDirectWhatsAppSubmit);
 
   root.onkeydown = (event) => {

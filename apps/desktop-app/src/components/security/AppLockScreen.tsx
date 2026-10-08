@@ -129,7 +129,7 @@ export function AppLockScreen({
               </div>
             </div>
 
-            <form className="app-lock-form" onSubmit={submitUnlock}>
+            <form className="app-lock-form" onSubmit={(event) => void submitUnlock(event)}>
               {passwordConfigured && (
                 <label>
                   Uygulama şifresi
@@ -177,7 +177,7 @@ export function AppLockScreen({
                 </button>
 
                 {recoveryOpen && (
-                  <form className="app-lock-recovery-form" onSubmit={submitPasswordReset}>
+                  <form className="app-lock-recovery-form" onSubmit={(event) => void submitPasswordReset(event)}>
                     <div className="app-lock-recovery-title">
                       <RotateCcw size={18} aria-hidden="true" />
                       <div>

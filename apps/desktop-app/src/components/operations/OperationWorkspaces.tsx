@@ -207,11 +207,11 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
                       variant="danger"
                       size="sm"
                       type="button"
-                      onClick={async () => {
+                      onClick={() => void (async () => {
                         if (await confirm({ title: "Günlük işi sil", description: `“${task.title}” günlük işi silinsin mi?`, tone: "danger", confirmLabel: "Sil" })) {
                           void onDelete(task.id);
                         }
-                      }}
+                      })()}
                     >
                       <Trash2 size={14} aria-hidden="true" />
                       Sil

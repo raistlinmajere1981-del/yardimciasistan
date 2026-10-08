@@ -91,7 +91,7 @@ export function SupportReportDialog({ onClose }: SupportReportDialogProps) {
   return (
     <FormDialog
       title="Hata Bildir"
-      onSubmit={submit}
+      onSubmit={(event) => void submit(event)}
       onClose={() => { if (!busy) onClose(); }}
       closeBlocked={busy}
       footer={
