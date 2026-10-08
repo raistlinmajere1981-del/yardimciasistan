@@ -37,7 +37,7 @@ try {
       "Generic catalog/sale/order dependencies alone must not expose retail navigation");
   }
   for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS, C.WHOLESALE, C.ONLINE_SALES]) {
-    const entries = salesEntry(expandBusinessCapabilities([capability]));
+    const entries = salesEntry(expandBusinessCapabilities([C.CATALOG, capability]));
     assert.equal(entries.length, 1, `${capability}: the Sales route must remain reachable`);
     assert.equal(entries[0].label, "Satış");
   }

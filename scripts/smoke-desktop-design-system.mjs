@@ -22,7 +22,8 @@ try {
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edece6"/><path d="M0 40L256 200M40 0L180 256" stroke="#fff" stroke-width="10"/></svg>' }));
   await page.addInitScript(({ setup, dashboard }) => {
     localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ version: 2, scheme: 'light', density: 'comfortable', scale: 1, accent: 'coral', font: 'plex', motion: 'system' }));
-    const enabledCapabilities = ['core.customers','core.requests','core.business_profile','accommodation.rooms','accommodation.reservations','food_service.tables','food_service.menu','food_service.orders','service.whatsapp','service.android','service.ai'];
+    const baseCapabilities = ['core.customers','core.requests','core.business_profile','accommodation.rooms','accommodation.reservations','food_service.tables','food_service.menu','food_service.orders','service.whatsapp','service.android','service.ai'];
+    let enabledCapabilities = [...baseCapabilities];
     let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'], socialLinks: [] };
     let rooms = [
       { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', capacity: 2, bedInfo: '1 çift kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 240000, currency: 'TRY', sortOrder: 1, outOfService: false, canRemove: true, removeBlockReason: '' },
@@ -69,7 +70,16 @@ try {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
       getSetupData: async () => setup,
       getDashboardData: async () => dashboard,
-      getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
+      getBusinessCapabilitySnapshot: async () => {
+        if (setup.profileId === 'market') {
+          enabledCapabilities = baseCapabilities.filter(capability => !capability.startsWith('accommodation.') && !capability.startsWith('food_service.'));
+        } else if (setup.profileId === 'restaurant') {
+          enabledCapabilities = baseCapabilities.filter(capability => !capability.startsWith('accommodation.'));
+        } else {
+          enabledCapabilities = [...baseCapabilities];
+        }
+        return { businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) };
+      },
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
       getGoogleReviewsSettings: async () => ({ enabled: false, placeId: '', apiKeyConfigured: false, lastPublishedAt: '', publicationPending: false }),
@@ -300,7 +310,7 @@ try {
       observations.push({ width, height, category: name, ...metrics });
       expect(metrics.documentOverflow, `Document overflow at ${width}/${name}`).toBe(false);
       expect(metrics.overflows, `Content overflow at ${width}/${name}`).toEqual([]);
-      await expect(page.getByRole('tablist')).toBeInViewport();
+      await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' })).toBeInViewport();
       await page.screenshot({ animations: 'disabled', path: `${output}/settings-${width}-${name}.png` });
     }
   }

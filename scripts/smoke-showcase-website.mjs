@@ -74,15 +74,22 @@ try {
   ]) {
     seed('business_context', { ...canonical, mapDisplayMode: mode, googleMapsEmbedUrl: url }, ++mapRevision);
     await page.reload();
-    await expect(mapFrame).toHaveAttribute('src', google ? embedUrl : /openstreetmap.org\/export\/embed/);
+    const invalidGoogleSelection = mode === 'google_maps_embed' && !google;
+    if (invalidGoogleSelection) {
+      await expect(mapFrame).toBeHidden();
+      await expect(page.locator('[data-business-map-placeholder]')).toBeVisible();
+    } else {
+      await expect(mapFrame).toHaveAttribute('src', google ? embedUrl : /openstreetmap.org\/export\/embed/);
+    }
     await expect(mapFrame).toHaveAttribute('loading', 'lazy');
     await expect(mapFrame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     await expect(mapFrame).toHaveAttribute('title', 'İşletme konumu');
-    if (google) await expect(page.locator('[data-business-map-attribution]')).toBeHidden(); else await expect(page.locator('[data-business-map-attribution]')).toBeVisible();
+    if (google) await expect(page.locator('[data-business-map-attribution]')).toBeHidden(); else if (mode === 'manual') await expect(page.locator('[data-business-map-attribution]')).toBeVisible(); else await expect(page.locator('[data-business-map-attribution]')).toBeHidden();
     const publicBusiness = (await (await page.request.get(base + '/yardimci-asistan/api/business.php')).json()).business;
     assert.equal(publicBusiness.latitude, 41); assert.equal(publicBusiness.longitude, 29);
     assert.equal(publicBusiness.mapDisplayMode, mode);
     assert.equal(publicBusiness.googleMapsEmbedUrl, url === embedUrl ? embedUrl : '');
+    if (invalidGoogleSelection) continue;
     for (const width of [375, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));

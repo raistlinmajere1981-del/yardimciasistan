@@ -122,7 +122,7 @@ try {
     prepareCustomerCreditWhatsApp: "commerce:customerCredit:prepareWhatsApp", recordCustomerCreditPayment: "commerce:customerCredit:payment",
     addCustomerCreditAdjustment: "commerce:customerCredit:adjustment", createCustomerCreditSale: "commerce:customerCredit:sale",
     listProducts: "commerce:product:list", listCategories: "commerce:category:list", createPaidSale: "commerce:sale:createPaid",
-    completeMarketSale: "commerce:sale:completeMarket"
+    completeMarketSale: "commerce:sale:completeMarket", resolveProductPrice: "commerce:price:resolve"
   };
   const scannerMethods = ["setBarcodeScanMode", "consumePendingBarcodeScans"];
   await page.exposeFunction("__m83Call", async (method, args) => {
@@ -345,7 +345,7 @@ try {
   await toggle("commerce.customer_credit", true); await navigate("Market");
   await page.locator(".market-sale-product").filter({ hasText: product.name }).click();
   const quick = page.locator(".market-sale-cart");
-  await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
+  await quick.getByRole("button", { name: "Veresiye" }).click();
   await chooseSearchSelect(quick, "Müşteri", {value:customerId});
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-receipt")).toContainText("Veresiye satış kaydedildi.");
