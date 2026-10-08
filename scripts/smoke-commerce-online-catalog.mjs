@@ -148,7 +148,20 @@ try {
   assert.equal(saveDelivery({ pickupEnabled: true, shippingEnabled: false }).ok, true);
   assert.equal((await coordinator.runNow()).ok, true);
 
-  for (const methods of [[], ["pickup", "pickup"], ["pickup", "carrier"], [null], undefined]) {
+  const deliveryOff = database.saveInitialSetup({ ...database.getSetupData(), onlineSalesDeliveryEnabled: false });
+  assert.equal(deliveryOff.ok, true, deliveryOff.message);
+  const browseOnly = database.createCommerceOnlineCatalog();
+  assert.equal(browseOnly.enabled, true);
+  assert.deepEqual(browseOnly.deliveryMethods, []);
+  assert.ok(browseOnly.products.some(item => item.productId === product.id));
+  assert.equal((await coordinator.runNow()).ok, true);
+  assert.equal(readCatalog().payload.enabled, true);
+  assert.deepEqual(readCatalog().payload.delivery_methods, []);
+  assert.equal(readCatalog().payload.products[0].product_id, product.id);
+  assert.equal(saveDelivery({ pickupEnabled: true, shippingEnabled: false }).ok, true);
+  assert.equal((await coordinator.runNow()).ok, true);
+
+  for (const methods of [["pickup", "pickup"], ["pickup", "carrier"], [null], undefined]) {
     assert.equal(endpoint("sync.php", { ...request, source_revision: 999, idempotency_key: "invalid-methods", online_catalog: { ...request.online_catalog, delivery_methods: methods } }).status, 422);
   }
 
@@ -216,8 +229,9 @@ try {
     assert.equal(database.getEnabledBusinessCapabilities().includes("channel.online_sales"), false);
     setBusinessCapability(database.databasePath, { capability: "commerce.orders", enabled: true });
     setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
-    // Profile transitions reset delivery activation; this fixture explicitly offers pickup.
-    raw.exec("UPDATE settings SET online_sales_delivery_enabled = 1, online_sales_pickup_enabled = 1, online_sales_shipping_enabled = 0");
+    assert.equal(database.getSetupData().onlineSalesDeliveryEnabled, false, "profile reset and capability ON never activate delivery");
+    assert.equal(database.createCommerceOnlineCatalog().enabled, true);
+    assert.deepEqual(database.createCommerceOnlineCatalog().deliveryMethods, []);
     const category = database.saveMenuCategory({ name: `${profileId} menu`, description: "", is_active: true, sort_order: 0 });
     assert.equal(category.ok, true, category.message);
     const before = raw.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n;

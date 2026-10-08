@@ -133,6 +133,17 @@ try {
   const page = await freshPage();
   await page.goto(`${base}/magaza/`);
   await expect(page.getByRole('status').filter({ hasText: 'online sipariş almıyor' })).toBeVisible();
+  await publish(true, [product, weighted], []);
+  await page.getByRole('button', { name: 'Ürünleri yenile' }).click();
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByRole('status').filter({ hasText: 'online sipariş almıyor' })).toBeVisible();
+  await expect(add(page)).toBeDisabled();
+  await add(page).dispatchEvent('click');
+  await expect(page.locator('#cart-count')).toHaveText('0');
+  await expect(page.locator('#open-checkout')).toBeDisabled();
+  await publish(); await page.getByRole('button', { name: 'Ürünleri yenile' }).click();
+  await expect(add(page)).toBeEnabled();
+  await expect(page.locator('#catalog-state')).toBeHidden();
   await publish(true, []); await page.getByRole('button', { name: 'Ürünleri yenile' }).click();
   await expect(page.getByText('Şu anda satışta ürün bulunmuyor.')).toBeVisible();
   await publish();
@@ -304,6 +315,16 @@ try {
     await deliveryPage.context().close();
   }
   // A definitive method rejection refreshes the allowed methods without losing draft PII.
+  await publish(true, [product]);
+  const closedCheckout = await freshPage(); await ready(closedCheckout); await add(closedCheckout).click(); await contact(closedCheckout);
+  await publish(true, [product], []);
+  clearGuard(); await closedCheckout.locator('#submit-order').click();
+  await expect(closedCheckout.locator('#submission-message')).toContainText('şu anda online sipariş almıyor');
+  await expect(closedCheckout.getByRole('article')).toHaveCount(1);
+  await expect(add(closedCheckout)).toBeDisabled();
+  await expect(closedCheckout.locator('#submit-order')).toBeDisabled();
+  await expect(quantityInput(closedCheckout)).toHaveValue('1');
+  await closedCheckout.context().close();
   await publish(true, [product], ['shipping']);
   const changedMethod = await freshPage(); await ready(changedMethod); await add(changedMethod).click(); await contact(changedMethod); await fillAddress(changedMethod);
   await changedMethod.route('**/api/order.php', async (route) => {

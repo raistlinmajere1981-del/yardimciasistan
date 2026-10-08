@@ -89,7 +89,8 @@ try {
   assert.deepEqual(db.createCommerceOnlineCatalog().deliveryMethods, ["shipping"]);
   assert.equal(save({ onlineSalesDeliveryEnabled: false, onlineSalesDelivery: { pickupEnabled: false, shippingEnabled: false } }).ok, true);
   assert.equal(db.getSetupData().arasShipping.enabled, false);
-  assert.equal(db.createCommerceOnlineCatalog().enabled, false, "disabled delivery withdraws online ordering through existing publication");
+  assert.equal(db.createCommerceOnlineCatalog().enabled, true, "disabled delivery preserves online channel visibility");
+  assert.deepEqual(db.createCommerceOnlineCatalog().deliveryMethods, [], "disabled delivery closes new ordering");
 
   const ai = { ...setup, aiEnabled: true, aiModel: "gpt-4.1", aiApiKey: "fixture-ai-key", aiImageModel: "" };
   assert.match(validate(ai), /test edin/);

@@ -8,7 +8,7 @@ function ya_online_catalog_projection(array $candidate): array
     $methods = [];
     if ($enabled) {
         $methods = $candidate['delivery_methods'] ?? null;
-        if (!is_array($methods) || !array_is_list($methods) || count($methods) < 1 || count($methods) > 2
+        if (!is_array($methods) || !array_is_list($methods) || count($methods) > 2
             || count(array_unique($methods, SORT_REGULAR)) !== count($methods)) throw new InvalidArgumentException('invalid_delivery_methods');
         foreach ($methods as $method) {
             if (!in_array($method, ['pickup', 'shipping'], true)) throw new InvalidArgumentException('invalid_delivery_methods');

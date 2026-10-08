@@ -87,11 +87,11 @@
       const body = el('div', undefined, 'product-body'); body.append(el('h3', product.name));
       if (product.description) body.append(el('p', product.description, 'description'));
       body.append(el('div', `${money(product.price, product.currency)} / ${units[product.unit]}`, 'price'), el('span', 'Satışta', 'availability'));
-      const add = button('Sepete ekle', () => addProduct(product), ''); add.disabled = Boolean(pending) || busy;
+      const add = button('Sepete ekle', () => addProduct(product), ''); add.disabled = !deliveryMethods.length || Boolean(pending) || busy;
       body.append(add); card.append(media, body); $('product-grid').append(card);
     }
   }
-  function validCart() { return cart.length > 0 && catalogStatus === 'ready' && cart.every((item) => catalog.has(item.productId) && quantity(item.q / scale, item.display.unit)); }
+  function validCart() { return cart.length > 0 && deliveryMethods.length > 0 && catalogStatus === 'ready' && cart.every((item) => catalog.has(item.productId) && quantity(item.q / scale, item.display.unit)); }
   function updateControls() {
     $('clear-cart').disabled = !cart.length || Boolean(pending) || busy;
     $('open-checkout').disabled = !validCart() || Boolean(pending) || busy;
@@ -149,7 +149,7 @@
     item.q = q; persistCart(); renderCart();
   }
   function addProduct(product) {
-    if (pending || busy) return;
+    if (!deliveryMethods.length || catalogStatus !== 'ready' || pending || busy) return;
     const existing = cart.find((item) => item.productId === product.product_id);
     if (existing) {
       if (!canChangeQuantity(existing, existing.q + scale)) { $('cart-message').textContent = 'Satır miktarı en fazla 1000, toplam miktar en fazla 10000 olabilir.'; return; }
@@ -168,7 +168,7 @@
       const response = await fetch(new URL('api/catalog.php', new URL('../', location.href)), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
       const result = await response.json();
       if (!response.ok || result.ok !== true || typeof result.enabled !== 'boolean' || !Array.isArray(result.products)
-          || !Array.isArray(result.delivery_methods) || (result.enabled && (!result.delivery_methods.length || result.delivery_methods.length > 2
+          || !Array.isArray(result.delivery_methods) || (result.enabled && (result.delivery_methods.length > 2
           || new Set(result.delivery_methods).size !== result.delivery_methods.length || result.delivery_methods.some((method) => !Object.hasOwn(deliveryLabels, method))))) throw new Error('catalog_unavailable');
       const products = result.enabled ? result.products.map(snapshot) : [];
       deliveryMethods = result.enabled ? result.delivery_methods : [];
@@ -177,8 +177,8 @@
       // A pending payload never changes; display snapshots can reflect current catalog.
       for (const item of cart) if (catalog.has(item.productId)) item.display = catalog.get(item.productId);
       persistCart();
-      $('catalog-state').textContent = !result.enabled ? 'Mağazamız şu anda online sipariş almıyor.' : !catalog.size ? 'Şu anda satışta ürün bulunmuyor.' : '';
-      $('catalog-state').hidden = result.enabled && catalog.size > 0;
+      $('catalog-state').textContent = !result.enabled || !deliveryMethods.length ? 'Mağazamız şu anda online sipariş almıyor.' : !catalog.size ? 'Şu anda satışta ürün bulunmuyor.' : '';
+      $('catalog-state').hidden = result.enabled && deliveryMethods.length > 0 && catalog.size > 0;
     } catch {
       catalogStatus = 'error'; $('catalog-state').textContent = 'Ürünler şu anda yüklenemiyor. Ürünleri yenile düğmesiyle tekrar deneyin.';
     } finally {
@@ -268,6 +268,8 @@
       } else if (response.status === 403 && result.code === 'online_sales_disabled') {
         forgetAttempt(); catalogStatus = 'disabled'; catalog.clear(); $('catalog-state').hidden = false;
         $('catalog-state').textContent = 'Mağazamız şu anda online sipariş almıyor.'; message('Mağaza sipariş almayı durdurdu. Sepetiniz korunuyor.');
+      } else if (response.status === 403 && result.code === 'online_ordering_disabled') {
+        forgetAttempt(); await loadCatalog(); message('Mağaza şu anda online sipariş almıyor. Sepetiniz korunuyor.');
       } else if (response.status === 422 && result.code === 'product_not_published') {
         forgetAttempt(); await loadCatalog(); message('Ürünlerden biri artık satışta değil. Sepetinizi kontrol edip ilgili satırı kaldırın.');
       } else if (response.status === 422 && result.code === 'delivery_method_unavailable') {

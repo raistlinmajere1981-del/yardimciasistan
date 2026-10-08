@@ -115,6 +115,9 @@ function ya_online_order_submit(array $input): array
         if (!$catalog['enabled']) {
             throw new YaOnlineOrderRejection(403, 'online_sales_disabled', 'Web siparişleri şu anda kapalı.');
         }
+        if ($catalog['delivery_methods'] === []) {
+            throw new YaOnlineOrderRejection(403, 'online_ordering_disabled', 'Web siparişleri şu anda kapalı.');
+        }
         if (!in_array($request['delivery']['method'], $catalog['delivery_methods'], true)) {
             throw new YaOnlineOrderRejection(422, 'delivery_method_unavailable', 'Seçilen teslimat yöntemi artık sunulmuyor.');
         }

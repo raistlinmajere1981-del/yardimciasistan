@@ -76,6 +76,15 @@ try {
   assert.equal((await submit(input)).payload.code, "online_sales_disabled");
   await publish(false);
   assert.equal((await submit(input)).status, 403);
+  await publish(true, [], []);
+  const browseOnly = await (await fetch(`${baseUrl}/api/catalog.php`)).json();
+  assert.equal(browseOnly.enabled, true);
+  assert.deepEqual(browseOnly.delivery_methods, []);
+  assert.equal(browseOnly.products[0].product_id, publishedProduct.product_id);
+  const closedOrder = await submit(input);
+  assert.equal(closedOrder.status, 403);
+  assert.equal(closedOrder.payload.code, "online_ordering_disabled");
+  assert.equal(storage("echo $db->query('SELECT COUNT(*) FROM web_orders')->fetchColumn();"), 0);
   await publish(true);
   assert.equal((await submit({ ...input, items: [{ productId: "unpublished-product", quantity: 1 }] })).payload.code, "product_not_published");
   for (const quantity of [0, -1, 1001, true, "2", 0.00001, null]) {
@@ -119,6 +128,9 @@ try {
     assert.equal(inbox.next_cursor, 0);
     assert.equal(inbox.has_more, false);
   }
+  await publish(true, [], []);
+  assert.deepEqual((await submit(input)).payload, accepted.payload, "accepted receipt survives delivery OFF");
+  assert.equal((await submit({ ...input, idempotencyKey: "guest-order-closed-2" })).payload.code, "online_ordering_disabled");
   await publish(false);
   assert.deepEqual((await submit(input)).payload, accepted.payload, "receipt replay survives publication disable and ack");
   assert.equal((await submit({ ...input, idempotencyKey: "guest-order-key-new-2" })).status, 403);

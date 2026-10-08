@@ -42,6 +42,8 @@ function ya_dealer_projection(array $input): array
             || ($catalog['access_revision'] ?? null) !== $owner['access_revision']
             || !is_string($catalog['catalog_revision'] ?? null)
             || preg_match('/^[a-f0-9]{64}$/D', $catalog['catalog_revision']) !== 1) throw new InvalidArgumentException('dealer_catalog_invalid');
+        // Dealer catalogs retain their existing ordering-only delivery contract.
+        if (($catalog['delivery_methods'] ?? null) === []) throw new InvalidArgumentException('invalid_delivery_methods');
         $safe = ya_online_catalog_projection(['enabled' => true, 'delivery_methods' => $catalog['delivery_methods'] ?? null, 'products' => $catalog['products'] ?? null]);
         $catalogIds[$id] = true;
         $catalogs[] = ['access_id' => $id, 'access_revision' => $owner['access_revision'], 'catalog_revision' => $catalog['catalog_revision'],

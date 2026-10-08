@@ -24,11 +24,11 @@ export function createCommerceOnlineCatalog(db: DatabaseSync, capabilities: Iter
     const business = db.prepare("SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1").get();
     const businessId = String(business?.id ?? "");
     const settings = db.prepare("SELECT online_sales_delivery_enabled, online_sales_pickup_enabled, online_sales_shipping_enabled FROM settings WHERE business_id = ? AND deleted_at = '' LIMIT 1").get(businessId);
-    if (Number(settings?.online_sales_delivery_enabled) !== 1) return { version: 1, enabled: false, updatedAt: "", deliveryMethods: [], products: [] };
+    const deliveryEnabled = Number(settings?.online_sales_delivery_enabled) === 1;
     const deliveryMethods: CommerceOrderDeliveryMethod[] = [];
-    if (Number(settings?.online_sales_pickup_enabled) === 1) deliveryMethods.push("pickup");
-    if (Number(settings?.online_sales_shipping_enabled) === 1) deliveryMethods.push("shipping");
-    if (!deliveryMethods.length) throw new Error("Online satış teslimat ayarları geçersiz.");
+    if (deliveryEnabled && Number(settings?.online_sales_pickup_enabled) === 1) deliveryMethods.push("pickup");
+    if (deliveryEnabled && Number(settings?.online_sales_shipping_enabled) === 1) deliveryMethods.push("shipping");
+    if (deliveryEnabled && !deliveryMethods.length) throw new Error("Online satış teslimat ayarları geçersiz.");
     const rows = db.prepare(`
       SELECT p.id, p.name, p.description, p.sku, p.unit, p.tax_rate, p.image_source_url,
              p.updated_at AS product_updated_at, publication.title_override,

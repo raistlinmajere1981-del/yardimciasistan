@@ -1467,3 +1467,18 @@ the canonical dependency resolver owns requirements such as purchasing -> invent
 Local commit and remote convergence remain distinct: existing publication/outbox owners retry
 offline withdrawals, and already-submitted external work is not undone by a profile change.
 No service framework, publication protocol or historical migration path is introduced.
+
+
+## D-047 — Online catalog visibility is independent of order acceptance
+
+**Status:** ACCEPTED, implementing the requested channel activation semantics.
+
+ONLINE_SALES alone owns `online_catalog.enabled`. Delivery OFF publishes the enabled
+catalog and its products with empty `delivery_methods`; the storefront remains public
+and new guest orders are rejected. Delivery ON requires at least one valid pickup/shipping
+method under the existing Settings validation. No second persisted activation field is
+introduced. Capability ON does not activate delivery; profile transition delivery resets
+remain OFF. Capability OFF uses the existing disabled publication/outbox withdrawal.
+Accepted-order receipt replay remains idempotent even after ordering closes. Dealer
+catalog activation/validation is unchanged. This supersedes D-045's online catalog
+withdrawal on delivery OFF; dealer catalog withdrawal semantics remain unchanged.

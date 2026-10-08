@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
 import { activateFixtureSource } from './test-helpers/publication-protocol.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
@@ -137,16 +138,31 @@ try {
   await assertSurfaces(true);
   assert.equal((await page.request.get(base + '/yardimci-asistan/api/menu.php')).status(), 200);
   // Real Desktop channel intent projects through the existing online publication owner/transport.
+  const settingsFixture = new DatabaseSync(f.db.databasePath);
+  try { settingsFixture.exec('UPDATE settings SET online_sales_delivery_enabled = 0'); } finally { settingsFixture.close(); }
   setBusinessCapability(f.db.databasePath, { capability: 'channel.online_sales', enabled: true });
   const product = saveRuntimeCatalogProduct(f.db.databasePath, { name: 'Canonical showcase product', salePrice: 50, trackInventory: false });
   const onlineCatalog = f.db.createCommerceOnlineCatalog();
+  assert.equal(f.db.getSetupData().onlineSalesDeliveryEnabled, false, 'capability ON does not activate delivery');
   assert.equal(onlineCatalog.enabled, true);
+  assert.deepEqual(onlineCatalog.deliveryMethods, []);
   assert.ok(onlineCatalog.products.some(item => item.productId === product.id));
   const onlinePublish = await transport.publishOnlineCatalog({ value: onlineCatalog, sourceRevision: 4, idempotencyKey: 'showcase-store-on-4' });
   assert.equal(onlinePublish.ok, true, onlinePublish.message);
   await assertSurfaces(true);
+  await page.goto(base + '/yardimci-asistan/magaza/');
+  await expect(page.getByRole('article')).toContainText('Canonical showcase product');
+  await expect(page.getByRole('status').filter({ hasText: 'online sipariş almıyor' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sepete ekle' })).toBeDisabled();
+  const pickupFixture = new DatabaseSync(f.db.databasePath);
+  try { pickupFixture.exec('UPDATE settings SET online_sales_delivery_enabled = 1, online_sales_pickup_enabled = 1, online_sales_shipping_enabled = 0'); } finally { pickupFixture.close(); }
+  const pickupPublish = await transport.publishOnlineCatalog({ value: f.db.createCommerceOnlineCatalog(), sourceRevision: 5, idempotencyKey: 'showcase-pickup-on-5' });
+  assert.equal(pickupPublish.ok, true, pickupPublish.message);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Sepete ekle' })).toBeEnabled();
+  await assertSurfaces(true);
   setBusinessCapability(f.db.databasePath, { capability: 'channel.online_sales', enabled: false });
-  const onlineWithdrawal = await transport.publishOnlineCatalog({ value: f.db.createCommerceOnlineCatalog(), sourceRevision: 5, idempotencyKey: 'showcase-store-off-5' });
+  const onlineWithdrawal = await transport.publishOnlineCatalog({ value: f.db.createCommerceOnlineCatalog(), sourceRevision: 6, idempotencyKey: 'showcase-store-off-6' });
   assert.equal(onlineWithdrawal.ok, true, onlineWithdrawal.message);
   await page.goto(base);
   await expect(page.locator('[data-site-nav] a[href="/yardimci-asistan/magaza/"]')).toHaveCount(0);

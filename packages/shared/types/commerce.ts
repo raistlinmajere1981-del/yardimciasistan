@@ -466,8 +466,10 @@ export interface PublishedCommerceProduct {
 }
 
 export interface CommerceOnlineCatalog {
+  /** Empty when delivery is disabled: public catalog, no new online orders. */
   deliveryMethods: CommerceOrderDeliveryMethod[];
   version: 1;
+  /** Online Sales channel visibility, independent of order acceptance. */
   enabled: boolean;
   updatedAt: string;
   products: PublishedCommerceProduct[];
