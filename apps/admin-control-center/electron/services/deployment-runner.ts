@@ -335,8 +335,8 @@ export class DeploymentRunner {
 
       this.child = child;
 
-      child.stdout?.on("data", (chunk) => this.appendOutput(chunk.toString()));
-      child.stderr?.on("data", (chunk) => this.appendOutput(chunk.toString()));
+      child.stdout?.on("data", (chunk: Buffer) => this.appendOutput(chunk.toString()));
+      child.stderr?.on("data", (chunk: Buffer) => this.appendOutput(chunk.toString()));
 
       child.on("error", (error) => {
         this.appendOutput(`Çalıştırma hatası: ${error.message}`);

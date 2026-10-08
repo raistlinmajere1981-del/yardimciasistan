@@ -11,6 +11,12 @@ import {
 } from "./services/support-service";
 import { getSystemEnvironment } from "./services/system-environment-service";
 import { listVerificationHistory, VerificationRunner } from "./services/verification-runner";
+import type {
+  DeploymentRunRequest,
+  ReleaseOperationRequest,
+  SupportReportStatus,
+  VerificationRunRequest
+} from "../shared/contracts";
 
 const APP_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = process.env.YARDIMCI_REPO_ROOT
@@ -85,31 +91,31 @@ function busyOperationMessage(exclude: "verification" | "deployment" | "release"
 }
 
 ipcMain.handle("admin:get-verification-run-state", () => verificationRunner.getState());
-ipcMain.handle("admin:get-verification-history", (_event, limit) => listVerificationHistory(REPO_ROOT, limit));
-ipcMain.handle("admin:start-verification", (_event, request) => {
+ipcMain.handle("admin:get-verification-history", (_event, limit: number) => listVerificationHistory(REPO_ROOT, limit));
+ipcMain.handle("admin:start-verification", (_event, request: VerificationRunRequest) => {
   const busy = busyOperationMessage("verification");
   return busy ? { accepted: false, message: busy } : verificationRunner.start(request);
 });
 ipcMain.handle("admin:cancel-verification", () => verificationRunner.cancel());
 ipcMain.handle("admin:get-deployment-targets", () => getDeploymentTargets(REPO_ROOT));
 ipcMain.handle("admin:get-deployment-run-state", () => deploymentRunner.getState());
-ipcMain.handle("admin:start-deployment", (_event, request) => {
+ipcMain.handle("admin:start-deployment", (_event, request: DeploymentRunRequest) => {
   const busy = busyOperationMessage("deployment");
   return busy ? { accepted: false, message: busy } : deploymentRunner.start(request);
 });
 ipcMain.handle("admin:cancel-deployment", () => deploymentRunner.cancel());
 ipcMain.handle("admin:get-release-operation-state", () => releaseRunner.getState());
-ipcMain.handle("admin:start-release-operation", (_event, request) => {
+ipcMain.handle("admin:start-release-operation", (_event, request: ReleaseOperationRequest) => {
   const busy = busyOperationMessage("release");
   return busy ? { accepted: false, message: busy } : releaseRunner.start(request);
 });
 ipcMain.handle("admin:cancel-release-operation", () => releaseRunner.cancel());
 ipcMain.handle("admin:get-system-environment", () => getSystemEnvironment(REPO_ROOT));
-ipcMain.handle("admin:list-support-reports", (_event, limit) => listSupportReports(REPO_ROOT, limit));
-ipcMain.handle("admin:get-support-report-detail", (_event, reportId) => getSupportReportDetail(REPO_ROOT, reportId));
+ipcMain.handle("admin:list-support-reports", (_event, limit: number) => listSupportReports(REPO_ROOT, limit));
+ipcMain.handle("admin:get-support-report-detail", (_event, reportId: string) => getSupportReportDetail(REPO_ROOT, reportId));
 ipcMain.handle(
   "admin:update-support-report-status",
-  (_event, reportId, status, resolvedInVersion, resolutionNote) =>
+  (_event, reportId: string, status: SupportReportStatus, resolvedInVersion: string, resolutionNote: string) =>
     updateSupportReportStatus(REPO_ROOT, reportId, status, resolvedInVersion, resolutionNote)
 );
 ipcMain.handle("admin:open-external", async (_event, value: unknown) => {

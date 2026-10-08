@@ -124,7 +124,7 @@ function getAndroidDevices(adbAvailable: boolean): AndroidDeviceSnapshot[] {
         parts
           .map((part) => part.split(":", 2))
           .filter((pair) => pair.length === 2)
-      );
+      ) as Record<string, string>;
       return {
         serial,
         state,
