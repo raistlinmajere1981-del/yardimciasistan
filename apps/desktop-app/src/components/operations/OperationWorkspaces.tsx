@@ -384,7 +384,7 @@ export function ReservationsWorkspace({
                       size="sm"
                       onClick={() => navigation.openWorkspace({
                         entityType: "room",
-                        entityId: reservation.roomIds[0] || entryRooms[reservation.id],
+                        entityId: reservation.roomIds[0] || entryRooms[reservation.id] || "",
                         mode: "stay",
                         action: "linked-stay",
                         reservationId: reservation.id,

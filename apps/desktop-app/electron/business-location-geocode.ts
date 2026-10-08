@@ -162,7 +162,7 @@ function removeSecondaryAddressDetails(value: string): string {
 
 function removeStreetSegment(value: string): string {
   const match = value.match(/^.*?\b(?:caddesi|cadde|sokağı|sokak|bulvarı|bulvar)\b\s+(.+)$/iu);
-  return match ? normalizeQuery(match[1]) : "";
+  return match ? normalizeQuery(match[1] ?? "") : "";
 }
 
 function parseGeocoderPayload(payload: unknown): BusinessLocationGeocodeCandidate[] {

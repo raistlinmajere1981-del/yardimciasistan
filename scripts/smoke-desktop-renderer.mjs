@@ -2106,7 +2106,6 @@ try {
   await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
   const restaurantBoard = compactPage.getByRole("region", { name: "Restoran operasyonları", exact: true });
   await expect(restaurantBoard.locator(".operations-board__pane")).toHaveCount(3);
-  const compactTableCards = compactPage.locator(".resource-card");
   await expect(compactPage.locator(".table-area-heading strong")).toHaveText(["Bahçe", "Salon"]);
   await expect(compactPage.getByLabel("Restoran günlük işleri", { exact: true })).toBeVisible();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();

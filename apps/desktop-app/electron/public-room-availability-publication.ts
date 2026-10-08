@@ -129,7 +129,7 @@ function normalizeRoomStatus(value: string): string {
 function normalizeDate(value: string): string {
   const candidate = value.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return "";
-  const [year, month, day] = candidate.split("-").map(Number);
+  const [year = 0, month = 0, day = 0] = candidate.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
   return candidate;

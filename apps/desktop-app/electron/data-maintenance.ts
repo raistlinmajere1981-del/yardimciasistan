@@ -249,13 +249,14 @@ function extractQrMenuImages(databasePath: string, assetDatabasePath: string, ou
       const match = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(imageUrl);
       if (!match) continue;
 
-      const mimeType = match[1].toLowerCase() === "image/jpg" ? "image/jpeg" : match[1].toLowerCase();
+      const mimeGroup = match[1] ?? "";
+      const mimeType = mimeGroup.toLowerCase() === "image/jpg" ? "image/jpeg" : mimeGroup.toLowerCase();
       const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
       const menuItemId = String(row.id ?? "");
       const menuItemName = String(row.name ?? "Ürün");
       const suffix = sanitizeFileName(menuItemId).slice(-12) || String(files.length + 1);
       const fileName = `${sanitizeFileName(menuItemName)}-${suffix}.${extension}`;
-      const bytes = Buffer.from(match[2].replace(/\s+/g, ""), "base64");
+      const bytes = Buffer.from((match[2] ?? "").replace(/\s+/g, ""), "base64");
       if (bytes.length === 0) continue;
 
       fs.mkdirSync(outputDirectory, { recursive: true });

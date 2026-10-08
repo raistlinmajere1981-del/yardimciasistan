@@ -22,7 +22,9 @@ export function SettingsCategoryTabs({ active, dirty, categories = settingsCateg
 
     event.preventDefault();
     const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-    void requestChange(categories[next].id, tabs?.[next]);
+    const target = categories[next];
+    if (!target) return;
+    void requestChange(target.id, tabs?.[next]);
   }
 
   return (

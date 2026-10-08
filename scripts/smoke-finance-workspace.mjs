@@ -85,7 +85,7 @@ try {
       pensionBalances: [],
       categories: clone(defaultCategories)
     };
-    let roomData = {
+    const roomData = {
       generatedAt: now,
       rooms: [],
       activeStays: [],

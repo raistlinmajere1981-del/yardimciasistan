@@ -769,8 +769,11 @@ function reconcileTableCategories(
     predicate: (table: Record<string, unknown>) => boolean
   ) => {
     for (let index = 0; index < remaining.length && assignment.tables.length < assignment.category.tableCount;) {
-      if (predicate(remaining[index])) {
-        assignment.tables.push(remaining.splice(index, 1)[0]);
+      const current = remaining[index];
+      if (current === undefined) break;
+      if (predicate(current)) {
+        const removed = remaining.splice(index, 1)[0];
+        if (removed) assignment.tables.push(removed);
       } else {
         index += 1;
       }
@@ -793,7 +796,9 @@ function reconcileTableCategories(
           (table) => protectedIds.has(text(table.id)) === protectedOnly
         );
         if (candidateIndex < 0) break;
-        assignment.tables.push(remaining.splice(candidateIndex, 1)[0]);
+        const removed = remaining.splice(candidateIndex, 1)[0];
+        if (!removed) break;
+        assignment.tables.push(removed);
       }
     }
   };

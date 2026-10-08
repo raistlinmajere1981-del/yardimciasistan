@@ -146,7 +146,7 @@ for (const path of ["setup", "apply"]) {
     setBusinessCapability(database.databasePath, { capability: C.AI, enabled: true });
     setBusinessCapability(database.databasePath, { capability: C.ANDROID, enabled: true });
     const configuration = () => stateTables.slice(3, 8).map(table => raw.prepare(`SELECT * FROM ${table}`).all()
-      .map(({ enabled, updated_at, ...config }) => config));
+      .map(({ enabled: _enabled, updated_at: _updated_at, ...config }) => config));
     const before = configuration();
     if (path === "setup") save({ profileId: "pension" });
     else applyBusinessProfileCapabilities(database.databasePath, "pension");

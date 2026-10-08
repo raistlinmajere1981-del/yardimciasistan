@@ -1,5 +1,4 @@
 import { app, BrowserWindow } from "electron";
-import fs from "node:fs";
 import path from "node:path";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { getSyncCapabilities, resetHostingRuntime } from "@yardimci-asistan/sync-core";

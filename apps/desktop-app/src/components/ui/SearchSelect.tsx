@@ -64,8 +64,11 @@ export function SearchSelect({ value, options, onChange, ariaLabel, placeholder 
     return () => { cancelAnimationFrame(focusFrame); observer.disconnect(); if (popover.matches(":popover-open")) popover.hidePopover(); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
   }, [open]);
   useEffect(() => {
-    if (open && active) document.getElementById(optionId(active))?.scrollIntoView({ block: "nearest" });
-  }, [open, active?.id, query]);
+    if (open && active?.id) {
+      const index = options.findIndex((option) => option.id === active.id);
+      if (index >= 0) document.getElementById(`${id}-${index}`)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [open, active?.id, query, options, id]);
   useEffect(() => {
     if (!open) return;
     const pointer = (event: PointerEvent) => { const target = event.target as Node; if (!anchorRef.current?.contains(target) && !popoverRef.current?.contains(target)) setOpen(false); };
@@ -83,7 +86,7 @@ export function SearchSelect({ value, options, onChange, ariaLabel, placeholder 
     const index = enabledOptions.findIndex(option => option.id === active?.id);
     const next = event.key === "ArrowDown" ? Math.min(index + 1, enabledOptions.length - 1) : event.key === "ArrowUp" ? Math.max(index - 1, 0)
       : event.key === "Home" ? 0 : event.key === "End" ? enabledOptions.length - 1 : -1;
-    if (next >= 0) { event.preventDefault(); setActiveId(enabledOptions[next].id); }
+    if (next >= 0) { event.preventDefault(); const target = enabledOptions[next]; if (target) setActiveId(target.id); }
     else if (event.key === "Enter") { event.preventDefault(); if (active) choose(active.id); }
   }
   return <div className="search-select">

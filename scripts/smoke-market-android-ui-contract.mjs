@@ -15,7 +15,6 @@ const cameraScanner = read("apps/android-app/src/main/java/com/yardimciasistan/a
 const syncController = read("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidOperationsSyncController.java");
 const productLookup = read("apps/android-app/src/main/java/com/yardimciasistan/android/ProductDataLookupClient.java");
 const tests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketUiTest.java");
-const foundationTests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketFoundationTest.java");
 const gradle = read("apps/android-app/build.gradle");
 const manifest = read("apps/android-app/AndroidManifest.xml");
 const uiSources = `${workspace}\n${rules}\n${main}\n${shell}`;

@@ -137,12 +137,13 @@ export function RequestsWorkspace({
   const visibleRequests = requestFilter === "waiting" ? waitingRequests : requests;
   const selectedRequest = visibleRequests.find((request) => request.id === externallySelectedRequest?.id)
     ?? visibleRequests[0];
+  const selectedRequestId = selectedRequest?.id;
 
   useEffect(() => {
-    if (selectedRequest && selectedRequest.id !== externallySelectedRequest?.id) {
-      onSelectRequest(selectedRequest.id);
+    if (selectedRequestId && selectedRequestId !== externallySelectedRequest?.id) {
+      onSelectRequest(selectedRequestId);
     }
-  }, [externallySelectedRequest?.id, onSelectRequest, selectedRequest?.id]);
+  }, [externallySelectedRequest?.id, onSelectRequest, selectedRequestId]);
 
   useEffect(() => {
     setAiCopyMessage("");

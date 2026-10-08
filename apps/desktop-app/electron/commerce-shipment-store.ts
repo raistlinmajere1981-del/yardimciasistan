@@ -155,7 +155,9 @@ export function applyShipmentProviderResult(path: string, input: ShipmentProvide
     const target = input.status ? steps.indexOf(input.status) : -1;
     if (current >= 0 && target > current && !(order.status === "cancelled" && current < 2)) {
       for (let step = current + 1; step <= target; step++) {
-        updateShipmentStatusInTransaction(db, businessId, { shipmentId: input.shipmentId, status: steps[step] }, true);
+        const nextStatus = steps[step];
+        if (!nextStatus) continue;
+        updateShipmentStatusInTransaction(db, businessId, { shipmentId: input.shipmentId, status: nextStatus }, true);
       }
     }
     return mapShipment(shipmentRow(db, businessId, input.shipmentId)!);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { activateFixtureSource, publicationEnvelope } from './test-helpers/publication-protocol.mjs';
 import { spawn } from 'node:child_process';
-import { cpSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';

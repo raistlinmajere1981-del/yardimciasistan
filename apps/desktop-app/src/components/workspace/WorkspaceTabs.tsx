@@ -31,8 +31,10 @@ export function WorkspaceTabList<T extends string>({ tabs, onChange, label }: {
           : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : -1;
         if (next < 0) return;
         event.preventDefault();
-        onChange(tabs[next].id);
-        document.getElementById(`${prefix}-tab-${tabs[next].id}`)?.focus();
+        const target = tabs[next];
+        if (!target) return;
+        onChange(target.id);
+        document.getElementById(`${prefix}-tab-${target.id}`)?.focus();
       }}>{tab.label}</button>)}
   </div>;
 }

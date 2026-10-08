@@ -22,6 +22,8 @@ interface MarketLabelsWorkspaceProps {
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }
 
+const FALLBACK_LABEL_SIZE: LabelSizePreset = { id: "58x40", label: "58 × 40 mm", widthMm: 58, heightMm: 40 };
+
 export function MarketLabelsWorkspace({
   products,
   categories,
@@ -42,10 +44,10 @@ export function MarketLabelsWorkspace({
   useEffect(() => {
     if (productId && activeProducts.some((product) => product.id === productId)) return;
     setProductId(activeProducts[0]?.id ?? "");
-  }, [activeProducts, productId]);
+  }, [activeProducts, productId, setProductId]);
 
   const product = activeProducts.find((item) => item.id === productId) ?? null;
-  const size = LABEL_SIZE_PRESETS.find((item) => item.id === sizeId) ?? LABEL_SIZE_PRESETS[0];
+  const size = LABEL_SIZE_PRESETS.find((item) => item.id === sizeId) ?? LABEL_SIZE_PRESETS[0] ?? FALLBACK_LABEL_SIZE;
   const category = product
     ? categories.find((item) => item.id === product.categoryId) ?? null
     : null;

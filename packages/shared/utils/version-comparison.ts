@@ -11,13 +11,15 @@ export function compareVersions(left: string, right: string): number {
   if (!b[4]) return -1;
   const ap = a[4].split("."), bp = b[4].split(".");
   for (let i = 0; i < Math.max(ap.length, bp.length); ++i) {
-    if (ap[i] === bp[i]) continue;
-    if (ap[i] === undefined) return -1;
-    if (bp[i] === undefined) return 1;
-    const an = /^\d+$/.test(ap[i]), bn = /^\d+$/.test(bp[i]);
-    if (an && bn) return Number(ap[i]) > Number(bp[i]) ? 1 : -1;
+    const aPart = ap[i];
+    const bPart = bp[i];
+    if (aPart === bPart) continue;
+    if (aPart === undefined) return -1;
+    if (bPart === undefined) return 1;
+    const an = /^\d+$/.test(aPart), bn = /^\d+$/.test(bPart);
+    if (an && bn) return Number(aPart) > Number(bPart) ? 1 : -1;
     if (an !== bn) return an ? -1 : 1;
-    return ap[i] > bp[i] ? 1 : -1;
+    return aPart > bPart ? 1 : -1;
   }
   return 0;
 }

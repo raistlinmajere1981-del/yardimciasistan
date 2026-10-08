@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import process from "node:process";
 import type {

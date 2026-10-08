@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { DatabaseSync } from "node:sqlite";
 import { fixtureHttp, fixtureSecretService, fixtureShippingService, testCredentials } from "./test-helpers/aras-provider-fixtures.mjs";

@@ -107,8 +107,13 @@ function parseAppPasswordVerifier(verifier: string): {
   }
 
   try {
-    const salt = Buffer.from(parts[5], "base64url");
-    const derivedKey = Buffer.from(parts[6], "base64url");
+    const saltPart = parts[5];
+    const derivedKeyPart = parts[6];
+    if (saltPart === undefined || derivedKeyPart === undefined) {
+      return null;
+    }
+    const salt = Buffer.from(saltPart, "base64url");
+    const derivedKey = Buffer.from(derivedKeyPart, "base64url");
     if (salt.length !== 16 || derivedKey.length !== SCRYPT_KEY_LENGTH) {
       return null;
     }

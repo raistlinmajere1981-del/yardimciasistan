@@ -450,7 +450,7 @@ function formatReservationTables(reservation: ReservationRecord, tables: Desktop
 
 function parseLocalDate(dateKey: string) {
   const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(year, Math.max(0, month - 1), day, 12, 0, 0, 0);
+  return new Date(year ?? 0, Math.max(0, (month ?? 1) - 1), day ?? 1, 12, 0, 0, 0);
 }
 
 function addDays(dateKey: string, amount: number) {
@@ -498,8 +498,8 @@ function isSameMonth(leftDateKey: string, rightDateKey: string) {
 }
 
 function formatRangeTitle(dates: string[]) {
-  if (dates.length === 1) return formatLongDate(dates[0]);
-  return `${formatShortRangeDate(dates[0])} – ${formatLongDate(dates[dates.length - 1])}`;
+  if (dates.length === 1) return formatLongDate(dates[0] ?? "");
+  return `${formatShortRangeDate(dates[0] ?? "")} – ${formatLongDate(dates[dates.length - 1] ?? "")}`;
 }
 
 function formatMonthTitle(dateKey: string) {

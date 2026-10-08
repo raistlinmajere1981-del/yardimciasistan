@@ -282,6 +282,7 @@ export function IdentityCameraCapture({
 
         if (candidatesRef.current.length >= 3) {
           const best = [...candidatesRef.current].sort((left, right) => right.score - left.score)[0];
+          if (!best) return;
           candidatesRef.current = [];
           stableFramesRef.current = 0;
           setCandidateCount(0);

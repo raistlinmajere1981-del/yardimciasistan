@@ -180,6 +180,7 @@ function assertValidCapabilityState(database: DatabaseSync, businessId: string) 
   if (violations.length === 0) return;
 
   const first = violations[0];
+  if (!first) return;
   throw new Error(
     `${first.capability} yeteneği için gerekli yetenekler etkin değil: ${formatCapabilityList(first.missingDependencies)}.`
   );

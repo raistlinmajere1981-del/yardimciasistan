@@ -117,7 +117,7 @@ await test("owning feature OFF disables activation, preserves credentials/config
     UPDATE commerce_shipping_provider_config SET enabled=1,customer_code='code',username='user',password_encrypted='safe-storage:v1:shipping';
     UPDATE settings SET dealer_portal_enabled=1, online_sales_shipping_enabled=1;`);
   const configuration = () => ["marketing_provider_config", "business_messaging_provider_config", "commerce_shipping_provider_config"]
-    .map(table => raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(({ enabled, updated_at, ...config }) => config));
+    .map(table => raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(({ enabled: _enabled, updated_at: _updated_at, ...config }) => config));
   const before = configuration();
   save({ profileOptions: [] });
   assert.deepEqual(configuration(), before);

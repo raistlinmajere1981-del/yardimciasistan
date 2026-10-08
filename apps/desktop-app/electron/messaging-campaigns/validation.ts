@@ -49,7 +49,7 @@ export function validateCampaignInput(value: MessagingCampaignInput): MessagingC
 export function validateCampaignTemplate(input: MessagingCampaignInput, template: BusinessMessageTemplate) {
   if (!template || template.status !== "APPROVED" || template.name !== input.templateName || template.language !== input.templateLanguage) invalid("missing_template", "Onaylı şablon artık kullanılamıyor.");
   if (!template.supported || template.components.some((component) => !["body", "header"].includes(component.type))) invalid("unsupported_template", "Şablon bileşeni kampanyalarda desteklenmiyor.");
-  if (input.bindings.length !== template.components.length || input.bindings.some((group, index) => group.length !== template.components[index].parameters.length)) invalid("invalid_bindings", "Gerekli şablon parametrelerini bağlayın.");
+  if (input.bindings.length !== template.components.length || input.bindings.some((group, index) => group.length !== template.components[index]?.parameters.length)) invalid("invalid_bindings", "Gerekli şablon parametrelerini bağlayın.");
 }
 export function resolveCampaignBindings(bindings: MessagingTemplateBinding[][], customer: { fullName: string; companyName: string }): string[][] {
   return bindings.map((group) => group.map((binding) => boundedText(binding.type === "static_text" ? binding.value

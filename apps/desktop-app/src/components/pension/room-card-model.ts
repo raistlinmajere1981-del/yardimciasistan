@@ -23,12 +23,13 @@ export function getRoomCardModel(room: DesktopRoom, summary: DesktopRoomOperatio
       && !stays.some(stay => stay.reservationId === item.id))
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.id.localeCompare(b.id))[0] : undefined;
   const accounts = capabilities.folioEnabled ? summary?.accounts ?? [] : [];
-  const currentAccount = current.length === 1 ? accounts.find(item => item.stayId === current[0].id) : undefined;
+  const firstCurrent = current[0];
+  const currentAccount = current.length === 1 ? accounts.find(item => item.stayId === firstCurrent?.id) : undefined;
   const previousAccounts = accounts.filter(item => !["planned", "checked_in"].includes(item.stayStatus) && item.remainingMinor > 0);
   const physical = !room.isActive ? "inactive" : ["cleaning", "maintenance", "out_of_service"].includes(room.status) ? room.status : "ready";
 
-  const quickAction: RoomQuickAction | undefined = summary && physical === "ready" && current.length === 1
-    ? { label: "Misafir çıkışı", kind: "checkout", stayId: current[0].id }
+  const quickAction: RoomQuickAction | undefined = summary && physical === "ready" && current.length === 1 && firstCurrent
+    ? { label: "Misafir çıkışı", kind: "checkout", stayId: firstCurrent.id }
     : undefined;
 
   return { current, planned, upcoming, currentAccount, previousAccounts, physical, quickAction };

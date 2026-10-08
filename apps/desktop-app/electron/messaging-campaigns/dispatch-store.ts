@@ -31,7 +31,7 @@ export function recoverDispatchClaims(db: DatabaseSync, now: string, staleBefore
     for (const row of rows) {
       const status = row.provider_message_id ? "dispatched" : row.campaign_status === "cancelled" ? (Number(row.submitted) === 1 ? "failed" : "cancelled") : "pending";
       db.prepare("UPDATE messaging_outbox SET status=?,claim_token='',claimed_at='',next_attempt_at=?,last_error=?,updated_at=? WHERE id=? AND claim_token=?")
-        .run(status, now, status === "failed" ? "submission_uncertain" : String(row.last_error), now, row.id, row.claim_token);
+        .run(status, now, status === "failed" ? "submission_uncertain" : String(row.last_error), now, row.id ?? "", row.claim_token ?? "");
     }
     return rows.length;
   });
@@ -47,7 +47,7 @@ export function claimDispatchBatch(db: DatabaseSync, now: string, size: number):
     return rows.map((row) => {
       const token = randomUUID();
       db.prepare("UPDATE messaging_outbox SET status='claimed',claim_token=?,claimed_at=?,attempt_count=attempt_count+1,updated_at=? WHERE id=? AND status='pending'")
-        .run(token, now, now, row.id);
+        .run(token, now, now, row.id ?? "");
       return item({ ...row, status: "claimed", claim_token: token, claimed_at: now, attempt_count: Number(row.attempt_count) + 1, updated_at: now });
     });
   });
@@ -142,7 +142,7 @@ export function completeDispatchCampaigns(db: DatabaseSync, now: string): string
   return campaignTransaction(db, () => {
     const rows = db.prepare(`SELECT id FROM messaging_campaigns c WHERE status='running' AND business_id=(SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1)
       AND NOT EXISTS(SELECT 1 FROM messaging_outbox o WHERE o.campaign_id=c.id AND o.status IN ('pending','claimed'))`).all();
-    for (const row of rows) db.prepare("UPDATE messaging_campaigns SET status='completed',updated_at=? WHERE id=? AND status='running'").run(now, row.id);
+    for (const row of rows) db.prepare("UPDATE messaging_campaigns SET status='completed',updated_at=? WHERE id=? AND status='running'").run(now, row.id ?? "");
     return rows.map((row) => String(row.id));
   });
 }

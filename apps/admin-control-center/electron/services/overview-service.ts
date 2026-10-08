@@ -71,7 +71,7 @@ function getRepoSnapshot(repoRoot: string): RepoSnapshot {
 
   if (upstream.ok && upstream.out) {
     const [behindRaw, aheadRaw] = upstream.out.split(/\s+/).map(Number);
-    if (Number.isFinite(aheadRaw) && Number.isFinite(behindRaw)) {
+    if (behindRaw !== undefined && aheadRaw !== undefined && Number.isFinite(aheadRaw) && Number.isFinite(behindRaw)) {
       ahead = aheadRaw;
       behind = behindRaw;
     }

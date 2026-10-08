@@ -55,7 +55,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
   const blocked = useWorkspaceCloseGuard({ busy: controller.busy, dirty: controller.dirty, scope: { entityType: "table", entityId: intent.entityId } });
   const table = data.tables.find(item => item.id === intent.entityId);
   const order = controller.active;
-  useEffect(() => { if (returnRequested && !blocked) navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); }, [returnRequested, blocked, navigation]);
+  useEffect(() => { if (returnRequested && !blocked) navigation.closeWorkspace({ entityType: "table", entityId: intent.entityId }); }, [returnRequested, blocked, navigation, intent.entityId]);
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useLayoutEffect(() => {
     if (history) return;

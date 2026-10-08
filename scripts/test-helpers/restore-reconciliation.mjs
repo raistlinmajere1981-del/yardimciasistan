@@ -126,7 +126,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     const a = backup(); // T1: no Web-owned request/order yet
     const claim = await post('dealer/claim', { invite_token: token }, { 'X-YA-Dealer': '1' });
     assert.equal(claim.status, 200); const cookie = claim.cookie.split(';')[0];
-    pub = f.service.savePublication({ ...pub, expectedRevision: pub.revision, title: 'Remote B', text: 'Newer B' });
+    f.service.savePublication({ ...pub, expectedRevision: pub.revision, title: 'Remote B', text: 'Newer B' });
     mutate("UPDATE business SET name='Remote B', display_name='Remote B'; UPDATE settings SET google_place_id='restore-place-B';");
     mutate("UPDATE rooms SET name='Room B'; UPDATE reservations SET end_date='2030-07-25'; UPDATE tables SET name='Table B'; UPDATE menu_categories SET name='Menu B';");
     saveRuntimeCatalogProduct(f.db.databasePath, { ...productInput, id: product.id, salePrice: 140, dealerPriceA: 90 });

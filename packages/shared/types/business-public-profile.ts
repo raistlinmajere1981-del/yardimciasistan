@@ -150,7 +150,7 @@ export function isBusinessPublicClockTime(value: unknown): value is string {
   if (typeof value !== "string") return false;
   if (value === "") return true;
   if (!/^\d{2}:\d{2}$/.test(value)) return false;
-  const [hours, minutes] = value.split(":").map(Number);
+  const [hours = NaN, minutes = NaN] = value.split(":").map(Number);
   return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 }
 

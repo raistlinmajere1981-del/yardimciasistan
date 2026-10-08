@@ -34,7 +34,8 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
       return;
     }
     if (!draft.tables.some((table) => table.key === mediaTableKey)) {
-      setMediaTableKey(draft.tables[0].key);
+      const first = draft.tables[0];
+      if (first) setMediaTableKey(first.key);
     }
   }, [draft.tables, mediaTableKey]);
 

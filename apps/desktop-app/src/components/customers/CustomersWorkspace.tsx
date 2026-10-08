@@ -109,7 +109,7 @@ export function CustomersWorkspace({
     if (filter === "staying" && !hasStayCustomers) setFilter("all");
     if (filter === "reserved" && !hasReservationCustomers) setFilter("all");
     if ((filter === "kbs_pending" || filter === "kbs_failed") && !kbsOverview.enabled) setFilter("all");
-  }, [filter, hasDealerCustomers, hasReservationCustomers, hasStayCustomers, kbsOverview.enabled]);
+  }, [filter, hasDealerCustomers, hasReservationCustomers, hasStayCustomers, kbsOverview.enabled, setFilter]);
 
   useEffect(() => {
     if (createOpen || !pendingCustomerId) return;

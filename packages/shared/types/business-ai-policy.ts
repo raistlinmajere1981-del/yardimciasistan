@@ -47,7 +47,7 @@ export const BUSINESS_AI_INFORMATION_PATTERNS = [
 export function normalizeBusinessAiIntentText(value: string): string {
   const replacements: Record<string, string> = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" };
   return String(value ?? "").toLocaleLowerCase("tr-TR")
-    .replace(/[çğıöşü]/g, (letter) => replacements[letter])
+    .replace(/[çğıöşü]/g, (letter) => replacements[letter] ?? letter)
     .replace(/[^a-z0-9]+/g, " ").trim();
 }
 

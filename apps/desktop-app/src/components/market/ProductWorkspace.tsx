@@ -66,6 +66,7 @@ export function ProductWorkspace({
   const navigation = useWorkspaceNavigation();
   const bridge = window.yardimciDesktop?.commerce;
   const product = products.find((item) => item.id === intent.entityId) ?? null;
+  const productId = product?.id ?? "";
   const [form, setForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
   const [baseline, setBaseline] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
   const [localImageDataUrl, setLocalImageDataUrl] = useState("");
@@ -121,19 +122,19 @@ export function ProductWorkspace({
     setPublicationLoaded(false);
     setIsPublished(false);
     setPublicationMessage("");
-    if (!onlineSalesEnabled || !product || !bridge) {
+    if (!onlineSalesEnabled || !productId || !bridge) {
       setPublicationBusy(false);
       return;
     }
     setPublicationBusy(true);
-    void bridge.getProductPublication(product.id).then((publication) => {
+    void bridge.getProductPublication(productId).then((publication) => {
       if (!isCurrent()) return;
       setIsPublished(publication?.isPublished ?? false);
       setPublicationLoaded(true);
     }).catch(() => {
       if (isCurrent()) setPublicationMessage("Web yayın tercihi okunamadı. Ürün kartını yeniden açıp deneyin.");
     }).finally(() => { if (isCurrent()) setPublicationBusy(false); });
-  }, [beginPublicationRequest, bridge, onlineSalesEnabled, product?.id]);
+  }, [beginPublicationRequest, bridge, onlineSalesEnabled, productId]);
 
   async function savePublication(published: boolean) {
     if (!bridge || !product || !onlineSalesEnabled || mutationBusy || !publicationLoaded) return;

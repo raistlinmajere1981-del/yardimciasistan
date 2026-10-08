@@ -274,9 +274,11 @@ export function useWorkspaceCloseGuard({ busy, dirty, scope }: {
   scope?: CloseGuardScope;
 }) {
   const { registerCloseGuard } = useWorkspaceNavigation();
+  const scopeEntityType = scope?.entityType;
+  const scopeEntityId = scope?.entityId;
   useLayoutEffect(
-    () => registerCloseGuard(() => !busy && !dirty, scope),
-    [registerCloseGuard, busy, dirty, scope?.entityType, scope?.entityId]
+    () => registerCloseGuard(() => !busy && !dirty, scopeEntityType === undefined || scopeEntityId === undefined ? undefined : { entityType: scopeEntityType, entityId: scopeEntityId }),
+    [registerCloseGuard, busy, dirty, scopeEntityType, scopeEntityId]
   );
   return busy || dirty;
 }

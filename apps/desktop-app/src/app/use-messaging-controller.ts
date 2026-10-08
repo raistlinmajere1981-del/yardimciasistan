@@ -319,7 +319,7 @@ export function useMessagingController({
     setSuggestingRequestId("");
     setAiState("idle");
     setAiMessage("AI cevap taslağı hazır.");
-  }, [customersEnabled]);
+  }, [customersEnabled, setStatusMessage, setSyncState]);
 
   useEffect(() => {
     if (whatsappEnabled) return;
@@ -334,9 +334,12 @@ export function useMessagingController({
     }
     setSelectedWhatsAppRequestIdState("");
     setEphemeralWhatsAppHandoff(null);
-  }, [whatsappEnabled]);
+  }, [whatsappEnabled, setStatusMessage, setSyncState]);
 
-  const preparedWhatsAppRecords = surfaceData.preparedWhatsAppMessages ?? [];
+  const preparedWhatsAppRecords = useMemo(
+    () => surfaceData.preparedWhatsAppMessages ?? [],
+    [surfaceData.preparedWhatsAppMessages]
+  );
 
   const readyWhatsAppRequestIds = useMemo(
     () => new Set(

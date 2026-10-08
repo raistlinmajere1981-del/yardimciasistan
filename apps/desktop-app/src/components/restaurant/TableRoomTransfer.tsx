@@ -49,7 +49,7 @@ export function TableRoomTransfer({ order, busy, onTransfer, revision, customerI
     folio.status === "open"
     && stays.some(stay => stay.id === folio.stayId)
     && folio.currency === getOrderCurrency(order)) ?? [];
-  const selectedId = folios.length === 1 ? folios[0].id : folioId;
+  const selectedId = folios.length === 1 ? folios[0]?.id ?? folioId : folioId;
   const selected = folios.find(folio => folio.id === selectedId);
 
   async function requestTransfer() {

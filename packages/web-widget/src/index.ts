@@ -15,7 +15,6 @@ import {
   normalizePublicSurfaces,
   readScriptConfig as getScriptConfig,
   resolvePublicSurfaces,
-  type BusinessProfileId,
   type PublicSurface,
   type WidgetConfig
 } from "./widget-config";

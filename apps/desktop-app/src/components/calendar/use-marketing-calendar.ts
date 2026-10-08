@@ -15,6 +15,7 @@ export function useMarketingCalendar(enabled: boolean, dates: string[]) {
     const snapshots = await Promise.all(months.split(",").map(async month => resultValue(await window.yardimciDesktop!.getMarketingSchedules(month))));
     if(!mounted.current || ticket !== epoch.current)return;
     const first = snapshots[0];
+    if (!first) return;
     const occurrences = [...new Map(snapshots.flatMap(s => s.occurrences).map(o => [`${o.scheduleId}:${o.plannedAt}`, o])).values()];
     setSnapshot({...first, occurrences}); setMessage("");
   }, [enabled, months]);

@@ -27,7 +27,9 @@ export function resolveScheduleLocal(local: string, timezone: string): string {
   const exact = candidates.find(t => wall(t,timezone) === desired);
   const shifted = candidates.filter(t=>wall(t,timezone)>desired).sort((a,b)=>(wall(a,timezone)-desired)-(wall(b,timezone)-desired))[0];
   if (exact === undefined && shifted === undefined) invalid();
-  return new Date(exact ?? shifted).toISOString();
+  const next = exact ?? shifted;
+  if (next === undefined) invalid();
+  return new Date(next).toISOString();
 }
 export function validateScheduleTiming(input: MarketingScheduleInput) {
   const timezone = scheduleTimezone(input.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);

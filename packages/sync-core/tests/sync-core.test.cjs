@@ -2,7 +2,6 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
-  ANDROID_PERMISSIONS,
   ANDROID_PERMISSION_GROUP_PERMISSIONS,
   ANDROID_STAFF_PERMISSIONS,
   LOCAL_COMPANION_API_PREFIX,

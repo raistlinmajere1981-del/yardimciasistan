@@ -29,12 +29,13 @@ export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChang
     const off = window.yardimciDesktop?.onBusinessMessagingChanged?.(() => { void refreshConfiguration(); });
     return () => { configurationRequest.current++; off?.(); };
   }, [refreshConfiguration]);
+  const messageId = message?.id;
   useEffect(() => {
-    if (!message || !window.yardimciDesktop) return;
+    if (!messageId || !window.yardimciDesktop) return;
     const bridge = window.yardimciDesktop; let live = true;
-    const refresh = () => { void bridge.getBusinessMessage(message.id).then((result) => { if (live && result.ok) setMessage(result.value); }).catch(() => {}); };
+    const refresh = () => { void bridge.getBusinessMessage(messageId).then((result) => { if (live && result.ok) setMessage(result.value); }).catch(() => {}); };
     const off = bridge.onBusinessMessagingChanged(refresh); refresh(); return () => { live = false; off(); };
-  }, [message?.id]);
+  }, [messageId]);
   const template = templates.find((item) => `${item.name}:${item.language}` === selected);
   function choose(value: string) {
     setSelected(value); const item = templates.find((entry) => `${entry.name}:${entry.language}` === value);

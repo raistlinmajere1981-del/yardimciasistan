@@ -37,7 +37,7 @@ try {
 
   // Recurring catch-up collapses 12+ missed occurrences. Explicit pause/resume and cancel.
   const r=f.scheduleService.save(f.input(f.publication(),{startsLocal:'2030-01-02T09:00',scheduleType:'recurring',recurrenceRule:{frequency:'daily',interval:1,localTime:'09:00'}})).schedule;
-  let paused=f.scheduleService.transition(r.id,r.revision,'pause');f.advance(14*86400000);await f.tick();
+  const paused=f.scheduleService.transition(r.id,r.revision,'pause');f.advance(14*86400000);await f.tick();
   assert.equal(f.db.listMarketingSchedules().find(d=>d.schedule.id===r.id).executions.length,0);
   f.scheduleService.transition(r.id,paused.schedule.revision,'resume');await f.tick();d=f.db.listMarketingSchedules().find(d=>d.schedule.id===r.id);
   assert.equal(d.executions.length,1);assert.equal(d.executions[0].status,'succeeded');assert(Date.parse(d.schedule.nextRunAt)>f.now().getTime());

@@ -135,7 +135,7 @@ try {
       }),
       testGoogleReviewsConnection: async () => ({ ok: true, message: "Google Places bağlantısı doğrulandı.", name: "Smoke İşletme", rating: 4.8, userRatingCount: 12 }),
       getBusinessLayout: async () => ({ capabilities: { rooms: false, tables: false }, rooms: [], tableCategories: [] }),
-      saveBusinessLayout: async (input) => ({ ok: true, message: "İşletme düzeni kaydedildi.", layout: { capabilities: { rooms: false, tables: false }, rooms: [], tableCategories: [] } }),
+      saveBusinessLayout: async (_input) => ({ ok: true, message: "İşletme düzeni kaydedildi.", layout: { capabilities: { rooms: false, tables: false }, rooms: [], tableCategories: [] } }),
       getKbsSettings: async () => ({ enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false }),
       saveKbsSettings: async (input) => ({ ok: true, message: "KBS ayarları kaydedildi.", settings: { enabled: input.enabled, provider: input.provider, facilityCode: input.facilityCode, username: input.username, authorizedIdentityNumber: input.authorizedIdentityNumber, passwordConfigured: Boolean(input.password) } }),
       testKbsConnection: async () => ({ ok: false, message: "Smoke modunda KBS bağlantısı denenemez." }),

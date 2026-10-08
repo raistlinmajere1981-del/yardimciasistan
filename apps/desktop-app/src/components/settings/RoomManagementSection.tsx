@@ -52,7 +52,8 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
       return;
     }
     if (!rooms.some((room) => room.key === mediaRoomKey)) {
-      setMediaRoomKey(rooms[0].key);
+      const first = rooms[0];
+      if (first) setMediaRoomKey(first.key);
     }
   }, [mediaRoomKey, rooms]);
 

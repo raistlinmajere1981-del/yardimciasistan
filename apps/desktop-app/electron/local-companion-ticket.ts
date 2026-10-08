@@ -42,7 +42,7 @@ export function verifyLocalCompanionPairingTicket(input: {
   }
 
   const encodedPayload = parts[1];
-  const suppliedSignature = parts[2].toLowerCase();
+  const suppliedSignature = (parts[2] ?? "").toLowerCase();
   if (!encodedPayload || !/^[a-f0-9]{64}$/.test(suppliedSignature)) {
     return fail("local_pairing_ticket_invalid", "Yerel eşleştirme bileti geçersiz.");
   }

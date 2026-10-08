@@ -2,7 +2,7 @@ import { SearchSelect } from "../ui/SearchSelect";
 import type { MarketingAssetView } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
 export function MarketingMediaGallery({assets,selected,onChange,maxImages,disabled=false}:{assets:MarketingAssetView[];selected:string[];onChange:(ids:string[])=>void;maxImages:number;disabled?:boolean}) {
-  function move(index:number,offset:number) {const next=[...selected];[next[index],next[index+offset]]=[next[index+offset],next[index]];onChange(next);}
+  function move(index:number,offset:number) {const next=[...selected];const current=next[index];const other=next[index+offset];if(current===undefined||other===undefined)return;next[index]=other;next[index+offset]=current;onChange(next);}
   return <section aria-label="Seçilen görseller" className="marketing-media-selector">
     <p>{selected.length} / {maxImages} görsel · İlk görsel kapak olarak kullanılır.</p>
     <ol className="marketing-selected-media">{selected.map((id,index)=>{

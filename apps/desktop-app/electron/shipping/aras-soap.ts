@@ -46,12 +46,18 @@ export function parseSoapResult(xml: string, operation: string): Element {
     inspect(root, 0);
     const bodies = children(root, "Body", SOAP_NS);
     if (bodies.length !== 1) throw malformed();
-    if (children(bodies[0], "Fault", SOAP_NS).length) throw new ShippingProviderError("soap_fault", "Kargo sağlayıcısı isteği kabul etmedi. Hesap ve servis yetkilerini kontrol edin.");
-    const responses = children(bodies[0], `${operation}Response`, ARAS_SERVICE_NS);
-    if (responses.length !== 1 || children(bodies[0]).length !== 1) throw malformed();
-    const results = children(responses[0], `${operation}Result`, ARAS_SERVICE_NS);
+    const body = bodies[0];
+    if (!body) throw malformed();
+    if (children(body, "Fault", SOAP_NS).length) throw new ShippingProviderError("soap_fault", "Kargo sağlayıcısı isteği kabul etmedi. Hesap ve servis yetkilerini kontrol edin.");
+    const responses = children(body, `${operation}Response`, ARAS_SERVICE_NS);
+    if (responses.length !== 1 || children(body).length !== 1) throw malformed();
+    const response = responses[0];
+    if (!response) throw malformed();
+    const results = children(response, `${operation}Result`, ARAS_SERVICE_NS);
     if (results.length !== 1) throw malformed();
-    return results[0];
+    const result = results[0];
+    if (!result) throw malformed();
+    return result;
   } catch (error) { if (error instanceof ShippingProviderError) throw error; throw malformed(); }
 }
 
@@ -59,10 +65,13 @@ export function parseSoapResult(xml: string, operation: string): Element {
 export function dataRows(result: Element): Element[] {
   const diffgrams = children(result, "diffgram", "urn:schemas-microsoft-com:xml-diffgram-v1");
   if (diffgrams.length !== 1) throw malformed();
-  if (children(diffgrams[0], "errors", "urn:schemas-microsoft-com:xml-diffgram-v1").length) throw new ShippingProviderError("query_rejected", "Kargo sorgu yanıtında veri hatası var.");
-  const tables = children(diffgrams[0]).filter((node) => node.namespaceURI !== "urn:schemas-microsoft-com:xml-diffgram-v1");
+  const diffgram = diffgrams[0];
+  if (!diffgram) throw malformed();
+  if (children(diffgram, "errors", "urn:schemas-microsoft-com:xml-diffgram-v1").length) throw new ShippingProviderError("query_rejected", "Kargo sorgu yanıtında veri hatası var.");
+  const tables = children(diffgram).filter((node) => node.namespaceURI !== "urn:schemas-microsoft-com:xml-diffgram-v1");
   if (tables.length > 1) throw malformed();
-  return tables.length ? children(tables[0]) : [];
+  const table = tables[0];
+  return table ? children(table) : [];
 }
 
 export class ArasSoapClient {

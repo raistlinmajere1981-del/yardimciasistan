@@ -42,7 +42,7 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
       desktopNexa.setActive(active);
       setMotionActive(active && root.dataset.motion !== "reduced" && (root.dataset.motion === "full" || !motionQuery.matches));
     }
-    const intersection = new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); });
+    const intersection = new IntersectionObserver(([entry]) => { inView = entry?.isIntersecting ?? false; update(); });
     if (host.current) intersection.observe(host.current);
     const appearance = new MutationObserver(update);
     appearance.observe(document.documentElement, { attributes: true, attributeFilter: ["data-color-scheme", "data-motion"] });

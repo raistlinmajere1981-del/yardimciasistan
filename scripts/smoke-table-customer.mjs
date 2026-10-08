@@ -78,7 +78,7 @@ try {
   const ipcPath = resolve('apps/desktop-app/dist-electron/ipc/room-table-ipc.js');
   runInNewContext(readFileSync(ipcPath, 'utf8'), { exports: ipcModule.exports,
     require: name => name === 'electron' ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } } : require(name) });
-  let locked = false; let capabilities = new Set([C.FOOD_TABLES, C.CUSTOMERS]); let calls = 0;
+  let locked = false; const capabilities = new Set([C.FOOD_TABLES, C.CUSTOMERS]); let calls = 0;
   ipcModule.exports.registerRoomTableIpcHandlers({
     getDatabase: () => ({ assignTableCustomer: input => { calls++; return database.assignTableCustomer(input); } }),
     assertUnlocked: () => { if (locked) throw new Error('locked'); },

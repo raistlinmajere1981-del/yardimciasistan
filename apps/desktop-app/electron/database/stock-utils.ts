@@ -172,8 +172,8 @@ function parseMeasuredStockQuantity(value: string, unit: MenuStockUnit): number 
   if (!match) {
     return null;
   }
-  const quantity = parseTurkishDocumentNumber(match[1]);
-  const source = match[2];
+  const quantity = parseTurkishDocumentNumber(match[1] ?? "");
+  const source = match[2] ?? "";
   const mass = ["kg", "kilogram", "kilo", "gr", "gram", "g"].includes(source);
   const volume = ["ml", "mililitre", "lt", "litre", "l"].includes(source);
   let result: number | null = null;

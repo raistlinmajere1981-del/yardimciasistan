@@ -1,6 +1,6 @@
 import { usePageViewState } from "../../app/page-view-state";
 import { RoomCategoryControl, RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
-import { useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES as C,
   getReservationDomain,
@@ -88,7 +88,6 @@ export function DesktopWorkspaceRouter({
   customerWorkTab,
   setCustomerWorkTab,
   registerPageLeaveGuard,
-  syncState,
   setSyncState,
   setStatusMessage,
   setupController,
@@ -116,8 +115,7 @@ export function DesktopWorkspaceRouter({
     setDashboardData,
     businessCapabilities,
     saveSetupWithCapabilityRefresh,
-    automaticSyncStatus,
-    pullRequests
+    automaticSyncStatus
   } = desktopSyncController;
   const {
     menuEditState,

@@ -25,7 +25,7 @@ try {
   assert.equal((await post(form({expires:String(Math.floor(Date.now()/1000)+1500)}))).status,422);
   assert.equal((await post(form({bytes:Buffer.alloc(8388609)}))).status,413);
   assert.equal((await post(form())).status,200);assert.equal((await post(form())).status,200);
-  let result=await fetch(`${base}/${token}.jpg`);assert.equal(result.status,200);assert.equal(result.headers.get('content-type'),'image/jpeg');assert.equal(result.headers.get('cache-control'),'no-store');assert.deepEqual(Buffer.from(await result.arrayBuffer()),bytes);
+  const result=await fetch(`${base}/${token}.jpg`);assert.equal(result.status,200);assert.equal(result.headers.get('content-type'),'image/jpeg');assert.equal(result.headers.get('cache-control'),'no-store');assert.deepEqual(Buffer.from(await result.arrayBuffer()),bytes);
   for(const path of ['','/','/%2e%2e%2fconfig%2fbusiness.json','/unknown.jpg',`/${token}.jpg?token=QUERY_LOG_CANARY`]){const response=await fetch(base+path);assert.equal(response.status,404);assert.equal((await response.text()).includes('STAGING_LOG_CANARY'),false);}
   assert.equal((await fetch(`${base.replace('/api/instagram-media.php','')}/data/instagram-staging/`)).status,403);
   const files=readdirSync(join(root,'data/instagram-staging'));assert.equal(files.length,1);assert.equal(files[0].includes(token),false);

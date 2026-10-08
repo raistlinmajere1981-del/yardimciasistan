@@ -191,7 +191,7 @@ export async function testAiConnection(
   if (!result || !result.ok) {
     return {
       ok: false,
-      message: formatAiConnectionFailure(attemptedModels.at(-1) || modelCandidates[0], result, attemptedModels),
+      message: formatAiConnectionFailure((attemptedModels.at(-1) || modelCandidates[0]) ?? "", result, attemptedModels),
       model: service === "gemini" ? attemptedModels.at(-1) : undefined,
       models: service === "gemini" ? models : undefined
     };

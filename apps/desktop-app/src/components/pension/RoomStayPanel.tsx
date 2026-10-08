@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { defaultRoomAssignmentForm } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
@@ -27,7 +27,9 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
   const request = useRef({ signature: "", id: "" });
   const quickCustomerRequest = useRef("");
   const entryDirty = useRef(false);
-  function markEntry(value: boolean) { entryDirty.current = value; onDirty(value); }
+  const onDirtyRef = useRef(onDirty);
+  onDirtyRef.current = onDirty;
+  const markEntry = useCallback((value: boolean) => { entryDirty.current = value; onDirtyRef.current(value); }, []);
   const { room, state, active, reservations } = model;
   const eligible = room ? reservations.filter(item => item.reservationType === "room" && item.status === "approved"
     && (!item.roomIds.length || item.roomIds.includes(room.id)) && !model.stays.some(stay => stay.reservationId === item.id && stay.status !== "cancelled")) : [];
@@ -74,6 +76,10 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
 
     if (active.length === 1) {
       const stay = active[0];
+      if (!stay) {
+        onQuickCustomerHandled?.();
+        return;
+      }
       if ((stay.guests ?? []).some(guest => guest.customerId === customerId && ["planned", "checked_in"].includes(guest.status))) {
         onQuickCustomerHandled?.();
         return;
@@ -94,7 +100,7 @@ export function RoomStayPanel({ model, data, intent, operations, disabled, stays
     }
     markEntry(true);
     onQuickCustomerHandled?.();
-  }, [active, additional, onQuickCustomerHandled, operations, primary, quickCustomerId, room, state]);
+  }, [active, additional, markEntry, onQuickCustomerHandled, operations, primary, quickCustomerId, room, state]);
 
   if (!room || !state) return null;
 

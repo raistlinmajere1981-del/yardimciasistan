@@ -84,7 +84,7 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
       <AnalyticsTrends data={data}/>
       <section aria-label="Kanal sonuçları" className="marketing-analytics-results"><header><h3>Kanal sonuçları</h3><p className="muted">Her kanal kendi ölçümleriyle gösterilir. Yayın ve mesaj sayıları farklı şeyleri ölçer.</p></header>
         <div className="marketing-analytics-channels">{data.channels.map(c => {
-          const metrics = c.metrics.filter(m => channelMetrics[c.channel].includes(m.metric));
+          const metrics = c.metrics.filter(m => (channelMetrics[c.channel] ?? []).includes(m.metric));
           return <Panel as="section" className="marketing-analytics-channel" key={c.channel} aria-label={`${channelNames[c.channel]} analitiği`}>
           <h3>{channelNames[c.channel]}</h3>
           {metrics.some(m => m.value !== null) ? <AnalyticsMetricList metrics={metrics} label={`${channelNames[c.channel]} metrikleri`}/>

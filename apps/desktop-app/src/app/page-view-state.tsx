@@ -27,6 +27,9 @@ export function usePageViewScroll<T extends HTMLElement = HTMLDivElement>(key: s
   const store = useContext(PageViewState);
   const cleanup = useRef<(() => void) | undefined>(undefined);
   return useCallback((element: T | null) => {
+    // contentVersion is identity-only: changing it forces React to re-attach
+    // this callback ref so scroll restoration re-runs after async lists populate.
+    void contentVersion;
     cleanup.current?.(); cleanup.current = undefined;
     if (!element || !store) return;
     const saved = store.get(key) as { top: number; left: number } | undefined;

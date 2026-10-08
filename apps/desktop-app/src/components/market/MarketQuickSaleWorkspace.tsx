@@ -245,7 +245,7 @@ export function MarketQuickSaleWorkspace({
     return result === "added";
   }, [addSessionProduct, onStateChange]);
 
-  const resolveBarcode = useCallback(async (barcode: string, source: string) => {
+  const resolveBarcode = useCallback(async (barcode: string, _source: string) => {
     if (!bridge || saleInFlight.current) return "stale" as const;
     const isCurrent = beginBarcodeRequest();
     setSearch("");
@@ -279,7 +279,7 @@ export function MarketQuickSaleWorkspace({
       onStateChange("error", message);
       return "not_found" as const;
     }
-  }, [addProduct, beginBarcodeRequest, bridge, onExternalProductFound, onStateChange, saleInFlight]);
+  }, [addProduct, beginBarcodeRequest, bridge, onExternalProductFound, onStateChange, saleInFlight, setSearch]);
 
   const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
     if (!barcodeEnabled || busy || submitting || saleInFlight.current || draftLoading || localScanInFlight.current) return;

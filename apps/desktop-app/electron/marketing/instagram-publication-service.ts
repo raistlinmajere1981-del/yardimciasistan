@@ -75,7 +75,7 @@ export class InstagramPublicationService {
       if(!state.containerId) {
         if(state.createSubmitted)throw new MarketingProviderError("submission_uncertain");
         this.stagingGate(web,state.stageBaseUrl);
-        const bytes=this.media.instagramJpeg(original.mediaAssetIds[0]);
+        const bytes=this.media.instagramJpeg(original.mediaAssetIds[0] ?? "");
         const url=await this.staging.upload({...web,baseUrl:state.stageBaseUrl},{token:state.stageToken,expiresAt:state.stageExpiresAt},bytes);
         desktopLog.info({scope:"instagram",event:"instagram.media.staged",message:"Instagram görsel aktarımı hazır.",operationId:id});
         await adapter.getAccountProfile();this.gate(credentials);this.stagingGate(web,state.stageBaseUrl);

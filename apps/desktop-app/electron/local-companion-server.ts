@@ -87,12 +87,14 @@ function isLocalNetworkAddress(value: string | undefined): boolean {
 
   if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(address)) {
     const parts = address.split(".").map(Number);
+    const first = parts[0] ?? -1;
+    const second = parts[1] ?? -1;
     if (parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
-    if (parts[0] === 10 || parts[0] === 127) return true;
-    if (parts[0] === 169 && parts[1] === 254) return true;
-    if (parts[0] === 192 && parts[1] === 168) return true;
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
+    if (first === 10 || first === 127) return true;
+    if (first === 169 && second === 254) return true;
+    if (first === 192 && second === 168) return true;
+    if (first === 172 && second >= 16 && second <= 31) return true;
+    if (first === 100 && second >= 64 && second <= 127) return true;
     return false;
   }
 

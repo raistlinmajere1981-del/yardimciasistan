@@ -33,7 +33,7 @@ export function evaluateIdentityFrame(
   let brightnessSum = 0;
   let clippedPixels = 0;
   for (let index = 0, pixel = 0; pixel < pixelCount; pixel += 1, index += 4) {
-    const value = Math.round(data[index] * 0.2126 + data[index + 1] * 0.7152 + data[index + 2] * 0.0722);
+    const value = Math.round((data[index] ?? 0) * 0.2126 + (data[index + 1] ?? 0) * 0.7152 + (data[index + 2] ?? 0) * 0.0722);
     luma[pixel] = value;
     brightnessSum += value;
     if (value <= 18 || value >= 242) clippedPixels += 1;
@@ -47,7 +47,7 @@ export function evaluateIdentityFrame(
   if (hasMotionBaseline && previousLuma) {
     let delta = 0;
     for (let index = 0; index < luma.length; index += 2) {
-      delta += Math.abs(luma[index] - previousLuma[index]);
+      delta += Math.abs((luma[index] ?? 0) - (previousLuma[index] ?? 0));
     }
     motion = delta / Math.ceil(luma.length / 2) / 255;
   }
@@ -59,11 +59,11 @@ export function evaluateIdentityFrame(
     for (let x = 1; x < width - 1; x += 2) {
       const index = y * width + x;
       const laplacian =
-        4 * luma[index]
-        - luma[index - 1]
-        - luma[index + 1]
-        - luma[index - width]
-        - luma[index + width];
+        4 * (luma[index] ?? 0)
+        - (luma[index - 1] ?? 0)
+        - (luma[index + 1] ?? 0)
+        - (luma[index - width] ?? 0)
+        - (luma[index + width] ?? 0);
       laplacianSum += laplacian;
       laplacianSquaredSum += laplacian * laplacian;
       laplacianSamples += 1;
@@ -93,8 +93,8 @@ export function evaluateIdentityFrame(
   for (let y = 0; y < height - 1; y += 2) {
     for (let x = 0; x < width - 1; x += 2) {
       const index = y * width + x;
-      const gradient = Math.abs(luma[index] - luma[index + 1])
-        + Math.abs(luma[index] - luma[index + width]);
+      const gradient = Math.abs((luma[index] ?? 0) - (luma[index + 1] ?? 0))
+        + Math.abs((luma[index] ?? 0) - (luma[index + width] ?? 0));
       totalGradient += gradient;
       if (x >= guideLeft && x < guideRight && y >= guideTop && y < guideBottom) {
         guideGradient += gradient;

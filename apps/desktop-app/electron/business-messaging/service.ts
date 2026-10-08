@@ -46,7 +46,7 @@ export class BusinessMessagingService {
   }
   private assertCustomers() { assertPersistedBusinessCapability(this.getDatabase().databasePath, BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil."); }
   private validateParameters(template: BusinessMessageTemplate, parameters: string[][]) {
-    if (!template.supported || !Array.isArray(parameters) || parameters.length !== template.components.length || parameters.some((values, index) => !Array.isArray(values) || values.length !== template.components[index].parameters.length || values.some((value) => typeof value !== "string" || !value.trim() || value.length > 2000 || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)))) throw new BusinessMessagingError("invalid_parameters", "Şablon parametrelerini tamamlayın.");
+    if (!template.supported || !Array.isArray(parameters) || parameters.length !== template.components.length || parameters.some((values, index) => !Array.isArray(values) || values.length !== template.components[index]?.parameters.length || values.some((value) => typeof value !== "string" || !value.trim() || value.length > 2000 || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)))) throw new BusinessMessagingError("invalid_parameters", "Şablon parametrelerini tamamlayın.");
   }
   async prepare(input: BusinessTemplateIntentInput) {
     this.assertCustomers();

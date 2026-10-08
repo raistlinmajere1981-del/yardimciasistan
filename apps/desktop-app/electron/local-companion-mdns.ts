@@ -102,9 +102,9 @@ function isPrivateIpv4(address: string): boolean {
     return false;
   }
   return parts[0] === 10
-    || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31)
+    || (parts[0] === 172 && (parts[1] ?? -1) >= 16 && (parts[1] ?? -1) <= 31)
     || (parts[0] === 192 && parts[1] === 168)
-    || (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127)
+    || (parts[0] === 100 && (parts[1] ?? -1) >= 64 && (parts[1] ?? -1) <= 127)
     || (parts[0] === 169 && parts[1] === 254);
 }
 
@@ -124,10 +124,10 @@ function ipv4ToInt(address: string): number | null {
     return null;
   }
   return (
-    ((parts[0] << 24) >>> 0)
-    | (parts[1] << 16)
-    | (parts[2] << 8)
-    | parts[3]
+    (((parts[0] ?? 0) << 24) >>> 0)
+    | ((parts[1] ?? 0) << 16)
+    | ((parts[2] ?? 0) << 8)
+    | (parts[3] ?? 0)
   ) >>> 0;
 }
 
@@ -171,7 +171,7 @@ function decodeName(packet: Buffer, start: number): { name: string; next: number
     if (visited.has(offset)) return null;
     visited.add(offset);
 
-    const length = packet[offset];
+    const length = packet[offset] ?? 0;
     if (length === 0) {
       if (!jumped) next = offset + 1;
       return { name: labels.join("."), next };
@@ -179,7 +179,7 @@ function decodeName(packet: Buffer, start: number): { name: string; next: number
 
     if ((length & 0xc0) === 0xc0) {
       if (offset + 1 >= packet.length) return null;
-      const pointer = ((length & 0x3f) << 8) | packet[offset + 1];
+      const pointer = ((length & 0x3f) << 8) | (packet[offset + 1] ?? 0);
       if (!jumped) next = offset + 2;
       jumped = true;
       offset = pointer;

@@ -365,7 +365,7 @@ export function BusinessPublicProfileSection({
   controller: ReturnType<typeof useBusinessPublicProfileSettings>;
   disabled?: boolean;
 }) {
-  const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, feedback } = controller;
+  const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, feedback } = controller;
 
   return (
     <section ref={sectionRef} id="settings-public-profile" tabIndex={-1} className="business-public-profile-section settings-business-subsection settings-panel" aria-busy={loading || saving}>

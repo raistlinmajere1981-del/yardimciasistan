@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bug, Clipboard, Pause, Play, RefreshCw } from "lucide-react";
 import type {
   DesktopDiagnosticEvent,
@@ -41,7 +41,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
   const selectedSession = sessions.find((session) => session.sessionId === sessionId) ?? null;
   const isCurrentSession = Boolean(selectedSession?.current);
 
-  async function refreshSessions(preferredSessionId = sessionId) {
+  const refreshSessions = useCallback(async (preferredSessionId: string) => {
     const bridge = window.yardimciDesktop;
     if (!bridge?.listDiagnosticSessions) {
       setState("error");
@@ -65,9 +65,9 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       setState("error");
       setMessage("Log oturumları okunamadı.");
     }
-  }
+  }, []);
 
-  async function refreshEvents(targetSessionId = sessionId, quiet = false) {
+  const refreshEvents = useCallback(async (targetSessionId: string, quiet = false) => {
     if (!targetSessionId) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.readDiagnosticSession) {
@@ -94,18 +94,18 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       setState("error");
       setMessage("Log kayıtları okunamadı.");
     }
-  }
+  }, []);
 
   useEffect(() => {
     void refreshSessions("");
-  }, []);
+  }, [refreshSessions]);
 
   useEffect(() => {
     if (!sessionId) return;
     setSelectedSequence(null);
     setCopyMessage("");
     void refreshEvents(sessionId);
-  }, [sessionId]);
+  }, [refreshEvents, sessionId]);
 
   useEffect(() => {
     if (!isCurrentSession || paused || !sessionId) return;
@@ -113,7 +113,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
       void refreshEvents(sessionId, true);
     }, LIVE_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [isCurrentSession, paused, sessionId]);
+  }, [isCurrentSession, paused, refreshEvents, sessionId]);
 
   useEffect(() => {
     if (!paused) {

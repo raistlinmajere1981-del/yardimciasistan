@@ -186,14 +186,6 @@ export interface DesktopKbsOverview {
   activeMissingIdentityCount: number;
 }
 
-type DesktopKbsDeliveryState =
-  | "sent"
-  | "already_sent"
-  | "waiting"
-  | "interaction_required"
-  | "submission_unknown"
-  | "failed";
-
 export type DesktopKbsDeliveryMutationResult =
   | {
       ok: true;

@@ -1,6 +1,6 @@
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useRef, useState } from "react";
-import { BUSINESS_CAPABILITIES, isBusinessServiceAvailable } from "@yardimci-asistan/shared";
+import { isBusinessServiceAvailable } from "@yardimci-asistan/shared";
 import type { SaveInitialSetupInput } from "../../../electron/database";
 import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
@@ -74,6 +74,7 @@ interface PendingPageTransition {
 type PendingTransition = PendingCategoryTransition | PendingPageTransition;
 
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
+  const { registerPageLeaveGuard } = props;
   const [storedActive, setActive] = usePageViewState<SettingsCategoryId>("settings.category", "business");
   const [query, setQuery] = usePageViewState("settings.search", "");
   const [focusTarget, setFocusTarget] = useState("");
@@ -90,7 +91,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const roomsEnabled = isSettingsSectionVisible(roomSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const tablesEnabled = isSettingsSectionVisible(layoutSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const category = visibleCategories.find((item) => item.id === storedActive)
-    ?? settingsCategories[0];
+    ?? settingsCategories[0] ?? { id: "business" as SettingsCategoryId, title: "İşletme", description: "" };
   const active = category.id;
   useEffect(() => {
     if (storedActive !== active) setActive(active);
@@ -359,10 +360,10 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   }
 
   useEffect(() => {
-    if (!props.registerPageLeaveGuard) return;
+    if (!registerPageLeaveGuard) return;
 
-    return props.registerPageLeaveGuard((destination, continueNavigation) => {
-      if (!dirty[active]) return true;
+    return registerPageLeaveGuard((destination, continueNavigation) => {
+      if (!categoryDirty) return true;
       if (pendingTransition || guardBusy) return false;
       setPendingTransition({
         kind: "page",
@@ -371,7 +372,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       });
       return false;
     });
-  }, [active, guardBusy, pendingTransition, props.registerPageLeaveGuard, dirty.business, dirty.operations, dirty.services, dirty.application]);
+  }, [categoryDirty, guardBusy, pendingTransition, registerPageLeaveGuard]);
 
   useEffect(() => {
     if (!focusTarget) return;

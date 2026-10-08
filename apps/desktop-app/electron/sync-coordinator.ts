@@ -1209,7 +1209,7 @@ function calculateNextAttempt(attemptCount: number) {
 
 function calculateRetryDelayMs(attemptCount: number) {
   const index = Math.min(Math.max(0, attemptCount), RETRY_DELAYS_SECONDS.length - 1);
-  const seconds = RETRY_DELAYS_SECONDS[index];
+  const seconds = RETRY_DELAYS_SECONDS[index] ?? 5;
   const jitter = 0.9 + Math.random() * 0.2;
   return Math.round(seconds * jitter * 1000);
 }

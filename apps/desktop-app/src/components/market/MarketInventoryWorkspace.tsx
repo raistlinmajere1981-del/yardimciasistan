@@ -52,7 +52,8 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
 
   useEffect(() => {
     if (!productId && trackedProducts.length > 0) {
-      setProductId(trackedProducts[0].id);
+      const first = trackedProducts[0];
+      if (first) setProductId(first.id);
     }
   }, [productId, trackedProducts]);
 

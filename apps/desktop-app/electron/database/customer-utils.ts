@@ -113,10 +113,10 @@ function isValidTurkishIdentityNumber(value: string): boolean {
     return false;
   }
   const digits = [...value].map(Number);
-  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8];
-  const evenSum = digits[1] + digits[3] + digits[5] + digits[7];
-  return ((oddSum * 7 - evenSum) % 10 + 10) % 10 === digits[9]
-    && digits.slice(0, 10).reduce((total, digit) => total + digit, 0) % 10 === digits[10];
+  const oddSum = (digits[0] ?? 0) + (digits[2] ?? 0) + (digits[4] ?? 0) + (digits[6] ?? 0) + (digits[8] ?? 0);
+  const evenSum = (digits[1] ?? 0) + (digits[3] ?? 0) + (digits[5] ?? 0) + (digits[7] ?? 0);
+  return ((oddSum * 7 - evenSum) % 10 + 10) % 10 === (digits[9] ?? -1)
+    && digits.slice(0, 10).reduce((total, digit) => total + (digit ?? 0), 0) % 10 === (digits[10] ?? -1);
 }
 
 function normalizeOptionalIsoDate(value: unknown): string | null {

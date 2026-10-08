@@ -11,7 +11,7 @@ export function mapArasShipmentStatus(state: string): CommerceShipmentStatus | n
     "TESLİM EDİLDİ": "delivered", "TESLIM EDILDI": "delivered", "DELIVERED": "delivered",
     "TRANSFERDE": "dispatched", "DAĞITIMDA": "dispatched", "DAGITIMDA": "dispatched", "IN TRANSIT": "dispatched"
   };
-  return Object.hasOwn(statuses, normalized) ? statuses[normalized] : null;
+  return Object.hasOwn(statuses, normalized) ? (statuses[normalized] ?? null) : null;
 }
 function safeTracking(value: string) {
   return /^[A-Za-z0-9-]{1,100}$/.test(value) ? value : "";
@@ -48,7 +48,9 @@ export class ArasShippingProviderAdapter implements CommerceShippingProviderAdap
       if (children(result).length || result.textContent?.trim()) throw new ShippingProviderError("invalid_query", "Kargo kayıt sorgusu doğrulanamadı.");
       return false;
     }
-    if (orders.length !== 1 || field(orders[0], "IntegrationCode") !== integrationCode) throw new ShippingProviderError("reference_mismatch", "Kargo sağlayıcısı kayıt referansı eşleşmedi.");
+    if (orders.length !== 1) throw new ShippingProviderError("reference_mismatch", "Kargo sağlayıcısı kayıt referansı eşleşmedi.");
+    const order = orders[0];
+    if (!order || field(order, "IntegrationCode") !== integrationCode) throw new ShippingProviderError("reference_mismatch", "Kargo sağlayıcısı kayıt referansı eşleşmedi.");
     return true;
   }
   async createShipment(input: Parameters<CommerceShippingProviderAdapter["createShipment"]>[0]) {
@@ -66,7 +68,8 @@ export class ArasShippingProviderAdapter implements CommerceShippingProviderAdap
     };
     const result = await this.soap.call("SetOrder", `<orderInfo><Order>${Object.entries(fields).map(([name, value]) => xmlField(name, value)).join("")}</Order></orderInfo>${this.auth()}`);
     const rows = children(result, "OrderResultInfo");
-    if (rows.length !== 1 || !field(rows[0], "ResultCode")) throw new ShippingProviderError("invalid_registration", "Kargo kayıt yanıtı doğrulanamadı. Aynı gönderiyi tekrar sorgulayın.");
+    const created = rows[0];
+    if (rows.length !== 1 || !created || !field(created, "ResultCode")) throw new ShippingProviderError("invalid_registration", "Kargo kayıt yanıtı doğrulanamadı. Aynı gönderiyi tekrar sorgulayın.");
     // WSDL does not specify ResultCode semantics. A read-back is the success authority.
     if (!await this.findShipment(integrationCode)) throw new ShippingProviderError("registration_pending", "Gönderinin sağlayıcı sonucu henüz doğrulanamadı. Aynı gönderiyi tekrar sorgulayın; yeni gönderi oluşturmayın.");
     return { externalReference: integrationCode };
@@ -77,6 +80,7 @@ export class ArasShippingProviderAdapter implements CommerceShippingProviderAdap
     if (!rows.length) return { status: null, trackingNumber: "", trackingUrl: "" };
     if (rows.length !== 1) throw new ShippingProviderError("ambiguous_status", "Kargo durum yanıtı tek gönderiyle eşleştirilemedi.");
     const row = rows[0];
+    if (!row) throw new ShippingProviderError("ambiguous_status", "Kargo durum yanıtı tek gönderiyle eşleştirilemedi.");
     const reference = projectedField(row, ["IntegrationCode", "INTEGRATION_CODE", "INTEGRATIONCODE"]);
     if (reference && reference !== externalReference) throw new ShippingProviderError("reference_mismatch", "Kargo sağlayıcısı kayıt referansı eşleşmedi.");
     if (projectedField(row, ["Error", "ErrorCode", "HATA", "HATA_KODU"])) throw new ShippingProviderError("query_rejected", "Kargo durum sorgusu kabul edilmedi.");

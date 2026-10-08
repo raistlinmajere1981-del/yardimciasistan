@@ -81,7 +81,7 @@ export class WhatsAppCloudProviderAdapter implements BusinessMessagingProviderAd
         if (component.type === "FOOTER") continue;
         if (!["HEADER", "BODY"].includes(component.type) || (component.type === "HEADER" && component.format !== "TEXT")) { template.supported = false; continue; }
         if (typeof component.text !== "string" || component.text.length > 10000) throw new BusinessMessagingError("invalid_response");
-        const names = [...component.text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((match) => match[1]);
+        const names = [...component.text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((match) => match[1] ?? "");
         const parameters = [...new Set(names)];
         if (/\{\{|\}\}/.test(component.text.replace(/\{\{[a-zA-Z0-9_]+\}\}/g, ""))) template.supported = false;
         if (parameters.length > 30) throw new BusinessMessagingError("invalid_response");
@@ -96,7 +96,7 @@ export class WhatsAppCloudProviderAdapter implements BusinessMessagingProviderAd
   }
   async sendTemplateMessage(input: Parameters<BusinessMessagingProviderAdapter["sendTemplateMessage"]>[0]) {
     const components = input.template.components.flatMap((component, index) => component.parameters.length ? [{
-      type: component.type, parameters: component.parameters.map((name, param) => ({ type: "text", text: input.parameters[index][param], ...(/^\d+$/.test(name) ? {} : { parameter_name: name }) }))
+      type: component.type, parameters: component.parameters.map((name, param) => ({ type: "text", text: input.parameters[index]?.[param] ?? "", ...(/^\d+$/.test(name) ? {} : { parameter_name: name }) }))
     }] : []);
     const result = await this.request(`${this.credentials.phoneNumberId}/messages`, {
       messaging_product: "whatsapp", to: input.message.recipient, type: "template",

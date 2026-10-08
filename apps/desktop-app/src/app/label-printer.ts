@@ -109,7 +109,7 @@ function encodeCode128B(valueInput: string): Code128Encoding | null {
     0
   )) % 103;
   const codes = [CODE128_START_B, ...dataCodes, checksum, CODE128_STOP];
-  const patterns = codes.map((code) => CODE128_PATTERNS[code]);
+  const patterns = codes.map((code) => CODE128_PATTERNS[code] ?? "");
   const symbolModules = patterns.reduce(
     (sum, pattern) => sum + [...pattern].reduce((patternSum, width) => patternSum + Number(width), 0),
     0
@@ -331,6 +331,7 @@ function jpegPdf(
 
   for (let index = 0; index < pageCount; index += 1) {
     const pageId = pageIds[index];
+    if (pageId === undefined) throw new Error(`PDF nesnesi eksik: ${4 + (index * 2)}`);
     const contentId = pageId + 1;
     const content = `q\n${pageWidth.toFixed(3)} 0 0 ${pageHeight.toFixed(3)} 0 0 cm\n/Im0 Do\nQ\n`;
     objects.set(pageId, ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(3)} ${pageHeight.toFixed(3)}] /Resources << /XObject << /Im0 3 0 R >> >> /Contents ${contentId} 0 R >>`));
@@ -339,7 +340,7 @@ function jpegPdf(
 
   const chunks: Uint8Array[] = [new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10, 37, 226, 227, 207, 211, 10])];
   const offsets = new Array<number>(maxObjectId + 1).fill(0);
-  let cursor = chunks[0].byteLength;
+  let cursor = chunks[0]?.byteLength ?? 0;
 
   for (let id = 1; id <= maxObjectId; id += 1) {
     const body = objects.get(id);

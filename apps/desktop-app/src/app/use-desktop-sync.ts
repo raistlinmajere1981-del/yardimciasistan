@@ -48,7 +48,7 @@ export function useDesktopSync({
     setDashboardData(nextDashboardData);
     onDashboardLoadedRef.current?.(nextDashboardData);
     return nextDashboardData;
-  }, []);
+  }, [setDashboardData]);
 
   const loadBusinessCapabilities = useCallback(async () => {
     const bridge = window.yardimciDesktop;
@@ -171,7 +171,7 @@ export function useDesktopSync({
       unsubscribeDashboard?.();
       unsubscribeSync?.();
     };
-  }, [accessPhase, loadBusinessCapabilities, loadDashboardData, setStatusMessage, setSyncState]);
+  }, [accessPhase, loadBusinessCapabilities, loadDashboardData, setDashboardData, setStatusMessage, setSyncState]);
 
   const pullRequests = useCallback(async () => {
     setSyncState("loading");

@@ -114,7 +114,7 @@ export function MarketPage({
     productHandoffRequestId.current += 1;
     setProductLookupRequest({ requestId: productHandoffRequestId.current, product });
     onViewChange("products");
-  }, []);
+  }, [onViewChange]);
 
   const clearProductLookupRequest = useCallback((requestId: number) => {
     setProductLookupRequest((current) => current?.requestId === requestId ? null : current);
