@@ -15,7 +15,7 @@
     "design:audit": "node scripts/design-system-audit.mjs",
     "design:audit:baseline": "node scripts/design-system-audit.mjs --write-baseline",
     "design:audit:strict": "node --test scripts/test-desktop-style-audit.mjs && node scripts/design-system-audit.mjs --strict",
-    "lint": "eslint --no-error-on-unmatched-pattern --cache --cache-location node_modules/.cache/eslint \"apps/**/*.{js,mjs,cjs,ts,tsx}\" \"packages/**/*.{js,mjs,cjs,ts,tsx}\" \"scripts/**/*.{js,mjs,cjs,ts}\" \"tests/**/*.{js,mjs,cjs,ts,tsx}\" \"tools/**/*.mjs\"",
+    "lint": "eslint --no-error-on-unmatched-pattern --cache --cache-location node_modules/.cache/eslint \"apps/**/*.{js,mjs,cjs,ts,tsx}\" \"packages/**/*.{js,mjs,cjs,ts,tsx}\" \"scripts/**/*.{js,mjs,cjs,ts}\" \"tests/**/*.{js,mjs,cjs,ts,tsx}\" \"tools/**/*.mjs\" \"firm-template/web-module/**/*.js\"",
     "lint:strict": "npm run lint -- --max-warnings=0",
     "lint:fix": "npm run lint -- --fix",
     "knip": "knip --config knip.json",

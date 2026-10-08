@@ -19,7 +19,11 @@ export default tseslint.config(
       "**/coverage/**",
       "**/.demo-runtime/**",
       "**/release/**",
-      "firm-template/**",
+      // Only the hand-written web-module scripts are linted. widget.js is a
+      // tracked build snapshot of packages/web-widget (linted at its source)
+      // and widget-core.js is a minified bundle, so both stay out of scope.
+      "firm-template/web-module/widget.js",
+      "firm-template/web-module/widget-core.js",
       "demo-data/**"
     ]
   },

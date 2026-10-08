@@ -17,7 +17,12 @@
   const deliveryLabels = { pickup: 'İşletmeden teslim', shipping: 'Kargo ile gönderim' };
   let cart = [], pending = null, busy = false, retryUntil = 0, timer;
   function read(storage, key) { try { return JSON.parse(window[storage].getItem(key)); } catch { return null; } }
-  function write(storage, key, value) { try { value === null ? window[storage].removeItem(key) : window[storage].setItem(key, JSON.stringify(value)); } catch { /* storage may be blocked */ } }
+  function write(storage, key, value) {
+    try {
+      if (value === null) window[storage].removeItem(key);
+      else window[storage].setItem(key, JSON.stringify(value));
+    } catch { /* storage may be blocked */ }
+  }
   function snapshot(raw) {
     if (!raw || typeof raw.product_id !== 'string' || !raw.product_id.trim() || raw.product_id.length > 180
       || typeof raw.name !== 'string' || !raw.name.trim() || raw.name.length > 360
@@ -71,7 +76,7 @@
       if (!value || value.length > 2048) return '';
       const url = new URL(value);
       if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash
-        || !url.hostname.includes('.') || /^[\d.:\[\]]+$/.test(url.hostname) || /\.(local|localhost|internal|test)$/.test(url.hostname)) return '';
+        || !url.hostname.includes('.') || /^[\d.:[\]]+$/.test(url.hostname) || /\.(local|localhost|internal|test)$/.test(url.hostname)) return '';
       return url.href;
     } catch { return ''; }
   }
@@ -225,7 +230,7 @@
     const controls = /[\x00-\x1f\x7f]/;
     if (!values.name || length(values.name) > 160 || controls.test(values.name)) errors.name = 'Adınızı yazın (en fazla 160 karakter).';
     const digits = values.phone.replace(/\D/g, '');
-    if (length(values.phone) > 40 || !/^\+?[0-9 ().\/-]+$/.test(values.phone) || digits.length < 7 || digits.length > 15) errors.phone = '7–15 rakam içeren geçerli bir telefon yazın. Uluslararası numaralar kabul edilir.';
+    if (length(values.phone) > 40 || !/^\+?[0-9 ()./-]+$/.test(values.phone) || digits.length < 7 || digits.length > 15) errors.phone = '7–15 rakam içeren geçerli bir telefon yazın. Uluslararası numaralar kabul edilir.';
     if (length(values.email) > 254 || controls.test(values.email) || (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email))) errors.email = 'Geçerli bir e-posta yazın veya alanı boş bırakın.';
     if (length(values.note) > 2000 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(values.note)) errors.note = 'Not en fazla 2000 karakter olabilir.';
     for (const name of ['name', 'phone', 'email', 'note']) {
