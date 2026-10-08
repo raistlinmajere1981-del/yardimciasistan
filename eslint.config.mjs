@@ -87,18 +87,13 @@ export default tseslint.config(
     }
   },
   {
-    // Diagnostic only (uncommitted): measure floating/misused promises.
-    // Scoped to tsconfig-covered sources; scripts/tests fixtures live
-    // outside every project and would otherwise fail parsing.
-    // The Vite-served smoke fixture below is intentionally outside all
-    // tsconfigs (mirrors scripts/fixtures/*); it keeps the remaining
-    // rules but skips type-aware ones.
+    // Promise correctness gates. Scoped to tsconfig-covered sources;
+    // scripts/tests fixtures live outside every project and would
+    // otherwise fail type-aware parsing.
     files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
     ignores: ["apps/desktop-app/scripts/**"],
     languageOptions: {
       parserOptions: {
-        // NOTE: projectService only discovers tsconfig.json names, so the
-        // tsconfig.electron.json projects would be invisible to it.
         project: [
           "./apps/admin-control-center/tsconfig.json",
           "./apps/admin-control-center/tsconfig.electron.json",
@@ -114,8 +109,8 @@ export default tseslint.config(
       }
     },
     rules: {
-      "@typescript-eslint/no-floating-promises": "warn",
-      "@typescript-eslint/no-misused-promises": "warn"
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error"
     }
   }
 );
