@@ -12,13 +12,13 @@ interface RootErrorBoundaryState {
 }
 
 export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErrorBoundaryState> {
-  state: RootErrorBoundaryState = { failed: false };
+  override state: RootErrorBoundaryState = { failed: false };
 
   static getDerivedStateFromError(): RootErrorBoundaryState {
     return { failed: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     writeRendererDiagnostic({
       level: "ERROR",
       scope: "renderer",
@@ -31,7 +31,7 @@ export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErr
     });
   }
 
-  render() {
+  override render() {
     if (!this.state.failed) return this.props.children;
 
     return (

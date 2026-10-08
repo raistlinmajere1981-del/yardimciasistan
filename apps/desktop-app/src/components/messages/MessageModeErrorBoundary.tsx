@@ -15,7 +15,7 @@ interface MessageModeErrorBoundaryState {
 // pencereyi tema arka planıyla boş bırakmamalı; bu sınır hatayı
 // mesaj alanının içinde tutup güvenli moda dönüş sunar.
 export class MessageModeErrorBoundary extends Component<MessageModeErrorBoundaryProps, MessageModeErrorBoundaryState> {
-  state: MessageModeErrorBoundaryState = { hasError: false };
+  override state: MessageModeErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): MessageModeErrorBoundaryState {
     return { hasError: true };
@@ -26,7 +26,7 @@ export class MessageModeErrorBoundary extends Component<MessageModeErrorBoundary
     this.props.onReturnToSafe();
   };
 
-  render() {
+  override render() {
     if (!this.state.hasError) {
       return this.props.children;
     }
