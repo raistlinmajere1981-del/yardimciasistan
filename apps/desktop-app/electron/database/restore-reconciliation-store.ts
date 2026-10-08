@@ -109,7 +109,85 @@ export function finishRestoreReconciliationIfReady(db: DatabaseSync) {
  * were copied locally before replacement, never supplied by the Web. Existing
  * restored owner decisions (including tombstones) win. Missing historical price
  * evidence blocks/retries rather than silently repricing or acknowledging loss.
+ *
+ * Retained snapshots round-trip through JSON, so the decoded value is validated
+ * against the two shapes produced above before any field is read or persisted.
  */
+type RestoreSnapshotScalar = string | number | null;
+
+interface RestoreRejectedSnapshot {
+  dealer_access_id: RestoreSnapshotScalar;
+  access_revision: RestoreSnapshotScalar;
+  created_at: RestoreSnapshotScalar;
+}
+
+interface RestoreOrderSnapshot {
+  source: RestoreSnapshotScalar;
+  source_reference: RestoreSnapshotScalar;
+  business_id: RestoreSnapshotScalar;
+  customer_id: RestoreSnapshotScalar;
+  customer_name: RestoreSnapshotScalar;
+  buyer_snapshot_json: RestoreSnapshotScalar;
+  delivery_snapshot_json: RestoreSnapshotScalar;
+  subtotal: RestoreSnapshotScalar;
+  discount_total: RestoreSnapshotScalar;
+  total: RestoreSnapshotScalar;
+  currency: RestoreSnapshotScalar;
+  note: RestoreSnapshotScalar;
+  placed_at: RestoreSnapshotScalar;
+  created_at: RestoreSnapshotScalar;
+}
+
+interface RestoreSnapshotItem {
+  product_id: RestoreSnapshotScalar;
+  product_name: RestoreSnapshotScalar;
+  sku: RestoreSnapshotScalar;
+  barcode: RestoreSnapshotScalar;
+  unit: RestoreSnapshotScalar;
+  unit_price: RestoreSnapshotScalar;
+  quantity: RestoreSnapshotScalar;
+  line_total: RestoreSnapshotScalar;
+  tax_rate: RestoreSnapshotScalar;
+  created_at: RestoreSnapshotScalar;
+}
+
+type RetainedWebOrderSnapshot =
+  | { kind: "rejected"; rejected: RestoreRejectedSnapshot }
+  | { kind: "order"; order: RestoreOrderSnapshot; items: RestoreSnapshotItem[] };
+
+const RESTORE_REJECTED_KEYS = ["dealer_access_id", "access_revision", "created_at"] as const;
+const RESTORE_ORDER_KEYS = ["source", "source_reference", "business_id", "customer_id", "customer_name",
+  "buyer_snapshot_json", "delivery_snapshot_json", "subtotal", "discount_total", "total", "currency",
+  "note", "placed_at", "created_at"] as const;
+const RESTORE_ITEM_KEYS = ["product_id", "product_name", "sku", "barcode", "unit", "unit_price",
+  "quantity", "line_total", "tax_rate", "created_at"] as const;
+
+function isSnapshotScalar(value: unknown): value is RestoreSnapshotScalar {
+  return typeof value === "string" || typeof value === "number" || value === null;
+}
+
+function isSnapshotRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasSnapshotScalars(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return keys.every((key) => isSnapshotScalar(value[key]));
+}
+
+function isRetainedWebOrderSnapshot(value: unknown): value is RetainedWebOrderSnapshot {
+  if (!isSnapshotRecord(value)) return false;
+  if (value.kind === "rejected") {
+    return isSnapshotRecord(value.rejected) && hasSnapshotScalars(value.rejected, RESTORE_REJECTED_KEYS);
+  }
+  if (value.kind === "order") {
+    return isSnapshotRecord(value.order)
+      && hasSnapshotScalars(value.order, RESTORE_ORDER_KEYS)
+      && Array.isArray(value.items)
+      && value.items.every((item) => isSnapshotRecord(item) && hasSnapshotScalars(item, RESTORE_ITEM_KEYS));
+  }
+  return false;
+}
+
 export function replayRetainedWebOrder(db: DatabaseSync, envelope: WebOrderEnvelope): boolean {
   const restore = getRestoreReconciliationStatus(db);
   if (!restore || restore.state !== "reconciliation_pending" || restore.ordersComplete
@@ -127,7 +205,8 @@ export function replayRetainedWebOrder(db: DatabaseSync, envelope: WebOrderEnvel
       if (envelope.previouslyAcknowledged) throw new Error("Geçmiş Web siparişinin canonical fiyat snapshot'ı yok; replay bekliyor.");
       db.exec("COMMIT"); return false;
     }
-    const snapshot = JSON.parse(String(row.snapshot_json));
+    const snapshot: unknown = JSON.parse(String(row.snapshot_json));
+    if (!isRetainedWebOrderSnapshot(snapshot)) throw new Error("Restore sipariş ingress snapshot'ı uyuşmuyor.");
     if (snapshot.kind === "rejected") {
       if (source !== "web-dealer") throw new Error("Restore sipariş kaynağı uyuşmuyor.");
       const rejected = snapshot.rejected;
@@ -136,7 +215,7 @@ export function replayRetainedWebOrder(db: DatabaseSync, envelope: WebOrderEnvel
     } else {
       const order = snapshot.order;
       if (snapshot.kind !== "order" || order.source !== source || order.source_reference !== envelope.id || order.business_id !== businessId
-          || JSON.stringify(snapshot.items.map((item: { product_id: string; quantity: number }) => [item.product_id, Number(item.quantity)]).sort())
+          || JSON.stringify(snapshot.items.map((item) => [item.product_id, Number(item.quantity)]).sort())
             !== JSON.stringify(envelope.items.map(item => [item.productId, Number(item.quantity)]).sort())) throw new Error("Restore sipariş ingress snapshot'ı uyuşmuyor.");
       const customerId = order.customer_id && db.prepare("SELECT 1 FROM customers WHERE id = ? AND business_id = ?").get(order.customer_id, businessId) ? order.customer_id : null;
       const id = createId("commerce_order_");
