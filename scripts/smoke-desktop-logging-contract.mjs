@@ -24,6 +24,7 @@ const rootErrorBoundary = read("apps/desktop-app/src/components/app/RootErrorBou
 const preload = read("apps/desktop-app/electron/preload.ts");
 const rendererEntry = read("apps/desktop-app/src/main.tsx");
 const agents = read("AGENTS.md");
+const loggingDoc = read("docs/diagnostics/logging.md");
 const diagnosticsViewer = read("apps/desktop-app/src/components/diagnostics/DiagnosticsViewer.tsx");
 const frame = read("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
 
@@ -75,8 +76,9 @@ assert.match(rendererEntry, /renderer\.window-error/);
 assert.match(rendererEntry, /renderer\.unhandled-rejection/);
 assert.match(rendererEntry, /RootErrorBoundary/);
 assert.match(rootErrorBoundary, /renderer\.react-boundary/);
-assert.match(agents, /Logging and diagnostics/);
-assert.match(agents, /data\/logs\/sessions/);
+assert.match(agents, /docs\/diagnostics\/logging\.md/);
+assert.match(loggingDoc, /Desktop diagnostics/);
+assert.match(loggingDoc, /data\/logs\/sessions/);
 assert.match(diagnosticsViewer, /Tüm Oturumu Kopyala/);
 assert.match(diagnosticsViewer, /Bu Kaydın Bağlamını Kopyala/);
 assert.match(diagnosticsViewer, /LIVE_REFRESH_MS = 1000/);
