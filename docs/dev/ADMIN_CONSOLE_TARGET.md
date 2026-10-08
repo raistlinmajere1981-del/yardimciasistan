@@ -212,7 +212,7 @@ Referans görsel bir tasarım yönüdür; piksel kopyası değildir.
 
 ## Ana uygulamadan izolasyon
 
-Bu branch'teki admin geliştirmesi mümkün olduğunca şu alanlara dokunmaz:
+Admin Control Center geliştirmesi mümkün olduğunca şu alanlara dokunmaz:
 
 - `apps/desktop-app`
 - Android runtime
@@ -222,19 +222,6 @@ Bu branch'teki admin geliştirmesi mümkün olduğunca şu alanlara dokunmaz:
 Admin için yeni veri gerekiyorsa önce mevcut canonical metadata veya salt-okunur
 adapter kullanılır. Ürün runtime'ında gerçek yeni capability gerekiyorsa bu ayrı bir
 ana uygulama değişikliği olarak ele alınır.
-
-## Geliştirme sırası
-
-1. Ayrı Admin Control Center uygulama iskeleti.
-2. Typed Electron IPC ve güvenli process/FS sınırı.
-3. Gerçek verili Genel Bakış.
-4. Kurulumlar + health + version drift.
-5. Testler + verification geçmişi.
-6. Release görünümü.
-7. Deploy workflow'ları.
-8. Destek merkezi.
-9. Sistem/credential yönetimi.
-10. Legacy terminal admin ve ona özel kodların kaldırılması.
 
 ## Mevcut durum
 
