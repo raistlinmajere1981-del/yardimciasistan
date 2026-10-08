@@ -47,13 +47,13 @@ export default tseslint.config(
       "no-useless-assignment": "off",
       "no-empty": ["error", { "allowEmptyCatch": true }],
       "prefer-const": "warn",
-      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-empty-object-type": [
         "error",
         { "allowInterfaces": "with-single-extends" }
       ],
       "@typescript-eslint/no-unused-vars": [
-        "warn",
+        "error",
         {
           "argsIgnorePattern": "^_",
           "varsIgnorePattern": "^_",
@@ -83,7 +83,7 @@ export default tseslint.config(
       // set-state-in-effect/refs/immutability; those are useful migration
       // diagnostics but too opinionated to be repository gates for this app.
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn"
+      "react-hooks/exhaustive-deps": "error"
     }
   },
   {
