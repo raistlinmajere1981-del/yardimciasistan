@@ -61,7 +61,7 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage, onCal
   const recentRow = (row: typeof recent[number]) => <button type="button" className="marketing-record" key={row.id} onClick={() => openRecent(row)}><MarketingThumbnail snapshot={snapshot!} ids={row.images}/><span><strong>{row.title}</strong><small>{channelNames[row.channel]} · {new Date(row.date).toLocaleDateString("tr-TR")}</small></span><StatusBadge tone={row.label === "Yayında" || row.label === "Tamamlandı" ? "success" : row.label === "Planlandı" ? "info" : "neutral"}>{row.label}</StatusBadge></button>;
   return <FeatureWorkspacePage label="Pazarlama" bodyLabel="Pazarlama çalışma alanı" layout="fill" toolbar={<>
     <FeatureViewSelector label="Pazarlama görünümü" value={view} items={[{id: "workspace", label: "Çalışma Alanı"}, {id: "analytics", label: "Analitik"}]} onChange={setView}/>
-    <div className="page-toolbar__actions"><ActionButton variant="quiet" disabled={loading} onClick={() => {setMessage(""); setLoading(true); void reload().catch(e => setMessage(e.message)).finally(() => setLoading(false));}}><RefreshCw size={16}/>Durumu yenile</ActionButton></div>
+    <div className="page-toolbar__actions"><ActionButton variant="quiet" disabled={loading} onClick={() => {setMessage(""); setLoading(true); void reload().catch((e: unknown) => setMessage(e instanceof Error ? e.message : "Pazarlama verileri alınamadı.")).finally(() => setLoading(false));}}><RefreshCw size={16}/>Durumu yenile</ActionButton></div>
   </>}>
     <div className="marketing-page" aria-busy={loading}>
       {message && <p role="alert">{message}</p>}

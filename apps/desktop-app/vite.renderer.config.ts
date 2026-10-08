@@ -1,15 +1,16 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error Build tooling is an ESM JavaScript module shared with packaging.
 import { nexaAssetsPlugin } from "../../scripts/nexa-assets.mjs";
 
 const sharedSource = fileURLToPath(new URL("../../packages/shared/index.ts", import.meta.url));
 const syncCoreSource = fileURLToPath(new URL("../../packages/sync-core/index.ts", import.meta.url));
+const nexaPlugin = nexaAssetsPlugin as (surface: "desktop" | "web") => PluginOption;
 
 export default defineConfig({
   base: "./",
-  plugins: [react(), nexaAssetsPlugin("desktop")],
+  plugins: [react(), nexaPlugin("desktop")],
   resolve: {
     // Workspace packages are emitted as CommonJS for Electron/Node. Renderer
     // code consumes their TypeScript sources so Rollup can use named exports.

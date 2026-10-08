@@ -354,11 +354,12 @@ function installIpcErrorLogging() {
 
   const originalHandle = ipcMain.handle.bind(ipcMain);
   const mutableIpcMain = ipcMain as unknown as { handle: typeof ipcMain.handle };
+  type IpcListener = (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
 
   mutableIpcMain.handle = ((channel, listener) => {
-    originalHandle(channel, async (event, ...args) => {
+    originalHandle(channel, async (event, ...args: unknown[]) => {
       try {
-        return await listener(event, ...args);
+        return await (listener as IpcListener)(event, ...args);
       } catch (error) {
         desktopLog.error({
           scope: "ipc",

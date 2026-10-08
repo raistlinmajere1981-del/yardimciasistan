@@ -120,7 +120,7 @@ function writeJson(response: ServerResponse, statusCode: number, payload: unknow
 async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   let total = 0;
-  for await (const chunk of request) {
+  for await (const chunk of request as AsyncIterable<Uint8Array>) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += buffer.length;
     if (total > MAX_JSON_BODY_BYTES) {

@@ -271,8 +271,8 @@ function cleanText(value: unknown, maxLength: number): string {
 function parseJsonArray(value: unknown): unknown[] {
   if (typeof value !== "string" || !value) return [];
   try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as unknown[] : [];
   } catch {
     return [];
   }

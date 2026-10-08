@@ -96,11 +96,11 @@ export function previewMessagingSegment(db: DatabaseSync, id: string, channel: M
 function campaign(row: Row): MessagingCampaign {
   return { id: String(row.id), businessId: String(row.business_id), name: String(row.name), purpose: "marketing", channel: row.channel as MessagingChannel,
     ...(row.provider_id ? { providerId: row.provider_id as NonNullable<MessagingCampaign["providerId"]> } : {}), segmentId: String(row.segment_id), templateName: String(row.template_name),
-    templateLanguage: String(row.template_language), bindings: JSON.parse(String(row.bindings_json)), status: row.status as MessagingCampaign["status"],
+    templateLanguage: String(row.template_language), bindings: JSON.parse(String(row.bindings_json)) as MessagingCampaign["bindings"], status: row.status as MessagingCampaign["status"],
     preparedAt: String(row.prepared_at), cancelledAt: String(row.cancelled_at), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
     ...(row.content_id ? { contentId: String(row.content_id) } : {}), ...(row.content_revision ? { contentRevision: Number(row.content_revision) } : {}), text: String(row.text ?? ""),
-    templateSnapshot: row.template_snapshot_json ? JSON.parse(String(row.template_snapshot_json)) : null,
-    preparationCounts: row.preparation_counts_json ? JSON.parse(String(row.preparation_counts_json)) : null };
+    templateSnapshot: row.template_snapshot_json ? JSON.parse(String(row.template_snapshot_json)) as MessagingCampaign["templateSnapshot"] : null,
+    preparationCounts: row.preparation_counts_json ? JSON.parse(String(row.preparation_counts_json)) as MessagingCampaign["preparationCounts"] : null };
 }
 export function getMessagingCampaign(db: DatabaseSync, id: string): MessagingCampaign {
   assertCampaignCapabilities(db);

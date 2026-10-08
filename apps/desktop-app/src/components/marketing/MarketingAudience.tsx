@@ -11,7 +11,7 @@ export function MarketingAudience({value, channels, onChange, onBusy}: {value: s
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const epoch = useRef(0), active = useRef(true), working = useRef(false);
   const invalidateEpoch = useCallback(() => { ++epoch.current; }, []);
-  useEffect(() => {active.current = true; void window.yardimciDesktop!.listMessagingSegments().then(r => {if (active.current) setAudiences(resultValue(r));}).catch(e => {if(active.current) setError(e.message);}); return () => {active.current = false; invalidateEpoch();};}, [invalidateEpoch]);
+  useEffect(() => {active.current = true; void window.yardimciDesktop!.listMessagingSegments().then(r => {if (active.current) setAudiences(resultValue(r));}).catch((e: unknown) => {if(active.current) setError(e instanceof Error ? e.message : "Hedef kitle işlemi tamamlanamadı.");}); return () => {active.current = false; invalidateEpoch();};}, [invalidateEpoch]);
   const update = (field: MessagingSegmentRule["field"], value: string) => {
     const rules = draft.filterDefinition.rules.filter(r => r.field !== field);
     if (value) rules.push(field === "phone" ? {field, operator: value as "present" | "absent"} : {field, operator: "eq", value} as MessagingSegmentRule);

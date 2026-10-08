@@ -28,7 +28,7 @@ export function getMarketingShare(db: DatabaseSync, id: string): MarketingShareD
   const row = db.prepare("SELECT options_json FROM marketing_shares WHERE content_id=?").get(id);
   const targets = db.prepare("SELECT channel,target_type,target_id FROM marketing_share_targets WHERE content_id=? ORDER BY channel").all(id)
     .map(r => ({channel: r.channel, targetType: r.target_type, targetId: r.target_id}) as MarketingShareTarget);
-  return {content, options: row ? options(JSON.parse(String(row.options_json))) : emptyShareOptions(), targets};
+  return {content, options: row ? options(JSON.parse(String(row.options_json)) as MarketingShareOptions) : emptyShareOptions(), targets};
 }
 export function listMarketingShares(db: DatabaseSync) {
   return db.prepare("SELECT content_id FROM marketing_shares").all().map(r => {

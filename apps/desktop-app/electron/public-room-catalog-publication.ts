@@ -71,8 +71,8 @@ export function createPublicRoomCatalog(
 
 function parseArray(value: unknown): unknown[] {
   try {
-    const parsed = JSON.parse(String(value ?? "[]"));
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(String(value ?? "[]"));
+    return Array.isArray(parsed) ? parsed as unknown[] : [];
   } catch {
     return [];
   }

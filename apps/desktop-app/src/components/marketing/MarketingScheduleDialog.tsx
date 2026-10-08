@@ -18,7 +18,7 @@ export function MarketingScheduleDialog({detail, initial, onClose, onReload, onM
     if (!detail || dirty || busy || current && detail.schedule.revision < current.schedule.revision || JSON.stringify(detail) === JSON.stringify(current)) return;
     const next = scheduleDraft(detail); setCurrent(detail); setDraft(next); setBaseline(JSON.stringify(next));
   }, [detail, dirty, busy, current]);
-  useEffect(() => {let live = true; void window.yardimciDesktop!.getMarketingStudio().then(r => {if(live) setStudio(resultValue(r));}).catch(e => {if(live) setMessage(e.message);}); return () => {live = false; invalidateEpoch();};}, [invalidateEpoch]);
+  useEffect(() => {let live = true; void window.yardimciDesktop!.getMarketingStudio().then(r => {if(live) setStudio(resultValue(r));}).catch((e: unknown) => {if(live) setMessage(e instanceof Error ? e.message : "Plan işlemi tamamlanamadı.");}); return () => {live = false; invalidateEpoch();};}, [invalidateEpoch]);
   useEffect(() => registerPageLeaveGuard?.((_destination, next) => {if(working.current)return false; if(!dirty)return true; setPending(() => next); return false;}), [dirty, registerPageLeaveGuard]);
   function close() {if(working.current)return; if(dirty) setPending(() => onClose); else onClose();}
   const publication = studio?.publications.find(p => p.id === draft.targetId);

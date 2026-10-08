@@ -32,10 +32,10 @@ function setModule(modules: (boolean | null)[][], row: number, col: number, valu
 function reedSolomonGenerator(degree: number): number[] {
   let result = [1];
   for (let index = 0; index < degree; index += 1) {
-    const next = new Array(result.length + 1).fill(0);
+    const next = new Array<number>(result.length + 1).fill(0);
     for (let position = 0; position < result.length; position += 1) {
       next[position] = (next[position] ?? 0) ^ (result[position] ?? 0);
-      next[position + 1] ^= gfMultiply(result[position] ?? 0, gfExp[index] ?? 0);
+      next[position + 1] = (next[position + 1] ?? 0) ^ gfMultiply(result[position] ?? 0, gfExp[index] ?? 0);
     }
     result = next;
   }
@@ -44,7 +44,7 @@ function reedSolomonGenerator(degree: number): number[] {
 
 function reedSolomonRemainder(data: number[], degree: number): number[] {
   const generator = reedSolomonGenerator(degree);
-  const working = [...data, ...new Array(degree).fill(0)];
+  const working = [...data, ...new Array<number>(degree).fill(0)];
   for (let index = 0; index < data.length; index += 1) {
     const factor = working[index];
     if (!factor) continue;

@@ -557,10 +557,10 @@ export class AndroidInstallationService {
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"]
       });
-      child.stdout?.on("data", (chunk) => {
+      child.stdout?.on("data", (chunk: Buffer) => {
         stdout += chunk.toString();
       });
-      child.stderr?.on("data", (chunk) => {
+      child.stderr?.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();
       });
       child.once("error", (error) => {

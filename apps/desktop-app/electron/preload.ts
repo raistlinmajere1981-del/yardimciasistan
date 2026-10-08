@@ -673,7 +673,7 @@ const bridge: DesktopBridge = {
         let approved = false;
         try {
           approved = await listener(request);
-          const status: AppLockStatus = await ipcRenderer.invoke("appLock:getStatus");
+          const status = await ipcRenderer.invoke("appLock:getStatus") as AppLockStatus;
           approved = approved && !status.locked;
         } catch { approved = false; }
         ipcRenderer.send("dataMaintenance:confirmationResponse", requestId, approved);

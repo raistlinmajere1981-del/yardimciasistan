@@ -7,7 +7,7 @@ import { channelNames, resultValue } from "./share-draft";
 export function MarketingChannelDetails({draft, onChange, channels, onAi}: {draft: MarketingShareInput; onChange: (d: MarketingShareInput) => void; channels: MarketingChannelRegistry; onAi: (channel: "website" | "instagram" | "sms") => void}) {
   const [templates, setTemplates] = useState<BusinessMessageTemplate[]>([]), [error, setError] = useState("");
   const hasWhatsappChannel = channels.some((channel) => channel.id === "whatsapp");
-  useEffect(() => {let live = true; if(hasWhatsappChannel) void window.yardimciDesktop!.listBusinessMessagingTemplates().then(r => {if(live) setTemplates(resultValue(r));}).catch(e => {if(live) setError(e.message);}); return () => {live = false;};}, [hasWhatsappChannel]);
+  useEffect(() => {let live = true; if(hasWhatsappChannel) void window.yardimciDesktop!.listBusinessMessagingTemplates().then(r => {if(live) setTemplates(resultValue(r));}).catch((e: unknown) => {if(live) setError(e instanceof Error ? e.message : "Şablonlar alınamadı.");}); return () => {live = false;};}, [hasWhatsappChannel]);
   const w = draft.options.whatsapp;
   const selected = templates.find(t => t.name === w.templateName && t.language === w.templateLanguage);
   const patchWhatsapp = (patch: Partial<typeof w>) => onChange({...draft, options: {...draft.options, whatsapp: {...w, ...patch}}});

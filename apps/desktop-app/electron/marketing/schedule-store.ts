@@ -10,7 +10,7 @@ type Row = Record<string, unknown>;
 function scheduleRow(r: Row): MarketingSchedule {
   return {id:String(r.id),businessId:String(r.business_id),name:String(r.name),targetType:r.target_type as MarketingSchedule["targetType"],targetId:String(r.target_id),channel:r.channel as MarketingSchedule["channel"],
     ...(r.target_revision!=null?{targetRevision:Number(r.target_revision)}:{}),...(r.content_revision!=null?{contentRevision:Number(r.content_revision)}:{}),scheduleType:r.schedule_type as MarketingSchedule["scheduleType"],timezone:String(r.timezone),startsAt:String(r.starts_at),startsLocal:String(r.starts_local),
-    ...(r.recurrence_json?{recurrenceRule:JSON.parse(String(r.recurrence_json))}:{}),status:r.status as MarketingSchedule["status"],missedRunPolicy:r.missed_run_policy as MarketingSchedule["missedRunPolicy"],nextRunAt:String(r.next_run_at),lastRunAt:String(r.last_run_at),revision:Number(r.revision),createdAt:String(r.created_at),updatedAt:String(r.updated_at)};
+    ...(r.recurrence_json?{recurrenceRule:JSON.parse(String(r.recurrence_json)) as NonNullable<MarketingSchedule["recurrenceRule"]>}:{}),status:r.status as MarketingSchedule["status"],missedRunPolicy:r.missed_run_policy as MarketingSchedule["missedRunPolicy"],nextRunAt:String(r.next_run_at),lastRunAt:String(r.last_run_at),revision:Number(r.revision),createdAt:String(r.created_at),updatedAt:String(r.updated_at)};
 }
 function executionRow(r: Row): MarketingScheduleExecution {
   return {id:String(r.id),scheduleId:String(r.schedule_id),occurrenceKey:String(r.occurrence_key),plannedAt:String(r.planned_at),claimedAt:String(r.claimed_at),completedAt:String(r.completed_at),status:r.status as MarketingScheduleExecution["status"],
@@ -27,7 +27,7 @@ export function getMarketingScheduleExecution(db: DatabaseSync,id: string): Mark
 export function marketingScheduleDetail(db: DatabaseSync,id: string): MarketingScheduleDetail {
   const schedule=getMarketingSchedule(db,id);
   const frozen=schedule.targetRevision?db.prepare("SELECT snapshot_json FROM marketing_publication_revisions WHERE publication_id=? AND revision=?").get(schedule.targetId,schedule.targetRevision):undefined;
-  const snapshot=frozen?JSON.parse(String(frozen.snapshot_json)):undefined;
+  const snapshot=frozen?JSON.parse(String(frozen.snapshot_json)) as { title: unknown; mediaAssetIds: unknown[] }:undefined;
   const targetSummary=snapshot?{name:String(snapshot.title),...(schedule.targetRevision !== undefined ? { revision: schedule.targetRevision } : {}),mediaCount:snapshot.mediaAssetIds.length}:{name:getMessagingCampaign(db,schedule.targetId).name};
   return {schedule,targetSummary,executions:db.prepare("SELECT * FROM marketing_schedule_executions WHERE schedule_id=? ORDER BY planned_at DESC LIMIT 40").all(id).map(executionRow)};
 }

@@ -4,7 +4,7 @@ import { marketingBusiness as business, marketingTransaction as transaction } fr
 import { MarketingError, marketingText, marketingId } from "./validation";
 type Row = Record<string, unknown>;
 function assetRow(r: Row): MediaAsset {
-  const metadata = JSON.parse(String(r.ai_metadata_json));
+  const metadata = JSON.parse(String(r.ai_metadata_json)) as NonNullable<MediaAsset["aiGenerationMetadata"]>;
   return { id: String(r.id),businessId: String(r.business_id),kind:"image",source:r.source as MediaAsset["source"],storageRef:String(r.storage_ref),
     mimeType:String(r.mime_type),width:Number(r.width),height:Number(r.height),fileSize:Number(r.file_size),altText:String(r.alt_text),contentHash:String(r.content_hash),
     ...(metadata.providerId ? { aiGenerationMetadata: metadata } : {}),createdAt:String(r.created_at),...(r.archived_at ? {archivedAt:String(r.archived_at)} : {}) };
@@ -29,11 +29,11 @@ export function assetUsage(db: DatabaseSync, id: string): {usageCount:number;act
   const pubs = db.prepare(`SELECT p.id,p.desired_published FROM marketing_publications p
     JOIN marketing_publication_media m ON m.publication_id=p.id WHERE m.media_asset_id=? AND p.business_id=?`).all(id,business(db));
   const snapshots = db.prepare("SELECT id,published_snapshot_json FROM marketing_publications WHERE business_id=?").all(business(db))
-    .filter(r => (JSON.parse(String(r.published_snapshot_json)).mediaAssetIds ?? []).includes(id));
+    .filter(r => ((JSON.parse(String(r.published_snapshot_json)) as { mediaAssetIds?: unknown[] }).mediaAssetIds ?? []).includes(id));
   const planned = db.prepare(`SELECT s.id,r.snapshot_json FROM marketing_schedules s JOIN marketing_publication_revisions r
     ON r.publication_id=s.target_id AND r.revision=s.target_revision WHERE s.business_id=? AND
     (s.status IN ('active','paused') OR EXISTS(SELECT 1 FROM marketing_schedule_executions e WHERE e.schedule_id=s.id AND e.status IN ('pending','claimed')))`)
-    .all(business(db)).filter(r=>(JSON.parse(String(r.snapshot_json)).mediaAssetIds ?? []).includes(id)).length;
+    .all(business(db)).filter(r=>((JSON.parse(String(r.snapshot_json)) as { mediaAssetIds?: unknown[] }).mediaAssetIds ?? []).includes(id)).length;
   return {usageCount:contentCount+variantCount+planned+new Set([...pubs.map(p => String(p.id)),...snapshots.map(r => String(r.id)),...pending]).size,
     activePublicationCount:new Set([...pubs.filter(p => Number(p.desired_published)===1).map(p => String(p.id)),...snapshots.map(r => String(r.id)),...pending]).size};
 }

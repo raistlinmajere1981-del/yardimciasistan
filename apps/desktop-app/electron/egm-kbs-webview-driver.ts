@@ -120,7 +120,7 @@ export class EgmKbsWebviewDriver {
       };
     }
     try {
-      const raw = await guest.executeJavaScript(script, true);
+      const raw: unknown = await guest.executeJavaScript(script, true);
       if (!raw || typeof raw !== "object") {
         return { ok: false, state: "unknown", message: "EGM KBS sayfa durumu doğrulanamadı.", url: guest.getURL() };
       }
