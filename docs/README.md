@@ -51,7 +51,10 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `PILOT_FIELD_TEST.md`
 - `WINDOWS_HOSTING_FIELD_TEST.md`
 - `dev/LOCAL_COMPANION_NETWORK.md`
-- `dev/ADMIN_CONSOLE_TARGET.md` — geliştirici/yönetici konsolunun installation registry, secret sınırı, health, drift ve deploy hedef sözleşmesi.
+- `dev/ADMIN_CONSOLE_TARGET.md` — mevcut Electron Admin Control Center'ın operasyon, secret ve paketleme sınırları.
+
+- `dev/KBS_PROVIDER_VERIFICATION.md` — gerçek işletme hesabı gerektiren KBS doğrulama sınırları.
+- `dev/LOCAL_COMPANION_NETWORK.md` — yerel Android bağlantısının protokol ve güvenlik sınırları.
 
 ## Operasyonel geliştirme notları
 
