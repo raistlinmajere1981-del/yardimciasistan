@@ -1,7 +1,6 @@
 import {
   BUSINESS_CAPABILITIES,
   getBusinessProfile,
-  getBusinessProfileSelectionCapabilities,
   getEnabledBusinessCapabilityDependents,
   toggleBusinessProfileOption,
   type BusinessCapability
@@ -39,13 +38,9 @@ export function BusinessProfileOptionEditor({
   disabled = false
 }: BusinessProfileOptionEditorProps) {
   const profile = getBusinessProfile(profileId);
-  const selected = new Set(getBusinessProfileSelectionCapabilities(profileId, selectedCapabilities));
   const options = profile.optionalCapabilities;
-
-  const setOption = (capability: BusinessCapability, enabled: boolean) => {
-    if (disabled) return;
-    onChange(toggleBusinessProfileOption(profileId, selectedCapabilities, capability, enabled));
-  };
+  const independentOptions = options.filter(capability =>
+    getEnabledBusinessCapabilityDependents(capability, selectedCapabilities).length === 0);
 
   return (
     <fieldset id="settings-options" tabIndex={-1} className="settings-profile-options" disabled={disabled}>
@@ -54,18 +49,20 @@ export function BusinessProfileOptionEditor({
         <p>Bu sektör için ek özellik bulunmuyor.</p>
       ) : (
         <div className="settings-profile-option-list">
-          {options.map((capability) => (
+          {independentOptions.map((capability) => (
             <label className="settings-profile-option" key={capability}>
               <input
                 type="checkbox"
                 aria-label={CAPABILITY_LABELS[capability] ?? capability}
                 value={capability}
-                checked={selected.has(capability)}
-                onChange={(event) => setOption(capability, event.target.checked)}
+                checked={selectedCapabilities.includes(capability)}
+                onChange={(event) => onChange(toggleBusinessProfileOption(profileId, selectedCapabilities, capability, event.target.checked))}
               />
               <span>{CAPABILITY_LABELS[capability] ?? capability}</span>
-              {selected.has(capability) && !selectedCapabilities.includes(capability) && (
-                <small>{CAPABILITY_LABELS[getEnabledBusinessCapabilityDependents(capability, selectedCapabilities)[0]]} için gerekli</small>
+              {selectedCapabilities.includes(capability) && options.some(option =>
+                getEnabledBusinessCapabilityDependents(option, [capability]).length > 0) && (
+                <small>{options.filter(option => getEnabledBusinessCapabilityDependents(option, [capability]).length > 0)
+                  .map(option => CAPABILITY_LABELS[option]).join(", ")} dahil</small>
               )}
             </label>
           ))}

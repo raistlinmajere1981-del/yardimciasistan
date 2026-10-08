@@ -62,10 +62,6 @@ function Harness() {
 
   return <BusinessCapabilityRuntimeProvider value={{
     snapshot,
-    state: "success",
-    message: "",
-    setCapability: async () => undefined,
-    clearOverride: async () => undefined
   }}>
     <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="market">
       <MarketPage customers={[customer]} controller={controller} activeView={marketView} onViewChange={setMarketView} />

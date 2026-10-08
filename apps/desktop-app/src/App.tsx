@@ -144,11 +144,7 @@ function App() {
   return (
     <BusinessCapabilityRuntimeProvider
       value={{
-        snapshot: desktopSyncController.businessCapabilities,
-        state: desktopSyncController.businessCapabilityState,
-        message: desktopSyncController.businessCapabilityMessage,
-        setCapability: desktopSyncController.setRuntimeBusinessCapability,
-        clearOverride: desktopSyncController.clearRuntimeBusinessCapabilityOverride
+        snapshot: desktopSyncController.businessCapabilities
       }}
     >
       {customerController.confirmDialog}

@@ -7,6 +7,7 @@ import {
   getBusinessProfileSelectionCapabilities,
   getEnabledBusinessCapabilityDependents,
   normalizeBusinessType,
+  normalizeBusinessProfileOptions,
   validateBusinessCapabilitySet,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
@@ -102,8 +103,8 @@ export function replaceBusinessCapabilitiesInTransaction(
   const profileChanged = input.previousProfileId !== undefined
     && normalizeBusinessType(input.previousProfileId) !== profile.id;
   const allowedOptional = new Set(profile.optionalCapabilities);
-  const selectedOptional = [...new Set(profileChanged ? profile.defaultOptionalCapabilities : input.selectedOptionalCapabilities)]
-    .filter((capability) => allowedOptional.has(capability));
+  const selectedOptional = normalizeBusinessProfileOptions(profile.id,
+    profileChanged ? profile.defaultOptionalCapabilities : input.selectedOptionalCapabilities);
   const serviceCapabilities: BusinessCapability[] = [
     ...(!profileChanged && input.whatsappEnabled ? [BUSINESS_CAPABILITIES.WHATSAPP] : []),
     ...(!profileChanged && input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),

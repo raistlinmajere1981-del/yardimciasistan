@@ -30,7 +30,7 @@ export function ArasShippingSettingsSection({ draft, busy, onChange }: {
     const bridge = window.yardimciDesktop?.commerce;
     if (!bridge || testing || !canTest) return;
     await connection.run(async () => {
-      try { return await bridge.testShippingProviderConnection({ enabled: draft.enabled, environment: draft.environment,
+      try { return await bridge.testShippingProviderConnection({ enabled: false, environment: draft.environment,
         customerCode: draft.customerCode, username: draft.username, password: draft.password, clearPassword: draft.clearPassword });
       } catch { return { ok: false, providerId: "aras", message: "Kargo bağlantısı kontrol edilemedi.", testedAt: new Date().toISOString() }; }
     });

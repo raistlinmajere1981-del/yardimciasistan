@@ -1,4 +1,5 @@
-import { BUSINESS_CAPABILITIES, getBusinessProfile } from "@yardimci-asistan/shared";
+import { getBusinessProfile } from "@yardimci-asistan/shared";
+import { createCapabilitySnapshotFixture } from "../test-helpers/business-capability-fixtures.mjs";
 
 function createReportFixture() {
   return {
@@ -751,26 +752,7 @@ function createPulledRequestFixture() {
 }
 
 function createBusinessCapabilitySnapshotFixture(setupData) {
-  const enabled = new Set(getBusinessProfile(setupData.profileId).defaultCapabilities);
-  if (setupData.servicePreferences?.whatsapp) enabled.add(BUSINESS_CAPABILITIES.WHATSAPP);
-  else enabled.delete(BUSINESS_CAPABILITIES.WHATSAPP);
-  if (setupData.servicePreferences?.android) enabled.add(BUSINESS_CAPABILITIES.ANDROID);
-  else enabled.delete(BUSINESS_CAPABILITIES.ANDROID);
-  if (setupData.aiEnabled) enabled.add(BUSINESS_CAPABILITIES.AI);
-  else enabled.delete(BUSINESS_CAPABILITIES.AI);
-
-  const enabledCapabilities = [...enabled];
-  return {
-    businessId: setupData.setupRequired ? "" : "renderer-smoke-business",
-    profileId: setupData.profileId,
-    capabilities: enabledCapabilities.map((capability) => ({
-      capability,
-      enabled: true,
-      source: capability.startsWith("core.") ? "system" : "profile",
-      updatedAt: "2026-07-18T12:00:00+03:00"
-    })),
-    enabledCapabilities
-  };
+  return createCapabilitySnapshotFixture(setupData, setupData.setupRequired ? "" : "renderer-smoke-business");
 }
 
 export { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture, createBusinessCapabilitySnapshotFixture };

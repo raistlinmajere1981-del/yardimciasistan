@@ -1,6 +1,5 @@
 import { useDashboardSnapshot } from "./use-dashboard-snapshot";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
@@ -34,8 +33,6 @@ export function useDesktopSync({
   const capabilityGeneration = useRef(0);
   const capabilityMutations = useRef(0);
   const setupGeneration = useRef(0);
-  const [businessCapabilityState, setBusinessCapabilityState] = useState<SyncState>("idle");
-  const [businessCapabilityMessage, setBusinessCapabilityMessage] = useState("İşletme yetenekleri profil varsayımlarını kullanıyor.");
   const [automaticSyncStatus, setAutomaticSyncStatus] = useState<AutomaticSyncStatus>(defaultAutomaticSyncStatus);
 
   onBootstrapSetupRef.current = onBootstrapSetup;
@@ -85,60 +82,6 @@ export function useDesktopSync({
         return { ...result, refreshWarning: "Ayarlar kaydedildi; işletme yetenekleri yenilenemedi. Sayfayı yeniden açın." };
       }
       return result;
-    } finally { capabilityMutations.current -= 1; }
-  }, []);
-
-  const setRuntimeBusinessCapability = useCallback(async (capability: BusinessCapability, enabled: boolean) => {
-    const bridge = window.yardimciDesktop;
-    if (!bridge?.setBusinessCapability) {
-      setBusinessCapabilityState("error");
-      setBusinessCapabilityMessage("İşletme yetenekleri değiştirilemiyor. Uygulamayı yeniden başlatın.");
-      return undefined;
-    }
-
-    setBusinessCapabilityState("loading");
-    setBusinessCapabilityMessage(`${capability} ${enabled ? "açılıyor" : "kapatılıyor"}...`);
-    const generation = ++capabilityGeneration.current;
-    capabilityMutations.current += 1;
-    try {
-      const snapshot = await bridge.setBusinessCapability(capability, enabled);
-      if (generation !== capabilityGeneration.current) return undefined;
-      setBusinessCapabilities(snapshot);
-      setBusinessCapabilityState("success");
-      setBusinessCapabilityMessage(`${capability} ${enabled ? "etkinleştirildi" : "kapatıldı"}.`);
-      return snapshot;
-    } catch (error) {
-      if (generation !== capabilityGeneration.current) return undefined;
-      setBusinessCapabilityState("error");
-      setBusinessCapabilityMessage(error instanceof Error ? error.message : "İşletme yeteneği güncellenemedi.");
-      return undefined;
-    } finally { capabilityMutations.current -= 1; }
-  }, []);
-
-  const clearRuntimeBusinessCapabilityOverride = useCallback(async (capability: BusinessCapability) => {
-    const bridge = window.yardimciDesktop;
-    if (!bridge?.clearBusinessCapabilityOverride) {
-      setBusinessCapabilityState("error");
-      setBusinessCapabilityMessage("İşletme yeteneği profil varsayımına döndürülemiyor. Uygulamayı yeniden başlatın.");
-      return undefined;
-    }
-
-    setBusinessCapabilityState("loading");
-    setBusinessCapabilityMessage(`${capability} profil varsayımına döndürülüyor...`);
-    const generation = ++capabilityGeneration.current;
-    capabilityMutations.current += 1;
-    try {
-      const snapshot = await bridge.clearBusinessCapabilityOverride(capability);
-      if (generation !== capabilityGeneration.current) return undefined;
-      setBusinessCapabilities(snapshot);
-      setBusinessCapabilityState("success");
-      setBusinessCapabilityMessage(`${capability} profil varsayımına döndürüldü.`);
-      return snapshot;
-    } catch (error) {
-      if (generation !== capabilityGeneration.current) return undefined;
-      setBusinessCapabilityState("error");
-      setBusinessCapabilityMessage(error instanceof Error ? error.message : "İşletme yeteneği sıfırlanamadı.");
-      return undefined;
     } finally { capabilityMutations.current -= 1; }
   }, []);
 
@@ -290,13 +233,8 @@ export function useDesktopSync({
     dashboardData,
     setDashboardData,
     businessCapabilities,
-    setBusinessCapabilities,
-    businessCapabilityState,
-    businessCapabilityMessage,
     loadBusinessCapabilities,
     saveSetupWithCapabilityRefresh,
-    setRuntimeBusinessCapability,
-    clearRuntimeBusinessCapabilityOverride,
     automaticSyncStatus,
     loadDashboardData,
     pullRequests

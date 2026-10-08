@@ -9,7 +9,6 @@ import type {
 } from "../../electron/database";
 import {
   type ArasShippingConfigurationInput,
-  getBusinessProfile,
   normalizeBirthdaySettings,
   type BirthdaySettings,
   type OnlineSalesDeliverySettings,
@@ -58,14 +57,13 @@ export interface SetupFormState {
   whatsappEnabled: boolean;
   androidEnabled: boolean;
   productDataEnabled: boolean;
-  productDataProvider: "open_food_facts";
   productDataAutoSearch: boolean;
   productDataIncludeImages: boolean;
   birthdaySettings: BirthdaySettings;
   sms: SmsConfigurationInput & { hasApiKey: boolean; hasApiHash: boolean; configured: boolean };
   instagram: InstagramConfigurationInput & { hasSecret: boolean; configured: boolean };
   whatsappCloud: WhatsAppCloudConfigurationInput & { hasSecret: boolean; configured: boolean };
-  arasShipping: ArasShippingConfigurationInput & { hasSecret: boolean; configured: boolean };
+  arasShipping: Omit<ArasShippingConfigurationInput, "enabled"> & { hasSecret: boolean };
   dealerPortalEnabled: boolean;
   onlineSalesDelivery: OnlineSalesDeliverySettings;
   onlineSalesDeliveryEnabled: boolean;
@@ -93,6 +91,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
   const service = normalizeAiService(setupData.aiService);
   const aiServiceDrafts = createAiServiceFormDrafts(setupData);
   const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
+  const shipping = setupData.arasShipping ?? defaultSetupData.arasShipping;
 
   return {
     businessName: setupData.businessName || "",
@@ -125,20 +124,19 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     sms: { ...(setupData.sms ?? defaultSetupData.sms), apiKey: "", apiHash: "", clearApiKey: false, clearApiHash: false },
     instagram: { ...(setupData.instagram ?? defaultSetupData.instagram), accessToken: "", clearAccessToken: false },
     whatsappCloud: { ...(setupData.whatsappCloud ?? defaultSetupData.whatsappCloud), accessToken: "", clearAccessToken: false },
-    arasShipping: { ...(setupData.arasShipping ?? defaultSetupData.arasShipping), password: "", clearPassword: false },
+    arasShipping: {
+      environment: shipping.environment, customerCode: shipping.customerCode,
+      username: shipping.username, hasSecret: shipping.hasSecret,
+      password: "", clearPassword: false
+    },
     dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
     onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? defaultSetupData.onlineSalesDelivery) },
     onlineSalesDeliveryEnabled: setupData.onlineSalesDeliveryEnabled ?? false,
     productDataEnabled: setupData.productData.enabled,
-    productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,
     productDataIncludeImages: setupData.productData.includeImages,
     birthdaySettings: { ...normalizeBirthdaySettings(setupData.birthdaySettings), mode: "manual" }
   };
-}
-
-export function createProfileOptionDefaults(profileId: string): BusinessCapability[] {
-  return [...getBusinessProfile(profileId).defaultOptionalCapabilities];
 }
 
 function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {
@@ -270,7 +268,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       onlineSalesDeliveryEnabled: setupForm.onlineSalesDeliveryEnabled,
       productData: {
         enabled: setupForm.productDataEnabled,
-        provider: setupForm.productDataProvider,
+        provider: "open_food_facts",
         autoSearchUnknownBarcode: setupForm.productDataAutoSearch,
         includeImages: setupForm.productDataIncludeImages
       },

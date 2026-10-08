@@ -9,7 +9,7 @@ import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import { saveSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 const require = createRequire(import.meta.url);
 const commerce = require("../apps/desktop-app/dist-electron/commerce-store.js");
-const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { BUSINESS_CAPABILITIES: C, toggleBusinessProfileOption } = require("../packages/shared/dist");
 const { deleteCatalogProduct } = require("../apps/desktop-app/dist-electron/commerce-catalog-presentation-store.js");
 const ok = result => { assert.equal(result.ok, true, result.message); return result; };
 
@@ -105,8 +105,9 @@ try {
     assert.equal(stock(), 9); assert.equal(commerce.listInventoryMovements(database.databasePath, { productId }).length, movements);
     ok(database.closeTableOrder({ orderId: failed.id, status: "cancelled" }));
 
-    setBusinessCapability(database.databasePath, { capability: "commerce.orders", enabled: true });
-    setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+    const current = database.getSetupData();
+    ok(database.saveInitialSetup(createSmokeSetupInput({ ...current,
+      profileOptions: toggleBusinessProfileOption(current.profileId, current.profileOptions, C.ONLINE_SALES, true) })));
     database.saveCommerceProductPublication({ productId, isPublished: true, publicTitle: "Shared", publicDescription: "", publicImageUrl: "", sortOrder: 1 });
     const online = database.createCommerceOnlineCatalog().products.find(product => product.productId === productId);
     assert.ok(online); assert.equal(online.price, 80); assert.equal(online.unit, "l");
@@ -173,7 +174,9 @@ try {
     assert.equal(manifest.qrMenuImages.files[0].menuItemId, withImage.savedId);
     assert.deepEqual(readFileSync(join(backup.folderPath, "assets/products/canonical_image/image.png")), readFileSync(join(dirname(database.databasePath), assetPath)));
 
-    setBusinessCapability(database.databasePath, { capability: "commerce.inventory", enabled: false });
+    const beforeStockOff = database.getSetupData();
+    ok(database.saveInitialSetup(createSmokeSetupInput({ ...beforeStockOff,
+      profileOptions: toggleBusinessProfileOption(beforeStockOff.profileId, beforeStockOff.profileOptions, C.INVENTORY, false) })));
     const noStockInput = { ...entryInput, stock_consumption_quantity: 1, hide_when_out_of_stock: false };
     assert.equal(database.applyAndroidAction(phoneAction("canonical_no_inventory_default", "menu_entry_create", { ...noStockInput, product: { name: "Unauthorized tracking", salePrice: 1 } })).ok, false);
     ok(database.applyAndroidAction(phoneAction("canonical_no_inventory_untracked", "menu_entry_create", { ...noStockInput, product: { name: "Untracked phone product", salePrice: 1, trackInventory: false } })));

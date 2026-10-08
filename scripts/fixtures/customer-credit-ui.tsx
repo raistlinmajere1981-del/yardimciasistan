@@ -41,8 +41,7 @@ function Harness() {
     setStatusMessage(message);
   }), []);
 
-  return <BusinessCapabilityRuntimeProvider value={{ snapshot, state: "success", message: "",
-    setCapability: async () => undefined, clearOverride: async () => undefined }}>
+  return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
     <main className="smoke-shell">
       {customers.confirmDialog}
       <nav aria-label="Çalışma alanı">

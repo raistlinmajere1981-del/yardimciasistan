@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { getBusinessProfile } from "@yardimci-asistan/shared";
-import { createCapabilitySnapshotFixture } from "./capability-smoke-fixture.mjs";
+import { createCapabilitySnapshotFixture } from "./test-helpers/business-capability-fixtures.mjs";
 
 const UI_PREFERENCES_KEY = "yardimci-asistan.ui-preferences";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));

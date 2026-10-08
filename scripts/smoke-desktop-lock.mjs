@@ -3,7 +3,7 @@ import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import http from "node:http";
-import { createCapabilitySnapshotFixture } from "./capability-smoke-fixture.mjs";
+import { createCapabilitySnapshotFixture } from "./test-helpers/business-capability-fixtures.mjs";
 
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;

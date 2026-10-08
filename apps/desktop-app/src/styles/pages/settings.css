@@ -165,10 +165,6 @@
   border: 0;
 }
 
-.settings-service-card.is-disabled .settings-service-card-body {
-  opacity: 0.58;
-}
-
 .settings-service-empty,
 .settings-service-note {
   margin: 0;

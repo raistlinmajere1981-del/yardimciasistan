@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
-import { normalizeBusinessProfileOptions } from "@yardimci-asistan/shared";
+import { getBusinessProfile, normalizeBusinessProfileOptions } from "@yardimci-asistan/shared";
 import type { DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
-import { createSetupInput, toSetupForm, createProfileOptionDefaults, type SetupFormState } from "./setup-model";
+import { createSetupInput, toSetupForm, type SetupFormState } from "./setup-model";
 import {
   copyCategory,
   isCategoryDirty,
@@ -38,7 +38,7 @@ export function useSettingsDrafts(
     if (value.profileId !== previous.profileId) {
       value = { ...value, profileOptions: value.profileId === canonicalRef.current.profileId
         ? [...canonicalRef.current.profileOptions]
-        : createProfileOptionDefaults(value.profileId) };
+        : [...getBusinessProfile(value.profileId).defaultOptionalCapabilities] };
     }
     value = { ...value, profileOptions: normalizeBusinessProfileOptions(value.profileId, value.profileOptions) };
     draftRef.current = value;

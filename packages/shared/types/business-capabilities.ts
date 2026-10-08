@@ -326,9 +326,7 @@ export function getBusinessProfileSelectionCapabilities(
   selectedOptionalCapabilities: Iterable<BusinessCapability>
 ): BusinessCapability[] {
   const profile = getBusinessProfile(value);
-  const allowedOptional = new Set(profile.optionalCapabilities);
-  const selected = [...new Set(selectedOptionalCapabilities)]
-    .filter((capability) => allowedOptional.has(capability));
+  const selected = normalizeBusinessProfileOptions(profile.id, selectedOptionalCapabilities);
   return expandBusinessCapabilities(uniqueCapabilities(
     CORE_BUSINESS_CAPABILITIES,
     profile.requiredCapabilities,

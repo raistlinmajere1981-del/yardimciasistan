@@ -5,7 +5,6 @@ import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron
 import type { DesktopCustomer } from "../../apps/desktop-app/electron/database";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
 import { useMarketController } from "../../apps/desktop-app/src/app/use-market-controller";
-import { useDesktopSync } from "../../apps/desktop-app/src/app/use-desktop-sync";
 import { buildNavigation } from "../../apps/desktop-app/src/app/navigation";
 import { productWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
@@ -23,7 +22,7 @@ function Harness() {
   const controller = useMarketController({ businessCapabilities: snapshot, active: true });
   useEffect(() => { control.__setSalesSnapshot = setSnapshot; }, []);
   const enabled = (capability: string) => snapshot.enabledCapabilities.some(value => value === capability);
-  return <BusinessCapabilityRuntimeProvider value={{ snapshot, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
+  return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
     <nav aria-label="Global test navigation">{buildNavigation(snapshot).map(item => <button key={item.id}>{item.label}</button>)}</nav>
     <main style={{ height: "calc(100vh - 44px)" }}>
       <MarketPage customers={control.__salesInitial.customers} controller={controller} activeView={view} onViewChange={setView} />
@@ -33,12 +32,4 @@ function Harness() {
       busy: controller.dataState === "loading", onReload: controller.reloadCatalog, onProductSaved: controller.upsertProduct, onStateChange: controller.handleStateChange }} />
   </BusinessCapabilityRuntimeProvider>;
 }
-function NavigationRace() {
-  const runtime = useDesktopSync({ accessPhase: "locked", setSyncState: () => {}, setStatusMessage: () => {}, onBootstrapSetup: () => {} });
-  return <>
-    <button onClick={() => void runtime.loadBusinessCapabilities()}>Capabilities yenile</button>
-    <button onClick={() => void runtime.setRuntimeBusinessCapability(C.RETAIL_BARCODE, false)}>Satışı kapat</button>
-    <nav aria-label="Runtime navigation">{buildNavigation(runtime.businessCapabilities).map(item => <button key={item.id}>{item.label}</button>)}</nav>
-  </>;
-}
-createRoot(document.getElementById("root")!).render(location.pathname.includes("navigation-race") ? <NavigationRace /> : <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="market"><Harness /></WorkspaceNavigationProvider>);
+createRoot(document.getElementById("root")!).render(<WorkspaceNavigationProvider definitions={workspaceDefinitions} page="market"><Harness /></WorkspaceNavigationProvider>);

@@ -59,13 +59,8 @@ try {
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('');
   await expect(page.locator('#settings-operations')).toBeVisible();
 
-  // Persisted runtime capability, not the profile preset, controls this resource/search surface.
-  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=market&tables=on`);
-  await select('İşletme Düzeni');
-  await expect(page.locator('#settings-operations')).toBeVisible();
-  await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
-  await expect(page.getByRole('button', { name: 'İşletme Düzeni · Masa yönetimi', exact: true })).toBeVisible();
-  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=restaurant&tables=off`);
+  // Missing persisted authority fails closed even when the profile permits tables.
+  await page.goto(`${server.resolvedUrls.local[0]}settings-platform-test?profile=restaurant&missingRuntime`);
   await expect(tab('İşletme Düzeni')).toHaveCount(0);
   await expect(page.locator('#settings-operations')).toHaveCount(0);
   await page.getByRole('searchbox', { name: 'Ayarlarda ara' }).fill('masa yönetimi');
@@ -196,7 +191,7 @@ try {
   const serviceSetupBefore = (await setupCalls()).length;
   await expect(productService.locator('.settings-service-card-body')).toHaveCount(0);
   await productToggle.check();
-  await expect(productService.getByRole('combobox')).toBeVisible();
+  await expect(productService).toContainText('Open Food Facts');
   await expect(productService.getByLabel('Bilinmeyen barkodu otomatik ara', { exact: true })).toBeVisible();
   await expect(productService.getByLabel('Görselleri ekle', { exact: true })).toBeVisible();
   await expect(productService).toContainText('Veri lisansı: ODbL');
@@ -211,7 +206,7 @@ try {
   await expect(productService.locator('.settings-service-card-body')).toHaveCount(0);
   await discard();
   await expect(productToggle).toBeChecked();
-  await expect(productService.getByRole('combobox')).toBeVisible();
+  await expect(productService).toContainText('Open Food Facts');
 
   await page.evaluate(() => window.refreshSettings({ profileOptions: ['commerce.wholesale'], onlineSalesDeliveryEnabled: true }));
   await expect(page.locator('#settings-online-delivery')).toBeVisible();

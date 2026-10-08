@@ -1,7 +1,6 @@
-import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, isBusinessServiceAvailable, type BusinessCapability } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, isBusinessServiceAvailable, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
-import type { SetupFormState } from "./setup-model";
 
 export type SettingsCategoryId = "business" | "operations" | "services" | "application";
 export type StagedSettingsCategoryId = "business" | "services";
@@ -104,11 +103,6 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-password", category: "application", title: "Uygulama Şifresi", keywords: "parola güvenlik kilit sıfırla değiştir", persistence: "action" },
   { id: "settings-maintenance", category: "application", title: "Veri ve Yedekleme", keywords: "yedek oluştur geri yükle sil sıfırla", persistence: "action", visible: (_, initialized) => initialized }
 ];
-
-export function settingsCapabilities(form: SetupFormState): BusinessCapability[] {
-  return [...getBusinessProfileSelectionCapabilities(form.profileId, form.profileOptions),
-    ...(form.whatsappEnabled ? [C.WHATSAPP] : []), ...(form.androidEnabled ? [C.ANDROID] : []), ...(form.aiEnabled ? [C.AI] : [])];
-}
 
 export function isSettingsSectionVisible(
   section: SettingsSectionDefinition,

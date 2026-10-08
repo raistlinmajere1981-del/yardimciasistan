@@ -1,5 +1,5 @@
 import { getBusinessProfiles } from "@yardimci-asistan/shared";
-import { createProfileOptionDefaults, type SetupFormState } from "../../app/setup-model";
+import type { SetupFormState } from "../../app/setup-model";
 import type { SetupFieldsProps } from "./setup-fields";
 import { BusinessProfileOptionEditor } from "./BusinessCapabilitySettings";
 
@@ -7,13 +7,6 @@ export function BusinessSettingsSection({ form, onFormChange, persistedProfileId
   const profileChanged = form.profileId !== persistedProfileId;
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
-  };
-  const updateProfile = (profileId: string) => {
-    onFormChange({
-      ...form,
-      profileId,
-      profileOptions: createProfileOptionDefaults(profileId)
-    });
   };
 
   return (
@@ -32,7 +25,7 @@ export function BusinessSettingsSection({ form, onFormChange, persistedProfileId
             </label>
             <label className="form-field form-field--medium">
               Sektör tipi
-              <select value={form.profileId} onChange={(event) => updateProfile(event.target.value)}>
+              <select value={form.profileId} onChange={(event) => update("profileId", event.target.value)}>
                 {getBusinessProfiles().map((profile) => (
                   <option value={profile.id} key={profile.id}>{profile.label}</option>
                 ))}
@@ -40,7 +33,7 @@ export function BusinessSettingsSection({ form, onFormChange, persistedProfileId
             </label>
             <BusinessProfileOptionEditor
               profileId={form.profileId}
-              selectedCapabilities={profileChanged ? createProfileOptionDefaults(form.profileId) : form.profileOptions}
+              selectedCapabilities={form.profileOptions}
               disabled={profileChanged}
               onChange={(profileOptions) => update("profileOptions", profileOptions)}
             />

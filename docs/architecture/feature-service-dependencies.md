@@ -80,9 +80,13 @@ shared foundations/services until the final owner disappears.
 
 ## Draft, persistence and defense
 
-`profileOptions` contains selected roots, not their automatic closure. Checkbox state is
-computed from the canonical closure. A short prerequisite note is shown only for automatic
-visible prerequisites. No cascade confirmation is opened. Unsaved edits never change
+`profileOptions` contains selected roots, not their automatic closure. Settings presents
+independent root choices. While an active root requires another optional feature, that
+prerequisite's checkbox is replaced by a short “included” note on the dependent. This is
+derived from the canonical graph, with no UI dependency list. Previously explicit root
+intent survives: after Suppliers OFF, an explicitly selected Purchasing checkbox returns ON;
+an automatic Purchasing checkbox returns OFF. Marketing/Campaigns follows the same rule.
+No cascade confirmation is opened. Unsaved edits never change
 runtime, credentials, publications or DB. Profile preview options stay disabled until Save;
 Revert restores the committed root selection. Category ownership/save paths are unchanged.
 
@@ -94,6 +98,18 @@ resolves closure; direct capability writes reject unsupported profiles and missi
 Renderer capability IPC cannot bypass the service configuration/test owner or edit technical
 foundations. Navigation verifies the same graph against persisted capabilities and fails
 closed on incomplete snapshots.
+
+The runtime renderer context is read-only. Settings saves and the fenced canonical refresh
+are the single renderer mutation flow; the unused individual override orchestration and
+its feedback state are removed. First-run Settings needs no synthetic service/capability
+fallback: resource/service surfaces remain unavailable until committed runtime state exists.
+Profile preview/revert belongs only to the category draft owner, not the identity form.
+
+Shipping drafts contain credentials/configuration, not a second provider activation flag.
+The existing IPC input still serializes its legacy activation field from Delivery + Shipping
+intent; connection tests never activate it. Product data's only provider is Open Food Facts,
+so its redundant one-option selector/form state is removed. Backend validation, test evidence,
+permission/lock gates, transaction resets and canonical withdrawal owners remain unchanged.
 
 ## Removed combinations and verification
 

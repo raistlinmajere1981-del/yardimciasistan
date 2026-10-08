@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { PageViewStateProvider, usePageViewState } from "../../apps/desktop-app/src/app/page-view-state";
 import { createRoot } from "react-dom/client";
-import { BUSINESS_CAPABILITIES as C, getBusinessProfile, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, getBusinessProfile, getBusinessProfileSelectionCapabilities } from "@yardimci-asistan/shared";
 import { normalizeProfileTransitionInput } from "../../apps/desktop-app/electron/profile-service-activation";
 import { defaultDashboardData, defaultSetupData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
 import { useSetupController } from "../../apps/desktop-app/src/app/use-setup-controller";
-import { settingsCapabilities } from "../../apps/desktop-app/src/app/settings-registry";
-import { toSetupForm } from "../../apps/desktop-app/src/app/setup-model";
+import { createCapabilitySnapshotFixture } from "../test-helpers/business-capability-fixtures.mjs";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
 import { SettingsWorkspace } from "../../apps/desktop-app/src/components/settings/SettingsWorkspace";
 import type { PageLeaveGuard } from "../../apps/desktop-app/src/app/page-navigation-guard";
@@ -33,12 +32,6 @@ const firstRun = new URLSearchParams(window.location.search).get("firstRun") ===
 if (firstRun) canonical = { ...canonical, setupRequired: true, businessName: "" };
 canonical.profileOptions = [...getBusinessProfile(canonical.profileId).defaultOptionalCapabilities];
 if (new URLSearchParams(window.location.search).get("wholesale") === "on") canonical.profileOptions = [C.WHOLESALE];
-function runtimeCapabilities(capabilities: BusinessCapability[]) {
-  const override = new URLSearchParams(window.location.search).get("tables");
-  if (override === "on") return [...new Set([...capabilities, C.FOOD_TABLES])];
-  if (override === "off") return capabilities.filter(capability => ![C.FOOD_TABLES, C.FOOD_ORDERS, C.FOOD_RESERVATIONS].includes(capability));
-  return capabilities;
-}
 let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"], socialLinks: [] };
 let layout = {
   capabilities: { rooms: true, tables: true },
@@ -144,7 +137,7 @@ window.yardimciDesktop = {
       ...canonical.arasShipping, enabled: input.onlineSalesDeliveryEnabled && input.onlineSalesDelivery.shippingEnabled, environment: input.arasShipping.environment,
       username: input.arasShipping.username, customerCode: input.arasShipping.customerCode,
       hasSecret: input.arasShipping.clearPassword ? false : Boolean(input.arasShipping.password) || canonical.arasShipping.hasSecret,
-      configured: input.arasShipping.enabled && Boolean(input.arasShipping.username && input.arasShipping.customerCode
+      configured: Boolean(input.arasShipping.username && input.arasShipping.customerCode
         && (input.arasShipping.password || (canonical.arasShipping.hasSecret && !input.arasShipping.clearPassword)))
     } : canonical.arasShipping;
     if (input.arasShipping?.clearPassword) shippingPassword = "";
@@ -200,7 +193,7 @@ window.yardimciDesktop = {
   },
   getDashboardData: async () => defaultDashboardData,
   getBusinessLayout: async () => {
-    const enabled = runtimeCapabilities(getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions));
+    const enabled = createCapabilitySnapshotFixture(canonical).enabledCapabilities;
     return structuredClone({
       ...layout,
       capabilities: {
@@ -264,7 +257,7 @@ window.yardimciDesktop = {
       };
     }
 
-    const enabled = runtimeCapabilities(getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions));
+    const enabled = createCapabilitySnapshotFixture(canonical).enabledCapabilities;
     return {
       ok: true,
       message: "İşletme düzeni kaydedildi.",
@@ -386,10 +379,12 @@ function Fixture() {
   window.refreshSettings = patch => { canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
   window.persistedSettings = () => canonical;
   window.reopenSettings = () => setWorkspaceKey(key => key + 1);
-  const capabilities = runtimeCapabilities(settingsCapabilities(toSetupForm(setup.setupData)));
+  const snapshot = new URLSearchParams(window.location.search).has("missingRuntime")
+    ? null : createCapabilitySnapshotFixture(setup.setupData);
+  const capabilities = snapshot?.enabledCapabilities ?? [];
   window.fixtureRuntimeCapabilities = () => [...capabilities];
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
-  return <BusinessCapabilityRuntimeProvider value={{ snapshot: { profileId: setup.setupData.profileId, enabledCapabilities: capabilities }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
+  return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
     <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}>
       {ready && <SettingsWorkspace key={workspaceKey} setupData={setup.setupData} dashboardData={dashboard}
         onSave={input => setup.saveSetup(input, setDashboard)}

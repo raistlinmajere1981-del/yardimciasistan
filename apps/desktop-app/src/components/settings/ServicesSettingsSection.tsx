@@ -140,15 +140,6 @@ export function ServicesSettingsSection({
           {isBusinessServiceAvailable("productData", enabledCapabilities) && (
           <ServiceSettingsCard id="settings-product-data" title="Ürün Verisi"
             enabled={form.productDataEnabled} onEnabledChange={(enabled) => update("productDataEnabled", enabled)}>
-              <label className="form-field form-field--medium">
-                Sağlayıcı
-                <select
-                  value={form.productDataProvider}
-                  onChange={() => update("productDataProvider", "open_food_facts")}
-                >
-                  <option value="open_food_facts">Open Food Facts</option>
-                </select>
-              </label>
               <div className="settings-service-empty">
                 Veri kaynağı: Open Food Facts · Veri lisansı: ODbL · Görseller: CC BY-SA
               </div>

@@ -16,7 +16,6 @@ import {
   layoutSettingsDefinition,
   roomSettingsDefinition,
   searchSettings,
-  settingsCapabilities,
   settingsCategories,
   visibleSettingsCategories,
   settingsSections,
@@ -86,9 +85,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const drafts = useSettingsDrafts(props.setupData, props.onSave);
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
   const initialized = !props.setupData.setupRequired;
-  const capabilities = initialized
-    ? runtimeCapabilities?.enabledCapabilities ?? []
-    : settingsCapabilities(drafts.canonical);
+  const capabilities = runtimeCapabilities?.enabledCapabilities ?? [];
   const visibleCategories = visibleSettingsCategories(initialized, runtimeCapabilities);
   const roomsEnabled = isSettingsSectionVisible(roomSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const tablesEnabled = isSettingsSectionVisible(layoutSettingsDefinition, capabilities, initialized, runtimeCapabilities);

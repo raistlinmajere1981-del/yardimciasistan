@@ -498,7 +498,7 @@ try {
   await expect(settings.getByLabel("İşletme açıklaması")).toBeVisible();
   await expect(settings.locator(".settings-profile-options")).toBeVisible();
   await expect(settings.getByText("Ek özellikler")).toBeVisible();
-  await expect(settings.locator(".settings-profile-option")).toHaveCount(7);
+  await expect(settings.getByRole("checkbox", { name: "Online Satış", exact: true })).not.toBeChecked();
   await expect(settings.getByText("WhatsApp / SMS Kampanyaları", { exact: true })).toBeVisible();
   await expect(settings.getByText("Pazarlama", { exact: true })).toBeVisible();
   await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode|messaging\.campaigns|marketing\.studio/)).toHaveCount(0);

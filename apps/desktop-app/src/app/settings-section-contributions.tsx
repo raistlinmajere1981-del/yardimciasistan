@@ -23,7 +23,6 @@ export type CategoryDraft<C extends StagedSettingsCategoryId> = Pick<SetupFormSt
 interface StagedSectionProps<C extends StagedSettingsCategoryId> {
   readonly draft: Readonly<CategoryDraft<C>>;
   readonly busy: boolean;
-  readonly configurationCapabilities: readonly BusinessCapability[];
   readonly onChange: (patch: Partial<CategoryDraft<C>>) => void;
 }
 
@@ -42,12 +41,10 @@ type StagedSettingsContributions = {
 // Static provider-specific field adapters under one delivery owner; no runtime discovery.
 const shippingProviderSettings = {
   aras: {
-    isConfigured: (draft: Readonly<CategoryDraft<"services">>) => isArasShippingConfigurationReady(draft.arasShipping),
     render: ({ draft, onChange, busy }: StagedSectionProps<"services">) => <ArasShippingSettingsSection
       draft={draft.arasShipping} busy={busy} onChange={arasShipping => onChange({ arasShipping })} />
   }
 } satisfies Record<keyof typeof COMMERCE_SHIPPING_PROVIDERS, {
-  isConfigured: (draft: Readonly<CategoryDraft<"services">>) => boolean;
   render: (props: StagedSectionProps<"services">) => ReactNode;
 }>;
 
@@ -86,7 +83,7 @@ const stagedSettingsContributions = {
           <h3>Kargo firmaları / sağlayıcılar</h3>
           {Object.values(COMMERCE_SHIPPING_PROVIDERS).map(provider =>
             <div key={provider.id}>{shippingProviderSettings[provider.id].render(props)}</div>)}
-          {!Object.values(COMMERCE_SHIPPING_PROVIDERS).some(provider => shippingProviderSettings[provider.id].isConfigured(draft)) &&
+          {!isArasShippingConfigurationReady(draft.arasShipping) &&
             <p role="alert">Kargo ile gönderim için bir kargo sağlayıcısının hesap ayarlarını tamamlayın ve bağlantıyı test edin.</p>}
         </section>}
       </ServiceSettingsCard>
@@ -132,7 +129,6 @@ export function StagedSettingsContributionSlot<C extends StagedSettingsCategoryI
           {contribution.render({
             draft,
             busy,
-            configurationCapabilities,
             onChange: (patch) => onFormChange((current) => applyCategoryPatch(current, category, patch))
           })}
         </fieldset>

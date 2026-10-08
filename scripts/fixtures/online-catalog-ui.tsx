@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BUSINESS_CAPABILITIES, type CatalogProduct } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type CatalogProduct } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
 import { productWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
@@ -14,7 +14,7 @@ function Harness() {
   const [products, setProducts] = useState([control.__product]);
   const onProductSaved = (saved: CatalogProduct) => setProducts((current) => [...current.filter((item) => item.id !== saved.id), saved]);
   useEffect(() => { control.__onlineToggle = setEnabled; return () => { delete control.__onlineToggle; }; }, []);
-  return <BusinessCapabilityRuntimeProvider value={{ snapshot: { businessId: "fixture", profileId: control.__menuData ? "restaurant" : "market", capabilities: [], enabledCapabilities: [BUSINESS_CAPABILITIES.CATALOG, ...(enabled ? [BUSINESS_CAPABILITIES.ONLINE_SALES] : [])] }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
+  return <BusinessCapabilityRuntimeProvider value={{ snapshot: { businessId: "fixture", profileId: control.__menuData ? "restaurant" : "market", capabilities: [], enabledCapabilities: getBusinessProfileSelectionCapabilities(control.__menuData ? "restaurant" : "market", enabled ? [C.ONLINE_SALES] : []) } }}>
     {!control.__menuData && <MarketProductsWorkspace products={products} categories={[]} busy={false} onReload={async () => {}} onProductSaved={onProductSaved} onStateChange={() => {}} />}
     <button onClick={() => navigation.openWorkspace({ entityType: "product", entityId: control.__product.id, mode: "details" })}>Ürünü Aç</button>
     {control.__menuData && <button onClick={() => navigation.openWorkspace({ entityType: "product", entityId: control.__product.id,

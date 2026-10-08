@@ -219,47 +219,7 @@ try {
   await categories.getByRole("button", { name: "Hızlı Erişim", exact: true }).click();
   await expect(grid.locator(".market-sale-product > span > strong")).toHaveText(["Su", "Ekmek", "Elma kg"]);
   assert.deepEqual(errors, []);
-  // Late pre-save snapshots must never reopen navigation after a capability mutation.
-  const race = await browser.newPage();
-  await race.addInitScript(() => {
-    window.__caps = { businessId: "fixture", profileId: "market", capabilities: [], enabledCapabilities: ["commerce.catalog", "commerce.sales", "commerce.inventory", "retail.barcode"] };
-    window.__pendingCaps = [];
-    window.yardimciDesktop = {
-      getBusinessCapabilitySnapshot: async () => {
-        const captured = window.__caps;
-        return window.__delayCaps ? new Promise(done => window.__pendingCaps.push(() => done(captured))) : captured;
-      },
-      setBusinessCapability: async (capability) => {
-        if (window.__delayMutation) await new Promise(done => { window.__finishMutation = done; });
-        window.__caps = { ...window.__caps, enabledCapabilities: window.__caps.enabledCapabilities.filter(item => item !== capability) }; return window.__caps;
-      }
-    };
-  });
-  await race.route("**/navigation-race-test", async route => route.fulfill({ contentType: "text/html", body: await server.transformIndexHtml("/navigation-race-test", `<html><body><div id="root"></div><script type="module" src="/@fs/${resolve("scripts/fixtures/sales-workspace.tsx")}"></script></body></html>`) }));
-  await race.goto(`${server.resolvedUrls.local[0]}navigation-race-test`);
-  await race.getByRole("button", { name: "Capabilities yenile", exact: true }).click();
-  await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toBeVisible();
-  await race.evaluate(() => { window.__delayCaps = true; });
-  await race.getByRole("button", { name: "Capabilities yenile", exact: true }).click();
-  await expect.poll(() => race.evaluate(() => window.__pendingCaps.length)).toBe(1);
-  await race.getByRole("button", { name: "Satışı kapat", exact: true }).click();
-  await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
-  await race.evaluate(() => window.__pendingCaps.splice(0).forEach(done => done()));
-  await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
-  await race.evaluate(() => { window.__delayCaps = false; window.__caps = { ...window.__caps, enabledCapabilities: ["commerce.catalog", "commerce.sales", "commerce.inventory", "retail.barcode"] }; });
-  await race.getByRole("button", { name: "Capabilities yenile", exact: true }).click();
-  await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toBeVisible();
-  await race.evaluate(() => { window.__delayMutation = true; });
-  await race.getByRole("button", { name: "Satışı kapat", exact: true }).click();
-  await expect.poll(() => race.evaluate(() => Boolean(window.__finishMutation))).toBe(true);
-  await race.evaluate(() => { window.__delayCaps = true; });
-  await race.getByRole("button", { name: "Capabilities yenile", exact: true }).click();
-  await expect.poll(() => race.evaluate(() => window.__pendingCaps.length)).toBe(1);
-  await race.evaluate(() => window.__finishMutation());
-  await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
-  await race.evaluate(() => window.__pendingCaps.splice(0).forEach(done => done()));
-  await expect(race.getByRole("navigation").getByRole("button", { name: "Satış", exact: true })).toHaveCount(0);
-  await race.close();
+  // Canonical Settings save/read fencing is covered by smoke-profile-transition-ui.
   console.log("sales-workspace-ui-smoke-ok");
 } catch (error) {
   if (page) {

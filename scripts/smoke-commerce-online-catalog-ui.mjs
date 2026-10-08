@@ -1,3 +1,4 @@
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { createRequire } from "node:module";
@@ -10,11 +11,18 @@ import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { saveRuntimeCatalogProduct, listRuntimeCatalogProducts } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
-const { applyBusinessProfileCapabilities, setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { applyBusinessProfileCapabilities } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { toggleBusinessProfileOption } = require("../packages/shared/dist");
 const root = mkdtempSync(join(tmpdir(), "ya-online-catalog-ui-"));
 const appPath = join(process.cwd(), "apps/desktop-app");
 const database = new DesktopDatabase({ appPath, userDataPath: root });
 let server, browser, raw;
+function selectOnlineSales(enabled) {
+  const current = database.getSetupData();
+  const saved = database.saveInitialSetup(createSmokeSetupInput({ ...current,
+    profileOptions: toggleBusinessProfileOption(current.profileId, current.profileOptions, "channel.online_sales", enabled) }));
+  assert.equal(saved.ok, true, saved.message);
+}
 try {
   database.initialize();
   assert.equal(database.saveInitialSetup({
@@ -80,11 +88,11 @@ try {
   await expect(checkbox).not.toBeChecked();
   await expect.poll(() => database.getCommerceProductPublication(product.id).isPublished).toBe(false);
   const beforeToggleSaves = saves;
-  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: false });
+  selectOnlineSales(false);
   await page.evaluate(() => window.__onlineToggle(false));
   await expect(checkbox).toHaveCount(0);
   assert.equal(saves, beforeToggleSaves, "hiding control must not rewrite the preference");
-  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+  selectOnlineSales(true);
   await page.evaluate(() => window.__onlineToggle(true));
   await expect(checkbox).toBeEnabled();
   await expect(checkbox).not.toBeChecked();
@@ -107,7 +115,7 @@ try {
     assert.equal(database.createCommerceOnlineCatalog().products.some((entry) => entry.productId === saved.id), !optOut);
     await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   }
-  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: false });
+  selectOnlineSales(false);
   await page.evaluate(() => window.__onlineToggle(false));
   await page.getByRole("button", { name: "Ürün Ekle", exact: true }).click();
   const offlineCreate = page.getByRole("dialog", { name: "Yeni ürün ekle", exact: true });
@@ -117,12 +125,11 @@ try {
   await offlineCreate.getByLabel("Alış fiyatı", { exact: true }).fill("10");
   await offlineCreate.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
   await expect(offlineCreate).toHaveCount(0);
-  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+  selectOnlineSales(true);
   assert.equal(database.getCommerceProductPublication(createdProducts.at(-1).id), null);
   await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   applyBusinessProfileCapabilities(database.databasePath, "restaurant", { preserveUserOverrides: false });
-  setBusinessCapability(database.databasePath, { capability: "commerce.orders", enabled: true });
-  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+  selectOnlineSales(true);
   raw = new DatabaseSync(database.databasePath);
   raw.exec("UPDATE settings SET online_sales_delivery_enabled = 1, online_sales_pickup_enabled = 1, online_sales_shipping_enabled = 0");
   const category = database.saveMenuCategory({ name: "Restaurant menu", description: "", is_active: true, sort_order: 0 });
@@ -144,7 +151,7 @@ try {
   await checkbox.check();
   await expect.poll(() => database.createCommerceOnlineCatalog().products.some(item => item.productId === menuProductId)).toBe(true);
   assert.equal(listRuntimeCatalogProducts(database.databasePath).length, countBeforePublish, "Menu publication must not insert another product row");
-  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: false });
+  selectOnlineSales(false);
   await page.evaluate(() => window.__onlineToggle(false));
   await expect(checkbox).toHaveCount(0);
   assert.equal(database.createCommerceOnlineCatalog().enabled, false);

@@ -26,24 +26,26 @@ try {
   const save = page.getByRole("button", { name: "Kaydet", exact: true });
   const revert = page.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true });
   const warning = page.getByText("İşletme tipi değiştirildi. Kaydettiğinizde yeni işletme tipinin varsayılan özellikleri uygulanacak.", { exact: true });
-  await page.evaluate(() => window.refreshSettings({ profileOptions: ["messaging.campaigns"], servicePreferences: { whatsapp: false, android: true }, productData: { ...window.persistedSettings().productData, enabled: true } }));
+  await page.evaluate(() => window.refreshSettings({ profileOptions: ["messaging.campaigns"], servicePreferences: { whatsapp: false, android: true } }));
   await expect(options.getByLabel("Talepler", { exact: true })).not.toBeChecked();
   const before = await page.evaluate(() => structuredClone(window.persistedSettings()));
   const beforeRuntime = await page.evaluate(() => window.fixtureRuntimeCapabilities());
   const beforeCalls = await page.evaluate(() => structuredClone(window.settingsCalls));
   // Fetch the real registry through Vite, not a second list of preset defaults.
   const registry = await page.evaluate(async sharedPath => {
-    const shared = await import("/src/app/setup-model.ts");
-    const { getBusinessProfiles } = await import(sharedPath);
-    return getBusinessProfiles().map(profile => ({ ...profile, preview: shared.createProfileOptionDefaults(profile.id) }));
+    const { getBusinessProfiles, getEnabledBusinessCapabilityDependents } = await import(sharedPath);
+    return getBusinessProfiles().map(profile => ({ ...profile, preview: profile.defaultOptionalCapabilities,
+      choices: profile.optionalCapabilities.filter(option => getEnabledBusinessCapabilityDependents(option, profile.defaultOptionalCapabilities).length === 0) }));
   }, `/@fs/${resolve("packages/shared/types/business-capabilities.ts")}`);
   for (const profile of registry.filter(profile => profile.id !== before.profileId)) {
     await select.selectOption(profile.id);
     await expect(warning).toBeVisible();
     for (const capability of profile.optionalCapabilities) {
       const checkbox = options.locator(`input[value="${capability}"]`);
-      await expect(checkbox).toBeDisabled();
-      expect(await checkbox.isChecked()).toBe(profile.preview.includes(capability));
+      if (profile.choices.includes(capability)) {
+        await expect(checkbox).toBeDisabled();
+        expect(await checkbox.isChecked()).toBe(profile.preview.includes(capability));
+      } else await expect(checkbox).toHaveCount(0);
     }
     expect(await page.evaluate(() => window.persistedSettings())).toEqual(before);
     expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).toEqual(beforeRuntime);
@@ -65,8 +67,9 @@ try {
   await page.evaluate(() => { window.failSetup = false; });
   await save.click();
   await expect(warning).toHaveCount(0);
-  await expect(options.getByLabel("Satın alma", { exact: true })).toBeEnabled();
-  await expect(options.getByLabel("Satın alma", { exact: true })).toBeChecked();
+  await expect(options.getByLabel("Satın alma", { exact: true })).toHaveCount(0);
+  await expect(options.getByLabel("Tedarikçiler", { exact: true })).toBeEnabled();
+  await expect(options.getByLabel("Tedarikçiler", { exact: true })).toBeChecked();
   await expect(options.getByLabel("WhatsApp / SMS Kampanyaları", { exact: true })).not.toBeChecked();
   await options.getByLabel("WhatsApp / SMS Kampanyaları", { exact: true }).check();
   await save.click();
@@ -106,7 +109,9 @@ try {
         return shared.getBusinessProfileSelectionCapabilities(id, [feature]);
       }, { path: `/@fs/${resolve("packages/shared/types/business-capabilities.ts")}`, id: profile.id, feature });
       for (const option of profile.optionalCapabilities) {
-        expect(await options.locator(`input[value="${option}"]`).isChecked()).toBe(expected.includes(option));
+        const checkbox = options.locator(`input[value="${option}"]`);
+        if (option !== feature && expected.includes(option)) await expect(checkbox).toHaveCount(0);
+        else expect(await checkbox.isChecked()).toBe(option === feature);
       }
       expect(await page.evaluate(() => window.persistedSettings())).toEqual(persisted);
       expect(await page.evaluate(() => window.settingsCalls.length)).toBe(calls);
@@ -120,9 +125,9 @@ try {
   const purchasing = options.locator('input[value="retail.purchasing"]');
   const suppliers = options.locator('input[value="retail.suppliers"]');
   await suppliers.check();
-  await expect(purchasing).toBeChecked();
-  await expect(options.getByText("Tedarikçiler için gerekli", { exact: true })).toBeVisible();
-  await purchasing.uncheck();
+  await expect(purchasing).toHaveCount(0);
+  await expect(options.getByText("Satın alma dahil", { exact: true })).toBeVisible();
+  await suppliers.uncheck();
   await expect(suppliers).not.toBeChecked();
   await expect(save).toBeDisabled();
   await purchasing.check();
@@ -134,18 +139,27 @@ try {
   await save.click();
   expect(await page.evaluate(() => window.persistedSettings().profileOptions)).toEqual(["retail.suppliers"]);
   await page.evaluate(() => window.reopenSettings());
-  await expect(purchasing).toBeChecked();
+  await expect(purchasing).toHaveCount(0);
   await suppliers.uncheck();
   await expect(purchasing).not.toBeChecked();
   await revert.click();
   await expect(suppliers).toBeChecked();
-  await expect(purchasing).toBeChecked();
+  await expect(purchasing).toHaveCount(0);
   await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
   await options.locator('input[value="messaging.campaigns"]').check();
-  await expect(options.locator('input[value="marketing.studio"]')).toBeChecked();
-  await options.locator('input[value="marketing.studio"]').uncheck();
+  await expect(options.locator('input[value="marketing.studio"]')).toHaveCount(0);
+  await options.locator('input[value="messaging.campaigns"]').uncheck();
   await expect(options.locator('input[value="messaging.campaigns"]')).not.toBeChecked();
   await expect(save).toBeDisabled();
+  await options.locator('input[value="marketing.studio"]').check();
+  await options.locator('input[value="messaging.campaigns"]').check();
+  await expect(options.locator('input[value="marketing.studio"]')).toHaveCount(0);
+  await save.click();
+  await page.evaluate(() => window.reopenSettings());
+  await options.locator('input[value="messaging.campaigns"]').uncheck();
+  await expect(options.locator('input[value="marketing.studio"]')).toBeChecked();
+  await revert.click();
+  await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
   await page.getByRole("tab", { name: "Servisler", exact: true }).click();
   await expect(page.locator("#settings-marketing-sms")).toHaveCount(0);
   await expect(page.locator("#settings-marketing-instagram")).toHaveCount(0);

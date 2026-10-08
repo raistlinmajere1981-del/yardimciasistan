@@ -34,7 +34,7 @@ try {
   // activate the correct resource surface without navigating away or reopening.
   for (const [query, rooms, tables] of [
     ["pension", true, false], ["restaurant", false, true], ["market", false, false],
-    ["market&wholesale=on", false, false], ["market&tables=on", false, true]
+    ["market&wholesale=on", false, false]
   ]) {
     await visit(`?profile=${query}&firstRun=on&category=operations`);
     await expect(page.locator("#settings-panel-business")).toBeVisible();
@@ -136,7 +136,7 @@ try {
     await expect(tab("İşletme Düzeni")).toHaveCount(0);
     await expect(page.locator("#settings-panel-business")).toBeVisible();
   }
-  for (const query of ["?profile=pension", "?profile=restaurant", "?profile=market&tables=on"]) {
+  for (const query of ["?profile=pension", "?profile=restaurant", "?profile=pension_restaurant"]) {
     await visit(query);
     await expect(tab("İşletme Düzeni")).toBeVisible();
   }
@@ -145,7 +145,8 @@ try {
   const options = page.locator("#settings-options");
   await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).not.toBeChecked();
   await options.getByRole("checkbox", { name: "WhatsApp / SMS Kampanyaları", exact: true }).check();
-  await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).toBeChecked();
+  await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).toHaveCount(0);
+  await expect(options.getByText("Pazarlama dahil", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Kaydet", exact: true }).click();
   expect(await page.evaluate(() => window.persistedSettings().profileOptions)).toEqual(["messaging.campaigns"]);
   expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).toContain("marketing.studio");

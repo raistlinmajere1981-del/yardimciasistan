@@ -31,7 +31,7 @@ export function emptyArasShippingConfiguration(): ArasShippingConfiguration {
 }
 
 /** Credentials readiness is independent of delivery activation; not a remote test. */
-export function isArasShippingConfigurationReady(config: Pick<ArasShippingConfiguration, "enabled" | "customerCode" | "username"> & {
+export function isArasShippingConfigurationReady(config: Pick<ArasShippingConfiguration, "customerCode" | "username"> & {
   hasSecret?: boolean; password?: string; clearPassword?: boolean;
 }): boolean {
   return Boolean(config.customerCode.trim() && config.username.trim()

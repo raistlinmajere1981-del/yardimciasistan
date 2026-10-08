@@ -5,16 +5,18 @@ import { join } from 'node:path';
 import { campaignFixture, C } from './messaging-campaign-fixtures.mjs';
 const base = new URL('../../apps/desktop-app/dist-electron/marketing/', import.meta.url);
 const require = createRequire(base);
-const { setBusinessCapability } = require('../business-capability-store.js');
 const aiCore = require('@yardimci-asistan/ai-core');
 export const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ioAAAAASUVORK5CYII=', 'base64');
 export const editorialInput = (changes = {}) => ({ title: 'Yeni sezon', purpose: 'promotion', masterText: 'Yeni sezon duyurusu', status: 'draft',
   variants: [{channel:'website',title:'Web başlığı',text:'Website metni',metadata:{version:1,adaptation:'manual'}},{channel:'whatsapp',text:'WhatsApp metni',metadata:{version:1}}],mediaAssetIds:[],...changes });
 export function marketingFixture({ enabled = true, ai = false } = {}) {
   const foundation = campaignFixture(), logs = [], calls = [], cache = new Map();
-  if (!enabled) setBusinessCapability(foundation.db.databasePath,{capability:C.MESSAGING_CAMPAIGNS,enabled:false});
-  setBusinessCapability(foundation.db.databasePath,{capability:C.MARKETING_STUDIO,enabled});
-  setBusinessCapability(foundation.db.databasePath,{capability:C.AI,enabled:ai});
+  const current = foundation.db.getSetupData();
+  const saved = foundation.db.saveInitialSetup({ ...foundation.setup, ...current,
+    profileOptions: enabled ? [C.MESSAGING_CAMPAIGNS, C.WHOLESALE] : [C.WHOLESALE],
+    aiEnabled: ai, aiModel: ai ? 'fixture-chat' : '',
+    whatsappCloud: { ...current.whatsappCloud, accessToken: '' } });
+  if (!saved.ok) throw new Error(saved.message);
   const state = { webUrl:null, selected:[], unavailable:false, response:'AI aday metni', fail:false, selectedAiService:'openai', aiProfiles:null };
   const fetchImpl = async (url,init) => {calls.push({url:String(url),body:JSON.parse(init.body)});
     if(state.fail)return Response.json({error:{message:'PRIVATE_PROVIDER_ERROR'}},{status:500});

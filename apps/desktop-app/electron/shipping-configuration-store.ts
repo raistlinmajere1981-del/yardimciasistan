@@ -30,7 +30,7 @@ export function getArasShippingConfiguration(db: DatabaseSync): ArasShippingConf
   return { providerId: ARAS_SHIPPING_PROVIDER.id, providerName: ARAS_SHIPPING_PROVIDER.name,
     enabled, environment: row.environment === "production" ? "production" : "test",
     customerCode: String(row.customer_code), username: String(row.username), hasSecret,
-    configured: isArasShippingConfigurationReady({ enabled, customerCode: String(row.customer_code), username: String(row.username), hasSecret }) };
+    configured: isArasShippingConfigurationReady({ customerCode: String(row.customer_code), username: String(row.username), hasSecret }) };
 }
 
 export function getStoredArasShippingConfiguration(db: DatabaseSync) {
