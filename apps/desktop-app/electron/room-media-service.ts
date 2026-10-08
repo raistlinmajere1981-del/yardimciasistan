@@ -108,5 +108,5 @@ function toMutationResult(result: ReturnType<typeof service.update>): RoomMediaM
   return {
     ...result,
     media: result.media.map(toRoomAsset)
-  } as RoomMediaMutationResult;
+  };
 }

@@ -50,7 +50,7 @@ export function mergeIdentityImageAnalyses(analyses: readonly IdentityImageAnaly
       }
     }
 
-    return selected as IdentityDocumentFields[K];
+    return selected;
   };
 
   const fields: IdentityDocumentFields = {

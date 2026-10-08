@@ -159,7 +159,7 @@ function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<
       timeoutSeconds: String(profile?.timeoutSeconds ?? (isActiveService ? setupData.aiTimeoutSeconds : 30) ?? 30),
       storedApiKeyConfigured: profile?.apiKeyConfigured ?? (isActiveService && setupData.aiApiKeyConfigured)
     } satisfies AiServiceFormDraft];
-  })) as Partial<Record<DesktopAiService, AiServiceFormDraft>>;
+  }));
 }
 
 export function createDefaultAiServiceDraft(service: DesktopAiService): AiServiceFormDraft {

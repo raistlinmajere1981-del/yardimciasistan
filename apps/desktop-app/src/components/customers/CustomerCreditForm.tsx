@@ -54,7 +54,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
     setRuntimeNoticeActive(false);
     onSavingChange(true);
     try {
-      const input = { customerId: account.customer.id, amountMinor: amountMinor!, currency, note: note.trim(), source: "desktop-customer-credit" };
+      const input = { customerId: account.customer.id, amountMinor, currency, note: note.trim(), source: "desktop-customer-credit" };
       const entry = mode === "payment"
         ? await bridge.recordCustomerCreditPayment({ ...input, paymentMethod })
         : await bridge.addCustomerCreditAdjustment({ ...input, entryType: adjustmentType });

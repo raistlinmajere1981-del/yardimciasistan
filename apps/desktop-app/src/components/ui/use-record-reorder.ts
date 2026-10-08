@@ -53,7 +53,7 @@ export function useRecordReorder<K extends string>({ getIds, canDrag, onReorder 
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/x-yardimci-record-sort", JSON.stringify({ kind, id }));
     event.dataTransfer.setData("text/plain", id);
-    const record = event.currentTarget.closest(".menu-sortable-record") as HTMLElement | null;
+    const record = event.currentTarget.closest(".menu-sortable-record");
     if (record) { const rect = record.getBoundingClientRect(); event.dataTransfer.setDragImage(record, Math.max(0, Math.min(rect.width, event.clientX - rect.left)), Math.max(0, Math.min(rect.height, event.clientY - rect.top))); }
   }
   function handleDragOver(event: DragEvent<HTMLElement>, kind: K, id: string) {

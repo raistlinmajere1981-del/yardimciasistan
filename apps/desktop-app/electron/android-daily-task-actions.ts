@@ -142,7 +142,7 @@ function deleteDailyTask(context: AndroidDailyTaskActionContext): AndroidDailyTa
 function taskRow(db: DatabaseSync, taskId: string): Record<string, unknown> | undefined {
   if (!taskId) return undefined;
   return db.prepare("SELECT * FROM daily_tasks WHERE id = ? AND deleted_at = ''")
-    .get(taskId) as Record<string, unknown> | undefined;
+    .get(taskId);
 }
 
 function validateTaskInput(input: {

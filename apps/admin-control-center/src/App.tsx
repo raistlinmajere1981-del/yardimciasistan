@@ -2336,10 +2336,10 @@ export default function App() {
   }, [loadOverview]);
 
   const sidebarState = useMemo(() => {
-    if (!data) return { text: "Veri bekleniyor", tone: "unknown" as StatusKind };
-    if (data.counts.errors > 0) return { text: `${data.counts.errors} hata`, tone: "error" as StatusKind };
-    if (data.counts.drift > 0) return { text: `${data.counts.drift} dikkat`, tone: "warning" as StatusKind };
-    return { text: "Sistemler stabil", tone: "ready" as StatusKind };
+    if (!data) return { text: "Veri bekleniyor", tone: "unknown" };
+    if (data.counts.errors > 0) return { text: `${data.counts.errors} hata`, tone: "error" };
+    if (data.counts.drift > 0) return { text: `${data.counts.drift} dikkat`, tone: "warning" };
+    return { text: "Sistemler stabil", tone: "ready" };
   }, [data]);
 
   if (!data) {

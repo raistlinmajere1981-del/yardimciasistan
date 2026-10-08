@@ -32,9 +32,9 @@ export function getPublicRoomAvailabilityInput(db: DatabaseSync): PublicRoomAvai
   for (const row of rows) {
     if (row.kind === "room") input.rooms.push({ id: String(row.id), name: String(row.name), number: String(row.number),
       capacity: Number(row.capacity), status: String(row.status), isActive: true });
-    else if (row.kind === "reservation") input.reservations.push({ status: String(row.status) as "pending" | "approved",
+    else if (row.kind === "reservation") input.reservations.push({ status: String(row.status),
       startDate: String(row.start_date), endDate: String(row.end_date), roomIds: parseStoredStringArray(row.room_ids_json) });
-    else input.customerRoomStays.push({ roomId: String(row.id), status: String(row.status) as "planned" | "checked_in",
+    else input.customerRoomStays.push({ roomId: String(row.id), status: String(row.status),
       checkInDate: String(row.start_date), checkOutDate: String(row.end_date) });
   }
   return input;

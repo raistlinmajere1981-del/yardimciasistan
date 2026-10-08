@@ -117,9 +117,9 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, e
           [ownerPage]: {
             intent: {
               ...intent,
-              returnContext: sameEntity ? existing!.intent.returnContext : { page, ...intent.returnContext }
+              returnContext: sameEntity ? existing.intent.returnContext : { page, ...intent.returnContext }
             } as HospitalityWorkspaceIntent,
-            presentation: sameEntity ? existing!.presentation : definition.defaultPresentation
+            presentation: sameEntity ? existing.presentation : definition.defaultPresentation
           }
         }));
         writeRendererDiagnostic({
@@ -146,10 +146,10 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, e
       if (!transient) returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       const sameEntity = transient?.intent.entityType === intent.entityType && transient.intent.entityId === intent.entityId;
       if (!sameEntity) transientOnReturn.current = options?.onReturn;
-      const nextReturnContext = sameEntity ? transient!.intent.returnContext : { page, ...intent.returnContext };
+      const nextReturnContext = sameEntity ? transient.intent.returnContext : { page, ...intent.returnContext };
       setTransient({
         intent: { ...intent, ...(nextReturnContext === undefined ? {} : { returnContext: nextReturnContext }) },
-        presentation: sameEntity ? transient!.presentation : definition.defaultPresentation
+        presentation: sameEntity ? transient.presentation : definition.defaultPresentation
       });
       writeRendererDiagnostic({
         level: "INFO",
@@ -232,7 +232,7 @@ export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, e
       if (page === "pension" || page === "restaurant") {
         setHospitalitySessions((sessions) => ({
           ...sessions,
-          [page]: sessions[page] ? { ...sessions[page]!, presentation } : null
+          [page]: sessions[page] ? { ...sessions[page], presentation } : null
         }));
       }
     },

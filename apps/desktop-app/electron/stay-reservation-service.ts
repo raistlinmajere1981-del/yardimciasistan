@@ -442,7 +442,7 @@ export function saveManualReservation(db: DatabaseSync, input: SaveManualReserva
   if (roomId) {
     room = db
       .prepare("SELECT id, name, status, capacity FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-      .get(roomId) as { id?: string; name?: string; status?: string; capacity?: number } | undefined;
+      .get(roomId);
     if (!room?.id) {
       return { ok: false, message: "Seçilen oda artık kullanılamıyor." };
     }

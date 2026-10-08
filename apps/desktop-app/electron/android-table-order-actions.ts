@@ -77,7 +77,7 @@ export function applyAndroidTableOrderStatus(db: DatabaseSync, action: AndroidSy
   if (!current) return { ok: false, message: "Güncellenecek aktif adisyon bulunamadı." };
   const conflict = getAndroidVersionConflict(action.payload, "expected_updated_at", current.updated_at, "Adisyon");
   if (conflict) return conflict;
-  const result = updateTableOrderStatus(db, { orderId, status: status as "open" | "preparing" | "served" | "payment" }, {
+  const result = updateTableOrderStatus(db, { orderId, status }, {
     now: nextMutationTimestamp(current.updated_at, now), androidAction: action
   });
   return result.ok ? { ok: true, message: "Adisyon durumu telefondan güncellendi." } : result;
@@ -92,7 +92,7 @@ export function applyAndroidTableOrderClose(db: DatabaseSync, action: AndroidSyn
   if (!current) return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
   const conflict = getAndroidVersionConflict(action.payload, "expected_updated_at", current.updated_at, "Adisyon");
   if (conflict) return conflict;
-  const result = closeTableOrder(db, { orderId, status: status as "paid" | "cancelled" }, {
+  const result = closeTableOrder(db, { orderId, status }, {
     now: nextMutationTimestamp(current.updated_at, now), androidAction: action
   });
   return result.ok ? { ok: true, message: status === "paid" ? "Adisyon telefondan ödendi olarak kapatıldı." : "Adisyon telefondan iptal edildi." } : result;

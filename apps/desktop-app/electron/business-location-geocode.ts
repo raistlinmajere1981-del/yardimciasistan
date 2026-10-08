@@ -211,7 +211,7 @@ function enqueueGeocoderRequest<T>(operation: () => Promise<T>): Promise<T> {
 
 function cacheResult(key: string, results: BusinessLocationGeocodeCandidate[]) {
   if (cache.size >= GEOCODER_CACHE_LIMIT) {
-    const oldestKey = cache.keys().next().value as string | undefined;
+    const oldestKey = cache.keys().next().value;
     if (oldestKey) cache.delete(oldestKey);
   }
   cache.set(key, results.map((candidate) => ({ ...candidate })));

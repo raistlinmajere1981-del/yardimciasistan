@@ -47,7 +47,7 @@ export function readScriptConfig(): Partial<WidgetConfig> {
 function removeEmptyValues(values: Partial<WidgetConfig>): Partial<WidgetConfig> {
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => typeof value === "string" && value.length > 0)
-  ) as Partial<WidgetConfig>;
+  );
 }
 
 export function normalizeBusinessProfileId(value: unknown): BusinessProfileId | "" {

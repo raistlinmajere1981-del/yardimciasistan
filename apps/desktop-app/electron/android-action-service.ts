@@ -198,7 +198,7 @@ export function applyAndroidMenuStockAction(db: DatabaseSync, action: AndroidSyn
 function getActiveAndroidActionFailureRows(db: DatabaseSync, limit: number | null = 100): Array<Record<string, unknown>> {
   const statement = db.prepare(`SELECT id, actor_id, entity_id, payload_json, created_at FROM events
     WHERE type = 'android.action_failed' AND deleted_at = '' ORDER BY created_at DESC ${limit === null ? "" : "LIMIT ?"}`);
-  return (limit === null ? statement.all() : statement.all(limit)) as Array<Record<string, unknown>>;
+  return limit === null ? statement.all() : statement.all(limit);
 }
 
 function parseStringArray(value: unknown): string[] {

@@ -104,6 +104,6 @@ export class WhatsAppCloudProviderAdapter implements BusinessMessagingProviderAd
       template: { name: input.template.name, language: { code: input.template.language }, components }
     });
     if (result.messaging_product !== "whatsapp" || !Array.isArray(result.messages) || result.messages.length !== 1 || !object(result.messages[0]) || !text(result.messages[0].id, 512) || !/^[A-Za-z0-9_.=:-]+$/.test(result.messages[0].id)) throw new BusinessMessagingError("invalid_response");
-    return { providerMessageId: result.messages[0].id as string };
+    return { providerMessageId: result.messages[0].id };
   }
 }

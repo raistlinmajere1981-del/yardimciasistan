@@ -50,7 +50,7 @@ export class BusinessMessagingStatusSyncService {
         if (size > 262144) { await reader.cancel(); throw new Error("response_limit"); } chunks.push(part.value); } } finally { reader.releaseLock(); }
       const data: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       if (!data || typeof data !== "object" || !("ok" in data) || data.ok !== true) throw new Error("invalid_response");
-      return data as Record<string, unknown>;
+      return data;
     } finally { clearTimeout(timer); }
   }
 }

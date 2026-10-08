@@ -108,5 +108,5 @@ function toMutationResult(result: ReturnType<typeof service.update>): TableMedia
   return {
     ...result,
     media: result.media.map(toTableAsset)
-  } as TableMediaMutationResult;
+  };
 }
