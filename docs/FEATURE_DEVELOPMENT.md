@@ -29,7 +29,8 @@ must not destroy the mounted entity draft/state.
 
 ## 3. Use capabilities, not sector-name switches
 
-Business Profiles are presets. Runtime UI composition uses the persisted
+Business Profiles define allowed workflow roots and their canonical dependency closure
+under D-048. Runtime UI composition uses the persisted
 `BusinessCapabilitySnapshot.enabledCapabilities`.
 
 For static contribution visibility, use the bounded `CapabilityCondition` contract.

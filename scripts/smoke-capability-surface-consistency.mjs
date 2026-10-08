@@ -626,7 +626,8 @@ function verifyPersistedRuntimeSource() {
     applyBusinessProfileCapabilities(database.databasePath, "pension", { preserveUserOverrides: false });
     assert.equal(contextualTaskReport(database).summary.pendingTasks, 1);
     assert.equal(contextualTaskReport(database).summary.approvedReservations, 3);
-    setBusinessCapability(database.databasePath, { capability: C.FOOD_TABLES, enabled: true });
+    assert.throws(() => setBusinessCapability(database.databasePath, { capability: C.FOOD_TABLES, enabled: true }), /profilinde/);
+    applyBusinessProfileCapabilities(database.databasePath, "pension_restaurant", { preserveUserOverrides: false });
     assert.equal(contextualTaskReport(database).summary.pendingTasks, 3);
 
     applyBusinessProfileCapabilities(database.databasePath, "pension_restaurant", { preserveUserOverrides: false });
@@ -647,14 +648,13 @@ function verifyPersistedRuntimeSource() {
     assert.equal(rejectedRestaurantRequest.ok, false);
 
     applyBusinessProfileCapabilities(database.databasePath, "market", { preserveUserOverrides: false });
-    setBusinessCapability(database.databasePath, { capability: C.ACCOMMODATION_ROOMS, enabled: true });
-    setBusinessCapability(database.databasePath, { capability: C.ACCOMMODATION_RESERVATIONS, enabled: true });
-    setBusinessCapability(database.databasePath, { capability: C.ACCOMMODATION_STAYS, enabled: true });
-    const hybrid = setBusinessCapability(database.databasePath, { capability: C.ACCOMMODATION_FOLIO, enabled: true });
-    assert.equal(hybrid.enabledCapabilities.includes(C.RETAIL_BARCODE), true);
-    assert.equal(hybrid.enabledCapabilities.includes(C.ACCOMMODATION_RESERVATIONS), true);
-    assert.equal(hybrid.enabledCapabilities.includes(C.FOOD_RESERVATIONS), false);
-    assert.deepEqual(readBusinessCapabilitySnapshot(database.databasePath).enabledCapabilities.sort(), hybrid.enabledCapabilities.sort());
+    for (const capability of [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_RESERVATIONS, C.ACCOMMODATION_STAYS, C.ACCOMMODATION_FOLIO]) {
+      assert.throws(() => setBusinessCapability(database.databasePath, { capability, enabled: true }), /profilinde/);
+    }
+    const retail = readBusinessCapabilitySnapshot(database.databasePath);
+    assert.equal(retail.enabledCapabilities.includes(C.RETAIL_BARCODE), true);
+    assert.equal(retail.enabledCapabilities.includes(C.ACCOMMODATION_RESERVATIONS), false);
+
   } finally {
     database.close();
     rmSync(dataDir, { recursive: true, force: true });

@@ -73,13 +73,7 @@ const marketContribution = {
   order: 50,
   // Catalog, sales and inventory are shared foundations (also supplied by
   // hospitality). Only retail/dealer surfaces grant workspace entry.
-  condition: { anyOf: [
-    { allOf: [C.CATALOG, C.ORDERS, C.WHOLESALE] },
-    { allOf: [C.CATALOG, C.RETAIL_BARCODE] },
-    { allOf: [C.CATALOG, C.RETAIL_PURCHASING] },
-    { allOf: [C.CATALOG, C.RETAIL_SUPPLIERS] },
-    { allOf: [C.CATALOG, C.RETAIL_LABELS] }
-  ] },
+  condition: { anyOf: [C.WHOLESALE, C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS] },
   contentScroll: "workspace",
   presentation: { label: "Satış", title: "Satış" }
 } satisfies NavigationContribution;

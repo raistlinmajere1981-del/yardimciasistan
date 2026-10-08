@@ -1,4 +1,5 @@
 const SMOKE_FILES = [
+  "scripts/smoke-feature-dependencies.mjs",
   "scripts/smoke-profile-transition.mjs",
   "scripts/smoke-profile-transition-ui.mjs",
   "scripts/smoke-sales-correctness.mjs",
@@ -319,6 +320,7 @@ const SMOKE_CHECKS = SMOKE_FILES
   });
 
 const SETTINGS_CHECKS = new Set([
+  "feature-dependencies",
   "typecheck", "typecheck-electron", "unit-tests", "version-contract-tests", "version-check", "verification-registry-tests",
   "settings-correctness", "settings-ui-correctness", "settings-platform", "workspace-platform", "sector-feature-contributions",
   "profile-transition", "profile-transition-ui",
@@ -336,6 +338,7 @@ const SALES_WORKSPACE_CHECKS = new Set([
   "menu-reorder-contract", "desktop-menu-db", "workspace-platform", "verification-registry-tests", "schema-authority"
 ]);
 const PROFILE_TRANSITION_CHECKS = new Set([
+  "feature-dependencies",
   "profile-transition", "profile-transition-ui", "business-capabilities", "setup-profile-contract",
   "capability-settings-source", "settings-correctness", "settings-ui-correctness", "settings-platform",
   "capability-runtime", "capability-surface-consistency", "workspace-platform", "sector-feature-contributions",

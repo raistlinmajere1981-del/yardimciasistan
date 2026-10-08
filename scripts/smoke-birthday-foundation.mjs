@@ -77,7 +77,7 @@ try {
     assert.ok(!initialOverview.candidates.some((candidate) => candidate.customerName === "Doğum Tarihi Eksik"));
 
     const initialSettings = database.getSetupData().birthdaySettings;
-    assert.equal(initialSettings.enabled, true);
+    assert.equal(initialSettings.enabled, false, "birthday activation is unavailable before WhatsApp activation");
     assert.equal(initialSettings.mode, "manual");
     assert.equal(initialSettings.sendTime, "10:00");
 
@@ -145,9 +145,10 @@ try {
     assert.equal(duplicateAfterSent.code, "already_sent");
 
     setBusinessCapability(database.databasePath, { capability: C.WHATSAPP, enabled: false });
+    assert.equal(database.getSetupData().birthdaySettings.enabled, false);
     const whatsappDisabledOverview = database.getDashboardData().birthdayOverview;
-    assert.ok(whatsappDisabledOverview.candidates.some((candidate) => candidate.customerId === todayCustomer));
-    assert.ok(whatsappDisabledOverview.candidates.some((candidate) => candidate.customerId === invalidPhoneCustomer));
+    assert.deepEqual(whatsappDisabledOverview.candidates, []);
+    assert.equal(database.getSetupData().birthdaySettings.messageTemplate, "İyi ki doğdun {ad}! {işletme} ekibi");
   } finally {
     raw.close();
   }

@@ -76,6 +76,7 @@ try {
   assert.equal((await transport.publishMarketingWebsite(oldWire)).ok,true);
   f.db.failSyncJob(older.jobKey,older.sourceRevision,'lost response','9999');
   const editorial=f.db.listMarketingPublications().map(p=>[p.id,p.desiredPublished,p.revision]);
+  setBusinessCapability(f.db.databasePath,{capability:'messaging.campaigns',enabled:false});
   assert.equal(setBusinessCapability(f.db.databasePath,{capability:'marketing.studio',enabled:false}).enabledCapabilities.includes('marketing.studio'),false);
   const withdrawal=f.db.getPendingSyncJobs().find(j=>j.jobType==='marketing_website_publish');
   assert.ok(withdrawal.sourceRevision>older.sourceRevision);

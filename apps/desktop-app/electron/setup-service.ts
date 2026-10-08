@@ -13,6 +13,7 @@ import {
   normalizeOnlineSalesDeliverySettings,
   isArasShippingConfigurationReady,
   getBusinessProfile,
+  isBusinessServiceAvailable,
   normalizeBirthdaySettings,
   normalizeBusinessType,
   validateBirthdaySettings,
@@ -76,6 +77,10 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
   const activeAiProfile = aiProfiles.find((profile) => profile.service === aiService);
   const profileId = normalizeBusinessType(String(business?.profile_id ?? ""));
   const profile = getBusinessProfile(profileId);
+  const available = (service: Parameters<typeof isBusinessServiceAvailable>[0]) => isBusinessServiceAvailable(service, enabledCapabilities);
+  const selected = new Set((db.prepare(`SELECT capability_id FROM business_capabilities
+    WHERE business_id = ? AND is_selected = 1`).all(String(business?.id ?? "")) as Array<{ capability_id: string }>)
+    .map(row => row.capability_id));
   const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
   const setupRequired =
     !setupCompleted ||
@@ -89,7 +94,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     businessName,
     profileId,
     profileOptions: setupCompleted
-      ? profile.optionalCapabilities.filter((capability) => enabledCapabilities.has(capability))
+      ? profile.optionalCapabilities.filter((capability) => selected.has(capability))
       : [...profile.defaultOptionalCapabilities],
     phone: String(business?.phone ?? ""),
     whatsapp: String(business?.whatsapp ?? ""),
@@ -113,14 +118,14 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     arasShipping: getArasShippingConfiguration(db),
     sms: smsConfiguration(db), instagram: instagramConfiguration(db),
     whatsappCloud: getMessagingConfiguration(db),
-    dealerPortalEnabled: Number(settings?.dealer_portal_enabled ?? 0) === 1,
-    onlineSalesDeliveryEnabled: Number(settings?.online_sales_delivery_enabled ?? 1) === 1,
+    dealerPortalEnabled: available("dealerPortal") && Number(settings?.dealer_portal_enabled ?? 0) === 1,
+    onlineSalesDeliveryEnabled: available("delivery") && Number(settings?.online_sales_delivery_enabled ?? 0) === 1,
     onlineSalesDelivery: {
       pickupEnabled: Number(settings?.online_sales_pickup_enabled ?? 1) === 1,
       shippingEnabled: Number(settings?.online_sales_shipping_enabled ?? 0) === 1
     },
     productData: {
-      enabled: Number(settings?.product_data_enabled ?? 0) === 1,
+      enabled: available("productData") && Number(settings?.product_data_enabled ?? 0) === 1,
       provider: "open_food_facts",
       autoSearchUnknownBarcode: Number(settings?.product_data_auto_search ?? 1) === 1,
       includeImages: Number(settings?.product_data_include_images ?? 1) === 1
@@ -130,7 +135,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
       android: enabledCapabilities.has(BUSINESS_CAPABILITIES.ANDROID)
     },
     birthdaySettings: normalizeBirthdaySettings({
-      enabled: normalizeBoolean(settings?.birthday_enabled, true),
+      enabled: available("birthday") && normalizeBoolean(settings?.birthday_enabled, true),
       mode: settings?.birthday_mode === "automatic" ? "automatic" : "manual",
       sendTime: String(settings?.birthday_send_time ?? "10:00"),
       messageTemplate: String(settings?.birthday_message_template ?? "")

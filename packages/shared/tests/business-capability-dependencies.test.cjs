@@ -3,9 +3,68 @@ const assert = require("node:assert/strict");
 const {
   BUSINESS_CAPABILITIES: C,
   expandBusinessCapabilities,
+  getBusinessProfiles,
+  getBusinessProfileSelectionCapabilities,
+  businessProfileSupportsCapability,
+  toggleBusinessProfileOption,
+  BUSINESS_SERVICE_CAPABILITY_OWNERS,
+  isBusinessServiceAvailable,
   getEnabledBusinessCapabilityDependents,
   validateBusinessCapabilitySet
 } = require("../dist/index.js");
+
+for (const profile of getBusinessProfiles()) {
+  test(`${profile.id}: every optional combination and ON/OFF cascade resolves valid allowed capabilities`, () => {
+    assert.deepEqual(validateBusinessCapabilitySet(profile.defaultCapabilities), []);
+    for (const internal of [C.CATALOG, C.SALES, C.ORDERS]) assert.equal(profile.optionalCapabilities.includes(internal), false);
+    for (let mask = 0; mask < 2 ** profile.optionalCapabilities.length; mask++) {
+      const selected = profile.optionalCapabilities.filter((_, index) => mask & (1 << index));
+      for (const feature of profile.optionalCapabilities) for (const enabled of [true, false]) {
+        const roots = toggleBusinessProfileOption(profile.id, selected, feature, enabled);
+        const resolved = getBusinessProfileSelectionCapabilities(profile.id, roots);
+        assert.deepEqual(validateBusinessCapabilitySet(resolved), []);
+        assert.ok(resolved.every(capability => businessProfileSupportsCapability(profile.id, capability)));
+        assert.equal(resolved.includes(feature), enabled, `${profile.id}: ${feature}, ${enabled}`);
+        if (!enabled) assert.ok(roots.every(root => !expandBusinessCapabilities([root]).includes(feature)));
+      }
+    }
+  });
+}
+
+test("diamond: Orders survives either channel and disappears after both roots close", () => {
+  let roots = toggleBusinessProfileOption("market", [], C.ONLINE_SALES, true);
+  roots = toggleBusinessProfileOption("market", roots, C.WHOLESALE, true);
+  roots = toggleBusinessProfileOption("market", roots, C.ONLINE_SALES, false);
+  assert.equal(getBusinessProfileSelectionCapabilities("market", roots).includes(C.ORDERS), true);
+  roots = toggleBusinessProfileOption("market", roots, C.WHOLESALE, false);
+  assert.equal(getBusinessProfileSelectionCapabilities("market", roots).includes(C.ORDERS), false);
+});
+
+test("supplier prerequisites are automatic; explicit Purchasing selection survives Suppliers OFF", () => {
+  const suppliers = toggleBusinessProfileOption("market", [], C.RETAIL_SUPPLIERS, true);
+  assert.deepEqual(suppliers, [C.RETAIL_SUPPLIERS]);
+  for (const capability of [C.RETAIL_PURCHASING, C.INVENTORY, C.CATALOG]) {
+    assert.ok(getBusinessProfileSelectionCapabilities("market", suppliers).includes(capability));
+  }
+  assert.deepEqual(toggleBusinessProfileOption("market", suppliers, C.RETAIL_SUPPLIERS, false), []);
+  assert.deepEqual(toggleBusinessProfileOption("market", suppliers, C.RETAIL_PURCHASING, false), []);
+  const explicit = toggleBusinessProfileOption("market", suppliers, C.RETAIL_PURCHASING, true);
+  assert.deepEqual(toggleBusinessProfileOption("market", explicit, C.RETAIL_SUPPLIERS, false), [C.RETAIL_PURCHASING]);
+});
+
+test("campaign prerequisite OFF cascades; operational services retain their independent owner", () => {
+  const roots = toggleBusinessProfileOption("restaurant", [], C.MESSAGING_CAMPAIGNS, true);
+  const resolved = getBusinessProfileSelectionCapabilities("restaurant", roots);
+  assert.ok(resolved.includes(C.MARKETING_STUDIO));
+  assert.deepEqual(toggleBusinessProfileOption("restaurant", roots, C.MARKETING_STUDIO, false), []);
+  assert.equal(isBusinessServiceAvailable("sms", resolved), true);
+  assert.equal(isBusinessServiceAvailable("whatsappCloud", [C.CUSTOMERS]), true);
+  assert.equal(isBusinessServiceAvailable("ai", [C.CUSTOMERS]), true);
+  for (const [service, owners] of Object.entries(BUSINESS_SERVICE_CAPABILITY_OWNERS)) {
+    assert.equal(isBusinessServiceAvailable(service, []), false);
+    for (const owner of owners) assert.equal(isBusinessServiceAvailable(service, expandBusinessCapabilities([owner])), true);
+  }
+});
 
 test("folio expands to its structural prerequisites", () => {
   const expanded = new Set(expandBusinessCapabilities([C.ACCOMMODATION_FOLIO]));

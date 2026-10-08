@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import type { BusinessCapability } from "@yardimci-asistan/shared";
+import { getBusinessProfile, type BusinessCapability } from "@yardimci-asistan/shared";
 import {
   clearBusinessCapabilityOverride,
   readBusinessCapabilitySnapshot,
@@ -22,6 +22,10 @@ export function registerBusinessCapabilityIpcHandlers(options: {
     "capability:set",
     (_event, capability: BusinessCapability, enabled: boolean): BusinessCapabilitySnapshot => {
       options.assertUnlocked();
+      const current = readBusinessCapabilitySnapshot(options.databasePath());
+      if (!getBusinessProfile(current.profileId).optionalCapabilities.includes(capability)) {
+        throw new Error("Bu ayarı ilgili işletme veya servis bölümünden değiştirin.");
+      }
       const snapshot = setBusinessCapability(options.databasePath(), {
         capability,
         enabled: enabled === true
@@ -35,6 +39,10 @@ export function registerBusinessCapabilityIpcHandlers(options: {
     "capability:clearOverride",
     (_event, capability: BusinessCapability): BusinessCapabilitySnapshot => {
       options.assertUnlocked();
+      const current = readBusinessCapabilitySnapshot(options.databasePath());
+      if (!getBusinessProfile(current.profileId).optionalCapabilities.includes(capability)) {
+        throw new Error("Bu ayarı ilgili işletme veya servis bölümünden değiştirin.");
+      }
       const snapshot = clearBusinessCapabilityOverride(options.databasePath(), capability);
       options.onMutation?.();
       return snapshot;

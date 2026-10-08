@@ -1,6 +1,6 @@
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useRef, useState } from "react";
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, isBusinessServiceAvailable } from "@yardimci-asistan/shared";
 import type { SaveInitialSetupInput } from "../../../electron/database";
 import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
@@ -103,8 +103,8 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     enabledCapabilities: capabilities,
     enabled: initialized
   });
-  const googleReviews = useGoogleReviewsSettings(initialized);
-  const kbs = useKbsSettings(initialized && capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS), drafts.canonical.profileId);
+  const googleReviews = useGoogleReviewsSettings(initialized && isBusinessServiceAvailable("googleReviews", capabilities));
+  const kbs = useKbsSettings(initialized && isBusinessServiceAvailable("kbs", capabilities), drafts.canonical.profileId);
   const layout = useBusinessLayoutSettings({
     enabled: initialized,
     capabilities: {
@@ -454,7 +454,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                     controller={profile}
                     disabled={drafts.busy || guardBusy}
                   />
-                  {capabilities.includes("accommodation.rooms") && (
+                  {isBusinessServiceAvailable("googleReviews", capabilities) && (
                     <GoogleReviewsSettingsSection
                       controller={googleReviews}
                       disabled={drafts.busy || guardBusy}
@@ -486,7 +486,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                   onAndroidPermissionGroupsChange={androidPermissions.update}
                 />
               </fieldset>
-              {capabilities.includes(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS) && (
+              {isBusinessServiceAvailable("kbs", capabilities) && (
                 <KbsSettingsSection controller={kbs} disabled={drafts.busy || guardBusy} />
               )}
               <StagedSettingsContributionSlot

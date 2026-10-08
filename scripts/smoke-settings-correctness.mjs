@@ -30,7 +30,7 @@ function loadProvider(filename, overrides, globals = {}) {
     ...globals, require: name => overrides[name] ?? providerRequire(name) });
   return exports;
 }
-const setup = { businessName: "Settings fixture", profileId: "market", profileOptions: [C.ONLINE_SALES, C.WHOLESALE],
+const setup = { businessName: "Settings fixture", profileId: "market", profileOptions: [C.ONLINE_SALES, C.WHOLESALE, C.MESSAGING_CAMPAIGNS],
   phone: "", whatsapp: "", email: "", address: "Draft-safe address", webModuleUrl: "https://example.test/module", syncSecret: "fixture-sync-secret", autoSyncEnabled: false,
   onlineSalesDeliveryEnabled: true, onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },
   aiEnabled: false, aiProvider: "openai_compatible", aiService: "openai", aiProjectName: "", aiBaseUrl: "https://api.openai.com/v1", aiModel: "", aiTimeoutSeconds: 30, aiApiKey: "", clearAiApiKey: false,
@@ -160,6 +160,7 @@ try {
   assert.match(validate(autoSync), /test edin/, "unchanged active transport still requires matching evidence");
   assert.match(validate({ ...setup, arasShipping: { ...shipping, username: null } }), /geçersiz/);
 
+  assert.equal(db.saveInitialSetup({ ...setup, profileId: "pension" }).ok, true);
   const electron = { safeStorage: { isEncryptionAvailable: () => true,
     encryptString: value => Buffer.from(value), decryptString: value => value.toString() } };
   const kbs = loadProvider("kbs-settings", { electron });
@@ -187,6 +188,12 @@ try {
   assert.equal((await reviews.testGoogleReviewsConnection(db.databasePath, reviewsInput,
     { baseUrl: setup.webModuleUrl, syncSecret: setup.syncSecret }, "fixture-client")).ok, false);
   assert.equal(reviews.getGoogleReviewsSettings(db.databasePath).enabled, true);
+
+  assert.equal(db.saveInitialSetup({ ...setup, profileId: "market" }).ok, true);
+  assert.match(kbs.saveKbsSettings(db.databasePath, kbsInput).message, /konaklama yönetimi gerekli/);
+  assert.match(reviews.saveGoogleReviewsSettings(db.databasePath, reviewsInput).message, /konaklama yönetimi gerekli/);
+  assert.equal(kbs.getKbsSettings(db.databasePath).enabled, false);
+  assert.equal(reviews.getGoogleReviewsSettings(db.databasePath).enabled, false);
 
   // Canonical coordinates remain persisted, but Web receives only the selected source.
   const embed = "https://www.google.com/maps/embed?pb=!fixture";

@@ -12,6 +12,7 @@ export const editorialInput = (changes = {}) => ({ title: 'Yeni sezon', purpose:
   variants: [{channel:'website',title:'Web başlığı',text:'Website metni',metadata:{version:1,adaptation:'manual'}},{channel:'whatsapp',text:'WhatsApp metni',metadata:{version:1}}],mediaAssetIds:[],...changes });
 export function marketingFixture({ enabled = true, ai = false } = {}) {
   const foundation = campaignFixture(), logs = [], calls = [], cache = new Map();
+  if (!enabled) setBusinessCapability(foundation.db.databasePath,{capability:C.MESSAGING_CAMPAIGNS,enabled:false});
   setBusinessCapability(foundation.db.databasePath,{capability:C.MARKETING_STUDIO,enabled});
   setBusinessCapability(foundation.db.databasePath,{capability:C.AI,enabled:ai});
   const state = { webUrl:null, selected:[], unavailable:false, response:'AI aday metni', fail:false, selectedAiService:'openai', aiProfiles:null };

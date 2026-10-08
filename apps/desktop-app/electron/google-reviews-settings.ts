@@ -1,5 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { safeStorage } from "electron";
+import { isBusinessServiceAvailable } from "@yardimci-asistan/shared";
+import { readEnabledBusinessCapabilities } from "./business-capability-store";
 import type { DesktopDatabase } from "./database";
 import { pushGoogleReviewsSettings } from "@yardimci-asistan/sync-core";
 import { publishDesktopProjection } from "./desktop-publication-service";
@@ -75,6 +77,9 @@ export function saveGoogleReviewsSettings(
 
   const db = new DatabaseSync(databasePath);
   try {
+    if (input.enabled && !isBusinessServiceAvailable("googleReviews", readEnabledBusinessCapabilities(db))) {
+      return { ok: false, message: "Google Yorumları için konaklama yönetimi gerekli." };
+    }
     const fingerprint = serviceConfigFingerprint({ placeId, apiKey: input.apiKey.trim() || (input.clearApiKey ? "" : decryptApiKey(current.encryptedApiKey)) });
     const activationError = validateServiceActivation({ label: "Google Yorumları", enabled: input.enabled,
       configured: Boolean(placeId && keyUpdate.encryptedValue), fingerprint, verifiedFingerprint: readServiceVerification(db, "google_reviews") });

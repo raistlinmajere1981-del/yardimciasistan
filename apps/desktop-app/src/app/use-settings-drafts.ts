@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
+import { normalizeBusinessProfileOptions } from "@yardimci-asistan/shared";
 import type { DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
 import { createSetupInput, toSetupForm, createProfileOptionDefaults, type SetupFormState } from "./setup-model";
 import {
@@ -39,6 +40,7 @@ export function useSettingsDrafts(
         ? [...canonicalRef.current.profileOptions]
         : createProfileOptionDefaults(value.profileId) };
     }
+    value = { ...value, profileOptions: normalizeBusinessProfileOptions(value.profileId, value.profileOptions) };
     draftRef.current = value;
     setForm(value);
 

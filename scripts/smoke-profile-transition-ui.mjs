@@ -92,6 +92,75 @@ try {
     for (const surface of ["dashboard", "customerWork", "calendar", "reports", "settings"]) expect(row.defaults).toContain(surface);
   }
 
+  // Exercise real Settings controls for every registry option; no checkbox graph copy.
+  for (const profile of registry) {
+    await visit(`?profile=${profile.id}`);
+    for (const feature of profile.optionalCapabilities) {
+      await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
+      const persisted = await page.evaluate(() => structuredClone(window.persistedSettings()));
+      const calls = await page.evaluate(() => window.settingsCalls.length);
+      const featureControl = options.locator(`input[value="${feature}"]`);
+      await featureControl.check();
+      const expected = await page.evaluate(async ({ path, id, feature }) => {
+        const shared = await import(path);
+        return shared.getBusinessProfileSelectionCapabilities(id, [feature]);
+      }, { path: `/@fs/${resolve("packages/shared/types/business-capabilities.ts")}`, id: profile.id, feature });
+      for (const option of profile.optionalCapabilities) {
+        expect(await options.locator(`input[value="${option}"]`).isChecked()).toBe(expected.includes(option));
+      }
+      expect(await page.evaluate(() => window.persistedSettings())).toEqual(persisted);
+      expect(await page.evaluate(() => window.settingsCalls.length)).toBe(calls);
+      await featureControl.uncheck();
+      for (const option of profile.optionalCapabilities) await expect(options.locator(`input[value="${option}"]`)).not.toBeChecked();
+      await expect(save).toBeDisabled();
+    }
+  }
+  await visit("?profile=market");
+  await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
+  const purchasing = options.locator('input[value="retail.purchasing"]');
+  const suppliers = options.locator('input[value="retail.suppliers"]');
+  await suppliers.check();
+  await expect(purchasing).toBeChecked();
+  await expect(options.getByText("Tedarikçiler için gerekli", { exact: true })).toBeVisible();
+  await purchasing.uncheck();
+  await expect(suppliers).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await purchasing.check();
+  await suppliers.check();
+  await suppliers.uncheck();
+  await expect(purchasing).toBeChecked();
+  await revert.click();
+  await suppliers.check();
+  await save.click();
+  expect(await page.evaluate(() => window.persistedSettings().profileOptions)).toEqual(["retail.suppliers"]);
+  await page.evaluate(() => window.reopenSettings());
+  await expect(purchasing).toBeChecked();
+  await suppliers.uncheck();
+  await expect(purchasing).not.toBeChecked();
+  await revert.click();
+  await expect(suppliers).toBeChecked();
+  await expect(purchasing).toBeChecked();
+  await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
+  await options.locator('input[value="messaging.campaigns"]').check();
+  await expect(options.locator('input[value="marketing.studio"]')).toBeChecked();
+  await options.locator('input[value="marketing.studio"]').uncheck();
+  await expect(options.locator('input[value="messaging.campaigns"]')).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await page.getByRole("tab", { name: "Servisler", exact: true }).click();
+  await expect(page.locator("#settings-marketing-sms")).toHaveCount(0);
+  await expect(page.locator("#settings-marketing-instagram")).toHaveCount(0);
+  await expect(page.locator("#settings-online-delivery")).toHaveCount(0);
+  await page.getByRole("tab", { name: "İşletme", exact: true }).click();
+  await options.locator('input[value="messaging.campaigns"]').check();
+  await options.locator('input[value="channel.online_sales"]').check();
+  await save.click();
+  await page.getByRole("tab", { name: "Servisler", exact: true }).click();
+  await expect(page.locator("#settings-marketing-sms")).toBeVisible();
+  await expect(page.locator("#settings-marketing-instagram")).toBeVisible();
+  await expect(page.locator("#settings-online-delivery").getByRole("checkbox", { name: "Teslimat ve Gönderim servisi", exact: true })).not.toBeChecked();
+  expect(await page.evaluate(() => window.persistedSettings().sms.enabled)).toBe(false);
+  expect(await page.evaluate(() => window.persistedSettings().instagram.enabled)).toBe(false);
+
   await visit("?runtime");
   const runtime = page.getByLabel("Runtime profile", { exact: true });
   const nav = page.getByLabel("Runtime navigation", { exact: true });
@@ -117,13 +186,12 @@ try {
   await expectSales(false);
   await expect(nav).not.toContainText("pension");
   // A capability removal also fences a previously captured eligible Sales response.
-  await page.evaluate(async () => {
-    await window.changeRuntimeCapability("commerce.orders", true);
-    await window.changeRuntimeCapability("commerce.wholesale", true);
-  });
+  await page.evaluate(() => { window.saving = window.saveProfile("market"); });
+  await page.evaluate(() => { window.finishProfileSave(); });
   await expectSales(true);
   await page.evaluate(() => { window.holdCapabilityRead(); window.oldRead = window.readCapabilities(); });
-  await page.evaluate(async () => { await window.changeRuntimeCapability("commerce.wholesale", false); });
+  await page.evaluate(() => { window.saving = window.saveProfile("restaurant"); });
+  await page.evaluate(() => { window.finishProfileSave(); });
   await expectSales(false);
   await page.evaluate(async () => { window.releaseCapabilityRead(); await window.oldRead; });
   await expectSales(false);

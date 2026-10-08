@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { createServer } from "vite";
 import ts from "typescript";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
@@ -26,7 +27,7 @@ if (diagnostics.length) {
 // rather than asserting the source shape of navigation/settings/workspace modules.
 const conditionSource = readFileSync(resolve("apps/desktop-app/src/app/capability-condition.ts"), "utf8");
 const conditionModule = await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(
-  conditionSource,
+  conditionSource.replace("@yardimci-asistan/shared", pathToFileURL(resolve("packages/shared/dist/index.js")).href),
   { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }
 ).outputText).toString("base64")}`);
 const matches = conditionModule.matchesCapabilityCondition;

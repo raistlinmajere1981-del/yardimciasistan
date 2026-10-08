@@ -29,7 +29,7 @@ try {
   check("retail", () => assert.equal(sales(getBusinessProfile("market").defaultCapabilities), true));
   check("retail without barcode retains purchasing/supplier surfaces", () => assert.equal(
     sales(getBusinessProfile("market").defaultCapabilities.filter(capability => capability !== C.RETAIL_BARCODE)), true));
-  check("wholesale", () => assert.equal(sales([C.CATALOG, C.ORDERS, C.WHOLESALE]), true));
+  check("wholesale", () => assert.equal(sales(expandBusinessCapabilities([C.WHOLESALE])), true));
   for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS]) {
     check(`${capability} with catalog grants an actual retail surface`, () => assert.equal(sales(expandBusinessCapabilities([C.CATALOG, capability])), true));
   }
@@ -134,20 +134,24 @@ try {
     check("profile switch and persisted capability navigation", () => {
       for (const profile of ["pension", "pension_restaurant", "restaurant"]) {
         applyBusinessProfileCapabilities(database.databasePath, profile, { preserveUserOverrides: false });
-        // Keep the real hospitality defaults, including shared SALES where supplied.
-        // Inventory requires catalog; adding both must still not grant Sales entry.
-        setBusinessCapability(database.databasePath, { capability: C.CATALOG, enabled: true });
-        setBusinessCapability(database.databasePath, { capability: C.INVENTORY, enabled: true });
-        assert.equal(buildNavigation(readBusinessCapabilitySnapshot(database.databasePath)).some(item => item.id === "market"), false, profile);
-        assert.equal(readBusinessCapabilitySnapshot(database.databasePath).enabledCapabilities.includes(C.INVENTORY), true);
+        const persisted = readBusinessCapabilitySnapshot(database.databasePath);
+        assert.equal(buildNavigation(persisted).some(item => item.id === "market"), false, profile);
+        assert.throws(() => setBusinessCapability(database.databasePath, { capability: C.WHOLESALE, enabled: true }), /profilinde/);
+        if (profile === "pension") {
+          assert.throws(() => setBusinessCapability(database.databasePath, { capability: C.INVENTORY, enabled: true }), /profilinde/);
+        } else {
+          const current = database.getSetupData();
+          const saved = database.saveInitialSetup({ ...current, aiApiKey: "", clearAiApiKey: false,
+            profileOptions: [...current.profileOptions, C.ONLINE_SALES], servicePreferences: current.servicePreferences });
+          assert.equal(saved.ok, true, saved.message);
+          const online = readBusinessCapabilitySnapshot(database.databasePath);
+          assert.equal(buildNavigation(online).some(item => item.id === "market"), false);
+          assert.equal(buildNavigation(online).some(item => item.id === "menu"), true);
+          assert.ok(online.enabledCapabilities.includes(C.ORDERS));
+        }
         const reopened = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dataDir });
         try { reopened.initialize(); assert.equal(buildNavigation(readBusinessCapabilitySnapshot(reopened.databasePath)).some(item => item.id === "market"), false); } finally { reopened.close(); }
-        setBusinessCapability(database.databasePath, { capability: C.ORDERS, enabled: true });
-        setBusinessCapability(database.databasePath, { capability: C.WHOLESALE, enabled: true });
-        assert.equal(buildNavigation(readBusinessCapabilitySnapshot(database.databasePath)).some(item => item.id === "market"), true);
-        setBusinessCapability(database.databasePath, { capability: C.WHOLESALE, enabled: false });
-        assert.equal(buildNavigation(readBusinessCapabilitySnapshot(database.databasePath)).some(item => item.id === "market"), false,
-          "removing the entry surface hides Sales without disabling shared inventory");
+
       }
     });
   } finally { db.close(); }

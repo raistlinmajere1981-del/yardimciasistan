@@ -128,7 +128,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     arasShipping: { ...(setupData.arasShipping ?? defaultSetupData.arasShipping), password: "", clearPassword: false },
     dealerPortalEnabled: setupData.dealerPortalEnabled ?? false,
     onlineSalesDelivery: { ...(setupData.onlineSalesDelivery ?? defaultSetupData.onlineSalesDelivery) },
-    onlineSalesDeliveryEnabled: setupData.onlineSalesDeliveryEnabled ?? true,
+    onlineSalesDeliveryEnabled: setupData.onlineSalesDeliveryEnabled ?? false,
     productDataEnabled: setupData.productData.enabled,
     productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,

@@ -147,7 +147,7 @@ try {
     expect(form.validation).toBeNull();
   }
   for (const form of deliveryForms.explicit) expect(form.output).toEqual(form.input);
-  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: ['channel.online_sales'], onlineSalesDelivery: undefined }));
+  await page.evaluate(() => window.refreshSettings({ profileId: 'market', profileOptions: ['channel.online_sales'], onlineSalesDelivery: undefined, onlineSalesDeliveryEnabled: true }));
   await select('Servisler');
   const deliverySettings = page.locator('#settings-online-delivery');
   await expect(deliverySettings).toBeVisible();
@@ -213,7 +213,7 @@ try {
   await expect(productToggle).toBeChecked();
   await expect(productService.getByRole('combobox')).toBeVisible();
 
-  await page.evaluate(() => window.refreshSettings({ profileOptions: ['commerce.wholesale'] }));
+  await page.evaluate(() => window.refreshSettings({ profileOptions: ['commerce.wholesale'], onlineSalesDeliveryEnabled: true }));
   await expect(page.locator('#settings-online-delivery')).toBeVisible();
   await expect(page.locator('#settings-online-delivery')).toContainText('Teslimat ve Gönderim');
   const dealerPortal = page.locator('#settings-dealer-portal');

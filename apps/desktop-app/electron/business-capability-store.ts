@@ -6,13 +6,12 @@ import {
   getBusinessProfile,
   getBusinessProfileSelectionCapabilities,
   getEnabledBusinessCapabilityDependents,
-  expandBusinessCapabilities,
   normalizeBusinessType,
   validateBusinessCapabilitySet,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import { queueSyncJob } from "./database/sync-runtime-store";
-import { resetProfileServiceActivationsInTransaction } from "./profile-service-activation";
+import { resetProfileServiceActivationsInTransaction, resetUnavailableServiceActivationsInTransaction } from "./profile-service-activation";
 
 type BusinessCapabilitySource = "system" | "profile" | "user";
 
@@ -110,60 +109,34 @@ export function replaceBusinessCapabilitiesInTransaction(
     ...(!profileChanged && input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),
     ...(!profileChanged && input.aiEnabled ? [BUSINESS_CAPABILITIES.AI] : [])
   ];
-  const selected = new Set<BusinessCapability>([
-    ...getBusinessProfileSelectionCapabilities(profile.id, selectedOptional),
-    ...serviceCapabilities
+  const resolved = new Set<BusinessCapability>([
+    ...getBusinessProfileSelectionCapabilities(profile.id, selectedOptional), ...serviceCapabilities
   ]);
-  const explicitSelection = new Set<BusinessCapability>([
-    ...profile.requiredCapabilities, ...selectedOptional, ...serviceCapabilities
-  ]);
-  const profileDefaults = new Set(profile.defaultCapabilities);
+  const explicitSelection = new Set<BusinessCapability>([...selectedOptional, ...serviceCapabilities]);
+  const defaultSelection = new Set(profile.defaultOptionalCapabilities);
   const serviceCapabilitiesSet = new Set<BusinessCapability>([
     BUSINESS_CAPABILITIES.WHATSAPP, BUSINESS_CAPABILITIES.ANDROID, BUSINESS_CAPABILITIES.AI
   ]);
   const existing = new Map((input.previousProfileId === undefined || profileChanged ? [] : database.prepare(`
-    SELECT capability_id, is_enabled, source FROM business_capabilities WHERE business_id = ?
-  `).all(input.businessId) as Array<{ capability_id: string; is_enabled: number; source: string }>)
-    .map((row) => [row.capability_id, { enabled: row.is_enabled === 1, source: row.source }]));
-  const overrides = new Map<BusinessCapability, boolean>();
-
-  for (const capability of KNOWN_CAPABILITIES) {
-    if (SYSTEM_CAPABILITIES.has(capability) || !businessProfileSupportsCapability(profile.id, capability)) continue;
-    if (profileChanged) continue;
+    SELECT capability_id, is_selected, source FROM business_capabilities WHERE business_id = ?
+  `).all(input.businessId) as Array<{ capability_id: string; is_selected: number; source: string }>)
+    .map(row => [row.capability_id, { selected: row.is_selected === 1, source: row.source }]));
+  const overrides = new Set<BusinessCapability>();
+  if (!profileChanged) for (const capability of KNOWN_CAPABILITIES) {
+    if (!allowedOptional.has(capability) && !serviceCapabilitiesSet.has(capability)) continue;
     const previous = existing.get(capability);
-    const controlled = allowedOptional.has(capability) || serviceCapabilitiesSet.has(capability);
-    if (!controlled) {
-      if (previous?.source === "user") overrides.set(capability, previous.enabled);
-      continue;
-    }
-    const enabled = explicitSelection.has(capability);
-    // Only edits of the current profile create overrides. A no-op preserves authority.
-    const baselineEnabled = previous
-      ? previous.enabled
-      : profileDefaults.has(capability);
-    if (enabled !== baselineEnabled) {
-      overrides.set(capability, enabled);
-    } else if (previous?.source === "user") {
-      overrides.set(capability, previous.enabled);
-    }
-  }
-
-  for (const [capability, enabled] of overrides) {
-    if (enabled) selected.add(capability);
-    else selected.delete(capability);
-  }
-  const resolved = new Set(expandBusinessCapabilities(selected));
-  // Dependency expansion must not silently undo an explicit OFF override.
-  for (const [capability, enabled] of overrides) {
-    if (!enabled) resolved.delete(capability);
+    const selected = explicitSelection.has(capability);
+    const baseline = previous ? previous.selected : defaultSelection.has(capability);
+    if (selected !== baseline || previous?.source === "user") overrides.add(capability);
   }
 
   const statement = database.prepare(`
     INSERT INTO business_capabilities (
-      business_id, capability_id, is_enabled, source, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      business_id, capability_id, is_enabled, is_selected, source, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(business_id, capability_id) DO UPDATE SET
       is_enabled = excluded.is_enabled,
+      is_selected = excluded.is_selected,
       source = excluded.source,
       updated_at = excluded.updated_at
   `);
@@ -171,13 +144,14 @@ export function replaceBusinessCapabilitiesInTransaction(
   for (const capability of KNOWN_CAPABILITIES) {
     const source: BusinessCapabilitySource = SYSTEM_CAPABILITIES.has(capability)
       ? "system"
-      : overrides.has(capability)
+      : overrides.has(capability) && !(resolved.has(capability) && !explicitSelection.has(capability))
         ? "user"
         : "profile";
     statement.run(
       input.businessId,
       capability,
       resolved.has(capability) ? 1 : 0,
+      explicitSelection.has(capability) ? 1 : 0,
       source,
       input.now,
       input.now
@@ -186,6 +160,7 @@ export function replaceBusinessCapabilitiesInTransaction(
 
   assertValidCapabilityState(database, input.businessId);
   if (profileChanged) resetProfileServiceActivationsInTransaction(database, input.businessId, input.now);
+  resetUnavailableServiceActivationsInTransaction(database, input.businessId, resolved, input.now);
   queueSyncJob(database, "android_snapshot", input.now);
   queueSyncJob(database, "menu_publish", input.now);
   return [...resolved].sort();
@@ -197,6 +172,9 @@ function formatCapabilityList(capabilities: Iterable<BusinessCapability>) {
 
 function assertValidCapabilityState(database: DatabaseSync, businessId: string) {
   const enabled = readEnabledCapabilities(database, businessId);
+  const profileId = resolveProfileId(readActiveBusiness(database));
+  const forbidden = [...enabled].find(capability => !businessProfileSupportsCapability(profileId, capability));
+  if (forbidden) throw new Error(`${forbidden} mevcut işletme profilinde kullanılamaz.`);
   const violations = validateBusinessCapabilitySet(enabled);
   if (violations.length === 0) return;
 
@@ -282,7 +260,8 @@ export function applyBusinessProfileCapabilities(
         businessId, profileId,
         previousProfileId: preserveUserOverrides || !sameProfile ? resolveProfileId(business) : undefined,
         selectedOptionalCapabilities: sameProfile && preserveUserOverrides
-          ? profile.optionalCapabilities.filter(capability => current.has(capability))
+          ? (database.prepare("SELECT capability_id FROM business_capabilities WHERE business_id = ? AND is_selected = 1").all(businessId) as Array<{ capability_id: string }>)
+            .map(row => row.capability_id as BusinessCapability).filter(capability => profile.optionalCapabilities.includes(capability))
           : profile.defaultOptionalCapabilities,
         whatsappEnabled: sameProfile && preserveUserOverrides && current.has(BUSINESS_CAPABILITIES.WHATSAPP),
         androidEnabled: sameProfile && preserveUserOverrides && current.has(BUSINESS_CAPABILITIES.ANDROID),
@@ -302,9 +281,9 @@ export function applyBusinessProfileCapabilities(
 }
 
 /**
- * Writes an explicit operator override. Core capabilities are immutable. Domain
- * capabilities are composable unless an explicit profile policy scopes them;
- * mutations must also satisfy declared capability dependencies.
+ * Strict persistence boundary for explicit overrides. Core capabilities are
+ * immutable; profile allowance and graph requirements remain backend defenses.
+ * Operator Settings resolves feature roots before reaching this boundary.
  */
 export function setBusinessCapability(
   databasePath: string,
@@ -324,7 +303,9 @@ export function setBusinessCapability(
     if (!businessId) throw new Error("Aktif işletme bulunamadı.");
     const profileId = resolveProfileId(business);
     if (input.enabled && !businessProfileSupportsCapability(profileId, input.capability)) {
-      throw new Error("Veresiye / Müşteri Hesabı yalnızca Market / Perakende işletmelerinde kullanılabilir.");
+      throw new Error(input.capability === BUSINESS_CAPABILITIES.CUSTOMER_CREDIT
+        ? "Veresiye / Müşteri Hesabı yalnızca Market / Perakende işletmelerinde kullanılabilir."
+        : `${input.capability} mevcut işletme profilinde kullanılamaz.`);
     }
     const now = new Date().toISOString();
 
@@ -342,15 +323,17 @@ export function setBusinessCapability(
     try {
       database.prepare(`
         INSERT INTO business_capabilities (
-          business_id, capability_id, is_enabled, source, created_at, updated_at
-        ) VALUES (?, ?, ?, 'user', ?, ?)
+          business_id, capability_id, is_enabled, is_selected, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'user', ?, ?)
         ON CONFLICT(business_id, capability_id) DO UPDATE SET
           is_enabled = excluded.is_enabled,
+          is_selected = excluded.is_selected,
           source = 'user',
           updated_at = excluded.updated_at
-      `).run(businessId, input.capability, input.enabled ? 1 : 0, now, now);
+      `).run(businessId, input.capability, input.enabled ? 1 : 0, input.enabled ? 1 : 0, now, now);
 
       assertValidCapabilityState(database, businessId);
+      resetUnavailableServiceActivationsInTransaction(database, businessId, readEnabledCapabilities(database, businessId), now);
       queueSyncJob(database, "android_snapshot", now);
       if (input.capability === BUSINESS_CAPABILITIES.QR_MENU) queueSyncJob(database, "menu_publish", now);
       database.exec("COMMIT");
@@ -389,15 +372,18 @@ export function clearBusinessCapabilityOverride(
     try {
       database.prepare(`
         INSERT INTO business_capabilities (
-          business_id, capability_id, is_enabled, source, created_at, updated_at
-        ) VALUES (?, ?, ?, 'profile', ?, ?)
+          business_id, capability_id, is_enabled, is_selected, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'profile', ?, ?)
         ON CONFLICT(business_id, capability_id) DO UPDATE SET
           is_enabled = excluded.is_enabled,
+          is_selected = excluded.is_selected,
           source = 'profile',
           updated_at = excluded.updated_at
-      `).run(businessId, capability, profileDefaults.has(capability) ? 1 : 0, now, now);
+      `).run(businessId, capability, profileDefaults.has(capability) ? 1 : 0,
+        getBusinessProfile(profileId).defaultOptionalCapabilities.includes(capability) ? 1 : 0, now, now);
 
       assertValidCapabilityState(database, businessId);
+      resetUnavailableServiceActivationsInTransaction(database, businessId, readEnabledCapabilities(database, businessId), now);
       queueSyncJob(database, "android_snapshot", now);
       if (capability === BUSINESS_CAPABILITIES.QR_MENU) queueSyncJob(database, "menu_publish", now);
       database.exec("COMMIT");

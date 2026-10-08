@@ -1,5 +1,5 @@
 import type { AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
-import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
+import { isBusinessServiceAvailable, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
 import type { DesktopAndroidInstallationSnapshot } from "../../../electron/android-installation-service";
 import type { SetupFormState } from "../../app/setup-model";
@@ -68,6 +68,7 @@ export function ServicesSettingsSection({
         <div id="settings-connections" className="settings-services-workspace">
           <WebSettingsSection form={form} onFormChange={onFormChange} />
 
+          {isBusinessServiceAvailable("whatsapp", enabledCapabilities) && (
           <ServiceSettingsCard id="settings-whatsapp" title="WhatsApp" enabled={form.whatsappEnabled} onEnabledChange={enabled => update("whatsappEnabled", enabled)}>
             <div className="setup-birthday-settings form-stack">
               <div className="setup-section-title setup-section-title--subsection">
@@ -95,7 +96,9 @@ export function ServicesSettingsSection({
             </div>
             </div>
           </ServiceSettingsCard>
+          )}
 
+          {isBusinessServiceAvailable("android", enabledCapabilities) && (
           <ServiceSettingsCard id="settings-android" title="Android" enabled={form.androidEnabled} onEnabledChange={enabled => update("androidEnabled", enabled)}>
               <div className="form-stack">
                 <div className="form-stack">
@@ -132,8 +135,9 @@ export function ServicesSettingsSection({
                 )}
               </div>
           </ServiceSettingsCard>
+          )}
 
-          {hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.RETAIL_BARCODE) && (
+          {isBusinessServiceAvailable("productData", enabledCapabilities) && (
           <ServiceSettingsCard id="settings-product-data" title="Ürün Verisi"
             enabled={form.productDataEnabled} onEnabledChange={(enabled) => update("productDataEnabled", enabled)}>
               <label className="form-field form-field--medium">
@@ -170,6 +174,7 @@ export function ServicesSettingsSection({
           </ServiceSettingsCard>
           )}
 
+          {isBusinessServiceAvailable("ai", enabledCapabilities) && (
           <AiSettingsSection
             form={form}
             onFormChange={onFormChange}
@@ -177,6 +182,7 @@ export function ServicesSettingsSection({
             aiConnectionTestState={aiConnectionTestState}
             aiConnectionTestMessage={aiConnectionTestMessage}
           />
+          )}
         </div>
   );
 }

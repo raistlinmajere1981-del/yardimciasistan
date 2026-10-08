@@ -73,23 +73,9 @@ try {
     /folio-disabled/
   );
 
-  const marketWithRooms = setBusinessCapability(databasePath, {
-    capability: C.ACCOMMODATION_ROOMS,
-    enabled: true
-  });
-  assert.equal(marketWithRooms.profileId, "market");
-  assert.equal(marketWithRooms.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), true);
-  assert.throws(
-    () => setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_FOLIO, enabled: true }),
-    /accommodation\.stays/
-  );
-
-  setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_STAYS, enabled: true });
-  const marketWithFolio = setBusinessCapability(databasePath, {
-    capability: C.ACCOMMODATION_FOLIO,
-    enabled: true
-  });
-  assert.equal(marketWithFolio.enabledCapabilities.includes(C.ACCOMMODATION_FOLIO), true);
+  for (const capability of [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS, C.ACCOMMODATION_FOLIO]) {
+    assert.throws(() => setBusinessCapability(databasePath, { capability, enabled: true }), /profilinde/);
+  }
 
   const restaurant = applyBusinessProfileCapabilities(databasePath, "restaurant");
   assert.equal(restaurant.profileId, "restaurant");
@@ -99,19 +85,10 @@ try {
   assert.equal(restaurant.enabledCapabilities.includes(C.ACCOMMODATION_STAYS), false);
   assert.equal(restaurant.enabledCapabilities.includes(C.ACCOMMODATION_FOLIO), false);
 
-  // Hybrids still work when explicitly configured AFTER the transition.
-  setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_ROOMS, enabled: true });
-  setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_STAYS, enabled: true });
-  setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_FOLIO, enabled: true });
-
-  assert.throws(
-    () => clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_ROOMS),
-    /gerekli yetenekler|bağlı/i
-  );
-  clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_FOLIO);
-  clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_STAYS);
-  const cleared = clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_ROOMS);
-  assert.equal(cleared.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), false);
+  assert.throws(() => setBusinessCapability(databasePath, { capability: C.ACCOMMODATION_ROOMS, enabled: true }), /profilinde/);
+  setBusinessCapability(databasePath, { capability: C.QR_MENU, enabled: false });
+  const cleared = clearBusinessCapabilityOverride(databasePath, C.QR_MENU);
+  assert.equal(cleared.enabledCapabilities.includes(C.QR_MENU), true);
   assert.equal(cleared.profileId, "restaurant");
   assert.throws(
     () => setBusinessCapability(databasePath, { capability: C.FINANCE, enabled: false }),

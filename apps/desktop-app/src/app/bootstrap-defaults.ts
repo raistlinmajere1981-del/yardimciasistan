@@ -95,6 +95,7 @@ export const defaultSetupData: DesktopSetupData = {
   arasShipping: emptyArasShippingConfiguration(),
   dealerPortalEnabled: false,
   onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: false },
+  onlineSalesDeliveryEnabled: false,
   aiEnabled: false,
   aiProvider: "openai_compatible",
   aiService: "openai",

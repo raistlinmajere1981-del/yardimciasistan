@@ -1,6 +1,9 @@
 import {
   BUSINESS_CAPABILITIES,
   getBusinessProfile,
+  getBusinessProfileSelectionCapabilities,
+  getEnabledBusinessCapabilityDependents,
+  toggleBusinessProfileOption,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 
@@ -36,18 +39,12 @@ export function BusinessProfileOptionEditor({
   disabled = false
 }: BusinessProfileOptionEditorProps) {
   const profile = getBusinessProfile(profileId);
-  const selected = new Set(selectedCapabilities);
+  const selected = new Set(getBusinessProfileSelectionCapabilities(profileId, selectedCapabilities));
   const options = profile.optionalCapabilities;
 
   const setOption = (capability: BusinessCapability, enabled: boolean) => {
     if (disabled) return;
-    const next = new Set(selected);
-    if (enabled) {
-      next.add(capability);
-    } else {
-      next.delete(capability);
-    }
-    onChange(options.filter((candidate) => next.has(candidate)));
+    onChange(toggleBusinessProfileOption(profileId, selectedCapabilities, capability, enabled));
   };
 
   return (
@@ -61,11 +58,15 @@ export function BusinessProfileOptionEditor({
             <label className="settings-profile-option" key={capability}>
               <input
                 type="checkbox"
+                aria-label={CAPABILITY_LABELS[capability] ?? capability}
                 value={capability}
                 checked={selected.has(capability)}
                 onChange={(event) => setOption(capability, event.target.checked)}
               />
               <span>{CAPABILITY_LABELS[capability] ?? capability}</span>
+              {selected.has(capability) && !selectedCapabilities.includes(capability) && (
+                <small>{CAPABILITY_LABELS[getEnabledBusinessCapabilityDependents(capability, selectedCapabilities)[0]]} için gerekli</small>
+              )}
             </label>
           ))}
         </div>

@@ -6,6 +6,7 @@ export * from "./types/business-ai-policy";
 export * from "./types/business-web-context";
 export * from "./types/business-ai-catalog";
 export * from "./types/business-capabilities";
+export * from "./types/business-service-ownership";
 export * from "./types/business-public-profile";
 export * from "./types/capability-policy";
 export * from "./types/commerce";

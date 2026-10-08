@@ -1482,3 +1482,47 @@ remain OFF. Capability OFF uses the existing disabled publication/outbox withdra
 Accepted-order receipt replay remains idempotent even after ordering closes. Dealer
 catalog activation/validation is unchanged. This supersedes D-045's online catalog
 withdrawal on delivery OFF; dealer catalog withdrawal semantics remain unchanged.
+
+## D-048 — Profile workflows own capability selection and service availability
+
+**Status:** ACCEPTED (2026-10-08), implementing the requested workflow dependency pass.
+
+Profiles define allowed user-facing feature roots. Their required roots, optional roots
+and the closure of `BUSINESS_CAPABILITY_DEPENDENCIES` define the allowed capability set;
+service capabilities retain their explicit Settings lifecycle. This supersedes the freely
+composable post-transition hybrids in D-046. Runtime gates and navigation still read
+persisted capabilities, never profile names or unsaved drafts.
+
+Settings stores selected roots and renders their canonical closure. ON adds the selected
+root; OFF removes that root and every selected transitive dependent. Closure is recomputed,
+so a shared prerequisite survives while another selected root requires it. Automatic
+foundations are never independent checkboxes. `business_capabilities.is_selected` records
+root intent separately from effective `is_enabled`, preserving this behavior through a
+no-op save/restart. System rows stay system-owned, dependency rows profile-owned, explicit
+optional/service edits user-owned. Profile changes reset roots to registry defaults;
+preview/revert remain draft-only and new-profile option controls stay disabled until Save.
+
+Suppliers requires Purchasing; Purchasing can record an anonymous purchase without a
+supplier, and requires Inventory/Catalog. Campaigns requires Customers and Marketing
+because the canonical user entry is the Marketing workspace. Online Sales continues to
+require Orders/Catalog; Wholesale requires Customers/Orders. No provider, AI or Android
+activation enters the feature dependency graph.
+
+`BUSINESS_SERVICE_CAPABILITY_OWNERS` owns service availability across Settings and backend
+save/reset policy. SMS requires Campaigns, Instagram requires Marketing, product lookup
+requires Barcode, dealer portal requires Wholesale, delivery/shipping requires Online Sales
+or Wholesale, KBS requires Stays and Google Reviews requires Rooms. WhatsApp Web/Cloud
+remain available for core Customer operational messaging; Campaigns OFF stops campaign
+work, not independent operational messages. AI remains available for the core assistant,
+and Android for core device workflows.
+
+Unavailable activation is normalized OFF in the existing Setup/capability transaction,
+with encrypted credentials, provider configuration and delivery method choices retained.
+Re-enabling a feature never restores activation. Provider test evidence remains main-owned
+under D-045, shipping activation remains derived from explicit delivery + shipping method,
+and D-047 storefront/order-acceptance semantics are unchanged. Existing publication/outbox
+owners carry withdrawals; already submitted external work is not undone. Capability IPC
+cannot mutate technical/service roots to bypass their Settings/configuration/test owner.
+
+Only the current schema is extended; no historical migration chain or second Settings
+persistence path is introduced.

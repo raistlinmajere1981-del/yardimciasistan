@@ -66,7 +66,7 @@ try {
   assert.equal(http.calls.length, 0);
   const config = { ...testCredentials, enabled: true };
   assert.equal((await service.testConnection(config)).ok, true);
-  database.saveInitialSetup({ ...setup, onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: true },
+  database.saveInitialSetup({ ...setup, onlineSalesDeliveryEnabled: true, onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: true },
     arasShipping: { ...config, password: "" } }, undefined, undefined, secrets.createShippingSecretWrite(config));
   await page.evaluate(() => window.__woEmitShippingConfiguration());
   await expect(register).toBeEnabled();
@@ -109,6 +109,7 @@ try {
   const connectionTest = settingsSection.getByRole("button", { name: "Bağlantıyı test et", exact: true });
   await expect(connectionTest).toHaveCount(0);
   async function fillConfiguration() {
+    await deliverySettings.getByRole("checkbox", { name: "Teslimat ve Gönderim servisi", exact: true }).check();
     await deliverySettings.getByLabel("Kargo ile gönderim", { exact: true }).check();
     await expect(settingsSection.getByRole("checkbox", { name: `${provider.name} servisi`, exact: true })).toHaveCount(0);
     await settingsSection.getByLabel("Müşteri kodu", { exact: true }).fill("fixture-account");

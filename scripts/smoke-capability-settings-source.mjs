@@ -98,13 +98,11 @@ await test("Settings profile switch removes old defaults without manufacturing O
   expectEntry(C.RETAIL_PURCHASING, false, "profile");
 }));
 
-await test("composable overrides outside the profile's Settings options survive unrelated saves", () => scenario(({ database, save, expectEntry }) => {
+await test("out-of-profile overrides are rejected and cannot survive Settings saves", () => scenario(({ database, save, expectEntry }) => {
   applyBusinessProfileCapabilities(database.databasePath, "market", { preserveUserOverrides: false });
-  setBusinessCapability(database.databasePath, { capability: C.ACCOMMODATION_ROOMS, enabled: true });
-  setBusinessCapability(database.databasePath, { capability: C.ACCOMMODATION_STAYS, enabled: true });
+  assert.throws(() => setBusinessCapability(database.databasePath, { capability: C.ACCOMMODATION_ROOMS, enabled: true }), /profilinde/);
   save();
-  expectEntry(C.ACCOMMODATION_ROOMS, true, "user");
-  expectEntry(C.ACCOMMODATION_STAYS, true, "user");
+  expectEntry(C.ACCOMMODATION_ROOMS, false, "profile");
 }));
 
 await test("service OFF is an explicit override and is not erased by a later no-op save", () => scenario(({ save, expectEntry }) => {

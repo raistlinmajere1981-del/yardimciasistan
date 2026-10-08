@@ -9,10 +9,9 @@ import { marketingFixture, editorialInput, imageBytes } from './marketing-fixtur
 
 const require = createRequire(import.meta.url);
 const core = require('../../packages/sync-core/dist');
-const { BUSINESS_CAPABILITIES: C } = require('../../packages/shared/dist');
+const { BUSINESS_CAPABILITIES: C, expandBusinessCapabilities, getEnabledBusinessCapabilityDependents } = require('../../packages/shared/dist');
 const { SyncCoordinator } = require('../../apps/desktop-app/dist-electron/sync-coordinator.js');
 const { DESKTOP_PUBLICATIONS } = require('../../apps/desktop-app/dist-electron/desktop-publication-registry.js');
-const { setBusinessCapability } = require('../../apps/desktop-app/dist-electron/business-capability-store.js');
 const { saveRuntimeCatalogProduct, listRuntimeOrders } = require('../../apps/desktop-app/dist-electron/commerce-runtime.js');
 const { createAndroidOperationsSnapshot } = require('../../apps/desktop-app/dist-electron/android-operations-snapshot.js');
 const { createBusinessAiCatalog } = require('../../apps/desktop-app/dist-electron/business-ai-catalog-service.js');
@@ -31,6 +30,16 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     return result.stdout ? JSON.parse(result.stdout) : null;
   };
   const mutate = sql => { const db = new DatabaseSync(f.db.databasePath); try { db.exec(sql); } finally { db.close(); } };
+  // This registry projection/restore fixture intentionally spans all publication kinds.
+  // Synthetic rows do not represent an allowed operator profile or bypass production Settings.
+  const setPublicationFixtureCapability = ({ capability, enabled }) => {
+    const db = new DatabaseSync(f.db.databasePath);
+    try {
+      const capabilities = enabled ? expandBusinessCapabilities([capability])
+        : [capability, ...getEnabledBusinessCapabilityDependents(capability, Object.values(C))];
+      for (const id of capabilities) db.prepare("UPDATE business_capabilities SET is_enabled=? WHERE capability_id=?").run(enabled ? 1 : 0, id);
+    } finally { db.close(); }
+  };
   const orders = () => listRuntimeOrders(f.db.databasePath);
   const makeCoordinator = () => new SyncCoordinator({ database: f.db, marketingWebsite: f.publisher, getSyncConfig: () => config,
     createAndroidSnapshot: () => createAndroidOperationsSnapshot(f.db, f.db.getDashboardData()),
@@ -87,12 +96,12 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     const activated = await core.activatePublicationSource({ ...config, clientId: client, expectedEpoch: remote.source_epoch, activationKey: `${client}:test` });
     assert.equal(activated.ok, true, activated.message);
     f.db.savePublicationSourceEpoch(config.baseUrl, activated.source_epoch);
-    setBusinessCapability(f.db.databasePath, { capability: C.ONLINE_SALES, enabled: true });
-    setBusinessCapability(f.db.databasePath, { capability: C.REQUESTS, enabled: true });
+    setPublicationFixtureCapability({ capability: C.ONLINE_SALES, enabled: true });
+    setPublicationFixtureCapability({ capability: C.REQUESTS, enabled: true });
     for (const capability of [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_RESERVATIONS, C.FOOD_TABLES, C.FOOD_MENU, C.QR_MENU, C.ANDROID, C.AI]) {
-      setBusinessCapability(f.db.databasePath, { capability, enabled: true });
+      setPublicationFixtureCapability({ capability, enabled: true });
     }
-    mutate("UPDATE settings SET dealer_portal_enabled=1, online_sales_pickup_enabled=1, google_place_id='restore-place-A'; UPDATE business SET name='Restore A', display_name='Restore A';");
+    mutate("UPDATE settings SET dealer_portal_enabled=1, online_sales_delivery_enabled=1, online_sales_pickup_enabled=1, google_place_id='restore-place-A'; UPDATE business SET name='Restore A', display_name='Restore A';");
     mutate(`UPDATE business SET publish_tables_web=1;
       INSERT INTO rooms(id,name,number,capacity,status,created_at,updated_at) VALUES ('restore-room','Room A','101',2,'available','2026-10-06','2026-10-06');
       INSERT INTO reservations(id,reservation_type,status,title,start_date,end_date,room_ids_json,created_at,updated_at)
@@ -245,15 +254,15 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     assert.equal(f.db.getRestoreReconciliationStatus().state, 'complete'); assert.equal(orders().length, 2);
     assert.equal(f.db.getDashboardData().requests.length, 1);
     // OFF backup: full reconciliation withdraws an enabled remote marketing/menu.
-    setBusinessCapability(f.db.databasePath, { capability: C.MARKETING_STUDIO, enabled: false });
-    setBusinessCapability(f.db.databasePath, { capability: C.QR_MENU, enabled: false });
+    setPublicationFixtureCapability({ capability: C.MARKETING_STUDIO, enabled: false });
+    setPublicationFixtureCapability({ capability: C.QR_MENU, enabled: false });
     f.db.changeDealerWebAccess(customer.savedId, 'disable');
     const localRequest = f.db.getDashboardData().requests[0];
     assert.equal(f.db.updateRequestStatus({ requestId: localRequest.id, status: 'approved' }).ok, true);
     mutate("UPDATE commerce_orders SET status='confirmed';");
     const off = backup();
-    setBusinessCapability(f.db.databasePath, { capability: C.MARKETING_STUDIO, enabled: true });
-    setBusinessCapability(f.db.databasePath, { capability: C.QR_MENU, enabled: true });
+    setPublicationFixtureCapability({ capability: C.MARKETING_STUDIO, enabled: true });
+    setPublicationFixtureCapability({ capability: C.QR_MENU, enabled: true });
     f.db.changeDealerWebAccess(customer.savedId, 'enable');
     const offRaceInvite = f.db.changeDealerWebAccess(customer.savedId, 'invite');
     result = await coordinator.runNow(); assert.equal(result.ok, true, result.message);

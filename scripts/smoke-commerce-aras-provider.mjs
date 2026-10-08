@@ -98,6 +98,7 @@ try {
   assert.throws(() => secrets.createShippingSecretWrite(config), /güvenli/);
   secrets.setAvailable(true);
   assert.equal((await service.testConnection(config)).ok, true);
+  setup.onlineSalesDeliveryEnabled = true;
   setup.onlineSalesDelivery = { pickupEnabled: true, shippingEnabled: true };
   const saved = database.saveInitialSetup({ ...setup, arasShipping: { ...config, password: "" } }, undefined, undefined, write);
   assert.equal(saved.ok, true);

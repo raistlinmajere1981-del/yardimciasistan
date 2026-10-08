@@ -145,11 +145,11 @@ try {
   const options = page.locator("#settings-options");
   await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).not.toBeChecked();
   await options.getByRole("checkbox", { name: "WhatsApp / SMS Kampanyaları", exact: true }).check();
-  await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).not.toBeChecked();
+  await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Kaydet", exact: true }).click();
   expect(await page.evaluate(() => window.persistedSettings().profileOptions)).toEqual(["messaging.campaigns"]);
-  expect(await page.evaluate(() => window.requiredCapabilities())).not.toContain("marketing.studio");
-  await page.evaluate(() => window.refreshSettings({ profileOptions: ["commerce.wholesale", "channel.online_sales", "marketing.studio"] }));
+  expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).toContain("marketing.studio");
+  await page.evaluate(() => window.refreshSettings({ profileOptions: ["commerce.wholesale", "channel.online_sales", "marketing.studio"], onlineSalesDeliveryEnabled: true }));
   await tab("Servisler").click();
   const web = page.locator("#settings-web");
   await expect(web.getByRole("button")).toHaveCount(1);

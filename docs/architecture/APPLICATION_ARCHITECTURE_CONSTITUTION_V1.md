@@ -328,7 +328,7 @@ Capabilities remain the behavior gate. UI visibility alone is never the security
 
 A new sector should preferably compose existing capabilities and domain modules before inventing sector-specific copies.
 
-Stage 9 extracted evidence-backed **static typed** contribution seams for navigation, staged Settings sections and entity workspace definitions. These are internal composition APIs, not runtime discovery or a public plugin contract. Persisted runtime capabilities remain the behavior/visibility gate; business profiles remain presets rather than permanent sector locks.
+Stage 9 extracted evidence-backed **static typed** contribution seams for navigation, staged Settings sections and entity workspace definitions. These are internal composition APIs, not runtime discovery or a public plugin contract. Persisted runtime capabilities remain the behavior/visibility gate. Under D-048, profiles define allowed workflow roots and their canonical dependency closure; runtime UI still never gates on profile names or drafts.
 
 Dashboard contributions and executable/domain-operation registration remain explicit. Do not add a generic service locator, dependency container, command bus, controller factory or dynamic plugin registry merely to make the contribution model look uniform.
 

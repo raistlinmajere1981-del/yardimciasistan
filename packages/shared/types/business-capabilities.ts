@@ -64,14 +64,12 @@ export interface BusinessCapabilityDependencyViolation {
 const C = BUSINESS_CAPABILITIES;
 
 /**
- * Capability dependencies describe structural requirements, not UI bundles.
- * A capability may still be toggled independently as long as its prerequisites
- * remain enabled. This prevents invalid hybrid profiles without reintroducing
- * hardcoded business-type combinations.
+ * Canonical workflow requirements. Profiles select user-facing roots; setup,
+ * Settings and backend validation derive their foundations from this graph.
  */
 export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability, readonly BusinessCapability[]>> = {
   [C.REQUESTS]: [C.CUSTOMERS],
-  [C.MESSAGING_CAMPAIGNS]: [C.CUSTOMERS],
+  [C.MESSAGING_CAMPAIGNS]: [C.CUSTOMERS, C.MARKETING_STUDIO],
   [C.ACCOMMODATION_RESERVATIONS]: [C.ACCOMMODATION_ROOMS],
   [C.ACCOMMODATION_STAYS]: [C.ACCOMMODATION_ROOMS],
   [C.ACCOMMODATION_FOLIO]: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS, C.FINANCE],
@@ -89,6 +87,7 @@ export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability
   [C.CUSTOMER_CREDIT]: [C.CUSTOMERS, C.SALES, C.FINANCE],
   [C.RETAIL_BARCODE]: [C.CATALOG],
   [C.RETAIL_PURCHASING]: [C.CATALOG, C.INVENTORY],
+  [C.RETAIL_SUPPLIERS]: [C.RETAIL_PURCHASING],
   [C.RETAIL_LABELS]: [C.CATALOG]
 };
 
@@ -187,7 +186,7 @@ function createBusinessProfile(
     description,
     requiredCapabilities: [...requiredCapabilities],
     optionalCapabilities: [...optionalCapabilities],
-    defaultOptionalCapabilities: optionalCapabilities.filter(capability => defaultCapabilities.includes(capability)),
+    defaultOptionalCapabilities: [...normalizedDefaults],
     defaultCapabilities
   };
 }
@@ -288,16 +287,38 @@ export function getBusinessProfile(value: string): BusinessProfileDefinition {
 }
 
 /**
- * Most capabilities remain composable across profiles. Customer credit is the
- * exception: it is a retail account model and must not overlap hospitality
- * folios/table accounts.
+ * A profile permits its workflow roots and their canonical dependency closure.
+ * Service capabilities have their own explicit activation lifecycle.
  */
 export function businessProfileSupportsCapability(
   value: string,
   capability: BusinessCapability
 ): boolean {
-  if (capability === C.CUSTOMER_CREDIT) return normalizeBusinessType(value) === "market";
-  return true;
+  if ([C.WHATSAPP, C.ANDROID, C.AI].some(service => service === capability)) return true;
+  const profile = getBusinessProfile(value);
+  return getBusinessProfileSelectionCapabilities(profile.id, profile.optionalCapabilities).includes(capability);
+}
+
+/** Selection contains roots only; automatic prerequisites never become choices. */
+export function normalizeBusinessProfileOptions(
+  value: string,
+  selected: Iterable<BusinessCapability>
+): BusinessCapability[] {
+  const roots = new Set(selected);
+  return getBusinessProfile(value).optionalCapabilities.filter(capability => roots.has(capability));
+}
+
+export function toggleBusinessProfileOption(
+  value: string,
+  selected: Iterable<BusinessCapability>,
+  capability: BusinessCapability,
+  enabled: boolean
+): BusinessCapability[] {
+  const roots = normalizeBusinessProfileOptions(value, selected);
+  if (!getBusinessProfile(value).optionalCapabilities.includes(capability)) return roots;
+  if (enabled) return normalizeBusinessProfileOptions(value, [...roots, capability]);
+  const dependents = new Set(getEnabledBusinessCapabilityDependents(capability, roots));
+  return roots.filter(root => root !== capability && !dependents.has(root));
 }
 
 export function getBusinessProfileSelectionCapabilities(

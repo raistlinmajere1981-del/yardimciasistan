@@ -51,7 +51,7 @@ let raw;
 try {
   database.initialize();
   assert.equal(database.saveInitialSetup({
-    businessName: "Online Catalog A2", profileId: "market", profileOptions: ["channel.online_sales", "commerce.wholesale"],
+    onlineSalesDeliveryEnabled: true, businessName: "Online Catalog A2", profileId: "market", profileOptions: ["channel.online_sales", "commerce.wholesale"],
     phone: "", whatsapp: "", email: "", address: "", webModuleUrl: "https://catalog.example.test", syncSecret: secret,
     autoSyncEnabled: false, aiEnabled: false, aiProvider: "openai_compatible", aiService: "openai", aiProjectName: "", aiModel: "", aiModelOptions: [],
     aiBaseUrl: "https://api.openai.com/v1", aiTimeoutSeconds: 30, aiApiKey: "", clearAiApiKey: false,

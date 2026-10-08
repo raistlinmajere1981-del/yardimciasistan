@@ -123,7 +123,8 @@ try {
       return originalExec.call(this, sql);
     };
     ok(database.saveInitialSetup(createSmokeSetupInput({ businessName: "Schema authority", phone: "+905550095901", whatsapp: "+905550095901",
-      syncSecret: "schema-authority-regression", servicePreferences: { whatsapp: true, android: true } })));
+      syncSecret: "schema-authority-regression", servicePreferences: { whatsapp: true, android: true },
+      birthdaySettings: { ...database.getSetupData().birthdaySettings, enabled: true } })));
     seedSmokeBusinessLayout(database.databasePath, { roomCount: 1, nightlyPriceMinor: 1000 });
     const path = database.databasePath;
     const finance = new DesktopFinanceService(path);

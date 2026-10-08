@@ -61,7 +61,7 @@ try {
   database.initialize();
   assert.equal(database.saveInitialSetup({ businessName: "C2", profileId: "market", profileOptions: [C.WHOLESALE], dealerPortalEnabled: true,
     arasShipping: { enabled: true, environment: "test", customerCode: "fixture", username: "fixture", password: "" },
-    onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: true }, phone: "", whatsapp: "", email: "", address: "", webModuleUrl: "https://example.test/module",
+    onlineSalesDeliveryEnabled: true, onlineSalesDelivery: { pickupEnabled: true, shippingEnabled: true }, phone: "", whatsapp: "", email: "", address: "", webModuleUrl: "https://example.test/module",
     syncSecret: secret, autoSyncEnabled: false, aiEnabled: false, aiProvider: "openai_compatible", aiService: "openai", aiProjectName: "", aiModel: "",
     aiModelOptions: [], aiBaseUrl: "https://api.openai.com/v1", aiTimeoutSeconds: 30, aiApiKey: "", clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: false }, initialCounts: { rooms: 0, tables: 0 }, tableCategories: [] }, undefined, undefined,
