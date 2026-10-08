@@ -59,9 +59,7 @@ export interface BusinessAiContextSource {
 
 export function createBusinessAiContext(source: BusinessAiContextSource): BusinessAiContext {
   const profile = getBusinessProfile(source.profileId);
-  const enabled = source.enabledCapabilities instanceof Set
-    ? source.enabledCapabilities
-    : new Set(source.enabledCapabilities);
+  const enabled = new Set(source.enabledCapabilities);
   const hasAccommodation = canBusinessSpeakForAiDomain(enabled, "accommodation");
   const hasFoodService = canBusinessSpeakForAiDomain(enabled, "food_service");
   const hospitalityDetailsRelevant = hasAccommodation || hasFoodService;

@@ -29,8 +29,11 @@ export async function generateConfiguredImage(config: AIProviderConfig, prompt: 
     for (;;) { const item=await reader.read(); if (item.done) break; size+=item.value.length;
       if (size>42*1024*1024) { await reader.cancel(); throw new Error("image_too_large"); } chunks.push(item.value); }
     const joined=new Uint8Array(size); let offset=0; for (const chunk of chunks) {joined.set(chunk,offset);offset+=chunk.length;}
-    const payload=JSON.parse(new TextDecoder().decode(joined));
-    const encoded = gemini ? payload.candidates?.[0]?.content?.parts?.find((p: {inlineData?:{mimeType?:string}}) => p.inlineData?.mimeType === "image/png")?.inlineData?.data : payload.data?.[0]?.b64_json;
+    const payload = JSON.parse(new TextDecoder().decode(joined)) as {
+      candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> } }>;
+      data?: Array<{ b64_json?: unknown }>;
+    };
+    const encoded = gemini ? payload.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.mimeType === "image/png")?.inlineData?.data : payload.data?.[0]?.b64_json;
     if (typeof encoded !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new Error("invalid_image_output");
     const bytes = Uint8Array.from(atob(encoded),char=>char.charCodeAt(0));
     if (!bytes.length || bytes.length>30*1024*1024) throw new Error("invalid_image_output");
