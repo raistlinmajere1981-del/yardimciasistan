@@ -36,11 +36,13 @@ try {
     assert.deepEqual(salesEntry(expandBusinessCapabilities(capabilities)), [],
       "Generic catalog/sale/order dependencies alone must not expose retail navigation");
   }
-  for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS, C.WHOLESALE, C.ONLINE_SALES]) {
+  for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS, C.WHOLESALE]) {
     const entries = salesEntry(expandBusinessCapabilities([C.CATALOG, capability]));
     assert.equal(entries.length, 1, `${capability}: the Sales route must remain reachable`);
     assert.equal(entries[0].label, "Satış");
   }
+  assert.deepEqual(salesEntry(expandBusinessCapabilities([C.ONLINE_SALES])), [],
+    "Online Sales is a channel, not retail workspace authority");
   assert.equal(salesEntry(getBusinessProfile("market").defaultCapabilities).length, 1,
     "The persisted Market profile defaults must expose Sales");
 } finally { await server.close(); }

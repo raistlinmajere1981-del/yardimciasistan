@@ -30,8 +30,17 @@ try {
   check("retail without barcode retains purchasing/supplier surfaces", () => assert.equal(
     sales(getBusinessProfile("market").defaultCapabilities.filter(capability => capability !== C.RETAIL_BARCODE)), true));
   check("wholesale", () => assert.equal(sales([C.CATALOG, C.ORDERS, C.WHOLESALE]), true));
-  for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS, C.ONLINE_SALES]) {
-    check(`${capability} with catalog grants an actual retail/channel surface`, () => assert.equal(sales(expandBusinessCapabilities([C.CATALOG, capability])), true));
+  for (const capability of [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS]) {
+    check(`${capability} with catalog grants an actual retail surface`, () => assert.equal(sales(expandBusinessCapabilities([C.CATALOG, capability])), true));
+  }
+  check("online channel alone cannot grant Sales entry", () => assert.equal(sales(expandBusinessCapabilities([C.ONLINE_SALES])), false));
+  for (const profileId of ["restaurant", "pension_restaurant", "market"]) {
+    check(`${profileId} + Online Sales navigation`, () => {
+      const enabledCapabilities = expandBusinessCapabilities([...getBusinessProfile(profileId).defaultCapabilities, C.ONLINE_SALES]);
+      const navigation = buildNavigation({ profileId, enabledCapabilities });
+      assert.equal(navigation.some(item => item.id === "market"), profileId === "market");
+      assert.equal(navigation.some(item => item.id === "menu"), profileId !== "market");
+    });
   }
   check("shared catalog/products alone cannot grant Sales entry", () => assert.equal(sales([C.CATALOG]), false));
   check("orders without the implemented wholesale/channel surfaces cannot grant entry", () => assert.equal(sales([C.CATALOG, C.ORDERS]), false));

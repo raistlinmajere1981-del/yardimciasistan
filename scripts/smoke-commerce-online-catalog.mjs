@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
-const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { applyBusinessProfileCapabilities, setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const { saveRuntimeCatalogProduct } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 const root = mkdtempSync(join(tmpdir(), "ya-online-catalog-"));
 const hosting = join(root, "web-module");
@@ -37,7 +37,7 @@ globalThis.fetch = async (url, init) => {
   if (!String(url).endsWith("/api/sync.php")) return new Response("{}", { status: 404 });
   const body = JSON.parse(init.body);
   calls.push(body);
-  if (["capabilities", "activate_publication_source", "pull_web_orders"].includes(body.action) || body.action.startsWith("publish_")) {
+  if (["capabilities", "activate_publication_source", "pull_web_orders", "pull_requests", "acknowledge_requests"].includes(body.action) || body.action.startsWith("publish_")) {
     if (body.action === "publish_online_catalog" && failPublication) return Response.json({ ok: false, message: "retry" }, { status: 503 });
     const result = endpoint("sync.php", body);
     if (body.action === "capabilities" && !supportsCatalog) result.payload.features = result.payload.features.filter((feature) => feature !== "online_catalog_v1");
@@ -210,6 +210,38 @@ try {
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_orders").get().n, 0);
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM commerce_sales").get().n, 0);
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM inventory_movements").get().n, 0);
+  // Food-service channels publish and withdraw through the same canonical owners.
+  for (const profileId of ["restaurant", "pension_restaurant"]) {
+    applyBusinessProfileCapabilities(database.databasePath, profileId, { preserveUserOverrides: false });
+    assert.equal(database.getEnabledBusinessCapabilities().includes("channel.online_sales"), false);
+    setBusinessCapability(database.databasePath, { capability: "commerce.orders", enabled: true });
+    setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+    // Profile transitions reset delivery activation; this fixture explicitly offers pickup.
+    raw.exec("UPDATE settings SET online_sales_delivery_enabled = 1, online_sales_pickup_enabled = 1, online_sales_shipping_enabled = 0");
+    const category = database.saveMenuCategory({ name: `${profileId} menu`, description: "", is_active: true, sort_order: 0 });
+    assert.equal(category.ok, true, category.message);
+    const before = raw.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n;
+    const menuResult = database.saveMenuProductEntry({ product: { name: `${profileId} menu product`, salePrice: 42, trackInventory: false, onlineSalesPublished: false },
+      category_id: category.savedId, price_override: null, is_available: true, is_featured: false,
+      allergens: [], tags: [], stock_consumption_quantity: 1, hide_when_out_of_stock: false, sort_order: 0 });
+    assert.equal(menuResult.ok, true, menuResult.message);
+    const menuProductId = database.getPublishedMenu().items.find(item => item.id === menuResult.savedId).product_id;
+    database.saveCommerceProductPublication({ productId: menuProductId, isPublished: true });
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n, before + 1, "publication must not duplicate a menu product");
+    const syncResult = await coordinator.runNow();
+    assert.equal(syncResult.ok, true, syncResult.message);
+    assert.ok(readCatalog().payload.products.some(product => product.product_id === menuProductId), "Web catalog preserves canonical menu product_id");
+    const revision = readCatalog().payload.source_revision;
+    setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: false });
+    assert.equal(database.createCommerceOnlineCatalog().enabled, false);
+    const withdrawal = database.getPendingSyncJobs().find(job => job.jobKey === "online_catalog");
+    assert.ok(withdrawal.sourceRevision > revision, "capability OFF queues canonical withdrawal");
+    assert.equal((await coordinator.runNow()).ok, true);
+    assert.equal(readCatalog().payload.enabled, false);
+    assert.deepEqual(readCatalog().payload.products, []);
+    assert.equal(raw.prepare("SELECT is_published FROM commerce_product_publications WHERE product_id = ?").get(menuProductId).is_published, 1, "withdrawal preserves publication preference");
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM catalog_products").get().n, before + 1);
+  }
   assert.equal(endpoint("sync.php", { action: "reset_runtime" }).status, 200);
   assert.equal(readCatalog().payload.enabled, false);
   assert.deepEqual(readCatalog().payload.products, []);

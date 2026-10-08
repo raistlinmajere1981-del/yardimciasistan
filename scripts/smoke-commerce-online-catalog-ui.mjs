@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,12 +9,12 @@ import { chromium, expect } from "@playwright/test";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const { saveRuntimeCatalogProduct } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
-const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { saveRuntimeCatalogProduct, listRuntimeCatalogProducts } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { applyBusinessProfileCapabilities, setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const root = mkdtempSync(join(tmpdir(), "ya-online-catalog-ui-"));
 const appPath = join(process.cwd(), "apps/desktop-app");
 const database = new DesktopDatabase({ appPath, userDataPath: root });
-let server, browser;
+let server, browser, raw;
 try {
   database.initialize();
   assert.equal(database.saveInitialSetup({
@@ -118,6 +119,35 @@ try {
   await expect(offlineCreate).toHaveCount(0);
   setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
   assert.equal(database.getCommerceProductPublication(createdProducts.at(-1).id), null);
+  await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+  applyBusinessProfileCapabilities(database.databasePath, "restaurant", { preserveUserOverrides: false });
+  setBusinessCapability(database.databasePath, { capability: "commerce.orders", enabled: true });
+  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: true });
+  raw = new DatabaseSync(database.databasePath);
+  raw.exec("UPDATE settings SET online_sales_delivery_enabled = 1, online_sales_pickup_enabled = 1, online_sales_shipping_enabled = 0");
+  const category = database.saveMenuCategory({ name: "Restaurant menu", description: "", is_active: true, sort_order: 0 });
+  assert.equal(category.ok, true, category.message);
+  const menuResult = database.saveMenuProductEntry({ product: { name: "Restaurant menu product", salePrice: 42, trackInventory: false, onlineSalesPublished: false },
+    category_id: category.savedId, price_override: null, is_available: true, is_featured: false,
+    allergens: [], tags: [], stock_consumption_quantity: 1, hide_when_out_of_stock: false, sort_order: 0 });
+  assert.equal(menuResult.ok, true, menuResult.message);
+  const menuData = database.getDashboardData();
+  const menuProductId = menuData.menu.items.find(item => item.id === menuResult.savedId).product_id;
+  const menuProduct = listRuntimeCatalogProducts(database.databasePath).find(item => item.id === menuProductId);
+  const countBeforePublish = listRuntimeCatalogProducts(database.databasePath).length;
+  await page.addInitScript(({ menuData, menuProduct }) => { window.__menuData = menuData; window.__product = menuProduct; }, { menuData, menuProduct });
+  await page.reload();
+  await page.getByRole("button", { name: "Menü Ürününü Aç", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Menü Sunumunu Kaydet", exact: true })).toBeVisible();
+  await expect(checkbox).toBeEnabled();
+  await expect(checkbox).not.toBeChecked();
+  await checkbox.check();
+  await expect.poll(() => database.createCommerceOnlineCatalog().products.some(item => item.productId === menuProductId)).toBe(true);
+  assert.equal(listRuntimeCatalogProducts(database.databasePath).length, countBeforePublish, "Menu publication must not insert another product row");
+  setBusinessCapability(database.databasePath, { capability: "channel.online_sales", enabled: false });
+  await page.evaluate(() => window.__onlineToggle(false));
+  await expect(checkbox).toHaveCount(0);
+  assert.equal(database.createCommerceOnlineCatalog().enabled, false);
   assert.deepEqual(errors, []);
   console.log("commerce-online-catalog-ui-smoke-ok");
-} finally { await browser?.close(); await server?.close(); database.close(); rmSync(root, { recursive: true, force: true }); }
+} finally { await browser?.close(); await server?.close(); raw?.close(); database.close(); rmSync(root, { recursive: true, force: true }); }

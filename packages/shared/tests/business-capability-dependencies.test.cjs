@@ -66,3 +66,18 @@ test("online sales is an optional retail channel with canonical order dependenci
   assert.equal(BUSINESS_PROFILES.market.optionalCapabilities.includes(C.ONLINE_SALES), true);
   assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.ONLINE_SALES), false);
 });
+
+
+test("online sales is optional and defaults OFF for food-service profiles only", () => {
+  const { BUSINESS_PROFILES, getBusinessProfileSelectionCapabilities } = require("../dist");
+  for (const profileId of ["restaurant", "pension_restaurant", "market"]) {
+    const profile = BUSINESS_PROFILES[profileId];
+    assert.equal(profile.optionalCapabilities.includes(C.ONLINE_SALES), true, profileId);
+    assert.equal(profile.defaultOptionalCapabilities.includes(C.ONLINE_SALES), false, profileId);
+    assert.equal(profile.defaultCapabilities.includes(C.ONLINE_SALES), false, profileId);
+    const selected = getBusinessProfileSelectionCapabilities(profileId, [C.ONLINE_SALES]);
+    for (const capability of [C.ONLINE_SALES, C.ORDERS, C.CATALOG]) assert.equal(selected.includes(capability), true);
+  }
+  assert.equal(BUSINESS_PROFILES.pension.optionalCapabilities.includes(C.ONLINE_SALES), false);
+  assert.equal(getBusinessProfileSelectionCapabilities("pension", [C.ONLINE_SALES]).includes(C.ONLINE_SALES), false);
+});
