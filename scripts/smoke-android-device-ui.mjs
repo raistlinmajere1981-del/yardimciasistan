@@ -1021,25 +1021,45 @@ async function runMarketOnly(baseUrl) {
     "Market ana ekranı açılamadı."
   );
   assertContains(xml, [
-    "MARKET", "Saha işlemleri", "Kasa Barkod Modu", "Barkod Tara", "Stok Say", "Mal Kabul", "Sepet", "Yeni Ürün",
-    "Bugün", "Satış", "Kritik stok"
+    "MARKET", "Saha işlemleri", "Kasa Barkod Modu", "Barkod Tara", "Stok Say", "Mal Kabul", "Sepet", "Yeni Ürün"
   ]);
   assertNotContains(xml, ["Bekleyen sipariş", "Satışı Tamamla"]);
   captureScreenshot("market-home.png");
 
+  // Özet metrik kartı ilk viewport'a sığmayabilir (dump yalnızca görünür
+  // alanı içerir); metrikleri kaydırarak birikimli dökümde doğrula.
+  let marketSummaryXml = xml;
+  for (let index = 0; index < 8 && !(marketSummaryXml.includes("Kritik stok") && marketSummaryXml.includes("Mal kabul")); index += 1) {
+    swipe(360, 900, 360, 300, 420);
+    await delay(300);
+    marketSummaryXml += dumpUi(`market-home-summary-metrics-${index}.xml`);
+  }
+  assertContains(marketSummaryXml, ["Bugün", "Satış", "3 · ₺105,00", "Kritik stok", "Mal kabul"]);
+  captureScreenshot("market-home-summary-metrics.png");
+  scrollToTop();
+  await delay(300);
+  xml = dumpUi("market-home-top-after-summary.xml");
+
   tap(centerOf(findClickableBoundsByText(xml, "▣  Kasa Barkod Modu")));
   xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Kasa Barkod Okuyucu")
+      && candidate.includes("Kamerayı ürün barkoduna doğrultun.")
+      && candidate.includes("KAPAT"),
+    8000,
+    "Kasa Barkod Modu kamera overlay'i açılamadı."
+  );
+  assertContains(xml, ["Kasa Barkod Okuyucu", "ELLE GIR", "KAPAT"]);
+  captureScreenshot("market-cash-barcode-mode.png");
+  tap(centerOf(findClickableBoundsByText(xml, "KAPAT")));
+  xml = await waitForUiCondition(
     (candidate) => candidate.includes("KASA BARKOD MODU")
-      && candidate.includes("Ürünleri arka arkaya okutabilirsiniz.")
       && candidate.includes("Modu Kapat"),
     5000,
-    "Kasa Barkod Modu ekranı açılamadı."
+    "Kamera overlay'i kapatılınca kasa barkod ekranına dönülemedi."
   );
-  assertContains(xml, ["Son taranan", "Tarayıcı hazır", "Scanner girişi", "Modu Kapat"]);
-  assertNotContains(xml, ["Sepete Ekle", "Stok Say", "Mal Kabule Ekle"]);
-  captureScreenshot("market-cash-barcode-mode.png");
+  assertContains(xml, ["KASA BARKOD MODU", "Son taranan", "Modu Kapat"]);
   tap(centerOf(findClickableBoundsByText(xml, "Modu Kapat")));
-  xml = await waitForUiText("Saha işlemleri", 5000);
+  await waitForUiText("Saha işlemleri", 5000);
 
   scrollToBottom();
   xml = await waitForUiCondition(
@@ -1089,30 +1109,28 @@ async function runMarketOnly(baseUrl) {
   await enterMarketBarcode("8699999999999");
   xml = await waitForUiCondition(
     (candidate) => candidate.includes("Barkod kayıtlı değil.")
-      && candidate.includes("Yeni Ürün Taslağı"),
+      && candidate.includes("Yeni Ürün"),
     5000,
     "Bilinmeyen barkod akışı açılamadı."
   );
-  tap(centerOf(findClickableBoundsByText(xml, "Yeni Ürün Taslağı")));
+  tap(centerOf(findClickableBoundsByText(xml, "Yeni Ürün")));
   xml = await waitForUiCondition(
-    (candidate) => candidate.includes("Masaüstünde kontrol edilip ürün kartına dönüştürülecek.")
+    (candidate) => candidate.includes("Ürün bilgileri doğrudan kataloğa kaydedilir.")
       && candidate.includes("Ürün adı")
       && candidate.includes("SKU (isteğe bağlı)"),
     5000,
-    "Yeni ürün taslak ekranı açılamadı."
+    "Yeni ürün kayıt ekranı açılamadı."
   );
-  assertContains(xml, ["Barkod", "8699999999999", "Ürün adı", "SKU (isteğe bağlı)", "Birim", "Alış fiyatı (isteğe bağlı)"]);
-  captureScreenshot("market-product-draft.png");
-  scrollToBottom();
-  xml = await waitForUiCondition(
-    (candidate) => candidate.includes("Satış fiyatı (isteğe bağlı)")
-      && candidate.includes("Kategori (isteğe bağlı)")
-      && candidate.includes("Taslak Gönder"),
-    5000,
-    "Yeni ürün taslağının alt alanları görünmedi."
-  );
-  assertContains(xml, ["Satış fiyatı (isteğe bağlı)", "Kategori (isteğe bağlı)", "Not", "Taslak Gönder"]);
-  captureScreenshot("market-product-draft-bottom.png");
+  assertContains(xml, ["Barkod", "8699999999999", "Ürün adı", "SKU (isteğe bağlı)", "Birim"]);
+  captureScreenshot("market-product-create.png");
+  let productCreateBottomXml = xml;
+  for (let index = 0; index < 8 && !(productCreateBottomXml.includes("Ürünü Kaydet") && productCreateBottomXml.includes("Satış fiyatı (isteğe bağlı)")); index += 1) {
+    swipe(360, 900, 360, 300, 420);
+    await delay(300);
+    productCreateBottomXml += dumpUi(`market-product-create-scrolled-${index}.xml`);
+  }
+  assertContains(productCreateBottomXml, ["Alış fiyatı (isteğe bağlı)", "Satış fiyatı (isteğe bağlı)", "Kategori (isteğe bağlı)", "Not", "Ürünü Kaydet"]);
+  captureScreenshot("market-product-create-bottom.png");
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await waitForUiText("Saha işlemleri", 5000);
 
@@ -1173,7 +1191,17 @@ async function enterMarketBarcode(barcode) {
   let xml = dumpUi(`market-barcode-before-${barcode}.xml`);
   const barcodeButton = xml.includes('text="▣  Barkod Tara"') ? "▣  Barkod Tara" : "Barkod Tara";
   tap(centerOf(findClickableBoundsByText(xml, barcodeButton)));
-  await waitForUiText("El terminaliyle okutun veya barkodu elle girin.", 5000);
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Kamerayı barkoda doğrultun.") && candidate.includes("ELLE GIR"),
+    5000,
+    "Barkod kamera tarayıcısı açılamadı."
+  );
+  tap(centerOf(findClickableBoundsByText(xml, "ELLE GIR")));
+  await waitForUiCondition(
+    (candidate) => candidate.includes("Barkod Gir") && candidate.includes("Barkodu elle girin."),
+    5000,
+    "Barkod manuel giriş ekranı açılamadı."
+  );
   adb(["shell", "input", "text", barcode]);
   xml = dumpUi(`market-barcode-entry-${barcode}.xml`);
   tap(centerOf(findClickableBoundsByText(xml, "BUL")));
