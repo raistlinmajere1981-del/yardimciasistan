@@ -89,7 +89,7 @@ try {
   const publicBusinessAfterSyncResponse = await fetch(`${baseUrl}/api/business.php`);
   expect(publicBusinessAfterSyncResponse.status).toBe(200);
   const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
-  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu"]);
+  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
   expect(publicBusinessAfterSync.business.ai_enabled).toBe(true);
   expect(publicBusinessAfterSync.business.whatsapp_enabled).toBe(true);
   expect(publicBusinessAfterSync.business.requests_enabled).toBe(true);
@@ -201,7 +201,7 @@ try {
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
   await expect(page.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
   await expect(page.locator('[data-ya-request-type="restaurant_reservation"]')).toBeVisible();
-  await expect(page.locator(".ya-widget-action-card")).toHaveCount(4);
+  await expect(page.locator(".ya-widget-action-card")).toHaveCount(5);
   await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
 
   await page.evaluate(() => {
@@ -394,7 +394,7 @@ try {
   expect(requestsDisabledBusiness.business.requests_enabled).toBe(false);
   expect(requestsDisabledBusiness.business.ai_enabled).toBe(true);
   expect(requestsDisabledBusiness.business.whatsapp_enabled).toBe(true);
-  expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu"]);
+  expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
 
   const requestsDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await requestsDisabledPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });

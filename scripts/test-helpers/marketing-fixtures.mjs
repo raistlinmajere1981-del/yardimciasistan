@@ -15,7 +15,9 @@ export function marketingFixture({ enabled = true, ai = false } = {}) {
   const saved = foundation.db.saveInitialSetup({ ...foundation.setup, ...current,
     profileOptions: enabled ? [C.MESSAGING_CAMPAIGNS, C.WHOLESALE] : [C.WHOLESALE],
     aiEnabled: ai, aiModel: ai ? 'fixture-chat' : '',
-    whatsappCloud: { ...current.whatsappCloud, accessToken: '' } });
+    aiApiKey: ai ? 'fixture-ai-key' : '', clearAiApiKey: false,
+    whatsappCloud: { ...current.whatsappCloud, accessToken: '' } },
+    ai ? { mode: 'replace', encryptedValue: 'safe-storage:v1:fixture-ai-key' } : undefined);
   if (!saved.ok) throw new Error(saved.message);
   const state = { webUrl:null, selected:[], unavailable:false, response:'AI aday metni', fail:false, selectedAiService:'openai', aiProfiles:null };
   const fetchImpl = async (url,init) => {calls.push({url:String(url),body:JSON.parse(init.body)});
@@ -35,7 +37,7 @@ export function marketingFixture({ enabled = true, ai = false } = {}) {
         :name.startsWith('./')?load(name.slice(2)+'.js'):localRequire(name)});
     return exports;
   }
-  // Existing saved-profile contract, no actual key or live provider call.
+  // Fixture provides an encrypted test key when AI is enabled; providers remain mocked.
   const originalSetup=foundation.db.getSetupData.bind(foundation.db);
   foundation.db.getSetupData=()=>({...originalSetup(),...(state.webUrl?{webModuleUrl:state.webUrl}:{}),aiService:state.selectedAiService,aiProfiles:state.aiProfiles??[{service:'openai',baseUrl:'https://api.openai.com/v1',model:'fixture-chat',modelOptions:[],timeoutSeconds:30,apiKeyConfigured:ai}]});
   const media=new (load('media-service.js').MarketingMediaService)(()=>foundation.db,()=>foundation.db.userDataPath);

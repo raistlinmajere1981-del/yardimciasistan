@@ -502,6 +502,11 @@ try {
     );
 
     assert.equal(database.setAndroidDeviceRole(DEVICE_ID, "admin").ok, true);
+    // Suppliers depends on Purchasing: disable in dependency order.
+    setBusinessCapability(database.databasePath, {
+      capability: C.RETAIL_SUPPLIERS,
+      enabled: false
+    });
     setBusinessCapability(database.databasePath, {
       capability: C.RETAIL_PURCHASING,
       enabled: false

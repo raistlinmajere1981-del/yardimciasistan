@@ -99,6 +99,8 @@ try {
   assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 0);
 
   const movementsBeforeInventoryDisabledSale = listRuntimeInventoryMovements(databasePath, { productId: product.id }).length;
+  // Canonical dependency order: suppliers → purchasing → inventory.
+  setBusinessCapability(databasePath, { capability: "retail.suppliers", enabled: false });
   setBusinessCapability(databasePath, { capability: "retail.purchasing", enabled: false });
   setBusinessCapability(databasePath, { capability: "commerce.inventory", enabled: false });
   const saleWithoutInventory = createRuntimePaidSale(databasePath, {
@@ -110,6 +112,7 @@ try {
   assert.equal(saleWithoutInventory.total, 75);
   setBusinessCapability(databasePath, { capability: "commerce.inventory", enabled: true });
   setBusinessCapability(databasePath, { capability: "retail.purchasing", enabled: true });
+  setBusinessCapability(databasePath, { capability: "retail.suppliers", enabled: true });
   assert.equal(
     getRuntimeInventoryBalance(databasePath, product.id).quantity,
     0,
