@@ -60,23 +60,7 @@ function site_qr_menu_available(): bool
     if ($publication === []) {
         return false;
     }
-    if (array_key_exists('enabled', $menu) && ($menu['enabled'] ?? false) !== true) {
-        return false;
-    }
-
-    $snapshot = site_publication('android_snapshot');
-    $capabilities = is_array($snapshot['business_capabilities'] ?? null)
-        ? $snapshot['business_capabilities']
-        : null;
-
-    if ($capabilities === null) {
-        return true;
-    }
-
-    return in_array('channel.qr_menu', array_map(
-        static fn (mixed $capability): string => trim((string) $capability),
-        $capabilities
-    ), true);
+    return ($menu['enabled'] ?? false) === true;
 }
 
 function render_site_hero(string $eyebrow, string $title, string $description = ''): void
@@ -113,8 +97,6 @@ function site_availability(): array
         $value = site_publication($name);
         return !empty($value['_publication']) && ($value['enabled'] ?? false) === true;
     };
-    $capabilities = site_publication('android_snapshot')['business_capabilities'] ?? null;
-    $capable = static fn(string $id): bool => $capabilities === null || in_array($id, $capabilities, true);
     $marketing = site_publication('marketing_website');
     $announcements = ($marketing['enabled'] ?? false) === true && count(array_filter($marketing['publications'] ?? [], static fn(array $p): bool => ($p['published'] ?? false) === true)) > 0;
     $reviews = false;
@@ -122,9 +104,9 @@ function site_availability(): array
     if (is_file($path)) {
         try { $settings = require $path; $reviews = ($settings['enabled'] ?? false) === true && !empty($settings['place_id']) && !empty($settings['api_key']); } catch (Throwable) {}
     }
-    return ['always'=>true, 'rooms'=>$has('room_catalog') && $capable('accommodation.rooms'),
-        'restaurant'=>$has('table_catalog') && $capable('food_service.tables'), 'qr_menu'=>site_qr_menu_available(),
-        'store'=>$has('online_catalog') && $capable('channel.online_sales'), 'announcements'=>$announcements, 'reviews'=>$reviews];
+    return ['always'=>true, 'rooms'=>$has('room_catalog'),
+        'restaurant'=>$has('table_catalog'), 'qr_menu'=>site_qr_menu_available(),
+        'store'=>$has('online_catalog'), 'announcements'=>$announcements, 'reviews'=>$reviews];
 }
 function render_site_links(): void
 {

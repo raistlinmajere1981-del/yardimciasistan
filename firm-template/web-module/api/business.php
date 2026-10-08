@@ -41,28 +41,19 @@ $whatsappEnabled = array_key_exists('whatsapp_enabled', $publicContext)
 $requestsEnabled = $runtimeCapabilities !== null
     ? in_array('customer.requests', $runtimeCapabilities, true)
     : ya_business_profile_requests_enabled($profileId);
-$surfaceConfig = $config;
-$surfaceConfig['address'] = $address;
-if ($runtimeCapabilities !== null) {
-    $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, $surfaceConfig);
-} elseif (array_key_exists('public_surfaces', $config)) {
+if (array_key_exists('public_surfaces', $config)) {
     $publicSurfaces = ya_business_normalize_public_surfaces($config['public_surfaces']);
 } else {
     $publicSurfaces = ya_business_profile_public_surfaces($profileId);
 }
 
-if (!ya_business_publication_enabled('menu', true)) {
-    $publicSurfaces = array_values(array_filter(
-        $publicSurfaces,
-        static fn (string $surface): bool => $surface !== 'qr_menu'
-    ));
-}
-
-if (ya_business_publication_enabled('room_catalog', true)) {
-    $publicSurfaces[] = 'rooms';
-}
-if (ya_business_publication_enabled('table_catalog', false)) {
-    $publicSurfaces[] = 'restaurant';
+// Published channel state owns these public surfaces, independently of Android.
+$surfacePublications = ['rooms' => 'room_catalog', 'restaurant' => 'table_catalog',
+    'qr_menu' => 'menu', 'store' => 'online_catalog'];
+$publicSurfaces = array_values(array_filter($publicSurfaces,
+    static fn (string $surface): bool => !array_key_exists($surface, $surfacePublications)));
+foreach ($surfacePublications as $surface => $publicationName) {
+    if (ya_business_publication_enabled($publicationName)) $publicSurfaces[] = $surface;
 }
 $publicSurfaces = array_values(array_unique($publicSurfaces));
 
@@ -138,7 +129,7 @@ function ya_business_public_context(): array
     }
 }
 
-function ya_business_publication_enabled(string $name, bool $legacyDefault): bool
+function ya_business_publication_enabled(string $name): bool
 {
     try {
         $catalog = ya_storage_get_publication($name, []);
@@ -150,10 +141,7 @@ function ya_business_publication_enabled(string $name, bool $legacyDefault): boo
     if ($publication === []) {
         return false;
     }
-    if (array_key_exists('enabled', $catalog)) {
-        return ($catalog['enabled'] ?? false) === true;
-    }
-    return $legacyDefault;
+    return ($catalog['enabled'] ?? false) === true;
 }
 
 function ya_business_google_reviews_enabled(): bool
@@ -180,36 +168,6 @@ function ya_business_public_capabilities(): ?array
         static fn (mixed $capability): string => trim((string) $capability),
         $capabilities
     ))));
-}
-
-function ya_business_capability_public_surfaces(array $capabilities, array $config): array
-{
-    $enabled = array_fill_keys($capabilities, true);
-    $surfaces = [];
-
-    if (isset($enabled['accommodation.reservations'])) {
-        $surfaces[] = 'accommodation';
-    }
-    if (isset($enabled['food_service.reservations'])) {
-        $surfaces[] = 'food_service';
-    }
-    if (isset($enabled['food_service.menu'])) {
-        $surfaces[] = 'menu';
-    }
-    if (isset($enabled['channel.qr_menu'])) {
-        $surfaces[] = 'qr_menu';
-    }
-    if (isset($enabled['commerce.catalog'])) {
-        $surfaces[] = 'catalog';
-    }
-
-    $address = ya_business_string($config['address'] ?? '');
-    $mapUrl = ya_business_string($config['map_url'] ?? '');
-    if ($address !== '' || $mapUrl !== '') {
-        $surfaces[] = 'directions';
-    }
-
-    return $surfaces;
 }
 
 function ya_business_normalize_public_surfaces(mixed $value): array

@@ -428,11 +428,11 @@ try {
   });
   expect(qrModuleDisabledSnapshot.ok()).toBe(true);
   const qrModuleDisabledMenu = await page.request.get(`${baseUrl}/api/menu.php`);
-  expect(qrModuleDisabledMenu.status()).toBe(404);
-  expect(await qrModuleDisabledMenu.json()).toMatchObject({ ok: false, message: "QR menü etkin değil." });
+  expect(qrModuleDisabledMenu.ok()).toBe(true);
+  expect((await qrModuleDisabledMenu.json()).items.length).toBeGreaterThan(0);
   const qrModuleDisabledBusiness = await page.request.get(`${baseUrl}/api/business.php`);
   expect(qrModuleDisabledBusiness.ok()).toBe(true);
-  expect((await qrModuleDisabledBusiness.json()).business.public_surfaces).not.toContain("qr_menu");
+  expect((await qrModuleDisabledBusiness.json()).business.public_surfaces).toContain("qr_menu");
 
   const qrModuleEnabledSnapshot = await syncPost(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },

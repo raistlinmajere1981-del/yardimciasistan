@@ -12,6 +12,8 @@ import { marketingFixture, imageBytes, editorialInput } from './test-helpers/mar
 const require = createRequire(import.meta.url);
 const { PhpHostingSyncTransport } = require('../packages/sync-core/dist');
 const { SyncCoordinator } = require('../apps/desktop-app/dist-electron/sync-coordinator.js');
+const { setBusinessCapability } = require('../apps/desktop-app/dist-electron/business-capability-store.js');
+const { saveRuntimeCatalogProduct } = require('../apps/desktop-app/dist-electron/commerce-runtime.js');
 const root = mkdtempSync(join(tmpdir(), 'ya-showcase-')), f = marketingFixture();
 cpSync('test-site/landing', root, { recursive: true });
 const moduleRoot = join(root, 'yardimci-asistan'); cpSync('firm-template/web-module', moduleRoot, { recursive: true });
@@ -49,10 +51,27 @@ try {
   await expect(page.locator('[data-marketing-wrapper]')).toBeHidden();
   await expect(page.locator('.download-card')).toHaveCount(3);
   mkdirSync(join(root, 'downloads')); for (const link of await page.locator('.download-card').evaluateAll(nodes => nodes.map(n => n.getAttribute('href')))) { writeFileSync(join(root, link), 'test-download'); assert.equal((await fetch(base + link)).status, 200); }
+  const surfaces = [
+    ['room_catalog', 'rooms', '/odalar/'], ['table_catalog', 'restaurant', '/restoran/'],
+    ['menu', 'qr_menu', '/qr-menu/'], ['online_catalog', 'store', '/yardimci-asistan/magaza/']
+  ];
+  const assertSurfaces = async (visible) => {
+    await page.goto(base);
+    const business = (await (await page.request.get(base + '/yardimci-asistan/api/business.php')).json()).business;
+    for (const [, surface, path] of surfaces) {
+      await expect(page.locator(`[data-site-nav] a[href="${path}"]`)).toHaveCount(visible ? 1 : 0);
+      await expect(page.locator(`.demo-surface-card a[href="${path}"]`)).toHaveCount(visible ? 1 : 0);
+      assert.equal(business.public_surfaces.includes(surface), visible, surface);
+    }
+  };
+  await assertSurfaces(false);
+  // Android disabled/empty capabilities cannot hide independently enabled Web publications.
+  seed('android_snapshot', { enabled: false, business_capabilities: [] });
   seed('room_catalog', { enabled: true, rooms: [{ id: 'showcase-room', name: 'Örnek oda', capacity: 2, media: [], features: [] }] });
   seed('table_catalog', { enabled: true, tables: [{ id: 'showcase-table', name: 'Örnek masa', capacity: 4, area: 'Salon', media: [], features: [] }] });
   seed('menu', { enabled: true, categories: [{ id: 'drinks', name: 'İçecekler' }], items: [{ id: 'tea', name: 'Çay', category_id: 'drinks', price: 25, currency: 'TRY', is_active: true }] });
   seed('online_catalog', { enabled: true, version: 1, delivery_methods: ['pickup'], products: [{ product_id: 'showcase-product', name: 'Örnek ürün', unit: 'piece', price: 50, currency: 'TRY', tax_rate: 20, availability: 'available' }] });
+  await assertSurfaces(true);
   seed('business_context', { business_name: 'Örnek işletme', phone: '+90 555 000 0000', address: 'Örnek adres', latitude: 41, longitude: 29, social_links: [{ platform: 'instagram', url: 'https://instagram.com/example' }] });
   await page.goto(base + '/odalar/'); await expect(page.locator('.room-card')).toContainText('Örnek oda');
   await page.goto(base + '/odalar/oda/?id=showcase-room'); await expect(page.locator('[data-room-name]')).toContainText('Örnek oda');
@@ -106,7 +125,33 @@ try {
   await page.goto(base);
   await page.reload(); for (const path of ['/odalar/', '/restoran/', '/qr-menu/', '/yardimci-asistan/magaza/']) await expect(page.locator(`[data-site-nav] a[href="${path}"]`)).toHaveCount(1);
   assert.equal(await page.locator('[data-site-nav] a').first().getAttribute('href'), '/');
-  seed('menu', { enabled: false, categories: [], items: [] }, 2); await page.reload(); await expect(page.locator('[data-site-nav] a[href="/qr-menu/"]')).toHaveCount(0);
+  // A stale snapshot claiming all capabilities cannot reopen withdrawn Web surfaces.
+  seed('android_snapshot', { enabled: true, business_capabilities: ['service.android', 'accommodation.rooms', 'food_service.tables', 'channel.qr_menu', 'channel.online_sales'] }, 2);
+  for (const [publication] of surfaces) seed(publication, { enabled: false }, 2);
+  await assertSurfaces(false);
+  const withdrawnMenu = await page.request.get(base + '/yardimci-asistan/api/menu.php');
+  assert.equal(withdrawnMenu.status(), 404);
+  for (const [publication] of surfaces) seed(publication, { enabled: true }, 3);
+  await assertSurfaces(true);
+  seed('android_snapshot', { enabled: false, business_capabilities: [] }, 3);
+  await assertSurfaces(true);
+  assert.equal((await page.request.get(base + '/yardimci-asistan/api/menu.php')).status(), 200);
+  // Real Desktop channel intent projects through the existing online publication owner/transport.
+  setBusinessCapability(f.db.databasePath, { capability: 'channel.online_sales', enabled: true });
+  const product = saveRuntimeCatalogProduct(f.db.databasePath, { name: 'Canonical showcase product', salePrice: 50, trackInventory: false });
+  const onlineCatalog = f.db.createCommerceOnlineCatalog();
+  assert.equal(onlineCatalog.enabled, true);
+  assert.ok(onlineCatalog.products.some(item => item.productId === product.id));
+  const onlinePublish = await transport.publishOnlineCatalog({ value: onlineCatalog, sourceRevision: 4, idempotencyKey: 'showcase-store-on-4' });
+  assert.equal(onlinePublish.ok, true, onlinePublish.message);
+  await assertSurfaces(true);
+  setBusinessCapability(f.db.databasePath, { capability: 'channel.online_sales', enabled: false });
+  const onlineWithdrawal = await transport.publishOnlineCatalog({ value: f.db.createCommerceOnlineCatalog(), sourceRevision: 5, idempotencyKey: 'showcase-store-off-5' });
+  assert.equal(onlineWithdrawal.ok, true, onlineWithdrawal.message);
+  await page.goto(base);
+  await expect(page.locator('[data-site-nav] a[href="/yardimci-asistan/magaza/"]')).toHaveCount(0);
+  await expect(page.locator('.demo-surface-card a[href="/yardimci-asistan/magaza/"]')).toHaveCount(0);
+  assert.equal((await (await page.request.get(base + '/yardimci-asistan/api/business.php')).json()).business.public_surfaces.includes('store'), false);
   const a = f.media.importBytes(imageBytes, 'upload'), b = f.media.importBytes(imageBytes, 'upload'), c = f.media.importBytes(imageBytes, 'upload');
   const content = f.service.saveContent(editorialInput());
   let publication = f.service.savePublication({ contentId: content.content.id, channel: 'website', placement: 'homepage_feature', title: 'Demo kampanya', text: 'İlk paylaşım', mediaAssetIds: [a.id, b.id] });
