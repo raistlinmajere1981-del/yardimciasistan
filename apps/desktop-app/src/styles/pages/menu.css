@@ -6,7 +6,7 @@
 
 .menu-manager {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .menu-manager__toolbar {
@@ -38,14 +38,14 @@
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
   align-items: stretch;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-height: 0;
   overflow: hidden;
 }
 
 :is(.menu-category-panel, .menu-product-panel, .menu-item-editor) {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-height: 0;
 }
 

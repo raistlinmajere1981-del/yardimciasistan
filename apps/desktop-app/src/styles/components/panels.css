@@ -20,7 +20,9 @@
 .panel-heading h2,
 .setup-section-title h2 {
   margin: 0;
-  font-size: var(--text-lg);
+  color: var(--color-shell-ink);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
 }
 
 .panel-heading p,
@@ -93,7 +95,7 @@
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--color-border);
 }
-.page-section__header h2, .page-section__header h3 { margin: 0; font-size: var(--text-lg); }
+.page-section__header h2, .page-section__header h3 { margin: 0; color: var(--color-shell-ink); font-size: var(--panel-title-size); font-weight: var(--panel-title-weight); }
 .page-section__header p { margin: var(--space-1) 0 0; color: var(--color-text-muted); max-width: var(--reading-max-width); }
 
 .panel-heading > *, .page-section__header > * { min-width: 0; max-width: 100%; }

@@ -2,7 +2,7 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -10,8 +10,9 @@
 
 .finance-section-heading h3 {
   margin: 0;
-  color: var(--color-text);
-  font-size: var(--text-xl);
+  color: var(--color-shell-ink);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
 }
 
 .finance-section-heading p {
@@ -31,7 +32,7 @@
 .finance-summary-grid {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-sm)), 1fr));
   gap: var(--space-3);
 }
 
@@ -45,7 +46,7 @@
   flex: 1 1 auto;
   grid-template-columns: minmax(0, 2fr) minmax(320px, 0.95fr);
   align-items: stretch;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
   min-height: 0;
   overflow: hidden;

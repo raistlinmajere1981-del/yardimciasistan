@@ -39,7 +39,7 @@
 }
 
 .operations-board__pane--center {
-  border-color: var(--color-border-strong);
+  border-color: var(--color-role-integration-border);
 }
 
 .operations-board__pane-header {
@@ -55,7 +55,9 @@
 
 .operations-board__pane-header h2 {
   margin: 0;
-  font-size: var(--text-md);
+  color: var(--color-shell-ink);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
 }
 
 .operations-board__pane-title {
@@ -238,14 +240,4 @@
   .operations-board__pane--left .restaurant-reservation-list {
     overflow: visible;
   }
-}
-
-/* Board notes are previews; full record text stays in the canonical workspace. */
-.operations-board .list-row__description {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  line-clamp: 1;
-  overflow: hidden;
-  max-width: 100%;
 }

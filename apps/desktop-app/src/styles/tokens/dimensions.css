@@ -21,6 +21,8 @@
   --header-height: 60px;
   --page-padding: var(--space-4);
   --panel-padding: var(--space-4);
+  --panel-title-size: var(--text-md);
+  --panel-title-weight: var(--weight-extrabold);
   --dialog-width-sm: 28rem;
   --dialog-width-md: 40rem;
   --dialog-width-lg: 72rem;

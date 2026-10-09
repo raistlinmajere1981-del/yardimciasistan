@@ -5,7 +5,7 @@
 .operation-calendar-page {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: var(--space-3);
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -38,8 +38,9 @@
 }
 
 .operation-calendar-title-block strong {
-  font-size: var(--text-md);
-  color: var(--color-text);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
+  color: var(--color-shell-ink);
 }
 
 .operation-calendar-title-block span {

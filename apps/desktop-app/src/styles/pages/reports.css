@@ -25,7 +25,7 @@
 }
 
 .reports-view-tabs button {
-  min-height: var(--control-height-md);
+  min-height: max(var(--interaction-target-min), var(--control-height-md));
   color: var(--color-text-muted);
   background: var(--color-bg-panel);
   border: 1px solid transparent;
@@ -146,8 +146,9 @@
 .report-filter-heading h2,
 .report-section-title h2 {
   margin: 0;
-  color: var(--color-text);
-  font-size: var(--text-lg);
+  color: var(--color-shell-ink);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
 }
 
 .report-section-title p {

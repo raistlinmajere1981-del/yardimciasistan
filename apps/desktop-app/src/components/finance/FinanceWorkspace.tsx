@@ -164,7 +164,7 @@ export function FinanceWorkspace({
       {topPanel && <div className="finance-top-panel">{topPanel}</div>}
 
       <div className={`finance-main-grid ${!accommodationFolioEnabled ? "is-single-column" : ""}`}>
-        <Panel className="finance-recent-panel">
+        <Panel className="finance-recent-panel" surfaceRole="finance">
           <div className="finance-section-heading page-toolbar">
             <div>
               <h3>Son Hareketler</h3>
@@ -219,7 +219,7 @@ export function FinanceWorkspace({
         </Panel>
 
         {accommodationFolioEnabled && (
-          <Panel className="finance-outstanding-panel" padding="compact">
+          <Panel className="finance-outstanding-panel" padding="compact" surfaceRole="finance">
             <div className="finance-section-heading page-toolbar">
               <div>
                 <h3>Bekleyen Alacaklar</h3>

@@ -29,7 +29,7 @@ export function DataListItem({
           <h3 title={typeof title === "string" ? title : undefined}>{title}</h3>
         </div>
         {meta && <div className="list-row__meta" title={typeof meta === "string" ? meta : undefined}>{meta}</div>}
-        {description && <p className="list-row__description">{description}</p>}
+        {description && <p className="list-row__description" title={typeof description === "string" ? description : undefined}>{description}</p>}
       </div>
       {actions && <div className="list-row__actions">{actions}</div>}
     </article>
@@ -70,7 +70,7 @@ export function DataListButton({
           <strong title={typeof title === "string" ? title : undefined} className="list-row__title">{title}</strong>
         </span>
         {meta && <span className="list-row__meta" title={typeof meta === "string" ? meta : undefined}>{meta}</span>}
-        {description && <span className="list-row__description">{description}</span>}
+        {description && <span className="list-row__description" title={typeof description === "string" ? description : undefined}>{description}</span>}
       </span>
       {trailing && <span className="list-row__trailing">{trailing}</span>}
     </button>

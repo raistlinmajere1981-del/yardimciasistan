@@ -66,6 +66,15 @@ try {
 
   await page.addInitScript(({ dashboard, setup, syncStatus }) => {
     window.__m8fInitial = { dashboard, setup, syncStatus };
+    if (location.search.includes("crowded")) {
+      dashboard.attention = {
+        ...dashboard.attention,
+        items: Array.from({ length: 24 }, (_, index) => ({
+          kind: "low_stock", title: `Stok uyarısı ${index + 1}`,
+          detail: index === 23 ? "Son süreç notu korunuyor." : "Sayım bekliyor."
+        }))
+      };
+    }
     window.__m8fActions = [];
     delete window.yardimciDesktop;
   }, { dashboard, setup, syncStatus });
@@ -98,6 +107,28 @@ try {
 
   await page.getByRole("button", { name: "Günü değerlendir", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__m8fActions.some((item) => item.kind === "daily-ai"))).toBe(true);
+
+  // A crowded side pane must keep the final process note and its launchers reachable.
+  for (const scheme of ["light", "dark"]) {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto(`${baseUrl}dashboard-workspace-test?crowded`);
+    await page.evaluate(scheme => {
+      document.documentElement.dataset.colorScheme = scheme;
+      document.documentElement.dataset.density = "compact";
+    }, scheme);
+    const priorityScroll = await page.locator(".dashboard-priority-list").evaluate(el => el.scrollTop);
+    const finalNote = page.getByText("Son süreç notu korunuyor.", { exact: true });
+    await finalNote.scrollIntoViewIfNeeded();
+    await expect(finalNote).toBeInViewport();
+    await page.getByRole("button", { name: "Günü değerlendir", exact: true }).scrollIntoViewIfNeeded();
+    await expect(page.getByRole("button", { name: "Günü değerlendir", exact: true })).toBeInViewport();
+    expect(await page.locator(".dashboard-priority-list").evaluate(el => el.scrollTop)).toBe(priorityScroll);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+  }
+  await page.goto(`${baseUrl}dashboard-workspace-test?noSide`);
+  await expect(page.getByRole("complementary", { name: "Takvim ve işletme durumu" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Şimdi yapılacaklar" })).toBeVisible();
 
   expect(pageErrors).toEqual([]);
   console.log("dashboard-workspace-smoke-ok");

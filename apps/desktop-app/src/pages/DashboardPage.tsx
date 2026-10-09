@@ -137,6 +137,8 @@ export function DashboardPage({
   const visibleScheduleItems = dashboard.scheduleItems;
   const hasCapacityMetrics = features.rooms || features.tables || (features.whatsapp && customersEnabled);
   const capacityVisible = hasCapacityMetrics || aiEnabled;
+  const sideVisible = operationalAttentionItems.length > 0 || calendarEnabled || capacityVisible
+    || (customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0);
 
   const renderPriorityItem = (item: DashboardPriorityItem, index: number) => (
     <li className={`dashboard-priority-item priority-${item.kind}`} key={item.key}>
@@ -159,7 +161,7 @@ export function DashboardPage({
         <p className="dashboard-priority-meta">
           {getPriorityMeta(item, dashboard.today, formatRequestType, formatTaskDue, formatReservationDate)}
         </p>
-        {getPriorityDescription(item) && <p className="dashboard-priority-description">{getPriorityDescription(item)}</p>}
+        {getPriorityDescription(item) && <p className="dashboard-priority-description" title={getPriorityDescription(item)}>{getPriorityDescription(item)}</p>}
       </div>
       <div className="dashboard-priority-action">
         {item.kind === "request" ? (
@@ -244,7 +246,7 @@ export function DashboardPage({
         aiEnabled={aiEnabled}
       />
 
-      <section className="dashboard-workspace">
+      <section className={`dashboard-workspace${sideVisible ? "" : " dashboard-workspace--single"}`}>
         <Panel className="dashboard-priority-panel" aria-labelledby="dashboard-priority-title">
           <div className="dashboard-section-heading page-toolbar">
             <div>
@@ -271,7 +273,7 @@ export function DashboardPage({
 
         </Panel>
 
-        {(operationalAttentionItems.length > 0 || calendarEnabled || capacityVisible || (customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0)) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
+        {sideVisible && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
           {operationalAttentionItems.length > 0 && (
             <Panel className="dashboard-operational-attention-panel" padding="compact">
               <div className="dashboard-section-heading page-toolbar compact">

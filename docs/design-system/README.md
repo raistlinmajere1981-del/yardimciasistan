@@ -251,6 +251,10 @@ Mouse ile kullanılan filtre/choice kontrolleri (`ChoiceChips`, `StatusChip`,
 Bu istisna action, field veya workspace/page tab hedeflerini küçültmez.
 Bilgilendirme `StatusBadge` için `--status-height` 24px'dir; tıklanabilir hedef değildir.
 Başlık ve panel aralıkları shared geometri tokenlarından gelir; scroll sahipliği değişmez.
+Panel başlıkları `--panel-title-size` / `--panel-title-weight` ve `--color-shell-ink`
+kullanır. `DataList` açıklaması tek satırlık önizlemedir; metin DOM’da korunur, string
+açıklamanın tamamı tooltip ile de okunabilir. Dashboard’un sağ sütunu kendi scroll
+alanını sahiplenir; kapasite, müşteri notları ve takvim kayıtları birlikte erişilebilir kalır.
 Kalıcı yardım yalnız iş kararını veya kritik kapsamı açıklıyorsa gösterilir. Başlığı tekrar
 eden kılavuz metni component'te kaldırılır; boş/hata durumları, capability açıklamaları,
 mahremiyet, KBS, WhatsApp, finans ve veri kaybı uyarıları korunur.

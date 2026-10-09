@@ -40,7 +40,7 @@
 @media (max-width: 800px) { .marketing-analytics-channels, .marketing-analytics-trends { grid-template-columns: 1fr; } .marketing-analytics-heading { flex-wrap: wrap; } }
 @media (max-width: 650px) { .marketing-analytics-summary { grid-template-columns: 1fr; } }
 
-.marketing-welcome { display: flex; align-items: center; gap: var(--space-4); background: linear-gradient(110deg, var(--color-accent-soft), var(--color-bg-panel)); }
+.marketing-welcome { display: flex; align-items: center; gap: var(--space-4); background: linear-gradient(120deg, var(--color-role-integration-bg), var(--color-role-operation-bg)); }
 .marketing-welcome h2 { margin: 0 0 var(--space-2); }
 .marketing-welcome p { margin: 0; color: var(--color-text-muted); line-height: var(--leading-normal); }
 .marketing-welcome > div { flex: 1; }
@@ -58,8 +58,8 @@
 .marketing-record[aria-pressed="true"] { background: var(--color-accent-soft); border-color: var(--color-accent); }
 .marketing-record:disabled { opacity: 0.5; cursor: default; }
 .marketing-record > span:not(.marketing-thumbnail):not(.status-badge) { flex: 1; min-width: 0; }
-.marketing-record strong { display: block; font-size: var(--text-sm); overflow-wrap: anywhere; }
-.marketing-record small { display: block; color: var(--color-text-muted); font-size: var(--text-xs); margin-top: var(--space-1); }
+.marketing-record strong { display: block; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marketing-record small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); font-size: var(--text-xs); margin-top: var(--space-1); }
 .marketing-record .status-badge { max-width: 8rem; white-space: normal; text-align: center; }
 .marketing-thumbnail { display: flex; align-items: center; justify-content: center; flex: 0 0 3.5rem; width: 3.5rem; height: 3.5rem; border-radius: var(--radius-control); background: var(--color-bg-hover); color: var(--color-text-muted); overflow: hidden; }
 .marketing-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
