@@ -15,7 +15,8 @@ assert.equal(exports.moveRecordId(["a", "b"], "missing", "a", "after"), null);
 assert.match(manager, /useRecordReorder/);
 assert.match(reorder, /setDragImage\(/);
 assert.match(manager, /draggable=\{!reorderBusy && Boolean\(selectedCategoryId\)\}/);
-assert.match(manager, /Sıralamak için kategori seçin/);
+assert.match(manager, /title=\{selectedCategoryId \? "Sürükleyerek sırala" : "Ürün sıralamak için önce bir kategori seçin"\}/);
+assert.match(manager, /canDrag: \(kind, id\) => kind === "category" \? editingCategoryId !== id : Boolean\(selectedCategoryId\)/);
 assert.match(manager, /handleDragOver\(event, "category", category\.id\)/);
 assert.match(manager, /handleDragOver\(event, "item", item\.id\)/);
 
