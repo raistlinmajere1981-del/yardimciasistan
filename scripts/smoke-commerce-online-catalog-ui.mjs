@@ -10,7 +10,7 @@ import { chromium, expect } from "@playwright/test";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const { saveRuntimeCatalogProduct, listRuntimeCatalogProducts } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { saveRuntimeCatalogProduct, listRuntimeCatalogProducts, getRuntimeInventoryBalance, listRuntimeInventoryMovements, setRuntimeInventoryCount } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 const { applyBusinessProfileCapabilities } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const { toggleBusinessProfileOption } = require("../packages/shared/dist");
 const root = mkdtempSync(join(tmpdir(), "ya-online-catalog-ui-"));
@@ -128,6 +128,98 @@ try {
   selectOnlineSales(true);
   assert.equal(database.getCommerceProductPublication(createdProducts.at(-1).id), null);
   await page.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+
+  // Exercise the real detail editor against the same temporary database. Counting
+  // inventory and saving a product remain independent operations after regrouping.
+  selectOnlineSales(true);
+  const stockProduct = saveRuntimeCatalogProduct(database.databasePath, {
+    name: "Hybrid stock product", salePrice: 25, purchasePrice: 10, trackInventory: true,
+    minimumQuantity: 2, imageAssetPath: "test-preview.png"
+  });
+  setRuntimeInventoryCount(database.databasePath, { productId: stockProduct.id, countedQuantity: 10 });
+  const detailCalls = [];
+  const detailPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  detailPage.on("pageerror", error => errors.push(error.message));
+  await detailPage.exposeFunction("__detailCall", (method, input) => {
+    detailCalls.push(method);
+    if (method === "save") return saveRuntimeCatalogProduct(database.databasePath, input);
+    if (method === "balance") return getRuntimeInventoryBalance(database.databasePath, input);
+    if (method === "movements") return listRuntimeInventoryMovements(database.databasePath, input);
+    if (method === "count") return setRuntimeInventoryCount(database.databasePath, input);
+    if (method === "publication") return database.getCommerceProductPublication(input);
+    if (method === "publish") return database.saveCommerceProductPublication(input);
+    throw new Error(`Unexpected detail bridge call: ${method}`);
+  });
+  await detailPage.addInitScript((product) => {
+    window.__product = product;
+    window.__inventoryEnabled = true;
+    window.yardimciDesktop = { commerce: {
+      saveProduct: input => window.__detailCall("save", input),
+      getInventoryBalance: id => window.__detailCall("balance", id),
+      listInventoryMovements: input => window.__detailCall("movements", input),
+      setInventoryCount: input => window.__detailCall("count", input),
+      getProductPublication: id => window.__detailCall("publication", id),
+      saveProductPublication: input => window.__detailCall("publish", input),
+      getProductImageDataUrl: async () => "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="1000"><rect width="360" height="1000" fill="green"/></svg>')
+    } };
+  }, { ...stockProduct, imageAssetPath: "test-preview.png" });
+  await detailPage.goto(`http://127.0.0.1:${server.httpServer.address().port}/online-catalog-ui-smoke`);
+  await detailPage.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
+  const detail = detailPage.locator("dialog.product-workspace-frame");
+  const fields = detail.getByRole("region", { name: "Ürün detayları", exact: true });
+  const rail = detail.getByRole("complementary", { name: "Ürün işlemleri", exact: true });
+  for (const title of ["Ürün bilgileri", "Sınıflandırma", "Fiyatlandırma", "Stok kuralları", "Açıklama"]) {
+    await expect(fields.getByRole("heading", { name: title, exact: true })).toHaveCount(1);
+  }
+  await expect(fields.getByLabel("Ürün adı", { exact: true })).toHaveValue(stockProduct.name);
+  await fields.getByRole("textbox", { name: "Açıklama", exact: true }).scrollIntoViewIfNeeded();
+  await expect(rail.getByRole("button", { name: "Stok Güncelle / Düzelt", exact: true })).toBeInViewport();
+  for (const name of ["Aktif ürün", "Stok takibi", "Hızlı erişim", "Web satışında yayınla"]) {
+    await expect(rail.getByRole("checkbox", { name, exact: true })).toBeInViewport();
+  }
+  await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeInViewport();
+  const image = rail.locator(".market-product-image-card img");
+  await image.scrollIntoViewIfNeeded();
+  for (const dimensions of [[360, 1000], [1200, 400]]) {
+    await image.evaluate((element, [width, height]) => {
+      element.src = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" fill="green"/></svg>`);
+    }, dimensions);
+    await expect.poll(() => image.evaluate(element => element.complete && element.naturalHeight > 0)).toBe(true);
+    assert.equal(await image.evaluate(element => {
+      const frame = element.parentElement.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      return getComputedStyle(element).objectFit === "contain" && bounds.height <= frame.height && bounds.width <= frame.width;
+    }), true, "Portrait and landscape previews must fit a bounded, non-cropping frame.");
+  }
+  await rail.getByLabel("Yeni stok miktarı", { exact: true }).fill("12");
+  await expect(fields.getByLabel("Ürün adı", { exact: true })).toBeDisabled();
+  await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
+  await expect(detail.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
+  await rail.getByRole("button", { name: "Stok Güncelle / Düzelt", exact: true }).click();
+  await expect(rail.getByRole("status").filter({ hasText: "Stok güncellendi." })).toBeVisible();
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, stockProduct.id).quantity, 12);
+  assert.equal(detailCalls.filter(method => method === "save").length, 0);
+  await fields.getByLabel("Ürün adı", { exact: true }).fill("Hybrid saved product");
+  await expect(rail.getByLabel("Yeni stok miktarı", { exact: true })).toBeDisabled();
+  await expect(detail.getByRole("button", { name: "Stok Hareketleri", exact: true })).toBeDisabled();
+  await detail.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  await expect(detail.getByRole("heading", { name: "Hybrid saved product", exact: true })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeDisabled();
+  assert.equal(listRuntimeCatalogProducts(database.databasePath).find(product => product.id === stockProduct.id).name, "Hybrid saved product");
+  assert.equal(getRuntimeInventoryBalance(database.databasePath, stockProduct.id).quantity, 12);
+  assert.equal(detailCalls.filter(method => method === "count").length, 1);
+  await fields.getByLabel("Ürün adı", { exact: true }).fill("Discard this draft");
+  await detail.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true }).click();
+  await expect(fields.getByLabel("Ürün adı", { exact: true })).toHaveValue("Hybrid saved product");
+  for (const width of [820, 480]) {
+    await detailPage.setViewportSize({ width, height: 900 });
+    await fields.getByRole("textbox", { name: "Açıklama", exact: true }).scrollIntoViewIfNeeded();
+    await expect(detail.getByRole("button", { name: "Ürünü Kaydet", exact: true })).toBeInViewport();
+    assert.equal(await detail.evaluate(element => element.scrollWidth <= element.clientWidth + 1), true);
+    assert.equal(await detailPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+  }
+  await detailPage.close();
+
   applyBusinessProfileCapabilities(database.databasePath, "restaurant", { preserveUserOverrides: false });
   selectOnlineSales(true);
   raw = new DatabaseSync(database.databasePath);

@@ -8,6 +8,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { DatePicker } from "../ui/DateTimePicker";
 import { CustomerCommercialProfileFields } from "./CustomerCommercialProfileFields";
 import { IdentityCameraCapture } from "./IdentityCameraCapture";
+import { DetailSectionCard } from "../workspace/DetailWorkspaceLayout";
 
 type AnalysisState = "idle" | "loading" | "success" | "error";
 
@@ -121,31 +122,27 @@ export function CustomerFormFields({
 
   return (
     <>
-      <section className="panel form-stack">
-        <div className="page-toolbar">
-          <div className="page-toolbar__copy">
-            <strong>Temel bilgiler</strong>
-          </div>
-        </div>
+      <DetailSectionCard title="Temel bilgiler">
         <div className="form-grid">
           <label className="form-field form-field--medium">Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
           <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
           <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
+        </div>
+      </DetailSectionCard>
+
+      <DetailSectionCard title="Notlar ve adres">
+        <div className="form-grid">
           <label className="form-field form-field--fluid customer-note-field">Not<textarea aria-label="Not" rows={2} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
           <label className="form-field form-field--fluid customer-address-field">Adres<textarea aria-label="Adres" rows={2} value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
         </div>
-      </section>
+      </DetailSectionCard>
 
       {wholesaleEnabled && (
         <CustomerCommercialProfileFields form={form} onChange={onChange} />
       )}
 
-      <section className="panel form-stack identity-form-section">
-        <div className="page-toolbar">
-          <div className="page-toolbar__copy">
-            <strong>Kimlik kartı bilgileri</strong>
-          </div>
+      <DetailSectionCard title="Kimlik kartı bilgileri" className="identity-form-section" actions={
           <div className="action-row identity-scan-actions">
             <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeSelectedIdentity(event.target.files?.[0])} />
             <label className="form-check identity-back-side-toggle">
@@ -166,7 +163,7 @@ export function CustomerFormFields({
               {analysisState === "loading" ? "Okunuyor" : "Dosyadan AI ile Doldur"}
             </ActionButton>
           </div>
-        </div>
+      }>
         <div className="form-grid">
           <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
             <option value="">Seçilmedi</option><option value="tc_identity_card">T.C. Kimlik Kartı</option><option value="passport">Pasaport</option><option value="other">Diğer</option>
@@ -199,7 +196,7 @@ export function CustomerFormFields({
           <label className="form-field form-field--medium">Veren makam<input value={form.issuingAuthority} onChange={(event) => update("issuingAuthority", event.target.value)} /></label>
         </div>
         {analysisMessage && <p className={"form-status sync-" + analysisState} role={analysisState === "error" ? "alert" : "status"}>{analysisMessage}</p>}
-      </section>
+      </DetailSectionCard>
 
       {cameraOpen && <IdentityCameraCapture
         captureBackSide={scanBackSide}

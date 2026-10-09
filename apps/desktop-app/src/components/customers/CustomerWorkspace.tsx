@@ -11,6 +11,7 @@ import { customerCreditError } from "../../app/customer-credit-ui";
 import { reportAppStatus } from "../../app/runtime-state";
 import type { EphemeralWhatsAppHandoff } from "../../app/whatsapp-handoff";
 import type { CustomerWorkspaceIntent } from "../workspace/workspace-intent";
+import { DetailWorkspaceLayout } from "../workspace/DetailWorkspaceLayout";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { ActionButton } from "../ui/ActionButton";
@@ -141,7 +142,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   }
 
   return <WorkspaceFrame
-    className="customer-workspace-frame"
+    className="customer-workspace-frame detail-workspace-frame"
+    bodyScroll={history ? "body" : "panes"}
     title={customer.fullName}
     context={<span>{formatCustomerSource(customer.source)} · Son temas {formatCustomerLastContactDate(customer.lastContactAt || customer.updatedAt)}</span>}
     actions={<ActionButton
@@ -176,24 +178,14 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
       </ActionButton>
     </div> : undefined}
   >
-    {!history ? <div className="customer-workspace-main">
-      <form className="customer-workspace-profile" onSubmit={(event) => { event.preventDefault(); void saveCustomer(); }}>
-        <CustomerFormFields
-          form={form}
-          aiEnabled={aiEnabled}
-          wholesaleEnabled={wholesaleEnabled}
-          onChange={setForm}
-          onAnalyzeIdentity={onAnalyzeIdentity}
-        />
-      </form>
-
-      <aside className="customer-workspace-operations" aria-label="Müşteri işlemleri">
+    {!history ? <DetailWorkspaceLayout className="customer-workspace-main"
+      railLabel="Müşteri işlemleri" contentLabel="Müşteri bilgileri" rail={<>
         <CustomerMessagingPreferences key={`preference-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || messagingBusy} onBusyChange={setMessagingBusy} />
         <BusinessTemplateMessagePanel key={`business-message-${customer.id}`} customerId={customerId} disabled={dirty || saveState === "loading" || !customer.phone} onBusyChange={setMessagingBusy} />
         {wholesaleEnabled && customer.commercialProfile?.dealerStatus === "active" && <DealerWebAccessPanel key={customer.id} customerId={customerId} disabled={dirty || saveState === "loading"} />}
         {staysEnabled && <section className="panel customer-operation-card form-stack" aria-label="Konaklama">
           <div className="customer-operation-card__heading">
-            <div><h3>Konaklama</h3><small>Oda ve aktif kalış</small></div>
+            <div><h3>Konaklama</h3></div>
             {activeStay && <StatusBadge tone="success">Aktif</StatusBadge>}
           </div>
           {activeStay ? <>
@@ -233,7 +225,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
 
         {(reservationsEnabled || selectedRequests.length > 0) && <section className="panel customer-operation-card form-stack" aria-label="Yakın kayıtlar">
           <div className="customer-operation-card__heading">
-            <div><h3>Yakın kayıtlar</h3><small>Son operasyon özeti</small></div>
+            <div><h3>Yakın kayıtlar</h3></div>
           </div>
           {reservationsEnabled && <div className="customer-related-record">
             <span>Rezervasyon</span>
@@ -262,7 +254,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
         />}
 
         <section className="panel customer-operation-card form-stack" aria-label="Hızlı işlemler">
-          <div className="customer-operation-card__heading"><div><h3>Hızlı işlemler</h3><small>Müşteri kaydı</small></div></div>
+          <div className="customer-operation-card__heading"><div><h3>Hızlı işlemler</h3></div></div>
           <div className="action-row customer-workspace-quick-actions">
             {whatsappEnabled && <ActionButton
               
@@ -286,8 +278,18 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
             </ActionButton>
           </div>
         </section>
-      </aside>
-    </div> : <CustomerHistoryView
+      </>}
+    >
+      <form className="customer-workspace-profile" onSubmit={(event) => { event.preventDefault(); void saveCustomer(); }}>
+        <CustomerFormFields
+          form={form}
+          aiEnabled={aiEnabled}
+          wholesaleEnabled={wholesaleEnabled}
+          onChange={setForm}
+          onAnalyzeIdentity={onAnalyzeIdentity}
+        />
+      </form>
+    </DetailWorkspaceLayout> : <CustomerHistoryView
       requests={selectedRequests}
       reservations={selectedReservations}
       stays={selectedStays}

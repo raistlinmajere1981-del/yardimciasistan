@@ -1,4 +1,5 @@
 import type { CustomerFormState } from "../../app/customer-model";
+import { DetailSectionCard } from "../workspace/DetailWorkspaceLayout";
 
 interface CustomerCommercialProfileFieldsProps {
   form: CustomerFormState;
@@ -27,11 +28,7 @@ export function CustomerCommercialProfileFields({
   };
 
   return (
-    <section className="panel form-stack customer-commercial-profile">
-      <div className="page-toolbar">
-        <div className="page-toolbar__copy">
-          <strong>Ticari bilgiler</strong>
-        </div>
+    <DetailSectionCard title="Ticari bilgiler" className="customer-commercial-profile" actions={
         <label className="form-check">
           <input
             type="checkbox"
@@ -40,7 +37,7 @@ export function CustomerCommercialProfileFields({
           />
           <strong>Ticari / bayi müşterisi</strong>
         </label>
-      </div>
+      }>
 
       {form.commercialProfileEnabled && (
         <div className="form-grid">
@@ -136,6 +133,6 @@ export function CustomerCommercialProfileFields({
           </label>
         </div>
       )}
-    </section>
+    </DetailSectionCard>
   );
 }

@@ -25,6 +25,7 @@
 @import "./components/history.css" layer(components.primitives);
 @import "./components/dialogs.css" layer(components.primitives);
 @import "./components/workspace.css" layer(components.primitives);
+@import "./components/detail-workspace.css" layer(components.primitives);
 @import "./components/navigation.css" layer(components.primitives);
 @import "./components/nexa.css" layer(components.primitives);
 @import "./components/header.css" layer(components.primitives);

@@ -13,6 +13,7 @@ import {
   type ProductFormState
 } from "../../app/product-model";
 import { MoneyInput } from "../ui/MoneyInput";
+import { DetailSectionCard } from "../workspace/DetailWorkspaceLayout";
 import { ActionButton } from "../ui/ActionButton";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
@@ -38,6 +39,7 @@ export function ProductFormFields({
   onImageClear,
   onExternalImageSelected,
   statusFields,
+  renderSections,
   salePriceError,
   onSalePriceBlur,
   onChange,
@@ -59,6 +61,7 @@ export function ProductFormFields({
   onImageClear?: () => void;
   onExternalImageSelected?: () => void;
   statusFields?: ReactNode;
+  renderSections?: (sections: { status: ReactNode; details: ReactNode; media: ReactNode }) => ReactNode;
   salePriceError?: string | null;
   onSalePriceBlur?: () => void;
   onChange: (form: ProductFormState) => void;
@@ -193,15 +196,15 @@ export function ProductFormFields({
     }
   }
 
-  return <div className="market-product-fields">
-    {showDetails && <section className="market-product-status" aria-label="Durum / Kullanım">
+  const status = showDetails && <section className={`market-product-status${renderSections ? " panel detail-section-card" : ""}`} aria-label="Durum / Kullanım">
       <h3>Durum / Kullanım</h3>
       <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.isActive} onChange={event => onChange({ ...form, isActive: event.target.checked })} /> Aktif ürün</label>
       <label className="market-check"><input disabled={disabled || !inventoryEnabled} type="checkbox" checked={form.trackInventory} onChange={event => onChange({ ...form, trackInventory: event.target.checked })} /> Stok takibi</label>
       {retailFieldsEnabled && <label className="market-check"><input disabled={disabled} type="checkbox" checked={form.quickAccessEnabled} onChange={event => onChange({ ...form, quickAccessEnabled: event.target.checked })} /> Hızlı erişim</label>}
       {statusFields}
-    </section>}
-    {showDetails && <div className="market-form-grid">
+    </section>;
+  const details = showDetails && <div className={renderSections ? "form-stack" : "market-form-grid"}>
+      <ProductFieldSection grouped={Boolean(renderSections)} title="Ürün bilgileri">
       <label className="market-field market-field-wide">Ürün adı<input disabled={disabled} value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} /></label>
       <label className="market-field">Marka<input disabled={disabled} value={form.brand} onChange={(event) => onChange({ ...form, brand: event.target.value })} /></label>
       {retailFieldsEnabled && <label className="market-field">SKU<input disabled={disabled} value={form.sku} onChange={(event) => onChange({ ...form, sku: event.target.value })} /></label>}
@@ -221,8 +224,12 @@ export function ProductFormFields({
           </ActionButton>}
         </span>
       </label>}
+      </ProductFieldSection>
+      <ProductFieldSection grouped={Boolean(renderSections)} title="Sınıflandırma">
       {retailFieldsEnabled && <label className="market-field">Kategori<SearchSelect ariaLabel="Kategori" disabled={disabled} value={form.categoryId} placeholder="Kategorisiz" onChange={categoryId => onChange({ ...form, categoryId })} options={categories.filter(category => category.isActive).map(category => ({ id: category.id, label: category.name }))} /></label>}
       <label className="market-field">Birim<select disabled={disabled} value={form.unit} onChange={(event) => onChange({ ...form, unit: event.target.value as ProductFormState["unit"] })}>{Object.entries(PRODUCT_UNIT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+      </ProductFieldSection>
+      <ProductFieldSection grouped={Boolean(renderSections)} title="Fiyatlandırma">
       <label className="market-field">{wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"}<MoneyInput aria-label={wholesaleEnabled ? "Perakende fiyat" : "Satış fiyatı"} disabled={disabled} value={form.salePrice}
         onBlur={onSalePriceBlur} aria-invalid={salePriceError ? true : undefined} aria-describedby={salePriceError ? salePriceErrorId : undefined}
         onChange={(salePrice) => onChange({ ...form, salePrice })} />
@@ -234,11 +241,17 @@ export function ProductFormFields({
       {purchasingEnabled && <label className="market-field">Alış fiyatı<MoneyInput aria-label="Alış fiyatı" disabled={disabled} value={form.purchasePrice} onChange={(purchasePrice) => onChange({ ...form, purchasePrice })} /></label>}
       <label className="market-field">Para birimi<input disabled={disabled} value={form.currency} maxLength={3} onChange={(event) => onChange({ ...form, currency: event.target.value.toUpperCase() })} /></label>
       <label className="market-field">KDV %<input disabled={disabled} type="number" min="0" step="0.01" value={form.taxRate} onChange={(event) => onChange({ ...form, taxRate: event.target.value })} /></label>
-      {inventoryEnabled && form.trackInventory && <label className="market-field">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>}
+      </ProductFieldSection>
+      {inventoryEnabled && form.trackInventory && <ProductFieldSection grouped={Boolean(renderSections)} title="Stok kuralları">
+      <label className="market-field">Minimum stok<input disabled={disabled} type="number" min="0" step="0.0001" value={form.minimumQuantity} onChange={(event) => onChange({ ...form, minimumQuantity: event.target.value })} /></label>
+      </ProductFieldSection>}
+      <ProductFieldSection grouped={Boolean(renderSections)} title="Açıklama">
       <label className="market-field market-field-wide">Açıklama<textarea disabled={disabled} value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} /></label>
-    </div>}
+      </ProductFieldSection>
+    </div>;
 
-    {showMedia && <div className="form-stack market-product-media">
+  const media = showMedia && <section aria-label="Ürün görseli" className={`form-stack market-product-media${renderSections ? " panel detail-section-card" : ""}`}>
+      {renderSections && <header className="detail-section-card__heading"><h3>Ürün görseli</h3></header>}
       <div className={`market-product-image-card${previewDataUrl ? " has-image" : ""}`}>
         {previewDataUrl ? <img src={previewDataUrl} alt={form.name ? `${form.name} ürün görseli` : "Ürün görseli"} /> : <div className="market-product-image-placeholder">
           <ImageIcon size={28} aria-hidden="true" />
@@ -279,6 +292,13 @@ export function ProductFormFields({
         <span>Veri lisansı: {form.dataLicense || "—"}{form.imageLicense ? ` · Görsel: ${form.imageLicense}` : ""}</span>
         {form.sourceFetchedAt && <small>Alınma: {new Date(form.sourceFetchedAt).toLocaleString("tr-TR")}</small>}
       </aside>}
-    </div>}
-  </div>;
+    </section>;
+
+  return renderSections ? renderSections({ status, details, media }) :
+    <div className="market-product-fields">{status}{details}{media}</div>;
+}
+
+/** Creation keeps its flat form; the canonical detail editor uses named panels. */
+function ProductFieldSection({ grouped, title, children }: { grouped: boolean; title: string; children: ReactNode }) {
+  return grouped ? <DetailSectionCard title={title}><div className="market-form-grid">{children}</div></DetailSectionCard> : <>{children}</>;
 }

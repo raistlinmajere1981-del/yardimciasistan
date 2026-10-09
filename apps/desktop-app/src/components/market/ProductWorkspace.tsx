@@ -15,6 +15,7 @@ import {
 } from "../../app/product-model";
 import type { ProductWorkspaceIntent } from "../workspace/workspace-intent";
 import { ActionButton } from "../ui/ActionButton";
+import { DetailSectionCard, DetailWorkspaceLayout } from "../workspace/DetailWorkspaceLayout";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useRequestGeneration } from "../workspace/use-request-generation";
@@ -383,7 +384,33 @@ export function ProductWorkspace({
     </WorkspaceFrame>;
   }
 
+  const stockPanel = inventoryEnabled && product.trackInventory && <DetailSectionCard title="Stok güncelleme" className="market-product-stock-update">
+    <strong>Mevcut stok: {balance?.quantity ?? "—"} {product.unit}</strong>
+    <label className="market-field">Yeni stok miktarı<input inputMode="decimal" aria-label="Yeni stok miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
+    <label className="market-field">Stok açıklaması<input value={countNote} onChange={event => setCountNote(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
+    <ActionButton variant="secondary" disabled={dirty || mutationBusy || !balance || !countedQuantity.trim()} onClick={() => void updateStock()}>Stok Güncelle / Düzelt</ActionButton>
+    <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={() => { setCountedQuantity(""); setCountNote(""); }}>Sayım taslağını temizle</ActionButton>
+    {dirty && <small>Stok güncellemeden önce ürün değişikliklerini kaydedin veya geri alın.</small>}
+    {stockMessage && <p role="status">{stockMessage}</p>}
+  </DetailSectionCard>;
+
+  const menuPanel = menuEntry && menuData && <section className="form-stack">
+    <MenuProductEntryFields form={menuForm} dashboardData={menuData} inventoryEnabled={inventoryEnabled}
+      qrMenuEnabled={qrMenuEnabled} disabled={mutationBusy} onChange={setMenuForm} />
+    <div className="action-row">
+      <ActionButton variant="secondary" disabled={!menuDirty || mutationBusy} onClick={() => { setMenuForm(menuBaseline); setMenuMessage(""); }}>Menü değişikliklerini geri al</ActionButton>
+      <ActionButton disabled={!menuDirty || mutationBusy} onClick={() => void saveMenuPresentation()}>Menü Sunumunu Kaydet</ActionButton>
+      <ActionButton variant="danger" disabled={dirty || menuDirty || mutationBusy} onClick={() => setRemoveMenuConfirm(true)}>Menüden kaldır</ActionButton>
+    </div>
+    {menuMessage && <p role="status">{menuMessage}</p>}
+    {removeMenuConfirm && <ConfirmDialog embedded tone="danger" title="Menüden kaldır"
+      description="Yalnız menü ilişkisi kaldırılır. Ortak ürün, stok ve online satış korunur." confirmLabel="Menüden kaldır"
+      busy={menuBusy} onCancel={() => setRemoveMenuConfirm(false)} onConfirm={() => void removeMenuEntry()} />}
+  </section>;
+
   return <WorkspaceFrame
+      className="product-workspace-frame detail-workspace-frame"
+      bodyScroll={history ? "body" : "panes"}
       title={product.name}
       context={[product.brand, product.sku || product.barcode].filter(Boolean).join(" · ") || "Katalog ürünü"}
       actions={inventoryEnabled && <ActionButton variant="secondary" disabled={dirty || menuDirty || stockDraftDirty || mutationBusy || resourceState !== "success"} onClick={() => {
@@ -412,18 +439,12 @@ export function ProductWorkspace({
         </div>
       </>}
     >
-      {!history ? <div className="form-stack">
-        {inventoryEnabled && product.trackInventory && <section className="market-product-stock-update" aria-label="Stok güncelleme">
-          <strong>Mevcut stok: {balance?.quantity ?? "—"} {product.unit}</strong>
-          <label className="market-field">Yeni stok miktarı<input inputMode="decimal" aria-label="Yeni stok miktarı" value={countedQuantity} onChange={event => setCountedQuantity(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
-          <label className="market-field">Stok açıklaması<input value={countNote} onChange={event => setCountNote(event.target.value)} disabled={dirty || mutationBusy || !balance} /></label>
-          <ActionButton variant="secondary" disabled={dirty || mutationBusy || !balance || !countedQuantity.trim()} onClick={() => void updateStock()}>Stok Güncelle / Düzelt</ActionButton>
-          <ActionButton variant="secondary" disabled={mutationBusy || !stockDraftDirty} onClick={() => { setCountedQuantity(""); setCountNote(""); }}>Sayım taslağını temizle</ActionButton>
-          {dirty && <small>Stok güncellemeden önce ürün değişikliklerini kaydedin veya geri alın.</small>}
-          {stockMessage && <p role="status">{stockMessage}</p>}
-        </section>}
-        {resourceState === "error" ? <div className="empty-state"><strong>Ürün kartı güvenli biçimde yüklenemedi.</strong><p>{saveMessage}</p><ActionButton variant="secondary" onClick={() => void loadProductResources()}>Tekrar Dene</ActionButton></div> :
+      {!history ? <>
+        {resourceState === "error" ? <DetailWorkspaceLayout railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={stockPanel}><div className="empty-state"><strong>Ürün kartı güvenli biçimde yüklenemedi.</strong><p>{saveMessage}</p><ActionButton variant="secondary" onClick={() => void loadProductResources()}>Tekrar Dene</ActionButton></div>{menuPanel}</DetailWorkspaceLayout> :
           <ProductFormFields
+            renderSections={({ status, details, media }) => <DetailWorkspaceLayout
+              railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={<>{stockPanel}{status}{media}</>}
+            >{details}{menuPanel}</DetailWorkspaceLayout>}
             form={form}
             categories={categories}
             inventoryEnabled={inventoryEnabled}
@@ -453,20 +474,7 @@ export function ProductWorkspace({
             onChange={setForm}
             onStateChange={onStateChange}
           />}
-        {menuEntry && menuData && <section className="form-stack">
-          <MenuProductEntryFields form={menuForm} dashboardData={menuData} inventoryEnabled={inventoryEnabled}
-            qrMenuEnabled={qrMenuEnabled} disabled={mutationBusy} onChange={setMenuForm} />
-          <div className="action-row">
-            <ActionButton variant="secondary" disabled={!menuDirty || mutationBusy} onClick={() => { setMenuForm(menuBaseline); setMenuMessage(""); }}>Menü değişikliklerini geri al</ActionButton>
-            <ActionButton disabled={!menuDirty || mutationBusy} onClick={() => void saveMenuPresentation()}>Menü Sunumunu Kaydet</ActionButton>
-            <ActionButton variant="danger" disabled={dirty || menuDirty || mutationBusy} onClick={() => setRemoveMenuConfirm(true)}>Menüden kaldır</ActionButton>
-          </div>
-          {menuMessage && <p role="status">{menuMessage}</p>}
-          {removeMenuConfirm && <ConfirmDialog embedded tone="danger" title="Menüden kaldır"
-            description="Yalnız menü ilişkisi kaldırılır. Ortak ürün, stok ve online satış korunur." confirmLabel="Menüden kaldır"
-            busy={menuBusy} onCancel={() => setRemoveMenuConfirm(false)} onConfirm={() => void removeMenuEntry()} />}
-        </section>}
-      </div> : <section className="form-stack" aria-label="Stok hareketleri">
+      </> : <section className="form-stack" aria-label="Stok hareketleri">
               <header className="market-panel-heading market-panel-heading-row"><h3>Son stok hareketleri</h3><ActionButton variant="secondary" disabled={stockBusy} onClick={() => void refreshStockHistory()}>Yenile</ActionButton></header>
               {historyError && <p role="alert">{historyError}</p>}
               <div className="market-history-list">

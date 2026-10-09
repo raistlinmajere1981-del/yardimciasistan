@@ -352,28 +352,10 @@
 .customer-workspace-frame.workspace-frame--centered {
   width: min(78rem, calc(100vw / var(--ui-scale) - var(--space-6)));
 }
-.customer-workspace-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(18rem, 0.72fr);
-  align-items: start;
-  gap: var(--space-4);
-  min-width: 0;
-}
-:is(.customer-workspace-profile, .customer-workspace-operations) {
-  min-width: 0;
-}
 .customer-workspace-profile {
   display: grid;
-  gap: var(--space-4);
-}
-.customer-workspace-operations {
-  display: grid;
-  align-content: start;
+  min-width: 0;
   gap: var(--space-3);
-}
-.customer-operation-card,
-.customer-workspace-operations > .customer-credit-panel {
-  margin: 0;
 }
 .customer-operation-card__heading {
   display: flex;
@@ -419,9 +401,24 @@
 }
 .customer-workspace-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
   width: 100%;
+}
+@container (max-width: 64rem) {
+  .customer-workspace-main {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+  .customer-workspace-main > :is(.detail-workspace-layout__rail, .detail-workspace-layout__content) {
+    flex: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+  .customer-workspace-main > .detail-workspace-layout__content { order: -1; }
+  .customer-workspace-profile .customer-birth-field { grid-column: 1 / -1; }
 }
 .customer-history-view {
   min-height: 0;
@@ -434,16 +431,6 @@
 @media (max-width: 1024px) {
   .request-meta-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .customer-workspace-main {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .customer-workspace-operations {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .customer-workspace-operations > .customer-credit-panel,
-  .customer-workspace-operations > .customer-operation-card:last-child {
-    grid-column: 1 / -1;
   }
 }
 
@@ -460,13 +447,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .customer-workspace-operations {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .customer-workspace-operations > .customer-credit-panel,
-  .customer-workspace-operations > .customer-operation-card:last-child {
-    grid-column: auto;
-  }
   .customer-workspace-footer {
     flex-direction: column;
     align-items: stretch;

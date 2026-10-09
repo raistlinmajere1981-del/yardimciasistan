@@ -148,6 +148,16 @@ try {
   let workspace = page.locator("dialog.customer-workspace-frame");
   await expect(workspace).toBeVisible();
   await expect(workspace.getByRole("heading", { name: "Ada Bayi", exact: true })).toBeVisible();
+  const profile = workspace.getByRole("region", { name: "Müşteri bilgileri", exact: true });
+  await expect(profile.getByRole("region", { name: "Temel bilgiler", exact: true }).getByLabel("Ad soyad", { exact: true })).toHaveValue("Ada Bayi");
+  await expect(profile.getByRole("region", { name: "Notlar ve adres", exact: true }).getByLabel("Adres", { exact: true })).toHaveCount(1);
+  await expect(profile.getByRole("region", { name: "Ticari bilgiler", exact: true })).toHaveCount(1);
+  const operations = workspace.getByRole("complementary", { name: "Müşteri işlemleri", exact: true });
+  await profile.getByRole("region", { name: "Kimlik kartı bilgileri", exact: true }).getByLabel("Veren makam", { exact: true }).scrollIntoViewIfNeeded();
+  await expect(operations.getByRole("region", { name: "Web bayi erişimi", exact: true })).toBeInViewport();
+  await expect(workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true })).toBeInViewport();
+  await operations.getByRole("region", { name: "Hızlı işlemler", exact: true }).scrollIntoViewIfNeeded();
+  await expect(workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true })).toBeInViewport();
   await expect(workspace.getByRole("checkbox", { name: "Ticari / bayi müşterisi", exact: true })).toBeChecked();
   await expect(workspace.getByLabel("Firma / unvan", { exact: true })).toHaveValue("Ada Gıda Ltd. Şti.");
   await expect(workspace.getByLabel("Vergi no", { exact: true })).toHaveValue("9876543210");
@@ -196,6 +206,7 @@ try {
 
   await workspace.getByLabel("Ödeme vadesi (gün)", { exact: true }).fill("45");
   await workspace.getByLabel("Ticari not", { exact: true }).fill("Vade güncellendi.");
+  await expect(workspace.getByRole("button", { name: "Geçmiş", exact: true })).toBeDisabled();
   await expect(accessPanel.getByRole("button", { name: "Web erişimini etkinleştir" })).toBeDisabled();
   await workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true }).click();
   await expect(workspace.getByLabel("Ödeme vadesi (gün)", { exact: true })).toHaveValue("45");
@@ -271,6 +282,9 @@ try {
   await expect(workspace.getByLabel("Ticari not", { exact: true })).toHaveValue("Vade güncellendi.");
 
   await page.setViewportSize({ width: 900, height: 1000 });
+  await workspace.getByLabel("Veren makam", { exact: true }).scrollIntoViewIfNeeded();
+  await expect(workspace.getByRole("button", { name: "Müşteri Kartını Kaydet", exact: true })).toBeInViewport();
+  assert.equal(await workspace.evaluate(element => element.scrollWidth <= element.clientWidth + 1), true);
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     true,

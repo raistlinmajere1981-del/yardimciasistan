@@ -7,7 +7,7 @@ import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } fr
 import { MarketProductsWorkspace } from "../../apps/desktop-app/src/components/market/MarketProductsWorkspace";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
 import "../../apps/desktop-app/src/styles/index.css";
-const control = window as typeof window & { __product: CatalogProduct; __menuData?: DesktopDashboardData; __onlineToggle?: (enabled: boolean) => void };
+const control = window as typeof window & { __product: CatalogProduct; __menuData?: DesktopDashboardData; __inventoryEnabled?: boolean; __onlineToggle?: (enabled: boolean) => void };
 function Harness() {
   const navigation = useWorkspaceNavigation();
   const [enabled, setEnabled] = useState(true);
@@ -22,7 +22,7 @@ function Harness() {
       mode: "details", returnContext: { page: "menu" } })}>Menü Ürününü Aç</button>}
     <WorkspaceHost definition={productWorkspaceDefinition} context={{
       menuData: control.__menuData, retailFieldsEnabled: !control.__menuData,
-      products, categories: [], inventoryEnabled: false, productDataEnabled: false,
+      products, categories: [], inventoryEnabled: control.__inventoryEnabled ?? false, productDataEnabled: false,
       onlineSalesEnabled: enabled, busy: false, onReload: async () => {}, onProductSaved, onStateChange: () => {}
     }} />
   </BusinessCapabilityRuntimeProvider>;
