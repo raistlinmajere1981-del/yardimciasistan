@@ -57,6 +57,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
         publishAriaLabel="Masa web yayını"
         disabled={loading || saving}
         onPublishChange={(tables) => updatePublication({ tables })}
+        actions={<ActionButton variant="secondary" size="sm" type="button" disabled={loading || saving} onClick={addTableCategory}><Plus size={15} aria-hidden="true" />Kategori Ekle</ActionButton>}
         media={
           <TableMediaPanel
             table={mediaTable ? {
@@ -109,36 +110,11 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                   >
                     <Trash2 size={15} aria-hidden="true" />
                   </ActionButton>
-                  <div className="table-category-add-slot">
-                    {index === 0 && (
-                      <ActionButton
-                        variant="secondary"
-                        size="sm"
-                        className="table-category-add"
-                        type="button"
-                        onClick={addTableCategory}
-                      >
-                        <Plus size={15} aria-hidden="true" />
-                        Kategori Ekle
-                      </ActionButton>
-                    )}
-                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="table-category-empty table-category-empty-with-action">
-              <span>Henüz masa kategorisi yok.</span>
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                type="button"
-                onClick={addTableCategory}
-              >
-                <Plus size={15} aria-hidden="true" />
-                Kategori Ekle
-              </ActionButton>
-            </div>
+            <p className="table-category-empty">Henüz masa kategorisi yok.</p>
           )}
 
           <section className="resource-management-subsection">

@@ -11,6 +11,7 @@ interface ResourceManagementWorkspaceProps {
   onPublishChange: (checked: boolean) => void;
   children: ReactNode;
   media: ReactNode;
+  actions?: ReactNode;
 }
 
 export function ResourceManagementWorkspace({
@@ -23,6 +24,7 @@ export function ResourceManagementWorkspace({
   disabled = false,
   onPublishChange,
   children,
+  actions,
   media
 }: ResourceManagementWorkspaceProps) {
   return (
@@ -38,16 +40,19 @@ export function ResourceManagementWorkspace({
               <h2>{title}</h2>
               <p>{subtitle}</p>
             </div>
-            <label className="resource-management-publication-toggle">
-              <input
-                type="checkbox"
-                aria-label={publishAriaLabel}
-                checked={publishChecked}
-                disabled={disabled}
-                onChange={(event) => onPublishChange(event.target.checked)}
-              />
-              <span>Webde yayınla</span>
-            </label>
+            <div className="resource-management-header-actions">
+              <label className="resource-management-publication-toggle">
+                <input
+                  type="checkbox"
+                  aria-label={publishAriaLabel}
+                  checked={publishChecked}
+                  disabled={disabled}
+                  onChange={(event) => onPublishChange(event.target.checked)}
+                />
+                <span>Webde yayınla</span>
+              </label>
+              {actions}
+            </div>
           </div>
 
           <div className="resource-management-main-body">

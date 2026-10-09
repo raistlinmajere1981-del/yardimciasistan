@@ -27,8 +27,27 @@ try {
     await tab("İşletme Düzeni").click();
     await expect(page.getByRole("heading", { name: "Oda Yönetimi", exact: true })).toHaveCount(rooms ? 1 : 0);
     await expect(page.getByRole("heading", { name: "Masa Yönetimi", exact: true })).toHaveCount(tables ? 1 : 0);
-    if (rooms) await expect(page.getByRole("button", { name: "Oda Ekle", exact: true })).toBeEnabled();
-    if (tables) await expect(page.getByRole("button", { name: "Kategori Ekle", exact: true })).toBeEnabled();
+    for (const [enabled, id, name, toggle] of [[rooms, 'settings-rooms', 'Oda Ekle', 'Oda web yayını'], [tables, 'settings-operations', 'Kategori Ekle', 'Masa web yayını']]) {
+      if (!enabled) continue;
+      const header = page.locator(`#${id} .resource-management-pane-header`);
+      await expect(header.getByRole('button', { name, exact: true })).toBeEnabled();
+      await expect(header.getByRole('checkbox', { name: toggle, exact: true })).toBeVisible();
+      await expect(page.locator(`#${id} .resource-management-content`).getByRole('button', { name, exact: true })).toHaveCount(0);
+      const assertActionsInOneRow = async () => {
+        await expect.poll(() => header.evaluate(el => {
+          const label = el.querySelector('.resource-management-publication-toggle').getBoundingClientRect();
+          const button = el.querySelector('.resource-management-header-actions button').getBoundingClientRect();
+          return button.left >= label.right && Math.abs((label.top + label.bottom) / 2 - (button.top + button.bottom) / 2) < 1;
+        })).toBe(true);
+      };
+      await assertActionsInOneRow();
+      const viewport = page.viewportSize();
+      await page.setViewportSize({ width: 480, height: 900 });
+      await expect(header.getByRole('button', { name, exact: true })).toBeEnabled();
+      await expect.poll(() => header.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      await assertActionsInOneRow();
+      await page.setViewportSize(viewport);
+    }
   };
   // A clean first run cannot edit layout before setup exists. The first save must
   // activate the correct resource surface without navigating away or reopening.

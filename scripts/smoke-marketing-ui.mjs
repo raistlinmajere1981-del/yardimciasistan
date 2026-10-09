@@ -13,6 +13,12 @@ try {
   await expect(page.getByRole('button',{name:'Yeni paylaşım',exact:true})).toBeEnabled();
   mkdirSync('artifacts/marketing',{recursive:true});await page.screenshot({path:'artifacts/marketing/workspace-empty.png'});
   await page.getByRole('button',{name:'Yeni paylaşım',exact:true}).click();await page.getByLabel('Başlık',{exact:true}).fill('Yeni ürün duyurusu');await page.getByLabel('Paylaşım metni',{exact:true}).fill('Ürün duyurusu amacı');
+  const share = page.getByRole('dialog', {name: 'Yeni paylaşım oluştur', exact: true});
+  for (const name of ['Paylaşım içeriği', 'Kanallar ve hedef kitle', 'Yayın planı']) await expect(share.getByRole('region', {name, exact: true})).toBeVisible();
+  await page.setViewportSize({width: 390, height: 844});
+  await expect(share.getByRole('button', {name: 'Taslak kaydet', exact: true})).toBeInViewport();
+  assert.equal(await share.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+  await page.setViewportSize({width: 1366, height: 768});
   await expect(page.getByLabel('Yayın tarihi',{exact:true})).toBeVisible();await expect(page.getByLabel('Yayın tarihi',{exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();await expect(page.getByRole('alertdialog')).toBeVisible();await page.getByRole('button',{name:'Düzenlemeye dön',exact:true}).click();await expect(page.getByLabel('Başlık',{exact:true})).toHaveValue('Yeni ürün duyurusu');
   await page.getByRole('button',{name:'Fixture sayfa değiştir',exact:true}).evaluate(button=>button.click());await expect(page.getByRole('alertdialog')).toBeVisible();await page.getByRole('button',{name:'Düzenlemeye dön',exact:true}).click();await expect(page.getByLabel('Başlık',{exact:true})).toHaveValue('Yeni ürün duyurusu');
@@ -28,7 +34,7 @@ try {
   await page.getByRole('button',{name:'Önizle',exact:true}).click();await expect(page.getByLabel('Kanal önizlemesi')).toContainText('Web için özel duyuru');assert.equal(f.db.listMarketingPublications().length,0,'preview has no publication effect');await page.getByRole('button',{name:'Paylaşıma dön',exact:true}).click();
   await page.screenshot({path:'artifacts/marketing/new-share.png'});
   await page.setViewportSize({width:640,height:900});await expect(page.getByRole('button',{name:'Yayınla',exact:true})).toBeInViewport();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'artifacts/marketing/new-share-narrow.png'});
-  await page.evaluate(async()=>{const {applyUiPreferences}=await import('/src/ui-preferences.ts');applyUiPreferences({version:2,scheme:'dark',density:'compact',scale:1.2,accent:'blue',font:'system',motion:'reduced'});});await expect(page.getByRole('button',{name:'Yayınla',exact:true})).toBeInViewport();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'artifacts/marketing/new-share-dark.png'});
+  await page.evaluate(async()=>{const {applyUiPreferences}=await import('/src/ui-preferences.ts');applyUiPreferences({version:2,scheme:'dark',density:'compact',scale:1.2,accent:'blue',font:'system',motion:'reduced'});});await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));await expect(page.getByRole('button',{name:'Yayınla',exact:true})).toBeInViewport();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'artifacts/marketing/new-share-dark.png'});
   await page.evaluate(async()=>{const {applyUiPreferences}=await import('/src/ui-preferences.ts');applyUiPreferences({version:2,scheme:'light',density:'comfortable',scale:1,accent:'coral',font:'plex',motion:'system'});});await page.setViewportSize({width:1440,height:1000});
   await page.getByRole('button',{name:'Yayınla',exact:true}).click();await expect(page.getByRole('region',{name:'Paylaşım sonucu',exact:true})).toContainText('Yayın onayı bekleniyor');let pub=f.db.listMarketingPublications()[0];assert.equal(pub.status,'publishing');assert.equal(pub.text,'Web için özel duyuru');
   await page.getByRole('button',{name:'Sonucu yeniden kontrol et',exact:true}).click();assert.equal(f.db.listMarketingPublications().length,1);await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();

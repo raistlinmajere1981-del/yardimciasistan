@@ -41,3 +41,8 @@ apps/desktop-app/resources/android/*
 
 # Local admin/deploy credential backend (never commit secrets)
 config/credentials.local.json
+.superdesign
+
+# Local assistant files and accidental CLI output
+/.claude/
+/--title

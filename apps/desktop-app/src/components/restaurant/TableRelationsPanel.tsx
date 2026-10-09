@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarPlus, UserPlus } from "lucide-react";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { RecordPicker } from "../ui/RecordPicker";
 import { SearchSelect } from "../ui/SearchSelect";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import type { useTableOrderController } from "./use-table-order-controller";
@@ -104,7 +105,7 @@ export function TableRelationsPanel({
         <span>Müşteri</span>
         {table.currentCustomerId && <ActionButton variant="ghost" size="sm" disabled={disabled} onClick={() => void assignCustomer("")}>Bağı kaldır</ActionButton>}
       </div>
-      <SearchSelect
+      <RecordPicker withinWorkspace pickerType="customer" alphabetical
         ariaLabel="Müşteri seç"
         value={selectedCustomerId}
         disabled={disabled}

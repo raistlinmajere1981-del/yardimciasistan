@@ -166,6 +166,8 @@ try {
   await detailPage.goto(`http://127.0.0.1:${server.httpServer.address().port}/online-catalog-ui-smoke`);
   await detailPage.getByRole("button", { name: "Ürünü Aç", exact: true }).click();
   const detail = detailPage.locator("dialog.product-workspace-frame");
+  await expect(detail.locator('.product-workspace-actions').getByRole('button', { name: 'Ürünü Kaydet', exact: true })).toBeInViewport();
+  await expect(detail.locator('.product-workspace-actions').getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeVisible();
   const fields = detail.getByRole("region", { name: "Ürün detayları", exact: true });
   const rail = detail.getByRole("complementary", { name: "Ürün işlemleri", exact: true });
   for (const title of ["Ürün bilgileri", "Sınıflandırma", "Fiyatlandırma", "Stok kuralları", "Açıklama"]) {

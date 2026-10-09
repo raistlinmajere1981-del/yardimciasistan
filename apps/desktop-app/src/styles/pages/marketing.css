@@ -5,7 +5,7 @@
 .marketing-selected-media { display: flex; flex-direction: column; padding: 0; gap: var(--space-2); list-style: none; }
 .marketing-selected-media li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .marketing-selected-media img { width: 6rem; height: 4rem; object-fit: contain; }
-.marketing-schedule-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-3); }
+.marketing-schedule-fields { min-width: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-3); }
 
 .marketing-analytics { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .marketing-analytics-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
@@ -71,6 +71,8 @@
 .marketing-share-workspace .workspace-frame__footer { gap: var(--space-2); }
 .marketing-workspace-message { min-height: var(--space-3); margin: 0 0 var(--space-2); color: var(--color-text-muted); }
 .marketing-share-form { gap: var(--space-3); }
+.marketing-share-section { margin: 0; padding: var(--space-3); min-width: 0; }
+.marketing-share-section h3 { margin: 0; font-size: var(--text-md); }
 .marketing-share-form fieldset { padding: 0; border: 0; margin: 0; min-width: 0; }
 .marketing-share-form legend { font-weight: var(--weight-semibold); font-size: var(--text-sm); margin-bottom: var(--space-2); }
 .marketing-image-summary { display: flex; align-items: center; gap: var(--space-3); }
@@ -112,3 +114,9 @@
 
 .marketing-counts { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 .marketing-counts dd { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-semibold); }
+
+@media (max-width: 650px) {
+  .marketing-share-form .marketing-schedule-fields { grid-template-columns: minmax(0, 1fr); }
+  .marketing-share-form .marketing-image-summary { flex-wrap: wrap; }
+  .marketing-share-workspace > .workspace-frame__footer > .marketing-actions { width: 100%; justify-content: flex-end; }
+}

@@ -1,11 +1,13 @@
 import { Check, ChevronRight, LayoutGrid, List, Minus, Plus, Search, X } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { pickerScreenClass, readRecordPickerPreference, saveRecordPickerPreference, type RecordPickerPreference, type RecordPickerType } from "../../ui-preferences";
+import { WorkspaceSubflowOverlay } from "../workspace/WorkspaceSubflowOverlay";
 import { ModalSurface, useInsideModalSurface } from "./ModalSurface";
 import { SearchSelect, type SearchSelectOption } from "./SearchSelect";
 
 interface RecordPickerProps {
+  withinWorkspace?: boolean;
   value: string;
   options: SearchSelectOption[];
   onChange: (value: string) => void;
@@ -25,14 +27,14 @@ const LETTER_GROUPS = ["ABC", "ÇDE", "FGH", "IİJ", "KLM", "NOÖ", "PRS", "ŞTU
 const PAGE_SIZE = 60;
 const MIN_CARD_WIDTH = 155;
 
-/** High-volume selection on a page. Existing modal consumers retain their non-modal picker. */
+/** Pages use a modal; opted-in workspaces reuse the same picker in their subflow overlay. */
 export function RecordPicker(props: RecordPickerProps) {
   const insideModal = useInsideModalSurface();
-  if (insideModal) return <SearchSelect {...props} />;
+  if (insideModal && !props.withinWorkspace) return <SearchSelect {...props} />;
   return <PageRecordPicker {...props} />;
 }
 
-function PageRecordPicker({ value, options, onChange, ariaLabel, pickerType, alphabetical = false,
+function PageRecordPicker({ withinWorkspace = false, value, options, onChange, ariaLabel, pickerType, alphabetical = false,
   placeholder = "Seçin", searchPlaceholder = "Ara", emptyMessage = "Eşleşen kayıt yok.", disabled = false, clearable = true, loadOptions, resultLimit }: RecordPickerProps) {
   const id = useId(), titleId = `${id}-title`, listId = `${id}-options`;
   const trigger = useRef<HTMLButtonElement>(null), field = useRef<HTMLInputElement>(null), results = useRef<HTMLDivElement>(null);
@@ -123,12 +125,12 @@ function PageRecordPicker({ value, options, onChange, ariaLabel, pickerType, alp
       onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); show(); } }}>
       <span className={selected ? undefined : "is-placeholder"}>{selected?.label ?? placeholder}</span><Search size={17} aria-hidden="true" />
     </button>
-    {open && createPortal(<ModalSurface labelledBy={titleId} className="record-picker" onClose={() => setOpen(false)} dismissOnBackdrop initialFocusRef={field} returnFocusRef={trigger}>
+    {open && createPortal(<PickerSurface withinWorkspace={withinWorkspace} title={`${ariaLabel} seçici`} titleId={titleId} onClose={() => setOpen(false)} field={field} trigger={trigger}>
       <div id={`${id}-picker`} className="record-picker__surface">
-        <header className="record-picker__header"><div><h2 id={titleId}>{ariaLabel} seçici</h2><small>{options.length.toLocaleString("tr-TR")} kayıt</small></div>
-          <button type="button" aria-label="Kapat" onClick={() => setOpen(false)}><X size={19} aria-hidden="true" /></button></header>
+        {!withinWorkspace && <header className="record-picker__header"><div><h2 id={titleId}>{ariaLabel} seçici</h2><small>{options.length.toLocaleString("tr-TR")} kayıt</small></div>
+          <button type="button" aria-label="Kapat" onClick={() => setOpen(false)}><X size={19} aria-hidden="true" /></button></header>}
         <div className="record-picker__search"><Search size={19} aria-hidden="true" />
-          <input ref={field} role="combobox" aria-label={`${ariaLabel} ara`} aria-expanded="true" aria-autocomplete="list" aria-controls={listId}
+          <input ref={field} data-modal-initial-focus role="combobox" aria-label={`${ariaLabel} ara`} aria-expanded="true" aria-autocomplete="list" aria-controls={listId}
             aria-activedescendant={active ? optionId(active) : undefined} placeholder={searchPlaceholder} value={query}
             onChange={event => { setQuery(event.target.value); resetResults(); }} onKeyDown={navigate} />
           {query && <button type="button" aria-label="Aramayı temizle" onClick={() => { setQuery(""); resetResults(); field.current?.focus(); }}><X size={17} aria-hidden="true" /></button>}
@@ -169,6 +171,16 @@ function PageRecordPicker({ value, options, onChange, ariaLabel, pickerType, alp
         <footer className="record-picker__footer">{clearable && value ? <button type="button" onClick={() => choose("")}>Seçimi temizle</button> : <span />}
           <button type="button" onClick={() => setOpen(false)}>Vazgeç</button></footer>
       </div>
-    </ModalSurface>, document.body)}
+    </PickerSurface>, withinWorkspace ? trigger.current?.closest(".workspace-frame, .workspace-page-frame") ?? document.body : document.body)}
   </div>;
+}
+
+function PickerSurface({ withinWorkspace, title, titleId, onClose, field, trigger, children }: {
+  withinWorkspace: boolean; title: string; titleId: string; onClose: () => void;
+  field: RefObject<HTMLInputElement | null>; trigger: RefObject<HTMLButtonElement | null>; children: ReactNode;
+}) {
+  useLayoutEffect(() => { if (withinWorkspace) field.current?.focus(); }, [withinWorkspace, field]);
+  return withinWorkspace
+    ? <WorkspaceSubflowOverlay title={title} onClose={onClose} className="record-picker record-picker--workspace">{children}</WorkspaceSubflowOverlay>
+    : <ModalSurface labelledBy={titleId} className="record-picker" onClose={onClose} dismissOnBackdrop initialFocusRef={field} returnFocusRef={trigger}>{children}</ModalSurface>;
 }

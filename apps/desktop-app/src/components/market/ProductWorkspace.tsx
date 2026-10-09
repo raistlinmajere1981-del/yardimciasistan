@@ -423,7 +423,7 @@ export function ProductWorkspace({
       closeBlocked={closeBlocked}
       returnFocusRef={navigation.returnFocusRef}
       dismissOnBackdrop
-      footer={!history && <>
+      footer={!history && <div className="panel product-workspace-actions" data-surface-role="configuration">
         <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
         <div className="action-row">
           <ActionButton variant="secondary" type="button" disabled={mutationBusy || !dirty} onClick={() => {
@@ -437,7 +437,7 @@ export function ProductWorkspace({
             <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
           </ActionButton>
         </div>
-      </>}
+      </div>}
     >
       {!history ? <>
         {resourceState === "error" ? <DetailWorkspaceLayout railLabel="Ürün işlemleri" contentLabel="Ürün detayları" rail={stockPanel}><div className="empty-state"><strong>Ürün kartı güvenli biçimde yüklenemedi.</strong><p>{saveMessage}</p><ActionButton variant="secondary" onClick={() => void loadProductResources()}>Tekrar Dene</ActionButton></div>{menuPanel}</DetailWorkspaceLayout> :

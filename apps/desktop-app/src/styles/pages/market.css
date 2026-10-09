@@ -1612,3 +1612,7 @@ button.market-list-row {
     justify-content: start;
   }
 }
+
+.product-workspace-frame > .workspace-frame__footer { padding: var(--space-3); border-top: 0; }
+.product-workspace-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; min-width: 0; margin: 0; padding: var(--space-3); }
+.product-workspace-actions .form-status { margin: 0; overflow-wrap: anywhere; }

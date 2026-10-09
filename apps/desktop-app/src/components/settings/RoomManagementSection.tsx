@@ -68,6 +68,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
         publishAriaLabel="Oda web yayını"
         disabled={loading || saving}
         onPublishChange={(rooms) => updatePublication({ rooms })}
+        actions={<ActionButton variant="secondary" size="sm" type="button" disabled={loading || saving} onClick={addRoom}><Plus size={15} aria-hidden="true" />Oda Ekle</ActionButton>}
         media={
           <RoomMediaPanel
             room={mediaRoom ? {
@@ -84,18 +85,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
         }
       >
         <fieldset disabled={saving || loading} className="settings-resource-fields">
-          <div className="resource-management-content-actions">
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              type="button"
-              disabled={loading || saving}
-              onClick={addRoom}
-            >
-              <Plus size={15} aria-hidden="true" />
-              Oda Ekle
-            </ActionButton>
-          </div>
+
 
           <div className="room-management-list" aria-label="Oda özetleri">
             {loading ? (

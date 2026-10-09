@@ -156,11 +156,16 @@ try {
   await otherStayPanel.getByRole('button', { name: /boş misafir slotu/ }).first().click();
   await otherStayPanel.getByLabel('Misafir ekle', { exact: true }).click();
   const customerPicker = page.getByRole('dialog', { name: 'Misafir ekle seçici', exact: true });
+  await expect(customerPicker.getByRole('combobox')).toBeFocused();
+  await expect(customerPicker.getByRole('button', { name: 'Grid görünümü', exact: true })).toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
   const activeOption = customerPicker.getByRole('option', { name: /Aktif konaklaması var/ });
   await expect(activeOption).toBeVisible();
   await expect(activeOption).toBeDisabled();
   await expect(activeOption).toContainText('Kompakt Misafir 1');
   await page.keyboard.press('Escape');
+  await expect(otherStayPanel.getByLabel('Misafir ekle', { exact: true })).toBeFocused();
+  await expect(workspace).toBeVisible();
   await button('Çalışma alanını kapat').click();
   await page.evaluate(() => {
     const current = window.fixtureState();

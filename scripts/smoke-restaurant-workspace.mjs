@@ -65,6 +65,18 @@ try {
   const customerCalls = () => page.evaluate(() => window.fixtureCalls.filter(call => call.kind === 'customer'));
   expect(await customerCalls()).toEqual([]);
   await expect(customerSelect).toBeVisible();
+  await customerSelect.click();
+  const relationPicker = workspace.getByRole('dialog', { name: 'Müşteri seç seçici', exact: true });
+  await expect(relationPicker.getByRole('combobox')).toBeFocused();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await relationPicker.getByRole('button', { name: 'Grid görünümü', exact: true }).click();
+  await relationPicker.getByRole('combobox').fill('İkinci');
+  await expect(relationPicker.getByRole('option')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(relationPicker).toHaveCount(0);
+  await expect(customerSelect).toBeFocused();
+  await expect(workspace).toBeVisible();
+  expect(await customerCalls()).toEqual([]);
   await page.evaluate(() => { window.fixtureDelayCustomer = true; });
   await chooseSearchSelect(customerPanel, 'Müşteri seç', /^Pilot Misafir(?:\s|$)/);
   await expect.poll(async () => (await customerCalls()).length).toBe(1);

@@ -206,14 +206,14 @@ read-projection sözleşmesi gerektirir.
 
 `FormDialog` veya modal `WorkspaceFrame` içinde `RecordPicker` mevcut
 `useInsideModalSurface()` sınırını okuyup non-modal `SearchSelect` kullanır.
-Bu yerlerde yeni `showModal` çağrısı yoktur; yüksek hacimli modal-içi seçim modu
-henüz taşınmamıştır. Kanonik alt akış yüzeyi hazır olana kadar bu girişler açıkça
-ertelenmiştir. Onaylı tasarım laboratuvarındaki import transformları runtime'a
-taşınmaz.
+Pansiyon `StayGuestPicker` ve Table workspace müşteri ilişkisi, `withinWorkspace` ile
+aynı RecordPicker arama/liste/grid gövdesini `WorkspaceSubflowOverlay` içinde açar.
+Yeni native dialog oluşturmaz; Escape yalnız seçimi kapatır ve odağı tetikleyiciye döndürür.
+Diğer modal-içi girişler fallback kullanmaya devam eder. Onaylı tasarım
+laboratuvarındaki import transformları runtime'a taşınmaz.
 
-Modal çalışma alanlarındaki `StayGuestPicker`, rezervasyon editörlerindeki müşteri
-alanları, Table workspace müşteri ilişkisi ve Stock Image Import ürün eşleştirmesi
-bu kapsamda `SearchSelect` olarak bırakılmıştır. Bu canonical alt akışlar için
+Rezervasyon editörlerindeki müşteri alanları ve Stock Image Import ürün
+eşleştirmesi bu kapsamda `SearchSelect` olarak bırakılmıştır. Bu canonical alt akışlar için
 modal-içi seçim modu ayrıca ele alınmalıdır; ürün kategori/enum seçicileri de
 mevcut küçük-enum primitive'ini kullanır.
 

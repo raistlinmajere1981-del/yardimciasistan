@@ -6,6 +6,7 @@ import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { ActionButton } from "../ui/ActionButton";
 import { DatePicker, TimePicker } from "../ui/DateTimePicker";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { Panel } from "../ui/Panel";
 import { StatusBadge } from "../ui/StatusBadge";
 import { MarketingTextAssistant } from "./MarketingTextAssistant";
 import { MarketingImages } from "./MarketingImages";
@@ -93,8 +94,10 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
       <ActionButton disabled={busy || (!submitted && (!draft.content.title.trim() || !draft.options.channels.length)) || Boolean(pub && !pub.desiredPublished && dirty)} onClick={() => void (pub?.desiredPublished ? saveDraft() : submit())}><Send size={16}/>{readOnly ? "Sonucu yeniden kontrol et" : primary}</ActionButton>
     </div></>}
     overlay={pending && <ConfirmDialog withinModal tone="warning" title="Değişiklikler kaydedilmedi" description="Paylaşımı kaydetmeden çıkmak istiyor musunuz?" confirmLabel="Değişiklikleri bırak" cancelLabel="Düzenlemeye dön" onCancel={() => setPending(null)} onConfirm={() => {const next = pending; setPending(null); next();}}/>}>
-    <p className="marketing-workspace-message" role="status">{message}</p>
+    {message && <p className="marketing-workspace-message" role="status">{message}</p>}
     {step === "content" && <section className="form-stack marketing-share-form" aria-label="Paylaşım formu">
+      <Panel as="section" surfaceRole="communication" className="form-stack marketing-share-section" aria-label="Paylaşım içeriği">
+      <h3>Paylaşım içeriği</h3>
       <label className="form-field form-field--fluid"><span>Başlık *</span><input aria-label="Başlık" required value={draft.content.title} maxLength={240} disabled={locked} onChange={e => change({...draft, content: {...draft.content, title: e.target.value}})}/></label>
       <label className="form-field form-field--fluid"><span>Paylaşım metni *</span><textarea aria-label="Paylaşım metni" value={draft.content.masterText} rows={4} maxLength={12000} disabled={locked} onChange={e => change({...draft, content: {...draft.content, masterText: e.target.value}})}/><small>{draft.content.masterText.length}/12000 karakter</small></label>
       <div className="marketing-actions"><ActionButton variant="secondary" disabled={locked} onClick={() => {setAiChannel(undefined); setStep("ai");}}><Sparkles size={16}/>AI ile metin oluştur / yeniden yaz</ActionButton></div>
@@ -102,16 +105,22 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
         <div className="marketing-image-cover">{snapshot.assets.find(a => a.id === draft.content.mediaAssetIds[0]) ? <img src={snapshot.assets.find(a => a.id === draft.content.mediaAssetIds[0])!.previewUrl} alt="Paylaşım kapak görseli"/> : <Image size={30} aria-hidden="true"/>}</div>
         <div><strong>Görsel</strong><div className="marketing-actions"><ActionButton variant="secondary" disabled={locked} onClick={() => {setGenerateImage(false); setStep("images");}}>Görsel seç / yükle</ActionButton><ActionButton variant="secondary" disabled={locked || !snapshot.aiCapabilities.includes("image_generation")} onClick={() => {setGenerateImage(true); setStep("images");}}><Sparkles size={15}/>AI ile görsel oluştur</ActionButton></div><small>{draft.content.mediaAssetIds.length} görsel · İlk görsel kapak ve Instagram görselidir.</small></div>
       </section>
+      </Panel>
+      <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Kanallar ve hedef kitle">
+      <h3>Kanallar ve hedef kitle</h3>
       <fieldset className="marketing-channel-picks" disabled={locked || Boolean(pub)}><legend>Aktif paylaşım kanalları</legend>
         {(pub ? snapshot.channels.filter(c => c.id === pub.channel) : channels).map(c => <label key={c.id}><input type="checkbox" checked={draft.options.channels.includes(c.id)} onChange={e => change({...draft, options: {...draft.options, channels: e.target.checked ? [...draft.options.channels, c.id] : draft.options.channels.filter(id => id !== c.id)}})}/>{channelNames[c.id]}</label>)}
         {!channels.length && <p>Şu anda kullanılabilir paylaşım kanalı yok. İçeriğinizi taslak olarak kaydedebilirsiniz.</p>}
       </fieldset>
       <div className="marketing-options-row"><div><strong>Hedef kitle</strong><small>{audienceChannels.length ? audienceName : "Web sitesi / Instagram için gerekmez"}</small></div><ActionButton variant="secondary" disabled={locked || Boolean(pub) || !audienceChannels.length} onClick={() => setStep("audience")}><Users size={16}/>Hedef kitle seç</ActionButton></div>
       <div className="marketing-actions"><ActionButton variant="secondary" disabled={locked || Boolean(pub) || !channels.length} onClick={() => setStep("channels")}>Kanal / gönderim ayrıntıları</ActionButton><ActionButton variant="quiet" disabled={busy} onClick={() => setStep("preview")}>Önizle</ActionButton></div>
+      </Panel>
+      <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Yayın planı">
       <fieldset className="marketing-timing" disabled={locked || Boolean(pub)}><legend>Yayın zamanı</legend><div className="marketing-actions"><label><input type="radio" name="share-timing" checked={draft.options.timing === "now"} onChange={() => change({...draft, options: {...draft.options, timing: "now"}})}/>Hemen yayınla</label><label><input type="radio" name="share-timing" checked={draft.options.timing === "scheduled"} onChange={() => change({...draft, options: {...draft.options, timing: "scheduled"}})}/>Planla</label></div>
         <div className="marketing-schedule-fields"><label className="form-field form-field--fluid">Yayın tarihi<DatePicker ariaLabel="Yayın tarihi" clearable={false} value={draft.options.startsLocal.slice(0,10)} disabled={draft.options.timing !== "scheduled"} onChange={value => change({...draft, options: {...draft.options, startsLocal: `${value}T${draft.options.startsLocal.slice(11)}`}})}/></label><label className="form-field form-field--fluid">Yayın saati<TimePicker ariaLabel="Yayın saati" clearable={false} value={draft.options.startsLocal.slice(11)} disabled={draft.options.timing !== "scheduled"} onChange={value => change({...draft, options: {...draft.options, startsLocal: `${draft.options.startsLocal.slice(0,10)}T${value}`}})}/></label></div>
         <label className="form-field form-field--fluid">Saat dilimi<input value={draft.options.timezone} disabled={draft.options.timing !== "scheduled"} onChange={e => change({...draft, options: {...draft.options, timezone: e.target.value}})}/></label><small>Planlı paylaşımlar ana Takvim’de görünür.</small>
       </fieldset>
+      </Panel>
     </section>}
     {step === "ai" && <MarketingTextAssistant text={aiChannel ? draft.content.variants.find(v => v.channel === aiChannel)?.text || draft.content.masterText : draft.content.masterText} {...(aiChannel === undefined ? {} : { channel: aiChannel })} capabilities={snapshot.aiCapabilities} onBusy={childBusy} onApply={text => {change({...draft, content: aiChannel ? {...draft.content, variants: draft.content.variants.map(v => v.channel === aiChannel ? {...v, text, metadata: {version: 1, adaptation: "ai"}} : v)} : {...draft.content, masterText: text, source: "ai"}}); setStep(aiChannel ? "channels" : "content");}}/>}
     {step === "images" && <MarketingImages assets={snapshot.assets} selected={draft.content.mediaAssetIds} onChange={mediaAssetIds => change({...draft, content: {...draft.content, mediaAssetIds}})} onReload={onReload} aiAvailable={snapshot.aiCapabilities.includes("image_generation")} generateFirst={generateImage} onBusy={childBusy}/>}

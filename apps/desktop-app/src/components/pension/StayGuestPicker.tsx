@@ -1,5 +1,5 @@
 import type { DesktopDashboardData } from "../../../electron/database";
-import { SearchSelect } from "../ui/SearchSelect";
+import { RecordPicker } from "../ui/RecordPicker";
 
 export function StayGuestPicker({ data, selectedIds, onSelect, disabled }: {
   data: DesktopDashboardData; selectedIds: string[]; onSelect: (id: string) => void; disabled: boolean;
@@ -8,7 +8,7 @@ export function StayGuestPicker({ data, selectedIds, onSelect, disabled }: {
     .flatMap(stay => (stay.guests ?? []).filter(guest => ["planned", "checked_in"].includes(guest.status)).map(guest => guest.customerId));
   return <div className="form-field">
     <span>Misafir ekle</span>
-    <SearchSelect
+    <RecordPicker withinWorkspace pickerType="customer" alphabetical clearable={false}
       ariaLabel="Misafir ekle"
       value=""
       disabled={disabled}
