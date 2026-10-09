@@ -135,6 +135,7 @@ Güncel ortak sözlük:
 - `PageWorkSurface`
 - `FeatureWorkspacePage` / `FeatureViewSelector`
 - `SearchSelect`
+- `RecordPicker` — yüksek hacimli sayfa seçimleri
 - `ActionButton`
 - `IconButton`
 - `StatusBadge`
@@ -150,6 +151,77 @@ Güncel ortak sözlük:
 - `ResourceCard`
 
 Yeni component yalnız tekrar eden gerçek bir semantic contract varsa çıkarılır.
+
+### Yüksek hacimli kayıt seçimi
+
+`RecordPicker`, Page üzerindeki ürün, tedarikçi, bayi ve müşteri seçimleri için
+ortalanmış tek `ModalSurface` kullanır. Küçük enum'lar `SearchSelect` kullanmaya
+devam eder. `MarketInventoryWorkspace` ve `MarketPurchasingWorkspace` ürünleri
+`MarketCatalogPicker` üzerinden seçer; Etiketler aynı seçiciyi stok takibi
+olmayan aktif ürünleri de dahil ederek kullanır. Siparişler yalnız mevcut uygun aktif
+bayileri verir. `CustomerPicker` kayıtlı müşteri seçiminde aynı yüzeyi kullanır; var olan bir modal içindeyse
+ikinci modal açmamak için güvenli `SearchSelect` davranışına döner. Seçim mevcut kimlik/onChange hattını kullanır; fiyat, capability,
+veresiye, stok ve mutasyon sahipliği değişmez.
+
+Liste ve Grid aynı arama/seçim state'ini korur. Grid 1–4 kolon kullanır; gerçek
+sonuç alanının genişliği en az 155px kart genişliğini koruyacak şekilde sınırlar.
+Kontroller en az 44px'tir. Görünüm ve istenen kolon sayısı mevcut
+`src/ui-preferences.ts` sahibi tarafından picker türü ve ekran sınıfı başına
+localStorage'da saklanır; depolama kapalıysa oturumda korunur. Yeni Settings
+kaynağı veya SQLite şeması yoktur. Renkler ve reduced motion ortak appearance
+sisteminden gelir; bu yüzey dekoratif hareket eklemez.
+
+Sonuçlar 60 kayıtlık sayfalarda render edilir; sonraki sayfa DOM'a eklenmez,
+öncekinin yerini alır. Combobox aktif seçeneği bildirir; oklar Grid'de kolon
+adımıyla ve sayfa sınırları boyunca gezer. Home/End ilk/son sonuca gider, Enter
+seçer, Escape kapatır ve `ModalSurface` odağı tetikleyiciye geri verir. Tab ortak
+modal focus sınırını kullanır. Türkçe gruplar tam olarak
+`ABC ÇDE FGH IİJ KLM NOÖ PRS ŞTU ÜVY Z` şeklindedir; Ğ chip'i yoktur.
+Metin/telefon araması seçili chip'ten bağımsız tüm sunulan kayıtlara bakar;
+Tümü aramayı ve chip'i sıfırlar.
+
+Ürün görselleri mevcut `MarketProductThumbnail` ve
+`commerce.getProductImageDataUrl(product.id)` sahibinden gelir. Asset path veya
+uzak kaynak URL'si img src'ye bağlanmaz. Bu panel `object-fit: contain` kullanır;
+eksik veya kırık görsel alanı boş kalır. Yalnız görünür sayfanın thumbnail'ları
+mount edilir.
+
+Mevcut katalog/tedarikçi read API'leri çağrı başına en fazla 500 kayıt verir.
+Sayfa projeksiyonu bu sınırı korur; seçicinin debounce ve eski yanıt korumalı
+araması aynı canonical API'yi kullanarak ilk 500 dışındaki ürün/tedarikçileri de
+bulur. Geniş sonuçlar ilk 500'de sınırlıdır ve aramayı daraltma bilgisi gösterilir;
+bu API'de offset/total olmadığı için tüm kataloğun sıralı sayfalanması iddia
+edilmez. Projeksiyon dışından seçilen ürün, seçicinin/sayımın mevcut yaşamı boyunca
+korunur; yeni domain cache veya ikinci writer oluşturulmaz.
+Etiketlerde aramadan seçilen ürün, mevcut katalog controller'ının `upsertProduct`
+projection hattına verilir; page view store yalnız mevcut ürün kimliğini korur,
+entity snapshot saklamaz.
+
+Müşteri/bayi verisi mevcut dashboard müşteri projeksiyonundan gelir. Bu sahibin
+500 müşteri sınırı ve katalog API'sinin mevcut SQLite metin eşleştirme davranışı
+değiştirilmemiştir. Component 10.000+ sunulan kaydı sınırlı DOM ile destekler;
+bu, canlı dashboard'ın tüm müşteri verisini sağladığı anlamına gelmez. Tüm
+müşterileri backend'de aramak veya katalogda sınırsız sıralı gezinmek ayrı bir
+read-projection sözleşmesi gerektirir.
+
+`FormDialog` veya modal `WorkspaceFrame` içinde `RecordPicker` mevcut
+`useInsideModalSurface()` sınırını okuyup non-modal `SearchSelect` kullanır.
+Bu yerlerde yeni `showModal` çağrısı yoktur; yüksek hacimli modal-içi seçim modu
+henüz taşınmamıştır. Kanonik alt akış yüzeyi hazır olana kadar bu girişler açıkça
+ertelenmiştir. Onaylı tasarım laboratuvarındaki import transformları runtime'a
+taşınmaz.
+
+Modal çalışma alanlarındaki `StayGuestPicker`, rezervasyon editörlerindeki müşteri
+alanları, Table workspace müşteri ilişkisi ve Stock Image Import ürün eşleştirmesi
+bu kapsamda `SearchSelect` olarak bırakılmıştır. Bu canonical alt akışlar için
+modal-içi seçim modu ayrıca ele alınmalıdır; ürün kategori/enum seçicileri de
+mevcut küçük-enum primitive'ini kullanır.
+
+`npm run verify:check -- record-picker-ui`, gerçek MarketPage/React ve geçici
+SQLite kataloğunda 10.021 ürün/821 tedarikçiyle arama ve seçim, Türkçe müşteri
+filtresi, 10.020 sunulan müşteriyle DOM sınırı, klavye, tercihler, görünüm ve
+modal-içi fallback davranışını doğrular. Şema ve seçim öncesi/sonrası domain
+kayıt sayıları ayrıca karşılaştırılır.
 
 ## Formlar ve feedback
 

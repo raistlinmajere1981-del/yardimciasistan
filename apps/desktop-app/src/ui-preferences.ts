@@ -3,6 +3,34 @@ export type UiDensity = "comfortable" | "compact";
 export type UiAccent = "coral" | "blue" | "green";
 export type UiFont = "plex" | "system";
 export type UiMotion = "system" | "full" | "reduced";
+export type RecordPickerType = "product" | "supplier" | "dealer" | "customer";
+export type PickerScreenClass = "small" | "medium" | "large";
+export interface RecordPickerPreference { view: "list" | "grid"; columns: number }
+const PICKER_VIEW_STORAGE_KEY = "yardimci-asistan.record-picker-view";
+const pickerSessionPreferences = new Map<string, RecordPickerPreference>();
+
+export function pickerScreenClass(width: number): PickerScreenClass {
+  return width < 600 ? "small" : width < 1000 ? "medium" : "large";
+}
+
+export function readRecordPickerPreference(type: RecordPickerType, screen: PickerScreenClass): RecordPickerPreference {
+  const key = `${type}:${screen}`;
+  const fallback: RecordPickerPreference = { view: "list", columns: screen === "large" ? 3 : 2 };
+  const session = pickerSessionPreferences.get(key);
+  if (session) return session;
+  try {
+    const record = JSON.parse(window.localStorage.getItem(`${PICKER_VIEW_STORAGE_KEY}:${key}`) ?? "null") as Partial<RecordPickerPreference> | null;
+    return { view: record?.view === "grid" ? "grid" : "list",
+      columns: Number.isInteger(record?.columns) && Number(record?.columns) >= 1 && Number(record?.columns) <= 4 ? Number(record?.columns) : fallback.columns };
+  } catch { return fallback; }
+}
+
+export function saveRecordPickerPreference(type: RecordPickerType, screen: PickerScreenClass, preference: RecordPickerPreference) {
+  const key = `${type}:${screen}`;
+  pickerSessionPreferences.set(key, preference);
+  try { window.localStorage.setItem(`${PICKER_VIEW_STORAGE_KEY}:${key}`, JSON.stringify(preference)); } catch { /* Keep the session preference when storage is unavailable. */ }
+}
+
 export type SaleProductViewPreset = "comfortable" | "balanced" | "dense" | "list" | "custom";
 export interface SaleProductViewPreference {
   preset: SaleProductViewPreset;

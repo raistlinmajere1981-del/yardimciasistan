@@ -57,5 +57,5 @@ export function MarketProductThumbnail({ product, className }: MarketProductThum
   }, [product]);
 
   if (!src) return null;
-  return <img className={className} src={src} alt="" aria-hidden="true" />;
+  return <img className={className} src={src} alt="" aria-hidden="true" loading="lazy" decoding="async" onError={() => setSrc("")} />;
 }

@@ -1,4 +1,4 @@
-import { SearchSelect } from "../ui/SearchSelect";
+import { RecordPicker } from "../ui/RecordPicker";
 import { CheckCircle2, ClipboardList, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards, XCircle } from "lucide-react";
 import { useMemo } from "react";
 import type { CatalogProduct } from "@yardimci-asistan/shared";
@@ -246,7 +246,7 @@ export function MarketOrdersWorkspace({
         <div className="market-order-customer">
           <label className="market-field">
             Aktif bayi
-            <SearchSelect ariaLabel="Sipariş müşterisi" value={customerId} onChange={changeCustomer} disabled={disabled || Boolean(resolvingProductId)} placeholder="Bayi seçin" options={activeDealers.map(customer => ({ id: customer.id, label: customer.commercialProfile?.companyName || customer.fullName, description: `${customer.fullName} · ${priceGroupLabel(customer.commercialProfile?.priceGroup ?? "retail")}`, keywords: customer.phone }))} />
+            <RecordPicker pickerType="dealer" alphabetical searchPlaceholder="Firma, ad veya telefon" ariaLabel="Sipariş müşterisi" value={customerId} onChange={changeCustomer} disabled={disabled || Boolean(resolvingProductId)} placeholder="Bayi seçin" options={activeDealers.map(customer => ({ id: customer.id, label: customer.commercialProfile?.companyName || customer.fullName, description: `${customer.fullName} · ${priceGroupLabel(customer.commercialProfile?.priceGroup ?? "retail")}`, keywords: customer.phone }))} />
           </label>
           {selectedCustomer && (
             <div className="market-order-customer-summary">

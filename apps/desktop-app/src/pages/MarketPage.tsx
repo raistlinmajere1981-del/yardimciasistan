@@ -190,6 +190,7 @@ export function MarketPage({
           products={products}
           categories={categories}
           busy={dataState === "loading"}
+          onProductSelected={upsertProduct}
           onStateChange={handleStateChange}
         />
       )}

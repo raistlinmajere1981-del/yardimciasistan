@@ -1,6 +1,7 @@
-import { SearchSelect } from "../ui/SearchSelect";
+import { MarketCatalogPicker } from "./MarketCatalogPicker";
+import { RecordPicker } from "../ui/RecordPicker";
 import { PackagePlus, Plus, Save, Truck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BUSINESS_CAPABILITIES, parseMoneyToMajor, type CatalogProduct, type CommercePurchaseOrder, type CommerceSupplier } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
@@ -64,6 +65,11 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
   const [purchaseSupplierId, setPurchaseSupplierId] = useState("");
   const [purchaseNotes, setPurchaseNotes] = useState("");
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLineState[]>([createPurchaseLine(0)]);
+
+  const searchSuppliers = useCallback(async (query: string) => {
+    if (!bridge || !suppliersEnabled) return [];
+    return (await bridge.listSuppliers({ search: query, activeOnly: true, limit: 500 })).map(supplier => ({ id: supplier.id, label: supplier.name, description: supplier.phone, keywords: supplier.email }));
+  }, [bridge, suppliersEnabled]);
 
   async function reload() {
     if (!bridge) return;
@@ -191,11 +197,11 @@ export function MarketPurchasingWorkspace({ products, busy, onStateChange }: Mar
       {purchasingEnabled && (
         <section className="market-panel">
           <header className="market-panel-heading"><span>Alım</span><h2>Stok Girişi</h2><p>Teslim alınmış alımı tek transaction ile sipariş + stok hareketine dönüştürür.</p></header>
-          {suppliersEnabled && <label className="market-field">Tedarikçi<SearchSelect ariaLabel="Tedarikçi" value={purchaseSupplierId} placeholder="Tedarikçisiz alım" onChange={setPurchaseSupplierId} options={suppliers.filter(supplier => supplier.isActive).map(supplier => ({ id: supplier.id, label: supplier.name }))} /></label>}
+          {suppliersEnabled && <label className="market-field">Tedarikçi<RecordPicker loadOptions={searchSuppliers} resultLimit={500} disabled={busy} pickerType="supplier" searchPlaceholder="Firma, telefon veya e-posta" ariaLabel="Tedarikçi" value={purchaseSupplierId} placeholder="Tedarikçisiz alım" onChange={setPurchaseSupplierId} options={suppliers.filter(supplier => supplier.isActive).map(supplier => ({ id: supplier.id, label: supplier.name, description: supplier.phone, keywords: supplier.email }))} /></label>}
           <div className="market-purchase-lines">
             {purchaseLines.map((line, index) => (
               <div className="market-purchase-line" key={line.key}>
-                <label className="market-field">Ürün<SearchSelect ariaLabel={`${index + 1}. alım ürünü`} value={line.productId} placeholder="Ürün seçin" onChange={productId => updatePurchaseLine(line.key, { productId })} options={products.filter(product => product.trackInventory && product.isActive).map(product => ({ id: product.id, label: product.name, description: product.barcode, keywords: product.sku }))} /></label>
+                <label className="market-field">Ürün<MarketCatalogPicker ariaLabel={`${index + 1}. alım ürünü`} value={line.productId} products={products} disabled={busy} onChange={productId => updatePurchaseLine(line.key, { productId })} /></label>
                 <label className="market-field">Miktar<input type="number" min="0" step="0.0001" value={line.quantity} onChange={(event) => updatePurchaseLine(line.key, { quantity: event.target.value })} /></label>
                 <label className="market-field">Birim maliyet<MoneyInput value={line.unitCost} onChange={(unitCost) => updatePurchaseLine(line.key, { unitCost })} /></label>
                 {purchaseLines.length > 1 && <ActionButton variant="secondary" type="button" className="market-icon-button" aria-label={`${index + 1}. satırı kaldır`} onClick={() => setPurchaseLines((current) => current.filter((item) => item.key !== line.key))}>×</ActionButton>}

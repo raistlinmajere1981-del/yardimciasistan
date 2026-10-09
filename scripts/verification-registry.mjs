@@ -1,4 +1,5 @@
 const SMOKE_FILES = [
+  "scripts/smoke-record-picker-ui.mjs",
   "scripts/smoke-feature-dependencies.mjs",
   "scripts/smoke-profile-transition.mjs",
   "scripts/smoke-profile-transition-ui.mjs",
@@ -560,6 +561,7 @@ function smokeDomains(file) {
 
 function smokeDomainsForGeneralOwnership(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
+  if (name === "record-picker-ui") return ["desktop", "commerce", "customers", "platform"];
   if (name === "publication-protocol") return ["web", "android", "commerce", "marketing", "platform"];
   if (name === "sync-publication-correctness") return ["web", "android", "platform"];
 

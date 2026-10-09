@@ -1,4 +1,4 @@
-import { SearchSelect } from "../ui/SearchSelect";
+import { MarketCatalogPicker } from "./MarketCatalogPicker";
 import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { CatalogProduct, CommerceUnit, InventoryBalance, InventoryMovement } from "@yardimci-asistan/shared";
@@ -45,6 +45,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
   const bridge = window.yardimciDesktop?.commerce;
   const trackedProducts = products.filter((product) => product.trackInventory && product.isActive);
   const [productId, setProductId] = useState("");
+  const [pickedProduct, setPickedProduct] = useState<CatalogProduct | null>(null);
   const [balance, setBalance] = useState<InventoryBalance | null>(null);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [countedQuantity, setCountedQuantity] = useState("0");
@@ -104,7 +105,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
     }
   }
 
-  const selectedProduct = products.find((product) => product.id === productId) ?? null;
+  const selectedProduct = products.find((product) => product.id === productId) ?? (pickedProduct?.id === productId ? pickedProduct : null);
 
   return (
     <div className="market-two-column">
@@ -112,7 +113,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
         <header className="market-panel-heading"><span>Stok</span><h2>Fiziksel Sayım</h2><p>Mevcut fiziksel miktarı yazın; fark sistem tarafından hesaplanır.</p></header>
         <label className="market-field">
           Ürün
-          <SearchSelect ariaLabel="Ürün" value={productId} placeholder="Ürün seçin" onChange={setProductId} options={trackedProducts.map(product => ({ id: product.id, label: product.name, description: product.barcode, keywords: product.sku }))} />
+          <MarketCatalogPicker ariaLabel="Ürün" value={productId} products={products} onChange={setProductId} onProductSelected={setPickedProduct} disabled={busy} />
         </label>
         {selectedProduct && (
           <div className="market-stock-card">

@@ -1,4 +1,4 @@
-import { SearchSelect } from "../ui/SearchSelect";
+import { RecordPicker } from "../ui/RecordPicker";
 import { useId } from "react";
 import type { DesktopCustomer } from "../../../electron/database";
 import { useCustomerCreditAccount } from "../../app/use-customer-credit-account";
@@ -21,7 +21,7 @@ export function CustomerPicker({ customers, value, onChange, disabled, compact =
     <section className={compact ? "record-stack customer-credit-picker customer-credit-picker--compact" : "panel record-stack customer-credit-picker"} aria-labelledby={labelId}>
       <h3 id={labelId}>{showDebt ? "Veresiye müşterisi" : "Satış müşterisi"}</h3>
       <label className="form-field form-field--medium">Müşteri
-        <SearchSelect ariaLabel="Müşteri" value={selected?.id ?? ""} placeholder="Kayıtlı müşteri seçin" disabled={disabled} onChange={onChange}
+        <RecordPicker pickerType="customer" alphabetical ariaLabel="Müşteri" value={selected?.id ?? ""} placeholder="Kayıtlı müşteri seçin" disabled={disabled} onChange={onChange}
           searchPlaceholder="Ad veya telefon" options={customers.map(customer => ({ id: customer.id, label: customer.fullName, description: customer.phone }))}
           emptyMessage="Bu aramaya uygun müşteri yok. Yeni kayıt için Müşteriler ekranını kullanın." />
       </label>

@@ -36,6 +36,7 @@
 @import "./components/feedback.css" layer(components.support);
 @import "./components/forms.css" layer(components.primitives);
 @import "./components/pickers.css" layer(components.primitives);
+@import "./components/record-picker.css" layer(components.primitives);
 @import "./components/metrics.css" layer(components.support);
 @import "./components/panels.css" layer(components.primitives);
 @import "./components/operation-surface.css" layer(components.primitives);

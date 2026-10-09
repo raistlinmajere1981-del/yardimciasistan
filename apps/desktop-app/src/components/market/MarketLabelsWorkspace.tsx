@@ -1,5 +1,5 @@
 import { usePageViewState } from "../../app/page-view-state";
-import { SearchSelect } from "../ui/SearchSelect";
+import { MarketCatalogPicker } from "./MarketCatalogPicker";
 import { Download, FileImage, FileText, Printer, Tags } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CatalogCategory, CatalogProduct } from "@yardimci-asistan/shared";
@@ -19,6 +19,7 @@ interface MarketLabelsWorkspaceProps {
   products: CatalogProduct[];
   categories: CatalogCategory[];
   busy: boolean;
+  onProductSelected: (product: CatalogProduct) => void;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }
 
@@ -28,6 +29,7 @@ export function MarketLabelsWorkspace({
   products,
   categories,
   busy,
+  onProductSelected,
   onStateChange
 }: MarketLabelsWorkspaceProps) {
   const activeProducts = useMemo(() => products.filter((product) => product.isActive), [products]);
@@ -138,7 +140,8 @@ export function MarketLabelsWorkspace({
         <div className="market-form-grid">
           <label className="market-field market-field-wide">
             Ürün
-            <SearchSelect ariaLabel="Ürün" value={productId} disabled={disabled} clearable={false} onChange={setProductId} options={activeProducts.map(product => ({ id: product.id, label: product.name, description: product.barcode, keywords: product.sku }))} />
+            <MarketCatalogPicker ariaLabel="Ürün" value={productId} products={activeProducts} disabled={disabled} clearable={false} inventoryOnly={false}
+              onChange={setProductId} onProductSelected={selected => { if (selected) onProductSelected(selected); }} />
           </label>
           <label className="market-field">
             Etiket ölçüsü
