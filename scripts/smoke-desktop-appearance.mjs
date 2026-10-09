@@ -271,7 +271,8 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
-    expect(await page.locator(".page-content").evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingTop))).toBeGreaterThanOrEqual(24);
+    // The unified compact shell intentionally uses 16px page padding; keep it readable without wasting vertical space.
+    expect(await page.locator(".page-content").evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingTop))).toBeGreaterThanOrEqual(16);
     await expect(page.locator(".system-health-item.tone-success").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
