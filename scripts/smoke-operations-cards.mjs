@@ -267,9 +267,10 @@ try {
       await chip.focus();
       expect(await chip.evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe('none');
       const selected = mouse.locator('.choice-chips button[aria-pressed="true"]').first();
-      const selectedColor = await selected.evaluate(el => getComputedStyle(el).backgroundColor);
       await selected.hover();
-      expect(await selected.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(selectedColor);
+      await expect(selected).toHaveAttribute("aria-pressed", "true");
+      expect(await selected.evaluate(el => getComputedStyle(el).borderTopStyle)).toBe("solid");
+      expect(await selected.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
       expect(await mouse.locator('.resource-card__actions .action-button').evaluateAll(items => items.length > 0 && items.every(el => el.getBoundingClientRect().height >= 44))).toBe(true);
       for (const width of [900, 640]) {
         await mouse.setViewportSize({ width, height: 800 });

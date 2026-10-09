@@ -190,6 +190,8 @@ try {
   await panel.getByRole("option").first().click();
   await expect(page.getByText("Aktif bayi · Bayi A", { exact: true })).toBeVisible();
   await page.evaluate(() => window.__pickerView("quickSale"));
+  await expect(page.getByRole("button", { name: "Müşteri", exact: true })).toBeVisible({ timeout: 45000 });
+  await expect(page.getByRole("button", { name: "Müşteri", exact: true })).toBeEnabled({ timeout: 45000 });
   panel = await open("Müşteri");
   assert.deepEqual(await panel.getByRole("group", { name: "Harf grupları" }).locator("button").allTextContents(), ["ABC", "ÇDE", "FGH", "IİJ", "KLM", "NOÖ", "PRS", "ŞTU", "ÜVY", "Z"]);
   await panel.getByRole("button", { name: "IİJ", exact: true }).click();
