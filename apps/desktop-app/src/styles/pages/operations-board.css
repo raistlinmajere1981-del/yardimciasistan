@@ -32,7 +32,8 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-shell-edge);
+  box-shadow: var(--shadow-panel);
   border-radius: var(--radius-panel);
   background: var(--color-bg-panel);
 }
@@ -47,7 +48,8 @@
   align-items: end;
   justify-content: space-between;
   gap: var(--space-2) var(--space-3);
-  padding: var(--space-3);
+  padding: var(--panel-header-padding);
+  background: linear-gradient(105deg, var(--color-role-integration-bg), var(--color-role-operation-bg));
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -84,7 +86,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: var(--space-3);
+  padding: var(--panel-body-padding);
 }
 
 .operations-board__pane--center .operations-board__pane-body {
@@ -236,4 +238,14 @@
   .operations-board__pane--left .restaurant-reservation-list {
     overflow: visible;
   }
+}
+
+/* Board notes are previews; full record text stays in the canonical workspace. */
+.operations-board .list-row__description {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  line-clamp: 1;
+  overflow: hidden;
+  max-width: 100%;
 }

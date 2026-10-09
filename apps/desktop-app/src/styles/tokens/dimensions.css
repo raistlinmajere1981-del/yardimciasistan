@@ -1,5 +1,12 @@
 :root {
   --interaction-target-min: 44px;
+  /* Mouse choices have their own geometry; actions and fields keep full targets. */
+  --choice-height: 34px;
+  --status-height: 24px;
+  --panel-header-padding: var(--space-2) var(--space-4);
+  --panel-body-padding: var(--space-3);
+  --resource-card-padding: var(--space-3);
+  --resource-card-gap: var(--space-2);
   --control-height-sm: 32px;
   --control-height-md: 36px;
   --control-height-lg: 44px;
@@ -11,9 +18,9 @@
   --reading-max-width: 72ch;
   --sidebar-width: 208px;
   --sidebar-collapsed-width: 64px;
-  --header-height: 64px;
-  --page-padding: var(--space-6);
-  --panel-padding: var(--space-5);
+  --header-height: 60px;
+  --page-padding: var(--space-4);
+  --panel-padding: var(--space-4);
   --dialog-width-sm: 28rem;
   --dialog-width-md: 40rem;
   --dialog-width-lg: 72rem;
@@ -30,4 +37,11 @@
   --motion-normal: var(--motion-surface);
   --motion-slow: 800ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (pointer: coarse) {
+  :root { --choice-height: max(var(--interaction-target-min), var(--control-height-lg)); }
+}
+@media (max-width: 900px) {
+  :root { --header-height: 58px; }
 }

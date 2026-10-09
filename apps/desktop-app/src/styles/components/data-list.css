@@ -96,6 +96,13 @@
   border-color: var(--color-selected-border);
 }
 
+.list-row--button.is-selected,
+.interactive-surface:is(.is-selected, [aria-pressed="true"], [aria-current="true"]):hover:not(:disabled) {
+  background: var(--color-selected-soft);
+  border-color: var(--color-selected-border);
+  box-shadow: var(--shadow-selected-ring), var(--shadow-sm);
+}
+
 .list-row__main {
   flex: 1 1 var(--field-width-md);
   min-width: 0;

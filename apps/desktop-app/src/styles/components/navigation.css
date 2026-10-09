@@ -175,8 +175,19 @@
   font-weight: var(--weight-semibold);
 }
 
-:is(.segmented-control, .page-tabs) button.is-active {
-  color: var(--color-accent);
+.segmented-control button {
+  min-height: var(--choice-height);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+:is(.segmented-control, .page-tabs) button:hover:not(:disabled) {
+  color: var(--color-text);
   background: var(--color-bg-hover);
-  box-shadow: var(--shadow-sm);
+}
+
+:is(.segmented-control, .page-tabs) button.is-active {
+  color: var(--color-selected);
+  background: var(--color-selected-soft);
+  box-shadow: var(--shadow-selected-ring);
 }

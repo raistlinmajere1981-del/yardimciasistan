@@ -107,7 +107,7 @@
 }
 
 .operations-workspace .workspace-status-chips button {
-  min-height: var(--control-height-sm);
+  min-height: var(--choice-height);
   flex: 0 0 auto;
   padding: 0 var(--space-2);
   font-size: var(--text-xs);

@@ -244,8 +244,16 @@ Mevcut canonical örnekler ve seçim/görünüm hafızası sözleşmesi
 [UX consolidation](UX_CONSOLIDATION.md) belgesinde kayıtlıdır. Yeni bir görsel sistem
 oluşturulmaz; burada tanımlı primitive'ler genişletilir.
 
-Tıklanabilir kontrolün minimum hedefi `--interaction-target-min` (44px)'dir.
-Compact density padding ve yazı yoğunluğunu azaltır; etkileşim hedefini küçültmez.
+Eylem ve navigation kontrollerinin minimum hedefi `--interaction-target-min` (44px)'dir.
+Mouse ile kullanılan filtre/choice kontrolleri (`ChoiceChips`, `StatusChip`,
+`SegmentedControl`) ayrı `--choice-height` kullanır: compact 34px, comfortable 38px.
+`pointer: coarse` her iki yoğunlukta en az 44px (comfortable 48px) hedefi korur.
+Bu istisna action, field veya workspace/page tab hedeflerini küçültmez.
+Bilgilendirme `StatusBadge` için `--status-height` 24px'dir; tıklanabilir hedef değildir.
+Başlık ve panel aralıkları shared geometri tokenlarından gelir; scroll sahipliği değişmez.
+Kalıcı yardım yalnız iş kararını veya kritik kapsamı açıklıyorsa gösterilir. Başlığı tekrar
+eden kılavuz metni component'te kaldırılır; boş/hata durumları, capability açıklamaları,
+mahremiyet, KBS, WhatsApp, finans ve veri kaybı uyarıları korunur.
 Uzun koleksiyon satırlarında `DataListButton` / `DataListItem` `twoLine` kullanılır:
 başlık + metadata. Tam metin tooltip/erişilebilir isimde ve seçilen kaydın workspace'inde
 korunur. Açıklama gerekiyorsa işlem veya alanın yakınında kısa contextual yardım bırakılır.

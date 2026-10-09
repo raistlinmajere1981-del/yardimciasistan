@@ -1,8 +1,4 @@
-.status-badge,
-.status-chip,
-.password-status,
-.backup-kind,
-.backup-count {
+:is(.status-badge, .status-chip, .password-status, .backup-kind, .backup-count) {
   --status-tone: var(--color-text-muted);
   --status-soft: var(--color-bg-surface);
   --status-border: var(--color-border);
@@ -15,7 +11,7 @@
   color: var(--status-tone);
   background: var(--status-soft);
   font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   white-space: nowrap;
 }
 
@@ -64,13 +60,19 @@
   opacity: .8;
 }
 
+.status-badge {
+  min-height: var(--status-height);
+  padding-block: calc(var(--space-1) / 2);
+  line-height: var(--leading-tight);
+}
+
 /* StatusChip is interactive; StatusBadge remains descriptive only. */
 button.status-chip {
-  min-height: max(var(--interaction-target-min), var(--control-height-sm));
+  min-height: var(--choice-height);
   padding-inline: var(--space-3);
   font: inherit;
   font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   cursor: pointer;
   transition:
     color var(--motion-hover) var(--ease-standard),

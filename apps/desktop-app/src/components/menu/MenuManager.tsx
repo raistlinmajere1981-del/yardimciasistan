@@ -367,7 +367,6 @@ export function MenuManager({
               <h2>Ürünler</h2>
               <div className="page-toolbar__actions">
                 <div className="menu-product-heading-status">
-                {!selectedCategoryId && <span className="menu-sort-hint">Sıralamak için kategori seçin</span>}
                 <StatusBadge tone="info">{visibleItems.length} kayıt</StatusBadge>
               </div>
                 <ActionButton variant="primary" size="sm" onClick={startItemCreate}>

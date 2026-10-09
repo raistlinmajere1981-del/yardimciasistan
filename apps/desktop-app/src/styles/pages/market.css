@@ -1344,8 +1344,7 @@ button.market-list-row {
   gap: var(--space-1);
 }
 
-.market-sale-toolbar :is(input, select),
-.market-workspace--quickSale .choice-chips button {
+.market-sale-toolbar :is(input, select) {
   min-height: var(--interaction-target-min);
 }
 

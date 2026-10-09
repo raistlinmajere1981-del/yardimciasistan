@@ -431,7 +431,7 @@ details.table-area-group > .resource-grid { margin-top: var(--space-3); }
 }
 
 .restaurant-reservation-summary .status-badge {
-  min-height: var(--control-height-sm);
+  min-height: var(--status-height);
   padding-inline: var(--space-2);
 }
 

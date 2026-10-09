@@ -1,4 +1,9 @@
 :root {
+  --color-shell-edge: color-mix(in srgb, var(--color-border) 77%, var(--color-text-muted) 23%);
+  --color-shell-ink: color-mix(in srgb, var(--color-text) 88%, var(--color-info) 12%);
+  --color-shell-canvas: color-mix(in srgb, var(--color-bg-app) 84%, var(--color-bg-panel) 16%);
+  --shadow-panel: 0 3px 10px color-mix(in srgb, var(--color-text) 7%, transparent),
+                  0 15px 35px color-mix(in srgb, var(--color-text) 3%, transparent);
   --color-backdrop: color-mix(in srgb, var(--neutral-900) 64%, transparent);
   --color-bg-app: var(--neutral-100);
   --color-bg-surface: var(--neutral-50);

@@ -4,7 +4,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
   background: var(--color-bg-panel);
-  box-shadow: none;
+  box-shadow: var(--shadow-panel);
 }
 
 .panel-heading,
@@ -51,7 +51,7 @@
   border: 1px solid var(--panel-role-border);
   border-radius: var(--radius-panel);
   background: var(--panel-role-bg);
-  box-shadow: none;
+  box-shadow: var(--shadow-panel);
   transition:
     background-color var(--motion-surface) var(--ease-standard),
     border-color var(--motion-surface) var(--ease-standard);

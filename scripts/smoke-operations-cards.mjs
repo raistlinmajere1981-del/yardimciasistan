@@ -15,8 +15,8 @@ let browser;
 try {
   browser = await launchChromiumForSmoke(chromium);
   const errors = [];
-  async function open(kind, variant = 'all') {
-    const page = await browser.newPage({ viewport: { width: 1366, height: 768 }, hasTouch: true });
+  async function open(kind, variant = 'all', hasTouch = true) {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 }, hasTouch });
     page.setDefaultTimeout(10000);
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/cards-test', async route => {
@@ -252,6 +252,34 @@ try {
     expect(await visual.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await visual.screenshot({ animations: "disabled", path: `${screenshots}/${kind}-600-stacked.png` });
     await visual.close();
+  }
+  // Mouse choices are compact; touch and primary actions retain full targets.
+  for (const kind of ['pension', 'restaurant']) {
+    const mouse = await open(kind, 'all', false);
+    for (const scheme of ['light', 'dark']) for (const density of ['compact', 'comfortable']) {
+      await mouse.evaluate(({ scheme, density }) => {
+        document.documentElement.dataset.colorScheme = scheme;
+        document.documentElement.dataset.density = density;
+      }, { scheme, density });
+      const chip = mouse.locator('.resource-card__status .choice-chips button').first();
+      await expect(chip).toBeVisible();
+      expect(await chip.evaluate(el => el.getBoundingClientRect().height)).toBe(density === 'compact' ? 34 : 38);
+      await chip.focus();
+      expect(await chip.evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe('none');
+      const selected = mouse.locator('.choice-chips button[aria-pressed="true"]').first();
+      const selectedColor = await selected.evaluate(el => getComputedStyle(el).backgroundColor);
+      await selected.hover();
+      expect(await selected.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(selectedColor);
+      expect(await mouse.locator('.resource-card__actions .action-button').evaluateAll(items => items.length > 0 && items.every(el => el.getBoundingClientRect().height >= 44))).toBe(true);
+      for (const width of [900, 640]) {
+        await mouse.setViewportSize({ width, height: 800 });
+        expect(await mouse.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(await mouse.locator('.operations-board__pane--center .operations-board__pane-body').evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
+        await mouse.screenshot({ animations: 'disabled', path: `${screenshots}/${kind}-mouse-${width}-${scheme}-${density}.png` });
+      }
+      await mouse.setViewportSize({ width: 1366, height: 768 });
+    }
+    await mouse.close();
   }
   expect(errors).toEqual([]);
   console.log(`operations-cards-ok: priorities/forms, exact account/order identity, read-only details, deduplication, refresh/staleness, capability gates, focus/touch, appearance matrix; screenshots: ${screenshots}`);

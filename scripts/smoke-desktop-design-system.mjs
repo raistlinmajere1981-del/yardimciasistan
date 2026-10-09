@@ -297,7 +297,7 @@ try {
 
   const observations = [];
   await expect(page.getByLabel('Telefon', { exact: true })).toHaveValue('');
-  for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[600,800]]) {
+  for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[640,800],[600,800]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);
     for (const name of ['İşletme', 'İşletme Düzeni', 'Servisler', 'Uygulama']) {

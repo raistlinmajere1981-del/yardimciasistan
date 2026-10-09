@@ -171,7 +171,6 @@ export function GoogleReviewsSettingsSection({
       <div className="settings-panel-header">
         <div>
           <h2>Google Yorumları</h2>
-          <p>Web sitesinde Google puanı ve misafir yorumlarını güvenli sunucu bağlantısıyla yayınlar.</p>
         </div>
       </div>
 
@@ -185,7 +184,6 @@ export function GoogleReviewsSettingsSection({
         <label className="setting-switch-row">
           <span>
             <strong>Google yorumlarını web sitesinde göster</strong>
-            <small>Kapalıysa yorum alanları ve yorum bağlantıları web sitesinde gizli kalır.</small>
           </span>
           <input
             type="checkbox"

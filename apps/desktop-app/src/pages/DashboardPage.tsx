@@ -248,7 +248,6 @@ export function DashboardPage({
         <Panel className="dashboard-priority-panel" aria-labelledby="dashboard-priority-title">
           <div className="dashboard-section-heading page-toolbar">
             <div>
-              <p>Öncelik sırası</p>
               <h2 id="dashboard-priority-title">Şimdi yapılacaklar</h2>
             </div>
             {requestsEnabled && (
@@ -277,7 +276,6 @@ export function DashboardPage({
             <Panel className="dashboard-operational-attention-panel" padding="compact">
               <div className="dashboard-section-heading page-toolbar compact">
                 <div>
-                  <p>Dikkat gerektirenler</p>
                   <h2>Anlık durum</h2>
                 </div>
                 <AlertTriangle size={19} aria-hidden="true" />
@@ -301,7 +299,6 @@ export function DashboardPage({
           {capacityVisible && <Panel className="dashboard-capacity-panel" padding="compact">
             <div className="dashboard-section-heading page-toolbar compact">
               <div>
-                <p>{hasCapacityMetrics ? "Anlık durum" : "AI Yardımcı"}</p>
                 <h2>{hasCapacityMetrics ? "İşletme kapasitesi" : "Günlük değerlendirme"}</h2>
               </div>
             </div>
