@@ -136,6 +136,9 @@ function supportConfig(repoRoot: string) {
 
   if (!HOST_PATTERN.test(host)) throw new Error("Destek SSH hedefi geçersiz.");
   if (!REMOTE_PATH_PATTERN.test(remoteRoot)) throw new Error("Destek storage yolu geçersiz.");
+  if (remoteRoot.split("/").some((segment) => segment === "." || segment === "..")) {
+    throw new Error("Destek storage yolu güvenli değil.");
+  }
 
   let identityFile = "";
   const credentialRef = textValue(support?.credentialRef);
@@ -408,4 +411,16 @@ export async function updateSupportReportStatus(
   }
 
   return normalizeMeta(meta);
+}
+
+export async function deleteSupportReport(repoRoot: string, reportId: string): Promise<void> {
+  assertReportId(reportId);
+  const config = supportConfig(repoRoot);
+  await readRemoteMeta(repoRoot, reportId);
+
+  const remoteDir = `${config.remoteRoot}/${reportId}`;
+  await sshCapture(repoRoot, `rm -rf -- ${remoteDir} && test ! -e ${remoteDir}`);
+
+  const localCache = join(tmpdir(), "yardimci-asistan-admin", "support", reportId);
+  rmSync(localCache, { recursive: true, force: true });
 }

@@ -185,8 +185,8 @@ async function getLiveWebVersion(
       check: {
         id: "version",
         label: "Canlı web sürümü",
-        status: "unconfigured",
-        detail: "Bu kurulum tipi için sürüm endpoint'i tanımlı değil.",
+        status: "unknown",
+        detail: "Bu kurulum için sürüm endpoint'i tanımlı değil; kontrol uygulanmıyor.",
         durationMs: null
       }
     };
@@ -285,7 +285,7 @@ function credentialCheck(status: CredentialStatus, credentialRef: string | null)
   if (!credentialRef) {
     return {
       id: "credential",
-      label: "Credential kaydı",
+      label: "Yerel credential kaydı",
       status: "unconfigured",
       detail: "Credential referansı yok.",
       durationMs: null
@@ -295,7 +295,7 @@ function credentialCheck(status: CredentialStatus, credentialRef: string | null)
   if (status === "configured") {
     return {
       id: "credential",
-      label: "Credential kaydı",
+      label: "Yerel credential kaydı",
       status: "ready",
       detail: `${credentialRef} · lokal kayıt mevcut`,
       durationMs: null
@@ -305,7 +305,7 @@ function credentialCheck(status: CredentialStatus, credentialRef: string | null)
   if (status === "unreadable") {
     return {
       id: "credential",
-      label: "Credential kaydı",
+      label: "Yerel credential kaydı",
       status: "error",
       detail: `${credentialRef} · lokal kayıt okunamadı`,
       durationMs: null
@@ -314,7 +314,7 @@ function credentialCheck(status: CredentialStatus, credentialRef: string | null)
 
   return {
     id: "credential",
-    label: "Credential kaydı",
+    label: "Yerel credential kaydı",
     status: "unconfigured",
     detail: `${credentialRef} · lokal kayıt yok`,
     durationMs: null
@@ -356,6 +356,18 @@ async function getInstallations(
   registry: InstallationRegistry
 ): Promise<InstallationSnapshot[]> {
   const entries = Object.entries(registry.installations ?? {});
+  const siteChecks = new Map<string, Promise<HealthCheckSnapshot>>();
+
+  function getSharedSiteCheck(url: string | null) {
+    if (!url) return probeUrl(null);
+
+    let check = siteChecks.get(url);
+    if (!check) {
+      check = probeUrl(url);
+      siteChecks.set(url, check);
+    }
+    return check;
+  }
 
   return Promise.all(entries.map(async ([key, record]) => {
     const credentialRef = record.credentialRef?.trim() || null;
@@ -365,7 +377,7 @@ async function getInstallations(
     const expectedWebVersion = endpoint ? product.webModuleVersion : null;
 
     const [siteCheck, live] = await Promise.all([
-      probeUrl(siteUrl),
+      getSharedSiteCheck(siteUrl),
       getLiveWebVersion(endpoint, expectedWebVersion)
     ]);
 
@@ -390,7 +402,9 @@ async function getInstallations(
       healthChecks: [
         siteCheck,
         live.check,
-        credentialCheck(credentialStatus, credentialRef)
+        ...(record.deploy?.type === "ssh-rsync" && credentialStatus !== "unreadable"
+          ? []
+          : [credentialCheck(credentialStatus, credentialRef)])
       ]
     };
   }));

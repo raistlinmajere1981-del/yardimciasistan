@@ -16,6 +16,32 @@ export type ProductSnapshot = {
 
 export type CredentialStatus = "configured" | "unconfigured" | "unreadable";
 
+export type CredentialField =
+  | "syncSecret"
+  | "ftpProtocol"
+  | "ftpHost"
+  | "ftpPort"
+  | "ftpUser"
+  | "ftpPassword"
+  | "ftpRemoteRoot"
+  | "ftpTlsMode"
+  | "ftpCleanDefaultPlaceholder"
+  | "sshIdentityFile";
+export type InstallationCredentialRecord = Partial<Record<CredentialField, string>>;
+export type CredentialFieldDefinition = { id: CredentialField; label: string; secret: boolean };
+export const CREDENTIAL_FIELDS: CredentialFieldDefinition[] = [
+  { id: "syncSecret", label: "Sync secret", secret: true },
+  { id: "ftpProtocol", label: "FTP protokolü", secret: false },
+  { id: "ftpHost", label: "FTP sunucusu", secret: false },
+  { id: "ftpPort", label: "FTP portu", secret: false },
+  { id: "ftpUser", label: "FTP kullanıcı adı", secret: false },
+  { id: "ftpPassword", label: "FTP parolası", secret: true },
+  { id: "ftpRemoteRoot", label: "FTP hedef dizini", secret: false },
+  { id: "ftpTlsMode", label: "FTP TLS modu", secret: false },
+  { id: "ftpCleanDefaultPlaceholder", label: "Temiz kurulum varsayılanı", secret: false },
+  { id: "sshIdentityFile", label: "SSH anahtar dosyası", secret: false }
+];
+
 export type HealthCheckSnapshot = {
   id: string;
   label: string;
@@ -220,6 +246,7 @@ export type SystemCredentialSnapshot = {
   ref: string;
   status: CredentialStatus;
   usedBy: string[];
+  systemManaged: boolean;
 };
 
 export type AndroidDeviceSnapshot = {
@@ -278,6 +305,9 @@ export type OverviewSnapshot = {
 
 export type AdminBridge = {
   getOverview(): Promise<OverviewSnapshot>;
+  getInstallationCredentials(installationId: string): Promise<{ ref: string | null; fields: InstallationCredentialRecord }>;
+  saveInstallationCredential(installationId: string, field: CredentialField, value: string): Promise<{ ok: boolean; message: string }>;
+  copyInstallationCredential(installationId: string, field: CredentialField): Promise<boolean>;
   checkDependencyUpdates(): Promise<DependencyUpdateReport>;
   getVerificationRunState(): Promise<VerificationRunState>;
   getVerificationHistory(limit?: number): Promise<VerificationHistoryItem[]>;
@@ -302,5 +332,6 @@ export type AdminBridge = {
     resolvedInVersion?: string,
     resolutionNote?: string
   ): Promise<SupportReportListItem>;
+  deleteSupportReport(reportId: string): Promise<void>;
   openExternal(url: string): Promise<boolean>;
 };

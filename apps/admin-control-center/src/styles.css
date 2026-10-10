@@ -803,6 +803,56 @@ nav {
   padding-bottom: 16px;
 }
 
+.credential-panel .panel-header {
+  align-items: center;
+}
+
+.credential-list {
+  display: grid;
+  gap: 10px;
+  padding-top: 15px;
+}
+
+.credential-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1.5fr) repeat(3, auto);
+  gap: 9px;
+  align-items: center;
+}
+
+.credential-row label {
+  color: #59738f;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.credential-row input {
+  min-width: 0;
+  height: 38px;
+  padding: 0 11px;
+  color: #254564;
+  background: #f8fbff;
+  border: 1px solid #dce9f6;
+  border-radius: 9px;
+  outline-color: #72aee8;
+}
+
+.credential-row .button--compact {
+  white-space: nowrap;
+}
+
+.credential-note {
+  margin: 13px 0 0;
+  color: #7890aa;
+  font-size: 12px;
+}
+
+@media (max-width: 1050px) {
+  .credential-row {
+    grid-template-columns: minmax(130px, 0.8fr) minmax(160px, 1.5fr) repeat(3, auto);
+  }
+}
+
 .metadata-grid {
   padding-top: 14px;
   display: grid;
@@ -2284,10 +2334,10 @@ body {
   border-radius: 12px;
   background: transparent;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 9px;
   color: #17345d;
-  text-align: left;
-  cursor: pointer;
   transition: 140ms ease;
 }
 
@@ -2304,6 +2354,25 @@ body {
   background: #eaf5ff;
   border-color: #d2e7fa;
   box-shadow: inset 3px 0 0 #1676dc;
+}
+
+.support-list-select {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: grid;
+  gap: 9px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.support-delete-button {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  justify-content: center;
 }
 
 .support-list-title {

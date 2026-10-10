@@ -39,7 +39,7 @@
     "prepare:web-install": "node scripts/prepare-web-install.mjs",
     "doctor": "node scripts/dev-doctor.mjs",
     "admin": "npm run dev -w @yardimci-asistan/admin-control-center",
-    "admin:check": "npm run typecheck -w @yardimci-asistan/admin-control-center && npm run build -w @yardimci-asistan/admin-control-center",
+    "admin:check": "npm run typecheck -w @yardimci-asistan/admin-control-center && npm run build:check -w @yardimci-asistan/admin-control-center",
     "test:admin": "npm run admin:check",
     "e2e": "playwright test --pass-with-no-tests",
     "lint:php": "node scripts/php-lint.mjs",

@@ -1,10 +1,31 @@
-import { spawn } from "node:child_process";
-import { dirname, join } from "node:path";
+import { execFileSync, spawn } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const appDir = join(scriptDir, "..");
+const appRepoRoot = resolve(appDir, "../..");
+
+function findMainWorktree(fallback) {
+  try {
+    const output = execFileSync("git", ["worktree", "list", "--porcelain"], {
+      cwd: fallback,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+    const worktrees = output.split(/\r?\n\r?\n/).map((block) => {
+      const path = block.match(/^worktree (.+)$/m)?.[1];
+      const branch = block.match(/^branch (.+)$/m)?.[1];
+      return { path, branch };
+    });
+    return worktrees.find((worktree) => worktree.branch === "refs/heads/main")?.path ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const repositoryRoot = process.env.YARDIMCI_REPO_ROOT?.trim() || findMainWorktree(appRepoRoot);
 
 await run("npx", ["tsc", "-p", "tsconfig.electron.json"], appDir);
 
@@ -23,7 +44,11 @@ function startElectron() {
     cwd: appDir,
     stdio: "inherit",
     shell: process.platform === "win32",
-    env: { ...process.env, VITE_DEV_SERVER_URL: devServerUrl }
+    env: {
+      ...process.env,
+      YARDIMCI_REPO_ROOT: repositoryRoot,
+      VITE_DEV_SERVER_URL: devServerUrl
+    }
   });
 
   electron.on("exit", (code) => {
