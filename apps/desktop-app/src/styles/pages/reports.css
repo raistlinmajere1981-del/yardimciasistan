@@ -33,7 +33,7 @@
   cursor: pointer;
   font: inherit;
   font-weight: var(--weight-semibold);
-  transition: all var(--motion-fast) var(--ease-standard);
+  transition: all var(--motion-hover) var(--ease-standard);
 }
 
 .reports-view-tabs button:hover {

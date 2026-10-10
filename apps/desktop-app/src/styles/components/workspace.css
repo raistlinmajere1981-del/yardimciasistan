@@ -32,7 +32,7 @@
 .workspace-frame--centered {
   width: min(var(--dialog-width-lg), calc(100vw / var(--ui-scale) - var(--space-4)));
   height: calc(100dvh / var(--ui-scale) - var(--space-10));
-  animation: workspace-enter var(--motion-normal) var(--ease-standard);
+  animation: workspace-enter var(--motion-surface) var(--ease-standard);
 }
 .workspace-frame--full-canvas {
   inset: var(--workspace-canvas-top, 0px) auto auto var(--workspace-canvas-left, 0px);
@@ -103,7 +103,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   cursor: pointer;
-  transition: background var(--motion-fast) var(--ease-standard);
+  transition: background var(--motion-hover) var(--ease-standard);
 }
 .icon-button--sm { width: max(var(--interaction-target-min), var(--control-height-sm)); height: max(var(--interaction-target-min), var(--control-height-sm)); }
 .icon-button:hover { background: var(--color-bg-hover); }

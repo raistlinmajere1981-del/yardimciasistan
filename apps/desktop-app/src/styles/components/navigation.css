@@ -95,7 +95,7 @@
   cursor: pointer;
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
-  transition: color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+  transition: color var(--motion-hover) var(--ease-standard), background-color var(--motion-hover) var(--ease-standard), border-color var(--motion-hover) var(--ease-standard);
 }
 
 .nav-item span {

@@ -34,9 +34,7 @@
   --motion-hover: 140ms;
   --motion-surface: 180ms;
   --motion-feedback: 560ms;
-  /* Compatibility aliases for existing surfaces during the v3 migration. */
-  --motion-fast: var(--motion-hover);
-  --motion-normal: var(--motion-surface);
+  /* Functional progress indicators keep their own continuous rhythm. */
   --motion-slow: 800ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }

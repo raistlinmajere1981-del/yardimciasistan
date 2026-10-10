@@ -51,7 +51,7 @@
 .marketing-summary-card header p { font-size: var(--text-xs); color: var(--color-text-muted); margin: var(--space-2) 0 0; }
 .marketing-summary-card header .action-button { flex-shrink: 0; }
 .marketing-card-list { flex: 1; min-height: 0; overflow: auto; }
-.marketing-record { display: flex; width: 100%; min-height: max(var(--interaction-target-min),var(--control-height-md)); align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-2); background: transparent; color: var(--color-text); border: 1px solid transparent; border-bottom-color: var(--color-border); border-radius: var(--radius-control); text-align: start; cursor: pointer; transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard); }
+.marketing-record { display: flex; width: 100%; min-height: max(var(--interaction-target-min),var(--control-height-md)); align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-2); background: transparent; color: var(--color-text); border: 1px solid transparent; border-bottom-color: var(--color-border); border-radius: var(--radius-control); text-align: start; cursor: pointer; transition: background var(--motion-hover) var(--ease-standard), border-color var(--motion-hover) var(--ease-standard); }
 .marketing-record:hover { background: var(--color-bg-hover); }
 .marketing-record:active { background: var(--color-accent-soft); }
 .marketing-record[aria-pressed="true"] { background: var(--color-accent-soft); border-color: var(--color-accent); }

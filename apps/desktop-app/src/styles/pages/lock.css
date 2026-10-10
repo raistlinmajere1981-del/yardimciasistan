@@ -51,12 +51,12 @@
     radial-gradient(circle at 88% 86%, color-mix(in srgb, var(--color-info) 12%, transparent), transparent 32%),
     var(--color-security-backdrop);
   isolation: isolate;
-  animation: app-lock-enter var(--motion-normal) var(--ease-standard) both;
+  animation: app-lock-enter var(--motion-surface) var(--ease-standard) both;
 }
 
 .app-lock-screen.is-unlocking {
   pointer-events: none;
-  animation: app-lock-exit var(--motion-fast) var(--ease-standard) both;
+  animation: app-lock-exit var(--motion-hover) var(--ease-standard) both;
 }
 
 .app-lock-card {
@@ -282,7 +282,7 @@
   background: var(--color-security-field);
   border: 1px solid var(--color-security-border);
   border-radius: var(--radius-panel);
-  animation: app-lock-recovery-enter var(--motion-fast) var(--ease-standard) both;
+  animation: app-lock-recovery-enter var(--motion-hover) var(--ease-standard) both;
 }
 
 .app-lock-recovery-title {

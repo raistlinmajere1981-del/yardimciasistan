@@ -96,7 +96,7 @@ function assertTokenContract() {
     "--control-height-sm", "--control-height-md", "--control-height-lg",
     "--field-width-xs", "--field-width-sm", "--field-width-md", "--field-width-lg",
     "--page-max-width", "--reading-max-width", "--sidebar-width", "--header-height",
-    "--motion-fast", "--motion-normal", "--motion-slow", "--ease-standard",
+    "--motion-hover", "--motion-surface", "--motion-slow", "--ease-standard",
     "--color-security-backdrop", "--color-security-surface", "--color-security-surface-raised",
     "--color-security-field", "--color-security-text", "--color-security-text-muted",
     "--color-security-border", "--color-security-accent", "--color-security-accent-hover",
@@ -197,10 +197,16 @@ const current = readMetrics();
 printSummary(current);
 
 if (writeBaseline) {
+  // Missing metrics already have a zero allowance in strict mode.
+  const allowances = {};
+  for (const [file, values] of Object.entries(current)) {
+    const debt = Object.fromEntries(Object.entries(values).filter(([, value]) => value > 0));
+    if (Object.keys(debt).length) allowances[file] = debt;
+  }
   fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
   fs.writeFileSync(
     BASELINE_PATH,
-    `${JSON.stringify({ version: 1, generatedAt: new Date().toISOString(), files: current }, null, 2)}\n`
+    `${JSON.stringify({ version: 1, generatedAt: new Date().toISOString(), files: allowances }, null, 2)}\n`
   );
   console.log(`design-audit-baseline-written: ${normalize(path.relative(ROOT, BASELINE_PATH))}`);
   process.exit(0);

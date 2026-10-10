@@ -41,7 +41,7 @@ function guardKey(scope?: CloseGuardScope) {
 
 /**
  * Mounted inside the unlocked frame. Hospitality workspaces keep one independent
- * session per owning page; transient entity workspaces keep the legacy modal slot.
+ * session per owning page; transient entity workspaces use the shared modal host.
  */
 export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, enabledHospitalityPages, children }: {
   page: DesktopPage;

@@ -105,8 +105,6 @@
   display: inline-grid;
   align-self: stretch;
   place-items: center;
-  min-width: var(--control-height-lg);
-  min-height: var(--control-height-lg);
   cursor: grab;
   touch-action: none;
   min-width: var(--interaction-target-min);
