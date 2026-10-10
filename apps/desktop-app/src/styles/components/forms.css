@@ -164,13 +164,6 @@ textarea {
 .form-stack .sync-error { color: var(--color-danger); }
 .form-stack .sync-success { color: var(--color-success); }
 
-.date-field-hint {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-}
-
-
 .choice-chips {
   display: flex;
   flex-wrap: wrap;

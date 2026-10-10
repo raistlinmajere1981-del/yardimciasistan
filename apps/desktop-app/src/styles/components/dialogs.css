@@ -9,8 +9,7 @@
   padding: var(--space-5);
   background: var(--color-backdrop);
 }
-.overlay--drawer { display: flex; justify-content: flex-end; padding: 0; }
-.dialog, .drawer {
+.dialog {
   position: relative;
   min-width: 0;
   max-width: 100%;
@@ -25,18 +24,9 @@
   overflow: auto;
   border-radius: var(--radius-dialog);
 }
-.dialog--compact { width: min(var(--dialog-width-sm), 100%); padding: var(--panel-padding); }
 .dialog--wide { width: min(var(--dialog-width-lg), 100%); }
 .dialog--preview { height: calc(100dvh - var(--space-10)); }
-.drawer {
-  width: min(var(--dialog-width-sm), calc(100% - var(--space-6)));
-  height: 100%;
-  border-width: 0 0 0 1px;
-  border-radius: 0;
-}
-.drawer--wide { width: min(var(--dialog-width-lg), calc(100% - var(--space-6))); }
-.drawer--scroll { overflow-y: auto; }
-.overlay-header, .overlay-footer {
+.overlay-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -48,12 +38,8 @@
   background: var(--color-bg-panel);
 }
 .overlay-header { border-bottom: 1px solid var(--color-border); }
-.overlay-header--sticky { position: sticky; top: 0; z-index: var(--z-sticky); }
 .overlay-header h2, .overlay-header h3 { margin: 0; font-size: var(--text-lg); }
 .overlay-header > * { min-width: 0; }
-.overlay-body { min-height: 0; overflow: auto; padding: var(--panel-padding); }
-.overlay-footer { border-top: 1px solid var(--color-border); }
-.overlay-footer--inset { padding: var(--space-3) 0 0; }
 .overlay-close, .drawer-close-button {
   display: inline-flex;
   align-items: center;
@@ -76,20 +62,9 @@
 .drawer-close-button::after { content: "Kapat"; }
 @media (max-width: 760px) {
   .overlay { padding: var(--space-2); }
-  .overlay--drawer { padding: 0; }
-  .drawer { width: 100%; }
   .dialog { max-height: calc(100dvh - var(--space-4)); }
   .dialog--preview { height: calc(100dvh - var(--space-4)); }
-  .overlay-footer { align-items: stretch; }
 }
-
-.drawer--form { width: min(var(--dialog-width-md), 100%); }
-.overlay-form { padding: var(--panel-padding); }
-.overlay-heading { display: grid; gap: var(--space-1); }
-.overlay-heading p { margin: 0; color: var(--color-text-muted); font-size: var(--text-xs); }
-.overlay-form > .overlay-footer { position: sticky; bottom: calc(-1 * var(--panel-padding)); z-index: var(--z-sticky); margin: 0 calc(-1 * var(--panel-padding)) calc(-1 * var(--panel-padding)); padding: var(--space-3) var(--panel-padding); }
-.overlay-footer > p { margin: 0; font-size: var(--text-sm); }
-.overlay-footer > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .confirm-dialog.modal-surface { width: min(620px, calc(100vw - var(--space-4))); padding: 0; overflow-y: auto; }
 .confirm-dialog__header { padding: var(--space-5) var(--space-5) 0; display: grid; gap: var(--space-2); }

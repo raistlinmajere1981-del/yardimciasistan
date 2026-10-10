@@ -1,7 +1,6 @@
 .marketing-page { display: flex; flex-direction: column; min-height: 0; height: 100%; gap: var(--space-3); }
 .marketing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .marketing-body { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
-.marketing-editor { min-width: 0; min-height: 0; overflow: auto; }
 .marketing-selected-media { display: flex; flex-direction: column; padding: 0; gap: var(--space-2); list-style: none; }
 .marketing-selected-media li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .marketing-selected-media img { width: 6rem; height: 4rem; object-fit: contain; }

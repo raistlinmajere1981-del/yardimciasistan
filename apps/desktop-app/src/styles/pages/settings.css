@@ -145,7 +145,6 @@
   color: var(--color-text-muted);
 }
 
-
 .settings-service-toggle {
   display: inline-flex;
   align-items: center;
@@ -169,8 +168,7 @@
   border: 0;
 }
 
-.settings-service-empty,
-.settings-service-note {
+.settings-service-empty {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -190,28 +188,6 @@
   font-size: var(--text-sm);
 }
 
-.setup-toggle-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.setup-toggle-grid label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--control-height-md);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  font-size: var(--text-sm);
-}
-
-.setup-toggle-grid label:has(:checked) {
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent-border);
-}
-
 .setup-birthday-settings {
   margin: 0;
 }
@@ -225,22 +201,6 @@
   font-size: var(--text-md);
 }
 
-.birthday-mode-fieldset {
-  align-content: start;
-}
-
-.birthday-mode-fieldset legend {
-  margin-bottom: var(--space-1);
-  color: var(--color-text);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-}
-
-.setup-birthday-note {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
 .setup-field {
   display: grid;
   align-content: start;
@@ -250,16 +210,6 @@
 
 .setup-field small {
   color: var(--color-text-muted);
-}
-
-.setup-danger-checkline {
-  color: var(--color-danger);
-}
-
-
-.setup-status-message {
-  max-width: 100%;
-  overflow-wrap: anywhere;
 }
 
 .setup-connection-message {
@@ -325,11 +275,6 @@
   margin-bottom: 0;
 }
 
-.setup-count-row {
-  margin-bottom: var(--space-4);
-}
-
-
 .settings-profile-options {
   align-self: stretch;
   flex: 1 1 100%;
@@ -372,29 +317,11 @@
   margin: 0;
 }
 
-.table-category-editor,
 .table-category-list {
   display: grid;
   gap: var(--space-3);
 }
 
-.table-category-heading {
-  align-items: start;
-}
-
-.table-category-heading > div {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.table-category-heading h2,
-.table-category-heading p {
-  margin: 0;
-}
-
-.table-category-heading p,
-.table-category-heading small,
-.table-category-note,
 .table-category-empty {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
@@ -406,22 +333,6 @@
   justify-content: start;
   align-items: end;
   gap: var(--space-3);
-}
-
-.room-management-heading {
-  align-items: start;
-}
-
-.room-management-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: var(--space-3);
-}
-
-.room-management-save-state {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
 }
 
 .room-management-list {
@@ -477,19 +388,6 @@
   font-size: var(--text-xs);
 }
 
-.room-management-price-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  font-size: var(--text-xs);
-}
-
-.room-management-price-wrap span {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
 .room-public-details-form {
   gap: var(--space-4);
 }
@@ -504,29 +402,11 @@
   gap: var(--space-2) var(--space-4);
 }
 
-.room-management-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
-  gap: var(--space-4);
-  min-height: 34rem;
-  height: min(64vh, 46rem);
-  min-width: 0;
-}
-
-.room-management-settings,
 .room-media-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
   height: 100%;
-}
-
-.room-management-panel-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .room-management-row.is-media-selected::before {
@@ -697,50 +577,15 @@
   gap: var(--space-1);
 }
 
-@media (max-width: 1050px) {
-  .room-management-workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(15rem, 18rem);
-  }
-
-}
-
 @media (max-width: 820px) {
-  .room-management-workspace {
-    height: auto;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .room-management-settings {
-    min-height: 28rem;
-  }
-
   .room-media-panel {
     min-height: 30rem;
     max-height: 38rem;
   }
 }
 
-.room-management-footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
-.room-management-footer > span {
-  max-width: var(--reading-max-width);
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
 .settings-business-subsection {
   margin-top: var(--space-4);
-}
-
-.settings-subsection-heading {
-  margin: 0;
 }
 
 .business-public-profile-body {
@@ -805,15 +650,6 @@
   gap: var(--space-2);
   max-height: 12rem;
   overflow: auto;
-}
-
-.business-public-profile-address-result {
-  text-align: left;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-bg-field);
-  color: var(--color-text);
 }
 
 .business-public-profile-field-error,
@@ -897,13 +733,11 @@
   color: var(--color-text-muted);
 }
 
-.password-settings-message.is-error,
-.room-management-save-state.is-error {
+.password-settings-message.is-error {
   color: var(--color-danger);
 }
 
-.password-settings-message.is-success,
-.room-management-save-state.is-success {
+.password-settings-message.is-success {
   color: var(--color-success);
 }
 
@@ -1105,11 +939,9 @@
   .settings-category-actions > div { flex-basis: 100%; }
 }
 
-
 .room-management-remove {
   justify-self: end;
 }
-
 
 .business-social-links-section {
   min-width: 0;
@@ -1166,26 +998,6 @@
   }
 }
 
-.table-layout-settings {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.table-public-heading > div {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.table-public-heading h2,
-.table-public-heading p {
-  margin: 0;
-}
-
-.table-public-heading p {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
 .table-public-resource-list {
   display: grid;
   gap: var(--space-2);
@@ -1239,41 +1051,6 @@
   }
 }
 
-
-/* Room management summary-first layout */
-.room-management-heading {
-  align-items: center;
-}
-
-.room-management-heading-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.room-management-publication-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 2rem;
-  padding-inline: var(--space-2);
-  color: var(--color-text);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-}
-
-.room-management-publication-toggle input {
-  margin: 0;
-  accent-color: var(--color-accent);
-}
-
-.room-management-publication-toggle:has(input:disabled) {
-  cursor: default;
-  opacity: .65;
-}
 
 .room-management-list-head,
 .room-management-row {
@@ -1335,14 +1112,6 @@
 }
 
 @media (max-width: 760px) {
-  .room-management-heading {
-    align-items: flex-start;
-  }
-
-  .room-management-heading-actions {
-    justify-content: flex-start;
-  }
-
   .room-management-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
@@ -1357,7 +1126,6 @@
     align-self: center;
   }
 }
-
 
 /* Shared room/table management workspace */
 .resource-management-workspace {
@@ -1438,38 +1206,6 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
-}
-
-.resource-management-toolbar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 4.25rem;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-surface);
-}
-
-.resource-management-toolbar > .action-button:only-child {
-  margin-inline-start: auto;
-}
-
-.resource-management-toolbar-copy {
-  display: grid;
-  min-width: 0;
-  gap: .1rem;
-}
-
-.resource-management-toolbar-copy strong {
-  color: var(--color-text);
-  font-size: var(--text-sm);
-}
-
-.resource-management-toolbar-copy span {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
 }
 
 .resource-management-content {
@@ -1560,18 +1296,6 @@
   }
 }
 
-@media (max-width: 760px) {
-  .resource-management-toolbar {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .resource-management-toolbar > .action-button:only-child {
-    margin-inline-start: 0;
-  }
-}
-
-
 /* Final resource workspace polish: page owns vertical scrolling. */
 .resource-management-shell {
   min-height: 0;
@@ -1590,15 +1314,6 @@
   overscroll-behavior: auto;
   scrollbar-gutter: auto;
 }
-
-
-.table-category-row-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-1);
-}
-
 
 .room-media-panel.resource-media-panel--embedded {
   min-height: 100%;
@@ -1622,14 +1337,6 @@
     max-height: none;
   }
 }
-
-@media (max-width: 760px) {
-  .table-category-row-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-  }
-}
-
 
 /* Resource workspace sizing: growing lists scroll, workspace height stays stable. */
 .resource-management-shell {
@@ -1732,7 +1439,6 @@
   justify-self: start;
 }
 
-
 @media (max-width: 820px) {
   .resource-management-shell {
     height: auto;
@@ -1762,7 +1468,6 @@
   }
 }
 
-
 /* Disabled service cards stay header-only; draft toggles expand immediately. */
 .settings-service-card.is-disabled > .settings-service-card-header {
   border-bottom: 0;
@@ -1775,7 +1480,6 @@
 .settings-service-card.is-disabled .settings-service-card-header {
   padding-block: var(--space-3);
 }
-
 
 .kbs-login-test {
   display: grid;

@@ -245,10 +245,6 @@
   font-size: var(--text-sm);
 }
 
-.record-disclosure__body {
-  padding: var(--space-3) 0;
-}
-
 @media (max-width: 1024px) {
 
   .data-list {

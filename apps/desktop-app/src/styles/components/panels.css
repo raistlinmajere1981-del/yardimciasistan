@@ -25,8 +25,7 @@
   font-weight: var(--panel-title-weight);
 }
 
-.panel-heading p,
-.setup-section-description {
+.panel-heading p {
   max-width: var(--reading-max-width);
   margin: 0 0 var(--space-4);
   color: var(--color-text-muted);
