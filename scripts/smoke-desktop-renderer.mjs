@@ -511,9 +511,13 @@ try {
   await expect(tableCategoryList.locator(".table-category-row")).toHaveCount(2);
   await expect(tableCategoryList.locator(".table-category-row").nth(0).getByLabel("Kategori adı")).toHaveValue("Bahçe");
   await expect(tableCategoryList.locator(".table-category-row").nth(1).getByLabel("Kategori adı")).toHaveValue("Salon");
-  // Kategori Ekle ilk kategori satırının en sağında yer alır.
-  await expect(tableCategoryList.locator(".table-category-row").first().getByRole("button", { name: "Kategori Ekle", exact: true })).toBeVisible();
-  await tableCategoryList.locator(".table-category-row").first().getByRole("button", { name: "Kategori Ekle", exact: true }).click();
+  // Ekleme eylemi web yayını kontrolüyle birlikte yönetim başlığında yer alır.
+  const tableManagementHeader = tableWorkspace.locator(".resource-management-pane-header");
+  const addTableCategory = tableManagementHeader.getByRole("button", { name: "Kategori Ekle", exact: true });
+  await expect(tableManagementHeader.getByRole("checkbox", { name: "Masa web yayını", exact: true })).toBeVisible();
+  await expect(addTableCategory).toBeVisible();
+  await expect(tableCategoryList.getByRole("button", { name: "Kategori Ekle", exact: true })).toHaveCount(0);
+  await addTableCategory.click();
   await expect(tableCategoryList.locator(".table-category-row")).toHaveCount(3);
   await tableCategoryList.locator(".table-category-row").nth(2).getByLabel("Kategori adı").fill("Teras");
   await expect(tableWorkspace).toContainText("Restoran · 3 masa");
