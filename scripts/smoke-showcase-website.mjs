@@ -78,9 +78,18 @@ try {
   await assertSurfaces(true);
   seed('business_context', { business_name: 'Örnek işletme', phone: '+90 555 000 0000', address: 'Örnek adres', latitude: 41, longitude: 29, social_links: [{ platform: 'instagram', url: 'https://instagram.com/example' }] });
   await page.goto(base + '/odalar/'); await expect(page.locator('.room-card')).toContainText('Örnek oda');
-  await page.goto(base + '/odalar/oda/?id=showcase-room'); await expect(page.locator('[data-room-name]')).toContainText('Örnek oda');
+  await expect(page.locator('.room-card')).not.toContainText('Oda detaylarını inceleyebilirsiniz.');
+  await page.goto(base + '/odalar/oda/?id=showcase-room'); await expect(page.locator('.breadcrumb [data-room-name]')).toContainText('Örnek oda');
+  await expect(page.locator('.room-detail-copy h2')).toHaveText('Örnek oda');
+  await expect(page.locator('[data-room-price-note]')).toBeHidden();
+  await expect(page.locator('[data-room-reserve]')).toBeVisible();
+  await expect(page.locator('[data-room-media-section] h2')).toHaveText('Fotoğraflar ve videolar');
   await page.goto(base + '/restoran/'); await expect(page.locator('.table-card')).toContainText('Örnek masa');
+  await expect(page.locator('.table-card')).not.toContainText('Masa detaylarını inceleyebilirsiniz.');
+  await expect(page.locator('[data-table-count]')).toHaveText('1 masa');
+  await expect(page.getByRole('heading', { name: 'Yayınlanmış masalar' })).toHaveCount(0);
   await page.goto(base + '/restoran/masa/?id=showcase-table'); await expect(page.locator('[data-table-name]')).toContainText('Örnek masa');
+  await expect(page.locator('.room-detail-copy h2')).toHaveCount(0);
   await page.goto(base + '/qr-menu/'); await expect(page.locator('.qr-menu-item')).toContainText('Çay');
   const commerceRequests = [];
   page.on('request', request => {

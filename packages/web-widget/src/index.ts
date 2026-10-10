@@ -301,8 +301,8 @@ function buttonTemplate() {
         ${nexaImage("launcher")}
       </span>
       <span class="ya-widget-launcher-copy">
-        <strong>Nexa</strong>
-        <small>Yardımcı Asistan</small>
+        <strong>Yardımcı</strong>
+        <small>Asistan</small>
       </span>
     </button>
   `;

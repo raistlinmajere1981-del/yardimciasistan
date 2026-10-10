@@ -129,12 +129,14 @@
     if (room.bed_info) metaParts.push(String(room.bed_info));
     meta.textContent = metaParts.join(" · ");
 
-    const description = document.createElement("p");
-    description.textContent = String(room.description || "Oda detaylarını inceleyebilirsiniz.");
-
     body.append(title);
     if (meta.textContent) body.append(meta);
-    body.append(description);
+    const descriptionText = String(room.description || "").trim();
+    if (descriptionText) {
+      const description = document.createElement("p");
+      description.textContent = descriptionText;
+      body.append(description);
+    }
 
     const priceText = formatPrice(room.nightly_price_minor, room.currency);
     if (priceText) {
@@ -370,7 +372,12 @@
     setText("[data-room-capacity]", Number(room.capacity) > 0 ? `${Math.trunc(Number(room.capacity))} kişi` : "");
     setText("[data-room-bed]", room.bed_info || "");
     setText("[data-room-floor]", formatFloor(room.floor));
-    setText("[data-room-price-note]", room.price_note || "");
+    const priceNote = document.querySelector("[data-room-price-note]");
+    if (priceNote instanceof HTMLElement) {
+      const note = String(room.price_note || "").trim();
+      priceNote.textContent = note;
+      priceNote.hidden = !note;
+    }
 
     const price = formatPrice(room.nightly_price_minor, room.currency);
     const priceNode = document.querySelector("[data-room-price]");

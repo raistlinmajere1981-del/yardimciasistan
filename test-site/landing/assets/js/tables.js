@@ -85,9 +85,12 @@
       body.append(meta);
     }
 
-    const description = document.createElement("p");
-    description.textContent = String(table.description || "Masa detaylarını inceleyebilirsiniz.");
-    body.append(description);
+    const descriptionText = String(table.description || "").trim();
+    if (descriptionText) {
+      const description = document.createElement("p");
+      description.textContent = descriptionText;
+      body.append(description);
+    }
 
     const actions = document.createElement("div");
     actions.className = "card-actions";

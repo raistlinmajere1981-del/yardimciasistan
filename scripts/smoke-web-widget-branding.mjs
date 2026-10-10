@@ -49,6 +49,8 @@ try {
     });
   });
   await expect(page.locator('.ya-widget-button [data-nexa-role="launcher"]')).toHaveAttribute("src", /assets\/nexa\/.*\.webp$/);
+  await expect(page.locator('.ya-widget-launcher-copy strong')).toHaveText("Yardımcı");
+  await expect(page.locator('.ya-widget-launcher-copy small')).toHaveText("Asistan");
 
   await page.evaluate(() => {
     window.YardimciAsistanWidget?.init({
