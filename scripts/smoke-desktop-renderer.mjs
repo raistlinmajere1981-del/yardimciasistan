@@ -36,11 +36,14 @@ try {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "dark", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     let currentDashboardData = dashboardData;
+    const previewProduct = currentDashboardData.menu.items.find(item => item.product_id === "product_local_preview");
+    previewProduct.image_url = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="90"><rect width="180" height="90" fill="green"/></svg>')}`;
     let products = currentDashboardData.menu.items.map(item => ({
       id: item.product_id, businessId: "fixture-business", categoryId: "", name: item.name, description: item.description,
       brand: "", sku: "", barcode: "", salePrice: item.price, purchasePrice: 0, dealerPriceA: null, dealerPriceB: null,
       currency: item.currency, unit: item.stock_unit, taxRate: 0, trackInventory: item.stock_quantity !== null,
-      minimumQuantity: item.stock_min_quantity ?? 0, isActive: true, quickAccessEnabled: false, imageAssetPath: "", imageSourceUrl: item.image_url,
+      minimumQuantity: item.stock_min_quantity ?? 0, isActive: true, quickAccessEnabled: false,
+      imageAssetPath: item.product_id === "product_local_preview" ? "assets/products/product_local_preview/fixture.svg" : "", imageSourceUrl: item.image_url,
       dataSource: "", sourceProductUrl: "", dataLicense: "", imageLicense: "", sourceFetchedAt: "", updatedAt: item.updated_at,
       createdAt: item.created_at, sortOrder: item.sort_order
     }));
@@ -782,6 +785,10 @@ try {
   await page.locator(".menu-product-panel .menu-record").filter({ hasText: "Yerel Serpme Kahvaltı" }).first().click();
   const menuItemWorkspace = page.getByRole("dialog", { name: "Yerel Serpme Kahvaltı" });
   await expect(menuItemWorkspace).toBeVisible();
+  const productImagePreview = menuItemWorkspace.locator(".market-product-image-card img");
+  await expect(productImagePreview).toBeVisible();
+  await expect(productImagePreview).toHaveCSS("object-fit", "contain");
+  await expect.poll(() => productImagePreview.evaluate(image => image.naturalWidth / image.naturalHeight)).toBe(2);
   await expect(menuItemWorkspace.getByLabel("Menü sunumu", { exact: true })).toBeVisible();
   await expect(menuItemWorkspace.getByLabel("Stok güncelleme", { exact: true })).toBeVisible();
   await menuItemWorkspace.getByRole("button", { name: "Menüden kaldır", exact: true }).click();

@@ -72,6 +72,7 @@ const androidActivitySource = source("apps/android-app/src/main/java/com/yardimc
 const hostingSyncSource = source("firm-template/web-module/api/sync.php");
 const webChatSource = source("firm-template/web-module/api/chat.php");
 const menuCssSource = source("apps/desktop-app/src/styles/pages/menu.css");
+const productCssSource = source("apps/desktop-app/src/styles/pages/market.css");
 const testSiteHeaderSource = source("test-site/landing/inc/site.php");
 const testSiteQrMenuSource = source("test-site/landing/assets/js/qr-menu.js");
 
@@ -153,8 +154,8 @@ assert.doesNotMatch(
   "Menu fields must not own a second canonical product or stock draft"
 );
 assert.match(
-  menuCssSource,
-  /\.menu-image-preview-frame > img\s*\{[\s\S]{0,180}object-fit:\s*contain/,
+  productCssSource,
+  /\.market-product-image-card img\s*\{[^}]*object-fit:\s*contain/,
   "product image preview must show the full image instead of cropping it"
 );
 assertHandlerGuard(menuIpcSource, "menu:setWebPublication", "assertCapability(BUSINESS_CAPABILITIES.QR_MENU");
