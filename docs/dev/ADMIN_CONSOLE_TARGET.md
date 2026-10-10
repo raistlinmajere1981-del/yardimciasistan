@@ -62,6 +62,12 @@ canonical kaynakları okur ve orkestre eder:
 - mevcut build/deploy/live-check scriptleri
 - support inbox altyapısı
 
+Admin Control Center başka bir Git worktree'sinden geliştirilirken `main` worktree'sini
+canonical repo ve credential kökü olarak kullanır. Yerel credential dosyası Git'e girmez
+ve yalnızca elle girilmesi gereken BlackSea web modül secret'ı için düzenlenir; FTP deploy
+ayarları aynı kayıttan okunur. Alwaysdata SSH erişimi işletim sistemi SSH config/agent'ını
+kullanır.
+
 Bu kaynakların arayüz için yetersiz kaldığı yerde admin uygulamasına özel yeni model
 ve servisler eklenebilir. Eski TUI'nin soyutlamaları korunmak zorunda değildir.
 
