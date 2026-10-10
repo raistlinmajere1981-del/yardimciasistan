@@ -3,6 +3,11 @@ import type { AdminBridge } from "../shared/contracts";
 
 const bridge: AdminBridge = {
   getOverview: () => ipcRenderer.invoke("admin:get-overview"),
+  getInstallationCredentials: (installationId) => ipcRenderer.invoke("admin:get-installation-credentials", installationId),
+  saveInstallationCredential: (installationId, field, value) =>
+    ipcRenderer.invoke("admin:save-installation-credential", installationId, field, value),
+  copyInstallationCredential: (installationId, field) =>
+    ipcRenderer.invoke("admin:copy-installation-credential", installationId, field),
   checkDependencyUpdates: () => ipcRenderer.invoke("admin:check-dependency-updates"),
   getVerificationRunState: () => ipcRenderer.invoke("admin:get-verification-run-state"),
   getVerificationHistory: (limit) => ipcRenderer.invoke("admin:get-verification-history", limit),
@@ -41,6 +46,7 @@ const bridge: AdminBridge = {
       resolvedInVersion,
       resolutionNote
     ),
+  deleteSupportReport: (reportId) => ipcRenderer.invoke("admin:delete-support-report", reportId),
   openExternal: (url) => ipcRenderer.invoke("admin:open-external", url)
 };
 

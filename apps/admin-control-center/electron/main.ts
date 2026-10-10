@@ -1,12 +1,18 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, shell } from "electron";
 import { join, resolve } from "node:path";
 import { checkDependencyUpdates } from "./services/dependency-update-service";
+import {
+  getCredentialForClipboard,
+  getInstallationCredentials,
+  saveInstallationCredential
+} from "./services/credentials-service";
 import { DeploymentRunner, getDeploymentTargets } from "./services/deployment-runner";
 import { getOverviewSnapshot } from "./services/overview-service";
 import { ReleaseRunner } from "./services/release-runner";
 import {
   getSupportReportDetail,
   listSupportReports,
+  deleteSupportReport,
   updateSupportReportStatus
 } from "./services/support-service";
 import { getSystemEnvironment } from "./services/system-environment-service";
@@ -79,6 +85,18 @@ function createWindow() {
 }
 
 ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));
+ipcMain.handle("admin:get-installation-credentials", (_event, installationId: string) =>
+  getInstallationCredentials(REPO_ROOT, installationId)
+);
+ipcMain.handle("admin:save-installation-credential", (_event, installationId: string, field: string, value: string) =>
+  saveInstallationCredential(REPO_ROOT, installationId, field, value)
+);
+ipcMain.handle("admin:copy-installation-credential", (_event, installationId: string, field: string) => {
+  const value = getCredentialForClipboard(REPO_ROOT, installationId, field);
+  if (value === null) return false;
+  clipboard.writeText(value);
+  return true;
+});
 ipcMain.handle("admin:check-dependency-updates", () => checkDependencyUpdates(REPO_ROOT));
 function busyOperationMessage(exclude: "verification" | "deployment" | "release") {
   const active = [
@@ -117,6 +135,9 @@ ipcMain.handle(
   "admin:update-support-report-status",
   (_event, reportId: string, status: SupportReportStatus, resolvedInVersion: string, resolutionNote: string) =>
     updateSupportReportStatus(REPO_ROOT, reportId, status, resolvedInVersion, resolutionNote)
+);
+ipcMain.handle("admin:delete-support-report", (_event, reportId: string) =>
+  deleteSupportReport(REPO_ROOT, reportId)
 );
 ipcMain.handle("admin:open-external", async (_event, value: unknown) => {
   const url = typeof value === "string" ? value.trim() : "";

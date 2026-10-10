@@ -2,6 +2,9 @@ import {
   Activity,
   CheckCircle2,
   CloudUpload,
+  Copy,
+  Eye,
+  EyeOff,
   ExternalLink,
   FlaskConical,
   GitBranch,
@@ -13,17 +16,21 @@ import {
   Play,
   RefreshCw,
   Rocket,
+  Save,
   Server,
   Settings,
   ShieldCheck,
   Square,
   Timer,
+  Trash2,
   TriangleAlert,
   XCircle
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CREDENTIAL_FIELDS } from "../shared/contracts";
 import type {
   DependencyUpdateReport,
+  CredentialField,
   DeploymentRunState,
   DeploymentTargetSnapshot,
   HealthCheckSnapshot,
@@ -283,7 +290,7 @@ function Overview({
 
                 <div className="installation-credential">
                   <span>Credential</span>
-                  <strong>{credentialLabel(installation.credentialStatus)}</strong>
+                  <strong>{installation.deployType === "ssh-rsync" && installation.credentialStatus === "unconfigured" ? "SSH config/agent" : credentialLabel(installation.credentialStatus)}</strong>
                 </div>
 
                 <button
@@ -326,6 +333,7 @@ function Overview({
 }
 
 function HealthRow({ check }: { check: HealthCheckSnapshot }) {
+  const label = check.id === "version" && check.status === "unknown" ? "İzlenmiyor" : statusLabel(check.status);
   return (
     <div className="health-row">
       <span className="health-dot" data-status={check.status} />
@@ -334,10 +342,160 @@ function HealthRow({ check }: { check: HealthCheckSnapshot }) {
         <small>{check.detail}</small>
       </div>
       <div className="health-tail">
-        <span className={statusClass(check.status)}>{statusLabel(check.status)}</span>
+        <span className={statusClass(check.status)}>{label}</span>
         {check.durationMs !== null ? <small>{check.durationMs} ms</small> : null}
       </div>
     </div>
+  );
+}
+
+function LiveConsole({
+  lines,
+  className,
+  emptyText
+}: {
+  lines: string[];
+  className: string;
+  emptyText: string;
+}) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const followAfterRef = useRef(0);
+  const timerRef = useRef<number | null>(null);
+
+  const scheduleFollow = useCallback(() => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    const remaining = Math.max(0, followAfterRef.current - Date.now());
+    timerRef.current = window.setTimeout(() => {
+      const element = elementRef.current;
+      if (Date.now() < followAfterRef.current) {
+        scheduleFollow();
+      } else if (element) {
+        element.scrollTop = element.scrollHeight;
+      }
+    }, remaining);
+  }, []);
+
+  useEffect(() => {
+    scheduleFollow();
+    return () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    };
+  }, [lines, scheduleFollow]);
+
+  function pauseFollow() {
+    followAfterRef.current = Date.now() + 3000;
+    scheduleFollow();
+  }
+
+  return (
+    <div
+      ref={elementRef}
+      className={className}
+      tabIndex={0}
+      onWheel={pauseFollow}
+      onPointerDown={pauseFollow}
+      onTouchMove={pauseFollow}
+      onKeyDown={(event) => {
+        if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) pauseFollow();
+      }}
+      aria-live="off"
+    >
+      {lines.length
+        ? lines.map((line, index) => <div key={`${index}:${line}`}>{line}</div>)
+        : <div>{emptyText}</div>}
+    </div>
+  );
+}
+
+function InstallationCredentials({ installation }: { installation: InstallationSnapshot }) {
+  const [fields, setFields] = useState<Partial<Record<CredentialField, string>>>({});
+  const [drafts, setDrafts] = useState<Partial<Record<CredentialField, string>>>({});
+  const [visible, setVisible] = useState<Partial<Record<CredentialField, boolean>>>({});
+  const [busyField, setBusyField] = useState<CredentialField | null>(null);
+  const [notice, setNotice] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoaded(false);
+    setNotice("");
+    if (!installation.credentialRef) {
+      setFields({});
+      setDrafts({});
+      setLoaded(true);
+      return () => { active = false; };
+    }
+    void window.adminControlCenter.getInstallationCredentials(installation.id).then((result) => {
+      if (!active) return;
+      setFields(result.fields);
+      setDrafts(result.fields);
+      setLoaded(true);
+    }).catch(() => {
+      if (!active) return;
+      setNotice("Yerel erişim bilgileri okunamadı.");
+      setLoaded(true);
+    });
+    return () => { active = false; };
+  }, [installation.id, installation.credentialRef]);
+
+  async function save(field: CredentialField) {
+    setBusyField(field);
+    const result = await window.adminControlCenter.saveInstallationCredential(installation.id, field, drafts[field] ?? "");
+    setNotice(result.message);
+    if (result.ok) {
+      const refreshed = await window.adminControlCenter.getInstallationCredentials(installation.id);
+      setFields(refreshed.fields);
+      setDrafts(refreshed.fields);
+    }
+    setBusyField(null);
+  }
+
+  return (
+    <section className="panel credential-panel">
+      <div className="panel-header">
+        <div>
+          <p className="panel-kicker">YEREL DOSYA · config/credentials.local.json</p>
+          <h2>Erişim Bilgileri</h2>
+        </div>
+        <span className="quiet">{installation.credentialRef ?? "Credential referansı yok"}</span>
+      </div>
+      {!installation.credentialRef ? <p className="credential-note">Bu kurulum için credentialRef tanımlanmamış.</p> : null}
+      {installation.credentialRef && !loaded ? <p className="credential-note">Yerel kayıt okunuyor…</p> : null}
+      {installation.credentialRef && loaded ? <div className="credential-list">
+        {CREDENTIAL_FIELDS.filter((field) => installation.id === "blacksea"
+          ? field.id !== "sshIdentityFile"
+          : field.id === "syncSecret" || field.id === "sshIdentityFile")
+          .filter((field) => (installation.id === "blacksea" && field.id === "syncSecret") || Boolean(fields[field.id]))
+          .map((field) => {
+          const saved = fields[field.id] ?? "";
+          const manual = installation.id === "blacksea" && field.id === "syncSecret";
+          const draft = manual ? drafts[field.id] ?? "" : saved;
+          return <div className="credential-row" key={field.id}>
+            <label htmlFor={`credential-${installation.id}-${field.id}`}>{field.label}</label>
+            <input
+              id={`credential-${installation.id}-${field.id}`}
+              type={field.secret && !visible[field.id] ? "password" : "text"}
+              autoComplete="off"
+              value={draft}
+              readOnly={!manual}
+              placeholder={manual ? "BlackSea web modül secret’ını girin" : "SSH sistem ayarlarından kullanılıyor"}
+              onChange={manual ? (event) => setDrafts((current) => ({ ...current, [field.id]: event.target.value })) : undefined}
+            />
+            {saved ? <button className="button button--secondary button--compact" title={visible[field.id] ? "Gizle" : "Göster"} aria-label={visible[field.id] ? "Gizle" : "Göster"} onClick={() => setVisible((current) => ({ ...current, [field.id]: !current[field.id] }))}>
+              {visible[field.id] ? <EyeOff size={15} /> : <Eye size={15} />}{visible[field.id] ? "Gizle" : "Göster"}
+            </button> : <span />}
+            {saved ? <button className="button button--secondary button--compact" title="Kopyala" onClick={() => void window.adminControlCenter.copyInstallationCredential(installation.id, field.id)}><Copy size={15} />Kopyala</button> : null}
+            {manual ? <button className="button button--secondary button--compact" disabled={!draft.trim() || draft === saved || busyField === field.id} onClick={() => void save(field.id)}>
+              <Save size={15} />{busyField === field.id ? "Kaydediliyor" : saved ? "Değiştir" : "Kaydet"}
+            </button> : <span />}
+          </div>;
+        })}
+        {installation.id !== "blacksea" && !fields.syncSecret && !fields.sshIdentityFile ? (
+          <p className="credential-note">Bu deploy SSH config/agent üzerinden çalışıyor; ayrıca parola girilmesi gerekmiyor.</p>
+        ) : null}
+      </div> : null}
+      {notice ? <p className="credential-note" role="status">{notice}</p> : null}
+    </section>
   );
 }
 
@@ -446,8 +604,8 @@ function Installations({
               </article>
               <article className="summary-card">
                 <span>Credential</span>
-                <strong>{credentialLabel(selected.credentialStatus)}</strong>
-                <small>{selected.credentialRef ?? "Referans yok"}</small>
+                <strong>{selected.deployType === "ssh-rsync" && selected.credentialStatus === "unconfigured" ? "SSH config/agent" : credentialLabel(selected.credentialStatus)}</strong>
+                <small>{selected.deployType === "ssh-rsync" && selected.credentialStatus === "unconfigured" ? "İşletim sistemi kimlik doğrulaması" : selected.credentialRef ?? "Referans yok"}</small>
               </article>
               <article className="summary-card">
                 <span>Deploy tipi</span>
@@ -470,6 +628,8 @@ function Installations({
                 {selected.healthChecks.map((check) => <HealthRow key={check.id} check={check} />)}
               </div>
             </section>
+
+            <InstallationCredentials installation={selected} />
 
             <section className="panel installation-metadata">
               <div className="panel-header">
@@ -498,10 +658,6 @@ function Installations({
                 </div>
               </div>
 
-              <div className="security-note">
-                <KeyRound size={17} />
-                <span>Bu ekranda yalnız credential referansı ve kayıt durumu gösterilir; secret değeri renderer'a taşınmaz.</span>
-              </div>
             </section>
           </div>
         ) : (
@@ -1123,11 +1279,11 @@ function Tests({
             ) : null}
           </div>
 
-          <div className="verification-console">
-            {runState.outputTail.length
-              ? runState.outputTail.map((line, index) => <div key={`${index}:${line}`}>{line}</div>)
-              : <div>{runMessage || "Çıktı bekleniyor…"}</div>}
-          </div>
+          <LiveConsole
+            className="verification-console"
+            lines={runState.outputTail}
+            emptyText={runMessage || "Çıktı bekleniyor…"}
+          />
         </section>
       ) : null}
 
@@ -1473,8 +1629,14 @@ function Deploy({
               </article>
               <article className="summary-card">
                 <span>Credential</span>
-                <strong>{selectedInstallation ? credentialLabel(selectedInstallation.credentialStatus) : "—"}</strong>
-                <small>{selectedInstallation?.credentialRef ?? "Referans yok"}</small>
+                <strong>{selectedInstallation
+                  ? selectedInstallation.deployType === "ssh-rsync" && selectedInstallation.credentialStatus === "unconfigured"
+                    ? "SSH config/agent"
+                    : credentialLabel(selectedInstallation.credentialStatus)
+                  : "—"}</strong>
+                <small>{selectedInstallation?.deployType === "ssh-rsync" && selectedInstallation.credentialStatus === "unconfigured"
+                  ? "İşletim sistemi kimlik doğrulaması"
+                  : selectedInstallation?.credentialRef ?? "Referans yok"}</small>
               </article>
               <article className="summary-card">
                 <span>Hazırlık</span>
@@ -1585,6 +1747,7 @@ function Support({ productVersion }: { productVersion: string }) {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState("");
   const [statusBusy, setStatusBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [showResolve, setShowResolve] = useState(false);
   const [resolvedVersion, setResolvedVersion] = useState(productVersion);
   const [resolutionNote, setResolutionNote] = useState("");
@@ -1660,6 +1823,29 @@ function Support({ productVersion }: { productVersion: string }) {
     }
   }, [loadDetail, selectedId, statusBusy]);
 
+  async function deleteReport(report: SupportReportListItem) {
+    if (deletingId || statusBusy) return;
+    const confirmed = window.confirm(`${report.reportId} raporu sunucudan ve yerel önbellekten kalıcı olarak silinsin mi?`);
+    if (!confirmed) return;
+
+    setDeletingId(report.reportId);
+    setError("");
+    try {
+      await window.adminControlCenter.deleteSupportReport(report.reportId);
+      const remaining = reports.filter((item) => item.reportId !== report.reportId);
+      setReports(remaining);
+      if (selectedId === report.reportId) {
+        setDetail(null);
+        const nextSelection = remaining.find((item) => filter === "all" || item.status === filter);
+        setSelectedId(nextSelection?.reportId ?? "");
+      }
+    } catch (value) {
+      setError(value instanceof Error ? value.message : String(value));
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   const counts = useMemo(() => ({
     all: reports.length,
     new: reports.filter((item) => item.status === "new").length,
@@ -1719,23 +1905,37 @@ function Support({ productVersion }: { productVersion: string }) {
 
           <div className="support-list">
             {filtered.map((report) => (
-              <button
+              <div
                 key={report.reportId}
                 className={report.reportId === selectedId ? "support-list-item support-list-item--active" : "support-list-item"}
-                onClick={() => setSelectedId(report.reportId)}
               >
-                <div className="support-list-title">
-                  <span className="installation-dot" data-status={supportStatusTone(report.status)} />
-                  <div>
-                    <strong>{report.reportId}</strong>
-                    <small>{new Date(report.receivedAt).toLocaleString("tr-TR")}</small>
+                <button
+                  className="support-list-select"
+                  onClick={() => setSelectedId(report.reportId)}
+                  aria-current={report.reportId === selectedId ? "true" : undefined}
+                >
+                  <div className="support-list-title">
+                    <span className="installation-dot" data-status={supportStatusTone(report.status)} />
+                    <div>
+                      <strong>{report.reportId}</strong>
+                      <small>{new Date(report.receivedAt).toLocaleString("tr-TR")}</small>
+                    </div>
                   </div>
-                </div>
-                <div className="support-list-meta">
-                  <span className={statusClass(supportStatusTone(report.status))}>{supportStatusLabel(report.status)}</span>
-                  <small>{report.errorCount} error · {report.warnCount} warn</small>
-                </div>
-              </button>
+                  <div className="support-list-meta">
+                    <span className={statusClass(supportStatusTone(report.status))}>{supportStatusLabel(report.status)}</span>
+                    <small>{report.errorCount} error · {report.warnCount} warn</small>
+                  </div>
+                </button>
+                <button
+                  className="button button--danger button--compact support-delete-button"
+                  title="Raporu sil"
+                  aria-label={`${report.reportId} raporunu sil`}
+                  disabled={Boolean(deletingId) || statusBusy}
+                  onClick={() => void deleteReport(report)}
+                >
+                  {deletingId === report.reportId ? <RefreshCw size={15} className="spin" /> : <Trash2 size={15} />}
+                </button>
+              </div>
             ))}
             {!loadingList && !filtered.length ? (
               <div className="empty-row">Bu filtrede destek raporu yok.</div>
@@ -2075,8 +2275,8 @@ function System({ data }: { data: OverviewSnapshot }) {
                   <strong>{item.ref}</strong>
                   <small>{item.usedBy.join(" · ")}</small>
                 </div>
-                <span className={statusClass(item.status === "configured" ? "ready" : item.status === "unreadable" ? "error" : "unconfigured")}>
-                  {credentialLabel(item.status)}
+                <span className={statusClass(item.systemManaged ? "unknown" : item.status === "configured" ? "ready" : item.status === "unreadable" ? "error" : "unconfigured")}>
+                  {item.systemManaged ? "SSH config/agent" : credentialLabel(item.status)}
                 </span>
               </div>
             ))}
@@ -2314,6 +2514,7 @@ function StartupSplash({
 }
 
 export default function App() {
+  const bridgeRecoveryScheduled = useRef(false);
   const [section, setSection] = useState<Section>("overview");
   const [data, setData] = useState<OverviewSnapshot | null>(null);
   const [error, setError] = useState("");
@@ -2322,7 +2523,35 @@ export default function App() {
   const loadOverview = useCallback(async () => {
     setRefreshing(true);
     try {
-      setData(await window.adminControlCenter.getOverview());
+      const bridge = window.adminControlCenter;
+      if (!bridge || typeof bridge.getOverview !== "function") {
+        let attempts = 0;
+        try {
+          attempts = Number(sessionStorage.getItem("admin-bridge-recovery-attempts") ?? "0");
+        } catch {
+          // Do not reload repeatedly when recovery state cannot be persisted.
+          attempts = 5;
+        }
+        if (attempts < 5 && !bridgeRecoveryScheduled.current) {
+          try {
+            sessionStorage.setItem("admin-bridge-recovery-attempts", String(attempts + 1));
+          } catch {
+            throw new Error("Electron preload bağlantısı yüklenemedi. Uygulamayı kapatıp yeniden açın.");
+          }
+          bridgeRecoveryScheduled.current = true;
+          setError("Electron bağlantısı kuruluyor; uygulama kısa süre içinde yeniden yüklenecek.");
+          window.setTimeout(() => window.location.reload(), 900);
+          return;
+        }
+        throw new Error("Electron preload bağlantısı yüklenemedi. Uygulamayı kapatıp yeniden açın.");
+      }
+      try {
+        sessionStorage.removeItem("admin-bridge-recovery-attempts");
+      } catch {
+        // The bridge is available; session storage is optional.
+      }
+      bridgeRecoveryScheduled.current = false;
+      setData(await bridge.getOverview());
       setError("");
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));

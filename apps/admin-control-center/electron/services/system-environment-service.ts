@@ -13,6 +13,7 @@ type Registry = {
   installations?: Record<string, {
     title?: string;
     credentialRef?: string;
+    deploy?: { type?: string };
     externalRepo?: {
       env?: string;
       defaultSibling?: string;
@@ -68,32 +69,44 @@ function credentialStatus(record: Record<string, unknown> | undefined): Credenti
 function getCredentialSnapshots(repoRoot: string, registry: Registry): SystemCredentialSnapshot[] {
   const credentialPath = join(repoRoot, "config", "credentials.local.json");
   let local: Credentials = {};
+  let credentialFileUnreadable = false;
 
   if (existsSync(credentialPath)) {
     try {
       local = readJson<Credentials>(credentialPath);
     } catch {
       local = {};
+      credentialFileUnreadable = true;
     }
   }
 
-  const refs = new Map<string, string[]>();
+  const refs = new Map<string, Array<{ title: string; deployType: string }>>();
 
   for (const [id, installation] of Object.entries(registry.installations ?? {})) {
     const ref = String(installation.credentialRef ?? "").trim();
     if (!ref) continue;
     const usedBy = refs.get(ref) ?? [];
-    usedBy.push(String(installation.title ?? id));
+    usedBy.push({
+      title: String(installation.title ?? id),
+      deployType: String(installation.deploy?.type ?? "")
+    });
     refs.set(ref, usedBy);
   }
 
-  return [...refs.entries()].map(([ref, usedBy]) => ({
-    ref,
-    status: existsSync(credentialPath)
-      ? credentialStatus(local.credentials?.[ref])
-      : "unconfigured",
-    usedBy
-  }));
+  return [...refs.entries()].map(([ref, installations]) => {
+    const record = local.credentials?.[ref];
+    const systemManaged = !credentialFileUnreadable
+      && installations.every((installation) => installation.deployType === "ssh-rsync")
+      && !String(record?.sshIdentityFile ?? "").trim();
+    return {
+      ref,
+      status: credentialFileUnreadable
+        ? "unreadable"
+        : existsSync(credentialPath) ? credentialStatus(record) : "unconfigured",
+      usedBy: installations.map((installation) => installation.title),
+      systemManaged
+    };
+  });
 }
 
 function resolveBlackSeaRoot(repoRoot: string, registry: Registry) {

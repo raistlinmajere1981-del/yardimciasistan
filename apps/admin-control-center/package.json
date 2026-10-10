@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "node scripts/start-dev.mjs",
     "build": "tsc -p tsconfig.electron.json && vite build --config vite.renderer.config.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
+    "build:check": "node scripts/build-check.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "test:credentials": "tsc -p tsconfig.electron.json && node --test ../../scripts/test-admin-credentials.mjs"
   },
   "dependencies": {
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
