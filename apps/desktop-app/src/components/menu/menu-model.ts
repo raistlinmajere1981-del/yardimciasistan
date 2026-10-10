@@ -53,7 +53,7 @@ export function findMenuCategoryName(categoryId: string, categories: DesktopDash
 export function compareMenuRecords(left: { sort_order: number; name: string }, right: { sort_order: number; name: string }) {
   return left.sort_order - right.sort_order || left.name.localeCompare(right.name, "tr");
 }
-export function stockUnitShortLabel(unit: CommerceUnit): string { return unit === "piece" ? "adet" : unit; }
+function stockUnitShortLabel(unit: CommerceUnit): string { return unit === "piece" ? "adet" : unit; }
 export function getMenuStockBadge(item: PublishedMenuItem): { label: string; tone: StatusTone } | null {
   if (item.stock_quantity == null) return null;
   if (item.stock_quantity < item.stock_consumption_quantity) return { label: "Stokta yok", tone: "danger" };
@@ -72,7 +72,7 @@ export function resolveMenuPreviewImageUrl(imageUrl: string, webModuleUrl: strin
 export function formatCurrency(value: number, currency: string) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
-export function buildMenuPreviewData(menu: DesktopDashboardData["menu"], categoryForm: CategoryFormState, _itemForm: ItemFormState) {
+export function buildMenuPreviewData(menu: DesktopDashboardData["menu"], categoryForm: CategoryFormState) {
   // Prices and product presentation are always the last backend projection, not renderer calculations.
   return { ...menu, categories: menu.categories.map(category => category.id === categoryForm.id
     ? { ...category, ...categoryForm, sort_order: Number(categoryForm.sort_order) } : category) };

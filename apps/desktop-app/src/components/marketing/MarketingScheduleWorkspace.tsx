@@ -1,8 +1,8 @@
 import type { MarketingChannelRegistry, MarketingRecurrenceRule, MarketingScheduleDetail, MarketingScheduleInput, MarketingPublication } from "@yardimci-asistan/shared";
 import { DatePicker, TimePicker } from "../ui/DateTimePicker";
 import { ActionButton } from "../ui/ActionButton";
-export const scheduleStatuses={active:"Aktif",paused:"Plan duraklatıldı",completed:"Tamamlandı",cancelled:"İptal edildi"};
-export const executionStatuses={pending:"Sonuç bekleniyor",claimed:"Çalışıyor",succeeded:"Başarılı",skipped:"Atlandı",failed:"Başarısız"};
+const scheduleStatuses={active:"Aktif",paused:"Plan duraklatıldı",completed:"Tamamlandı",cancelled:"İptal edildi"};
+const executionStatuses={pending:"Sonuç bekleniyor",claimed:"Çalışıyor",succeeded:"Başarılı",skipped:"Atlandı",failed:"Başarısız"};
 function scheduleDate(instant:string,timezone:string) {return instant?new Date(instant).toLocaleString("tr-TR",{timeZone:timezone}):"—";}
 export function scheduleDraft(detail:MarketingScheduleDetail):MarketingScheduleInput {
   const s=detail.schedule;

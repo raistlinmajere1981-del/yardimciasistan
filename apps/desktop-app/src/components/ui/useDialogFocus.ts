@@ -20,7 +20,7 @@ export function useDialogFocus(open: boolean) {
       if (dialogs.at(-1) !== dialog) return;
       if (event.key === "Escape") {
         if (event.defaultPrevented || event.target instanceof Element && event.target.closest("[popover]:popover-open")) return;
-        const close = dialog.querySelector<HTMLButtonElement>('[data-dialog-close], .drawer-close-button, .overlay-close');
+        const close = dialog.querySelector<HTMLButtonElement>('[data-dialog-close]');
         if (close && !close.disabled) { event.preventDefault(); event.stopPropagation(); close.click(); }
       }
       if (event.key !== "Tab") return;

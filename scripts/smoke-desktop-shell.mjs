@@ -186,7 +186,7 @@ try {
         await page.getByRole('navigation', { name: 'Müşteri işleri görünümü' }).getByRole('button', { name: 'Talepler', exact: true }).click();
         await page.getByRole('button', { name: 'Talimat Ekle', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: 'Yeni talimat', exact: true });
-        await checkOverlay(dialog, 'request-drawer');
+        await checkOverlay(dialog, 'request-workspace');
         await dialog.getByRole('button', { name: 'Formu kapat', exact: true }).click();
         await expect(dialog).toHaveCount(0);
       }

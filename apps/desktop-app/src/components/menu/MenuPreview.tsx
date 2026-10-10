@@ -10,7 +10,8 @@ import {
   isQrHiddenByStock,
   resolveMenuPreviewImageUrl
 } from "./menu-model";
-import { useDialogFocus } from "../ui/useDialogFocus";
+import { ModalSurface } from "../ui/ModalSurface";
+import { ActionButton } from "../ui/ActionButton";
 
 interface LocalMenuPreviewProps {
   menu: DesktopDashboardData["menu"];
@@ -23,34 +24,23 @@ interface LocalMenuPreviewProps {
 }
 
 export function LocalMenuPreview({ menu, setupData, webModuleUrl, whatsappEnabled, qrMenuEnabled, inventoryEnabled, onClose }: LocalMenuPreviewProps) {
-  const dialogRef = useDialogFocus(true);
-
   return (
-    <div
-      className="local-menu-preview-overlay overlay"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <section ref={dialogRef} className="local-menu-preview-dialog dialog dialog--wide dialog--preview" role="dialog" aria-modal="true" aria-labelledby="local-menu-preview-title">
-        <header className="local-menu-preview-toolbar overlay-header">
-          <div>
-            <strong id="local-menu-preview-title">Yerel Menü Önizlemesi</strong>
-            <span>{qrMenuEnabled ? "Düzenleme alanındaki canlı taslak gösteriliyor; kaydetmeden web yayını etkilenmez." : "Düzenleme alanındaki yerel menü taslağı gösteriliyor."}</span>
-          </div>
-          <button className="overlay-close" data-dialog-close type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
-            <X size={18} aria-hidden="true" />
-            Kapat
-          </button>
-        </header>
-
-        <div className="local-menu-preview-viewport">
-          <MenuPreviewCanvas menu={menu} setupData={setupData} webModuleUrl={webModuleUrl} whatsappEnabled={whatsappEnabled} qrMenuEnabled={qrMenuEnabled} inventoryEnabled={inventoryEnabled} />
+    <ModalSurface className="local-menu-preview-dialog" labelledBy="local-menu-preview-title" onClose={onClose} dismissOnBackdrop>
+      <header className="local-menu-preview-toolbar workspace-frame__header">
+        <div>
+          <strong id="local-menu-preview-title">Yerel Menü Önizlemesi</strong>
+          <span>{qrMenuEnabled ? "Düzenleme alanındaki canlı taslak gösteriliyor; kaydetmeden web yayını etkilenmez." : "Düzenleme alanındaki yerel menü taslağı gösteriliyor."}</span>
         </div>
-      </section>
-    </div>
+        <ActionButton variant="ghost" data-modal-initial-focus type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
+          <X size={18} aria-hidden="true" />
+          Kapat
+        </ActionButton>
+      </header>
+
+      <div className="local-menu-preview-viewport">
+        <MenuPreviewCanvas menu={menu} setupData={setupData} webModuleUrl={webModuleUrl} whatsappEnabled={whatsappEnabled} qrMenuEnabled={qrMenuEnabled} inventoryEnabled={inventoryEnabled} />
+      </div>
+    </ModalSurface>
   );
 }
 
@@ -61,10 +51,6 @@ interface MenuPreviewCanvasProps {
   whatsappEnabled: boolean;
   qrMenuEnabled: boolean;
   inventoryEnabled: boolean;
-  embedded?: boolean;
-  activeCategoryHint?: string;
-  focusedItemId?: string;
-  onActiveCategoryChange?: (categoryId: string) => void;
 }
 
 function MenuPreviewCanvas({
@@ -73,13 +59,9 @@ function MenuPreviewCanvas({
   webModuleUrl,
   whatsappEnabled,
   qrMenuEnabled,
-  inventoryEnabled,
-  embedded = false,
-  activeCategoryHint = "all",
-  focusedItemId = "",
-  onActiveCategoryChange
+  inventoryEnabled
 }: MenuPreviewCanvasProps) {
-  const [activeCategoryId, setActiveCategoryId] = useState(activeCategoryHint || "all");
+  const [activeCategoryId, setActiveCategoryId] = useState("all");
   const [failedHeroImageUrl, setFailedHeroImageUrl] = useState("");
   const categories = useMemo(
     () => menu.categories.filter((category) => category.is_active).sort(compareMenuRecords),
@@ -94,19 +76,10 @@ function MenuPreviewCanvas({
   );
 
   useEffect(() => {
-    setActiveCategoryId(activeCategoryHint || "all");
-  }, [activeCategoryHint]);
-
-  useEffect(() => {
     setActiveCategoryId((current) => (
       current === "all" || categories.some((category) => category.id === current) ? current : "all"
     ));
   }, [categories]);
-
-  function selectPreviewCategory(categoryId: string) {
-    setActiveCategoryId(categoryId);
-    onActiveCategoryChange?.(categoryId);
-  }
 
   const visibleCategories = activeCategoryId === "all"
     ? categories
@@ -126,12 +99,12 @@ function MenuPreviewCanvas({
   const visibleHeroImageUrl = heroImageUrl === failedHeroImageUrl ? "" : heroImageUrl;
 
   return (
-    <article className={embedded ? "local-menu-preview-page is-embedded" : "local-menu-preview-page"} aria-label="Müşteri menüsü görünümü">
+    <article className="local-menu-preview-page" aria-label="Müşteri menüsü görünümü">
       <header className={visibleHeroImageUrl ? "local-menu-hero has-image" : "local-menu-hero"}>
         {visibleHeroImageUrl && <img src={visibleHeroImageUrl} alt="" onError={() => setFailedHeroImageUrl(visibleHeroImageUrl)} />}
         <div className="local-menu-hero-shade" />
         <div className="local-menu-hero-content">
-          <p>{qrMenuEnabled ? "QR Menü" : "Menü"} · {embedded ? "Canlı Taslak" : "Yerel Önizleme"}</p>
+          <p>{qrMenuEnabled ? "QR Menü" : "Menü"} · Yerel Önizleme</p>
           <h2>{setupData.businessName || "İşletme"} Menü</h2>
           <span>{qrMenuEnabled ? "Güncel ürünleri ve fiyatları yayınlamadan önce kontrol edin." : "Güncel ürünleri ve fiyatları kontrol edin."}</span>
           <div className="local-menu-hero-meta" aria-label="Menü bilgileri">
@@ -149,7 +122,7 @@ function MenuPreviewCanvas({
               className={activeCategoryId === "all" ? "is-active" : ""}
               type="button"
               aria-pressed={activeCategoryId === "all"}
-              onClick={() => selectPreviewCategory("all")}
+              onClick={() => setActiveCategoryId("all")}
             >
               Tüm Ürünler
             </button>
@@ -158,7 +131,7 @@ function MenuPreviewCanvas({
                 className={activeCategoryId === category.id ? "is-active" : ""}
                 type="button"
                 aria-pressed={activeCategoryId === category.id}
-                onClick={() => selectPreviewCategory(category.id)}
+                onClick={() => setActiveCategoryId(category.id)}
                 key={category.id}
               >
                 {category.name}
@@ -183,7 +156,6 @@ function MenuPreviewCanvas({
                     key={item.id}
                     item={item}
                     webModuleUrl={webModuleUrl}
-                    focused={item.id === focusedItemId}
                   />
                 ))}
               </div>
@@ -206,24 +178,21 @@ function MenuPreviewCanvas({
 interface MenuPreviewItemProps {
   item: PublishedMenuItem;
   webModuleUrl: string;
-  focused: boolean;
 }
 
-function MenuPreviewItem({ item, webModuleUrl, focused }: MenuPreviewItemProps) {
+function MenuPreviewItem({ item, webModuleUrl }: MenuPreviewItemProps) {
   const [failedImageUrl, setFailedImageUrl] = useState("");
   const imageUrl = resolveMenuPreviewImageUrl(item.image_url, webModuleUrl);
   const visibleImageUrl = imageUrl === failedImageUrl ? "" : imageUrl;
   const itemClasses = [
     "local-menu-preview-item",
     visibleImageUrl ? "" : "no-image",
-    focused ? "is-focused" : ""
   ].filter(Boolean).join(" ");
 
   return (
     <article className={itemClasses}>
       {visibleImageUrl && <img src={visibleImageUrl} alt={item.name} onError={() => setFailedImageUrl(visibleImageUrl)} />}
       <div className="local-menu-preview-item-body">
-        {focused && <span className="local-menu-preview-editing">Canlı düzenleme</span>}
         <div className="local-menu-preview-item-title">
           <strong className={item.is_featured ? "is-featured" : ""}>{item.name}</strong>
           <span>{formatCurrency(item.price, item.currency)}</span>

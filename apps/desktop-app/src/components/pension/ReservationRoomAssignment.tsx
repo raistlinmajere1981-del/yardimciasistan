@@ -6,7 +6,7 @@ import { SearchSelect } from "../ui/SearchSelect";
 
 type Reservation = DesktopDashboardData["reservations"][number];
 // Only user intent crosses the bridge; persisted metadata stays backend-owned.
-export function assignReservationRoom(reservation: Reservation, roomId: string,
+function assignReservationRoom(reservation: Reservation, roomId: string,
   save: (input: AssignReservationRoomInput) => Promise<DesktopStatusUpdateResult> = input => window.yardimciDesktop!.assignReservationRoom(input)
 ): Promise<DesktopStatusUpdateResult> {
   return save({ reservationId: reservation.id, roomId });

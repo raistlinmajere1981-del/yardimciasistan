@@ -87,15 +87,15 @@ export function QuickCustomerCreator({
           <strong>Yeni müşteri</strong>
           <small>Her misafir için ayrı kayıt oluşturun. Telefon zorunlu değildir.</small>
         </div>
-        <button
-          className="drawer-close-button"
+        <ActionButton
+          variant="ghost"
           type="button"
           aria-label="Hızlı müşteri formunu kapat"
           disabled={state === "loading"}
           onClick={closeEditor}
         >
-          <X size={16} aria-hidden="true" />
-        </button>
+          <X size={16} aria-hidden="true" /> Kapat
+        </ActionButton>
       </div>
 
       <div className="form-row">

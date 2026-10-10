@@ -165,14 +165,14 @@ export function QrMenuPanel({ enabled: moduleEnabled, webModuleUrl, onPreview, u
       onClose={() => setToolsOpen(false)}
     >
       <div className="qr-menu-tools">
-        <header className="overlay-header">
+        <header className="workspace-frame__header">
           <div>
             <strong id="qr-menu-tools-title">QR Menü</strong>
             <span>Bu kod webdeki güncel QR Menü sayfasını açar.</span>
           </div>
-          <button className="overlay-close" type="button" data-modal-initial-focus onClick={() => setToolsOpen(false)} aria-label="QR Menü araçlarını kapat">
+          <ActionButton variant="ghost" type="button" data-modal-initial-focus onClick={() => setToolsOpen(false)} aria-label="QR Menü araçlarını kapat">
             <X size={18} aria-hidden="true" />
-          </button>
+          </ActionButton>
         </header>
         <div className="qr-menu-tools__body">
           {svg

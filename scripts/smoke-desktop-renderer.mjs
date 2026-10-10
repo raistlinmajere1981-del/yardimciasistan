@@ -746,6 +746,12 @@ try {
   });
   await stockImageDialog.getByRole("button", { name: "Kapat", exact: true }).click();
   await expect(stockImageDialog).toHaveCount(0);
+  await expect(stockImageTrigger).toBeFocused();
+  await stockImageTrigger.click();
+  await expect(stockImageDialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(stockImageDialog).toHaveCount(0);
+  await expect(stockImageTrigger).toBeFocused();
   await expect(page.locator(".menu-category-panel .menu-panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
   await expect(page.locator(".menu-product-panel .menu-panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
   await expect(page.getByText("Menüdeki ürün gruplarını yönetin. Sıralamak için kayıtları sürükleyin.", { exact: true })).toHaveCount(0);
@@ -861,6 +867,12 @@ try {
   await page.screenshot({ path: "artifacts/screenshots/desktop-local-menu-preview.png", fullPage: true });
   await localMenuPreview.getByRole("button", { name: "Önizlemeyi kapat" }).click();
   await expect(localMenuPreview).toHaveCount(0);
+  await expect(qrMenuPanel.getByRole("button", { name: "Önizle", exact: true })).toBeFocused();
+  await qrMenuPanel.getByRole("button", { name: "Önizle", exact: true }).click();
+  await expect(localMenuPreview).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(localMenuPreview).toHaveCount(0);
+  await expect(qrMenuPanel.getByRole("button", { name: "Önizle", exact: true })).toBeFocused();
   await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(0);
   await qrMenuPanel.getByRole("button", { name: "QR Kod", exact: true }).click();
   const qrTools = page.getByRole("dialog", { name: "QR Menü", exact: true });
@@ -2160,7 +2172,7 @@ try {
   const polishedOrderStatus = polishedOrderDrawer.getByRole("group", { name: "Sipariş durumu", exact: true });
   await expect(polishedOrderStatus).toBeVisible();
   await expect(polishedOrderDrawer.getByRole("button", { name: "Ödendi / Kapat" })).toBeVisible();
-  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-table-order-drawer-polish-1366x768.png" });
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-table-order-workspace-1366x768.png" });
   await polishedOrderStatus.getByRole("button", { name: "Hazırlanıyor", exact: true }).click();
   await expect(polishedOrderStatus.getByRole("button", { name: "Hazırlanıyor", exact: true })).toHaveAttribute("aria-pressed", "true");
   await polishedOrderDrawer.getByRole("button", { name: "Masa çalışma alanını kapat", exact: true }).click();

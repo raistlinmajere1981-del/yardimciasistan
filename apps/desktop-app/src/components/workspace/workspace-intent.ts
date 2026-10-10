@@ -22,7 +22,7 @@ export interface TableWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-export type CustomerWorkspaceMode = "main" | "history";
+type CustomerWorkspaceMode = "main" | "history";
 
 export interface CustomerWorkspaceIntent {
   entityType: "customer";
@@ -32,7 +32,7 @@ export interface CustomerWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-export type ProductWorkspaceMode = "details" | "history";
+type ProductWorkspaceMode = "details" | "history";
 
 export interface ProductWorkspaceIntent {
   entityType: "product";

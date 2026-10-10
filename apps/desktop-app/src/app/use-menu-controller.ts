@@ -21,7 +21,6 @@ import {
 interface UseMenuControllerOptions {
   dashboardData: DesktopDashboardData;
   setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>;
-  loadDashboardData: () => Promise<DesktopDashboardData | undefined>;
 }
 
 const initialCategoryForm = toCategoryForm(defaultDashboardData.menu.categories[0]);
@@ -58,8 +57,8 @@ export function useMenuController({
   }, [dashboardData.menu.categories, dashboardData.menu.items, selectedCategoryId, selectedItemId]);
 
   const menuPreviewData = useMemo(
-    () => buildMenuPreviewData(dashboardData.menu, categoryForm, itemForm),
-    [categoryForm, dashboardData.menu, itemForm]
+    () => buildMenuPreviewData(dashboardData.menu, categoryForm),
+    [categoryForm, dashboardData.menu]
   );
 
   async function openMenuPreview() {

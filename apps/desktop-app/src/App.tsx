@@ -95,8 +95,7 @@ function App() {
   });
   const menuController = useMenuController({
     dashboardData: desktopSyncController.dashboardData,
-    setDashboardData: desktopSyncController.setDashboardData,
-    loadDashboardData: desktopSyncController.loadDashboardData
+    setDashboardData: desktopSyncController.setDashboardData
   });
   const surfaceData = useMemo(
     () => projectDesktopDashboardData(

@@ -27,6 +27,10 @@ fiyatlama, yayın sürümü ve gönderim bilgileri workspace veya contextual yar
 Navigasyon için quiet selected state; kaydet/ana işlem primary, yardımcı işlem secondary,
 yıkıcı işlem danger kullanılır. Hover/pressed/focus/selected durumları shared CSS'e aittir.
 
+Menü önizlemesi ve stok görseli aktarımı da aynı `ModalSurface` sınırını kullanır;
+ayrı overlay/dialog veya drawer görünümü yoktur. Modal içi onay ve workspace
+alt akışları mevcut sınırın içinde kalır.
+
 ## Search / select
 
 `SearchSelect`, mevcut primitive'in non-modal native popover sürümüdür. Native top layer

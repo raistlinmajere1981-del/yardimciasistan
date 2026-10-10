@@ -194,7 +194,7 @@ try {
       const dialog = [...document.querySelectorAll('[aria-modal="true"]')].at(-1);
       const bounds = dialog?.getBoundingClientRect();
       return { documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, contentOverflow: content.scrollWidth > content.clientWidth + 1,
-        surfaces: [...document.querySelectorAll('.record-workspace, .card, .panel, .page-toolbar, .form-row, .drawer, .overlay-body')].filter(el => el.clientWidth && el.scrollWidth > el.clientWidth + 1).map(el => el.className),
+        surfaces: [...document.querySelectorAll('.record-workspace, .card, .panel, .page-toolbar, .form-row, .workspace-frame, .workspace-frame__body')].filter(el => el.clientWidth && el.scrollWidth > el.clientWidth + 1).map(el => el.className),
         dialogOverflow: bounds ? bounds.left < 0 || bounds.right > innerWidth + 1 || bounds.bottom > innerHeight + 1 : false };
     });
     observations.push({ width: page.viewportSize().width, name, ...metrics });
