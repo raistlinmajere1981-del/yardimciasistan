@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
@@ -14,7 +15,7 @@ const runtime = require("../apps/desktop-app/dist-electron/commerce-runtime.js")
 const presentation = require("../apps/desktop-app/dist-electron/commerce-catalog-presentation-store.js");
 const { completeMarketSale } = require("../apps/desktop-app/dist-electron/market-sale-operation.js");
 const { readBusinessCapabilitySnapshot } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
-const dir = mkdtempSync("/tmp/opencode/sales-ui-");
+const dir = mkdtempSync(join(tmpdir(), "sales-ui-"));
 const database = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dir });
 let server, browser, page;
 const errors = [];
@@ -224,7 +225,7 @@ try {
 } catch (error) {
   if (page) {
     console.error("sales-ui-failure", { errors, text: (await page.locator("body").innerText()).slice(0, 4000) });
-    await page.screenshot({ path: "/tmp/opencode/sales-ui-failure.png" });
+    await page.screenshot({ path: "artifacts/screenshots/sales-ui-failure.png" });
   }
   throw error;
 } finally { await browser?.close(); await server?.close(); database.close(); rmSync(dir, { recursive: true, force: true }); }

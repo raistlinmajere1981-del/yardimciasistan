@@ -3,6 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import http from "node:http";
 import { verifyRestoreReconciliation } from "./test-helpers/restore-reconciliation.mjs";
@@ -15,7 +16,7 @@ const { createAndroidOperationsSnapshot } = require("../apps/desktop-app/dist-el
 const core = require("../packages/sync-core/dist/index.js");
 const {createPublicRoomAvailabilityPublication}=require('../apps/desktop-app/dist-electron/public-room-availability-publication.js');
 const {publishDesktopProjection}=require('../apps/desktop-app/dist-electron/desktop-publication-service.js');
-const root = mkdtempSync("/tmp/opencode/publication-protocol-");
+const root = mkdtempSync(join(tmpdir(), "publication-protocol-"));
 const hosting = join(root, "web-module");
 cpSync("firm-template/web-module", hosting, { recursive: true });
 for (const file of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) rmSync(join(hosting, "data", file), { force: true });

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { runInNewContext } from "node:vm";
 import { DatabaseSync } from "node:sqlite";
 import { fixtureHttp, fixtureSecretService, fixtureShippingService, testCredentials } from "./test-helpers/aras-provider-fixtures.mjs";
@@ -11,7 +12,7 @@ const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.
 const { BUSINESS_CAPABILITIES: C, COMMERCE_SHIPPING_PROVIDERS, ARAS_SHIPPING_PROVIDER, compareVersions } = require("../packages/shared/dist");
 const { createCurrentBusinessWebContext } = require("../apps/desktop-app/dist-electron/business-ai-context-service.js");
 const { getBusinessPublicProfile, saveBusinessPublicProfile } = require("../apps/desktop-app/dist-electron/business-public-profile.js");
-const root = mkdtempSync("/tmp/opencode/settings-correctness-");
+const root = mkdtempSync(join(tmpdir(), "settings-correctness-"));
 const db = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: root });
 const secrets = fixtureSecretService();
 const activationExports = {};

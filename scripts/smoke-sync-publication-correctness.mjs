@@ -4,6 +4,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import http from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
@@ -19,7 +20,7 @@ const { BUSINESS_CAPABILITIES: C } = require("@yardimci-asistan/shared");
 const nativeFetch = globalThis.fetch;
 
 async function fixture(t) {
-  const root = mkdtempSync("/tmp/opencode/sync-correctness-");
+  const root = mkdtempSync(join(tmpdir(), "sync-correctness-"));
   const hosting = join(root, "web-module");
   cpSync("firm-template/web-module", hosting, { recursive: true });
   for (const suffix of ["", "-wal", "-shm"]) rmSync(join(hosting, "data", `yardimci-asistan.sqlite${suffix}`), { force: true });

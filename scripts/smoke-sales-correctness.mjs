@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "vite";
 
@@ -48,7 +49,7 @@ try {
   check("runtime removal", () => assert.equal(sales([]), false));
 } finally { await server.close(); }
 
-const dataDir = mkdtempSync("/tmp/opencode/sales-correctness-");
+const dataDir = mkdtempSync(join(tmpdir(), "sales-correctness-"));
 const database = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: dataDir });
 try {
   database.initialize();
