@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { BusinessCapabilityRuntimeProvider } from "./app/business-capability-context";
 import { runtimeHasCapability } from "./app/capabilities";
@@ -20,6 +20,7 @@ import { writeRendererDiagnostic } from "./app/diagnostics-client";
 
 function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
+  const [pageTransitionPending, startPageTransition] = useTransition();
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [customerWorkTab, setCustomerWorkTab] = useState<CustomerWorkTab>("customers");
@@ -38,10 +39,10 @@ function App() {
   const requestPageChange = useCallback((destination: DesktopPage) => {
     if (destination === activePage) return;
     const guard = pageLeaveGuardRef.current;
-    if (guard && !guard(destination, () => setActivePage(destination))) {
+    if (guard && !guard(destination, () => startPageTransition(() => setActivePage(destination)))) {
       return;
     }
-    setActivePage(destination);
+    startPageTransition(() => setActivePage(destination));
   }, [activePage]);
 
   useEffect(() => subscribeAppStatus(({ state, message }) => {
@@ -152,6 +153,7 @@ function App() {
       {messagingController.confirmDialog}
       <DesktopAppView
         activePage={activePage}
+        pageTransitionPending={pageTransitionPending}
         requestPageChange={requestPageChange}
         customerWorkTab={customerWorkTab}
         setCustomerWorkTab={setCustomerWorkTab}

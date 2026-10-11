@@ -36,6 +36,7 @@ const DiagnosticsViewer = lazy(() => import("../diagnostics/DiagnosticsViewer").
 
 interface DesktopAppFrameProps {
   activePage: DesktopPage;
+  pageTransitionPending: boolean;
   requestPageChange: RequestPageChange;
   setCustomerWorkTab: Dispatch<SetStateAction<CustomerWorkTab>>;
   surfaceData: DesktopDashboardData;
@@ -71,6 +72,7 @@ export function DesktopAppFrame(props: DesktopAppFrameProps) {
 
 function DesktopAppFrameContent({
   activePage,
+  pageTransitionPending,
   requestPageChange,
   setCustomerWorkTab,
   surfaceData,
@@ -225,6 +227,12 @@ function DesktopAppFrameContent({
           ) : undefined}
           action={(
             <div className="page-header-tools">
+              {pageTransitionPending && (
+                <span className="page-transition-indicator" role="status">
+                  <span className="page-transition-indicator__dots" aria-hidden="true"><i /><i /><i /></span>
+                  Açılıyor
+                </span>
+              )}
               <SyncStatusIndicator
                 automaticSyncStatus={automaticSyncStatus}
                 onSync={() => void handlePullRequests()}

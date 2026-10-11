@@ -41,6 +41,7 @@ import { useRestaurantPageController } from "../restaurant/restaurant-page-state
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import type { MarketView } from "../workspace/workspace-intent";
 import { CustomerWorkRoute } from "./routes/CustomerWorkRoute";
+import { PageLoadingFallback } from "./PageLoadingFallback";
 
 const RoomCategoryControl = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomCategoryControl})));
 const RoomFiltersToolbar = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomFiltersToolbar})));
@@ -338,7 +339,7 @@ export function DesktopWorkspaceRouter({
 
   return (
     <>
-      <Suspense fallback={<p role="status" aria-live="polite">Sayfa hazırlanıyor…</p>}>
+      <Suspense fallback={<PageLoadingFallback />}>
       {activePage === "dashboard" ? (
         <DashboardPage
           data={surfaceData}
