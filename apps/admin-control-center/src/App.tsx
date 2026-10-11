@@ -48,6 +48,10 @@ import type {
 
 type Section = "overview" | "installations" | "release" | "tests" | "deploy" | "support" | "system";
 
+function normalizeVerificationRunState(state: VerificationRunState): VerificationRunState {
+  return { ...state, totalPlanned: state.totalPlanned ?? 0, checks: Array.isArray(state.checks) ? state.checks : [] };
+}
+
 const NAV_ITEMS: Array<{ id: Section; label: string; icon: typeof Home }> = [
   { id: "overview", label: "Genel Bakış", icon: Home },
   { id: "installations", label: "Kurulumlar", icon: Server },
@@ -682,6 +686,8 @@ function Release({
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [message, setMessage] = useState("");
   const [verifyRun, setVerifyRun] = useState<VerificationRunState>({
+    totalPlanned: 0,
+    checks: [],
     running: false,
     selectionLabel: "",
     startedAt: null,
@@ -1067,6 +1073,8 @@ function Tests({
   const [preset, setPreset] = useState(defaultPreset);
   const [domain, setDomain] = useState("all");
   const [runState, setRunState] = useState<VerificationRunState>({
+    totalPlanned: 0,
+    checks: [],
     running: false,
     selectionLabel: "",
     startedAt: null,
@@ -1077,6 +1085,9 @@ function Tests({
   });
   const [runMessage, setRunMessage] = useState("");
   const [history, setHistory] = useState<VerificationHistoryItem[]>([]);
+  const [expandedCheckId, setExpandedCheckId] = useState("");
+  const [expandedOutput, setExpandedOutput] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
 
   const loadHistory = useCallback(async () => {
     try {
@@ -1099,18 +1110,20 @@ function Tests({
   useEffect(() => {
     let previousRunning = false;
     let active = true;
+    let receivedLiveState = false;
 
     void window.adminControlCenter.getVerificationRunState().then((state) => {
-      if (!active) return;
+      if (!active || receivedLiveState) return;
       previousRunning = state.running;
-      setRunState(state);
+      setRunState(normalizeVerificationRunState(state));
     });
 
     const unsubscribe = window.adminControlCenter.onVerificationRunState((state) => {
       if (!active) return;
+      receivedLiveState = true;
       const justFinished = previousRunning && !state.running;
       previousRunning = state.running;
-      setRunState(state);
+      setRunState(normalizeVerificationRunState(state));
       if (justFinished) {
         onRefresh();
         void loadHistory();
@@ -1127,6 +1140,26 @@ function Tests({
   const visibleChecks = verification.checks.filter((check) =>
     planIds.has(check.id) && (domain === "all" || check.domains.includes(domain))
   );
+
+  const activeCheck = runState.checks.find((check) => check.status === "running");
+  const doneCount = runState.checks.filter((check) => check.status !== "running").length;
+  const failedCount = runState.checks.filter((check) => check.status === "failed").length;
+  const totalCount = runState.totalPlanned || runState.checks.length;
+  const runChecksById = new Map(runState.checks.map((check) => [check.id, check]));
+
+  useEffect(() => {
+    if (!expandedCheckId) return;
+    let active = true;
+    void window.adminControlCenter.getVerificationCheckOutput(expandedCheckId).then((value) => {
+      if (active) setExpandedOutput(value);
+    });
+    return () => { active = false; };
+  }, [expandedCheckId, runChecksById.get(expandedCheckId)?.status]);
+
+  const copyCheck = useCallback(async (checkId: string) => {
+    const copied = await window.adminControlCenter.copyVerificationCheckOutput(checkId);
+    setCopyStatus(copied ? "Kontrol çıktısı kopyalandı." : "Kopyalanabilecek çıktı bulunamadı.");
+  }, []);
 
   const latestTone: StatusKind = verification.latest.result === "passed"
     ? "ready"
@@ -1148,6 +1181,9 @@ function Tests({
 
   const startRun = useCallback(async (mode: "preset" | "domain" | "check", value: string) => {
     if (!value || runState.running) return;
+    setExpandedCheckId("");
+    setExpandedOutput("");
+    setCopyStatus("");
     setRunMessage("");
     const result = await window.adminControlCenter.startVerification({ mode, value });
     setRunMessage(result.message);
@@ -1196,34 +1232,42 @@ function Tests({
 
       <section className="verification-summary">
         <article className="verification-latest">
-          <div className="verification-result-icon" data-status={latestTone}>
-            {verification.latest.result === "passed"
+          <div className="verification-result-icon" data-status={runState.startedAt ? runTone : latestTone}>
+            {(runState.startedAt ? runState.result : verification.latest.result) === "passed"
               ? <CheckCircle2 size={25} />
-              : verification.latest.result === "failed"
+              : (runState.startedAt ? runState.result : verification.latest.result) === "failed"
                 ? <XCircle size={25} />
                 : <Timer size={25} />}
           </div>
           <div className="verification-latest-copy">
-            <span>Son doğrulama</span>
+            <span>{runState.startedAt ? "Bu koşu" : "Son doğrulama"}</span>
             <strong>
-              {verification.latest.available
-                ? verification.latest.result === "passed"
-                  ? "Temiz"
-                  : verification.latest.result === "failed"
-                    ? "Başarısız"
-                    : verification.latest.result === "running"
-                      ? "Çalışıyor"
-                      : "Bilinmiyor"
-                : "Henüz rapor yok"}
+              {runState.startedAt
+                ? runState.result === "running" ? "Çalışıyor"
+                  : runState.result === "passed" ? "Temiz"
+                    : runState.result === "failed" ? "Başarısız" : "İptal edildi"
+                : verification.latest.available
+                  ? verification.latest.result === "passed" ? "Temiz"
+                    : verification.latest.result === "failed" ? "Başarısız"
+                      : verification.latest.result === "running" ? "Çalışıyor" : "Bilinmiyor"
+                  : "Henüz rapor yok"}
             </strong>
             <small>
-              {verification.latest.available
-                ? `${verification.latest.selectionLabel} · ${formatAge(verification.latest.ageMs)}`
-                : "artifacts/verify/latest.json bulunamadı"}
+              {runState.startedAt
+                ? runState.selectionLabel
+                : verification.latest.available
+                  ? `${verification.latest.selectionLabel} · ${formatAge(verification.latest.ageMs)}`
+                  : "artifacts/verify/latest.json bulunamadı"}
             </small>
           </div>
 
-          {verification.latest.available ? (
+          {runState.startedAt ? (
+            <div className="verification-counts">
+              <div><strong>{runState.checks.filter((item) => item.status === "passed").length}</strong><span>geçen</span></div>
+              <div><strong>{failedCount}</strong><span>kalan</span></div>
+              <div><strong>{runState.checks.filter((item) => item.status === "skipped").length}</strong><span>atlanan</span></div>
+            </div>
+          ) : verification.latest.available ? (
             <div className="verification-counts">
               <div><strong>{verification.latest.passed}</strong><span>geçen</span></div>
               <div><strong>{verification.latest.failed}</strong><span>kalan</span></div>
@@ -1279,11 +1323,24 @@ function Tests({
             ) : null}
           </div>
 
-          <LiveConsole
-            className="verification-console"
-            lines={runState.outputTail}
-            emptyText={runMessage || "Çıktı bekleniyor…"}
-          />
+          {totalCount > 0 && (
+            <div className="verification-live-progress">
+              <div className="verification-live-progress__text">
+                <strong>{doneCount} / {totalCount} tamamlandı</strong>
+                <span>{activeCheck ? `Çalışıyor: ${verification.checks.find((item) => item.id === activeCheck.id)?.label ?? activeCheck.id}` : (runState.running ? "Sonraki kontrol bekleniyor…" : "Koşu tamamlandı")}</span>
+                {failedCount > 0 && <span className="verification-live-progress__failed">{failedCount} başarısız</span>}
+              </div>
+              <progress aria-label="Test ilerlemesi" value={doneCount} max={totalCount} />
+            </div>
+          )}
+          <details className="verification-console-details">
+            <summary>Ham terminal çıktısı ({runState.outputTail.length} satır)</summary>
+            <LiveConsole
+              className="verification-console"
+              lines={runState.outputTail}
+              emptyText={runMessage || "Çıktı bekleniyor…"}
+            />
+          </details>
         </section>
       ) : null}
 
@@ -1326,17 +1383,20 @@ function Tests({
 
         <div className="verification-list">
           {visibleChecks.map((check, index) => {
-            const result = verification.latest.checks.find((item) => item.id === check.id);
-            const resultStatus: StatusKind = result?.status === "passed"
+            const live = runChecksById.get(check.id);
+            const result = runState.startedAt ? undefined : verification.latest.checks.find((item) => item.id === check.id);
+            const status = live?.status ?? result?.status;
+            const resultStatus: StatusKind = status === "passed"
               ? "ready"
-              : result?.status === "failed"
+              : status === "failed"
                 ? "error"
-                : result?.status === "skipped"
+                : status === "skipped" || status === "running"
                   ? "warning"
                   : "unknown";
 
             return (
-              <div className="verification-row verification-row--action" key={check.id}>
+              <div className="verification-check-item" key={check.id}>
+              <div className={`verification-row verification-row--action${live?.status === "running" ? " verification-row--running" : ""}`}>
                 <span className="verification-index">{String(index + 1).padStart(2, "0")}</span>
                 <div className="verification-check-copy">
                   <strong>{check.label}</strong>
@@ -1350,23 +1410,48 @@ function Tests({
                 </div>
                 <div className="verification-last-status">
                   <span className={statusClass(resultStatus)}>
-                    {result
-                      ? result.status === "passed"
-                        ? "Geçti"
-                        : result.status === "failed"
-                          ? "Kaldı"
-                          : "Atlandı"
-                      : "Sonuç yok"}
+                    {status === "running" ? "Çalışıyor"
+                      : status === "passed" ? "Geçti"
+                        : status === "failed" ? "Kaldı"
+                          : status === "skipped" ? "Atlandı"
+                            : runState.running ? "Bekliyor" : "Sonuç yok"}
                   </span>
-                  {result ? <small>{result.durationMs} ms</small> : null}
+                  {(live?.durationMs ?? result?.durationMs) !== null && (live?.durationMs ?? result?.durationMs) !== undefined
+                    ? <small>{live?.durationMs ?? result?.durationMs} ms</small> : null}
                 </div>
-                <button
-                  className="text-button verification-run-check"
-                  disabled={runState.running}
-                  onClick={() => void startRun("check", check.id)}
-                >
-                  Çalıştır
-                </button>
+                <div className="verification-row-actions">
+                  {live && (
+                    <button
+                      className="text-button"
+                      aria-expanded={expandedCheckId === check.id}
+                      onClick={() => {
+                        setExpandedCheckId(expandedCheckId === check.id ? "" : check.id);
+                        setExpandedOutput("");
+                        setCopyStatus("");
+                      }}
+                    >{expandedCheckId === check.id ? "Kapat" : "Çıktı"}</button>
+                  )}
+                  <button
+                    className="text-button verification-run-check"
+                    disabled={runState.running}
+                    onClick={() => void startRun("check", check.id)}
+                  >
+                    Çalıştır
+                  </button>
+                </div>
+              </div>
+              {expandedCheckId === check.id && (
+                <div className="verification-check-detail">
+                  <div className="verification-check-detail__top">
+                    <strong>{check.label} · {status === "failed" ? "Başarısız" : status === "running" ? "Çalışıyor" : status === "passed" ? "Geçti" : "Atlandı"}</strong>
+                    <button className="button button--secondary button--compact" onClick={() => void copyCheck(check.id)}>
+                      <Copy size={14} /> Çıktıyı Kopyala
+                    </button>
+                  </div>
+                  <pre>{expandedOutput || "Çıktı yükleniyor…"}</pre>
+                  {copyStatus && <small role="status">{copyStatus}</small>}
+                </div>
+              )}
               </div>
             );
           })}
@@ -2532,14 +2617,22 @@ export default function App() {
           // Do not reload repeatedly when recovery state cannot be persisted.
           attempts = 5;
         }
-        if (attempts < 5 && !bridgeRecoveryScheduled.current) {
+        if (bridgeRecoveryScheduled.current) {
+          // StrictMode may invoke this startup effect twice; the first call
+          // already scheduled recovery, so the second must not show an error.
+          setError("");
+          return;
+        }
+        if (attempts < 5) {
           try {
             sessionStorage.setItem("admin-bridge-recovery-attempts", String(attempts + 1));
           } catch {
             throw new Error("Electron preload bağlantısı yüklenemedi. Uygulamayı kapatıp yeniden açın.");
           }
           bridgeRecoveryScheduled.current = true;
-          setError("Electron bağlantısı kuruluyor; uygulama kısa süre içinde yeniden yüklenecek.");
+          // A transient missing preload must remain a loading state, not flash
+          // the failure card before the already-scheduled recovery reload.
+          setError("");
           window.setTimeout(() => window.location.reload(), 900);
           return;
         }

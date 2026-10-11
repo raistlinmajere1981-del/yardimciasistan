@@ -110,6 +110,18 @@ function busyOperationMessage(exclude: "verification" | "deployment" | "release"
 
 ipcMain.handle("admin:get-verification-run-state", () => verificationRunner.getState());
 ipcMain.handle("admin:get-verification-history", (_event, limit: number) => listVerificationHistory(REPO_ROOT, limit));
+ipcMain.handle("admin:get-verification-check-output", (_event, checkId: unknown) =>
+  typeof checkId === "string" && /^[a-zA-Z0-9:_-]+$/.test(checkId)
+    ? verificationRunner.getCheckOutput(checkId)
+    : ""
+);
+ipcMain.handle("admin:copy-verification-check-output", (_event, checkId: unknown) => {
+  if (typeof checkId !== "string" || !/^[a-zA-Z0-9:_-]+$/.test(checkId)) return false;
+  const output = verificationRunner.getCheckOutput(checkId);
+  if (!output) return false;
+  clipboard.writeText(output);
+  return true;
+});
 ipcMain.handle("admin:start-verification", (_event, request: VerificationRunRequest) => {
   const busy = busyOperationMessage("verification");
   return busy ? { accepted: false, message: busy } : verificationRunner.start(request);

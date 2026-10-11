@@ -144,7 +144,17 @@ export type VerificationRunRequest = {
   includeManual?: boolean;
 };
 
+export type VerificationCheckProgress = {
+  id: string;
+  index: number;
+  status: "running" | "passed" | "failed" | "skipped";
+  durationMs: number | null;
+  reason: string;
+};
+
 export type VerificationRunState = {
+  totalPlanned: number;
+  checks: VerificationCheckProgress[];
   running: boolean;
   selectionLabel: string;
   startedAt: string | null;
@@ -311,6 +321,8 @@ export type AdminBridge = {
   checkDependencyUpdates(): Promise<DependencyUpdateReport>;
   getVerificationRunState(): Promise<VerificationRunState>;
   getVerificationHistory(limit?: number): Promise<VerificationHistoryItem[]>;
+  getVerificationCheckOutput(checkId: string): Promise<string>;
+  copyVerificationCheckOutput(checkId: string): Promise<boolean>;
   startVerification(request: VerificationRunRequest): Promise<{ accepted: boolean; message: string }>;
   cancelVerification(): Promise<boolean>;
   onVerificationRunState(listener: (state: VerificationRunState) => void): () => void;

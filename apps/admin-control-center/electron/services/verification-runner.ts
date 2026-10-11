@@ -1,6 +1,8 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
+import { StringDecoder } from "node:string_decoder";
+import { VerificationProgressTracker } from "./verification-progress";
 import process from "node:process";
 import type {
   VerificationHistoryItem,
@@ -78,9 +80,15 @@ export function listVerificationHistory(
 export class VerificationRunner {
   private child: ChildProcess | null = null;
   private listeners = new Set<Listener>();
+  private emitTimer: ReturnType<typeof setTimeout> | null = null;
   private cancelled = false;
+  private readonly progress = new VerificationProgressTracker();
+  private readonly decoders = { stdout: new StringDecoder("utf8"), stderr: new StringDecoder("utf8") };
+  private pending = { stdout: "", stderr: "" };
   private gitContext: GitContext | null = null;
   private state: VerificationRunState = {
+    totalPlanned: 0,
+    checks: [],
     running: false,
     selectionLabel: "",
     startedAt: null,
@@ -100,8 +108,13 @@ export class VerificationRunner {
   getState(): VerificationRunState {
     return {
       ...this.state,
-      outputTail: [...this.state.outputTail]
+      outputTail: [...this.state.outputTail],
+      checks: this.state.checks.map((item) => ({ ...item }))
     };
+  }
+
+  getCheckOutput(id: string): string {
+    return this.progress.getOutput(id);
   }
 
   start(request: VerificationRunRequest) {
@@ -128,8 +141,12 @@ export class VerificationRunner {
 
     const selectionLabel = `${request.mode}=${value}`;
     this.cancelled = false;
+    this.progress.reset();
+    this.pending = { stdout: "", stderr: "" };
     this.gitContext = readGitContext(this.repoRoot);
     this.state = {
+      totalPlanned: 0,
+      checks: [],
       running: true,
       selectionLabel,
       startedAt: new Date().toISOString(),
@@ -156,17 +173,23 @@ export class VerificationRunner {
       `Git: ${this.gitContext.branch} · ${this.gitContext.head}${this.gitContext.dirtyCount ? ` · ${this.gitContext.dirtyCount} değişiklik` : " · temiz"}`
     );
 
-    child.stdout?.on("data", (chunk: Buffer) => this.appendOutput(chunk.toString()));
-    child.stderr?.on("data", (chunk: Buffer) => this.appendOutput(chunk.toString()));
+    child.stdout?.on("data", (chunk: Buffer) => this.appendChunk(chunk, "stdout"));
+    child.stderr?.on("data", (chunk: Buffer) => this.appendChunk(chunk, "stderr"));
 
     child.on("error", (error) => {
       this.appendOutput(`Çalıştırma hatası: ${error.message}`);
     });
 
     child.on("close", (code) => {
+      this.appendChunk(Buffer.alloc(0), "stdout", true);
+      this.appendChunk(Buffer.alloc(0), "stderr", true);
+      this.progress.finishInterrupted(this.cancelled);
+      const finishedProgress = this.progress.snapshot;
       this.child = null;
       this.state = {
         ...this.state,
+        checks: finishedProgress.checks,
+        totalPlanned: finishedProgress.total,
         running: false,
         finishedAt: new Date().toISOString(),
         result: this.cancelled ? "cancelled" : code === 0 ? "passed" : "failed",
@@ -251,23 +274,42 @@ export class VerificationRunner {
     }
   }
 
+  private appendChunk(chunk: Buffer, stream: "stdout" | "stderr", flush = false) {
+    const value = this.decoders[stream].write(chunk) + (flush ? this.decoders[stream].end() : "");
+    const parts = (this.pending[stream] + value).replace(/\r/g, "").split("\n");
+    this.pending[stream] = flush ? "" : (parts.pop() ?? "");
+    this.appendLines(parts);
+  }
+
   private appendOutput(value: string) {
-    const lines = value
-      .replace(/\r/g, "")
-      .split("\n")
-      .map((line) => line.trimEnd())
-      .filter(Boolean);
+    this.appendLines(value.replace(/\r/g, "").split("\n"));
+  }
 
+  private appendLines(values: string[]) {
+    const lines = values.map((line) => line.trimEnd()).filter(Boolean);
     if (!lines.length) return;
-
+    for (const line of lines) this.progress.feed(line);
+    const snapshot = this.progress.snapshot;
     this.state = {
       ...this.state,
+      totalPlanned: snapshot.total,
+      checks: snapshot.checks,
       outputTail: [...this.state.outputTail, ...lines].slice(-MAX_TAIL_LINES)
     };
-    this.emit();
+    this.scheduleEmit();
+  }
+
+  private scheduleEmit() {
+    if (this.emitTimer) return;
+    this.emitTimer = setTimeout(() => this.emit(), 90);
+    this.emitTimer.unref();
   }
 
   private emit() {
+    if (this.emitTimer) {
+      clearTimeout(this.emitTimer);
+      this.emitTimer = null;
+    }
     const snapshot = this.getState();
     for (const listener of this.listeners) listener(snapshot);
   }

@@ -93,7 +93,7 @@ for (const [index, item] of plan.entries()) {
     };
     results.set(item.id, result);
     report.checks.push(result);
-    console.log(`- ${progress} ${item.label} · ${result.reason}`);
+    console.log(`- ${progress} [${item.id}] ${item.label} · ${result.reason}`);
     save();
     continue;
   }

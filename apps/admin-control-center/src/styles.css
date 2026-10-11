@@ -3007,3 +3007,70 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Live verification is a per-check progress view, not a second terminal. */
+.verification-live-progress {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.verification-live-progress__text {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: #617d9b;
+  font-size: 12px;
+}
+.verification-live-progress__text strong { color: #17395c; }
+.verification-live-progress__text > span { min-width: 0; }
+.verification-live-progress__failed { color: #bf4545; font-weight: 700; }
+.verification-live-progress progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border: none;
+  border-radius: 20px;
+  accent-color: #2584d8;
+}
+.verification-console-details {
+  border: 1px solid #dae8f4;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.verification-console-details summary {
+  cursor: pointer;
+  background: #f1f7fc;
+  padding: 9px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #567393;
+}
+.verification-console-details .verification-console { border-radius: 0; max-height: 240px; }
+.verification-check-item { min-width: 0; }
+.verification-row--running { background: #f1f9ff; }
+.verification-row-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.verification-check-detail {
+  padding: 12px 14px 14px;
+  margin: 0 0 8px 32px;
+  border: 1px solid #d7e7f5;
+  border-radius: 10px;
+  background: #f7fbff;
+}
+.verification-check-detail__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.verification-check-detail__top strong { font-size: 12px; }
+.verification-check-detail pre {
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border-radius: 8px;
+  color: #dbeafb;
+  background: #13273d;
+  font: 11px/1.55 ui-monospace, monospace;
+}
+.verification-check-detail > small { display: block; font-size: 11px; color: #326fa7; }
+@media (max-width: 1050px) {
+  .verification-row--action { grid-template-columns: 26px minmax(0,1fr) 88px 82px auto; }
+}

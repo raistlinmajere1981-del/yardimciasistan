@@ -249,3 +249,11 @@ Desktop/Android installer ve release akışları Admin Control Center'ı paketle
 Fonksiyonel kapsam tamamlandıktan sonra bir sonraki çalışma biçimi, uygulamayı gerçek
 operasyonlarda kullanıp ihtiyaçları toplamak ve yalnız buna göre görsel/ergonomik
 düzeltmeler yapmaktır.
+
+## Canlı doğrulama ve açılış testi
+
+`VerificationRunner`, canonical `scripts/verify.mjs` çıktısından her kontrolün anlık durumunu üretir. Liste çalışan koşuyla senkron ilerler; ham terminal yalnız gerektiğinde açılır. Teste ait çıktı Electron clipboard köprüsüyle kopyalanabilir. Kontrol bazında bellek içi sınırlı çıktı tutulur; kalıcı history yalnız koşu metadatasını saklar.
+
+Linux `desktop-xvfb` testi artık yalnız Electron sürecinin açık kaldığını değil, izole profilde DevTools protokolüyle Yardımcı Asistan renderer DOM'unun oluştuğunu da doğrular. Süreç ve geçici profil test bitiminde kapatılır.
+
+Admin startup preload köprüsü geçici olarak eksikse yükleme ekranı korunur; React StrictMode'un çift effect çağrısı erken kırmızı hata kartı oluşturmaz. Kalıcı eksiklikte deneme sınırından sonra hata gösterilir.
