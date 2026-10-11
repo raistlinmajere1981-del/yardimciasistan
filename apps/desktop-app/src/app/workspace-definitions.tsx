@@ -1,6 +1,6 @@
-import type { ComponentProps } from "react";
-import { CustomerWorkspace } from "../components/customers/CustomerWorkspace";
-import { ProductWorkspace } from "../components/market/ProductWorkspace";
+import { Suspense, lazy, type ComponentProps } from "react";
+import type { CustomerWorkspace } from "../components/customers/CustomerWorkspace";
+import type { ProductWorkspace } from "../components/market/ProductWorkspace";
 import { roomWorkspaceDefinition } from "../components/pension/room-workspace-definition";
 import { tableWorkspaceDefinition } from "../components/restaurant/table-workspace-definition";
 import type { WorkspaceDefinition } from "../components/workspace/workspace-definition";
@@ -9,16 +9,19 @@ import type { CustomerWorkspaceIntent, ProductWorkspaceIntent } from "../compone
 export { roomWorkspaceDefinition } from "../components/pension/room-workspace-definition";
 export { tableWorkspaceDefinition } from "../components/restaurant/table-workspace-definition";
 
+const LazyCustomerWorkspace = lazy(() => import("../components/customers/CustomerWorkspace").then(module => ({ default: module.CustomerWorkspace })));
+const LazyProductWorkspace = lazy(() => import("../components/market/ProductWorkspace").then(module => ({ default: module.ProductWorkspace })));
+
 export const customerWorkspaceDefinition: WorkspaceDefinition<CustomerWorkspaceIntent, Omit<ComponentProps<typeof CustomerWorkspace>, "intent">> = {
   entityType: "customer",
   defaultPresentation: "centered",
-  render: (intent, context) => <CustomerWorkspace {...context} intent={intent} />
+  render: (intent, context) => <Suspense fallback={<p role="status">Müşteri bilgileri hazırlanıyor…</p>}><LazyCustomerWorkspace {...context} intent={intent} /></Suspense>
 };
 
 export const productWorkspaceDefinition: WorkspaceDefinition<ProductWorkspaceIntent, Omit<ComponentProps<typeof ProductWorkspace>, "intent">> = {
   entityType: "product",
   defaultPresentation: "centered",
-  render: (intent, context) => <ProductWorkspace {...context} intent={intent} />
+  render: (intent, context) => <Suspense fallback={<p role="status">Ürün bilgileri hazırlanıyor…</p>}><LazyProductWorkspace {...context} intent={intent} /></Suspense>
 };
 
 export const workspaceDefinitions = [

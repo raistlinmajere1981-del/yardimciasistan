@@ -27,7 +27,7 @@ export class CampaignDispatchService {
   private log(event: string, meta: Record<string, string | number>, operationId?: string) {
     desktopLog[event === "message.failed" ? "error" : event === "message.retry_scheduled" ? "warn" : "info"]({ scope: "messaging", event: `messaging.dispatch.${event}`, message: "Kontrollü kampanya gönderimi güncellendi.", ...(operationId !== undefined ? { operationId } : {}), meta });
   }
-  start() { this.active = true; this.wake(); }
+  start() { if (this.active) return; this.active = true; this.wake(); }
   wake() {
     if (!this.active) return;
     if (this.timer) clearTimeout(this.timer);

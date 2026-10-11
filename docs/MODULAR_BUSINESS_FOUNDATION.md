@@ -172,6 +172,10 @@ Kurulum formu doğrudan shared profile registry'sini kullanır ve tek `profileId
 
 **Kural:** Yeni renderer kodu profil kimliğini runtime feature gate olarak kullanmamalı; capability snapshot'ını okumalıdır.
 
+Sektör profili değişikliği nadir bir yapılandırma geçişidir: işletme ayarları ve ilgili diğer taslaklar başarıyla kaydedildikten sonra masaüstü uygulaması Electron'un güvenli relaunch/kapanış hattıyla yeniden başlar. İlk kurulum ve sıradan capability/servis açma-kapama restart istemez. Restart, yeni profilin capability seçimlerinin atomik kaydını veya IPC gate'lerini değiştirmez.
+
+Kapalı opsiyonel servisler yalnız menüden gizlenmez: `marketing.studio` zamanlayıcısı, `messaging.campaigns` gönderim denetimi ve Android/yerel ağ dinleyicisi çalışmıyorsa gereksiz timer/socket açılmaz. Başlat/durdur işlemi startup, oturum kilidi ve persist edilmiş capability değişimlerinde reconcile edilir; mevcut durable claim/outbox sahipliği korunur. Renderer sayfaları ve entity editörleri gerektiğinde lazy yüklenir; görünürlük ve işlem yetkisi yine persisted capability snapshot'ı ile denetlenir.
+
 ## 7. Commerce foundation
 
 Market UI'den bağımsız sektör ortak commerce omurgası oluşturuldu.

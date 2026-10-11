@@ -162,6 +162,8 @@ void mainProcessReady.then(async ({
   assertAppSessionUnlocked,
   markLocalCompanionSnapshotDirty,
   scheduleAutomaticSyncSoon,
+  reconcileOptionalBackgroundServices,
+  reconcileLocalCompanionRuntime,
   suspendAutomaticSyncForMaintenance,
   resumeAutomaticSyncAfterMaintenanceAbort
 }) => {
@@ -195,6 +197,10 @@ void mainProcessReady.then(async ({
         database.close();
       }
       scheduleAutomaticSyncSoon(capabilitiesChanged);
+      if (capabilitiesChanged) {
+        void reconcileOptionalBackgroundServices();
+        void reconcileLocalCompanionRuntime();
+      }
     };
 
     registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked, userDataPath });

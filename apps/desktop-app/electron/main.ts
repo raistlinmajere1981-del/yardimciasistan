@@ -328,11 +328,11 @@ if (!hasSingleInstanceLock) {
       getSyncStatus: () => syncCoordinator?.getStatus(),
       onUnlocked: () => {
         reconcileEgmKbsBackgroundSession();
-        campaignDispatchService.wake();
-        marketingSchedulerService.wake();
+        void reconcileOptionalBackgroundServices();
       },
       onLocked: () => {
         egmKbsBackgroundSession.destroy();
+        void reconcileOptionalBackgroundServices();
       }
     });
     reconcileEgmKbsBackgroundSession();
@@ -432,8 +432,7 @@ if (!hasSingleInstanceLock) {
     registerIpcHandlers();
     createMainWindow();
     syncCoordinator.start();
-    campaignDispatchService.start();
-    marketingSchedulerService.start();
+    void reconcileOptionalBackgroundServices();
     powerMonitor.on("resume", () => marketingSchedulerService.wake());
     if (!desktopDatabase.getSetupData().setupRequired) {
       void publishBusinessAiContextFromMain();
@@ -441,18 +440,7 @@ if (!hasSingleInstanceLock) {
         void publishGoogleReviewsSettingsFromMain();
       }
     }
-    void localCompanionServer.start()
-      .then(() => {
-        reconcileLocalCompanionAdvertisement();
-      })
-      .catch((error) => {
-        desktopLog.error({
-          scope: "local-companion",
-          event: "local-companion.server.start.failed",
-          message: "Yerel companion sunucusu başlatılamadı.",
-          error
-        });
-      });
+    void reconcileLocalCompanionRuntime();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -514,14 +502,34 @@ const campaignDispatchService = new CampaignDispatchService(getDatabase, {
     return (claim?.item.channel === "sms" ? smsMessagingService : businessMessagingService).dispatchCampaignItem(id, token, interval, allowed, now);
   }
 }, {
-  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()),
+  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked())
+    && hasBusinessCapability(enabledBusinessCapabilities(), C.MESSAGING_CAMPAIGNS),
   onChanged: () => { notifyMessagingCampaignsChanged(); notifyBusinessMessagingChanged(); }
 });
 const marketingScheduledTargets = new MarketingScheduledTargetService(getDatabase, messagingCampaignService, marketingStudioService, instagramPublicationService);
 const marketingSchedulerService = new MarketingSchedulerService(getDatabase, marketingScheduledTargets, {
-  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()),
+  allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked())
+    && hasBusinessCapability(enabledBusinessCapabilities(), C.MARKETING_STUDIO),
   onChanged: notifyMarketingSchedulesChanged
 });
+// Startup, lock transitions and committed capability changes share one lifecycle.
+// Suspend/drain preserves durable scheduled claims; disabled services have no timer.
+let optionalBackgroundReconcile: Promise<void> = Promise.resolve();
+export function reconcileOptionalBackgroundServices(): Promise<void> {
+  const operation = optionalBackgroundReconcile.then(async () => {
+    if (!desktopDatabase || campaignShutdownStarted) return;
+    const enabled = new Set(enabledBusinessCapabilities());
+    const allowed = !maintenanceSyncSuspended && Boolean(appLockService && !appLockService.isLocked());
+    if (allowed && enabled.has(C.MARKETING_STUDIO)) marketingSchedulerService.start();
+    else await marketingSchedulerService.suspendAndDrain();
+    if (allowed && enabled.has(C.MESSAGING_CAMPAIGNS)) campaignDispatchService.start();
+    else await campaignDispatchService.suspendAndDrain();
+  });
+  optionalBackgroundReconcile = operation.catch(error => {
+    desktopLog.error({scope:"runtime",event:"optional-background.reconcile.failed",message:"Opsiyonel arka plan servisleri güncellenemedi.",error});
+  });
+  return optionalBackgroundReconcile;
+}
 const marketingScheduleService = new MarketingScheduleService(getDatabase, () => { notifyMarketingSchedulesChanged(); marketingSchedulerService.wake(); });
 const marketingShareService = new MarketingShareService(getDatabase, marketingStudioService, messagingCampaignService, marketingScheduleService, () => businessMessagingService.listTemplates());
 function notifyMarketingSchedulesChanged() {
@@ -641,7 +649,8 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   }
   notifyBusinessMessagingChanged();
   markLocalCompanionSnapshotDirty();
-  reconcileLocalCompanionAdvertisement();
+  void reconcileLocalCompanionRuntime();
+  void reconcileOptionalBackgroundServices();
   scheduleAutomaticSyncSoon(true);
 
   const [aiWebSync, businessContextWebSync] = await Promise.all([
@@ -712,8 +721,7 @@ export async function suspendAutomaticSyncForMaintenance() {
 export function resumeAutomaticSyncAfterMaintenanceAbort() {
   maintenanceSyncSuspended = false;
   syncCoordinator?.restart();
-  campaignDispatchService.start();
-  marketingSchedulerService.start();
+  void reconcileOptionalBackgroundServices();
 }
 
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
@@ -884,6 +892,26 @@ function localCompanionEnabled(): boolean {
   const setup = getDatabase().getSetupData();
   return setup.localNetworkEnabled !== false
     && hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID);
+}
+
+// The local HTTP listener is not opened for businesses without Android/local LAN.
+let localCompanionReconcile: Promise<void> = Promise.resolve();
+export function reconcileLocalCompanionRuntime(): Promise<void> {
+  const operation = localCompanionReconcile.then(async () => {
+    if (!localCompanionServer || campaignShutdownStarted) return;
+    if (!localCompanionEnabled()) {
+      localCompanionMdnsAdvertiser?.stop();
+      localCompanionMdnsAdvertiser = null;
+      await localCompanionServer.stop();
+      return;
+    }
+    await localCompanionServer.start();
+    reconcileLocalCompanionAdvertisement();
+  });
+  localCompanionReconcile = operation.catch(error => {
+    desktopLog.error({scope:"local-companion",event:"local-companion.reconcile.failed",message:"Yerel Companion servis durumu güncellenemedi.",error});
+  });
+  return localCompanionReconcile;
 }
 
 function reconcileLocalCompanionAdvertisement() {

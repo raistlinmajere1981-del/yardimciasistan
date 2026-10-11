@@ -37,7 +37,7 @@ export function BusinessSettingsSection({ form, onFormChange, persistedProfileId
               onChange={(profileOptions) => update("profileOptions", profileOptions)}
             />
             {profileChanged && <p className="settings-profile-transition-warning" role="status">
-              İşletme tipi değiştirildi. Kaydettiğinizde yeni işletme tipinin varsayılan özellikleri uygulanacak.
+              İşletme tipi değiştirildi. Kaydedildiğinde yeni sektörün varsayılan özellikleri uygulanacak ve uygulama yeniden başlatılacak.
             </p>}
           </div>
           <div className="form-row">

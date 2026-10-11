@@ -1,4 +1,4 @@
-import { ipcMain, shell } from "electron";
+import { app, ipcMain, shell } from "electron";
 import {
   BUSINESS_CAPABILITIES,
   type BusinessCapability
@@ -59,6 +59,18 @@ export function registerAppIpcHandlers(options: {
     }
 
     await shell.openExternal(url);
+    return true;
+  });
+
+  ipcMain.handle("app:restartAfterProfileChange", (): boolean => {
+    assertUnlocked();
+    // Resolve the IPC call before quit; the standard Electron shutdown path
+    // drains durable background work and the dev relaunch bridge stays intact.
+    const timer = setTimeout(() => {
+      app.relaunch();
+      app.quit();
+    }, 250);
+    timer.unref();
     return true;
   });
 

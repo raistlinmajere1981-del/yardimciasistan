@@ -1,6 +1,8 @@
 import { usePageViewState } from "../../app/page-view-state";
-import { RoomCategoryControl, RoomFiltersToolbar, RoomsWorkspace } from "../pension/RoomsWorkspace";
-import { useState, type Dispatch, type SetStateAction } from "react";
+const RoomCategoryControl = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomCategoryControl})));
+const RoomFiltersToolbar = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomFiltersToolbar})));
+const RoomsWorkspace = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomsWorkspace})));
+import { Suspense, lazy, useState, type Dispatch, type SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES as C,
   getReservationDomain,
@@ -35,24 +37,22 @@ import type {
 } from "../../app/controller-types";
 import type { UiPreferences } from "../../ui-preferences";
 import { getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
-import { MenuManager } from "../menu/MenuManager";
-import { RestaurantReservationsWorkspace } from "../operations/RestaurantReservationsWorkspace";
-import {
-  DailyTasksWorkspace,
-  ReservationsWorkspace,
-  formatTaskDue
-} from "../operations/OperationWorkspaces";
-import { SettingsWorkspace } from "../settings/SettingsWorkspace";
-import { DashboardPage } from "../../pages/DashboardPage";
-import { MarketPage } from "../../pages/MarketPage";
-import { MarketingPage } from "../../pages/MarketingPage";
-import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
+const MenuManager = lazy(() => import("../menu/MenuManager").then(module => ({default: module.MenuManager})));
+const RestaurantReservationsWorkspace = lazy(() => import("../operations/RestaurantReservationsWorkspace").then(module => ({default: module.RestaurantReservationsWorkspace})));
+import { formatTaskDue } from "../operations/task-due-format";
+const DailyTasksWorkspace = lazy(() => import("../operations/OperationWorkspaces").then(module => ({default: module.DailyTasksWorkspace})));
+const ReservationsWorkspace = lazy(() => import("../operations/OperationWorkspaces").then(module => ({default: module.ReservationsWorkspace})));
+const SettingsWorkspace = lazy(() => import("../settings/SettingsWorkspace").then(module => ({default: module.SettingsWorkspace})));
+const DashboardPage = lazy(() => import("../../pages/DashboardPage").then((module) => ({ default: module.DashboardPage })));
+const MarketPage = lazy(() => import("../../pages/MarketPage").then((module) => ({ default: module.MarketPage })));
+const MarketingPage = lazy(() => import("../../pages/MarketingPage").then((module) => ({ default: module.MarketingPage })));
+const OperationCalendarPage = lazy(() => import("../../pages/OperationCalendarPage").then((module) => ({ default: module.OperationCalendarPage })));
+const PensionPage = lazy(() => import("../../pages/PensionPage").then((module) => ({ default: module.PensionPage })));
+const ReportsPage = lazy(() => import("../../pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
+const RestaurantPage = lazy(() => import("../../pages/RestaurantPage").then((module) => ({ default: module.RestaurantPage })));
 import { useCalendarPageController } from "../calendar/calendar-page-state";
 import { usePensionPageController } from "../pension/pension-page-state";
 import { useRestaurantPageController } from "../restaurant/restaurant-page-state";
-import { PensionPage } from "../../pages/PensionPage";
-import { ReportsPage } from "../../pages/ReportsPage";
-import { RestaurantPage } from "../../pages/RestaurantPage";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import type { MarketView } from "../workspace/workspace-intent";
 import { CustomerWorkRoute } from "./routes/CustomerWorkRoute";
@@ -337,6 +337,7 @@ export function DesktopWorkspaceRouter({
 
   return (
     <>
+      <Suspense fallback={<p role="status" aria-live="polite">Sayfa hazırlanıyor…</p>}>
       {activePage === "dashboard" ? (
         <DashboardPage
           data={surfaceData}
@@ -541,6 +542,7 @@ export function DesktopWorkspaceRouter({
           registerPageLeaveGuard={registerPageLeaveGuard}
         />
       )}
+      </Suspense>
       <CustomerWorkRoute
         activePage={activePage}
         activeTab={customerWorkTab}

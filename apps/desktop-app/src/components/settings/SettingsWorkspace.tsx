@@ -168,6 +168,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
   async function saveCategory(categoryId: SettingsCategoryId): Promise<SettingsOperationResult> {
     if (categoryId === "business") {
+      const profileChanged = initialized && drafts.form.profileId !== drafts.canonical.profileId;
       let changed = false;
       if (drafts.dirty.business) {
         const setupResult = await drafts.save("business");
@@ -183,6 +184,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         const googleReviewsResult = await googleReviews.save();
         if (!googleReviewsResult.ok) return googleReviewsResult;
         changed ||= googleReviewsResult.changed;
+      }
+      if (profileChanged && changed) {
+        try {
+          if (!window.yardimciDesktop?.restartAfterProfileChange) {
+            throw new Error("Yeniden başlatma köprüsü kullanılamıyor.");
+          }
+          await window.yardimciDesktop.restartAfterProfileChange();
+          return { ok: true, changed, message: "Yeni sektör kaydedildi. Uygulama yeniden başlatılıyor." };
+        } catch {
+          // The profile is already committed. Never claim that persistence failed.
+          return { ok: true, changed, message: "Yeni sektör kaydedildi. Değişikliklerin tam uygulanması için uygulamayı yeniden başlatın." };
+        }
       }
       return { ok: true, changed };
     }

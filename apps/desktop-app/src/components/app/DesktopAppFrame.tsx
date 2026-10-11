@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { LockKeyhole, ScrollText } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
@@ -27,9 +27,9 @@ import { PageHeader } from "../layout/PageHeader";
 import { GlobalMessageBar, type GlobalMessageTone } from "../layout/GlobalMessageBar";
 import { SyncStatusIndicator } from "../layout/SyncStatusIndicator";
 import { Sidebar } from "../layout/Sidebar";
-import { LocalMenuPreview } from "../menu/MenuPreview";
+const LocalMenuPreview = lazy(() => import("../menu/MenuPreview").then(module => ({default: module.LocalMenuPreview})));
 import { NotificationCenter } from "../notifications/NotificationCenter";
-import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
+const DiagnosticsViewer = lazy(() => import("../diagnostics/DiagnosticsViewer").then(module => ({default: module.DiagnosticsViewer})));
 import { customerWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
 import { HospitalityWorkspaceHost, WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 
@@ -331,6 +331,7 @@ function DesktopAppFrameContent({
             onProductSaved: marketController.upsertProduct,
             onStateChange: marketController.handleStateChange
           }} />
+          <Suspense fallback={null}>
           {diagnosticsOpen ? (
             <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />
           ) : menuEnabled && menuPreviewOpen ? (
@@ -344,6 +345,7 @@ function DesktopAppFrameContent({
               onClose={closeMenuPreview}
             />
           ) : undefined}
+          </Suspense>
         </>
       )}
     >

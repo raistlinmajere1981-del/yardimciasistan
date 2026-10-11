@@ -1,7 +1,9 @@
-import type { ComponentProps } from "react";
+import { Suspense, lazy, type ComponentProps } from "react";
 import type { WorkspaceDefinition } from "../workspace/workspace-definition";
 import type { RoomWorkspaceIntent } from "../workspace/workspace-intent";
-import { RoomWorkspace } from "./RoomWorkspace";
+import type { RoomWorkspace } from "./RoomWorkspace";
+
+const LazyRoomWorkspace = lazy(() => import("./RoomWorkspace").then(module => ({ default: module.RoomWorkspace })));
 
 export const roomWorkspaceDefinition: WorkspaceDefinition<
   RoomWorkspaceIntent,
@@ -10,5 +12,5 @@ export const roomWorkspaceDefinition: WorkspaceDefinition<
   entityType: "room",
   defaultPresentation: "centered",
   sessionPage: "pension",
-  render: (intent, context) => <RoomWorkspace {...context} intent={intent} />
+  render: (intent, context) => <Suspense fallback={<p role="status">Oda bilgileri hazırlanıyor…</p>}><LazyRoomWorkspace {...context} intent={intent} /></Suspense>
 };

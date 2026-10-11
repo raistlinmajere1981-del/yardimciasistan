@@ -19,10 +19,10 @@ import type {
   SaveManualReservationInput
 } from "../../../electron/database";
 import {
-  formatDateForDisplay,
   formatReservationDate,
   formatReservationStatus
 } from "../../app/record-formatters";
+import { formatTaskDue } from "./task-due-format";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { usePensionPage } from "../pension/pension-page-state";
 import { ReservationAssignmentDialog } from "../pension/ReservationRoomAssignment";
@@ -49,10 +49,6 @@ function formatTaskStatus(value: string) {
     archived: "Arşiv"
   };
   return labels[value] ?? "Bekliyor";
-}
-
-export function formatTaskDue(task: DesktopDashboardData["dailyTasks"][number]) {
-  return [formatDateForDisplay(task.dueDate), task.dueTime].filter(Boolean).join(" · ") || "Zaman yok";
 }
 
 function formatTaskRelation(task: DesktopDashboardData["dailyTasks"][number]) {

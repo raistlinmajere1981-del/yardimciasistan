@@ -249,6 +249,7 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
+  restartAfterProfileChange: () => Promise<boolean>;
   getBusinessLayout: () => Promise<BusinessLayoutSnapshot>;
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => Promise<BusinessLayoutSaveResult>;
   listRoomMedia: (roomId: string) => Promise<RoomMediaAsset[]>;
@@ -506,6 +507,7 @@ const bridge: DesktopBridge = {
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => invokeWhenUnlocked<DesktopSetupSaveResult>("setup:saveInitial", input),
+  restartAfterProfileChange: () => invokeWhenUnlocked<boolean>("app:restartAfterProfileChange"),
   getBusinessLayout: () => invokeWhenUnlocked<BusinessLayoutSnapshot>("businessLayout:get"),
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => invokeWhenUnlocked<BusinessLayoutSaveResult>("businessLayout:save", input),
   listRoomMedia: (roomId: string) => invokeWhenUnlocked<RoomMediaAsset[]>("roomMedia:list", roomId),

@@ -11,7 +11,7 @@ export class MarketingSchedulerService {
   constructor(private readonly database:()=>DesktopDatabase,private readonly targets:Pick<MarketingScheduledTargetService,"execute">,
     private readonly options:{allowed:()=>boolean;onChanged?:()=>void;now?:()=>Date}) {}
   private now() {return (this.options.now??(()=>new Date()))();}
-  start() {this.active=true;this.wake();}
+  start() {if(this.active)return;this.active=true;this.wake();}
   wake() {if(!this.active)return;if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>{this.timer=null;void this.runOnce().finally(()=>this.scheduleWake());},0);}
   private scheduleWake() {
     if(!this.active || this.timer)return;
