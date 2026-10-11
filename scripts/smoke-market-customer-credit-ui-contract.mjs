@@ -247,6 +247,12 @@ try {
   };
   await expect(page.getByRole("heading", { name: "Hızlı Satış", exact: true })).toBeVisible();
   await expect(page.locator(".market-status")).toHaveCount(0);
+  // Installed Electron bundles are local files. A Vite fixture instead serves lazy
+  // workspace chunks over HTTP, so fetch them while online before simulating
+  // an offline business session.
+  await page.evaluate(async () => {
+    await import("/src/components/customers/CustomerWorkspace.tsx");
+  });
   // Local UI remains functional after all browser networking is unavailable.
   await context.setOffline(true);
   const quick = page.locator(".market-sale-cart");

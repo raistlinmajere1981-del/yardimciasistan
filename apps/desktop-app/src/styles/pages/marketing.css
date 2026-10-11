@@ -17,8 +17,8 @@
 .marketing-analytics-summary .metric-card p { white-space: normal; overflow: visible; line-height: var(--leading-normal); margin-top: var(--space-2); }
 .marketing-analytics-results { min-width: 0; }
 .marketing-analytics-results > header { margin-bottom: var(--space-4); }
-.marketing-analytics-channels, .marketing-analytics-trends { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-3); }
-.marketing-analytics-trends { grid-template-columns: repeat(auto-fit,minmax(min(22rem,100%),1fr)); }
+.marketing-analytics-channels { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-3); }
+.marketing-analytics-trends { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(22rem,100%),1fr)); gap: var(--space-3); }
 .marketing-analytics-channel { min-width: 0; }
 .marketing-analytics-channel > p { font-size: var(--text-xs); margin: var(--space-3) 0 0; }
 .marketing-analytics-metrics { margin-bottom: 0; }

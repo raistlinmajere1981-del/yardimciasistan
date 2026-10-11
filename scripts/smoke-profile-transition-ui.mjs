@@ -25,7 +25,7 @@ try {
   const options = page.locator("#settings-options");
   const save = page.getByRole("button", { name: "Kaydet", exact: true });
   const revert = page.getByRole("button", { name: "Değişiklikleri Geri Al", exact: true });
-  const warning = page.getByText("İşletme tipi değiştirildi. Kaydettiğinizde yeni işletme tipinin varsayılan özellikleri uygulanacak.", { exact: true });
+  const warning = page.getByText("İşletme tipi değiştirildi. Kaydedildiğinde yeni sektörün varsayılan özellikleri uygulanacak ve uygulama yeniden başlatılacak.", { exact: true });
   await page.evaluate(() => window.refreshSettings({ profileOptions: ["messaging.campaigns"], servicePreferences: { whatsapp: false, android: true } }));
   await expect(options.getByLabel("Talepler", { exact: true })).not.toBeChecked();
   const before = await page.evaluate(() => structuredClone(window.persistedSettings()));
@@ -33,9 +33,9 @@ try {
   const beforeCalls = await page.evaluate(() => structuredClone(window.settingsCalls));
   // Fetch the real registry through Vite, not a second list of preset defaults.
   const registry = await page.evaluate(async sharedPath => {
-    const { getBusinessProfiles, getEnabledBusinessCapabilityDependents } = await import(sharedPath);
+    const { BUSINESS_CAPABILITIES, getBusinessProfiles, getEnabledBusinessCapabilityDependents } = await import(sharedPath);
     return getBusinessProfiles().map(profile => ({ ...profile, preview: profile.defaultOptionalCapabilities,
-      choices: profile.optionalCapabilities.filter(option => getEnabledBusinessCapabilityDependents(option, profile.defaultOptionalCapabilities).length === 0) }));
+      choices: profile.optionalCapabilities.filter(option => option === BUSINESS_CAPABILITIES.MARKETING_STUDIO || getEnabledBusinessCapabilityDependents(option, profile.defaultOptionalCapabilities).length === 0) }));
   }, `/@fs/${resolve("packages/shared/types/business-capabilities.ts")}`);
   for (const profile of registry.filter(profile => profile.id !== before.profileId)) {
     await select.selectOption(profile.id);
@@ -110,7 +110,10 @@ try {
       }, { path: `/@fs/${resolve("packages/shared/types/business-capabilities.ts")}`, id: profile.id, feature });
       for (const option of profile.optionalCapabilities) {
         const checkbox = options.locator(`input[value="${option}"]`);
-        if (option !== feature && expected.includes(option)) await expect(checkbox).toHaveCount(0);
+        if (option === "marketing.studio" && feature === "messaging.campaigns") {
+          await expect(checkbox).toBeChecked();
+          await expect(checkbox).toBeDisabled();
+        } else if (option !== feature && expected.includes(option)) await expect(checkbox).toHaveCount(0);
         else expect(await checkbox.isChecked()).toBe(option === feature);
       }
       expect(await page.evaluate(() => window.persistedSettings())).toEqual(persisted);
@@ -147,13 +150,15 @@ try {
   await expect(purchasing).toHaveCount(0);
   await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
   await options.locator('input[value="messaging.campaigns"]').check();
-  await expect(options.locator('input[value="marketing.studio"]')).toHaveCount(0);
+  await expect(options.locator('input[value="marketing.studio"]')).toBeChecked();
+  await expect(options.locator('input[value="marketing.studio"]')).toBeDisabled();
   await options.locator('input[value="messaging.campaigns"]').uncheck();
   await expect(options.locator('input[value="messaging.campaigns"]')).not.toBeChecked();
   await expect(save).toBeDisabled();
   await options.locator('input[value="marketing.studio"]').check();
   await options.locator('input[value="messaging.campaigns"]').check();
-  await expect(options.locator('input[value="marketing.studio"]')).toHaveCount(0);
+  await expect(options.locator('input[value="marketing.studio"]')).toBeChecked();
+  await expect(options.locator('input[value="marketing.studio"]')).toBeDisabled();
   await save.click();
   await page.evaluate(() => window.reopenSettings());
   await options.locator('input[value="messaging.campaigns"]').uncheck();

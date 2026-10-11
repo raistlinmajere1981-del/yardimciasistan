@@ -104,7 +104,7 @@ assert.match(updateService, /update\.install\.failed/);
 assert.match(companionServer, /local-companion\.server\.started/);
 assert.match(companionServer, /local-companion\.auth\.rejected/);
 assert.match(companionMdns, /local-companion-mdns\.advertising\.started/);
-assert.match(main, /local-companion\.server\.start\.failed/);
+assert.match(main, /local-companion\.reconcile\.failed/);
 assert.match(webDiagnostics, /protocol_mismatch/);
 assert.match(webDiagnostics, /authentication/);
 assert.match(webDiagnostics, /rate_limited/);

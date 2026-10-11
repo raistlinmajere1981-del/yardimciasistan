@@ -24,7 +24,7 @@
   display: block;
   width: 4px;
   height: 4px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: currentColor;
   animation: page-transition-bounce 950ms ease-in-out infinite;
 }

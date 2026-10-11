@@ -103,7 +103,8 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 255, "all production invoke registrations must execute");
+assert.equal(handlers.size, 256, "all production invoke registrations must execute");
+assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
 const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: { getURL: () => "fixture" } }, ...args));
 const lockFree = new Set(["appLock:getStatus", "appLock:lock", "appLock:unlock", "appLock:updatePassword",
   "appLock:resetWithWebSecurityKey", "diagnostics:writeRendererEvent", "sync:getStatus", "update:getStatus"]);

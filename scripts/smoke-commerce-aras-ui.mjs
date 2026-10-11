@@ -61,8 +61,9 @@ try {
   const section = page.getByRole("region", { name: "Gönderim", exact: true });
   await section.getByRole("button", { name: "Gönderi oluştur", exact: true }).click();
   const register = section.getByRole("button", { name: `${provider.name} ile oluştur`, exact: true });
-  await expect(register).toBeDisabled();
-  await expect(section).toContainText(`${provider.name} yapılandırılmamış`);
+  // Disabled shipping service does not expose controls or setup warnings.
+  await expect(register).toHaveCount(0);
+  await expect(section).not.toContainText(`${provider.name} yapılandırılmamış`);
   assert.equal(http.calls.length, 0);
   const config = { ...testCredentials, enabled: true };
   assert.equal((await service.testConnection(config)).ok, true);
