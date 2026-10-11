@@ -162,10 +162,30 @@ try {
   await visit("?profile=market");
   await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
   const options = page.locator("#settings-options");
-  await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).not.toBeChecked();
-  await options.getByRole("checkbox", { name: "WhatsApp / SMS Kampanyaları", exact: true }).check();
-  await expect(options.getByRole("checkbox", { name: "Pazarlama", exact: true })).toHaveCount(0);
-  await expect(options.getByText("Pazarlama dahil", { exact: true })).toBeVisible();
+  const marketingOption = options.getByRole("checkbox", { name: "Pazarlama", exact: true });
+  const campaignOption = options.getByRole("checkbox", { name: "WhatsApp / SMS Kampanyaları", exact: true });
+  const optionLayout = () => options.locator(".settings-profile-option").evaluateAll(labels => labels.map(label => ({
+    text: label.querySelector("span")?.textContent,
+    top: label.getBoundingClientRect().top
+  })));
+  const layoutBefore = await optionLayout();
+  await expect(marketingOption).not.toBeChecked();
+  await expect(marketingOption).toBeEnabled();
+  await campaignOption.check();
+  await expect(marketingOption).toBeChecked();
+  await expect(marketingOption).toBeDisabled();
+  await expect(options.getByText("Pazarlama dahil", { exact: true })).toHaveCount(0);
+  expect(await optionLayout()).toEqual(layoutBefore);
+  await campaignOption.uncheck();
+  await expect(marketingOption).not.toBeChecked();
+  await expect(marketingOption).toBeEnabled();
+  await marketingOption.check();
+  await campaignOption.check();
+  await campaignOption.uncheck();
+  await expect(marketingOption).toBeChecked();
+  await expect(marketingOption).toBeEnabled();
+  await marketingOption.uncheck();
+  await campaignOption.check();
   await page.getByRole("button", { name: "Kaydet", exact: true }).click();
   expect(await page.evaluate(() => window.persistedSettings().profileOptions)).toEqual(["messaging.campaigns"]);
   expect(await page.evaluate(() => window.fixtureRuntimeCapabilities())).toContain("marketing.studio");
