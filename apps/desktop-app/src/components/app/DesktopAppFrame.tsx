@@ -27,11 +27,12 @@ import { PageHeader } from "../layout/PageHeader";
 import { GlobalMessageBar, type GlobalMessageTone } from "../layout/GlobalMessageBar";
 import { SyncStatusIndicator } from "../layout/SyncStatusIndicator";
 import { Sidebar } from "../layout/Sidebar";
-const LocalMenuPreview = lazy(() => import("../menu/MenuPreview").then(module => ({default: module.LocalMenuPreview})));
 import { NotificationCenter } from "../notifications/NotificationCenter";
-const DiagnosticsViewer = lazy(() => import("../diagnostics/DiagnosticsViewer").then(module => ({default: module.DiagnosticsViewer})));
 import { customerWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, tableWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
 import { HospitalityWorkspaceHost, WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
+
+const LocalMenuPreview = lazy(() => import("../menu/MenuPreview").then(module => ({default: module.LocalMenuPreview})));
+const DiagnosticsViewer = lazy(() => import("../diagnostics/DiagnosticsViewer").then(module => ({default: module.DiagnosticsViewer})));
 
 interface DesktopAppFrameProps {
   activePage: DesktopPage;

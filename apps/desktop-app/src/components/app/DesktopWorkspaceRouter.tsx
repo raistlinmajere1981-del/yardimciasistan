@@ -1,7 +1,4 @@
 import { usePageViewState } from "../../app/page-view-state";
-const RoomCategoryControl = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomCategoryControl})));
-const RoomFiltersToolbar = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomFiltersToolbar})));
-const RoomsWorkspace = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomsWorkspace})));
 import { Suspense, lazy, useState, type Dispatch, type SetStateAction } from "react";
 import {
   BUSINESS_CAPABILITIES as C,
@@ -37,9 +34,19 @@ import type {
 } from "../../app/controller-types";
 import type { UiPreferences } from "../../ui-preferences";
 import { getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
+import { formatTaskDue } from "../operations/task-due-format";
+import { useCalendarPageController } from "../calendar/calendar-page-state";
+import { usePensionPageController } from "../pension/pension-page-state";
+import { useRestaurantPageController } from "../restaurant/restaurant-page-state";
+import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
+import type { MarketView } from "../workspace/workspace-intent";
+import { CustomerWorkRoute } from "./routes/CustomerWorkRoute";
+
+const RoomCategoryControl = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomCategoryControl})));
+const RoomFiltersToolbar = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomFiltersToolbar})));
+const RoomsWorkspace = lazy(() => import("../pension/RoomsWorkspace").then(module => ({default: module.RoomsWorkspace})));
 const MenuManager = lazy(() => import("../menu/MenuManager").then(module => ({default: module.MenuManager})));
 const RestaurantReservationsWorkspace = lazy(() => import("../operations/RestaurantReservationsWorkspace").then(module => ({default: module.RestaurantReservationsWorkspace})));
-import { formatTaskDue } from "../operations/task-due-format";
 const DailyTasksWorkspace = lazy(() => import("../operations/OperationWorkspaces").then(module => ({default: module.DailyTasksWorkspace})));
 const ReservationsWorkspace = lazy(() => import("../operations/OperationWorkspaces").then(module => ({default: module.ReservationsWorkspace})));
 const SettingsWorkspace = lazy(() => import("../settings/SettingsWorkspace").then(module => ({default: module.SettingsWorkspace})));
@@ -50,12 +57,6 @@ const OperationCalendarPage = lazy(() => import("../../pages/OperationCalendarPa
 const PensionPage = lazy(() => import("../../pages/PensionPage").then((module) => ({ default: module.PensionPage })));
 const ReportsPage = lazy(() => import("../../pages/ReportsPage").then((module) => ({ default: module.ReportsPage })));
 const RestaurantPage = lazy(() => import("../../pages/RestaurantPage").then((module) => ({ default: module.RestaurantPage })));
-import { useCalendarPageController } from "../calendar/calendar-page-state";
-import { usePensionPageController } from "../pension/pension-page-state";
-import { useRestaurantPageController } from "../restaurant/restaurant-page-state";
-import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
-import type { MarketView } from "../workspace/workspace-intent";
-import { CustomerWorkRoute } from "./routes/CustomerWorkRoute";
 
 interface DesktopWorkspaceRouterProps {
   activePage: DesktopPage;
