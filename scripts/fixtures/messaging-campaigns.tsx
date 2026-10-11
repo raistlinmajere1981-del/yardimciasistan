@@ -15,6 +15,7 @@ const control = window as typeof window & { __campaignInitial: { dashboard: Desk
 const call = (method: string, ...args: unknown[]) => control.__campaignCall(method, args);
 window.yardimciDesktop = {
   getMarketingChannels: () => call('channels'),
+  getSmsConfiguration: async () => ({enabled:true}),
   getBusinessMessagingConfiguration: () => call('configuration'), listBusinessMessagingTemplates: () => call('templates'),
   onBusinessMessagingChanged: (listener) => {
     window.addEventListener('fixture-provider-changed', listener);

@@ -1,7 +1,8 @@
+import {mkdirSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {expect} from '@playwright/test';
 import {scheduleFixture} from './test-helpers/marketing-schedule-fixtures.mjs';
-import {openMarketingWorkspaceBrowser} from './test-helpers/marketing-workspace-browser.mjs';
+import {assertMarketingDialog,openMarketingWorkspaceBrowser} from './test-helpers/marketing-workspace-browser.mjs';
 import {chooseDate} from './test-helpers/date-time-picker.mjs';
 const f=scheduleFixture();let ui;
 try {
@@ -9,14 +10,69 @@ try {
   const plan=f.scheduleService.save(f.input(web,{name:'Haftalık web duyurusu',startsLocal:'2030-01-02T09:00'}));
   f.scheduleService.save({...f.input(web,{name:'SMS planı',startsLocal:'2030-01-03T09:00'}),targetType:'audience_campaign',targetId:sms.id,channel:'sms',expectedTargetRevision:undefined});
   ui=await openMarketingWorkspaceBrowser(f);const {page}=ui;
+  await page.getByLabel('Son paylaşımlar',{exact:true}).getByRole('button').filter({hasText:'Web sitesi'}).click();
+  await expect(page.getByRole('region',{name:'İçerik detayı',exact:true})).toContainText('Planlandı');
+  await expect(page.getByRole('region',{name:'İçerik detayı',exact:true})).toContainText(`Sürüm ${plan.schedule.targetRevision}`);
+  await expect(page.getByRole('region',{name:'Kayıtlar',exact:true})).toHaveCount(0);await expect(page.getByLabel('Başlık',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Düzenle',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Seçili kanal önizlemesi',exact:true}).last().click();await expect(page.getByLabel('Web sitesi önizlemesi',{exact:true})).toContainText(web.text);await page.keyboard.press('Escape');
+  assert.equal(f.db.getMarketingSchedule(plan.schedule.id).targetRevision,plan.schedule.targetRevision);
+  // Inline operations retain the original dialog and never enter Calendar.
+  const detailDialog=page.getByRole('dialog',{name:'Paylaşım detayı',exact:true}), detailUrl=page.url();
+  await detailDialog.evaluate(el=>{el.dataset.inlineIdentity='original';});
+  const card=page.getByRole('region',{name:'Yayın planı',exact:true});
+  await expect(card).toContainText('Kaçırılan çalışma');await expect(card).toContainText('Europe/Istanbul');
+  for(const name of ['Planı aç','Sonucu aç','Paylaşım işlemini aç','Yayın sonuçlarını görüntüle'])await expect(detailDialog.getByRole('button',{name,exact:true})).toHaveCount(0);
+  assert.equal(f.db.getMarketingSchedule(plan.schedule.id).revision,plan.schedule.revision,'view and preview never save a plan');
+  for(const width of [1440,1280,640,390]){await page.setViewportSize({width,height:844});await assertMarketingDialog(page,detailDialog);}
+  await page.setViewportSize({width:1440,height:1000});
+  await card.getByRole('button',{name:'Planı düzenle',exact:true}).click();await expect(page.getByLabel('Plan adı',{exact:true})).toBeFocused();
+  await page.getByLabel('Plan adı',{exact:true}).fill('Geçici plan');await page.getByRole('button',{name:'Vazgeç',exact:true}).click();await expect(card).toContainText('Haftalık web duyurusu');await expect(card.getByRole('button',{name:'Planı düzenle',exact:true})).toBeFocused();
+  await card.getByRole('button',{name:'Planı düzenle',exact:true}).click();await page.getByLabel('Plan adı',{exact:true}).fill('Kaydedilmemiş inline plan');
+  await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();await expect(page.getByRole('alertdialog')).toBeVisible();await expect(page.locator('dialog[open]')).toHaveCount(1);await page.getByRole('button',{name:'Düzenlemeye dön',exact:true}).click();await expect(page.getByLabel('Plan adı',{exact:true})).toHaveValue('Kaydedilmemiş inline plan');
+  await page.evaluate(()=>{const b=window.yardimciDesktop,save=b.saveMarketingSchedule;b.saveMarketingSchedule=async()=>{b.saveMarketingSchedule=save;return {ok:false,code:'fixture',message:'Fixture plan save rejected'};};});
+  await page.getByRole('button',{name:'Planı kaydet',exact:true}).click();await expect(card).toContainText('Fixture plan save rejected');assert.equal(f.db.getMarketingSchedule(plan.schedule.id).revision,plan.schedule.revision);
+  await page.getByLabel('Plan adı',{exact:true}).fill('Haftalık web duyurusu');
+  await page.evaluate(()=>{const b=window.yardimciDesktop,save=b.saveMarketingSchedule;b.saveMarketingSchedule=async input=>{await new Promise(resolve=>{window.__releaseInlinePlan=resolve;});b.saveMarketingSchedule=save;return save(input);};});
+  await page.getByRole('button',{name:'Planı kaydet',exact:true}).click();await expect(page.getByLabel('Plan adı',{exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Çalışma alanını kapat',exact:true})).toBeDisabled();await page.keyboard.press('Escape');await expect(detailDialog).toBeVisible();await page.evaluate(()=>window.__releaseInlinePlan());
+  await expect(card.getByRole('button',{name:'Planı düzenle',exact:true})).toBeEnabled();assert.equal(f.db.getMarketingSchedule(plan.schedule.id).targetRevision,plan.schedule.targetRevision);
+  await card.getByRole('button',{name:'Planı duraklat',exact:true}).click();await expect(card.getByRole('button',{name:'Planı devam ettir',exact:true})).toBeEnabled();assert.equal(f.db.getMarketingSchedule(plan.schedule.id).status,'paused');await card.getByRole('button',{name:'Planı devam ettir',exact:true}).click();await expect(card.getByRole('button',{name:'Planı duraklat',exact:true})).toBeEnabled();
+  await expect(detailDialog).toHaveAttribute('data-inline-identity','original');await expect(page.locator('dialog[open]')).toHaveCount(1);assert.equal(page.url(),detailUrl);
+  await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
   await page.getByRole('button',{name:'Fixture ana Takvim',exact:true}).click();await chooseDate(page,'Takvim tarihi','2030-01-02');await page.getByRole('button',{name:'Gün',exact:true}).click();await expect(page.getByLabel('Operasyon takvimi',{exact:true})).toContainText('Haftalık web duyurusu');await page.getByRole('button',{name:'Planı aç',exact:true}).click();
-  const editor=page.getByLabel('Plan çalışma alanı',{exact:true});await page.getByLabel('Plan türü',{exact:true}).selectOption('recurring');await page.getByLabel('Tekrar',{exact:true}).selectOption('weekly');
+  mkdirSync('artifacts/marketing',{recursive:true});
+  const dialog=page.getByRole('dialog');
+  for (const width of [1440,1280,640,390]) {await page.setViewportSize({width,height:844});await assertMarketingDialog(page,dialog);await expect(dialog.locator('footer').getByRole('button',{name:'Planı kaydet',exact:true})).toBeInViewport();}
+  await page.evaluate(async()=>{const {applyUiPreferences}=await import('/src/ui-preferences.ts');applyUiPreferences({version:2,scheme:'dark',density:'compact',scale:1.2,accent:'blue',font:'system',motion:'reduced'});});
+  await assertMarketingDialog(page,dialog);await page.screenshot({path:'artifacts/marketing/schedule-mobile-dark.png'});
+  await page.evaluate(async()=>{const {applyUiPreferences}=await import('/src/ui-preferences.ts');applyUiPreferences({version:2,scheme:'light',density:'comfortable',scale:1,accent:'coral',font:'plex',motion:'system'});});await page.setViewportSize({width:1440,height:1000});
+  await page.screenshot({path:'artifacts/marketing/schedule-editor.png'});
+  const editor=page.getByLabel('Plan çalışma alanı',{exact:true});await expect(page.getByLabel('Tekrar',{exact:true})).toHaveCount(0);await page.getByLabel('Plan türü',{exact:true}).selectOption('recurring');await expect(page.getByLabel('Tekrar',{exact:true})).toBeVisible();await page.getByLabel('Tekrar',{exact:true}).selectOption('weekly');
   const controls=await editor.locator('input,select').count();await page.getByLabel('Tekrar',{exact:true}).selectOption('monthly');assert.equal(await editor.locator('input,select').count(),controls);await page.getByLabel('Tekrar',{exact:true}).selectOption('weekly');await page.getByRole('button',{name:'Planı kaydet',exact:true}).click();assert.equal(f.db.getMarketingSchedule(plan.schedule.id).recurrenceRule.frequency,'weekly');
-  await page.getByRole('button',{name:'Planı duraklat',exact:true}).click();await expect(page.getByRole('button',{name:'Planı devam ettir',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Planı devam ettir',exact:true}).click();await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
+  await page.getByRole('button',{name:'Planı duraklat',exact:true}).click();await expect(page.getByRole('button',{name:'Planı devam ettir',exact:true})).toBeEnabled();await expect(dialog.locator('footer').getByRole('button',{name:'Planı devam ettir',exact:true})).toBeInViewport();await page.getByRole('button',{name:'Planı devam ettir',exact:true}).click();await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
   const latest=f.db.getMarketingPublication(web.id);f.db.saveMarketingPublication({id:latest.id,expectedRevision:latest.revision,contentId:latest.contentId,channel:'website',placement:latest.placement,title:latest.title,text:'Yeni yayın metni',mediaAssetIds:[]});
   await page.getByRole('button',{name:'Planı aç',exact:true}).click();await expect(editor).toContainText('Yayın değişmiş');await page.getByRole('button',{name:'Planı güncelle · sürüm',exact:false}).click();await page.getByRole('button',{name:'Planı kaydet',exact:true}).click();assert.equal(f.db.getMarketingSchedule(plan.schedule.id).targetRevision,f.db.getMarketingPublication(web.id).revision);
-  await page.getByLabel('Plan adı',{exact:true}).fill('Kaydedilmemiş plan');await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();await expect(page.getByRole('alertdialog')).toBeVisible();await page.getByRole('button',{name:'Düzenlemeye dön',exact:true}).click();await expect(page.getByLabel('Plan adı',{exact:true})).toHaveValue('Kaydedilmemiş plan');await page.getByRole('button',{name:'Planı kaydet',exact:true}).click();await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
-  await page.getByRole('button',{name:'Ay',exact:true}).click();await page.getByRole('button',{name:'Kaydedilmemiş plan',exact:true}).first().click();await expect(editor).toBeVisible();await page.getByRole('button',{name:'Planı iptal et',exact:true}).click();await page.getByRole('alertdialog').getByRole('button',{name:'Planı iptal et',exact:true}).click();assert.equal(f.db.getMarketingSchedule(plan.schedule.id).status,'cancelled');assert.equal(f.db.getMarketingPublication(web.id).desiredPublished,false);await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
-  await chooseDate(page,'Takvim tarihi','2030-01-03');await page.getByRole('button',{name:'Gün',exact:true}).click();await page.getByRole('button',{name:'Planı aç',exact:true}).click();await expect(page.getByLabel('Plan türü',{exact:true}).locator('option[value="recurring"]')).toHaveAttribute('disabled','');await expect(page.getByLabel('Tekrar',{exact:true})).toBeDisabled();assert.equal(f.calls.filter(c=>c.url.includes('send-sms')).length,0);assert.deepEqual(ui.errors,[]);
+  await page.getByLabel('Plan adı',{exact:true}).fill('Kaydedilmemiş plan');await page.getByRole('button',{name:'Planı duraklat',exact:true}).click();await expect(dialog).toContainText('Önce değişiklikleri kaydedin.');assert.equal(f.db.getMarketingSchedule(plan.schedule.id).status,'active');await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();await expect(page.getByRole('alertdialog')).toBeVisible();await page.getByRole('button',{name:'Düzenlemeye dön',exact:true}).click();await expect(page.getByLabel('Plan adı',{exact:true})).toHaveValue('Kaydedilmemiş plan');
+  await page.evaluate(()=>{const bridge=window.yardimciDesktop,save=bridge.saveMarketingSchedule;bridge.saveMarketingSchedule=async input=>{await new Promise(resolve=>{window.__releaseMarketingSave=resolve;});bridge.saveMarketingSchedule=save;return save(input);};});
+  await page.getByRole('button',{name:'Planı kaydet',exact:true}).click();
+  for(const name of ['Planı kaydet','Planı duraklat','Planı iptal et','Çalışma alanını kapat']) await expect(dialog.getByRole('button',{name,exact:true})).toBeDisabled();
+  await expect(page.getByLabel('Plan adı',{exact:true})).toBeDisabled();await page.keyboard.press('Escape');await expect(dialog).toBeVisible();
+  await page.evaluate(()=>window.__releaseMarketingSave());await expect(dialog.getByRole('button',{name:'Planı kaydet',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
+  await page.getByRole('button',{name:'Ay',exact:true}).click();await page.getByRole('button',{name:'Kaydedilmemiş plan',exact:true}).first().click();await expect(editor).toBeVisible();await page.getByRole('button',{name:'Planı iptal et',exact:true}).click();await page.getByRole('alertdialog').getByRole('button',{name:'Planı iptal et',exact:true}).click();assert.equal(f.db.getMarketingSchedule(plan.schedule.id).status,'cancelled');await expect(dialog.locator('footer').getByRole('button',{name:'Planı kaydet',exact:true})).toBeDisabled();assert.equal(f.db.getMarketingPublication(web.id).desiredPublished,false);await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
+  await chooseDate(page,'Takvim tarihi','2030-01-03');await page.getByRole('button',{name:'Gün',exact:true}).click();await page.getByRole('button',{name:'Planı aç',exact:true}).click();await expect(page.getByLabel('Plan türü',{exact:true}).locator('option[value="recurring"]')).toHaveAttribute('disabled','');await expect(page.getByLabel('Tekrar',{exact:true})).toHaveCount(0);assert.equal(f.calls.filter(c=>c.url.includes('send-sms')).length,0);
+  await page.keyboard.press('Escape');
+  const claim=f.db.claimMarketingScheduleExecution('2030-01-03T06:00:00.000Z',60000);assert.equal(claim.schedule.channel,'sms');
+  await page.evaluate(()=>window.__notifyScheduleChanged());await page.getByRole('button',{name:'Planı aç',exact:true}).click();
+  await expect(page.getByLabel('Plan adı',{exact:true})).toBeDisabled();await expect(dialog.locator('footer').getByRole('button',{name:'Planı kaydet',exact:true})).toBeDisabled();await expect(dialog.getByRole('button',{name:'Planı duraklat',exact:true})).toBeEnabled();
+  // Pending execution and failure history are real records, without executing any publication.
+  f.db.finishMarketingScheduleExecution(claim.execution.id,'failed','2030-01-03T06:01:00.000Z','provider_failed');
+  const historySource=f.publication(),historyPub=f.db.saveMarketingPublication({id:historySource.id,expectedRevision:historySource.revision,contentId:historySource.contentId,channel:'website',placement:historySource.placement,title:'Inline çalışma geçmişi',text:historySource.text,mediaAssetIds:[]});
+  const historyPlan=f.scheduleService.save(f.input(historyPub,{name:'Geçmiş ve kilit planı',startsLocal:'2030-01-04T09:00'}));
+  const historyClaim=f.db.claimMarketingScheduleExecution('2030-01-04T06:00:00.000Z',60000);assert.equal(historyClaim.schedule.id,historyPlan.schedule.id);
+  await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();await page.getByRole('button',{name:'Fixture sayfa değiştir',exact:true}).click();
+  await page.getByLabel('Son paylaşımlar',{exact:true}).getByRole('button').filter({hasText:'Inline çalışma geçmişi'}).click();
+  const historyDialog=page.getByRole('dialog',{name:'Paylaşım detayı',exact:true});await expect(historyDialog.getByRole('button',{name:'Planı düzenle',exact:true})).toBeDisabled();await expect(historyDialog.getByRole('region',{name:'Geçmiş',exact:true})).toContainText('Çalışıyor');await expect(historyDialog.getByRole('button',{name:'Düzenle',exact:true})).toHaveCount(0);
+  f.db.finishMarketingScheduleExecution(historyClaim.execution.id,'failed','2030-01-04T06:01:00.000Z','provider_failed');await page.evaluate(()=>window.__notifyScheduleChanged());await expect(historyDialog.getByRole('region',{name:'Geçmiş',exact:true})).toContainText('Başarısız · provider_failed');await expect(historyDialog.getByRole('region',{name:'Yayın planı',exact:true})).toContainText('Plan tamamlandı');await expect(historyDialog.getByRole('button',{name:'Planı düzenle',exact:true})).toHaveCount(0);
+  assert.equal(f.db.getMarketingPublication(historyPub.id).desiredPublished,false);assert.equal(f.calls.filter(c=>c.url.includes('send-sms')).length,0);
+  assert.deepEqual(ui.errors,[]);
   console.log('Main Calendar Marketing UI: day/week/month projection, canonical schedule edits, stable recurrence controls, frozen revision update, dirty guard, pause/resume/cancel and SMS one-shot gate passed.');
 } finally {await ui?.close();await f.dispose();}

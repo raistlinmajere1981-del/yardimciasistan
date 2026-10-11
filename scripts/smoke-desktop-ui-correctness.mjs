@@ -173,8 +173,7 @@ try {
   for (const configured of ['false', 'true']) {
     await scenario(`Business messaging visible states (${configured})`, 'desktop-ui-correctness', `mode=business&configured=${configured}`, async page => {
       const card = page.getByRole('region', { name: 'WhatsApp Business mesajı', exact: true });
-      await expect(card).toHaveAttribute('aria-busy', 'true');
-      await expect(card.getByRole('status')).toBeVisible();
+      await expect(card).toHaveCount(0);
       await page.evaluate(() => window.uiFixture.finish());
       await expect(card.getByRole('alert')).toBeVisible();
       await expect(card).toHaveAttribute('aria-busy', 'false');
@@ -191,6 +190,20 @@ try {
       }
     });
   }
+  await scenario('Business disabled shows no customer warning or tools', 'desktop-ui-correctness', 'mode=business&enabled=false&success', async page => {
+    await page.waitForFunction(() => window.uiFixture.calls.includes('configuration'));
+    await page.evaluate(() => window.uiFixture.finish());
+    await expect(page.getByRole('region', {name:'WhatsApp Business mesajı',exact:true})).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('WhatsApp Business yapılandırılmamış');
+  });
+  for(const item of [{q:'mode=preferences&success&enabled=false', names:[]}, {q:'mode=preferences&success&enabled=false&sms=true',names:['SMS pazarlama']}, {q:'mode=preferences&success&enabled=true',names:['WhatsApp pazarlama']}, {q:'mode=preferences&success&enabled=true&sms=true',names:['WhatsApp pazarlama','SMS pazarlama']}]) {
+    await scenario('Customer consent visible only for enabled services: '+item.q, 'desktop-ui-correctness', item.q, async page => {
+      const region = page.getByRole('region',{name:'İletişim tercihleri', exact:true});
+      if(!item.names.length) await expect(region).toHaveCount(0);
+      else {await expect(region).toBeVisible();for(const name of item.names) await expect(region.getByRole('combobox',{name,exact:true})).toBeEnabled();}
+      for(const name of ['WhatsApp pazarlama','SMS pazarlama'].filter(v=>!item.names.includes(v))) await expect(page.getByRole('combobox',{name,exact:true})).toHaveCount(0);
+    });
+  }
   await scenario('Business background notifications preserve parameter input and focus', 'desktop-ui-correctness', 'mode=business&configured=true&success&template', async page => {
     await page.evaluate(() => { window.uiFixture.delay = false; window.uiFixture.finish(); });
     const card = page.getByRole('region', { name: 'WhatsApp Business mesajı', exact: true });
@@ -199,7 +212,7 @@ try {
     const parameter = card.getByLabel('body 1', { exact: true });
     await parameter.fill('Fixture parameter');
     await page.evaluate(() => { window.uiFixture.delay = true; window.uiFixture.notify(); });
-    await expect(card).toHaveAttribute('aria-busy', 'true');
+    await expect(card).toBeVisible();
     await expect(parameter).toBeFocused();
     await expect(parameter).toHaveValue('Fixture parameter');
     await page.evaluate(() => { window.uiFixture.fail = true; window.uiFixture.finish(); });

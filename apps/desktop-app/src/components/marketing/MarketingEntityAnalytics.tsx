@@ -4,7 +4,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { AnalyticsMetricList } from "./MarketingAnalyticsMetrics";
 
 /** A read-only section inside the existing canonical workspace, never a second editor. */
-export function MarketingEntityAnalytics({ kind, id, revision }: { kind: "campaign" | "publication"; id: string; revision: string }) {
+export function MarketingEntityAnalytics({ kind, id, revision, inline = false }: { inline?: boolean; kind: "campaign" | "publication"; id: string; revision: string }) {
   const [data, setData] = useState<MarketingCampaignAnalytics | MarketingPublicationAnalytics | null>(null);
   const [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [clock, setClock] = useState(Date.now);
   const epoch = useRef(0);
@@ -44,10 +44,10 @@ export function MarketingEntityAnalytics({ kind, id, revision }: { kind: "campai
     finally { if (ticket === epoch.current) setBusy(false); }
   }
   return <section className="marketing-analytics-detail" aria-label={kind === "campaign" ? "Kampanya analitiği" : "Yayın analitiği"} aria-busy={busy}>
-    <h3>Paylaşım sonuçları</h3><p className="muted">{kind === "campaign" ? "Hazırlanan tüm alıcıların güncel sonuçları. Gönderilen mesaj servise ulaşmıştır; teslim ve okunma ayrıca doğrulanır." : "Yayının tüm yaşam süresi · seçili genel tarih aralığından bağımsız."}</p>
+    {!inline && <h3>Paylaşım sonuçları</h3>}<p className="muted">{kind === "campaign" ? "Hazırlanan tüm alıcıların güncel sonuçları. Gönderilen mesaj servise ulaşmıştır; teslim ve okunma ayrıca doğrulanır." : "Yayının tüm yaşam süresi · seçili genel tarih aralığından bağımsız."}</p>
     {message && <p role="status">{message}</p>}
     {data ? <AnalyticsMetricList metrics={data.metrics} label={kind === "campaign" ? "Kampanya metrikleri" : "Yayın metrikleri"}/> : !message && <p>Henüz analitik veri yok.</p>}
-    {publication && <p>Durum: {publication.status === "published" ? "Yayınlandı" : publication.status === "publishing" ? "Yayın onayı bekleniyor" : publication.status === "failed" ? "Başarısız" : publication.status === "unpublished" ? "Yayından kaldırıldı" : "Taslak"} · Yayın zamanı: {publication.publishedAt ? new Date(publication.publishedAt).toLocaleString("tr-TR") : "—"} · Son güncelleme: {new Date(publication.updatedAt).toLocaleString("tr-TR")}</p>}
+    {publication && !inline && <p>Durum: {publication.status === "published" ? "Yayınlandı" : publication.status === "publishing" ? "Yayın onayı bekleniyor" : publication.status === "failed" ? "Başarısız" : publication.status === "unpublished" ? "Yayından kaldırıldı" : "Taslak"} · Yayın zamanı: {publication.publishedAt ? new Date(publication.publishedAt).toLocaleString("tr-TR") : "—"} · Son güncelleme: {new Date(publication.updatedAt).toLocaleString("tr-TR")}</p>}
     {publication?.channel === "website" && <p>Ziyaret verisi toplanmıyor.</p>}
     {publication?.canRefresh && <><ActionButton variant="secondary" disabled={busy || Boolean(publication.nextRefreshAt && Date.parse(publication.nextRefreshAt) > clock)} onClick={() => void refresh()}>Sağlayıcı metriklerini yenile</ActionButton>
       {publication.nextRefreshAt && Date.parse(publication.nextRefreshAt) > clock && <small>Bir sonraki yenileme: {new Date(publication.nextRefreshAt).toLocaleTimeString("tr-TR")}</small>}</>}

@@ -21,11 +21,15 @@ function count(value: number | null) { return value === null ? "—" : value.toL
 function date(value: string) { return new Date(`${value}T12:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" }); }
 
 /** Each series has its own scale: publications and messages have different units. */
-function AnalyticsTrends({ data }: { data: MarketingAnalyticsSnapshot }) {
-  const series = [{ key: "published", label: "Onaylanan yayın", detail: "Website + Instagram" }, { key: "accepted", label: "Gönderilen mesaj", detail: "WhatsApp + SMS · gönderim servisine ulaşan" }] as const;
+function AnalyticsTrends({ data, publishing, messaging }: { data: MarketingAnalyticsSnapshot; publishing: string; messaging: string }) {
+  const series = [
+    { key: "published", label: "Onaylanan yayın", detail: publishing, enabled: Boolean(publishing) },
+    { key: "accepted", label: "Gönderilen mesaj", detail: messaging + " · gönderim servisine ulaşan", enabled: Boolean(messaging) }
+  ] as const;
+  const visibleSeries = series.filter(s => s.enabled);
   return <Panel as="section" className="marketing-analytics-results" aria-label="Zaman içindeki sonuçlar">
     <header><h3>Zaman içindeki sonuçlar</h3><p className="muted">Seçilen günlerde hazırlanan gönderimlerin ve oluşturulan yayınların bugünkü sonuçları.</p></header>
-    <div className="marketing-analytics-trends">{series.map(({ key, label, detail }) => {
+    <div className="marketing-analytics-trends">{visibleSeries.map(({ key, label, detail }) => {
       const observedMaximum = Math.max(0, ...data.trends.map(t => t[key] ?? 0));
       const maximum = Math.max(1, observedMaximum);
       const step = 600 / data.trends.length;
@@ -38,7 +42,7 @@ function AnalyticsTrends({ data }: { data: MarketingAnalyticsSnapshot }) {
           : <div className="marketing-card-empty"><p>Bu aralıkta {key === "published" ? "yayın" : "gönderim"} verisi yok.</p></div>}
       </figure>;
     })}</div>
-    {data.trends.some(t => t.accepted !== null || t.published !== null) && <details className="record-disclosure"><summary>Günlük değerleri tablo olarak göster</summary><div className="marketing-analytics-table"><table><caption>Hazırlama / oluşturma gününe göre sonuçlar</caption><thead><tr><th scope="col">Tarih</th><th scope="col">Onaylanan yayın</th><th scope="col">Gönderilen mesaj</th></tr></thead><tbody>{data.trends.map(t => <tr key={t.date}><th scope="row">{t.date}</th><td>{count(t.published)}</td><td>{count(t.accepted)}</td></tr>)}</tbody></table></div></details>}
+    {visibleSeries.length > 0 && data.trends.some(t => visibleSeries.some(s => t[s.key] !== null)) && <details className="record-disclosure"><summary>Günlük değerleri tablo olarak göster</summary><div className="marketing-analytics-table"><table><caption>Hazırlama / oluşturma gününe göre sonuçlar</caption><thead><tr><th scope="col">Tarih</th>{visibleSeries.map(s => <th key={s.key} scope="col">{s.label}</th>)}</tr></thead><tbody>{data.trends.map(t => <tr key={t.date}><th scope="row">{t.date}</th>{visibleSeries.map(s => <td key={s.key}>{count(t[s.key])}</td>)}</tr>)}</tbody></table></div></details>}
   </Panel>;
 }
 
@@ -63,8 +67,13 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
     const campaign = bridge?.onMessagingCampaignsChanged?.(() => void load()), provider = bridge?.onBusinessMessagingChanged?.(() => void load()), schedule = bridge?.onMarketingSchedulesChanged?.(() => void load());
     return () => { active = false; invalidateAnalyticsEpoch(); campaign?.(); provider?.(); schedule?.(); };
   }, [range, refreshVersion, invalidateAnalyticsEpoch]);
+  // Main-owned registry state is authoritative; disabled providers are not pending setup tasks.
+  const activeChannels = data?.channels.filter(c => c.serviceState !== "disabled") ?? [];
+  const publishing = activeChannels.filter(c => c.channel === "website" || c.channel === "instagram").map(c => channelNames[c.channel]).join(" + ");
+  const messaging = activeChannels.filter(c => c.channel === "whatsapp" || c.channel === "sms").map(c => channelNames[c.channel]).join(" + ");
+  const activeIds = new Set(activeChannels.map(c => c.channel));
   return <section className="marketing-analytics" aria-label="Pazarlama analitiği" aria-busy={busy}>
-    <header className="marketing-analytics-heading"><div><h2>Paylaşımlarınızın sonuçları</h2><p className="muted">Yayınlarınızı ve müşterilerinize gönderdiğiniz mesajları bir arada izleyin.</p></div><ActionButton variant="quiet" onClick={() => setHelp(true)}><CircleHelp size={16}/>Ölçümler nasıl okunur?</ActionButton></header>
+    <header className="marketing-analytics-heading"><div><h2>Paylaşımlarınızın sonuçları</h2><p className="muted">Etkin kanallarınızın yayın ve gönderim sonuçlarını izleyin.</p></div><ActionButton variant="quiet" onClick={() => setHelp(true)}><CircleHelp size={16}/>Ölçümler nasıl okunur?</ActionButton></header>
     <div className="marketing-actions marketing-analytics-filters"><label className="form-field form-field--fluid">Tarih aralığı<select aria-label="Tarih aralığı" value={custom ? "custom" : range.preset} disabled={busy} onChange={e => {
       const preset = e.target.value as MarketingAnalyticsRangeInput["preset"]; setCustom(preset === "custom");
       if (preset !== "custom") onRange({ preset });
@@ -78,13 +87,13 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
     {data && <>
       <p className="muted marketing-analytics-period">{date(data.range.startDate)} – {date(data.range.endDate)} · {data.range.timezone} · Bu aralıkta hazırlanan gönderimler ve oluşturulan yayınlar</p>
       <div className="marketing-analytics-summary" aria-label="Analitik genel özet">
-        <MetricCard title="Onaylanan yayın" value={count(data.summary.published)} detail={data.summary.published === null ? "Bu aralıkta yayın verisi yok" : "Website + Instagram · kanal başına yayın"} tone="neutral" icon={Globe}/>
-        <MetricCard title="Gönderilen mesaj" value={count(data.summary.accepted)} detail={data.summary.accepted === null ? "Bu aralıkta gönderim verisi yok" : "WhatsApp + SMS · gönderim servisine ulaştı"} tone="neutral" icon={Send}/>
-        <MetricCard title="Kullanılan kanal" value={count(data.summary.usedChannels)} detail={data.summary.usedChannels === null ? "Bu aralıkta kullanım verisi yok" : "Yayın veya gönderim yapılan kanallar"} tone="neutral" icon={ChartNoAxesCombined}/>
+        {publishing && <MetricCard title="Onaylanan yayın" value={count(data.summary.published)} detail={data.summary.published === null ? "Bu aralıkta yayın verisi yok" : publishing + " · kanal başına yayın"} tone="neutral" icon={Globe}/>}
+        {messaging && <MetricCard title="Gönderilen mesaj" value={count(data.summary.accepted)} detail={data.summary.accepted === null ? "Bu aralıkta gönderim verisi yok" : messaging + " · gönderim servisine ulaştı"} tone="neutral" icon={Send}/>}
+        {activeChannels.length > 0 && <MetricCard title="Kullanılan kanal" value={count(data.summary.usedChannels)} detail={data.summary.usedChannels === null ? "Bu aralıkta kullanım verisi yok" : "Yayın veya gönderim yapılan kanallar"} tone="neutral" icon={ChartNoAxesCombined}/>}
       </div>
-      <AnalyticsTrends data={data}/>
-      <section aria-label="Kanal sonuçları" className="marketing-analytics-results"><header><h3>Kanal sonuçları</h3><p className="muted">Her kanal kendi ölçümleriyle gösterilir. Yayın ve mesaj sayıları farklı şeyleri ölçer.</p></header>
-        <div className="marketing-analytics-channels">{data.channels.map(c => {
+      {(publishing || messaging) && <AnalyticsTrends data={data} publishing={publishing} messaging={messaging}/>}
+      {activeChannels.length > 0 && <section aria-label="Kanal sonuçları" className="marketing-analytics-results"><header><h3>Kanal sonuçları</h3><p className="muted">Her kanal kendi ölçümleriyle gösterilir. Yayın ve mesaj sayıları farklı şeyleri ölçer.</p></header>
+        <div className="marketing-analytics-channels">{activeChannels.map(c => {
           const metrics = c.metrics.filter(m => (channelMetrics[c.channel] ?? []).includes(m.metric));
           return <Panel as="section" className="marketing-analytics-channel" key={c.channel} aria-label={`${channelNames[c.channel]} analitiği`}>
           <h3>{channelNames[c.channel]}</h3>
@@ -94,10 +103,10 @@ export function MarketingAnalytics({ range, onRange, onCampaign, onPublication }
           {c.channel === "website" && <p className="muted">Ziyaret verisi toplanmıyor.</p>}
           {c.channel === "instagram" && <p className="muted">{c.serviceState === "ready" && c.providerCapabilities.some(m => m.availability === "available") ? "Varsa görüntülenme ve etkileşim ölçümleri yayın ayrıntısında gösterilir." : "Görüntülenme ve etkileşim verisi alınamıyor. " + analyticsAvailabilityLabels[c.serviceState === "ready" ? (c.providerCapabilities.find(m => ["permission_denied", "permission_unverified"].includes(m.availability))?.availability ?? c.providerCapabilities[0]?.availability ?? "unsupported") : c.serviceState] + "."}</p>}
         </Panel>; })}</div>
-      </section>
+      </section>}
       <Panel as="section" className="marketing-analytics-results" aria-label="Son sonuçlar"><header><h3>Son sonuçlar</h3><p className="muted">Bu aralıkta oluşturulan paylaşımlar · her paylaşımın tüm süresindeki güncel durumu.</p></header>
-        {!data.recentResults.length && <div className="marketing-card-empty"><Send size={30}/><strong>Bu aralıkta henüz sonuç yok.</strong><p>Farklı bir tarih aralığı seçerek önceki paylaşımlarınızı görebilirsiniz.</p></div>}
-        {data.recentResults.map(row => {
+        {!data.recentResults.some(row => activeIds.has(row.result.channel)) && <div className="marketing-card-empty"><Send size={30}/><strong>Bu aralıkta henüz sonuç yok.</strong><p>Farklı bir tarih aralığı seçerek önceki paylaşımlarınızı görebilirsiniz.</p></div>}
+        {data.recentResults.filter(row => activeIds.has(row.result.channel)).map(row => {
           const result = row.result;
           const status = row.kind === "campaign" ? campaignStatuses[row.result.status] : publicationStatuses[row.result.status];
           const measurements = result.metrics.filter(m => ["accepted", "delivered", "read", "failed", "views", "likes"].includes(m.metric) && m.value !== null);

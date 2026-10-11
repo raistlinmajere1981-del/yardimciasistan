@@ -106,18 +106,19 @@ export class MarketingAnalyticsService {
       const ratio = (numerator: number | null, denominator: number | null) => numerator !== null && denominator !== null && denominator > 0 && numerator <= denominator ? numerator / denominator : null;
       return { channel, serviceState: definition.state === "ready" ? "ready" as const : definition.state === "unconfigured" ? "unconfigured" as const : "disabled" as const, metrics, providerCapabilities, deliveryRate: ratio(count("delivered"), count("accepted")), readRate: ratio(count("read"), count("delivered")) };
     });
-    const total = (name: MarketingMetricName) => { const values = channels.flatMap(c => c.metrics.filter(m => m.metric === name && m.value !== null).map(m => m.value!)); return values.length ? values.reduce((a, b) => a + b, 0) : null; };
+    const activeChannels = channels.filter(c => c.serviceState !== "disabled");
+    const total = (name: MarketingMetricName) => { const values = activeChannels.flatMap(c => c.metrics.filter(m => m.metric === name && m.value !== null).map(m => m.value!)); return values.length ? values.reduce((a, b) => a + b, 0) : null; };
     const trends: MarketingAnalyticsSnapshot["trends"] = [];
     for (let date = range.startDate; date <= range.endDate; date = analyticsDateOffset(date, 1)) {
       const recipients = facts.recipients.filter(r => analyticsDay(r.createdAt, range.timezone) === date);
-      const count = (name: MarketingMetricName) => { const value = ["whatsapp", "sms"].flatMap(channel => this.delivery(channel as "whatsapp" | "sms", recipients).filter(m => m.metric === name && m.value !== null).map(m => m.value!)); return total(name) === null ? null : value.reduce((a, b) => a + b, 0); };
+      const count = (name: MarketingMetricName) => { const value = (["whatsapp", "sms"] as const).filter(channel => activeChannels.some(c => c.channel === channel)).flatMap(channel => this.delivery(channel, recipients).filter(m => m.metric === name && m.value !== null).map(m => m.value!)); return total(name) === null ? null : value.reduce((a, b) => a + b, 0); };
       trends.push({ date, accepted: count("accepted"),
         published: total("published") === null ? null : facts.publications.filter(p => (p.publishedAt || p.status === "published") && analyticsDay(p.createdAt, range.timezone) === date).length });
     }
     if (opened === true) desktopLog.info({ scope: "marketing.analytics", event: "marketing.analytics.opened", message: "Pazarlama analitiği açıldı.", meta: { days: trends.length } });
     // A channel was used when a message was attempted/accepted or a publication progressed beyond draft.
     // This is a count of channels, never a comparison of recipient counts and publication counts.
-    const usedChannels = channels.filter(c => c.metrics.some(m => ["attempted", "accepted", "published", "publishing", "failed"].includes(m.metric) && m.value !== null && m.value > 0)).length;
+    const usedChannels = activeChannels.filter(c => c.metrics.some(m => ["attempted", "accepted", "published", "publishing", "failed"].includes(m.metric) && m.value !== null && m.value > 0)).length;
     const recentTargets = [
       ...facts.campaigns.filter(c => c.preparedAt).map(c => ({ kind: "campaign" as const, result: c })),
       ...facts.publications.filter(p => p.status !== "draft").map(p => ({ kind: "publication" as const, result: p }))
@@ -125,7 +126,7 @@ export class MarketingAnalyticsService {
     const recentResults: MarketingAnalyticsSnapshot["recentResults"] = recentTargets.map(target => target.kind === "campaign"
       ? { kind: target.kind, result: this.campaignProjection(target.result, this.database().readMarketingAnalyticsRecords("", "", { type: "campaign", id: target.result.id })) }
       : { kind: target.kind, result: this.publicationProjection(target.result) });
-    const hasActivityData = channels.some(c => c.metrics.some(m => ["attempted", "accepted", "published", "publishing", "failed"].includes(m.metric) && m.value !== null));
+    const hasActivityData = activeChannels.some(c => c.metrics.some(m => ["attempted", "accepted", "published", "publishing", "failed"].includes(m.metric) && m.value !== null));
     return { range, measuredAt: now.toISOString(), summary: { published: total("published"), accepted: total("accepted"), usedChannels: hasActivityData ? usedChannels : null }, channels, trends, recentResults };
   }
   campaign(id: string): MarketingCampaignAnalytics {

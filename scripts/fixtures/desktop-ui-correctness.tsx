@@ -3,6 +3,7 @@ import { useState } from "react";
 import { defaultDashboardData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
 import { useKbsNotificationController } from "../../apps/desktop-app/src/app/use-kbs-notification-controller";
 import { KbsAutomationWorkspace } from "../../apps/desktop-app/src/components/customers/KbsAutomationWorkspace";
+import { CustomerMessagingPreferences } from "../../apps/desktop-app/src/components/customers/CustomerMessagingPreferences";
 import { BusinessTemplateMessagePanel } from "../../apps/desktop-app/src/components/customers/BusinessTemplateMessagePanel";
 import { CustomerCreditPanel } from "../../apps/desktop-app/src/components/customers/CustomerCreditPanel";
 import { DiagnosticsViewer } from "../../apps/desktop-app/src/components/diagnostics/DiagnosticsViewer";
@@ -35,8 +36,11 @@ window.yardimciDesktop = {
   getBusinessMessagingConfiguration: async () => {
     fixture.calls.push("configuration"); await wait();
     if (fixture.fail) throw new Error("Fixture configuration rejection");
-    return { configured: params.get("configured") === "true" };
+    return { enabled: params.get("enabled") !== "false", configured: params.get("configured") === "true" };
   },
+  getSmsConfiguration: async () => ({enabled: params.get("sms") === "true"}),
+  getCustomerMessagingPreference: async (_customer, channel) => ({ok:true,value:{status:channel === "whatsapp" ? "unknown" : "opted_out"}}),
+  saveCustomerMessagingPreference: async (input) => ({ok:true,value:{status:input.status}}),
   onBusinessMessagingChanged: listener => { fixture.notify = listener; return () => {}; },
   listBusinessMessagingTemplates: async () => ({ ok: true, value: params.has("template") ? [{ name: "fixture_template", language: "tr", category: "UTILITY", status: "APPROVED", supported: true, components: [{ type: "body", text: "Merhaba {{1}}", parameters: ["1"] }] }] : [] }),
   listDiagnosticSessions: async () => [session],
@@ -64,6 +68,7 @@ function KbsFixture() {
 const content = mode === "kbs"
   ? <KbsFixture />
   : mode === "business" ? <BusinessTemplateMessagePanel customerId="customer-1" disabled={false} onBusyChange={noop} />
+  : mode === "preferences" ? <CustomerMessagingPreferences customerId="customer-1" disabled={false} onBusyChange={noop} />
   : mode === "marketing" ? <MarketingPage enabled={false} />
   : mode === "diagnostics" ? <DiagnosticsViewer onClose={noop} />
   : <CustomerCreditPanel customerId="customer-1" whatsappEnabled />;

@@ -5,7 +5,7 @@ import { ActionButton } from "../ui/ActionButton";
 const statusLabels = { draft: "Hazır", queued: "Sağlayıcı sonucu bekleniyor", accepted: "Sağlayıcı kabul etti", delivered: "İletildi", read: "Okundu", failed: "Başarısız", cancelled: "İptal" };
 /** A bounded Customer operation in the existing workspace body; no modal/editor. */
 export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChange }: { customerId: string; disabled: boolean; onBusyChange: (busy: boolean) => void }) {
-  const [configured, setConfigured] = useState(false), [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
+  const [enabled, setEnabled] = useState(false), [configured, setConfigured] = useState(false), [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
   const [templates, setTemplates] = useState<BusinessMessageTemplate[]>([]), [selected, setSelected] = useState("");
   const [parameters, setParameters] = useState<string[][]>([]), [message, setMessage] = useState<BusinessMessage | null>(null), [error, setError] = useState("");
   const [configurationState, setConfigurationState] = useState<"loading" | "ready" | "error">("loading");
@@ -13,13 +13,15 @@ export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChang
   const invalidateConfigurationRequest = useCallback(() => { ++configurationRequest.current; }, []);
   const refreshConfiguration = useCallback(async () => {
     const request = ++configurationRequest.current;
-    setConfigurationState("loading");
+    setConfigurationState(previous => previous === "ready" ? "ready" : "loading");
     try {
       const bridge = window.yardimciDesktop;
       if (!bridge?.getBusinessMessagingConfiguration) throw new Error("Configuration bridge unavailable");
       const config = await bridge.getBusinessMessagingConfiguration();
       if (request !== configurationRequest.current) return;
+      setEnabled(config.enabled);
       setConfigured(config.configured);
+      if (!config.enabled) { setOpen(false); setMessage(null); setError(""); }
       setConfigurationState("ready");
     } catch {
       if (request === configurationRequest.current) setConfigurationState("error");
@@ -60,14 +62,15 @@ export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChang
       if (!result.ok) { setError(result.message); return; } setMessage(result.value);
     } catch { setError("Mesaj sonucu okunamadı. Aynı mesajı tekrar kontrol edin."); } finally { working(false); }
   }
-  if (!configured) return <section className="panel customer-operation-card form-stack" aria-label="WhatsApp Business mesajı" aria-busy={configurationState === "loading"}>
-    {configurationState === "loading" ? <p role="status">WhatsApp Business yapılandırması yükleniyor…</p>
-      : configurationState === "error" ? <>
+  // A disabled provider is not an onboarding task; do not mount a warning or a placeholder.
+  if (configurationState === "loading" || configurationState === "ready" && !enabled) return null;
+  if (!configured) return <section className="panel customer-operation-card form-stack" aria-label="WhatsApp Business mesajı" aria-busy={false}>
+    {configurationState === "error" ? <>
         <p role="alert">WhatsApp Business yapılandırması okunamadı.</p>
         <ActionButton variant="secondary" disabled={disabled} onClick={() => void refreshConfiguration()}>Yeniden Dene</ActionButton>
       </> : <div className="empty-state empty-state--compact"><strong>WhatsApp Business yapılandırılmamış.</strong><p>Bağlantıyı Ayarlar → Servisler bölümünden yapılandırın.</p></div>}
   </section>;
-  return <section className="panel customer-operation-card form-stack" aria-label="WhatsApp Business mesajı" aria-busy={busy || configurationState === "loading"}>
+  return <section className="panel customer-operation-card form-stack" aria-label="WhatsApp Business mesajı" aria-busy={busy}>
     <ActionButton variant="secondary" disabled={disabled || busy} busy={busy} onClick={() => void load()}>WhatsApp Business mesajı</ActionButton>
     {open && <>
       <label className="form-field">Onaylı şablon<SearchSelect ariaLabel="Onaylı şablon" value={selected} disabled={busy || Boolean(message)} onChange={choose} clearable={false} options={templates.map(t => ({ id: `${t.name}:${t.language}`, label: t.name, description: `${t.language} · ${t.category}${!t.supported ? " · desteklenmeyen bileşen" : ""}`, disabled: !t.supported }))} /></label>
@@ -86,7 +89,6 @@ export function BusinessTemplateMessagePanel({ customerId, disabled, onBusyChang
       <ActionButton variant="ghost" disabled={busy} onClick={() => setOpen(false)}>Kapat</ActionButton>
     </>}
     {error && <p role="alert">{error}</p>}
-    {configurationState === "loading" && <p role="status">WhatsApp Business yapılandırması yükleniyor…</p>}
     {configurationState === "error" && <>
       <p role="alert">WhatsApp Business yapılandırması okunamadı.</p>
       <ActionButton variant="secondary" disabled={disabled || busy} onClick={() => void refreshConfiguration()}>Yeniden Dene</ActionButton>

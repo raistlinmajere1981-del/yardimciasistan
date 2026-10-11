@@ -42,12 +42,11 @@ try {
   await page.getByLabel('Son sonuçlar').locator('.list-row').filter({hasText:'WhatsApp Business gönderimi'}).getByRole('button', { name: 'Sonucu aç' }).click();
   await page.getByRole('button',{name:'Teslim ve okunma sonuçları',exact:true}).click(); await expect(page.getByLabel('Kampanya analitiği')).toBeVisible(); await expect(page.getByLabel('Kampanya metrikleri')).toContainText('Kitle5'); await expect(page.getByLabel('Kampanya metrikleri')).toContainText('Gönderilen3');
   await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click(); await page.getByLabel('Son sonuçlar').locator('.list-row').filter({ hasText: 'Web sitesi yayını' }).getByRole('button', { name: 'Sonucu aç' }).click();
-  await page.getByRole('button',{name:'Yayın sonuçlarını görüntüle',exact:true}).click(); await expect(page.getByLabel('Yayın analitiği')).toContainText('Ziyaret verisi toplanmıyor.'); await expect(page.getByLabel('Yayın analitiği')).toContainText('Yayın zamanı:');
+  await expect(page.getByLabel('Yayın analitiği')).toContainText('Ziyaret verisi toplanmıyor.'); await expect(page.getByRole('region',{name:'Geçmiş',exact:true})).toContainText('Yayınlandı');
   // Optional provider capability supplies 0 as a measured value and preserves failed/stale snapshots.
   await page.getByRole('button',{name:'Çalışma alanını kapat',exact:true}).click();
   const openInstagram = async () => {
     await page.getByLabel('Son sonuçlar').locator('.list-row').filter({hasText:'Instagram yayını'}).filter({hasText:'Yayınlandı'}).getByRole('button',{name:'Sonucu aç'}).click();
-    await page.getByRole('button',{name:'Yayın sonuçlarını görüntüle',exact:true}).click();
   };
   f.provider(true); await openInstagram();
   await expect(page.getByRole('button', { name: 'Sağlayıcı metriklerini yenile' })).toBeVisible();
@@ -62,5 +61,18 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0); assert.deepEqual(errors, []);
   for (const privateValue of ['CUSTOMER_PII_PRIVATE','MESSAGE_BODY_PRIVATE','CONTENT_BODY_PRIVATE','PRIVATE_TOKEN','RAW_PROVIDER_METRIC_PRIVATE']) assert(!JSON.stringify(responses).includes(privateValue));
   mkdirSync('artifacts/marketing', { recursive: true }); await page.screenshot({ path: 'artifacts/marketing/d7-analytics-mobile.png', fullPage: true }); await page.setViewportSize({ width: 1440, height: 1080 }); await page.screenshot({ path: 'artifacts/marketing/d7-analytics.png', fullPage: true });
+  // Deactivating an existing provider removes its card, help text and historical aggregates from this active-services view.
+  f.sql.prepare("UPDATE business_messaging_provider_config SET enabled=0 WHERE provider_id='whatsapp_cloud'").run();
+  await page.getByRole('button',{name:'Sonuçları yenile',exact:true}).click();
+  await expect(page.getByLabel('WhatsApp Business analitiği',{exact:true})).toHaveCount(0);
+  await expect(page.getByLabel('Analitik genel özet')).toContainText('Gönderilen mesaj3');
+  await expect(page.getByLabel('Analitik genel özet')).not.toContainText('WhatsApp');
+  await expect(page.getByLabel('Son sonuçlar')).not.toContainText('WhatsApp Business gönderimi');
+  f.sql.prepare("UPDATE marketing_provider_config SET enabled=0 WHERE provider_id='iletimerkezi'").run();
+  await page.getByRole('button',{name:'Sonuçları yenile',exact:true}).click();
+  await expect(page.getByLabel('SMS analitiği',{exact:true})).toHaveCount(0);
+  await expect(page.getByLabel('Analitik genel özet')).not.toContainText('Gönderilen mesaj');
+  await expect(page.getByLabel('Zaman içindeki sonuçlar')).not.toContainText('Gönderilen mesaj');
+  await expect(page.getByLabel('Son sonuçlar')).not.toContainText('SMS gönderimi');
   console.log('D7 UI: summary, four channel cards, unavailable vs measured zero, ranges, accessible trends, canonical campaign/publication entry, provider freshness/failure/permission, privacy and responsive no-modal layout passed.');
 } finally { await browser?.close(); await f.dispose(); }

@@ -8,7 +8,7 @@ import { MarketingEntityAnalytics } from "./MarketingEntityAnalytics";
 import { resultValue } from "./share-draft";
 
 export const deliveryStatuses = {draft: "Taslak", prepared: "Gönderime hazır", running: "Gönderim sürüyor", paused: "Duraklatıldı", cancelled: "İptal edildi", completed: "Tamamlandı"};
-const deliveryIssues: Record<string, string> = {submission_uncertain: "Sağlayıcı sonucu belirsiz; tekrar gönderilmedi", provider_failed: "Sağlayıcı gönderimi kabul etmedi", max_attempts: "Gönderim denemeleri tamamlanamadı", transient: "Geçici bağlantı sorunu", rate_limit: "Sağlayıcının gönderim sınırına ulaşıldı"};
+export const deliveryIssues: Record<string, string> = {submission_uncertain: "Sağlayıcı sonucu belirsiz; tekrar gönderilmedi", provider_failed: "Sağlayıcı gönderimi kabul etmedi", max_attempts: "Gönderim denemeleri tamamlanamadı", transient: "Geçici bağlantı sorunu", rate_limit: "Sağlayıcının gönderim sınırına ulaşıldı"};
 export function MarketingDeliveryWorkspace({id, channels, onClose, onReload, onPlan}: {id: string; channels: MarketingChannelRegistry; onClose: () => void; onReload: () => Promise<void>; onPlan?: (detail: MessagingCampaignDetail) => void}) {
   const [detail, setDetail] = useState<MessagingCampaignDetail | null>(null), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const [cancel, setCancel] = useState(false), [analytics, setAnalytics] = useState(false);
@@ -27,7 +27,7 @@ export function MarketingDeliveryWorkspace({id, channels, onClose, onReload, onP
   }
   const c = detail?.campaign;
   const available = channels.some(channel => channel.id === c?.channel && channel.enabled && channel.configured);
-  return <WorkspaceFrame title={c?.name || "Gönderim ayrıntıları"} context="WhatsApp / SMS gönderimi" className="marketing-management-workspace" presentation="centered" closeBlocked={busy} onClose={onClose}
+  return <WorkspaceFrame title={c?.name || "Gönderim ayrıntıları"} context="WhatsApp / SMS gönderimi" className="marketing-workspace-frame" presentation="centered" closeBlocked={busy} onClose={onClose}
     footer={<ActionButton variant="secondary" disabled={busy} onClick={onClose}>Kapat</ActionButton>}
     overlay={cancel && <ConfirmDialog withinModal tone="danger" title="Gönderim iptal edilsin mi?" description="Henüz işleme alınmamış alıcılar iptal edilir. Gönderilen mesajlar geri alınamaz." confirmLabel="Gönderimi iptal et" busy={busy} onConfirm={() => action("cancel")} onCancel={() => setCancel(false)}/>}>
     <p role="status">{message}</p>

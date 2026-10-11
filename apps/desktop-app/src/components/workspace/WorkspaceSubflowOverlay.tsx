@@ -44,8 +44,22 @@ export function WorkspaceSubflowOverlay({
       event.stopPropagation();
       if (!closeBlocked) onClose();
     };
+    // An async child operation may remove the focused button and leave focus on
+    // document.body. Capture Escape there too, or the native host dialog can close
+    // without dismissing only this subflow. Visible popovers handle Escape first.
+    const interceptDetachedEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !hostDialog.open || card.current?.contains(event.target as Node)
+        || document.querySelector(":popover-open")) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!closeBlocked) onClose();
+    };
     hostDialog.addEventListener("cancel", interceptCancel, true);
-    return () => hostDialog.removeEventListener("cancel", interceptCancel, true);
+    document.addEventListener("keydown", interceptDetachedEscape, true);
+    return () => {
+      hostDialog.removeEventListener("cancel", interceptCancel, true);
+      document.removeEventListener("keydown", interceptDetachedEscape, true);
+    };
   }, [closeBlocked, onClose]);
 
   return <div

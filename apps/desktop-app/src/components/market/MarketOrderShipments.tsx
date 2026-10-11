@@ -16,7 +16,7 @@ export function MarketOrderShipments({ session, orderStatus, busy }: {
   return (
     <section className="market-order-buyer" aria-label="Gönderim">
       <strong>Kargo / Gönderim</strong>
-      {!shippingProvider.configured && <p className="market-muted">{ARAS_SHIPPING_PROVIDER.name} yapılandırılmamış. Sağlayıcı işlemleri için Servisler ayarlarını tamamlayın.</p>}
+      {shippingProvider.enabled && !shippingProvider.configured && <p className="market-muted">{ARAS_SHIPPING_PROVIDER.name} yapılandırılmamış. Sağlayıcı işlemleri için Servisler ayarlarını tamamlayın.</p>}
       {loadingShipments && <p role="status">Gönderiler yükleniyor…</p>}
       {shipmentError && <p role="alert">{shipmentError}</p>}
       {shipmentError && <ActionButton variant="secondary" size="sm" onClick={() => void reloadShipments()} disabled={disabled}>Yenile</ActionButton>}
@@ -33,11 +33,11 @@ export function MarketOrderShipments({ session, orderStatus, busy }: {
           {shipment.trackingNumber && <p>Takip: {shipment.trackingNumber}</p>}
           {shipment.trackingUrl && <p>Takip bağlantısı: {shipment.trackingUrl}</p>}
           <div className="action-row market-order-actions">
-            {!shipment.providerId && (shipment.status === "draft" || shipment.status === "ready") && orderStatus !== "cancelled" && (
+            {shippingProvider.enabled && !shipment.providerId && (shipment.status === "draft" || shipment.status === "ready") && orderStatus !== "cancelled" && (
               <ActionButton variant="secondary" size="sm" disabled={disabled || !shippingProvider.configured}
                 onClick={() => void mutateShipment(shipment.id, undefined, "register")}>{ARAS_SHIPPING_PROVIDER.name} ile oluştur</ActionButton>
             )}
-            {shipment.providerId === ARAS_SHIPPING_PROVIDER.id && (
+            {shippingProvider.enabled && shipment.providerId === ARAS_SHIPPING_PROVIDER.id && (
               <ActionButton variant="secondary" size="sm" disabled={disabled || !shippingProvider.configured}
                 onClick={() => void mutateShipment(shipment.id, undefined, "refresh")}>Durumu güncelle</ActionButton>
             )}
