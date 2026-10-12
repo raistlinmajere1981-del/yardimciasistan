@@ -100,6 +100,21 @@ export function getPublishedMenu(db: DatabaseSync, includeInactiveProducts = fal
   };
 }
 
+/** Mutation baseline includes inactive products, as the editable menu does.
+ * No image, inventory balance, category or full menu projection is needed. */
+export function getMenuEntryMutationBaseline(db: DatabaseSync, entryId: string) {
+  const row = db.prepare(`SELECT e.stock_consumption_quantity, e.hide_when_out_of_stock
+    FROM menu_product_entries e
+    JOIN catalog_products p ON p.id = e.product_id AND p.deleted_at = ''
+    WHERE e.id = ? AND e.deleted_at = ''
+      AND p.business_id = (SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1)`)
+    .get(entryId);
+  return row ? {
+    stock_consumption_quantity: normalizePositiveStockNumber(row.stock_consumption_quantity) ?? 1,
+    hide_when_out_of_stock: Number(row.hide_when_out_of_stock) === 1
+  } : null;
+}
+
 export function getMenuProductCandidates(db: DatabaseSync) {
   return db.prepare(`SELECT p.id, p.name, p.unit, p.sale_price, p.currency FROM catalog_products p
     JOIN business b ON b.id = p.business_id AND b.deleted_at = ''

@@ -14,11 +14,28 @@ export function registerMenuIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
-  assertMenuItemSubfeatureMutation: (input: SaveMenuProductEntryInput) => void;
   finalizeMutation: <T extends DesktopMenuSaveResult | DesktopStatusUpdateResult>(result: T) => T;
   scheduleSync: () => void;
 }) {
-  const { getDatabase, assertCapability, assertMenuItemSubfeatureMutation, finalizeMutation, scheduleSync } = options;
+  const { getDatabase, assertCapability, finalizeMutation, scheduleSync } = options;
+
+  function assertMenuItemSubfeatureMutation(input: SaveMenuProductEntryInput) {
+    const capabilities = new Set(getDatabase().getEnabledBusinessCapabilities());
+    const itemId = input.id?.trim();
+    const baseline = (itemId ? getDatabase().getMenuEntryMutationBaseline(itemId) : null) ?? {
+      stock_consumption_quantity: 1,
+      hide_when_out_of_stock: false
+    };
+    const stockChanged = Number(input.stock_consumption_quantity ?? 1) !== Number(baseline.stock_consumption_quantity)
+      || Boolean(input.product && input.product.trackInventory !== false);
+    if (stockChanged && !capabilities.has(BUSINESS_CAPABILITIES.INVENTORY)) {
+      throw new Error("Stok alanları bu işletmede etkin değil.");
+    }
+    if (Boolean(input.hide_when_out_of_stock) !== Boolean(baseline.hide_when_out_of_stock)
+        && (!capabilities.has(BUSINESS_CAPABILITIES.INVENTORY) || !capabilities.has(BUSINESS_CAPABILITIES.QR_MENU))) {
+      throw new Error("Stokta yokken QR menüden gizleme bu işletmede etkin değil.");
+    }
+  }
 
   ipcMain.handle("menu:getWebPublication", () => {
     options.assertUnlocked();

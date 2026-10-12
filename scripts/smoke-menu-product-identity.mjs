@@ -7,6 +7,7 @@ import { runInNewContext } from "node:vm";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import { saveSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
+import { verifyMenuMutationBaseline, verifyMenuMutationDatabaseChange } from "./test-helpers/menu-mutation-baseline.mjs";
 const require = createRequire(import.meta.url);
 const commerce = require("../apps/desktop-app/dist-electron/commerce-store.js");
 const { BUSINESS_CAPABILITIES: C, toggleBusinessProfileOption } = require("../packages/shared/dist");
@@ -152,6 +153,8 @@ try {
     const withImage = ok(database.saveMenuProductEntry({ ...entryInput, product: { name: "Image product", salePrice: 1, onlineSalesPublished: false } },
       { productId: "canonical_image", assetPath, sourceUrl: "", license: "" }));
     assert.equal(database.getPublishedMenu().items.find(entry => entry.id === withImage.savedId).image_url, "data:image/png;base64,iVBORw0KGgo=");
+    verifyMenuMutationBaseline(database, db, withImage.savedId, "canonical_image", entryInput);
+    await verifyMenuMutationDatabaseChange(database, entryInput);
 
     // QR uses archived media; Online Sales retains its existing public-HTTPS-only policy.
     const imageProductId = "canonical_image";

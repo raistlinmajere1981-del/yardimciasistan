@@ -67,8 +67,6 @@ export type DesktopIpcRegistryDependencies = {
   isTrustedRendererUrl: (url: string) => boolean;
   kbsInteractiveDriver: EgmKbsWebviewDriver;
   kbsBackgroundSession: EgmKbsBackgroundSession;
-  assertMenuItemSubfeatureMutation:
-    MenuIpcOptions["assertMenuItemSubfeatureMutation"];
   finalizeMenuMutation: MenuIpcOptions["finalizeMutation"];
   finalizeStockImageApply:
     ImageAnalysisIpcOptions["finalizeStockImageApply"];
@@ -116,7 +114,6 @@ export function registerDesktopIpcHandlers(
     isTrustedRendererUrl,
     kbsInteractiveDriver,
     kbsBackgroundSession,
-    assertMenuItemSubfeatureMutation,
     finalizeMenuMutation,
     finalizeStockImageApply,
     saveInitial,
@@ -226,7 +223,6 @@ export function registerDesktopIpcHandlers(
     assertUnlocked,
     getDatabase,
     assertCapability,
-    assertMenuItemSubfeatureMutation,
     finalizeMutation: finalizeMenuMutation,
     scheduleSync: () => getSyncCoordinator().scheduleSoon()
   });

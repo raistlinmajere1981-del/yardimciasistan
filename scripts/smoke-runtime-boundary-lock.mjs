@@ -18,6 +18,7 @@ const calls = [];
 let businessMessagingAuthority;
 let businessMessagingDrain = () => Promise.resolve();
 let androidIngress, androidIngressOptions, coordinatorOptions;
+let menuGuardFixture = null;
 const durable = createTemporaryDesktopDatabase("sync-finalize-intent-");
 durable.database.initialize();
 const dashboard = { revision: 1, kbsOverview: { enabled: false }, hospitalityNotifications: [] };
@@ -26,6 +27,16 @@ const record = (name) => (..._args) => { calls.push(name); return result(); };
 const read = (name, value) => () => { calls.push(name); return value; };
 const setup = { setupRequired: true, servicePreferences: {}, webModuleUrl: "", syncSecret: "" };
 const database = new Proxy({}, { get: (_target, key) => {
+  if (menuGuardFixture) {
+    if (key === "getEnabledBusinessCapabilities") return () => menuGuardFixture.capabilities;
+    if (key === "getPublishedMenu") return () => { menuGuardFixture.projections++; return { items: menuGuardFixture.items }; };
+    if (key === "getMenuEntryMutationBaseline") return (id) => {
+      menuGuardFixture.baselines++;
+      const item = menuGuardFixture.items.find((entry) => entry.id === id);
+      return item ? { stock_consumption_quantity: item.stock_consumption_quantity, hide_when_out_of_stock: item.hide_when_out_of_stock } : null;
+    };
+    if (key === "saveMenuProductEntry") return () => { menuGuardFixture.writes++; return result(); };
+  }
   if (key === "queueSyncJob") return (type) => { calls.push(`database.queueSyncJob:${type}`); durable.database.queueSyncJob(type); };
   if (key === "getPendingSyncJobs") return (...args) => durable.database.getPendingSyncJobs(...args);
   if (key === "databasePath" || key === "userDataPath" || key === "backupPath") return "/tmp/opencode/runtime-boundary-fixture";
@@ -100,6 +111,9 @@ function load(file) {
       if (relative === "kbs-settings") return { getKbsSettings: () => ({ enabled: false }) };
       if (relative === "google-reviews-settings") return { getGoogleReviewsSettings: () => ({ publicationPending: false }) };
       if (relative === "business-capability-runtime") return { assertPersistedBusinessCapability: record("capability.assert"), hasPersistedBusinessCapability: () => true };
+      if (relative === "product-data-service") return new Proxy(stub(relative), { get: (target, key) => key === "prepareProductImageForSave"
+        ? async () => { if (menuGuardFixture) { menuGuardFixture.preparations++; await menuGuardFixture.prepare?.(); } return undefined; }
+        : target[key] });
       if (relative === "sync-request-menu-service") return {
         pullRequestsFromWeb: async (_database, afterSuccessfulPull) => { await afterSuccessfulPull(); return result(); },
         markRequestsSyncedOnWeb: record("sync-request-menu-service.markRequestsSyncedOnWeb"),
@@ -155,6 +169,57 @@ const beforeManualAndroid = calls.filter((call) => call === "android-action-sync
 assert.equal((await invoke("sync:pullRequests")).ok, true);
 assert.equal(calls.filter((call) => call === "android-action-sync-service.processQueue").length, beforeManualAndroid + 1,
   "real manual IPC delegates after pull to the ingress owner injected into automatic sync");
+// Exercise the real menu handler and guard through the production composition root.
+const C = shared.BUSINESS_CAPABILITIES;
+const menuInput = { id: "menu-entry", category_id: "category", product_id: "product", price_override: null,
+  is_available: true, is_featured: false, allergens: [], tags: [], stock_consumption_quantity: 0.25,
+  hide_when_out_of_stock: false, sort_order: 10 };
+const menuFixture = (capabilities) => ({ capabilities, items: [{ id: menuInput.id, stock_consumption_quantity: 0.25, hide_when_out_of_stock: false }],
+  writes: 0, preparations: 0, projections: 0, baselines: 0 });
+try {
+  menuGuardFixture = menuFixture([C.FOOD_MENU]);
+  await assert.rejects(invoke("menu:saveEntry", { ...menuInput, stock_consumption_quantity: 1 }), /Stok alanları bu işletmede etkin değil\./);
+  assert.equal(menuGuardFixture.writes, 0); assert.equal(menuGuardFixture.preparations, 0);
+  assert.equal(menuGuardFixture.projections, 0, "mutation guard must not load the full menu projection");
+  for (const product of [{ name: "Tracked" }, { name: "Tracked", trackInventory: true }]) {
+    await assert.rejects(invoke("menu:saveEntry", { ...menuInput, id: undefined, product_id: undefined, stock_consumption_quantity: 1, product }), /Stok alanları bu işletmede etkin değil\./);
+    assert.equal(menuGuardFixture.preparations, 0, "unauthorized stock creation is rejected before I/O");
+  }
+  for (const capabilities of [[C.FOOD_MENU], [C.FOOD_MENU, C.INVENTORY], [C.FOOD_MENU, C.QR_MENU]]) {
+    menuGuardFixture = menuFixture(capabilities);
+    await assert.rejects(invoke("menu:saveEntry", { ...menuInput, hide_when_out_of_stock: true }), /Stokta yokken QR menüden gizleme bu işletmede etkin değil\./);
+    assert.equal(menuGuardFixture.writes, 0);
+  }
+  menuGuardFixture = menuFixture([C.FOOD_MENU]);
+  assert.equal((await invoke("menu:saveEntry", menuInput)).ok, true, "unchanged stock fields need no Inventory permission");
+  assert.equal(menuGuardFixture.baselines, 2, "existing entry baseline is checked on both sides of image preparation");
+  assert.equal(menuGuardFixture.projections, 0);
+  assert.equal((await invoke("menu:saveEntry", { ...menuInput, id: undefined, product_id: undefined, stock_consumption_quantity: 1, product: { name: "Untracked", trackInventory: false } })).ok, true);
+  menuGuardFixture = menuFixture([C.FOOD_MENU, C.INVENTORY, C.QR_MENU]);
+  assert.equal((await invoke("menu:saveEntry", { ...menuInput, stock_consumption_quantity: 2, hide_when_out_of_stock: true })).ok, true);
+  for (const [withdraw, expected] of [
+    [C.INVENTORY, /Stok alanları bu işletmede etkin değil\./],
+    [C.QR_MENU, /Stokta yokken QR menüden gizleme bu işletmede etkin değil\./],
+    [C.FOOD_MENU, /Menü yönetimi bu işletmede etkin değil\./],
+    ["session", /Uygulama kilitli/]
+  ]) {
+    menuGuardFixture = menuFixture([C.FOOD_MENU, C.INVENTORY, C.QR_MENU]);
+    let entered, release;
+    const enteredImage = new Promise((resolve) => { entered = resolve; });
+    const image = new Promise((resolve) => { release = resolve; });
+    menuGuardFixture.prepare = () => { entered(); return image; };
+    const pending = invoke("menu:saveEntry", { ...menuInput, id: undefined, product_id: undefined, stock_consumption_quantity: 2, hide_when_out_of_stock: true, product: { name: "Image product" } });
+    await enteredImage;
+    if (withdraw === "session") await invoke("appLock:lock");
+    else menuGuardFixture.capabilities = menuGuardFixture.capabilities.filter((capability) => capability !== withdraw);
+    const rejection = assert.rejects(pending, expected); release(); await rejection;
+    assert.equal(menuGuardFixture.writes, 0, "late permission withdrawal cannot reach the mutation");
+    await invoke("appLock:unlock", "");
+  }
+  menuGuardFixture = menuFixture([C.FOOD_MENU]);
+  menuGuardFixture.items = [];
+  assert.equal((await invoke("menu:saveEntry", { ...menuInput, id: "missing", stock_consumption_quantity: 1 })).ok, true, "missing baseline keeps existing default guard semantics; domain validates identity");
+} finally { menuGuardFixture = null; }
 // Execute the actual preload; lock after its status response, before invocation.
 let bridge, beforeHandler;
 runInNewContext(readFileSync(resolve(root, "preload.js"), "utf8"), { exports: {}, Error,

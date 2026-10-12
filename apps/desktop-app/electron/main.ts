@@ -60,7 +60,6 @@ import {
   type DesktopDashboardData,
   type DesktopSetupSaveResult,
   type SaveInitialSetupInput,
-  type SaveMenuProductEntryInput,
   type DesktopMenuSaveResult,
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
@@ -177,31 +176,6 @@ function assertDesktopRequestType(requestType: string) {
   const requiredCapability = getRequestTypeRequiredCapability(requestType);
   if (requiredCapability) {
     assertDesktopCapability(requiredCapability, "Bu talep türü işletmenin etkin yeteneklerinde kullanılamıyor.");
-  }
-}
-
-function assertMenuItemSubfeatureMutation(input: SaveMenuProductEntryInput) {
-  const capabilities = new Set(enabledBusinessCapabilities());
-  const itemId = input.id?.trim();
-  const existing = itemId
-    ? getDatabase().getPublishedMenu(true).items.find((item) => item.id === itemId)
-    : undefined;
-  const baseline = existing ?? {
-    stock_quantity: null,
-    stock_min_quantity: null,
-    stock_unit: "piece",
-    stock_consumption_quantity: 1,
-    hide_when_out_of_stock: false,
-    stock_note: null
-  };
-  const stockChanged = Number(input.stock_consumption_quantity ?? 1) !== Number(baseline.stock_consumption_quantity)
-    || Boolean(input.product && input.product.trackInventory !== false);
-  if (stockChanged && !capabilities.has(C.INVENTORY)) {
-    throw new Error("Stok alanları bu işletmede etkin değil.");
-  }
-  if (Boolean(input.hide_when_out_of_stock) !== Boolean(baseline.hide_when_out_of_stock)
-      && (!capabilities.has(C.INVENTORY) || !capabilities.has(C.QR_MENU))) {
-    throw new Error("Stokta yokken QR menüden gizleme bu işletmede etkin değil.");
   }
 }
 
@@ -599,7 +573,6 @@ function registerIpcHandlers() {
     isTrustedRendererUrl: isTrustedDesktopRendererUrl,
     kbsInteractiveDriver: egmKbsInteractiveDriver,
     kbsBackgroundSession: egmKbsBackgroundSession,
-    assertMenuItemSubfeatureMutation,
     finalizeMenuMutation: finalizeDesktopMenuMutation,
     finalizeStockImageApply,
     saveInitial: saveInitialSetupFromRenderer,

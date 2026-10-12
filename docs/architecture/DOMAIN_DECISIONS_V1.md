@@ -198,6 +198,13 @@ Menu owns category, order, availability, featured, allergens/tags, nullable pric
 hide-when-out-of-stock and inventory consumption per ordered portion. Menu categories and
 catalog categories remain separate. Price fallback to canonical sale price is backend-owned.
 
+Menu IPC owns the stock-consumption/creation-tracking and QR hide-when-out-of-stock
+mutation gates. It rechecks them before and after asynchronous product-image preparation.
+The baseline reads only consumption and hide flag by Menu entry id through the database
+facade/menu store, scoped to the current non-deleted business/product/entry. Inactive products
+remain editable baselines; this does not make them public or available. Product link validation
+uses the same business boundary. Mutation gating never loads the menu/image projection.
+
 Every stock write delegates to `applyInventoryMovementInTransaction`; no Menu balance or
 movement authority exists. Table/Folio lines freeze product identity, monetary/name snapshots,
 consumption and inventory location. Quantity changes/removal restore only the exact frozen

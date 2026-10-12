@@ -1145,6 +1145,7 @@ export class DesktopDatabase {
     return getStoredPublishedMenu(this.db, includeInactiveProducts);
   }
   getMenuProductCandidates() { return getStoredMenuProductCandidates(this.db); }
+  getMenuEntryMutationBaseline(entryId: string) { return getStoredMenuEntryMutationBaseline(this.db, entryId); }
   getTrackedStockProducts() { return getStoredTrackedStockProducts(this.db); }
 
   getDeletedRequestIds(): string[] {
@@ -1390,6 +1391,7 @@ import {
 
 import {
   getPublishedMenu as getStoredPublishedMenu,
+  getMenuEntryMutationBaseline as getStoredMenuEntryMutationBaseline,
   getMenuProductCandidates as getStoredMenuProductCandidates,
   getQrMenuPublication as getStoredQrMenuPublication,
   getQrMenuWebPublicationEnabled as getStoredQrMenuWebPublicationEnabled,

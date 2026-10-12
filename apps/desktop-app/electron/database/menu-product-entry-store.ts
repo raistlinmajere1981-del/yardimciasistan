@@ -19,7 +19,8 @@ export function saveMenuProductEntryInTransaction(db: DatabaseSync, input: SaveM
     : String(input.product_id ?? existing?.product_id ?? "").trim();
   if (existing && productId !== existing.product_id) throw new Error("Menü ilişkisinin ürün kimliği değiştirilemez.");
   if (!db.prepare(`SELECT 1 FROM catalog_products p JOIN business b ON b.id = p.business_id
-    WHERE p.id = ? AND p.deleted_at = '' AND b.deleted_at = ''`).get(productId)) throw new Error("Ürün bulunamadı.");
+    WHERE p.id = ? AND p.deleted_at = '' AND b.deleted_at = ''
+      AND p.business_id = (SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1)`).get(productId)) throw new Error("Ürün bulunamadı.");
   if (db.prepare("SELECT 1 FROM menu_product_entries WHERE product_id = ? AND deleted_at = '' AND id <> ?").get(productId, input.id ?? "")) {
     throw new Error("Bu ürün zaten menüde.");
   }
