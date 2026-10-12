@@ -56,6 +56,9 @@ final class OperationCache {
     try {
       String serialized = preferences.getString(KEY_REVISIONS, "{}");
       JSONObject revisions = new JSONObject(serialized == null ? "{}" : serialized);
+      if (sourceRevision < revisions.optLong(normalizedSourceKey, 0L)) {
+        throw new CacheException("Eski sunucu revizyonu telefon önbelleğini değiştiremez.");
+      }
       revisions.put(normalizedSourceKey, Math.max(0L, sourceRevision));
 
       SharedPreferences.Editor editor = preferences.edit()

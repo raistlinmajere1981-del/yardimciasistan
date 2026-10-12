@@ -65,7 +65,14 @@ export const ANDROID_PERMISSIONS = [
   "market.receiving",
   "market.product_create",
   "market.cart_draft",
-  "market.scan_to_desktop"
+  "market.scan_to_desktop",
+  "commerce_order.view",
+  "commerce_order.confirm",
+  "commerce_order.cancel",
+  "dealer.view",
+  "shipment.view",
+  "online_sales.view",
+  "marketing.status.view"
 ] as const;
 
 export type AndroidPermission = typeof ANDROID_PERMISSIONS[number];
@@ -75,13 +82,25 @@ export const ANDROID_PERMISSION_GROUP_IDS = [
   "cashier",
   "rooms_tasks",
   "customer_reservation",
-  "market_operations"
+  "market_operations",
+  "commerce_orders_view",
+  "commerce_orders_manage",
+  "dealer_view",
+  "shipment_view",
+  "online_sales_view",
+  "marketing_status_view"
 ] as const;
 
 export type AndroidPermissionGroupId = typeof ANDROID_PERMISSION_GROUP_IDS[number];
 export type AndroidPermissionGroups = Record<AndroidPermissionGroupId, boolean>;
 
 export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermissionGroupId, readonly AndroidPermission[]>> = {
+  commerce_orders_view: ["commerce_order.view"],
+  commerce_orders_manage: ["commerce_order.view", "commerce_order.confirm", "commerce_order.cancel"],
+  dealer_view: ["dealer.view"],
+  shipment_view: ["commerce_order.view", "shipment.view"],
+  online_sales_view: ["commerce_order.view", "online_sales.view"],
+  marketing_status_view: ["marketing.status.view"],
   service_orders: [
     "table.view",
     "table.update_status",
@@ -143,7 +162,13 @@ export const ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS: Readonly<AndroidPermission
   cashier: false,
   rooms_tasks: true,
   customer_reservation: false,
-  market_operations: false
+  market_operations: false,
+  commerce_orders_view: false,
+  commerce_orders_manage: false,
+  dealer_view: false,
+  shipment_view: false,
+  online_sales_view: false,
+  marketing_status_view: false
 };
 
 export function androidPermissionsForGroups(groups: AndroidPermissionGroups): AndroidPermission[] {
@@ -191,6 +216,13 @@ const ANDROID_ACCOMMODATION_FOOD_CAPABILITIES = [
  * check through androidActionAllowedByCapabilities.
  */
 export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<AndroidPermission, AndroidPermissionCapabilityRequirement>> = {
+  "commerce_order.view": { allOf: [C.ORDERS] },
+  "commerce_order.confirm": { allOf: [C.ORDERS] },
+  "commerce_order.cancel": { allOf: [C.ORDERS] },
+  "dealer.view": { allOf: [C.CUSTOMERS, C.ORDERS, C.WHOLESALE] },
+  "shipment.view": { allOf: [C.ORDERS] },
+  "online_sales.view": { allOf: [C.ORDERS, C.ONLINE_SALES] },
+  "marketing.status.view": { allOf: [C.MARKETING_STUDIO] },
   "customer.view": { allOf: [C.CUSTOMERS] },
   "customer.manage": { allOf: [C.CUSTOMERS] },
   "customer.respond": { allOf: [C.CUSTOMERS, C.REQUESTS] },
@@ -303,8 +335,14 @@ export function androidAvailablePermissionGroupIds(
     && !ANDROID_ACCOMMODATION_FOOD_CAPABILITIES.some((capability) => enabled.has(capability));
 
   return ANDROID_PERMISSION_GROUP_IDS.filter((groupId) => {
-    if (isRetailOnly && groupId !== "market_operations") return false;
+    if (isRetailOnly && ["service_orders", "cashier", "rooms_tasks", "customer_reservation"].includes(groupId)) return false;
     switch (groupId) {
+      case "commerce_orders_view":
+      case "commerce_orders_manage": return enabled.has(C.ORDERS);
+      case "dealer_view": return enabled.has(C.WHOLESALE) && enabled.has(C.ORDERS) && enabled.has(C.CUSTOMERS);
+      case "shipment_view": return enabled.has(C.ORDERS);
+      case "online_sales_view": return enabled.has(C.ONLINE_SALES) && enabled.has(C.ORDERS);
+      case "marketing_status_view": return enabled.has(C.MARKETING_STUDIO);
       case "service_orders":
         return enabled.has(C.FOOD_TABLES) || enabled.has(C.FOOD_ORDERS) || enabled.has(C.FOOD_MENU);
       case "cashier":
@@ -333,6 +371,7 @@ export interface AndroidActionCapabilityContext {
   relatedReservationType?: string;
   relatedReservationRoomIds?: readonly unknown[];
   relatedReservationTableIds?: readonly unknown[];
+  commerceOrderSource?: string;
   payload?: Record<string, unknown>;
 }
 
@@ -361,6 +400,11 @@ export function androidActionAllowedByCapabilities(
   const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   if (!enabled.has(C.ANDROID)) return false;
 
+  if (["commerce_order_confirm", "commerce_order_cancel"].includes(actionType)) {
+    return enabled.has(C.ORDERS)
+      && (context.commerceOrderSource !== "web-dealer" || enabled.has(C.WHOLESALE))
+      && (context.commerceOrderSource !== "web-online-sales" || enabled.has(C.ONLINE_SALES));
+  }
   if (actionType === "customer_request_convert_to_reservation") {
     return canConvertRequestToReservation(enabled, context.requestType ?? "");
   }
@@ -418,6 +462,8 @@ export const ANDROID_STAFF_PERMISSIONS: readonly AndroidPermission[] = androidPe
 
 
 export const ANDROID_ACTION_TYPES = [
+  "commerce_order_confirm",
+  "commerce_order_cancel",
   "customer_request_mark_answered",
   "customer_request_reopen",
   "customer_request_approve",
@@ -475,6 +521,8 @@ export const ANDROID_ACTION_TYPES = [
 export type AndroidActionType = typeof ANDROID_ACTION_TYPES[number];
 
 export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, AndroidPermission>> = {
+  commerce_order_confirm: "commerce_order.confirm",
+  commerce_order_cancel: "commerce_order.cancel",
   customer_request_mark_answered: "customer.mark_answered",
   customer_request_reopen: "customer.respond",
   customer_request_approve: "customer.respond",

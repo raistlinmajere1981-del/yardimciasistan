@@ -12,6 +12,7 @@ require_once YA_BASE_DIR . '/lib/online-catalog.php';
 require_once YA_BASE_DIR . '/lib/marketing.php';
 require_once YA_BASE_DIR . '/lib/dealer-access.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
+require_once YA_BASE_DIR . '/lib/android-companion-projection.php';
 require_once YA_BASE_DIR . '/lib/google-reviews.php';
 
 $businessConfig = ya_sync_load_json(YA_CONFIG_FILE, []);
@@ -344,6 +345,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $permissionList = is_array($permissionProfile['permissions'] ?? null) ? $permissionProfile['permissions'] : [];
     $deviceActive = ya_sync_bool($permissionProfile['is_active'] ?? false);
     $serverRevision = ya_storage_server_revision();
+    $companion = ya_companion_project($androidSnapshot, $deviceActive
+        && defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED ? $permissionList : []);
 
     if (!$deviceActive) {
         $now = date(DATE_ATOM);
@@ -414,6 +417,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             ],
             'finance' => [],
             'reports' => [],
+            ...$companion,
             'market' => ya_sync_empty_android_market(),
             'actions' => [],
             'server_revision' => $serverRevision
@@ -432,7 +436,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     ));
 
     $knownServerRevision = max(0, ya_sync_int($payload['known_server_revision'] ?? 0, 0));
-    if ($knownServerRevision > 0 && $knownServerRevision === $serverRevision) {
+    if (defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED
+        && $knownServerRevision > 0 && $knownServerRevision === $serverRevision) {
         $now = date(DATE_ATOM);
         ya_sync_update_state(['last_android_summary_at' => $now]);
         ya_sync_response(200, [
@@ -559,7 +564,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'android_snapshot_updated_at' => ya_sync_string($androidSnapshot['updated_at'] ?? ''),
             'pending_action_count' => $pendingActionCount
         ],
-        'operations' => $androidSnapshot['summary'],
+        'operations' => [...$androidSnapshot['summary'], ...ya_companion_counters($companion)],
         'business_capabilities' => $androidSnapshot['business_capabilities'],
         'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
         'daily_tasks' => $androidSnapshot['daily_tasks'],
@@ -588,6 +593,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         ],
         'finance' => $financeAllowed ? $androidSnapshot['finance'] : [],
         'reports' => $reportsAllowed ? $androidSnapshot['reports'] : [],
+        ...$companion,
         'market' => ya_sync_android_market_for_permissions($androidSnapshot['market'], $permissionList),
         'actions' => $actions,
         'server_revision' => ya_storage_server_revision()
@@ -858,6 +864,29 @@ function ya_sync_enqueue_android_action(array $payload): void
         ]);
     }
 
+    if (in_array($actionType, ['commerce_order_confirm', 'commerce_order_cancel'], true)) {
+        if (!defined('YA_ANDROID_DEVICE_AUTHENTICATED') || !YA_ANDROID_DEVICE_AUTHENTICATED
+            || !in_array('commerce_order.view', $permissions, true)) {
+            ya_sync_response(403, ['ok' => false, 'code' => 'commerce_device_permission_denied', 'message' => 'Ticari sipariş için cihaz anahtarı ve görüntüleme yetkisi gerekli.']);
+        }
+        $order = ya_sync_android_snapshot_record($snapshot['commerce']['orders'] ?? [], 'id', ya_sync_string($actionPayload['order_id'] ?? ''));
+        if (($order['source'] ?? '') === 'web-online-sales' && !in_array('online_sales.view', $permissions, true)) {
+            ya_sync_response(403, ['ok' => false, 'code' => 'android_action_permission_denied', 'message' => 'Online sipariş görüntüleme yetkisi gerekli.']);
+        }
+        $expected = ya_sync_string($actionPayload['expected_updated_at'] ?? '');
+        if ($expected === '' || strlen($expected) > 40 || strtotime($expected) === false
+            || !in_array($actionPayload['expected_status'] ?? '', ['placed', 'confirmed', 'fulfilled', 'cancelled'], true)) {
+            ya_sync_response(422, ['ok' => false, 'message' => 'Beklenen sipariş durumu ve güncelleme zamanı gerekli.']);
+        }
+        $existing = ya_storage_get_android_action($actionId);
+        if ($existing !== null && (($existing['action_type'] ?? '') !== $actionType || ($existing['device_id'] ?? '') !== $deviceId
+            || ($existing['payload']['order_id'] ?? '') !== ($actionPayload['order_id'] ?? '')
+            || ($existing['payload']['expected_updated_at'] ?? '') !== $expected
+            || ($existing['payload']['expected_status'] ?? '') !== ($actionPayload['expected_status'] ?? ''))) {
+            ya_sync_response(409, ['ok' => false, 'code' => 'android_action_id_conflict', 'message' => 'İşlem kimliği farklı bir sipariş kararı için kullanılmış.']);
+        }
+    }
+
     $encodedPayload = json_encode($actionPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($encodedPayload === false || strlen($encodedPayload) > 32768) {
         ya_sync_response(422, [
@@ -883,6 +912,15 @@ function ya_sync_enqueue_android_action(array $payload): void
             'error_message' => '',
             'processed_at' => ''
     ]);
+    if (in_array($actionType, ['commerce_order_confirm', 'commerce_order_cancel'], true)) {
+        $queued = $stored['action'];
+        if (($queued['action_type'] ?? '') !== $actionType || ($queued['device_id'] ?? '') !== $deviceId
+            || ($queued['payload']['order_id'] ?? '') !== ($actionPayload['order_id'] ?? '')
+            || ($queued['payload']['expected_updated_at'] ?? '') !== ($actionPayload['expected_updated_at'] ?? '')
+            || ($queued['payload']['expected_status'] ?? '') !== ($actionPayload['expected_status'] ?? '')) {
+            ya_sync_response(409, ['ok' => false, 'code' => 'android_action_id_conflict', 'message' => 'İşlem kimliği farklı bir sipariş kararı için kullanılmış.']);
+        }
+    }
     $created = $stored['created'] === true;
     $storedAction = ya_sync_public_android_action($stored['action']);
 
@@ -1799,6 +1837,8 @@ function ya_sync_public_request(array $record): array
 function ya_sync_android_action_types(): array
 {
     return [
+        'commerce_order_confirm',
+        'commerce_order_cancel',
         'customer_request_mark_answered',
         'customer_request_reopen',
         'customer_request_approve',
@@ -1906,6 +1946,8 @@ function ya_sync_android_action_permission(string $actionType, array $payload): 
         'table_order_set_payment_waiting' => 'table_order.set_payment_waiting',
         'table_order_close_paid' => 'table_order.close_paid',
         'table_order_cancel' => 'table_order.cancel',
+        'commerce_order_confirm' => 'commerce_order.confirm',
+        'commerce_order_cancel' => 'commerce_order.cancel',
         'menu_category_delete' => 'menu.delete',
         'menu_entry_create' => 'menu.edit',
         'menu_entry_update' => 'menu.edit',
@@ -1933,6 +1975,12 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
         is_array($snapshot['business_capabilities'] ?? null) ? $snapshot['business_capabilities'] : [],
         true
     );
+    if (in_array($actionType, ['commerce_order_confirm', 'commerce_order_cancel'], true)) {
+        $order = ya_sync_android_snapshot_record($snapshot['commerce']['orders'] ?? [], 'id', ya_sync_string($payload['order_id'] ?? ''));
+        return isset($capabilities['service.android'], $capabilities['commerce.orders']) && $order !== []
+            && (($order['source'] ?? '') !== 'web-dealer' || isset($capabilities['commerce.wholesale']))
+            && (($order['source'] ?? '') !== 'web-online-sales' || isset($capabilities['channel.online_sales']));
+    }
     if (str_starts_with($actionType, 'reservation_room_')) {
         return isset($capabilities['accommodation.reservations']);
     }
@@ -2210,6 +2258,7 @@ function ya_sync_load_android_snapshot(): array
 
 function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTimestamp): array
 {
+    $companion = ya_companion_project($snapshot, ya_sync_android_permissions());
     $summary = is_array($snapshot['summary'] ?? null) ? $snapshot['summary'] : [];
     $tasks = is_array($snapshot['daily_tasks'] ?? null) ? $snapshot['daily_tasks'] : [];
     $menu = is_array($snapshot['menu'] ?? null) ? $snapshot['menu'] : [];
@@ -2272,6 +2321,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
         'finance' => ya_sync_sanitize_android_finance($snapshot['finance'] ?? []),
         'reports' => ya_sync_sanitize_android_reports($snapshot['reports'] ?? []),
+        ...$companion,
         'market' => ya_sync_sanitize_android_market($snapshot['market'] ?? []),
         'updated_at' => $updatedAt
     ];
@@ -2306,6 +2356,11 @@ function ya_sync_sanitize_business_capabilities(mixed $value): array
         'commerce.catalog',
         'commerce.inventory',
         'commerce.sales',
+        'commerce.orders',
+        'commerce.wholesale',
+        'channel.online_sales',
+        'marketing.studio',
+        'messaging.campaigns',
         'retail.barcode',
         'retail.purchasing',
         'retail.suppliers',
@@ -2753,6 +2808,13 @@ function ya_sync_sanitize_android_reports(mixed $reports): array
 function ya_sync_android_permissions(): array
 {
     return [
+        'commerce_order.view',
+        'commerce_order.confirm',
+        'commerce_order.cancel',
+        'dealer.view',
+        'shipment.view',
+        'online_sales.view',
+        'marketing.status.view',
         'customer.view',
         'customer.manage',
         'customer.respond',

@@ -114,7 +114,10 @@ try {
       assert.equal(next.createdAt, first.createdAt);
       if (previous.readyAt) assert.equal(next.readyAt, previous.readyAt);
       if (previous.dispatchedAt) assert.equal(next.dispatchedAt, previous.dispatchedAt);
+      const revisionBeforeRetry = raw.prepare("SELECT source_revision FROM sync_outbox WHERE job_key='android_snapshot'").get().source_revision;
       assert.deepEqual(database.updateShipmentStatus({ shipmentId: first.id, status }), next, "same-status retry preserves timestamps");
+      assert.equal(raw.prepare("SELECT source_revision FROM sync_outbox WHERE job_key='android_snapshot'").get().source_revision,
+        revisionBeforeRetry, "a no-op shipping retry does not create another publication revision");
       if (status !== "delivered") assert.equal(next.deliveredAt, "");
       previous = next;
     }
@@ -128,7 +131,11 @@ try {
     assert.deepEqual(getRuntimeOrder(databasePath, order.order.id), initialOrder);
     assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 10);
     for (const table of ["commerce_sales", "commerce_order_fulfillments"]) assert.equal(Number(raw.prepare(`SELECT count(*) AS n FROM ${table}`).get().n), 0);
-    assert.deepEqual(raw.prepare("SELECT * FROM sync_outbox ORDER BY job_key").all(), outboxBefore);
+    const outboxAfter = raw.prepare("SELECT * FROM sync_outbox ORDER BY job_key").all();
+    assert.deepEqual(outboxAfter.filter(job => job.job_key !== "android_snapshot"), outboxBefore.filter(job => job.job_key !== "android_snapshot"),
+      "Shipment execution creates no independent publication or provider queue");
+    assert.ok(outboxAfter.find(job => job.job_key === "android_snapshot").source_revision > outboxBefore.find(job => job.job_key === "android_snapshot").source_revision,
+      "Canonical shipment changes invalidate the existing companion status projection");
 
     const readyCancel = database.createShipmentForOrder(order.order.id);
     database.updateShipmentStatus({ shipmentId: readyCancel.id, status: "ready" });

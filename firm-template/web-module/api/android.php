@@ -36,6 +36,9 @@ if (!ya_android_auth_snapshot_has_capabilities(['service.android'])) {
     ]);
 }
 
+// This request-local flag is set only after token validation, never from request payload.
+define('YA_ANDROID_DEVICE_AUTHENTICATED', trim((string)($_SERVER['HTTP_X_YA_DEVICE_TOKEN'] ?? '')) !== '');
+
 // Device tokens are intentionally not general sync credentials. They may only
 // call the narrow Android transport actions required by the companion.
 $rawBody = file_get_contents('php://input') ?: '';

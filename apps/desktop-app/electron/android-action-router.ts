@@ -1,3 +1,4 @@
+import { applyAndroidCommerceOrderAction } from "./android-commerce-order-actions";
 import type { DatabaseSync } from "node:sqlite";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
@@ -79,6 +80,9 @@ export function routeAndroidActionInTransaction(
   ) => insertAndroidActionEvent(db, sinkAction, type, entityType, entityId, payload, eventNow);
 
   switch (action.action_type) {
+    case "commerce_order_confirm":
+    case "commerce_order_cancel":
+      return applyAndroidCommerceOrderAction(db, action, now);
     case "customer_request_mark_answered":
       return applyAndroidRequestStatus(db, action, "answered", now, enabledCapabilities);
     case "customer_request_reopen":

@@ -206,6 +206,8 @@ function summaryResponse(
     finance: snapshot.finance,
     reports: snapshot.reports,
     market: snapshot.market,
+    commerce: snapshot.commerce,
+    marketing: snapshot.marketing,
     actions: [],
     server_revision: sourceRevision
   };
@@ -444,7 +446,7 @@ export class LocalCompanionServer {
         const snapshot = this.options.createSummary(deviceId);
         const approvalRequired = !snapshot.androidPermissions[deviceId]?.is_active;
         const knownRevision = Math.max(0, Number(body.known_server_revision ?? 0) || 0);
-        if (knownRevision > 0 && knownRevision === this.sourceRevision) {
+        if (!approvalRequired && knownRevision > 0 && knownRevision === this.sourceRevision) {
           writeJson(response, 200, {
             ok: true,
             message: approvalRequired

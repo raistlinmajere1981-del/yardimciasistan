@@ -585,8 +585,10 @@ Order was subsequently cancelled. New shipments cannot be created for cancelled 
 Shipment mutations never change Order status or create Sale, stock, payment, reservation
 or fulfillment. Confirmation/fulfillment never dispatches a Shipment. The provider adapter
 is a typed boundary only, with no production fake, SDK, credentials or automatic execution.
-B2 is local desktop persistence; existing web ingress/publication outboxes do not transport
-shipments. A future provider/sync slice must explicitly define its own execution contract.
+B2 is local desktop persistence. Companion v3 A carries only bounded, permission-projected
+Shipment status facts through the existing Android snapshot publication; it never queues
+Shipment execution or sends receiver/address/tracking details. A future provider/sync
+execution slice must explicitly define its own execution contract.
 Shipment-specific change events refresh only the selected Order's shipment projection;
 local mutation responses update that projection immediately without polling.
 

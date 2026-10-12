@@ -62,6 +62,12 @@ function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
     cashier: false,
     rooms_tasks: false,
     customer_reservation: false,
+    commerce_orders_view: false,
+    commerce_orders_manage: false,
+    dealer_view: false,
+    shipment_view: false,
+    online_sales_view: false,
+    marketing_status_view: false,
     market_operations: false
   };
 }
@@ -91,6 +97,7 @@ export function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPe
   const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
   for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
     if (!(groupId in record)) {
+      if (["commerce_orders_view", "commerce_orders_manage", "dealer_view", "shipment_view", "online_sales_view", "marketing_status_view"].includes(groupId)) continue;
       return null;
     }
     if (typeof record[groupId] !== "boolean") return null;

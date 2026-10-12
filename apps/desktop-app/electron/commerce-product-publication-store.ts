@@ -61,3 +61,14 @@ export function deleteCommerceProductPublication(db: DatabaseSync, productId: st
   db.prepare("DELETE FROM commerce_product_publications WHERE business_id = ? AND product_id = ? AND channel = 'online_sales'")
     .run(activeBusinessId(db), String(productId ?? "").trim());
 }
+
+/** Publication intent count and durable pending state, never a second acknowledgement. */
+export function readOnlineCatalogOperations(db: DatabaseSync) {
+  const row = db.prepare(`SELECT COUNT(*) AS count,COALESCE(MAX(p.updated_at),'') AS updated_at
+    FROM commerce_product_publications p JOIN catalog_products c ON c.id=p.product_id AND c.business_id=p.business_id
+    WHERE p.business_id=? AND p.channel='online_sales' AND p.is_published=1 AND c.is_active=1 AND c.deleted_at=''`)
+    .get(activeBusinessId(db));
+  return { desired_product_count: Number(row?.count ?? 0),
+    pending: Boolean(db.prepare("SELECT 1 FROM sync_outbox WHERE job_type='online_catalog_publish'").get()),
+    updated_at: String(row?.updated_at ?? "") };
+}

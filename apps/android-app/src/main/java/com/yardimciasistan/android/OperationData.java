@@ -69,6 +69,13 @@ final class OperationData {
       "market.receiving",
       "market.product_create",
       "market.cart_draft",
+      "commerce_order.view",
+      "commerce_order.confirm",
+      "commerce_order.cancel",
+      "dealer.view",
+      "shipment.view",
+      "online_sales.view",
+      "marketing.status.view",
       "market.scan_to_desktop"
   };
   private static final String[] KNOWN_BUSINESS_CAPABILITIES = {
@@ -98,6 +105,11 @@ final class OperationData {
       "commerce.catalog",
       "commerce.inventory",
       "commerce.sales",
+      "commerce.orders",
+      "commerce.wholesale",
+      "channel.online_sales",
+      "marketing.studio",
+      "messaging.campaigns",
       "retail.barcode",
       "retail.purchasing",
       "retail.suppliers",
@@ -154,6 +166,7 @@ final class OperationData {
   FinanceSnapshot finance = new FinanceSnapshot();
   final Map<String, ReportSnapshot> reports = new HashMap<>();
   MarketSnapshot market = new MarketSnapshot();
+  CompanionData companion = new CompanionData();
 
   static OperationData fromJson(JSONObject root) {
     return fromJson(root, "");
@@ -272,6 +285,7 @@ final class OperationData {
     }
 
     data.applyPermissionProfile(root.optJSONObject("androidPermissions"), deviceId);
+    data.companion = CompanionData.fromJson(root, data);
 
     if (!messagesIncluded) {
       for (RequestRecord request : data.requests) {
@@ -308,6 +322,10 @@ final class OperationData {
     if (permission == null || permission.isEmpty()) {
       return false;
     }
+    if (permission.startsWith("commerce_order.") || "shipment.view".equals(permission)) return hasBusinessCapability("commerce.orders");
+    if ("dealer.view".equals(permission)) return hasBusinessCapability("core.customers") && hasBusinessCapability("commerce.orders") && hasBusinessCapability("commerce.wholesale");
+    if ("online_sales.view".equals(permission)) return hasBusinessCapability("commerce.orders") && hasBusinessCapability("channel.online_sales");
+    if ("marketing.status.view".equals(permission)) return hasBusinessCapability("marketing.studio");
     if (permission.startsWith("room_folio.")) {
       return hasBusinessCapability("accommodation.folio");
     }
@@ -441,6 +459,7 @@ final class OperationData {
     permissions.clear();
     JSONArray profilePermissions = profile.optJSONArray("permissions");
     if (profilePermissions == null) {
+      companion.redact(this);
       return;
     }
     Set<String> allowed = new HashSet<>(Arrays.asList(ALL_PERMISSIONS));
@@ -450,6 +469,7 @@ final class OperationData {
         permissions.add(permission);
       }
     }
+    companion.redact(this);
   }
 
   TableOrder activeOrderForTable(String tableId) {

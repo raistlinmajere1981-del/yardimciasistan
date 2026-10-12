@@ -80,6 +80,41 @@ public final class AndroidCompanionStorageTest {
     assertEquals(0L, cache.revision("local:desktop-123"));
   }
 
+  @Test
+  public void lowerSourceRevisionCannotRepopulateRevokedSnapshot() throws Exception {
+    InMemoryPreferences preferences = new InMemoryPreferences();
+    OperationCache cache = new OperationCache(preferences, "device-123");
+    JSONObject withdrawn = new JSONObject().put("server_revision", 12)
+        .put("business_capabilities", new org.json.JSONArray(new String[] { "service.android", "commerce.orders" }))
+        .put("androidPermissions", new JSONObject().put("device-123", new JSONObject().put("role", "staff").put("is_active", false)));
+    cache.save(withdrawn, "hosting:test", 12);
+    try {
+      cache.save(new JSONObject().put("server_revision", 11), "hosting:test", 11);
+      org.junit.Assert.fail("Older source revision must be rejected");
+    } catch (OperationCache.CacheException expected) {
+      assertEquals(12L, cache.revision("hosting:test"));
+      assertFalse(cache.load().deviceActive);
+      assertTrue(cache.load().companion.orders.isEmpty());
+    }
+  }
+
+  @Test
+  public void offlineCommerceRetryKeepsActionIdIntentAndLogicalTarget() throws Exception {
+    InMemoryPreferences preferences = new InMemoryPreferences();
+    ActionOutbox outbox = new ActionOutbox(preferences);
+    ActionOutbox.PendingAction action = ActionOutbox.PendingAction.create("commerce_retry_001", "commerce_order_confirm",
+        new JSONObject().put("order_id", "order-1").put("expected_updated_at", "2026-10-12T12:00:00Z").put("expected_status", "placed"), "companion:target");
+    java.util.ArrayList<ActionOutbox.PendingAction> actions = new java.util.ArrayList<>(); actions.add(action);
+    outbox.appendAll(actions);
+    ActionOutbox.PendingAction retry = new ActionOutbox(preferences).load().get(0);
+    assertEquals(action.id, retry.id);
+    assertEquals("commerce_order_confirm", retry.type);
+    assertEquals("order-1", retry.payload.optString("order_id"));
+    assertEquals("2026-10-12T12:00:00Z", retry.payload.optString("expected_updated_at"));
+    assertEquals("placed", retry.payload.optString("expected_status"));
+    assertTrue(retry.matchesTarget("companion:target"));
+  }
+
   private static final class InMemoryPreferences implements SharedPreferences {
     private final Map<String, Object> values = new HashMap<>();
 

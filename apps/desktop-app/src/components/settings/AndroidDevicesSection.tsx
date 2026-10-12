@@ -26,6 +26,12 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   shortLabel: string;
   description: string;
 }> = [
+  { id: "commerce_orders_view", label: "Ticari Sipariş / Görüntüleme", shortLabel: "Ticari sipariş", description: "Ticari sipariş durum özetleri" },
+  { id: "commerce_orders_manage", label: "Ticari Sipariş / Karar", shortLabel: "Sipariş kararı", description: "Ticari siparişi onaylama ve iptal etme" },
+  { id: "dealer_view", label: "Bayi / Durum", shortLabel: "Bayi", description: "Ticari profil ve fiyat grubu özeti" },
+  { id: "shipment_view", label: "Gönderi / Durum", shortLabel: "Gönderi", description: "Siparişe bağlı gönderi ve takip durumu" },
+  { id: "online_sales_view", label: "Online Satış / Durum", shortLabel: "Online satış", description: "Online sipariş kaynağı ve katalog yayın durumu" },
+  { id: "marketing_status_view", label: "Pazarlama / Durum", shortLabel: "Pazarlama", description: "Yayın, plan ve kampanya sonuçları" },
   { id: "service_orders", label: "Servis / Sipariş", shortLabel: "Servis", description: "Masa, sipariş ve servis akışı" },
   { id: "cashier", label: "Kasa / Hesap", shortLabel: "Kasa", description: "Ödendi / Kapat işlemi" },
   { id: "rooms_tasks", label: "Oda / Günlük İşler", shortLabel: "Oda işleri", description: "Oda durumu ve günlük işler" },

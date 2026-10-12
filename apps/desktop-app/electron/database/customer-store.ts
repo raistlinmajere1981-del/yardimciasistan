@@ -371,3 +371,12 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput, context
     savedId: id
   };
 }
+
+/** Commercial status projection, deliberately excluding customer/contact/tax/free-text fields. */
+export function readCustomerCommercialOperations(db: DatabaseSync) {
+  return db.prepare(`SELECT p.customer_id,p.dealer_status,p.price_group,p.updated_at FROM customer_commercial_profiles p
+    JOIN customers c ON c.id=p.customer_id AND c.business_id=p.business_id
+    JOIN business b ON b.id=p.business_id AND b.deleted_at=''
+    WHERE c.deleted_at='' AND p.business_id=(SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1)
+    ORDER BY p.updated_at DESC,p.customer_id LIMIT 100`).all();
+}

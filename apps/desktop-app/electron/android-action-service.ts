@@ -1,3 +1,4 @@
+import { getCommerceOrderOperationState } from "./commerce-order-store";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import { androidActionAllowedByCapabilities, resolveAndroidActionPermission, type AndroidSyncAction } from "@yardimci-asistan/sync-core";
@@ -49,6 +50,12 @@ export function authorizeAndroidAction(db: DatabaseSync, action: AndroidSyncActi
     return { ok: false, message: requiredPermission === "table_order.close_paid"
       ? "Bu cihazın hesap kapatma yetkisi yok." : "Bu cihazın bu işlem için yetkisi yok." };
   }
+  if (action.action_type.startsWith("commerce_order_")) {
+    if (!permissions.includes("commerce_order.view")
+        || (capabilityContext.commerceOrderSource === "web-online-sales" && !permissions.includes("online_sales.view"))) {
+      return { ok: false, message: "Bu cihazın ticari sipariş görüntüleme yetkisi yok." };
+    }
+  }
   if (["customer_room_assign", "customer_room_stay_status"].includes(action.action_type) && !permissions.includes("customer.manage")) {
     return { ok: false, message: "Bu cihazın müşteri yönetimi yetkisi yok." };
   }
@@ -57,10 +64,14 @@ export function authorizeAndroidAction(db: DatabaseSync, action: AndroidSyncActi
 
 function getAndroidActionCapabilityContext(db: DatabaseSync, action: AndroidSyncAction) {
   const context = {
-    requestType: "", reservationType: "", reservationRoomIds: [] as string[], reservationTableIds: [] as string[],
+    commerceOrderSource: "", requestType: "", reservationType: "", reservationRoomIds: [] as string[], reservationTableIds: [] as string[],
     taskType: String(action.payload.task_type ?? "").trim(), relatedType: String(action.payload.related_type ?? "").trim(),
     relatedReservationType: "", relatedReservationRoomIds: [] as string[], relatedReservationTableIds: [] as string[], payload: action.payload
   };
+  if (action.action_type.startsWith("commerce_order_")) {
+    const orderId = androidPayloadString(action.payload, "order_id");
+    context.commerceOrderSource = orderId ? getCommerceOrderOperationState(db, orderId)?.source ?? "" : "";
+  }
   if (action.action_type === "customer_request_convert_to_reservation") {
     const requestId = androidPayloadString(action.payload, "request_id");
     const request = requestId ? db.prepare("SELECT request_type FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { request_type?: unknown } | undefined : undefined;

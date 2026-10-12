@@ -1,4 +1,5 @@
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { projectAndroidCompanion, androidCompanionCounters } from "@yardimci-asistan/sync-core";
 import type {
   AndroidFinanceSnapshot,
   AndroidOperationsSnapshot,
@@ -48,11 +49,13 @@ function inactiveSnapshot(
   deviceId: string,
   profile: AndroidSnapshotPermissionProfile
 ): AndroidOperationsSnapshot {
+  const companion = projectAndroidCompanion(undefined, undefined, []);
   const menuUpdatedAt = source.menu.updated_at;
   const adminMenuUpdatedAt = source.admin_menu.updated_at;
   return {
     ...source,
-    summary: emptySummary(),
+    ...companion,
+    summary: { ...emptySummary(), ...androidCompanionCounters(companion.commerce, companion.marketing) },
     daily_tasks: [],
     requests: [],
     customers: [],
@@ -100,6 +103,7 @@ export function projectLocalAndroidSnapshotForDevice(
     return inactiveSnapshot(source, deviceId || "unknown", profile);
   }
 
+  const companion = projectAndroidCompanion(source.commerce, source.marketing, source.business_capabilities, profile.permissions);
   const permissions = new Set(profile.permissions);
   const customerManagementAllowed = profile.role === "admin" && permissions.has("customer.manage");
   const roomFolioAllowed = permissions.has("room_folio.view");
@@ -126,6 +130,8 @@ export function projectLocalAndroidSnapshotForDevice(
 
   return {
     ...source,
+    ...companion,
+    summary: { ...source.summary, ...androidCompanionCounters(companion.commerce, companion.marketing) },
     customers: customerManagementAllowed ? source.customers : [],
     menu_product_candidates: permissions.has("menu.edit") ? source.menu_product_candidates ?? [] : [],
     customer_room_stays: customerManagementAllowed ? source.customer_room_stays : [],

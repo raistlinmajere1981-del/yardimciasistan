@@ -1,6 +1,6 @@
 # Android Companion v3 — kapsam ve sözleşme hazırlığı
 
-Durum: **tasarım kararı / uygulama öncesi kontrol listesi**, çalışan kod değişikliği değildir.
+Durum: **A veri/izin sözleşmesi ve sonraki aşamaların kapsamı**. B/C/D kullanıcı arayüzü ve ses çalışmaları ayrı bloklardır.
 Başlangıç incelemesi: 2026-10-12, `main` / `6f67f5b3`.
 Hedef: Masaüstüyle **iş kuralı ve veri tutarlılığı**; masaüstünün bütün ekranlarını telefona kopyalamak değil.
 
@@ -12,14 +12,14 @@ Hedef: Masaüstüyle **iş kuralı ve veri tutarlılığı**; masaüstünün bü
 - Ekran görünürlüğü **işletme capability'si AND cihazın etkin izni** ile belirlenir. Admin rolü kapalı capability'yi açamaz.
 - Mevcut Java ekranları, bildirimler, kamera, action outbox, hosting ve yerel eşitleme yolları korunur. İşlevsel eşitleme sırasında geniş UI refactor yapılmaz.
 
-## Kodda doğrulanan mevcut durum
+## Kanonik sahipler ve mevcut sınırlar
 
 | Kanonik alan | Mevcut kod | Durum |
 | --- | --- | --- |
 | Android operatör ekranları | `apps/android-app/src/main/java/com/yardimciasistan/android/{AndroidUiRules,AndroidShellController,AndroidWorkspaceCoordinator}.java` | Bugün, Müşteri, Pansiyon, Restoran, Market, Mesajlar var; kasa/rapor yetenekleri de kurallarda tanımlı. |
-| Snapshot şeması | `packages/sync-core/index.ts` → `AndroidOperationsSnapshot` | Oda, rezervasyon, masa siparişi, müşteri, finans, rapor, market var; ticari sipariş/bayi/gönderi/pazarlama özeti yok. |
-| Kaynak ve redaksiyon | `apps/desktop-app/electron/{android-operations-snapshot,android-capability-projection}.ts` | Mevcut domainler capability'ye göre kırpılıyor. Yeni domainler aynı koşulları karşılamalı. |
-| Mutasyon | `packages/sync-core/android-policy.ts`, `apps/desktop-app/electron/android-action-router.ts` | Kalıcı outbox/receipt aksiyonları mevcut; commerce order ve marketing aksiyonları Android için tanımlı değil. |
+| Snapshot şeması | `packages/sync-core/index.ts` → `AndroidOperationsSnapshot` | Mevcut alanlar korunur; optional commerce/marketing durum modelleri A sözleşmesidir. |
+| Kaynak ve redaksiyon | `apps/desktop-app/electron/{android-operations-snapshot,android-capability-projection}.ts` | Capability ve yeni domainlerde cihaz izni/server allowlist kırpması vardır. |
+| Mutasyon | `packages/sync-core/android-policy.ts`, `apps/desktop-app/electron/android-action-router.ts` | Kalıcı outbox/receipt korunur; commerce confirm/cancel domain sahibine bağlıdır, marketing mutasyonu yoktur. |
 | Ticari sipariş | `packages/shared/types/commerce.ts`, `apps/desktop-app/electron/commerce-order-store.ts` | `placed → confirmed`, uygun durumdan `cancelled`; `fulfilled` satış/finans/stok hattına bağlı, mobil ilk turun dışında. |
 | Gönderi | `apps/desktop-app/electron/commerce-shipment-store.ts` | Siparişe bağlı ayrı yaşam döngüsü; ilk aşamada yalnız durum/takip bilgisi. |
 | Bayi profili | `packages/shared/types/wholesale.ts`, `apps/desktop-app/electron/database/customer-store.ts` | Ticari kimlik/fiyat grubu kanonik müşteri alanı; mobilde ilk aşama salt-okunur. |
@@ -42,27 +42,132 @@ Hedef: Masaüstüyle **iş kuralı ve veri tutarlılığı**; masaüstünün bü
 
 **Terminoloji:** `food_service.orders` = masa adisyonu; `commerce.orders` = ticari sipariş. Aynı `order` etiketi altında yetki veya aksiyon karıştırılmaz. Mevcut ticari sipariş sisteminde ayrı `rejected` durumu bulunmadığı için mobilde `Reddet` adıyla gizli `cancelled` yazılmaz; mevcut domain dilinde `İptal` kullanılır.
 
-## Önerilen mobil veri sözleşmesi (uygulama öncesi taslak)
+## A — Uygulanan mobil veri ve işlem sözleşmesi
 
-1. Mevcut `AndroidOperationsSnapshot` geriye uyumlu kalır. Yeni **opsiyonel**, domain-isimli ve varsayılanı boş bir commerce/marketing mobil projeksiyonu seçilir; kesin alan adları uygulama sırasında tek kez kararlaştırılır.
-2. Liste projeksiyonu kompakt ve sayıca sınırlı olur: ID, durum, kısa başlık, zaman, sipariş toplamı/para birimi ve kaynak. Kalemler, teslimat adresi, alıcı iletişimi ve gönderi detayları yalnız yetkili detay akışında sunulur. Tek snapshot'a sınırsız sipariş/kalem/medya gömülmez.
-3. Ticari siparişlerde `commerce.orders` + `service.android`, bayi/toptan alanlarında ayrıca `commerce.wholesale`, online yayın/sipariş bilgisinde uygun `channel.online_sales` koşulları uygulanır. Gönderi görünürlüğü ilgili ticari sipariş iznine bağlanır; henüz bağımsız bir shipping business capability yoktur.
-4. Pazarlama durumları `marketing.studio` ve gerekiyorsa `messaging.campaigns` ile kırpılır; SMS/WhatsApp alıcı listeleri, yayın sırları, müşteri segment içeriği, sağlayıcı kimlik bilgileri ve gereksiz kişisel veri **yayınlanmaz**.
-5. Yeni işlemler için `AndroidPermission`, cihaz/rol grupları, capability matrisi, sunucu yetki reddi, Java permission kontrolü **birlikte** güncellenir. Önerilen ayrık izinler: commerce order view/manage, dealer view, shipment view, marketing status view. İsimleri kod öncesi kanonik hale getirilecek; genel `table_order`, `market` veya `customer.view` izni yeni mutasyonları otomatik açmayacak.
-6. Sipariş onay/iptal ilk iki mobil mutasyon adayıdır. Kapsam: `placed→confirmed` ve mevcut backend'in izin verdiği `cancelled` geçişleri. Desktop kanonik service/store çağrılır; paralel iş kuralı Java/PHP'ye yazılmaz. `expected updatedAt/revision`, tekil action ID, kalıcı queue, receipt/idempotency, yeniden deneme, yetki revocation ve stale transition test edilir.
-7. Snapshot sadece UI filtresi değildir: yetkisiz veri sunucudan/cihazdan alınmamalı. Hostingin işyeri-genel snapshot tüketiminde **cihaz bazlı alan yetkisi** ve veri minimizasyonunun nerede uygulandığı önce doğrulanır. Bu kontrol bitmeden ticari müşteri adresleri/iletişim bilgileri eklenmez.
-8. Capability OFF veya Android bağlantısı OFF olduğunda yayınlanan domainler boş/tombstone olur, yeni action kabul edilmez. Local LAN + hosting + offline cached snapshot + geç gelen publication revizyonları aynı sınırları korur.
+Kanonik taşıma türleri `packages/sync-core/android-companion.ts` içindedir.
+`AndroidOperationsSnapshot.commerce` ve `.marketing` **optional** alanlardır.
+Eksik alanlar Desktop/LAN/Hosting/Java'da boş model olur; eski istemciler bilinmeyen
+alanları yok sayar. Restoranın `table_orders` alanı ve `table_order.*` izinleri ayrıdır.
+
+| Projection | Kaynak sahibi | Mobil alanlar / sınır |
+| --- | --- | --- |
+| `commerce.orders` | `commerce-order-store` | ID, durum, kaynak enum'u, toplam/para birimi, teslimat yöntemi, placed/updatedAt; en fazla 100; açık siparişler önce |
+| `commerce.customer_profiles` | `database/customer-store` | Opaque müşteri ID, bayi durumu, fiyat grubu, updatedAt; en fazla 100 |
+| `commerce.shipments` | `commerce-shipment-store` | ID, ilgili sipariş ID, mevcut gönderi durumu, takip kaydı var/yok, updatedAt; görünür sipariş penceresinde en fazla 100 |
+| `commerce.online_catalog` | `commerce-product-publication-store` | Aktif ürünlerin **yayın niyeti** sayısı (`desired_product_count`), mevcut durable yayının pending durumu, niyet updatedAt; ürün listesi yok |
+| `marketing.publications` | `marketing/companion-status-store` / kanonik publication tabloları | ID, website/instagram, durum, revision/publishedRevision, desiredPublished, updatedAt; en fazla 50 |
+| `marketing.schedules` | Aynı marketing sahibi / schedule-execution tabloları | ID, kanal/hedef türü, durum, nextRunAt, son execution durumu, updatedAt; en fazla 50 |
+| `marketing.campaigns` | Kanonik campaign/outbox tabloları | ID, kanal, durum, pending+claimed ve failed sayıları, updatedAt; en fazla 50 |
+
+Serbest metin, firma/kişi adı, vergi kimliği, alıcı, telefon/e-posta, teslimat adresi,
+not, sipariş kalemleri, takip kodu/URL, sağlayıcı hatasının ham metni, alıcı/segment
+listesi, medya ve kimlik bilgileri bu sözleşmede **bulunmaz**. Siparişin optional
+`customer_id` bağlantısı yalnız `dealer.view` ile çıkar. Kaynak yalnız
+`desktop | web-online-sales | web-dealer | other` olabilir; özel kaynak metni ve
+sourceReference dışarı çıkmaz. Bilinmeyen alanlar sunucu allowlist'inde atılır.
+
+`summary`/Android cevabının `operations` alanına eklenen optional sayaçlar:
+`pending_commerce_orders`, `open_commerce_orders`, `pending_shipments`,
+`online_catalog_pending`, `recent_failed_marketing_operations`.
+Commerce sayıları kaynak/durum başına sınırlı aggregate satırlarından hesaplanır ve
+100 kayıt liste sınırından bağımsızdır; kapalı kaynak ve cihaz izinleri sayacı da
+kapatır. Gönderi pending sayısı draft/ready/dispatched kayıtlarıdır; mevcut domainde
+gecikme/başarısız teslimat durumu olmadığı için yeni durum veya gecikme kuralı
+üretilmez. Pazarlama hata sayacı **son 50'şer kayıttaki** başarısız yayın, son execution'ı
+başarısız plan ve failed outbox'ı olan kampanya sayısıdır; işletme-genel analiz değildir.
+
+### İzinler ve taşıma güvenliği
+
+Her izin ayrıca `service.android` gerektirir. Yeni staff grupları varsayılan OFF'tur;
+eski kayıt/input'ta eksik yeni grup anahtarı OFF kabul edilir. Admin mevcut rol
+sözleşmesi gereği etkin capability izinlerini alır; kapalı capability'yi aşamaz.
+
+| Ayrı izin / grup | Capability ve ek sınır |
+| --- | --- |
+| `commerce_order.view` / `commerce_orders_view` | `commerce.orders` |
+| `commerce_order.confirm`, `commerce_order.cancel` / `commerce_orders_manage` | `commerce.orders` + ayrıca order view; genel customer/table/market izni yeterli değildir |
+| `dealer.view` / `dealer_view` | `core.customers` + `commerce.orders` + `commerce.wholesale` |
+| `shipment.view` / `shipment_view` | `commerce.orders` + ayrıca order view |
+| `online_sales.view` / `online_sales_view` | `commerce.orders` + `channel.online_sales` + ayrıca order view |
+| `marketing.status.view` / `marketing_status_view` | `marketing.studio`; audience campaign/plan için ayrıca `messaging.campaigns` + `core.customers` |
+
+`web-dealer` siparişleri Wholesale OFF iken; `web-online-sales` siparişleri Online Sales
+OFF veya cihaz online view izni yokken kaldırılır. Gönderiler görünür sipariş ID'lerine
+bağlanır. LAN response güncel cihaz profiline göre kırpılır. Hosting aynı allowlist ve
+capability/permission kesişimini **cevap üretirken** uygular; yalnız Android UI filtresi
+değildir. Hosting'teki yeni veriler ve commerce queue işlemleri sadece `android.php`
+üzerinden doğrulanmış **kişisel cihaz tokenı** ile erişilebilir. Header tokenının
+kimliği body device ID'sine bağlanır; request-local authentication bayrağını body
+üretemez. Eski shared-secret bootstrap ve genel `sync.php` summary cevapları yeni
+alanlar için boş model döndürür; eski bağlantı sözleşmesi korunur.
+
+Aktif olmayan/bilinmeyen cihaz boş model alır. Aktif olmayan cihaz için
+`not_modified` ile eski cache'i saklama yolu kapalıdır. Java parse ve sonradan
+permission profile uygulama yeni alanları/sayaçları tekrar kırpar; hatırlanan bir
+profil, profilsiz snapshot'ın yeni alanlarını açamaz. OperationCache aynı kaynak
+anahtarında daha düşük server revision'ı kabul etmez. LAN ve Hosting revision'ları
+birbirleriyle karşılaştırılmaz; farklı kaynakların sayıları farklı otoritelerdir.
+
+**Kalan güvenlik sınırı:** Hosting yalnız son kabul edilmiş Desktop yayınının cihaz
+profilini bilir. Desktop'ın çevrimdışı yaptığı permission/capability iptali, Hosting'e
+ulaşmadan uygulanamaz; önceden indirilmiş çevrimdışı cache uzaktan silinemez. Kaynak
+başına revision fencing bu iletişim yokluğunu çözmez; LAN→Hosting geçişinde daha eski
+otorite bilgisi de mümkündür. Shared-secret bootstrap eski alanlar için ayrıca legacy
+kimlik sınırını korur. Bu yüzden A yalnız yukarıdaki kişisel veri içermeyen özetleri
+sunmaktadır. Müşteri/firma kimliği, iletişim/adres, takip detayları ve yetkili detay
+endpoint'i bir sonraki güvenlik bloğuna kadar hazır değildir. Anında çevrimdışı
+revocation veya güvenli hassas detay akışı iddia edilmez.
+
+### Ticari sipariş karar altyapısı
+
+`commerce_order_confirm` ve `commerce_order_cancel` payload'u:
+`{order_id, expected_updated_at, expected_status}`. Action ID tekil ve kalıcı outbox'a
+aittir. updatedAt ve **durum** birlikte zorunludur; durum önkoşulu aynı milisaniyede
+olan Desktop değişikliğini de yakalar. Java yalnız erişim/önkoşul altyapısını bilir;
+durum geçişlerini ikinci kez uygulamaz.
+
+`updateCommerceOrderStatusInTransaction` aynı kanonik store içindeki tek transition
+uygulamasıdır; Desktop wrapper ve Android receipt transaction'ı onu kullanır.
+Mevcut placed→confirmed, uygun durum→cancelled ve terminal/no-op davranışı korunur.
+Mutasyon, domain event ve receipt tek `BEGIN IMMEDIATE` transaction'ında commit olur.
+Mevcut receipt tablosuna eklenen `intent_hash` alanı yalnız ID/status
+önkoşullarından üretilen SHA-256 hash'i tutar; aynı receipt ID'sinin farklı
+cihaz/sipariş/kararda kullanılmasını reddeder ve event history temizliğinden
+bağımsızdır. Eski action receipt davranışı değişmez; yeni receipt tablosu veya
+tarihsel migration yoktur. Aynı intent retry'ı receipt'i replay eder,
+updatedAt kontrolünü tekrar çalıştırıp başarılı retry'ı stale diye bozmaz. Replay'de
+bile güncel cihaz/capability/permission kontrol edilir. PHP queue aynı ID için farklı
+intent'i 409 ile reddeder; eşzamanlı insert sonucu da kontrol edilir. LAN ve Hosting
+aynı Desktop owner'a ulaşır.
+
+Fulfillment, satış, tahsilat, finans/stock/credit mutation action'ı eklenmemiştir.
+Bu domainlere ticari kararın yan etkisi yoktur.
+
+### Yayın yaşam döngüsü
+
+Commerce order/shipment/profile/publication ve marketing publication/schedule/
+execution/campaign/outbox değişiklikleri şemadaki trigger'larla mevcut
+`android_snapshot` invalidation kaydını yükseltir. Retry/backoff reseti, durable
+revision ledger, frozen payload, exact ack ve source epoch fencing aynı sahiplerde
+kalır; ikinci registry veya yayın yolu yoktur. Online catalog pending durumunu
+kapatmak için yalnız **eşleşen tamamlanmış** online outbox kaydı Android'i yeniden
+invalidates eder; henüz freeze edilmemiş pending Android işi yeni durumu kendi
+revizyonunda okur. Stale completion ve restore/reset'in ham DELETE işlemi bunu yapmaz.
+Current-schema-only politikası geçerlidir; tarihsel migration/startup backfill yoktur.
 
 ## Uygulama blokları ve tamamlanma ölçütü
 
 ### A — Sözleşme ve izin (ilk kod işi / Codex'e uygun)
 
-- [ ] Yalnız yeni read-model türlerini tanımla; optional parse ve empty fallback ile eski Android sürümünü kırma.
-- [ ] Desktop sipariş, gönderi, bayi ve pazarlama servislerinden **kırpılmış** projection üret; büyüklük sınırını ve last-updated bilgisini belirle.
-- [ ] İzin/capability/security matrisi ve görünürlük testleri: Android OFF; ORDERS OFF; WHOLESALE OFF; ONLINE_SALES OFF; MARKETING OFF; staff/admin; revoked device; eksik eski snapshot.
-- [ ] Hosting ve LAN yollarında read model redaksiyonunun sunucu sınırı testleri. Eski mobil sürümde bilinmeyen alanlar yok sayılmalı.
+- [x] Yalnız yeni read-model türlerini tanımla; optional parse ve empty fallback ile eski Android sürümünü kırma.
+- [x] Desktop sipariş, gönderi, bayi ve pazarlama servislerinden **kırpılmış** projection üret; büyüklük sınırını ve last-updated bilgisini belirle.
+- [x] İzin/capability/security matrisi ve görünürlük testleri: Android OFF; ORDERS OFF; WHOLESALE OFF; ONLINE_SALES OFF; MARKETING OFF; staff/admin; revoked device; eksik eski snapshot.
+- [x] Hosting ve LAN yollarında read model redaksiyonunun sunucu sınırı testleri. Eski mobil sürümde bilinmeyen alanlar yok sayılmalı.
 
 ### B — İlk değerli mobil davranışlar
+
+Confirm/cancel backend ve Java policy/outbox altyapısı A içinde hazırlanmıştır;
+aşağıdaki checkbox kullanıcı arayüzüne bağlı tamamlanma ölçütüdür.
 
 - [ ] Ticari sipariş listesi/detayı ve Bugün'de bekleyen sipariş sayısı.
 - [ ] Yeni order confirm/cancel işlemleri **yalnız backend domain sahibi üzerinden**, permission+status+idempotency testleri ile.
@@ -86,6 +191,15 @@ Hedef: Masaüstüyle **iş kuralı ve veri tutarlılığı**; masaüstünün bü
 - [ ] Tek çalışan Android UI; eski kullanılmayan sınıfları temizle. Sync, bildirim, kamera, action queue ve izin temellerini sakla.
 
 ## Test ve geliştirme disiplini
+
+A için kayıtlı hedefli gate: `npm run verify:check -- android-companion-v3`.
+Gerçek SQLite transaction/receipt rollback ve retry, PHP/HTTP cihaz tokenı ve
+sunucu redaksiyonu, LAN parity, bounded projection ve ordered withdrawal/replay
+senaryolarını çalıştırır. Paket ve Java unit testleri optional parse, capability/izin
+kesişimi, kalıcı action ID ve kaynak başına cache fencing'ini ayrıca korur.
+Publication protocol restore testi, yeni domain invalidation'larını normal
+coordinator turlarıyla drain eder ve en son Android projection'ında replay edilen
+siparişlerin bulunduğunu doğrular.
 
 - Baseline: `main` temiz, testler kullanıcı tarafından temiz bildirildi. **Bu hazırlıkta tam test çalıştırılmaz.**
 - Her blokta ilgili `packages/sync-core/tests`, Android Java unit/smoke, desktop/hosting capability ve action-path hedefli testler.

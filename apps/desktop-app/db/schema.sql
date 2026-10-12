@@ -23,6 +23,7 @@ CREATE TABLE ai_service_profiles (
 
 CREATE TABLE android_action_receipts (
   id TEXT PRIMARY KEY,
+  intent_hash TEXT NOT NULL DEFAULT '',
   action_type TEXT NOT NULL,
   device_id TEXT NOT NULL,
   applied_at TEXT NOT NULL
@@ -2763,3 +2764,209 @@ CREATE TABLE marketing_metric_snapshots (
   value INTEGER NOT NULL CHECK(value>=0), measured_at TEXT NOT NULL, expires_at TEXT NOT NULL,
   UNIQUE(business_id,target_id,provider_key,metric,range_start,range_end)
 );
+
+-- Companion v3 uses the existing durable Android publication invalidation/revision ledger.
+CREATE TRIGGER trg_companion_commerce_orders_insert AFTER INSERT ON commerce_orders BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_orders_update AFTER UPDATE ON commerce_orders BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_orders_delete AFTER DELETE ON commerce_orders BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_shipments_insert AFTER INSERT ON commerce_shipments BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_shipments_update AFTER UPDATE ON commerce_shipments BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_shipments_delete AFTER DELETE ON commerce_shipments BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_customer_commercial_profiles_insert AFTER INSERT ON customer_commercial_profiles BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_customer_commercial_profiles_update AFTER UPDATE ON customer_commercial_profiles BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_customer_commercial_profiles_delete AFTER DELETE ON customer_commercial_profiles BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_product_publications_insert AFTER INSERT ON commerce_product_publications BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_product_publications_update AFTER UPDATE ON commerce_product_publications BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_commerce_product_publications_delete AFTER DELETE ON commerce_product_publications BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_publications_insert AFTER INSERT ON marketing_publications BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_publications_update AFTER UPDATE ON marketing_publications BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_publications_delete AFTER DELETE ON marketing_publications BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_schedules_insert AFTER INSERT ON marketing_schedules BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_schedules_update AFTER UPDATE ON marketing_schedules BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_schedules_delete AFTER DELETE ON marketing_schedules BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_schedule_executions_insert AFTER INSERT ON marketing_schedule_executions BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.created_at, NEW.created_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_schedule_executions_update AFTER UPDATE ON marketing_schedule_executions BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.created_at, NEW.created_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_marketing_schedule_executions_delete AFTER DELETE ON marketing_schedule_executions BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.created_at, OLD.created_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_messaging_campaigns_insert AFTER INSERT ON messaging_campaigns BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_messaging_campaigns_update AFTER UPDATE ON messaging_campaigns BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_messaging_campaigns_delete AFTER DELETE ON messaging_campaigns BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_messaging_outbox_insert AFTER INSERT ON messaging_outbox BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_messaging_outbox_update AFTER UPDATE ON messaging_outbox BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_messaging_outbox_delete AFTER DELETE ON messaging_outbox BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_online_product_update AFTER UPDATE ON catalog_products
+WHEN EXISTS (SELECT 1 FROM commerce_product_publications WHERE product_id=OLD.id AND is_published=1) BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_companion_online_product_delete AFTER DELETE ON catalog_products
+WHEN EXISTS (SELECT 1 FROM commerce_product_publications WHERE product_id=OLD.id AND is_published=1) BEGIN
+  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;

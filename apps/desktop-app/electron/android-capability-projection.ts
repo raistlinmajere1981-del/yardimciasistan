@@ -6,6 +6,8 @@ import {
 } from "@yardimci-asistan/shared";
 import {
   androidEffectivePermissions,
+  projectAndroidCompanion,
+  androidCompanionCounters,
   androidTaskAllowedByCapabilities,
   type AndroidMarketSnapshot,
   type AndroidOperationsSnapshot,
@@ -120,13 +122,17 @@ export function projectAndroidOperationsSnapshot(
     androidEnabled
   );
 
+  const companion = projectAndroidCompanion(source.commerce, source.marketing, enabled);
+
   return {
     ...source,
+    ...companion,
     // The hosted module also uses this publication to gate desktop/public AI
     // endpoints. Keep the persisted capability set while Android is disabled;
     // all Android data and credentials below are still projected to tombstones.
     business_capabilities: [...enabled],
     summary: {
+      ...androidCompanionCounters(companion.commerce, companion.marketing),
       pending_daily_tasks: tasks.filter((task) => task.status === "pending").length,
       today_tasks: tasks.filter((task) => task.due_date === today && task.status !== "archived").length,
       available_rooms: rooms.filter((room) => room.status === "available").length,

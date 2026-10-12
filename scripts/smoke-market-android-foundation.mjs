@@ -12,6 +12,7 @@ const {
   getBusinessProfile
 } = require("../packages/shared/dist/index.js");
 const {
+  ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
   ANDROID_PERMISSIONS,
   ANDROID_PERMISSION_GROUP_PERMISSIONS,
   androidActionAllowedByCapabilities,
@@ -55,6 +56,7 @@ const MARKET_PERMISSIONS = [
   "market.scan_to_desktop"
 ];
 const MARKET_GROUPS = {
+  ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
   service_orders: false,
   cashier: false,
   rooms_tasks: false,

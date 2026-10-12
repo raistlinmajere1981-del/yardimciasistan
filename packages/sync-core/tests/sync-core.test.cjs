@@ -656,7 +656,13 @@ test("Android staff permission groups produce only their documented effective pe
     cashier: false,
     rooms_tasks: true,
     customer_reservation: false,
-    market_operations: false
+    market_operations: false,
+    commerce_orders_view: false,
+    commerce_orders_manage: false,
+    dealer_view: false,
+    shipment_view: false,
+    online_sales_view: false,
+    marketing_status_view: false
   });
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_operations, [
     "market.summary.view",

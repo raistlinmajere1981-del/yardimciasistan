@@ -1,3 +1,4 @@
+import { createAndroidCompanionSnapshot } from "./android-companion-snapshot";
 import type { AndroidOperationsSnapshot } from "@yardimci-asistan/sync-core";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
 import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
@@ -49,6 +50,7 @@ export function createAndroidOperationsSnapshot(
   }));
 
   const source: AndroidOperationsSnapshot = {
+    ...createAndroidCompanionSnapshot(database.databasePath, database.getEnabledBusinessCapabilities()),
     business_capabilities: [],
     local_network_enabled: database.getSetupData().localNetworkEnabled !== false,
     summary: {

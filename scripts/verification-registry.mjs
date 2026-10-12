@@ -1,4 +1,5 @@
 const SMOKE_FILES = [
+  "scripts/smoke-android-companion-v3.mjs",
   "scripts/smoke-record-picker-ui.mjs",
   "scripts/smoke-feature-dependencies.mjs",
   "scripts/smoke-profile-transition.mjs",
@@ -533,6 +534,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-android-companion-v3.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-publication-protocol.mjs" || file === "scripts/smoke-sync-publication-correctness.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-nexa-assets.mjs") return [];
   if (file === "scripts/smoke-web-nexa.mjs") return ["build-packages"];
@@ -571,6 +573,7 @@ function smokeDomains(file) {
 function smokeDomainsForGeneralOwnership(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   if (name === "record-picker-ui") return ["desktop", "commerce", "customers", "platform"];
+  if (name === "android-companion-v3") return ["android", "commerce", "marketing", "web", "platform"];
   if (name === "publication-protocol") return ["web", "android", "commerce", "marketing", "platform"];
   if (name === "sync-publication-correctness") return ["web", "android", "platform"];
 

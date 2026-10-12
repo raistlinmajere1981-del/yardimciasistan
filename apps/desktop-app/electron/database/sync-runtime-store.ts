@@ -156,6 +156,15 @@ export function completeSyncJob(db: DatabaseSync, jobKey: string, sourceRevision
     const result = db.prepare("DELETE FROM sync_outbox WHERE job_key = ? AND source_revision = ?").run(jobKey, sourceRevision);
     if (result.changes && sourceEpoch) db.prepare("UPDATE sync_restore_publications SET applied_revision = ? WHERE job_key = ? AND EXISTS (SELECT 1 FROM sync_restore_reconciliation WHERE state = 'reconciliation_pending' AND source_epoch = ?)")
       .run(sourceRevision, jobKey, sourceEpoch);
+    // Only an exact completed online publication changes the companion pending status.
+    // Raw outbox deletion during restore/reset must not create new runtime work.
+    if (result.changes && jobKey === "online_catalog") {
+      const unfrozenAndroidJob = db.prepare(`SELECT 1 FROM sync_outbox o WHERE o.job_key='android_snapshot'
+        AND NOT EXISTS (SELECT 1 FROM sync_publication_payloads p WHERE p.job_key=o.job_key AND p.source_revision=o.source_revision)`).get();
+      // An unfrozen Android job already reads the newly completed state. Preserve
+      // its revision so the current coordinator batch can still publish it.
+      if (!unfrozenAndroidJob) queueSyncJob(db, "android_snapshot");
+    }
     finishRestoreReconciliationIfReady(db);
     db.exec("COMMIT");
   } catch (error) { db.exec("ROLLBACK"); throw error; }

@@ -163,3 +163,17 @@ export function applyShipmentProviderResult(path: string, input: ShipmentProvide
     return mapShipment(shipmentRow(db, businessId, input.shipmentId)!);
   });
 }
+
+/** Shipping facts only; list is restricted to the bounded visible Order window. */
+export function readCommerceShipmentOperations(db: DatabaseSync, orderIds: string[]) {
+  const businessId = String(db.prepare("SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1").get()?.id ?? "");
+  const shipments = orderIds.length ? db.prepare(`SELECT s.* FROM commerce_shipments s
+    JOIN commerce_orders o ON o.id=s.order_id AND o.business_id=s.business_id
+    WHERE s.business_id=? AND s.deleted_at='' AND o.deleted_at='' AND o.id IN (${orderIds.map(() => "?").join(",")})
+    ORDER BY s.updated_at DESC,s.id DESC LIMIT 100`).all(businessId, ...orderIds).map(mapShipment) : [];
+  const counts = db.prepare(`SELECT CASE WHEN o.source IN ('desktop','web-online-sales','web-dealer') THEN o.source ELSE 'other' END AS source,
+    COUNT(*) AS pending FROM commerce_shipments s JOIN commerce_orders o ON o.id=s.order_id AND o.business_id=s.business_id
+    WHERE s.business_id=? AND s.deleted_at='' AND o.deleted_at='' AND s.status IN ('draft','ready','dispatched')
+    GROUP BY 1`).all(businessId);
+  return { shipments, counts };
+}

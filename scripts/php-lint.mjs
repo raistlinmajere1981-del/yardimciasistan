@@ -32,6 +32,8 @@ const phpFiles = [
   "firm-template/web-module/api/order.php",
   "firm-template/web-module/api/catalog.php",
   "firm-template/web-module/api/sync.php",
+  "firm-template/web-module/api/android.php",
+  "firm-template/web-module/lib/android-companion-projection.php",
   "firm-template/web-module/api/menu.php",
   "firm-template/web-module/api/chat.php",
   "firm-template/web-module/api/availability.php",

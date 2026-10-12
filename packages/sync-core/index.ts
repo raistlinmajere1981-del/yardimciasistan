@@ -240,6 +240,11 @@ export interface PublishedQrMenu {
 }
 
 export interface AndroidOperationsSummary {
+  pending_commerce_orders?: number;
+  open_commerce_orders?: number;
+  pending_shipments?: number;
+  online_catalog_pending?: number;
+  recent_failed_marketing_operations?: number;
   pending_daily_tasks: number;
   today_tasks: number;
   available_rooms: number;
@@ -463,6 +468,9 @@ export interface AndroidMarketSnapshot {
 }
 
 export interface AndroidOperationsSnapshot {
+  /** Companion v3 additions are optional for legacy publications/clients. */
+  commerce?: import("./android-companion").AndroidCommerceSnapshot;
+  marketing?: import("./android-companion").AndroidMarketingSnapshot;
   /** Persisted runtime capabilities used by desktop projection and Android UI. */
   business_capabilities: BusinessCapability[];
   /** Whether same-LAN desktop discovery and direct transport may be used. */
@@ -1018,3 +1026,5 @@ export type {
   AndroidPermissionGroupId,
   AndroidPermissionGroups
 } from "./android-policy";
+
+export * from "./android-companion";

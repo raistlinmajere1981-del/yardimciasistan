@@ -76,6 +76,18 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     return { status: response.status, body: await response.json(), cookie: response.headers.get('set-cookie') };
   };
   let coordinator;
+  // Imported Orders and acknowledged publication statuses now invalidate the
+  // canonical Android projection. Let normal recovery cycles drain that work.
+  const finishRecovery = async () => {
+    for (let cycle = 0; cycle < 5 && f.db.getRestoreReconciliationStatus().state !== 'complete'; cycle++) {
+      const result = await coordinator.run(false); assert.equal(result.ok, true, result.message);
+    }
+    assert.equal(f.db.getRestoreReconciliationStatus().state, 'complete');
+    assert.equal(f.db.getSyncRuntimeStatus().pendingJobs, 0, 'recovery cannot complete with requeued projection work');
+    const snapshot = storage("echo json_encode(ya_storage_get_publication('android_snapshot', []));");
+    assert.equal(snapshot.commerce.order_counts.reduce((sum, row) => sum + row.count, 0), orders().length,
+      'the completed Android projection includes replayed canonical Orders');
+  };
   try {
     // B: fail midway through queuing the registry. SQLite rolls back identity,
     // cleanup and every job, not just the failing kind. Retry queues the full set.
@@ -224,7 +236,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     recovered.close();
     f.reopen(); mutate("UPDATE sync_outbox SET next_attempt_at=''"); coordinator = makeCoordinator();
     result = await coordinator.run(false); assert.equal(result.ok, true, result.message);
-    assert.equal(f.db.getRestoreReconciliationStatus().state, 'complete');
+    await finishRecovery();
     assert.equal(f.db.getSyncRuntimeStatus().enabled, false, 'explicit recovery does not change passive sync preference');
     const remoteNames = storage(`$q=$db->prepare('SELECT name FROM publications WHERE source_epoch = ? ORDER BY name'); $q->execute([${newEpoch}]); echo json_encode($q->fetchAll(PDO::FETCH_COLUMN));`);
     assert.deepEqual(remoteNames, Object.values(DESKTOP_PUBLICATIONS).map(p => p.name).sort(), 'every registry kind actually applied under restored authority');
@@ -251,7 +263,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     f.db.beginRestoreReconciliation(operationId, newClient); assert.equal(f.db.getSyncRuntimeStatus().pendingJobs, jobsBefore);
     await restore(a); coordinator = makeCoordinator();
     result = await coordinator.run(false); assert.equal(result.ok, true, result.message);
-    assert.equal(f.db.getRestoreReconciliationStatus().state, 'complete'); assert.equal(orders().length, 2);
+    await finishRecovery(); assert.equal(orders().length, 2);
     assert.equal(f.db.getDashboardData().requests.length, 1);
     // OFF backup: full reconciliation withdraws an enabled remote marketing/menu.
     setPublicationFixtureCapability({ capability: C.MARKETING_STUDIO, enabled: false });
@@ -270,7 +282,7 @@ export async function verifyRestoreReconciliation({ config, hosting }) {
     assert.equal(offRaceClaim.status, 200); const offRaceCookie = offRaceClaim.cookie.split(';')[0];
     await restore(off); coordinator = makeCoordinator();
     result = await coordinator.run(false); assert.equal(result.ok, true, result.message);
-    assert.equal(f.db.getRestoreReconciliationStatus().state, 'complete');
+    await finishRecovery();
     assert.deepEqual((await nativeFetch(`${config.baseUrl}/api/marketing.php`).then(r => r.json())).publications, []);
     assert.equal(storage("echo json_encode(ya_storage_get_publication('menu', []));").enabled, false);
     assert.equal(f.db.getDashboardData().requests[0].status, 'approved', 'same-ID replay preserves restored local owner decisions');

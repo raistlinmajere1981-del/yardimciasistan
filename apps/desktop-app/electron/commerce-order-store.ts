@@ -451,6 +451,47 @@ export function createCommerceOrder(
   }
 }
 
+export function updateCommerceOrderStatusInTransaction(
+  database: DatabaseSync,
+  input: UpdateCommerceOrderStatusInput,
+  mutationTime = new Date().toISOString()
+): CommerceOrderDetail {
+  const businessId = activeBusinessId(database);
+  const row = getOrderRow(database, businessId, input.orderId);
+  if (!row) throw new Error("Sipariş bulunamadı.");
+
+  const current = String(row.status ?? "") as CommerceOrderStatus;
+  const target = String(input.status ?? "");
+  if (target !== "confirmed" && target !== "cancelled") {
+    throw new Error("Geçersiz sipariş durumu.");
+  }
+  if (current === target) {
+    const existing = getOrderDetailInDatabase(database, businessId, String(row.id));
+    if (!existing) throw new Error("Sipariş okunamadı.");
+    return existing;
+  }
+  if (current === "fulfilled" || current === "cancelled") {
+    throw new Error("Tamamlanmış veya iptal edilmiş sipariş değiştirilemez.");
+  }
+  if (target === "confirmed" && current !== "placed") {
+    throw new Error("Yalnız yeni sipariş onaylanabilir.");
+  }
+
+  const now = mutationTime;
+  database.prepare(`
+    UPDATE commerce_orders
+    SET status = ?,
+        confirmed_at = CASE WHEN ? = 'confirmed' THEN ? ELSE confirmed_at END,
+        cancelled_at = CASE WHEN ? = 'cancelled' THEN ? ELSE cancelled_at END,
+        updated_at = ?
+    WHERE id = ? AND business_id = ? AND deleted_at = ''
+  `).run(target, target, now, target, now, now, String(row.id), businessId);
+
+  const detail = getOrderDetailInDatabase(database, businessId, String(row.id));
+  if (!detail) throw new Error("Güncellenen sipariş okunamadı.");
+  return detail;
+}
+
 export function updateCommerceOrderStatus(
   databasePath: string,
   input: UpdateCommerceOrderStatusInput
@@ -459,40 +500,7 @@ export function updateCommerceOrderStatus(
   try {
     database.exec("BEGIN IMMEDIATE");
     try {
-      const businessId = activeBusinessId(database);
-      const row = getOrderRow(database, businessId, input.orderId);
-      if (!row) throw new Error("Sipariş bulunamadı.");
-
-      const current = String(row.status ?? "") as CommerceOrderStatus;
-      const target = String(input.status ?? "");
-      if (target !== "confirmed" && target !== "cancelled") {
-        throw new Error("Geçersiz sipariş durumu.");
-      }
-      if (current === target) {
-        const existing = getOrderDetailInDatabase(database, businessId, String(row.id));
-        if (!existing) throw new Error("Sipariş okunamadı.");
-        database.exec("COMMIT");
-        return existing;
-      }
-      if (current === "fulfilled" || current === "cancelled") {
-        throw new Error("Tamamlanmış veya iptal edilmiş sipariş değiştirilemez.");
-      }
-      if (target === "confirmed" && current !== "placed") {
-        throw new Error("Yalnız yeni sipariş onaylanabilir.");
-      }
-
-      const now = new Date().toISOString();
-      database.prepare(`
-        UPDATE commerce_orders
-        SET status = ?,
-            confirmed_at = CASE WHEN ? = 'confirmed' THEN ? ELSE confirmed_at END,
-            cancelled_at = CASE WHEN ? = 'cancelled' THEN ? ELSE cancelled_at END,
-            updated_at = ?
-        WHERE id = ? AND business_id = ? AND deleted_at = ''
-      `).run(target, target, now, target, now, now, String(row.id), businessId);
-
-      const detail = getOrderDetailInDatabase(database, businessId, String(row.id));
-      if (!detail) throw new Error("Güncellenen sipariş okunamadı.");
+      const detail = updateCommerceOrderStatusInTransaction(database, input);
       database.exec("COMMIT");
       return detail;
     } catch (error) {
@@ -502,4 +510,22 @@ export function updateCommerceOrderStatus(
   } finally {
     database.close();
   }
+}
+
+/** Complete status aggregates plus a bounded canonical list; no item expansion. */
+export function readCommerceOrderOperations(database: DatabaseSync) {
+  const businessId = activeBusinessId(database);
+  const sourceCase = "CASE WHEN source IN ('desktop','web-online-sales','web-dealer') THEN source ELSE 'other' END";
+  const orders = database.prepare(`SELECT * FROM commerce_orders WHERE business_id=? AND deleted_at=''
+    ORDER BY CASE WHEN status IN ('placed','confirmed') THEN 0 ELSE 1 END, placed_at DESC,id DESC LIMIT 100`)
+    .all(businessId).map(mapOrder);
+  const counts = database.prepare(`SELECT ${sourceCase} AS source,status,COUNT(*) AS count
+    FROM commerce_orders WHERE business_id=? AND deleted_at='' GROUP BY ${sourceCase},status`).all(businessId);
+  return { orders, counts };
+}
+
+/** Business-scoped identity/version for mutation authorization; no detail expansion. */
+export function getCommerceOrderOperationState(db: DatabaseSync, orderId: string) {
+  const row = getOrderRow(db, activeBusinessId(db), orderId);
+  return row ? { id: String(row.id), source: String(row.source), status: String(row.status) as CommerceOrderStatus, updatedAt: String(row.updated_at) } : null;
 }

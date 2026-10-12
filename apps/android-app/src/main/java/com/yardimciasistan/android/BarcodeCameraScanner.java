@@ -164,6 +164,7 @@ final class BarcodeCameraScanner {
     scanner.dialog.show();
   }
 
+  @androidx.annotation.OptIn(markerClass = androidx.camera.core.ExperimentalGetImage.class)
   private void startCamera() {
     ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(activity);
     future.addListener(() -> {

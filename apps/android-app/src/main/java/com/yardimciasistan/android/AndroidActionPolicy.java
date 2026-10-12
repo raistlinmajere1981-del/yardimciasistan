@@ -21,6 +21,11 @@ final class AndroidActionPolicy {
       return "Bu işlem işletmenin etkin özellikleri dışında.";
     }
 
+    if (("commerce_order_confirm".equals(actionType) || "commerce_order_cancel".equals(actionType))
+        && (actionPayload == null || actionPayload.optString("expected_updated_at", "").trim().isEmpty()
+            || actionPayload.optString("expected_status", "").trim().isEmpty())) {
+      return "Beklenen sipariş durumu ve güncelleme zamanı gerekli.";
+    }
     String requiredPermission = requiredPermissionForAction(actionType, actionPayload);
     if (requiredPermission == null || !data.hasPermission(requiredPermission)) {
       return "table_order.close_paid".equals(requiredPermission)
@@ -46,6 +51,12 @@ final class AndroidActionPolicy {
       return data.hasBusinessCapability("food_service.menu") && data.hasBusinessCapability("commerce.catalog");
     }
 
+    if ("commerce_order_confirm".equals(type) || "commerce_order_cancel".equals(type)) {
+      CompanionData.Order order = data.companion.orderById(payload.optString("order_id", ""));
+      return data.hasPermission("commerce_order.view") && order != null
+          && (!"web-dealer".equals(order.source) || data.hasBusinessCapability("commerce.wholesale"))
+          && (!"web-online-sales".equals(order.source) || data.hasPermission("online_sales.view"));
+    }
     String marketPermission = MarketUiRules.requiredPermissionForAction(type);
     if (marketPermission != null) {
       return data.hasPermission(marketPermission);
@@ -131,6 +142,8 @@ final class AndroidActionPolicy {
   ) {
     String type = actionType == null ? "" : actionType;
     switch (type) {
+      case "commerce_order_confirm": return "commerce_order.confirm";
+      case "commerce_order_cancel": return "commerce_order.cancel";
       case "customer_create":
       case "customer_update":
         return "customer.manage";
