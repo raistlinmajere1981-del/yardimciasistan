@@ -611,6 +611,13 @@ URL'sini doğrudan açmaz; Electron main güvenli provider doğrulaması ve boyu
 yapar. Android önizlemeyi telefonda indirir, masaüstü action uygulandığında görseli
 kendi yerel asset arşivine alır.
 
+Manuel ve otomatik Android ingress, başarılı `market_product_create` apply sonrasında
+aynı `archiveAndroidProductImage` adımını ACK öncesinde bekler. Ürün ve action receipt
+mevcut apply transaction'ında birlikte commit edilir; opsiyonel görsel ayrı mevcut
+asset yazma/attachment sınırını kullanır. Görsel hatası warning olarak kaydedilir,
+ürün apply sonucu ve ACK sözleşmesi değişmez. ACK kaybında replay ürün oluşturmayı
+tekrarlamaz; mevcut yerel görseli korur, yalnız görseli eksik üründe arşivlemeyi tekrar dener.
+
 Katalog ürününde kaynak/provenance alanları saklanır: provider, kaynak ürün URL'si,
 veri lisansı, görsel lisansı ve alınma zamanı. Open Food Facts verisi ODbL, kullanılan
 ürün görselleri sağlayıcının bildirdiği CC BY-SA provenance bilgisiyle kaydedilir.

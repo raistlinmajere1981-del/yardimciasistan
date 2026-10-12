@@ -8,6 +8,7 @@ import {
 } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase, DesktopDashboardData } from "./database";
 import { getWebSyncConfig } from "./sync-config";
+import { archiveAndroidProductImage } from "./product-data-service";
 
 export interface AndroidActionProcessSummary {
   pulled: number;
@@ -111,6 +112,9 @@ export class AndroidActionSyncService {
     for (const action of pullResult.actions) {
       const applyResult = this.database.applyAndroidAction(action);
       this.database.recordAndroidActionResult(action, applyResult);
+      if (applyResult.ok && action.action_type === "market_product_create") {
+        await archiveAndroidProductImage(this.database.databasePath, action);
+      }
 
       const markResult = await markAndroidActionResult({
         ...syncConfig,

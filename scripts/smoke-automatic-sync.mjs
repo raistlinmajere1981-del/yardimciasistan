@@ -1,4 +1,5 @@
 import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
+import { verifyAndroidProductImageIngress } from "./test-helpers/android-product-image-ingress.mjs";
 import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
 import assert from "node:assert/strict";
 import { saveMenuProductFixture, fixtureProductId } from "./test-helpers/menu-product-fixture.mjs";
@@ -20,6 +21,7 @@ const {
 } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
 
 const syncSecret = "automatic-sync-secret-12345";
+await verifyAndroidProductImageIngress();
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-automatic-sync-"));
 const webModuleRoot = join(tempRoot, "web-module");
 const desktopDataRoot = join(tempRoot, "desktop-data");

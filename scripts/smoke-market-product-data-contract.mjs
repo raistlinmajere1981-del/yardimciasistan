@@ -116,7 +116,7 @@ assert.match(androidSnapshot, /data_source/);
 assert.match(androidActions, /brand: text\(payload\.brand\)/);
 assert.match(androidActions, /imageSourceUrl: text\(payload\.image_source_url\)/);
 assert.match(syncCoordinator, /archiveAndroidProductImage/);
-assert.match(syncCoordinator, /archiveExternalProductImage/);
+assert.match(service, /archiveAndroidProductImage/);
 
 assert.match(androidOperationData, /MarketProductDataSettings/);
 assert.match(androidOperationData, /auto_search_unknown_barcode/);

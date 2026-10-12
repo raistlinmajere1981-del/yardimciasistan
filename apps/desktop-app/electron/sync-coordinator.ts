@@ -12,7 +12,6 @@ import {
   pushAndroidSnapshot,
   pushOnlineCatalog,
   type AndroidOperationsSnapshot,
-  type AndroidSyncAction,
   type SyncCapabilitiesSuccess,
   type SyncFailure,
   type PushMenuResult,
@@ -32,10 +31,9 @@ import {
   type DesktopSyncJob,
   type DesktopSyncRuntimeStatus
 } from "./database";
-import { findCatalogProductByBarcode } from "./commerce-store";
 import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
 import { logWebFailure, safeWebTarget } from "./web-diagnostics";
-import { archiveExternalProductImage } from "./product-data-service";
+import { archiveAndroidProductImage } from "./product-data-service";
 import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
 import { publishDesktopProjection } from "./desktop-publication-service";
 import { ensurePublicationSource } from "./publication-source-service";
@@ -765,7 +763,7 @@ export class SyncCoordinator {
       const local = this.options.database.applyAndroidAction(action);
       this.options.database.recordAndroidActionResult(action, local);
       if (local.ok && action.action_type === "market_product_create") {
-        await this.archiveAndroidProductImage(action);
+        await archiveAndroidProductImage(this.options.database.databasePath, action);
       }
       const status = local.ok ? "applied" : "failed";
       const completion = await transport.completeAndroidAction({
@@ -793,32 +791,6 @@ export class SyncCoordinator {
       message: `${applied} telefon işlemi uygulandı, ${failed} işlem reddedildi.`
     });
     return { pulled: pulled.count, applied, failed, devicesChanged, error: "" };
-  }
-
-  private async archiveAndroidProductImage(action: AndroidSyncAction): Promise<void> {
-    const barcode = String(action.payload?.barcode ?? "").trim();
-    const imageUrl = String(action.payload?.image_source_url ?? "").trim();
-    const provider = String(action.payload?.data_source ?? "").trim();
-    if (!barcode || !imageUrl || !provider) return;
-
-    try {
-      const product = findCatalogProductByBarcode(this.options.database.databasePath, barcode);
-      if (!product || product.imageAssetPath) return;
-      await archiveExternalProductImage(
-        this.options.database.databasePath,
-        product.id,
-        provider,
-        imageUrl
-      );
-    } catch (error) {
-      desktopLog.warn({
-        scope: "product-data",
-        event: "product-data.image-archive.failed",
-        message: "Android ürün görseli yerel arşive alınamadı.",
-        meta: { barcode },
-        error
-      });
-    }
   }
 
   private async publishAvailabilityHeartbeat(

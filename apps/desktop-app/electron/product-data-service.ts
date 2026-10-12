@@ -3,6 +3,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { app, nativeImage } from "electron";
+import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import {
   normalizeBarcodeIdentity,
   createId,
@@ -14,7 +15,7 @@ import {
   resolveProductAssetAbsolutePath,
   resolveProductAssetRelativePath
 } from "./data-paths.js";
-import { attachCatalogProductImageInTransaction, type SaveCatalogProductInput, type CatalogProductImageMutation } from "./commerce-store";
+import { attachCatalogProductImageInTransaction, findCatalogProductByBarcode, type SaveCatalogProductInput, type CatalogProductImageMutation } from "./commerce-store";
 import { desktopLog } from "./desktop-logger";
 import { readProductImageAsset } from "./product-image-reader.js";
 
@@ -387,6 +388,29 @@ export async function previewExternalProductImage(
 ): Promise<string> {
   const encoded = await fetchNormalizedProductImage(providerId, imageUrl);
   return `data:image/jpeg;base64,${encoded.toString("base64")}`;
+}
+
+/** Optional post-apply acquisition shared by Android ingress paths, before transport ACK.
+ * Product and action receipt have already committed; replay keeps an existing asset. */
+export async function archiveAndroidProductImage(databasePath: string, action: AndroidSyncAction): Promise<void> {
+  const barcode = String(action.payload?.barcode ?? "").trim();
+  const imageUrl = String(action.payload?.image_source_url ?? "").trim();
+  const provider = String(action.payload?.data_source ?? "").trim();
+  if (!barcode || !imageUrl || !provider) return;
+
+  try {
+    const product = findCatalogProductByBarcode(databasePath, barcode);
+    if (!product || product.imageAssetPath) return;
+    await archiveExternalProductImage(databasePath, product.id, provider, imageUrl);
+  } catch (error) {
+    desktopLog.warn({
+      scope: "product-data",
+      event: "product-data.image-archive.failed",
+      message: "Android ürün görseli yerel arşive alınamadı.",
+      meta: { barcode },
+      error
+    });
+  }
 }
 
 export async function archiveExternalProductImage(
