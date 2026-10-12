@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { DatabaseSync } from 'node:sqlite';
 import { credentials, configuration, providerFixture, secretFixture, serviceFixture, statusSyncFixture } from './test-helpers/business-messaging-fixtures.mjs';
+import { verifySendAuthorityRaces } from './test-helpers/business-messaging-send-races.mjs';
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require('../apps/desktop-app/dist-electron/database.js');
 const { WhatsAppCloudProviderAdapter } = require('../apps/desktop-app/dist-electron/business-messaging/whatsapp-cloud-provider.js');
@@ -128,8 +129,9 @@ try {
   assert.ok(await sync.pull(config)); assert.equal(await sync.pull(config), ''); assert.equal(acks, 1); assert.equal(changed, 2);
   assert.deepEqual(raw.prepare('SELECT * FROM customers WHERE id=?').get(customerId), canonicalBefore);
   assert.deepEqual(raw.prepare('SELECT * FROM commerce_orders').all(), ordersBefore); assert.deepEqual(raw.prepare('SELECT * FROM commerce_sales').all(), salesBefore);
+  await verifySendAuthorityRaces({ db, raw, http, secrets, logs, input });
   const serialized = JSON.stringify(logs);
-  for (const sensitive of [credentials.accessToken, '905550000000', 'PARAMETER_PRIVATE', 'CUSTOMER_PRIVATE', config.syncSecret]) assert.ok(!serialized.includes(sensitive));
+  for (const sensitive of [credentials.accessToken, 'fixture_ROTATED_only', '905550000000', 'PARAMETER_PRIVATE', 'CUSTOMER_PRIVATE', config.syncSecret]) assert.ok(!serialized.includes(sensitive));
   for (const event of ['connection.test', 'template.list', 'send.started', 'send.succeeded', 'send.failed', 'webhook.status']) assert.ok(logs.some((row) => row.event === `business-messaging.${event}`));
   secrets.setAvailable(false); assert.equal(service.getConfiguration().configured, false); secrets.setAvailable(true);
   const clear = secrets.createMessagingSecretWrite({ ...configuration, clearAccessToken: true });

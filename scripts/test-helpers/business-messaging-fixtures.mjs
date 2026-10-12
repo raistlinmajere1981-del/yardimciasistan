@@ -41,7 +41,7 @@ export function providerFixture() {
   };
   return { fetchImpl, state, calls, templates };
 }
-export function serviceFixture(getDatabase, http, secrets, logs = []) {
+export function serviceFixture(getDatabase, http, secrets, logs = [], options = {}) {
   const exports = {};
   runInNewContext(readFileSync(new URL('service.js', base), 'utf8'), { exports, Error,
     require: (name) => {
@@ -49,7 +49,7 @@ export function serviceFixture(getDatabase, http, secrets, logs = []) {
       if (name === '../desktop-logger') return { desktopLog: { info: (event) => logs.push(event), warn: (event) => logs.push(event), error: (event) => logs.push(event) } };
       return compiledRequire(name);
     } });
-  return new exports.BusinessMessagingService(getDatabase, { fetchImpl: http.fetchImpl, timeoutMs: 100 });
+  return new exports.BusinessMessagingService(getDatabase, { assertCanSubmit: () => {}, fetchImpl: http.fetchImpl, timeoutMs: 100, ...options });
 }
 export function statusSyncFixture(getDatabase, onChanged, fetchImpl, logs = []) {
   const exports = {};

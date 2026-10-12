@@ -15,7 +15,9 @@ function intentHash(customerId: string, recipient: string, name: string, languag
   return createHash("sha256").update(JSON.stringify([customerId, recipient, name, language, parameters])).digest("hex");
 }
 export class BusinessMessagingService {
-  constructor(private readonly getDatabase: () => DesktopDatabase, private readonly httpOptions: { fetchImpl?: typeof fetch; timeoutMs?: number } = {}) {}
+  private readonly pendingSends = new Set<Promise<unknown>>();
+  constructor(private readonly getDatabase: () => DesktopDatabase, private readonly httpOptions: { assertCanSubmit: () => void; fetchImpl?: typeof fetch; timeoutMs?: number }) {}
+  async drain() { await Promise.allSettled(this.pendingSends); }
   getConfiguration() {
     const db = this.getDatabase(), config = db.getMessagingConfiguration();
     return { ...config, configured: config.configured && Boolean(decryptMessagingSecret(db.getEncryptedMessagingToken())) };
@@ -63,7 +65,14 @@ export class BusinessMessagingService {
       accountKey: messagingAccountKey(credentials.wabaId, credentials.phoneNumberId), intentHash: intentHash(customer.id, recipient.whatsapp, template.name, template.language, input.parameters) });
   }
   getMessage(id: string) { this.assertCustomers(); const message = this.getDatabase().getBusinessMessage(id); if (!message) throw new BusinessMessagingError("missing_message"); return message; }
-  async send(id: string, parameters: string[][]) {
+  send(id: string, parameters: string[][]) {
+    const pending = this.sendOnce(id, parameters);
+    this.pendingSends.add(pending);
+    void pending.then(() => this.pendingSends.delete(pending), () => this.pendingSends.delete(pending));
+    return pending;
+  }
+  private async sendOnce(id: string, parameters: string[][]) {
+    this.httpOptions.assertCanSubmit();
     const message = this.getMessage(id), db = this.getDatabase();
     if (message.campaignId) throw new BusinessMessagingError("campaign_dispatch_only", "Kampanya mesajları kontrollü gönderim üzerinden işlenir.");
     const binding = db.getMessageBinding(id);
@@ -77,17 +86,25 @@ export class BusinessMessagingService {
     const template = (await adapter.listTemplates()).find((item) => item.name === message.templateName && item.language === message.templateLanguage);
     if (!template) throw new BusinessMessagingError("missing_template");
     this.validateParameters(template, parameters);
-    // Catalog HTTP may yield while canonical Customer/configuration changes.
-    this.assertCustomers();
-    const customer = db.getMessagingCustomer(message.customerId!);
-    const phone = customer ? normalizeInternationalPhone(customer.phone) : null;
-    if (!phone?.ok || phone.whatsapp !== message.recipient) throw new BusinessMessagingError("recipient_changed", "Müşteri telefonu değişmiş. Yeni mesaj hazırlayın.");
-    const currentAccount = db.getMessagingConfiguration();
-    if (!currentAccount.enabled || binding.account_key !== messagingAccountKey(currentAccount.wabaId, currentAccount.phoneNumberId)) throw new BusinessMessagingError("account_changed", "Mesajın sağlayıcı hesabı değişmiş.");
+    // Catalog HTTP yields: re-read authority and canonical state before claiming or posting.
+    const assertSubmissionAllowed = () => {
+      this.httpOptions.assertCanSubmit();
+      if (this.getDatabase() !== db || db.getBusinessMessage(id)?.businessId !== message.businessId) throw new BusinessMessagingError("business_changed", "Mesajın işletmesi değişmiş. Yeni mesaj hazırlayın.");
+      this.assertCustomers();
+      const current = this.credentials();
+      if (messagingAccountKey(current.wabaId, current.phoneNumberId) !== binding.account_key || current.accessToken !== credentials.accessToken) throw new BusinessMessagingError("account_changed", "Mesajın sağlayıcı hesabı değişmiş.");
+      const customer = db.getMessagingCustomer(message.customerId!);
+      const phone = customer ? normalizeInternationalPhone(customer.phone) : null;
+      if (!phone?.ok || phone.whatsapp !== message.recipient) throw new BusinessMessagingError("recipient_changed", "Müşteri telefonu değişmiş. Yeni mesaj hazırlayın.");
+    };
+    assertSubmissionAllowed();
     if (!db.claimBusinessMessage(id)) return this.getMessage(id);
-    this.log("send.started", true, id);
     try {
+      // No await between this final check and the adapter starting its provider POST.
+      assertSubmissionAllowed();
+      this.log("send.started", true, id);
       const result = await adapter.sendTemplateMessage({ message, template, parameters });
+      // Once POST starts, persist its receipt even if authority is withdrawn meanwhile.
       const saved = db.applyBusinessMessageStatus({ ...result, messageId: id, status: "accepted", timestamp: new Date().toISOString(), accountKey: String(binding.account_key) });
       if (!saved || saved.id !== id) throw new BusinessMessagingError("duplicate_provider_response", "Sağlayıcı mesaj kimliği başka bir mesaja bağlı.");
       this.log("send.succeeded", true, id); return saved;

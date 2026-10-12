@@ -12,7 +12,10 @@ const require = createRequire(import.meta.url);
 const root = resolve("apps/desktop-app/dist-electron");
 const shared = require("@yardimci-asistan/shared");
 const handlers = new Map(), events = new Map(), modules = new Map(), immediate = [];
+const appEvents = new Map();
 const calls = [];
+let businessMessagingAuthority;
+let businessMessagingDrain = () => Promise.resolve();
 const durable = createTemporaryDesktopDatabase("sync-finalize-intent-");
 durable.database.initialize();
 const dashboard = { revision: 1, kbsOverview: { enabled: false }, hospitalityNotifications: [] };
@@ -34,7 +37,7 @@ const database = new Proxy({}, { get: (_target, key) => {
   return record(`database.${String(key)}`);
 } });
 const app = {
-  isPackaged: false, on() {}, getVersion: () => "fixture", getAppPath: () => root,
+  isPackaged: false, on: (event, action) => appEvents.set(event, action), getVersion: () => "fixture", getAppPath: () => root,
   getPath: () => "/tmp/opencode/runtime-boundary-fixture", setPath() {},
   requestSingleInstanceLock: () => true, whenReady: () => Promise.resolve(), quit() {},
   commandLine: { appendSwitch() {}, getSwitchValue: () => "" }
@@ -44,7 +47,7 @@ const electron = { app, BrowserWindow: { getAllWindows: () => [] }, powerMonitor
     on: (channel, action) => events.set(channel, action), removeHandler: (channel) => handlers.delete(channel) },
   shell: { openExternal: record("shell.openExternal") } };
 const real = new Set([
-  "main", "main-entry", "desktop-ipc-registry", "app-lock-service", "app-lock", "preload",
+  "main", "main-entry", "desktop-ipc-registry", "app-lock-service", "app-lock", "preload", "business-messaging/provider-error",
   "finance-ipc", "room-folio-ipc", "business-capability-ipc", "business-layout-ipc",
   "business-public-profile-ipc", "business-location-geocode-ipc", "google-reviews-settings-ipc",
   "kbs-settings-ipc", "kbs-webview-ipc", "room-media-ipc", "table-media-ipc",
@@ -55,7 +58,10 @@ function stub(name) {
     if (key in target) return target[key];
     if (key === "then") return undefined;
     if (/^[A-Z]/.test(String(key))) return class {
-      constructor() { return new Proxy({}, { get: (_target, method) => {
+      constructor(...args) {
+        if (name === "business-messaging/service") businessMessagingAuthority = args[1];
+        return new Proxy({}, { get: (_target, method) => {
+        if (name === "business-messaging/service" && method === "drain") return () => businessMessagingDrain();
         if (method === "start" || method === "drain" || method === "suspendAndDrain") return () => Promise.resolve();
         if (method === "getStatus") return () => ({ enabled: false });
         return record(`${name}.${String(method)}`);
@@ -178,4 +184,34 @@ try {
     assert.equal((await invoke(channel, ...args)).ok, true, channel);
     assert.ok(durable.database.getPendingSyncJobs().some(job => job.jobType === "android_snapshot"), `${channel}: successful finalize must create durable snapshot intent`);
   }
+  // Actual composition must pass the central session/maintenance authority to single sends.
+  businessMessagingAuthority.assertCanSubmit();
+  await invoke("appLock:lock");
+  assert.throws(() => businessMessagingAuthority.assertCanSubmit(), /Uygulama kilitli/);
+  await invoke("appLock:unlock", "");
+  businessMessagingAuthority.assertCanSubmit();
+  let releaseSend, enteredDrain;
+  const send = new Promise((resolve) => { releaseSend = resolve; });
+  const entered = new Promise((resolve) => { enteredDrain = resolve; });
+  businessMessagingDrain = () => { enteredDrain(); return send; };
+  const main = modules.get(resolve(root, "main"));
+  let maintenanceFinished = false;
+  const maintenance = main.suspendAutomaticSyncForMaintenance().then(() => { maintenanceFinished = true; });
+  assert.throws(() => businessMessagingAuthority.assertCanSubmit(), (error) => error.code === "session_unavailable");
+  await entered;
+  assert.equal(maintenanceFinished, false, "maintenance waits for begun single-message sends");
+  releaseSend(); await maintenance;
+  main.resumeAutomaticSyncAfterMaintenanceAbort();
+  businessMessagingAuthority.assertCanSubmit();
+  let releaseShutdownSend, enteredShutdownDrain;
+  const shutdownSend = new Promise((resolve) => { releaseShutdownSend = resolve; });
+  const shutdownEntered = new Promise((resolve) => { enteredShutdownDrain = resolve; });
+  businessMessagingDrain = () => { enteredShutdownDrain(); return shutdownSend; };
+  const beforeShutdown = calls.length;
+  appEvents.get("before-quit")({ preventDefault() {} });
+  assert.throws(() => businessMessagingAuthority.assertCanSubmit(), (error) => error.code === "session_unavailable");
+  await shutdownEntered;
+  assert.ok(!calls.slice(beforeShutdown).includes("database.close"), "shutdown keeps receipt database open while POST is pending");
+  releaseShutdownSend(); await new Promise(setImmediate);
+  assert.ok(calls.slice(beforeShutdown).includes("database.close"), "shutdown closes database after send drain");
 } finally { durable.cleanup(); }

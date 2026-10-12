@@ -17,6 +17,7 @@ import { MarketingWebsitePublicationService } from "./marketing/website-publicat
 import { registerMarketingIpc } from "./ipc/marketing-ipc";
 import { BusinessMessagingStatusSyncService } from "./business-messaging/status-sync-service";
 import { BusinessMessagingService } from "./business-messaging/service";
+import { BusinessMessagingError } from "./business-messaging/provider-error";
 import { CampaignDispatchService } from "./messaging-campaigns/dispatch-service";
 import { MessagingCampaignService } from "./messaging-campaigns/service";
 import { MessagingCampaignError } from "./messaging-campaigns/validation";
@@ -464,7 +465,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (campaignShutdownStarted) return;
   campaignShutdownStarted = true;
-  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([campaignDispatchService.suspendAndDrain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()])).then(() => {
+  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([campaignDispatchService.suspendAndDrain(), businessMessagingService.drain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()])).then(() => {
     campaignShutdownDrained = true;
     desktopDatabase?.close();
     app.quit();
@@ -472,7 +473,10 @@ app.on("before-quit", (event) => {
 });
 
 const businessMessagingStatusSyncService = new BusinessMessagingStatusSyncService(getDatabase, notifyBusinessMessagingChanged);
-const businessMessagingService = new BusinessMessagingService(getDatabase);
+const businessMessagingService = new BusinessMessagingService(getDatabase, { assertCanSubmit: () => {
+  assertAppSessionUnlocked();
+  if (maintenanceSyncSuspended || campaignShutdownStarted) throw new BusinessMessagingError("session_unavailable", "Bakım veya kapanış sırasında mesaj gönderilemez.");
+} });
 const smsMessagingService = new SmsMessagingService(getDatabase);
 const marketingAnalyticsService = new MarketingAnalyticsService(getDatabase, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()) });
 const marketingMediaService = new MarketingMediaService(getDatabase, () => getDatabase().userDataPath);
@@ -705,6 +709,7 @@ export async function suspendAutomaticSyncForMaintenance() {
   desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
   await marketingSchedulerService.suspendAndDrain();
   await campaignDispatchService.suspendAndDrain();
+  await businessMessagingService.drain();
   await instagramPublicationService.drain();
   await syncCoordinator?.suspendAndDrain();
   const androidPull = getAndroidActionSyncService().currentInFlight();

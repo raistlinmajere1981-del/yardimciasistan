@@ -55,6 +55,13 @@ parameters, and snapshots the recipient. Values stay in memory; only a fingerpri
 Changing Customer phone before submission requires a new intent. Changing provider account
 cannot reuse an intent created under another account.
 
+After catalog HTTP, single-message sends recheck the central session gate, maintenance/shutdown,
+current database/business, persisted Customer capability, enabled provider and decrypted credentials.
+The same synchronous check runs after the durable claim, immediately before provider POST.
+Once POST starts, receipt/failure persistence continues even if the session locks or credentials
+change. Maintenance and shutdown drain pending sends before closing or replacing the database.
+Authority failures never release the durable submission fence or schedule an automatic resend.
+
 An intent is prepared locally, then submitted by its local id. A transaction claims it before
 HTTP. Retries with the exact intent return its current record without re-sending, even after
 timeout, provider rejection, process crash or application restart. Changed intent parameters
