@@ -31,7 +31,7 @@ export function TableWorkspace({ intent, data, ordersEnabled, menuEnabled, inven
   onUpdateTableStatus: (tableId: string, status: string) => Promise<DesktopStatusUpdateResult>;
   aiEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
-  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
+  onAnalyzeIdentity: (file: File, isCurrent?: () => boolean) => Promise<DesktopIdentityImageAnalyzeResult>;
   onSaveReservation: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   intent: TableWorkspaceIntent; data: DesktopDashboardData;
   ordersEnabled: boolean; menuEnabled: boolean; inventoryEnabled?: boolean; customersEnabled: boolean; reservationsEnabled: boolean;

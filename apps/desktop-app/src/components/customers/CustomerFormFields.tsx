@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Camera, Sparkles } from "lucide-react";
 import type { DesktopIdentityImageAnalyzeResult } from "../../../electron/database";
 import { mergeIdentityImageAnalyses } from "../../app/identity-analysis-merge";
@@ -9,15 +9,29 @@ import { DatePicker } from "../ui/DateTimePicker";
 import { CustomerCommercialProfileFields } from "./CustomerCommercialProfileFields";
 import { IdentityCameraCapture } from "./IdentityCameraCapture";
 import { DetailSectionCard } from "../workspace/DetailWorkspaceLayout";
+import { useRequestGeneration } from "../workspace/use-request-generation";
 
 type AnalysisState = "idle" | "loading" | "success" | "error";
+
+const IDENTITY_FORM_FIELDS = {
+  fullName: "full_name", identityType: "identity_type", identityNumber: "identity_number",
+  nationality: "nationality", birthDate: "birth_date", gender: "gender",
+  documentSerialNumber: "document_serial_number", documentExpiryDate: "document_expiry_date",
+  birthPlace: "birth_place", motherName: "mother_name", fatherName: "father_name",
+  issuingAuthority: "issuing_authority", address: "address"
+} as const;
+type IdentityFormField = keyof typeof IDENTITY_FORM_FIELDS;
+const supersededAnalysis = () => ({
+  ok: false, code: "analysis_superseded", message: "Kimlik analizi bu form için artık geçerli değil."
+});
 
 interface CustomerFormFieldsProps {
   form: CustomerFormState;
   aiEnabled: boolean;
   wholesaleEnabled?: boolean;
-  onChange: (form: CustomerFormState) => void;
-  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
+  onChange: Dispatch<SetStateAction<CustomerFormState>>;
+  isFormCurrent: () => boolean;
+  onAnalyzeIdentity: (file: File, isCurrent?: () => boolean) => Promise<DesktopIdentityImageAnalyzeResult>;
 }
 
 export function CustomerFormFields({
@@ -25,6 +39,7 @@ export function CustomerFormFields({
   aiEnabled,
   wholesaleEnabled = false,
   onChange,
+  isFormCurrent,
   onAnalyzeIdentity
 }: CustomerFormFieldsProps) {
   const identityFileRef = useRef<HTMLInputElement>(null);
@@ -32,20 +47,35 @@ export function CustomerFormFields({
   const [analysisMessage, setAnalysisMessage] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scanBackSide, setScanBackSide] = useState(false);
+  const beginAnalysis = useRequestGeneration();
+  const mounted = useRef(false);
+  const fieldEdits = useRef<Partial<Record<keyof CustomerFormState, number>>>({});
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const update = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
-    onChange({ ...form, [field]: value });
+    fieldEdits.current[field] = (fieldEdits.current[field] ?? 0) + 1;
+    onChange(current => ({ ...current, [field]: value }));
   };
 
   const updateBirthDate = (value: string) => {
-    onChange({
-      ...form,
+    fieldEdits.current.birthDate = (fieldEdits.current.birthDate ?? 0) + 1;
+    onChange(current => ({
+      ...current,
       birthDate: value,
-      birthdayMessageEnabled: value ? form.birthdayMessageEnabled : false
-    });
+      birthdayMessageEnabled: value ? current.birthdayMessageEnabled : false
+    }));
   };
 
   async function analyzeIdentityFiles(files: File[]): Promise<{ ok: boolean; message: string; code?: string }> {
+    // A callback retained by camera/file work cannot start again after its form expires.
+    if (!mounted.current || !isFormCurrent()) return supersededAnalysis();
+    const requestIsCurrent = beginAnalysis();
+    const isCurrent = () => mounted.current && isFormCurrent() && requestIsCurrent();
+    const baseline = form;
+    const editsAtStart = { ...fieldEdits.current };
     if (!aiEnabled) {
       const message = "Kimlik görseli analizi için AI bağlantısını etkinleştirin.";
       setAnalysisState("error");
@@ -72,10 +102,11 @@ export function CustomerFormFields({
     for (const file of files) {
       let result: DesktopIdentityImageAnalyzeResult;
       try {
-        result = await onAnalyzeIdentity(file);
+        result = await onAnalyzeIdentity(file, isCurrent);
       } catch {
         result = { ok: false, message: "Kimlik görseli okunamadı." };
       }
+      if (!isCurrent()) return supersededAnalysis();
       if (!result.ok) {
         setAnalysisState("error");
         setAnalysisMessage(result.message);
@@ -86,21 +117,17 @@ export function CustomerFormFields({
 
     const merged = mergeIdentityImageAnalyses(analyses);
     const fields = merged.fields;
-    onChange({
-      ...form,
-      fullName: fields.full_name || form.fullName,
-      identityType: fields.identity_type || form.identityType,
-      identityNumber: fields.identity_number || form.identityNumber,
-      nationality: fields.nationality || form.nationality,
-      birthDate: fields.birth_date || form.birthDate,
-      gender: fields.gender || form.gender,
-      documentSerialNumber: fields.document_serial_number || form.documentSerialNumber,
-      documentExpiryDate: fields.document_expiry_date || form.documentExpiryDate,
-      birthPlace: fields.birth_place || form.birthPlace,
-      motherName: fields.mother_name || form.motherName,
-      fatherName: fields.father_name || form.fatherName,
-      issuingAuthority: fields.issuing_authority || form.issuingAuthority,
-      address: fields.address || form.address
+    onChange(current => {
+      // Recheck at the actual state update, including a reset queued in the same turn.
+      if (!isCurrent() || current.id !== baseline.id) return current;
+      const next = { ...current };
+      for (const field of Object.keys(IDENTITY_FORM_FIELDS) as IdentityFormField[]) {
+        const value = fields[IDENTITY_FORM_FIELDS[field]];
+        if (value && fieldEdits.current[field] === editsAtStart[field] && current[field] === baseline[field]) {
+          next[field] = value;
+        }
+      }
+      return next;
     });
 
     const baseMessage = files.length > 1
@@ -116,8 +143,9 @@ export function CustomerFormFields({
 
   async function analyzeSelectedIdentity(file: File | undefined) {
     if (!file) return;
-    await analyzeIdentityFiles([file]);
-    if (identityFileRef.current) identityFileRef.current.value = "";
+    const input = identityFileRef.current;
+    const result = await analyzeIdentityFiles([file]);
+    if (result.code !== "analysis_superseded" && input && identityFileRef.current === input) input.value = "";
   }
 
   return (

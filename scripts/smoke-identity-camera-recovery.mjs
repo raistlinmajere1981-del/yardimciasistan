@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
+import { checkCustomerIdentityAnalysis } from "./test-helpers/customer-identity-analysis-browser.mjs";
 
 let server, browser;
 const errors = [];
@@ -96,6 +97,8 @@ try {
   assert.equal(await count(), 4);
   await expect(page.getByRole("textbox", { name: "Müşteri notu" })).toHaveValue("Önceden girilen bilgi");
   assert.deepEqual(errors, [], "Unexpected renderer errors");
+  await page.close();
+  await checkCustomerIdentityAnalysis(browser, server);
   console.log("identity-camera-recovery-smoke-ok");
 } finally {
   await browser?.close();

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Plus, Save } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
@@ -21,7 +21,7 @@ interface CustomerCreateEditorProps {
   withinWorkspace?: boolean;
   onClose: () => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
-  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
+  onAnalyzeIdentity: (file: File, isCurrent?: () => boolean) => Promise<DesktopIdentityImageAnalyzeResult>;
   onCreated: (customerId: string) => void;
 }
 
@@ -37,16 +37,23 @@ export function CustomerCreateEditor({
 }: CustomerCreateEditorProps) {
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(null));
   const [formRevision, setFormRevision] = useState(0);
+  const formGeneration = useRef(0);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    formGeneration.current++;
     if (!open) return;
     setForm(toCustomerForm(null));
-    setFormRevision((revision) => revision + 1);
+    setFormRevision(formGeneration.current);
     setSaveState("idle");
   }, [open]);
 
   if (!open) return null;
+
+  function closeForm() {
+    formGeneration.current++;
+    onClose();
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,14 +73,14 @@ export function CustomerCreateEditor({
     }
 
     if (mode === "continue") {
+      setFormRevision(++formGeneration.current);
       setForm(toCustomerForm(null));
-      setFormRevision((revision) => revision + 1);
       setSaveState("success");
       return;
     }
 
     onCreated(result.savedId);
-    onClose();
+    closeForm();
   }
 
   const body = <div className="form-stack customer-create-form">
@@ -83,12 +90,13 @@ export function CustomerCreateEditor({
       aiEnabled={aiEnabled}
       wholesaleEnabled={wholesaleEnabled}
       onChange={setForm}
+      isFormCurrent={() => formGeneration.current === formRevision}
       onAnalyzeIdentity={onAnalyzeIdentity}
     />
   </div>;
 
   const footer = <div className="action-row">
-      <ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={onClose}>Vazgeç</ActionButton>
+      <ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={closeForm}>Vazgeç</ActionButton>
       <ActionButton variant="secondary" type="submit" name="saveMode" value="continue" disabled={saveState === "loading"}>
         <Plus size={16} aria-hidden="true" />Kaydet ve Yeni Ekle
       </ActionButton>
@@ -98,6 +106,6 @@ export function CustomerCreateEditor({
     </div>;
 
   return withinWorkspace
-    ? <WorkspaceFormOverlay title="Yeni müşteri ekle" onClose={onClose} closeBlocked={saveState === "loading"} onSubmit={(event) => void submit(event)} footer={footer}>{body}</WorkspaceFormOverlay>
-    : <FormDialog title="Yeni müşteri ekle" onClose={onClose} closeBlocked={saveState === "loading"} dismissOnBackdrop onSubmit={(event) => void submit(event)} footer={footer}>{body}</FormDialog>;
+    ? <WorkspaceFormOverlay title="Yeni müşteri ekle" onClose={closeForm} closeBlocked={saveState === "loading"} onSubmit={(event) => void submit(event)} footer={footer}>{body}</WorkspaceFormOverlay>
+    : <FormDialog title="Yeni müşteri ekle" onClose={closeForm} closeBlocked={saveState === "loading"} dismissOnBackdrop onSubmit={(event) => void submit(event)} footer={footer}>{body}</FormDialog>;
 }

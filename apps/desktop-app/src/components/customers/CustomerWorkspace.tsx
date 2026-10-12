@@ -1,7 +1,7 @@
 import { SearchSelect } from "../ui/SearchSelect";
 import { BusinessTemplateMessagePanel } from "./BusinessTemplateMessagePanel";
 import { CustomerMessagingPreferences } from "./CustomerMessagingPreferences";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BedDouble, History, MessageCircle, Save, Trash2 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, DesktopStatusUpdateResult, SaveCustomerInput } from "../../../electron/database";
@@ -37,7 +37,7 @@ export interface CustomerWorkspaceProps {
   onPreparedCreditWhatsApp?: (message: EphemeralWhatsAppHandoff) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
-  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
+  onAnalyzeIdentity: (file: File, isCurrent?: () => boolean) => Promise<DesktopIdentityImageAnalyzeResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => Promise<DesktopStatusUpdateResult | undefined>;
 }
 
@@ -61,6 +61,8 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
   const customer = data.customers.find((item) => item.id === intent.entityId) ?? null;
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
+  const [formRevision, setFormRevision] = useState(0);
+  const formGeneration = useRef(0);
   const [baseline, setBaseline] = useState<CustomerFormState>(() => toCustomerForm(customer));
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [entryRoomId, setEntryRoomId] = useState(data.rooms.find((room) => room.isActive)?.id ?? "");
@@ -73,6 +75,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
   useEffect(() => {
     if (!customer || baseline.id === customer.id) return;
     const next = toCustomerForm(customer);
+    setFormRevision(++formGeneration.current);
     setForm(next);
     setBaseline(next);
     setSaveState("idle");
@@ -167,6 +170,7 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
         type="button"
         disabled={saveState === "loading" || !dirty}
         onClick={() => {
+          setFormRevision(++formGeneration.current);
           setForm(baseline);
           setSaveState("idle");
         }}
@@ -282,10 +286,12 @@ export function CustomerWorkspace(props: CustomerWorkspaceProps) {
     >
       <form className="customer-workspace-profile" onSubmit={(event) => { event.preventDefault(); void saveCustomer(); }}>
         <CustomerFormFields
+          key={`${customer.id}:${formRevision}`}
           form={form}
           aiEnabled={aiEnabled}
           wholesaleEnabled={wholesaleEnabled}
           onChange={setForm}
+          isFormCurrent={() => formGeneration.current === formRevision && form.id === customer.id}
           onAnalyzeIdentity={onAnalyzeIdentity}
         />
       </form>

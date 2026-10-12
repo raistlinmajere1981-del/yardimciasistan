@@ -23,7 +23,7 @@ interface CustomersWorkspaceProps {
   staysEnabled?: boolean;
   reservationsEnabled?: boolean;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
-  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
+  onAnalyzeIdentity: (file: File, isCurrent?: () => boolean) => Promise<DesktopIdentityImageAnalyzeResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => void | Promise<unknown>;
   onSendKbs: (notificationId: string, customerId: string) => void | Promise<unknown>;
 }

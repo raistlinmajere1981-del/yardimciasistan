@@ -1,5 +1,6 @@
 import { observeNexaAi } from "./nexa-activity";
 import { useConfirmDialog } from "../components/ui/useConfirmDialog";
+import { useRequestGeneration } from "../components/workspace/use-request-generation";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type {
@@ -30,6 +31,7 @@ export function useCustomerController({
   setSelectedWhatsAppRequestId
 }: UseCustomerControllerOptions) {
   const { confirm, confirmDialog } = useConfirmDialog();
+  const beginIdentityAnalysis = useRequestGeneration();
   const [manualRequestForm, setManualRequestForm] = useState<ManualRequestFormState>(initialManualRequestForm);
   const [manualRequestState, setManualRequestState] = useState<SyncState>("idle");
   const [manualRequestMessage, setManualRequestMessage] = useState("Telefonla veya yüz yüze gelen talebi kaydedin.");
@@ -215,7 +217,9 @@ export function useCustomerController({
     return result;
   }
 
-  async function handleAnalyzeIdentityImage(file: File): Promise<DesktopIdentityImageAnalyzeResult> {
+  async function handleAnalyzeIdentityImage(file: File, isFormCurrent: () => boolean = () => true): Promise<DesktopIdentityImageAnalyzeResult> {
+    const requestIsCurrent = beginIdentityAnalysis();
+    const isCurrent = () => requestIsCurrent() && isFormCurrent();
     if (!window.yardimciDesktop) {
       return { ok: false, message: "Kimlik görseli analizi kullanılamıyor." };
     }
@@ -227,12 +231,14 @@ export function useCustomerController({
         fileName: file.name,
         mimeType: file.type,
         bytes: await file.arrayBuffer()
-      }));
+      }), "response", isCurrent);
     } catch {
       result = { ok: false, code: "image_unreadable", message: "Kimlik görseli okunamadı." };
     }
-    setSyncState(result.ok ? "success" : "error");
-    setStatusMessage(result.message);
+    if (isCurrent()) {
+      setSyncState(result.ok ? "success" : "error");
+      setStatusMessage(result.message);
+    }
     return result;
   }
 
