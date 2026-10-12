@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { runInNewContext } from "node:vm";
@@ -195,14 +196,25 @@ try {
   const entered = new Promise((resolve) => { enteredDrain = resolve; });
   businessMessagingDrain = () => { enteredDrain(); return send; };
   const main = modules.get(resolve(root, "main"));
+  const barcodeSenders = [1, 2].map((id) => Object.assign(new EventEmitter(), { id }));
+  const barcodeMode = (sender, enabled) => handlers.get("sync:setMarketBarcodeFastPull")({ sender }, enabled);
+  for (const sender of barcodeSenders) {
+    barcodeMode(sender, true);
+    assert.equal(sender.listenerCount("destroyed"), 1);
+  }
   let maintenanceFinished = false;
   const maintenance = main.suspendAutomaticSyncForMaintenance().then(() => { maintenanceFinished = true; });
+  for (const sender of barcodeSenders) assert.equal(sender.listenerCount("destroyed"), 0, "actual maintenance wiring removes every fast-pull listener");
   assert.throws(() => businessMessagingAuthority.assertCanSubmit(), (error) => error.code === "session_unavailable");
   await entered;
   assert.equal(maintenanceFinished, false, "maintenance waits for begun single-message sends");
   releaseSend(); await maintenance;
   main.resumeAutomaticSyncAfterMaintenanceAbort();
   businessMessagingAuthority.assertCanSubmit();
+  barcodeMode(barcodeSenders[0], true);
+  assert.equal(barcodeSenders[0].listenerCount("destroyed"), 1, "maintenance clear permits re-enable");
+  barcodeMode(barcodeSenders[0], false);
+  assert.equal(barcodeSenders[0].listenerCount("destroyed"), 0);
   let releaseShutdownSend, enteredShutdownDrain;
   const shutdownSend = new Promise((resolve) => { releaseShutdownSend = resolve; });
   const shutdownEntered = new Promise((resolve) => { enteredShutdownDrain = resolve; });

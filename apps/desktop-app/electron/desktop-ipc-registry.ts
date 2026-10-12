@@ -1,6 +1,6 @@
 import { registerDealerAccessIpcHandlers } from "./ipc/dealer-access-ipc";
 import { registerCommerceProductPublicationIpcHandlers } from "./ipc/commerce-product-publication-ipc";
-import { app, ipcMain } from "electron";
+import { app, ipcMain, type WebContents } from "electron";
 import {
   BUSINESS_CAPABILITIES,
   hasBusinessCapability,
@@ -379,7 +379,13 @@ function registerMarketBarcodeFastPullHandler(
     message?: string
   ) => void
 ) {
-  const senders = new Set<number>();
+  const senders = new Map<number, { sender: WebContents; onDestroyed: () => void }>();
+  const removeSender = (senderId: number) => {
+    const registration = senders.get(senderId);
+    if (!registration) return;
+    registration.sender.removeListener("destroyed", registration.onDestroyed);
+    senders.delete(senderId);
+  };
 
   ipcMain.handle(
     "sync:setMarketBarcodeFastPull",
@@ -403,16 +409,18 @@ function registerMarketBarcodeFastPullHandler(
         );
 
         if (!senders.has(senderId)) {
-          senders.add(senderId);
-          event.sender.once("destroyed", () => {
-            senders.delete(senderId);
+          const onDestroyed = () => {
+            if (senders.get(senderId)?.onDestroyed !== onDestroyed) return;
+            removeSender(senderId);
             getSyncCoordinator().setMarketBarcodeFastPullEnabled(
               senders.size > 0
             );
-          });
+          };
+          senders.set(senderId, { sender: event.sender, onDestroyed });
+          event.sender.once("destroyed", onDestroyed);
         }
       } else {
-        senders.delete(senderId);
+        removeSender(senderId);
       }
 
       return getSyncCoordinator().setMarketBarcodeFastPullEnabled(
@@ -423,7 +431,7 @@ function registerMarketBarcodeFastPullHandler(
 
   return {
     clear: () => {
-      senders.clear();
+      for (const senderId of senders.keys()) removeSender(senderId);
       getSyncCoordinator().setMarketBarcodeFastPullEnabled(false);
     }
   };

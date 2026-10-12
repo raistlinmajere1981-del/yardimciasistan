@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 import { DatabaseSync } from "node:sqlite";
+import { verifyMarketBarcodeFastPullLifecycle } from "./test-helpers/market-barcode-fast-pull.mjs";
 
 const require = createRequire(import.meta.url);
 const { BUSINESS_CAPABILITIES: C, getBusinessProfile } = require("../packages/shared/dist/index.js");
@@ -35,6 +36,7 @@ const MARKET_GROUPS = {
 const marketCapabilities = getBusinessProfile("market").defaultCapabilities;
 // ANDROID is opt-in since the sector feature selection simplification.
 const marketCapabilitiesWithAndroid = [...marketCapabilities, C.ANDROID];
+verifyMarketBarcodeFastPullLifecycle();
 
 assert.equal(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_operations.includes("market.scan_to_desktop"), true);
 assert.equal(androidEffectivePermissionsForGroups(MARKET_GROUPS, marketCapabilitiesWithAndroid).includes("market.scan_to_desktop"), true);
