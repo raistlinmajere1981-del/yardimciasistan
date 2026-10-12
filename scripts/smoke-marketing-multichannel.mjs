@@ -9,7 +9,7 @@ const f=multichannelFixture(),raw=new DatabaseSync(f.db.databasePath),plain=v=>J
 try {
   const secretService=f.load('marketing/provider-secrets');
   f.state.secureStorage=false;assert.throws(()=>secretService.createMarketingProviderSecretWrites({apiKey:'NEW',apiHash:'HASH'}),e=>e.code==='secure_storage_unavailable');f.state.secureStorage=true;
-  f.state.storageBackend='basic_text';assert.throws(()=>secretService.createMarketingProviderSecretWrites(undefined,{accessToken:'NEW'}),e=>e.code==='secure_storage_unavailable');f.state.storageBackend='gnome_libsecret';
+  f.state.storageBackend='basic_text';assert.throws(()=>secretService.createMarketingProviderSecretWrites({apiKey:'NEW'}),e=>e.code==='secure_storage_unavailable');f.state.storageBackend='gnome_libsecret';
   assert.equal(secretService.createMarketingProviderSecretWrites({clearApiHash:true}).apiHash.mode,'clear');
   const cleanDir=mkdtempSync(join(tmpdir(),'marketing-clean-')),clean=new f.db.constructor({appPath:resolve('apps/desktop-app'),userDataPath:cleanDir});try{clean.initialize();assert.equal(clean.getSetupData().sms.configured,false);assert.equal(clean.getSetupData().instagram.configured,false);}finally{clean.close();rmSync(cleanDir,{recursive:true,force:true});}
 raw.prepare("UPDATE marketing_provider_config SET enabled=0 WHERE provider_id='iletimerkezi'").run();assert.equal(f.sms.getConfiguration().configured,false);assert.equal(f.instagram.getConfiguration().configured,true);assert.equal((await f.sms.testConnection()).ok,false);raw.prepare("UPDATE marketing_provider_config SET enabled=1 WHERE provider_id='iletimerkezi'").run();

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSettingsConnectionTest } from "../../app/use-settings-connection-test";
-import { INSTAGRAM_API_VERSION, type MarketingProviderConnectionResult } from "@yardimci-asistan/shared";
+import { type InstagramConfiguration, type MarketingProviderConnectionResult } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "../../app/setup-model";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { ActionButton } from "../ui/ActionButton";
@@ -34,20 +34,84 @@ export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["
     {result && <p role="status">{result.ok?"Başarılı":"Başarısız"} · {result.message} · {new Date(result.testedAt).toLocaleString("tr-TR")}</p>}
   </ServiceSettingsCard>;
 }
-export function InstagramSettingsSection({draft,busy,onChange}:{draft:SetupFormState["instagram"];busy:boolean;onChange:(draft:SetupFormState["instagram"])=>void}) {
-  const connection=useSettingsConnectionTest<MarketingProviderConnectionResult>(draft);
-  const {testing,result}=connection;
-  const change=(patch:Partial<typeof draft>)=>{connection.clear();onChange({...draft,...patch});};
-  const complete=Boolean(draft.accountId && (draft.accessToken || draft.hasSecret&&!draft.clearAccessToken));
-  async function test(){const bridge=window.yardimciDesktop;if(!bridge)return;await connection.run(async()=>{try{return await bridge.testInstagramConnection(draft);}catch{return {ok:false,message:"Bağlantı testi tamamlanamadı.",testedAt:new Date().toISOString()};}});}
-  return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram" enabled={draft.enabled} disabled={busy||testing} onEnabledChange={enabled=>change({enabled})}
-    status={!draft.enabled?"Kapalı":complete?"Etkin · Yapılandırılmış":"Etkin · Yapılandırılmamış"}>
-    <label className="form-field">Instagram hesap / User ID<input aria-label="Instagram User ID" inputMode="numeric" maxLength={40} value={draft.accountId} onChange={e=>change({accountId:e.target.value})}/></label>
-    <label className="form-field">Access Token<input aria-label="Instagram Access Token" type="password" autoComplete="new-password" maxLength={4096} value={draft.accessToken??""} placeholder={draft.hasSecret?"Kayıtlı anahtarı değiştirmek için girin":"Instagram User access token"} onChange={e=>change({accessToken:e.target.value,clearAccessToken:false})}/></label>
-    {draft.hasSecret && <label className="form-check"><input type="checkbox" checked={Boolean(draft.clearAccessToken)} onChange={e=>change({clearAccessToken:e.target.checked,accessToken:""})}/>Kayıtlı erişim anahtarını kaldır</label>}
-    <p>Instagram Login · Business / Creator · API {INSTAGRAM_API_VERSION}. Token izinleri: instagram_business_basic ve instagram_business_content_publish.</p>
-    <p>Görsel aktarımı için HTTPS Web Modülü gerekir. Test yalnız hesap bilgisini okur.</p>
-    <ActionButton variant="secondary" disabled={busy||testing||!complete} busy={testing} onClick={()=>void test()}>Bağlantıyı test et</ActionButton>
-    {result && <p role="status">{result.ok?"Başarılı":"Başarısız"} · {result.message}{result.accountType?` · ${result.accountType}`:""} · {new Date(result.testedAt).toLocaleString("tr-TR")}</p>}
+/** OAuth connection is saved immediately by the main process, independently of staged Settings. */
+export function InstagramSettingsSection({busy}:{busy:boolean}) {
+  const [config,setConfig]=useState<InstagramConfiguration|null>(null);
+  const [waiting,setWaiting]=useState(false);
+  const [working,setWorking]=useState(false);
+  const [confirmDisconnect,setConfirmDisconnect]=useState(false);
+  const [message,setMessage]=useState("");
+  const [testResult,setTestResult]=useState<MarketingProviderConnectionResult|null>(null);
+  const polling=useRef(false);
+  useEffect(()=>{
+    let live=true;
+    void window.yardimciDesktop?.getInstagramConfiguration().then(value=>{if(live)setConfig(value);})
+      .catch(()=>{if(live)setMessage("Instagram bağlantı durumu okunamadı.");});
+    return()=>{live=false;};
+  },[]);
+  useEffect(()=>{
+    if(!waiting)return;
+    let stopped=false;
+    const timer=window.setInterval(()=>{
+      if(polling.current||stopped)return;
+      polling.current=true;
+      void window.yardimciDesktop!.pollInstagramOAuth().then(async result=>{
+        if(stopped)return;
+        if(result.status==="pending")return;
+        setWaiting(false);
+        if(result.status==="connected") {
+          setConfig(await window.yardimciDesktop!.getInstagramConfiguration());
+          setMessage(`Instagram @${result.username} bağlandı.`);
+        } else setMessage(result.message);
+      }).catch(()=>{if(!stopped){setWaiting(false);setMessage("Bağlantı kontrolü tamamlanamadı. Yeniden bağlanmayı deneyin.");}})
+        .finally(()=>{polling.current=false;});
+    },2500);
+    return()=>{stopped=true;window.clearInterval(timer);};
+  },[waiting]);
+  async function begin() {
+    if(working||waiting||busy)return;
+    setWorking(true);setMessage("");setTestResult(null);setConfirmDisconnect(false);
+    try {
+      const result=await window.yardimciDesktop!.beginInstagramOAuth();
+      setMessage(result.message);setWaiting(result.ok);
+    } catch {setMessage("Instagram giriş işlemi başlatılamadı.");}
+    finally {setWorking(false);}
+  }
+  async function disconnect() {
+    if(!confirmDisconnect){setConfirmDisconnect(true);return;}
+    setWorking(true);
+    try {
+      setConfig(await window.yardimciDesktop!.disconnectInstagramOAuth());
+      setMessage("Instagram bağlantısı kesildi.");setTestResult(null);
+    } catch {setMessage("Instagram bağlantısı kesilemedi.");}
+    finally {setWorking(false);setConfirmDisconnect(false);}
+  }
+  async function test() {
+    setWorking(true);setTestResult(null);
+    try {const result=await window.yardimciDesktop!.testInstagramConnection();setTestResult(result);}
+    catch {setMessage("Instagram bağlantısı test edilemedi.");}
+    finally {setWorking(false);}
+  }
+  const linked=Boolean(config?.configured && config.username);
+  const legacy=Boolean(config?.configured && !config.username);
+  return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram" enabled
+    status={linked?`Bağlı · @${config?.username}`:legacy?"Önceki bağlantı · Yeniden bağlayın":"Bağlı değil"}>
+    <p>Instagram Business veya Creator hesabınızı tarayıcıdan giriş yaparak bağlayın. User ID ve erişim anahtarı girmeniz gerekmez.</p>
+    {linked && <p role="status"><strong>@{config?.username}</strong> · Paylaşım izni etkin{config?.expiresAt?` · Erişim: ${new Date(config.expiresAt).toLocaleDateString("tr-TR")}`:""}</p>}
+    {legacy && <p role="status">Önceki manuel bağlantı bulundu. Yeni bağlantı kurulduğunda eski erişim anahtarı otomatik değiştirilir.</p>}
+    {waiting && <p role="status">Instagram girişini tarayıcıda tamamlayın. Bağlantı bekleniyor; bu sayfadan ayrılırsanız daha sonra tekrar bağlanabilirsiniz.</p>}
+    <div className="action-row">
+      <ActionButton disabled={busy||working||waiting} busy={working} onClick={()=>void begin()}>
+        {linked||legacy?"Hesabı yeniden bağla":"Instagram ile bağlan"}
+      </ActionButton>
+      {linked && <ActionButton variant="secondary" disabled={busy||working||waiting} onClick={()=>void test()}>Bağlantıyı test et</ActionButton>}
+      {(linked||legacy) && <ActionButton variant="secondary" disabled={busy||working||waiting} onClick={()=>void disconnect()}>
+        {confirmDisconnect?"Bağlantıyı kesmeyi onayla":"Bağlantıyı kes"}
+      </ActionButton>}
+    </div>
+    {confirmDisconnect && <p role="alert">Bağlantıyı keserseniz Instagram'a planlanmış yayınlar yeniden bağlanana kadar gönderilemez.</p>}
+    {message && <p role="status">{message}</p>}
+    {testResult && <p role="status">{testResult.ok?"Başarılı":"Başarısız"} · {testResult.message}</p>}
+    <p>Görsel yayınlamak için HTTPS Web Modülü bağlantısı gereklidir.</p>
   </ServiceSettingsCard>;
 }

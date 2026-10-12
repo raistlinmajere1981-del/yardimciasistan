@@ -6,6 +6,7 @@ import { MarketingSchedulerService } from "./marketing/scheduler-service";
 import { MarketingScheduledTargetService } from "./marketing/scheduled-target-service";
 import { registerMarketingScheduleIpc } from "./ipc/marketing-schedule-ipc";
 import { InstagramPublicationService } from "./marketing/instagram-publication-service";
+import { InstagramOAuthService } from "./marketing/instagram-oauth-service";
 import { registerMarketingProviderIpc } from "./ipc/marketing-provider-ipc";
 import { SmsMessagingService } from "./business-messaging/sms-service";
 import { createMarketingProviderSecretWrites } from "./marketing/provider-secrets";
@@ -475,7 +476,8 @@ const businessMessagingService = new BusinessMessagingService(getDatabase);
 const smsMessagingService = new SmsMessagingService(getDatabase);
 const marketingAnalyticsService = new MarketingAnalyticsService(getDatabase, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()) });
 const marketingMediaService = new MarketingMediaService(getDatabase, () => getDatabase().userDataPath);
-const instagramPublicationService = new InstagramPublicationService(getDatabase, marketingMediaService, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()) });
+const instagramOAuthService = new InstagramOAuthService(getDatabase, fetch, assertAppSessionUnlocked);
+const instagramPublicationService = new InstagramPublicationService(getDatabase, marketingMediaService, { allowed: () => !maintenanceSyncSuspended && !campaignShutdownStarted && Boolean(appLockService && !appLockService.isLocked()), refreshInstagram: () => instagramOAuthService.refreshIfNeeded() });
 const marketingWebsiteService = new MarketingWebsitePublicationService(getDatabase, marketingMediaService);
 function publishPendingMarketingWebsiteIntent() {
   // Explicit user publication actions work even when passive automatic sync is disabled.
@@ -550,7 +552,7 @@ function notifyBusinessMessagingChanged() {
 const shippingProviderService = new ShippingProviderService(getDatabase);
 
 function registerIpcHandlers() {
-  registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, assertUnlocked: assertAppSessionUnlocked });
+  registerMarketingProviderIpc({ sms: smsMessagingService, instagram: instagramPublicationService, instagramOAuth: instagramOAuthService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingAnalyticsIpc({ service: marketingAnalyticsService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingScheduleIpc({ service: marketingScheduleService, assertUnlocked: assertAppSessionUnlocked });
   registerMarketingIpc({ service: marketingStudioService, shares: marketingShareService, assertUnlocked: assertAppSessionUnlocked });
@@ -623,7 +625,7 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   }
 
   let marketingSecretWrites;
-  try { marketingSecretWrites = createMarketingProviderSecretWrites(input.sms, input.instagram); }
+  try { marketingSecretWrites = createMarketingProviderSecretWrites(input.sms); }
   catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Servis anahtarı kaydedilemedi." }; }
   let messagingSecretWrite;
   try { messagingSecretWrite = createMessagingSecretWrite(input.whatsappCloud); }
@@ -636,7 +638,6 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
     ...(input.arasShipping ? { arasShipping: { ...input.arasShipping, password: "" } } : {}),
     ...(input.sms ? { sms: { ...input.sms, apiKey: "", apiHash: "" } } : {}),
-    ...(input.instagram ? { instagram: { ...input.instagram, accessToken: "" } } : {}),
     ...(input.whatsappCloud ? { whatsappCloud: { ...input.whatsappCloud, accessToken: "" } } : {}),
     aiProfiles: profileSecretUpdates.profiles
   }, secretUpdate.update, profileSecretUpdates.updates, shippingSecretWrite, messagingSecretWrite, marketingSecretWrites);

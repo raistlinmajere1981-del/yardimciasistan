@@ -48,10 +48,15 @@ export function multichannelFixture() {
     return exports;
   }
   const smsInput={enabled:true,senderId:'FIXTURE',iysList:'BIREYSEL',apiKey:'PRIVATE_KEY',apiHash:'PRIVATE_HASH'};
-  const instagramInput={enabled:true,accountId:'9001',accessToken:'PRIVATE_TOKEN'};
-  const writes=load('marketing/provider-secrets').createMarketingProviderSecretWrites(smsInput,instagramInput);
-  const saved=f.db.saveInitialSetup({...f.setup,profileOptions:f.db.getSetupData().profileOptions,sms:{...smsInput,apiKey:'',apiHash:''},instagram:{...instagramInput,accessToken:''}},undefined,undefined,undefined,undefined,writes);
+  const writes=load('marketing/provider-secrets').createMarketingProviderSecretWrites(smsInput);
+  const saved=f.db.saveInitialSetup({...f.setup,profileOptions:f.db.getSetupData().profileOptions,sms:{...smsInput,apiKey:'',apiHash:''}},undefined,undefined,undefined,undefined,writes);
   if(!saved.ok)throw new Error(saved.message);
+  // Instagram is linked exclusively through the OAuth owner, never Setup.
+  f.db.saveInstagramOAuthConnection({
+    accountId:'9001',username:'fixture_account',
+    encryptedToken:'safe-storage:v1:' + Buffer.from([...('PRIVATE_TOKEN')].reverse().join('')).toString('base64'),
+    expiresAt:'2030-02-15T00:00:00.000Z'
+  });
   const sms=new (load('business-messaging/sms-service').SmsMessagingService)(()=>f.db,{fetchImpl});
   const instagram=new (load('marketing/instagram-publication-service').InstagramPublicationService)(()=>f.db,{instagramJpeg:()=>Buffer.from('FIXTURE_JPEG')},{fetchImpl,allowed:()=>state.allowed});
   const campaigns=new (load('messaging-campaigns/service').MessagingCampaignService)(()=>f.db,{

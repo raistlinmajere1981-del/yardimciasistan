@@ -5,7 +5,7 @@ import { decryptMessagingSecret } from "./business-messaging/secret-service";
 import { normalizeAiBaseUrl } from "./database/ai-settings-utils";
 import { normalizeArasShippingInput } from "./shipping-configuration-store";
 import { normalizeMessagingConfiguration } from "./business-messaging/store";
-import { validateSmsConfiguration, validateInstagramConfiguration } from "./marketing/provider-configuration-store";
+import { validateSmsConfiguration } from "./marketing/provider-configuration-store";
 import { serviceConfigFingerprint, validateServiceActivation, type TestedSettingsService } from "./service-settings-validation";
 import { normalizeProfileTransitionInput } from "./profile-service-activation";
 
@@ -18,7 +18,6 @@ export function validateSetupServiceActivation(db: DesktopDatabase, input: SaveI
     if (input.arasShipping) shipping = normalizeArasShippingInput(input.arasShipping);
     if (input.whatsappCloud) normalizeMessagingConfiguration(input.whatsappCloud);
     if (input.sms) validateSmsConfiguration(input.sms);
-    if (input.instagram) validateInstagramConfiguration(input.instagram);
   } catch (error) {
     return error instanceof Error ? error.message : "Servis ayarları geçersiz.";
   }
@@ -47,11 +46,6 @@ export function validateSetupServiceActivation(db: DesktopDatabase, input: SaveI
     apiKey: input.sms?.clearApiKey ? "" : input.sms?.apiKey || decryptMessagingSecret(String(smsStored?.secret_one_encrypted ?? "")),
     apiHash: input.sms?.clearApiHash ? "" : input.sms?.apiHash || decryptMessagingSecret(String(smsStored?.secret_two_encrypted ?? "")) };
   error = check("sms", "SMS / İleti Merkezi", sms.enabled, smsConfig, Boolean(smsConfig.senderId && smsConfig.apiKey && smsConfig.apiHash));
-  if (error) return error;
-  const instagram = input.instagram ?? current.instagram, instagramStored = db.getStoredMarketingProvider("instagram_api");
-  const instagramConfig = { accountId: instagram.accountId,
-    accessToken: input.instagram?.clearAccessToken ? "" : input.instagram?.accessToken || decryptMessagingSecret(String(instagramStored?.secret_one_encrypted ?? "")) };
-  error = check("instagram", "Instagram", instagram.enabled, instagramConfig, Boolean(instagramConfig.accountId && instagramConfig.accessToken));
   if (error) return error;
   // Initial setup establishes the required transport, not an optional service activation.
   // Normal saves of enabled automatic sync require evidence for the effective transport.

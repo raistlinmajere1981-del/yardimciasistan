@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { BUSINESS_CAPABILITIES as C, hasBusinessCapability, type InstagramConfigurationInput, type MarketingProviderConnectionResult, type MarketingPublication } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, hasBusinessCapability, type MarketingProviderConnectionResult, type MarketingPublication } from "@yardimci-asistan/shared";
 import type { DesktopDatabase } from "../database";
 import { decryptMessagingSecret } from "../business-messaging/secret-service";
 import { getWebSyncConfig } from "../sync-config";
@@ -7,24 +7,22 @@ import { desktopLog } from "../desktop-logger";
 import { InstagramPublishingProviderAdapter, type InstagramCredentials } from "./instagram-provider";
 import { InstagramMediaStaging } from "./instagram-media-staging";
 import { MarketingProviderError } from "./provider-http";
-import { validateInstagramConfiguration } from "./provider-configuration-store";
 import { MarketingError } from "./validation";
 import type { MarketingMediaService } from "./media-service";
 export class InstagramPublicationService {
   private readonly flights = new Map<string, Promise<MarketingPublication>>();
   private readonly staging: InstagramMediaStaging;
   constructor(private readonly database: () => DesktopDatabase, private readonly media: MarketingMediaService,
-    private readonly options: { fetchImpl?: typeof fetch; timeoutMs?: number; allowed?: () => boolean } = {}) { this.staging = new InstagramMediaStaging(options); }
+    private readonly options: { fetchImpl?: typeof fetch; timeoutMs?: number; allowed?: () => boolean; refreshInstagram?: () => Promise<void> } = {}) { this.staging = new InstagramMediaStaging(options); }
   getConfiguration() { return this.database().getInstagramConfiguration(); }
-  private credentials(input?: InstagramConfigurationInput): InstagramCredentials {
-    if (input) validateInstagramConfiguration(input);
-    const config = input ?? this.getConfiguration(), stored = this.database().getStoredMarketingProvider("instagram_api");
-    if (!config.enabled) throw new MarketingProviderError("unconfigured");
-    return { accountId: config.accountId, accessToken: input?.clearAccessToken ? "" : input?.accessToken || decryptMessagingSecret(String(stored?.secret_one_encrypted ?? "")) };
+  private credentials(): InstagramCredentials {
+    const config = this.getConfiguration(), stored = this.database().getStoredMarketingProvider("instagram_api");
+    if (!config.enabled || !config.configured) throw new MarketingProviderError("unconfigured");
+    return { accountId: config.accountId, accessToken: decryptMessagingSecret(String(stored?.secret_one_encrypted ?? "")) };
   }
-  async testConnection(input?: InstagramConfigurationInput): Promise<MarketingProviderConnectionResult> {
+  async testConnection(): Promise<MarketingProviderConnectionResult> {
     let result: MarketingProviderConnectionResult;
-    try { const credentials = this.credentials(input);
+    try { if (this.options.refreshInstagram) await this.options.refreshInstagram(); const credentials = this.credentials();
       const profile = await new InstagramPublishingProviderAdapter(credentials,this.options).testConnection();
       this.database().recordServiceSettingsVerification("instagram", { ...credentials });
       result = { ok:true, ...profile, testedAt:new Date().toISOString(), message:`Instagram @${profile.username} profesyonel hesabı doğrulandı.` }; }
@@ -60,6 +58,7 @@ export class InstagramPublicationService {
     }
   }
   private async run(id:string,revision:number):Promise<MarketingPublication> {
+    if (this.options.refreshInstagram) await this.options.refreshInstagram();
     const db=this.database(),credentials=this.credentials(),adapter=new InstagramPublishingProviderAdapter(credentials,this.options);
     this.gate(credentials);
     const original=db.getMarketingPublication(id);

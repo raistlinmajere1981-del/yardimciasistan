@@ -1,5 +1,5 @@
 import { defaultSetupData } from "./bootstrap-defaults";
-import { type SmsConfigurationInput, type InstagramConfigurationInput } from "@yardimci-asistan/shared";
+import { type SmsConfigurationInput, type InstagramConfiguration } from "@yardimci-asistan/shared";
 import { type WhatsAppCloudConfigurationInput } from "@yardimci-asistan/shared";
 import type {
   DesktopAiModelOption,
@@ -61,7 +61,7 @@ export interface SetupFormState {
   productDataIncludeImages: boolean;
   birthdaySettings: BirthdaySettings;
   sms: SmsConfigurationInput & { hasApiKey: boolean; hasApiHash: boolean; configured: boolean };
-  instagram: InstagramConfigurationInput & { hasSecret: boolean; configured: boolean };
+  instagram: InstagramConfiguration;
   whatsappCloud: WhatsAppCloudConfigurationInput & { hasSecret: boolean; configured: boolean };
   arasShipping: Omit<ArasShippingConfigurationInput, "enabled"> & { hasSecret: boolean };
   dealerPortalEnabled: boolean;
@@ -122,7 +122,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
     sms: { ...(setupData.sms ?? defaultSetupData.sms), apiKey: "", apiHash: "", clearApiKey: false, clearApiHash: false },
-    instagram: { ...(setupData.instagram ?? defaultSetupData.instagram), accessToken: "", clearAccessToken: false },
+    instagram: setupData.instagram ?? defaultSetupData.instagram,
     whatsappCloud: { ...(setupData.whatsappCloud ?? defaultSetupData.whatsappCloud), accessToken: "", clearAccessToken: false },
     arasShipping: {
       environment: shipping.environment, customerCode: shipping.customerCode,
@@ -257,7 +257,6 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
       sms: { enabled: setupForm.sms.enabled, senderId: setupForm.sms.senderId, iysList: setupForm.sms.iysList, ...(setupForm.sms.apiKey === undefined ? {} : { apiKey: setupForm.sms.apiKey }), ...(setupForm.sms.apiHash === undefined ? {} : { apiHash: setupForm.sms.apiHash }), ...(setupForm.sms.clearApiKey === undefined ? {} : { clearApiKey: setupForm.sms.clearApiKey }), ...(setupForm.sms.clearApiHash === undefined ? {} : { clearApiHash: setupForm.sms.clearApiHash }) },
-      instagram: { enabled: setupForm.instagram.enabled, accountId: setupForm.instagram.accountId, ...(setupForm.instagram.accessToken === undefined ? {} : { accessToken: setupForm.instagram.accessToken }), ...(setupForm.instagram.clearAccessToken === undefined ? {} : { clearAccessToken: setupForm.instagram.clearAccessToken }) },
       whatsappCloud: { enabled: setupForm.whatsappCloud.enabled, wabaId: setupForm.whatsappCloud.wabaId,
         phoneNumberId: setupForm.whatsappCloud.phoneNumberId, ...(setupForm.whatsappCloud.accessToken === undefined ? {} : { accessToken: setupForm.whatsappCloud.accessToken }), ...(setupForm.whatsappCloud.clearAccessToken === undefined ? {} : { clearAccessToken: setupForm.whatsappCloud.clearAccessToken }) },
       arasShipping: { enabled: setupForm.onlineSalesDeliveryEnabled && setupForm.onlineSalesDelivery.shippingEnabled, environment: setupForm.arasShipping.environment,

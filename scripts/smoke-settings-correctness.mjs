@@ -114,8 +114,7 @@ try {
 
   for (const [field, serviceId, configuration, credentials, change] of [
     ["sms", "sms", { enabled: true, senderId: "FIXTURE", iysList: "BIREYSEL", apiKey: "fixture-key", apiHash: "fixture-hash" }, { senderId: "FIXTURE", iysList: "BIREYSEL", apiKey: "fixture-key", apiHash: "fixture-hash" }, { senderId: "OTHER" }],
-    ["whatsappCloud", "whatsapp_cloud", { enabled: true, wabaId: "123", phoneNumberId: "456", accessToken: "fixture-token" }, { wabaId: "123", phoneNumberId: "456", accessToken: "fixture-token" }, { phoneNumberId: "789" }],
-    ["instagram", "instagram", { enabled: true, accountId: "123", accessToken: "fixture-token" }, { accountId: "123", accessToken: "fixture-token" }, { accountId: "789" }]
+    ["whatsappCloud", "whatsapp_cloud", { enabled: true, wabaId: "123", phoneNumberId: "456", accessToken: "fixture-token" }, { wabaId: "123", phoneNumberId: "456", accessToken: "fixture-token" }, { phoneNumberId: "789" }]
   ]) {
     assert.equal(validate({ ...setup, [field]: { ...configuration, enabled: false } }), null);
     assert.match(validate({ ...setup, [field]: configuration }), /test edin/);

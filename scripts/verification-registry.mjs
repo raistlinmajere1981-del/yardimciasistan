@@ -23,6 +23,9 @@ const SMOKE_FILES = [
   "scripts/smoke-marketing-multichannel.mjs",
   "scripts/smoke-marketing-multichannel-ui.mjs",
   "scripts/smoke-instagram-staging.mjs",
+  "scripts/smoke-instagram-oauth-web.mjs",
+  "scripts/smoke-instagram-oauth-settings-ui.mjs",
+  "scripts/smoke-instagram-oauth-refresh.mjs",
   "scripts/smoke-showcase-website.mjs",
   "scripts/smoke-marketing-media-native.mjs",
   "scripts/smoke-marketing-studio.mjs",
@@ -533,7 +536,7 @@ function smokeRequires(file) {
   if (file === "scripts/smoke-nexa-assets.mjs") return [];
   if (file === "scripts/smoke-web-nexa.mjs") return ["build-packages"];
   if (file === "scripts/smoke-marketing-log-privacy.mjs") return ["php-lint"];
-  if (file === "scripts/smoke-instagram-staging.mjs") return ["php-lint"];
+  if (file === "scripts/smoke-instagram-staging.mjs" || file === "scripts/smoke-instagram-oauth-web.mjs") return ["php-lint"];
   if (file === "scripts/smoke-showcase-website.mjs" || file === "scripts/smoke-marketing-website.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-business-messaging-hosting.mjs" || file === "scripts/smoke-business-messaging-webhook.php") return ["php-lint"];
   if (file === "scripts/smoke-web-dealer-portal.mjs" || file === "scripts/smoke-commerce-dealer-orders.mjs") return ["build-desktop", "php-lint"];

@@ -104,7 +104,7 @@ const localFavicon = join(repoRoot, "favicon.png");
 const localAssets = join(repoRoot, "assets");
 const localSite = repoRoot;
 const localRelease = join(repoRoot, "release.json");
-const publicRouteDirs = ["odalar", "restoran", "qr-menu", "magaza", "yorumlar", "iletisim", "duyurular", "kurulum", "kullanim-kilavuzu"];
+const publicRouteDirs = ["odalar", "restoran", "qr-menu", "magaza", "yorumlar", "iletisim", "duyurular", "kurulum", "kullanim-kilavuzu", "instagram"];
 const requiredLocal = [
   localIndex,
   localFavicon,
@@ -348,7 +348,7 @@ sshRun(
   `cd ${remoteWww} && ` +
     `for f in index.php index.html favicon.png release.json; do [ -f "$f" ] && cp -p "$f" ${remoteBackup}/ || true; done && ` +
     `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ` +
-    `for d in inc odalar restoran qr-menu magaza yorumlar iletisim duyurular kurulum kullanim-kilavuzu demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
+    `for d in inc odalar restoran qr-menu magaza yorumlar iletisim duyurular kurulum kullanim-kilavuzu instagram demo; do [ -d "$d" ] && cp -a "$d" ${remoteBackup}/ || true; done && ` +
     `ls -la ${remoteBackup}/`
 );
 

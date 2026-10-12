@@ -9,22 +9,26 @@ export interface SmsConfiguration {
   providerId: "iletimerkezi"; enabled: boolean; senderId: string; iysList: "BIREYSEL" | "TACIR";
   hasApiKey: boolean; hasApiHash: boolean; configured: boolean;
 }
-export interface InstagramConfigurationInput { enabled: boolean; accountId: string; accessToken?: string; clearAccessToken?: boolean }
 export interface InstagramConfiguration {
   providerId: "instagram_api"; enabled: boolean; accountId: string; apiVersion: string; hasSecret: boolean; configured: boolean;
+  username: string; expiresAt: string;
 }
+export type InstagramOAuthProgress = {status:"pending"} | {status:"connected";username:string} | {status:"failed";message:string};
 export interface MarketingProviderConnectionResult {
   ok: boolean; message: string; testedAt: string; username?: string; accountType?: "BUSINESS" | "MEDIA_CREATOR";
   senderIds?: string[];
 }
 export const emptySmsConfiguration = (): SmsConfiguration => ({ providerId: "iletimerkezi", enabled: false, senderId: "", iysList: "BIREYSEL", hasApiKey: false, hasApiHash: false, configured: false });
-export const emptyInstagramConfiguration = (): InstagramConfiguration => ({ providerId: "instagram_api", enabled: false, accountId: "", apiVersion: INSTAGRAM_API_VERSION, hasSecret: false, configured: false });
+export const emptyInstagramConfiguration = (): InstagramConfiguration => ({ providerId: "instagram_api", enabled: false, accountId: "", username: "", expiresAt: "", apiVersion: INSTAGRAM_API_VERSION, hasSecret: false, configured: false });
 export interface MarketingProviderBridge {
   getSmsConfiguration(): Promise<SmsConfiguration>;
   getInstagramConfiguration(): Promise<InstagramConfiguration>;
   testSmsConnection(input?: SmsConfigurationInput): Promise<MarketingProviderConnectionResult>;
   listSmsSenderIds(input?: SmsConfigurationInput): Promise<import("./marketing").MarketingResult<string[]>>;
-  testInstagramConnection(input?: InstagramConfigurationInput): Promise<MarketingProviderConnectionResult>;
+  testInstagramConnection(): Promise<MarketingProviderConnectionResult>;
+  beginInstagramOAuth(): Promise<{ok:boolean;message:string}>;
+  pollInstagramOAuth(): Promise<InstagramOAuthProgress>;
+  disconnectInstagramOAuth(): Promise<InstagramConfiguration>;
 }
 export interface InstagramPublicationState {
   publicationId: string; accountKey: string; containerId: string; providerMediaId: string; permalink: string;

@@ -20,6 +20,7 @@ import { getArasShippingConfiguration, getStoredArasShippingConfiguration, type 
 import { getDealerWebAccess, changeDealerWebAccess, createDealerAccessProjection } from "./dealer-web-access-store";
 import type { DealerAccessAction } from "@yardimci-asistan/shared";
 import { createCommerceOnlineCatalog } from "./commerce-online-catalog-publication";
+import * as instagramOAuthStore from "./marketing/instagram-oauth-store";
 import { getCommerceProductPublication, listCommerceProductPublications, saveCommerceProductPublication, deleteCommerceProductPublication } from "./commerce-product-publication-store";
 import { hasBusinessCapability, type SaveCommerceProductPublicationInput } from "@yardimci-asistan/shared";
 import { listRuntimeShipmentsForOrder, getRuntimeShipment, createRuntimeShipmentForOrder, updateRuntimeShipmentStatus, createRuntimeOrder } from "./commerce-runtime";
@@ -1020,6 +1021,8 @@ export class DesktopDatabase {
   clearInstagramStage(id: string) { instagramPublicationStore.clearInstagramStage(this.db,id); }
   getSmsConfiguration() { return marketingProviderStore.smsConfiguration(this.db); }
   getInstagramConfiguration() { return marketingProviderStore.instagramConfiguration(this.db); }
+  saveInstagramOAuthConnection(account: Parameters<typeof instagramOAuthStore.saveInstagramOAuth>[1]) { return instagramOAuthStore.saveInstagramOAuth(this.db,account); }
+  disconnectInstagramOAuthConnection() { return instagramOAuthStore.disconnectInstagramOAuth(this.db); }
   getStoredMarketingProvider(provider: "iletimerkezi" | "instagram_api") { return marketingProviderStore.storedMarketingProvider(this.db, provider); }
   listMarketingContents() { return marketingStore.listMarketingContents(this.db); }
   getMarketingShare(id: string) { return marketingShareStore.getMarketingShare(this.db, id); }

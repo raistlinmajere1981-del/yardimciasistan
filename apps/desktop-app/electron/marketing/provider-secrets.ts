@@ -1,8 +1,8 @@
 import { safeStorage } from "electron";
-import type { SmsConfigurationInput, InstagramConfigurationInput } from "@yardimci-asistan/shared";
+import type { SmsConfigurationInput } from "@yardimci-asistan/shared";
 import type { MessagingSecretWrite } from "../business-messaging/secret-service";
 import { MarketingError } from "./validation";
-export interface MarketingProviderSecretWrites { apiKey?: MessagingSecretWrite; apiHash?: MessagingSecretWrite; instagramToken?: MessagingSecretWrite }
+export interface MarketingProviderSecretWrites { apiKey?: MessagingSecretWrite; apiHash?: MessagingSecretWrite }
 function encrypt(value: unknown, clear?: boolean): MessagingSecretWrite {
   if (clear) return { mode: "clear" };
   if (value === undefined || value === "") return { mode: "keep" };
@@ -11,6 +11,6 @@ function encrypt(value: unknown, clear?: boolean): MessagingSecretWrite {
   try { return { mode: "replace", encryptedValue: `safe-storage:v1:${safeStorage.encryptString(value).toString("base64")}` }; }
   catch { throw new MarketingError("secure_storage_unavailable", "Servis anahtarı şifrelenemedi."); }
 }
-export function createMarketingProviderSecretWrites(sms?: SmsConfigurationInput, instagram?: InstagramConfigurationInput): MarketingProviderSecretWrites {
-  return { apiKey: encrypt(sms?.apiKey, sms?.clearApiKey), apiHash: encrypt(sms?.apiHash, sms?.clearApiHash), instagramToken: encrypt(instagram?.accessToken, instagram?.clearAccessToken) };
+export function createMarketingProviderSecretWrites(sms?: SmsConfigurationInput): MarketingProviderSecretWrites {
+  return { apiKey: encrypt(sms?.apiKey, sms?.clearApiKey), apiHash: encrypt(sms?.apiHash, sms?.clearApiHash) };
 }

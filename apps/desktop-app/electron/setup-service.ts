@@ -1,4 +1,4 @@
-import { smsConfiguration, instagramConfiguration, validateSmsConfiguration, validateInstagramConfiguration, saveMarketingProviderConfigurations, storedMarketingProvider } from "./marketing/provider-configuration-store";
+import { smsConfiguration, instagramConfiguration, validateSmsConfiguration, saveMarketingProviderConfigurations, storedMarketingProvider } from "./marketing/provider-configuration-store";
 import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets";
 import { getMessagingConfiguration, getStoredMessagingConfiguration, normalizeMessagingConfiguration, saveMessagingConfiguration } from "./business-messaging/store";
 import type { MessagingSecretWrite } from "./business-messaging/secret-service";
@@ -176,8 +176,8 @@ export function saveSetupData(
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Kargo ayarları geçersiz." };
   }
-  try { if (input.sms) validateSmsConfiguration(input.sms); if (input.instagram) validateInstagramConfiguration(input.instagram); }
-  catch { return { ok: false, message: "SMS / Instagram servis ayarları geçersiz." }; }
+  try { if (input.sms) validateSmsConfiguration(input.sms); }
+  catch { return { ok: false, message: "SMS servis ayarları geçersiz." }; }
   if (input.whatsappCloud) {
     try { normalizeMessagingConfiguration(input.whatsappCloud); }
     catch { return { ok: false, message: "WhatsApp Business ayarları geçersiz." }; }
@@ -191,8 +191,6 @@ export function saveSetupData(
     ...(input.sms ? [{ label: "SMS / İleti Merkezi", enabled: input.sms.enabled, configured: Boolean(input.sms.senderId
       && effectiveSecret(marketingSecretWrites.apiKey, String(storedMarketingProvider(db, "iletimerkezi")?.secret_one_encrypted ?? ""), input.sms.clearApiKey)
       && effectiveSecret(marketingSecretWrites.apiHash, String(storedMarketingProvider(db, "iletimerkezi")?.secret_two_encrypted ?? ""), input.sms.clearApiHash)) }] : []),
-    ...(input.instagram ? [{ label: "Instagram", enabled: input.instagram.enabled, configured: Boolean(input.instagram.accountId
-      && effectiveSecret(marketingSecretWrites.instagramToken, String(storedMarketingProvider(db, "instagram_api")?.secret_one_encrypted ?? ""), input.instagram.clearAccessToken)) }] : [])
   ];
   for (const service of requiredServices) {
     const error = validateServiceActivation(service);
@@ -472,7 +470,7 @@ export function saveSetupData(
     db.prepare("UPDATE settings SET dealer_portal_enabled = ? WHERE id = ?")
       .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);
 
-    saveMarketingProviderConfigurations(db, businessId, input.sms, input.instagram, marketingSecretWrites);
+    saveMarketingProviderConfigurations(db, businessId, input.sms, marketingSecretWrites);
     if (input.whatsappCloud) saveMessagingConfiguration(db, businessId, input.whatsappCloud, messagingSecretWrite);
     // Legacy provider activation is a projection of delivery intent, never an independent Settings switch.
     saveArasShippingConfigurationInTransaction(db, businessId, {
