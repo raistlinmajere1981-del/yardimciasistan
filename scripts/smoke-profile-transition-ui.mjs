@@ -35,7 +35,7 @@ try {
   const registry = await page.evaluate(async sharedPath => {
     const { BUSINESS_CAPABILITIES, getBusinessProfiles, getEnabledBusinessCapabilityDependents } = await import(sharedPath);
     return getBusinessProfiles().map(profile => ({ ...profile, preview: profile.defaultOptionalCapabilities,
-      choices: profile.optionalCapabilities.filter(option => option === BUSINESS_CAPABILITIES.MARKETING_STUDIO || getEnabledBusinessCapabilityDependents(option, profile.defaultOptionalCapabilities).length === 0) }));
+      choices: profile.optionalCapabilities.filter(option => [BUSINESS_CAPABILITIES.MARKETING_STUDIO, BUSINESS_CAPABILITIES.RETAIL_PURCHASING].includes(option) || getEnabledBusinessCapabilityDependents(option, profile.defaultOptionalCapabilities).length === 0) }));
   }, `/@fs/${resolve("packages/shared/types/business-capabilities.ts")}`);
   for (const profile of registry.filter(profile => profile.id !== before.profileId)) {
     await select.selectOption(profile.id);
@@ -67,7 +67,8 @@ try {
   await page.evaluate(() => { window.failSetup = false; });
   await save.click();
   await expect(warning).toHaveCount(0);
-  await expect(options.getByLabel("Satın alma", { exact: true })).toHaveCount(0);
+  await expect(options.getByLabel("Satın alma", { exact: true })).toBeChecked();
+  await expect(options.getByLabel("Satın alma", { exact: true })).toBeDisabled();
   await expect(options.getByLabel("Tedarikçiler", { exact: true })).toBeEnabled();
   await expect(options.getByLabel("Tedarikçiler", { exact: true })).toBeChecked();
   await expect(options.getByLabel("WhatsApp / SMS Kampanyaları", { exact: true })).not.toBeChecked();
@@ -110,7 +111,8 @@ try {
       }, { path: `/@fs/${resolve("packages/shared/types/business-capabilities.ts")}`, id: profile.id, feature });
       for (const option of profile.optionalCapabilities) {
         const checkbox = options.locator(`input[value="${option}"]`);
-        if (option === "marketing.studio" && feature === "messaging.campaigns") {
+        if ((option === "marketing.studio" && feature === "messaging.campaigns") ||
+          (option === "retail.purchasing" && feature === "retail.suppliers")) {
           await expect(checkbox).toBeChecked();
           await expect(checkbox).toBeDisabled();
         } else if (option !== feature && expected.includes(option)) await expect(checkbox).toHaveCount(0);
@@ -128,26 +130,34 @@ try {
   const purchasing = options.locator('input[value="retail.purchasing"]');
   const suppliers = options.locator('input[value="retail.suppliers"]');
   await suppliers.check();
-  await expect(purchasing).toHaveCount(0);
-  await expect(options.getByText("Satın alma dahil", { exact: true })).toBeVisible();
+  await expect(purchasing).toBeChecked();
+  await expect(purchasing).toBeDisabled();
+  await expect(options.getByText("Satın alma dahil", { exact: true })).toHaveCount(0);
   await suppliers.uncheck();
   await expect(suppliers).not.toBeChecked();
+  await expect(purchasing).not.toBeChecked();
+  await expect(purchasing).toBeEnabled();
   await expect(save).toBeDisabled();
   await purchasing.check();
   await suppliers.check();
+  await expect(purchasing).toBeDisabled();
   await suppliers.uncheck();
   await expect(purchasing).toBeChecked();
+  await expect(purchasing).toBeEnabled();
   await revert.click();
   await suppliers.check();
   await save.click();
   expect(await page.evaluate(() => window.persistedSettings().profileOptions)).toEqual(["retail.suppliers"]);
   await page.evaluate(() => window.reopenSettings());
-  await expect(purchasing).toHaveCount(0);
+  await expect(purchasing).toBeChecked();
+  await expect(purchasing).toBeDisabled();
   await suppliers.uncheck();
   await expect(purchasing).not.toBeChecked();
+  await expect(purchasing).toBeEnabled();
   await revert.click();
   await expect(suppliers).toBeChecked();
-  await expect(purchasing).toHaveCount(0);
+  await expect(purchasing).toBeChecked();
+  await expect(purchasing).toBeDisabled();
   await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
   await options.locator('input[value="messaging.campaigns"]').check();
   await expect(options.locator('input[value="marketing.studio"]')).toBeChecked();

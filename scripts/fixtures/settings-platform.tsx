@@ -117,6 +117,11 @@ let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, last
 let kbsSettings = { enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false };
 window.yardimciDesktop = {
   getSetupData: async () => structuredClone(canonical),
+  getInstagramConfiguration: async () => structuredClone(canonical.instagram),
+  beginInstagramOAuth: async () => ({ ok: false, message: "OAuth fixture bağlı değil." }),
+  pollInstagramOAuth: async () => ({ status: "failed", message: "OAuth fixture bağlı değil." }),
+  disconnectInstagramOAuth: async () => structuredClone(canonical.instagram),
+  testInstagramConnection: async () => ({ ok: false, message: "OAuth fixture bağlı değil.", testedAt: new Date().toISOString() }),
   testWebConnection: async input => { window.settingsCalls.push({ kind: "web-test", input }); return { ok: true, message: "Fixture web bağlantısı doğrulandı." }; },
   commerce: {
     getShippingProviderConfiguration: async () => ({ ...canonical.arasShipping,
