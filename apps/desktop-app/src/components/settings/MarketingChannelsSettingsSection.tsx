@@ -61,7 +61,7 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
         setWaiting(false);
         if(result.status==="connected") {
           setConfig(await window.yardimciDesktop!.getInstagramConfiguration());
-          setMessage(`Instagram @${result.username} bağlandı.`);
+          setMessage("");
         } else setMessage(result.message);
       }).catch(()=>{if(!stopped){setWaiting(false);setMessage("Bağlantı kontrolü tamamlanamadı. Yeniden bağlanmayı deneyin.");}})
         .finally(()=>{polling.current=false;});
@@ -96,7 +96,6 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
   const legacy=Boolean(config?.configured && !config.username);
   return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram" enabled
     status={linked?`Bağlı · @${config?.username}`:legacy?"Önceki bağlantı · Yeniden bağlayın":"Bağlı değil"}>
-    <p>Instagram Business veya Creator hesabınızı tarayıcıdan giriş yaparak bağlayın. User ID ve erişim anahtarı girmeniz gerekmez.</p>
     {linked && <p role="status"><strong>@{config?.username}</strong> · Paylaşım izni etkin{config?.expiresAt?` · Erişim: ${new Date(config.expiresAt).toLocaleDateString("tr-TR")}`:""}</p>}
     {legacy && <p role="status">Önceki manuel bağlantı bulundu. Yeni bağlantı kurulduğunda eski erişim anahtarı otomatik değiştirilir.</p>}
     {waiting && <p role="status">Instagram girişini tarayıcıda tamamlayın. Bağlantı bekleniyor; bu sayfadan ayrılırsanız daha sonra tekrar bağlanabilirsiniz.</p>}
@@ -112,6 +111,5 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
     {confirmDisconnect && <p role="alert">Bağlantıyı keserseniz Instagram'a planlanmış yayınlar yeniden bağlanana kadar gönderilemez.</p>}
     {message && <p role="status">{message}</p>}
     {testResult && <p role="status">{testResult.ok?"Başarılı":"Başarısız"} · {testResult.message}</p>}
-    <p>Görsel yayınlamak için HTTPS Web Modülü bağlantısı gereklidir.</p>
   </ServiceSettingsCard>;
 }

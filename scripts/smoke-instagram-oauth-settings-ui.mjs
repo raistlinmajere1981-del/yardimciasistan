@@ -34,6 +34,10 @@ try {
   assert.equal(await page.evaluate(() => window.__igSettingsState.beginCount),1);
   await page.evaluate(() => {window.__igSettingsState.stage = "complete";});
   await expect(section).toContainText("@ornek_hesap", {timeout: 9000});
+  await expect(section).toContainText("Paylaşım izni etkin");
+  await expect(section).not.toContainText("Instagram Business veya Creator hesabınızı");
+  await expect(section).not.toContainText("Instagram @ornek_hesap bağlandı.");
+  await expect(section).not.toContainText("Görsel yayınlamak için HTTPS Web Modülü");
   await section.getByRole("button", {name:"Bağlantıyı test et"}).click();
   await expect(section).toContainText("Instagram bağlantısı doğrulandı");
   await section.getByRole("button", {name:"Bağlantıyı kes",exact:true}).click();
