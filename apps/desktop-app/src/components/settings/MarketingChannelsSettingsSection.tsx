@@ -38,6 +38,7 @@ export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["
 export function InstagramSettingsSection({busy}:{busy:boolean}) {
   const [config,setConfig]=useState<InstagramConfiguration|null>(null);
   const [waiting,setWaiting]=useState(false);
+  const [connectionRequested,setConnectionRequested]=useState(false);
   const [working,setWorking]=useState(false);
   const [confirmDisconnect,setConfirmDisconnect]=useState(false);
   const [message,setMessage]=useState("");
@@ -61,6 +62,7 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
         setWaiting(false);
         if(result.status==="connected") {
           setConfig(await window.yardimciDesktop!.getInstagramConfiguration());
+          setConnectionRequested(false);
           setMessage("");
         } else setMessage(result.message);
       }).catch(()=>{if(!stopped){setWaiting(false);setMessage("Bağlantı kontrolü tamamlanamadı. Yeniden bağlanmayı deneyin.");}})
@@ -70,6 +72,7 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
   },[waiting]);
   async function begin() {
     if(working||waiting||busy)return;
+    setConnectionRequested(true);
     setWorking(true);setMessage("");setTestResult(null);setConfirmDisconnect(false);
     try {
       const result=await window.yardimciDesktop!.beginInstagramOAuth();
@@ -78,17 +81,28 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
     finally {setWorking(false);}
   }
   async function toggleEnabled(enabled:boolean) {
-    if(busy||working||waiting||!config?.hasSecret)return;
+    if(busy||working||waiting||!config)return;
+    if(enabled && !(config.hasSecret && config.accountId && config.username &&
+      Number.isFinite(Date.parse(config.expiresAt)) && Date.parse(config.expiresAt)>Date.now())) {
+      await begin();
+      return;
+    }
     setWorking(true);setMessage("");setTestResult(null);setConfirmDisconnect(false);
-    try {setConfig(await window.yardimciDesktop!.setInstagramEnabled(enabled));}
-    catch {setMessage(enabled?"Instagram etkinleştirilemedi. Erişim süresi dolduysa hesabı yeniden bağlayın.":"Instagram duraklatılamadı.");}
-    finally {setWorking(false);}
+    try {
+      const updated=await window.yardimciDesktop!.setInstagramEnabled(enabled);
+      setConfig(updated);
+      setConnectionRequested(false);
+    } catch {
+      setMessage(enabled?"Instagram etkinleştirilemedi. Hesabı yeniden bağlayın.":"Instagram duraklatılamadı.");
+      if(enabled)setConnectionRequested(true);
+    } finally {setWorking(false);}
   }
   async function disconnect() {
     if(!confirmDisconnect){setConfirmDisconnect(true);return;}
     setWorking(true);
     try {
       setConfig(await window.yardimciDesktop!.disconnectInstagramOAuth());
+      setConnectionRequested(false);
       setMessage("Instagram bağlantısı kesildi.");setTestResult(null);
     } catch {setMessage("Instagram bağlantısı kesilemedi.");}
     finally {setWorking(false);setConfirmDisconnect(false);}
@@ -103,9 +117,9 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
   const legacy=Boolean(config?.hasSecret && config.accountId && !config.username);
   return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram"
     enabled={Boolean(config?.enabled)} onEnabledChange={enabled=>void toggleEnabled(enabled)}
-    toggleDisabled={busy||working||waiting||!config?.hasSecret} disabled={busy||working||waiting}
-    showBodyWhenDisabled
-    status={linked?(config?.enabled?`Bağlı · @${config?.username}`:`Bağlı · Pasif · @${config?.username}`):legacy?"Önceki bağlantı · Yeniden bağlayın":"Bağlı değil"}>
+    toggleDisabled={busy||working||waiting||!config} disabled={busy||working||waiting}
+    showBodyWhenDisabled={connectionRequested}
+    status={config?.enabled && linked?`Bağlı · @${config.username}`:config?.enabled?"Etkin":"Kapalı"}>
     {linked && <p role="status"><strong>@{config?.username}</strong> · {config?.enabled?"Paylaşım izni etkin":"Paylaşımlar duraklatıldı"}{config?.expiresAt?` · Erişim: ${new Date(config.expiresAt).toLocaleDateString("tr-TR")}`:""}</p>}
     {legacy && <p role="status">Önceki manuel bağlantı bulundu. Yeni bağlantı kurulduğunda eski erişim anahtarı otomatik değiştirilir.</p>}
     {waiting && <p role="status">Instagram girişini tarayıcıda tamamlayın. Bağlantı bekleniyor; bu sayfadan ayrılırsanız daha sonra tekrar bağlanabilirsiniz.</p>}
