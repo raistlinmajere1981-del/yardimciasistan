@@ -192,6 +192,8 @@ try {
   await page.evaluate(() => window.__pickerView("quickSale"));
   await expect(page.getByRole("button", { name: "Müşteri", exact: true })).toBeVisible({ timeout: 45000 });
   await expect(page.getByRole("button", { name: "Müşteri", exact: true })).toBeEnabled({ timeout: 45000 });
+  const quickSaleCards = await page.locator(".market-sale-product").count();
+  assert.ok(quickSaleCards > 0 && quickSaleCards <= 40, "Picker smoke bounds unrelated Quick Sale catalog rendering");
   panel = await open("Müşteri");
   assert.deepEqual(await panel.getByRole("group", { name: "Harf grupları" }).locator("button").allTextContents(), ["ABC", "ÇDE", "FGH", "IİJ", "KLM", "NOÖ", "PRS", "ŞTU", "ÜVY", "Z"]);
   await panel.getByRole("button", { name: "IİJ", exact: true }).click();
