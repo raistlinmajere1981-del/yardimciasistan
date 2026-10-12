@@ -2,7 +2,6 @@
    Media queries use literal boundaries: CSS custom properties cannot be used here. */
 @media (max-width: 1100px) {
   :root { --page-padding: var(--space-4); }
-  .page-header-tools .sync-pill > span { display: none; }
 }
 @media (max-width: 760px) {
   :root { --page-padding: var(--space-3); --panel-padding: var(--space-4); }

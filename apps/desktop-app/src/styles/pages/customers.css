@@ -1,9 +1,5 @@
 /* Customer workflow composition; shared controls live in components/. */
 
-.identity-address {
-  grid-column: 1 / -1;
-}
-
 .customer-note-field textarea,
 .customer-address-field textarea {
   min-height: calc(var(--control-height-md) * 2);

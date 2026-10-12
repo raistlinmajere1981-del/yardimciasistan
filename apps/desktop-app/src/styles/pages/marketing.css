@@ -125,13 +125,9 @@
 .marketing-image-tile span { font-size: var(--text-xs); }
 .marketing-image-candidate { display: flex; align-items: center; justify-content: center; min-height: 12rem; padding: var(--space-3); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-control); color: var(--color-text-muted); }
 .marketing-image-candidate img { max-width: 100%; max-height: 16rem; object-fit: contain; }
-.marketing-channel-preview p, .marketing-management-detail > p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.marketing-channel-preview p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .marketing-channel-preview { border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-3); }
-.marketing-records-panel { min-width: 0; }
 .marketing-records-list { display: grid; grid-template-columns: minmax(0,1fr); gap: var(--space-1); }
-.marketing-detail-footer { display: flex; width: 100%; justify-content: flex-end; }
-.marketing-detail-feedback { margin: 0; color: var(--color-text-muted); }
-.marketing-detail-card { min-width: 0; }
 .marketing-detail-overview { display: grid; grid-template-columns: minmax(0,10rem) minmax(0,1fr); align-items: start; gap: var(--space-3); }
 .marketing-detail-cover { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 4 / 3; min-width: 0; overflow: hidden; color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-bg-hover); }
 .marketing-detail-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
@@ -142,16 +138,12 @@
 .marketing-detail-meta dt { color: var(--color-text-muted); font-size: var(--text-xs); }
 .marketing-detail-meta dd { margin: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
 .marketing-detail-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: var(--leading-normal); }
-.marketing-detail-actions { align-items: center; flex-wrap: wrap; }
 .marketing-detail-link { display: inline-flex; align-items: center; min-height: var(--interaction-target-min); }
-.marketing-detail-result-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.marketing-detail-card .marketing-analytics-detail { border-top: 0; padding-top: 0; }
 @container (max-width: 36rem) {
   .marketing-preview-grid { grid-template-columns: minmax(0,1fr); }
   .marketing-tool { padding: var(--space-2); }
   .marketing-detail-overview { grid-template-columns: minmax(0,1fr); }
   .marketing-detail-cover { max-width: 9rem; }
-  .marketing-detail-result-actions { align-items: flex-start; }
 }
 @media (max-width: 1000px) { .marketing-welcome-icon { display: none; } .marketing-dashboard { gap: var(--space-2); } .marketing-record { flex-wrap: wrap; } .marketing-summary-card > header { flex-wrap: wrap; } }
 @media (max-width: 650px) { .marketing-dashboard { grid-template-columns: 1fr; overflow: auto; } .marketing-summary-card { min-height: 14rem; } .marketing-card-list { overflow: visible; } .marketing-card-empty { min-height: 9rem; } .marketing-welcome { align-items: flex-start; flex-wrap: wrap; } .marketing-welcome-break { display: none; } .marketing-options-row { flex-wrap: wrap; } .marketing-image-summary { align-items: flex-start; } .marketing-binding { grid-template-columns: 1fr; } }
@@ -171,10 +163,6 @@
   .marketing-share-form .marketing-image-summary { flex-wrap: wrap; }
   .marketing-workspace-frame .marketing-actions > .action-button { max-width: 100%; white-space: normal; }
   .marketing-workspace-frame > .workspace-frame__footer > .marketing-actions { width: 100%; justify-content: flex-end; }
-}
-
-@container (max-width: 56rem) {
-  .marketing-records-workspace .detail-workspace-layout__rail { max-height: 14rem; overflow-y: auto; }
 }
 
 /* Publication detail keeps channel results and plan operations in one body. */
