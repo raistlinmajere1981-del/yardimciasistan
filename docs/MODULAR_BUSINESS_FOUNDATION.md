@@ -611,7 +611,15 @@ URL'sini doğrudan açmaz; Electron main güvenli provider doğrulaması ve boyu
 yapar. Android önizlemeyi telefonda indirir, masaüstü action uygulandığında görseli
 kendi yerel asset arşivine alır.
 
-Manuel ve otomatik Android ingress, başarılı `market_product_create` apply sonrasında
+Manuel tetikleme ve otomatik scheduler aynı `AndroidActionSyncService.processQueue`
+instance'ına delege eder. Pull/apply/record/post-apply/ACK döngüsü ve tek `inFlight`
+bu owner'dadır; SyncCoordinator zamanlamayı ve owner'ın suspend/drain/resume lifecycle'ını
+yönetir. Hatalı action veya kayıp ACK bağımsız sonraki action'ları engellemez. ACK hatası
+raporlanır ve otomatik sync backoff'u korunur; apply sayacı yerel sonucu, receipt kalıcı
+tekilleştirmeyi ifade eder. Manuel IPC kilit gate'i korunur; mevcut arka plan sync'i kilit
+sırasında durdurulmaz ve başlanmış işler kayıtlarını tamamlar.
+
+Canonical ingress, başarılı `market_product_create` apply sonrasında
 aynı `archiveAndroidProductImage` adımını ACK öncesinde bekler. Ürün ve action receipt
 mevcut apply transaction'ında birlikte commit edilir; opsiyonel görsel ayrı mevcut
 asset yazma/attachment sınırını kullanır. Görsel hatası warning olarak kaydedilir,

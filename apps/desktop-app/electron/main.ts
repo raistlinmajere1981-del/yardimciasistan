@@ -317,7 +317,7 @@ if (!hasSingleInstanceLock) {
     cleanupOrphanProductImages(desktopDatabase.databasePath);
     androidActionSyncService = new AndroidActionSyncService({
       database: desktopDatabase,
-      isSuspended: () => maintenanceSyncSuspended,
+      isSuspended: () => maintenanceSyncSuspended || campaignShutdownStarted,
       markLocalSnapshotDirty: () => {
         markLocalCompanionSnapshotDirty();
       },
@@ -339,6 +339,7 @@ if (!hasSingleInstanceLock) {
     });
     reconcileEgmKbsBackgroundSession();
     syncCoordinator = new SyncCoordinator({
+      androidActions: androidActionSyncService,
       onlineOrderIngress: new OnlineOrderIngressService(desktopDatabase),
       pullBusinessMessagingStatuses: (config) => businessMessagingStatusSyncService.pull(config),
       database: desktopDatabase,
@@ -465,7 +466,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (campaignShutdownStarted) return;
   campaignShutdownStarted = true;
-  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([campaignDispatchService.suspendAndDrain(), businessMessagingService.drain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain(), androidActionSyncService?.currentInFlight()])).then(() => {
+  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([campaignDispatchService.suspendAndDrain(), businessMessagingService.drain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain()])).then(() => {
     campaignShutdownDrained = true;
     desktopDatabase?.close();
     app.quit();
@@ -711,16 +712,6 @@ export async function suspendAutomaticSyncForMaintenance() {
   await campaignDispatchService.suspendAndDrain();
   await businessMessagingService.drain();
   await instagramPublicationService.drain();
-  await syncCoordinator?.suspendAndDrain();
-  const androidPull = getAndroidActionSyncService().currentInFlight();
-  if (androidPull) {
-    try {
-      await androidPull;
-    } catch {
-      // The normal Android sync path records its own failure state.
-    }
-  }
-  // Draining the Android path can itself attempt to schedule a follow-up.
   await syncCoordinator?.suspendAndDrain();
 }
 

@@ -88,7 +88,7 @@ test("Android action ingress does not own or send snapshot publication", async t
   const actions = new AndroidActionSyncService({ database, isSuspended: () => false, markLocalSnapshotDirty() {}, notifyDashboardChanged() {} });
   const writes = [];
   globalThis.fetch = (url, init) => { if (init?.body && JSON.parse(init.body).action === "publish_android_snapshot") writes.push(JSON.parse(init.body)); return nativeFetch(url, init); };
-  assert.deepEqual(await actions.processQueue(false), { pulled: 0, applied: 0, failed: 0 });
+  assert.deepEqual(await actions.processQueue(false), { pulled: 0, applied: 0, failed: 0, devicesChanged: 0, error: "" });
   assert.equal(writes.length, 0, "pull/apply must not be a second snapshot writer");
   assert.equal(config.baseUrl.startsWith("http://127.0.0.1:"), true);
 });

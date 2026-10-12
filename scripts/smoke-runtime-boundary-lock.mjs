@@ -17,6 +17,7 @@ const appEvents = new Map();
 const calls = [];
 let businessMessagingAuthority;
 let businessMessagingDrain = () => Promise.resolve();
+let androidIngress, androidIngressOptions, coordinatorOptions;
 const durable = createTemporaryDesktopDatabase("sync-finalize-intent-");
 durable.database.initialize();
 const dashboard = { revision: 1, kbsOverview: { enabled: false }, hospitalityNotifications: [] };
@@ -61,12 +62,16 @@ function stub(name) {
     if (/^[A-Z]/.test(String(key))) return class {
       constructor(...args) {
         if (name === "business-messaging/service") businessMessagingAuthority = args[1];
-        return new Proxy({}, { get: (_target, method) => {
+        const instance = new Proxy({}, { get: (_target, method) => {
         if (name === "business-messaging/service" && method === "drain") return () => businessMessagingDrain();
         if (method === "start" || method === "drain" || method === "suspendAndDrain") return () => Promise.resolve();
         if (method === "getStatus") return () => ({ enabled: false });
         return record(`${name}.${String(method)}`);
-      } }); }
+        } });
+        if (name === "android-action-sync-service") { androidIngress = instance; androidIngressOptions = args[0]; }
+        if (name === "sync-coordinator") coordinatorOptions = args[0];
+        return instance;
+      }
     };
     return record(`${name}.${String(key)}`);
   } });
@@ -95,6 +100,11 @@ function load(file) {
       if (relative === "kbs-settings") return { getKbsSettings: () => ({ enabled: false }) };
       if (relative === "google-reviews-settings") return { getGoogleReviewsSettings: () => ({ publicationPending: false }) };
       if (relative === "business-capability-runtime") return { assertPersistedBusinessCapability: record("capability.assert"), hasPersistedBusinessCapability: () => true };
+      if (relative === "sync-request-menu-service") return {
+        pullRequestsFromWeb: async (_database, afterSuccessfulPull) => { await afterSuccessfulPull(); return result(); },
+        markRequestsSyncedOnWeb: record("sync-request-menu-service.markRequestsSyncedOnWeb"),
+        pushMenuToWeb: record("sync-request-menu-service.pushMenuToWeb")
+      };
       if (relative.startsWith("ipc/") || real.has(relative)) {
         const actual = load(dependency);
         if (relative === "data-maintenance") return { ...actual, resolveProjectBackupPath: () => "/tmp/opencode/runtime-boundary-fixture", applyPendingDataMaintenanceAtStartup() {} };
@@ -111,12 +121,14 @@ load(resolve(root, "main-entry"));
 await new Promise(setImmediate);
 for (const action of immediate) action();
 assert.equal(handlers.size, 259, "all production invoke registrations must execute");
+assert.equal(coordinatorOptions.androidActions, androidIngress, "main composes the same ingress owner for automatic and manual sync");
 assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
 const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: { getURL: () => "fixture" } }, ...args));
 const lockFree = new Set(["appLock:getStatus", "appLock:lock", "appLock:unlock", "appLock:updatePassword",
   "appLock:resetWithWebSecurityKey", "diagnostics:writeRendererEvent", "sync:getStatus", "update:getStatus"]);
 await invoke("appLock:lock");
 assert.equal((await invoke("appLock:getStatus")).locked, true);
+assert.equal(androidIngressOptions.isSuspended(), false, "session lock keeps the existing background sync authority");
 await invoke("sync:getStatus");
 await invoke("update:getStatus");
 for (const channel of handlers.keys()) {
@@ -139,6 +151,10 @@ for (const [channel, input] of representatives) {
   assert.equal((await invoke(channel, input)).ok, true, `${channel}: unlocked path`);
   assert.ok(calls.length > before, `${channel}: delegated when unlocked`);
 }
+const beforeManualAndroid = calls.filter((call) => call === "android-action-sync-service.processQueue").length;
+assert.equal((await invoke("sync:pullRequests")).ok, true);
+assert.equal(calls.filter((call) => call === "android-action-sync-service.processQueue").length, beforeManualAndroid + 1,
+  "real manual IPC delegates after pull to the ingress owner injected into automatic sync");
 // Execute the actual preload; lock after its status response, before invocation.
 let bridge, beforeHandler;
 runInNewContext(readFileSync(resolve(root, "preload.js"), "utf8"), { exports: {}, Error,
@@ -204,12 +220,14 @@ try {
   }
   let maintenanceFinished = false;
   const maintenance = main.suspendAutomaticSyncForMaintenance().then(() => { maintenanceFinished = true; });
+  assert.equal(androidIngressOptions.isSuspended(), true, "maintenance blocks new canonical ingress");
   for (const sender of barcodeSenders) assert.equal(sender.listenerCount("destroyed"), 0, "actual maintenance wiring removes every fast-pull listener");
   assert.throws(() => businessMessagingAuthority.assertCanSubmit(), (error) => error.code === "session_unavailable");
   await entered;
   assert.equal(maintenanceFinished, false, "maintenance waits for begun single-message sends");
   releaseSend(); await maintenance;
   main.resumeAutomaticSyncAfterMaintenanceAbort();
+  assert.equal(androidIngressOptions.isSuspended(), false);
   businessMessagingAuthority.assertCanSubmit();
   barcodeMode(barcodeSenders[0], true);
   assert.equal(barcodeSenders[0].listenerCount("destroyed"), 1, "maintenance clear permits re-enable");
@@ -221,6 +239,7 @@ try {
   businessMessagingDrain = () => { enteredShutdownDrain(); return shutdownSend; };
   const beforeShutdown = calls.length;
   appEvents.get("before-quit")({ preventDefault() {} });
+  assert.equal(androidIngressOptions.isSuspended(), true, "shutdown blocks new canonical ingress");
   assert.throws(() => businessMessagingAuthority.assertCanSubmit(), (error) => error.code === "session_unavailable");
   await shutdownEntered;
   assert.ok(!calls.slice(beforeShutdown).includes("database.close"), "shutdown keeps receipt database open while POST is pending");

@@ -33,7 +33,7 @@ import {
 } from "./database";
 import { createDiagnosticOperationId, desktopLog } from "./desktop-logger";
 import { logWebFailure, safeWebTarget } from "./web-diagnostics";
-import { archiveAndroidProductImage } from "./product-data-service";
+import { AndroidActionSyncService } from "./android-action-sync-service";
 import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
 import { publishDesktopProjection } from "./desktop-publication-service";
 import { ensurePublicationSource } from "./publication-source-service";
@@ -79,6 +79,7 @@ export interface AutomaticSyncCycleResult {
 
 export interface SyncCoordinatorOptions {
   database: DesktopDatabase;
+  androidActions?: AndroidActionSyncService;
   marketingWebsite?: MarketingWebsitePublicationService;
   onlineOrderIngress?: OnlineOrderIngressService;
   pullBusinessMessagingStatuses?: (config: { baseUrl: string; syncSecret: string }) => Promise<string>;
@@ -101,6 +102,7 @@ export interface SyncCoordinatorOptions {
 }
 
 export class SyncCoordinator {
+  private readonly androidActions: AndroidActionSyncService;
   private pullTimer: NodeJS.Timeout | null = null;
   private marketBarcodeFastPullTimer: NodeJS.Timeout | null = null;
   private outboxTimer: NodeJS.Timeout | null = null;
@@ -128,10 +130,20 @@ export class SyncCoordinator {
   private activeCycleStartedAt = 0;
   private activeTargetUrl = "";
 
-  constructor(private readonly options: SyncCoordinatorOptions) {}
+  constructor(private readonly options: SyncCoordinatorOptions) {
+    // Main injects the same owner used by manual ingress. Standalone coordinator
+    // consumers compose one owner here, retained for their entire lifecycle.
+    this.androidActions = options.androidActions ?? new AndroidActionSyncService({
+      database: options.database,
+      isSuspended: () => this.suspendedForMaintenance,
+      markLocalSnapshotDirty: () => {},
+      notifyDashboardChanged: () => options.onDashboardChanged()
+    });
+  }
 
   start() {
     this.suspendedForMaintenance = false;
+    this.androidActions.resume();
     this.stop();
     this.aiCatalogSupported = null;
     this.roomCatalogSupported = null;
@@ -175,6 +187,7 @@ export class SyncCoordinator {
   async suspendAndDrain() {
     this.suspendedForMaintenance = true;
     this.stop();
+    const androidDrain = this.androidActions.suspendAndDrain();
     const active = this.inFlight;
     if (active) {
       try {
@@ -183,6 +196,7 @@ export class SyncCoordinator {
         // run() already normalizes failures; maintenance only needs the cycle to finish.
       }
     }
+    await androidDrain;
     await Promise.allSettled([...this.outboxPublicationsInFlight.values()].map(item => item.promise));
     // A mutation may have tried to schedule work while the previous cycle was draining.
     this.stop();
@@ -512,7 +526,6 @@ export class SyncCoordinator {
     counts.pulledActions = actionResult.pulled;
     counts.appliedActions = actionResult.applied;
     counts.failedActions = actionResult.failed;
-    dashboardChanged ||= actionResult.applied > 0 || actionResult.failed > 0 || actionResult.devicesChanged > 0;
     if (actionResult.error) {
       errors.push(actionResult.error);
     }
@@ -740,57 +753,10 @@ export class SyncCoordinator {
     return "";
   }
 
-  private async processAndroidActions(transport: SyncTransport): Promise<{
-    pulled: number;
-    applied: number;
-    failed: number;
-    devicesChanged: number;
-    error: string;
-  }> {
-    const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
-    if (!hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ANDROID)) {
-      return { pulled: 0, applied: 0, failed: 0, devicesChanged: 0, error: "" };
-    }
-    const pulled = await transport.pullAndroidActions({ limit: 100 });
-    if (!pulled.ok) {
-      this.logSyncFailure("android-actions-pull", pulled);
-      return { pulled: 0, applied: 0, failed: 0, devicesChanged: 0, error: pulled.message };
-    }
-    const devicesChanged = this.options.database.upsertAndroidDeviceSightings(pulled.devices ?? []);
-    let applied = 0;
-    let failed = 0;
-    for (const action of pulled.actions) {
-      const local = this.options.database.applyAndroidAction(action);
-      this.options.database.recordAndroidActionResult(action, local);
-      if (local.ok && action.action_type === "market_product_create") {
-        await archiveAndroidProductImage(this.options.database.databasePath, action);
-      }
-      const status = local.ok ? "applied" : "failed";
-      const completion = await transport.completeAndroidAction({
-        actionId: action.id,
-        status,
-        errorMessage: local.ok ? "" : local.message
-      });
-      if (!completion.ok) {
-        this.logSyncFailure("android-action-complete", completion, {
-          actionType: action.action_type
-        });
-        return { pulled: pulled.count, applied, failed, devicesChanged, error: completion.message };
-      }
-      if (local.ok) {
-        applied += 1;
-      } else {
-        failed += 1;
-      }
-    }
-    this.options.database.recordSyncEvent({
-      direction: "pull",
-      entityType: "android_action",
-      ok: true,
-      recordCount: pulled.count,
-      message: `${applied} telefon işlemi uygulandı, ${failed} işlem reddedildi.`
-    });
-    return { pulled: pulled.count, applied, failed, devicesChanged, error: "" };
+  private async processAndroidActions(transport: SyncTransport) {
+    const result = await this.androidActions.processQueue(false, transport);
+    if (result.error) this.logSyncFailure("android-actions", { message: result.error });
+    return result;
   }
 
   private async publishAvailabilityHeartbeat(
