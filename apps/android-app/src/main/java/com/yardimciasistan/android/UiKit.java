@@ -264,7 +264,7 @@ final class UiKit {
     return button;
   }
 
-  static Button counterChip(Context context, String label, int value, int tone, View.OnClickListener listener) {
+  static Button counterChip(Context context, String label, long value, int tone, View.OnClickListener listener) {
     Button button = new Button(context);
     button.setText(label + " " + value);
     button.setTextSize(12);

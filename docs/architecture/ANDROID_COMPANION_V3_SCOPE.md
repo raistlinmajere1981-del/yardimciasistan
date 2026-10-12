@@ -1,6 +1,6 @@
 # Android Companion v3 — kapsam ve sözleşme hazırlığı
 
-Durum: **A veri/izin sözleşmesi ve sonraki aşamaların kapsamı**. B/C/D kullanıcı arayüzü ve ses çalışmaları ayrı bloklardır.
+Durum: **A veri/izin sözleşmesi, B1 salt-okunur ekranlar ve sonraki aşamaların kapsamı**. B2 karar/detay güvenliği ile C/D çalışmaları ayrı bloklardır.
 Başlangıç incelemesi: 2026-10-12, `main` / `6f67f5b3`.
 Hedef: Masaüstüyle **iş kuralı ve veri tutarlılığı**; masaüstünün bütün ekranlarını telefona kopyalamak değil.
 
@@ -155,6 +155,37 @@ invalidates eder; henüz freeze edilmemiş pending Android işi yeni durumu kend
 revizyonunda okur. Stale completion ve restore/reset'in ham DELETE işlemi bunu yapmaz.
 Current-schema-only politikası geçerlidir; tarihsel migration/startup backfill yoktur.
 
+## B1 — Güvenli özetlerin Android ekran sözleşmesi
+
+Bugün içindeki `today:commerce`, `today:shipments` ve `today:marketing`
+alt görünümleri mevcut UiKit ve navigasyonu kullanır; yeni alt navigasyon sekmesi
+yoktur. Ticari sipariş erişimi Market capability'sine bağlı değildir.
+Bugün, yetkili cihazlarda bekleyen ticari sipariş/gönderi ve son kayıt penceresindeki
+pazarlama başarısızlık sayaçlarını gösterir. Özet bağlantıları sıfır kayıtta da erişilebilirdir.
+
+Sipariş kartı ID, canonical durum, kaynak, tarih, tutar/para birimi ve teslimat
+yöntemini gösterir. Online satış ve bayi filtreleri A izin/capability kesişimini
+kullanır; bayi siparişi filtresi ayrıca müşteri profili izni istemez.
+Gönderi görünümü yalnız görünür siparişlere bağlı kayıtları ve takip kaydı var/yok
+bilgisini gösterir. Pazarlama görünümü yayın/plan/kampanya durumlarını, mevcut son
+çalıştırma sonucunu ve başarısız adetlerini kullanır; hata nedeni üretmez.
+Online katalog durumu yayın niyeti ve pending bilgisidir; başarılı kanal yayını
+olarak yorumlanmaz. Liste sınırları ekranda belirtilir, işletme-genel sayaçlardan ayrıdır.
+
+Java, her çizimde canonical `CompanionData.redact` uygular. İzin/capability kaybı
+açık alt görünümü kapatır ve Bugün'e döndürür. Eksik optional alan henüz alınmamış
+özet olarak gösterilir; A sunucusunun eski snapshot'ı boş modele normalize ettiği
+durumda boş özet gösterilir. Özetin güncelleme zamanı ve son senkron zamanı ayrı
+gösterilir; yeni bir pull eski yayını güncelmiş gibi göstermez. Bağlantı hatasında son alınan özet,
+senkronizasyon ve mevcut telefon kuyruğunun bekleme durumu kullanılır.
+İkinci cache veya eşitleme hattı yoktur; A'nın çevrimdışı revocation sınırları geçerlidir.
+
+**B2 önkoşulu:** Sipariş onay/iptal düğmesi B1'de bulunmaz; karar izni olan admin
+cihazda da ekran salt-okunurdur. Alıcı ve sipariş kalemleri için güvenli, cihaz bazlı
+detay erişimi ve Hosting/LAN otorite/izin güncelliği çözülmeden düğmeler açılmaz.
+Adres, iletişim, müşteri kimliği ve takip kodu/URL bu aşamada eklenmez. B2,
+A'daki domain owner + receipt/outbox altyapısını yeniden kullanmalıdır.
+
 ## Uygulama blokları ve tamamlanma ölçütü
 
 ### A — Sözleşme ve izin (ilk kod işi / Codex'e uygun)
@@ -164,16 +195,18 @@ Current-schema-only politikası geçerlidir; tarihsel migration/startup backfill
 - [x] İzin/capability/security matrisi ve görünürlük testleri: Android OFF; ORDERS OFF; WHOLESALE OFF; ONLINE_SALES OFF; MARKETING OFF; staff/admin; revoked device; eksik eski snapshot.
 - [x] Hosting ve LAN yollarında read model redaksiyonunun sunucu sınırı testleri. Eski mobil sürümde bilinmeyen alanlar yok sayılmalı.
 
-### B — İlk değerli mobil davranışlar
+### B — Mobil davranışlar (B1 özet, B2 güvenli detay/karar)
 
 Confirm/cancel backend ve Java policy/outbox altyapısı A içinde hazırlanmıştır;
 aşağıdaki checkbox kullanıcı arayüzüne bağlı tamamlanma ölçütüdür.
 
-- [ ] Ticari sipariş listesi/detayı ve Bugün'de bekleyen sipariş sayısı.
+- [x] Ticari siparişlerin güvenli durum listesi ve Bugün'de bekleyen sipariş sayısı (B1).
+- [ ] Güvenli alıcı/kalem detayı (B2).
 - [ ] Yeni order confirm/cancel işlemleri **yalnız backend domain sahibi üzerinden**, permission+status+idempotency testleri ile.
 - [ ] Müşteri/Bayi profilinde kısa salt-okunur alanlar; siparişin ilgili müşteriye bağlanması.
-- [ ] Sipariş detayı içinde kargo takip ve durum; online kaynak ayrımı.
-- [ ] Pazarlama plan/yayın/başarısızlık durumlarının güvenli salt-okunur özeti.
+- [x] Sipariş özetinde gönderi durumu ve takip kaydı var/yok; online/bayi kaynak ayrımı (B1).
+- [ ] Takip kodu/URL için güvenli detay erişimi (B2).
+- [x] Pazarlama plan/yayın/başarısızlık durumlarının güvenli salt-okunur özeti (B1).
 - [ ] Mevcut Restoran/Pansiyon/Market ekranlarının regresyonu; full suite aşama sonunda.
 
 ### C — Ses (ayrı, ortak servis aşaması)

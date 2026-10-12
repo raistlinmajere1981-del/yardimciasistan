@@ -55,6 +55,7 @@ public final class MainActivity extends ComponentActivity {
   private String activeTab = TAB_TODAY;
   private boolean settingsOpen;
   private boolean loading;
+  private boolean operationsSyncFailed;
   private String connectionState = "Henüz bağlanmadı";
 
   private AndroidShellController shell;
@@ -132,6 +133,10 @@ public final class MainActivity extends ComponentActivity {
         if (TAB_MARKET.equals(activeTab) && marketWorkspace != null && marketWorkspace.handleBack()) {
           return;
         }
+        if (TAB_TODAY.equals(activeTab) && todayCoordinator != null && todayCoordinator.handleBack()) {
+          render();
+          return;
+        }
         if (TAB_REPORTS.equals(activeTab) || TAB_CASH.equals(activeTab)) {
           activeTab = TAB_TODAY;
           settingsOpen = true;
@@ -176,6 +181,7 @@ public final class MainActivity extends ComponentActivity {
           @Override public void onTabSelected(String tab) {
             activeTab = tab;
             settingsOpen = false;
+            if (TAB_TODAY.equals(tab) && todayCoordinator != null) todayCoordinator.handleBack();
             render();
           }
           @Override public boolean canOpenTab(String tab) { return MainActivity.this.canOpenTab(tab); }
@@ -272,6 +278,7 @@ public final class MainActivity extends ComponentActivity {
         this,
         operationCards,
         new AndroidTodayCoordinator.Listener() {
+          @Override public void render() { MainActivity.this.render(); }
           @Override
           public void openRoute(String route) {
             MainActivity.this.openRoute(route);
@@ -803,6 +810,7 @@ public final class MainActivity extends ComponentActivity {
     if (workspaceCoordinator != null) {
       workspaceCoordinator.applyDestination(data, destination);
     }
+    if (todayCoordinator != null) todayCoordinator.applyDestination(data, destination);
     activeTab = canOpenTab(destination.tab) ? destination.tab : TAB_TODAY;
   }
 
@@ -860,6 +868,7 @@ public final class MainActivity extends ComponentActivity {
     if (workspaceCoordinator != null) {
       workspaceCoordinator.normalize(data);
     }
+    if (todayCoordinator != null) todayCoordinator.normalize(data);
     boolean inactiveDevice = data.permissionsResolved && !data.deviceActive;
     if (inactiveDevice) {
       settingsOpen = false;
@@ -906,7 +915,7 @@ public final class MainActivity extends ComponentActivity {
       title = "Raporlar";
       screen = reportsScreen();
     } else {
-      title = "Bugün";
+      title = todayCoordinator.title();
       screen = todayScreen();
     }
 
@@ -941,7 +950,7 @@ public final class MainActivity extends ComponentActivity {
     if (TAB_REPORTS.equals(activeTab)) {
       return TAB_REPORTS + ":" + (reportsWorkspace == null ? AndroidUiRules.REPORT_LAST_7 : reportsWorkspace.screenKey());
     }
-    return activeTab;
+    return TAB_TODAY.equals(activeTab) && todayCoordinator != null ? todayCoordinator.screenKey() : activeTab;
   }
 
   private boolean canOpenTab(String tab) {
@@ -953,7 +962,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View todayScreen() {
-    return todayCoordinator.build(data, shell.contentBottomPaddingDp());
+    return todayCoordinator.build(data, shell.contentBottomPaddingDp(), loading, operationsSyncFailed);
   }
 
   private View customerScreen() {
@@ -1192,8 +1201,10 @@ public final class MainActivity extends ComponentActivity {
       @Override
       public void onStarted(String nextConnectionState) {
         loading = true;
+        operationsSyncFailed = false;
         connectionState = nextConnectionState;
         clearError();
+        if (companionViewVisible()) render();
       }
 
       @Override
@@ -1208,6 +1219,7 @@ public final class MainActivity extends ComponentActivity {
 
         data = result.data;
         loading = false;
+        operationsSyncFailed = false;
         connectionState = result.connectionState;
         if (result.discardedActionCount > 0) {
           showError(result.discardedActionCount + " bekleyen telefon işlemi yeni yetki veya capability sınırı nedeniyle iptal edildi.");
@@ -1220,7 +1232,7 @@ public final class MainActivity extends ComponentActivity {
             );
           }
         }
-        if (result.shouldRender) {
+        if (result.shouldRender || companionViewVisible()) {
           render();
         }
       }
@@ -1229,6 +1241,7 @@ public final class MainActivity extends ComponentActivity {
       public void onAndroidDisabled(OperationData disabledData, String message) {
         data = disabledData;
         loading = false;
+        operationsSyncFailed = false;
         connectionState = message;
         showError(message);
         render();
@@ -1241,6 +1254,7 @@ public final class MainActivity extends ComponentActivity {
           String retriedMarketActionType
       ) {
         loading = false;
+        operationsSyncFailed = true;
         connectionState = message;
         if (retryingOnlyMarketActions && marketWorkspace != null) {
           clearError();
@@ -1251,9 +1265,15 @@ public final class MainActivity extends ComponentActivity {
           render();
         } else {
           showError(message);
+          if (companionViewVisible()) render();
         }
       }
     });
+  }
+
+  private boolean companionViewVisible() {
+    return TAB_TODAY.equals(activeTab) && !settingsOpen
+        && todayCoordinator != null && todayCoordinator.isCompanionViewOpen();
   }
 
   private void sendAction(String actionType, JSONObject actionPayload, String successMessage) {

@@ -139,6 +139,7 @@ let originalDeviceOrientation = null;
 
 const options = parseArgs(process.argv.slice(2));
 let phoneTest = null;
+let companionPreferencesBackup = null;
 
 process.once("SIGINT", () => stopAndExit(0));
 process.once("SIGTERM", () => stopAndExit(0));
@@ -146,16 +147,20 @@ process.once("SIGTERM", () => stopAndExit(0));
 try {
   await main();
 } catch (error) {
-  cleanup();
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+  process.exitCode = 1;
+} finally {
+  cleanup();
+  await waitForPhoneTestExit();
+  restoreCompanionPreferences();
 }
 
 async function main() {
   ensureArtifactDir();
   ensureAdbDevice();
   lockDevicePortrait();
-  prepareStockGalleryFixture();
+  if (options.companionOnly) backupCompanionPreferences();
+  else prepareStockGalleryFixture();
 
   phoneTest = startPhoneTest();
   await waitForReady(phoneTest, options.readyTimeoutMs);
@@ -164,6 +169,11 @@ async function main() {
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
   await waitForUiText("Öncelikli işler", 12000);
+  if (options.companionOnly) {
+    await runCompanionOnly(baseUrl);
+    console.log("android-companion-device-ui-smoke-ok");
+    return;
+  }
   if (options.marketOnly) {
     await runMarketOnly(baseUrl);
     await restoreEmbeddedConnectionAfterTest();
@@ -863,6 +873,7 @@ function parseArgs(args) {
     noBuild: false,
     stockImageOnly: false,
     reportsOnly: false,
+    companionOnly: false,
     marketOnly: false
   };
 
@@ -876,6 +887,8 @@ function parseArgs(args) {
       parsed.reportsOnly = true;
     } else if (arg === "--market-only") {
       parsed.marketOnly = true;
+    } else if (arg === "--companion-only") {
+      parsed.companionOnly = true;
     } else if (arg.startsWith("--hold-ms=")) {
       parsed.holdMs = Number(arg.slice("--hold-ms=".length));
     } else if (arg === "--hold-ms") {
@@ -904,11 +917,189 @@ function parseArgs(args) {
   if (parsed.holdMs < 8000) {
     throw new Error("--hold-ms Android UI smoke için en az 8000 olmalı.");
   }
-  if ([parsed.stockImageOnly, parsed.reportsOnly, parsed.marketOnly].filter(Boolean).length > 1) {
-    throw new Error("--stock-image-only, --reports-only ve --market-only birlikte kullanılamaz.");
+  if ([parsed.stockImageOnly, parsed.reportsOnly, parsed.marketOnly, parsed.companionOnly].filter(Boolean).length > 1) {
+    throw new Error("Tek bir --*-only Android UI smoke seçeneği kullanılmalı.");
   }
 
   return parsed;
+}
+
+function backupCompanionPreferences() {
+  // Keep the original directory untouched inside the app sandbox, also on interruption.
+  // Never write credentials/cache/outbox into host artifacts.
+  adb(["shell", "am", "force-stop", packageName]);
+  const backupPath = "files/companion-ui-original-preferences";
+  const priorBackup = adb(["shell", "run-as", packageName, "test", "-d", backupPath], { allowFailure: true });
+  assert.notEqual(priorBackup.status, 0, "Önceki cihaz testi yedeği mevcut; test başlatılmadı. Bu klasörü shared_prefs olarak geri yükleyin.");
+  const existing = adb(["shell", "run-as", packageName, "test", "-d", "shared_prefs"], { allowFailure: true });
+  assert.equal(existing.status, 0, "Önce kurulu debug uygulamasını bir kez başlatın; mevcut tercihleri olmayan cihazda test başlatılmadı.");
+  const paths = adb(["shell", "run-as", packageName, "find", "shared_prefs", "-type", "f"]).stdout.trim().split(/\r?\n/);
+  const files = new Map();
+  for (const path of paths) {
+    assert.match(path, /^shared_prefs\/[A-Za-z0-9_.-]+$/);
+    files.set(path, adb(["exec-out", "run-as", packageName, "cat", path], { binary: true }).stdout);
+  }
+  // Keep only the existing device identity in the working test directory so the
+  // phone fixture can approve it before launch. Original credentials/outbox stay protected.
+  const original = files.get("shared_prefs/yardimci_asistan_android.xml")?.toString("utf8") ?? "";
+  const identity = original.match(/<string name="device_id">([^<]+)<\/string>/)?.[1] ?? "";
+  assert.match(identity, /^[A-Za-z0-9._:-]+$/);
+  adb(["shell", "run-as", packageName, "mv", "shared_prefs", backupPath]);
+  companionPreferencesBackup = { backupPath, files };
+  adb(["shell", "run-as", packageName, "mkdir", "shared_prefs"]);
+  adb(["shell", "-T", "run-as", packageName, "tee", "shared_prefs/yardimci_asistan_android.xml"], {
+    input: '<?xml version="1.0" encoding="utf-8" standalone="yes" ?><map><string name="device_id">' + identity + '</string></map>'
+  });
+  assert.equal(readDeviceId(), identity);
+}
+
+function restoreCompanionPreferences() {
+  if (!companionPreferencesBackup) return;
+  assert.ok(!phoneTest || phoneTest.exitCode !== null, "Telefon test süreci kapanmadan cihaz ayarları geri yüklenemez.");
+  adb(["shell", "am", "force-stop", packageName]);
+  const testPath = "files/companion-ui-test-preferences";
+  const working = adb(["shell", "run-as", packageName, "test", "-d", "shared_prefs"], { allowFailure: true });
+  if (working.status === 0) adb(["shell", "run-as", packageName, "mv", "shared_prefs", testPath]);
+  adb(["shell", "run-as", packageName, "mv", companionPreferencesBackup.backupPath, "shared_prefs"]);
+  for (const [path, content] of companionPreferencesBackup.files) {
+    const restored = adb(["exec-out", "run-as", packageName, "cat", path], { binary: true });
+    assert.ok(restored.stdout.equals(content), "Test sonrasında cihaz ayar dosyası birebir geri yüklenemedi.");
+  }
+  companionPreferencesBackup = null;
+  adb(["shell", "run-as", packageName, "rm", "-rf", testPath]);
+  console.log("Companion cihaz ayarları, kimlik ve mevcut kuyruk geri yüklendi.");
+}
+
+async function runCompanionOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  const time = "2026-10-13T10:00:00.000Z";
+  const rights = ["commerce_order.view", "commerce_order.confirm", "commerce_order.cancel",
+    "shipment.view", "online_sales.view", "marketing.status.view"];
+  function snapshot({ role = "staff", permissions = rights, capabilities, legacy = false, empty = false, active = true } = {}) {
+    const value = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
+    value.business_capabilities = capabilities ?? ["service.android", "commerce.orders", "commerce.wholesale",
+      "channel.online_sales", "marketing.studio", "messaging.campaigns", "core.customers"];
+    value.androidPermissions = { [deviceId]: { role, permissions, is_active: active } };
+    if (legacy) return value;
+    value.commerce = {
+      orders: empty ? [] : ["desktop", "web-online-sales", "web-dealer"].map((source, index) => ({
+        id: ["desktop-order", "online-order", "dealer-order"][index], source, status: "placed",
+        total: 123.45, currency: "EUR", delivery_method: "shipping", placed_at: time, updated_at: time,
+        address: "PRIVATE_ADDRESS", phone: "PRIVATE_PHONE", items: ["PRIVATE_ITEM"]
+      })),
+      shipments: empty ? [] : [{ id: "shipment-1", order_id: "dealer-order", status: "dispatched",
+        tracking_available: true, updated_at: time, tracking_number: "PRIVATE_NUMBER", tracking_url: "https://private.invalid/" }],
+      order_counts: empty ? [] : [{ source: "desktop", status: "placed", count: 123 }],
+      shipment_counts: empty ? [] : [{ source: "web-dealer", pending: 12 }],
+      online_catalog: { desired_product_count: 4, pending: true, updated_at: time }
+    };
+    value.marketing = {
+      publications: empty ? [] : [{ id: "publication-1", channel: "website", status: "failed",
+        revision: 2, published_revision: 1, desired_published: true, updated_at: time }],
+      schedules: empty ? [] : [{ id: "schedule-1", channel: "sms", target_type: "audience_campaign",
+        status: "active", last_execution_status: "failed", next_run_at: time, updated_at: time }],
+      campaigns: empty ? [] : [{ id: "campaign-1", channel: "sms", status: "completed",
+        pending_count: 0, failed_count: 2, updated_at: time }]
+    };
+    return value;
+  }
+  async function publish(value, label) {
+    const at = await publishSnapshot(baseUrl, value, label);
+    const xml = dumpUi("companion-before-refresh.xml");
+    tap(centerOf(findClickableBoundsByDescription(xml, "Yenile")));
+    await waitForCachedSnapshotText(at, 20000);
+    await delay(400);
+    scrollToTop();
+    return dumpUi("companion-" + label + ".xml");
+  }
+  async function clickText(text) {
+    const xml = dumpUi("companion-before-click.xml");
+    tap(centerOf(findClickableBoundsByText(xml, text)));
+    await delay(400);
+  }
+  async function readPage(label) {
+    let xml = "";
+    for (let index = 0; index < 5; index += 1) {
+      xml += dumpUi("companion-" + label + "-" + index + ".xml");
+      swipe(360, 1020, 360, 400, 300);
+      await delay(200);
+    }
+    assertNotContains(xml, ["PRIVATE_", "https://private.invalid/", 'text="Onayla"', 'text="İptal Et"',
+      'text="İptal"', 'text="Tahsilat"', 'text="Satışa Dönüştür"']);
+    scrollToTop();
+    return xml;
+  }
+  let top = await publish(snapshot(), "staff");
+  assertContains(top, ["Ticari sipariş 123", "Gönderi 12", "Pazarlama hatası 3",
+    "Ticari siparişler", "Gönderiler", "Pazarlama durumu"]);
+  assertNotContains(top, ['text="Market"', 'text="Restoran"', 'text="Pansiyon"']);
+  await clickText("Ticari siparişler");
+  await waitForUiText("Tümü", 8000);
+  await clickText("Bayi siparişleri");
+  const dealer = await readPage("dealer");
+  assertContains(dealer, ["Sipariş dealer-order", "Onay bekliyor", "Kaynak: Bayi siparişi", "EUR", "Teslimat: Kargo",
+    "Gönderildi", "Takip kaydı: Var"]);
+  assertNotContains(dealer, ["Sipariş online-order", "Sipariş desktop-order"]);
+  await clickText("Online satış");
+  const online = await readPage("online");
+  assertContains(online, ["Sipariş online-order", "Kaynak: Online satış", "Online katalog", "Yayın güncellemesi bekliyor"]);
+  assertNotContains(online, ["Sipariş dealer-order"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiText("Öncelikli işler", 8000);
+  await clickText("Gönderiler");
+  assertContains(await readPage("shipments"), ["Sipariş dealer-order", "Takip kaydı: Var"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await clickText("Pazarlama durumu");
+  assertContains(await readPage("marketing"), ["Yayın publication-1", "Başarısız", "Plan schedule-1",
+    "Son çalıştırma: Başarısız", "Kampanya campaign-1", "Bekleyen: 0 · Başarısız: 2"]);
+  captureScreenshot("companion-marketing.png");
+
+  top = await publish(snapshot({ permissions: [] }), "revoked");
+  assertContains(top, ["Görünüm kapatıldı", "izni kaldırıldı"]);
+  assertNotContains(top, ['text="Ticari siparişler"', 'text="Pazarlama durumu"', "publication-1", "dealer-order"]);
+  top = await publish(snapshot({ role: "admin" }), "admin");
+  assertContains(top, ["Yönetici", "Ticari siparişler"]);
+  await clickText("Ticari siparişler");
+  await readPage("admin-read-only"); // Decision permissions still produce no buttons.
+  await publish(snapshot({ capabilities: ["service.android"] }), "capability-off");
+  assertNotContains(await readPage("capability-off"), ['text="Ticari siparişler"', "Sipariş online-order"]);
+
+  await publish(snapshot({ legacy: true }), "legacy");
+  await clickText("Ticari siparişler");
+  assertContains(await readPage("legacy-orders"), ["Bu özette sipariş yok"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await clickText("Pazarlama durumu");
+  assertContains(await readPage("legacy-marketing"), ["Bu özette yayın yok", "Bu özette plan yok"]);
+  await publish(snapshot({ empty: true }), "empty");
+  assertContains(await readPage("empty-marketing"), ["Bu özette yayın yok", "Bu özette plan yok", "Bu özette kampanya yok"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await clickText("Ticari siparişler");
+  assertContains(await readPage("empty-orders"), ["Bu özette sipariş yok"]);
+
+  await publish(snapshot({ permissions: ["commerce_order.view"], capabilities: ["service.android", "commerce.orders"] }), "source-rights");
+  const restricted = await readPage("source-rights");
+  assertContains(restricted, ["Sipariş desktop-order"]);
+  assertNotContains(restricted, ['text="Online satış"', 'text="Bayi siparişleri"', "Sipariş online-order", "Sipariş dealer-order"]);
+  // Remove only the test's reverse tunnel: cached safe summaries remain usable.
+  const port = new URL(baseUrl).port;
+  adb(["reverse", "--remove", "tcp:" + port]);
+  const beforeOffline = dumpUi("companion-before-offline.xml");
+  tap(centerOf(findClickableBoundsByDescription(beforeOffline, "Yenile")));
+  await waitForUiText("Bağlantı kurulamadı; son alınan özet", 35000);
+  assertContains(await readPage("offline"), ["Sipariş desktop-order", "Son senkron:"]);
+  adb(["reverse", "tcp:" + port, "tcp:" + port]);
+  const queuedResponse = await fetch(baseUrl + "/api/sync.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
+    body: JSON.stringify({ action: "pull_android_actions", limit: 100 })
+  });
+  assert.equal(queuedResponse.ok, true);
+  const queued = await queuedResponse.json();
+  assert.equal(queued.ok, true);
+  assert.equal((queued.actions ?? []).some((action) => action.action_type.startsWith("commerce_order_")), false,
+    "Salt-okunur ekranlar ticari sipariş işlemi üretmemeli.");
+  await publish(snapshot({ active: false }), "inactive");
+  assertContains(dumpUi("companion-inactive.xml"), ["Cihaz Pasif"]);
 }
 
 async function runMarketOnly(baseUrl) {
@@ -1526,7 +1717,7 @@ function prepareAppForUi(baseUrl) {
   adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"], { allowFailure: true });
   adb(["shell", "wm", "dismiss-keyguard"], { allowFailure: true });
   adb(["shell", "am", "force-stop", "com.android.documentsui"], { allowFailure: true });
-  prepareSystemCameraForUiTest();
+  if (!options.companionOnly) prepareSystemCameraForUiTest();
   adb(["shell", "cmd", "statusbar", "collapse"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
@@ -2139,6 +2330,7 @@ function adb(args, options = {}) {
   const result = spawnSync("adb", args, {
     cwd: repoRoot,
     encoding: options.binary ? null : "utf8",
+    input: options.input,
     maxBuffer: options.maxBuffer ?? 10 * 1024 * 1024
   });
 
@@ -2185,7 +2377,7 @@ function waitForPhoneTestExit() {
       return;
     }
 
-    const timeout = setTimeout(resolve, 3000);
+    const timeout = setTimeout(resolve, 10000);
     phoneTest.once("exit", () => {
       clearTimeout(timeout);
       resolve();
@@ -2193,8 +2385,10 @@ function waitForPhoneTestExit() {
   });
 }
 
-function stopAndExit(code) {
+async function stopAndExit(code) {
   cleanup();
+  await waitForPhoneTestExit();
+  restoreCompanionPreferences();
   process.exit(code);
 }
 

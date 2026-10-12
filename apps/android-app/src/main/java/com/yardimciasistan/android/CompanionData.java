@@ -30,12 +30,14 @@ final class CompanionData {
   long pendingOrders, openOrders, pendingShipments;
   int recentFailedMarketingOperations, desiredProductCount;
   boolean onlineCatalogPending;
+  boolean commerceAvailable, marketingAvailable;
   String onlineCatalogUpdatedAt = "";
 
   static CompanionData fromJson(JSONObject root, OperationData data) {
     CompanionData result = new CompanionData();
     if (!data.permissionsResolved || !data.deviceActive || !data.hasBusinessCapability("service.android")) return result;
     JSONObject c = object(root, "commerce");
+    result.commerceAvailable = root.optJSONObject("commerce") != null;
     for (JSONObject r : rows(c, "orders", 100)) {
       if (!validId(r, "id") || !oneOf(r, "status", "placed", "confirmed", "fulfilled", "cancelled")
           || !oneOf(r, "source", "desktop", "other", "web-online-sales", "web-dealer")) continue;
@@ -69,6 +71,7 @@ final class CompanionData {
     result.desiredProductCount = number(catalog, "desired_product_count"); result.onlineCatalogPending = catalog.optBoolean("pending", false);
     result.onlineCatalogUpdatedAt = timestamp(catalog, "updated_at");
     JSONObject m = object(root, "marketing");
+    result.marketingAvailable = root.optJSONObject("marketing") != null;
     for (JSONObject r : rows(m, "publications", 50)) {
       if (!validId(r, "id") || !oneOf(r, "channel", "website", "instagram") || !oneOf(r, "status", "draft", "publishing", "published", "unpublished", "failed")) continue;
       Publication p = new Publication(); p.id = r.optString("id"); p.channel = r.optString("channel"); p.status = r.optString("status");

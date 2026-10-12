@@ -31,6 +31,10 @@ final class AndroidUiRules {
   static final String TAB_CASH = "cash";
   static final String TAB_REPORTS = "reports";
 
+  static final String TODAY_COMMERCE = "commerce";
+  static final String TODAY_SHIPMENTS = "shipments";
+  static final String TODAY_MARKETING = "marketing";
+
   static final String CUSTOMER_NEW = "new";
   static final String CUSTOMER_LIST = "customers";
   static final String CUSTOMER_WAITING = "waiting";
@@ -498,6 +502,9 @@ final class AndroidUiRules {
     String tab = parts.length > 0 ? parts[0] : "";
     String mode = parts.length > 1 ? parts[1] : "";
 
+    if (TAB_TODAY.equals(tab)) {
+      return new Destination(TAB_TODAY, CompanionUiRules.isMode(mode) ? mode : "");
+    }
     if (TAB_CUSTOMERS.equals(tab)) {
       if (!CUSTOMER_LIST.equals(mode) && !CUSTOMER_WAITING.equals(mode)) {
         mode = CUSTOMER_NEW;

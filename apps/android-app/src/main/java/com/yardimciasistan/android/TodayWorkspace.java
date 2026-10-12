@@ -28,19 +28,25 @@ final class TodayWorkspace {
   private final ComponentActivity activity;
   private final OperationData data;
   private final Listener listener;
+  private final String companionNotice;
 
   TodayWorkspace(
       ComponentActivity activity,
       OperationData data,
+      String companionNotice,
       Listener listener
   ) {
     this.activity = activity;
     this.data = data;
     this.listener = listener;
+    this.companionNotice = companionNotice;
   }
 
   View build() {
     LinearLayout page = UiKit.column(activity);
+    if (!companionNotice.isEmpty()) {
+      page.addView(emptyCard("Görünüm kapatıldı", companionNotice));
+    }
     boolean canViewCustomers = data.hasPermission("customer.view");
     boolean canViewRequests = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS)
         && data.hasPermission("customer.view");
@@ -58,8 +64,21 @@ final class TodayWorkspace {
     boolean canViewTables = data.hasPermission("table.view");
     boolean canViewOrders = data.hasPermission("table_order.view");
     boolean canViewStock = data.hasPermission("menu.stock_view");
+    boolean canViewCommerce = CompanionUiRules.canOpen(data, AndroidUiRules.TODAY_COMMERCE);
+    boolean canViewShipments = CompanionUiRules.canOpen(data, AndroidUiRules.TODAY_SHIPMENTS);
+    boolean canViewMarketing = CompanionUiRules.canOpen(data, AndroidUiRules.TODAY_MARKETING);
+    data.companion.redact(data);
 
     ArrayList<Counter> counters = new ArrayList<>();
+    if (canViewCommerce && data.companion.commerceAvailable) {
+      counters.add(new Counter("Ticari sipariş", data.companion.pendingOrders, UiKit.WARNING, "today:commerce"));
+    }
+    if (canViewShipments && data.companion.commerceAvailable) {
+      counters.add(new Counter("Gönderi", data.companion.pendingShipments, UiKit.INFO, "today:shipments"));
+    }
+    if (canViewMarketing && data.companion.marketingAvailable) {
+      counters.add(new Counter("Pazarlama hatası", data.companion.recentFailedMarketingOperations, UiKit.DANGER, "today:marketing"));
+    }
     if (canViewRequests) {
       counters.add(new Counter("Yeni", data.newRequests, UiKit.INFO, "customers:new"));
       counters.add(new Counter(
@@ -167,6 +186,10 @@ final class TodayWorkspace {
       page.addView(statusStrip(counters));
     }
 
+    if (canViewCommerce) page.addView(companionEntry(AndroidUiRules.TODAY_COMMERCE));
+    if (canViewShipments) page.addView(companionEntry(AndroidUiRules.TODAY_SHIPMENTS));
+    if (canViewMarketing) page.addView(companionEntry(AndroidUiRules.TODAY_MARKETING));
+
     page.addView(sectionLabel("Öncelikli işler"));
     int shown = 0;
     int categoryShown = 0;
@@ -260,7 +283,9 @@ final class TodayWorkspace {
           || canViewTasks
           || canViewTables
           || canViewOrders
-          || canViewStock;
+          || canViewStock
+          || canViewCommerce
+          || canViewMarketing;
       page.addView(
           hasOperationalPermission
               ? emptyCard(
@@ -299,6 +324,10 @@ final class TodayWorkspace {
     }
 
     return listener.wrap(page);
+  }
+
+  private View companionEntry(String mode) {
+    return UiKit.outlineButton(activity, CompanionUiRules.title(mode), view -> listener.openRoute("today:" + mode));
   }
 
   private View statusStrip(ArrayList<Counter> counters) {
@@ -403,11 +432,11 @@ final class TodayWorkspace {
 
   private static final class Counter {
     final String label;
-    final int value;
+    final long value;
     final int tone;
     final String route;
 
-    Counter(String label, int value, int tone, String route) {
+    Counter(String label, long value, int tone, String route) {
       this.label = label;
       this.value = value;
       this.tone = tone;

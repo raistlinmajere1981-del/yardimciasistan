@@ -263,6 +263,10 @@ const BASE_CHECKS = [
     phase: 27, presets: ["full"], domains: ["android"],
     requires: ["version-check"]
   }),
+  check("android-companion-device-ui", "Companion salt-okunur cihaz arayüzü", "node", ["scripts/smoke-android-device-ui.mjs", "--no-build", "--companion-only"], {
+    phase: 50, presets: [], domains: ["android"], manual: true,
+    requires: ["build-packages", "build-desktop", "build-android-debug"]
+  }),
   check("php-lint", "Web modülü PHP lint", "node", ["scripts/php-lint.mjs"], {
     phase: 20, presets: ["full"], domains: ["web", "business-messaging"]
   }),

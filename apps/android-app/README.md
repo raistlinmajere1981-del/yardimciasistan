@@ -10,7 +10,9 @@ Alt navigasyon işletmenin capability ve cihaz izinlerine göre ilgili operasyon
 ekranlarını gösterir:
 
 - **Bugün:** kompakt sayaç şeridi ile yeni talep, rezervasyon, günlük iş, hesap ve
-  kritik stok kayıtlarından oluşan tek bir öncelikli işler listesi.
+  kritik stok kayıtlarından oluşan tek bir öncelikli işler listesi. Yetkiye göre
+  ticari sipariş, gönderi ve pazarlama başarısızlık sayaçları ile salt-okunur özetlere
+  bağlantılar; bu özetler Market ekranı olmayan işletmelerde de erişilebilirdir.
 - **Müşteri:** `Yeni Talepler`, `Müşteriler` ve `Cevap Bekleyenler` segmentleri;
   karttaki kısa iletişim aksiyonlarından sonra karar ve uzun içerik tam ekran detayda.
 - **Pansiyon:** yetkiye göre gösterilen `Rezervasyonlar`, `Odalar` ve `İşler`
@@ -33,6 +35,13 @@ Masa siparişi tam ekran açılır; ürün arama ve kategori filtrelerinden sonr
 aktif adisyon satırları gösterilir. Servis, hesap ve yetkili cihazdaki kapatma aksiyonları
 ekranın altında en fazla iki sütunlu satırlara bölünerek sabit kalır. Stokta olmayan
 takipli ürünün ekleme aksiyonu devre dışıdır.
+
+Companion ticari özetleri ayrı `commerce_order.view`, `shipment.view`,
+`online_sales.view` ve `marketing.status.view` izinlerini kullanır. Online satış/bayi
+filtreleri mevcut capability sınırlarına bağlıdır; restoran adisyonlarıyla karışmaz.
+Siparişler en fazla 100, pazarlama türleri 50 kayıt gösterir. Gönderi takip kaydı
+yalnız var/yok olarak gösterilir. Onay/iptal, alıcı/kalem detayı, kişisel bilgi ve
+takip kodu/URL bu ekranlarda bulunmaz.
 
 Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
 `Ayarlar` ekranında gösterilir.
@@ -268,6 +277,16 @@ Saf Market profili, kamera barkod akışları, ekran dönüşünde sepet state'i
 
 ```bash
 npm run smoke:android-market-device-ui
+```
+
+Companion sipariş/gönderi/pazarlama özetleri, izin kaybı, eski/boş snapshot ve
+çevrimdışı gösterim için odaklı cihaz testi (önceden başlatılmış debug uygulaması
+gerektirir; mevcut tercih klasörünü cihaz içinde
+korur ve sonuçta geri yükler; kesilirse `files/companion-ui-original-preferences`
+klasörü özgün tercihleri saklar):
+
+```bash
+npm run verify:check -- android-companion-device-ui --include-manual
 ```
 
 ADB üzerinden ekran görüntüsü, UI ağacı ve aynalama:
