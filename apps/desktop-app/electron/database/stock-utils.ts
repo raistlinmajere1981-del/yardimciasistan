@@ -9,10 +9,6 @@ import type {
 
 export const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
 
-export function normalizePrice(value: number) {
-  return Number.isFinite(value) && value >= 0 ? value : 0;
-}
-
 export function normalizeStockPrecision(value: number): number {
   return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
 }
@@ -227,11 +223,6 @@ export function roundMoney(value: number): number {
   }
 
   return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-export function normalizeCurrency(value: string) {
-  const currency = value.trim().toUpperCase();
-  return currency || "TRY";
 }
 
 export function normalizeTableOrderCurrency(value: unknown): string {
