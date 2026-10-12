@@ -32,7 +32,7 @@ type StoredRequestReservationConversionResult =
   | { ok: true; message: string; reservationId: string }
   | { ok: false; message: string };
 
-export function ensureCustomerForRequest(db: DatabaseSync, request: Record<string, unknown>, now: string): string {
+function ensureCustomerForRequest(db: DatabaseSync, request: Record<string, unknown>, now: string): string {
   const requestCustomerId = String(request.customer_id ?? "").trim();
   if (requestCustomerId) {
     const existing = db.prepare("SELECT id FROM customers WHERE id = ? AND deleted_at = ''").get(requestCustomerId);

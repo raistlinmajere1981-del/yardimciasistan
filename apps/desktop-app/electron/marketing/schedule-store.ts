@@ -24,7 +24,7 @@ export function getMarketingScheduleExecution(db: DatabaseSync,id: string): Mark
   const r=db.prepare("SELECT e.* FROM marketing_schedule_executions e JOIN marketing_schedules s ON s.id=e.schedule_id WHERE e.id=? AND s.business_id=?").get(marketingId(id),business(db));
   if (!r) throw new MarketingError("not_found","Plan çalışması bulunamadı."); return executionRow(r);
 }
-export function marketingScheduleDetail(db: DatabaseSync,id: string): MarketingScheduleDetail {
+function marketingScheduleDetail(db: DatabaseSync,id: string): MarketingScheduleDetail {
   const schedule=getMarketingSchedule(db,id);
   const frozen=schedule.targetRevision?db.prepare("SELECT snapshot_json FROM marketing_publication_revisions WHERE publication_id=? AND revision=?").get(schedule.targetId,schedule.targetRevision):undefined;
   const snapshot=frozen?JSON.parse(String(frozen.snapshot_json)) as { title: unknown; mediaAssetIds: unknown[] }:undefined;

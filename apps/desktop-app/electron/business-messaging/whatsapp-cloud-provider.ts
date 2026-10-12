@@ -1,6 +1,6 @@
 import type { BusinessMessagingProviderAdapter, BusinessMessageTemplate } from "@yardimci-asistan/shared";
 import { BusinessMessagingError } from "./provider-error";
-export const WHATSAPP_GRAPH_API_VERSION = "v25.0";
+const WHATSAPP_GRAPH_API_VERSION = "v25.0";
 export interface WhatsAppCloudCredentials { wabaId: string; phoneNumberId: string; accessToken: string }
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const text = (value: unknown, limit = 512): value is string => typeof value === "string" && value.length > 0 && value.length <= limit;

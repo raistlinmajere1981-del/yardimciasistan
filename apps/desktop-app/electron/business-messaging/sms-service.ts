@@ -8,7 +8,7 @@ import { validateSmsConfiguration } from "../marketing/provider-configuration-st
 import { MessagingCampaignError } from "../messaging-campaigns/validation";
 import { reconcile, type DispatchResult } from "../messaging-campaigns/dispatch-contract";
 import { desktopLog } from "../desktop-logger";
-export const smsAccountKey = (credentials: IletiMerkeziCredentials) => createHash("sha256").update(JSON.stringify([credentials.apiKey, credentials.apiHash, credentials.senderId, credentials.iysList])).digest("hex");
+const smsAccountKey = (credentials: IletiMerkeziCredentials) => createHash("sha256").update(JSON.stringify([credentials.apiKey, credentials.apiHash, credentials.senderId, credentials.iysList])).digest("hex");
 export class SmsMessagingService {
   constructor(private readonly database: () => DesktopDatabase, private readonly options: { fetchImpl?: typeof fetch; timeoutMs?: number } = {}) {}
   getConfiguration() { return this.database().getSmsConfiguration(); }

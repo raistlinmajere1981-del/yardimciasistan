@@ -3,14 +3,14 @@ import type { ShippingEnvironment } from "@yardimci-asistan/shared";
 import { ShippingProviderError } from "./shipping-provider-error";
 
 const SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/";
-export const ARAS_SERVICE_NS = "http://tempuri.org/";
+const ARAS_SERVICE_NS = "http://tempuri.org/";
 const ENDPOINTS: Record<ShippingEnvironment, string> = {
   test: "https://customerservicestest.araskargo.com.tr/arascargoservice/arascargoservice.asmx",
   production: "https://customerws.araskargo.com.tr/arascargoservice.asmx"
 };
 const MAX_RESPONSE_BYTES = 512 * 1024;
 export type SoapElement = NonNullable<ReturnType<InstanceType<typeof DOMParser>["parseFromString"]>["documentElement"]>;
-export function xmlText(value: string) {
+function xmlText(value: string) {
   if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) throw new ShippingProviderError("invalid_input", "Kargo alanlarında geçersiz karakter var.");
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
@@ -32,6 +32,7 @@ export function field(element: SoapElement, name: string): string {
 }
 function malformed() { return new ShippingProviderError("malformed_xml", "Kargo sağlayıcısının yanıtı doğrulanamadı."); }
 
+/** @compiledSmoke scripts/smoke-commerce-aras-provider.mjs (dist-electron require) */
 export function parseSoapResult(xml: string, operation: string): SoapElement {
   if (Buffer.byteLength(xml, "utf8") > MAX_RESPONSE_BYTES || /<!DOCTYPE|<!ENTITY/i.test(xml)) throw malformed();
   try {

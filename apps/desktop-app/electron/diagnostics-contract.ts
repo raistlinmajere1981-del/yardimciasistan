@@ -73,7 +73,7 @@ export interface DesktopDiagnosticSupportSession {
   events: DesktopDiagnosticEvent[];
 }
 
-export interface DesktopSupportScreenshotDraft {
+interface DesktopSupportScreenshotDraft {
   previewDataUrl: string;
   width: number;
   height: number;

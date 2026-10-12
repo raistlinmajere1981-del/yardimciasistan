@@ -35,7 +35,7 @@ export interface SetBusinessCapabilityInput {
   enabled: boolean;
 }
 
-export interface ApplyBusinessProfileOptions {
+interface ApplyBusinessProfileOptions {
   preserveUserOverrides?: boolean;
 }
 
@@ -231,6 +231,7 @@ export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCa
 /**
  * Applies the same canonical transition as Setup. Changed profiles always recompute;
  * preserveUserOverrides applies only when explicitly reapplying the CURRENT profile.
+ * @compiledSmoke scripts/smoke-capability-settings-source.mjs and profile/capability smokes (dist-electron require)
  */
 export function applyBusinessProfileCapabilities(
   databasePath: string,

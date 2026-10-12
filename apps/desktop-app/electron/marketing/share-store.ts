@@ -6,7 +6,7 @@ import { createMessagingCampaign } from "../messaging-campaigns/store";
 import { marketingTransaction } from "./marketing-persistence";
 import { MarketingError, marketingChannel, marketingId, marketingText } from "./validation";
 
-export function emptyShareOptions(): MarketingShareOptions {
+function emptyShareOptions(): MarketingShareOptions {
   return { channels: [], audienceId: "", whatsapp: {templateName: "", templateLanguage: "", bindings: []}, timing: "now", startsLocal: "", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
 }
 function options(value: MarketingShareOptions): MarketingShareOptions {

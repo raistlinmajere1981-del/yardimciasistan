@@ -4,7 +4,8 @@ import { ShippingProviderError } from "./shipping-provider-error";
 
 export interface ArasCredentials { username: string; password: string; customerCode: string; environment: ShippingEnvironment }
 
-/** Numeric/undocumented states intentionally have no domain meaning. Exact text only. */
+/** Numeric/undocumented states intentionally have no domain meaning. Exact text only.
+ * @compiledSmoke scripts/smoke-commerce-aras-provider.mjs (dist-electron require) */
 export function mapArasShipmentStatus(state: string): CommerceShipmentStatus | null {
   const normalized = state.trim().toUpperCase().replace(/\s+/g, " ");
   const statuses: Record<string, CommerceShipmentStatus> = {

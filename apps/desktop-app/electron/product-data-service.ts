@@ -413,6 +413,7 @@ export async function archiveAndroidProductImage(databasePath: string, action: A
   }
 }
 
+/** @compiledSmoke apps/desktop-app/scripts/fixtures/commerce-product-media.cjs (dist-electron require) */
 export async function archiveExternalProductImage(
   databasePath: string,
   productId: string,

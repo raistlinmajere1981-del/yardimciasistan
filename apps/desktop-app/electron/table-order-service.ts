@@ -595,7 +595,7 @@ export function closeTableOrder(db: DatabaseSync, input: UpdateTableOrderStatusI
   );
 }
 
-export function updateTableStatusForOrder(
+function updateTableStatusForOrder(
   db: DatabaseSync,
   tableId: string,
   status: "available" | "occupied" | "bill_waiting",

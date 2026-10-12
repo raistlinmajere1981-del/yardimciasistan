@@ -8,7 +8,7 @@ export interface CampaignDispatchPolicy {
   pollIntervalMs: number; transientBackoffMs: number; rateLimitBackoffMs: number; maxBackoffMs: number;
 }
 /** Internal conservative policy, not a claim about any provider's account limits. */
-export const DEFAULT_CAMPAIGN_DISPATCH_POLICY: Readonly<CampaignDispatchPolicy> = {
+const DEFAULT_CAMPAIGN_DISPATCH_POLICY: Readonly<CampaignDispatchPolicy> = {
   batchSize: 3, minimumIntervalMs: 3000, maxAttempts: 4, claimLeaseMs: 300000,
   pollIntervalMs: 15000, transientBackoffMs: 5000, rateLimitBackoffMs: 60000, maxBackoffMs: 900000
 };

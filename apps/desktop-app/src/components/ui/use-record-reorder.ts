@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from "react";
 
+/** @compiledSmoke scripts/smoke-menu-reorder-contract.mjs (transpiled source VM) */
 export function moveRecordId(ids: string[], sourceId: string, targetId: string, position: "before" | "after"): string[] | null {
   if (!ids.includes(sourceId) || !ids.includes(targetId) || sourceId === targetId) return null;
   const next = ids.filter(id => id !== sourceId);

@@ -49,7 +49,8 @@ export async function publishBusinessAiContext(
   return result;
 }
 
-/** Web projection uses only the chosen map source; canonical location remains intact. */
+/** Web projection uses only the chosen map source; canonical location remains intact.
+ * @compiledSmoke scripts/smoke-settings-correctness.mjs (dist-electron require) */
 export function createCurrentBusinessWebContext(database: DesktopDatabase): BusinessWebContext {
   const profile = getBusinessPublicProfile(database.databasePath);
   const context = createCurrentBusinessAiContext(database);

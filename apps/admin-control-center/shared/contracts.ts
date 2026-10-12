@@ -79,12 +79,12 @@ export type ReleaseChannelSnapshot = {
   durationMs: number | null;
 };
 
-export type ReleaseSnapshot = {
+type ReleaseSnapshot = {
   expectedVersion: string;
   desktop: ReleaseChannelSnapshot[];
 };
 
-export type VerificationCheckSnapshot = {
+type VerificationCheckSnapshot = {
   id: string;
   label: string;
   phase: number;

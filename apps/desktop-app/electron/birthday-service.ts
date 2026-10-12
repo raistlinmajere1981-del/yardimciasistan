@@ -72,7 +72,7 @@ export interface DesktopBirthdayOverview {
   failedCount: number;
 }
 
-export interface DesktopAutomaticBirthdayClaim {
+interface DesktopAutomaticBirthdayClaim {
   id: string;
   customerId: string;
   birthdayYear: number;

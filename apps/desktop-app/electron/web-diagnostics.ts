@@ -30,7 +30,7 @@ export function safeWebTarget(value: string) {
   }
 }
 
-export function classifyWebFailure(input: {
+function classifyWebFailure(input: {
   status?: number;
   message?: string;
   error?: string;

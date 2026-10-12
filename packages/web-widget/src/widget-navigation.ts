@@ -73,7 +73,7 @@ export function resolveWidgetOpenOptions(
   return { view: "home", context, questionDraft: "" };
 }
 
-export function normalizeWidgetContext(value: WidgetContext | undefined): WidgetContext | null {
+function normalizeWidgetContext(value: WidgetContext | undefined): WidgetContext | null {
   if (!value) return null;
   const normalized: WidgetContext = {
     resourceType: String(value.resourceType ?? "").trim(),

@@ -7,7 +7,7 @@ export const widgetNexa = createNexaPresence({
   cancel: (handle) => window.clearTimeout(handle as number),
 });
 
-export function widgetNexaUrl(role: "launcher" | "welcome" | "header", state: NexaState, apiBaseUrl: string) {
+function widgetNexaUrl(role: "launcher" | "welcome" | "header", state: NexaState, apiBaseUrl: string) {
   const key = role !== "header" ? role : state === "thinking" || state === "speaking" || state === "concerned" ? state : "ready";
   const asset = resolveNexaAsset(manifest, manifest.runtime.web[key]);
   if (scriptUrl) return new URL(asset.assetPath, new URL(".", scriptUrl)).href;

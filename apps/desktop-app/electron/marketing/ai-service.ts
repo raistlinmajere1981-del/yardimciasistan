@@ -4,7 +4,8 @@ import type { DesktopDatabase } from "../database";
 import { getEffectiveAiApiKey } from "../ai-secret-service";
 import { MarketingError, marketingText, marketingChannel } from "./validation";
 
-/** Selected configured profile first, then other configured capable profiles. No renderer provider coupling. */
+/** Selected configured profile first, then other configured capable profiles. No renderer provider coupling.
+ * @compiledSmoke scripts/smoke-settings-correctness.mjs (dist-electron VM) */
 export function resolveMarketingAi(db: DesktopDatabase, capability: MarketingAiCapability): AIProviderConfig | undefined {
   if (!hasBusinessCapability(db.getEnabledBusinessCapabilities(),C.AI)) return;
   const setup=db.getSetupData();
@@ -18,7 +19,7 @@ export function resolveMarketingAi(db: DesktopDatabase, capability: MarketingAiC
   }
 }
 /** Privacy boundary: never enrich requests with Customers, recipient lists, messages or credentials. */
-export function sanitizeMarketingAiText(value: string, privateNames: readonly string[]): string {
+function sanitizeMarketingAiText(value: string, privateNames: readonly string[]): string {
   let text=value;
   for (const name of [...privateNames].sort((a,b)=>b.length-a.length)) {
     if (name.trim().length<2) continue;

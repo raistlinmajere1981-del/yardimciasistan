@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
+/** @compiledSmoke scripts/smoke-schema-authority.mjs (dist-electron require) */
 export const CURRENT_DESKTOP_SCHEMA_ERROR =
   "Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.";
 
-export type DesktopDatabaseCompatibilityState =
+type DesktopDatabaseCompatibilityState =
   | "fresh"
   | "current"
   | "incompatible"
@@ -40,6 +41,7 @@ function tableColumns(database: DatabaseSync, tableName: string) {
   );
 }
 
+/** @compiledSmoke scripts/smoke-schema-authority.mjs (dist-electron require) */
 export function currentDesktopSchemaProblem(
   database: DatabaseSync,
   schemaSql: string

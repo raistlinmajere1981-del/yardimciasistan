@@ -129,7 +129,7 @@ export function archiveLocalDataForCleanStart(
 
 export const CLEAN_START_SESSION_CLEAR_TIMEOUT_MS = 8_000;
 
-export type CleanStartOperationStatus = "completed" | "failed" | "timed-out";
+type CleanStartOperationStatus = "completed" | "failed" | "timed-out";
 
 export interface CleanStartOperationResult {
   name: string;
@@ -167,7 +167,7 @@ export async function settleCleanStartOperation(
   return result;
 }
 
-export interface CleanStartTransientCleanupFailure {
+interface CleanStartTransientCleanupFailure {
   name: string;
   code: string;
   message: string;
