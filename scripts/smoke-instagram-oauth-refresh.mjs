@@ -81,7 +81,27 @@ try {
   assert.equal(save.ok, true, save.message);
   assert.deepEqual(row(), linked, "Settings save must not overwrite OAuth credentials or expiry");
 
-  console.log("instagram-oauth-refresh-ok: threshold, rotation, failure preservation, concurrency, disconnect fencing, settings isolation");
+  // Instagram's service toggle pauses publication but preserves the OAuth grant.
+  const tokenBeforePause = row();
+  const oauthBeforePause = f.db.getInstagramConfiguration();
+  assert.equal(oauthBeforePause.enabled, true);
+  service.setEnabled(false);
+  assert.equal(f.db.getInstagramConfiguration().enabled, false);
+  assert.equal(f.db.getInstagramConfiguration().configured, false);
+  assert.deepEqual(row(), tokenBeforePause, "pausing must preserve encrypted token, account and expiry");
+  await service.refreshIfNeeded();
+  assert.equal(refreshCalls, 4, "a paused channel must not refresh in background");
+  service.setEnabled(true);
+  assert.equal(f.db.getInstagramConfiguration().enabled, true);
+  assert.deepEqual(row(), tokenBeforePause, "resuming must reuse the same OAuth connection");
+
+  connect("EXPIRED_TOKEN", -1);
+  service.setEnabled(false);
+  assert.throws(() => service.setEnabled(true), /Instagram erişimi geçerli değil/);
+  assert.equal(f.db.getInstagramConfiguration().enabled, false, "expired account stays paused");
+  assert.notEqual(row().secret_one_encrypted, "", "pause must not delete expired token; reconnect remains possible");
+
+  console.log("instagram-oauth-refresh-ok: threshold, rotation, failure preservation, concurrency, disconnect fencing, settings isolation, pause/resume");
 } finally {
   raw.close();
   await f.dispose();

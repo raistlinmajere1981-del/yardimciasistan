@@ -404,6 +404,7 @@ const bridge: DesktopBridge = {
   beginInstagramOAuth: () => invokeWhenUnlocked("marketingProviders:beginInstagramOAuth"),
   pollInstagramOAuth: () => invokeWhenUnlocked("marketingProviders:pollInstagramOAuth"),
   disconnectInstagramOAuth: () => invokeWhenUnlocked("marketingProviders:disconnectInstagramOAuth"),
+  setInstagramEnabled: (enabled) => invokeWhenUnlocked("marketingProviders:setInstagramEnabled",enabled),
   getMarketingSchedules: (month) => invokeWhenUnlocked("marketingSchedules:list", month),
   saveMarketingSchedule: (input) => invokeWhenUnlocked("marketingSchedules:save", input),
   transitionMarketingSchedule: (id, revision, action) => invokeWhenUnlocked("marketingSchedules:transition", id, revision, action),

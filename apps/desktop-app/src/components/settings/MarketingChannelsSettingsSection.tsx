@@ -77,6 +77,13 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
     } catch {setMessage("Instagram giriş işlemi başlatılamadı.");}
     finally {setWorking(false);}
   }
+  async function toggleEnabled(enabled:boolean) {
+    if(busy||working||waiting||!config?.hasSecret)return;
+    setWorking(true);setMessage("");setTestResult(null);setConfirmDisconnect(false);
+    try {setConfig(await window.yardimciDesktop!.setInstagramEnabled(enabled));}
+    catch {setMessage(enabled?"Instagram etkinleştirilemedi. Erişim süresi dolduysa hesabı yeniden bağlayın.":"Instagram duraklatılamadı.");}
+    finally {setWorking(false);}
+  }
   async function disconnect() {
     if(!confirmDisconnect){setConfirmDisconnect(true);return;}
     setWorking(true);
@@ -92,18 +99,21 @@ export function InstagramSettingsSection({busy}:{busy:boolean}) {
     catch {setMessage("Instagram bağlantısı test edilemedi.");}
     finally {setWorking(false);}
   }
-  const linked=Boolean(config?.configured && config.username);
-  const legacy=Boolean(config?.configured && !config.username);
-  return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram" enabled
-    status={linked?`Bağlı · @${config?.username}`:legacy?"Önceki bağlantı · Yeniden bağlayın":"Bağlı değil"}>
-    {linked && <p role="status"><strong>@{config?.username}</strong> · Paylaşım izni etkin{config?.expiresAt?` · Erişim: ${new Date(config.expiresAt).toLocaleDateString("tr-TR")}`:""}</p>}
+  const linked=Boolean(config?.hasSecret && config.accountId && config.username);
+  const legacy=Boolean(config?.hasSecret && config.accountId && !config.username);
+  return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram"
+    enabled={Boolean(config?.enabled)} onEnabledChange={enabled=>void toggleEnabled(enabled)}
+    toggleDisabled={busy||working||waiting||!config?.hasSecret} disabled={busy||working||waiting}
+    showBodyWhenDisabled
+    status={linked?(config?.enabled?`Bağlı · @${config?.username}`:`Bağlı · Pasif · @${config?.username}`):legacy?"Önceki bağlantı · Yeniden bağlayın":"Bağlı değil"}>
+    {linked && <p role="status"><strong>@{config?.username}</strong> · {config?.enabled?"Paylaşım izni etkin":"Paylaşımlar duraklatıldı"}{config?.expiresAt?` · Erişim: ${new Date(config.expiresAt).toLocaleDateString("tr-TR")}`:""}</p>}
     {legacy && <p role="status">Önceki manuel bağlantı bulundu. Yeni bağlantı kurulduğunda eski erişim anahtarı otomatik değiştirilir.</p>}
     {waiting && <p role="status">Instagram girişini tarayıcıda tamamlayın. Bağlantı bekleniyor; bu sayfadan ayrılırsanız daha sonra tekrar bağlanabilirsiniz.</p>}
     <div className="action-row">
       <ActionButton disabled={busy||working||waiting} busy={working} onClick={()=>void begin()}>
         {linked||legacy?"Hesabı yeniden bağla":"Instagram ile bağlan"}
       </ActionButton>
-      {linked && <ActionButton variant="secondary" disabled={busy||working||waiting} onClick={()=>void test()}>Bağlantıyı test et</ActionButton>}
+      {linked && config?.enabled && <ActionButton variant="secondary" disabled={busy||working||waiting} onClick={()=>void test()}>Bağlantıyı test et</ActionButton>}
       {(linked||legacy) && <ActionButton variant="secondary" disabled={busy||working||waiting} onClick={()=>void disconnect()}>
         {confirmDisconnect?"Bağlantıyı kesmeyi onayla":"Bağlantıyı kes"}
       </ActionButton>}

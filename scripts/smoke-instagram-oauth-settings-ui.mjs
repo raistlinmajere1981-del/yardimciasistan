@@ -27,6 +27,8 @@ try {
   const section = page.getByRole("region", {name:"Instagram"});
   await expect(section).toBeVisible();
   await expect(section).toContainText("Bağlı değil");
+  await expect(section.getByRole("checkbox", {name:"Instagram servisi"})).not.toBeChecked();
+  await expect(section.getByRole("checkbox", {name:"Instagram servisi"})).toBeDisabled();
   await expect(page.getByRole("textbox", {name:"Instagram User ID"})).toHaveCount(0);
   await expect(page.getByRole("textbox", {name:"Instagram Access Token"})).toHaveCount(0);
   await section.getByRole("button", {name:"Instagram ile bağlan"}).click();
@@ -35,6 +37,17 @@ try {
   await page.evaluate(() => {window.__igSettingsState.stage = "complete";});
   await expect(section).toContainText("@ornek_hesap", {timeout: 9000});
   await expect(section).toContainText("Paylaşım izni etkin");
+  const activeToggle=section.getByRole("checkbox", {name:"Instagram servisi"});
+  await expect(activeToggle).toBeChecked();
+  await activeToggle.uncheck();
+  await expect(activeToggle).not.toBeChecked();
+  await expect(section).toContainText("Paylaşımlar duraklatıldı");
+  await expect(section.getByRole("button", {name:"Hesabı yeniden bağla"})).toBeVisible();
+  await expect(section.getByRole("button", {name:"Bağlantıyı test et"})).toHaveCount(0);
+  await activeToggle.check();
+  await expect(activeToggle).toBeChecked();
+  await expect(section).toContainText("Paylaşım izni etkin");
+  assert.equal(await page.evaluate(() => window.__igSettingsState.toggleCount),2);
   await expect(section).not.toContainText("Instagram Business veya Creator hesabınızı");
   await expect(section).not.toContainText("Instagram @ornek_hesap bağlandı.");
   await expect(section).not.toContainText("Görsel yayınlamak için HTTPS Web Modülü");
@@ -45,6 +58,8 @@ try {
   assert.equal(await page.evaluate(() => window.__igSettingsState.disconnectCount),0);
   await section.getByRole("button", {name:"Bağlantıyı kesmeyi onayla"}).click();
   await expect(section).toContainText("Bağlı değil");
+  await expect(activeToggle).not.toBeChecked();
+  await expect(activeToggle).toBeDisabled();
   assert.equal(await page.evaluate(() => window.__igSettingsState.disconnectCount),1);
   assert.deepEqual(errors, []);
   console.log("instagram-oauth-settings-ui-ok: no manual fields, connect, one-time poll, verified account, double-confirm disconnect");

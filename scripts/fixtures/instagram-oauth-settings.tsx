@@ -7,7 +7,7 @@ const empty = {
   apiVersion: "v25.0", hasSecret: false, configured: false
 };
 const state = {
-  configuration: {...empty}, stage: "idle", beginCount: 0, pollCount: 0, disconnectCount: 0
+  configuration: {...empty}, stage: "idle", beginCount: 0, pollCount: 0, disconnectCount: 0, toggleCount: 0
 };
 (window as unknown as {__igSettingsState:typeof state}).__igSettingsState = state;
 Object.defineProperty(window, "yardimciDesktop", {
@@ -28,6 +28,10 @@ Object.defineProperty(window, "yardimciDesktop", {
         return {status:"connected",username:"ornek_hesap"};
       }
       return {status:"failed",message:"Giriş tamamlanamadı."};
+    },
+    setInstagramEnabled: async (enabled:boolean) => {
+      state.toggleCount++; state.configuration = {...state.configuration, enabled, configured:enabled && state.configuration.hasSecret};
+      return {...state.configuration};
     },
     disconnectInstagramOAuth: async () => {
       state.disconnectCount++; state.configuration = {...empty};

@@ -1023,6 +1023,7 @@ export class DesktopDatabase {
   getInstagramConfiguration() { return marketingProviderStore.instagramConfiguration(this.db); }
   saveInstagramOAuthConnection(account: Parameters<typeof instagramOAuthStore.saveInstagramOAuth>[1]) { return instagramOAuthStore.saveInstagramOAuth(this.db,account); }
   disconnectInstagramOAuthConnection() { return instagramOAuthStore.disconnectInstagramOAuth(this.db); }
+  setInstagramOAuthEnabled(enabled: boolean) { return instagramOAuthStore.setInstagramOAuthEnabled(this.db, enabled); }
   getStoredMarketingProvider(provider: "iletimerkezi" | "instagram_api") { return marketingProviderStore.storedMarketingProvider(this.db, provider); }
   listMarketingContents() { return marketingStore.listMarketingContents(this.db); }
   getMarketingShare(id: string) { return marketingShareStore.getMarketingShare(this.db, id); }
