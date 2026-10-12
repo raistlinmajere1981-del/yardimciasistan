@@ -9,6 +9,7 @@ const dataPaths = read("apps/desktop-app/electron/data-paths.ts");
 const commerceIpc = read("apps/desktop-app/electron/commerce-ipc.ts");
 const productDataService = read("apps/desktop-app/electron/product-data-service.ts");
 const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
+const androidActionSync = read("apps/desktop-app/electron/android-action-sync-service.ts");
 const dataMaintenance = read("apps/desktop-app/electron/data-maintenance.ts");
 const updateService = read("apps/desktop-app/electron/desktop-update-service.ts");
 const companionServer = read("apps/desktop-app/electron/local-companion-server.ts");
@@ -94,7 +95,10 @@ assert.match(productDataService, /product-data\.image-archive\.failed/);
 assert.match(commerceIpc, /commerce\.domain\.rejected/);
 assert.match(commerceIpc, /desktopLog\.warn\(\{[\s\S]*?event:\s*"commerce\.domain\.rejected"/);
 assert.match(commerceIpc, /mutateForIpc\("commerce:sale:createPaid"/);
-assert.match(syncCoordinator, /product-data\.image-archive\.failed/);
+// The canonical Android ingress delegates image archiving to product-data-service.
+// Its structured failure event must remain at that owner after the sync refactor.
+assert.match(androidActionSync, /archiveAndroidProductImage\(/);
+assert.match(productDataService, /event:\s*"product-data\.image-archive\.failed"/);
 assert.match(dataMaintenance, /restore\.pending\.apply\.failed/);
 assert.match(dataMaintenance, /reset\.preferences\.clear\.failed/);
 assert.match(dataMaintenance, /restore\.republish\.failed/);
