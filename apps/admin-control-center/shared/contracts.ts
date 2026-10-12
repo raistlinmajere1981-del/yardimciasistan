@@ -193,12 +193,14 @@ export type DeploymentRunState = {
 };
 
 export type ReleaseOperationRequest = {
-  action: "package" | "preview" | "publish";
+  action: "version" | "package" | "preview" | "publish";
+  version?: string;
+  updateWebModule?: boolean;
 };
 
 export type ReleaseOperationState = {
   running: boolean;
-  action: "package" | "preview" | "publish" | "";
+  action: "version" | "package" | "preview" | "publish" | "";
   stage: string;
   startedAt: string | null;
   finishedAt: string | null;

@@ -672,6 +672,13 @@ function Installations({
   );
 }
 
+function nextPatchVersion(value: string) {
+  const parts = value.split(".").map(Number);
+  return parts.length === 3 && parts.every(Number.isSafeInteger)
+    ? `${parts[0]}.${parts[1]}.${parts[2]! + 1}`
+    : "";
+}
+
 function Release({
   data,
   refreshing,
@@ -684,7 +691,15 @@ function Release({
   const webInstallations = data.installations.filter((item) => item.versionEndpoint);
   const publishedDesktop = data.release.desktop.filter((item) => item.status === "ready").length;
   const [confirmPublish, setConfirmPublish] = useState(false);
+  const [confirmVersion, setConfirmVersion] = useState(false);
+  const [versionInput, setVersionInput] = useState(() => nextPatchVersion(data.product.version));
+  const [updateWebModule, setUpdateWebModule] = useState(true);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setVersionInput(nextPatchVersion(data.product.version));
+    setConfirmVersion(false);
+  }, [data.product.version]);
   const [verifyRun, setVerifyRun] = useState<VerificationRunState>({
     totalPlanned: 0,
     checks: [],
@@ -784,6 +799,15 @@ function Release({
     const result = await window.adminControlCenter.startVerification({ mode: "preset", value: "release" });
     setMessage(result.message);
   }, []);
+
+  const prepareVersion = useCallback(async () => {
+    setConfirmVersion(false);
+    setMessage("");
+    const result = await window.adminControlCenter.startReleaseOperation({
+      action: "version", version: versionInput.trim(), updateWebModule
+    });
+    setMessage(result.message);
+  }, [versionInput, updateWebModule]);
 
   const startReleaseAction = useCallback(async (action: "package" | "preview" | "publish") => {
     setMessage("");
@@ -889,32 +913,68 @@ function Release({
           <span className="quiet">Her adım canonical scriptleri çalıştırır.</span>
         </div>
 
+        <div className="release-version-preparation">
+          <div className="release-version-heading">
+            <div>
+              <strong>1 · Yeni Sürüm Hazırla</strong>
+              <small>Mevcut v{data.product.version} · Android kodu {data.product.androidVersionCode} · Web v{data.product.webModuleVersion}</small>
+            </div>
+            <span className="quiet">Yalnız sürüm dosyaları değişir; test ve paketleme başlamaz.</span>
+          </div>
+          <div className="release-version-controls">
+            <label className="release-version-input">
+              <span>Yeni ürün sürümü</span>
+              <input aria-label="Yeni ürün sürümü" value={versionInput} disabled={busy}
+                onChange={(event) => { setVersionInput(event.target.value); setConfirmVersion(false); }}
+                placeholder="2.0.6" spellCheck={false}/>
+            </label>
+            <label className="release-version-check">
+              <input type="checkbox" checked={updateWebModule} disabled={busy}
+                onChange={(event) => { setUpdateWebModule(event.target.checked); setConfirmVersion(false); }}/>
+              Web modülü sürümünü de eşitle
+            </label>
+            <button className="button button--primary" disabled={busy || !/^\d+\.\d+\.\d+$/.test(versionInput.trim())}
+              onClick={() => setConfirmVersion(true)}>
+              <Save size={16}/> Sürümü Hazırla
+            </button>
+          </div>
+          {confirmVersion && !busy ? (
+            <div className="release-version-confirm" role="group" aria-label="Sürüm hazırlama onayı">
+              <span><strong>Onay:</strong> v{data.product.version} → v{versionInput.trim()} · Android kodu {data.product.androidVersionCode + 1}
+                {" · "}Web modülü {updateWebModule ? `v${versionInput.trim()}` : `v${data.product.webModuleVersion} (değişmez)`}</span>
+              <div className="release-version-confirm-actions">
+                <button className="button button--secondary" onClick={() => setConfirmVersion(false)}>Vazgeç</button>
+                <button className="button button--primary" onClick={() => void prepareVersion()}>Onayla ve Hazırla</button>
+              </div>
+            </div>
+          ) : null}
+        </div>
         <div className="release-action-grid">
           <button className="release-action-card" disabled={busy} onClick={() => void startVerify()}>
             <FlaskConical size={22} />
             <div>
-              <strong>1 · Release Check</strong>
+              <strong>2 · Release Check</strong>
               <small>verify:release presetini çalıştırır.</small>
             </div>
           </button>
           <button className="release-action-card" disabled={busy} onClick={() => void startReleaseAction("package")}>
             <PackageCheck size={22} />
             <div>
-              <strong>2 · Paketleri Oluştur</strong>
+              <strong>3 · Paketleri Oluştur</strong>
               <small>Windows x64/x86, Linux, Android APK ve web modülü.</small>
             </div>
           </button>
           <button className="release-action-card" disabled={busy} onClick={() => void startReleaseAction("preview")}>
             <ShieldCheck size={22} />
             <div>
-              <strong>3 · Yayın Farkını Gör</strong>
+              <strong>4 · Yayın Farkını Gör</strong>
               <small>Landing + downloads dry-run; canlıya yazmaz.</small>
             </div>
           </button>
           <button className="release-action-card release-action-card--danger" disabled={busy} onClick={() => setConfirmPublish(true)}>
             <Rocket size={22} />
             <div>
-              <strong>4 · Kurulumları Yayınla</strong>
+              <strong>5 · Kurulumları Yayınla</strong>
               <small>Landing, installer dosyaları ve update feed canlıya gider.</small>
             </div>
           </button>

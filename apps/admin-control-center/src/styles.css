@@ -2877,6 +2877,90 @@ body {
   padding-bottom: 16px;
 }
 
+
+.release-version-preparation {
+  margin-top: 14px;
+  padding: 17px;
+  border: 1px solid #dce8f3;
+  border-radius: 13px;
+  background: #f8fbfe;
+}
+
+.release-version-heading,
+.release-version-controls,
+.release-version-confirm,
+.release-version-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.release-version-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.release-version-heading > div,
+.release-version-input {
+  display: grid;
+  gap: 4px;
+}
+
+.release-version-heading strong {
+  color: #183654;
+  font-size: 15px;
+}
+
+.release-version-heading small,
+.release-version-input span {
+  color: #72879d;
+  font-size: 12px;
+}
+
+.release-version-controls {
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.release-version-input input {
+  width: 150px;
+  padding: 10px 11px;
+  font: inherit;
+  color: #173452;
+  background: #fff;
+  border: 1px solid #c8d9e9;
+  border-radius: 9px;
+}
+
+.release-version-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #445f7b;
+  cursor: pointer;
+}
+
+.release-version-check input {
+  width: 17px;
+  height: 17px;
+  accent-color: #1674cb;
+}
+
+.release-version-confirm {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  border-top: 1px solid #dae6f2;
+  padding-top: 14px;
+  color: #294a69;
+  font-size: 13px;
+}
+
+.release-version-confirm-actions {
+  gap: 8px;
+}
+
 .release-action-grid {
   padding-top: 14px;
   display: grid;

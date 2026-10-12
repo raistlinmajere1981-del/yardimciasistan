@@ -1,4 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { planReleaseVersion, type ProductReleaseSnapshot } from "./release-version-plan";
 import process from "node:process";
 import type { ReleaseOperationRequest, ReleaseOperationState } from "../../shared/contracts";
 
@@ -79,11 +82,21 @@ export class ReleaseRunner {
     }
 
     const action = request?.action;
-    if (!["package", "preview", "publish"].includes(action)) {
+    if (!["version", "package", "preview", "publish"].includes(action)) {
       return { accepted: false, message: "Geçersiz release işlemi." };
     }
 
-    const steps = stepsFor(action);
+    let steps: Step[];
+    if (action === "version") {
+      try {
+        const product = JSON.parse(readFileSync(join(this.repoRoot, "product-version.json"), "utf8")) as ProductReleaseSnapshot;
+        steps = planReleaseVersion(request, product, npmCommand()).steps;
+      } catch (error) {
+        return { accepted: false, message: error instanceof Error ? error.message : "Sürüm hazırlama başlatılamadı." };
+      }
+    } else {
+      steps = stepsFor(action);
+    }
     this.cancelled = false;
     this.state = {
       running: true,
@@ -99,6 +112,7 @@ export class ReleaseRunner {
     void this.runSteps(steps);
 
     const labels = {
+      version: "Yeni sürüm hazırlanıyor. Test ve paketleme başlatılmayacak.",
       package: "Release paketleri oluşturuluyor.",
       preview: "Yayın farkı kontrol ediliyor.",
       publish: "Kurulum dosyaları ve update feed yayınlanıyor."

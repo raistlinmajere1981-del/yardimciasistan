@@ -40,7 +40,7 @@
     "doctor": "node scripts/dev-doctor.mjs",
     "admin": "npm run dev -w @yardimci-asistan/admin-control-center",
     "admin:check": "npm run typecheck -w @yardimci-asistan/admin-control-center && npm run build:check -w @yardimci-asistan/admin-control-center",
-    "test:admin": "npm run admin:check && npm run test:verification -w @yardimci-asistan/admin-control-center",
+    "test:admin": "npm run admin:check && npm run test:verification -w @yardimci-asistan/admin-control-center && node --test scripts/test-admin-release-version.mjs",
     "test:local-credentials": "node --test scripts/test-local-credentials.mjs",
     "e2e": "playwright test --pass-with-no-tests",
     "lint:php": "node scripts/php-lint.mjs",
