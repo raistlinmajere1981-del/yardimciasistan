@@ -70,19 +70,17 @@ export function widgetStyles(rootId: string, widgetConfig: WidgetStyleConfig) {
       transition: background-color 180ms ease;
     }
     .ya-widget-button:hover { background: #eef6fa; }
-    .ya-widget-launcher-avatar { display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center; }
+    #${rootId} .ya-widget-launcher-avatar { display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center; }
     .ya-widget-launcher-copy { display: grid; min-width: 0; text-align: left; }
     .ya-widget-launcher-copy strong { font-size: 14px; }
     .ya-widget-launcher-copy small { color: #5e7384; font-size: 11px; }
-    .ya-widget-nexa { display: block; width: 100%; height: 100%; object-fit: contain; }
-    .ya-widget-nexa-welcome { display: block; width: 112px; height: 112px; flex: 0 0 auto; }
-    .ya-widget-business-mark { display: inline-flex; vertical-align: middle; margin-right: 6px; }
-    .ya-widget-business-mark .ya-widget-mark { width: 20px; height: 20px; border-radius: 4px; }
-    .ya-widget-business-mark .ya-widget-mark-fallback { font-size: 8px; }
-    .ya-widget-nexa.is-nexa-changing { animation: ya-nexa-state-in 180ms ease-out both; }
-    #${rootId}[data-nexa-motion-active="true"] [data-nexa-role="header"] { animation: ya-nexa-state-in 180ms ease-out both; }
-    #${rootId}[data-nexa-motion-active="false"] .ya-widget-nexa { animation: none; }
-    @keyframes ya-nexa-state-in { from { opacity: .65; transform: translateY(1px); } to { opacity: 1; transform: translateY(0); } }
+    #${rootId} .ya-widget-nexa,
+    #${rootId} .ya-widget-nexa-fallback { display: block; width: 100%; height: 100%; object-fit: contain; }
+    #${rootId} .ya-widget-nexa-welcome { display: block; width: 112px; height: 112px; flex: 0 0 auto; position: relative; }
+    #${rootId} .ya-widget-nexa-welcome::after { content: ""; position: absolute; width: 48px; height: 4px; left: 32px; bottom: 2px; border-radius: 50%; background: rgba(18,45,70,.1); filter: blur(2px); }
+    #${rootId} .ya-widget-business-mark { display: inline-flex; vertical-align: middle; margin-right: 6px; }
+    #${rootId} .ya-widget-business-mark .ya-widget-mark { width: 20px; height: 20px; border-radius: 4px; }
+    #${rootId} .ya-widget-business-mark .ya-widget-mark-fallback { font-size: 8px; }
     @media (prefers-color-scheme: dark) {
       .ya-widget-button { background: #1d2e40; color: #eef6fb; border-color: #415668; }
       .ya-widget-button:hover { background: #263d50; }
@@ -172,8 +170,7 @@ export function widgetStyles(rootId: string, widgetConfig: WidgetStyleConfig) {
       min-width: 0;
     }
 
-    .ya-widget-avatar { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; }
-
+    #${rootId} .ya-widget-avatar { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; }
     .ya-widget-title-copy {
       display: grid;
       min-width: 0;
@@ -1325,7 +1322,8 @@ export function widgetStyles(rootId: string, widgetConfig: WidgetStyleConfig) {
         transition: none;
       }
 
-      .ya-widget-nexa.is-nexa-changing,
+      #${rootId} .ya-widget-launcher-avatar,
+      #${rootId} .ya-widget-avatar,
       .ya-widget-panel.is-opening,
       .ya-widget-panel.is-closing,
       .ya-widget-home,
@@ -1336,6 +1334,7 @@ export function widgetStyles(rootId: string, widgetConfig: WidgetStyleConfig) {
       .ya-widget-spinner {
         animation: none;
       }
+      #${rootId} .ya-widget-launcher-avatar { transition: none; }
     }
   `;
 }

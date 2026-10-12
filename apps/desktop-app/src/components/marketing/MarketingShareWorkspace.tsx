@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { Image, Send, Sparkles, Users, Eye } from "lucide-react";
-import type { MarketingChannel, MarketingPublication, MarketingShareInput, MarketingShareDetail, MarketingShareOutcome, MarketingStudioSnapshot, MarketingShareTarget, MarketingScheduleSnapshot } from "@yardimci-asistan/shared";
+import type { MarketingChannel, MarketingPublication, MarketingShareInput, MarketingShareDetail, MarketingShareOutcome, MarketingStudioSnapshot, MarketingShareTarget, MarketingScheduleInput, MarketingScheduleSnapshot } from "@yardimci-asistan/shared";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
 import { WorkspaceSubflowOverlay } from "../workspace/WorkspaceSubflowOverlay";
 import { MarketingSharePreview } from "./MarketingSharePreview";
 import { MarketingInlinePlan } from "./MarketingInlinePlan";
+import { MarketingInlineScheduleCreate } from "./MarketingInlineScheduleCreate";
 import { executionStatuses, scheduleDate } from "./MarketingScheduleWorkspace";
 import { StatusChip } from "../ui/StatusChip";
 import { MarketingEntityAnalytics } from "./MarketingEntityAnalytics";
@@ -25,10 +26,11 @@ import { channelNames, contentDraft, newShare, resultValue } from "./share-draft
 type Pane = "ai" | "images" | "audience" | "channels" | "preview" | null;
 const planLabels = {active: "Planlandı", paused: "Plan duraklatıldı", cancelled: "Plan iptal edildi", completed: "Plan tamamlandı"};
 const toolTitles = {ai: "AI ile metin oluştur", images: "Medya arşivi", audience: "Hedef kitle", channels: "Kanal ayrıntıları", preview: "Çoklu kanal önizlemesi"};
-export function MarketingShareWorkspace({snapshot, initial, publication, onClose, onReload, onMessage, registerPageLeaveGuard, onOpenTarget, schedules, initialChannel, returnFocusRef}: {
+export function MarketingShareWorkspace({snapshot, initial, publication, onClose, onReload, onMessage, registerPageLeaveGuard, onOpenTarget, schedules, initialChannel, focusScheduleId, createScheduleInput, returnFocusRef}: {
   returnFocusRef?: RefObject<HTMLElement | null>; snapshot: MarketingStudioSnapshot; initial?: MarketingShareDetail; publication?: MarketingPublication;
   onClose: () => void; onReload: () => Promise<void>; onMessage?: (message: string) => void;
   registerPageLeaveGuard?: RegisterPageLeaveGuard; schedules?: MarketingScheduleSnapshot; initialChannel?: MarketingChannel;
+  focusScheduleId?: string; createScheduleInput?: MarketingScheduleInput;
   onOpenTarget?: (target: MarketingShareTarget) => void;
 }) {
   const channels = snapshot.channels.filter(c => c.enabled && c.configured);
@@ -38,7 +40,7 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
     return initial?.targets.length ? input : {...input, options: {...input.options, channels: input.options.channels.filter(id => channels.some(c => c.id === id))}};
   });
   const [baseline, setBaseline] = useState(() => JSON.stringify(draft));
-  const [submitted, setSubmitted] = useState(Boolean(initial?.targets.length));
+  const [submitted, setSubmitted] = useState(Boolean(initial?.targets.length || focusScheduleId || createScheduleInput));
   const [pane, setPane] = useState<Pane>(null), [aiChannel, setAiChannel] = useState<MarketingChannel>();
   const [aiFromChannels, setAiFromChannels] = useState(false);
   const [staged, setStaged] = useState<MarketingShareInput>(draft);
@@ -56,27 +58,32 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
   const [pending, setPending] = useState<(() => void) | null>(null);
   const working = useRef(false), mounted = useRef(true), lastSaved = useRef(initial);
   const [selectedChannel, setSelectedChannel] = useState<MarketingChannel>(initialChannel || publication?.channel || draft.options.channels[0] || "website");
-  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [selectedPlanId, setSelectedPlanId] = useState(focusScheduleId || "");
   const [planDirty, setPlanDirty] = useState(false);
   const discardPlan = useRef<() => void>(() => {});
   const planChanged = useCallback((value: boolean, discard: () => void, id: string) => {setPlanDirty(value); discardPlan.current = discard; if (value) setSelectedPlanId(id);}, []);
   const [savedPublication, setPub] = useState(publication);
   const targets = lastSaved.current?.targets || [];
-  const selectedTarget = targets.find(t => t.channel === selectedChannel);
+  // A calendar entry may refer to an older plan without a persisted share record.
+  // Use the canonical schedule target rather than treating that share as a new draft.
+  const focusedSchedule = schedules?.schedules.find(p => p.schedule.id === focusScheduleId)?.schedule;
+  const selectedTarget = targets.find(t => t.channel === selectedChannel) ||
+    (focusedSchedule?.channel === selectedChannel ? {channel: focusedSchedule.channel, targetType: focusedSchedule.targetType, targetId: focusedSchedule.targetId} : undefined) ||
+    (createScheduleInput?.channel === selectedChannel ? {channel: createScheduleInput.channel, targetType: createScheduleInput.targetType, targetId: createScheduleInput.targetId} : undefined);
   const latestPublication = snapshot.publications.find(p => selectedTarget ? p.id === selectedTarget.targetId : p.id === savedPublication?.id && p.channel === selectedChannel);
   const pub = editingPublication ? savedPublication : latestPublication && (latestPublication.id !== savedPublication?.id || latestPublication.revision >= savedPublication.revision) ? latestPublication : savedPublication?.channel === selectedChannel ? savedPublication : undefined;
   const dirty = JSON.stringify(draft) !== baseline;
   const readOnly = pub ? !editingPublication : submitted;
   const locked = busy || readOnly || Boolean(pane);
-  const sharePlans = schedules?.schedules.filter(p => targets.some(t => t.targetId === p.schedule.targetId) || p.schedule.targetId === publication?.id) || [];
+  const sharePlans = schedules?.schedules.filter(p => targets.some(t => t.targetId === p.schedule.targetId) || p.schedule.targetId === publication?.id || p.schedule.id === focusScheduleId || p.schedule.targetId === createScheduleInput?.targetId) || [];
   const selectedPlan = sharePlans.find(p => p.schedule.id === selectedPlanId) || sharePlans.find(p => p.schedule.channel === selectedChannel && ["active", "paused"].includes(p.schedule.status)) || sharePlans.find(p => p.schedule.channel === selectedChannel) || sharePlans[0];
   const activePlan = sharePlans.some(p => p.schedule.targetId === pub?.id && ["active", "paused"].includes(p.schedule.status));
   const inFlight = sharePlans.some(p => p.schedule.targetId === pub?.id && p.executions.some(e => ["pending", "claimed"].includes(e.status)));
   const campaignDetail = snapshot.campaigns?.find(c => c.campaign.id === selectedTarget?.targetId);
-  const resultChannels = [...new Set<MarketingChannel>([...targets.map(t => t.channel), ...(publication ? [publication.channel] : [])])];
+  const resultChannels = [...new Set<MarketingChannel>([...targets.map(t => t.channel), ...(publication ? [publication.channel] : []), ...(focusedSchedule ? [focusedSchedule.channel] : []), ...(createScheduleInput ? [createScheduleInput.channel] : [])])];
   const outcome = outcomes.find(o => o.channel === selectedChannel);
   function statusFor(channel: MarketingChannel) {
-    const target = targets.find(t => t.channel === channel), p = pub?.channel === channel ? pub : snapshot.publications.find(p => p.id === target?.targetId);
+    const target = targets.find(t => t.channel === channel) || (selectedTarget?.channel === channel ? selectedTarget : undefined), p = pub?.channel === channel ? pub : snapshot.publications.find(p => p.id === target?.targetId);
     const campaign = snapshot.campaigns?.find(c => c.campaign.id === target?.targetId)?.campaign;
     const plan = sharePlans.find(p => p.schedule.channel === channel && ["active", "paused"].includes(p.schedule.status)) || sharePlans.find(p => p.schedule.channel === channel);
     if (outcomes.some(o => o.channel === channel && o.state === "failed")) return "Kontrol gerekiyor";
@@ -286,9 +293,11 @@ export function MarketingShareWorkspace({snapshot, initial, publication, onClose
             </div> : <small>Paylaşım seçili kanallara hemen gönderilmek üzere hazırlanır.</small>}
           </>
         </Panel>}
-        {readOnly && sharePlans.length > 0 && <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Yayın planı"><h3>Yayın planı</h3>
+        {readOnly && (sharePlans.length > 0 || createScheduleInput) && <Panel as="section" surfaceRole="configuration" className="form-stack marketing-share-section" aria-label="Yayın planı"><h3>Yayın planı</h3>
           {sharePlans.length > 1 && <label className="form-field form-field--fluid">Kanal planı<select aria-label="Kanal planı" value={selectedPlan?.schedule.id} disabled={busy || planDirty} onChange={e => setSelectedPlanId(e.target.value)}>{sharePlans.map(p => <option key={p.schedule.id} value={p.schedule.id}>{channelNames[p.schedule.channel]} · {p.schedule.name}</option>)}</select></label>}
-          {selectedPlan && <MarketingInlinePlan key={selectedPlan.schedule.id} detail={selectedPlan} channels={snapshot.channels} {...(selectedPlanPublication === undefined ? {} : {publication: selectedPlanPublication})} blocked={busy || Boolean(pane)} onReload={onReload} onBusy={childBusy} onDirty={planChanged}/>}
+          {createScheduleInput && !sharePlans.some(p => p.schedule.targetId === createScheduleInput.targetId && ["active", "paused"].includes(p.schedule.status))
+            ? <MarketingInlineScheduleCreate key={createScheduleInput.targetId} initial={createScheduleInput} channels={snapshot.channels} blocked={busy || Boolean(pane)} onReload={onReload} onBusy={childBusy} onDirty={planChanged}/>
+            : selectedPlan && <MarketingInlinePlan key={selectedPlan.schedule.id} detail={selectedPlan} channels={snapshot.channels} {...(selectedPlanPublication === undefined ? {} : {publication: selectedPlanPublication})} blocked={busy || Boolean(pane)} onReload={onReload} onBusy={childBusy} onDirty={planChanged}/>}
         </Panel>}
         {readOnly && <Panel as="section" className="form-stack marketing-share-section" aria-label="Geçmiş"><h3>Geçmiş</h3>
           {pub?.publishedAt && <p>Yayınlandı · {new Date(pub.publishedAt).toLocaleString("tr-TR")}</p>}

@@ -99,11 +99,10 @@ export function AppLockScreen({
       aria-label="Yardımcı Asistan kilit ekranı"
     >
       <section className="app-lock-card">
-        <img
-          className="app-lock-logo"
-          src="./assets/yardimci-asistan-logo.png"
-          alt="Yardımcı Asistan"
-        />
+        <div className="app-lock-brand" aria-label="Yardımcı Asistan">
+          <img src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
+          <span>Yardımcı <strong>Asistan</strong></span>
+        </div>
 
         {phase === "checking" ? (
           <div className="app-lock-checking" role="status" aria-live="polite">

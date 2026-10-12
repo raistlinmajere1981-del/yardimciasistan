@@ -19,7 +19,7 @@ import { PageWorkSurface } from "../components/layout/PageWorkSurface";
 import { ChoiceChips } from "../components/ui/ChoiceChips";
 
 import { useMarketingCalendar, type MarketingCalendarEntry } from "../components/calendar/use-marketing-calendar";
-import { MarketingScheduleDialog } from "../components/marketing/MarketingScheduleDialog";
+import { MarketingCalendarShareWorkspace } from "../components/marketing/MarketingCalendarShareWorkspace";
 import type { RegisterPageLeaveGuard } from "../app/page-navigation-guard";
 
 type ReservationRecord = DesktopDashboardData["reservations"][number];
@@ -264,7 +264,7 @@ export function OperationCalendarPage({
         </div>
       )}
       </section>
-      {selectedPlan && <MarketingScheduleDialog key={selectedPlan.schedule.id} detail={selectedPlan} onClose={() => setSelectedPlanId("")} onReload={marketing.reload} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })}/>}
+      {selectedPlan && <MarketingCalendarShareWorkspace key={selectedPlan.schedule.id} plan={selectedPlan} onClose={() => setSelectedPlanId("")} onReload={marketing.reload} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })}/>}
     </PageWorkSurface>
   );
 }

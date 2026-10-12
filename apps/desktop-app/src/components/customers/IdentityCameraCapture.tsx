@@ -17,12 +17,21 @@ import { ActionButton } from "../ui/ActionButton";
 import { WorkspaceSubflowOverlay } from "../workspace/WorkspaceSubflowOverlay";
 
 type CaptureSide = "front" | "back";
-type CapturePhase = "starting" | "capturing" | "processing" | "error";
+type CapturePhase = "starting" | "capturing" | "processing" | "analysis-error" | "error";
+
+type AnalysisResult = { ok: boolean; message: string; code?: string };
+
+// Only temporary service failures warrant retrying an unchanged identity image.
+// All other failures (including missing/unknown codes) require intervention.
+const RETRYABLE_ANALYSIS_ERRORS = new Set([
+  "analysis_connection_failed", "analysis_timeout", "provider_timeout",
+  "provider_unavailable", "provider_rate_limited"
+]);
 
 interface IdentityCameraCaptureProps {
   captureBackSide: boolean;
   onClose: () => void;
-  onCaptured: (files: File[]) => Promise<{ ok: boolean; message: string }>;
+  onCaptured: (files: File[]) => Promise<AnalysisResult>;
 }
 
 interface CandidateFrame {
@@ -39,6 +48,8 @@ export function IdentityCameraCapture({
   const analysisCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const frontFileRef = useRef<File | null>(null);
+  const pendingFilesRef = useRef<File[]>([]);
+  const retryAttemptsRef = useRef(0);
   const previousLumaRef = useRef<Uint8Array | null>(null);
   const stableFramesRef = useRef(0);
   const candidatesRef = useRef<CandidateFrame[]>([]);
@@ -51,6 +62,8 @@ export function IdentityCameraCapture({
   const [status, setStatus] = useState("Kamera hazırlanıyor...");
   const [quality, setQuality] = useState<IdentityFrameQuality | null>(null);
   const [candidateCount, setCandidateCount] = useState(0);
+  const [canRetryAnalysis, setCanRetryAnalysis] = useState(false);
+  const [analysisErrorCode, setAnalysisErrorCode] = useState("");
 
   const resetSampling = useCallback(() => {
     previousLumaRef.current = null;
@@ -62,11 +75,45 @@ export function IdentityCameraCapture({
     setCandidateCount(0);
   }, []);
 
-  const finishSide = useCallback(async (file: File) => {
+  const analyzeCapturedFiles = useCallback(async (files: File[]) => {
     if (processingRef.current) return;
     processingRef.current = true;
+    pendingFilesRef.current = files;
+    setCanRetryAnalysis(false);
+    setPhase("processing");
+    setStatus(files.length > 1 ? "Ön ve arka yüz alındı. Kimlik bilgileri okunuyor..." : "Kimlik alındı. Bilgiler okunuyor...");
+    announceIdentityCamera("Kimlik alındı.", "ready");
+
+    let result: AnalysisResult;
+    try {
+      result = await onCaptured(files);
+    } catch {
+      result = { ok: false, code: "analysis_failed", message: "Kimlik görseli okunamadı." };
+    }
+    if (result.ok) {
+      pendingFilesRef.current = [];
+      frontFileRef.current = null;
+      setStatus(result.message);
+      announceIdentityCamera("İşlem tamam.", "success");
+      onClose();
+      return;
+    }
+
+    // Stop sampling on every analysis error. Never send another AI request
+    // automatically, even when a persistent provider failure repeats.
+    setAnalysisErrorCode(result.code ?? "");
+    setCanRetryAnalysis(RETRYABLE_ANALYSIS_ERRORS.has(result.code ?? "") && retryAttemptsRef.current < 1);
+    setPhase("analysis-error");
+    setStatus(result.message);
+    announceIdentityCamera("Kimlik analizi tamamlanamadı.", "error");
+    processingRef.current = false;
+  }, [onCaptured, onClose]);
+
+  const finishSide = useCallback(async (file: File) => {
+    if (processingRef.current) return;
 
     if (side === "front" && captureBackSide) {
+      processingRef.current = true;
       frontFileRef.current = file;
       resetSampling();
       setSide("back");
@@ -77,31 +124,34 @@ export function IdentityCameraCapture({
     }
 
     const files = frontFileRef.current ? [frontFileRef.current, file] : [file];
-    setPhase("processing");
-    setStatus(files.length > 1 ? "Ön ve arka yüz alındı. Kimlik bilgileri okunuyor..." : "Kimlik alındı. Bilgiler okunuyor...");
-    announceIdentityCamera("Kimlik alındı.", "ready");
+    await analyzeCapturedFiles(files);
+  }, [analyzeCapturedFiles, captureBackSide, resetSampling, side]);
 
-    let result: { ok: boolean; message: string };
-    try {
-      result = await onCaptured(files);
-    } catch {
-      result = { ok: false, message: "Kimlik görseli okunamadı." };
-    }
-    if (result.ok) {
-      setStatus(result.message);
-      announceIdentityCamera("İşlem tamam.", "success");
-      onClose();
-      return;
-    }
+  const retryAnalysis = useCallback(() => {
+    if (phase !== "analysis-error" || !canRetryAnalysis || processingRef.current || pendingFilesRef.current.length === 0) return;
+    retryAttemptsRef.current += 1;
+    void analyzeCapturedFiles(pendingFilesRef.current);
+  }, [analyzeCapturedFiles, canRetryAnalysis, phase]);
 
+  const recapture = useCallback(() => {
+    if (phase !== "analysis-error" || processingRef.current) return;
+    pendingFilesRef.current = [];
     frontFileRef.current = null;
+    retryAttemptsRef.current = 0;
+    setCanRetryAnalysis(false);
+    setAnalysisErrorCode("");
     resetSampling();
     setSide("front");
     setPhase("capturing");
-    setStatus(`${result.message} Kimliği yeniden gösterin.`);
-    announceIdentityCamera("Kimlik okunamadı, tekrar deneyin.", "error");
-    processingRef.current = false;
-  }, [captureBackSide, onCaptured, onClose, resetSampling, side]);
+    setStatus("Kimliği yeniden kameraya gösterin.");
+  }, [phase, resetSampling]);
+
+  const closeCamera = useCallback(() => {
+    if (processingRef.current) return;
+    pendingFilesRef.current = [];
+    frontFileRef.current = null;
+    onClose();
+  }, [onClose]);
 
   const captureManual = useCallback(async () => {
     if (phase !== "capturing" || processingRef.current || captureBusyRef.current || !videoRef.current) return;
@@ -331,14 +381,18 @@ export function IdentityCameraCapture({
     title="Kimliği kameradan tara"
     className="identity-camera-overlay"
     closeBlocked={phase === "processing"}
-    onClose={onClose}
+    onClose={closeCamera}
     footer={<div className="identity-camera__footer">
-      <span className="identity-camera__shortcut">Space: fotoğraf çek · Esc: iptal</span>
+      <span className="identity-camera__shortcut">{phase === "capturing" ? "Space: fotoğraf çek · Esc: iptal" : "Esc: iptal"}</span>
       <div className="action-row">
-        <ActionButton variant="secondary" type="button" disabled={phase === "processing"} onClick={onClose}>İptal</ActionButton>
-        <ActionButton type="button" disabled={phase !== "capturing"} onClick={() => void captureManual()}>
+        <ActionButton variant="secondary" type="button" disabled={phase === "processing"} onClick={closeCamera}>İptal</ActionButton>
+        {phase === "analysis-error" && <>
+          <ActionButton variant="secondary" type="button" onClick={recapture}>Yeniden Çek</ActionButton>
+          {canRetryAnalysis && <ActionButton type="button" onClick={retryAnalysis}>Tekrar Dene</ActionButton>}
+        </>}
+        {phase === "capturing" && <ActionButton type="button" onClick={() => void captureManual()}>
           <Camera size={16} aria-hidden="true" />Fotoğraf çek
-        </ActionButton>
+        </ActionButton>}
       </div>
     </div>}
   >
@@ -350,14 +404,25 @@ export function IdentityCameraCapture({
         </div>
         {phase !== "capturing" && <div className="identity-camera__viewport-state">
           <ScanLine size={26} aria-hidden="true" />
-          <strong>{phase === "processing" ? "Kimlik okunuyor" : phase === "error" ? "Kamera kullanılamıyor" : "Kamera hazırlanıyor"}</strong>
+          <strong>{phase === "processing" ? "Kimlik okunuyor" : phase === "analysis-error" ? "AI analizi tamamlanamadı" : phase === "error" ? "Kamera kullanılamıyor" : "Kamera hazırlanıyor"}</strong>
         </div>}
       </div>
 
-      <div className="identity-camera__status" role={phase === "error" ? "alert" : "status"} aria-live="polite">
+      <div className="identity-camera__status" role={phase === "error" || phase === "analysis-error" ? "alert" : "status"} aria-live="polite">
         <strong>{side === "front" ? "Kimliğin ön yüzü" : "Kimliğin arka yüzü"}</strong>
         <span>{status}</span>
       </div>
+
+      {phase === "analysis-error" && <p className="identity-camera__flow-note">
+        {canRetryAnalysis
+          ? "Geçici bir AI hatası oluştu. Aynı görüntülerle bir kez daha deneyebilirsiniz."
+          : retryAttemptsRef.current > 0
+            ? "Tekrar deneme de başarısız oldu. İşlem durduruldu; bağlantıyı veya AI ayarlarını kontrol edin."
+            : ["invalid_image", "image_unreadable", "image_missing", "image_too_large", "unsupported_image_type"].includes(analysisErrorCode)
+              ? "Görsel işlenemedi. Yeniden fotoğraf çekebilir veya bilgileri elle girebilirsiniz."
+              : "Bu hata yeniden denemeyle düzelmeyebilir. AI bağlantı ve yetki ayarlarını kontrol edin veya bilgileri elle girin."}
+        {" "}Görüntüler yalnız bu pencere açıkken korunur; iptal edince temizlenir.
+      </p>}
 
       {phase === "capturing" && <div className="identity-camera__quality" aria-label="Görüntü kalitesi">
         {qualitySummary.map(([label, ready]) => <span className={ready ? "is-ready" : ""} key={label}>
@@ -366,7 +431,7 @@ export function IdentityCameraCapture({
         {candidateCount > 0 && <span className="identity-camera__candidate-count">{candidateCount}/3 iyi kare</span>}
       </div>}
 
-      {captureBackSide && <p className="identity-camera__flow-note">
+      {captureBackSide && phase === "capturing" && <p className="identity-camera__flow-note">
         Ön yüz otomatik alındıktan sonra kimliği çevirmeniz istenecek. İki yüz de çekilmeden AI analizi başlamaz.
       </p>}
 

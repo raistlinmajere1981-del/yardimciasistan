@@ -70,11 +70,27 @@
   box-shadow: var(--shadow-security);
 }
 
-.app-lock-logo {
-  display: block;
-  width: min(100%, 330px);
-  height: auto;
+.app-lock-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
   margin: 0 auto var(--space-1);
+  color: var(--color-security-text);
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.app-lock-brand img {
+  display: block;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+}
+
+.app-lock-brand strong {
+  color: var(--blue-400);
 }
 
 .app-lock-title {

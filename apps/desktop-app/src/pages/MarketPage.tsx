@@ -10,9 +10,10 @@ import {
 import { runtimeHasCapability } from "../app/capabilities";
 import type { MarketController } from "../app/controller-types";
 import type { MarketView } from "../components/workspace/workspace-intent";
-import type { DesktopCustomer } from "../../electron/database";
+import type { DesktopCustomer, DesktopDashboardData } from "../../electron/database";
 import { useBusinessCapabilityRuntime } from "../app/business-capability-context";
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
+import { StockImageImportWorkspace } from "../components/restaurant/StockImageImportWorkspace";
 import { MarketLabelsWorkspace } from "../components/market/MarketLabelsWorkspace";
 import { MarketCompanionInboxWorkspace } from "../components/market/MarketCompanionInboxWorkspace";
 import {
@@ -37,17 +38,20 @@ export function MarketPage({
   customers,
   controller,
   activeView,
-  onViewChange
+  onViewChange,
+  onDashboardDataChanged
 }: {
   customers: DesktopCustomer[];
   controller: MarketController;
   activeView: MarketView;
   onViewChange: (view: MarketView) => void;
+  onDashboardDataChanged?: (data: DesktopDashboardData) => void;
 }) {
   const { snapshot } = useBusinessCapabilityRuntime();
   const C = BUSINESS_CAPABILITIES;
   const catalogEnabled = runtimeHasCapability(snapshot, C.CATALOG);
   const inventoryEnabled = runtimeHasCapability(snapshot, C.INVENTORY);
+  const aiEnabled = runtimeHasCapability(snapshot, C.AI);
   const salesEnabled = runtimeHasCapability(snapshot, C.SALES);
   const customerCreditEnabled = runtimeHasCapability(snapshot, C.CUSTOMER_CREDIT);
   const ordersEnabled = runtimeHasCapability(snapshot, C.ORDERS);
@@ -82,6 +86,7 @@ export function MarketPage({
     ? activeView
     : (availableTabs[0]?.id ?? "products");
   const [productLookupRequest, setProductLookupRequest] = useState<ProductLookupFormRequest | null>(null);
+  const [inventoryRevision, setInventoryRevision] = useState(0);
   const productHandoffRequestId = useRef(0);
 
   useEffect(() => {
@@ -98,6 +103,14 @@ export function MarketPage({
         ? "Veresiye satış kaydedildi."
         : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`
     );
+  }
+
+  function handleStockImageApplied(data: DesktopDashboardData) {
+    onDashboardDataChanged?.(data);
+    setInventoryRevision((current) => current + 1);
+    void reloadCatalog().catch((error) => {
+      handleStateChange("error", error instanceof Error ? error.message : "Katalog yenilenemedi.");
+    });
   }
 
   function openCartDraft(detail: CommerceSaleDraftDetail) {
@@ -178,6 +191,10 @@ export function MarketPage({
           products={products}
           busy={dataState === "loading"}
           onStateChange={handleStateChange}
+          refreshRevision={inventoryRevision}
+          utilityAction={catalogEnabled && inventoryEnabled && aiEnabled
+            ? <StockImageImportWorkspace products={products} onApplied={handleStockImageApplied} />
+            : undefined}
         />
       ) : activeTab === "purchasing" ? (
         <MarketPurchasingWorkspace

@@ -183,7 +183,10 @@ try {
 
   const lockDialog = page.getByRole("dialog", { name: "Yardımcı Asistan kilit ekranı" });
   await expect(lockDialog).toBeVisible();
-  await expect(lockDialog.getByRole("img", { name: "Yardımcı Asistan" })).toBeVisible();
+  const brandImage = lockDialog.locator(".app-lock-brand img");
+  await expect(brandImage).toBeVisible();
+  await expect(brandImage).toHaveAttribute("src", /yardimci-asistan-symbol\.png$/);
+  await expect.poll(() => brandImage.evaluate((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)).toBe(true);
   await expect(lockDialog.getByLabel("7 bildirim")).toBeVisible();
   await expect(lockDialog.getByLabel("Uygulama şifresi")).toBeFocused();
   await expect(page.locator(".desktop-shell")).toHaveCount(0);

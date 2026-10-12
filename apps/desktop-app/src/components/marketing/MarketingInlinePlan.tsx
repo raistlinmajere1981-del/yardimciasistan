@@ -35,7 +35,7 @@ export function MarketingInlinePlan({detail, channels, publication, blocked, onR
     </dl>
       {publication && s.targetRevision !== publication.revision && <small>Yayın değişmiş; plan eski sürümü kullanır. Güncel sürüm yalnız açık “Planı güncelle” seçimiyle bağlanır.</small>}
       {!terminal && <div ref={launcher}><ActionButton variant="secondary" disabled={blocked || busy || inFlight || !available} onClick={() => setEditing(true)}>Planı düzenle</ActionButton></div>}
-    </> : <div ref={editor}><MarketingScheduleWorkspace embedded draft={draft} detail={lifecycle!} onChange={setDraft} channels={channels} {...(publication === undefined ? {} : {publication})} busy={blocked || busy || !available}/></div>}
+    </> : <div ref={editor}><MarketingScheduleWorkspace draft={draft} detail={lifecycle!} onChange={setDraft} channels={channels} {...(publication === undefined ? {} : {publication})} busy={blocked || busy || !available}/></div>}
     {!available && <p>Bu kanal şu anda kullanılamıyor. Plan bilgileri korunuyor.</p>}
     {inFlight && !editing && <p>Çalışma sürüyor. Sonuçlandıktan sonra plan düzenlenebilir.</p>}
     {message && <p role="status">{message}</p>}

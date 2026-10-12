@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileText, Globe, Plus, RefreshCw, Send } from "lucide-react";
-import type { MarketingAnalyticsRangeInput, MarketingChannel, MarketingPublication, MarketingScheduleDetail, MarketingScheduleInput, MarketingScheduleSnapshot, MarketingShareDetail, MarketingStudioSnapshot } from "@yardimci-asistan/shared";
+import type { MarketingAnalyticsRangeInput, MarketingChannel, MarketingPublication, MarketingScheduleInput, MarketingScheduleSnapshot, MarketingShareDetail, MarketingStudioSnapshot } from "@yardimci-asistan/shared";
 import type { RegisterPageLeaveGuard } from "../app/page-navigation-guard";
 import { usePageViewState } from "../app/page-view-state";
 import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
@@ -13,10 +13,9 @@ import { MarketingAnalytics } from "../components/marketing/MarketingAnalytics";
 import { MarketingShareWorkspace } from "../components/marketing/MarketingShareWorkspace";
 import { MarketingRecordManager, MarketingThumbnail, publicationLabel } from "../components/marketing/MarketingRecordManager";
 import { MarketingDeliveryWorkspace, deliveryStatuses } from "../components/marketing/MarketingDeliveryWorkspace";
-import { MarketingScheduleDialog } from "../components/marketing/MarketingScheduleDialog";
 import { channelNames, newShare, resultValue } from "../components/marketing/share-draft";
 
-type Surface = {kind: "share"; initial?: MarketingShareDetail; publication?: MarketingPublication; initialChannel?: MarketingChannel} | {kind: "website" | "drafts" | "publications"} | {kind: "recent"} | {kind: "delivery"; id: string} | {kind: "schedule"; detail?: MarketingScheduleDetail; initial?: MarketingScheduleInput};
+type Surface = {kind: "share"; initial?: MarketingShareDetail; publication?: MarketingPublication; initialChannel?: MarketingChannel; focusScheduleId?: string; createScheduleInput?: MarketingScheduleInput} | {kind: "website" | "drafts" | "publications"} | {kind: "recent"} | {kind: "delivery"; id: string};
 export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: {
   enabled: boolean; registerPageLeaveGuard?: RegisterPageLeaveGuard; onMessage?: (message: string) => void; onCalendar?: () => void;
 }) {
@@ -46,9 +45,9 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: {
     const timer = setInterval(refresh, 5000);
     return () => {mounted.current = false; invalidateMarketingEpoch(); clearInterval(timer); disposeCampaign?.(); disposeSchedules?.(); disposeProviders?.();};
   }, [enabled, reload, invalidateMarketingEpoch]);
-  async function openContent(id: string, publication?: MarketingPublication, initialChannel?: MarketingChannel) {
+  async function openContent(id: string, publication?: MarketingPublication, initialChannel?: MarketingChannel, plan?: {focusScheduleId?: string; createScheduleInput?: MarketingScheduleInput}) {
     if(opening.current)return; captureLauncher(); opening.current = true; setLoading(true); setMessage("");
-    try {const detail = resultValue(await window.yardimciDesktop!.getMarketingShare(id)); if(mounted.current) setSurface({kind: "share", initial: detail, ...(publication === undefined ? {} : { publication }), ...(initialChannel === undefined ? {} : {initialChannel})});}
+    try {const detail = resultValue(await window.yardimciDesktop!.getMarketingShare(id)); if(mounted.current) setSurface({kind: "share", initial: detail, ...(publication === undefined ? {} : { publication }), ...(initialChannel === undefined ? {} : {initialChannel}), ...plan});}
     catch(e) {if(mounted.current) setMessage(e instanceof Error ? e.message : "İçerik açılamadı.");}
     finally {opening.current = false; if(mounted.current) setLoading(false);}
   }
@@ -83,13 +82,18 @@ export function MarketingPage({enabled, registerPageLeaveGuard, onMessage}: {
         </div>
       </>}
     </div>
-    {snapshot && surface?.kind === "share" && <MarketingShareWorkspace returnFocusRef={workspaceLauncher} key={surface.publication?.id || surface.initial?.content.content.id || "new"} snapshot={snapshot} {...(surface.initial === undefined ? {} : { initial: surface.initial })} {...(surface.publication === undefined ? {} : { publication: surface.publication })} onClose={() => setSurface(null)} onReload={reload} {...(plans ? {schedules: plans} : {})} onOpenTarget={target => {if(target.targetType === "audience_campaign") openSurface({kind: "delivery", id: target.targetId}); else {const p = snapshot.publications.find(p => p.id === target.targetId); if(p) void openContent(p.contentId, p);}}} {...(surface.initialChannel === undefined ? {} : {initialChannel: surface.initialChannel})} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })}/>}
+    {snapshot && surface?.kind === "share" && <MarketingShareWorkspace returnFocusRef={workspaceLauncher} key={surface.publication?.id || surface.initial?.content.content.id || "new"} snapshot={snapshot} {...(surface.initial === undefined ? {} : { initial: surface.initial })} {...(surface.publication === undefined ? {} : { publication: surface.publication })} onClose={() => setSurface(null)} onReload={reload} {...(plans ? {schedules: plans} : {})} onOpenTarget={target => {if(target.targetType === "audience_campaign") openSurface({kind: "delivery", id: target.targetId}); else {const p = snapshot.publications.find(p => p.id === target.targetId); if(p) void openContent(p.contentId, p);}}} {...(surface.initialChannel === undefined ? {} : {initialChannel: surface.initialChannel})} {...(surface.focusScheduleId === undefined ? {} : {focusScheduleId: surface.focusScheduleId})} {...(surface.createScheduleInput === undefined ? {} : {createScheduleInput: surface.createScheduleInput})} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })}/>}
     {snapshot && surface && ["website","drafts","publications"].includes(surface.kind) && <MarketingRecordManager kind={surface.kind as "website" | "drafts" | "publications"} snapshot={snapshot} publications={surface.kind === "website" ? activeWebsite : surface.kind === "publications" ? snapshot.publications : []} contents={surface.kind === "drafts" ? drafts : []} onClose={() => setSurface(null)} onEditContent={id => void openContent(id)} onEditPublication={p => void openContent(p.contentId, p)}/>}
     {snapshot && surface?.kind === "recent" && <WorkspaceFrame presentation="centered" className="marketing-workspace-frame" title="Tüm paylaşımlar" context="Yayın ve gönderim durumlarını izleyin." onClose={() => setSurface(null)} footer={<ActionButton variant="secondary" onClick={() => setSurface(null)}>Kapat</ActionButton>}><section className="form-stack">{recent.map(recentRow)}{!recent.length && <p>Henüz paylaşım yok.</p>}</section></WorkspaceFrame>}
     {surface?.kind === "delivery" && <MarketingDeliveryWorkspace id={surface.id} channels={snapshot?.channels || []} onClose={() => setSurface(null)} onReload={reload} onPlan={detail => {
-      const c = detail.campaign, existing = plans?.schedules.find(p => p.schedule.targetId === c.id && ["active","paused"].includes(p.schedule.status)), options = newShare().options;
-      openSurface({kind: "schedule", ...(existing === undefined ? {} : { detail: existing }), initial: {name: c.name, targetType: "audience_campaign", targetId: c.id, channel: c.channel, scheduleType: "once", timezone: options.timezone, startsLocal: options.startsLocal, missedRunPolicy: "run_once_when_resumed"}});
+      const c = detail.campaign, existing = plans?.schedules.find(p => p.schedule.targetId === c.id && ["active", "paused"].includes(p.schedule.status)), options = newShare().options;
+      if (!c.contentId) {setMessage("Bu gönderime bağlı bir paylaşım içeriği bulunamadı."); return;}
+      const plan = existing ? {focusScheduleId: existing.schedule.id} : {createScheduleInput: {
+        name: c.name, targetType: "audience_campaign" as const, targetId: c.id, channel: c.channel,
+        scheduleType: "once" as const, timezone: options.timezone, startsLocal: options.startsLocal,
+        missedRunPolicy: "run_once_when_resumed" as const
+      }};
+      void openContent(c.contentId, undefined, c.channel, plan);
     }}/>}
-    {surface?.kind === "schedule" && <MarketingScheduleDialog {...(surface.detail === undefined ? {} : { detail: surface.detail })} {...(surface.initial === undefined ? {} : { initial: surface.initial })} onClose={() => setSurface(null)} onReload={reload} {...(onMessage === undefined ? {} : { onMessage })} {...(registerPageLeaveGuard === undefined ? {} : { registerPageLeaveGuard })}/>}
   </FeatureWorkspacePage>;
 }

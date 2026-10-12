@@ -52,3 +52,4 @@ export * from "./types/marketing-providers";
 export * from "./types/marketing-schedules";
 
 export * from "./types/marketing-analytics";
+export * from "./utils/nexa-rig";

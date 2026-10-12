@@ -23,7 +23,6 @@ export function registerImageAnalysisIpcHandlers(options: {
 
   ipcMain.handle("stockImage:analyze", async (_event, value: unknown): Promise<DesktopStockImageAnalyzeResult> => {
     options.assertUnlocked();
-    assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI stok analizi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
     return analyzeDesktopStockImage(getDatabase(), value);
@@ -31,7 +30,6 @@ export function registerImageAnalysisIpcHandlers(options: {
 
   ipcMain.handle("stockImage:cancel", (_event, importIdValue: unknown): boolean => {
     options.assertUnlocked();
-    assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI stok analizi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
     return cancelDesktopStockImageAnalysis(getDatabase(), importIdValue);
@@ -39,7 +37,6 @@ export function registerImageAnalysisIpcHandlers(options: {
 
   ipcMain.handle("stockImage:apply", (_event, value: unknown): DesktopStockImageApplyResult => {
     options.assertUnlocked();
-    assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.AI, "AI stok analizi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
     const input = parseStockImageApplyInput(value);

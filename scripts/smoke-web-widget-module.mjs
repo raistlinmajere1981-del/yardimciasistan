@@ -194,7 +194,8 @@ try {
   await injectWidget(page, baseUrl);
 
   await expect(page.getByRole("button", { name: "Yardımcı Asistan'ı aç" })).toBeVisible();
-  await expect(page.locator('[data-nexa-role="launcher"]')).toHaveAttribute("src", /\/assets\/nexa\/.*\.webp$/);
+  await expect(page.locator('[data-nexa-role="launcher"] svg[data-nexa-rig]')).toHaveAttribute("data-expression", "idle");
+  await expect(page.locator('[data-nexa-role="launcher"] svg[data-nexa-rig]')).toHaveAttribute("data-motion-active", "false");
 
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);

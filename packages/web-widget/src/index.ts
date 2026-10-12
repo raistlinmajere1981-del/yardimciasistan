@@ -4,7 +4,7 @@ import {
   normalizeInternationalPhone as normalizeBridgeInternationalPhone
 } from "@yardimci-asistan/whatsapp-bridge";
 import { widgetStyles } from "./widget-styles";
-import { widgetNexa, widgetNexaUrl } from "./widget-nexa";
+import { mountWidgetNexa, unmountWidgetNexa, updateWidgetNexa, widgetNexa } from "./widget-nexa";
 import { iconTemplate, type IconName } from "./widget-icons";
 import {
   buildInfoSuggestions,
@@ -148,28 +148,19 @@ let panelEntrancePending = false;
 let businessContextLoadId = 0;
 let nexaLifecycleBound = false;
 
-function nexaImage(role: "launcher" | "welcome" | "header") {
-  return `<img class="ya-widget-nexa" data-nexa-role="${role}" src="${escapeAttribute(widgetNexaUrl(role, widgetNexa.getState(), config.apiBaseUrl))}" alt="" aria-hidden="true" decoding="async" />`;
+function nexaCharacter(role: "launcher" | "welcome" | "header") {
+  return `<span class="ya-widget-nexa" data-nexa-role="${role}" aria-hidden="true"></span>`;
 }
 
 function updateNexaPresentation() {
   const root = document.getElementById(ROOT_ID);
-  const active = state.isOpen && document.visibilityState === "visible" && document.hasFocus();
+  const active = state.isOpen && !closeAnimationTimer && document.visibilityState === "visible" && document.hasFocus();
   widgetNexa.setActive(active);
   if (!root) return;
-  root.dataset.nexaMotionActive = String(active && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const next = widgetNexa.getState();
-  if (root.dataset.nexaState === next) return;
-  root.dataset.nexaState = next;
-  const image = root.querySelector<HTMLImageElement>('[data-nexa-role="header"]');
-  if (image) {
-    image.src = widgetNexaUrl("header", next, config.apiBaseUrl);
-    image.classList.remove("is-nexa-changing");
-    if (root.dataset.nexaMotionActive === "true") {
-      void image.offsetWidth;
-      image.classList.add("is-nexa-changing");
-    }
-  }
+  const motion = active && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  root.dataset.nexaMotionActive = String(motion);
+  root.dataset.nexaState = widgetNexa.getState();
+  updateWidgetNexa(motion, config.apiBaseUrl);
 }
 
 function bindNexaLifecycle() {
@@ -234,6 +225,7 @@ export function close() {
       closeAnimationTimer = 0;
       finalizeClose();
     }, 150);
+    updateNexaPresentation();
     return;
   }
   finalizeClose();
@@ -288,7 +280,9 @@ export function normalizeInternationalPhone(phone: string): { ok: true; whatsapp
 function render() {
   const root = getOrCreateRoot();
   root.dataset.yaWhatsappEnabled = config.whatsappEnabled ? "1" : "0";
+  unmountWidgetNexa();
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
+  mountWidgetNexa(root, config.apiBaseUrl);
   if (state.isOpen) panelEntrancePending = false;
   bindEvents(root);
   updateNexaPresentation();
@@ -298,7 +292,7 @@ function buttonTemplate() {
   return `
     <button class="ya-widget-button" type="button" data-ya-open aria-label="Yardımcı Asistan'ı aç">
       <span class="ya-widget-launcher-avatar">
-        ${nexaImage("launcher")}
+        ${nexaCharacter("launcher")}
       </span>
       <span class="ya-widget-launcher-copy">
         <strong>Yardımcı</strong>
@@ -313,9 +307,9 @@ function panelTemplate() {
     <section class="ya-widget-panel${panelEntrancePending ? " is-opening" : ""}" role="dialog" aria-labelledby="ya-widget-title">
       <header class="ya-widget-header">
         <div class="ya-widget-identity">
-          ${state.view === "home" ? "" : `<span class="ya-widget-avatar">${nexaImage("header")}</span>`}
+          ${state.view === "home" ? "" : `<span class="ya-widget-avatar">${nexaCharacter("header")}</span>`}
           <span class="ya-widget-title-copy">
-            <strong id="ya-widget-title"><span class="ya-widget-business-mark">${brandMarkTemplate()}</span>${escapeHtml(getAssistantTitle())}</strong>
+            <strong id="ya-widget-title">${state.view === "home" && config.logoUrl ? `<span class="ya-widget-business-mark">${brandMarkTemplate()}</span>` : ""}${escapeHtml(getAssistantTitle())}</strong>
             <small>${escapeHtml(getAssistantSubtitle())}</small>
           </span>
         </div>
@@ -405,7 +399,7 @@ function homeTemplate() {
   return `
     <div class="ya-widget-home">
       <div class="ya-widget-welcome">
-        <span class="ya-widget-nexa-welcome">${nexaImage("welcome")}</span>
+        <span class="ya-widget-nexa-welcome">${nexaCharacter("welcome")}</span>
         <div>
           <span class="ya-widget-kicker">İşletme yardımcısı</span>
           <h2 class="ya-widget-view-title" tabindex="-1">Merhaba, ben Nexa.</h2>

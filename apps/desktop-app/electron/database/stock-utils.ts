@@ -125,7 +125,7 @@ export function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates
     const suggestedQuantity = candidate && candidate.stock_unit !== "piece" ? measuredQuantity : integerQuantity;
     let reason = normalizeStockImageText(line.needs_review_reason, 500);
     if (requestedId && !candidate) {
-      reason = reason || "Önerilen ürün mevcut stok takipli menü listesinde değil.";
+      reason = reason || "Önerilen ürün mevcut stok takipli katalog listesinde değil.";
     }
     if (ambiguousQuantity) {
       reason = candidate?.stock_unit === "g"

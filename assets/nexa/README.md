@@ -1,7 +1,11 @@
 # Nexa assets
 
-Character design is locked. Ready is the default. The shared white face, small
-navy eyes, asymmetric upper crest and lower diagonal wrap are unchanged.
+Desktop and Web use the aquatic V2 SVG rig from
+`packages/shared/utils/nexa-rig.ts`. This single module owns the locally authored
+SVG, instance-scoped paints/clip IDs, expressions and child-part motion. The
+executable reference lab remains at `.superdesign/audit/nexa-rig-v2/`.
+The raster manifest and all retained artwork remain available for fallback and
+other uses. Ready is the default.
 
 ## Authoritative map
 
@@ -36,24 +40,41 @@ Master/source/quality PNGs never enter Desktop/Web runtime distributions.
 Web packaging copies those build assets beside widget.js, without modifying the
 tracked template snapshot during normal builds.
 
-Desktop uses a common full-detail state source for wide/compact and the optical
-48 px source for micro. It reduces or hides the habitat when navigation needs the
-space. The existing sidebar scroll ownership is confined to navigation; the brand,
-Settings and habitat do not create additional scrolling regions.
+Desktop mounts the shared rig at 112/64/40 px in wide/compact/micro modes and
+unmounts it when sidebar navigation needs the space. Only a contact shadow frames
+it; the older niche/blob layers are retained assets. A small nearby speech bubble
+appears only in wide mode during work or a result; it never contains customer or
+AI message content. Brand, Settings and navigation keep their existing ownership.
 
-Web loads only launcher pixels while closed. Welcome is requested only on the
-home panel. Conversation uses one compact header avatar, including thinking /
-speaking states, and no per-message avatar. Asset URLs resolve beside the widget
-script independently of the host site's URL and API endpoint.
+Web mounts the same rig at 48 px in the static closed launcher, 112 px on welcome,
+and 32 px in the conversation/form header. Home uses only the configured business
+logo in its header. Conversation/forms use one Nexa and no logo or per-message
+avatars. If SVG rendering fails, `widgetNexaUrl` resolves manifest-backed WebP
+beside widget.js, independently of host-page and API paths. Desktop likewise uses
+its existing manifest fallback. Normal SVG rendering requests no character image.
 
 ## Motion and theme
 
-There is no baked animation or idle loop. Only brief state-entry opacity/position
-changes run while visible and focused. Reduced motion uses static image changes.
-Hidden/background surfaces cancel transient reaction timers. Character colors do
-not change with theme; only separate habitat/shadow layers differ.
+The existing shared `createNexaPresence` remains the semantic authority:
+ready → idle, thinking → focused eyes, speaking → mouth/gaze/fin gestures,
+pleased → success with one finite delight, concerned → serious brows and mouth.
+Sleep uses closed eyes; listening retains the calm fallback. Speaking is a visual
+reaction to the existing response lifecycle, with no audio synchronization.
+Web form success is observed only after the existing request API confirms it.
 
-The original 32/48 px artwork preview remains in `quality/`. Fine state differences
-are intentionally subtle at 32 px; global/operation feedback stays in its existing
-UI owner. New integration checks are registered in the repository verification
-registry: nexa-assets, desktop-nexa and web-nexa.
+The SVG and body never bounce or scale. Crown, fins, eye aperture and clipped
+pupils, mouth and trailing ribbons move independently. Each controller cancels
+its animation frame and releases observers/listeners on unmount. Visibility,
+intersection, focus, reduced motion and consumer activity gate the loop. The
+closed launcher schedules no animation loop; closing stops the open rig before
+the panel exit. Reduced motion retains distinct static expressions, including
+success and concern. Character paints are fixed artwork, scoped by instance IDs;
+surface/shadow styling uses each consumer's existing appearance system.
+
+`smoke-desktop-nexa.mjs`, `smoke-web-nexa.mjs` and
+`smoke-web-widget-branding.mjs` remain registered integration checks. They cover
+child motion/clipping, semantic reactions, readable static expressions, stopped
+lifecycles, unique IDs, fallback URLs, branding and narrow/sidebar interactions.
+They save light/dark and small Desktop/Web screenshots under the ignored
+`artifacts/nexa-integration/`. Run these on a host that permits local servers and
+Chromium; no live service or publication is required.

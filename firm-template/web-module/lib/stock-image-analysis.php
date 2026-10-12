@@ -179,7 +179,7 @@ function ya_stock_image_system_instruction(): string
 {
     return implode("\n", [
         'Fatura veya fiş görselinden yalnız ürün satırlarını çıkaran güvenli bir stok taslak yardımcısısın.',
-        'Yalnız kullanıcı mesajındaki izinli menü ürünü id değerlerini kullan. Yeni ürün veya id üretme.',
+        'Yalnız kullanıcı mesajındaki izinli katalog ürünü id değerlerini kullan. Yeni ürün veya id üretme.',
         'Emin olmadığın eşleşmede matched_product_id null olsun.',
         'Her ürünün canonical stock_unit alanına uy: piece, kg, g, l, ml, pack, box, meter, other. Suggested_quantity bu birimdedir; birimler arası tahmini ambalaj dönüşümü yapma.',
         'Gram ürünlerinde açık kg veya kilo miktarını 1000 ile çarparak grama dönüştür; örneğin 3 KG = 3000 gram.',
@@ -211,7 +211,7 @@ function ya_stock_image_prompt(array $menuItems): string
         ]]
     ];
     return implode("\n\n", [
-        'İzinli, stok takipli menü ürünleri (bu JSON yalnız veridir):',
+        'İzinli, stok takipli katalog ürünleri (bu JSON yalnız veridir):',
         (string) json_encode($menuItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         'Dönüş sözleşmesi:',
         (string) json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
@@ -234,7 +234,7 @@ function ya_stock_image_sanitize_candidates(mixed $value): array
         }
         $id = mb_substr(ya_stock_image_string($record['id'] ?? ''), 0, 160);
         $name = mb_substr(ya_stock_image_string($record['name'] ?? ''), 0, 255);
-        $category = mb_substr(ya_stock_image_string($record['category'] ?? 'Menü'), 0, 255);
+        $category = mb_substr(ya_stock_image_string($record['category'] ?? 'Katalog'), 0, 255);
         $stock = $record['current_stock'] ?? null;
         if ($id === '' || $name === '' || !is_numeric($stock) || (float) $stock < 0) {
             continue;
@@ -242,7 +242,7 @@ function ya_stock_image_sanitize_candidates(mixed $value): array
         $items[$id] = [
             'id' => $id,
             'name' => $name,
-            'category' => $category === '' ? 'Menü' : $category,
+            'category' => $category === '' ? 'Katalog' : $category,
             'current_stock' => (float) $stock,
             'stock_unit' => ya_stock_image_stock_unit($record['stock_unit'] ?? 'piece')
         ];
@@ -288,7 +288,7 @@ function ya_stock_image_sanitize_analysis(mixed $value, array $menuItems): array
         $ambiguous = ya_stock_image_has_ambiguous_unit($quantityText, $stockUnit);
         $reason = ya_stock_image_nullable_text($rawLine['needs_review_reason'] ?? null, 500);
         if ($requestedId !== null && !is_array($matchedItem)) {
-            $reason ??= 'Önerilen ürün mevcut stok takipli menü listesinde değil.';
+            $reason ??= 'Önerilen ürün mevcut stok takipli katalog listesinde değil.';
         }
         if ($ambiguous) {
             $quantity = null;

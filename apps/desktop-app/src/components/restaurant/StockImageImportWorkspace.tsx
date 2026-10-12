@@ -332,7 +332,7 @@ export function StockImageImportWorkspace({ products, onApplied }: StockImageImp
               {message && <p className="stock-image-info status-message status-message--info" role="status">{message}</p>}
               {duplicateWarning && <label className="stock-image-duplicate-warning"><input type="checkbox" checked={duplicateAcknowledged} onChange={(event) => setDuplicateAcknowledged(event.target.checked)} /><span><strong>Bu görsel daha önce stok girişinde kullanılmış olabilir.</strong> Yönetici olarak yine de uygulamak istediğimi onaylıyorum.</span></label>}
               <div className="stock-image-table" role="table" aria-label="AI stok eşleştirme taslağı">
-                <div className="stock-image-table-head" role="row"><span>Faturada okunan</span><span>Menü karşılığı</span><span>Eklenecek miktar</span><span>Güven</span><span>İşlem</span></div>
+                <div className="stock-image-table-head" role="row"><span>Faturada okunan</span><span>Ürün karşılığı</span><span>Eklenecek miktar</span><span>Güven</span><span>İşlem</span></div>
                 {reviewLines.map(line => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}>
                   <div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div>
                   <label><span className="stock-image-mobile-label">Ürün karşılığı</span>

@@ -34,7 +34,7 @@ export async function analyzeDesktopStockImage(
   }
   const menuItems = database.getTrackedStockCandidates();
   if (menuItems.length === 0) {
-    return { ok: false, code: "no_tracked_items", message: "Stok takip edilen menü ürünü bulunamadı." };
+    return { ok: false, code: "no_tracked_items", message: "Stok takip edilen katalog ürünü bulunamadı." };
   }
   if (stockImageAnalysisControllers.has(input.importId)) {
     return { ok: false, code: "analysis_in_progress", message: "Bu görsel zaten analiz ediliyor." };

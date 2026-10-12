@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { resolveNexaAsset } from "@yardimci-asistan/shared";
+import { mountNexaRig, resolveNexaAsset, type NexaRigController } from "@yardimci-asistan/shared";
 import manifest from "../../../../../assets/nexa/manifest.json";
 import { desktopNexa } from "../../app/nexa-activity";
 
@@ -7,6 +7,9 @@ type HabitatSize = "wide" | "compact" | "micro" | "hidden";
 
 export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
   const host = useRef<HTMLDivElement>(null);
+  const rigHost = useRef<HTMLSpanElement>(null);
+  const rig = useRef<NexaRigController | null>(null);
+  const [rigFailed, setRigFailed] = useState(false);
   const [size, setSize] = useState<HabitatSize>("hidden");
   const [motionActive, setMotionActive] = useState(false);
   const [dark, setDark] = useState(false);
@@ -60,20 +63,35 @@ export function NexaHabitat({ collapsed }: { collapsed: boolean }) {
     };
   }, [size]);
 
+  const visible = size !== "hidden";
+  useLayoutEffect(() => {
+    if (!visible || !rigHost.current) return;
+    setRigFailed(false);
+    try {
+      rig.current = mountNexaRig(rigHost.current, { state: "ready", motion: false, size: 112 });
+    } catch {
+      // Manifest-backed artwork remains usable when inline SVG is unavailable.
+      setRigFailed(true);
+    }
+    return () => { rig.current?.unmount(); rig.current = null; };
+  }, [visible]);
+  useLayoutEffect(() => {
+    rig.current?.update({ state, motion: motionActive, size: size === "micro" ? 40 : size === "compact" ? 64 : 112 });
+  }, [state, motionActive, size, visible]);
+
   const mode = size === "hidden" ? "micro" : size;
   const rule = manifest.runtime.desktop[mode];
   const character = resolveNexaAsset(manifest, { ...rule, state });
   const theme = dark ? "dark" : "light";
-  const habitat = mode === "micro" ? null : resolveNexaAsset(manifest, { usage: `habitat-${mode}`, theme });
   const shadow = resolveNexaAsset(manifest, { usage: mode === "micro" ? "micro-shadow" : "contact-shadow", theme });
   const url = (path: string) => `${import.meta.env.BASE_URL}${path}`;
   return (
     <div ref={host} className={`nexa-habitat nexa-habitat--${size}`} data-nexa-state={state} data-motion-active={motionActive} aria-hidden="true">
       {size !== "hidden" && <>
-        {habitat && <img className="nexa-habitat-back" src={url(habitat.assetPath)} alt="" />}
         <img className="nexa-habitat-shadow" src={url(shadow.assetPath)} alt="" />
-        <img key={state} className="nexa-character" src={url(character.assetPath)} alt="" decoding="async" />
-        {size === "wide" && <span className="nexa-habitat-copy">{state === "thinking" ? "Düşünüyorum…" : state === "ready" ? "Buradayım" : ""}</span>}
+        <span ref={rigHost} className="nexa-character" />
+        {rigFailed && <img className="nexa-character nexa-character-fallback" src={url(character.assetPath)} alt="" decoding="async" />}
+        {size === "wide" && state !== "ready" && <span className="nexa-habitat-speech">{state === "thinking" ? "Düşünüyorum…" : state === "speaking" ? "Yanıt hazır." : state === "pleased" ? "Tamamlandı." : "Bir sorun oldu."}</span>}
       </>}
     </div>
   );

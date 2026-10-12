@@ -521,6 +521,7 @@ export function DesktopWorkspaceRouter({
           controller={marketController}
           activeView={marketView}
           onViewChange={setMarketView}
+          onDashboardDataChanged={setDashboardData}
         />
       ) : (
         <SettingsWorkspace

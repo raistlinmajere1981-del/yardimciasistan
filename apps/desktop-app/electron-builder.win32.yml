@@ -1,4 +1,8 @@
 extends: ./electron-builder.yml
 
+# Electron 44 no longer ships win32-ia32. Keep the supported x86 runtime
+# separate; x64/Linux continue to use the newer runtime from the base config.
+electronVersion: 43.1.1
+
 win:
   artifactName: YardimciAsistan-Setup-${version}-x86.${ext}

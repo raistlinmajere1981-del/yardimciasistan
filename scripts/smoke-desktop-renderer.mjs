@@ -1019,14 +1019,20 @@ try {
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
   await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   await page.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Müşteri İşleri", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
   await expect(customerWorkViews.getByRole("button", { name: "Müşteriler", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".whatsapp-webview")).toBeHidden();
-  await customerWorkViews.getByRole("button", { name: "Hazır Mesajlar", exact: true }).click();
+  // This click swaps the customer page for the persistent WhatsApp page, unmounting
+  // the source navigation in the same React commit. Dispatch the click once rather
+  // than retrying Playwright's actionability sequence against a detached button.
+  await customerWorkViews.getByRole("button", { name: "Hazır Mesajlar", exact: true }).dispatchEvent("click");
+  await expect(customerWorkViews.getByRole("button", { name: "Hazır Mesajlar", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".persistent-customer-messages-page.is-active .whatsapp-webview")).toBeVisible();
   await expect(page.getByRole("tab", { name: "WhatsApp" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator(".whatsapp-webview")).toBeVisible();
-  await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
+  await expect(page.locator(".whatsapp-webview:visible")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
 
-  expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
+  expect(await page.locator(".whatsapp-webview:visible").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
   await expectWhatsAppToFillWorkspace(page);
   await page.screenshot({ path: "artifacts/screenshots/desktop-whatsapp-workspace.png", fullPage: true });
   await page.getByRole("button", { name: "Müşteri Numarasına Git" }).click();
@@ -2325,13 +2331,18 @@ try {
   await compactPage.getByRole("tab", { name: "Servisler", exact: true }).click();
   await expect(compactPage.locator(".settings-service-card", { hasText: "Android" })).toBeVisible();
   await compactPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  await expect(compactPage.getByRole("button", { name: "Ana Ekran", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(compactPage.getByRole("heading", { name: "Bugün ne var?" })).toBeVisible();
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
+  await expect(compactPage.getByRole("button", { name: "Ayarlar", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(compactPage.getByRole("tab", { name: "Servisler", exact: true })).toHaveAttribute("aria-selected", "true");
-  await compactPage.getByRole("tab", { name: "Uygulama", exact: true }).click();
+  // Revisiting Settings can remount its tab bar during the deferred page switch.
+  // Dispatch once after the route is active, then assert the rendered section.
+  await compactPage.getByRole("tab", { name: "Uygulama", exact: true }).dispatchEvent("click");
   await expect(compactPage.getByRole("heading", { name: "Görünüm" })).toBeVisible();
   expect(await compactPage.locator(".setup-capabilities").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-settings-1366x768.png" });
-  await compactPage.getByRole("tab", { name: "Servisler", exact: true }).click();
+  await compactPage.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab", { name: /^Servisler(?: ·|$)/ }).dispatchEvent("click");
   await expect(compactPage.locator(".settings-service-card", { hasText: "Web Modülü" })).toBeVisible();
   await expect(compactPage.getByLabel("Web eşitleme adresi")).toBeVisible();
   await expect(compactPage.getByLabel("Web güvenlik anahtarı")).toBeVisible();

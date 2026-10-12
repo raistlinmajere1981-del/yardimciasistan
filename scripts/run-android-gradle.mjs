@@ -15,8 +15,8 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-const gradleVersion = "9.6.1";
-const gradleSha256 = "9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14";
+const gradleVersion = "9.8.1";
+const gradleSha256 = "dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f";
 const distributionUrl = `https://services.gradle.org/distributions/gradle-${gradleVersion}-bin.zip`;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = join(repoRoot, "apps", "android-app");

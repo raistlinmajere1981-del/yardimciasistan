@@ -7,7 +7,8 @@ import { DatabaseSync } from "node:sqlite";
 
 const require = createRequire(import.meta.url);
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
-const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { setBusinessCapability, readBusinessCapabilitySnapshot } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const runtime = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 const { listInventoryMovements } = require("../apps/desktop-app/dist-electron/commerce-store.js");
 const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-stock-import-db-");
 
@@ -255,9 +256,47 @@ try {
   } finally {
     sqlite.close();
   }
-  console.log("stock-image-import-db-smoke-ok: drafts, ambiguity, duplicate guard, atomic apply, provenance, approval and permissions verified");
+  verifyCatalogOnlyImport();
+  console.log("stock-image-import-db-smoke-ok: drafts, ambiguity, duplicate guard, atomic apply, provenance, approval, permissions and catalog-only retail verified");
 } finally {
   cleanup();
+}
+
+function verifyCatalogOnlyImport() {
+  const { database: retail, cleanup: cleanupRetail } = createTemporaryDesktopDatabase("yardimci-stock-import-retail-");
+  try {
+    retail.initialize();
+    const setup = retail.saveInitialSetup(createSmokeSetupInput({ profileId: "market", businessName: "Katalog Stok Testi",
+      phone: "", whatsapp: "", syncSecret: "retail-stock-smoke-secret", servicePreferences: { whatsapp: false, android: false },
+      initialCounts: { rooms: 0, tables: 0 }, tableCategories: [] }));
+    assert.equal(setup.ok, true, setup.message);
+    const path = retail.databasePath;
+    assert.ok(!readBusinessCapabilitySnapshot(path).enabledCapabilities.includes(C.FOOD_MENU));
+    const product = runtime.saveRuntimeCatalogProduct(path, { name: "Katalog Kalem", salePrice: 10, trackInventory: true });
+    runtime.saveRuntimeCatalogProduct(path, { name: "Takipsiz", salePrice: 10, trackInventory: false });
+    runtime.setRuntimeInventoryCount(path, { productId: product.id, countedQuantity: 5 });
+    assert.deepEqual(retail.getTrackedStockCandidates().map(candidate => candidate.id), [product.id]);
+    assert.equal(retail.getDashboardData().menu.items.length, 0);
+    const importId = "stock_import_retail_catalog_only", imageHash = "e".repeat(64);
+    assert.equal(retail.createStockImageImport({ importId, imageHash, source: "desktop" }).ok, true);
+    const analysis = retail.completeStockImageAnalysis(importId, { ...emptyAnalysis(), lines: [{
+      raw_text: "AI tahmini", matched_product_id: "guessed-product", matched_product_name: "Yeni ürün tahmini",
+      suggested_quantity: 1, source_quantity_text: "1 AD", confidence: "low", needs_review_reason: null
+    }] });
+    assert.equal(analysis.lines[0].matched_product_id, null);
+    assert.match(analysis.lines[0].needs_review_reason, /katalog/);
+    const line = { product_id: product.id, quantity: 3, raw_text: "Kalem 3 AD", confidence: "high" };
+    const beforeMovements = runtime.listRuntimeInventoryMovements(path).length;
+    assert.equal(retail.applyStockImageImport({ importId, imageHash, lines: [line, { ...line, product_id: "guessed-product" }] }).ok, false);
+    assert.equal(runtime.getRuntimeInventoryBalance(path, product.id).quantity, 5);
+    assert.equal(runtime.listRuntimeInventoryMovements(path).length, beforeMovements, "catalog-only imports retain atomic rejection");
+    assert.equal(retail.applyStockImageImport({ importId, imageHash, lines: [line] }).ok, true);
+    assert.equal(runtime.getRuntimeInventoryBalance(path, product.id).quantity, 8);
+    const movement = runtime.listRuntimeInventoryMovements(path).find(item => item.referenceId === importId);
+    assert.equal(movement.type, "purchase"); assert.equal(movement.quantityDelta, 3);
+    assert.equal(movement.referenceType, "stock_image_import");
+    assert.equal(runtime.listRuntimeCatalogProducts(path).length, 2, "AI guesses never create catalog products");
+  } finally { cleanupRetail(); }
 }
 
 function trackedInput(item, quantity, hideWhenOut) {

@@ -9,37 +9,38 @@ const ENDPOINTS: Record<ShippingEnvironment, string> = {
   production: "https://customerws.araskargo.com.tr/arascargoservice.asmx"
 };
 const MAX_RESPONSE_BYTES = 512 * 1024;
+export type SoapElement = NonNullable<ReturnType<InstanceType<typeof DOMParser>["parseFromString"]>["documentElement"]>;
 export function xmlText(value: string) {
   if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) throw new ShippingProviderError("invalid_input", "Kargo alanlarında geçersiz karakter var.");
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 export function xmlField(name: string, value: string) { return `<${name}>${xmlText(value)}</${name}>`; }
-export function children(element: Element, name?: string, namespace?: string): Element[] {
-  const result: Element[] = [];
+export function children(element: SoapElement, name?: string, namespace?: string): SoapElement[] {
+  const result: SoapElement[] = [];
   for (let node = element.firstChild; node; node = node.nextSibling) {
     if (node.nodeType === 1) {
-      const child = node as Element;
+      const child = node as SoapElement;
       if ((!name || child.localName === name) && (!namespace || child.namespaceURI === namespace)) result.push(child);
     }
   }
   return result;
 }
-export function field(element: Element, name: string): string {
+export function field(element: SoapElement, name: string): string {
   const matches = children(element, name);
   if (matches.length > 1 || (matches[0] && children(matches[0]).length)) throw malformed();
   return matches[0]?.textContent?.trim() ?? "";
 }
 function malformed() { return new ShippingProviderError("malformed_xml", "Kargo sağlayıcısının yanıtı doğrulanamadı."); }
 
-export function parseSoapResult(xml: string, operation: string): Element {
+export function parseSoapResult(xml: string, operation: string): SoapElement {
   if (Buffer.byteLength(xml, "utf8") > MAX_RESPONSE_BYTES || /<!DOCTYPE|<!ENTITY/i.test(xml)) throw malformed();
   try {
     let invalid = false;
-    const document = new DOMParser({ errorHandler: { warning: () => { invalid = true; }, error: () => { invalid = true; }, fatalError: () => { invalid = true; } } }).parseFromString(xml, "text/xml");
+    const document = new DOMParser({ onError: () => { invalid = true; } }).parseFromString(xml, "text/xml");
     const root = document.documentElement;
     if (invalid || root?.localName !== "Envelope" || root.namespaceURI !== SOAP_NS) throw malformed();
     let nodes = 0;
-    const inspect = (element: Element, depth: number) => {
+    const inspect = (element: SoapElement, depth: number) => {
       if (++nodes > 10000 || depth > 40) throw malformed();
       for (const child of children(element)) inspect(child, depth + 1);
     };
@@ -62,7 +63,7 @@ export function parseSoapResult(xml: string, operation: string): Element {
 }
 
 /** DataTable projection ignores xsd declarations, diffgram before/errors and arbitrary metadata. */
-export function dataRows(result: Element): Element[] {
+export function dataRows(result: SoapElement): SoapElement[] {
   const diffgrams = children(result, "diffgram", "urn:schemas-microsoft-com:xml-diffgram-v1");
   if (diffgrams.length !== 1) throw malformed();
   const diffgram = diffgrams[0];
@@ -77,7 +78,7 @@ export function dataRows(result: Element): Element[] {
 export class ArasSoapClient {
   constructor(private readonly environment: ShippingEnvironment, private readonly fetchImpl: typeof fetch = fetch,
     private readonly timeoutMs = 15000) {}
-  async call(operation: string, fields: string): Promise<Element> {
+  async call(operation: string, fields: string): Promise<SoapElement> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let httpStatus: number | undefined;

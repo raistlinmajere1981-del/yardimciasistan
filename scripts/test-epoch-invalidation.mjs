@@ -20,7 +20,6 @@ const FILES = {
   "apps/desktop-app/src/components/marketing/MarketingAudience.tsx": ["epoch"],
   "apps/desktop-app/src/components/marketing/MarketingDeliveryWorkspace.tsx": ["epoch"],
   "apps/desktop-app/src/components/marketing/MarketingEntityAnalytics.tsx": ["epoch"],
-  "apps/desktop-app/src/components/marketing/MarketingScheduleDialog.tsx": ["epoch"],
   "apps/desktop-app/src/components/restaurant/TableWorkspace.tsx": ["historyRead"],
   "apps/desktop-app/src/pages/MarketingPage.tsx": ["epoch"]
 };

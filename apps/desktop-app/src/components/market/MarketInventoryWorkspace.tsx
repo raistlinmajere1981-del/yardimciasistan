@@ -1,6 +1,6 @@
 import { MarketCatalogPicker } from "./MarketCatalogPicker";
 import { Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CatalogProduct, CommerceUnit, InventoryBalance, InventoryMovement } from "@yardimci-asistan/shared";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ActionButton } from "../ui/ActionButton";
@@ -9,6 +9,8 @@ interface MarketInventoryWorkspaceProps {
   products: CatalogProduct[];
   busy: boolean;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
+  refreshRevision?: number;
+  utilityAction?: ReactNode;
 }
 
 const unitLabels: Record<CommerceUnit, string> = {
@@ -41,7 +43,7 @@ function localDateTime(value: string) {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString("tr-TR");
 }
 
-export function MarketInventoryWorkspace({ products, busy, onStateChange }: MarketInventoryWorkspaceProps) {
+export function MarketInventoryWorkspace({ products, busy, onStateChange, refreshRevision = 0, utilityAction }: MarketInventoryWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
   const trackedProducts = products.filter((product) => product.trackInventory && product.isActive);
   const [productId, setProductId] = useState("");
@@ -50,6 +52,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [countedQuantity, setCountedQuantity] = useState("0");
   const [note, setNote] = useState("");
+  const requestGeneration = useRef(0);
 
   useEffect(() => {
     if (!productId && trackedProducts.length > 0) {
@@ -59,31 +62,32 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
   }, [productId, trackedProducts]);
 
   useEffect(() => {
+    const request = ++requestGeneration.current;
     if (!bridge || !productId) {
       setBalance(null);
       setMovements([]);
       return;
     }
-    let mounted = true;
     void Promise.all([
       bridge.getInventoryBalance(productId),
       bridge.listInventoryMovements({ productId, limit: 50 })
     ]).then(([nextBalance, nextMovements]) => {
-      if (!mounted) return;
+      if (request !== requestGeneration.current) return;
       setBalance(nextBalance);
       setMovements(nextMovements);
       setCountedQuantity(String(nextBalance.quantity));
     }).catch((error) => {
-      if (!mounted) return;
+      if (request !== requestGeneration.current) return;
       onStateChange("error", error instanceof Error ? error.message : "Stok bilgisi yüklenemedi.");
     });
     return () => {
-      mounted = false;
+      requestGeneration.current += 1;
     };
-  }, [bridge, onStateChange, productId]);
+  }, [bridge, onStateChange, productId, refreshRevision]);
 
   async function saveCount() {
     if (!bridge || !productId) return;
+    const request = requestGeneration.current;
     onStateChange("loading", "Fiziksel sayım kaydediliyor…");
     try {
       const result = await bridge.setInventoryCount({
@@ -92,10 +96,13 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
         note,
         actorSource: "desktop-market"
       });
-      setBalance(result.balance);
-      setCountedQuantity(String(result.balance.quantity));
-      setNote("");
-      setMovements(await bridge.listInventoryMovements({ productId, limit: 50 }));
+      if (request === requestGeneration.current) {
+        setBalance(result.balance);
+        setCountedQuantity(String(result.balance.quantity));
+        setNote("");
+      }
+      const nextMovements = await bridge.listInventoryMovements({ productId, limit: 50 });
+      if (request === requestGeneration.current) setMovements(nextMovements);
       onStateChange(
         "success",
         result.movement ? "Fiziksel stok sayımı kaydedildi." : "Sayım mevcut stokla aynı; hareket oluşturulmadı."
@@ -111,6 +118,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
     <div className="market-two-column">
       <section className="market-panel">
         <header className="market-panel-heading"><span>Stok</span><h2>Fiziksel Sayım</h2><p>Mevcut fiziksel miktarı yazın; fark sistem tarafından hesaplanır.</p></header>
+        {utilityAction}
         <label className="market-field">
           Ürün
           <MarketCatalogPicker ariaLabel="Ürün" value={productId} products={products} onChange={setProductId} onProductSelected={setPickedProduct} disabled={busy} />

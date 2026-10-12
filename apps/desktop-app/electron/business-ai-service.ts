@@ -170,7 +170,8 @@ export async function generateDailyBusinessEvaluation(
   if (!completion.ok) {
     return {
       ok: true,
-      message: `AI servisi kullanılamadı; güvenli yerel değerlendirme hazırlandı. ${completion.message}`.trim(),
+      // Provider diagnostics are logged above; do not expose raw provider errors in the owner UI.
+      message: "AI servisine geçici olarak ulaşılamadı; güvenli yerel değerlendirme hazırlandı.",
       content: fallback,
       fallback: true
     };

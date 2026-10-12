@@ -25,7 +25,7 @@ export function MarketingScheduleActions({draft,detail,busy,onSave,onTransition,
   </div>;
 }
 
-export function MarketingScheduleWorkspace({draft,onChange,detail,channels,publication,busy, embedded = false}:{embedded?:boolean;draft:MarketingScheduleInput;onChange:(d:MarketingScheduleInput)=>void;detail?:MarketingScheduleDetail;channels:MarketingChannelRegistry;publication?:MarketingPublication;busy:boolean}) {
+export function MarketingScheduleWorkspace({draft,onChange,detail,channels,publication,busy}:{draft:MarketingScheduleInput;onChange:(d:MarketingScheduleInput)=>void;detail?:MarketingScheduleDetail;channels:MarketingChannelRegistry;publication?:MarketingPublication;busy:boolean}) {
   const channel=channels.find(c=>c.id===draft.channel), {s, terminal, inFlight} = scheduleState(detail);
   const latest=detail?.executions[0];
   const rule=draft.recurrenceRule;
@@ -63,6 +63,5 @@ export function MarketingScheduleWorkspace({draft,onChange,detail,channels,publi
     </fieldset>
     {inFlight && <p>Çalışma sonuçlandıktan sonra plan düzenlenebilir. Planı duraklatmak devam eden işlemi zorla durdurmaz.</p>}
     <p>Planı iptal etmek yayımlanmış içeriği geri almaz veya kampanyayı iptal etmez.</p>
-    {detail && !embedded && <section aria-label="Plan çalışma geçmişi"><h3>Son çalışma sonuçları</h3>{!detail.executions.length && <p>Henüz çalışma yok.</p>}{detail.executions.map(e=><p key={e.id}>{scheduleDate(e.plannedAt,s!.timezone)} · {executionStatuses[e.status]}{e.lastError?` · ${e.lastError}`:""}{e.resultReference?" · Yayın / gönderim işleme alındı":""}</p>)}</section>}
   </section>;
 }

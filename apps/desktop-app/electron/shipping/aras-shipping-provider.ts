@@ -1,5 +1,5 @@
 import { ARAS_SHIPPING_PROVIDER, type CommerceShippingProviderAdapter, type CommerceShipmentStatus, type ShippingEnvironment } from "@yardimci-asistan/shared";
-import { ArasSoapClient, children, dataRows, field, xmlField } from "./aras-soap";
+import { ArasSoapClient, children, dataRows, field, xmlField, type SoapElement } from "./aras-soap";
 import { ShippingProviderError } from "./shipping-provider-error";
 
 export interface ArasCredentials { username: string; password: string; customerCode: string; environment: ShippingEnvironment }
@@ -20,7 +20,7 @@ function trackingUrl(number: string) {
   // Construct locally; never trust a provider-returned URL.
   return /^\d{8,30}$/.test(number) ? `https://kargotakip.araskargo.com.tr/mainpage.aspx?code=${encodeURIComponent(number)}` : "";
 }
-function projectedField(row: Element, names: string[]) {
+function projectedField(row: SoapElement, names: string[]) {
   for (const name of names) { const value = field(row, name); if (value) return value; }
   return "";
 }

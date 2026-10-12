@@ -23,26 +23,81 @@ try {
   const habitat = page.locator(".nexa-habitat");
   await expect(habitat).toHaveClass(/--wide/);
   await expect(habitat).toHaveAttribute("data-nexa-state", "ready");
-  await expect.poll(() => habitat.locator('.nexa-character').evaluate((im) => im.complete && im.naturalWidth > 0)).toBe(true);
+  const svg = habitat.locator("svg[data-nexa-rig]");
+  await expect(svg).toBeVisible();
+  for (const part of ["crown", "side-fin", "far-fin", "tail", "ribbon"]) {
+    await expect(svg.locator(`[data-part="${part}"]`)).toHaveCount(1);
+  }
+  await expect(habitat.locator(".nexa-habitat-back, .nexa-habitat-speech")).toHaveCount(0);
+  const idleMouth = await svg.locator("[data-mouth-line]").getAttribute("d");
+  const idleBrow = await svg.locator('[data-brow="left"]').getAttribute("d");
+  await expect(habitat).toHaveAttribute("data-motion-active","true");
+  await expect(svg).toHaveAttribute("data-motion-active", "true");
+  // Observe an entire eye-contact/glance/blink cycle, including actual clipping.
+  const eyeMotion = await svg.evaluate(async (rig) => {
+    const eye = rig.querySelector('[data-eye-white="left"]');
+    const clip = rig.querySelector('[data-eye-clip="left"]');
+    const pupil = rig.querySelector('[data-pupil="left"]');
+    const shapes = new Set(), gazes = new Set();
+    let matched = true;
+    const start = performance.now();
+    await new Promise((done) => {
+      function sample(now) {
+        shapes.add(eye.getAttribute("d")); gazes.add(pupil.getAttribute("transform"));
+        matched &&= eye.getAttribute("d") === clip.getAttribute("d");
+        if (now - start >= 6500) done(); else requestAnimationFrame(sample);
+      }
+      requestAnimationFrame(sample);
+    });
+    return { shapes: shapes.size, gazes: gazes.size, matched,
+      rootTransform: getComputedStyle(rig).transform, bodyTransform: rig.querySelector('[data-part="body"]').getAttribute("transform") };
+  });
+  expect(eyeMotion.shapes).toBeGreaterThan(1); expect(eyeMotion.gazes).toBeGreaterThan(1);
+  expect(eyeMotion.matched).toBe(true); expect(eyeMotion.rootTransform).toBe("none"); expect(eyeMotion.bodyTransform).toBeNull();
   mkdirSync("artifacts/nexa-integration", { recursive: true });
-  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-wide.png' });
+  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-wide-light.png' });
+  await page.evaluate(() => { document.documentElement.dataset.colorScheme = "dark"; });
+  await expect(habitat.locator('.nexa-habitat-shadow')).toHaveAttribute("src", /dark\.svg$/);
+  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-wide-dark.png' });
+  await page.evaluate(() => { document.documentElement.dataset.colorScheme = "light"; });
   await page.getByRole("button", { name: "AI cevabı iste" }).click();
   await expect(habitat).toHaveAttribute("data-nexa-state", "thinking");
+  await expect(svg).toHaveAttribute("data-expression", "thinking");
+  await expect(habitat.locator(".nexa-habitat-speech")).toHaveText("Düşünüyorum…");
+  const fin = svg.locator('[data-part="side-fin"]');
+  const initialFin = await fin.getAttribute("transform");
+  await expect.poll(() => fin.getAttribute("transform")).not.toBe(initialFin);
   await page.evaluate(() => window.__nexaReply({ ok: true, content: "Gerçek AI yanıtı", fallback: false, message: "Hazır" }));
   await expect(habitat).toHaveAttribute("data-nexa-state", "speaking");
+  await expect(svg).toHaveAttribute("data-expression", "speaking");
+  await expect(svg.locator("[data-mouth]")).not.toHaveAttribute("d", "");
+  // The presence reaction lasts 700ms: open and rounded mouth shapes fit within it.
+  const openMouth = await svg.locator("[data-mouth]").getAttribute("d");
+  await expect.poll(() => svg.locator("[data-mouth]").getAttribute("d"), { intervals: [30], timeout: 650 }).not.toBe(openMouth);
+  await expect(svg).toHaveAttribute("data-expression", "speaking");
   await expect(page.getByTestId("ai-result")).toHaveText("Gerçek AI yanıtı");
   await expect(habitat).toHaveAttribute("data-nexa-state", "ready");
   await page.getByRole("button", { name: "AI işlemini doğrula" }).click();
   await expect(habitat).toHaveAttribute("data-nexa-state", "pleased");
+  await expect(svg).toHaveAttribute("data-expression", "success");
+  const delightFin = await fin.getAttribute("transform");
+  await expect.poll(() => fin.getAttribute("transform"), { intervals: [30], timeout: 700 }).not.toBe(delightFin);
   await expect(habitat).toHaveAttribute("data-nexa-state", "ready");
   await page.getByRole("button", { name: "AI cevabı iste" }).click();
   await page.evaluate(() => window.__nexaReply({ ok: false, message: "AI başarısız" }));
   await expect(habitat).toHaveAttribute("data-nexa-state", "concerned");
   await expect(habitat).not.toContainText("AI başarısız");
+  await expect(svg).toHaveAttribute("data-expression", "concerned");
+  await expect(svg.locator('[data-brow="left"]')).not.toHaveAttribute("d", idleBrow);
+  await expect(svg.locator("[data-mouth-line]")).not.toHaveAttribute("d", idleMouth);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "AI cevabı iste" }).click();
   await expect(habitat).toHaveAttribute("data-motion-active", "false");
-  await expect.poll(() => habitat.locator('.nexa-character').evaluate((im) => getComputedStyle(im).animationName)).toBe("none");
+  await expect(svg).toHaveAttribute("data-motion-active", "false");
+  await expect(svg).toHaveAttribute("data-expression", "thinking");
+  const paused = await svg.evaluate(el => el.outerHTML);
+  await page.waitForTimeout(200);
+  expect(await svg.evaluate(el => el.outerHTML)).toBe(paused);
   await page.evaluate(() => { document.documentElement.dataset.motion = "reduced"; });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(habitat).toHaveAttribute("data-motion-active", "false");
@@ -54,14 +109,26 @@ try {
   await expect(habitat).toHaveAttribute("data-motion-active", "false");
   await page.evaluate(() => { Object.defineProperty(document, "hasFocus", { configurable: true, value: () => true }); window.dispatchEvent(new Event("focus")); });
   await expect(habitat).toHaveAttribute("data-motion-active", "true");
+  await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" }); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect(habitat).toHaveAttribute("data-motion-active", "false");
+  await expect(svg).toHaveAttribute("data-motion-active", "false");
+  await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" }); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect(svg).toHaveAttribute("data-motion-active", "true");
   // With eleven entries, the compact mode appears before navigation is squeezed.
   await page.setViewportSize({ width: 1280, height: 840 });
   await expect(habitat).toHaveClass(/--compact/);
+  await expect(svg).toBeVisible();
+  await expect(habitat.locator(".nexa-habitat-speech")).toHaveCount(0);
+  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-compact-light.png' });
+  await page.evaluate(() => { document.documentElement.dataset.colorScheme = "dark"; });
+  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-compact-dark.png' });
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByRole("button", { name: "Ayarlar", exact: true })).toBeInViewport();
   await expect.poll(() => page.locator('.desktop-shell').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.setViewportSize({ width: 1280, height: 360 });
   await expect(habitat).toHaveClass(/--hidden/);
+  await expect(svg).toHaveCount(0);
+  await expect(habitat).toHaveAttribute("data-motion-active", "false");
   const settings = page.getByRole("button", { name: "Ayarlar", exact: true });
   await expect(settings).toBeInViewport(); await settings.click();
   await expect(page.getByTestId("selected-page")).toHaveText("settings");
@@ -72,7 +139,60 @@ try {
   await expect(settings).toBeInViewport();
   await page.evaluate(() => { document.documentElement.dataset.colorScheme = "dark"; });
   await expect(habitat.locator('.nexa-habitat-shadow')).toHaveAttribute("src", /dark\.svg$/);
-  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-micro.png' });
+  await expect(svg).toHaveAttribute("data-size", "small");
+  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-micro-dark.png' });
+  await page.evaluate(() => { document.documentElement.dataset.colorScheme = "light"; });
+  await page.locator('.sidebar').screenshot({ path: 'artifacts/nexa-integration/desktop-micro-light.png' });
+  // The shared rig remains expressive at 32/48/64/112px, IDs never collide,
+  // and a sustained pleased pose performs its delight only once.
+  const rigModuleUrl = `/@fs/${resolve("packages/shared/utils/nexa-rig.ts")}`;
+  await page.evaluate(async (url) => {
+    const { mountNexaRig } = await import(url);
+    window.__rigControllers = [];
+    window.__rigNodes = [];
+    for (const size of [32, 48, 64, 112]) {
+      const host = document.createElement("div");
+      host.className = "nexa-size-proof";
+      host.style.cssText = `position:fixed;top:20px;left:${300 + size * 2}px;width:${size}px;height:${size}px`;
+      document.body.append(host);
+      window.__rigControllers.push(mountNexaRig(host, { state: "ready", motion: true, size }));
+      window.__rigNodes.push(host.querySelector("svg"));
+    }
+  }, rigModuleUrl);
+  const proofs = page.locator(".nexa-size-proof svg");
+  await expect(proofs).toHaveCount(4);
+  await expect.poll(async () => proofs.evaluateAll(nodes => nodes.every(node => node.dataset.motionActive === "true"))).toBe(true);
+  await page.evaluate(() => window.__rigControllers.forEach((controller, index) => controller.update({ state: "pleased", motion: true, size: [32,48,64,112][index] })));
+  await expect.poll(async () => proofs.evaluateAll(nodes => nodes.every(node => node.dataset.motionActive === "false"))).toBe(true);
+  const settled = await proofs.evaluateAll(nodes => nodes.map(node => node.outerHTML));
+  await page.waitForTimeout(250);
+  expect(await proofs.evaluateAll(nodes => nodes.map(node => node.outerHTML))).toEqual(settled);
+  const ids = await page.locator("svg[data-nexa-rig] [id], svg[data-nexa-rig]").evaluateAll(nodes => nodes.map(node => node.id));
+  expect(new Set(ids).size).toBe(ids.length);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const staticFaces = [];
+  for (const state of ["ready", "thinking", "speaking", "pleased", "concerned"]) {
+    await page.evaluate(state => window.__rigControllers.forEach((controller, index) => controller.update({ state, motion: true, size: [32,48,64,112][index] })), state);
+    await expect(proofs.first()).toHaveAttribute("data-motion-active", "false");
+    staticFaces.push(await proofs.first().evaluate(svg => [...svg.querySelectorAll("[data-mouth], [data-mouth-line], [data-brow], [data-eye-white]")].map(part => part.getAttribute("d")).join("|")));
+  }
+  expect(new Set(staticFaces).size).toBe(5);
+  await page.evaluate(() => window.__rigControllers.forEach((controller, index) => controller.update({ state: "sleep", motion: true, size: [32,48,64,112][index] })));
+  await expect(proofs.first()).toHaveAttribute("data-nexa-state", "sleep");
+  await expect(proofs.first()).toHaveAttribute("data-motion-active", "false");
+  await page.evaluate(() => window.__rigControllers.forEach((controller, index) => controller.update({ state: "listening", motion: false, size: [32,48,64,112][index] })));
+  await expect(proofs.first()).toHaveAttribute("data-expression", "idle");
+  await page.evaluate(() => window.__rigControllers.forEach(controller => controller.unmount()));
+  await expect(proofs).toHaveCount(0);
+  expect(await page.evaluate(() => window.__rigNodes.every(node => !node.isConnected && node.dataset.motionActive === "false"))).toBe(true);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.evaluate(() => { Object.defineProperty(SVGSVGElement.prototype, "createSVGRect", { configurable: true, value: undefined }); });
+  await page.setViewportSize({ width: 1280, height: 360 });
+  await expect(habitat).toHaveClass(/--hidden/);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  const fallback = habitat.locator("img.nexa-character-fallback");
+  await expect.poll(() => fallback.evaluate(im => im.complete && im.naturalWidth > 0)).toBe(true);
+  await expect(fallback).toHaveAttribute("src", /assets\/nexa\/.*\.webp$/);
   expect(errors).toEqual([]);
   console.log("desktop-nexa-smoke-ok");
 } finally { await browser?.close(); await server.close(); }

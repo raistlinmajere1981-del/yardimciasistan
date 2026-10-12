@@ -45,7 +45,7 @@ export function CustomerFormFields({
     });
   };
 
-  async function analyzeIdentityFiles(files: File[]): Promise<{ ok: boolean; message: string }> {
+  async function analyzeIdentityFiles(files: File[]): Promise<{ ok: boolean; message: string; code?: string }> {
     if (!aiEnabled) {
       const message = "Kimlik görseli analizi için AI bağlantısını etkinleştirin.";
       setAnalysisState("error");
@@ -79,7 +79,7 @@ export function CustomerFormFields({
       if (!result.ok) {
         setAnalysisState("error");
         setAnalysisMessage(result.message);
-        return { ok: false, message: result.message };
+        return { ok: false, message: result.message, ...(result.code ? { code: result.code } : {}) };
       }
       analyses.push(result.analysis);
     }

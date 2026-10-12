@@ -257,7 +257,7 @@ export function applyStockImageImportInTransaction(db: DatabaseSync, input: Appl
   const candidates = new Map(getTrackedStockCandidates(db).map((candidate) => [candidate.id, candidate]));
   for (const line of lines) {
     if (!candidates.has(line.product_id)) {
-      return { ok: false, message: "Satırlardan biri artık mevcut veya stok takipli bir menü ürünü değil." };
+      return { ok: false, message: "Satırlardan biri artık mevcut veya stok takipli bir katalog ürünü değil." };
     }
   }
 

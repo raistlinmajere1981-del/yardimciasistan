@@ -15,7 +15,6 @@
   object-fit: contain;
   padding: var(--space-1);
   border-radius: var(--radius-md);
-  background: var(--color-bg-panel);
 }
 
 .brand > div {

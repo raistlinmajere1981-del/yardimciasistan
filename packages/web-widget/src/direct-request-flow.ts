@@ -1,3 +1,4 @@
+import { widgetNexa } from "./widget-nexa";
 import {
   buildCustomerRequestWhatsAppMessage,
   createWhatsAppUrl,
@@ -184,6 +185,7 @@ async function submitRequest(form: HTMLFormElement) {
   submitting = true;
   hideStatus();
   setFormBusy(form, true);
+  const settleNexa = widgetNexa.begin();
 
   try {
     const response = await fetch(`${runtimeConfig.apiBaseUrl.trim().replace(/\/$/, "")}/api/request.php`, {
@@ -196,10 +198,12 @@ async function submitRequest(form: HTMLFormElement) {
       throw new Error(result?.message || "Talep işletmeye iletilemedi.");
     }
 
+    settleNexa(form.isConnected ? "success" : "cancel");
     submissionIntents.delete(form);
     hideStatus();
     renderSuccess(form, result.whatsapp_message || payload.whatsapp_message);
   } catch (error) {
+    settleNexa(form.isConnected ? "error" : "cancel");
     const message = error instanceof Error && error.message && error.message !== "Failed to fetch"
       ? error.message
       : "Talep işletmeye iletilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.";

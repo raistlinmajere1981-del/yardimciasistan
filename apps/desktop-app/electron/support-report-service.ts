@@ -166,8 +166,36 @@ export function getSupportReportDraft(userDataPath: string): DesktopSupportRepor
   return currentDraft(userDataPath);
 }
 
-export function addClipboardScreenshotToSupportReport(userDataPath: string): DesktopSupportReportActionResult {
-  const image = clipboard.readImage();
+export async function addClipboardScreenshotToSupportReport(userDataPath: string): Promise<DesktopSupportReportActionResult> {
+  // Electron 44 uses async ClipboardItem blobs instead of clipboard.readImage().
+  // Only supported raster MIME types are accepted; never interpret clipboard text.
+  let image = nativeImage.createEmpty();
+  try {
+    // The x86 build uses Electron 43 (the last available win32-ia32 runtime).
+    // Keep its synchronous readImage path while x64/Linux use Electron 44's
+    // async ClipboardItem API. Never read clipboard text as image data.
+    const compatibleClipboard = clipboard as typeof clipboard & {
+      readImage?: () => ReturnType<typeof nativeImage.createEmpty>;
+    };
+    if (typeof compatibleClipboard.read === "function") {
+      const items = await compatibleClipboard.read();
+      const imageTypes = ["image/png", "image/jpeg", "image/webp"] as const;
+      for (const item of items) {
+        const mime = imageTypes.find(type => item.types.includes(type));
+        if (!mime) continue;
+        const blob = await item.getType(mime);
+        if (blob.size > MAX_SCREENSHOT_BYTES) {
+          return { ok: false, message: "Ekran görüntüsü boş veya gönderim için çok büyük.", draft: currentDraft(userDataPath) };
+        }
+        image = nativeImage.createFromBuffer(Buffer.from(await blob.arrayBuffer()));
+        if (!image.isEmpty()) break;
+      }
+    } else if (typeof compatibleClipboard.readImage === "function") {
+      image = compatibleClipboard.readImage();
+    }
+  } catch {
+    return { ok: false, message: "Panodaki görüntü okunamadı. Ekran görüntüsünü yeniden kopyalayıp deneyin.", draft: currentDraft(userDataPath) };
+  }
   if (image.isEmpty()) {
     return {
       ok: false,

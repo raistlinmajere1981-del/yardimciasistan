@@ -381,7 +381,9 @@ if [[ -d "$remote_backup/knowledge" ]]; then
 fi
 if [[ -d "$remote_backup/assets" ]]; then
   mkdir -p "$remote_stage/assets"
-  rsync -a "$remote_backup/assets/" "$remote_stage/assets/"
+  # The bundled brand symbol belongs to the module release, not tenant media.
+  # Preserve tenant assets without overwriting the updated packaged logo.
+  rsync -a --exclude='/yardimci-asistan-symbol.png' "$remote_backup/assets/" "$remote_stage/assets/"
 fi
 if [[ -d "$remote_backup/media" ]]; then
   mkdir -p "$remote_stage/media"

@@ -91,10 +91,10 @@ ipcMain.handle("admin:get-installation-credentials", (_event, installationId: st
 ipcMain.handle("admin:save-installation-credential", (_event, installationId: string, field: string, value: string) =>
   saveInstallationCredential(REPO_ROOT, installationId, field, value)
 );
-ipcMain.handle("admin:copy-installation-credential", (_event, installationId: string, field: string) => {
+ipcMain.handle("admin:copy-installation-credential", async (_event, installationId: string, field: string) => {
   const value = getCredentialForClipboard(REPO_ROOT, installationId, field);
   if (value === null) return false;
-  clipboard.writeText(value);
+  await clipboard.writeText(value);
   return true;
 });
 ipcMain.handle("admin:check-dependency-updates", () => checkDependencyUpdates(REPO_ROOT));
@@ -115,11 +115,11 @@ ipcMain.handle("admin:get-verification-check-output", (_event, checkId: unknown)
     ? verificationRunner.getCheckOutput(checkId)
     : ""
 );
-ipcMain.handle("admin:copy-verification-check-output", (_event, checkId: unknown) => {
+ipcMain.handle("admin:copy-verification-check-output", async (_event, checkId: unknown) => {
   if (typeof checkId !== "string" || !/^[a-zA-Z0-9:_-]+$/.test(checkId)) return false;
   const output = verificationRunner.getCheckOutput(checkId);
   if (!output) return false;
-  clipboard.writeText(output);
+  await clipboard.writeText(output);
   return true;
 });
 ipcMain.handle("admin:start-verification", (_event, request: VerificationRunRequest) => {
