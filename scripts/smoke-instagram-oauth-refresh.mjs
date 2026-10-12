@@ -70,12 +70,14 @@ try {
   assert.equal(row().secret_one_encrypted, "", "a stale refresh must not reactivate a disconnected account");
   allowRequest = null;
   connect("RECONNECTED_TOKEN", 40);
+  f.db.setInstagramOAuthEnabled(true); // Fixture reconnect has a previously confirmed account.
 
   // Ordinary Settings saves must not modify the canonical OAuth connection.
   const linked = row();
   const setup = f.db.getSetupData();
   const save = f.db.saveInitialSetup({
     ...f.setup, profileOptions: setup.profileOptions,
+    instagram: undefined, // Unrelated settings save must not rewrite OAuth activation.
     sms: { enabled: setup.sms.enabled, senderId: setup.sms.senderId, iysList: setup.sms.iysList }
   });
   assert.equal(save.ok, true, save.message);
@@ -85,19 +87,19 @@ try {
   const tokenBeforePause = row();
   const oauthBeforePause = f.db.getInstagramConfiguration();
   assert.equal(oauthBeforePause.enabled, true);
-  service.setEnabled(false);
+  f.db.setInstagramOAuthEnabled(false);
   assert.equal(f.db.getInstagramConfiguration().enabled, false);
   assert.equal(f.db.getInstagramConfiguration().configured, false);
   assert.deepEqual(row(), tokenBeforePause, "pausing must preserve encrypted token, account and expiry");
   await service.refreshIfNeeded();
   assert.equal(refreshCalls, 4, "a paused channel must not refresh in background");
-  service.setEnabled(true);
+  f.db.setInstagramOAuthEnabled(true);
   assert.equal(f.db.getInstagramConfiguration().enabled, true);
   assert.deepEqual(row(), tokenBeforePause, "resuming must reuse the same OAuth connection");
 
   connect("EXPIRED_TOKEN", -1);
-  service.setEnabled(false);
-  assert.throws(() => service.setEnabled(true), /Instagram erişimi geçerli değil/);
+  f.db.setInstagramOAuthEnabled(false);
+  assert.throws(() => f.db.setInstagramOAuthEnabled(true), /Instagram erişimi geçerli değil/);
   assert.equal(f.db.getInstagramConfiguration().enabled, false, "expired account stays paused");
   assert.notEqual(row().secret_one_encrypted, "", "pause must not delete expired token; reconnect remains possible");
 

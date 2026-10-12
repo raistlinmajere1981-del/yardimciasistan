@@ -69,7 +69,7 @@ function load(file) {
   if (modules.has(file)) return modules.get(file);
   const exports = {}; modules.set(file, exports);
   runInNewContext(readFileSync(`${file}.js`, "utf8"), {
-    exports, __dirname: dirname(file), Buffer, URL, Error, console,
+    exports, __dirname: dirname(file), Buffer, URL, Error, fetch, console,
     process: { platform: process.platform, env: {}, argv: [], exit: () => assert.fail("unexpected exit") },
     setImmediate: (action) => immediate.push(action), setTimeout: () => ({ unref() {} }), clearTimeout,
     require: (name) => {
@@ -103,7 +103,7 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 256, "all production invoke registrations must execute");
+assert.equal(handlers.size, 259, "all production invoke registrations must execute");
 assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
 const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: { getURL: () => "fixture" } }, ...args));
 const lockFree = new Set(["appLock:getStatus", "appLock:lock", "appLock:unlock", "appLock:updatePassword",
@@ -159,7 +159,7 @@ assert.equal(calls.length, beforeHandler, "market operation: no mutation across 
 const beforeAttach = calls.length;
 events.get("kbs:registerWebview")({ sender: { getURL: () => "fixture" } }, 1);
 assert.equal(calls.length, beforeAttach);
-console.log("Production IPC lock: 247 protected invokes, real roots/session authority, unlocked delegation and preload TOCTOU passed.");
+console.log(`Production IPC lock: ${handlers.size - lockFree.size} protected invokes, real roots/session authority, unlocked delegation and preload TOCTOU passed.`);
 
 // Execute production finalize wiring; only domain operations are fixtures above.
 // The publication effect uses the real durable outbox, not a fake queue counter.

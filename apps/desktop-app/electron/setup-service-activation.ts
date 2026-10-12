@@ -47,6 +47,15 @@ export function validateSetupServiceActivation(db: DesktopDatabase, input: SaveI
     apiHash: input.sms?.clearApiHash ? "" : input.sms?.apiHash || decryptMessagingSecret(String(smsStored?.secret_two_encrypted ?? "")) };
   error = check("sms", "SMS / İleti Merkezi", sms.enabled, smsConfig, Boolean(smsConfig.senderId && smsConfig.apiKey && smsConfig.apiHash));
   if (error) return error;
+  const instagramEnabled = input.instagram?.enabled ?? current.instagram.enabled;
+  const instagramStored = db.getStoredMarketingProvider("instagram_api");
+  const instagramConfig = { accountId: String(instagramStored?.account_id ?? ""),
+    accessToken: decryptMessagingSecret(String(instagramStored?.secret_one_encrypted ?? "")) };
+  error = check("instagram", "Instagram", instagramEnabled, instagramConfig,
+    Boolean(instagramConfig.accountId && instagramConfig.accessToken &&
+      Number.isFinite(Date.parse(String(instagramStored?.secret_two_encrypted ?? ""))) &&
+      Date.parse(String(instagramStored?.secret_two_encrypted ?? "")) > Date.now()));
+  if (error) return error;
   // Initial setup establishes the required transport, not an optional service activation.
   // Normal saves of enabled automatic sync require evidence for the effective transport.
   if (!current.setupRequired && (input.autoSyncEnabled ?? current.autoSyncEnabled)) {

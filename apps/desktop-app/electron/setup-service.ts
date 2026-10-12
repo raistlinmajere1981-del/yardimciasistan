@@ -3,7 +3,9 @@ import type { MarketingProviderSecretWrites } from "./marketing/provider-secrets
 import { getMessagingConfiguration, getStoredMessagingConfiguration, normalizeMessagingConfiguration, saveMessagingConfiguration } from "./business-messaging/store";
 import type { MessagingSecretWrite } from "./business-messaging/secret-service";
 import { getArasShippingConfiguration, getStoredArasShippingConfiguration, normalizeArasShippingInput, saveArasShippingConfigurationInTransaction, type ShippingSecretWrite } from "./shipping-configuration-store";
-import { validateServiceActivation } from "./service-settings-validation";
+import { validateServiceActivation, serviceConfigFingerprint, readServiceVerification } from "./service-settings-validation";
+import { decryptMessagingSecret } from "./business-messaging/secret-service";
+import { setInstagramOAuthEnabled } from "./marketing/instagram-oauth-store";
 import { normalizeProfileTransitionInput } from "./profile-service-activation";
 import type { DatabaseSync } from "node:sqlite";
 import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
@@ -194,6 +196,16 @@ export function saveSetupData(
   ];
   for (const service of requiredServices) {
     const error = validateServiceActivation(service);
+    if (error) return { ok: false, message: error };
+  }
+  if (input.instagram?.enabled === true && !instagramConfiguration(db).enabled) {
+    const stored = storedMarketingProvider(db, "instagram_api");
+    const credentials = { accountId: String(stored?.account_id ?? ""),
+      accessToken: decryptMessagingSecret(String(stored?.secret_one_encrypted ?? "")) };
+    const expiresAt = Date.parse(String(stored?.secret_two_encrypted ?? ""));
+    const error = validateServiceActivation({ label: "Instagram", enabled: true,
+      configured: Boolean(credentials.accountId && credentials.accessToken && expiresAt > Date.now()),
+      fingerprint: serviceConfigFingerprint(credentials), verifiedFingerprint: readServiceVerification(db, "instagram") });
     if (error) return { ok: false, message: error };
   }
   let onlineSalesDelivery;
@@ -471,6 +483,7 @@ export function saveSetupData(
       .run((input.dealerPortalEnabled ?? Number(existingSettings?.dealer_portal_enabled ?? 0) === 1) ? 1 : 0, settingsId);
 
     saveMarketingProviderConfigurations(db, businessId, input.sms, marketingSecretWrites);
+    if (input.instagram) setInstagramOAuthEnabled(db, input.instagram.enabled);
     if (input.whatsappCloud) saveMessagingConfiguration(db, businessId, input.whatsappCloud, messagingSecretWrite);
     // Legacy provider activation is a projection of delivery intent, never an independent Settings switch.
     saveArasShippingConfigurationInTransaction(db, businessId, {

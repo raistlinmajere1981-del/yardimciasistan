@@ -582,6 +582,7 @@ export interface SaveInitialSetupInput {
   aiProfiles?: SaveAiServiceProfileInput[];
   productData?: DesktopProductDataSettings;
   sms?: import("@yardimci-asistan/shared").SmsConfigurationInput;
+  instagram?: { enabled: boolean };
   whatsappCloud?: import("@yardimci-asistan/shared").WhatsAppCloudConfigurationInput;
   arasShipping?: import("@yardimci-asistan/shared").ArasShippingConfigurationInput;
   dealerPortalEnabled?: boolean;

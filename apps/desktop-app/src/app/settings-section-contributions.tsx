@@ -55,7 +55,7 @@ const stagedSettingsContributions = {
     render: ({ draft, onChange, busy }) => <SmsSettingsSection draft={draft.sms} busy={busy} onChange={sms=>onChange({sms})}/>
   }, {
     definition: instagramProviderDefinition,
-    render: ({ busy }) => <InstagramSettingsSection busy={busy}/>
+    render: ({ draft, onChange, busy }) => <InstagramSettingsSection draft={draft.instagram} busy={busy} onChange={instagram=>onChange({instagram})}/>
   }, {
     definition: whatsappCloudDefinition,
     render: ({ draft, onChange, busy }) => <WhatsAppBusinessSettingsSection draft={draft.whatsappCloud} busy={busy} onChange={(whatsappCloud) => onChange({ whatsappCloud })} />

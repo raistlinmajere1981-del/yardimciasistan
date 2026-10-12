@@ -57,6 +57,8 @@ export function multichannelFixture() {
     encryptedToken:'safe-storage:v1:' + Buffer.from([...('PRIVATE_TOKEN')].reverse().join('')).toString('base64'),
     expiresAt:'2030-02-15T00:00:00.000Z'
   });
+  // This fixture represents an already-saved, enabled Instagram provider.
+  f.db.setInstagramOAuthEnabled(true);
   const sms=new (load('business-messaging/sms-service').SmsMessagingService)(()=>f.db,{fetchImpl});
   const instagram=new (load('marketing/instagram-publication-service').InstagramPublicationService)(()=>f.db,{instagramJpeg:()=>Buffer.from('FIXTURE_JPEG')},{fetchImpl,allowed:()=>state.allowed});
   const campaigns=new (load('messaging-campaigns/service').MessagingCampaignService)(()=>f.db,{

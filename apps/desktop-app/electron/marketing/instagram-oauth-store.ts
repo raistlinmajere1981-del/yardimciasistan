@@ -11,9 +11,9 @@ export function saveInstagramOAuth(db: DatabaseSync, account: {
   const business = db.prepare("SELECT id FROM business WHERE deleted_at='' ORDER BY created_at LIMIT 1").get() as {id:string}|undefined;
   if (!business) throw new MarketingError("business_missing", "İşletme kaydı bulunamadı.");
   db.prepare(`INSERT INTO marketing_provider_config VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(business_id,provider_id) DO UPDATE SET
-    enabled=excluded.enabled,account_id=excluded.account_id,sender_id=excluded.sender_id,
+    account_id=excluded.account_id,sender_id=excluded.sender_id,
     secret_one_encrypted=excluded.secret_one_encrypted,secret_two_encrypted=excluded.secret_two_encrypted,updated_at=excluded.updated_at`)
-    .run(business.id,"instagram_api",1,account.accountId,account.username,"BIREYSEL",account.encryptedToken,account.expiresAt,new Date().toISOString());
+    .run(business.id,"instagram_api",0,account.accountId,account.username,"BIREYSEL",account.encryptedToken,account.expiresAt,new Date().toISOString());
 }
 /** Pause/resume publishing without touching the OAuth identity or encrypted token. */
 export function setInstagramOAuthEnabled(db: DatabaseSync, enabled: boolean) {

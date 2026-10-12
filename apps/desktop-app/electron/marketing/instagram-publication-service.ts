@@ -15,14 +15,14 @@ export class InstagramPublicationService {
   constructor(private readonly database: () => DesktopDatabase, private readonly media: MarketingMediaService,
     private readonly options: { fetchImpl?: typeof fetch; timeoutMs?: number; allowed?: () => boolean; refreshInstagram?: () => Promise<void> } = {}) { this.staging = new InstagramMediaStaging(options); }
   getConfiguration() { return this.database().getInstagramConfiguration(); }
-  private credentials(): InstagramCredentials {
+  private credentials(requireEnabled = true): InstagramCredentials {
     const config = this.getConfiguration(), stored = this.database().getStoredMarketingProvider("instagram_api");
-    if (!config.enabled || !config.configured) throw new MarketingProviderError("unconfigured");
+    if ((requireEnabled && !config.enabled) || !config.hasSecret || !config.accountId) throw new MarketingProviderError("unconfigured");
     return { accountId: config.accountId, accessToken: decryptMessagingSecret(String(stored?.secret_one_encrypted ?? "")) };
   }
   async testConnection(): Promise<MarketingProviderConnectionResult> {
     let result: MarketingProviderConnectionResult;
-    try { if (this.options.refreshInstagram) await this.options.refreshInstagram(); const credentials = this.credentials();
+    try { if (this.options.refreshInstagram) await this.options.refreshInstagram(); const credentials = this.credentials(false);
       const profile = await new InstagramPublishingProviderAdapter(credentials,this.options).testConnection();
       this.database().recordServiceSettingsVerification("instagram", { ...credentials });
       result = { ok:true, ...profile, testedAt:new Date().toISOString(), message:`Instagram @${profile.username} profesyonel hesabı doğrulandı.` }; }

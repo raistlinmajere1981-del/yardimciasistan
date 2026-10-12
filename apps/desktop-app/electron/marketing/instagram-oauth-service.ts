@@ -100,12 +100,6 @@ export class InstagramOAuthService {
       return { status: "failed", message: error instanceof Error ? error.message : "Instagram bağlantısı doğrulanamadı." };
     } finally { this.inFlight = false; }
   }
-  setEnabled(enabled: boolean) {
-    this.assertUnlocked();
-    this.database().setInstagramOAuthEnabled(enabled);
-    this.connectionEpoch++;
-    return this.database().getInstagramConfiguration();
-  }
   disconnect() {
     this.connectionEpoch++;
     this.pending = null;

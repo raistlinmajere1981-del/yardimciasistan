@@ -21,6 +21,7 @@ export function normalizeProfileTransitionInput(
     arasShipping: { ...(input.arasShipping ?? current.arasShipping), enabled: false },
     whatsappCloud: { ...(input.whatsappCloud ?? current.whatsappCloud), enabled: false },
     sms: { ...(input.sms ?? current.sms), enabled: false },
+    instagram: { enabled: false },
   } : input;
   const capabilities = getBusinessProfileSelectionCapabilities(effective.profileId,
     effective.profileOptions ?? getBusinessProfile(effective.profileId).defaultOptionalCapabilities);
@@ -39,6 +40,7 @@ export function normalizeProfileTransitionInput(
       enabled: available("shipping") && Boolean(effective.onlineSalesDeliveryEnabled ?? current.onlineSalesDeliveryEnabled)
         && (effective.onlineSalesDelivery ?? current.onlineSalesDelivery).shippingEnabled },
     sms: { ...(effective.sms ?? current.sms), enabled: available("sms") && (effective.sms ?? current.sms).enabled },
+    instagram: { enabled: available("instagram") && (effective.instagram?.enabled ?? current.instagram.enabled) },
   };
 }
 

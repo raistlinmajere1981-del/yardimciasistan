@@ -25,6 +25,7 @@ const SMOKE_FILES = [
   "scripts/smoke-instagram-staging.mjs",
   "scripts/smoke-instagram-oauth-web.mjs",
   "scripts/smoke-instagram-oauth-settings-ui.mjs",
+  "scripts/smoke-instagram-staged-activation.mjs",
   "scripts/smoke-instagram-oauth-refresh.mjs",
   "scripts/smoke-showcase-website.mjs",
   "scripts/smoke-marketing-media-native.mjs",

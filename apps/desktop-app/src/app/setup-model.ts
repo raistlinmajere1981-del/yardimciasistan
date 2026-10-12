@@ -256,6 +256,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       clearAiApiKey: setupForm.clearAiApiKey,
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
+      instagram: { enabled: setupForm.instagram.enabled },
       sms: { enabled: setupForm.sms.enabled, senderId: setupForm.sms.senderId, iysList: setupForm.sms.iysList, ...(setupForm.sms.apiKey === undefined ? {} : { apiKey: setupForm.sms.apiKey }), ...(setupForm.sms.apiHash === undefined ? {} : { apiHash: setupForm.sms.apiHash }), ...(setupForm.sms.clearApiKey === undefined ? {} : { clearApiKey: setupForm.sms.clearApiKey }), ...(setupForm.sms.clearApiHash === undefined ? {} : { clearApiHash: setupForm.sms.clearApiHash }) },
       whatsappCloud: { enabled: setupForm.whatsappCloud.enabled, wabaId: setupForm.whatsappCloud.wabaId,
         phoneNumberId: setupForm.whatsappCloud.phoneNumberId, ...(setupForm.whatsappCloud.accessToken === undefined ? {} : { accessToken: setupForm.whatsappCloud.accessToken }), ...(setupForm.whatsappCloud.clearAccessToken === undefined ? {} : { clearAccessToken: setupForm.whatsappCloud.clearAccessToken }) },
