@@ -1,4 +1,5 @@
 import { createAndroidCompanionSnapshot } from "./android-companion-snapshot";
+import { supportsSttModel, isSupportedSttBaseUrl } from "@yardimci-asistan/shared";
 import type { AndroidOperationsSnapshot } from "@yardimci-asistan/sync-core";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
 import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
@@ -17,6 +18,7 @@ export function createAndroidOperationsSnapshot(
   dashboardData: DesktopDashboardData
 ): AndroidOperationsSnapshot {
   const updatedAt = new Date().toISOString();
+  const setup = database.getSetupData();
   const today = formatLocalDateKey(new Date());
   const activeTableOrders = database
     .listTableOrders()
@@ -52,7 +54,10 @@ export function createAndroidOperationsSnapshot(
   const source: AndroidOperationsSnapshot = {
     ...createAndroidCompanionSnapshot(database.databasePath, database.getEnabledBusinessCapabilities()),
     business_capabilities: [],
-    local_network_enabled: database.getSetupData().localNetworkEnabled !== false,
+    voice: { stt_available: setup.aiEnabled && setup.aiApiKeyConfigured
+      && supportsSttModel(setup.aiService, setup.aiSttModel ?? "")
+      && isSupportedSttBaseUrl(setup.aiService, setup.aiBaseUrl) },
+    local_network_enabled: setup.localNetworkEnabled !== false,
     summary: {
       pending_daily_tasks: dashboardData.summary.pendingDailyTasks,
       today_tasks: dashboardData.dailyTasks.filter(

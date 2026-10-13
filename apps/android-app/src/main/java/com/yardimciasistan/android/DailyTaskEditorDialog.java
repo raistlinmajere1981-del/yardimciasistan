@@ -36,6 +36,7 @@ final class DailyTaskEditorDialog {
       Kind kind,
       OperationData.TaskRecord existing,
       boolean canDelete,
+      AndroidVoiceController voice,
       Listener listener
   ) {
     boolean editing = existing != null;
@@ -107,6 +108,9 @@ final class DailyTaskEditorDialog {
       builder.setNeutralButton("Sil", null);
     }
     AlertDialog dialog = builder.create();
+    voice.addDictation(dialog, form, description, 1000,
+        () -> voice.hasPermission(editing ? "daily_task.update" : "daily_task.create"));
+    voice.bindDialog(dialog);
     dialog.setOnShowListener(ignored -> {
       dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
         String normalizedTitle = title.getText().toString().trim().replaceAll("\\s+", " ");

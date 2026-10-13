@@ -78,6 +78,7 @@ public final class MainActivity extends ComponentActivity {
   private IdentityImageWorkflow identityImageWorkflow;
   private StockImageAnalysisController stockImageAnalysisController;
   private StockImageWorkflow stockImageWorkflow;
+  private AndroidVoiceController voiceController;
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
@@ -223,6 +224,8 @@ public final class MainActivity extends ComponentActivity {
         }
     );
     identity = DeviceIdentity.loadOrCreate(this, preferences);
+    voiceController = new AndroidVoiceController(this, preferences, identity, syncClient, () -> data,
+        () -> { if (settingsOpen && shell != null) render(); });
     identityImageWorkflow = new IdentityImageWorkflow(
         this,
         preferences,
@@ -350,6 +353,7 @@ public final class MainActivity extends ComponentActivity {
     );
     detailDialogCoordinator = new AndroidDetailDialogCoordinator(
         this,
+        voiceController,
         new AndroidDetailDialogCoordinator.Listener() {
           @Override public void addHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) { shell.addDetailHeaderActions(header, dialog, reopen); }
           @Override public void configureFullDialog(Dialog dialog) { MainActivity.this.configureFullDialog(dialog); }
@@ -571,6 +575,7 @@ public final class MainActivity extends ComponentActivity {
         this,
         preferences,
         identity,
+        voiceController,
         new AndroidSettingsWorkspace.Listener() {
           @Override
           public void openCash() {
@@ -703,13 +708,21 @@ public final class MainActivity extends ComponentActivity {
   @Override
   protected void onResume() {
     super.onResume();
+    if (voiceController != null) voiceController.resume();
     foregroundSyncController.resume();
   }
 
   @Override
   protected void onPause() {
+    if (voiceController != null) voiceController.pause();
     foregroundSyncController.pause();
     super.onPause();
+  }
+
+  @Override
+  protected void onStop() {
+    if (voiceController != null) voiceController.background();
+    super.onStop();
   }
 
   @Override
@@ -731,6 +744,7 @@ public final class MainActivity extends ComponentActivity {
 
   @Override
   protected void onDestroy() {
+    if (voiceController != null) voiceController.destroy();
     foregroundSyncController.destroy();
     executor.shutdownNow();
     if (imageCaptureController != null) {
@@ -1226,6 +1240,7 @@ public final class MainActivity extends ComponentActivity {
         : ConnectionSettings.syncSecret(preferences);
 
     operationsSyncController.sync(baseUrl, syncSecret, data, new AndroidOperationsSyncController.Listener() {
+      private long voiceSyncTicket;
       @Override
       public void onRejected(String message) {
         showError(message);
@@ -1233,6 +1248,7 @@ public final class MainActivity extends ComponentActivity {
 
       @Override
       public void onStarted(String nextConnectionState) {
+        voiceSyncTicket = voiceController.syncStarted();
         loading = true;
         operationsSyncFailed = false;
         connectionState = nextConnectionState;
@@ -1251,6 +1267,7 @@ public final class MainActivity extends ComponentActivity {
         }
 
         data = result.data;
+        voiceController.synced(voiceSyncTicket);
         loading = false;
         operationsSyncFailed = false;
         connectionState = result.connectionState;
@@ -1273,6 +1290,7 @@ public final class MainActivity extends ComponentActivity {
       @Override
       public void onAndroidDisabled(OperationData disabledData, String message) {
         data = disabledData;
+        voiceController.syncFailed();
         loading = false;
         operationsSyncFailed = false;
         connectionState = message;
@@ -1288,6 +1306,7 @@ public final class MainActivity extends ComponentActivity {
       ) {
         loading = false;
         operationsSyncFailed = true;
+        voiceController.syncFailed();
         connectionState = message;
         if (retryingOnlyMarketActions && marketWorkspace != null) {
           clearError();

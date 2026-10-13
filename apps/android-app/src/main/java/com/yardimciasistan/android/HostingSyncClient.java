@@ -4,7 +4,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -12,10 +14,133 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Timer;
+import java.util.TimerTask;
+import javax.net.ssl.HttpsURLConnection;
 
 final class HostingSyncClient {
+  interface AudioConnectionFactory { HttpsURLConnection open(URL url) throws java.io.IOException; }
+  private final AudioConnectionFactory audioConnections;
   private static final int CONNECT_TIMEOUT_MS = 12000;
   private static final int READ_TIMEOUT_MS = 18000;
+
+  HostingSyncClient() { this(url -> (HttpsURLConnection) url.openConnection()); }
+  HostingSyncClient(AudioConnectionFactory audioConnections) { this.audioConnections = audioConnections; }
+
+  /** Direct Hosting only: deliberately never enters the LAN router or token bootstrap. */
+  String transcribeAudio(String baseUrl, String credential, DeviceIdentity identity,
+      File audio, AudioRequest request) throws SyncException {
+    if (!ConnectionSettings.isDeviceCredential(credential) || !AndroidVoiceRules.httpsHosting(baseUrl)) {
+      throw new SyncException("Dikte için HTTPS Hosting ve kişisel cihaz bağlantısı gerekli.");
+    }
+    if (audio == null || audio.length() <= 0 || audio.length() > AndroidVoiceRules.MAX_AUDIO_BYTES) {
+      throw new SyncException("Ses kaydı boş veya 5 MiB sınırını aşıyor.");
+    }
+    HttpsURLConnection connection = null;
+    Timer deadline = new Timer("android-dictation-timeout", true);
+    deadline.schedule(new TimerTask() {
+      @Override public void run() { request.timeout(); }
+    }, 70_000);
+    try {
+      request.check();
+      String boundary = "----YardimciAsistanAudio" + java.util.UUID.randomUUID();
+      ByteArrayOutputStream fields = new ByteArrayOutputStream();
+      try (DataOutputStream prefix = new DataOutputStream(fields)) {
+        writeMultipartField(prefix, boundary, "source", "android");
+        writeMultipartField(prefix, boundary, "device_id", identity.deviceId);
+        prefix.writeBytes("--" + boundary + "\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"dictation.m4a\"\r\n");
+        prefix.writeBytes("Content-Type: audio/mp4\r\n\r\n");
+      }
+      byte[] prefix = fields.toByteArray();
+      byte[] suffix = ("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8);
+      connection = audioConnections.open(new URL(normalizeBaseUrl(baseUrl) + "/api/audio-transcribe.php"));
+      request.attach(connection);
+      connection.setInstanceFollowRedirects(false);
+      connection.setRequestMethod("POST");
+      connection.setConnectTimeout(10_000);
+      connection.setReadTimeout(65_000);
+      connection.setDoOutput(true);
+      connection.setFixedLengthStreamingMode(prefix.length + audio.length() + suffix.length);
+      connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+      connection.setRequestProperty("Accept", "application/json");
+      applyAuthorization(connection, credential, identity);
+      try (OutputStream output = connection.getOutputStream(); FileInputStream input = new FileInputStream(audio)) {
+        request.check();
+        output.write(prefix);
+        byte[] buffer = new byte[16 * 1024];
+        int count;
+        long total = 0;
+        while ((count = input.read(buffer)) != -1) {
+          request.check();
+          total += count;
+          if (total > AndroidVoiceRules.MAX_AUDIO_BYTES) throw new SyncException("Ses kaydı 5 MiB sınırını aşıyor.");
+          output.write(buffer, 0, count);
+        }
+        output.write(suffix);
+      }
+      request.check();
+      int status = connection.getResponseCode();
+      // Keep status even when a proxy returns HTML or an empty denial body.
+      // Raw error bodies never enter UI, diagnostics or transcript parsing.
+      if (status != 200) throw audioHttpFailure(status);
+      InputStream stream = connection.getInputStream();
+      ByteArrayOutputStream responseBytes = new ByteArrayOutputStream();
+      if (stream != null) try (InputStream input = stream) {
+        byte[] buffer = new byte[4096];
+        int count;
+        while ((count = input.read(buffer)) != -1) {
+          request.check();
+          if (responseBytes.size() + count > 128 * 1024) throw new SyncException("Dikte yanıtı okunamadı.");
+          responseBytes.write(buffer, 0, count);
+        }
+      }
+      request.check();
+      JSONObject response = new JSONObject(new String(responseBytes.toByteArray(), StandardCharsets.UTF_8));
+      if (!response.optBoolean("ok", false)) throw audioHttpFailure(status);
+      Object value = response.opt("text");
+      if (!(value instanceof String) || ((String) value).length() > AndroidVoiceRules.MAX_TEXT_CHARS) {
+        throw new SyncException("Dikte yanıtı okunamadı.");
+      }
+      return ((String) value).replace(ConnectionSettings.deviceToken(credential), "[gizlendi]");
+    } catch (SyncException error) {
+      throw error;
+    } catch (Exception ignored) {
+      throw new SyncException(request.timedOut ? "Dikte yanıtı zamanında alınamadı." : "Dikte bağlantısı tamamlanamadı.");
+    } finally {
+      deadline.cancel();
+      request.detach();
+      if (connection != null) connection.disconnect();
+    }
+  }
+
+  private static SyncException audioHttpFailure(int status) {
+    String message = status == 401 ? "Telefon bağlantısı doğrulanamadı. Cihazı yeniden eşleştirin."
+        : status == 403 ? "Bu telefonun güncel onayı veya dikte yetkisi yok."
+        : status == 413 ? "Ses kaydı 5 MiB sınırını aşıyor."
+        : status == 415 ? "Ses kaydı biçimi Hosting tarafından desteklenmiyor."
+        : status == 422 ? "Konuşma tanıma modeli Hosting'de etkin değil veya kayıt geçersiz. Ayarları yayınlayın."
+        : "Ses metne çevrilemedi. Bağlantı ve AI ayarlarını kontrol edin.";
+    return new SyncException(message, "audio_transcription_failed", status);
+  }
+
+  static final class AudioRequest {
+    private boolean canceled;
+    private volatile boolean timedOut;
+    private HttpURLConnection connection;
+    synchronized void check() throws SyncException {
+      if (canceled) throw new SyncException(timedOut ? "Dikte yanıtı zamanında alınamadı." : "Dikte iptal edildi.");
+    }
+    synchronized void attach(HttpURLConnection value) throws SyncException {
+      check();
+      connection = value;
+    }
+    synchronized void detach() { connection = null; }
+    synchronized void cancel() {
+      canceled = true;
+      if (connection != null) connection.disconnect();
+    }
+    synchronized void timeout() { timedOut = true; cancel(); }
+  }
 
   OperationData fetchOperations(String baseUrl, String credential, DeviceIdentity identity) throws SyncException {
     FetchResult result = fetchOperations(baseUrl, credential, identity, 0L);

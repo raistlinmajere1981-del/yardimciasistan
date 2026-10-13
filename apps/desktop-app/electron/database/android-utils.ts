@@ -58,6 +58,7 @@ export function androidPermissionsForRole(role: AndroidDeviceRole): AndroidPermi
 
 function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
   return {
+    voice_dictation: false,
     service_orders: false,
     cashier: false,
     rooms_tasks: false,
@@ -97,7 +98,7 @@ export function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPe
   const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
   for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
     if (!(groupId in record)) {
-      if (["commerce_orders_view", "commerce_orders_manage", "dealer_view", "shipment_view", "online_sales_view", "marketing_status_view"].includes(groupId)) continue;
+      if (["voice_dictation", "commerce_orders_view", "commerce_orders_manage", "dealer_view", "shipment_view", "online_sales_view", "marketing_status_view"].includes(groupId)) continue;
       return null;
     }
     if (typeof record[groupId] !== "boolean") return null;

@@ -339,9 +339,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $customersEnabled = isset($businessCapabilities['core.customers']);
     $aiEnabled = isset($businessCapabilities['service.ai']);
     $whatsAppEnabled = isset($businessCapabilities['service.whatsapp']);
-    $permissionProfile = is_array($androidSnapshot['androidPermissions'][$deviceId] ?? null)
-        ? $androidSnapshot['androidPermissions'][$deviceId]
-        : [];
+    $permissionProfile = ya_android_auth_device_profile($androidSnapshot, $deviceId);
     $permissionList = is_array($permissionProfile['permissions'] ?? null) ? $permissionProfile['permissions'] : [];
     $deviceActive = ya_sync_bool($permissionProfile['is_active'] ?? false);
     $serverRevision = ya_storage_server_revision();
@@ -394,6 +392,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             ],
             'business_capabilities' => $androidSnapshot['business_capabilities'],
             'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
+            'voice' => defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED
+                ? ya_android_auth_voice_projection($androidSnapshot, $deviceId) : ['stt_available' => false],
             'daily_tasks' => [],
             'requests' => [],
             'customers' => [],
@@ -470,6 +470,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'approval_required' => false,
             'not_modified' => true,
             'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
+            'voice' => defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED
+                ? ya_android_auth_voice_projection($androidSnapshot, $deviceId) : ['stt_available' => false],
             'server_revision' => $serverRevision,
             'pulled_at' => $now,
             'pending_action_count' => $pendingActionCount,
@@ -593,6 +595,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'operations' => [...$androidSnapshot['summary'], ...ya_companion_counters($companion)],
         'business_capabilities' => $androidSnapshot['business_capabilities'],
         'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
+        'voice' => defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED
+            ? ya_android_auth_voice_projection($androidSnapshot, $deviceId) : ['stt_available' => false],
         'daily_tasks' => $androidSnapshot['daily_tasks'],
         'requests' => $visibleRequests,
         'customers' => $customerManagementAllowed ? $androidSnapshot['customers'] : [],
@@ -846,9 +850,7 @@ function ya_sync_enqueue_android_action(array $payload): void
         ]);
     }
 
-    $permissionProfile = is_array($snapshot['androidPermissions'][$deviceId] ?? null)
-        ? $snapshot['androidPermissions'][$deviceId]
-        : [];
+    $permissionProfile = ya_android_auth_device_profile($snapshot, $deviceId);
     if (!ya_sync_bool($permissionProfile['is_active'] ?? false)) {
         ya_sync_response(403, [
             'ok' => false,
@@ -2314,6 +2316,8 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
             $snapshot['business_capabilities'] ?? []
         ),
         'local_network_enabled' => ya_sync_bool($snapshot['local_network_enabled'] ?? true),
+        'voice' => ['stt_available' => ($snapshot['voice']['stt_available'] ?? false) === true
+            && ya_android_auth_snapshot_has_capabilities(['service.android', 'service.ai'], $snapshot)],
         'summary' => [
             'pending_daily_tasks' => max(0, ya_sync_int($summary['pending_daily_tasks'] ?? 0, 0)),
             'today_tasks' => max(0, ya_sync_int($summary['today_tasks'] ?? 0, 0)),
@@ -2851,6 +2855,7 @@ function ya_sync_android_permissions(): array
         'shipment.view',
         'online_sales.view',
         'marketing.status.view',
+        'voice.dictation',
         'customer.view',
         'customer.manage',
         'customer.respond',

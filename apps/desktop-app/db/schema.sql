@@ -1872,6 +1872,10 @@ BEGIN
   VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
 CREATE TRIGGER trg_sync_ai_profile_update AFTER UPDATE OF base_url, model, stt_model, timeout_seconds, api_key_encrypted ON ai_service_profiles
 WHEN NEW.base_url != OLD.base_url OR NEW.model != OLD.model OR NEW.stt_model != OLD.stt_model OR NEW.timeout_seconds != OLD.timeout_seconds OR NEW.api_key_encrypted != OLD.api_key_encrypted
@@ -1880,12 +1884,20 @@ BEGIN
   VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
 CREATE TRIGGER trg_sync_ai_settings_update AFTER UPDATE OF ai_provider, ai_service ON settings
 WHEN NEW.ai_provider != OLD.ai_provider OR NEW.ai_service != OLD.ai_service
 BEGIN
   INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
   VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
+  ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
+    attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+  INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
+  VALUES ('android_snapshot', 'android_snapshot', NEW.updated_at, NEW.updated_at)
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;

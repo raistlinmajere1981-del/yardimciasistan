@@ -156,9 +156,7 @@ function ya_chat_generate_android_report(array $businessConfig, array $aiConfig,
     }
     $snapshot = ya_storage_get_publication('android_snapshot', []);
     unset($snapshot['_publication']);
-    $profile = is_array($snapshot['androidPermissions'][$deviceId] ?? null)
-        ? $snapshot['androidPermissions'][$deviceId]
-        : [];
+    $profile = ya_android_auth_device_profile($snapshot, $deviceId);
     if (($profile['role'] ?? 'staff') !== 'admin' || !ya_chat_bool($profile['is_active'] ?? false)) {
         ya_chat_response(403, [
             'ok' => false,

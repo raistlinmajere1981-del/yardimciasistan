@@ -20,6 +20,20 @@ const allGroups = {
   market_operations: true
 };
 
+test("dictation has an independent OFF staff group and Android/AI intersection", () => {
+  const { ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS, ANDROID_PERMISSION_GROUP_PERMISSIONS,
+    androidPermissionAllowedByCapabilities } = require("../dist");
+  assert.equal(ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS.voice_dictation, false);
+  assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.voice_dictation, ["voice.dictation"]);
+  assert.equal(androidEffectivePermissionsForGroups(ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS, [...core, C.AI]).includes("voice.dictation"), false);
+  assert.equal(androidEffectivePermissionsForRole("staff", ["customer.respond", "settings.edit"], [...core, C.AI]).includes("voice.dictation"), false);
+  assert.equal(androidEffectivePermissionsForRole("admin", [], [...core, C.AI]).includes("voice.dictation"), true);
+  assert.equal(androidAvailablePermissionGroupIds([...core, C.AI]).includes("voice_dictation"), true);
+  assert.equal(androidPermissionAllowedByCapabilities("voice.dictation", core), false);
+  assert.equal(androidPermissionAllowedByCapabilities("voice.dictation", [C.AI]), false);
+  assert.equal(androidPermissionAllowedByCapabilities("voice.dictation", [C.ANDROID, C.AI]), true);
+});
+
 test("stored Android groups cannot grant disabled room or food domains", () => {
   const permissions = androidEffectivePermissionsForGroups(allGroups, core);
   assert.equal(permissions.includes("room.view"), false);

@@ -43,12 +43,15 @@ final class AndroidDetailDialogCoordinator {
 
   private final ComponentActivity activity;
   private final Listener listener;
+  private final AndroidVoiceController voice;
 
   AndroidDetailDialogCoordinator(
       ComponentActivity activity,
+      AndroidVoiceController voice,
       Listener listener
   ) {
     this.activity = activity;
+    this.voice = voice;
     this.listener = listener;
   }
 
@@ -216,6 +219,7 @@ final class AndroidDetailDialogCoordinator {
         activity,
         data,
         request,
+        voice,
         new CustomerRequestDetailDialog.Listener() {
           @Override
           public void addHeaderActions(
@@ -334,6 +338,7 @@ final class AndroidDetailDialogCoordinator {
         activity,
         data,
         message,
+        voice,
         new MessageDetailDialog.Listener() {
           @Override
           public void addHeaderActions(
@@ -585,6 +590,7 @@ final class AndroidDetailDialogCoordinator {
         kind,
         task,
         canDelete,
+        voice,
         new DailyTaskEditorDialog.Listener() {
           @Override
           public void onSave(JSONObject actionPayload) {

@@ -15,6 +15,7 @@ const SMOKE_FILES = [
   "scripts/smoke-voice-stt-ui.mjs",
   "scripts/smoke-voice-stt-desktop.mjs",
   "scripts/smoke-voice-stt-desktop-ui.mjs",
+  "scripts/smoke-voice-stt-android.mjs",
   "scripts/smoke-desktop-ui-correctness.mjs",
   "scripts/smoke-publication-protocol.mjs",
   "scripts/smoke-sync-publication-correctness.mjs",
@@ -271,6 +272,9 @@ const BASE_CHECKS = [
   check("build-android-debug", "Android testleri + debug APK", "npm", ["run", "smoke:android:build"], {
     phase: 27, presets: ["full"], domains: ["android"],
     requires: ["version-check"]
+  }),
+  check("android-lint", "Android native lint", "node", ["scripts/run-android-gradle.mjs", "lintDebug"], {
+    phase: 28, presets: ["full"], domains: ["android", "voice"], requires: ["version-check"]
   }),
   check("android-companion-device-ui", "Companion salt-okunur cihaz arayüzü", "node", ["scripts/smoke-android-device-ui.mjs", "--no-build", "--companion-only"], {
     phase: 50, presets: [], domains: ["android"], manual: true,
@@ -552,6 +556,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-voice-stt-android.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-voice-stt-desktop.mjs") return [];
   if (file === "scripts/smoke-voice-stt-provider.php") return ["php-lint"];
   if (file === "scripts/smoke-voice-stt-hosting.mjs" || file === "scripts/smoke-voice-stt-publication.mjs") return ["build-packages", "php-lint"];
@@ -577,6 +582,7 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file === "scripts/smoke-voice-stt-android.mjs") return ["voice", "android", "settings", "web"];
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   const productIdentityChecks = new Set([
     "menu-product-identity", "desktop-menu-db", "menu-reorder-contract", "schema-authority", "storage-correctness",

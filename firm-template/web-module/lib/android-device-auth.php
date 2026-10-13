@@ -27,6 +27,39 @@ function ya_android_auth_snapshot_has_capabilities(array $required, ?array $snap
     return true;
 }
 
+/** One snapshot membership/approval resolver for all Android consumers. */
+function ya_android_auth_device_profile(array $snapshot, string $deviceId): array
+{
+    $profile = $snapshot['androidPermissions'][$deviceId] ?? null;
+    return is_array($profile) ? $profile : [];
+}
+
+/** Sensitive requests require the personal token; no bootstrap/shared-secret fallback. */
+function ya_android_auth_personal_request_authorized(array $server, string $deviceId): bool
+{
+    $headerId = $server['HTTP_X_YA_DEVICE_ID'] ?? null;
+    $token = $server['HTTP_X_YA_DEVICE_TOKEN'] ?? null;
+    return is_string($headerId) && is_string($token)
+        && hash_equals($deviceId, trim($headerId))
+        && ya_android_auth_validate_token($deviceId, $token);
+}
+
+/** Safe projection shared by snapshot redaction and upload authorization. */
+function ya_android_auth_dictation_allowed(array $snapshot, string $deviceId): bool
+{
+    $profile = ya_android_auth_device_profile($snapshot, $deviceId);
+    return ($profile['is_active'] ?? false) === true
+        && is_array($profile['permissions'] ?? null)
+        && in_array('voice.dictation', $profile['permissions'], true)
+        && ya_android_auth_snapshot_has_capabilities(['service.android', 'service.ai'], $snapshot);
+}
+
+function ya_android_auth_voice_projection(array $snapshot, string $deviceId): array
+{
+    return ['stt_available' => ($snapshot['voice']['stt_available'] ?? false) === true
+        && ya_android_auth_dictation_allowed($snapshot, $deviceId)];
+}
+
 function ya_android_auth_ensure_schema(): void
 {
     ya_storage_open()->exec(<<<'SQL'

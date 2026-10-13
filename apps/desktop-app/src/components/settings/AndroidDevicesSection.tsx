@@ -26,6 +26,7 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   shortLabel: string;
   description: string;
 }> = [
+  { id: "voice_dictation", label: "Ses / Dikte", shortLabel: "Dikte", description: "Ses kaydını Hosting üzerinden metne çevirme; metin yalnız açık onayla kullanılır" },
   { id: "commerce_orders_view", label: "Ticari Sipariş / Görüntüleme", shortLabel: "Ticari sipariş", description: "Ticari sipariş durum özetleri" },
   { id: "commerce_orders_manage", label: "Ticari Sipariş / Karar", shortLabel: "Sipariş kararı", description: "Ticari siparişi onaylama ve iptal etme" },
   { id: "dealer_view", label: "Bayi / Durum", shortLabel: "Bayi", description: "Ticari profil ve fiyat grubu özeti" },

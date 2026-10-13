@@ -25,17 +25,20 @@ final class AndroidSettingsWorkspace {
   private final SharedPreferences preferences;
   private final DeviceIdentity identity;
   private final Listener listener;
+  private final AndroidVoiceController voice;
   private AndroidConnectionSettingsPanel connectionPanel;
 
   AndroidSettingsWorkspace(
       ComponentActivity activity,
       SharedPreferences preferences,
       DeviceIdentity identity,
+      AndroidVoiceController voice,
       Listener listener
   ) {
     this.activity = activity;
     this.preferences = preferences;
     this.identity = identity;
+    this.voice = voice;
     this.listener = listener;
   }
 
@@ -53,6 +56,8 @@ final class AndroidSettingsWorkspace {
     LinearLayout appearance = UiKit.card(activity);
     appearance.addView(settingLine("Tema", themeLabel, UiKit.PRIMARY));
     page.addView(appearance);
+    page.addView(sectionLabel("Ses"));
+    page.addView(voice.settingsView());
 
     if (data.hasPermission("finance.view")) {
       page.addView(sectionLabel("Kasa"));

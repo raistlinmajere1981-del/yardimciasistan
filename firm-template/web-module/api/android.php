@@ -96,8 +96,7 @@ require __DIR__ . '/sync.php';
 function ya_android_gate_device_active(string $deviceId): bool
 {
     $snapshot = ya_storage_get_publication('android_snapshot', []);
-    $profiles = is_array($snapshot['androidPermissions'] ?? null) ? $snapshot['androidPermissions'] : [];
-    $profile = is_array($profiles[$deviceId] ?? null) ? $profiles[$deviceId] : [];
+    $profile = ya_android_auth_device_profile($snapshot, $deviceId);
     $active = $profile['is_active'] ?? false;
     if (is_bool($active)) {
         return $active;

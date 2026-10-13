@@ -32,7 +32,10 @@ function ya_stt_failure(int $status, string $code): array
     $message = match ($code) {
         'method_not_allowed' => 'Konuşma tanıma için POST isteği gerekli.',
         'unauthorized' => 'Konuşma tanıma bağlantısı doğrulanamadı.',
-        'android_stt_scope_denied' => 'Android ses girişi bu sürümde etkin değil.',
+        'android_stt_scope_denied' => 'Android ses girişi için kişisel cihaz bağlantısı gerekli.',
+        'device_identity_mismatch' => 'Telefon kimliği doğrulanamadı.',
+        'device_approval_required' => 'Bu telefonun güncel masaüstü onayı yok.',
+        'voice_dictation_denied' => 'Bu telefonun sesle dikte yetkisi yok.',
         'ai_capability_disabled', 'ai_disabled' => 'AI konuşma tanıma işletme ayarlarında kapalı.',
         'stt_not_configured' => 'Bir konuşma tanıma modeli seçip ayarları yayınlayın.',
         'stt_configuration_invalid' => 'Konuşma tanıma sağlayıcı ayarları desteklenmiyor.',
@@ -46,16 +49,33 @@ function ya_stt_failure(int $status, string $code): array
     return ['status' => $status, 'payload' => ['ok' => false, 'code' => $code, 'message' => $message]];
 }
 
-/** Desktop credential boundary. Android needs a dedicated canonical permission in S2B. */
+/** Desktop and personal Android credentials have separate, explicit authority. */
 function ya_stt_request_gate(array $server, array $post, array $businessConfig, callable $getCapabilities): ?array
 {
     if (($server['REQUEST_METHOD'] ?? '') !== 'POST') return ya_stt_failure(405, 'method_not_allowed');
+    if (($post['source'] ?? '') === 'android') {
+        require_once __DIR__ . '/android-device-auth.php';
+        $deviceId = $server['HTTP_X_YA_DEVICE_ID'] ?? '';
+        if (!is_string($deviceId) || !ya_android_auth_personal_request_authorized($server, trim($deviceId))) {
+            return ya_stt_failure(401, 'unauthorized');
+        }
+        $deviceId = trim($deviceId);
+        if (!is_string($post['device_id'] ?? null) || !hash_equals($deviceId, trim($post['device_id']))) {
+            return ya_stt_failure(403, 'device_identity_mismatch');
+        }
+        $snapshot = ya_android_auth_snapshot();
+        $profile = ya_android_auth_device_profile($snapshot, $deviceId);
+        if (($profile['is_active'] ?? false) !== true) return ya_stt_failure(403, 'device_approval_required');
+        if (!ya_android_auth_dictation_allowed($snapshot, $deviceId)) return ya_stt_failure(403, 'voice_dictation_denied');
+        if ((int) ($server['CONTENT_LENGTH'] ?? 0) > YA_STT_MAX_AUDIO_BYTES + 65536) return ya_stt_failure(413, 'audio_too_large');
+        if (count($post) !== 2 || ($server['QUERY_STRING'] ?? '') !== '') return ya_stt_failure(422, 'invalid_request');
+        return null;
+    }
     $configured = $businessConfig['sync_secret'] ?? '';
     $provided = $server['HTTP_X_YA_SYNC_SECRET'] ?? '';
     if (!is_string($configured) || $configured === '' || !is_string($provided) || $provided === ''
         || !hash_equals($configured, $provided)) return ya_stt_failure(401, 'unauthorized');
-    if (isset($server['HTTP_X_YA_DEVICE_TOKEN']) || isset($server['HTTP_X_YA_DEVICE_ID'])
-        || ($post['source'] ?? '') === 'android') return ya_stt_failure(403, 'android_stt_scope_denied');
+    if (isset($server['HTTP_X_YA_DEVICE_TOKEN']) || isset($server['HTTP_X_YA_DEVICE_ID'])) return ya_stt_failure(403, 'android_stt_scope_denied');
     if (!in_array('service.ai', $getCapabilities(), true)) return ya_stt_failure(403, 'ai_capability_disabled');
     if ((int) ($server['CONTENT_LENGTH'] ?? 0) > YA_STT_MAX_AUDIO_BYTES + 65536) return ya_stt_failure(413, 'audio_too_large');
     if (($post['source'] ?? '') !== 'desktop' || count($post) !== 1

@@ -13,6 +13,7 @@ import java.util.Set;
 
 final class OperationData {
   private static final String[] ALL_PERMISSIONS = {
+      "voice.dictation",
       "customer.view",
       "customer.manage",
       "customer.respond",
@@ -140,6 +141,7 @@ final class OperationData {
   int customerCount;
   String deviceRole = "staff";
   boolean deviceActive = true;
+  boolean sttAvailable;
   boolean permissionsResolved;
   boolean capabilitiesResolved;
   final Set<String> permissions = new HashSet<>();
@@ -213,6 +215,7 @@ final class OperationData {
       return data;
     }
 
+    data.applyVoiceProjection(root);
     JSONObject summary = object(root, "summary");
     data.totalRequests = number(summary, "total_requests");
     data.newRequests = number(summary, "new_requests");
@@ -314,6 +317,10 @@ final class OperationData {
         && permissions.contains(permission);
   }
 
+  void applyVoiceProjection(JSONObject response) {
+    sttAvailable = Boolean.TRUE.equals(object(response, "voice").opt("stt_available"));
+  }
+
   boolean hasBusinessCapability(String capability) {
     return capabilitiesResolved && businessCapabilities.contains(capability);
   }
@@ -322,6 +329,7 @@ final class OperationData {
     if (permission == null || permission.isEmpty()) {
       return false;
     }
+    if ("voice.dictation".equals(permission)) return hasBusinessCapability("service.ai");
     if (permission.startsWith("commerce_order.") || "shipment.view".equals(permission)) return hasBusinessCapability("commerce.orders");
     if ("dealer.view".equals(permission)) return hasBusinessCapability("core.customers") && hasBusinessCapability("commerce.orders") && hasBusinessCapability("commerce.wholesale");
     if ("online_sales.view".equals(permission)) return hasBusinessCapability("commerce.orders") && hasBusinessCapability("channel.online_sales");

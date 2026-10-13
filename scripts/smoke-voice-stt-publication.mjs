@@ -94,7 +94,7 @@ try {
   assert.equal(voice({ REQUEST_METHOD: "GET" }).status, 405);
   assert.equal(voice({ HTTP_X_YA_SYNC_SECRET: "wrong" }).status, 401);
   assert.equal(voice({ HTTP_X_YA_DEVICE_TOKEN: `yat_${"a".repeat(64)}` }).status, 403);
-  assert.equal(voice({}, { source: "android" }).status, 403);
+  assert.equal(voice({}, { source: "android" }).status, 401);
   publishCaps(false);
   assert.equal(voice().body.code, "ai_capability_disabled");
   publishCaps(true);

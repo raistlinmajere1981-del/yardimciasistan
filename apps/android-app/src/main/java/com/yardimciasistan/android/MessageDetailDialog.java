@@ -26,6 +26,7 @@ final class MessageDetailDialog {
       ComponentActivity activity,
       OperationData data,
       OperationData.MessageRecord message,
+      AndroidVoiceController voice,
       Listener listener
   ) {
     Dialog dialog = new Dialog(activity);
@@ -47,7 +48,7 @@ final class MessageDetailDialog {
     listener.addHeaderActions(
         header,
         dialog,
-        () -> show(activity, data, message, listener)
+        () -> show(activity, data, message, voice, listener)
     );
     shell.addView(header);
 
@@ -73,6 +74,7 @@ final class MessageDetailDialog {
     bodyParams.setMargins(0, UiKit.dp(activity, 10), 0, 0);
     body.setLayoutParams(bodyParams);
     messageCard.addView(body);
+    voice.addSpeaker(dialog, messageCard, message.message, () -> voice.hasPermission("customer.view"));
     page.addView(messageCard);
 
     if (AndroidUiRules.canUseWhatsApp(data)
@@ -181,6 +183,7 @@ final class MessageDetailDialog {
     scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
     shell.addView(scroll);
     dialog.setContentView(shell);
+    voice.bindDialog(dialog);
     dialog.show();
     listener.configureFullDialog(dialog);
   }

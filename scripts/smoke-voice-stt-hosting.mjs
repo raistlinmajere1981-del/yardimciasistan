@@ -29,6 +29,8 @@ try {
   writeFileSync(endpointPath, endpoint.replace(call, "ya_stt_transcribe(is_array($config) ? $config : [], $upload['tmp_name'], require __DIR__ . '/../stt-provider-fixture.php')"));
   writeFileSync(join(hosting, "stt-provider-fixture.php"), `<?php
 return static function (string $url, array $options): array {
+    $count = __DIR__ . '/provider-call-count';
+    file_put_contents($count, (string) ((int) @file_get_contents($count) + 1));
     $mode = $_SERVER['HTTP_X_FIXTURE_RESPONSE'] ?? 'success';
     if ($mode === 'timeout') return ['status' => 0, 'error' => CURLE_OPERATION_TIMEDOUT, 'body' => ''];
     if ($mode === 'error') return ['status' => 401, 'error' => 0, 'body' => json_encode(['error' => ['message' => '${key}']])];
@@ -57,10 +59,10 @@ return static function (string $url, array $options): array {
   const clientId = "voice-hosting-desktop";
   await activateFixtureSource(baseUrl, secret, clientId);
   const post = body => fetch(`${baseUrl}/api/sync.php`, { method: "POST", headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": secret }, body: JSON.stringify(body) });
-  const publishCaps = async enabled => {
+  const publishCaps = async (enabled, patch = {}) => {
     const result = await post(publicationEnvelope({ action: "publish_android_snapshot", client_id: clientId, snapshot: {
       business: {}, business_capabilities: enabled ? ["service.ai"] : [], menu: { categories: [], items: [] },
-      requests: [], reservations: [], rooms: [], tables: [], customers: [], dailyTasks: [], financeEntries: [], androidPermissions: {}, updatedAt: new Date().toISOString()
+      requests: [], reservations: [], rooms: [], tables: [], customers: [], dailyTasks: [], financeEntries: [], androidPermissions: {}, updatedAt: new Date().toISOString(), ...patch
     } }, clientId));
     assert.equal(result.status, 200, await result.text());
   };
@@ -94,7 +96,7 @@ return static function (string $url, array $options): array {
   assert.equal((await request({ method: "OPTIONS" })).response.status, 405);
   assert.equal((await request({ auth: null })).response.status, 401);
   assert.equal((await request({ auth: "wrong" })).response.status, 401);
-  assert.equal((await request({ source: "android", headers: { "X-YA-Device-Token": `yat_${"a".repeat(64)}`, "X-YA-Device-Id": "android-fixture" } })).response.status, 403);
+  assert.equal((await request({ source: "android", headers: { "X-YA-Device-Token": `yat_${"a".repeat(64)}`, "X-YA-Device-Id": "android-fixture" } })).response.status, 401);
   assert.equal((await request({ headers: { "X-YA-Device-Id": "android-fixture" } })).response.status, 403);
   await publishCaps(false);
   assert.equal((await request()).body.code, "ai_capability_disabled");
@@ -106,6 +108,75 @@ return static function (string $url, array $options): array {
   const applied = await publish({});
   assert.equal(applied.ok, true, applied.message);
   assert.equal(applied.stt_model, settings.sttModel);
+  const deviceId = "android-voice-fixture";
+  const issueToken = () => {
+    const issued = spawnSync("php", ["-r", "require $argv[1]; echo ya_android_auth_issue_token($argv[2]);",
+      join(hosting, "lib/android-device-auth.php"), deviceId], { encoding: "utf8" });
+    assert.equal(issued.status, 0, "fixture token issued without error");
+    assert.equal(issued.stderr, "");
+    assert.ok(/^yat_[a-f0-9]{64}$/.test(issued.stdout));
+    return issued.stdout;
+  };
+  let token = issueToken();
+  const androidSnapshot = (permissions = ["voice.dictation"], active = true, caps = ["service.android", "service.ai"]) => ({
+    business_capabilities: caps, voice: { stt_available: true, api_key: key, model_secret: key },
+    androidPermissions: { [deviceId]: { role: "staff", is_active: active, permissions } }
+  });
+  const androidRequest = (patch = {}) => request({ auth: null, source: "android", extra: { device_id: deviceId },
+    headers: { "X-YA-Device-Id": deviceId, "X-YA-Device-Token": token }, ...patch });
+  await publishCaps(true, androidSnapshot());
+  assert.deepEqual((await androidRequest()).body, { ok: true, text: transcript });
+  // MPEG_4/AAC MediaRecorder's ISO-BMFF container is content-detected as MP4/M4A.
+  const mp4 = Buffer.from("00000018667479706d703432000000006d70343269736f6d000000086d646174", "hex");
+  assert.equal((await androidRequest({ audio: mp4, type: "text/plain", filename: "ignored.aac" })).response.status, 200);
+  const summary = async (personal = true) => {
+    const response = await fetch(`${baseUrl}/api/${personal ? "android" : "sync"}.php`, { method: "POST",
+      headers: { "Content-Type": "application/json", ...(personal ? { "X-YA-Device-Id": deviceId, "X-YA-Device-Token": token } : { "X-YA-Sync-Secret": secret }) },
+      body: JSON.stringify({ action: "android_summary", device_id: deviceId }) });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(JSON.stringify(body).includes(key) || JSON.stringify(body).includes(token), false);
+    return body;
+  };
+  assert.deepEqual((await summary()).voice, { stt_available: true });
+  assert.deepEqual((await summary(false)).voice, { stt_available: false });
+  const callsBeforeDenials = readFileSync(join(hosting, "provider-call-count"), "utf8");
+  assert.equal((await androidRequest({ headers: { "X-YA-Device-Id": deviceId, "X-YA-Sync-Secret": secret } })).response.status, 401);
+  assert.equal((await androidRequest({ headers: { "X-YA-Device-Token": token } })).response.status, 401);
+  assert.equal((await androidRequest({ headers: { "X-YA-Device-Id": "different-device", "X-YA-Device-Token": token } })).response.status, 401);
+  assert.equal((await androidRequest({ extra: { device_id: "different-device" } })).body.code, "device_identity_mismatch");
+  assert.equal((await androidRequest({ extra: { device_id: deviceId, model: "whisper-1" } })).response.status, 422);
+  assert.equal((await androidRequest({ query: "?secret=ignored" })).response.status, 422);
+  assert.equal((await androidRequest({ audio: wave(5 * 1024 * 1024 + 1) })).response.status, 413);
+  assert.equal((await androidRequest({ audio: Buffer.from("fake AAC"), type: "audio/mp4" })).response.status, 415);
+  await publishCaps(true, androidSnapshot(["customer.view", "settings.edit"]));
+  assert.equal((await androidRequest()).body.code, "voice_dictation_denied");
+  assert.deepEqual((await summary()).voice, { stt_available: false });
+  await publishCaps(true, androidSnapshot(["voice.dictation"], false));
+  assert.equal((await androidRequest()).body.code, "device_approval_required");
+  assert.deepEqual((await summary()).voice, { stt_available: false });
+  await publishCaps(true, { ...androidSnapshot(), androidPermissions: {} });
+  assert.equal((await androidRequest()).body.code, "device_approval_required");
+  for (const caps of [["service.ai"], ["service.android"]]) {
+    await publishCaps(true, androidSnapshot(["voice.dictation"], true, caps));
+    assert.equal((await androidRequest()).response.status, 403);
+  }
+  await publishCaps(true, androidSnapshot());
+  assert.equal((await publish({ sttModel: "" })).ok, true);
+  assert.equal((await androidRequest()).body.code, "stt_not_configured");
+  assert.equal((await publish({ enabled: false })).ok, true);
+  assert.equal((await androidRequest()).body.code, "ai_disabled");
+  assert.equal(readFileSync(join(hosting, "provider-call-count"), "utf8"), callsBeforeDenials, "all device/input/config denials stop before provider");
+  assert.equal((await publish({})).ok, true);
+  const revoked = spawnSync("php", ["-r", "require $argv[1]; ya_android_auth_revoke_token($argv[2]);",
+    join(hosting, "lib/android-device-auth.php"), deviceId], { encoding: "utf8" });
+  assert.equal(revoked.status, 0); assert.equal(revoked.stdout + revoked.stderr, "");
+  assert.equal((await androidRequest()).response.status, 401);
+  assert.equal((await androidRequest({ auth: secret, headers: { "X-YA-Device-Id": deviceId } })).response.status, 401, "revoked token cannot fall back to shared secret");
+  const oldToken = token; token = issueToken();
+  assert.equal((await androidRequest({ headers: { "X-YA-Device-Id": deviceId, "X-YA-Device-Token": oldToken } })).response.status, 401);
+  assert.equal((await androidRequest()).response.status, 200);
+  assert.equal(serverOutput.includes(token) || serverOutput.includes(oldToken), false, "no device credentials logged");
   writeFileSync(join(hosting, "config/ai.local.php"), "<?php return ['stt_model' => '', 'enabled' => false];");
   assert.deepEqual((await request({ type: "text/plain", filename: "../private-key.txt" })).body, { ok: true, text: transcript }, "published config overrides host-local defaults; detected MIME and safe filename");
   assert.equal((await request({ audio: null })).body.code, "invalid_audio");
@@ -140,7 +211,7 @@ return static function (string $url, array $options): array {
     assert.equal(bytes.includes(Buffer.from("VOICE_PRIVATE_TRANSCRIPT_SENTINEL")), false, "no persistent transcript");
   }
   assert.equal(serverOutput.includes(key) || serverOutput.includes(transcript) || serverOutput.includes(secret), false, "no credential/transcript logs");
-  console.log("voice-stt-hosting-smoke-ok: genuine HTTP upload, gates, cleanup, private config, publication rejection and mocked adapters");
+  console.log("voice-stt-hosting-smoke-ok: Desktop + personal Android HTTP upload, approval/permission/config gates, MP4 finfo, cleanup and mocked adapters");
 } finally {
   if (listener.listening) await new Promise(done => listener.close(done));
   if (server && server.exitCode === null) { const exited = new Promise(done => server.once("exit", done)); server.kill(); await exited; }

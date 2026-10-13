@@ -171,6 +171,7 @@ final class AndroidOperationsSyncController {
           nextData = cachedData == null ? fetched.data : cachedData;
         } else {
           nextData = previousData == null ? fallbackData : previousData;
+          nextData.applyVoiceProjection(fetched.payload);
           nextData.pulledAt = fetched.payload.optString("pulled_at", nextData.pulledAt);
           nextData.pendingActions = Math.max(
               0,

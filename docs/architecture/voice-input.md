@@ -137,15 +137,46 @@ and actual local voices, and play only after a click. Marketing answers/share te
 are the bounded visible read-aloud surfaces; field/context changes, tab switches and
 unmount cancel owned playback. Remote/default nonlocal voices remain excluded.
 
-## S2B.2: Android direct input (deferred)
+## S2B.2: Android Companion local read-aloud + direct Hosting dictation
 
-Android S2B first defines a dedicated persisted dictation permission, admin/staff
-defaults and capability intersection. Its direct Hosting request must validate
-the canonical device token, matching header/body identity, current active approval
-and that permission, with no shared-secret audio fallback. Revoked/inactive/denied
-phones fail before provider transport. The phone gets text, never the provider
-key. Any later command uses its own existing permission/mutation path. This is
-future work, separate from the supported Companion v3 workflows.
+Companion has an independent canonical `voice.dictation` device permission and
+`voice_dictation` staff group (default OFF). Effective access intersects the
+approved active device, `service.android` + `service.ai`, and its selected
+permission. The optional Android snapshot `voice.stt_available` carries only
+saved/published STT readiness; old, absent, disabled and locally cached snapshots
+fail closed for upload. LAN and Hosting projections redact this signal per device.
+
+Android STT is user-triggered from supported editable fields (daily task details
+and customer-request response): `Dikte Başlat` requests Android RECORD_AUDIO,
+records private-cache MPEG-4/AAC, `Durdur / Metne Çevir` posts multipart audio
+directly to HTTPS Hosting, and `İptal` discards it. Hard limits are 5 MiB and
+two minutes. No Desktop relay, outbox, persistent transcript or background capture.
+The 70-second bounded HTTPS request is cancelable and never redirects. The
+transcript must be reviewed/edited then explicitly applied with `Metni Kullan`;
+the existing editor remains owner of any eventual submit/mutation. Foreground,
+network, current sync authority, screen closing and canceled permission/result
+are rechecked; stale responses cannot silently write a field. Temporary audio
+is deleted, including on cancel and restart cleanup.
+
+Hosting requires a personal Android device token and matching device ID,
+current active approval, published `voice.dictation`, Android + AI capabilities
+and an enabled supported STT model. Shared sync-secret/bootstrap credentials
+cannot authorize Android audio. Revoked and unauthorized requests are denied
+before provider transport. Neither the provider API key nor the raw provider
+response is returned to the phone. Desktop's independent authenticated route
+stays supported.
+
+Android TTS uses only available, installed offline TextToSpeech engine voices.
+Its own device-local `Seslendirme etkin`, engine, voice/language, rate and pitch
+settings never override or synchronize Desktop TTS preferences. Read-only message
+and request text expose `Seslendir` only when enabled, a voice is usable and
+the source surface is authorized; playback requires a click and is canceled on
+dismiss, backgrounding, permission loss or disable. No external Freya package
+is bundled.
+
+Physical Android microphone, Android system speech voice quality and a real
+STT provider call must still be verified on a device after deployment; all
+listed automated transport/provider checks use controlled test responses.
 
 ## Verification
 
@@ -162,3 +193,9 @@ and `voice-stt-desktop-ui` (real Settings/editor UI, route callbacks and fake na
 media/voice), plus existing TTS/settings/camera regressions. Browser checks require
 an allowed localhost listener and installed Chromium. No real microphone, Hosting
 or provider call is claimed by these tests.
+
+S2B.2 targets `smoke-voice-stt-android` (SQLite/permission/Hosting and LAN
+parity), `smoke-voice-stt-hosting` and `smoke-voice-stt-publication`,
+Android native dictation/voice Java tests, `testDebugUnitTest`, `assembleDebug`,
+`lintDebug`, Companion v3 smoke, TypeScript typecheck, strict lint and registry.
+Neither `verify:pre-main` nor real-device test is claimed complete.

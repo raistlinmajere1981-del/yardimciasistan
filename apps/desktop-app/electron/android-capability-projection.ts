@@ -127,6 +127,7 @@ export function projectAndroidOperationsSnapshot(
   return {
     ...source,
     ...companion,
+    voice: { stt_available: has(C.AI) && source.voice?.stt_available === true },
     // The hosted module also uses this publication to gate desktop/public AI
     // endpoints. Keep the persisted capability set while Android is disabled;
     // all Android data and credentials below are still projected to tombstones.

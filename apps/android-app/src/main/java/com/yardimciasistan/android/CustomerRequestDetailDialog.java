@@ -5,6 +5,7 @@ import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -30,6 +31,7 @@ final class CustomerRequestDetailDialog {
       ComponentActivity activity,
       OperationData data,
       OperationData.RequestRecord request,
+      AndroidVoiceController voice,
       Listener listener
   ) {
     Dialog dialog = new Dialog(activity);
@@ -51,7 +53,7 @@ final class CustomerRequestDetailDialog {
     listener.addHeaderActions(
         header,
         dialog,
-        () -> show(activity, data, request, listener)
+        () -> show(activity, data, request, voice, listener)
     );
     shell.addView(header);
 
@@ -97,6 +99,22 @@ final class CustomerRequestDetailDialog {
       ));
     }
     page.addView(summary);
+    voice.addSpeaker(dialog, summary, request.message, () -> voice.hasPermission("customer.view"));
+
+    EditText reply = new EditText(activity);
+    reply.setContentDescription("Talep yanıtı taslağı");
+    reply.setHint("Yanıt taslağı");
+    reply.setText(request.readyMessage());
+    reply.setMinLines(2);
+    reply.setMaxLines(5);
+    reply.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
+      page.addView(UiKit.sectionTitle(activity, "Yanıt taslağı"));
+      page.addView(reply);
+      voice.addDictation(dialog, page, reply, AndroidVoiceRules.MAX_TEXT_CHARS,
+          () -> voice.hasPermission("customer.respond"));
+    }
 
     page.addView(UiKit.sectionTitle(activity, "İletişim"));
     LinearLayout contact = UiKit.row(activity);
@@ -119,7 +137,7 @@ final class CustomerRequestDetailDialog {
               UiKit.PRIMARY,
               view -> listener.openWhatsApp(
                   request.customerPhone,
-                  request.readyMessage()
+                  reply.getText().toString()
               )
           ),
           activity
@@ -303,6 +321,7 @@ final class CustomerRequestDetailDialog {
     scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
     shell.addView(scroll);
     dialog.setContentView(shell);
+    voice.bindDialog(dialog);
     dialog.show();
     listener.configureFullDialog(dialog);
   }

@@ -9,6 +9,7 @@ import {
 export type AndroidDeviceRole = "admin" | "staff";
 
 export const ANDROID_PERMISSIONS = [
+  "voice.dictation",
   "customer.view",
   "customer.manage",
   "customer.respond",
@@ -78,6 +79,7 @@ export const ANDROID_PERMISSIONS = [
 export type AndroidPermission = typeof ANDROID_PERMISSIONS[number];
 
 export const ANDROID_PERMISSION_GROUP_IDS = [
+  "voice_dictation",
   "service_orders",
   "cashier",
   "rooms_tasks",
@@ -95,6 +97,7 @@ export type AndroidPermissionGroupId = typeof ANDROID_PERMISSION_GROUP_IDS[numbe
 export type AndroidPermissionGroups = Record<AndroidPermissionGroupId, boolean>;
 
 export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermissionGroupId, readonly AndroidPermission[]>> = {
+  voice_dictation: ["voice.dictation"],
   commerce_orders_view: ["commerce_order.view"],
   commerce_orders_manage: ["commerce_order.view", "commerce_order.confirm", "commerce_order.cancel"],
   dealer_view: ["dealer.view"],
@@ -158,6 +161,7 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
 };
 
 export const ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS: Readonly<AndroidPermissionGroups> = {
+  voice_dictation: false,
   service_orders: true,
   cashier: false,
   rooms_tasks: true,
@@ -216,6 +220,7 @@ const ANDROID_ACCOMMODATION_FOOD_CAPABILITIES = [
  * check through androidActionAllowedByCapabilities.
  */
 export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<AndroidPermission, AndroidPermissionCapabilityRequirement>> = {
+  "voice.dictation": { allOf: [C.AI] },
   "commerce_order.view": { allOf: [C.ORDERS] },
   "commerce_order.confirm": { allOf: [C.ORDERS] },
   "commerce_order.cancel": { allOf: [C.ORDERS] },
@@ -337,6 +342,7 @@ export function androidAvailablePermissionGroupIds(
   return ANDROID_PERMISSION_GROUP_IDS.filter((groupId) => {
     if (isRetailOnly && ["service_orders", "cashier", "rooms_tasks", "customer_reservation"].includes(groupId)) return false;
     switch (groupId) {
+      case "voice_dictation": return enabled.has(C.AI);
       case "commerce_orders_view":
       case "commerce_orders_manage": return enabled.has(C.ORDERS);
       case "dealer_view": return enabled.has(C.WHOLESALE) && enabled.has(C.ORDERS) && enabled.has(C.CUSTOMERS);

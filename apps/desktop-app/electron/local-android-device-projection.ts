@@ -1,5 +1,5 @@
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
-import { projectAndroidCompanion, androidCompanionCounters } from "@yardimci-asistan/sync-core";
+import { projectAndroidCompanion, androidCompanionCounters, androidEffectivePermissions } from "@yardimci-asistan/sync-core";
 import type {
   AndroidFinanceSnapshot,
   AndroidOperationsSnapshot,
@@ -55,6 +55,7 @@ function inactiveSnapshot(
   return {
     ...source,
     ...companion,
+    voice: { stt_available: false },
     summary: { ...emptySummary(), ...androidCompanionCounters(companion.commerce, companion.marketing) },
     daily_tasks: [],
     requests: [],
@@ -95,7 +96,7 @@ export function projectLocalAndroidSnapshotForDevice(
     ? {
         role: storedProfile.role,
         is_active: storedProfile.is_active,
-        permissions: [...storedProfile.permissions]
+        permissions: androidEffectivePermissions(storedProfile.permissions, source.business_capabilities)
       }
     : { ...EMPTY_PROFILE, permissions: [] };
 
@@ -131,6 +132,7 @@ export function projectLocalAndroidSnapshotForDevice(
   return {
     ...source,
     ...companion,
+    voice: { stt_available: permissions.has("voice.dictation") && source.voice?.stt_available === true },
     summary: { ...source.summary, ...androidCompanionCounters(companion.commerce, companion.marketing) },
     customers: customerManagementAllowed ? source.customers : [],
     menu_product_candidates: permissions.has("menu.edit") ? source.menu_product_candidates ?? [] : [],

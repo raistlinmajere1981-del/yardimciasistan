@@ -469,6 +469,8 @@ export interface AndroidMarketSnapshot {
 }
 
 export interface AndroidOperationsSnapshot {
+  /** Safe saved STT readiness hint; omitted by old snapshots, never an upload authority. */
+  voice?: { stt_available: boolean };
   /** Companion v3 additions are optional for legacy publications/clients. */
   commerce?: import("./android-companion").AndroidCommerceSnapshot;
   marketing?: import("./android-companion").AndroidMarketingSnapshot;
