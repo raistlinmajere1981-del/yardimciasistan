@@ -884,6 +884,7 @@ Masaüstünde servisler arasında geçiş yapılabilmesi için servis başına b
   "project_name": "Google AI Studio",
   "base_url": "https://generativelanguage.googleapis.com/v1beta",
   "model": "gemini-3.6-flash",
+  "stt_model": "",
   "model_options_json": "[{\"id\":\"gemini-3.6-flash\",\"label\":\"Gemini 3.6 Flash\"}]",
   "timeout_seconds": 30,
   "api_key_encrypted": "<opaque-encrypted-value>",
@@ -893,6 +894,13 @@ Masaüstünde servisler arasında geçiş yapılabilmesi için servis başına b
 ```
 
 `api_key_encrypted` her profil için ayrı şifrelenir. Renderer yalnız anahtarın yapılandırılmış olup olmadığını görür; şifreli veya açık anahtar değeri iletilmez. `model_options_json` gizli değildir ve bağlantı testinde alınan model seçiminin ayarlar sayfasına geri dönüldüğünde yeniden kurulmasını sağlar.
+
+`stt_model` sağlayıcı başına isteğe bağlı konuşma tanıma tercihidir; boş değer
+kapalıdır. Tek kayıt otoritesi `ai_service_profiles` satırıdır. Aktif Setup alanı
+`aiSttModel` bu satırdan okunur; sağlayıcı taslakları mevcut Save/Discard hattında
+`sttModel` taşır. Geçersiz veya ses desteği doğrulanmamış model backend'de reddedilir.
+Aktif tercih mevcut özel `ai_settings` yayınına katılır. Model/hosting/Android
+sınırları [voice input](architecture/voice-input.md) sözleşmesindedir.
 
 AI kapalıysa sistemin form, WhatsApp, talep yönetimi ve yerel işletme özellikleri çalışmaya devam eder.
 

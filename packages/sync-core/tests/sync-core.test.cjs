@@ -750,6 +750,7 @@ test("pushAiSettings sends the complete snake_case settings and strips the API k
       service: apiKey,
       base_url: apiKey,
       model: apiKey,
+      stt_model: apiKey,
       timeout_seconds: 30,
       has_api_key: true,
       api_key: apiKey
@@ -785,6 +786,7 @@ test("pushAiSettings sends the complete snake_case settings and strips the API k
     service: "openrouter",
     base_url: "https://openrouter.ai/api/v1",
     model: "demo-model",
+    stt_model: "",
     timeout_seconds: 30,
     has_api_key: true
   });
@@ -799,6 +801,7 @@ test("pushAiSettings sends the complete snake_case settings and strips the API k
     service: "openrouter",
     base_url: "https://openrouter.ai/api/v1",
     model: "demo-model",
+    stt_model: "",
     api_key: apiKey,
     timeout_seconds: 30
   });

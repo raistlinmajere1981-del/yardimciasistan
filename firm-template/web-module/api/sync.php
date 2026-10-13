@@ -1686,6 +1686,7 @@ function ya_sync_publish_google_reviews_settings(array $payload): void
 
 function ya_sync_publish_ai_settings(array $payload): void
 {
+    require_once __DIR__ . '/../lib/audio-transcription.php';
     $candidate = $payload['ai_settings'] ?? null;
     if (!is_array($candidate)) {
         ya_sync_response(422, [
@@ -1725,6 +1726,11 @@ function ya_sync_publish_ai_settings(array $payload): void
     $baseUrl = trim($candidate['base_url']);
     $model = trim($candidate['model']);
     $apiKey = trim($candidate['api_key']);
+    $sttModel = array_key_exists('stt_model', $candidate) ? $candidate['stt_model'] : '';
+    if (!is_string($sttModel) || ($sttModel !== '' && (!in_array($sttModel, ya_stt_models($service), true)
+        || !ya_stt_base_url_supported($service, $baseUrl)))) {
+        ya_sync_response(422, ['ok' => false, 'message' => 'Konuşma tanıma modeli veya resmi HTTPS bağlantı adresi desteklenmiyor.']);
+    }
     $allowedServices = ['openai', 'openrouter', 'groq', 'gemini', 'custom'];
 
     if ($provider !== 'openai_compatible') {
@@ -1782,6 +1788,7 @@ function ya_sync_publish_ai_settings(array $payload): void
         'service' => $service,
         'base_url' => rtrim($baseUrl, '/'),
         'model' => $model,
+        'stt_model' => $sttModel,
         'api_key' => $apiKey,
         'timeout_seconds' => $timeoutSeconds
     ];
@@ -1799,6 +1806,7 @@ function ya_sync_publish_ai_settings(array $payload): void
         'service' => $settings['service'],
         'base_url' => $settings['base_url'],
         'model' => $settings['model'],
+        'stt_model' => $settings['stt_model'],
         'timeout_seconds' => $settings['timeout_seconds'],
         'has_api_key' => $settings['api_key'] !== ''
     ]);

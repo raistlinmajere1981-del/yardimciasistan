@@ -1,9 +1,9 @@
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
-import { imageGenerationModelOptions, supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { imageGenerationModelOptions, sttModelOptions, supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
-import { aiServicePresets, createDefaultAiServiceDraft, isAiServiceProfileStored, normalizeAiService, toAiServiceFormDraft, type SetupFormState } from "../../app/setup-model";
+import { aiServicePresets, isAiServiceProfileStored, selectAiService, type SetupFormState } from "../../app/setup-model";
 import type { ServicesSettingsProps } from "./ServicesSettingsSection";
 import { ActionButton } from "../ui/ActionButton";
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
@@ -109,27 +109,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
   };
 
   const updateAiService = (service: string) => {
-    const normalizedService = normalizeAiService(service);
-    const currentDraft = toAiServiceFormDraft(form);
-    const targetDraft = form.aiServiceDrafts[normalizedService] ?? createDefaultAiServiceDraft(normalizedService);
-    onFormChange({
-      ...form,
-      aiService: normalizedService,
-      aiProjectName: targetDraft.projectName,
-      aiGoogleCurl: targetDraft.googleCurl,
-      aiBaseUrl: targetDraft.baseUrl,
-      aiModel: targetDraft.model,
-      aiImageModel: targetDraft.imageModel,
-      aiModelOptions: targetDraft.modelOptions,
-      aiApiKey: targetDraft.apiKey,
-      aiStoredApiKeyConfigured: targetDraft.storedApiKeyConfigured,
-      clearAiApiKey: targetDraft.clearApiKey,
-      aiTimeoutSeconds: targetDraft.timeoutSeconds,
-      aiServiceDrafts: {
-        ...form.aiServiceDrafts,
-        [form.aiService]: currentDraft
-      }
-    });
+    onFormChange(selectAiService(form, service));
   };
 
   const renderAiConnectionActions = (inline: boolean) => (
@@ -245,6 +225,20 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                 {imageGenerationModelOptions(form.aiService, [form.aiImageModel, form.aiModel, ...form.aiModelOptions.map(model => model.id)]).map(model =>
                   <option key={model} value={model}>{model}</option>)}
               </select>
+            </label>
+            <label className="form-field form-field--medium">
+              Konuşma tanıma modeli (STT)
+              <select aria-label="Konuşma tanıma modeli (STT)" value={form.aiSttModel}
+                onChange={(event) => update("aiSttModel", event.target.value)}
+                disabled={!form.aiEnabled || sttModelOptions(form.aiService).length === 0}>
+                <option value="">Kapalı / seçilmedi</option>
+                {sttModelOptions(form.aiService).map(model => <option value={model} key={model}>{model}</option>)}
+              </select>
+              <small>{sttModelOptions(form.aiService).length === 0
+                ? "Bu sağlayıcının konuşma tanıma desteği bu sürümde doğrulanmadı."
+                : form.aiService === "gemini"
+                  ? "Gemini ses girdisini metne çevirir. Model erişimi Google hesabınıza bağlıdır; tüm sohbet modelleri ses desteklemez."
+                  : "Ses yalnız kullanıcı başlattığında gönderilir. Sonuç düzenlenebilir metindir; komut çalıştırmaz."}</small>
             </label>
             <label className="form-field form-field--short">
               Yanıt bekleme süresi (saniye)

@@ -21,6 +21,7 @@ export interface AiServiceFormDraft {
   baseUrl: string;
   model: string;
   imageModel: string;
+  sttModel: string;
   modelOptions: DesktopAiModelOption[];
   apiKey: string;
   storedApiKeyConfigured: boolean;
@@ -48,6 +49,7 @@ export interface SetupFormState {
   aiBaseUrl: string;
   aiModel: string;
   aiImageModel: string;
+  aiSttModel: string;
   aiModelOptions: DesktopAiModelOption[];
   aiApiKey: string;
   aiStoredApiKeyConfigured: boolean;
@@ -113,6 +115,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiBaseUrl: activeAiDraft.baseUrl,
     aiModel: activeAiDraft.model,
     aiImageModel: activeAiDraft.imageModel,
+    aiSttModel: activeAiDraft.sttModel,
     aiModelOptions: activeAiDraft.modelOptions,
     aiApiKey: activeAiDraft.apiKey,
     aiStoredApiKeyConfigured: activeAiDraft.storedApiKeyConfigured,
@@ -151,6 +154,7 @@ function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<
       baseUrl: profile?.baseUrl || (isActiveService ? setupData.aiBaseUrl : preset.baseUrl) || "",
       model: profile?.model ?? (isActiveService ? setupData.aiModel : ""),
       imageModel: profile?.imageModel ?? (isActiveService ? setupData.aiImageModel ?? "" : ""),
+      sttModel: profile?.sttModel ?? (isActiveService ? setupData.aiSttModel ?? "" : ""),
       modelOptions: profile?.modelOptions ?? (
         isActiveService && setupData.aiModel
           ? [{ id: setupData.aiModel, label: setupData.aiModel }]
@@ -170,6 +174,7 @@ export function createDefaultAiServiceDraft(service: DesktopAiService): AiServic
     baseUrl: preset?.baseUrl ?? "",
     model: "",
     imageModel: "",
+    sttModel: "",
     modelOptions: [],
     apiKey: "",
     storedApiKeyConfigured: false,
@@ -185,11 +190,24 @@ export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
     baseUrl: form.aiBaseUrl,
     model: form.aiModel,
     imageModel: form.aiImageModel,
+    sttModel: form.aiSttModel,
     modelOptions: form.aiModelOptions,
     apiKey: form.aiApiKey,
     storedApiKeyConfigured: form.aiStoredApiKeyConfigured,
     clearApiKey: form.clearAiApiKey,
     timeoutSeconds: form.aiTimeoutSeconds
+  };
+}
+
+export function selectAiService(form: SetupFormState, service: string): SetupFormState {
+  const selected = normalizeAiService(service);
+  const target = form.aiServiceDrafts[selected] ?? createDefaultAiServiceDraft(selected);
+  return {
+    ...form, aiService: selected, aiProjectName: target.projectName, aiGoogleCurl: target.googleCurl,
+    aiBaseUrl: target.baseUrl, aiModel: target.model, aiImageModel: target.imageModel, aiSttModel: target.sttModel,
+    aiModelOptions: target.modelOptions, aiApiKey: target.apiKey, aiStoredApiKeyConfigured: target.storedApiKeyConfigured,
+    clearAiApiKey: target.clearApiKey, aiTimeoutSeconds: target.timeoutSeconds,
+    aiServiceDrafts: { ...form.aiServiceDrafts, [form.aiService]: toAiServiceFormDraft(form) }
   };
 }
 
@@ -210,6 +228,7 @@ function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInit
       baseUrl: draft.baseUrl,
       model: draft.model,
       imageModel: draft.imageModel,
+      sttModel: draft.sttModel,
       modelOptions: draft.modelOptions,
       timeoutSeconds: Number(draft.timeoutSeconds),
       apiKey: draft.apiKey,
@@ -251,6 +270,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       aiBaseUrl: setupForm.aiBaseUrl,
       aiModel: setupForm.aiModel,
       aiImageModel: setupForm.aiImageModel,
+      aiSttModel: setupForm.aiSttModel,
       aiModelOptions: setupForm.aiModelOptions,
       aiApiKey: setupForm.aiApiKey,
       clearAiApiKey: setupForm.clearAiApiKey,

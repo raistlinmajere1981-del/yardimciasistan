@@ -397,6 +397,7 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
       service: options.aiSettings.service,
       base_url: options.aiSettings.baseUrl,
       model: options.aiSettings.model,
+      stt_model: options.aiSettings.sttModel ?? "",
       api_key: options.aiSettings.apiKey,
       timeout_seconds: options.aiSettings.timeoutSeconds
     }
@@ -438,6 +439,7 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
     service: options.aiSettings.service,
     base_url: options.aiSettings.baseUrl.replace(/\/+$/, ""),
     model: options.aiSettings.model,
+    stt_model: options.aiSettings.sttModel ?? "",
     timeout_seconds: options.aiSettings.timeoutSeconds,
     has_api_key: options.aiSettings.apiKey.trim() !== ""
   };

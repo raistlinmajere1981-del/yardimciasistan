@@ -22,6 +22,7 @@ export interface AiServiceProfileUpsert {
   baseUrl: string;
   model: string;
   imageModel?: string;
+  sttModel?: string;
   modelOptionsJson: string;
   timeoutSeconds: number;
   apiKeyEncrypted: string;
@@ -52,6 +53,7 @@ export function getAiServiceProfiles(db: DatabaseSync): DesktopAiServiceProfile[
       baseUrl,
       model,
       imageModel: String(row?.image_model ?? ""),
+      sttModel: String(row?.stt_model ?? ""),
       modelOptions: normalizeAiModelOptions(row?.model_options_json, model),
       timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? DEFAULT_AI_TIMEOUT_SECONDS),
       apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? "").trim()),
@@ -106,17 +108,19 @@ export function upsertAiServiceProfileInTransaction(db: DatabaseSync, profile: A
           base_url,
           model,
           image_model,
+          stt_model,
           model_options_json,
           timeout_seconds,
           api_key_encrypted,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(service) DO UPDATE SET
           project_name = excluded.project_name,
           base_url = excluded.base_url,
           model = excluded.model,
           image_model = excluded.image_model,
+          stt_model = excluded.stt_model,
           model_options_json = excluded.model_options_json,
           timeout_seconds = excluded.timeout_seconds,
           api_key_encrypted = excluded.api_key_encrypted,
@@ -128,6 +132,7 @@ export function upsertAiServiceProfileInTransaction(db: DatabaseSync, profile: A
       profile.baseUrl,
       profile.model,
       profile.imageModel ?? "",
+      profile.sttModel ?? "",
       profile.modelOptionsJson,
       profile.timeoutSeconds,
       profile.apiKeyEncrypted,

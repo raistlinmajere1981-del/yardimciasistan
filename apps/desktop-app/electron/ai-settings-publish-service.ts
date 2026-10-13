@@ -23,6 +23,7 @@ export async function publishSavedAiSettings(
       service: setup.aiService || "custom",
       baseUrl: setup.aiBaseUrl,
       model: setup.aiModel,
+      sttModel: setup.aiSttModel ?? "",
       apiKey: aiCapabilityEnabled ? getEffectiveAiApiKey(database, setup.aiService) : "",
       timeoutSeconds: normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds)
     };
@@ -49,6 +50,7 @@ export async function publishSavedAiSettings(
         || Boolean(current.aiBaseUrl && current.aiModel && getEffectiveAiApiKey(database, current.aiService)));
       if (current.aiProvider === sent.provider && current.aiService === sent.service && current.aiBaseUrl === sent.baseUrl
           && current.aiModel === sent.model && normalizeAiTimeoutSeconds(current.aiTimeoutSeconds) === sent.timeoutSeconds
+          && (current.aiSttModel ?? "") === sent.sttModel
           && effectiveEnabled === sent.enabled
           && (!sent.enabled || getEffectiveAiApiKey(database, current.aiService) === sent.apiKey)) database.markAiSettingsPublished(receipt.published_at);
     } });

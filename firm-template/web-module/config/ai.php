@@ -11,8 +11,11 @@ $enabled = getenv('YARDIMCI_ASISTAN_AI_ENABLED') ?: '';
 $config = [
     'enabled' => in_array(strtolower((string) $enabled), ['1', 'true', 'yes', 'on'], true),
     'provider' => getenv('YARDIMCI_ASISTAN_AI_PROVIDER') ?: 'openai_compatible',
+    'service' => getenv('YARDIMCI_ASISTAN_AI_SERVICE') ?: 'openai',
     'base_url' => getenv('YARDIMCI_ASISTAN_AI_BASE_URL') ?: 'https://api.openai.com/v1',
     'model' => getenv('YARDIMCI_ASISTAN_AI_MODEL') ?: '',
+    // Disabled unless explicitly selected; no fallback to a chat model.
+    'stt_model' => '',
     'api_key' => getenv('YARDIMCI_ASISTAN_AI_API_KEY') ?: (getenv('OPENAI_API_KEY') ?: ''),
     'timeout_seconds' => (int) (getenv('YARDIMCI_ASISTAN_AI_TIMEOUT_SECONDS') ?: 15)
 ];

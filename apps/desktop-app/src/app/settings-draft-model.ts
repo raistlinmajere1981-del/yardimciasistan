@@ -5,7 +5,7 @@ import type { StagedSettingsCategoryId } from "./settings-registry";
 // Setup persistence now owns only Business and Services. Operations has its own BusinessLayout draft.
 export const settingsFieldOwners = {
   business: ["businessName", "profileId", "profileOptions", "phone", "whatsapp", "email", "address"],
-  services: ["sms", "instagram", "whatsappCloud", "dealerPortalEnabled", "arasShipping", "onlineSalesDelivery", "onlineSalesDeliveryEnabled", "webModuleUrl", "syncSecret", "autoSyncEnabled", "localNetworkEnabled", "aiEnabled", "aiProvider", "aiService", "aiProjectName", "aiGoogleCurl", "aiBaseUrl", "aiModel", "aiImageModel", "aiModelOptions", "aiApiKey", "aiStoredApiKeyConfigured", "clearAiApiKey", "aiTimeoutSeconds", "aiServiceDrafts", "whatsappEnabled", "androidEnabled", "productDataEnabled", "productDataAutoSearch", "productDataIncludeImages", "birthdaySettings"]
+  services: ["sms", "instagram", "whatsappCloud", "dealerPortalEnabled", "arasShipping", "onlineSalesDelivery", "onlineSalesDeliveryEnabled", "webModuleUrl", "syncSecret", "autoSyncEnabled", "localNetworkEnabled", "aiEnabled", "aiProvider", "aiService", "aiProjectName", "aiGoogleCurl", "aiBaseUrl", "aiModel", "aiImageModel", "aiSttModel", "aiModelOptions", "aiApiKey", "aiStoredApiKeyConfigured", "clearAiApiKey", "aiTimeoutSeconds", "aiServiceDrafts", "whatsappEnabled", "androidEnabled", "productDataEnabled", "productDataAutoSearch", "productDataIncludeImages", "birthdaySettings"]
 } as const satisfies Record<StagedSettingsCategoryId, readonly (keyof SetupFormState)[]>;
 
 export const stagedSettingsCategories = ["business", "services"] as const;

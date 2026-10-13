@@ -1,0 +1,169 @@
+import assert from "node:assert/strict";
+import Module, { createRequire } from "node:module";
+import { createCipheriv, createDecipheriv, randomBytes, createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { runInNewContext } from "node:vm";
+import { DatabaseSync } from "node:sqlite";
+import ts from "typescript";
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { exactFixtureReceipt } from "./test-helpers/publication-protocol.mjs";
+
+const require = createRequire(import.meta.url);
+// OS encryption is mocked with real authenticated encryption; no base64 plaintext fixture.
+const cryptoKey = randomBytes(32);
+const safeStorage = {
+  isEncryptionAvailable: () => true,
+  encryptString(value) {
+    const iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", cryptoKey, iv);
+    const bytes = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+    return Buffer.concat([iv, cipher.getAuthTag(), bytes]);
+  },
+  decryptString(value) {
+    const cipher = createDecipheriv("aes-256-gcm", cryptoKey, value.subarray(0, 12));
+    cipher.setAuthTag(value.subarray(12, 28));
+    return Buffer.concat([cipher.update(value.subarray(28)), cipher.final()]).toString("utf8");
+  }
+};
+const originalLoad = Module._load;
+Module._load = function (id, ...args) { return id === "electron" ? { safeStorage } : originalLoad.call(this, id, ...args); };
+const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const { publishSavedAiSettings } = require("../apps/desktop-app/dist-electron/ai-settings-publish-service.js");
+const { createAiApiKeyUpdate, createAiProfileApiKeyUpdates } = require("../apps/desktop-app/dist-electron/ai-secret-service.js");
+Module._load = originalLoad;
+const shared = require("@yardimci-asistan/shared");
+
+const tsCache = new Map();
+function frontend(file) {
+  if (tsCache.has(file)) return tsCache.get(file);
+  const module = { exports: {} };
+  tsCache.set(file, module.exports);
+  const localRequire = createRequire(file);
+  const code = ts.transpileModule(readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  runInNewContext(code, { module, exports: module.exports, require: id => id.startsWith(".") ? frontend(resolve(dirname(file), `${id}.ts`)) : localRequire(id) });
+  return module.exports;
+}
+const model = frontend(resolve("apps/desktop-app/src/app/setup-model.ts"));
+const drafts = frontend(resolve("apps/desktop-app/src/app/settings-draft-model.ts"));
+const root = mkdtempSync(join(tmpdir(), "voice-stt-settings-"));
+const options = { appPath: resolve("apps/desktop-app"), userDataPath: root };
+let db = new DesktopDatabase(options);
+let raw;
+const nativeFetch = globalThis.fetch;
+try {
+  db.initialize();
+  const setup = createSmokeSetupInput({ businessName: "Voice settings fixture", phone: "", whatsapp: "", syncSecret: "voice-settings-sync-secret",
+    servicePreferences: { whatsapp: false, android: false }, aiModel: "gpt-4.1", aiImageModel: "gpt-image-1" });
+  assert.equal(db.saveInitialSetup(setup).ok, true);
+  assert.equal(db.getSetupData().aiSttModel, "", "default disabled");
+  assert.ok(db.getAiServiceProfiles().every(profile => profile.sttModel === ""));
+  const baseline = model.toSetupForm(db.getSetupData());
+  let form = { ...baseline, aiSttModel: "gpt-4o-mini-transcribe" };
+  assert.equal(drafts.isCategoryDirty(form, baseline, "services"), true);
+  assert.equal(drafts.isCategoryDirty(form, baseline, "business"), false);
+  form = model.selectAiService(form, "gemini");
+  assert.equal(form.aiSttModel, "");
+  form = { ...form, aiSttModel: "gemini-2.5-flash", aiModel: "gemini-2.5-flash" };
+  form = model.selectAiService(form, "openai");
+  assert.equal(form.aiSttModel, "gpt-4o-mini-transcribe", "provider switching preserves draft");
+  assert.equal(form.aiModel, "gpt-4.1");
+  assert.equal(form.aiImageModel, "gpt-image-1");
+  const discarded = drafts.copyCategory(form, baseline, "services");
+  assert.equal(discarded.aiSttModel, "");
+  assert.equal(discarded.aiServiceDrafts.gemini.sttModel, "");
+  assert.equal(drafts.isCategoryDirty(discarded, baseline, "services"), false);
+  const input = model.createSetupInput(form);
+  assert.equal(db.saveInitialSetup(input).ok, true);
+  db.close(); db = new DesktopDatabase(options); db.initialize();
+  let snapshot = db.getSetupData();
+  assert.equal(snapshot.aiSttModel, "gpt-4o-mini-transcribe");
+  assert.equal(snapshot.aiProfiles.find(profile => profile.service === "gemini").sttModel, "gemini-2.5-flash");
+  const save = patch => db.saveInitialSetup({ ...model.createSetupInput(model.toSetupForm(db.getSetupData())), ...patch });
+  assert.equal(save({ aiSttModel: undefined, aiProfiles: undefined }).ok, true, "omission preserves canonical selection");
+  for (const stt of ["gpt-4o", "gemini-3.5-transcribe", "../audio", null, ["whisper-1"]]) {
+    assert.equal(save({ aiSttModel: stt }).ok, false, "authority rejects invalid models/types");
+  }
+  for (const aiBaseUrl of ["http://api.openai.com/v1", "https://127.0.0.1/v1", "https://api.openai.com/v1?evil", "file:///secret"]) {
+    assert.equal(save({ aiBaseUrl }).ok, false, "authority rejects unsafe STT origin");
+  }
+  for (const service of ["openai", "gemini", "custom", "groq", "openrouter"]) {
+    assert.equal(save({ aiProfiles: [{ service, projectName: "", baseUrl: "https://api.openai.com/v1", model: "", sttModel: "gpt-4o", timeoutSeconds: 30, apiKey: "", clearApiKey: false }] }).ok, false,
+      "active and inactive profile input is validated");
+    const php = spawnSync("php", ["-r", 'require $argv[1]; echo json_encode(ya_stt_models($argv[2]));', resolve("firm-template/web-module/lib/audio-transcription.php"), service], { encoding: "utf8" });
+    assert.equal(php.status, 0, php.stderr);
+    assert.deepEqual(JSON.parse(php.stdout), shared.sttModelOptions(service), "Desktop/Hosting model policy parity");
+  }
+  assert.equal(save({ aiService: "gemini", aiBaseUrl: "https://generativelanguage.googleapis.com/v1beta", aiModel: "gemini-2.5-flash", aiImageModel: "", aiSttModel: "gemini-2.5-flash" }).ok, true);
+  assert.equal(db.getSetupData().aiSttModel, "gemini-2.5-flash");
+  assert.equal(save({ aiService: "openai", aiBaseUrl: "https://api.openai.com/v1", aiModel: "gpt-4.1", aiImageModel: "gpt-image-1", aiSttModel: "whisper-1" }).ok, true);
+  const key = "voice-provider-fixture-key";
+  const encrypted = createAiApiKeyUpdate({ aiApiKey: key, clearAiApiKey: false });
+  assert.equal(encrypted.ok, true);
+  const aiConfig = { provider: "openai_compatible", service: "openai", projectName: "", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1", imageModel: "gpt-image-1", apiKey: key, timeoutSeconds: 30 };
+  db.recordServiceSettingsVerification("ai", aiConfig);
+  assert.equal(db.saveInitialSetup({ ...model.createSetupInput(model.toSetupForm(db.getSetupData())), aiEnabled: true, aiApiKey: key },
+    encrypted.update).ok, true, "STT static support does not falsely require/claim an audio recording test");
+  const inactiveKey = "voice-google-fixture-key";
+  const withSecrets = model.createSetupInput(model.toSetupForm(db.getSetupData()));
+  withSecrets.aiProfiles = withSecrets.aiProfiles.map(profile => profile.service === "gemini" ? { ...profile, apiKey: inactiveKey } : profile);
+  const profileSecrets = createAiProfileApiKeyUpdates(withSecrets);
+  assert.equal(profileSecrets.ok, true);
+  assert.equal(db.saveInitialSetup({ ...withSecrets, aiProfiles: profileSecrets.profiles }, { mode: "keep" }, profileSecrets.updates).ok, true);
+  const storedKeys = [db.getEncryptedAiApiKey("openai"), db.getEncryptedAiApiKey("gemini")];
+  assert.equal(JSON.stringify(db.getSetupData()).includes(key) || JSON.stringify(db.getSetupData()).includes(inactiveKey), false, "preload Setup projection never exposes keys");
+  const config = { baseUrl: "https://hosting.example.test/module", syncSecret: setup.syncSecret };
+  db.ensurePublicationTarget(config.baseUrl); db.savePublicationSourceEpoch(config.baseUrl, 1);
+  let phase = "lost", onSend = null;
+  const sent = [];
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body); sent.push(body);
+    assert.equal(body.action, "publish_ai_settings");
+    assert.equal(body.payload_hash, createHash("sha256").update(body.publication_body).digest("hex"));
+    assert.equal(JSON.parse(body.publication_body).stt_model, body.ai_settings.stt_model);
+    onSend?.();
+    if (phase === "lost") throw new Error("fixture lost response");
+    return new Response(JSON.stringify({ ok: true, message: "Applied", ...exactFixtureReceipt(body,
+      phase === "wrong" ? { payload_hash: "0".repeat(64) } : {}) }));
+  };
+  assert.equal((await publishSavedAiSettings(db, config)).ok, false);
+  const first = sent[0];
+  assert.equal(first.ai_settings.stt_model, "whisper-1");
+  assert.equal(first.ai_settings.api_key, key);
+  raw = new DatabaseSync(db.databasePath);
+  assert.equal(JSON.stringify(raw.prepare("SELECT payload FROM sync_publication_payloads WHERE job_key='ai_settings'").all()).includes(key), false, "frozen secret is encrypted");
+  raw.close(); raw = null;
+  db.close(); db = new DesktopDatabase(options); db.initialize();
+  phase = "wrong";
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, false);
+  assert.equal(db.getSetupData().aiLastPublishedAt, "");
+  assert.equal(db.getPendingSyncJobs("9999").some(job => job.jobKey === "ai_settings"), true);
+  phase = "ok";
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
+  for (const retry of sent.slice(1)) assert.deepEqual(retry, first, "restart/ack retry preserves exact wire identity/body");
+  assert.equal(db.getPendingSyncJobs("9999").some(job => job.jobKey === "ai_settings"), false);
+  snapshot = db.getSetupData();
+  assert.equal(snapshot.aiLastPublishedAt, "2026-10-06T00:00:00Z");
+  assert.equal(save({ aiSttModel: "gpt-4o-transcribe" }).ok, true);
+  const newer = db.getPendingSyncJobs("9999").find(job => job.jobKey === "ai_settings");
+  assert.ok(newer.sourceRevision > first.source_revision, "STT-only mutation invalidates publication");
+  const previousPublished = db.getSetupData().aiLastPublishedAt;
+  onSend = () => { assert.equal(save({ aiSttModel: "gpt-4o-mini-transcribe" }).ok, true); };
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
+  assert.equal(db.getSetupData().aiLastPublishedAt, previousPublished, "older receipt does not mark in-flight STT edit published");
+  assert.ok(db.getPendingSyncJobs("9999").some(job => job.jobKey === "ai_settings" && job.sourceRevision > newer.sourceRevision));
+  onSend = null;
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
+  assert.equal(sent.at(-1).ai_settings.stt_model, "gpt-4o-mini-transcribe");
+  assert.equal(save({ aiSttModel: "" }).ok, true);
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
+  assert.equal(sent.at(-1).ai_settings.stt_model, "", "explicit OFF is published");
+  assert.equal(db.getSetupData().aiModel, "gpt-4.1");
+  assert.equal(db.getSetupData().aiImageModel, "gpt-image-1");
+  assert.deepEqual([db.getEncryptedAiApiKey("openai"), db.getEncryptedAiApiKey("gemini")], storedKeys, "STT changes preserve all provider ciphertext");
+  console.log("voice-stt-settings-smoke-ok: drafts, persistence, provider policy, durable exact ack/retry, OFF and secret privacy");
+} finally {
+  Module._load = originalLoad; globalThis.fetch = nativeFetch; raw?.close(); db.close();
+  rmSync(root, { recursive: true, force: true });
+}

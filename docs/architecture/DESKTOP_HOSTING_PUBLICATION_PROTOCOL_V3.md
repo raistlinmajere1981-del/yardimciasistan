@@ -123,6 +123,11 @@ the hosting `data/` boundary remains protected. AI transport returns allowlisted
 metadata, never raw secrets or untrusted response fields. Existing host-local defaults
 are not Desktop publishers and cannot override applied private config.
 
+Voice S2A adds active `stt_model` to this same private `ai_settings` body.
+Empty disables transcription. STT-only edits invalidate its durable revision and
+join exact acknowledgements, including in-flight mutation checks; no second
+publisher exists. See [voice input](voice-input.md).
+
 An installed AI capability with missing provider configuration is unconfigured,
 not a failure of unrelated automatic sync; its durable intent waits for configuration.
 Explicit publication still reports invalid configuration. Metadata acknowledgement

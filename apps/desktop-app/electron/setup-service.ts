@@ -8,7 +8,7 @@ import { decryptMessagingSecret } from "./business-messaging/secret-service";
 import { setInstagramOAuthEnabled } from "./marketing/instagram-oauth-store";
 import { normalizeProfileTransitionInput } from "./profile-service-activation";
 import type { DatabaseSync } from "node:sqlite";
-import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { isSupportedSttBaseUrl, supportsImageGenerationModel, supportsSttModel } from "@yardimci-asistan/shared";
 import {
   BUSINESS_CAPABILITIES,
   createId,
@@ -112,6 +112,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiProjectName: activeAiProfile?.projectName ?? "",
     aiModel: activeAiProfile?.model ?? "",
     aiImageModel: activeAiProfile?.imageModel ?? "",
+    aiSttModel: activeAiProfile?.sttModel ?? "",
     aiBaseUrl: activeAiProfile?.baseUrl ?? "",
     aiTimeoutSeconds: activeAiProfile?.timeoutSeconds ?? 30,
     aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? false,
@@ -241,6 +242,13 @@ export function saveSetupData(
     .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
     .get(profileService) as Record<string, unknown> | undefined;
   const existingEncryptedAiApiKey = String(existingAiProfile?.api_key_encrypted ?? "").trim();
+  const aiSttModel = input.aiSttModel === undefined ? String(existingAiProfile?.stt_model ?? "") : input.aiSttModel;
+  if (typeof aiSttModel !== "string" || (aiSttModel !== "" && !supportsSttModel(profileService, aiSttModel))) {
+    return { ok: false, message: "Seçilen konuşma tanıma modeli bu sağlayıcıda desteklenmiyor." };
+  }
+  if (aiSttModel && !isSupportedSttBaseUrl(profileService, input.aiBaseUrl)) {
+    return { ok: false, message: "Konuşma tanıma için sağlayıcının resmi HTTPS bağlantı adresi kullanılmalı." };
+  }
   const aiApiKeyResolution = resolveEncryptedAiApiKey({
     rawKeyProvided: rawAiApiKeyProvided,
     clearRequested: Boolean(input.clearAiApiKey),
@@ -296,6 +304,7 @@ export function saveSetupData(
     baseUrl: string;
     model: string;
     imageModel: string;
+    sttModel: string;
     modelOptions: DesktopAiModelOption[];
     timeoutSeconds: number;
     encryptedApiKey: string;
@@ -309,6 +318,10 @@ export function saveSetupData(
       return { ok: false, message: "Aynı AI servis profili birden fazla kez gönderilemez." };
     }
     seenProfileServices.add(service);
+    if (profileInput.sttModel !== undefined && (typeof profileInput.sttModel !== "string"
+        || (profileInput.sttModel !== "" && !supportsSttModel(service, profileInput.sttModel)))) {
+      return { ok: false, message: "Seçilen konuşma tanıma modeli bu sağlayıcıda desteklenmiyor." };
+    }
     if (service === profileService) continue;
 
     const existingProfile = db
@@ -320,6 +333,10 @@ export function saveSetupData(
     if (imageModel && !supportsImageGenerationModel(service, imageModel)) return { ok: false, message: "Seçilen görsel üretim modeli bu sağlayıcıda desteklenmiyor." };
     const normalizedBaseUrl = normalizeAiBaseUrl(profileInput.baseUrl);
     const baseUrl = normalizedBaseUrl || AI_SERVICE_DEFAULT_BASE_URLS[service];
+    const sttModel = profileInput.sttModel ?? String(existingProfile?.stt_model ?? "");
+    if (sttModel && (!supportsSttModel(service, sttModel) || !isSupportedSttBaseUrl(service, profileInput.baseUrl))) {
+      return { ok: false, message: "Konuşma tanıma modeli veya resmi HTTPS bağlantı adresi desteklenmiyor." };
+    }
     const timeoutSeconds = normalizeAiTimeout(profileInput.timeoutSeconds);
     const rawKeyProvided = Boolean(String(profileInput.apiKey ?? "").trim());
     const keyResolution = resolveEncryptedAiApiKey({
@@ -349,6 +366,7 @@ export function saveSetupData(
       baseUrl,
       model,
       imageModel,
+      sttModel,
       modelOptions: normalizeAiModelOptions(
         profileInput.modelOptions === undefined ? existingProfile?.model_options_json : profileInput.modelOptions,
         model
@@ -496,6 +514,7 @@ export function saveSetupData(
       baseUrl: storedAiBaseUrl,
       model: aiModel,
       imageModel: aiImageModel,
+      sttModel: aiSttModel,
       modelOptionsJson: JSON.stringify(storedAiModelOptions),
       timeoutSeconds: storedAiTimeoutSeconds,
       apiKeyEncrypted: storedEncryptedAiApiKey,
@@ -510,6 +529,7 @@ export function saveSetupData(
         baseUrl: profile.baseUrl,
         model: profile.model,
         imageModel: profile.imageModel,
+        sttModel: profile.sttModel,
         modelOptionsJson: JSON.stringify(profile.modelOptions),
         timeoutSeconds: profile.timeoutSeconds,
         apiKeyEncrypted: profile.encryptedApiKey,

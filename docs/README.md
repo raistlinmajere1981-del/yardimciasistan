@@ -27,6 +27,7 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `desktop-sync-identity.md` — desktop sync kimliği.
 - `architecture/hospitality-domain.md` — pansiyon domain sınırları.
 - `architecture/sector-feature-contribution-model.md` — capability tabanlı feature katkıları.
+- `architecture/voice-input.md` — S2A STT ayarları/hosting servisi ve S2B doğrudan ses girişi sınırı.
 
 ## Workspace / platform
 

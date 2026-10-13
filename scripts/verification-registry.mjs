@@ -8,6 +8,11 @@ const SMOKE_FILES = [
   "scripts/smoke-sales-workspace-ui.mjs",
   "scripts/smoke-settings-correctness.mjs",
   "scripts/smoke-settings-ui-correctness.mjs",
+  "scripts/smoke-voice-stt-settings.mjs",
+  "scripts/smoke-voice-stt-provider.php",
+  "scripts/smoke-voice-stt-publication.mjs",
+  "scripts/smoke-voice-stt-hosting.mjs",
+  "scripts/smoke-voice-stt-ui.mjs",
   "scripts/smoke-desktop-ui-correctness.mjs",
   "scripts/smoke-publication-protocol.mjs",
   "scripts/smoke-sync-publication-correctness.mjs",
@@ -545,6 +550,8 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-voice-stt-provider.php") return ["php-lint"];
+  if (file === "scripts/smoke-voice-stt-hosting.mjs" || file === "scripts/smoke-voice-stt-publication.mjs") return ["build-packages", "php-lint"];
   if (file === "scripts/smoke-desktop-tts.mjs") return [];
   if (file === "scripts/smoke-android-companion-v3.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-publication-protocol.mjs" || file === "scripts/smoke-sync-publication-correctness.mjs") return ["build-desktop", "php-lint"];
@@ -583,6 +590,7 @@ function smokeDomains(file) {
 }
 
 function smokeDomainsForGeneralOwnership(file) {
+  if (file.includes("voice-stt")) return ["voice", "settings", "web", "platform"];
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   if (name === "record-picker-ui") return ["desktop", "commerce", "customers", "platform"];
   if (name === "android-companion-v3") return ["android", "commerce", "marketing", "web", "platform"];

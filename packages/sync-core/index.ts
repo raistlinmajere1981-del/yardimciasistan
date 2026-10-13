@@ -160,6 +160,7 @@ export interface AiConnectionSettings {
   service: string;
   baseUrl: string;
   model: string;
+  sttModel?: string;
   apiKey: string;
   timeoutSeconds: number;
 }
@@ -846,6 +847,7 @@ export interface PushAiSettingsSuccess extends PublicationReceipt {
   service: string;
   base_url: string;
   model: string;
+  stt_model: string;
   timeout_seconds: number;
   has_api_key: boolean;
 }

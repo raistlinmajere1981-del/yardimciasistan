@@ -40,6 +40,8 @@ const phpFiles = [
   "firm-template/web-module/api/availability-sync.php",
   "firm-template/web-module/api/stock-image-analysis.php",
   "firm-template/web-module/api/identity-image-analysis.php",
+  "firm-template/web-module/api/audio-transcribe.php",
+  "firm-template/web-module/lib/audio-transcription.php",
   "firm-template/web-module/lib/storage.php",
   "firm-template/web-module/lib/online-order.php",
   "firm-template/web-module/lib/online-catalog.php",

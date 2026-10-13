@@ -102,6 +102,7 @@ export const defaultSetupData: DesktopSetupData = {
   aiProjectName: "",
   aiBaseUrl: "https://api.openai.com/v1",
   aiModel: "",
+  aiSttModel: "",
   aiTimeoutSeconds: 30,
   aiApiKeyConfigured: false,
   aiLastPublishedAt: "",

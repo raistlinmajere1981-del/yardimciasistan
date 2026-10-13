@@ -14,6 +14,7 @@ CREATE TABLE ai_service_profiles (
   base_url TEXT NOT NULL DEFAULT '',
   model TEXT NOT NULL DEFAULT '',
   image_model TEXT NOT NULL DEFAULT '',
+  stt_model TEXT NOT NULL DEFAULT '',
   model_options_json TEXT NOT NULL DEFAULT '[]',
   timeout_seconds INTEGER NOT NULL DEFAULT 30,
   api_key_encrypted TEXT NOT NULL DEFAULT '',
@@ -1872,8 +1873,8 @@ BEGIN
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
-CREATE TRIGGER trg_sync_ai_profile_update AFTER UPDATE OF base_url, model, timeout_seconds, api_key_encrypted ON ai_service_profiles
-WHEN NEW.base_url != OLD.base_url OR NEW.model != OLD.model OR NEW.timeout_seconds != OLD.timeout_seconds OR NEW.api_key_encrypted != OLD.api_key_encrypted
+CREATE TRIGGER trg_sync_ai_profile_update AFTER UPDATE OF base_url, model, stt_model, timeout_seconds, api_key_encrypted ON ai_service_profiles
+WHEN NEW.base_url != OLD.base_url OR NEW.model != OLD.model OR NEW.stt_model != OLD.stt_model OR NEW.timeout_seconds != OLD.timeout_seconds OR NEW.api_key_encrypted != OLD.api_key_encrypted
 BEGIN
   INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
   VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)

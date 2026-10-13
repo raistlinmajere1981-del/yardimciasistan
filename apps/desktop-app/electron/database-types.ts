@@ -486,6 +486,7 @@ export interface DesktopAiServiceProfile {
   baseUrl: string;
   model: string;
   imageModel?: string;
+  sttModel?: string;
   modelOptions: DesktopAiModelOption[];
   timeoutSeconds: number;
   apiKeyConfigured: boolean;
@@ -498,6 +499,7 @@ export interface SaveAiServiceProfileInput {
   baseUrl: string;
   model: string;
   imageModel?: string;
+  sttModel?: string;
   modelOptions?: DesktopAiModelOption[];
   timeoutSeconds: number;
   apiKey: string;
@@ -536,6 +538,7 @@ export interface DesktopSetupData {
   aiProjectName: string;
   aiModel: string;
   aiImageModel?: string;
+  aiSttModel?: string;
   aiBaseUrl: string;
   aiTimeoutSeconds: number;
   aiApiKeyConfigured: boolean;
@@ -574,6 +577,7 @@ export interface SaveInitialSetupInput {
   aiProjectName: string;
   aiModel: string;
   aiImageModel?: string;
+  aiSttModel?: string;
   aiModelOptions?: DesktopAiModelOption[];
   aiBaseUrl: string;
   aiTimeoutSeconds: number;
