@@ -1,4 +1,5 @@
 export * from "./types/business";
+export * from "./types/desktop-dictation";
 export * from "./utils/version-comparison";
 export * from "./utils/ai-model-capabilities";
 export * from "./types/business-ai-context";

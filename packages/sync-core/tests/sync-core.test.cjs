@@ -652,6 +652,7 @@ test("Android role presets and action permission mapping stay explicit", () => {
 
 test("Android staff permission groups produce only their documented effective permissions", () => {
   assert.deepEqual(ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS, {
+    voice_dictation: false,
     service_orders: true,
     cashier: false,
     rooms_tasks: true,
@@ -664,6 +665,9 @@ test("Android staff permission groups produce only their documented effective pe
     online_sales_view: false,
     marketing_status_view: false
   });
+  assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.voice_dictation, ["voice.dictation"]);
+  assert.equal(androidPermissionsForGroups(ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS).includes("voice.dictation"), false);
+  assert.equal(androidPermissionsForGroups({ ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS, voice_dictation: true }).includes("voice.dictation"), true);
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_operations, [
     "market.summary.view",
     "market.product.view",

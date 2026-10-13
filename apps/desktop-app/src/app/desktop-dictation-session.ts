@@ -1,4 +1,4 @@
-import { DICTATION_MAX_BYTES, type DesktopDictationInput, type DesktopDictationResult, type DesktopDictationStatus } from "../../electron/desktop-dictation-contract";
+import { DICTATION_MAX_BYTES, type DesktopDictationInput, type DesktopDictationResult, type DesktopDictationStatus } from "@yardimci-asistan/shared";
 
 export interface DictationSnapshot {
   phase: "idle" | "permission" | "recording" | "uploading" | "review";

@@ -902,6 +902,7 @@
 .settings-category-body > * + *,
 .settings-category-body .settings-resource-fields > * + * { margin-top: var(--space-4); }
 .settings-resource-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.settings-resource-fields input[type="range"] { margin: 0; }
 .settings-category-body > * + .settings-resource-fields { margin-top: var(--space-4); }
 .settings-resource-fields.settings-panel-body { padding: var(--space-4); }
 .settings-category-actions {

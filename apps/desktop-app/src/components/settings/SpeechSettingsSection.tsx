@@ -64,34 +64,36 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
       onChange={event => change({ ...preferences, enabled: event.target.checked })} />Seslendirme etkin</label>
     <p>Hoparlör, bu tercih kaydedildiğinde ve yerel ses bulunduğunda görünür. Metin yalnız Seslendir ile okunur. Kapalıyken kamera güvenlik bipleri devam eder.</p>
     {preferences.enabled && !committedEnabled && <p role="status">Seslendirmeyi açmak için önce Kaydet seçin.</p>}
-    <fieldset className="settings-resource-fields form-grid" disabled={disabled || testing}>
-      <div className="form-field"><span>Konuşma motoru</span><strong>{snapshot.engineName}</strong></div>
-      <label className="form-field">Konuşma dili
-        <select value={preferences.language ?? ""} onChange={event => change({ ...preferences, language: event.target.value || null, voiceId: null })}>
-          <option value="">Otomatik (Türkçe öncelikli)</option>
-          {preferences.language && !languages.includes(preferences.language) && <option value={preferences.language}>{preferences.language} — yerel ses yok</option>}
-          {languages.map(language => <option key={language} value={language}>{language}</option>)}
-        </select>
-      </label>
-      <label className="form-field">Konuşma sesi
-        <select value={preferences.voiceId ?? ""} onChange={event => change({ ...preferences, voiceId: event.target.value || null })}>
-          <option value="">Otomatik</option>
-          {preferences.voiceId && !visibleVoices.some(voice => voice.id === preferences.voiceId) && <option value={preferences.voiceId}>Kayıtlı ses kullanılamıyor</option>}
-          {visibleVoices.map(voice => <option key={voice.id} value={voice.id}>{voice.name} · {voice.language}{voice.isDefault ? " · Sistem varsayılanı" : ""}{voice.gender ? ` · ${voice.gender}` : ""}</option>)}
-        </select>
-      </label>
-      <label className="form-field">Konuşma hızı ({preferences.rate.toFixed(2)}×)
-        <input type="range" min="0.5" max="1.5" step="0.05" value={preferences.rate}
-          onChange={event => change({ ...preferences, rate: Number(event.target.value) })} />
-      </label>
-      {snapshot.features.pitch && <label className="form-field">Konuşma tonu
-        <input type="range" min="0" max="2" step="0.1" value={preferences.pitch}
-          onChange={event => change({ ...preferences, pitch: Number(event.target.value) })} />
-      </label>}
-      <label className="form-field">Ses düzeyi (%{preferences.volume})
-        <input type="range" min="0" max="100" step="1" value={preferences.volume}
-          onChange={event => change({ ...preferences, volume: Number(event.target.value) })} />
-      </label>
+    <fieldset className="settings-resource-fields" disabled={disabled || testing}>
+      <div className="form-grid">
+        <div className="form-field"><span>Konuşma motoru</span><strong>{snapshot.engineName}</strong></div>
+        <label className="form-field">Konuşma dili
+          <select value={preferences.language ?? ""} onChange={event => change({ ...preferences, language: event.target.value || null, voiceId: null })}>
+            <option value="">Otomatik (Türkçe öncelikli)</option>
+            {preferences.language && !languages.includes(preferences.language) && <option value={preferences.language}>{preferences.language} — yerel ses yok</option>}
+            {languages.map(language => <option key={language} value={language}>{language}</option>)}
+          </select>
+        </label>
+        <label className="form-field">Konuşma sesi
+          <select value={preferences.voiceId ?? ""} onChange={event => change({ ...preferences, voiceId: event.target.value || null })}>
+            <option value="">Otomatik</option>
+            {preferences.voiceId && !visibleVoices.some(voice => voice.id === preferences.voiceId) && <option value={preferences.voiceId}>Kayıtlı ses kullanılamıyor</option>}
+            {visibleVoices.map(voice => <option key={voice.id} value={voice.id}>{voice.name} · {voice.language}{voice.isDefault ? " · Sistem varsayılanı" : ""}{voice.gender ? ` · ${voice.gender}` : ""}</option>)}
+          </select>
+        </label>
+        <label className="form-field">Konuşma hızı ({preferences.rate.toFixed(2)}×)
+          <input type="range" min="0.5" max="1.5" step="0.05" value={preferences.rate}
+            onChange={event => change({ ...preferences, rate: Number(event.target.value) })} />
+        </label>
+        {snapshot.features.pitch && <label className="form-field">Konuşma tonu
+          <input type="range" min="0" max="2" step="0.1" value={preferences.pitch}
+            onChange={event => change({ ...preferences, pitch: Number(event.target.value) })} />
+        </label>}
+        <label className="form-field">Ses düzeyi (%{preferences.volume})
+          <input type="range" min="0" max="100" step="1" value={preferences.volume}
+            onChange={event => change({ ...preferences, volume: Number(event.target.value) })} />
+        </label>
+      </div>
     </fieldset>
     {!snapshot.features.pitch && <small>Sistem motoru ton desteğini bildirmiyor.</small>}
     {selection.voice && <p role="status">Kullanılacak ses: {selection.voice.name} · {selection.voice.language}

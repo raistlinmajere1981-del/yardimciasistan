@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import process from "node:process";
 import { readProductVersion } from "./product-version.mjs";
@@ -127,12 +127,20 @@ cpSync(sourceRoot, packageRoot, {
   filter: shouldCopySourcePath
 });
 cpSync(widgetBundlePath, join(packageRoot, "widget.js"));
+// Vite assets may inherit a restrictive local umask (0600). Public web files
+// must be readable by the hosting HTTP worker after FTP deployment.
+chmodSync(join(packageRoot, "widget.js"), 0o644);
 for (const assetPath of nexaRuntimePaths("web")) {
   const source = join(repoRoot, "packages/web-widget/dist", assetPath);
   assert.ok(existsSync(source), `Web Nexa build asset missing: ${assetPath}`);
   const destination = join(packageRoot, assetPath);
   mkdirSync(join(destination, ".."), { recursive: true });
   cpSync(source, destination);
+  chmodSync(destination, 0o644);
+}
+// The asset folders must also be traversable by the hosting HTTP worker.
+for (const relativePath of ["assets/nexa", "assets/nexa/states", "assets/nexa/web"]) {
+  chmodSync(join(packageRoot, relativePath), 0o755);
 }
 assert.equal(
   sha256(join(packageRoot, "widget.js")),
