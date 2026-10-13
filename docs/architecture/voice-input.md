@@ -99,11 +99,45 @@ process/host crash before cleanup depends on that directory's host lifecycle.
 The endpoint disables PHP display/error logging. Hosting/proxy/APM must keep body
 and auth-header capture disabled; application code cannot control upstream tracing.
 
-## S2B: microphone and Android direct input
+## S2B.1: Desktop capture and opt-in read-aloud
 
-Next step owns Desktop start/stop/cancel, an unlocked/capability-gated Electron
-upload operation, stale-result cancellation, editable insertion and explicit user
-submission. Each capture is opt-in. Provider keys are never capture-client inputs.
+`SpeechTextField` reuses existing field draft owners in the marketing instruction
+and share-text editors. Its microphone appears only after main reports an unlocked
+session, persisted `service.ai`, a saved supported STT model/provider and usable
+HTTPS Hosting configuration from `getWebSyncConfig`. Draft Settings never enable
+capture. Local MediaRecorder support and a secure context are also required.
+Electron grants explicit audio-only media requests only to its trusted Desktop
+window with the same saved gates; camera checks remain independent. Microphone
+permissions are not logged. Services explains setup; its existing Save/Discard
+owns the STT choice.
+
+Clicking Dikte Başlat explicitly requests microphone permission and records only
+audio with a runtime-supported WebM/Opus, Ogg/Opus or MP4 MIME. Only Durdur uploads;
+İptal, device errors, 2-minute/5-MiB limits, field/context replacement, hidden browser
+tab and unmount stop all tracks without initiating an upload. Audio stays in memory.
+The bounded base64 IPC sends no credentials. Main rechecks current saved gates and
+container signature before its HTTPS multipart POST. Transport verifies TLS, follows
+no redirects, retries nothing, caps response at 128 KiB and aborts at 70 seconds.
+Hosting remains responsible for content decoding, published gates and provider auth.
+
+Main owns transient serial revisions and sender-bound cancellation. Settings Save
+and lock invalidate in-flight work; upload, response and explicit Metni Kullan
+recheck revision/gates. Cancel aborts active HTTP where feasible; it cannot undo an
+already received/billed server request. No token, transcript history or audio file
+is persisted. Raw HTTP/provider errors never reach renderer or diagnostics. Returned
+text stays in an editable preview until Metni Kullan replaces the field; no action,
+form submission, AI generation, save or publication occurs automatically.
+
+Local TTS v1 preferences add strict boolean `enabled`, default **true**, including
+older v1 records without that field. The device-local Services switch
+“Seslendirme etkin” participates in Save/Discard. Saved OFF blocks every adapter
+caller and cancels playback; disabled camera speech retains safety beep fallback.
+Sesi Dene needs both draft and saved enablement. Speaker controls require saved ON
+and actual local voices, and play only after a click. Marketing answers/share text
+are the bounded visible read-aloud surfaces; field/context changes, tab switches and
+unmount cancel owned playback. Remote/default nonlocal voices remain excluded.
+
+## S2B.2: Android direct input (deferred)
 
 Android S2B first defines a dedicated persisted dictation permission, admin/staff
 defaults and capability intersection. Its direct Hosting request must validate
@@ -122,3 +156,9 @@ draft/persistence/exact receipt/restart tests and targeted Settings browser
 smoke. No live provider calls or recording-quality claims. Localhost/browser
 restrictions are blocked checks, never hidden skips/passes. Full pre-main, real
 devices/recordings and live deployment are outside S2A verification claims.
+
+S2B.1 adds `voice-stt-desktop` (real IPC/service/capture modules, fake HTTPS/media)
+and `voice-stt-desktop-ui` (real Settings/editor UI, route callbacks and fake native
+media/voice), plus existing TTS/settings/camera regressions. Browser checks require
+an allowed localhost listener and installed Chromium. No real microphone, Hosting
+or provider call is claimed by these tests.

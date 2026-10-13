@@ -14,6 +14,11 @@ import { GlobalMessageBar } from "../../apps/desktop-app/src/components/layout/G
 import { subscribeAppStatus, type AppStatusDetail } from "../../apps/desktop-app/src/app/runtime-state";
 import { readUiPreferences, applyUiPreferences, saveUiPreferences } from "../../apps/desktop-app/src/ui-preferences";
 import "../../apps/desktop-app/src/styles/index.css";
+import { SpeechTextField, ReadAloudButton } from "../../apps/desktop-app/src/components/speech/SpeechTextField";
+import { MarketingTextAssistant } from "../../apps/desktop-app/src/components/marketing/MarketingTextAssistant";
+
+const voiceDesktop = new URLSearchParams(window.location.search).has("voiceDesktop");
+let dictationRevision = 1;
 
 function FixtureStatusHost() {
   const [status, setStatus] = useState<AppStatusDetail | null>(null);
@@ -76,7 +81,7 @@ const tableMediaStagedDirty = () => tableMediaDraft !== null && JSON.stringify(t
 const tableMediaVisible = (tableId: string) => (tableMediaDraft ?? tableMediaCanonical)
   .filter((item) => item.tableId === tableId)
   .map((item) => ({ ...item }));
-let androidDevices = [
+const androidDevices = [
   {
     id: "android-device-row-1",
     deviceId: "android-smoke-staff-01",
@@ -116,6 +121,15 @@ const shippingSignature = (input: typeof canonical.arasShipping & { password?: s
 let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false };
 let kbsSettings = { enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false };
 window.yardimciDesktop = {
+  getDictationStatus: async () => {
+    const environment = voiceDesktop ? await (await fetch("/fixture-dictation-state")).json() : { locked: false, hosting: true, revision: 0 };
+    const available = !environment.locked && environment.hosting && canonical.aiEnabled && canonical.aiApiKeyConfigured
+      && Boolean(canonical.aiSttModel) && canonical.webModuleUrl.startsWith("https://");
+    return { available, revision: dictationRevision + environment.revision,
+      message: available ? "Dikte hazır · yalnız Durdur ile ses gönderilir." : "Dikte için Servisler'de AI Yardımcı, konuşma modeli ve HTTPS web bağlantısını kaydedin." };
+  },
+  transcribeAudio: async input => (await fetch("/fixture-dictation-upload", { method: "POST", body: JSON.stringify(input) })).json(),
+  cancelDictation: async id => { if (voiceDesktop) await fetch("/fixture-dictation-cancel", { method: "POST", body: JSON.stringify({ id }) }); return true; },
   getSetupData: async () => structuredClone(canonical),
   getInstagramConfiguration: async () => structuredClone(canonical.instagram),
   beginInstagramOAuth: async () => ({ ok: false, message: "OAuth fixture bağlı değil." }),
@@ -134,6 +148,7 @@ window.yardimciDesktop = {
     }
   },
   saveInitialSetup: async input => {
+    dictationRevision++;
     window.settingsCalls.push({ kind: "setup", input });
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
@@ -377,11 +392,13 @@ function Fixture() {
   const setup = useSetupController();
   const [ready, setReady] = useState(false);
   const [workspaceKey, setWorkspaceKey] = useState(0);
+  const [voiceScreen, setVoiceScreen] = useState("settings");
+  const [voiceText, setVoiceText] = useState("Mevcut paylaşım metni");
   const [preferences, setPreferences] = useState(readUiPreferences);
   const [dashboard, setDashboard] = useState(() => ({ ...defaultDashboardData, androidDevices: structuredClone(androidDevices) }));
   useEffect(() => { setup.applyBootstrapSetup(canonical, false); setReady(true); }, []);
   useEffect(() => { applyUiPreferences(preferences); saveUiPreferences(preferences); }, [preferences]);
-  window.refreshSettings = patch => { canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
+  window.refreshSettings = patch => { dictationRevision++; canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
   window.persistedSettings = () => canonical;
   window.reopenSettings = () => setWorkspaceKey(key => key + 1);
   const snapshot = new URLSearchParams(window.location.search).has("missingRuntime")
@@ -390,8 +407,14 @@ function Fixture() {
   window.fixtureRuntimeCapabilities = () => [...capabilities];
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
+    {voiceDesktop && <nav aria-label="Ses testi ekranı"><button onClick={() => setVoiceScreen("settings")}>Ayarları Aç</button><button onClick={() => setVoiceScreen("editor")}>Editörü Aç</button><button onClick={() => setVoiceScreen("ai")}>Metin Asistanını Aç</button></nav>}
     <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}>
-      {ready && <SettingsWorkspace key={workspaceKey} setupData={setup.setupData} dashboardData={dashboard}
+      {voiceDesktop && voiceScreen === "editor" && <section className="form-stack" aria-label="Paylaşım düzenleyicisi">
+        <SpeechTextField label="Paylaşım metni" value={voiceText} maxLength={12000} rows={6} onChange={setVoiceText} />
+        <ReadAloudButton text="Görünür yanıt metni" />
+      </section>}
+      {voiceDesktop && voiceScreen === "ai" && <MarketingTextAssistant text={voiceText} capabilities={["text_generation", "rewrite"]} onApply={setVoiceText} onBusy={() => {}} />}
+      {ready && (!voiceDesktop || voiceScreen === "settings") && <SettingsWorkspace key={workspaceKey} setupData={setup.setupData} dashboardData={dashboard}
         onSave={input => setup.saveSetup(input, setDashboard)}
         uiPreferences={preferences}
         onUiPreferencesChange={setPreferences}

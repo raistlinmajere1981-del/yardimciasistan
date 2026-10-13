@@ -1,4 +1,4 @@
-import { SYSTEM_TTS_ENGINE_ID, validateTtsPreferences } from "../../tts-preferences";
+import { readTtsPreferences, SYSTEM_TTS_ENGINE_ID, TTS_PREFERENCES_CHANGED, validateTtsPreferences } from "../../tts-preferences";
 import type { TtsAdapter, TtsError, TtsPreferences, TtsSelection, TtsSnapshot, TtsSpeakResult, TtsVoice } from "./tts-adapter";
 
 const NO_VOICES: TtsError = { code: "no-voices", message: "Yerel ses bulunamadı. İşletim sisteminin konuşma seslerini kontrol edin ve yeniden deneyin." };
@@ -25,6 +25,7 @@ export function createWebSpeechTtsAdapter(): TtsAdapter {
   let discoveryTimer: ReturnType<typeof setTimeout> | undefined;
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let listening = false;
+  let preferencesListening = false;
   let active: { utterance: SpeechSynthesisUtterance; cancel: () => void } | null = null;
 
   function update(patch: Partial<TtsSnapshot>) {
@@ -82,7 +83,15 @@ export function createWebSpeechTtsAdapter(): TtsAdapter {
     readVoices();
   }
 
-  function start() { if (snapshot.state === "idle") refresh(); }
+  function preferencesChanged() { if (!readTtsPreferences().enabled) cancel(); }
+  function start() {
+    if (!preferencesListening && snapshot.state !== "disposed") {
+      window.addEventListener(TTS_PREFERENCES_CHANGED, preferencesChanged);
+      window.addEventListener("storage", preferencesChanged);
+      preferencesListening = true;
+    }
+    if (snapshot.state === "idle") refresh();
+  }
 
   function resolveVoice(preferences: TtsPreferences): TtsSelection {
     const voices = snapshot.voices;
@@ -108,9 +117,12 @@ export function createWebSpeechTtsAdapter(): TtsAdapter {
   function speak(text: string, preferences: TtsPreferences, onStart?: () => void): Promise<TtsSpeakResult> {
     start();
     cancel();
+    if (!preferences.enabled || !readTtsPreferences().enabled) {
+      return Promise.resolve({ status: "failed", error: { code: "disabled", message: "Seslendirme kapalı. Servisler ayarlarından etkinleştirip kaydedin." } });
+    }
     readVoices(); // Re-resolve native instances after an install/uninstall or refresh.
     const invalid = validateTtsPreferences(preferences);
-    if (invalid || !text.trim() || text.length > 500 || /[<>]/.test(text)) {
+    if (invalid || !text.trim() || text.length > 16000 || /[<>]/.test(text)) {
       return Promise.resolve({ status: "failed", error: { code: "invalid-preferences", message: invalid ?? "Konuşma metni geçersiz." } });
     }
     if (!synthesis || snapshot.state === "disposed") return Promise.resolve({ status: "failed", error: UNAVAILABLE });
@@ -148,7 +160,7 @@ export function createWebSpeechTtsAdapter(): TtsAdapter {
         utterance.pitch = snapshot.features.pitch ? preferences.pitch : 1;
         active = { utterance, cancel: () => finish({ status: "cancelled" }) };
         startTimer = setTimeout(() => fail({ code: "start-timeout", message: "Konuşma başlatılamadı. Sistem sesini kontrol edip yeniden deneyin." }), 500);
-        completionTimer = setTimeout(() => fail({ code: "completion-timeout", message: "Konuşma tamamlanamadı. Yeniden deneyin." }), 30000);
+        completionTimer = setTimeout(() => fail({ code: "completion-timeout", message: "Konuşma tamamlanamadı. Yeniden deneyin." }), text.length > 500 ? 300000 : 30000);
         utterance.onstart = () => {
           if (settled) return;
           started = true;
@@ -175,6 +187,8 @@ export function createWebSpeechTtsAdapter(): TtsAdapter {
       cancel();
       stopDiscovery();
       if (listening) synthesis?.removeEventListener("voiceschanged", readVoices);
+      window.removeEventListener(TTS_PREFERENCES_CHANGED, preferencesChanged);
+      window.removeEventListener("storage", preferencesChanged);
       listening = false;
       nativeVoices = [];
       update({ state: "disposed", voices: [], error: null });

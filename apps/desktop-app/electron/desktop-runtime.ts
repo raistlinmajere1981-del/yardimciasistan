@@ -14,6 +14,7 @@ type DesktopSessionRuntimeOptions = {
   whatsappPartition: string;
   kbsPartition: string;
   isTrustedRendererUrl: (value: string) => boolean;
+  canCaptureAudio?: () => boolean;
 };
 
 export function createDesktopMainWindow(options: DesktopMainWindowOptions) {
@@ -121,12 +122,15 @@ export function configureDesktopSessionRuntime(
         && options.isTrustedRendererUrl(webContents.getURL());
 
       if (permission === "media") {
-        // mediaType can be omitted or reported as "unknown". Reject explicit
-        // microphone checks, while allowing camera checks from our trusted
-        // local renderer to proceed across Chromium/Windows variations.
         const mediaType = details.mediaType;
+        if (mediaType === "audio") {
+          // Opt-in dictation's native request still needs current saved authority.
+          // Audio permissions/payloads never enter the camera diagnostic stream.
+          return Boolean(trustedRenderer && options.canCaptureAudio?.());
+        }
+        // Keep the existing camera check for omitted/unknown mediaType.
         const granted = Boolean(
-          trustedRenderer && mediaType !== "audio"
+          trustedRenderer
         );
         const log = granted ? desktopLog.info : desktopLog.warn;
         log({
@@ -167,10 +171,13 @@ export function configureDesktopSessionRuntime(
       }
 
       if (permission === "media") {
+        if (mediaTypes?.includes("audio")) {
+          callback(Boolean(trustedRenderer && !mediaTypes.includes("video") && options.canCaptureAudio?.()));
+          return;
+        }
         // Electron documents mediaTypes as optional. A trusted local renderer
         // must not lose camera access merely because Chromium omitted that field.
-        // When Chromium does provide the requested types, keep the existing
-        // video-only rule so the renderer cannot silently acquire microphone audio.
+        // Preserve camera behavior; explicit audio requests use the separate gate above.
         const mediaTypesMissing = !mediaTypes || mediaTypes.length === 0;
         const videoOnlyRequest = Boolean(
           mediaTypes?.includes("video") && !mediaTypes.includes("audio")

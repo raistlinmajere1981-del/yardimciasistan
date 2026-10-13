@@ -61,6 +61,7 @@ const electron = { app, BrowserWindow: { getAllWindows: () => [] }, powerMonitor
   shell: { openExternal: record("shell.openExternal") } };
 const real = new Set([
   "main", "main-entry", "desktop-ipc-registry", "app-lock-service", "app-lock", "preload", "business-messaging/provider-error",
+  "desktop-dictation-service", "desktop-dictation-contract", "sync-config",
   "finance-ipc", "room-folio-ipc", "business-capability-ipc", "business-layout-ipc",
   "business-public-profile-ipc", "business-location-geocode-ipc", "google-reviews-settings-ipc",
   "kbs-settings-ipc", "kbs-webview-ipc", "room-media-ipc", "table-media-ipc",
@@ -134,21 +135,29 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 259, "all production invoke registrations must execute");
+assert.equal(handlers.size, 262, "all production invoke registrations must execute");
 assert.equal(coordinatorOptions.androidActions, androidIngress, "main composes the same ingress owner for automatic and manual sync");
 assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
-const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: { getURL: () => "fixture" } }, ...args));
+const renderer = Object.assign(new EventEmitter(), { id: 42, getURL: () => "fixture" });
+const invoke = (channel, ...args) => Promise.resolve().then(() => handlers.get(channel)({ sender: renderer }, ...args));
 const lockFree = new Set(["appLock:getStatus", "appLock:lock", "appLock:unlock", "appLock:updatePassword",
-  "appLock:resetWithWebSecurityKey", "diagnostics:writeRendererEvent", "sync:getStatus", "update:getStatus"]);
+  "appLock:resetWithWebSecurityKey", "diagnostics:writeRendererEvent", "sync:getStatus", "update:getStatus",
+  "dictation:getStatus", "dictation:cancel"]);
 await invoke("appLock:lock");
 assert.equal((await invoke("appLock:getStatus")).locked, true);
 assert.equal(androidIngressOptions.isSuspended(), false, "session lock keeps the existing background sync authority");
 await invoke("sync:getStatus");
 await invoke("update:getStatus");
+const beforeDictation = calls.length;
+assert.equal((await invoke("dictation:getStatus")).available, false);
+assert.equal((await invoke("dictation:transcribe", {})).ok, false, "Dictation returns a sanitized failure while locked");
+assert.equal(await invoke("dictation:cancel", "dictation_lock_fixture"), true, "Lock must not prevent cancellation");
+assert.equal(calls.length, beforeDictation, "Locked dictation must not read config or call transport");
 for (const channel of handlers.keys()) {
   if (lockFree.has(channel)) continue;
   const before = calls.length;
-  await assert.rejects(invoke(channel, {}), /Uygulama kilitli/, channel);
+  if (channel === "dictation:transcribe") assert.equal((await invoke(channel, {})).ok, false);
+  else await assert.rejects(invoke(channel, {}), /Uygulama kilitli/, channel);
   assert.equal(calls.length, before, `${channel}: no operation/read/network dependency before session gate`);
 }
 const representatives = [

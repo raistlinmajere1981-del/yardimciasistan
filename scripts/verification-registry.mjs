@@ -13,6 +13,8 @@ const SMOKE_FILES = [
   "scripts/smoke-voice-stt-publication.mjs",
   "scripts/smoke-voice-stt-hosting.mjs",
   "scripts/smoke-voice-stt-ui.mjs",
+  "scripts/smoke-voice-stt-desktop.mjs",
+  "scripts/smoke-voice-stt-desktop-ui.mjs",
   "scripts/smoke-desktop-ui-correctness.mjs",
   "scripts/smoke-publication-protocol.mjs",
   "scripts/smoke-sync-publication-correctness.mjs",
@@ -550,6 +552,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-voice-stt-desktop.mjs") return [];
   if (file === "scripts/smoke-voice-stt-provider.php") return ["php-lint"];
   if (file === "scripts/smoke-voice-stt-hosting.mjs" || file === "scripts/smoke-voice-stt-publication.mjs") return ["build-packages", "php-lint"];
   if (file === "scripts/smoke-desktop-tts.mjs") return [];
@@ -590,6 +593,7 @@ function smokeDomains(file) {
 }
 
 function smokeDomainsForGeneralOwnership(file) {
+  if (file.includes("desktop-tts")) return ["voice", "settings", "desktop", "platform"];
   if (file.includes("voice-stt")) return ["voice", "settings", "web", "platform"];
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   if (name === "record-picker-ui") return ["desktop", "commerce", "customers", "platform"];

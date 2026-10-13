@@ -24,6 +24,8 @@ import { registerKbsSettingsIpcHandlers } from "./kbs-settings-ipc";
 import { registerKbsWebviewIpcEvents } from "./kbs-webview-ipc";
 import { registerMenuIpcHandlers } from "./ipc/menu-ipc";
 import { registerImageAnalysisIpcHandlers } from "./ipc/image-analysis-ipc";
+import { registerDesktopDictationIpcHandlers } from "./ipc/desktop-dictation-ipc";
+import { createDesktopDictationService } from "./desktop-dictation-service";
 import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
@@ -93,6 +95,8 @@ export type DesktopIpcRegistryDependencies = {
 
 export type DesktopIpcRegistryHandle = {
   clearMarketBarcodeFastPull: () => void;
+  invalidateDictation: () => void;
+  canCaptureAudio: () => boolean;
 };
 
 export function registerDesktopIpcHandlers(
@@ -129,6 +133,8 @@ export function registerDesktopIpcHandlers(
     assertTaskScope
   } = dependencies;
   registerWebConnectionIpcHandlers({ getDatabase, assertUnlocked });
+  const dictation = createDesktopDictationService({ getSetupData: () => getDatabase().getSetupData(), assertUnlocked, assertCapability });
+  registerDesktopDictationIpcHandlers(dictation);
 
   registerAppLockIpcHandlers(getAppLockService());
 
@@ -237,7 +243,10 @@ export function registerDesktopIpcHandlers(
   registerSetupIpcHandlers({
     assertUnlocked,
     getSetupData: () => getDatabase().getSetupData(),
-    saveInitial
+    saveInitial: (input) => {
+      dictation.invalidate();
+      return saveInitial(input);
+    }
   });
 
   registerAiSecretIpcHandlers({
@@ -363,7 +372,9 @@ export function registerDesktopIpcHandlers(
   });
 
   return {
-    clearMarketBarcodeFastPull: marketBarcodeFastPull.clear
+    clearMarketBarcodeFastPull: marketBarcodeFastPull.clear,
+    invalidateDictation: dictation.invalidate,
+    canCaptureAudio: () => dictation.getStatus().available
   };
 }
 

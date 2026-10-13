@@ -7,6 +7,7 @@ import type {
   SaveKbsSettingsInput
 } from "./kbs-settings";
 import { contextBridge, ipcRenderer, webFrame } from "electron";
+import type { DesktopDictationInput, DesktopDictationResult, DesktopDictationStatus } from "./desktop-dictation-contract";
 import type { EgmKbsSessionResult } from "./egm-kbs-webview-driver";
 import type {
   BusinessCapability,
@@ -248,6 +249,9 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   setAutoSyncEnabled: (enabled: boolean) => Promise<AutomaticSyncStatus>;
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
+  getDictationStatus: () => Promise<DesktopDictationStatus>;
+  transcribeAudio: (input: DesktopDictationInput) => Promise<DesktopDictationResult>;
+  cancelDictation: (id: string) => Promise<boolean>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
   restartAfterProfileChange: () => Promise<boolean>;
   getBusinessLayout: () => Promise<BusinessLayoutSnapshot>;
@@ -509,6 +513,9 @@ const bridge: DesktopBridge = {
     return () => ipcRenderer.removeListener("sync:statusChanged", handler);
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
+  getDictationStatus: () => ipcRenderer.invoke("dictation:getStatus"),
+  transcribeAudio: (input) => ipcRenderer.invoke("dictation:transcribe", input),
+  cancelDictation: (id) => ipcRenderer.invoke("dictation:cancel", id),
   saveInitialSetup: (input: SaveInitialSetupInput) => invokeWhenUnlocked<DesktopSetupSaveResult>("setup:saveInitial", input),
   restartAfterProfileChange: () => invokeWhenUnlocked<boolean>("app:restartAfterProfileChange"),
   getBusinessLayout: () => invokeWhenUnlocked<BusinessLayoutSnapshot>("businessLayout:get"),

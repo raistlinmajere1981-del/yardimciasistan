@@ -6,6 +6,7 @@ import type { SetupFormState } from "../../app/setup-model";
 import { AndroidDevicesSection } from "./AndroidDevicesSection";
 type SyncState = "idle" | "loading" | "success" | "error";
 import { AiSettingsSection } from "./AiSettingsSection";
+import { DesktopDictationSetup } from "./DesktopDictationSetup";
 import { WebSettingsSection } from "./WebSettingsSection";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 export interface ServicesSettingsProps {
@@ -165,6 +166,9 @@ export function ServicesSettingsSection({
           </ServiceSettingsCard>
           )}
 
+          {isBusinessServiceAvailable("ai", enabledCapabilities) && (
+          <DesktopDictationSetup />
+          )}
           {isBusinessServiceAvailable("ai", enabledCapabilities) && (
           <AiSettingsSection
             form={form}

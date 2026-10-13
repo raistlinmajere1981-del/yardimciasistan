@@ -10,6 +10,7 @@ export interface TtsVoice {
 
 export interface TtsPreferences {
   version: 1;
+  enabled: boolean;
   engineId: string;
   voiceId: string | null;
   language: string | null;
@@ -25,7 +26,7 @@ export interface TtsFeatures {
 }
 
 export interface TtsError {
-  code: "unavailable" | "no-voices" | "discovery-failed" | "invalid-preferences"
+  code: "disabled" | "unavailable" | "no-voices" | "discovery-failed" | "invalid-preferences"
     | "start-timeout" | "synthesis-failed" | "completion-timeout";
   message: string;
 }

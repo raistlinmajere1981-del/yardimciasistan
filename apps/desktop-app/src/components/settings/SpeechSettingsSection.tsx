@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getDesktopTts } from "../../app/tts/desktop-tts";
+import { readTtsPreferences, TTS_PREFERENCES_CHANGED } from "../../tts-preferences";
 import type { useTtsSettings } from "../../app/use-tts-settings";
 import { ActionButton } from "../ui/ActionButton";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
@@ -12,9 +13,16 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
   const [snapshot, setSnapshot] = useState(() => adapter.getSnapshot());
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
+  const [committedEnabled, setCommittedEnabled] = useState(() => readTtsPreferences().enabled);
   const mounted = useRef(false);
   const previewActive = useRef(false);
   const { preferences, change } = controller;
+
+  useEffect(() => {
+    const update = () => setCommittedEnabled(readTtsPreferences().enabled);
+    window.addEventListener(TTS_PREFERENCES_CHANGED, update);
+    return () => window.removeEventListener(TTS_PREFERENCES_CHANGED, update);
+  }, []);
 
   useEffect(() => {
     mounted.current = true;
@@ -35,7 +43,7 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
       : snapshot.error?.message ?? "Sistem konuşma motoru kullanılamıyor.";
 
   async function testVoice() {
-    if (previewActive.current) return;
+    if (previewActive.current || !preferences.enabled || !readTtsPreferences().enabled) return;
     previewActive.current = true;
     setTesting(true);
     setMessage("Ses denemesi başlatılıyor…");
@@ -50,8 +58,12 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
         : preferences.volume === 0 ? "Ses düzeyi 0: sessiz deneme tamamlandı." : "Ses denemesi tamamlandı.");
   }
 
-  return <ServiceSettingsCard id="settings-speech" title="Konuşma ve Yazma" enabled status={status} disabled={disabled}>
+  return <ServiceSettingsCard id="settings-speech" title="Konuşma ve Yazma" enabled status={preferences.enabled ? status : "Seslendirme kapalı"} disabled={disabled}>
     <p>Bu masaüstündeki uygulamaya özeldir. Kaydet ile uygulanır; Sesi Dene taslağı kullanır.</p>
+    <label className="form-check"><input type="checkbox" checked={preferences.enabled} disabled={disabled || testing}
+      onChange={event => change({ ...preferences, enabled: event.target.checked })} />Seslendirme etkin</label>
+    <p>Hoparlör, bu tercih kaydedildiğinde ve yerel ses bulunduğunda görünür. Metin yalnız Seslendir ile okunur. Kapalıyken kamera güvenlik bipleri devam eder.</p>
+    {preferences.enabled && !committedEnabled && <p role="status">Seslendirmeyi açmak için önce Kaydet seçin.</p>}
     <fieldset className="settings-resource-fields form-grid" disabled={disabled || testing}>
       <div className="form-field"><span>Konuşma motoru</span><strong>{snapshot.engineName}</strong></div>
       <label className="form-field">Konuşma dili
@@ -88,7 +100,7 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
     </p>}
     <div className="settings-inline-actions">
       <ActionButton type="button" variant="secondary" disabled={disabled || testing} onClick={() => adapter.refresh()}>Sesleri Yenile</ActionButton>
-      <ActionButton type="button" variant="secondary" disabled={disabled || testing || !selection.voice} onClick={() => { void testVoice(); }}>Sesi Dene</ActionButton>
+      <ActionButton type="button" variant="secondary" disabled={disabled || testing || !preferences.enabled || !committedEnabled || !selection.voice} onClick={() => { void testVoice(); }}>Sesi Dene</ActionButton>
       {testing && <ActionButton type="button" variant="secondary" onClick={() => adapter.cancel()}>Sesi Durdur</ActionButton>}
     </div>
     {message && <p role="status">{message}</p>}

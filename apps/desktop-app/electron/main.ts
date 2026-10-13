@@ -279,7 +279,8 @@ if (!hasSingleInstanceLock) {
     configureDesktopSessionRuntime({
       whatsappPartition: WHATSAPP_WEB_PARTITION,
       kbsPartition: EGM_KBS_PARTITION,
-      isTrustedRendererUrl: isTrustedDesktopRendererUrl
+      isTrustedRendererUrl: isTrustedDesktopRendererUrl,
+      canCaptureAudio: () => desktopIpcRegistryHandle?.canCaptureAudio() ?? false
     });
 
     desktopDatabase = new DesktopDatabase({
@@ -307,6 +308,7 @@ if (!hasSingleInstanceLock) {
         void reconcileOptionalBackgroundServices();
       },
       onLocked: () => {
+        desktopIpcRegistryHandle?.invalidateDictation();
         egmKbsBackgroundSession.destroy();
         void reconcileOptionalBackgroundServices();
       }

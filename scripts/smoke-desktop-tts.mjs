@@ -39,6 +39,10 @@ const globals = {
   setInterval: (fn, delay) => schedule(fn, delay, true), clearInterval: id => timers.delete(id)
 };
 globals.window = globals;
+const events = new EventTarget();
+globals.addEventListener = events.addEventListener.bind(events);
+globals.removeEventListener = events.removeEventListener.bind(events);
+globals.dispatchEvent = events.dispatchEvent.bind(events);
 const context = createContext(globals);
 runInContext(`(${installSpeechMock.toString()})()`, context);
 const modules = new Map();
@@ -64,7 +68,8 @@ assert.deepEqual(plain(read()), plain(defaults));
 for (const patch of [
   { rate: 0.49 }, { rate: 1.51 }, { rate: NaN }, { rate: Infinity }, { rate: "1" },
   { volume: -1 }, { volume: 101 }, { volume: NaN }, { pitch: -0.01 }, { pitch: 2.01 },
-  { engineId: "freya" }, { language: "bad language" }, { voiceId: "" }, { version: 2 }
+  { engineId: "freya" }, { language: "bad language" }, { voiceId: "" }, { version: 2 },
+  { enabled: undefined }, { enabled: "false" }, { enabled: 1 }, { enabled: null }
 ]) {
   const preferences = { ...defaults, ...patch };
   assert.ok(validate(preferences), JSON.stringify(patch));
@@ -87,6 +92,14 @@ blockWrite = true;
 assert.throws(() => save(preferences), /saklanamadı/);
 blockWrite = false;
 data.delete(key);
+const legacy = { ...defaults }; delete legacy.enabled;
+data.set(key, JSON.stringify(legacy));
+assert.equal(read().enabled, true, "Existing version 1 voice preferences remain enabled");
+data.set(key, JSON.stringify({ ...defaults, enabled: "true" }));
+assert.equal(read().enabled, false, "Malformed switch fails closed");
+save({ ...defaults, enabled: false });
+assert.equal(read().enabled, false);
+save(defaults);
 
 const adapter = createWebSpeechTtsAdapter();
 let notifications = 0;
@@ -143,10 +156,21 @@ assert.deepEqual({ voice: utterance.voice.name, language: utterance.lang, rate: 
   { voice: "English One", language: "en-US", rate: 1.25, pitch: 1, volume: 0.42 });
 for (const mode of ["error-before", "error-after", "never-start", "end-before", "throw"]) assert.equal((await speak(mode)).status, "failed", mode);
 assert.equal((await speak("never-start")).error.code, "start-timeout");
-for (const text of ["", " ", "x".repeat(501), "<speak>markup</speak>"]) assert.equal((await speak("complete", text)).error.code, "invalid-preferences");
+for (const text of ["", " ", "x".repeat(16001), "<speak>markup</speak>"]) assert.equal((await speak("complete", text)).error.code, "invalid-preferences");
 assert.equal((await speak("complete", "Deneme", { ...defaults, rate: 5 })).error.code, "invalid-preferences");
 assert.equal((await speak("complete", "Sessiz", { ...defaults, volume: 0 })).status, "completed");
 assert.equal(state.spoken.at(-1).volume, 0);
+const spokenBeforeOff = state.spoken.length;
+save({ ...defaults, enabled: false });
+assert.equal((await speak("complete")).error.code, "disabled", "Even an enabled caller cannot bypass saved OFF");
+assert.equal(state.spoken.length, spokenBeforeOff);
+save(defaults);
+state.mode = "hang";
+const offDuringSpeech = adapter.speak("Durdur", defaults);
+advance(10);
+save({ ...defaults, enabled: false });
+assert.equal((await offDuringSpeech).status, "cancelled");
+save(defaults);
 state.mode = "never-start";
 const cancelled = adapter.speak("İptal", defaults);
 const staleError = state.spoken.at(-1).onerror;
@@ -223,4 +247,9 @@ announce("İşlem tamam.", "success");
 advance(600);
 await Promise.resolve();
 assert.deepEqual(plain(state.beeps), []);
+save({ ...defaults, enabled: false });
+const cameraSpokenBeforeOff = state.spoken.length;
+await announceAndAdvance("complete", "ready");
+assert.equal(state.spoken.length, cameraSpokenBeforeOff);
+assert.deepEqual(plain(state.beeps), [640], "Disabled speech retains camera safety signal");
 console.log("desktop-tts-smoke-ok: preferences/defaults/ranges, local-only late discovery, selection/refresh, speak/cancel/deadlines/errors and camera fallback");
