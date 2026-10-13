@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PageViewStateProvider, usePageViewState } from "../../apps/desktop-app/src/app/page-view-state";
 import { createRoot } from "react-dom/client";
-import { BUSINESS_CAPABILITIES as C, getBusinessProfile, getBusinessProfileSelectionCapabilities } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, getBusinessProfile, getBusinessProfileSelectionCapabilities, supportsSttModel, isSupportedSttBaseUrl } from "@yardimci-asistan/shared";
 import { normalizeProfileTransitionInput } from "../../apps/desktop-app/electron/profile-service-activation";
 import { defaultDashboardData, defaultSetupData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
 import { useSetupController } from "../../apps/desktop-app/src/app/use-setup-controller";
@@ -19,6 +19,8 @@ import { MarketingTextAssistant } from "../../apps/desktop-app/src/components/ma
 
 const voiceDesktop = new URLSearchParams(window.location.search).has("voiceDesktop");
 let dictationRevision = 1;
+let dictationEnabled = false, dictationVerification = "", dictationActivation = "";
+let dictationVerificationRevision = 0, dictationActivationRevision = 0;
 
 function FixtureStatusHost() {
   const [status, setStatus] = useState<AppStatusDetail | null>(null);
@@ -120,13 +122,34 @@ const shippingSignature = (input: typeof canonical.arasShipping & { password?: s
   JSON.stringify([input.environment, input.customerCode, input.username, input.clearPassword ? "" : input.password || shippingPassword]);
 let googleReviews = { enabled: false, placeId: "", apiKeyConfigured: false, lastPublishedAt: "", publicationPending: false };
 let kbsSettings = { enabled: false, provider: "egm", facilityCode: "", username: "", authorizedIdentityNumber: "", passwordConfigured: false };
+const dictationSignature = () => JSON.stringify([canonical.aiEnabled, canonical.aiService, canonical.aiBaseUrl, canonical.aiModel,
+  canonical.aiSttModel, canonical.aiTimeoutSeconds, canonical.webModuleUrl, canonical.syncSecret, canonical.autoSyncEnabled]);
+async function dictationStatus() {
+  const environment = voiceDesktop ? await (await fetch("/fixture-dictation-state")).json() : { locked: false, hosting: true, revision: 0 };
+  const canTest = !environment.locked && environment.hosting && canonical.aiEnabled && canonical.aiApiKeyConfigured
+    && supportsSttModel(canonical.aiService, canonical.aiSttModel ?? "") && isSupportedSttBaseUrl(canonical.aiService, canonical.aiBaseUrl)
+    && canonical.autoSyncEnabled && canonical.webModuleUrl.startsWith("https://");
+  const ready = canTest && dictationVerification === dictationSignature();
+  const enabled = ready && dictationEnabled && dictationActivation === dictationSignature() && dictationActivationRevision === dictationVerificationRevision;
+  return { available: enabled, enabled, ready, canTest, revision: dictationRevision + environment.revision,
+    message: !canTest ? "AI modeli veya HTTPS web bağlantısı gerekli" : !ready ? "STT bağlantısı doğrulanmadı"
+      : enabled ? "Etkin · Masaüstü dikte hazır" : "Kapalı · STT bağlantısı doğrulandı" };
+}
 window.yardimciDesktop = {
-  getDictationStatus: async () => {
-    const environment = voiceDesktop ? await (await fetch("/fixture-dictation-state")).json() : { locked: false, hosting: true, revision: 0 };
-    const available = !environment.locked && environment.hosting && canonical.aiEnabled && canonical.aiApiKeyConfigured
-      && Boolean(canonical.aiSttModel) && canonical.webModuleUrl.startsWith("https://");
-    return { available, revision: dictationRevision + environment.revision,
-      message: available ? "Dikte hazır · yalnız Durdur ile ses gönderilir." : "Dikte için Servisler'de AI Yardımcı, konuşma modeli ve HTTPS web bağlantısını kaydedin." };
+  getDictationStatus: dictationStatus,
+  saveDictationEnabled: async enabled => {
+    window.settingsCalls.push({ kind: "dictation-save", enabled });
+    if (window.failDictationSave) return { ok: false, message: "Fixture dikte kayıt hatası" };
+    if (enabled && !(await dictationStatus()).ready) return { ok: false, message: "STT bağlantısı doğrulanmadı" };
+    dictationEnabled = enabled; dictationActivation = dictationSignature(); dictationActivationRevision = dictationVerificationRevision; dictationRevision++;
+    return { ok: true, status: await dictationStatus() };
+  },
+  testDictationConnection: async () => {
+    window.settingsCalls.push({ kind: "dictation-test" });
+    dictationVerification = "";
+    if (window.failDictationTest || !(await dictationStatus()).canTest) return { ok: false, message: "Fixture STT bağlantı hatası" };
+    dictationVerification = dictationSignature(); dictationVerificationRevision++; dictationRevision++;
+    return { ok: true, status: await dictationStatus() };
   },
   transcribeAudio: async input => (await fetch("/fixture-dictation-upload", { method: "POST", body: JSON.stringify(input) })).json(),
   cancelDictation: async id => { if (voiceDesktop) await fetch("/fixture-dictation-cancel", { method: "POST", body: JSON.stringify({ id }) }); return true; },
@@ -148,6 +171,7 @@ window.yardimciDesktop = {
     }
   },
   saveInitialSetup: async input => {
+    const previousDictation = dictationSignature();
     dictationRevision++;
     window.settingsCalls.push({ kind: "setup", input });
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
@@ -163,6 +187,7 @@ window.yardimciDesktop = {
     if (input.arasShipping?.clearPassword) shippingPassword = "";
     else if (input.arasShipping?.password) shippingPassword = input.arasShipping.password;
     canonical = { ...canonical, ...input, arasShipping, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured };
+    if (dictationSignature() !== previousDictation || input.aiApiKey || input.clearAiApiKey) dictationVerification = "";
     return { ok: true, message: "Kaydedildi", setupData: structuredClone(canonical), dashboardData: { ...defaultDashboardData, androidDevices: structuredClone(androidDevices) } };
   },
   getBusinessPublicProfile: async () => profile,

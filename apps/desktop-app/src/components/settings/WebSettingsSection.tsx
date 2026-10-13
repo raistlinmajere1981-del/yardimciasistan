@@ -58,11 +58,12 @@ export function WebSettingsSection({ form, onFormChange }: SetupFieldsProps) {
   };
 
   return (
-        <ServiceSettingsCard id="settings-web" title="Website / Web Modülü" enabled status={form.webModuleUrl.trim() && form.syncSecret.trim() ? "Yapılandırıldı" : "Yapılandırılmadı"}>
-          <label className="settings-service-toggle">
-            <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
-            <span>Otomatik eşitle</span>
-          </label>
+        <ServiceSettingsCard id="settings-web" title="Website / Web Modülü" enabled={form.autoSyncEnabled}
+          toggleLabel="Otomatik eşitle" onEnabledChange={enabled => update("autoSyncEnabled", enabled)} showBody
+          status={webConnectionTestState === "success" ? "Bağlantı doğrulandı"
+            : webConnectionTestState === "error" ? "Bağlantı doğrulanmadı"
+              : !form.autoSyncEnabled ? "Otomatik eşitleme kapalı"
+                : form.webModuleUrl.trim() && form.syncSecret.trim().length >= 12 ? "Bağlantı ayarlı" : "Bağlantı ayarları gerekli"}>
           <div className="form-grid">
             <label className="form-field form-field--long form-field--span setup-field">
               Web eşitleme adresi

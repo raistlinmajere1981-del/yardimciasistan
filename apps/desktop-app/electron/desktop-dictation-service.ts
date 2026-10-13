@@ -1,9 +1,12 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { Agent, request } from "node:https";
 import { BUSINESS_CAPABILITIES, isSupportedSttBaseUrl, supportsSttModel, type BusinessCapability } from "@yardimci-asistan/shared";
-import type { DesktopSetupData } from "./database";
+import type { DesktopDatabase } from "./database";
+import { getEffectiveAiApiKey } from "./ai-secret-service";
+import { serviceConfigFingerprint } from "./service-settings-validation";
+import { readDesktopDictationPreference, saveDesktopDictationPreference } from "./desktop-dictation-preferences";
 import { getWebSyncConfig } from "./sync-config";
-import { DICTATION_MAX_BYTES, DICTATION_MIME_TYPES, type DesktopDictationResult, type DesktopDictationStatus } from "./desktop-dictation-contract";
+import { DICTATION_MAX_BYTES, DICTATION_MIME_TYPES, type DesktopDictationResult, type DesktopDictationStatus, type DesktopDictationSettingsResult } from "./desktop-dictation-contract";
 
 const CHANGED = "Ses ayarları veya oturum değişti. Yeniden kayıt başlatın.";
 const FAILED = "Ses metne çevrilemedi. Bağlantıyı ve kayıtlı konuşma modelini kontrol edin.";
@@ -11,7 +14,7 @@ const RESPONSE_LIMIT = 128 * 1024;
 const TIMEOUT_MS = 70000;
 
 /** HTTPS only, no redirects/retries/proxy, bounded streaming response; no audio file or logging. */
-export function uploadDesktopDictation(url: URL, secret: string, mime: string, audio: Buffer, signal: AbortSignal): Promise<{ status: number; body: string }> {
+export function uploadDesktopDictation(url: URL, secret: string, mime: string, audio: Buffer, signal: AbortSignal, configuration?: string): Promise<{ status: number; body: string }> {
   const boundary = `ya-${randomBytes(16).toString("hex")}`;
   const prefix = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="source"\r\n\r\ndesktop\r\n--${boundary}\r\nContent-Disposition: form-data; name="audio"; filename="recording.${mime.split("/")[1]}"\r\nContent-Type: ${mime}\r\n\r\n`);
   const suffix = Buffer.from(`\r\n--${boundary}--\r\n`);
@@ -20,7 +23,8 @@ export function uploadDesktopDictation(url: URL, secret: string, mime: string, a
       method: "POST", signal, rejectUnauthorized: true,
       agent: new Agent({ keepAlive: false, proxyEnv: {} }),
       headers: { "X-YA-Sync-Secret": secret, "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        "Content-Length": prefix.length + audio.length + suffix.length, "Accept": "application/json" }
+        "Content-Length": prefix.length + audio.length + suffix.length, "Accept": "application/json",
+        ...(configuration ? { "X-YA-STT-Configuration": configuration } : {}) }
     }, response => {
       const chunks: Buffer[] = [];
       let size = 0;
@@ -62,7 +66,7 @@ function matchesContainer(audio: Buffer, mime: string): boolean {
 }
 
 export function createDesktopDictationService(options: {
-  getSetupData: () => DesktopSetupData;
+  getDatabase: () => DesktopDatabase;
   assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   upload?: typeof uploadDesktopDictation;
@@ -71,31 +75,101 @@ export function createDesktopDictationService(options: {
   let signature = "";
   const jobs = new Map<number, { id: string; controller: AbortController }>();
   const cancelled = new Map<number, Set<string>>();
+  let testJob: { sender: number; controller: AbortController } | null = null;
   function invalidate() {
     revision++;
     for (const job of jobs.values()) job.controller.abort();
+    testJob?.controller.abort();
   }
-  function current() {
-    try {
-      options.assertUnlocked();
-      options.assertCapability(BUSINESS_CAPABILITIES.AI);
-    } catch {
-      if (signature !== "denied") { invalidate(); signature = "denied"; }
-      return { available: false, revision, message: "Dikte için uygulama kilidi açık ve AI Yardımcı etkin olmalı." };
-    }
-    const setup = options.getSetupData();
-    const config = getWebSyncConfig(setup);
+  function configuration() {
+    const database = options.getDatabase(), setup = database.getSetupData(), web = getWebSyncConfig(setup);
+    const apiKey = getEffectiveAiApiKey(database, setup.aiService);
+    const config = { provider: setup.aiProvider, service: setup.aiService, baseUrl: setup.aiBaseUrl.replace(/\/+$/, ""),
+      model: setup.aiSttModel ?? "", apiKey, timeoutSeconds: setup.aiTimeoutSeconds,
+      aiEnabled: setup.aiEnabled, chatModel: setup.aiModel, imageModel: setup.aiImageModel ?? "",
+      webBaseUrl: web.baseUrl, syncSecret: web.syncSecret, autoSyncEnabled: setup.autoSyncEnabled };
+    // Bound to the actual private provider configuration checked by Hosting, never renderer evidence.
+    const binding = createHash("sha256").update(JSON.stringify([config.provider, config.service, config.baseUrl,
+      config.model, apiKey, config.timeoutSeconds])).digest("hex");
+    return { database, setup, web, config, binding, fingerprint: serviceConfigFingerprint(config) };
+  }
+  function current(): DesktopDictationStatus {
+    const denied = (message: string): DesktopDictationStatus => {
+      if (signature !== message) { invalidate(); signature = message; }
+      return { available: false, enabled: false, ready: false, canTest: false, revision, message };
+    };
+    try { options.assertUnlocked(); } catch { return denied("Oturum kilitli"); }
+    try { options.assertCapability(BUSINESS_CAPABILITIES.AI); } catch { return denied("AI özelliği kapalı"); }
+    const { setup, web, config, database, fingerprint } = configuration();
+    const preference = readDesktopDictationPreference(database.databasePath);
+    const verification = database.getServiceSettingsVerification("desktop_stt");
+    // Also fence effective environment/credential changes outside the Setup writer.
+    if (verification && verification !== fingerprint) database.clearServiceSettingsVerification("desktop_stt");
+    const activation = serviceConfigFingerprint({ fingerprint, testedAt: database.getServiceSettingsVerificationTime("desktop_stt") });
     // Identity never leaves main. A serial revision reveals no URL, key or secret digest.
-    const next = JSON.stringify([setup.aiEnabled, setup.aiService, setup.aiBaseUrl, setup.aiSttModel, setup.aiApiKeyConfigured, config]);
+    const next = JSON.stringify([activation, preference, setup.aiLastPublishedAt]);
     if (signature !== next) { invalidate(); signature = next; }
-    const available = setup.aiEnabled && setup.aiApiKeyConfigured && supportsSttModel(setup.aiService, setup.aiSttModel ?? "")
-      && isSupportedSttBaseUrl(setup.aiService, setup.aiBaseUrl) && Boolean(hostingEndpoint(config.baseUrl))
-      && config.syncSecret.trim().length >= 12 && config.syncSecret.length <= 4096 && !/[\r\n]/.test(config.syncSecret);
-    return { available, revision, message: available ? "Dikte hazır · yalnız Durdur ile ses gönderilir."
-      : "Dikte için Servisler'de AI Yardımcı, konuşma modeli ve HTTPS web bağlantısını kaydedin." };
+    const reason = !setup.aiEnabled ? "AI Yardımcı kapalı"
+      : !supportsSttModel(setup.aiService, setup.aiSttModel ?? "") ? "AI modeli gerekli"
+        : setup.aiProvider !== "openai_compatible" || !isSupportedSttBaseUrl(setup.aiService, setup.aiBaseUrl) ? "STT sağlayıcısı desteklenmiyor"
+          : !setup.aiApiKeyConfigured || !config.apiKey ? "AI anahtarı gerekli"
+            : setup.autoSyncEnabled === false ? "Web eşitlemesi kapalı"
+              : !hostingEndpoint(web.baseUrl) || web.syncSecret.trim().length < 12 || web.syncSecret.length > 4096
+                || web.syncSecret === "change-this-secret" || /[\r\n]/.test(web.syncSecret) ? "HTTPS web bağlantısı gerekli"
+                : !setup.aiLastPublishedAt ? "AI ayarlarının yayını bekleniyor" : "";
+    const canTest = !reason;
+    const ready = canTest && verification === fingerprint;
+    const enabled = ready && preference.enabled && preference.configuration === activation;
+    return { available: enabled, enabled, ready, canTest, revision,
+      message: reason || (!ready ? "STT bağlantısı doğrulanmadı" : enabled ? "Etkin · Masaüstü dikte hazır" : "Kapalı · STT bağlantısı doğrulandı") };
   }
   function getStatus(): DesktopDictationStatus {
-    try { return current(); } catch { return { available: false, revision, message: FAILED }; }
+    try { return current(); } catch { return { available: false, enabled: false, ready: false, canTest: false, revision, message: "Dikte durumu okunamadı" }; }
+  }
+  function saveEnabled(value: unknown): DesktopDictationSettingsResult {
+    try {
+      options.assertUnlocked();
+      if (typeof value !== "boolean") return { ok: false, message: "Masaüstü dikte seçimi geçersiz." };
+      const status = current();
+      if (value && !status.ready) return { ok: false, message: status.message };
+      const { database, fingerprint } = configuration();
+      const activation = serviceConfigFingerprint({ fingerprint, testedAt: database.getServiceSettingsVerificationTime("desktop_stt") });
+      saveDesktopDictationPreference(database.databasePath, { enabled: value, configuration: activation });
+      invalidate();
+      return { ok: true, status: current() };
+    } catch { return { ok: false, message: "Masaüstü dikte tercihi saklanamadı." }; }
+  }
+  async function testConnection(sender: number): Promise<DesktopDictationSettingsResult> {
+    if (testJob) return { ok: false, message: "STT bağlantısı deneniyor." };
+    try {
+      const status = current();
+      if (!status.canTest) return { ok: false, message: status.message };
+      const { database, web, config, fingerprint, binding } = configuration();
+      database.clearServiceSettingsVerification("desktop_stt");
+      const expectedRevision = current().revision, controller = new AbortController();
+      testJob = { sender, controller };
+      const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      const gate = setInterval(() => { if (getStatus().revision !== expectedRevision) controller.abort(); }, 250);
+      // One explicit, 250ms silent PCM WAV proves audio endpoint/model access, not speech quality.
+      const sample = Buffer.alloc(44 + 8000);
+      sample.write("RIFF", 0); sample.writeUInt32LE(sample.length - 8, 4); sample.write("WAVEfmt ", 8);
+      sample.writeUInt32LE(16, 16); sample.writeUInt16LE(1, 20); sample.writeUInt16LE(1, 22);
+      sample.writeUInt32LE(16000, 24); sample.writeUInt32LE(32000, 28); sample.writeUInt16LE(2, 32);
+      sample.writeUInt16LE(16, 34); sample.write("data", 36); sample.writeUInt32LE(8000, 40);
+      try {
+        const response = await (options.upload ?? uploadDesktopDictation)(hostingEndpoint(web.baseUrl)!, web.syncSecret, "audio/wav", sample, controller.signal, binding);
+        if (controller.signal.aborted || !current().canTest || revision !== expectedRevision) return { ok: false, message: CHANGED };
+        if (response.status !== 200 || Buffer.byteLength(response.body) > RESPONSE_LIMIT) return { ok: false, message: "STT bağlantısı doğrulanamadı" };
+        const result = JSON.parse(response.body) as Record<string, unknown>;
+        if (result?.ok !== true || typeof result.text !== "string" || result.stt_configuration !== binding) {
+          return { ok: false, message: "STT modeli doğrulanamadı; web hizmetini kontrol edin" };
+        }
+        if (configuration().fingerprint !== fingerprint) return { ok: false, message: CHANGED };
+        database.recordServiceSettingsVerification("desktop_stt", config);
+        invalidate();
+        return { ok: true, status: current() };
+      } finally { clearTimeout(timeout); clearInterval(gate); testJob = null; }
+    } catch { return { ok: false, message: "STT bağlantısı doğrulanamadı" }; }
   }
   function cancel(sender: number, value: unknown) {
     if (!validId(value)) return false;
@@ -109,6 +183,7 @@ export function createDesktopDictationService(options: {
   }
   function releaseSender(sender: number) {
     jobs.get(sender)?.controller.abort();
+    if (testJob?.sender === sender) testJob.controller.abort();
     cancelled.delete(sender);
   }
   async function transcribe(sender: number, value: unknown): Promise<DesktopDictationResult> {
@@ -130,7 +205,7 @@ export function createDesktopDictationService(options: {
       if (!audio.length || audio.length > DICTATION_MAX_BYTES || audio.toString("base64") !== encoded || !matchesContainer(audio, mime)) {
         return { ok: false, message: "Ses biçimi veya boyutu geçersiz (en fazla 5 MiB)." };
       }
-      const config = getWebSyncConfig(options.getSetupData());
+      const config = getWebSyncConfig(options.getDatabase().getSetupData());
       const controller = new AbortController();
       const job = { id: input.id, controller };
       const expectedRevision = revision;
@@ -156,5 +231,5 @@ export function createDesktopDictationService(options: {
       }
     } catch { return { ok: false, message: FAILED }; }
   }
-  return { getStatus, transcribe, cancel, releaseSender, invalidate };
+  return { getStatus, saveEnabled, testConnection, transcribe, cancel, releaseSender, invalidate };
 }

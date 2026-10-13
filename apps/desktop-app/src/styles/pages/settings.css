@@ -63,6 +63,13 @@
   min-width: 0;
 }
 
+.settings-service-card-title { flex: 1; }
+
+.settings-service-card > p {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
 .settings-panel-header h2,
 .settings-panel-header h3,
 .settings-panel-header strong,
@@ -1431,7 +1438,7 @@
 }
 
 /* Disabled service cards stay header-only; draft toggles expand immediately. */
-.settings-service-card.is-disabled > .settings-service-card-header {
+.settings-service-card.is-disabled:not(.is-expanded) > .settings-service-card-header {
   border-bottom: 0;
 }
 

@@ -402,13 +402,20 @@ export function saveSetupData(
     String(existingSettings.ai_service ?? "") !== storedAiService ||
     String(existingAiProfile.project_name ?? "").trim() !== aiProjectName ||
     String(existingAiProfile.model ?? "").trim() !== aiModel ||
+    String(existingAiProfile.stt_model ?? "") !== aiSttModel ||
     (normalizeAiBaseUrl(existingAiProfile.base_url) || AI_SERVICE_DEFAULT_BASE_URLS[storedAiService]) !== storedAiBaseUrl ||
     normalizeStoredAiTimeout(existingAiProfile.timeout_seconds) !== storedAiTimeoutSeconds ||
     existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
-  const aiLastPublishedAt = aiSettingsChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
+  const webTransportChanged = String(existingSettings?.web_module_url ?? "") !== webModuleUrl
+    || String(existingSettings?.sync_secret ?? "") !== syncSecret;
+  const dictationSettingsChanged = aiSettingsChanged || webTransportChanged
+    || String(existingAiProfile?.image_model ?? "") !== aiImageModel
+    || Number(existingSettings?.auto_sync_enabled ?? 1) !== Number(input.autoSyncEnabled !== false);
+  const aiLastPublishedAt = aiSettingsChanged || webTransportChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
 
   db.exec("BEGIN IMMEDIATE");
   try {
+    if (dictationSettingsChanged) db.prepare("DELETE FROM service_settings_verifications WHERE service = 'desktop_stt'").run();
     db
       .prepare(`
         INSERT INTO business (

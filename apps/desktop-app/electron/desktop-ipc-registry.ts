@@ -133,7 +133,7 @@ export function registerDesktopIpcHandlers(
     assertTaskScope
   } = dependencies;
   registerWebConnectionIpcHandlers({ getDatabase, assertUnlocked });
-  const dictation = createDesktopDictationService({ getSetupData: () => getDatabase().getSetupData(), assertUnlocked, assertCapability });
+  const dictation = createDesktopDictationService({ getDatabase, assertUnlocked, assertCapability });
   registerDesktopDictationIpcHandlers(dictation);
 
   registerAppLockIpcHandlers(getAppLockService());

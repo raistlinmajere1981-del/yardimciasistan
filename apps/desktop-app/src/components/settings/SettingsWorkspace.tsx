@@ -1,6 +1,6 @@
 import { usePageViewState, usePageViewScroll } from "../../app/page-view-state";
 import { useEffect, useRef, useState } from "react";
-import { isBusinessServiceAvailable } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C, isBusinessServiceAvailable } from "@yardimci-asistan/shared";
 import type { SaveInitialSetupInput } from "../../../electron/database";
 import type { DesktopPage } from "../../app/navigation";
 import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
@@ -9,6 +9,7 @@ import { useBusinessCapabilityRuntime } from "../../app/business-capability-cont
 import { StagedSettingsContributionSlot } from "../../app/settings-section-contributions";
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
 import { useTtsSettings } from "../../app/use-tts-settings";
+import { useDesktopDictationSettings } from "../../app/use-desktop-dictation-settings";
 import { useSettingsAiTest } from "../../app/use-settings-ai-test";
 import { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { useAndroidDevicePermissionSettings } from "../../app/use-android-device-permission-settings";
@@ -46,6 +47,9 @@ import { UpdateSettings, useUpdateSettings } from "./UpdateSettings";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
 import { ActionButton } from "../ui/ActionButton";
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
+import { DesktopDictationSetup } from "./DesktopDictationSetup";
+import { WebSettingsSection } from "./WebSettingsSection";
+import { AiSettingsSection } from "./AiSettingsSection";
 
 export type SettingsWorkspaceProps = Omit<
   ServicesSettingsProps,
@@ -87,6 +91,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
   const drafts = useSettingsDrafts(props.setupData, props.onSave);
   const tts = useTtsSettings();
+  const dictation = useDesktopDictationSettings(props.setupData);
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
   const initialized = !props.setupData.setupRequired;
   const capabilities = runtimeCapabilities?.enabledCapabilities ?? [];
@@ -117,7 +122,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const appearance = useAppearanceSettings(props.uiPreferences, props.onUiPreferencesChange);
   const androidPermissions = useAndroidDevicePermissionSettings({
     devices: props.dashboardData?.androidDevices ?? [],
-    enabled: initialized && props.setupData.servicePreferences.android,
+    enabled: initialized && props.setupData.servicePreferences.android && capabilities.includes(C.ANDROID),
     ...(props.onDashboardRefresh === undefined ? {} : { onDashboardRefresh: props.onDashboardRefresh })
   });
   const updates = useUpdateSettings(initialized);
@@ -143,7 +148,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const dirty: Record<SettingsCategoryId, boolean> = {
     business: drafts.dirty.business || profile.dirty || googleReviews.dirty,
     operations: layout.dirty,
-    services: drafts.dirty.services || androidPermissions.dirty || kbs.dirty || tts.dirty,
+    services: drafts.dirty.services || androidPermissions.dirty || kbs.dirty || tts.dirty || dictation.dirty,
     application: appearance.dirty || updates.dirty
   };
   const categoryDirty = dirty[active];
@@ -153,7 +158,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     : active === "application"
       ? updates.busy
       : drafts.busy
-      || (active === "services" && (androidPermissions.busy || kbs.loading || kbs.saving || kbs.testing))
+      || (active === "services" && (androidPermissions.busy || kbs.loading || kbs.saving || kbs.testing || dictation.loading || dictation.busy))
       || (active === "business" && (profile.saving || googleReviews.saving || googleReviews.testing));
 
   const categorySaving = active === "operations"
@@ -162,7 +167,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       ? updates.action === "save"
       : setupCategory
         ? drafts.feedback[setupCategory]?.state === "loading"
-          || (active === "services" && (androidPermissions.busy || kbs.saving))
+          || (active === "services" && (androidPermissions.busy || kbs.saving || dictation.saving))
           || (active === "business" && (profile.saving || googleReviews.saving))
         : false;
 
@@ -230,6 +235,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       const ttsResult = tts.save();
       if (!ttsResult.ok) return ttsResult;
       changed ||= ttsResult.changed;
+      const dictationResult = await dictation.save();
+      if (!dictationResult.ok) return dictationResult;
+      changed ||= dictationResult.changed;
       return { ok: true, changed };
     }
 
@@ -262,6 +270,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       androidPermissions.discard();
       kbs.discard();
       tts.discard();
+      await dictation.discard();
       ai.invalidate();
       return true;
     }
@@ -492,8 +501,17 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
           {active === "services" && (
             <>
+              <fieldset className="settings-resource-fields" disabled={categoryBusy || guardBusy}>
+                <WebSettingsSection form={drafts.form} onFormChange={drafts.setDraft} />
+              </fieldset>
+              {isBusinessServiceAvailable("ai", capabilities) && <fieldset className="settings-resource-fields" disabled={categoryBusy || guardBusy}>
+                <AiSettingsSection form={drafts.form} onFormChange={drafts.setDraft} {...ai}
+                  onTestAiConnection={() => void ai.testAiConnection()} savedEnabled={props.setupData.aiEnabled} />
+              </fieldset>}
               <SpeechSettingsSection controller={tts} disabled={categoryBusy || guardBusy} />
-              <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
+              <DesktopDictationSetup controller={dictation} form={drafts.form} canonical={drafts.canonical}
+                aiCapability={capabilities.includes(C.AI)} disabled={categoryBusy || guardBusy} />
+              <fieldset className="settings-resource-fields" disabled={categoryBusy || guardBusy}>
                 <ServicesSettingsSection
                   {...props}
                   {...ai}
@@ -506,13 +524,13 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 />
               </fieldset>
               {isBusinessServiceAvailable("kbs", capabilities) && (
-                <KbsSettingsSection controller={kbs} disabled={drafts.busy || guardBusy} />
+                <KbsSettingsSection controller={kbs} disabled={categoryBusy || guardBusy} />
               )}
               <StagedSettingsContributionSlot
                 category="services"
                 form={drafts.form}
                 onFormChange={drafts.setDraft}
-                busy={drafts.busy || guardBusy}
+                busy={categoryBusy || guardBusy}
                 configurationCapabilities={capabilities}
                 initialized={initialized}
                 runtimeSnapshot={runtimeCapabilities}

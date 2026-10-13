@@ -7,24 +7,32 @@ interface ServiceSettingsCardProps {
   status?: string;
   enabled: boolean;
   onEnabledChange?: (enabled: boolean) => void;
+  toggleLabel?: string;
+  toggleAriaLabel?: string;
+  toggleDisabled?: boolean;
+  headerActions?: ReactNode;
+  showBody?: boolean;
   disabled?: boolean;
+  feedback?: ReactNode;
   children: ReactNode;
 }
 
 /** Presentation only: toggles update the owning Settings draft. */
-export function ServiceSettingsCard({ id, title, status, enabled, onEnabledChange, disabled, className = "", children }: ServiceSettingsCardProps) {
+export function ServiceSettingsCard({ id, title, status, enabled, onEnabledChange, toggleLabel, toggleAriaLabel, toggleDisabled, headerActions, showBody = enabled, disabled, feedback, className = "", children }: ServiceSettingsCardProps) {
   return (
     <section id={id} tabIndex={-1} aria-label={title}
-      className={`settings-service-card settings-service-panel ${className}${enabled ? " is-enabled" : " is-disabled"}`}>
+      className={`settings-service-card settings-service-panel ${className}${enabled ? " is-enabled" : " is-disabled"}${showBody ? " is-expanded" : ""}`}>
       <div className="settings-service-card-header">
-        <div><strong>{title}</strong><span>{status ?? (enabled ? "Etkin" : "Kapalı")}</span></div>
+        <div className="settings-service-card-title"><strong>{title}</strong><span id={`${id}-status`}>{status ?? (enabled ? "Etkin" : "Kapalı")}</span></div>
+        {headerActions}
         {onEnabledChange && <label className="settings-service-toggle">
-          <input type="checkbox" aria-label={`${title} servisi`} checked={enabled} disabled={disabled}
+          <input type="checkbox" aria-label={toggleAriaLabel ?? toggleLabel ?? `${title} servisi`} aria-describedby={`${id}-status`} checked={enabled} disabled={disabled || toggleDisabled}
             onChange={(event) => onEnabledChange(event.target.checked)} />
-          <span>{enabled ? "Etkin" : "Kapalı"}</span>
+          <span>{toggleLabel ?? (enabled ? "Etkin" : "Kapalı")}</span>
         </label>}
       </div>
-      {enabled && <fieldset className="settings-service-card-body form-stack" disabled={disabled}>{children}</fieldset>}
+      {showBody && <fieldset className="settings-service-card-body form-stack" disabled={disabled}>{children}</fieldset>}
+      {feedback}
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { createContext, runInContext } from "node:vm";
@@ -40,14 +41,20 @@ function triggerDeadline(delay) {
   clearTimeout(handle); deadlines.delete(handle); callback();
 }
 const modules = new Map();
+let failPreferenceWrite = false;
 function load(file) {
   const filename = resolve(file);
   if (modules.has(filename)) return modules.get(filename);
   const exports = {}; modules.set(filename, exports);
   const code = ts.transpileModule(readFileSync(filename, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   runInContext(`(function(exports, require) { ${code}\n})`, context)(exports, name => {
-    if (name === "electron") return { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } };
+    if (name === "electron") return { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
+      safeStorage: { isEncryptionAvailable: () => true, decryptString: bytes => bytes.toString("utf8") } };
     if (name === "node:https") return fakeHttps;
+    if (name === "node:fs") return { ...require(name), writeFileSync: (...args) => {
+      if (failPreferenceWrite) throw new Error("fixture blocked preference write");
+      return require(name).writeFileSync(...args);
+    } };
     if (name === "@yardimci-asistan/shared") return shared;
     if (name.startsWith("node:")) return require(name);
     return load(resolve(dirname(filename), `${name}.ts`));
@@ -57,17 +64,38 @@ function load(file) {
 const plain = value => JSON.parse(JSON.stringify(value));
 const { createDesktopDictationService: createService, uploadDesktopDictation } = load("apps/desktop-app/electron/desktop-dictation-service.ts");
 const { registerDesktopDictationIpcHandlers } = load("apps/desktop-app/electron/ipc/desktop-dictation-ipc.ts");
-let setup = { aiEnabled: true, aiApiKeyConfigured: true, aiService: "openai", aiBaseUrl: "https://api.openai.com/v1", aiSttModel: "whisper-1", webModuleUrl: "https://hosting.example/module/", syncSecret: "fixture-private-sync-secret" };
+const preferenceRoot = mkdtempSync(resolve(tmpdir(), "desktop-dictation-"));
+process.on("exit", () => rmSync(preferenceRoot, { recursive: true, force: true }));
+let setup = { aiEnabled: true, aiProvider: "openai_compatible", aiModel: "gpt-4.1", aiTimeoutSeconds: 30,
+  aiLastPublishedAt: "2026-10-13T00:00:00Z", autoSyncEnabled: true, aiApiKeyConfigured: true, aiService: "openai", aiBaseUrl: "https://api.openai.com/v1", aiSttModel: "whisper-1", webModuleUrl: "https://hosting.example/module/", syncSecret: "fixture-private-sync-secret" };
+let credential = "fixture-private-provider-key";
+const verifications = new Map();
+const verificationTimes = new Map();
+const { serviceConfigFingerprint } = load("apps/desktop-app/electron/service-settings-validation.ts");
+const database = { databasePath: resolve(preferenceRoot, "fixture.sqlite"),
+  getSetupData: () => { gates.push("setup"); return setup; },
+  getEncryptedAiApiKey: () => `safe-storage:v1:${Buffer.from(credential).toString("base64")}`,
+  getServiceSettingsVerification: service => verifications.get(service) ?? "",
+  getServiceSettingsVerificationTime: service => verificationTimes.get(service) ?? "",
+  clearServiceSettingsVerification: service => { verifications.delete(service); verificationTimes.delete(service); },
+  recordServiceSettingsVerification: (service, config) => { verifications.set(service, serviceConfigFingerprint(config)); verificationTimes.set(service, String(Date.now())); } };
 let locked = false, ai = true, behavior = "success", pending, uploadCount = 0;
 const gates = [];
 const service = createService({
-  getSetupData: () => { gates.push("setup"); return setup; },
+  getDatabase: () => database,
   assertUnlocked: () => { gates.push("unlocked"); if (locked) throw new Error("locked-raw-secret"); },
   assertCapability: capability => { gates.push(capability); assert.equal(capability, "service.ai"); if (!ai) throw new Error("capability-raw-secret"); },
-  upload: async (url, secret, mime, audio, signal) => {
+  upload: async (url, secret, mime, audio, signal, configuration) => {
     uploadCount++;
     assert.equal(url.href, "https://hosting.example/module/api/audio-transcribe.php");
-    assert.equal(secret, setup.syncSecret); assert.equal(mime, "audio/webm"); assert.ok(audio.length <= 5 * 1024 * 1024);
+    assert.equal(secret, setup.syncSecret); assert.equal(mime, configuration ? "audio/wav" : "audio/webm"); assert.ok(audio.length <= 5 * 1024 * 1024);
+    if (configuration) {
+      assert.equal(audio.subarray(0, 4).toString(), "RIFF");
+      assert.equal(audio.readUInt32LE(28), 32000); assert.equal(audio.length, 8044);
+      if (behavior === "success") return { status: 200, body: JSON.stringify({ ok: true, text: "", stt_configuration: configuration }) };
+      if (behavior === "wrong-binding") return { status: 200, body: JSON.stringify({ ok: true, text: "", stt_configuration: "a".repeat(64) }) };
+      if (behavior === "legacy") return { status: 200, body: '{"ok":true,"text":""}' };
+    }
     if (behavior === "throw") throw new Error("raw-provider-auth-secret");
     if (behavior === "wait") return new Promise(resolve => { pending = { resolve, signal }; });
     if (behavior === "oversize") return { status: 200, body: "x".repeat(128 * 1024 + 1) };
@@ -87,13 +115,49 @@ const getStatus = () => invoke("dictation:getStatus");
 const audio = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0, 1, 2, 3]);
 let sequence = 0;
 const input = patch => ({ id: `dictation_test_${String(++sequence).padStart(8, "0")}`, revision: getStatus().revision, mimeType: "audio/webm", audioBase64: audio.toString("base64"), ...patch });
-assert.equal(getStatus().available, true);
-assert.deepEqual(Object.keys(getStatus()).sort(), ["available", "message", "revision"]);
+assert.equal(getStatus().available, false); assert.equal(getStatus().canTest, true);
+assert.equal(invoke("dictation:saveEnabled", true).ok, false, "Support/configuration alone never enables dictation");
+verifications.set("ai", "successful-text-and-image-test");
+assert.equal(getStatus().ready, false, "Text/image test cannot verify audio");
+const tested = await invoke("dictation:testConnection");
+assert.equal(tested.ok, true); assert.equal(tested.status.ready, true); assert.equal(tested.status.enabled, false);
+assert.equal(invoke("dictation:saveEnabled", true).ok, true); assert.equal(getStatus().available, true);
+assert.deepEqual(Object.keys(getStatus()).sort(), ["available", "canTest", "enabled", "message", "ready", "revision"]);
+for (const mode of ["error", "throw", "bad-json", "legacy", "wrong-binding"]) {
+  behavior = mode; const result = await invoke("dictation:testConnection");
+  assert.equal(result.ok, false, mode); assert.equal(getStatus().available, false, mode);
+  assert.equal(verifications.has("desktop_stt"), false, mode);
+  assert.ok(!JSON.stringify(result).includes(credential));
+}
+behavior = "success"; assert.equal((await invoke("dictation:testConnection")).ok, true);
+assert.equal(invoke("dictation:saveEnabled", false).ok, true); assert.equal(getStatus().available, false);
+assert.equal(setup.aiSttModel, "whisper-1", "OFF preserves the model");
+assert.equal(invoke("dictation:saveEnabled", true).ok, true);
+const reopened = createService({ getDatabase: () => database, assertUnlocked: () => {}, assertCapability: () => {} });
+assert.equal(reopened.getStatus().available, true, "New service instance reads the persisted opt-in/evidence");
+failPreferenceWrite = true;
+assert.equal(invoke("dictation:saveEnabled", false).ok, false, "Failed persistence cannot claim OFF was saved");
+failPreferenceWrite = false; assert.equal(getStatus().available, true);
+const oldCredential = credential; credential = "changed-fixture-key";
+assert.equal(getStatus().ready, false, "Same key-presence flag does not hide credential rotation");
+credential = oldCredential; assert.equal(getStatus().ready, false, "Restoring an old key cannot restore withdrawn evidence");
+assert.equal((await invoke("dictation:testConnection")).ok, true);
+assert.equal(invoke("dictation:saveEnabled", true).ok, true);
+behavior = "wait";
+const staleTest = invoke("dictation:testConnection");
+setup = { ...setup, aiSttModel: "gpt-4o-transcribe" };
+getStatus(); assert.equal(pending.signal.aborted, true, "Saved model change aborts in-flight audio verification");
+pending.resolve({ status: 200, body: '{"ok":true,"text":"","stt_configuration":"late"}' });
+assert.equal((await staleTest).ok, false); assert.equal(verifications.has("desktop_stt"), false);
+setup = { ...setup, aiSttModel: "whisper-1" }; behavior = "success";
+assert.equal((await invoke("dictation:testConnection")).ok, true);
+assert.equal(getStatus().enabled, false, "New evidence cannot reactivate an old opt-in, even for the same model");
+assert.equal(invoke("dictation:saveEnabled", true).ok, true);
 assert.ok(!JSON.stringify(getStatus()).includes(setup.syncSecret));
 const valid = input(); gates.length = 0;
 assert.equal((await invoke("dictation:transcribe", valid)).text, "Düzenlenebilir metin");
 assert.deepEqual(gates.slice(0, 3), ["unlocked", "service.ai", "setup"]);
-for (const deny of ["lock", "capability", "model", "disabled", "key", "http", "userinfo", "query", "no-secret", "provider", "provider-url"]) {
+for (const deny of ["lock", "capability", "model", "disabled", "key", "http", "userinfo", "query", "no-secret", "provider", "provider-url", "web-off", "unpublished"]) {
   const previous = { ...setup }, count = uploadCount;
   if (deny === "lock") locked = true;
   if (deny === "capability") ai = false;
@@ -106,11 +170,17 @@ for (const deny of ["lock", "capability", "model", "disabled", "key", "http", "u
   if (deny === "no-secret") setup.syncSecret = "";
   if (deny === "provider") setup.aiService = "custom";
   if (deny === "provider-url") setup.aiBaseUrl = "https://proxy.example/v1";
+  if (deny === "web-off") setup.autoSyncEnabled = false;
+  if (deny === "unpublished") setup.aiLastPublishedAt = "";
   assert.equal(getStatus().available, false, deny);
   const result = await invoke("dictation:transcribe", valid);
   assert.equal(result.ok, false, deny); assert.equal(uploadCount, count, deny);
   assert.ok(!JSON.stringify(result).includes("raw-secret"));
   locked = false; ai = true; setup = previous;
+  if (!getStatus().ready) {
+    assert.equal((await invoke("dictation:testConnection")).ok, true);
+    assert.equal(invoke("dictation:saveEnabled", true).ok, true);
+  }
 }
 for (const patch of [{ audioBase64: "" }, { audioBase64: "____" }, { audioBase64: "AAAA====" }, { audioBase64: "AQ==", mimeType: "audio/webm" }, { mimeType: "image/png" }, { mimeType: "audio/webm;codecs=opus" }, { id: "short" }, { audioBase64: "a".repeat(4 * Math.ceil((5 * 1024 * 1024 + 5) / 3)) }]) {
   const count = uploadCount; assert.equal((await invoke("dictation:transcribe", input(patch))).ok, false); assert.equal(uploadCount, count);
@@ -174,7 +244,7 @@ Object.assign(context, { Blob, Uint8Array, DOMException, queueMicrotask, btoa, c
 runInContext(`(${installDictationMock.toString()})()`, context);
 const { createDesktopDictationSession: createSession, supportedRecordingMime } = load("apps/desktop-app/src/app/desktop-dictation-session.ts");
 const media = context.__dictationMock;
-const rendererStatus = { available: true, revision: 1, message: "fixture ready" };
+const rendererStatus = { available: true, enabled: true, ready: true, canTest: true, revision: 1, message: "fixture ready" };
 const rendererUploads = [], cancelledIds = [];
 let rendererPending;
 let rendererBehavior = "success", snapshot;

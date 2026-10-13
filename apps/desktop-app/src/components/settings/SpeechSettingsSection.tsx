@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getDesktopTts } from "../../app/tts/desktop-tts";
-import { readTtsPreferences, TTS_PREFERENCES_CHANGED } from "../../tts-preferences";
+import { readTtsPreferences } from "../../tts-preferences";
 import type { useTtsSettings } from "../../app/use-tts-settings";
 import { ActionButton } from "../ui/ActionButton";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
@@ -13,16 +13,10 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
   const [snapshot, setSnapshot] = useState(() => adapter.getSnapshot());
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
-  const [committedEnabled, setCommittedEnabled] = useState(() => readTtsPreferences().enabled);
   const mounted = useRef(false);
   const previewActive = useRef(false);
   const { preferences, change } = controller;
-
-  useEffect(() => {
-    const update = () => setCommittedEnabled(readTtsPreferences().enabled);
-    window.addEventListener(TTS_PREFERENCES_CHANGED, update);
-    return () => window.removeEventListener(TTS_PREFERENCES_CHANGED, update);
-  }, []);
+  const committedEnabled = controller.savedPreferences.enabled;
 
   useEffect(() => {
     mounted.current = true;
@@ -40,7 +34,7 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
   const visibleVoices = snapshot.voices.filter(voice => !preferences.language || voice.language === preferences.language);
   const status = snapshot.state === "discovering" ? "Yerel sesler aranıyor…"
     : snapshot.state === "available" ? `${snapshot.voices.length} yerel ses`
-      : snapshot.error?.message ?? "Sistem konuşma motoru kullanılamıyor.";
+      : snapshot.state === "unavailable" ? "Yerel ses yok" : "Motor kullanılamıyor";
 
   async function testVoice() {
     if (previewActive.current || !preferences.enabled || !readTtsPreferences().enabled) return;
@@ -58,12 +52,11 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
         : preferences.volume === 0 ? "Ses düzeyi 0: sessiz deneme tamamlandı." : "Ses denemesi tamamlandı.");
   }
 
-  return <ServiceSettingsCard id="settings-speech" title="Konuşma ve Yazma" enabled status={preferences.enabled ? status : "Seslendirme kapalı"} disabled={disabled}>
-    <p>Bu masaüstündeki uygulamaya özeldir. Kaydet ile uygulanır; Sesi Dene taslağı kullanır.</p>
-    <label className="form-check"><input type="checkbox" checked={preferences.enabled} disabled={disabled || testing}
-      onChange={event => change({ ...preferences, enabled: event.target.checked })} />Seslendirme etkin</label>
-    <p>Hoparlör, bu tercih kaydedildiğinde ve yerel ses bulunduğunda görünür. Metin yalnız Seslendir ile okunur. Kapalıyken kamera güvenlik bipleri devam eder.</p>
-    {preferences.enabled && !committedEnabled && <p role="status">Seslendirmeyi açmak için önce Kaydet seçin.</p>}
+  return <ServiceSettingsCard id="settings-speech" title="Metin Seslendirme" enabled={preferences.enabled}
+    status={preferences.enabled ? status : "Kapalı"} disabled={disabled} toggleLabel="Seslendirme etkin"
+    onEnabledChange={enabled => { if (!enabled && previewActive.current) adapter.cancel(); change({ ...preferences, enabled }); }}
+    feedback={controller.error && <p role="alert">{controller.error}</p>}>
+    {preferences.enabled && !committedEnabled && <small>Etkinleştirmek için Kaydet seçin.</small>}
     <fieldset className="settings-resource-fields" disabled={disabled || testing}>
       <div className="form-grid">
         <div className="form-field"><span>Konuşma motoru</span><strong>{snapshot.engineName}</strong></div>
@@ -95,17 +88,15 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
         </label>
       </div>
     </fieldset>
-    {!snapshot.features.pitch && <small>Sistem motoru ton desteğini bildirmiyor.</small>}
-    {selection.voice && <p role="status">Kullanılacak ses: {selection.voice.name} · {selection.voice.language}
-      {selection.preferredVoiceMissing && ". Kayıtlı ses bulunamadı; kullanılabilir yerel sese dönüldü."}
-      {selection.languageFallback && ". İstenen dilde yerel ses yok; bu sesin dili kullanılacak."}
-    </p>}
+    {selection.voice && <small>Ses: {selection.voice.name} · {selection.voice.language}
+      {selection.preferredVoiceMissing && " · Kayıtlı ses bulunamadı"}
+      {selection.languageFallback && " · Dil için yedek ses"}
+    </small>}
     <div className="settings-inline-actions">
       <ActionButton type="button" variant="secondary" disabled={disabled || testing} onClick={() => adapter.refresh()}>Sesleri Yenile</ActionButton>
       <ActionButton type="button" variant="secondary" disabled={disabled || testing || !preferences.enabled || !committedEnabled || !selection.voice} onClick={() => { void testVoice(); }}>Sesi Dene</ActionButton>
       {testing && <ActionButton type="button" variant="secondary" onClick={() => adapter.cancel()}>Sesi Durdur</ActionButton>}
     </div>
     {message && <p role="status">{message}</p>}
-    {controller.error && <p role="alert">{controller.error}</p>}
   </ServiceSettingsCard>;
 }

@@ -98,6 +98,18 @@ try {
     code_is(ya_stt_transcribe($config, $root . '/large.wav', $transport), 413, 'audio_too_large');
     check($transportCalls === 0, 'all invalid input fails before provider');
 
+    $binding = hash('sha256', json_encode([$config['provider'], $config['service'], $config['base_url'],
+        $config['stt_model'], $config['api_key'], $config['timeout_seconds']], JSON_UNESCAPED_SLASHES));
+    foreach (['changed', str_repeat('a', 64)] as $wrong) {
+        code_is(ya_stt_transcribe($config, $wav, $transport, $wrong), 409, 'stt_configuration_changed');
+    }
+    foreach (['service' => 'gemini', 'stt_model' => 'whisper-1', 'api_key' => 'changed-fixture-key', 'timeout_seconds' => 30] as $key => $value) {
+        check(ya_stt_transcribe([...$config, $key => $value], $wav, $transport, $binding)['status'] >= 400, 'stale config cannot verify');
+    }
+    check($transportCalls === 0, 'stale test fails before any billed provider request');
+    $verified = ya_stt_transcribe($config, $wav, $transport, $binding);
+    check($verified['status'] === 200 && $verified['payload']['stt_configuration'] === $binding, 'actual audio response binds saved config');
+
     foreach (ya_stt_models('openai') as $model) {
         $result = ya_stt_transcribe([...$config, 'stt_model' => $model], $wav, $transport);
         check($result === ['status' => 200, 'payload' => ['ok' => true, 'text' => 'Merhaba dünya.']], 'clean editable text only');

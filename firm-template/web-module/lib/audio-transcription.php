@@ -39,6 +39,7 @@ function ya_stt_failure(int $status, string $code): array
         'ai_capability_disabled', 'ai_disabled' => 'AI konuşma tanıma işletme ayarlarında kapalı.',
         'stt_not_configured' => 'Bir konuşma tanıma modeli seçip ayarları yayınlayın.',
         'stt_configuration_invalid' => 'Konuşma tanıma sağlayıcı ayarları desteklenmiyor.',
+        'stt_configuration_changed' => 'Kayıtlı STT ayarlarının web yayını bekleniyor.',
         'audio_too_large' => 'Ses dosyası en fazla 5 MB olabilir.',
         'unsupported_audio_type' => 'Ses dosyasının biçimi bu sağlayıcıda desteklenmiyor.',
         'invalid_audio' => 'Ses dosyası okunamadı.',
@@ -108,7 +109,7 @@ function ya_stt_audio_format(string $path, string $service): ?array
 }
 
 /** Transport seam is server-owned, only used by mocked tests. No client override. */
-function ya_stt_transcribe(array $config, string $path, ?callable $transport = null): array
+function ya_stt_transcribe(array $config, string $path, ?callable $transport = null, ?string $expectedConfiguration = null): array
 {
     if (($config['enabled'] ?? false) !== true) return ya_stt_failure(422, 'ai_disabled');
     $service = $config['service'] ?? '';
@@ -124,6 +125,10 @@ function ya_stt_transcribe(array $config, string $path, ?callable $transport = n
     }
     $timeout = $config['timeout_seconds'] ?? 30;
     if (!is_int($timeout) || $timeout < 5 || $timeout > 120) return ya_stt_failure(422, 'stt_configuration_invalid');
+    // Desktop's explicit connection test must prove the saved provider/model/key, not a stale host config.
+    $binding = hash('sha256', json_encode([$config['provider'], $service, rtrim($baseUrl, '/'), $model, $key, $timeout], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    if ($expectedConfiguration !== null && (preg_match('/^[a-f0-9]{64}$/D', $expectedConfiguration) !== 1
+        || !hash_equals($binding, $expectedConfiguration))) return ya_stt_failure(409, 'stt_configuration_changed');
     if (!is_file($path) || !is_readable($path)) return ya_stt_failure(422, 'invalid_audio');
     clearstatcache(true, $path);
     $size = filesize($path);
@@ -193,7 +198,8 @@ function ya_stt_transcribe(array $config, string $path, ?callable $transport = n
         }
         $text = trim((string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', strip_tags($text)));
         $text = str_replace($key, '[gizlendi]', $text);
-        return ['status' => 200, 'payload' => ['ok' => true, 'text' => $text]];
+        return ['status' => 200, 'payload' => ['ok' => true, 'text' => $text]
+            + ($expectedConfiguration !== null ? ['stt_configuration' => $binding] : [])];
     } catch (Throwable) {
         return ya_stt_failure(502, 'provider_failed');
     }

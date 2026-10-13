@@ -5,9 +5,6 @@ import type { DesktopAndroidInstallationSnapshot } from "../../../electron/andro
 import type { SetupFormState } from "../../app/setup-model";
 import { AndroidDevicesSection } from "./AndroidDevicesSection";
 type SyncState = "idle" | "loading" | "success" | "error";
-import { AiSettingsSection } from "./AiSettingsSection";
-import { DesktopDictationSetup } from "./DesktopDictationSetup";
-import { WebSettingsSection } from "./WebSettingsSection";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 export interface ServicesSettingsProps {
   form: SetupFormState;
@@ -40,10 +37,7 @@ export function ServicesSettingsSection({
   androidDeviceState = "idle",
   androidInstallState = "idle",
   androidInstallSnapshot = null,
-  aiConnectionTestState,
-  aiConnectionTestMessage,
   onFormChange,
-  onTestAiConnection,
   onRefreshAndroidInstallDevices,
   onInstallAndroidApp,
   onProvisionAndroidApp,
@@ -67,7 +61,6 @@ export function ServicesSettingsSection({
 
   return (
         <div id="settings-connections" className="settings-services-workspace">
-          <WebSettingsSection form={form} onFormChange={onFormChange} />
 
           {isBusinessServiceAvailable("whatsapp", enabledCapabilities) && (
           <ServiceSettingsCard id="settings-whatsapp" title="WhatsApp" enabled={form.whatsappEnabled} onEnabledChange={enabled => update("whatsappEnabled", enabled)}>
@@ -100,7 +93,9 @@ export function ServicesSettingsSection({
           )}
 
           {isBusinessServiceAvailable("android", enabledCapabilities) && (
-          <ServiceSettingsCard id="settings-android" title="Android" enabled={form.androidEnabled} onEnabledChange={enabled => update("androidEnabled", enabled)}>
+          <ServiceSettingsCard id="settings-android" title="Android" enabled={form.androidEnabled}
+            status={`${form.androidEnabled !== setupData.servicePreferences.android ? (form.androidEnabled ? "Etkinleştirilecek" : "Kapatılacak") : form.androidEnabled ? "Etkin" : "Kapalı"} · ${(dashboardData?.androidDevices ?? []).filter(device => device.isActive && !device.revokedAt).length} etkin cihaz`}
+            onEnabledChange={enabled => update("androidEnabled", enabled)}>
               <div className="form-stack">
                 <div className="form-stack">
                   <label className="form-check setup-checkline">
@@ -166,18 +161,6 @@ export function ServicesSettingsSection({
           </ServiceSettingsCard>
           )}
 
-          {isBusinessServiceAvailable("ai", enabledCapabilities) && (
-          <DesktopDictationSetup />
-          )}
-          {isBusinessServiceAvailable("ai", enabledCapabilities) && (
-          <AiSettingsSection
-            form={form}
-            onFormChange={onFormChange}
-            onTestAiConnection={onTestAiConnection}
-            aiConnectionTestState={aiConnectionTestState}
-            aiConnectionTestMessage={aiConnectionTestMessage}
-          />
-          )}
         </div>
   );
 }

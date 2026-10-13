@@ -1108,8 +1108,16 @@ export class DesktopDatabase {
     return readServiceVerification(this.db, service);
   }
 
+  getServiceSettingsVerificationTime(service: TestedSettingsService): string {
+    return String(this.db.prepare("SELECT tested_at FROM service_settings_verifications WHERE service = ?").get(service)?.tested_at ?? "");
+  }
+
   recordServiceSettingsVerification(service: TestedSettingsService, config: Record<string, unknown>): void {
     recordServiceVerification(this.db, service, serviceConfigFingerprint(config));
+  }
+
+  clearServiceSettingsVerification(service: TestedSettingsService): void {
+    this.db.prepare("DELETE FROM service_settings_verifications WHERE service = ?").run(service);
   }
 
   markAiSettingsPublished(timestamp: string): DesktopSetupData {

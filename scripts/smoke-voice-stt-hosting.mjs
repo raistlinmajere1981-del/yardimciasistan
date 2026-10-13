@@ -3,6 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { activateFixtureSource, publicationEnvelope } from "./test-helpers/publication-protocol.mjs";
@@ -24,9 +25,9 @@ try {
   // authorization, config loader, cleanup and durable publication all run unchanged.
   const endpointPath = join(hosting, "api/audio-transcribe.php");
   const endpoint = readFileSync(endpointPath, "utf8");
-  const call = "ya_stt_transcribe(is_array($config) ? $config : [], $upload['tmp_name'])";
+  const call = "ya_stt_transcribe(is_array($config) ? $config : [], $upload['tmp_name'], null, $expectedConfiguration)";
   assert.equal(endpoint.split(call).length, 2);
-  writeFileSync(endpointPath, endpoint.replace(call, "ya_stt_transcribe(is_array($config) ? $config : [], $upload['tmp_name'], require __DIR__ . '/../stt-provider-fixture.php')"));
+  writeFileSync(endpointPath, endpoint.replace(call, "ya_stt_transcribe(is_array($config) ? $config : [], $upload['tmp_name'], require __DIR__ . '/../stt-provider-fixture.php', $expectedConfiguration)"));
   writeFileSync(join(hosting, "stt-provider-fixture.php"), `<?php
 return static function (string $url, array $options): array {
     $count = __DIR__ . '/provider-call-count';
@@ -108,6 +109,13 @@ return static function (string $url, array $options): array {
   const applied = await publish({});
   assert.equal(applied.ok, true, applied.message);
   assert.equal(applied.stt_model, settings.sttModel);
+  const binding = createHash("sha256").update(JSON.stringify([settings.provider, settings.service, settings.baseUrl,
+    settings.sttModel, settings.apiKey, settings.timeoutSeconds])).digest("hex");
+  const verified = await request({ headers: { "X-YA-STT-Configuration": binding } });
+  assert.equal(verified.response.status, 200); assert.equal(verified.body.stt_configuration, binding);
+  const callsBeforeMismatch = readFileSync(join(hosting, "provider-call-count"), "utf8");
+  assert.equal((await request({ headers: { "X-YA-STT-Configuration": "a".repeat(64) } })).response.status, 409);
+  assert.equal(readFileSync(join(hosting, "provider-call-count"), "utf8"), callsBeforeMismatch, "stale audio test never calls provider");
   const deviceId = "android-voice-fixture";
   const issueToken = () => {
     const issued = spawnSync("php", ["-r", "require $argv[1]; echo ya_android_auth_issue_token($argv[2]);",

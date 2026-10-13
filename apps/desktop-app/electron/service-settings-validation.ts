@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
-export type TestedSettingsService = "ai" | "web" | "aras" | "whatsapp_cloud" | "sms" | "instagram" | "kbs" | "google_reviews";
+export type TestedSettingsService = "ai" | "desktop_stt" | "web" | "aras" | "whatsapp_cloud" | "sms" | "instagram" | "kbs" | "google_reviews";
 
 /** Main-only evidence: never accept a renderer supplied success flag or fingerprint. */
 export function serviceConfigFingerprint(config: Record<string, unknown>): string {

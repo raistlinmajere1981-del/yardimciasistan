@@ -145,7 +145,10 @@ try {
   assert.equal(db.getPendingSyncJobs("9999").some(job => job.jobKey === "ai_settings"), false);
   snapshot = db.getSetupData();
   assert.equal(snapshot.aiLastPublishedAt, "2026-10-06T00:00:00Z");
+  db.recordServiceSettingsVerification("desktop_stt", { audio: "fixture verified configuration" });
   assert.equal(save({ aiSttModel: "gpt-4o-transcribe" }).ok, true);
+  assert.equal(db.getSetupData().aiLastPublishedAt, "", "STT-only edits cannot reuse the previous publication timestamp");
+  assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "STT edits withdraw saved audio test evidence atomically");
   const newer = db.getPendingSyncJobs("9999").find(job => job.jobKey === "ai_settings");
   assert.ok(newer.sourceRevision > first.source_revision, "STT-only mutation invalidates publication");
   const previousPublished = db.getSetupData().aiLastPublishedAt;
@@ -156,6 +159,15 @@ try {
   onSend = null;
   assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
   assert.equal(sent.at(-1).ai_settings.stt_model, "gpt-4o-mini-transcribe");
+  const initialAutoSync = db.getSetupData().autoSyncEnabled;
+  for (const patch of [{ autoSyncEnabled: !initialAutoSync }, { autoSyncEnabled: initialAutoSync }, { webModuleUrl: "https://changed-host.example/module" },
+    { webModuleUrl: setup.webModuleUrl }, { syncSecret: "changed-web-fixture-secret" }, { syncSecret: setup.syncSecret }]) {
+    const transport = { ...db.getSetupData(), ...patch };
+    db.recordServiceSettingsVerification("web", { baseUrl: transport.webModuleUrl.replace(/\/+$/, ""), syncSecret: transport.syncSecret });
+    db.recordServiceSettingsVerification("desktop_stt", { audio: "fixture verified configuration" });
+    assert.equal(save(patch).ok, true);
+    assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "Web/activation changes withdraw audio evidence");
+  }
   assert.equal(save({ aiSttModel: "" }).ok, true);
   assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
   assert.equal(sent.at(-1).ai_settings.stt_model, "", "explicit OFF is published");

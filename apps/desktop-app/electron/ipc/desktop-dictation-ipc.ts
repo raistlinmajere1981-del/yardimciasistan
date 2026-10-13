@@ -11,6 +11,8 @@ export function registerDesktopDictationIpcHandlers(service: ReturnType<typeof c
     }
   };
   ipcMain.handle("dictation:getStatus", () => service.getStatus());
+  ipcMain.handle("dictation:saveEnabled", (_event, value: unknown) => service.saveEnabled(value));
+  ipcMain.handle("dictation:testConnection", event => { trackSender(event.sender); return service.testConnection(event.sender.id); });
   ipcMain.handle("dictation:transcribe", (event, input: unknown) => {
     trackSender(event.sender);
     return service.transcribe(event.sender.id, input);

@@ -15,22 +15,14 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     if (signature === acceptedSignature.current) return;
     beginTest();
     setAiConnectionTestState("idle");
-    setAiConnectionTestMessage(
-      setupForm.aiStoredApiKeyConfigured
-        ? "Bu sağlayıcının kayıtlı bağlantısı kullanılabilir."
-        : "Bağlantı henüz denenmedi."
-    );
+    setAiConnectionTestMessage("Bağlantı henüz denenmedi.");
   }, [beginTest, signature, setupForm.aiStoredApiKeyConfigured]);
 
   function invalidate() {
     acceptedSignature.current = "";
     beginTest();
     setAiConnectionTestState("idle");
-    setAiConnectionTestMessage(
-      setupForm.aiStoredApiKeyConfigured
-        ? "Bu sağlayıcının kayıtlı bağlantısı kullanılabilir."
-        : "Bağlantı henüz denenmedi."
-    );
+    setAiConnectionTestMessage("Bağlantı henüz denenmedi.");
   }
 
   async function testAiConnection() {

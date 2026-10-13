@@ -45,7 +45,9 @@ try {
                 $result = ya_stt_failure(422, 'invalid_audio');
             } else {
                 $config = require dirname(__DIR__) . '/config/ai.php';
-                $result = ya_stt_transcribe(is_array($config) ? $config : [], $upload['tmp_name']);
+                $expectedConfiguration = ($_POST['source'] ?? '') === 'desktop'
+                    ? ($_SERVER['HTTP_X_YA_STT_CONFIGURATION'] ?? null) : null;
+                $result = ya_stt_transcribe(is_array($config) ? $config : [], $upload['tmp_name'], null, $expectedConfiguration);
             }
         }
     }

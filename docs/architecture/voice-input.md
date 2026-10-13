@@ -103,13 +103,32 @@ and auth-header capture disabled; application code cannot control upstream traci
 
 `SpeechTextField` reuses existing field draft owners in the marketing instruction
 and share-text editors. Its microphone appears only after main reports an unlocked
-session, persisted `service.ai`, a saved supported STT model/provider and usable
-HTTPS Hosting configuration from `getWebSyncConfig`. Draft Settings never enable
-capture. Local MediaRecorder support and a secure context are also required.
+session, persisted `service.ai`, a saved supported STT model/provider, enabled web
+sync, usable HTTPS Hosting configuration from `getWebSyncConfig`, matching successful
+audio-test evidence and the saved Desktop opt-in. Draft Settings never enable capture.
+Local MediaRecorder support and a secure context are also required.
 Electron grants explicit audio-only media requests only to its trusted Desktop
 window with the same saved gates; camera checks remain independent. Microphone
-permissions are not logged. Services explains setup; its existing Save/Discard
-owns the STT choice.
+permissions are not logged. Services' existing Save/Discard owns both the provider
+model draft and the independent Desktop activation resource. `desktop-dictation.json`
+beside the Desktop database stores only version, boolean opt-in and configuration
+fingerprint bound to the successful verification timestamp; main reads and atomically
+replaces it. Default is OFF. Each new successful test requires an explicit opt-in Save.
+This device preference neither changes SQLite schema nor publishes Android activation.
+
+“STT Bağlantısını Dene” explicitly sends one 250ms silent PCM WAV through the normal
+Hosting audio endpoint. It may be billed; there is no automatic probe or retry.
+Text/image AI tests never grant STT evidence. Main hashes the saved private provider,
+model, credentials and timeout; Hosting checks that binding before provider transport
+and returns it only after successful audio processing. A missing binding from an
+older Hosting endpoint fails verification. This proves model/audio access, not speech
+quality. The existing main-owned `service_settings_verifications` stores `desktop_stt`
+evidence bound also to AI activation/model choices and effective HTTPS web credentials.
+Settings changes withdraw evidence in the Setup transaction; an in-flight stale test
+cannot restore it. Failed explicit tests clear evidence. Capture/opt-in also require
+matching current configuration, while ordinary runtime failures preserve preferences.
+Turning Desktop dictation OFF preserves the per-provider STT model and Android's
+independent `voice.dictation` permission and readiness projection.
 
 Clicking Dikte Başlat explicitly requests microphone permission and records only
 audio with a runtime-supported WebM/Opus, Ogg/Opus or MP4 MIME. Only Durdur uploads;

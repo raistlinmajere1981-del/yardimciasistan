@@ -263,7 +263,8 @@ try {
       const delivery = document.querySelector('#settings-online-delivery');
       const previous = delivery.parentElement.previousElementSibling.getBoundingClientRect();
       const productRect = product.getBoundingClientRect();
-      const nextRect = product.nextElementSibling.getBoundingClientRect();
+      const cards = [...document.querySelectorAll('.settings-category-body .settings-service-card')];
+      const nextRect = cards[cards.indexOf(product) + 1].getBoundingClientRect();
       return {
         columns: Math.abs(fields[0].top - fields[1].top) < 1 ? 2 : 1,
         headerFields: [...aras.querySelectorAll('.settings-service-card-header input:not([type="checkbox"]), .settings-service-card-header select')].length,

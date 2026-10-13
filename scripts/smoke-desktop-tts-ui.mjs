@@ -37,7 +37,7 @@ try {
   await tab("Servisler").click();
   await expect(panel).toBeVisible();
   await expect(panel).toContainText("Yerel sesler aranıyor");
-  await expect(panel).toContainText("Yerel ses bulunamadı");
+  await expect(panel).toContainText("Yerel ses yok");
   await expect(panel.getByRole("button", { name: "Sesi Dene", exact: true })).toBeDisabled();
   await ui.evaluate(voices => window.__ttsVoices(voices), voices);
   await expect(panel).toContainText("3 yerel ses");
@@ -160,6 +160,20 @@ try {
   assert.deepEqual(camera.synthesisErrorBeep, [300, 220]);
   assert.deepEqual(camera.cancelledBeep, []);
   assert.ok(camera.gains.includes(0.14) && camera.gains.includes(0.22));
+  await panel.getByRole("checkbox", { name: "Seslendirme etkin", exact: true }).uncheck();
+  await expect(panel.locator(".settings-service-card-body")).toHaveCount(0);
+  await save();
+  const disabledCamera = await ui.evaluate(async () => {
+    const { announceIdentityCamera } = await import("/src/app/identity-camera-feedback.ts");
+    window.__ttsMock.beeps = [];
+    const spoken = window.__ttsMock.spoken.length;
+    announceIdentityCamera("İşlem tamam.", "success");
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return { beeps: window.__ttsMock.beeps, spoken: window.__ttsMock.spoken.length - spoken,
+      preferences: JSON.parse(localStorage.getItem("yardimci-asistan.desktop-tts")) };
+  });
+  assert.equal(disabledCamera.spoken, 0); assert.deepEqual(disabledCamera.beeps, [660, 840]);
+  assert.equal(disabledCamera.preferences.voiceId, secondVoice); assert.equal(disabledCamera.preferences.volume, 60);
   assert.deepEqual(errors, []);
   console.log("desktop-tts-ui-smoke-ok: preview, persistence/reload, category guards, missing voices, camera signals");
 } finally {

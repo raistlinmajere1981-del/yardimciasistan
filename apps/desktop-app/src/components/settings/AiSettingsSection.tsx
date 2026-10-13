@@ -7,7 +7,7 @@ import { aiServicePresets, isAiServiceProfileStored, selectAiService, type Setup
 import type { ServicesSettingsProps } from "./ServicesSettingsSection";
 import { ActionButton } from "../ui/ActionButton";
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
-export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiConnectionTestState, aiConnectionTestMessage }: Pick<ServicesSettingsProps, "form" | "onFormChange" | "onTestAiConnection" | "aiConnectionTestState" | "aiConnectionTestMessage">) {
+export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiConnectionTestState, aiConnectionTestMessage, savedEnabled = form.aiEnabled }: Pick<ServicesSettingsProps, "form" | "onFormChange" | "onTestAiConnection" | "aiConnectionTestState" | "aiConnectionTestMessage"> & { savedEnabled?: boolean }) {
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
   };
@@ -124,7 +124,9 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
 
   return (
         <>{confirmDialog}<ServiceSettingsCard id="settings-ai" title="AI Yardımcı" className="setup-ai-section" enabled={form.aiEnabled}
-          status={form.aiEnabled ? (form.aiStoredApiKeyConfigured ? "Hazır" : "Etkin · anahtar bekliyor") : "Kapalı"}
+          status={`${form.aiEnabled !== savedEnabled ? (form.aiEnabled ? "Etkinleştirilecek" : "Kapatılacak") : form.aiEnabled ? "Etkin" : "Kapalı"} · ${aiConnectionTestState === "success" ? "Metin/görsel bağlantısı doğrulandı"
+            : aiConnectionTestState === "error" ? "Bağlantı doğrulanmadı"
+              : (form.aiApiKey || form.aiGoogleCurl || (form.aiStoredApiKeyConfigured && !form.clearAiApiKey)) ? "Anahtar mevcut" : "Anahtar gerekli"}`}
           onEnabledChange={enabled => update("aiEnabled", enabled)}>
           <div className="form-grid">
             <div className="setup-ai-provider-row form-field--span">
@@ -231,14 +233,10 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               <select aria-label="Konuşma tanıma modeli (STT)" value={form.aiSttModel}
                 onChange={(event) => update("aiSttModel", event.target.value)}
                 disabled={!form.aiEnabled || sttModelOptions(form.aiService).length === 0}>
-                <option value="">Kapalı / seçilmedi</option>
+                <option value="">Model seçilmedi</option>
                 {sttModelOptions(form.aiService).map(model => <option value={model} key={model}>{model === "gemini-3.6-flash" ? "Gemini 3.6 Flash (önerilen)" : model === "gemini-2.5-flash" ? "Gemini 2.5 Flash (eski hesaplar)" : model}</option>)}
               </select>
-              <small>{sttModelOptions(form.aiService).length === 0
-                ? "Bu sağlayıcının konuşma tanıma desteği bu sürümde doğrulanmadı."
-                : form.aiService === "gemini"
-                  ? "Gemini ses girdisini metne çevirir. Model erişimi Google hesabınıza bağlıdır; tüm sohbet modelleri ses desteklemez."
-                  : "Ses yalnız kullanıcı başlattığında gönderilir. Sonuç düzenlenebilir metindir; komut çalıştırmaz."}</small>
+              {sttModelOptions(form.aiService).length === 0 && <small>Sağlayıcının STT desteği yok.</small>}
             </label>
             <label className="form-field form-field--short">
               Yanıt bekleme süresi (saniye)

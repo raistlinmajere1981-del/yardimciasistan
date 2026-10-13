@@ -64,7 +64,7 @@ try {
     await provider.selectOption(service);
     await expect(stt).toBeDisabled();
     await expect(stt).toHaveValue("");
-    await expect(ai.getByText("Bu sağlayıcının konuşma tanıma desteği bu sürümde doğrulanmadı.", { exact: true })).toBeVisible();
+    await expect(ai.getByText("Sağlayıcının STT desteği yok.", { exact: true })).toBeVisible();
   }
   await discard.click();
   await expect(provider).toHaveValue("openai");

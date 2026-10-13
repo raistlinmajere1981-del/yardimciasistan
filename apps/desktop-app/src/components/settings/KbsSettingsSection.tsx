@@ -8,6 +8,7 @@ import {
 import type { SettingsOperationResult } from "../../app/settings-save";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
+import { ServiceSettingsCard } from "./ServiceSettingsCard";
 
 const EGM_KBS_PORTAL_URL = "https://kbs.egm.gov.tr";
 
@@ -296,31 +297,15 @@ export function KbsSettingsSection({
   }
 
   return (
-    <section id="settings-kbs" tabIndex={-1} className={`settings-service-card${draft.enabled ? " is-enabled" : " is-disabled"}`} aria-busy={loading || saving || testing}>
-      <div className="settings-service-card-header">
-        <div>
-          <strong>Kimlik Bildirim Sistemi (KBS)</strong>
-          <span>{draft.enabled ? (draft.provider === "egm" ? "Emniyet" : "Jandarma") : "Kapalı"}</span>
-        </div>
-        <label className="settings-service-toggle">
-          <input
-            aria-label="Kimlik Bildirim Sistemi servisi"
-            type="checkbox"
-            checked={draft.enabled}
-            disabled={loading || saving || testing || disabled}
-            onChange={(event) => update("enabled", event.target.checked)}
-          />
-          <span>{draft.enabled ? "Açık" : "Kapalı"}</span>
-        </label>
-      </div>
-
-      {draft.enabled && (
-        <fieldset className="settings-service-card-body form-stack" disabled={loading || saving || testing || disabled}>
+    <ServiceSettingsCard id="settings-kbs" title="Kimlik Bildirim Sistemi (KBS)" enabled={draft.enabled}
+      disabled={loading || saving || testing || disabled} toggleAriaLabel="Kimlik Bildirim Sistemi servisi"
+      status={loading ? "Yükleniyor…" : draft.enabled ? (draft.provider === "egm" ? "Etkin · Emniyet" : "Etkin · Jandarma") : "Kapalı"}
+      onEnabledChange={enabled => { update("enabled", enabled); if (!enabled) setWebLoginOpen(false); }}
+      feedback={feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}>
           <p className="settings-service-empty">
             Konaklayan misafirlerin giriş, çıkış ve oda değişikliği bildirimlerini resmi KBS altyapısına iletmek için kullanılır.
           </p>
 
-          {feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}
 
           <div className="form-grid">
             <label className="form-field form-field--medium">
@@ -439,8 +424,6 @@ export function KbsSettingsSection({
               />
             </div>
           )}
-        </fieldset>
-      )}
-    </section>
+    </ServiceSettingsCard>
   );
 }

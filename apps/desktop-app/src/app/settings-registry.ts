@@ -77,7 +77,8 @@ export const instagramProviderDefinition = {
 } as const satisfies SettingsSectionDefinition;
 
 export const settingsSections: readonly SettingsSectionDefinition[] = [
-  { id: "settings-speech", category: "services", title: "Konuşma ve Yazma", keywords: "ses tts konuşma yerel sistem dil hız ton volume", persistence: "resource", visible: (_, initialized) => initialized },
+  { id: "settings-speech", category: "services", title: "Metin Seslendirme", keywords: "ses tts konuşma yerel sistem dil hız ton volume", persistence: "resource", visible: (_, initialized) => initialized },
+  { id: "settings-dictation", category: "services", title: "Konuşmadan Metne", keywords: "stt masaüstü dikte mikrofon ses model bağlantı testi", persistence: "resource", visible: (_, initialized) => initialized },
   smsProviderDefinition, instagramProviderDefinition,
   { id: "settings-business", category: "business", title: "İşletme", keywords: "firma adı sektör tipi telefon whatsapp e-posta adres", persistence: "staged" },
   { id: "settings-options", category: "business", title: "Ek özellikler", keywords: "yetenek talepler oda masa rezervasyonları qr menü stok veresiye müşteri hesabı satın alma tedarikçi etiket", persistence: "staged" },
@@ -94,7 +95,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-kbs", category: "services", title: "Kimlik Bildirim Sistemi", keywords: "kbs emniyet jandarma kimlik bildirim tesis kodu egmsec konaklayan", persistence: "resource", visible: (caps, initialized) => initialized && isBusinessServiceAvailable("kbs", caps) },
   { id: "settings-devices", category: "services", title: "Telefon Kurulumu", keywords: "android usb cihaz eşleme rol izin görev kur kaldır", persistence: "action", visible: (caps, initialized) => initialized && caps.includes(C.ANDROID) },
   { id: "settings-product-data", category: "services", title: "Ürün Verisi", keywords: "barkod open food facts sağlayıcı görseller otomatik ara", persistence: "staged", visible: caps => isBusinessServiceAvailable("productData", caps) },
-  { id: "settings-web", category: "services", title: "Web Modülü", keywords: "eşitleme adres güvenlik anahtarı otomatik", persistence: "staged" },
+  { id: "settings-web", category: "services", title: "Website / Web Modülü", keywords: "eşitleme adres güvenlik anahtarı otomatik", persistence: "staged" },
   { id: "settings-web-test", category: "services", title: "Web Bağlantısını Dene", keywords: "bağlantı test", persistence: "action" },
   { id: "settings-ai", category: "services", title: "AI Yardımcı", keywords: "openai gemini google studio groq openrouter metin görsel üretim modeli otomatik api anahtarı zaman aşımı", persistence: "staged", visible: caps => isBusinessServiceAvailable("ai", caps) },
   { id: "settings-ai-test", category: "services", title: "AI Bağlantısını Dene", keywords: "model test", persistence: "action", visible: caps => isBusinessServiceAvailable("ai", caps) },
