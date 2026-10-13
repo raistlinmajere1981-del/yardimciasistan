@@ -199,3 +199,14 @@ parity), `smoke-voice-stt-hosting` and `smoke-voice-stt-publication`,
 Android native dictation/voice Java tests, `testDebugUnitTest`, `assembleDebug`,
 `lintDebug`, Companion v3 smoke, TypeScript typecheck, strict lint and registry.
 Neither `verify:pre-main` nor real-device test is claimed complete.
+
+### Gemini STT provider compatibility (2026-10-13)
+
+Gemini 3.6 Flash was verified against the live Gemini REST API with a short
+synthetic WAV sample; the API returned HTTP 200 with a completed candidate.
+Gemini 3.8 Flash is listed but returned transient HTTP 503 during the check.
+Gemini 2.5 Flash is retained only for accounts with legacy access: Google's API
+reported it unavailable for new users. Hosting must prefer IPv4 for Gemini: the
+Google API returned a generic HTML 403 on the Hosting IPv6 egress, whereas
+IPv4 returned normal JSON API responses. The text/image AI models are unaffected.
+These tests do not establish actual speech transcription quality.

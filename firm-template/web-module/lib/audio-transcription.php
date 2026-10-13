@@ -10,7 +10,7 @@ function ya_stt_models(string $service): array
 {
     return match ($service) {
         'openai' => ['gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'whisper-1'],
-        'gemini' => ['gemini-2.5-flash'],
+        'gemini' => ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-2.5-flash'],
         default => []
     };
 }
@@ -162,6 +162,9 @@ function ya_stt_transcribe(array $config, string $path, ?callable $transport = n
             CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_PROXY => '', CURLOPT_VERBOSE => false
         ];
+        // This Hosting IPv6 egress receives Google's HTML 403; the IPv4 route
+        // reaches the official JSON API. Keep OpenAI on its default network path.
+        if ($service === 'gemini') $options[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
         $response = ($transport ?? 'ya_stt_curl')($url, $options);
         if (!is_array($response) || ($response['error'] ?? 0) !== 0) {
             return ya_stt_failure(($response['error'] ?? 0) === CURLE_OPERATION_TIMEDOUT ? 504 : 502,

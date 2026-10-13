@@ -35,6 +35,7 @@ $transport = static function (string $url, array $options) use (&$transportCalls
     check(!str_contains($url, 'fixture-provider-key') && !str_contains($url, '?'), 'no key in URL');
     if (str_contains($url, 'openai.com')) {
         check($url === 'https://api.openai.com/v1/audio/transcriptions', 'real transcription path');
+        check(!isset($options[CURLOPT_IPRESOLVE]), 'OpenAI retains OS-selected networking');
         check(in_array('Authorization: Bearer fixture-provider-key', $options[CURLOPT_HTTPHEADER], true), 'OpenAI auth');
         check(!in_array('Content-Type: application/json', $options[CURLOPT_HTTPHEADER], true), 'curl owns multipart boundary');
         $body = $options[CURLOPT_POSTFIELDS];
@@ -43,7 +44,10 @@ $transport = static function (string $url, array $options) use (&$transportCalls
         check($body['file']->getPostFilename() === 'audio.wav' && count($body) === 3, 'safe filename and no chat payload');
         check(in_array($body['model'], ya_stt_models('openai'), true), 'known OpenAI model');
     } else {
-        check($url === 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', 'real Gemini path');
+        check(str_starts_with($url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-')
+            && str_ends_with($url, ':generateContent'), 'real Gemini path');
+        check(($options[CURLOPT_IPRESOLVE] ?? null) === CURL_IPRESOLVE_V4,
+            'Gemini uses IPv4 Google API route on Hosting');
         check(in_array('x-goog-api-key: fixture-provider-key', $options[CURLOPT_HTTPHEADER], true), 'Gemini header auth');
         $body = json_decode($options[CURLOPT_POSTFIELDS], true, 32, JSON_THROW_ON_ERROR);
         $inline = $body['contents'][0]['parts'][0]['inline_data'];
@@ -116,7 +120,7 @@ try {
     $response['body'] = '{"text":""}';
     check(ya_stt_transcribe($config, $wav, $transport)['payload']['text'] === '', 'silence allowed');
 
-    $gemini = [...$config, 'service' => 'gemini', 'base_url' => 'https://generativelanguage.googleapis.com/v1beta', 'stt_model' => 'gemini-2.5-flash'];
+    $gemini = [...$config, 'service' => 'gemini', 'base_url' => 'https://generativelanguage.googleapis.com/v1beta', 'stt_model' => 'gemini-3.6-flash'];
     $candidate = ['finishReason' => 'STOP', 'content' => ['parts' => [['thought' => true, 'text' => 'private reasoning'], ['text' => 'Ses '], ['text' => 'metni.']]]];
     $response['body'] = json_encode(['candidates' => [$candidate], 'usageMetadata' => ['secret' => 'fixture-provider-key']]);
     check(ya_stt_transcribe($gemini, $wav, $transport)['payload'] === ['ok' => true, 'text' => 'Ses metni.'], 'Gemini joins final text without thought/metadata');

@@ -13,7 +13,7 @@ export function imageGenerationModelOptions(service: string, models: readonly st
 export function sttModelOptions(service: string): readonly string[] {
   switch (service) {
     case "openai": return ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"];
-    case "gemini": return ["gemini-2.5-flash"];
+    case "gemini": return ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-2.5-flash"];
     default: return [];
   }
 }

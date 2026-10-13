@@ -34,11 +34,11 @@ try {
   await stt.selectOption("whisper-1");
   await provider.selectOption("gemini");
   await expect(stt).toHaveValue("");
-  expect(await stt.locator("option").evaluateAll(options => options.map(option => option.value))).toEqual(["", "gemini-2.5-flash"]);
+  expect(await stt.locator("option").evaluateAll(options => options.map(option => option.value))).toEqual(["", "gemini-3.6-flash", "gemini-3.8-flash", "gemini-2.5-flash"]);
   await ai.getByLabel("Google AI Studio API anahtarı veya cURL", { exact: true }).fill("fixture-ui-google-key");
   await ai.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).click();
   await expect(ai.locator("#settings-ai-test")).toHaveClass(/sync-success/);
-  await stt.selectOption("gemini-2.5-flash");
+  await stt.selectOption("gemini-3.6-flash");
   await provider.selectOption("openai");
   await expect(stt).toHaveValue("whisper-1");
   await expect(ai.getByLabel("Model adı", { exact: true })).toHaveValue("gpt-4.1");
@@ -57,7 +57,7 @@ try {
   await expect(discard).toBeDisabled();
   const profiles = await page.evaluate(() => window.settingsCalls.filter(call => call.kind === "setup").at(-1).input.aiProfiles);
   expect(profiles.find(profile => profile.service === "openai").sttModel).toBe("whisper-1");
-  expect(profiles.find(profile => profile.service === "gemini").sttModel).toBe("gemini-2.5-flash");
+  expect(profiles.find(profile => profile.service === "gemini").sttModel).toBe("gemini-3.6-flash");
   await stt.selectOption("gpt-4o-transcribe");
   await expect(discard).toBeEnabled();
   for (const service of ["groq", "openrouter", "custom"]) {
@@ -70,11 +70,11 @@ try {
   await expect(provider).toHaveValue("openai");
   await expect(stt).toHaveValue("whisper-1");
   await provider.selectOption("gemini");
-  await expect(stt).toHaveValue("gemini-2.5-flash");
+  await expect(stt).toHaveValue("gemini-3.6-flash");
   await stt.selectOption("");
   await discard.click();
   await provider.selectOption("gemini");
-  await expect(stt).toHaveValue("gemini-2.5-flash");
+  await expect(stt).toHaveValue("gemini-3.6-flash");
   await discard.click();
   await page.evaluate(() => window.reopenSettings());
   await services();

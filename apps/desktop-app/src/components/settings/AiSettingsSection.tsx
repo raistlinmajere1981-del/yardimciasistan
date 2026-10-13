@@ -232,7 +232,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                 onChange={(event) => update("aiSttModel", event.target.value)}
                 disabled={!form.aiEnabled || sttModelOptions(form.aiService).length === 0}>
                 <option value="">Kapalı / seçilmedi</option>
-                {sttModelOptions(form.aiService).map(model => <option value={model} key={model}>{model}</option>)}
+                {sttModelOptions(form.aiService).map(model => <option value={model} key={model}>{model === "gemini-3.6-flash" ? "Gemini 3.6 Flash (önerilen)" : model === "gemini-2.5-flash" ? "Gemini 2.5 Flash (eski hesaplar)" : model}</option>)}
               </select>
               <small>{sttModelOptions(form.aiService).length === 0
                 ? "Bu sağlayıcının konuşma tanıma desteği bu sürümde doğrulanmadı."
