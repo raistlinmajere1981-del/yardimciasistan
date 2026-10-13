@@ -44,6 +44,34 @@ public final class AndroidVoiceRulesTest {
     assertFalse(OperationData.fromJson(malformed, DEVICE).sttAvailable);
   }
 
+  @Test public void harmlessSnapshotRevisionDoesNotInterruptDictationButAuthorityChangesDo() throws Exception {
+    OperationData ready = parse(true, true, true, true, true);
+    String initial = AndroidVoiceRules.authorityIdentity(ready, DEVICE, "https://hosting.example", CREDENTIAL);
+    ready.serverRevision += 100;
+    ready.snapshotUpdatedAt = "later sync";
+    assertEquals(initial, AndroidVoiceRules.authorityIdentity(ready, DEVICE, "https://hosting.example", CREDENTIAL));
+
+    // Permission order is irrelevant; actual access changes must revoke the session.
+    ready.permissions.clear();
+    ready.permissions.add("settings.edit");
+    ready.permissions.add("voice.dictation");
+    ready.permissions.add("customer.view");
+    assertEquals(initial, AndroidVoiceRules.authorityIdentity(ready, DEVICE, "https://hosting.example", CREDENTIAL));
+    ready.permissions.remove("voice.dictation");
+    assertNotEquals(initial, AndroidVoiceRules.authorityIdentity(ready, DEVICE, "https://hosting.example", CREDENTIAL));
+
+    OperationData changed = parse(true, true, true, true, true);
+    changed.businessCapabilities.remove("service.ai");
+    assertNotEquals(initial, AndroidVoiceRules.authorityIdentity(changed, DEVICE, "https://hosting.example", CREDENTIAL));
+    changed = parse(true, true, true, true, false);
+    assertNotEquals(initial, AndroidVoiceRules.authorityIdentity(changed, DEVICE, "https://hosting.example", CREDENTIAL));
+    changed = parse(true, true, false, true, true);
+    assertNotEquals(initial, AndroidVoiceRules.authorityIdentity(changed, DEVICE, "https://hosting.example", CREDENTIAL));
+    changed = parse(true, true, true, true, true);
+    assertNotEquals(initial, AndroidVoiceRules.authorityIdentity(changed, DEVICE, "https://other.example", CREDENTIAL));
+    assertNotEquals(initial, AndroidVoiceRules.authorityIdentity(changed, DEVICE, "https://hosting.example", CREDENTIAL + "changed"));
+  }
+
   @Test public void localSpeechDefaultIsConditionalAndKnownSecretTextIsExcluded() {
     assertTrue(AndroidVoiceRules.ttsEnabled(null, true));
     assertFalse(AndroidVoiceRules.ttsEnabled(null, false));

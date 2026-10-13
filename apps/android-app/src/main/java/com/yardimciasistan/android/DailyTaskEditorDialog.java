@@ -61,6 +61,10 @@ final class DailyTaskEditorDialog {
         editing ? existing.description : "",
         "İş için kısa açıklama (isteğe bağlı)"
     );
+    // Keep the microphone next to the note it edits, not below the date/time fields.
+    LinearLayout noteVoiceControls = new LinearLayout(context);
+    noteVoiceControls.setOrientation(LinearLayout.VERTICAL);
+    form.addView(noteVoiceControls);
 
     String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
     CheckBox useDate = new CheckBox(context);
@@ -108,7 +112,7 @@ final class DailyTaskEditorDialog {
       builder.setNeutralButton("Sil", null);
     }
     AlertDialog dialog = builder.create();
-    voice.addDictation(dialog, form, description, 1000,
+    voice.addDictation(dialog, noteVoiceControls, description, 1000,
         () -> voice.hasPermission(editing ? "daily_task.update" : "daily_task.create"));
     voice.bindDialog(dialog);
     dialog.setOnShowListener(ignored -> {

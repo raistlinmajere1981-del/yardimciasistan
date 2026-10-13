@@ -134,10 +134,8 @@ final class AndroidVoiceController {
   void synced(long ticket) {
     if (ticket != connectionRevision || !foreground || destroyed) return;
     OperationData data = currentData.get();
-    String next = identity.deviceId + "\n" + ConnectionSettings.webModuleUrl(preferences) + "\n"
-        + ConnectionSettings.syncSecret(preferences) + "\n" + data.serverRevision + "\n"
-        + data.snapshotUpdatedAt + "\n" + data.sttAvailable + "\n" + data.hasPermission("voice.dictation")
-        + "\n" + data.deviceActive;
+    String next = AndroidVoiceRules.authorityIdentity(data, identity.deviceId,
+        ConnectionSettings.webModuleUrl(preferences), ConnectionSettings.syncSecret(preferences));
     if (!next.equals(authorityIdentity)) invalidate("Veri veya dikte ayarları değişti; önceki kayıt ve yanıt iptal edildi.");
     authorityIdentity = next;
     freshAuthority = online();
