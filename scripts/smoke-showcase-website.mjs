@@ -32,7 +32,7 @@ const push = async () => { clearOthers(); const result = await coordinator.publi
 // Real storage publications, isolated from a customer's runtime. Leaf endpoint regressions have their own registered smokes.
 const seed = (name, value, revision = 1) => {
   const file = join(root, 'seed.json'); writeFileSync(file, JSON.stringify(value));
-  const result = spawnSync('php', ['-r', 'require $argv[1]; $json=file_get_contents($argv[3]); ya_storage_publish($argv[2], json_decode($json,true), $argv[5], (int)$argv[4], $argv[2].":".$argv[4], date(DATE_ATOM), 1, hash("sha256",$json));', join(moduleRoot, 'lib/storage.php'), name, file, String(revision), clientId], { encoding: 'utf8' });
+  const result = spawnSync('php', ['-r', 'require $argv[1]; $json=file_get_contents($argv[3]); $previous=ya_storage_get_publication($argv[2],[]); $rev=max((int)$argv[4],(int)($previous["_publication"]["source_revision"]??0)+1); ya_storage_publish($argv[2], json_decode($json,true), $argv[5], $rev, $argv[2].":".$rev, date(DATE_ATOM), 1, hash("sha256",$json));', join(moduleRoot, 'lib/storage.php'), name, file, String(revision), clientId], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
 };
 try {

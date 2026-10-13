@@ -10,6 +10,7 @@ import process from "node:process";
 
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const { ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS } = require("../packages/sync-core/dist/index.js");
 
 const appPath = join(process.cwd(), "apps", "desktop-app");
 const dataDir = join(process.cwd(), "artifacts", "desktop-menu-db-smoke", String(Date.now()));
@@ -782,13 +783,9 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.ok(automaticallyRegisteredDevice);
   assert.equal(automaticallyRegisteredDevice.role, "staff");
   assert.equal(automaticallyRegisteredDevice.isActive, true);
-  assert.deepEqual(automaticallyRegisteredDevice.permissionGroups, {
-    service_orders: true,
-    cashier: false,
-    rooms_tasks: true,
-    customer_reservation: false,
-    market_operations: false
-  });
+  const defaultGroups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
+  assert.deepEqual(automaticallyRegisteredDevice.permissionGroups, defaultGroups);
+  assert.equal(automaticallyRegisteredDevice.permissions.includes("commerce_order.view"), false);
   assert.equal(automaticallyRegisteredDevice.permissions.includes("table_order.open"), true);
   assert.equal(automaticallyRegisteredDevice.permissions.includes("room.update_status"), true);
   assert.equal(automaticallyRegisteredDevice.permissions.includes("table_order.close_paid"), false);
@@ -804,13 +801,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.match(deniedStaffClose.message, /hesap kapatma yetkisi yok/i);
   assert.ok(database.getActiveTableOrder("table_002"));
 
-  const cashierGroups = {
-    service_orders: true,
-    cashier: true,
-    rooms_tasks: true,
-    customer_reservation: false,
-    market_operations: false
-  };
+  const cashierGroups = { ...defaultGroups, cashier: true };
   const cashierResult = database.setAndroidDevicePermissionGroups("android-smoke-device", cashierGroups);
   assert.equal(cashierResult.ok, true);
   assert.equal(cashierResult.devices.find((device) => device.deviceId === "android-smoke-device")?.permissions.includes("table_order.close_paid"), true);
@@ -820,13 +811,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.equal(allowedStaffClose.ok, true);
   assert.equal(database.getActiveTableOrder("table_002"), null);
 
-  const serviceOnlyGroups = {
-    service_orders: true,
-    cashier: false,
-    rooms_tasks: false,
-    customer_reservation: false,
-    market_operations: false
-  };
+  const serviceOnlyGroups = { ...defaultGroups, rooms_tasks: false };
   assert.equal(database.setAndroidDevicePermissionGroups("android-smoke-device", serviceOnlyGroups).ok, true);
   const roomBeforePackageToggle = database.getDashboardData().rooms[0];
   assert.ok(roomBeforePackageToggle);
@@ -840,13 +825,6 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.match(deniedRoomUpdate.message, /yetkisi yok/i);
   assert.equal(database.getDashboardData().rooms.find((room) => room.id === roomBeforePackageToggle.id)?.status, roomBeforePackageToggle.status);
 
-  const defaultGroups = {
-    service_orders: true,
-    cashier: false,
-    rooms_tasks: true,
-    customer_reservation: false,
-    market_operations: false
-  };
   assert.equal(database.setAndroidDevicePermissionGroups("android-smoke-device", defaultGroups).ok, true);
   const allowedRoomUpdate = database.applyAndroidAction(androidAction("android_action_package_room_allowed_001", "room_status_update", {
     room_id: roomBeforePackageToggle.id,

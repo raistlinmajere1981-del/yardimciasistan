@@ -26,11 +26,14 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
-  // Remove initialization publications so this assertion exercises setup itself.
-  for (const job of database.getPendingSyncJobs()) {
-    database.completeSyncJob(job.jobKey, job.sourceRevision);
+  // Clear initialization-only publications. Completing the online catalog can
+  // correctly enqueue another Android snapshot because its pending state changed.
+  for (let pass = 0; pass < 8 && database.getPendingSyncJobs().length > 0; pass += 1) {
+    for (const job of database.getPendingSyncJobs()) {
+      database.completeSyncJob(job.jobKey, job.sourceRevision);
+    }
   }
-  assert.equal(database.getPendingSyncJobs().length, 0);
+  assert.equal(database.getPendingSyncJobs().length, 0, "initial publications must settle");
 
   const freshSetup = database.getSetupData();
   assert.equal(freshSetup.setupRequired, true);

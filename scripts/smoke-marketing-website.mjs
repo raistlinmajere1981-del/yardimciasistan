@@ -100,7 +100,18 @@ try {
     setBusinessCapability(f.db.databasePath,{capability:'marketing.studio',enabled:false});return p;},
     acknowledge:(...args)=>f.publisher.acknowledge(...args),fail:(...args)=>f.publisher.fail(...args)};
   const racingCoordinator=new SyncCoordinator({database:f.db,marketingWebsite:racingPublisher,getSyncConfig:()=>config,createAndroidSnapshot:()=>({}),onDashboardChanged:()=>{},onStatusChanged:()=>{}});
-  assert.equal((await racingCoordinator.publishOutbox(transport)).published,0);
+  // The race may publish an unrelated Android snapshot after capability changes.
+  // Assert the stale marketing revision itself was not sent, not total publications.
+  const publishMarketing = transport.publishMarketingWebsite.bind(transport);
+  let racedMarketingUploads = 0;
+  transport.publishMarketingWebsite = async (...args) => {
+    racedMarketingUploads += 1;
+    return publishMarketing(...args);
+  };
+  const racedResult = await racingCoordinator.publishOutbox(transport);
+  transport.publishMarketingWebsite = publishMarketing;
+  assert.deepEqual(racedResult.errors, []);
+  assert.equal(racedMarketingUploads, 0, "stale marketing body must never reach hosting");
   await push();assert.deepEqual((await fetch(`${baseUrl}/api/marketing.php`).then(r=>r.json())).publications,[]);
   setBusinessCapability(f.db.databasePath,{capability:'marketing.studio',enabled:true});await push();
   for(const p of f.db.listMarketingPublications())f.service.unpublish(p.id,p.revision);
