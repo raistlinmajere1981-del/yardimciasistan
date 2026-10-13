@@ -1,3 +1,6 @@
+import { readTtsPreferences } from "../tts-preferences";
+import { getDesktopTts } from "./tts/desktop-tts";
+
 export type IdentityCameraFeedbackTone = "prompt" | "ready" | "success" | "error";
 
 const FEEDBACK_GAIN = 0.14;
@@ -7,7 +10,7 @@ let audioContext: AudioContext | null = null;
 
 export function primeIdentityCameraFeedback() {
   try {
-    window.speechSynthesis?.getVoices();
+    getDesktopTts().refresh();
   } catch {
     // Some Linux builds expose speechSynthesis without a working voice backend.
   }
@@ -21,51 +24,12 @@ export function announceIdentityCamera(
   text: string,
   fallbackTone: IdentityCameraFeedbackTone = "prompt"
 ) {
-  if (trySpeak(text, fallbackTone)) return;
-  playFeedbackTone(fallbackTone);
-}
-
-function trySpeak(text: string, fallbackTone: IdentityCameraFeedbackTone): boolean {
-  if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
-    return false;
-  }
-
-  let voices: SpeechSynthesisVoice[];
   try {
-    voices = window.speechSynthesis.getVoices();
+    void getDesktopTts().speak(text, readTtsPreferences()).then(result => {
+      if (result.status === "failed") playFeedbackTone(fallbackTone);
+    }, () => playFeedbackTone(fallbackTone));
   } catch {
-    return false;
-  }
-  const voice = voices.find((item) => item.lang.toLowerCase().startsWith("tr"))
-    ?? voices.find((item) => item.default)
-    ?? voices[0];
-  if (!voice) return false;
-
-  try {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = voice;
-    utterance.lang = voice.lang || "tr-TR";
-    utterance.rate = 0.96;
-
-    let started = false;
-    const fallbackTimer = window.setTimeout(() => {
-      if (!started) playFeedbackTone(fallbackTone);
-    }, 500);
-    utterance.onstart = () => {
-      started = true;
-      window.clearTimeout(fallbackTimer);
-    };
-    utterance.onend = () => window.clearTimeout(fallbackTimer);
-    utterance.onerror = () => {
-      window.clearTimeout(fallbackTimer);
-      playFeedbackTone(fallbackTone);
-    };
-
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-    return true;
-  } catch {
-    return false;
+    playFeedbackTone(fallbackTone);
   }
 }
 

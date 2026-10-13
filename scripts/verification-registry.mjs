@@ -104,6 +104,8 @@ const SMOKE_FILES = [
   "scripts/smoke-desktop-clean-startup.mjs",
   "scripts/smoke-desktop-customer-pension.mjs",
   "scripts/smoke-identity-camera-recovery.mjs",
+  "scripts/smoke-desktop-tts.mjs",
+  "scripts/smoke-desktop-tts-ui.mjs",
   "scripts/smoke-desktop-design-system.mjs",
   "scripts/smoke-desktop-locale.mjs",
   "scripts/smoke-desktop-lock.mjs",
@@ -342,6 +344,7 @@ const SETTINGS_CHECKS = new Set([
   "feature-dependencies",
   "typecheck", "typecheck-electron", "unit-tests", "version-contract-tests", "version-check", "verification-registry-tests",
   "settings-correctness", "settings-ui-correctness", "settings-platform", "workspace-platform", "sector-feature-contributions",
+  "desktop-tts", "desktop-tts-ui",
   "profile-transition", "profile-transition-ui",
   "capability-runtime", "capability-settings-source", "capability-surface-consistency", "business-capabilities",
   "business-location-geocode", "business-public-profile", "setup-profile-contract", "schema-authority",
@@ -542,6 +545,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-desktop-tts.mjs") return [];
   if (file === "scripts/smoke-android-companion-v3.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-publication-protocol.mjs" || file === "scripts/smoke-sync-publication-correctness.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-nexa-assets.mjs") return [];

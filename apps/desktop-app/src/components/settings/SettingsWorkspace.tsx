@@ -8,6 +8,7 @@ import { reportAppStatus } from "../../app/runtime-state";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { StagedSettingsContributionSlot } from "../../app/settings-section-contributions";
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
+import { useTtsSettings } from "../../app/use-tts-settings";
 import { useSettingsAiTest } from "../../app/use-settings-ai-test";
 import { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { useAndroidDevicePermissionSettings } from "../../app/use-android-device-permission-settings";
@@ -44,6 +45,7 @@ import { PasswordSettings, usePasswordSettings } from "../security/PasswordSetti
 import { UpdateSettings, useUpdateSettings } from "./UpdateSettings";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
 import { ActionButton } from "../ui/ActionButton";
+import { SpeechSettingsSection } from "./SpeechSettingsSection";
 
 export type SettingsWorkspaceProps = Omit<
   ServicesSettingsProps,
@@ -84,6 +86,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const { snapshot: runtimeCapabilities } = useBusinessCapabilityRuntime();
 
   const drafts = useSettingsDrafts(props.setupData, props.onSave);
+  const tts = useTtsSettings();
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
   const initialized = !props.setupData.setupRequired;
   const capabilities = runtimeCapabilities?.enabledCapabilities ?? [];
@@ -140,7 +143,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const dirty: Record<SettingsCategoryId, boolean> = {
     business: drafts.dirty.business || profile.dirty || googleReviews.dirty,
     operations: layout.dirty,
-    services: drafts.dirty.services || androidPermissions.dirty || kbs.dirty,
+    services: drafts.dirty.services || androidPermissions.dirty || kbs.dirty || tts.dirty,
     application: appearance.dirty || updates.dirty
   };
   const categoryDirty = dirty[active];
@@ -224,6 +227,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         changed ||= kbsResult.changed;
         if (kbsResult.changed) await props.onDashboardRefresh?.();
       }
+      const ttsResult = tts.save();
+      if (!ttsResult.ok) return ttsResult;
+      changed ||= ttsResult.changed;
       return { ok: true, changed };
     }
 
@@ -255,6 +261,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       drafts.discard("services");
       androidPermissions.discard();
       kbs.discard();
+      tts.discard();
       ai.invalidate();
       return true;
     }
@@ -485,6 +492,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
           {active === "services" && (
             <>
+              <SpeechSettingsSection controller={tts} disabled={categoryBusy || guardBusy} />
               <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
                 <ServicesSettingsSection
                   {...props}

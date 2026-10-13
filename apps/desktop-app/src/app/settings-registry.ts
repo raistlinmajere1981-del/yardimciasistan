@@ -77,6 +77,7 @@ export const instagramProviderDefinition = {
 } as const satisfies SettingsSectionDefinition;
 
 export const settingsSections: readonly SettingsSectionDefinition[] = [
+  { id: "settings-speech", category: "services", title: "Konuşma ve Yazma", keywords: "ses tts konuşma yerel sistem dil hız ton volume", persistence: "resource", visible: (_, initialized) => initialized },
   smsProviderDefinition, instagramProviderDefinition,
   { id: "settings-business", category: "business", title: "İşletme", keywords: "firma adı sektör tipi telefon whatsapp e-posta adres", persistence: "staged" },
   { id: "settings-options", category: "business", title: "Ek özellikler", keywords: "yetenek talepler oda masa rezervasyonları qr menü stok veresiye müşteri hesabı satın alma tedarikçi etiket", persistence: "staged" },

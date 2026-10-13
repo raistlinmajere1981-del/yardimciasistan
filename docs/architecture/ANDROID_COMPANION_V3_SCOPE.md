@@ -256,10 +256,34 @@ aşağıdaki checkbox kullanıcı arayüzüne bağlı tamamlanma ölçütüdür.
 
 ### C — Ses (ayrı, ortak servis aşaması)
 
-- [ ] AI ayarlarına desteklenen bulut STT modeli seçimi, servis kapalı/model seçilmedi iken pasif durum.
-- [ ] Servisler → Konuşma ve Yazma: yerel TTS motor/ses/dil keşfi; harici TTS fallback; STT ayarı.
-- [ ] STT yalnız manuel basılan mikrofonla kaydet→çevir→metin alanına yerleştir; otomatik iş emri değil.
-- [ ] TTS yalnız manuel hoparlör düğmesi; işlemler platform bağımsız sözleşme ile, kayıtlar geçici ve korunur.
+**S1 Desktop:** Servisler → Konuşma ve Yazma, yalnız OS/Electron Web Speech
+yerel seslerini (`localService`) keşfeder. `src/app/tts/tts-adapter.ts` sağlayıcı
+sözleşmesidir; şu an tek gerçek adaptör sistem motorudur. Ses adı/dili motorun
+verisidir; cinsiyet tahmin edilmez. Web Speech motor bazında ton desteği bildirmediği
+için S1 ton kontrolü sunmaz; hız 0,5–1,5 ve volume 0–100 utterance'a uygulanır.
+Bu değerler OS tercihini değiştirmez. Varsayılan seçim Türkçe yerel ses, ardından
+yerel sistem varsayılanıdır; dil/ses kaybında gerçek kullanılan ses panelde belirtilir.
+
+Cihaz tercihleri `src/tts-preferences.ts` ile uygulamanın mevcut localStorage
+tercih alanında saklanır; DB/Setup, eşitleme, sektör veya abonelik capability'si yoktur.
+Servisler'in kategori Kaydet/Geri Al/çıkış korumasına bağlı bağımsız resource
+taslağıdır. Sesi Dene taslağı kullanır; mevcut kimlik kamerası bildirimleri kayıtlı
+tercihi aynı playback sahibinden okur. Boş/geç ses listesi, kaybolan ses, 500 ms
+başlama sınırı, utterance hatası ve iptal açık sonuç üretir. Başarısız kamera
+konuşması mevcut audio sinyalini korur; otomatik genel anlatım eklenmez. Playback
+kısa düz metinle sınırlıdır (500 karakter, markup yok), 30 saniye tamamlanma sınırı
+vardır. `npm run verify:check -- desktop-tts` adaptör/tercih/kamera davranışını mock
+Web Speech/audio cihazıyla; `npm run verify:check -- desktop-tts-ui` gerçek Settings
+renderer'ı ve kategori taslak lifecycle'ını sınar. Gerçek OS sesi/duyulabilirlik
+cihazda ayrıca sınanır.
+
+**Sonraki ayrı aşamalar:** isteğe bağlı harici Freya adaptörü ve ayrı dependency/
+updater kurulumu; sonra manuel STT'nin sağlayıcı/model/izin sözleşmesi. S1'de
+Freya kurulumu/indirmesi veya sahte kurulu motor, gömülü ses/model paketi, uzak TTS
+API'si ve STT bulunmaz. Android TTS/STT ve telefonun kendi ses tercihleri ayrı
+cihaz işidir; Desktop tercihi telefona aktarılmaz. STT ileride yalnız manuel
+mikrofonla kaydet→çevir→metin alanına yerleştir akışı olabilir; otomatik iş emri
+veya her alanı dinleme/seslendirme yoktur.
 
 ### D — SuperDesign / Android UI
 
