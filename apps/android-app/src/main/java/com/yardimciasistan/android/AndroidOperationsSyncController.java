@@ -131,7 +131,7 @@ final class AndroidOperationsSyncController {
         int invalidatedPendingActions = 0;
         for (ActionOutbox.PendingAction pending : pendingToRetry) {
           try {
-            operationsTransport.enqueueAction(
+            OperationData.ActionRecord result = operationsTransport.enqueueAction(
                 normalizedBaseUrl,
                 normalizedSecret,
                 identity,
@@ -139,11 +139,13 @@ final class AndroidOperationsSyncController {
                 pending.type,
                 pending.payload
             );
+            operationCache.recordActionResult(result, actionTargetKey);
             actionOutbox.remove(pending.id);
           } catch (AndroidOperationsTransport.TransportException error) {
             if (!error.invalidatesPendingAction()) {
               throw error;
             }
+            operationCache.recordActionResult(AndroidActionDispatcher.failedRecord(pending, error.getMessage()), actionTargetKey);
             actionOutbox.remove(pending.id);
             invalidatedPendingActions += 1;
             if (error.disablesAndroidService()) {
@@ -175,6 +177,13 @@ final class AndroidOperationsSyncController {
               fetched.payload.optInt("pending_action_count", nextData.pendingActions)
           );
         }
+        org.json.JSONArray results = fetched.payload.optJSONArray("action_results");
+        if (results != null) for (int i = 0; i < results.length() && i < 40; i++) {
+          org.json.JSONObject row = results.optJSONObject(i);
+          if (row != null) operationCache.recordActionResult(OperationData.ActionRecord.fromJson(row), actionTargetKey);
+        }
+        operationCache.markMissingActionResults(fetched.payload.optJSONArray("missing_action_result_ids"), actionTargetKey);
+        operationCache.mergeActionResults(nextData);
 
         if (!fetched.notModified) {
           localNotifications.processSnapshot(previousData, nextData);

@@ -10,7 +10,7 @@ public final class AndroidCompanionV3Test {
   private static final String TIME = "2026-10-12T12:00:00.000Z";
 
   private JSONObject snapshot() throws Exception {
-    JSONObject order = new JSONObject().put("id", "order-1").put("status", "placed").put("source", "desktop")
+    JSONObject order = new JSONObject().put("id", "order-1").put("customer_id", "customer-1").put("status", "placed").put("source", "desktop")
         .put("total", 20).put("currency", "TRY").put("delivery_method", "shipping").put("placed_at", TIME).put("updated_at", TIME)
         .put("address", "PRIVATE").put("phone", "PRIVATE");
     return new JSONObject().put("business_capabilities", new JSONArray(new String[] { "service.android", "commerce.orders", "commerce.wholesale",

@@ -462,21 +462,13 @@ export function updateCommerceOrderStatusInTransaction(
 
   const current = String(row.status ?? "") as CommerceOrderStatus;
   const target = String(input.status ?? "");
-  if (target !== "confirmed" && target !== "cancelled") {
-    throw new Error("Geçersiz sipariş durumu.");
-  }
+  const decisionError = commerceOrderDecisionError(current, target);
+  if (decisionError) throw new Error(decisionError);
   if (current === target) {
     const existing = getOrderDetailInDatabase(database, businessId, String(row.id));
     if (!existing) throw new Error("Sipariş okunamadı.");
     return existing;
   }
-  if (current === "fulfilled" || current === "cancelled") {
-    throw new Error("Tamamlanmış veya iptal edilmiş sipariş değiştirilemez.");
-  }
-  if (target === "confirmed" && current !== "placed") {
-    throw new Error("Yalnız yeni sipariş onaylanabilir.");
-  }
-
   const now = mutationTime;
   database.prepare(`
     UPDATE commerce_orders
@@ -512,16 +504,51 @@ export function updateCommerceOrderStatus(
   }
 }
 
-/** Complete status aggregates plus a bounded canonical list; no item expansion. */
+function commerceOrderDecisionError(current: CommerceOrderStatus, target: string): string {
+  if (target !== "confirmed" && target !== "cancelled") return "Geçersiz sipariş durumu.";
+  if (current === target) return "";
+  if (current === "fulfilled" || current === "cancelled") return "Tamamlanmış veya iptal edilmiş sipariş değiştirilemez.";
+  if (target === "confirmed" && current !== "placed") return "Yalnız yeni sipariş onaylanabilir.";
+  return "";
+}
+
+/** Same policy as the writer, excluding its idempotent current-status no-op. */
+export function commerceOrderAvailableDecisions(status: CommerceOrderStatus): UpdateCommerceOrderStatusInput["status"][] {
+  return (["confirmed", "cancelled"] as const).filter(target => target !== status && !commerceOrderDecisionError(status, target));
+}
+
+/** Complete aggregates and bounded canonical order/item facts for the mobile projection. */
 export function readCommerceOrderOperations(database: DatabaseSync) {
   const businessId = activeBusinessId(database);
   const sourceCase = "CASE WHEN source IN ('desktop','web-online-sales','web-dealer') THEN source ELSE 'other' END";
   const orders = database.prepare(`SELECT * FROM commerce_orders WHERE business_id=? AND deleted_at=''
     ORDER BY CASE WHEN status IN ('placed','confirmed') THEN 0 ELSE 1 END, placed_at DESC,id DESC LIMIT 100`)
     .all(businessId).map(mapOrder);
-  const counts = database.prepare(`SELECT ${sourceCase} AS source,status,COUNT(*) AS count
+  const counts = database.prepare(`SELECT ${sourceCase} AS source,status,COUNT(*) AS count,
+    SUM(CASE WHEN source='desktop-wholesale' THEN 1 ELSE 0 END) AS dealer_count
     FROM commerce_orders WHERE business_id=? AND deleted_at='' GROUP BY ${sourceCase},status`).all(businessId);
-  return { orders, counts };
+  const itemsByOrder = new Map<string, CommerceOrderItem[]>();
+  const itemCounts = new Map<string, number>();
+  if (orders.length) {
+    const ids = orders.map(order => order.id);
+    const placeholders = ids.map(() => "?").join(",");
+    for (const row of database.prepare(`SELECT order_id,COUNT(*) AS count FROM commerce_order_items
+      WHERE order_id IN (${placeholders}) GROUP BY order_id`).all(...ids)) {
+      itemCounts.set(String(row.order_id), Number(row.count));
+    }
+    // An oversized order stays explicitly incomplete without consuming every
+    // other order's bounded item budget.
+    const itemIds = ids.filter(id => (itemCounts.get(id) ?? 0) <= 500);
+    const rows = itemIds.length ? database.prepare(`SELECT i.* FROM commerce_order_items i JOIN commerce_orders o ON o.id=i.order_id
+      WHERE o.business_id=? AND o.deleted_at='' AND o.id IN (${itemIds.map(() => "?").join(",")})
+      ORDER BY CASE WHEN o.status IN ('placed','confirmed') THEN 0 ELSE 1 END,o.placed_at DESC,o.id DESC,i.created_at,i.id LIMIT 2000`)
+      .all(businessId, ...itemIds).map(mapOrderItem) : [];
+    for (const item of rows) {
+      const list = itemsByOrder.get(item.orderId) ?? [];
+      list.push(item); itemsByOrder.set(item.orderId, list);
+    }
+  }
+  return { orders, counts, itemsByOrder, itemCounts };
 }
 
 /** Business-scoped identity/version for mutation authorization; no detail expansion. */

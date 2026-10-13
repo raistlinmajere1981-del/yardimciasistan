@@ -34,6 +34,7 @@ const deviceId = "companion-v3-staff";
 const adminId = "companion-v3-admin";
 const secret = "companion-v3-fixture-secret";
 const privateValue = "PRIVATE_COMPANION_CANARY";
+const systemPrivate = "SYSTEM_PRIVATE_COMPANION_CANARY";
 let raw, server, local, token, adminToken, webUrl;
 let sourceRevision = 0;
 let lastPublication;
@@ -99,8 +100,23 @@ try {
   assert.equal(snapshot.marketing.campaigns[0].failed_count, 1);
   assert.equal(snapshot.marketing.schedules[0].last_execution_status, "failed");
   assert.equal(snapshot.summary.recent_failed_marketing_operations, 3);
-  assert.equal(JSON.stringify({ commerce: snapshot.commerce, marketing: snapshot.marketing }).includes(privateValue), false);
-  assert.equal(JSON.stringify(snapshot.commerce).includes("+905551234567"), false);
+  assert.equal(JSON.stringify(snapshot.marketing).includes(privateValue), false);
+  const firstMobile = snapshot.commerce.orders.find(order => order.id === first.id);
+  assert.equal(firstMobile.details.buyer.phone, "+905551234567");
+  assert.equal(firstMobile.details.delivery_address.address_line1, privateValue);
+  assert.equal(firstMobile.details.note, privateValue);
+  assert.equal(firstMobile.details.items[0].quantity, 2);
+  assert.equal(firstMobile.details.items[0].unit_price, 10);
+  assert.equal(firstMobile.details.items[0].line_total, 20);
+  assert.equal(firstMobile.details.subtotal, 20);
+  assert.equal(firstMobile.details.items_complete, true);
+  assert.equal(snapshot.commerce.customers[0].id, customer.savedId);
+  assert.equal(snapshot.commerce.customer_profiles[0].company_name, privateValue);
+  assert.equal(snapshot.commerce.customers[0].phone, "+905551234567");
+  const viewProjection = projectLocalAndroidSnapshotForDevice(snapshot, deviceId);
+  assert.deepEqual(viewProjection.commerce.orders.find(order => order.id === first.id).details.available_actions, []);
+  assert.deepEqual(projectLocalAndroidSnapshotForDevice(snapshot, adminId).commerce.orders.find(order => order.id === first.id).details.available_actions,
+    ["commerce_order_confirm", "commerce_order_cancel"]);
   assert.equal(snapshot.summary.pending_commerce_orders, 2);
   assert.equal(snapshot.summary.pending_shipments, 1);
   assert.equal(snapshot.table_orders.length, 0, "Commerce is never a table order.");
@@ -174,6 +190,23 @@ try {
   assert.equal(snapshot.commerce.orders.length, 100);
   assert.equal(snapshot.summary.pending_commerce_orders, 111);
   assert.ok(Buffer.byteLength(JSON.stringify({ commerce: snapshot.commerce, marketing: snapshot.marketing })) < 256 * 1024);
+  const manualDealer = createOrder("desktop-wholesale");
+  createShipmentForOrder(database.databasePath, manualDealer.id);
+  snapshot = sourceSnapshot();
+  assert.equal(snapshot.commerce.orders.find(order => order.id === manualDealer.id).dealer_order, true);
+  assert.equal(snapshot.commerce.order_counts.find(row => row.source === "other" && row.status === "placed").dealer_count, 1);
+  const oversized = createOrder();
+  raw.exec("BEGIN IMMEDIATE");
+  for (let i = 0; i < 500; i++) raw.prepare(`INSERT INTO commerce_order_items
+    (id,order_id,product_id,product_name,unit,quantity,unit_price,line_total,created_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(`oversized-item-${i}`, oversized.id, product.id, "Bounded item", "piece", 1, 10, 10, stamp);
+  raw.exec("COMMIT");
+  snapshot = sourceSnapshot();
+  const oversizedDetails = snapshot.commerce.orders.find(order => order.id === oversized.id).details;
+  assert.equal(oversizedDetails.items_total_count, 501);
+  assert.equal(oversizedDetails.items_complete, false);
+  assert.deepEqual(oversizedDetails.available_actions, []);
+  assert.equal(snapshot.commerce.orders.find(order => order.id === manualDealer.id).details.items_complete, true);
 
   // Real LAN replies share the projection, identity binding and canonical action receipt.
   local = new LocalCompanionServer({ desktopId: () => "desktop-companion", businessInfo: () => ({ displayName: "Test", phone: "", whatsapp: "" }),
@@ -202,8 +235,9 @@ try {
   const poisoned = sourceSnapshot();
   for (const rows of [poisoned.commerce.orders, poisoned.commerce.customer_profiles, poisoned.commerce.shipments,
     poisoned.marketing.publications, poisoned.marketing.schedules, poisoned.marketing.campaigns]) {
-    for (const row of rows) Object.assign(row, { address: privateValue, customer_phone: privateValue,
-      company_name: privateValue, text: privateValue, last_error: privateValue, recipients: [privateValue], media: [privateValue] });
+    for (const row of rows) Object.assign(row, { address: systemPrivate, customer_phone: systemPrivate,
+      api_key: systemPrivate, tax_number: systemPrivate, secret: systemPrivate,
+      text: systemPrivate, last_error: systemPrivate, recipients: [systemPrivate], media: [systemPrivate] });
   }
   await publish(poisoned);
   const fallback = await post(`${webUrl}/api/android.php`, { action: "android_summary", device_id: adminId }, {
@@ -219,7 +253,9 @@ try {
   const expected = projectLocalAndroidSnapshotForDevice(sourceSnapshot(), deviceId);
   assert.deepEqual(hosted.body.commerce, expected.commerce);
   assert.deepEqual(hosted.body.marketing, expected.marketing);
-  assert.equal(JSON.stringify({ commerce: hosted.body.commerce, marketing: hosted.body.marketing }).includes(privateValue), false);
+  assert.equal(JSON.stringify({ commerce: hosted.body.commerce, marketing: hosted.body.marketing }).includes(systemPrivate), false);
+  assert.equal(hosted.body.commerce.orders.find(order => order.id === third.id).details.buyer.phone, "+905551234567");
+  assert.equal(JSON.stringify(hosted.body.marketing).includes(privateValue), false);
   for (const capability of [C.ORDERS, C.WHOLESALE, C.ONLINE_SALES, C.MARKETING_STUDIO, C.MESSAGING_CAMPAIGNS]) {
     const mismatched = structuredClone(poisoned);
     mismatched.business_capabilities = mismatched.business_capabilities.filter(c => c !== capability);
@@ -228,6 +264,13 @@ try {
     const safe = projectLocalAndroidSnapshotForDevice(mismatched, deviceId);
     assert.deepEqual(remote.body.commerce, safe.commerce, `Hosting capability redaction: ${capability}`);
     assert.deepEqual(remote.body.marketing, safe.marketing, `Hosting marketing redaction: ${capability}`);
+    if (capability === C.WHOLESALE) {
+      assert.equal(remote.body.commerce.orders.some(order => order.id === manualDealer.id), false);
+      assert.equal(remote.body.commerce.shipments.some(shipment => shipment.order_id === manualDealer.id), false);
+      setBusinessCapability(database.databasePath, { capability, enabled: false });
+      assert.equal(database.applyAndroidAction(action("companion_manual_dealer_off_001", "commerce_order_confirm", manualDealer)).ok, false);
+      setBusinessCapability(database.databasePath, { capability, enabled: true });
+    }
   }
   await publish(sourceSnapshot());
   const generalSecret = await post(`${webUrl}/api/sync.php`, { action: "android_summary", device_id: adminId }, { "X-YA-Sync-Secret": secret });
@@ -250,6 +293,21 @@ try {
   assert.ok(inbound);
   assert.equal(database.applyAndroidAction(inbound).ok, true);
   assert.equal(database.applyAndroidAction(inbound).alreadyApplied, true);
+  const pendingResult = await summary(deviceId, token, { action_result_ids: [queueAction.id, "absent-receipt", "invalid id"] });
+  assert.equal(pendingResult.body.action_results[0].status, "pending");
+  assert.deepEqual(pendingResult.body.action_results[0].payload, queueAction.payload);
+  assert.deepEqual(pendingResult.body.missing_action_result_ids, ["absent-receipt"]);
+  assert.deepEqual((await summary(adminId, adminToken, { action_result_ids: [queueAction.id] })).body.action_results, [],
+    "Personal receipts cannot be read by a different device, including admin.");
+  const marked = await post(`${webUrl}/api/sync.php`, { action: "mark_android_action_result", action_id: queueAction.id, status: "applied" }, { "X-YA-Sync-Secret": secret });
+  assert.equal(marked.status, 200);
+  const revision = (await summary()).body.server_revision;
+  const unchangedResult = await summary(deviceId, token, { known_server_revision: revision, action_result_ids: [queueAction.id] });
+  assert.equal(unchangedResult.body.not_modified, true);
+  assert.equal(unchangedResult.body.action_results[0].status, "applied");
+  assert.deepEqual(unchangedResult.body.action_results[0].payload, queueAction.payload);
+  const boundedResults = await summary(deviceId, token, { action_result_ids: Array.from({ length: 50 }, (_, i) => `absent-${i}`) });
+  assert.equal(boundedResults.body.missing_action_result_ids.length, 40);
 
   // Revocation while an action is offline/pending is decided again by the Desktop owner.
   assert.equal(database.setAndroidDevicePermissionGroups(deviceId, viewGroups).ok, true);
@@ -257,6 +315,8 @@ try {
   assert.equal((await localPost(LOCAL_COMPANION_ENDPOINTS.action, { ...action("companion_lan_identity_001", "commerce_order_cancel", third), device_id: adminId })).body.status, "failed");
   assert.equal(database.applyAndroidAction(action("companion_revoked_grant_001", "commerce_order_cancel", getCommerceOrder(database.databasePath, third.id).order)).ok, false);
   await publish(sourceSnapshot());
+  assert.equal((await summary(deviceId, token, { action_result_ids: [queueAction.id] })).body.action_results[0].status, "applied",
+    "A device retaining order view can receive its own result after decision rights are revoked.");
   const denied = await enqueue(action("companion_host_denied_001", "commerce_order_cancel", getCommerceOrder(database.databasePath, third.id).order));
   assert.equal(denied.status, 403);
   assert.equal((await summary(adminId, adminToken)).body.commerce.orders.length, 100);
@@ -265,6 +325,7 @@ try {
   const oldPublication = lastPublication;
   await publish(withdrawn);
   assert.deepEqual((await summary()).body.commerce, empty.commerce);
+  assert.deepEqual((await summary(deviceId, token, { action_result_ids: [queueAction.id] })).body.action_results, []);
   assert.deepEqual((await summary()).body.marketing, empty.marketing);
   assert.deepEqual((await localPost(LOCAL_COMPANION_ENDPOINTS.summary, {})).body.commerce, empty.commerce);
   const late = await post(`${webUrl}/api/sync.php`, oldPublication, { "X-YA-Sync-Secret": secret });

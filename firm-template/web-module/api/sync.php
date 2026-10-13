@@ -434,6 +434,30 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         $visibleActionHistory,
         static fn (array $action): bool => ya_sync_string($action['status'] ?? '') === 'pending'
     ));
+    $actionResults = [];
+    $missingActionResultIds = [];
+    if (defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED
+        && isset($businessCapabilities['commerce.orders']) && in_array('commerce_order.view', $permissionList, true)) {
+        $ids = is_array($payload['action_result_ids'] ?? null) ? array_slice($payload['action_result_ids'], 0, 40) : [];
+        foreach (array_unique(array_filter($ids, 'is_string')) as $id) {
+            if (preg_match('/^[A-Za-z0-9._:-]{1,120}$/D', $id) !== 1) continue;
+            $record = ya_storage_get_android_action($id);
+            if (!is_array($record) || ($record['device_id'] ?? '') !== $deviceId
+                || !in_array($record['action_type'] ?? '', ['commerce_order_confirm', 'commerce_order_cancel'], true)) {
+                $missingActionResultIds[] = $id;
+                continue;
+            }
+            $actionResults[] = [
+                'id' => $record['id'], 'action_type' => $record['action_type'], 'status' => $record['status'],
+                'error_message' => $record['error_message'], 'created_at' => $record['created_at'], 'processed_at' => $record['processed_at'],
+                'payload' => [
+                    'order_id' => $record['payload']['order_id'] ?? '',
+                    'expected_updated_at' => $record['payload']['expected_updated_at'] ?? '',
+                    'expected_status' => $record['payload']['expected_status'] ?? ''
+                ]
+            ];
+        }
+    }
 
     $knownServerRevision = max(0, ya_sync_int($payload['known_server_revision'] ?? 0, 0));
     if (defined('YA_ANDROID_DEVICE_AUTHENTICATED') && YA_ANDROID_DEVICE_AUTHENTICATED
@@ -448,7 +472,9 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
             'server_revision' => $serverRevision,
             'pulled_at' => $now,
-            'pending_action_count' => $pendingActionCount
+            'pending_action_count' => $pendingActionCount,
+            'action_results' => $actionResults,
+            'missing_action_result_ids' => $missingActionResultIds
         ]);
     }
     $records = $customersEnabled ? ya_storage_all_requests() : [];
@@ -596,6 +622,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         ...$companion,
         'market' => ya_sync_android_market_for_permissions($androidSnapshot['market'], $permissionList),
         'actions' => $actions,
+        'action_results' => $actionResults,
+        'missing_action_result_ids' => $missingActionResultIds,
         'server_revision' => ya_storage_server_revision()
     ]);
 }
@@ -1978,7 +2006,7 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
     if (in_array($actionType, ['commerce_order_confirm', 'commerce_order_cancel'], true)) {
         $order = ya_sync_android_snapshot_record($snapshot['commerce']['orders'] ?? [], 'id', ya_sync_string($payload['order_id'] ?? ''));
         return isset($capabilities['service.android'], $capabilities['commerce.orders']) && $order !== []
-            && (($order['source'] ?? '') !== 'web-dealer' || isset($capabilities['commerce.wholesale']))
+            && ((($order['source'] ?? '') !== 'web-dealer' && ($order['dealer_order'] ?? false) !== true) || isset($capabilities['commerce.wholesale']))
             && (($order['source'] ?? '') !== 'web-online-sales' || isset($capabilities['channel.online_sales']));
     }
     if (str_starts_with($actionType, 'reservation_room_')) {

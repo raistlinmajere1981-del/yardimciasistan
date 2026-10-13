@@ -53,6 +53,7 @@ final class AndroidActionDispatcher {
   private final AndroidOperationsTransport operationsTransport;
   private final DeviceIdentity identity;
   private final ActionOutbox actionOutbox;
+  private final OperationCache operationCache;
   private final Listener listener;
 
   AndroidActionDispatcher(
@@ -62,6 +63,7 @@ final class AndroidActionDispatcher {
       AndroidOperationsTransport operationsTransport,
       DeviceIdentity identity,
       ActionOutbox actionOutbox,
+      OperationCache operationCache,
       Listener listener
   ) {
     this.activity = activity;
@@ -70,6 +72,7 @@ final class AndroidActionDispatcher {
     this.operationsTransport = operationsTransport;
     this.identity = identity;
     this.actionOutbox = actionOutbox;
+    this.operationCache = operationCache;
     this.listener = listener;
   }
 
@@ -112,8 +115,14 @@ final class AndroidActionDispatcher {
       return false;
     }
 
+    boolean commerceDecision = commands.size() == 1 && CompanionUiRules.isDecision(commands.get(0).type);
     try {
-      if (!actionOutbox.load().isEmpty()) {
+      List<ActionOutbox.PendingAction> existing = actionOutbox.load();
+      if (commerceDecision) {
+        Command command = commands.get(0);
+        String error = CompanionUiRules.submissionError(data, command.type, command.payload, existing, actionTargetKey);
+        if (!error.isEmpty()) { listener.onError(error); return false; }
+      } else if (!existing.isEmpty()) {
         listener.onToast("Önce telefonda bekleyen işlem yeniden gönderiliyor.");
         listener.onSyncRequired();
         return false;
@@ -123,7 +132,7 @@ final class AndroidActionDispatcher {
       return false;
     }
 
-    if (data.pendingActions > 0) {
+    if (!commerceDecision && data.pendingActions > 0) {
       listener.onError("Önce masaüstünü bekleyen işlemleri uygulayın ve canlı veriyi yenileyin.");
       listener.onToast("Güncel sonuç alınmadan yeni işlem gönderilemez.");
       return false;
@@ -162,6 +171,7 @@ final class AndroidActionDispatcher {
               action.type,
               action.payload
           );
+          operationCache.recordActionResult(record, actionTargetKey);
           actionOutbox.remove(action.id);
           accepted.add(record);
         }
@@ -172,15 +182,16 @@ final class AndroidActionDispatcher {
             successMessage,
             marketQueuedMessage != null
         ));
-      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException error) {
+      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
         boolean rejected = error instanceof AndroidOperationsTransport.TransportException
             && ((AndroidOperationsTransport.TransportException) error).invalidatesPendingAction();
 
         if (rejected) {
           for (ActionOutbox.PendingAction pending : pendingActions) {
             try {
+              if (CompanionUiRules.isDecision(pending.type)) operationCache.recordActionResult(failedRecord(pending, error.getMessage()), actionTargetKey);
               actionOutbox.remove(pending.id);
-            } catch (ActionOutbox.OutboxException ignored) {
+            } catch (ActionOutbox.OutboxException | OperationCache.CacheException ignored) {
               // The visible error remains actionable and the next sync retries cleanup.
             }
           }
@@ -197,6 +208,14 @@ final class AndroidActionDispatcher {
       }
     });
     return true;
+  }
+
+  static OperationData.ActionRecord failedRecord(ActionOutbox.PendingAction pending, String message) {
+    OperationData.ActionRecord record = new OperationData.ActionRecord();
+    record.id = pending.id; record.type = pending.type; record.orderId = pending.payload.optString("order_id");
+    record.status = "failed"; record.errorMessage = message;
+    record.createdAt = new java.util.Date().toInstant().toString(); record.processedAt = record.createdAt;
+    return record;
   }
 
   boolean sendBarcodeScan(

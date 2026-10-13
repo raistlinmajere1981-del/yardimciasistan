@@ -31,6 +31,8 @@ final class HostingSyncClient {
       payload.put("app_version", identity.appVersion);
       payload.put("limit", 200);
       payload.put("known_server_revision", Math.max(0L, knownServerRevision));
+      payload.put("action_result_ids", new OperationCache(identity.preferences, identity.deviceId)
+          .pendingActionResultIds(CompanionConnectionIdentity.actionTargetKey(baseUrl)));
     } catch (Exception error) {
       throw new SyncException("Güncelleme isteği hazırlanamadı.", error);
     }

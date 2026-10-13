@@ -15,6 +15,7 @@ const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const { BUSINESS_CAPABILITIES } = require("../packages/shared/dist/index.js");
+const { ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS } = require("../packages/sync-core/dist/index.js");
 const {
   SyncCoordinator,
   supportsAndroidDevicePermissionSync
@@ -262,6 +263,7 @@ try {
   assert.equal(staffDevice.role, "staff");
   assert.equal(staffDevice.isActive, true);
   assert.deepEqual(staffDevice.permissionGroups, {
+    ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
     service_orders: true,
     cashier: false,
     rooms_tasks: true,
@@ -274,6 +276,9 @@ try {
   assert.equal(staffDevice.permissions.includes("menu.stock_update"), false);
   assert.equal(staffDevice.permissions.includes("customer.view"), false);
   assert.equal(staffDevice.permissions.includes("table_order.close_paid"), false);
+  for (const group of ["commerce_orders_view", "commerce_orders_manage", "dealer_view", "shipment_view", "online_sales_view", "marketing_status_view"]) {
+    assert.equal(staffDevice.permissionGroups[group], false, "Missing Companion groups must remain OFF during permission sync.");
+  }
   const runtime = database.getSyncRuntimeStatus();
   assert.ok(runtime.requestCursor > 0);
   assert.equal(runtime.acknowledgedCursor, runtime.requestCursor);
@@ -378,7 +383,15 @@ try {
     known_server_revision: androidData.server_revision
   });
   assert.equal(unchangedSummary.status, 200);
-  assert.equal((await unchangedSummary.json()).not_modified, true);
+  assert.equal((await unchangedSummary.json()).not_modified, undefined, "Shared-secret summaries must not retain a device's old private cache.");
+  const claim = await fetch(`${baseUrl}/api/android-device-token.php`, { method: "POST", headers: {
+    "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret, "X-YA-Device-Id": "android-auto-smoke"
+  }, body: "{}" });
+  assert.equal(claim.status, 201);
+  const deviceToken = (await claim.json()).device_token;
+  const personalCurrent = await (await personalAndroidSummary(deviceToken)).json();
+  const personalUnchanged = await (await personalAndroidSummary(deviceToken, { known_server_revision: personalCurrent.server_revision })).json();
+  assert.equal(personalUnchanged.not_modified, true);
 
   const deletedHostedRequest = database.deleteRequest(requestResult.request_id);
   assert.equal(deletedHostedRequest.ok, true);
@@ -981,9 +994,7 @@ return [
     "Capability dışı eski Android action geçmişi telefona geri sızmamalı."
   );
   assert.equal(staleCapabilitySummary.summary.pending_action_count, 0);
-  const unchangedStaleCapabilitySummary = await (await syncApi({
-    action: "android_summary",
-    device_id: "android-auto-smoke",
+  const unchangedStaleCapabilitySummary = await (await personalAndroidSummary(deviceToken, {
     known_server_revision: staleCapabilitySummary.server_revision
   })).json();
   assert.equal(unchangedStaleCapabilitySummary.not_modified, true);
@@ -1171,6 +1182,12 @@ async function getAndroidAction(actionId) {
 
 async function syncApi(payload) {
   return postJson(`${baseUrl}/api/sync.php`, publicationEnvelope(payload), true);
+}
+
+function personalAndroidSummary(deviceToken, fields = {}) {
+  return fetch(`${baseUrl}/api/android.php`, { method: "POST", headers: {
+    "Content-Type": "application/json", "X-YA-Device-Id": "android-auto-smoke", "X-YA-Device-Token": deviceToken
+  }, body: JSON.stringify({ action: "android_summary", device_id: "android-auto-smoke", ...fields }) });
 }
 
 function postJson(url, payload, authenticated) {

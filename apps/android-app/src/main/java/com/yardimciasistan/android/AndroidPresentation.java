@@ -259,10 +259,13 @@ final class AndroidPresentation {
     if ("pending".equals(value)) return "Bekliyor";
     if ("applied".equals(value)) return "Uygulandı";
     if ("failed".equals(value)) return "Uygulanamadı";
+    if ("unknown".equals(value)) return "Sonuç kaydı bulunamadı";
     return value;
   }
 
   static String formatActionType(String value) {
+    if ("commerce_order_confirm".equals(value)) return "Ticari sipariş onayı";
+    if ("commerce_order_cancel".equals(value)) return "Ticari sipariş iptali";
     if (MarketUiRules.ACTION_STOCK_COUNT.equals(value)) return "Market stok sayımı";
     if (MarketUiRules.ACTION_PURCHASE_RECEIVE.equals(value)) return "Market mal kabulü";
     if (MarketUiRules.ACTION_PRODUCT_CREATE.equals(value)) return "Yeni ürün";

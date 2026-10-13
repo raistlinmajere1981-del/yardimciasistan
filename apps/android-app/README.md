@@ -39,9 +39,17 @@ takipli ürünün ekleme aksiyonu devre dışıdır.
 Companion ticari özetleri ayrı `commerce_order.view`, `shipment.view`,
 `online_sales.view` ve `marketing.status.view` izinlerini kullanır. Online satış/bayi
 filtreleri mevcut capability sınırlarına bağlıdır; restoran adisyonlarıyla karışmaz.
-Siparişler en fazla 100, pazarlama türleri 50 kayıt gösterir. Gönderi takip kaydı
-yalnız var/yok olarak gösterilir. Onay/iptal, alıcı/kalem detayı, kişisel bilgi ve
-takip kodu/URL bu ekranlarda bulunmaz.
+Siparişler en fazla 100, pazarlama türleri 50 kayıt gösterir. Sipariş ayrıntısı canonical
+alıcı, kalem, tutar, adres ve notu gösterir; güncel müşteri iletişimi `customer.view`
+veya etkin `dealer.view`, firma/yetkili alanları `dealer.view` gerektirir. Gönderi izni
+olan cihazlar mevcut takip numarası ve doğrulanmış HTTP(S) bağlantısını kullanabilir.
+Vergi/servis/ödeme kimlik bilgileri veya ilgisiz müşteriler aktarılmaz.
+
+Ürünler sipariş başına 500, snapshot toplamında 2000 satır ve ayrıntılar toplamda
+1 MiB ile sınırlıdır. Eski veya eksik ayrıntı salt-okunurdur. Tam ayrıntıda domainin
+ilan ettiği Onayla/İptal Et kararları, ayrı `commerce_order.confirm`/`commerce_order.cancel`
+izinleriyle açık onay ardından mevcut kalıcı outbox'a yazılır. Fulfillment, satış,
+tahsilat veya stok hareketi üretmez.
 
 Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
 `Ayarlar` ekranında gösterilir.
@@ -149,15 +157,24 @@ tablosu aynı action kimliğinin iki kez uygulanmasını engeller.
 
 İşlem kimliği ağ çağrısından önce üretilir ve işlem telefondaki kalıcı outbox'a yazılır.
 Yanıt kaybolur veya uygulama kapanırsa aynı kimlik ve payload yeniden gönderilir; sunucu
-ve masaüstü idempotency kontrolleri işlemin iki kez uygulanmasını engeller. Bir kayıt
-masaüstünü beklerken yeni değişiklik alınmaz; güncel snapshot çekildikten sonra devam edilir.
-Outbox kaydı normalize hosting endpoint'i ve güvenlik anahtarı parmak izine bağlıdır;
+ve masaüstü idempotency kontrolleri işlemin iki kez uygulanmasını engeller. Aynı sipariş
+masaüstünü beklerken yeni karar alınmaz. Farklı ticari siparişler bağımsız bekleyebilir;
+diğer operasyonların mevcut bekleme bariyerleri korunur.
+Outbox kaydı normalize hosting endpoint'inin mantıksal işlem hedefine bağlıdır;
 bekleyen işlem varken bağlantı başka bir firmaya değiştirilirse eski işlem yeni hedefe
 gönderilmez.
 
 Değiştirilebilir kayıtların payload'ı snapshot'taki `updated_at` değerini beklenti olarak
-taşır. Kayıt masaüstünde bu sırada değişmişse işlem uygulanmaz ve kullanıcıdan canlı veriyi
-yenilemesi istenir.
+taşır. Kayıt masaüstünde bu sırada değişmişse işlem uygulanmaz ve kullanıcıdan eşitlenen veriyi
+yenilemesi istenir. Sipariş kararları hem updated_at hem expected_status taşır.
+
+Son yetkili sipariş ayrıntısı internet veya Desktop olmadan mevcut kalıcı önbellekten
+açılabilir; snapshot zamanı ile son senkron zamanı ayrı gösterilir. Desktop sonradan
+güncel izin ve durumu doğrular. Hosting henüz öğrenmediği izin iptalini uygulayamaz;
+önceden indirilmiş çevrimdışı verinin uzaktan anında silindiği varsayılmaz.
+Kendi kararlarının en fazla 40 minimal sonucu mevcut cache içinde korunur. Uygulandı
+sonucu eski sipariş yayınıyla eşleşiyorsa yeni karar, normal sipariş güncellemesi gelene
+kadar kapalıdır. Sonuç kaydı Hosting retention nedeniyle bulunamıyorsa açıkça belirtilir.
 
 ### Görselden stok girişi
 
@@ -287,6 +304,13 @@ klasörü özgün tercihleri saklar):
 
 ```bash
 npm run verify:check -- android-companion-device-ui --include-manual
+```
+
+Canonical sipariş ayrıntısı, müşteri/bayi bağlantısı, takip bağlantısı, çevrimdışı
+kuyruk/restart/retry ve stale/izin iptali için aynı korumalı cihaz düzeneği:
+
+```bash
+npm run verify:check -- android-companion-commerce-device-ui --include-manual
 ```
 
 ADB üzerinden ekran görüntüsü, UI ağacı ve aynalama:

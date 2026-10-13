@@ -22,7 +22,7 @@ final class CompanionPresentation {
 
   static Summary order(CompanionData data, CompanionData.Order order, boolean showShipments) {
     Summary result = new Summary("Sipariş " + order.id, orderStatus(order.status), false, "placed".equals(order.status));
-    result.lines.add("Kaynak: " + source(order.source));
+    result.lines.add("Kaynak: " + (order.dealerOrder ? "Bayi siparişi (Masaüstü)" : source(order.source)));
     result.lines.add("Tarih: " + date(order.placedAt));
     result.lines.add("Tutar: " + AndroidPresentation.money(order.total, order.currency)
         + ("TRY".equals(order.currency) ? " · TRY" : ""));
@@ -67,6 +67,36 @@ final class CompanionPresentation {
     result.lines.add("Güncelleme: " + date(campaign.updatedAt));
     return result;
   }
+
+  static Summary shipment(CompanionData.Shipment shipment) {
+    Summary result = new Summary("Gönderi " + shipment.id, shipmentStatus(shipment.status), false, false);
+    result.lines.add("Kargo: " + missing(shipment.providerName));
+    result.lines.add("Takip numarası: " + missing(shipment.trackingNumber));
+    result.lines.add("Güncelleme: " + date(shipment.updatedAt));
+    if (!shipment.note.isEmpty()) result.lines.add("Not: " + shipment.note);
+    return result;
+  }
+
+  static String address(CompanionData.Address address) {
+    if (address == null) return "Teslimat adresi belirtilmemiş.";
+    return AndroidPresentation.joinNonEmpty("\n", address.recipient, address.line1, address.line2,
+        AndroidPresentation.joinNonEmpty(" · ", address.district, address.city, address.postalCode, address.countryCode), address.note);
+  }
+
+  static String itemQuantity(CompanionData.Item item) {
+    String unit;
+    switch (item.unit) {
+      case "piece": unit = "adet"; break;
+      case "pack": unit = "paket"; break;
+      case "box": unit = "kutu"; break;
+      case "meter": unit = "metre"; break;
+      case "other": unit = "diğer"; break;
+      default: unit = item.unit;
+    }
+    return java.math.BigDecimal.valueOf(item.quantity).stripTrailingZeros().toPlainString() + " " + unit;
+  }
+
+  static String missing(String value) { return value == null || value.isEmpty() ? "Belirtilmemiş" : value; }
 
   private static String date(String value) {
     return value == null || value.isEmpty() ? "Belirtilmemiş" : AndroidPresentation.shortTimestamp(value);

@@ -1,6 +1,6 @@
 # Android Companion v3 — kapsam ve sözleşme hazırlığı
 
-Durum: **A veri/izin sözleşmesi, B1 salt-okunur ekranlar ve sonraki aşamaların kapsamı**. B2 karar/detay güvenliği ile C/D çalışmaları ayrı bloklardır.
+Durum: **A veri/izin sözleşmesi, B1 operasyon özetleri ve B2 çevrimdışı sipariş detayı/kararı**. C/D çalışmaları ayrı bloklardır; milestone tam doğrulaması ayrıca yapılır.
 Başlangıç incelemesi: 2026-10-12, `main` / `6f67f5b3`.
 Hedef: Masaüstüyle **iş kuralı ve veri tutarlılığı**; masaüstünün bütün ekranlarını telefona kopyalamak değil.
 
@@ -59,12 +59,13 @@ alanları yok sayar. Restoranın `table_orders` alanı ve `table_order.*` izinle
 | `marketing.schedules` | Aynı marketing sahibi / schedule-execution tabloları | ID, kanal/hedef türü, durum, nextRunAt, son execution durumu, updatedAt; en fazla 50 |
 | `marketing.campaigns` | Kanonik campaign/outbox tabloları | ID, kanal, durum, pending+claimed ve failed sayıları, updatedAt; en fazla 50 |
 
-Serbest metin, firma/kişi adı, vergi kimliği, alıcı, telefon/e-posta, teslimat adresi,
+**A aşamasındaki özet sınırı:** Serbest metin, firma/kişi adı, vergi kimliği, alıcı, telefon/e-posta, teslimat adresi,
 not, sipariş kalemleri, takip kodu/URL, sağlayıcı hatasının ham metni, alıcı/segment
 listesi, medya ve kimlik bilgileri bu sözleşmede **bulunmaz**. Siparişin optional
 `customer_id` bağlantısı yalnız `dealer.view` ile çıkar. Kaynak yalnız
 `desktop | web-online-sales | web-dealer | other` olabilir; özel kaynak metni ve
 sourceReference dışarı çıkmaz. Bilinmeyen alanlar sunucu allowlist'inde atılır.
+B2'nin aşağıdaki optional ayrıntıları bu ilk özet sözleşmesini genişletir.
 
 `summary`/Android cevabının `operations` alanına eklenen optional sayaçlar:
 `pending_commerce_orders`, `open_commerce_orders`, `pending_shipments`,
@@ -91,7 +92,7 @@ sözleşmesi gereği etkin capability izinlerini alır; kapalı capability'yi a�
 | `online_sales.view` / `online_sales_view` | `commerce.orders` + `channel.online_sales` + ayrıca order view |
 | `marketing.status.view` / `marketing_status_view` | `marketing.studio`; audience campaign/plan için ayrıca `messaging.campaigns` + `core.customers` |
 
-`web-dealer` siparişleri Wholesale OFF iken; `web-online-sales` siparişleri Online Sales
+`web-dealer` ve `desktop-wholesale` siparişleri Wholesale OFF iken; `web-online-sales` siparişleri Online Sales
 OFF veya cihaz online view izni yokken kaldırılır. Gönderiler görünür sipariş ID'lerine
 bağlanır. LAN response güncel cihaz profiline göre kırpılır. Hosting aynı allowlist ve
 capability/permission kesişimini **cevap üretirken** uygular; yalnız Android UI filtresi
@@ -113,10 +114,10 @@ profilini bilir. Desktop'ın çevrimdışı yaptığı permission/capability ipt
 ulaşmadan uygulanamaz; önceden indirilmiş çevrimdışı cache uzaktan silinemez. Kaynak
 başına revision fencing bu iletişim yokluğunu çözmez; LAN→Hosting geçişinde daha eski
 otorite bilgisi de mümkündür. Shared-secret bootstrap eski alanlar için ayrıca legacy
-kimlik sınırını korur. Bu yüzden A yalnız yukarıdaki kişisel veri içermeyen özetleri
-sunmaktadır. Müşteri/firma kimliği, iletişim/adres, takip detayları ve yetkili detay
-endpoint'i bir sonraki güvenlik bloğuna kadar hazır değildir. Anında çevrimdışı
-revocation veya güvenli hassas detay akışı iddia edilmez.
+kimlik sınırını korur. B2 ürün kararı bu gecikmeyi kabul eder: yetkili cihazın son
+eşitlediği ayrıntılar çevrimdışı kullanılabilir. Ayrı canlı detay endpoint'i veya sürekli
+canlı yetki doğrulaması gerekmez. Yeni yayın gelince izin/capability redaksiyonu uygulanır;
+anında çevrimdışı revocation veya uzaktan cache silme iddia edilmez (D-049).
 
 ### Ticari sipariş karar altyapısı
 
@@ -180,11 +181,54 @@ gösterilir; yeni bir pull eski yayını güncelmiş gibi göstermez. Bağlantı
 senkronizasyon ve mevcut telefon kuyruğunun bekleme durumu kullanılır.
 İkinci cache veya eşitleme hattı yoktur; A'nın çevrimdışı revocation sınırları geçerlidir.
 
-**B2 önkoşulu:** Sipariş onay/iptal düğmesi B1'de bulunmaz; karar izni olan admin
-cihazda da ekran salt-okunurdur. Alıcı ve sipariş kalemleri için güvenli, cihaz bazlı
-detay erişimi ve Hosting/LAN otorite/izin güncelliği çözülmeden düğmeler açılmaz.
-Adres, iletişim, müşteri kimliği ve takip kodu/URL bu aşamada eklenmez. B2,
-A'daki domain owner + receipt/outbox altyapısını yeniden kullanmalıdır.
+Sipariş onay/iptal düğmesi B1'de bulunmaz; B1 snapshot'ının ayrıntıları olmayan
+siparişleri B2 istemcisinde de salt-okunurdur.
+
+## B2 — Çevrimdışı sipariş detayı ve karar
+
+Liste → ayrıntı akışı B1'in Bugün alt görünümlerinde kalır. Tam ayrıntı alıcıyı,
+ürün kalemlerini, sipariş tutarını, teslimat adresini ve notu gösterir. Sipariş anındaki
+immutable alıcı/adres ile güncel bağlı müşteri kaydı ayrı başlıklardır; güncel iletişim
+alanları sipariş geçmişinin üzerine yazılmaz. Bayi filtreleri web ve masaüstü bayi
+siparişlerini kapsar. Gönderi alanları salt-okunurdur; doğrulanmış HTTP(S) takip bağlantısı
+telefonun normal bağlantı açma mekanizmasını kullanır, uygulama kimlik bilgileri eklenmez.
+
+| Optional genişletme | Alanlar / erişim |
+| --- | --- |
+| `commerce.orders[].details` | Siparişteki müşteri adı, buyer adı/telefon/e-posta, immutable teslimat adresi, subtotal/discount, note, ürün ID/ad/birim/miktar/birim fiyat/satır toplamı; görünür siparişin `commerce_order.view` izni |
+| `details.items_total_count`, `items_complete`, `available_actions` | Tamlık bilgisi ve canonical order store'un mevcut geçişlerden ürettiği kararlar; ayrıca confirm/cancel izinleriyle kırpılır |
+| `commerce.customers` | Yalnız görünür siparişlerin bağlı mevcut müşteri ID/ad/telefon/e-posta/updatedAt; `customer.view` veya etkin `dealer.view` |
+| `commerce.customer_profiles` | Yukarıdaki bayi özeti + firma unvanı/yetkili adı; yalnız bağlı müşteri ve `dealer.view` |
+| `commerce.shipments` | Sağlayıcı adı, mevcut takip numarası/HTTP(S) bağlantısı ve not; görünür sipariş + `shipment.view` |
+| `orders[].dealer_order`, aggregate `dealer_count`/`dealer_pending` | `desktop-wholesale` için eski dört değerli source enum'unu koruyan bayi işareti; Wholesale OFF redaksiyonu sayaçlardan bayi kısmını da çıkarır |
+
+Sipariş/gönderi/müşteri/profil penceresi en fazla 100 kayıttır. Ürün kalemleri sipariş
+başına 500, snapshot toplamında 2000 satır; sanitize edilmiş sipariş ayrıntılarının toplam
+UTF-8 JSON bütçesi 1 MiB'dır. Serbest metinler alan bazlı sınırlanır. Bütçeyi aşan ayrıntı
+atlanır; eksik kalemli siparişte karar düğmeleri açılmaz. Kalemler için ikinci veri servisi
+veya sınırsız ürün/medya aktarımı yoktur. Vergi kimliği, kimlik bilgileri, ödeme/servis
+sırları, ham provider hatası, sourceReference, iç sistem alanları ve ilgisiz müşteriler
+allowlist dışında kalır. Pazarlamanın A/B1 özet sınırı değişmez.
+
+Son yetkili snapshot mevcut `OperationCache` içinde kalır; internet ve Desktop kapalıyken
+ayrıntılar açılır. Açık onay diyaloğunun ardından karar önce mevcut kalıcı `ActionOutbox`'a
+yazılır. Aynı siparişte bekleyen karar tekrar gönderilemez; farklı ticari siparişler
+bağımsız bekleyebilir. Önceki bağlantıya ait kuyruk ve diğer domainlerin mevcut işlem
+bariyerleri korunur. Retry aynı action ID ve expected_updated_at/expected_status ile yapılır.
+Desktop güncel cihaz iznini, capability'yi ve canonical sipariş durumunu receipt transaction'ında
+yeniden doğrular. Java/PHP sipariş durum makinesi üretmez; Java yalnız domainin ilan ettiği
+kararları, tamlık/izin/sürüm ve taşıma bariyerlerini kontrol eder.
+
+İşlem sonucu Bekliyor / Uygulandı / Uygulanamadı olarak ayrıntıda gösterilir. Hosting'in
+normal summary cevabı cihazın istediği en fazla 40 kendi karar sonucunu, `not_modified`
+cevabında da döndürür; başka cihazın sonucu paylaşılmaz. Mevcut cache facade'ında en fazla
+40 minimal receipt kimliği/sürüm/durum tutulur, müşteri veya ürün payload'u kopyalanmaz.
+Bilinen Uygulandı sonucu, sonraki retry'ın yetki reddiyle geri alınmış gibi gösterilmez.
+Uygulandı receipt'i sipariş yayını gelmeden ulaşırsa eski expected tuple ile eşleşen
+ayrıntıda yeni karar kapalıdır ve sipariş güncellemesinin beklendiği belirtilir; sipariş
+durumu tahmin edilmez. Hosting retention nedeniyle sonuç bulunamazsa açıkça sonuç kaydının
+bulunmadığı gösterilir, başarı uydurulmaz. Kaynak başına revision fencing, yayın source epoch,
+frozen payload, exact acknowledgement ve canonical idempotent receipt yaşam döngüsü korunur.
 
 ## Uygulama blokları ve tamamlanma ölçütü
 
@@ -201,13 +245,14 @@ Confirm/cancel backend ve Java policy/outbox altyapısı A içinde hazırlanmı�
 aşağıdaki checkbox kullanıcı arayüzüne bağlı tamamlanma ölçütüdür.
 
 - [x] Ticari siparişlerin güvenli durum listesi ve Bugün'de bekleyen sipariş sayısı (B1).
-- [ ] Güvenli alıcı/kalem detayı (B2).
-- [ ] Yeni order confirm/cancel işlemleri **yalnız backend domain sahibi üzerinden**, permission+status+idempotency testleri ile.
-- [ ] Müşteri/Bayi profilinde kısa salt-okunur alanlar; siparişin ilgili müşteriye bağlanması.
+- [x] Güvenli alıcı/kalem detayı (B2).
+- [x] Yeni order confirm/cancel işlemleri **yalnız backend domain sahibi üzerinden**, permission+status+idempotency testleri ile.
+- [x] Müşteri/Bayi profilinde kısa salt-okunur alanlar; siparişin ilgili müşteriye bağlanması.
 - [x] Sipariş özetinde gönderi durumu ve takip kaydı var/yok; online/bayi kaynak ayrımı (B1).
-- [ ] Takip kodu/URL için güvenli detay erişimi (B2).
+- [x] Takip kodu/URL için güvenli detay erişimi (B2).
 - [x] Pazarlama plan/yayın/başarısızlık durumlarının güvenli salt-okunur özeti (B1).
-- [ ] Mevcut Restoran/Pansiyon/Market ekranlarının regresyonu; full suite aşama sonunda.
+- [x] Mevcut Restoran/Pansiyon/Market/Mesajlar için hedefli Java, Android domain ve Companion regresyonları.
+- [ ] Milestone tam doğrulaması: `verify:pre-main` ayrı aşamada çalıştırılacak.
 
 ### C — Ses (ayrı, ortak servis aşaması)
 

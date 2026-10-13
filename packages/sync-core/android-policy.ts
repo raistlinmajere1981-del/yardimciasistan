@@ -402,7 +402,7 @@ export function androidActionAllowedByCapabilities(
 
   if (["commerce_order_confirm", "commerce_order_cancel"].includes(actionType)) {
     return enabled.has(C.ORDERS)
-      && (context.commerceOrderSource !== "web-dealer" || enabled.has(C.WHOLESALE))
+      && (!["web-dealer", "desktop-wholesale"].includes(context.commerceOrderSource ?? "") || enabled.has(C.WHOLESALE))
       && (context.commerceOrderSource !== "web-online-sales" || enabled.has(C.ONLINE_SALES));
   }
   if (actionType === "customer_request_convert_to_reservation") {

@@ -115,7 +115,7 @@ public final class AndroidCompanionStorageTest {
     assertTrue(retry.matchesTarget("companion:target"));
   }
 
-  private static final class InMemoryPreferences implements SharedPreferences {
+  static final class InMemoryPreferences implements SharedPreferences {
     private final Map<String, Object> values = new HashMap<>();
 
     @Override public Map<String, ?> getAll() { return new HashMap<>(values); }

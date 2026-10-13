@@ -181,7 +181,7 @@ public final class MainActivity extends ComponentActivity {
           @Override public void onTabSelected(String tab) {
             activeTab = tab;
             settingsOpen = false;
-            if (TAB_TODAY.equals(tab) && todayCoordinator != null) todayCoordinator.handleBack();
+            if (TAB_TODAY.equals(tab) && todayCoordinator != null) todayCoordinator.applyDestination(data, AndroidUiRules.resolveDestination("today"));
             render();
           }
           @Override public boolean canOpenTab(String tab) { return MainActivity.this.canOpenTab(tab); }
@@ -289,6 +289,29 @@ public final class MainActivity extends ComponentActivity {
           public int localPendingActionCount() {
             return MainActivity.this.localPendingActionCount();
           }
+          @Override public List<ActionOutbox.PendingAction> localActions() {
+            try { return actionOutbox == null ? new ArrayList<>() : actionOutbox.load(); }
+            catch (ActionOutbox.OutboxException error) { showError(error.getMessage()); return null; }
+          }
+          @Override public void confirmDecision(String type, String orderId, Runnable action) {
+            String label = CompanionUiRules.decisionLabel(type);
+            alertDialogBuilder().setTitle(label)
+                .setMessage("Sipariş " + orderId + " için bu kararı göndermek istiyor musunuz?\nİşlem uygulanana kadar Bekliyor olarak gösterilir.")
+                .setNegativeButton("Vazgeç", null)
+                .setPositiveButton(label, (dialog, which) -> action.run()).show();
+          }
+          @Override public void sendDecision(String type, JSONObject payload) {
+            ArrayList<AndroidActionDispatcher.Command> commands = new ArrayList<>();
+            commands.add(new AndroidActionDispatcher.Command(type, payload));
+            actionDispatcher.send(commands, "Sipariş kararı gönderildi.", "Sipariş kararı bekliyor. Bağlantı kurulunca yeniden gönderilecek.", data);
+          }
+          @Override public void openTracking(String url) {
+            String validated = CompanionData.trackingUrl(url);
+            if (validated.isEmpty()) { showError("Takip bağlantısı açılamadı."); return; }
+            try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(validated))); }
+            catch (android.content.ActivityNotFoundException ignored) { showError("Takip bağlantısını açacak uygulama bulunamadı."); }
+          }
+          @Override public void dial(String phone) { openDialer(phone); }
         }
     );
     inactiveDeviceScreen = new AndroidInactiveDeviceScreen(
@@ -409,6 +432,7 @@ public final class MainActivity extends ComponentActivity {
         }
     );
     actionOutbox = new ActionOutbox(preferences);
+    operationCache = new OperationCache(preferences, identity.deviceId);
     actionDispatcher = new AndroidActionDispatcher(
         this,
         preferences,
@@ -416,6 +440,7 @@ public final class MainActivity extends ComponentActivity {
         operationsTransport,
         identity,
         actionOutbox,
+        operationCache,
         new AndroidActionDispatcher.Listener() {
           @Override
           public boolean isBusy() {
@@ -446,6 +471,7 @@ public final class MainActivity extends ComponentActivity {
           public void onDispatchStarted() {
             loading = true;
             clearError();
+            if (companionViewVisible()) render();
           }
 
           @Override
@@ -460,8 +486,11 @@ public final class MainActivity extends ComponentActivity {
               data.actions.add(0, accepted.get(index));
             }
             data.pendingActions += pendingActionCount(accepted);
+            mergeCompanionActionResults();
             clearError();
-            if (marketFeedback && marketWorkspace != null) {
+            if (CompanionUiRules.isDecision(feedbackActionType)) {
+              Toast.makeText(MainActivity.this, successMessage, Toast.LENGTH_SHORT).show();
+            } else if (marketFeedback && marketWorkspace != null) {
               marketWorkspace.onSubmissionAccepted(feedbackActionType, successMessage);
               Toast.makeText(MainActivity.this, successMessage, Toast.LENGTH_SHORT).show();
             }
@@ -483,7 +512,12 @@ public final class MainActivity extends ComponentActivity {
               }
               data.pendingActions += pendingActionCount(accepted);
             }
-            if (actionRemainsQueued && marketWorkspace != null) {
+            mergeCompanionActionResults();
+            if (CompanionUiRules.isDecision(feedbackActionType) && actionRemainsQueued) {
+              connectionState = errorMessage;
+              clearError();
+              Toast.makeText(MainActivity.this, marketQueuedMessage, Toast.LENGTH_SHORT).show();
+            } else if (actionRemainsQueued && marketWorkspace != null) {
               connectionState = errorMessage;
               clearError();
               marketWorkspace.onSubmissionQueued(feedbackActionType, marketQueuedMessage);
@@ -532,7 +566,6 @@ public final class MainActivity extends ComponentActivity {
           }
         }
     );
-    operationCache = new OperationCache(preferences, identity.deviceId);
     localNotifications = new LocalNotificationCenter(this, preferences);
     settingsWorkspace = new AndroidSettingsWorkspace(
         this,
@@ -1274,6 +1307,11 @@ public final class MainActivity extends ComponentActivity {
   private boolean companionViewVisible() {
     return TAB_TODAY.equals(activeTab) && !settingsOpen
         && todayCoordinator != null && todayCoordinator.isCompanionViewOpen();
+  }
+
+  private void mergeCompanionActionResults() {
+    try { operationCache.mergeActionResults(data); }
+    catch (OperationCache.CacheException error) { showError(error.getMessage()); }
   }
 
   private void sendAction(String actionType, JSONObject actionPayload, String successMessage) {

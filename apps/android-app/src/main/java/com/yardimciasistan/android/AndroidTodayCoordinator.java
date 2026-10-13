@@ -4,12 +4,19 @@ import android.view.View;
 import android.widget.ScrollView;
 
 import androidx.activity.ComponentActivity;
+import org.json.JSONObject;
+import java.util.List;
 
 final class AndroidTodayCoordinator {
   interface Listener {
     void openRoute(String route);
     void render();
     int localPendingActionCount();
+    List<ActionOutbox.PendingAction> localActions();
+    void confirmDecision(String type, String orderId, Runnable action);
+    void sendDecision(String type, JSONObject payload);
+    void openTracking(String url);
+    void dial(String phone);
   }
 
   private final ComponentActivity activity;
@@ -18,6 +25,7 @@ final class AndroidTodayCoordinator {
   private String mode = "";
   private String source = CompanionUiRules.ALL;
   private String notice = "";
+  private String orderId = "";
 
   AndroidTodayCoordinator(
       ComponentActivity activity,
@@ -34,6 +42,7 @@ final class AndroidTodayCoordinator {
     mode = CompanionUiRules.canOpen(data, destination.mode) ? destination.mode : "";
     notice = CompanionUiRules.isMode(destination.mode) && mode.isEmpty() ? "Bu cihazın bu görünüm için yetkisi yok." : "";
     source = CompanionUiRules.ALL;
+    orderId = "";
   }
 
   void normalize(OperationData data) {
@@ -41,11 +50,17 @@ final class AndroidTodayCoordinator {
     if (!mode.isEmpty() && !CompanionUiRules.canOpen(data, mode)) {
       mode = "";
       notice = "Bu görünümün izni kaldırıldı veya işletme yeteneği kapatıldı.";
+      orderId = "";
+    }
+    if (!orderId.isEmpty() && data.companion.orderById(orderId) == null) {
+      orderId = "";
+      notice = "Sipariş bu eşitlemede görüntülenemiyor.";
     }
     if (!CompanionUiRules.sourceFilterAvailable(data, source)) source = CompanionUiRules.ALL;
   }
 
   boolean handleBack() {
+    if (!orderId.isEmpty()) { orderId = ""; return true; }
     if (mode.isEmpty()) return false;
     mode = "";
     notice = "";
@@ -53,9 +68,14 @@ final class AndroidTodayCoordinator {
     return true;
   }
 
-  String title() { return CompanionUiRules.title(mode); }
+  String title() { return orderId.isEmpty() ? CompanionUiRules.title(mode) : "Sipariş ayrıntısı"; }
   boolean isCompanionViewOpen() { return !mode.isEmpty(); }
-  String screenKey() { return "today:" + mode + ":" + source + (notice.isEmpty() ? "" : ":denied"); }
+  String screenKey() { return "today:" + mode + ":" + source + ":" + orderId + (notice.isEmpty() ? "" : ":denied"); }
+
+  void openOrder(OperationData data, String id) {
+    if (!CompanionUiRules.canOpen(data, mode) || data.companion.orderById(id) == null) return;
+    orderId = id; notice = "";
+  }
 
   View build(OperationData data, int bottomPaddingDp, boolean loading, boolean syncFailed) {
     if (!mode.isEmpty()) {
@@ -64,9 +84,22 @@ final class AndroidTodayCoordinator {
         @Override public void selectSource(String selected) {
           if (!CompanionUiRules.sourceFilterAvailable(data, selected)) return;
           source = selected;
+          orderId = ""; notice = "";
           listener.render();
         }
-      }).build(mode, source, loading, syncFailed, data.pendingActions + listener.localPendingActionCount(), bottomPaddingDp);
+        @Override public void openOrder(String id) { AndroidTodayCoordinator.this.openOrder(data, id); listener.render(); }
+        @Override public void backToList() { orderId = ""; listener.render(); }
+        @Override public void decide(CompanionData.Order order, String type) {
+          if (!CompanionUiRules.canDecide(data, order, type, listener.localActions())) return;
+          try {
+            JSONObject payload = CompanionUiRules.decisionPayload(order);
+            listener.confirmDecision(type, order.id, () -> listener.sendDecision(type, payload));
+          } catch (org.json.JSONException ignored) { /* No action can be sent with an incomplete precondition. */ }
+        }
+        @Override public void openTracking(String url) { listener.openTracking(url); }
+        @Override public void dial(String phone) { listener.dial(phone); }
+      }).build(mode, source, orderId, loading, syncFailed, data.pendingActions + listener.localPendingActionCount(),
+          listener.localActions(), notice, bottomPaddingDp);
     }
     return new TodayWorkspace(
         activity,

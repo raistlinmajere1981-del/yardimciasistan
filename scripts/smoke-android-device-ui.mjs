@@ -159,7 +159,7 @@ async function main() {
   ensureArtifactDir();
   ensureAdbDevice();
   lockDevicePortrait();
-  if (options.companionOnly) backupCompanionPreferences();
+  if (options.companionOnly || options.commerceOnly) backupCompanionPreferences();
   else prepareStockGalleryFixture();
 
   phoneTest = startPhoneTest();
@@ -169,6 +169,11 @@ async function main() {
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
   await waitForUiText("Öncelikli işler", 12000);
+  if (options.commerceOnly) {
+    await runCommerceOnly(baseUrl);
+    console.log("android-companion-commerce-device-ui-smoke-ok");
+    return;
+  }
   if (options.companionOnly) {
     await runCompanionOnly(baseUrl);
     console.log("android-companion-device-ui-smoke-ok");
@@ -874,6 +879,7 @@ function parseArgs(args) {
     stockImageOnly: false,
     reportsOnly: false,
     companionOnly: false,
+    commerceOnly: false,
     marketOnly: false
   };
 
@@ -889,6 +895,8 @@ function parseArgs(args) {
       parsed.marketOnly = true;
     } else if (arg === "--companion-only") {
       parsed.companionOnly = true;
+    } else if (arg === "--commerce-only") {
+      parsed.commerceOnly = true;
     } else if (arg.startsWith("--hold-ms=")) {
       parsed.holdMs = Number(arg.slice("--hold-ms=".length));
     } else if (arg === "--hold-ms") {
@@ -917,7 +925,7 @@ function parseArgs(args) {
   if (parsed.holdMs < 8000) {
     throw new Error("--hold-ms Android UI smoke için en az 8000 olmalı.");
   }
-  if ([parsed.stockImageOnly, parsed.reportsOnly, parsed.marketOnly, parsed.companionOnly].filter(Boolean).length > 1) {
+  if ([parsed.stockImageOnly, parsed.reportsOnly, parsed.marketOnly, parsed.companionOnly, parsed.commerceOnly].filter(Boolean).length > 1) {
     throw new Error("Tek bir --*-only Android UI smoke seçeneği kullanılmalı.");
   }
 
@@ -1100,6 +1108,216 @@ async function runCompanionOnly(baseUrl) {
     "Salt-okunur ekranlar ticari sipariş işlemi üretmemeli.");
   await publish(snapshot({ active: false }), "inactive");
   assertContains(dumpUi("companion-inactive.xml"), ["Cihaz Pasif"]);
+}
+
+async function runCommerceOnly(baseUrl) {
+  const { createRequire } = await import("node:module");
+  const { DatabaseSync } = await import("node:sqlite");
+  const { createTemporaryDesktopDatabase } = await import("./test-helpers/desktop-database.mjs");
+  const { createSmokeSetupInput } = await import("./test-helpers/desktop-setup.mjs");
+  const require = createRequire(import.meta.url);
+  const desktop = name => require(`../apps/desktop-app/dist-electron/${name}.js`);
+  const { createAndroidOperationsSnapshot } = desktop("android-operations-snapshot");
+  const { setBusinessCapability } = desktop("business-capability-store");
+  const { saveRuntimeCatalogProduct } = desktop("commerce-runtime");
+  const { createCommerceOrder, getCommerceOrder, updateCommerceOrderStatus } = desktop("commerce-order-store");
+  const { createShipmentForOrder } = desktop("commerce-shipment-store");
+  const { ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS } = require("../packages/sync-core/dist");
+  const { database, cleanup: closeDatabase } = createTemporaryDesktopDatabase("yardimci-companion-commerce-device-");
+  const deviceId = readDeviceId();
+  const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS, commerce_orders_view: true, commerce_orders_manage: true,
+    dealer_view: true, shipment_view: true, online_sales_view: true };
+  let raw;
+  const port = new URL(baseUrl).port;
+  const tunnel = enabled => adb(enabled ? ["reverse", "tcp:" + port, "tcp:" + port] : ["reverse", "--remove", "tcp:" + port]);
+  async function request(body) {
+    const response = await fetch(baseUrl + "/api/sync.php", { method: "POST", headers: {
+      "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret }, body: JSON.stringify(body) });
+    const result = await response.json(); assert.equal(response.ok && result.ok, true, result.message); return result;
+  }
+  async function refresh() {
+    tap(centerOf(findClickableBoundsByDescription(dumpUi("commerce-before-refresh.xml"), "Yenile")));
+    await delay(500);
+  }
+  async function publish(label) {
+    const snapshot = createAndroidOperationsSnapshot(database, database.getDashboardData());
+    const stamp = await publishSnapshot(baseUrl, snapshot, "commerce-" + label);
+    await refresh(); await waitForCachedSnapshotText(stamp, 25000); await delay(500); scrollToTop();
+    return snapshot;
+  }
+  async function click(text) {
+    const page = await waitForUiCondition(xml => {
+      try { findClickableBoundsByText(xml, text); return true; } catch { return false; }
+    }, 10000, "Tıklanabilir sipariş alanı bulunamadı: " + text);
+    writeFileSync(join(artifactDir, "commerce-before-click.xml"), page);
+    tap(centerOf(findClickableBoundsByText(page, text))); await delay(400);
+  }
+  async function findOnPage(text) {
+    for (let i = 0; i < 14; i++) {
+      const xml = dumpUi("commerce-search.xml");
+      const bounds = findBoundsByTextIfPresent(xml, text);
+      if (bounds) return xml;
+      swipe(360, 950, 360, 550, 1200); await delay(150);
+    }
+    throw new Error("Sipariş ekranında alan bulunamadı: " + text);
+  }
+  async function readDetail(label) {
+    scrollToTop(); let xml = "", previous = "";
+    for (let i = 0; i < 12; i++) {
+      const page = dumpUi("commerce-" + label + "-" + i + ".xml"); xml += page;
+      if (page === previous && page.includes("B2 Order Note")) break;
+      previous = page; swipe(360, 950, 360, 550, 1200);
+    }
+    assertNotContains(xml, ["Satışa Dönüştür", "Tahsilat", "PRIVATE_SYSTEM", "secret_key"]); scrollToTop(); return xml;
+  }
+  async function openOrder(order, filter) {
+    await click("Bugün"); await waitForUiText("Öncelikli işler", 12000);
+    scrollToTop();
+    await findOnPage("Ticari siparişler"); await click("Ticari siparişler");
+    scrollToTop();
+    if (filter) await click(filter);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      scrollToTop(); let tapped = false;
+      for (let i = 0; i < 14; i++) {
+        const xml = dumpUi("commerce-find-order.xml");
+        const description = "Sipariş " + order.id + " ayrıntısını aç";
+        if (xml.includes('content-desc="' + description + '"')) {
+          tap(centerOf(findClickableBoundsByDescription(xml, description))); tapped = true; break;
+        }
+        swipe(360, 950, 360, 550, 1200);
+      }
+      assert.ok(tapped, "Siparişin kendi ayrıntı bağlantısı bulunmalı.");
+      try {
+        await waitForUiText("Sipariş ayrıntısı", 6000);
+        scrollToTop(); // Returning to a detail restores its previous scroll position.
+        const detail = await waitForUiCondition(xml => xml.includes("Sipariş ayrıntısı") && xml.includes("Sipariş " + order.id),
+          12000, "Liste ile aynı siparişin ayrıntısı açılmalı.");
+        writeFileSync(join(artifactDir, "commerce-detail-top.xml"), detail); return;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        if (dumpUi("commerce-open-retry.xml").includes("Sipariş ayrıntısı")) await click("Listeye dön");
+      }
+    }
+  }
+  async function decide(label) {
+    let dialog;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // Automatic foreground sync may replace the view between a dump and tap.
+      const page = await findOnPage(label);
+      tap(centerOf(findClickableBoundsByText(page, label)));
+      try {
+        dialog = await waitForUiCondition(xml => xml.includes("bu kararı göndermek istiyor musunuz?"), 6000,
+          "Sipariş kararı onay diyaloğu açılmadı.");
+        break;
+      } catch (error) { if (attempt === 2) throw error; }
+    }
+    writeFileSync(join(artifactDir, "commerce-confirm-dialog.xml"), dialog);
+    assertContains(dialog, ["bu kararı göndermek istiyor musunuz?", "android:id/button2"]);
+    tap(centerOf(findBoundsByResourceId(dialog, "android:id/button1"))); await delay(500);
+  }
+  const localQueue = () => JSON.parse(readPreferenceValueIfPresent("pending_android_actions_v2") || "[]");
+  async function applyPending(order, type, expectedOk) {
+    let inbound;
+    for (let i = 0; i < 50; i++) {
+      const result = await request({ action: "pull_android_actions", limit: 100 });
+      inbound = result.actions.find(action => action.payload?.order_id === order.id && action.action_type === type);
+      if (inbound) break;
+      await delay(500);
+    }
+    assert.ok(inbound, "Kalıcı sipariş kararı Hosting kuyruğuna ulaşmalı.");
+    const result = database.applyAndroidAction(inbound); assert.equal(result.ok, expectedOk, result.message);
+    if (expectedOk) assert.equal(database.applyAndroidAction(inbound).alreadyApplied, true);
+    await request({ action: "mark_android_action_result", action_id: inbound.id,
+      status: result.ok ? "applied" : "failed", error_message: result.ok ? "" : result.message });
+    return { inbound, result };
+  }
+  try {
+    database.initialize();
+    assert.equal(database.saveInitialSetup(createSmokeSetupInput({ profileId: "market", businessName: "Commerce device fixture",
+      phone: "", whatsapp: "", syncSecret, initialCounts: { rooms: 0, tables: 0 }, tableCategories: [],
+      servicePreferences: { whatsapp: false, android: true } })).ok, true);
+    for (const capability of ["commerce.orders", "commerce.wholesale", "channel.online_sales"])
+      setBusinessCapability(database.databasePath, { capability, enabled: true });
+    database.upsertAndroidDeviceSightings([{ device_id: deviceId, device_name: "B2 test", app_version: "test",
+      first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString() }]);
+    assert.equal(database.setAndroidDeviceActive(deviceId, true).ok, true);
+    assert.equal(database.setAndroidDevicePermissionGroups(deviceId, groups).ok, true);
+    const customer = database.saveCustomer({ fullName: "B2 Current Customer", phone: "+905551112233", email: "current@example.test",
+      address: "Unrelated current address", notes: "PRIVATE_SYSTEM", tags: [], commercialProfile: {
+        companyName: "B2 Company", authorizedPerson: "B2 Authorized", dealerStatus: "active", priceGroup: "dealer_a", taxNumber: "1234567890" } });
+    assert.equal(customer.ok, true);
+    const product = saveRuntimeCatalogProduct(database.databasePath, { name: "B2 Product", salePrice: 12.5, purchasePrice: 5,
+      currency: "TRY", unit: "piece", taxRate: 20, trackInventory: false, isActive: true });
+    const makeOrder = (source, linked = false) => createCommerceOrder(database.databasePath, { source,
+      ...(linked ? { customerId: customer.savedId } : {}), buyerSnapshot: { name: "B2 Buyer", phone: "+905554445566", email: "buyer@example.test" },
+      deliverySnapshot: { method: "shipping", address: { recipientName: "B2 Receiver", addressLine1: "B2 Delivery Street",
+        district: "Merkez", city: "Ankara", countryCode: "TR", note: "B2 Door" } },
+      discountTotal: 5, note: "B2 Order Note", items: [{ productId: product.id, quantity: 2 }] }, { wholesaleEnabled: true }).order;
+    const dealer = makeOrder("desktop-wholesale", true), online = makeOrder("web-online-sales");
+    const stale = makeOrder("desktop"), revoked = makeOrder("desktop");
+    const shipment = createShipmentForOrder(database.databasePath, dealer.id);
+    raw = new DatabaseSync(database.databasePath);
+    raw.prepare("UPDATE commerce_shipments SET provider_name=?,tracking_number=?,tracking_url=?,status='dispatched' WHERE id=?")
+      .run("B2 Carrier", "B2TRACK123", baseUrl + "/index.php?b2_tracking=B2TRACK123", shipment.id);
+    const effects = () => ["commerce_sales", "inventory_movements", "finance_entries", "customer_credit_entries", "commerce_order_fulfillments"].map(table =>
+      raw.prepare("SELECT count(*) AS n FROM " + table).get().n);
+    const before = effects();
+    console.log("B2 cihaz: canonical bayi, müşteri, kalem, adres ve takip ayrıntısı.");
+    await publish("initial"); await openOrder(dealer, "Bayi siparişleri");
+    assertContains(await readDetail("dealer"), ["Bayi siparişi (Masaüstü)", "B2 Current Customer", "B2 Company", "B2 Authorized",
+      "B2 Buyer", "+905554445566", "buyer@example.test", "B2 Delivery Street", "B2 Product", "2 adet", "12,50", "25,00", "20,00",
+      "B2TRACK123", "Takibi Aç", "B2 Order Note", 'text="Onayla"', 'text="İptal Et"']);
+    captureScreenshot("commerce-detail.png");
+    await findOnPage("Takibi Aç"); await click("Takibi Aç");
+    await waitForUiCondition(() => focusedPackage() !== packageName, 12000, "Takip bağlantısı telefon uygulamasına açılamadı.");
+    adb(["shell", "input", "keyevent", "KEYCODE_BACK"]); await delay(500);
+    // Last authorized facts survive process restart without a Desktop or network.
+    console.log("B2 cihaz: çevrimdışı cache, kalıcı karar kuyruğu ve yeniden başlatma.");
+    const credential = readPreferenceValueIfPresent("sync_secret");
+    assert.equal(/^device:yat_[a-f0-9]{64}$/.test(credential), true, "Ayrıntı cihazın kişisel bağlantısıyla eşitlenmeli.");
+    tunnel(false); relaunchApp(true); await waitForUiText("Öncelikli işler", 12000); await openOrder(dealer, "Bayi siparişleri");
+    assert.equal(readPreferenceValueIfPresent("sync_secret") === credential, true, "Normal restart kişisel bağlantıyı korumalı.");
+    await waitForUiText("Bağlantı kurulamadı", 35000);
+    assertContains(await readDetail("offline"), ["B2 Delivery Street", "B2 Product", "Son senkron:"]);
+    await decide("Onayla"); await delay(500);
+    const pending = localQueue().find(action => action.payload?.order_id === dealer.id);
+    assert.ok(pending); assert.equal(pending.type, "commerce_order_confirm");
+    assert.equal(pending.payload.expected_updated_at, dealer.updatedAt); assert.equal(pending.payload.expected_status, "placed");
+    scrollToTop();
+    await waitForUiText("Bağlantı kurulamadı", 35000);
+    relaunchApp(true); await waitForUiText("Öncelikli işler", 12000);
+    assert.equal(localQueue().find(action => action.id === pending.id)?.id, pending.id);
+    tunnel(true); await delay(1000); await refresh();
+    console.log("B2 cihaz: aynı ID ile retry, canonical onay ve iptal.");
+    const applied = await applyPending(dealer, "commerce_order_confirm", true); assert.equal(applied.inbound.id, pending.id);
+    await publish("confirmed"); await openOrder(dealer, "Bayi siparişleri");
+    const confirmed = await readDetail("applied");
+    assertContains(confirmed, ["Onaylandı", "Uygulandı"]);
+    assertNotContains(confirmed, ['text="Onayla"']);
+    await openOrder(online, "Online satış"); await decide("İptal Et");
+    await applyPending(online, "commerce_order_cancel", true); await publish("cancelled"); await openOrder(online, "Online satış");
+    const cancelled = await readDetail("cancelled"); assertContains(cancelled, ["İptal edildi", "Uygulandı"]);
+    assertNotContains(cancelled, ['text="Onayla"', 'text="İptal Et"']);
+    console.log("B2 cihaz: stale karar, işlem sırasında izin iptali ve capability OFF.");
+    await openOrder(stale, "Tümü"); await decide("Onayla");
+    updateCommerceOrderStatus(database.databasePath, { orderId: stale.id, status: "cancelled" });
+    const staleResult = await applyPending(stale, "commerce_order_confirm", false);
+    await publish("stale"); await openOrder(stale, "Tümü");
+    assertContains(await readDetail("stale-failed"), ["Uygulanamadı", staleResult.result.message]);
+    assert.equal(getCommerceOrder(database.databasePath, stale.id).order.status, "cancelled");
+    await openOrder(revoked, "Tümü"); await decide("Onayla");
+    assert.equal(database.setAndroidDevicePermissionGroups(deviceId, { ...groups, commerce_orders_manage: false }).ok, true);
+    const denied = await applyPending(revoked, "commerce_order_confirm", false);
+    await publish("permission-revoked"); await openOrder(revoked, "Tümü");
+    const readonly = await readDetail("permission-revoked"); assertContains(readonly, ["Uygulanamadı", denied.result.message]);
+    assertNotContains(readonly, ['text="Onayla"', 'text="İptal Et"']);
+    assert.equal(getCommerceOrder(database.databasePath, revoked.id).order.status, "placed");
+    for (const capability of ["channel.online_sales", "commerce.wholesale", "commerce.orders"])
+      setBusinessCapability(database.databasePath, { capability, enabled: false });
+    await publish("capability-off");
+    assertNotContains(dumpUi("commerce-capability-off.xml"), ["B2 Buyer", "B2 Product", "Ticari siparişler"]);
+    assert.deepEqual(effects(), before);
+  } finally { tunnel(true); raw?.close(); closeDatabase(); }
 }
 
 async function runMarketOnly(baseUrl) {
@@ -1717,7 +1935,7 @@ function prepareAppForUi(baseUrl) {
   adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"], { allowFailure: true });
   adb(["shell", "wm", "dismiss-keyguard"], { allowFailure: true });
   adb(["shell", "am", "force-stop", "com.android.documentsui"], { allowFailure: true });
-  if (!options.companionOnly) prepareSystemCameraForUiTest();
+  if (!options.companionOnly && !options.commerceOnly) prepareSystemCameraForUiTest();
   adb(["shell", "cmd", "statusbar", "collapse"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
@@ -1860,11 +2078,15 @@ function focusedPackage() {
   return match?.[1] ?? "";
 }
 
-function relaunchApp() {
+function relaunchApp(preserveConnection = false) {
   if (!uiTestBaseUrl) {
     throw new Error("Android UI test bağlantısı hazırlanmadı.");
   }
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
+  if (preserveConnection) {
+    adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`]);
+    return;
+  }
   adb([
     "shell",
     "am",
@@ -1968,7 +2190,8 @@ function readPreferenceValueIfPresent(name) {
   }
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = result.stdout.match(new RegExp(`<string name="${escapedName}">([^<]+)<\\/string>`));
-  return match ? match[1].trim() : "";
+  return match ? match[1].trim().replaceAll("&quot;", '"').replaceAll("&apos;", "'")
+    .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&") : "";
 }
 
 async function publishDeviceRole(baseUrl, deviceId, role, options = {}) {

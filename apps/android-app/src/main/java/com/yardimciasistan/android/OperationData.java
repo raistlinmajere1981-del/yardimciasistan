@@ -1303,6 +1303,9 @@ final class OperationData {
     String status = "pending";
     String errorMessage = "";
     String taskType = "";
+    String orderId = "";
+    String expectedUpdatedAt = "";
+    String expectedStatus = "";
     String createdAt = "";
     String processedAt = "";
 
@@ -1314,6 +1317,9 @@ final class OperationData {
       record.errorMessage = value(source, "error_message", "");
       JSONObject payload = source.optJSONObject("payload");
       record.taskType = payload == null ? "" : value(payload, "task_type", "");
+      record.orderId = payload == null ? "" : value(payload, "order_id", "");
+      record.expectedUpdatedAt = payload == null ? "" : value(payload, "expected_updated_at", "");
+      record.expectedStatus = payload == null ? "" : value(payload, "expected_status", "");
       record.createdAt = value(source, "created_at", "");
       record.processedAt = value(source, "processed_at", "");
       return record;

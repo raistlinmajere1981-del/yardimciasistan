@@ -54,7 +54,7 @@ final class AndroidActionPolicy {
     if ("commerce_order_confirm".equals(type) || "commerce_order_cancel".equals(type)) {
       CompanionData.Order order = data.companion.orderById(payload.optString("order_id", ""));
       return data.hasPermission("commerce_order.view") && order != null
-          && (!"web-dealer".equals(order.source) || data.hasBusinessCapability("commerce.wholesale"))
+          && (!CompanionUiRules.isDealerOrder(order) || data.hasBusinessCapability("commerce.wholesale"))
           && (!"web-online-sales".equals(order.source) || data.hasPermission("online_sales.view"));
     }
     String marketPermission = MarketUiRules.requiredPermissionForAction(type);

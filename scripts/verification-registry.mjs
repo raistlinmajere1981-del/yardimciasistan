@@ -267,6 +267,10 @@ const BASE_CHECKS = [
     phase: 50, presets: [], domains: ["android"], manual: true,
     requires: ["build-packages", "build-desktop", "build-android-debug"]
   }),
+  check("android-companion-commerce-device-ui", "Companion sipariş detay ve karar cihaz akışı", "node", ["scripts/smoke-android-device-ui.mjs", "--no-build", "--commerce-only", "--hold-ms=900000"], {
+    phase: 50, presets: [], domains: ["android", "commerce"], manual: true,
+    requires: ["build-packages", "build-desktop", "build-android-debug"]
+  }),
   check("php-lint", "Web modülü PHP lint", "node", ["scripts/php-lint.mjs"], {
     phase: 20, presets: ["full"], domains: ["web", "business-messaging"]
   }),

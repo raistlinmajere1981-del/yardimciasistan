@@ -587,7 +587,8 @@ or fulfillment. Confirmation/fulfillment never dispatches a Shipment. The provid
 is a typed boundary only, with no production fake, SDK, credentials or automatic execution.
 B2 is local desktop persistence. Companion v3 A carries only bounded, permission-projected
 Shipment status facts through the existing Android snapshot publication; it never queues
-Shipment execution or sends receiver/address/tracking details. A future provider/sync
+Shipment execution. Companion v3 B2 extends only the read projection with authorized,
+offline receiver/address/tracking facts under D-049. A future provider/sync
 execution slice must explicitly define its own execution contract.
 Shipment-specific change events refresh only the selected Order's shipment projection;
 local mutation responses update that projection immediately without polling.
@@ -1535,3 +1536,35 @@ cannot mutate technical/service roots to bypass their Settings/configuration/tes
 
 Only the current schema is extended; no historical migration chain or second Settings
 persistence path is introduced.
+
+## D-049 — Companion commerce details use the authorized offline snapshot
+
+**Status:** ACCEPTED, implementing the requested Companion v3 B2 offline operation.
+
+Android's last authorized commerce snapshot includes bounded order-time buyer, delivery,
+items, amounts and note facts. Current linked Customer contact fields require customer
+view or effective dealer view; commercial company/authorized-person fields require dealer
+view; shipment tracking requires shipment view. Online and dealer sources retain their
+independent capability/permission gates, including Desktop-created wholesale orders.
+No new business capability or alternative order/customer/shipment owner is introduced.
+
+Hosting authenticates the personal device and redacts at response time; LAN uses the same
+allowlist and effective permission intersection. Shared-secret/general summary responses
+do not expose these private fields. Credentials, payment/provider secrets, tax identity,
+unrelated customers and arbitrary media remain excluded. No private detail endpoint or
+second cache/sync system is required. Existing transport security limits remain in force.
+
+The last authorized facts remain readable offline without a running Desktop. Hosting can
+only apply revocation after accepting the relevant Desktop publication; previously
+downloaded offline data cannot be remotely erased immediately. This accepted delay does
+not create a continuous connectivity or live authority validation requirement.
+
+After explicit confirmation, eligible confirm/cancel decisions enter the existing durable
+action outbox. Eligibility is advertised by the canonical order transition owner; Java
+and PHP do not implement a second order state machine. Desktop rechecks current rights,
+expected_updated_at and expected_status in the canonical receipt transaction. Action ID,
+intent hash, idempotent replay and publication fencing remain authoritative. An applied
+receipt arriving before its order snapshot blocks a further decision on the unchanged
+expected tuple without inventing an optimistic order status. Missing retained transport
+results are shown honestly. Fulfillment, Sale, payment, stock and finance operations stay
+outside this mobile decision flow.
