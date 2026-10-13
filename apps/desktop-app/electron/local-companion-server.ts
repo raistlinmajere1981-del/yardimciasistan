@@ -187,6 +187,8 @@ function summaryResponse(
     operations: snapshot.summary,
     business_capabilities: snapshot.business_capabilities,
     local_network_enabled: snapshot.local_network_enabled !== false,
+    // Mirrors Hosting's per-device voice projection; contains no provider secrets.
+    voice: { stt_available: snapshot.voice?.stt_available === true },
     daily_tasks: snapshot.daily_tasks,
     requests: snapshot.requests,
     customers: snapshot.customers,
@@ -456,7 +458,9 @@ export class LocalCompanionServer {
             not_modified: true,
             server_revision: this.sourceRevision,
             pulled_at: new Date().toISOString(),
-            pending_action_count: 0
+            pending_action_count: 0,
+            // Even unchanged snapshots must refresh the live STT availability gate.
+            voice: { stt_available: snapshot.voice?.stt_available === true }
           });
           return;
         }

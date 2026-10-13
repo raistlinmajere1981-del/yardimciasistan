@@ -26,7 +26,7 @@ const TOKEN = "yal_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 function baseSnapshot() {
   return {
-    business_capabilities: ["service.android", "core.reports", "core.finance", "food_service.menu", "commerce.catalog"],
+    business_capabilities: ["service.android", "core.customers", "accommodation.folio", "core.reports", "core.finance", "food_service.menu", "commerce.catalog"],
     local_network_enabled: true,
     summary: {
       pending_daily_tasks: 0,
@@ -109,9 +109,13 @@ function baseSnapshot() {
 function assertProjection() {
   const source = baseSnapshot();
 
+  source.business_capabilities.push("service.ai");
+  source.voice = { stt_available: true };
+  source.androidPermissions["device-admin"].permissions.push("voice.dictation");
   const staff = projectLocalAndroidSnapshotForDevice(source, "device-staff");
   assert.equal(Object.keys(staff.androidPermissions).length, 1);
   assert.equal(staff.androidPermissions["device-staff"].role, "staff");
+  assert.deepEqual(staff.voice, { stt_available: false });
   assert.deepEqual(staff.customers, []);
   assert.deepEqual(staff.customer_room_stays, []);
   assert.deepEqual(staff.room_folios, []);
@@ -123,6 +127,7 @@ function assertProjection() {
   const admin = projectLocalAndroidSnapshotForDevice(source, "device-admin");
   assert.equal(Object.keys(admin.androidPermissions).length, 1);
   assert.equal(admin.androidPermissions["device-other"], undefined);
+  assert.deepEqual(admin.voice, { stt_available: true });
   assert.equal(admin.customers.length, 1);
   assert.equal(admin.customer_room_stays.length, 1);
   assert.equal(admin.room_folios.length, 1);
@@ -130,6 +135,7 @@ function assertProjection() {
   assert.deepEqual(admin.menu_product_candidates, source.menu_product_candidates);
 
   const unknown = projectLocalAndroidSnapshotForDevice(source, "device-unknown");
+  assert.deepEqual(unknown.voice, { stt_available: false });
   assert.equal(unknown.androidPermissions["device-unknown"].is_active, false);
   assert.deepEqual(unknown.requests, []);
   assert.deepEqual(unknown.rooms, []);
@@ -224,7 +230,13 @@ async function assertServer() {
       phone: "05550000000",
       whatsapp: "05550000000"
     }),
-    createSummary: (deviceId) => projectLocalAndroidSnapshotForDevice(baseSnapshot(), deviceId),
+    createSummary: (deviceId) => {
+      const source = baseSnapshot();
+      source.business_capabilities.push("service.ai");
+      source.voice = { stt_available: true };
+      source.androidPermissions["device-test"].permissions.push("voice.dictation");
+      return projectLocalAndroidSnapshotForDevice(source, deviceId);
+    },
     applyAction: (action) => {
       appliedAction = action;
       return { ok: true, message: "Applied.", alreadyApplied: false };
@@ -282,6 +294,7 @@ async function assertServer() {
     assert.equal(summaryBody.business.display_name, "Local Test İşletmesi");
     assert.equal(summaryBody.approval_required, false);
     assert.equal(summaryBody.business_capabilities.includes("service.android"), true);
+    assert.deepEqual(summaryBody.voice, { stt_available: true });
     assert.equal(summaryBody.androidPermissions["device-test"].is_active, true);
 
     const beforeRevision = summaryBody.server_revision;
@@ -298,6 +311,7 @@ async function assertServer() {
     const unchangedBody = await unchanged.json();
     assert.equal(unchangedBody.not_modified, true);
     assert.equal(unchangedBody.server_revision, beforeRevision);
+    assert.deepEqual(unchangedBody.voice, { stt_available: true });
     const action = await fetch(`${base}/local/v1/action`, {
       method: "POST",
       headers: {
