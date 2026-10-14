@@ -1,9 +1,11 @@
-# Android Companion — Native UI v4 tasarım kararı (keşif aşaması)
+# Android Companion — Native UI v4 tasarım kararı ve güncel uygulama durumu
 
-**Durum:** Saha düzeni seçilerek sadeleştirme ve kişisel görünüm + tablet keşfi aşamasına geçildi. Üretim uygulaması değişmemiştir.
+**Durum (2026-10-14 / 2.0.8):** Native V4 gezinme temeli mevcut Android uygulamasına alındı. Saha v2 tam görsel yenilemesi hâlâ prototip aşamasında ve Codex hazır olana kadar bekletiliyor.
 **Kod tabanı:** `apps/android-app` / native Java. Kaynak otoritesi Desktop SQLite ve mevcut Android snapshot/action sözleşmeleri.
-**Baseline:** `android-ui-before-native-v4` Git etiketi; referans ekran `.superdesign/android-companion/baseline/`.
+**Baseline:** `android-ui-before-native-v4` Git etiketi; referans ekran `.superdesign/android-companion/baseline/`. Bu tarihsel referans korunur, güncel ekranlarla üzerine yazılmaz.
 **Alternatifler:** `.superdesign/android-companion/native-v4/index.html`, `akis.html`, `saha.html`.
+**Güncel kaynak:** `main` HEAD `a863a3fd`; Android/AI birleştirme `a3e56c54`; ürün sürümü `2.0.8` / Android versionCode `12`.
+**Güncel arşiv:** `.superdesign/android-companion/archive/source-current-2.0.8/`. Stage 1 ekranları `2.0.7-debug` paketinden alınmış tarihsel referanslardır; son birleştirme sonrasında güncel 2.0.8 ekranı olarak doğrulanmış sayılmaz.
 
 ## Hedef deneyim
 
@@ -24,9 +26,9 @@
 - TalkBack / Switch Access kullanıcıları için tüm root geçişleri dokunulabilir navigasyondan yapılabilir. Motion reduction etkin olduğunda animasyon minimum/kapalı. Orientation değişiminde state kaybolmaz.
 - Gezinme sabit 4+ pencere kopyası oluşturmayacak; yalnız görünür ekran üretilecek. Eski Java UI dönüştürüldükçe kaldırılacak; iki çalışan versiyon yok.
 
-## Aşamalar (tasarım seçimi sonrasında)
+## Aşamalar ve durum
 
-1. **Navigation owner** — Canonical root state, gesture arbiter, alt menü, izin değişimi fallback. Hedefli Java/unit + gerçek Samsung yatay/dikey swipe testi.
+1. **Navigation owner — tamamlandı (Native V4 Stage 1)** — Canonical root state, gesture arbiter, alt menü ve izin değişimi fallback uygulanmış, hedefli Java/unit ve gerçek Samsung yatay/dikey swipe doğrulamaları yapılmıştır. Yeni görsel çalışma mevcut navigation ownerı yeniden kurmamalı.
 2. **Bugün & ticaret** — Öncelikli işler, sayaçlar ve ticari sipariş/gönderi özeti. Salt okunur projection ve canonical order operations korunur.
 3. **Pansiyon / Restoran / Market** — Saha kartları, stok, rezervasyon, masa ve hızlı eylemler. Domain yetkileri ve optimistic/retry kontrolleri korunur.
 4. **Müşteri / Mesajlar** — İletişim, talep, yanıt bekleyenler; işlem düzenleyicileri tek anlamlı tam ekran veya native sheet.
