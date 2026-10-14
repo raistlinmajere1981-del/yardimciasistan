@@ -1,12 +1,16 @@
 import {
   classifyAIProviderFailure,
   generateConfiguredChat,
+  analyzeCloudflareImage,
+  generateConfiguredImage,
+  CloudflareAiError,
   listGoogleAiStudioModels,
   rankGoogleAiStudioModels,
   verifyGoogleAiStudioVisionModel,
   type AICompletionFailureReason
 } from "@yardimci-asistan/ai-core";
-import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { isCloudflareAiBaseUrl, supportsVisionModel, supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { normalizeGeneratedImagePng } from "./generated-image-normalization";
 import type { DesktopDatabase } from "./database";
 import { normalizeAiTimeoutSeconds } from "./ai-config";
 import { getEffectiveAiApiKey } from "./ai-secret-service";
@@ -22,6 +26,7 @@ export interface AiConnectionTestInput {
   baseUrl: string;
   model: string;
   imageModel?: string;
+  visionModel?: string;
   apiKey: string;
   useStoredApiKey: boolean;
   timeoutSeconds: number;
@@ -64,6 +69,9 @@ export async function testAiConnection(
     };
   }
 
+  if (service === "cloudflare" && (!isCloudflareAiBaseUrl(String(input.baseUrl)) || !isCloudflareAiBaseUrl(baseUrl))) {
+    return { ok: false, message: "Cloudflare için geçerli Account ID ile oluşturulan resmi API adresi gerekli." };
+  }
   const timeoutCandidate = Number(input?.timeoutSeconds);
   if (!Number.isInteger(timeoutCandidate) || timeoutCandidate < 5 || timeoutCandidate > 120) {
     return {
@@ -76,6 +84,43 @@ export async function testAiConnection(
   const timeoutSeconds = normalizeAiTimeoutSeconds(timeoutCandidate);
   const operationId = createDiagnosticOperationId("ai-connection");
   const operationStartedAt = Date.now();
+
+  if (service === "cloudflare") {
+    const config = { enabled: true, provider: "openai_compatible" as const, service, baseUrl, model, apiKey, timeoutMs: timeoutSeconds * 1000 };
+    if (input.visionModel && !supportsVisionModel(service, input.visionModel)) return { ok: false, message: "Cloudflare görsel analiz modeli desteklenmiyor." };
+    if (input.imageModel && !supportsImageGenerationModel(service, input.imageModel)) return { ok: false, message: "Cloudflare görsel üretim modeli desteklenmiyor." };
+    logAiOperationStarted("connection-test", config, operationId);
+    const text = await generateConfiguredChat({ ...config, messages: [{ role: "user", content: "Türkçe tek kısa cümleyle bağlantının çalıştığını belirt." }] });
+    logAiOperationCompleted("connection-test", config, text, operationStartedAt, operationId);
+    if (!text.ok) return { ok: false, message: `Metin: ${text.message}` };
+    if (input.visionModel) {
+      const visionConfig = { ...config, model: input.visionModel }, startedAt = Date.now();
+      logAiOperationStarted("vision-test", visionConfig, operationId);
+      const vision = await analyzeCloudflareImage(visionConfig, "Bu test görselini Türkçe tek cümleyle tarif et.",
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+      logAiOperationCompleted("vision-test", visionConfig, vision, startedAt, operationId);
+      if (!vision.ok) return { ok: false, message: `Görsel analiz: ${vision.message}` };
+    }
+    if (input.imageModel) {
+      const imageConfig = { ...config, model: input.imageModel }, startedAt = Date.now();
+      logAiOperationStarted("image-test", imageConfig, operationId);
+      try {
+        await generateConfiguredImage(imageConfig, "A cozy cottage beneath a clear blue sky", "square", globalThis.fetch, normalizeGeneratedImagePng);
+        logAiOperationCompleted("image-test", imageConfig, { ok: true, provider: "openai_compatible", service, model: input.imageModel, answer: "" }, startedAt, operationId);
+      } catch (error) {
+        const failure = error instanceof CloudflareAiError ? error : new CloudflareAiError("invalid_response");
+        logAiOperationCompleted("image-test", imageConfig, { ok: false, provider: "openai_compatible", service, model: input.imageModel,
+          message: failure.message, reason: failure.reason, fallbackAnswer: "", ...(failure.status !== undefined ? { status: failure.status } : {}),
+          ...(failure.providerCode ? { providerCode: failure.providerCode } : {}) }, startedAt, operationId);
+        return { ok: false, message: `Görsel üretim: ${failure.message}` };
+      }
+    }
+    database.recordServiceSettingsVerification("ai", { provider, service, projectName, baseUrl, model,
+      visionModel: input.visionModel ?? "", imageModel: input.imageModel ?? "", apiKey, timeoutSeconds });
+    const verified = ["metin", ...(input.visionModel ? ["görsel analiz"] : []), ...(input.imageModel ? ["görsel üretim"] : [])];
+    return { ok: true, message: `Cloudflare ${verified.join(", ")} isteği başarılı. STT ayrı test edilmeli; bu sonuç kalan ücretsiz kotayı garanti etmez. Ayarları kaydedin.`, model,
+      models: [...new Set([model, input.visionModel, input.imageModel].filter((id): id is string => Boolean(id)))].map(id => ({ id, label: id })) };
+  }
 
   if (service === "gemini") {
     const modelListResult = await listGoogleAiStudioModels({

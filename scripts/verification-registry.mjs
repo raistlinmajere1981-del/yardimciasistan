@@ -71,6 +71,8 @@ const SMOKE_FILES = [
   "scripts/smoke-android-release-connection.mjs",
   "scripts/smoke-android-reservation-actions.mjs",
   "scripts/smoke-android-room-folio-actions.mjs",
+  "scripts/smoke-android-kbs.mjs",
+  "scripts/smoke-android-kbs-hosting.mjs",
   "scripts/smoke-app-lock.mjs",
   "scripts/smoke-automatic-sync.mjs",
   "scripts/smoke-birthday-foundation.mjs",
@@ -139,6 +141,8 @@ const SMOKE_FILES = [
   "scripts/smoke-manual-reservation.mjs",
   "scripts/smoke-manual-restaurant-reservation.mjs",
   "scripts/smoke-market-android-foundation.mjs",
+  "scripts/smoke-market-android-sales.mjs",
+  "scripts/smoke-market-android-sales-hosting.mjs",
   "scripts/smoke-market-android-ui-contract.mjs",
   "scripts/smoke-market-barcode-input-contract.mjs",
   "scripts/smoke-market-companion-desktop-inbox.mjs",
@@ -153,6 +157,7 @@ const SMOKE_FILES = [
   "scripts/smoke-market-quick-sale-contract.mjs",
   "scripts/smoke-market-quick-sale-session.mjs",
   "scripts/smoke-market-sale-runtime.mjs",
+  "scripts/smoke-market-sale-finance.mjs",
   "scripts/smoke-messages-ai-staleness.mjs",
   "scripts/smoke-operations-card-models.mjs",
   "scripts/smoke-operations-cards.mjs",
@@ -556,6 +561,7 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-android-kbs-hosting.mjs") return ["php-lint"];
   if (file === "scripts/smoke-voice-stt-android.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-voice-stt-desktop.mjs") return [];
   if (file === "scripts/smoke-voice-stt-provider.php") return ["php-lint"];
@@ -582,6 +588,8 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file === "scripts/smoke-android-kbs.mjs") return ["android", "hospitality", "desktop"];
+  if (file === "scripts/smoke-android-kbs-hosting.mjs") return ["android", "hospitality", "web"];
   if (file === "scripts/smoke-voice-stt-android.mjs") return ["voice", "android", "settings", "web"];
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   const productIdentityChecks = new Set([
@@ -604,6 +612,7 @@ function smokeDomainsForGeneralOwnership(file) {
   const name = file.replace(/^scripts\/smoke-/, "").replace(/\.(mjs|php)$/, "");
   if (name === "record-picker-ui") return ["desktop", "commerce", "customers", "platform"];
   if (name === "android-companion-v3") return ["android", "commerce", "marketing", "web", "platform"];
+  if (name === "market-sale-finance") return ["commerce", "finance", "android"];
   if (name === "publication-protocol") return ["web", "android", "commerce", "marketing", "platform"];
   if (name === "sync-publication-correctness") return ["web", "android", "platform"];
 

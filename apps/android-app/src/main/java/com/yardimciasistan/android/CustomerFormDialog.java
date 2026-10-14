@@ -243,6 +243,9 @@ final class CustomerFormDialog {
       payload.put("issuing_authority", textValue(issuingAuthority));
       payload.put("address", textValue(address));
       if (existing != null) {
+        // Existing document numbers are Desktop-only. Empty mobile fields preserve them.
+        if (textValue(identityNumber).isEmpty()) payload.remove("identity_number");
+        if (textValue(documentSerialNumber).isEmpty()) payload.remove("document_serial_number");
         payload.put("customer_id", existing.id);
         payload.put("expected_updated_at", existing.updatedAt);
       }

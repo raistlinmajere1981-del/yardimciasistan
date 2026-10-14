@@ -37,6 +37,10 @@ return static function (string $url, array $options): array {
     if ($mode === 'error') return ['status' => 401, 'error' => 0, 'body' => json_encode(['error' => ['message' => '${key}']])];
     if ($mode === 'oversize') return ['status' => 200, 'error' => 0, 'body' => str_repeat('x', YA_STT_MAX_RESPONSE_BYTES + 1)];
     if ($mode === 'malformed') return ['status' => 200, 'error' => 0, 'body' => '{bad ${key}'];
+    if (str_contains($url, 'api.cloudflare.com')) {
+        if ($mode === 'quota') return ['status' => 429, 'error' => 0, 'body' => json_encode(['success' => false, 'errors' => [['code' => 3036, 'message' => '${key}']]])];
+        return ['status' => 200, 'error' => 0, 'body' => json_encode(['success' => true, 'result' => ['text' => '${transcript}']])];
+    }
     $text = $mode === 'leak' ? '${key}' : '${transcript}';
     $body = str_contains($url, ':generateContent')
         ? ['candidates' => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => $text]]]]]]
@@ -207,6 +211,17 @@ return static function (string $url, array $options): array {
   assert.deepEqual((await request()).body, { ok: true, text: transcript });
   assert.equal((await publish({ enabled: false })).ok, true);
   assert.equal((await request()).body.code, "ai_disabled");
+  const cfSettings = { service: "cloudflare", baseUrl: `https://api.cloudflare.com/client/v4/accounts/${"a".repeat(32)}/ai`,
+    model: "@cf/zai-org/glm-4.7-flash", visionModel: "@cf/meta/llama-4-scout-17b-16e-instruct", sttModel: "@cf/openai/whisper-large-v3-turbo" };
+  assert.equal((await publish(cfSettings)).ok, true, "Cloudflare uses canonical private publication");
+  assert.deepEqual((await request()).body, { ok: true, text: transcript });
+  assert.deepEqual((await androidRequest()).body, { ok: true, text: transcript }, "existing phone authorization remains unchanged");
+  const cfBinding = createHash("sha256").update(JSON.stringify([settings.provider, cfSettings.service, cfSettings.baseUrl,
+    cfSettings.sttModel, key, settings.timeoutSeconds])).digest("hex");
+  assert.equal((await request({ headers: { "X-YA-STT-Configuration": cfBinding } })).body.stt_configuration, cfBinding);
+  assert.equal((await request({ headers: { "X-YA-STT-Configuration": binding } })).response.status, 409, "old OpenAI binding cannot verify Cloudflare");
+  assert.equal((await request({ headers: { "X-Fixture-Response": "quota" } })).body.code, "provider_quota_exhausted");
+  assert.equal((await publish({ ...cfSettings, baseUrl: cfSettings.baseUrl + "?evil" })).ok, false);
   const inspect = spawnSync("php", ["-r", `require $argv[1]; $db = ya_storage_open(); echo json_encode([
     $db->query('SELECT name, payload_json FROM publications')->fetchAll(),
     $db->query('SELECT * FROM publication_receipts')->fetchAll()

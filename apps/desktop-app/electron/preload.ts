@@ -176,6 +176,7 @@ import type {
 } from "./desktop-update-service";
 
 interface AiConnectionTestInput {
+  visionModel?: string;
   imageModel?: string;
   provider: string;
   service: string;

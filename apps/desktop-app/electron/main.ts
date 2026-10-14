@@ -74,6 +74,7 @@ import {
 import { EgmKbsWebviewDriver } from "./egm-kbs-webview-driver.js";
 import { EgmKbsBackgroundSession } from "./egm-kbs-background-session.js";
 import { EgmKbsProviderAdapter, JandarmaKbsProviderAdapter } from "./kbs-provider-adapters.js";
+import { KbsDeliveryRequestProcessor } from "./kbs-delivery-request-processor.js";
 import {
   createAiApiKeyUpdate,
   createAiProfileApiKeyUpdates
@@ -128,7 +129,18 @@ const egmKbsBackgroundDriver = new EgmKbsWebviewDriver();
 const egmKbsBackgroundSession = new EgmKbsBackgroundSession(egmKbsBackgroundDriver);
 const egmKbsProviderAdapter = new EgmKbsProviderAdapter(egmKbsBackgroundSession);
 const jandarmaKbsProviderAdapter = new JandarmaKbsProviderAdapter();
+const kbsDeliveryRequestProcessor = new KbsDeliveryRequestProcessor({
+  processRequests: available => getDatabase().processKbsDeliveryRequests([egmKbsProviderAdapter, jandarmaKbsProviderAdapter], available),
+  available: () => Boolean(desktopDatabase && appLockService && !appLockService.isLocked()
+    && !maintenanceSyncSuspended && !campaignShutdownStarted && desktopDatabase.canProcessKbsDeliveryRequests()),
+  onChanged: notifyKbsChanged
+});
 const kbsDeliveryInFlight = new Map<string, Promise<DesktopKbsDeliveryMutationResult>>();
+function notifyKbsChanged() {
+  markLocalCompanionSnapshotDirty();
+  notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+  syncCoordinator?.scheduleSoon();
+}
 const C = BUSINESS_CAPABILITIES;
 
 function enabledBusinessCapabilities(): BusinessCapability[] {
@@ -292,6 +304,7 @@ if (!hasSingleInstanceLock) {
     cleanupOrphanProductImages(desktopDatabase.databasePath);
     androidActionSyncService = new AndroidActionSyncService({
       database: desktopDatabase,
+      onActionCommitted: () => kbsDeliveryRequestProcessor.wake(),
       isSuspended: () => maintenanceSyncSuspended || campaignShutdownStarted,
       markLocalSnapshotDirty: () => {
         markLocalCompanionSnapshotDirty();
@@ -400,6 +413,7 @@ if (!hasSingleInstanceLock) {
       },
       applyAction: (action) => {
         const result = getDatabase().applyAndroidAction(action);
+        if (result.ok) kbsDeliveryRequestProcessor.wake();
         getDatabase().recordAndroidActionResult(action, result);
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
         getDatabase().queueSyncJob("android_snapshot");
@@ -411,6 +425,7 @@ if (!hasSingleInstanceLock) {
     registerIpcHandlers();
     createMainWindow();
     syncCoordinator.start();
+    kbsDeliveryRequestProcessor.start();
     void reconcileOptionalBackgroundServices();
     powerMonitor.on("resume", () => marketingSchedulerService.wake());
     if (!desktopDatabase.getSetupData().setupRequired) {
@@ -442,7 +457,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (campaignShutdownStarted) return;
   campaignShutdownStarted = true;
-  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([campaignDispatchService.suspendAndDrain(), businessMessagingService.drain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain()])).then(() => {
+  void marketingSchedulerService.suspendAndDrain().then(() => Promise.allSettled([kbsDeliveryRequestProcessor.stopAndDrain(), campaignDispatchService.suspendAndDrain(), businessMessagingService.drain(), instagramPublicationService.drain(), syncCoordinator?.suspendAndDrain()])).then(() => {
     campaignShutdownDrained = true;
     desktopDatabase?.close();
     app.quit();
@@ -571,7 +586,8 @@ function registerIpcHandlers() {
       void publishBusinessAiContextFromMain();
     },
     deliverKbsNotification: deliverKbsNotificationOnce,
-    onKbsSettingsSaved: reconcileEgmKbsBackgroundSession,
+    onKbsSettingsSaved: () => { reconcileEgmKbsBackgroundSession(); notifyKbsChanged(); },
+    onKbsNotificationsChanged: notifyKbsChanged,
     isTrustedRendererUrl: isTrustedDesktopRendererUrl,
     kbsInteractiveDriver: egmKbsInteractiveDriver,
     kbsBackgroundSession: egmKbsBackgroundSession,
@@ -684,6 +700,7 @@ export async function suspendAutomaticSyncForMaintenance() {
   maintenanceSyncSuspended = true;
   desktopIpcRegistryHandle?.clearMarketBarcodeFastPull();
   await marketingSchedulerService.suspendAndDrain();
+  await kbsDeliveryRequestProcessor.stopAndDrain();
   await campaignDispatchService.suspendAndDrain();
   await businessMessagingService.drain();
   await instagramPublicationService.drain();
@@ -693,6 +710,7 @@ export async function suspendAutomaticSyncForMaintenance() {
 export function resumeAutomaticSyncAfterMaintenanceAbort() {
   maintenanceSyncSuspended = false;
   syncCoordinator?.restart();
+  kbsDeliveryRequestProcessor.start();
   void reconcileOptionalBackgroundServices();
 }
 

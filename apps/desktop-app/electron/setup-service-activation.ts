@@ -25,7 +25,9 @@ export function validateSetupServiceActivation(db: DesktopDatabase, input: SaveI
     validateServiceActivation({ label, enabled, configured, fingerprint: serviceConfigFingerprint(config), verifiedFingerprint: db.getServiceSettingsVerification(service) });
   const ai = {
     provider: String(input.aiProvider ?? "").trim(), service: String(input.aiService ?? "").trim(), projectName: String(input.aiProjectName ?? "").trim(),
-    baseUrl: normalizeAiBaseUrl(input.aiBaseUrl), model: String(input.aiModel ?? "").trim(), imageModel: String(input.aiImageModel ?? "").trim(),
+    baseUrl: normalizeAiBaseUrl(input.aiBaseUrl), model: String(input.aiModel ?? "").trim(),
+    imageModel: String(input.aiImageModel ?? "").trim(),
+    ...(input.aiService === "cloudflare" ? { visionModel: String(input.aiVisionModel ?? "").trim() } : {}),
     apiKey: input.clearAiApiKey ? "" : String(input.aiApiKey ?? "").trim() || getEffectiveAiApiKey(db, input.aiService), timeoutSeconds: input.aiTimeoutSeconds
   };
   let error = check("ai", "AI Yardımcı", input.aiEnabled, ai, Boolean(ai.baseUrl && ai.model && ai.apiKey));

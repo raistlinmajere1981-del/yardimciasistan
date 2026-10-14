@@ -161,6 +161,7 @@ export interface AiConnectionSettings {
   baseUrl: string;
   model: string;
   sttModel?: string;
+  visionModel?: string;
   apiKey: string;
   timeoutSeconds: number;
 }
@@ -359,6 +360,8 @@ export interface AndroidFinanceSnapshot {
 
 export interface AndroidRoomFolioSnapshot {
   id: string;
+  version?: string;
+  can_add_items?: boolean;
   stay_id: string;
   room_id: string;
   room_name: string;
@@ -422,6 +425,7 @@ export interface AndroidMarketProduct {
   inventory_updated_at: ISODateTimeString | "";
   image_source_url: string;
   data_source: string;
+  updated_at?: ISODateTimeString;
 }
 
 export interface AndroidMarketSupplier {
@@ -466,9 +470,74 @@ export interface AndroidMarketSnapshot {
   suppliers: AndroidMarketSupplier[];
   recent_purchases: AndroidMarketPurchase[];
   cart_drafts: AndroidMarketCartDraft[];
+  primary_location_id?: string;
+  customer_credit_accounts?: AndroidCustomerCreditAccount[];
+}
+
+/** Bounded private projection; no contact, identity, notes or sale detail fields. */
+export interface AndroidCustomerCreditAccount {
+  customer_id: string;
+  full_name: string;
+  balances: Array<{ currency: string; amount_minor: number }>;
+  entries: Array<{ direction: "debit" | "credit"; entry_type: string; amount_minor: number;
+    currency: string; payment_method: string; occurred_at: string }>;
+}
+
+export interface AndroidMarketSaleCompletePayload {
+  lines: Array<{ product_id: string; quantity: number; expected_unit_price: number;
+    expected_currency: string; expected_updated_at: string }>;
+  location_id: string;
+  settlement: "paid" | "credit";
+  customer_id: string;
+  payment_method: "cash" | "card" | "bank" | "other" | "";
+  external_payment_confirmed?: boolean;
+}
+
+export interface AndroidCustomerCreditPaymentPayload {
+  customer_id: string;
+  amount_minor: number;
+  currency: string;
+  expected_balance_minor: number;
+  payment_method: "cash" | "card" | "bank" | "other";
+  external_payment_confirmed?: boolean;
+}
+
+/** Private allowlist. Credentials, identity documents and provider messages never belong here. */
+export interface AndroidKbsSnapshot {
+  enabled: true;
+  configured: boolean;
+  provider: "egm" | "jandarma";
+  pending_count: number;
+  failed_count: number;
+  submission_unknown_count: number;
+  sent_count: number;
+  identity_ready_count: number;
+  identity_missing_count: number;
+  notifications: Array<{
+    id: string;
+    customer_name: string;
+    room_name: string;
+    room_number: string;
+    occurred_at: string;
+    kind: "arrival" | "departure" | "room_change";
+    status: "pending" | "failed" | "submission_unknown" | "sent";
+    identity_ready: boolean;
+    retry_ready: boolean;
+    delivery_requested: boolean;
+    request_state: "" | "queued" | "sent" | "failed" | "waiting" | "submission_unknown" | "denied";
+  }>;
+}
+
+export interface AndroidKbsActionPayload {
+  notification_id: string;
+  provider: "egm" | "jandarma";
+  expected_status: "pending" | "failed" | "submission_unknown";
+  portal_record_verified?: true;
+  external_confirmation?: "government_portal_verified";
 }
 
 export interface AndroidOperationsSnapshot {
+  kbs?: AndroidKbsSnapshot | null;
   /** Safe saved STT readiness hint; omitted by old snapshots, never an upload authority. */
   voice?: { stt_available: boolean };
   /** Companion v3 additions are optional for legacy publications/clients. */
@@ -850,6 +919,7 @@ export interface PushAiSettingsSuccess extends PublicationReceipt {
   base_url: string;
   model: string;
   stt_model: string;
+  vision_model?: string;
   timeout_seconds: number;
   has_api_key: boolean;
 }

@@ -6,6 +6,7 @@ import {
 } from "@yardimci-asistan/shared";
 import {
   androidEffectivePermissions,
+  androidPermissionAllowedByCapabilities,
   projectAndroidCompanion,
   androidCompanionCounters,
   androidTaskAllowedByCapabilities,
@@ -15,6 +16,7 @@ import {
   type PublishedQrMenu
 } from "@yardimci-asistan/sync-core";
 import { emptyAndroidMarketSnapshot } from "./market-android-snapshot.js";
+import { androidKbsAllowed, sanitizeAndroidKbsSnapshot } from "./android-kbs-projection.js";
 
 const C = BUSINESS_CAPABILITIES;
 
@@ -46,7 +48,8 @@ export function projectAndroidOperationsSnapshot(
           : ""
       }))
     : [];
-  const folios = has(C.ACCOMMODATION_FOLIO) ? source.room_folios : [];
+  const folios = has(C.ACCOMMODATION_FOLIO) ? source.room_folios.map(folio => ({ ...folio,
+    can_add_items: has(C.ACCOMMODATION_STAYS) && folio.can_add_items === true })) : [];
   const tables = has(C.FOOD_TABLES)
     ? source.tables.map((table) => ({
         ...table,
@@ -89,6 +92,8 @@ export function projectAndroidOperationsSnapshot(
   const customers = has(C.CUSTOMERS)
     ? source.customers.map((customer) => ({
         ...customer,
+        identity_number: "",
+        document_serial_number: "",
         reservation_count: reservations.filter((reservation) => reservation.customer_id === customer.id).length,
         stay_count: stays.filter((stay) => stay.customer_id === customer.id).length
       }))
@@ -127,6 +132,7 @@ export function projectAndroidOperationsSnapshot(
   return {
     ...source,
     ...companion,
+    kbs: androidKbsAllowed(enabled) ? sanitizeAndroidKbsSnapshot(source.kbs) : null,
     voice: { stt_available: has(C.AI) && source.voice?.stt_available === true },
     // The hosted module also uses this publication to gate desktop/public AI
     // endpoints. Keep the persisted capability set while Android is disabled;
@@ -247,7 +253,9 @@ export function projectAndroidMarketSnapshot(
       : [],
     suppliers: suppliersEnabled ? source.suppliers : [],
     recent_purchases: recentPurchases,
-    cart_drafts: catalogEnabled && salesEnabled ? source.cart_drafts : []
+    cart_drafts: catalogEnabled && salesEnabled ? source.cart_drafts : [],
+    primary_location_id: inventoryEnabled && catalogEnabled ? source.primary_location_id ?? "" : "",
+    customer_credit_accounts: androidPermissionAllowedByCapabilities("customer_credit.view", enabled) ? source.customer_credit_accounts ?? [] : []
   };
 }
 

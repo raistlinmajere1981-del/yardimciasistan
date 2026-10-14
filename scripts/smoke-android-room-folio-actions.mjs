@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { saveMenuProductFixture } from "./test-helpers/menu-product-fixture.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -11,6 +12,9 @@ const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.
 const { DesktopRoomFolioService } = require("../apps/desktop-app/dist-electron/room-folio.js");
 const { DesktopFinanceService } = require("../apps/desktop-app/dist-electron/finance.js");
 const { saveBusinessLayout } = require("../apps/desktop-app/dist-electron/business-layout.js");
+const { createAndroidOperationsSnapshot } = require("../apps/desktop-app/dist-electron/android-operations-snapshot.js");
+const { projectLocalAndroidSnapshotForDevice } = require("../apps/desktop-app/dist-electron/local-android-device-projection.js");
+const { projectAndroidOperationsSnapshot } = require("../apps/desktop-app/dist-electron/android-capability-projection.js");
 
 const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-android-room-folio-"));
 const database = new DesktopDatabase({
@@ -101,6 +105,7 @@ try {
   assert.ok(folio);
   assert.equal(folio.chargeTotalMinor, 240000);
   assert.equal(folio.remainingMinor, 240000);
+  verifyFolioCharges(database, roomFolio, folioId);
 
   const deniedPayment = database.applyAndroidAction(action("folio-payment-denied", "room_folio_payment_add", {
     folio_id: folioId,
@@ -227,6 +232,182 @@ function action(id, actionType, payload) {
     status: "pending",
     error_message: ""
   };
+}
+
+function verifyFolioCharges(database, service, folioId) {
+  const db = new DatabaseSync(database.databasePath);
+  db.exec("PRAGMA foreign_keys = ON");
+  const originalPermissions = db.prepare("SELECT permissions_json FROM android_devices WHERE device_id = ?").get(DEVICE_ID).permissions_json;
+  const permissions = ["room_folio.view", "room_folio.add_menu_item", "room_folio.add_manual_charge", "menu.view", "menu.stock_view"];
+  const setPermissions = values => db.prepare("UPDATE android_devices SET role = 'staff', permissions_json = ? WHERE device_id = ?").run(JSON.stringify(values), DEVICE_ID);
+  const currentFolio = () => service.getData().folios.find(folio => folio.id === folioId);
+  const currentSnapshot = () => createAndroidOperationsSnapshot(database, database.getDashboardData());
+  const category = database.saveMenuCategory({ name: "Folio menüsü", description: "", is_active: true, sort_order: 0 });
+  assert.equal(category.ok, true);
+  const saved = saveMenuProductFixture(database, { category_id: category.savedId, name: "İçecek", description: "", price: 12.34,
+    currency: "TRY", image_url: "", is_available: true, is_featured: false, sort_order: 0,
+    stock_quantity: 5, stock_unit: "l", stock_consumption_quantity: 0.125 });
+  assert.equal(saved.ok, true, saved.message);
+  const entryId = saved.savedId;
+  const menuEntry = () => database.getPublishedMenu().items.find(item => item.id === entryId);
+  const productId = menuEntry().product_id;
+  // The channel override, rather than catalog sale price, must be charged.
+  db.prepare("UPDATE menu_product_entries SET price_override = 9.87 WHERE id = ?").run(entryId);
+  const menuPayload = () => ({ folio_id: folioId, expected_folio_version: currentFolio().version,
+    menu_entry_id: entryId, quantity: 2, expected_menu_updated_at: menuEntry().updated_at,
+    expected_unit_price_minor: Math.round(menuEntry().price * 100), expected_currency: menuEntry().currency });
+  const manualPayload = () => ({ folio_id: folioId, expected_folio_version: currentFolio().version,
+    label: "Otopark", amount_minor: 12345, note: "İki gün" });
+  let sequence = 0;
+  const rejected = (type, payload, pattern) => {
+    const id = `folio-charge-rejected-${sequence++}`;
+    const before = db.prepare("SELECT COUNT(*) AS count FROM room_folio_items").get().count;
+    const balance = menuEntry().stock_quantity;
+    const result = database.applyAndroidAction(action(id, type, payload));
+    assert.equal(result.ok, false, `${type} should be rejected`);
+    if (pattern) assert.match(result.message, pattern);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM room_folio_items").get().count, before);
+    assert.equal(menuEntry().stock_quantity, balance);
+    assert.equal(db.prepare("SELECT id FROM android_action_receipts WHERE id = ?").get(id), undefined);
+    return result;
+  };
+  try {
+    setPermissions(permissions);
+    for (const [type, payload] of [["room_folio_menu_item_add", menuPayload], ["room_folio_manual_charge_add", manualPayload]]) {
+      db.prepare("UPDATE android_devices SET is_active = 0 WHERE device_id = ?").run(DEVICE_ID);
+      rejected(type, payload(), /pasifleştirilmiş/);
+      db.prepare("UPDATE android_devices SET is_active = 1, revoked_at = 'revoked' WHERE device_id = ?").run(DEVICE_ID);
+      rejected(type, payload(), /pasifleştirilmiş/);
+      db.prepare("UPDATE android_devices SET revoked_at = '' WHERE device_id = ?").run(DEVICE_ID);
+      for (const missing of ["room_folio.view", type === "room_folio_menu_item_add" ? "room_folio.add_menu_item" : "room_folio.add_manual_charge",
+        ...(type === "room_folio_menu_item_add" ? ["menu.view"] : [])]) {
+        setPermissions(permissions.filter(permission => permission !== missing));
+        rejected(type, payload(), /yetki/);
+      }
+      setPermissions(permissions);
+      for (const capability of ["service.android", "accommodation.folio", "accommodation.stays",
+        ...(type === "room_folio_menu_item_add" ? ["food_service.menu"] : [])]) {
+        for (const role of ["staff", "admin"]) {
+          db.prepare("UPDATE android_devices SET role = ? WHERE device_id = ?").run(role, DEVICE_ID);
+          db.prepare("UPDATE business_capabilities SET is_enabled = 0 WHERE capability_id = ?").run(capability);
+          rejected(type, payload(), /yetenek/);
+          db.prepare("UPDATE business_capabilities SET is_enabled = 1 WHERE capability_id = ?").run(capability);
+        }
+        setPermissions(permissions);
+      }
+      rejected(type, { ...payload(), expected_folio_version: "" }, /sürümü/);
+      rejected(type, { ...payload(), expected_folio_version: "f".repeat(64) }, /değişmiş/);
+      for (const status of ["planned", "checked_out", "cancelled"]) {
+        db.prepare("UPDATE customer_room_stays SET status = ? WHERE id = 'android_folio_stay'").run(status);
+        rejected(type, payload(), /konaklama/);
+      }
+      db.prepare("UPDATE stay_guests SET status = 'planned' WHERE stay_id = 'android_folio_stay'").run();
+      db.prepare("UPDATE customer_room_stays SET status = 'checked_in' WHERE id = 'android_folio_stay'").run();
+    }
+    for (const [table, id, field, invalid, valid] of [
+      ["rooms", currentFolio().roomId, "is_active", 0, 1],
+      ["customer_room_stays", "android_folio_stay", "deleted_at", "withdrawn", ""],
+      ["room_folios", folioId, "status", "closed", "open"]
+    ]) {
+      const payload = manualPayload();
+      db.prepare(`UPDATE ${table} SET ${field} = ? WHERE id = ?`).run(invalid, id);
+      rejected("room_folio_manual_charge_add", payload, /konaklama/);
+      db.prepare(`UPDATE ${table} SET ${field} = ? WHERE id = ?`).run(valid, id);
+    }
+    db.prepare("INSERT INTO customers (id, full_name, phone, created_at, updated_at) VALUES ('folio-other-customer', 'Diğer', '', ?, ?)").run(new Date().toISOString(), new Date().toISOString());
+    const mismatchedCustomer = manualPayload();
+    db.prepare("UPDATE customer_room_stays SET customer_id = 'folio-other-customer' WHERE id = 'android_folio_stay'").run();
+    rejected("room_folio_manual_charge_add", mismatchedCustomer, /konaklama/);
+    db.prepare("UPDATE customer_room_stays SET customer_id = 'android_folio_customer' WHERE id = 'android_folio_stay'").run();
+    const source = currentSnapshot();
+    const snapshotFolio = source.room_folios.find(folio => folio.id === folioId);
+    assert.equal(snapshotFolio.version, currentFolio().version);
+    assert.equal(snapshotFolio.can_add_items, true);
+    assert.equal(source.menu.items.find(item => item.id === entryId).price, 9.87);
+    const projected = projectLocalAndroidSnapshotForDevice(source, DEVICE_ID);
+    assert.equal(projected.menu.items.find(item => item.id === entryId).currency, "TRY");
+    assert.equal(projected.menu.items.find(item => item.id === entryId).stock_quantity, 5);
+    assert.deepEqual(projected.admin_menu.items, [], "Charge permissions must not grant menu editing");
+    const withoutMenu = { ...source, androidPermissions: { [DEVICE_ID]: { role: "staff", is_active: true, permissions: ["room_folio.view"] } } };
+    assert.deepEqual(projectLocalAndroidSnapshotForDevice(withoutMenu, DEVICE_ID).menu.items, []);
+    const noStock = { ...source, androidPermissions: { [DEVICE_ID]: { role: "staff", is_active: true, permissions: ["menu.view"] } } };
+    assert.equal(projectLocalAndroidSnapshotForDevice(noStock, DEVICE_ID).menu.items[0].stock_quantity, null);
+    assert.deepEqual(projectLocalAndroidSnapshotForDevice(source, "unknown-device").room_folios, []);
+    const noMenuCapability = projectAndroidOperationsSnapshot(source, source.business_capabilities.filter(cap => cap !== "food_service.menu"), "2026-10-14");
+    assert.deepEqual(noMenuCapability.menu.items, []);
+
+    rejected("room_folio_menu_item_add", { ...menuPayload(), quantity: 0 });
+    rejected("room_folio_menu_item_add", { ...menuPayload(), quantity: 1.5 });
+    rejected("room_folio_menu_item_add", { ...menuPayload(), quantity: "2" });
+    rejected("room_folio_menu_item_add", { ...menuPayload(), quantity: 1001 });
+    rejected("room_folio_menu_item_add", { ...menuPayload(), quantity: 100 }, /stok/i);
+    rejected("room_folio_menu_item_add", { ...menuPayload(), expected_menu_updated_at: "stale" }, /değişmiş/);
+    const stalePrice = menuPayload();
+    db.prepare("UPDATE menu_product_entries SET price_override = 10 WHERE id = ?").run(entryId);
+    rejected("room_folio_menu_item_add", stalePrice, /değişmiş/);
+    db.prepare("UPDATE menu_product_entries SET price_override = 9.87 WHERE id = ?").run(entryId);
+    db.prepare("UPDATE catalog_products SET currency = 'USD' WHERE id = ?").run(productId);
+    rejected("room_folio_menu_item_add", menuPayload(), /para birimi/);
+    db.prepare("UPDATE catalog_products SET currency = 'TRY' WHERE id = ?").run(productId);
+    for (const [table, id, field] of [["catalog_products", productId, "is_active"], ["menu_product_entries", entryId, "is_available"], ["menu_categories", category.savedId, "is_active"]]) {
+      const payload = menuPayload();
+      db.prepare(`UPDATE ${table} SET ${field} = 0 WHERE id = ?`).run(id);
+      // menuEntry() excludes inactive products; the known payload still checks withdrawal.
+      const result = database.applyAndroidAction(action(`folio-withdrawn-${sequence++}`, "room_folio_menu_item_add", payload));
+      assert.equal(result.ok, false);
+      assert.match(result.message, /satışa kapalı/);
+      db.prepare(`UPDATE ${table} SET ${field} = 1 WHERE id = ?`).run(id);
+    }
+    for (const invalid of [{ amount_minor: -1 }, { amount_minor: 1.1 }, { amount_minor: "100" }, { label: {} },
+      { label: "" }, { label: "x".repeat(121) }, { note: "x".repeat(501) }]) {
+      rejected("room_folio_manual_charge_add", { ...manualPayload(), ...invalid });
+    }
+    const baseTotal = currentFolio().chargeTotalMinor;
+    const oldVersion = currentFolio().version;
+    const menuAction = action("folio-menu-added", "room_folio_menu_item_add", menuPayload());
+    const movementCount = () => db.prepare("SELECT COUNT(*) AS count FROM inventory_movements WHERE reference_type = 'room_folio'").get().count;
+    const oldMovements = movementCount();
+    const financeCount = () => db.prepare("SELECT COUNT(*) AS count FROM finance_entries").get().count;
+    const oldFinance = financeCount();
+    assert.equal(database.applyAndroidAction(menuAction).ok, true);
+    assert.equal(database.applyAndroidAction(menuAction).alreadyApplied, true);
+    assert.equal(menuEntry().stock_quantity, 4.75);
+    assert.equal(movementCount(), oldMovements + 1);
+    let folio = currentFolio();
+    assert.equal(folio.chargeTotalMinor, baseTotal + 1974);
+    assert.notEqual(folio.version, oldVersion);
+    assert.equal(folio.items[0].unitPriceMinor, 987);
+    assert.equal(folio.items[0].productId, productId);
+    rejected("room_folio_manual_charge_add", { ...manualPayload(), expected_folio_version: oldVersion }, /değişmiş/);
+    db.prepare("DELETE FROM sync_outbox WHERE job_key = 'android_snapshot'").run();
+    const manualAction = action("folio-manual-added", "room_folio_manual_charge_add", manualPayload());
+    assert.equal(database.applyAndroidAction(manualAction).ok, true);
+    assert.equal(database.applyAndroidAction(manualAction).alreadyApplied, true);
+    assert.ok(db.prepare("SELECT job_key FROM sync_outbox WHERE job_key = 'android_snapshot'").get(), "Manual charges must durably invalidate the snapshot");
+    folio = currentFolio();
+    assert.equal(folio.chargeTotalMinor, baseTotal + 1974 + 12345);
+    assert.equal(folio.items.find(item => item.kind === "manual_charge").note, "İki gün");
+    assert.equal(menuEntry().stock_quantity, 4.75);
+    assert.equal(financeCount(), oldFinance, "Adding charges must not create a cash receipt");
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM android_action_receipts WHERE action_type IN ('room_folio_menu_item_add', 'room_folio_manual_charge_add')").get().count, 2);
+    const refreshed = currentSnapshot();
+    assert.equal(refreshed.room_folios.find(item => item.id === folioId).charge_total_minor, folio.chargeTotalMinor);
+    assert.equal(refreshed.menu.items.find(item => item.id === entryId).stock_quantity, 4.75);
+    const publishedVersion = currentFolio().version;
+    db.prepare("UPDATE room_folio_items SET sync_status = 'synced' WHERE folio_id = ?").run(folioId);
+    assert.equal(currentFolio().version, publishedVersion, "Publication acknowledgement must not invalidate the account version");
+    // A receipt write failure must roll back both the item and its inventory consumption.
+    db.exec("CREATE TRIGGER folio_test_receipt_failure BEFORE INSERT ON android_action_receipts WHEN NEW.id LIKE 'folio-charge-rejected-%' BEGIN SELECT RAISE(ABORT, 'test receipt failure'); END");
+    rejected("room_folio_menu_item_add", menuPayload());
+    rejected("room_folio_manual_charge_add", manualPayload());
+    db.exec("DROP TRIGGER folio_test_receipt_failure");
+    for (const item of folio.items) assert.equal(service.removeItem(item.id).ok, true);
+    assert.equal(currentFolio().chargeTotalMinor, baseTotal);
+    assert.equal(menuEntry().stock_quantity, 5, "Canonical removal restores the frozen consumption exactly");
+  } finally {
+    db.prepare("UPDATE android_devices SET role = 'staff', is_active = 1, revoked_at = '', permissions_json = ? WHERE device_id = ?").run(originalPermissions, DEVICE_ID);
+    db.close();
+  }
 }
 
 function shiftDate(value, days) {

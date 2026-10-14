@@ -21,8 +21,8 @@ const uiSources = `${workspace}\n${rules}\n${main}\n${shell}`;
 
 assert.match(navigation, /TAB_MARKET\s*=\s*"market"/);
 assert.match(navigation, /MarketUiRules\.canOpenMarket\(data\)/);
-assert.match(shell, /addNavButton\("Market", AndroidUiRules\.TAB_MARKET/);
-assert.match(shell, /canOpenTab\(AndroidUiRules\.TAB_MARKET\)/);
+// Market menu ownership, permission withdrawal and swipe selection are exercised
+// behaviorally by AndroidNavigationTest; do not freeze a shell method call here.
 assert.match(main, /marketWorkspace\.create\(data, localPendingActionCount\(\), loading\)/);
 assert.match(main, /marketWorkspace\.handleBack\(\)/);
 
@@ -42,7 +42,6 @@ assert.doesNotMatch(rules, /payload\.put\("(?:quantity_)?delta"/);
 assert.match(rules, /serialized\.put\("unit_cost", line\.unitCost\)/);
 assert.match(rules, /existing\.quantity\s*=\s*round\(existing\.quantity \+ 1/);
 assert.match(rules, /payload\.put\("lines", serializedLines\)/);
-assert.doesNotMatch(rules, /payload\.put\("payment/);
 
 for (const label of [
   "Barkod Tara",
@@ -57,7 +56,7 @@ for (const label of [
   "Yeni Ürün",
   "Sayımı Kaydet",
   "Mal Kabulü Gönder",
-  "Masaüstüne Gönder",
+  "Masaüstüne Sepet Taslağı Gönder",
   "Ürünü Kaydet",
   "Ürün bilgileri doğrudan kataloğa kaydedilir.",
   "Barkod kayıtlı değil.",
@@ -107,13 +106,10 @@ assert.ok(cashModeSource.length > 0, "cash barcode mode source missing");
 assert.doesNotMatch(cashModeSource, /Sepete Ekle|Stok Say|Mal Kabule Ekle|setPositiveButton/);
 
 for (const forbidden of [
-  "Satışı Tamamla",
-  "paymentMethod",
-  "payment_method",
   "invoice OCR",
   "pending purchase order"
 ]) {
-  assert.equal(workspace.includes(forbidden), false, `Forbidden mobile-POS concept leaked into Market UI: ${forbidden}`);
+  assert.equal(workspace.includes(forbidden), false, `Out-of-scope concept leaked into Market UI: ${forbidden}`);
 }
 
 assert.match(gradle, /androidx\.camera:camera-view:/);

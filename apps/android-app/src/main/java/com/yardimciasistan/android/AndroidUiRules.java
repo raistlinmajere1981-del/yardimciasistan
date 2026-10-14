@@ -1,6 +1,8 @@
 package com.yardimciasistan.android;
 
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 
 final class AndroidUiRules {
   static final String CAPABILITY_WHATSAPP = "service.whatsapp";
@@ -30,6 +32,7 @@ final class AndroidUiRules {
   static final String TAB_MESSAGES = "messages";
   static final String TAB_CASH = "cash";
   static final String TAB_REPORTS = "reports";
+  static final String TAB_MORE = "more";
 
   static final String TODAY_COMMERCE = "commerce";
   static final String TODAY_SHIPMENTS = "shipments";
@@ -43,6 +46,7 @@ final class AndroidUiRules {
   static final String PENSION_ROOMS = "rooms";
   static final String PENSION_STAYS = "stays";
   static final String PENSION_FOLIOS = "folios";
+  static final String PENSION_KBS = "kbs";
   static final String PENSION_TASKS = "tasks";
 
   static final String RESTAURANT_TABLES = "tables";
@@ -66,6 +70,7 @@ final class AndroidUiRules {
     if (TAB_TODAY.equals(tab)) {
       return true;
     }
+    if (TAB_MORE.equals(tab)) return !moreNavigation(data).isEmpty();
     if (TAB_CUSTOMERS.equals(tab)) {
       return data != null && (
           data.hasPermission("customer.view")
@@ -93,10 +98,75 @@ final class AndroidUiRules {
     return false;
   }
 
+  /** Profile presets never grant access: the first permitted business workspace owns slot three. */
+  static List<NavigationItem> rootNavigation(OperationData data) {
+    List<NavigationItem> items = new ArrayList<>();
+    items.add(new NavigationItem(TAB_TODAY, "Bugün", "Öncelikli işler"));
+    if (canOpenTab(data, TAB_CUSTOMERS)) items.add(new NavigationItem(TAB_CUSTOMERS, "Müşteri", "Müşteriler ve talepler"));
+    String business = primaryBusinessTab(data);
+    if (!business.isEmpty()) items.add(tabNavigationItem(business));
+    if (!moreNavigation(data).isEmpty()) items.add(new NavigationItem(TAB_MORE, "Diğer", "Diğer çalışma alanları"));
+    return items;
+  }
+
+  static String primaryBusinessTab(OperationData data) {
+    for (String tab : new String[]{TAB_PENSION, TAB_RESTAURANT, TAB_MARKET}) {
+      if (canOpenTab(data, tab)) return tab;
+    }
+    return "";
+  }
+
+  static List<NavigationItem> moreNavigation(OperationData data) {
+    List<NavigationItem> items = new ArrayList<>();
+    String primary = primaryBusinessTab(data);
+    for (String tab : new String[]{TAB_PENSION, TAB_RESTAURANT, TAB_MARKET, TAB_MESSAGES, TAB_CASH, TAB_REPORTS}) {
+      if (!tab.equals(primary) && canOpenTab(data, tab)) items.add(tabNavigationItem(tab));
+    }
+    for (String mode : new String[]{TODAY_COMMERCE, TODAY_SHIPMENTS, TODAY_MARKETING}) {
+      if (CompanionUiRules.canOpen(data, mode)) {
+        String detail = TODAY_COMMERCE.equals(mode) ? "Sipariş listesi ve mevcut kararlar"
+            : TODAY_SHIPMENTS.equals(mode) ? "Teslimat ve gönderi durumu" : "Yayın ve kampanya durumu";
+        items.add(new NavigationItem(TAB_TODAY + ":" + mode, CompanionUiRules.title(mode), detail));
+      }
+    }
+    return items;
+  }
+
+  private static NavigationItem tabNavigationItem(String tab) {
+    if (TAB_PENSION.equals(tab)) return new NavigationItem(tab, "Pansiyon", "Odalar ve konaklama işlemleri");
+    if (TAB_RESTAURANT.equals(tab)) return new NavigationItem(tab, "Restoran", "Masalar ve adisyonlar");
+    if (TAB_MARKET.equals(tab)) return new NavigationItem(tab, "Market", "Satış, stok ve cari işlemler");
+    if (TAB_MESSAGES.equals(tab)) return new NavigationItem(tab, "Mesajlar", "Hazır mesajlar ve yanıtlar");
+    if (TAB_CASH.equals(tab)) return new NavigationItem(tab, "Kasa", "Gelir, gider ve kasa hareketleri");
+    return new NavigationItem(tab, "Raporlar", "İşletme raporları");
+  }
+
+  static boolean canOpenRoute(OperationData data, String route) {
+    if ("settings".equals(route)) return data != null && (!data.permissionsResolved || data.deviceActive);
+    Destination target = resolveDestination(route);
+    if (!canOpenTab(data, target.tab)) return false;
+    if (TAB_TODAY.equals(target.tab) && !target.mode.isEmpty()) return CompanionUiRules.canOpen(data, target.mode);
+    if (route != null && route.contains(":")) {
+      if (TAB_PENSION.equals(target.tab)) return canOpenPensionMode(data, target.mode);
+      if (TAB_RESTAURANT.equals(target.tab)) return canOpenRestaurantMode(data, target.mode);
+    }
+    return true;
+  }
+
+  static final class NavigationItem {
+    final String route;
+    final String label;
+    final String description;
+    NavigationItem(String route, String label, String description) {
+      this.route = route; this.label = label; this.description = description;
+    }
+  }
+
   static boolean canOpenPensionMode(OperationData data, String mode) {
     if (data == null) {
       return false;
     }
+    if (PENSION_KBS.equals(mode)) return KbsUiRules.canView(data);
     if (PENSION_RESERVATIONS.equals(mode)) {
       return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
           && data.hasPermission("reservation.view");
@@ -134,6 +204,7 @@ final class AndroidUiRules {
     if (canOpenPensionMode(data, PENSION_FOLIOS)) {
       return PENSION_FOLIOS;
     }
+    if (canOpenPensionMode(data, PENSION_KBS)) return PENSION_KBS;
     if (canOpenPensionMode(data, PENSION_TASKS)) {
       return PENSION_TASKS;
     }
@@ -505,6 +576,7 @@ final class AndroidUiRules {
     if (TAB_TODAY.equals(tab)) {
       return new Destination(TAB_TODAY, CompanionUiRules.isMode(mode) ? mode : "");
     }
+    if (TAB_MORE.equals(tab)) return new Destination(TAB_MORE, "");
     if (TAB_CUSTOMERS.equals(tab)) {
       if (!CUSTOMER_LIST.equals(mode) && !CUSTOMER_WAITING.equals(mode)) {
         mode = CUSTOMER_NEW;
@@ -512,7 +584,7 @@ final class AndroidUiRules {
       return new Destination(TAB_CUSTOMERS, mode);
     }
     if (TAB_PENSION.equals(tab)) {
-      if (!PENSION_ROOMS.equals(mode) && !PENSION_STAYS.equals(mode) && !PENSION_FOLIOS.equals(mode) && !PENSION_TASKS.equals(mode)) {
+      if (!PENSION_ROOMS.equals(mode) && !PENSION_STAYS.equals(mode) && !PENSION_FOLIOS.equals(mode) && !PENSION_TASKS.equals(mode) && !PENSION_KBS.equals(mode)) {
         mode = PENSION_RESERVATIONS;
       }
       return new Destination(TAB_PENSION, mode);

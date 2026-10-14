@@ -8,6 +8,7 @@ const phpFiles = [
   ...sitePhpFiles("test-site/landing"),
   "firm-template/web-module/lib/business-map.php",
   "firm-template/web-module/lib/business-ai-policy.php",
+  "firm-template/web-module/lib/cloudflare-ai.php",
   "firm-template/web-module/api/business.php",
   "firm-template/web-module/lib/marketing.php",
   "firm-template/web-module/api/marketing.php",

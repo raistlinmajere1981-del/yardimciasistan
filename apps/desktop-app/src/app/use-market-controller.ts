@@ -113,6 +113,17 @@ export function useMarketController({
     };
   }, [active, catalogEnabled, enabled, reloadCatalog]);
 
+  // Android actions commit on Desktop and emit dashboard:dataChanged. Re-read the
+  // canonical catalog while Market/Menu is open instead of keeping stale cards.
+  useEffect(() => {
+    if (!active || !enabled || !catalogEnabled) return;
+    return window.yardimciDesktop?.onDashboardDataChanged?.(() => {
+      void reloadCatalog().catch((error) => {
+        reportAppStatus("error", error instanceof Error ? error.message : "Katalog yenilenemedi.");
+      });
+    });
+  }, [active, catalogEnabled, enabled, reloadCatalog]);
+
   return {
     products,
     categories,

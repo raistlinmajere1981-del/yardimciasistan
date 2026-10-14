@@ -4,7 +4,7 @@ import type {
   DesktopAiService
 } from "../database-types.js";
 
-export const AI_SERVICE_IDS: DesktopAiService[] = ["openai", "openrouter", "groq", "gemini", "custom"];
+export const AI_SERVICE_IDS: DesktopAiService[] = ["openai", "openrouter", "groq", "gemini", "cloudflare", "custom"];
 
 const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(AI_SERVICE_IDS);
 
@@ -19,6 +19,7 @@ export const AI_SERVICE_DEFAULT_BASE_URLS: Record<DesktopAiService, string> = {
   openrouter: "https://openrouter.ai/api/v1",
   groq: "https://api.groq.com/openai/v1",
   gemini: GOOGLE_AI_STUDIO_BASE_URL,
+  cloudflare: "",
   custom: ""
 };
 
@@ -27,6 +28,7 @@ const AI_SERVICE_DISPLAY_NAMES: Record<DesktopAiService, string> = {
   openrouter: "OpenRouter",
   groq: "Groq",
   gemini: "Google AI Studio",
+  cloudflare: "Cloudflare Workers AI",
   custom: "Özel AI servisi"
 };
 

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/cloudflare-ai.php';
 
 interface YaVisionStockAnalyzer
 {
@@ -150,8 +151,26 @@ final class YaGoogleAiStudioVisionStockAnalyzer implements YaVisionStockAnalyzer
     }
 }
 
+final class YaCloudflareVisionStockAnalyzer implements YaVisionStockAnalyzer
+{
+    public function supports(array $config): bool
+    {
+        return ($config['service'] ?? '') === 'cloudflare'
+            && ($config['vision_model'] ?? '') === '@cf/meta/llama-4-scout-17b-16e-instruct'
+            && ya_cloudflare_base_url_supported((string) ($config['base_url'] ?? ''));
+    }
+
+    public function analyze(array $config, string $imagePath, string $mimeType, array $menuItems): array
+    {
+        $result = ya_cloudflare_analyze_image($config, $imagePath, $mimeType,
+            ya_stock_image_prompt($menuItems), ya_stock_image_system_instruction());
+        return $result['ok'] ? ya_stock_image_decode_provider_analysis($result['answer']) : $result;
+    }
+}
+
 function ya_stock_image_create_analyzer(array $config): YaVisionStockAnalyzer
 {
+    if (($config['service'] ?? '') === 'cloudflare') return new YaCloudflareVisionStockAnalyzer();
     return ya_stock_image_string($config['service'] ?? '') === 'gemini'
         ? new YaGoogleAiStudioVisionStockAnalyzer()
         : new YaOpenAiCompatibleVisionStockAnalyzer();

@@ -176,10 +176,13 @@ final class AndroidActionDispatcher {
           accepted.add(record);
         }
 
+        final String acceptedMessage = MarketUiRules.ACTION_SALE.equals(feedbackActionType) || MarketUiRules.ACTION_CREDIT_PAYMENT.equals(feedbackActionType)
+            ? MarketUiRules.financialFeedback(feedbackActionType, accepted.get(0).status)
+            : KbsUiRules.isAction(feedbackActionType) ? KbsUiRules.actionFeedback(feedbackActionType, accepted.get(0).status) : successMessage;
         activity.runOnUiThread(() -> listener.onActionsAccepted(
             accepted,
             feedbackActionType,
-            successMessage,
+            acceptedMessage,
             marketQueuedMessage != null
         ));
       } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
@@ -197,11 +200,11 @@ final class AndroidActionDispatcher {
           }
         }
 
-        final boolean actionRemainsQueued = !rejected && marketQueuedMessage != null;
+        final boolean actionRemainsQueued = !rejected && (marketQueuedMessage != null || KbsUiRules.isAction(feedbackActionType));
         activity.runOnUiThread(() -> listener.onActionsFailed(
             accepted,
             feedbackActionType,
-            marketQueuedMessage,
+            KbsUiRules.isAction(feedbackActionType) ? "Kuyruğa alındı; bağlantı geldiğinde aynı istek masaüstüne iletilecek." : marketQueuedMessage,
             error.getMessage(),
             actionRemainsQueued
         ));
@@ -213,6 +216,7 @@ final class AndroidActionDispatcher {
   static OperationData.ActionRecord failedRecord(ActionOutbox.PendingAction pending, String message) {
     OperationData.ActionRecord record = new OperationData.ActionRecord();
     record.id = pending.id; record.type = pending.type; record.orderId = pending.payload.optString("order_id");
+    record.notificationId = pending.payload.optString("notification_id");
     record.status = "failed"; record.errorMessage = message;
     record.createdAt = new java.util.Date().toInstant().toString(); record.processedAt = record.createdAt;
     return record;

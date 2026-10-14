@@ -18,8 +18,9 @@ export function registerKbsSettingsIpcHandlers(options: {
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   deliverNotification: (notificationId: string) => Promise<DesktopKbsDeliveryMutationResult>;
   onSettingsSaved?: (settings: KbsSettings) => void | Promise<void>;
+  onNotificationsChanged?: () => void;
 }) {
-  const { getDatabase, assertUnlocked, assertCapability, deliverNotification, onSettingsSaved } = options;
+  const { getDatabase, assertUnlocked, assertCapability, deliverNotification, onSettingsSaved, onNotificationsChanged } = options;
 
   ipcMain.handle("kbs:getSettings", (): KbsSettings => {
     assertUnlocked();
@@ -39,19 +40,26 @@ export function registerKbsSettingsIpcHandlers(options: {
   ipcMain.handle("kbs:markNotificationSentExternally", (_event, notificationId: unknown): DesktopStatusUpdateResult => {
     assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Konaklama yönetimi bu işletmede etkin değil.");
-    return getDatabase().markKbsNotificationSentExternally(String(notificationId ?? ""));
+    const result = getDatabase().markKbsNotificationSentExternally(String(notificationId ?? ""));
+    if (result.ok) onNotificationsChanged?.();
+    return result;
   });
 
   ipcMain.handle("kbs:retryNotification", (_event, notificationId: unknown): DesktopStatusUpdateResult => {
     assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Konaklama yönetimi bu işletmede etkin değil.");
-    return getDatabase().retryKbsNotification(String(notificationId ?? ""));
+    const result = getDatabase().retryKbsNotification(String(notificationId ?? ""));
+    if (result.ok) onNotificationsChanged?.();
+    return result;
   });
 
   ipcMain.handle("kbs:sendNotification", async (_event, notificationId: unknown): Promise<DesktopKbsDeliveryMutationResult> => {
     assertUnlocked();
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS, "Konaklama yönetimi bu işletmede etkin değil.");
-    return deliverNotification(String(notificationId ?? ""));
+    const result = await deliverNotification(String(notificationId ?? ""));
+    // A failed/unknown provider result may still have changed the durable notification.
+    onNotificationsChanged?.();
+    return result;
   });
 
   ipcMain.handle(

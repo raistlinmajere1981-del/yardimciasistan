@@ -54,3 +54,4 @@ export * from "./types/marketing-schedules";
 
 export * from "./types/marketing-analytics";
 export * from "./utils/nexa-rig";
+export * from "./utils/cloudflare-ai";

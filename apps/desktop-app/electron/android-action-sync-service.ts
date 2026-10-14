@@ -27,6 +27,7 @@ type AndroidActionSyncServiceOptions = {
   isSuspended: () => boolean;
   markLocalSnapshotDirty: () => void;
   notifyDashboardChanged: (dashboardData: DesktopDashboardData) => void;
+  onActionCommitted?: () => void;
 };
 
 export class AndroidActionSyncService {
@@ -35,6 +36,7 @@ export class AndroidActionSyncService {
   private readonly markLocalSnapshotDirty: () => void;
   private readonly notifyDashboardChanged:
     (dashboardData: DesktopDashboardData) => void;
+  private readonly onActionCommitted: (() => void) | undefined;
 
   private inFlight: Promise<AndroidActionProcessSummary> | null = null;
   private suspended = false;
@@ -44,6 +46,7 @@ export class AndroidActionSyncService {
     this.isSuspended = options.isSuspended;
     this.markLocalSnapshotDirty = options.markLocalSnapshotDirty;
     this.notifyDashboardChanged = options.notifyDashboardChanged;
+    this.onActionCommitted = options.onActionCommitted;
   }
 
   currentInFlight() {
@@ -124,6 +127,7 @@ export class AndroidActionSyncService {
 
     for (const action of pullResult.actions) {
       const applyResult = this.database.applyAndroidAction(action);
+      if (applyResult.ok) this.onActionCommitted?.();
       this.database.recordAndroidActionResult(action, applyResult);
       if (applyResult.ok && action.action_type === "market_product_create") {
         await archiveAndroidProductImage(this.database.databasePath, action);

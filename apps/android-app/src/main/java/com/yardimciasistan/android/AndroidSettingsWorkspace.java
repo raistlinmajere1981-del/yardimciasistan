@@ -13,8 +13,6 @@ import androidx.activity.ComponentActivity;
 
 final class AndroidSettingsWorkspace {
   interface Listener {
-    void openCash();
-    void openReports();
     void onSyncRequested();
     void refreshNotifications(OperationData data);
     int localPendingActionCount();
@@ -58,85 +56,6 @@ final class AndroidSettingsWorkspace {
     page.addView(appearance);
     page.addView(sectionLabel("Ses"));
     page.addView(voice.settingsView());
-
-    if (data.hasPermission("finance.view")) {
-      page.addView(sectionLabel("Kasa"));
-      LinearLayout cash = UiKit.card(activity);
-      cash.addView(UiKit.text(
-          activity,
-          "Mobil Kasa",
-          15,
-          UiKit.TEXT,
-          Typeface.BOLD
-      ));
-      cash.addView(UiKit.text(
-          activity,
-          data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOLIO)
-              ? "Bugünkü gelir, gider, net durum, bekleyen oda alacağı ve son hareketleri hızlıca izleyin."
-              : "Bugünkü gelir, gider, net durum ve son hareketleri hızlıca izleyin.",
-          12,
-          UiKit.SECONDARY,
-          Typeface.NORMAL
-      ));
-
-      Button openCash = UiKit.button(
-          activity,
-          "Kasa'yı Aç",
-          UiKit.PRIMARY,
-          view -> listener.openCash()
-      );
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-      params.setMargins(0, UiKit.dp(activity, 12), 0, 0);
-      openCash.setLayoutParams(params);
-      cash.addView(openCash);
-      page.addView(cash);
-    }
-
-    if (AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_REPORTS)) {
-      page.addView(sectionLabel("Yönetici"));
-      LinearLayout reports = UiKit.card(activity);
-      reports.addView(UiKit.text(
-          activity,
-          "İşletme raporları",
-          15,
-          UiKit.TEXT,
-          Typeface.BOLD
-      ));
-
-      boolean ordersEnabled =
-          data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
-      boolean customersEnabled =
-          data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS);
-      String description = ordersEnabled && customersEnabled
-          ? "Satışları, müşteri taleplerini ve güncel dikkat listesini kısa dönemlerle izleyin."
-          : ordersEnabled
-              ? "Satışları ve etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin."
-              : customersEnabled
-                  ? "Müşteri taleplerini ve etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin."
-                  : "Etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin.";
-
-      reports.addView(UiKit.text(
-          activity,
-          description,
-          12,
-          UiKit.SECONDARY,
-          Typeface.NORMAL
-      ));
-
-      Button openReports = UiKit.button(
-          activity,
-          "Raporları Aç",
-          UiKit.PRIMARY,
-          view -> listener.openReports()
-      );
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-      params.setMargins(0, UiKit.dp(activity, 12), 0, 0);
-      openReports.setLayoutParams(params);
-      reports.addView(openReports);
-      page.addView(reports);
-    }
 
     if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_NOTIFICATIONS)) {
       appendNotificationPreferences(page, data, canViewTechnicalSettings);

@@ -19,6 +19,11 @@ function ya_identity_image_analyze(array $config, string $imagePath, string $mim
     if (!$analyzer->supports($config)) {
         return ya_stock_image_error('vision_not_supported', 'Mevcut AI hizmeti görsel analizini desteklemiyor.');
     }
+    if (($config['service'] ?? '') === 'cloudflare') {
+        $result = ya_cloudflare_analyze_image($config, $imagePath, $mimeType,
+            ya_identity_image_prompt(), ya_identity_image_system_instruction());
+        return $result['ok'] ? ya_stock_image_decode_provider_analysis($result['answer']) : $result;
+    }
 
     $baseUrl = rtrim(ya_stock_image_string($config['base_url'] ?? ''), '/');
     $model = ya_stock_image_string($config['model'] ?? '');

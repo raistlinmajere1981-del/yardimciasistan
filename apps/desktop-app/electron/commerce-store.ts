@@ -16,6 +16,7 @@ import { readEnabledBusinessCapabilities } from "./business-capability-store.js"
 import { saveCommerceProductPublication } from "./commerce-product-publication-store.js";
 import { isInventoryTrackingEnabled } from "./inventory-tracking.js";
 import { resolveCommerceProductPriceInDatabase } from "./commerce-pricing-service.js";
+import { synchronizeFinanceSourceInTransaction } from "./finance.js";
 
 const COMMERCE_UNITS = new Set<CommerceUnit>([
   "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
@@ -117,6 +118,10 @@ export interface CreateCommerceSaleInput {
   items: Array<{
     productId: string;
     quantity: number;
+    /** Optional offline expectation; current canonical pricing remains authority. */
+    expectedUnitPrice?: number;
+    expectedCurrency?: string;
+    expectedUpdatedAt?: string;
   }>;
 }
 
@@ -868,6 +873,11 @@ export function createCommerceSaleInTransaction(
       ...(input.customerId !== undefined ? { customerId: input.customerId } : {}) }, wholesaleEnabled);
     product.salePrice = resolvedPrice.unitPrice;
     moneyToMinor(product.salePrice);
+    if ((item.expectedUnitPrice !== undefined && moneyToMinor(item.expectedUnitPrice) !== moneyToMinor(product.salePrice))
+        || (item.expectedCurrency !== undefined && item.expectedCurrency !== product.currency)
+        || (item.expectedUpdatedAt !== undefined && item.expectedUpdatedAt !== product.updatedAt)) {
+      throw new Error("Ürün veya müşteri fiyatı değişti. Veriyi yenileyip satış tutarını tekrar onaylayın.");
+    }
     if (currency && product.currency !== currency) throw new Error("Tek satışta birden fazla para birimi kullanılamaz.");
     currency = product.currency;
     const lineTotal = roundMoney(product.salePrice * quantity);
@@ -927,6 +937,7 @@ export function createCommerceSaleInTransaction(
       }, now);
     }
   }
+  if (status === "paid") synchronizeFinanceSourceInTransaction(database, "commerce_sale", saleId);
   return {
     id: saleId,
     businessId,
@@ -1066,6 +1077,7 @@ export function createCommerceSaleFromOrderSnapshotInTransaction(
     }
   }
 
+  if (status === "paid") synchronizeFinanceSourceInTransaction(database, "commerce_sale", saleId);
   return {
     sale: {
       id: saleId,

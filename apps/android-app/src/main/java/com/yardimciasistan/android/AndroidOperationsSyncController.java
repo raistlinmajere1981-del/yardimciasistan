@@ -21,6 +21,7 @@ final class AndroidOperationsSyncController {
     final int discardedActionCount;
     final boolean retryingOnlyMarketActions;
     final String retriedMarketActionType;
+    final String retriedMarketActionId;
     final boolean usedLocalTransport;
     final boolean webAllowsLocalNetwork;
     final boolean shouldRender;
@@ -31,6 +32,7 @@ final class AndroidOperationsSyncController {
         int discardedActionCount,
         boolean retryingOnlyMarketActions,
         String retriedMarketActionType,
+        String retriedMarketActionId,
         boolean usedLocalTransport,
         boolean webAllowsLocalNetwork,
         boolean shouldRender,
@@ -40,6 +42,7 @@ final class AndroidOperationsSyncController {
       this.discardedActionCount = discardedActionCount;
       this.retryingOnlyMarketActions = retryingOnlyMarketActions;
       this.retriedMarketActionType = retriedMarketActionType;
+      this.retriedMarketActionId = retriedMarketActionId;
       this.usedLocalTransport = usedLocalTransport;
       this.webAllowsLocalNetwork = webAllowsLocalNetwork;
       this.shouldRender = shouldRender;
@@ -196,6 +199,7 @@ final class AndroidOperationsSyncController {
             invalidatedPendingActions,
             retryingOnlyMarketActions,
             retriedMarketActionType,
+            retryingOnlyMarketActions && !pendingToRetry.isEmpty() ? pendingToRetry.get(pendingToRetry.size() - 1).id : "",
             fetchedSourceKey.startsWith("local:"),
             fetched.payload.optBoolean("local_network_enabled", true),
             !fetched.notModified || !pendingToRetry.isEmpty(),

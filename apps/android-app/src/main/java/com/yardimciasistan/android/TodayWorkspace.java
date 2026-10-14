@@ -70,6 +70,7 @@ final class TodayWorkspace {
     data.companion.redact(data);
 
     ArrayList<Counter> counters = new ArrayList<>();
+    if (KbsUiRules.canView(data)) counters.add(new Counter("KBS bekleyen / sorunlu", data.kbs.pendingCount + data.kbs.failedCount + data.kbs.unknownCount, UiKit.WARNING, "pension:kbs"));
     if (canViewCommerce && data.companion.commerceAvailable) {
       counters.add(new Counter("Ticari sipariş", data.companion.pendingOrders, UiKit.WARNING, "today:commerce"));
     }
@@ -185,10 +186,6 @@ final class TodayWorkspace {
     if (!counters.isEmpty()) {
       page.addView(statusStrip(counters));
     }
-
-    if (canViewCommerce) page.addView(companionEntry(AndroidUiRules.TODAY_COMMERCE));
-    if (canViewShipments) page.addView(companionEntry(AndroidUiRules.TODAY_SHIPMENTS));
-    if (canViewMarketing) page.addView(companionEntry(AndroidUiRules.TODAY_MARKETING));
 
     page.addView(sectionLabel("Öncelikli işler"));
     int shown = 0;
@@ -326,9 +323,6 @@ final class TodayWorkspace {
     return listener.wrap(page);
   }
 
-  private View companionEntry(String mode) {
-    return UiKit.outlineButton(activity, CompanionUiRules.title(mode), view -> listener.openRoute("today:" + mode));
-  }
 
   private View statusStrip(ArrayList<Counter> counters) {
     HorizontalScrollView scroll = new HorizontalScrollView(activity);

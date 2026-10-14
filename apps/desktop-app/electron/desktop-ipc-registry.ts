@@ -66,6 +66,7 @@ export type DesktopIpcRegistryDependencies = {
   publishBusinessAiContext: () => void;
   deliverKbsNotification: KbsSettingsIpcOptions["deliverNotification"];
   onKbsSettingsSaved: () => void;
+  onKbsNotificationsChanged: () => void;
   isTrustedRendererUrl: (url: string) => boolean;
   kbsInteractiveDriver: EgmKbsWebviewDriver;
   kbsBackgroundSession: EgmKbsBackgroundSession;
@@ -115,6 +116,7 @@ export function registerDesktopIpcHandlers(
     publishBusinessAiContext,
     deliverKbsNotification,
     onKbsSettingsSaved,
+    onKbsNotificationsChanged,
     isTrustedRendererUrl,
     kbsInteractiveDriver,
     kbsBackgroundSession,
@@ -195,7 +197,8 @@ export function registerDesktopIpcHandlers(
     assertUnlocked,
     assertCapability,
     deliverNotification: deliverKbsNotification,
-    onSettingsSaved: onKbsSettingsSaved
+    onSettingsSaved: onKbsSettingsSaved,
+    onNotificationsChanged: onKbsNotificationsChanged
   });
 
   registerKbsWebviewIpcEvents({

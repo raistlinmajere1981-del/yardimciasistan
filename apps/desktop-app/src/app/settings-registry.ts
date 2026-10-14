@@ -97,7 +97,7 @@ export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-product-data", category: "services", title: "Ürün Verisi", keywords: "barkod open food facts sağlayıcı görseller otomatik ara", persistence: "staged", visible: caps => isBusinessServiceAvailable("productData", caps) },
   { id: "settings-web", category: "services", title: "Website / Web Modülü", keywords: "eşitleme adres güvenlik anahtarı otomatik", persistence: "staged" },
   { id: "settings-web-test", category: "services", title: "Web Bağlantısını Dene", keywords: "bağlantı test", persistence: "action" },
-  { id: "settings-ai", category: "services", title: "AI Yardımcı", keywords: "openai gemini google studio groq openrouter metin görsel üretim modeli otomatik api anahtarı zaman aşımı", persistence: "staged", visible: caps => isBusinessServiceAvailable("ai", caps) },
+  { id: "settings-ai", category: "services", title: "AI Yardımcı", keywords: "openai gemini google studio groq openrouter cloudflare workers account token metin görsel analiz üretim modeli konuşma tanıma stt whisper api anahtarı zaman aşımı", persistence: "staged", visible: caps => isBusinessServiceAvailable("ai", caps) },
   { id: "settings-ai-test", category: "services", title: "AI Bağlantısını Dene", keywords: "model test", persistence: "action", visible: caps => isBusinessServiceAvailable("ai", caps) },
   { id: "settings-appearance", category: "application", title: "Görünüm", keywords: "renk düzeni tema sistem koyu açık yoğunluk ölçek vurgu yazı tipi hareket", persistence: "resource" },
   { id: "settings-updates", category: "application", title: "Güncelleme tercihleri", keywords: "sunucu otomatik kontrol", persistence: "resource", visible: (_, initialized) => initialized },

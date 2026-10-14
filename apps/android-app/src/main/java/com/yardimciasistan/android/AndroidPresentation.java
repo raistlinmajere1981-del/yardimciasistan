@@ -264,12 +264,17 @@ final class AndroidPresentation {
   }
 
   static String formatActionType(String value) {
+    if (KbsUiRules.SEND.equals(value)) return "KBS gönderim isteği";
+    if (KbsUiRules.RETRY.equals(value)) return "KBS yeniden deneme hazırlığı";
+    if (KbsUiRules.EXTERNAL.equals(value)) return "KBS harici gönderim onayı";
     if ("commerce_order_confirm".equals(value)) return "Ticari sipariş onayı";
     if ("commerce_order_cancel".equals(value)) return "Ticari sipariş iptali";
     if (MarketUiRules.ACTION_STOCK_COUNT.equals(value)) return "Market stok sayımı";
     if (MarketUiRules.ACTION_PURCHASE_RECEIVE.equals(value)) return "Market mal kabulü";
     if (MarketUiRules.ACTION_PRODUCT_CREATE.equals(value)) return "Yeni ürün";
     if (MarketUiRules.ACTION_CART_DRAFT_CREATE.equals(value)) return "Market sepet taslağı";
+    if (MarketUiRules.ACTION_SALE.equals(value)) return "Mobil satış";
+    if (MarketUiRules.ACTION_CREDIT_PAYMENT.equals(value)) return "Cari tahsilat";
     if ("customer_create".equals(value)) return "Müşteri oluşturma";
     if ("customer_update".equals(value)) return "Müşteri güncelleme";
     if ("customer_room_assign".equals(value)) return "Müşteri-oda ataması";

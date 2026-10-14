@@ -32,6 +32,34 @@ final class AndroidActionPolicy {
           ? "Bu cihazın hesap kapatma yetkisi yok."
           : "Bu cihazın bu işlem için yetkisi yok.";
     }
+    if (MarketUiRules.ACTION_SALE.equals(actionType) || MarketUiRules.ACTION_CREDIT_PAYMENT.equals(actionType)) {
+      if (actionPayload == null) return "Satış veya tahsilat bilgileri eksik.";
+      String method = actionPayload.optString("payment_method", "");
+      boolean credit = MarketUiRules.ACTION_SALE.equals(actionType) && "credit".equals(actionPayload.optString("settlement"));
+      if ((!credit && !java.util.Arrays.asList("cash", "card", "bank", "other").contains(method))
+          || (credit && (!method.isEmpty() || actionPayload.optString("customer_id").isEmpty()))) return "Ödeme türü veya müşteri eksik.";
+      if ("card".equals(method) && !Boolean.TRUE.equals(actionPayload.opt("external_payment_confirmed"))) return "Harici POS ödemesini onaylayın.";
+      if (MarketUiRules.ACTION_SALE.equals(actionType)) {
+        org.json.JSONArray lines = actionPayload.optJSONArray("lines");
+        if (lines == null || lines.length() == 0 || lines.length() > 200) return "Satış ürünleri eksik.";
+        for (int i = 0; i < lines.length(); i++) {
+          JSONObject line = lines.optJSONObject(i);
+          if (line == null || line.optString("product_id").isEmpty() || line.optString("expected_updated_at").isEmpty()
+              || !line.optString("expected_currency").matches("[A-Z]{3}") || !line.has("expected_unit_price")) return "Güncel ürün fiyatı ve sürümü gerekli.";
+        }
+      } else if (!actionPayload.has("expected_balance_minor") || actionPayload.optLong("expected_balance_minor", 0) <= 0
+          || actionPayload.optLong("amount_minor", 0) <= 0 || !actionPayload.optString("currency").matches("[A-Z]{3}")) return "Tahsilat tutarı ve güncel bakiye gerekli.";
+    }
+    if ("room_folio_menu_item_add".equals(actionType) || "room_folio_manual_charge_add".equals(actionType)) {
+      if (!data.hasPermission("room_folio.view")
+          || ("room_folio_menu_item_add".equals(actionType) && !data.hasPermission("menu.view"))) {
+        return "Bu cihazın oda hesabı veya menü görüntüleme yetkisi yok.";
+      }
+      if (actionPayload == null || !actionPayload.optString("expected_folio_version", "").matches("[a-f0-9]{64}")) {
+        return "Güncel oda hesabı gerekli. Veriyi yenileyip tekrar deneyin.";
+      }
+    }
+    if (KbsUiRules.isAction(actionType)) return KbsUiRules.validationError(data, actionType, actionPayload);
     return "";
   }
 
@@ -47,6 +75,15 @@ final class AndroidActionPolicy {
 
     String type = actionType == null ? "" : actionType;
     JSONObject payload = actionPayload == null ? new JSONObject() : actionPayload;
+    if (KbsUiRules.isAction(type)) return KbsUiRules.canView(data);
+    if (MarketUiRules.ACTION_SALE.equals(type)) {
+      return MarketUiRules.canCompleteSale(data) && (!"credit".equals(payload.optString("settlement")) || MarketUiRules.canViewCredit(data));
+    }
+    if (MarketUiRules.ACTION_CREDIT_PAYMENT.equals(type)) return MarketUiRules.canPayCredit(data);
+    if ("room_folio_menu_item_add".equals(type) || "room_folio_manual_charge_add".equals(type)) {
+      return data.hasBusinessCapability("accommodation.folio") && data.hasBusinessCapability("accommodation.stays")
+          && (!"room_folio_menu_item_add".equals(type) || data.hasBusinessCapability("food_service.menu"));
+    }
     if ("menu_entry_create".equals(type) || "menu_entry_update".equals(type)) {
       return data.hasBusinessCapability("food_service.menu") && data.hasBusinessCapability("commerce.catalog");
     }
@@ -200,6 +237,14 @@ final class AndroidActionPolicy {
         return "finance.create";
       case "room_folio_payment_add":
         return "room_folio.payment";
+      case KbsUiRules.SEND:
+      case KbsUiRules.RETRY:
+      case KbsUiRules.EXTERNAL:
+        return KbsUiRules.permission(actionType);
+      case "room_folio_menu_item_add":
+        return "room_folio.add_menu_item";
+      case "room_folio_manual_charge_add":
+        return "room_folio.add_manual_charge";
       case "room_folio_checkout":
         return "room_folio.checkout";
       case "table_status_update":
@@ -237,6 +282,10 @@ final class AndroidActionPolicy {
         return MarketUiRules.PERMISSION_CART_DRAFT;
       case MarketUiRules.ACTION_BARCODE_SCAN:
         return MarketUiRules.PERMISSION_SCAN_TO_DESKTOP;
+      case MarketUiRules.ACTION_SALE:
+        return MarketUiRules.PERMISSION_SALE;
+      case MarketUiRules.ACTION_CREDIT_PAYMENT:
+        return MarketUiRules.PERMISSION_CREDIT_PAYMENT;
       default:
         return null;
     }
@@ -244,7 +293,7 @@ final class AndroidActionPolicy {
 
   static boolean isAdminOnlyAction(String actionType) {
     String type = actionType == null ? "" : actionType;
-    return "customer_request_delete".equals(type)
+    return KbsUiRules.isAction(type) || "customer_request_delete".equals(type)
         || "customer_delete".equals(type)
         || "customer_create".equals(type)
         || "customer_update".equals(type)

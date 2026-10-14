@@ -37,6 +37,9 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   { id: "cashier", label: "Kasa / Hesap", shortLabel: "Kasa", description: "Ödendi / Kapat işlemi" },
   { id: "rooms_tasks", label: "Oda / Günlük İşler", shortLabel: "Oda işleri", description: "Oda durumu ve günlük işler" },
   { id: "customer_reservation", label: "Müşteri / Rezervasyon", shortLabel: "Müşteri / Rezervasyon", description: "Talep yanıtı ve rezervasyon onayı" },
+  { id: "market_sales", label: "Market / Mobil Satış", shortLabel: "Mobil satış", description: "Sepeti son satış kaydına dönüştürme; kart ödemesi harici POS'ta alınır" },
+  { id: "customer_credit_view", label: "Cari / Görüntüleme", shortLabel: "Cari görüntüleme", description: "Müşteri adı, para birimine göre borç ve son hareketler" },
+  { id: "customer_credit_payment", label: "Cari / Tahsilat", shortLabel: "Cari tahsilat", description: "Müşteri borcuna nakit, harici kart, havale veya diğer tahsilatı kaydetme" },
   {
     id: "market_operations",
     label: "Market / El Terminali",

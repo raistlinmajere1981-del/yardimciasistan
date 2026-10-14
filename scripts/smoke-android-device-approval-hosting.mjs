@@ -95,11 +95,44 @@ try {
   assert.equal(approved.operations.total_rooms, 1);
   assert.equal(approved.summary.total_requests, 1);
   assert.deepEqual(approved.menu_product_candidates, [], "Menu linking candidates require menu.edit permission, not only device approval.");
+  assert.deepEqual(approved.menu.items, [], "Menu read permission is required independently of room visibility.");
 
   await publishSnapshot(3, { [deviceId]: { role: "admin", is_active: true, permissions: ["menu.edit"] } });
   const editor = await (await syncApi({ action: "android_summary", device_id: deviceId, device_name: "Menu editor", app_version: "smoke" })).json();
   assert.deepEqual(editor.menu_product_candidates, [{ product_id: "product-unlinked", name: "Existing product", unit: "l", sale_price: 12, currency: "TRY" }],
     "Hosting link discovery must expose only canonical identity/name/unit/price/currency, never purchase prices or private images/metadata.");
+
+  const chargePermissions = ["room_folio.view", "room_folio.add_menu_item", "room_folio.add_manual_charge", "menu.view"];
+  let revision = 4;
+  const charge = async (type, permissions, omittedCapabilities = [], role = "staff", active = true) => {
+    await publishSnapshot(revision++, { [deviceId]: { role, is_active: active, permissions } }, omittedCapabilities);
+    return syncApi({ action: "enqueue_android_action", action_id: `folio_hosting_action_${revision}`, action_type: type,
+      device_id: deviceId, device_name: "Folio phone", app_version: "smoke",
+      payload: { folio_id: "folio_approval_smoke", expected_folio_version: "a".repeat(64), label: "Otopark", amount_minor: 12345,
+        menu_entry_id: "item_approval_smoke", quantity: 2, expected_unit_price_minor: 5000, expected_currency: "TRY",
+        expected_menu_updated_at: "2036-08-17T09:00:00Z" } });
+  };
+  for (const type of ["room_folio_menu_item_add", "room_folio_manual_charge_add"]) {
+    const permission = type === "room_folio_menu_item_add" ? "room_folio.add_menu_item" : "room_folio.add_manual_charge";
+    for (const missing of [permission, "room_folio.view", ...(type === "room_folio_menu_item_add" ? ["menu.view"] : [])]) {
+      assert.equal((await charge(type, chargePermissions.filter(value => value !== missing))).status, 403);
+    }
+    assert.equal((await charge(type, chargePermissions, [], "staff", false)).status, 403);
+    for (const capability of ["accommodation.folio", "accommodation.stays", ...(type === "room_folio_menu_item_add" ? ["food_service.menu"] : [])]) {
+      for (const role of ["staff", "admin"]) assert.equal((await charge(type, chargePermissions, [capability], role)).status, 403);
+    }
+    assert.equal((await charge(type, chargePermissions)).status, 201);
+  }
+  const chargeSummary = await (await syncApi({ action: "android_summary", device_id: deviceId, device_name: "Folio phone", app_version: "smoke" })).json();
+  assert.equal(chargeSummary.room_folios[0].version, "a".repeat(64));
+  assert.equal(chargeSummary.room_folios[0].can_add_items, true);
+  assert.equal(chargeSummary.menu.items[0].price, 50);
+  assert.equal(chargeSummary.menu.items[0].currency, "TRY");
+  assert.equal(chargeSummary.menu.items[0].stock_quantity, null, "Menu visibility does not grant stock visibility.");
+  assert.deepEqual(chargeSummary.admin_menu.items, []);
+  await publishSnapshot(revision++, { [deviceId]: { role: "staff", is_active: true, permissions: [...chargePermissions, "menu.stock_view"] } });
+  const stockSummary = await (await syncApi({ action: "android_summary", device_id: deviceId, device_name: "Folio phone", app_version: "smoke" })).json();
+  assert.equal(stockSummary.menu.items[0].stock_quantity, 10);
 
   console.log("android-device-approval-hosting-smoke-ok: inactive device sees no operational snapshot, approved device does");
 } catch (error) {
@@ -112,7 +145,7 @@ try {
   rmSync(tempRoot, { recursive: true, force: true });
 }
 
-async function publishSnapshot(sourceRevision, androidPermissions) {
+async function publishSnapshot(sourceRevision, androidPermissions, omittedCapabilities = []) {
   const response = await syncApi({
     action: "publish_android_snapshot",
     client_id: "approval-smoke-desktop",
@@ -126,10 +159,13 @@ async function publishSnapshot(sourceRevision, androidPermissions) {
         "core.reports",
         "service.android",
         "accommodation.rooms",
+        "accommodation.folio",
+        "accommodation.stays",
         "food_service.tables",
         "food_service.menu",
-        "commerce.catalog"
-      ],
+        "commerce.catalog",
+        "commerce.inventory"
+      ].filter(capability => !omittedCapabilities.includes(capability)),
       summary: {
         pending_daily_tasks: 1,
         today_tasks: 1,
@@ -178,7 +214,9 @@ async function publishSnapshot(sourceRevision, androidPermissions) {
       }],
       customers: [],
       customer_room_stays: [],
-      room_folios: [],
+      room_folios: [{ id: "folio_approval_smoke", stay_id: "stay_approval_smoke", room_id: "room_approval_smoke",
+        status: "open", currency: "TRY", charge_total_minor: 10000, remaining_minor: 10000,
+        version: "a".repeat(64), can_add_items: true }],
       reservations: [],
       rooms: [{
         id: "room_approval_smoke",

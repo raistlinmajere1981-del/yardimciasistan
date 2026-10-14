@@ -28,6 +28,12 @@ export const ANDROID_PERMISSIONS = [
   "room.update_status",
   "room.assign_customer",
   "room_folio.view",
+  "kbs.view",
+  "kbs.send",
+  "kbs.retry",
+  "kbs.reconcile_external",
+  "room_folio.add_menu_item",
+  "room_folio.add_manual_charge",
   "room_folio.payment",
   "room_folio.checkout",
   "daily_task.view",
@@ -67,6 +73,9 @@ export const ANDROID_PERMISSIONS = [
   "market.product_create",
   "market.cart_draft",
   "market.scan_to_desktop",
+  "market.sale.complete",
+  "customer_credit.view",
+  "customer_credit.payment",
   "commerce_order.view",
   "commerce_order.confirm",
   "commerce_order.cancel",
@@ -85,6 +94,9 @@ export const ANDROID_PERMISSION_GROUP_IDS = [
   "rooms_tasks",
   "customer_reservation",
   "market_operations",
+  "market_sales",
+  "customer_credit_view",
+  "customer_credit_payment",
   "commerce_orders_view",
   "commerce_orders_manage",
   "dealer_view",
@@ -98,6 +110,9 @@ export type AndroidPermissionGroups = Record<AndroidPermissionGroupId, boolean>;
 
 export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermissionGroupId, readonly AndroidPermission[]>> = {
   voice_dictation: ["voice.dictation"],
+  market_sales: ["market.product.view", "market.sale.complete"],
+  customer_credit_view: ["customer_credit.view"],
+  customer_credit_payment: ["customer_credit.view", "customer_credit.payment"],
   commerce_orders_view: ["commerce_order.view"],
   commerce_orders_manage: ["commerce_order.view", "commerce_order.confirm", "commerce_order.cancel"],
   dealer_view: ["dealer.view"],
@@ -133,6 +148,8 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
     "room.view",
     "room.update_status",
     "room_folio.view",
+    "room_folio.add_menu_item",
+    "room_folio.add_manual_charge",
     "room_folio.checkout",
     "daily_task.view",
     "daily_task.create",
@@ -167,6 +184,9 @@ export const ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS: Readonly<AndroidPermission
   rooms_tasks: true,
   customer_reservation: false,
   market_operations: false,
+  market_sales: false,
+  customer_credit_view: false,
+  customer_credit_payment: false,
   commerce_orders_view: false,
   commerce_orders_manage: false,
   dealer_view: false,
@@ -202,6 +222,9 @@ const ANDROID_MARKET_CAPABILITIES = [
   C.RETAIL_PURCHASING,
   C.RETAIL_SUPPLIERS
 ] as const;
+
+const ANDROID_RETAIL_WORKSPACE_CAPABILITIES = [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS] as const;
+const ANDROID_CUSTOMER_CREDIT_CAPABILITIES = [C.CUSTOMER_CREDIT, C.CUSTOMERS, C.SALES, C.CATALOG, C.FINANCE] as const;
 
 const ANDROID_ACCOMMODATION_FOOD_CAPABILITIES = [
   C.ACCOMMODATION_ROOMS,
@@ -246,6 +269,12 @@ export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<Android
   "room.update_status": { allOf: [C.ACCOMMODATION_ROOMS] },
   "room.assign_customer": { allOf: [C.CUSTOMERS, C.ACCOMMODATION_STAYS] },
   "room_folio.view": { allOf: [C.ACCOMMODATION_FOLIO] },
+  "kbs.view": { allOf: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS] },
+  "kbs.send": { allOf: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS] },
+  "kbs.retry": { allOf: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS] },
+  "kbs.reconcile_external": { allOf: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS] },
+  "room_folio.add_menu_item": { allOf: [C.ACCOMMODATION_FOLIO, C.ACCOMMODATION_STAYS, C.FOOD_MENU] },
+  "room_folio.add_manual_charge": { allOf: [C.ACCOMMODATION_FOLIO, C.ACCOMMODATION_STAYS] },
   "room_folio.payment": { allOf: [C.ACCOMMODATION_FOLIO] },
   "room_folio.checkout": { allOf: [C.ACCOMMODATION_FOLIO] },
   "daily_task.view": { allOf: [C.TASKS] },
@@ -284,6 +313,9 @@ export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<Android
   "market.receiving": { allOf: [C.RETAIL_PURCHASING] },
   "market.product_create": { allOf: [C.CATALOG] },
   "market.cart_draft": { allOf: [C.SALES, C.CATALOG] },
+  "market.sale.complete": { allOf: [C.SALES, C.CATALOG], anyOf: ANDROID_RETAIL_WORKSPACE_CAPABILITIES },
+  "customer_credit.view": { allOf: ANDROID_CUSTOMER_CREDIT_CAPABILITIES, anyOf: ANDROID_RETAIL_WORKSPACE_CAPABILITIES },
+  "customer_credit.payment": { allOf: ANDROID_CUSTOMER_CREDIT_CAPABILITIES, anyOf: ANDROID_RETAIL_WORKSPACE_CAPABILITIES },
   "market.scan_to_desktop": { allOf: [C.RETAIL_BARCODE, C.CATALOG, C.SALES] }
 };
 
@@ -325,7 +357,8 @@ export function androidEffectivePermissionsForRole(
   storedPermissions: Iterable<AndroidPermission>,
   capabilities: Iterable<BusinessCapability>
 ): AndroidPermission[] {
-  const granted = role === "admin" ? ANDROID_PERMISSIONS : storedPermissions;
+  // KBS has no staff group or inherited rooms/tasks grant.
+  const granted = role === "admin" ? ANDROID_PERMISSIONS : [...storedPermissions].filter(permission => !permission.startsWith("kbs."));
   return androidEffectivePermissions(granted, capabilities);
 }
 
@@ -363,6 +396,9 @@ export function androidAvailablePermissionGroupIds(
           || ANDROID_RESERVATION_CAPABILITIES.some((capability) => enabled.has(capability));
       case "market_operations":
         return hasMarketOperations;
+      case "market_sales": return androidPermissionAllowedByCapabilities("market.sale.complete", enabled);
+      case "customer_credit_view":
+      case "customer_credit_payment": return androidPermissionAllowedByCapabilities("customer_credit.view", enabled);
     }
   });
 }
@@ -405,6 +441,11 @@ export function androidActionAllowedByCapabilities(
 ): boolean {
   const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   if (!enabled.has(C.ANDROID)) return false;
+
+  if (actionType === "market_sale_complete") {
+    return androidPermissionAllowedByCapabilities("market.sale.complete", enabled)
+      && (context.payload?.settlement !== "credit" || androidPermissionAllowedByCapabilities("customer_credit.view", enabled));
+  }
 
   if (["commerce_order_confirm", "commerce_order_cancel"].includes(actionType)) {
     return enabled.has(C.ORDERS)
@@ -468,6 +509,9 @@ export const ANDROID_STAFF_PERMISSIONS: readonly AndroidPermission[] = androidPe
 
 
 export const ANDROID_ACTION_TYPES = [
+  "kbs_send_request",
+  "kbs_retry_prepare",
+  "kbs_mark_sent_externally",
   "commerce_order_confirm",
   "commerce_order_cancel",
   "customer_request_mark_answered",
@@ -497,6 +541,8 @@ export const ANDROID_ACTION_TYPES = [
   "daily_task_cancel",
   "finance_manual_create",
   "room_folio_payment_add",
+  "room_folio_menu_item_add",
+  "room_folio_manual_charge_add",
   "room_folio_checkout",
   "table_status_update",
   "table_order_open",
@@ -521,12 +567,17 @@ export const ANDROID_ACTION_TYPES = [
   "market_purchase_receive",
   "market_product_create",
   "market_cart_draft_create",
-  "market_barcode_scan"
+  "market_barcode_scan",
+  "market_sale_complete",
+  "customer_credit_payment_add"
 ] as const;
 
 export type AndroidActionType = typeof ANDROID_ACTION_TYPES[number];
 
 export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, AndroidPermission>> = {
+  kbs_send_request: "kbs.send",
+  kbs_retry_prepare: "kbs.retry",
+  kbs_mark_sent_externally: "kbs.reconcile_external",
   commerce_order_confirm: "commerce_order.confirm",
   commerce_order_cancel: "commerce_order.cancel",
   customer_request_mark_answered: "customer.mark_answered",
@@ -556,6 +607,8 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   daily_task_cancel: "daily_task.update",
   finance_manual_create: "finance.create",
   room_folio_payment_add: "room_folio.payment",
+  room_folio_menu_item_add: "room_folio.add_menu_item",
+  room_folio_manual_charge_add: "room_folio.add_manual_charge",
   room_folio_checkout: "room_folio.checkout",
   table_status_update: "table.update_status",
   table_order_open: "table_order.open",
@@ -580,14 +633,17 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   market_purchase_receive: "market.receiving",
   market_product_create: "market.product_create",
   market_cart_draft_create: "market.cart_draft",
-  market_barcode_scan: "market.scan_to_desktop"
+  market_barcode_scan: "market.scan_to_desktop",
+  market_sale_complete: "market.sale.complete",
+  customer_credit_payment_add: "customer_credit.payment"
 };
 
 export function resolveAndroidActionPermission(
   actionType: string,
   _payload: Record<string, unknown> = {}
 ): AndroidPermission | null {
-  const mapped = ANDROID_ACTION_PERMISSION_MAP[actionType as AndroidActionType];
+  const mapped = Object.hasOwn(ANDROID_ACTION_PERMISSION_MAP, actionType)
+    ? ANDROID_ACTION_PERMISSION_MAP[actionType as AndroidActionType] : undefined;
   if (mapped) {
     return mapped;
   }

@@ -1,5 +1,5 @@
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
-import { imageGenerationModelOptions, sttModelOptions, supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { CLOUDFLARE_AI_MODELS, cloudflareAiAccountId, cloudflareAiBaseUrl, imageGenerationModelOptions, sttModelOptions, supportsImageGenerationModel } from "@yardimci-asistan/shared";
 import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
@@ -195,6 +195,13 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                 </div>
                 {renderAiConnectionActions(true)}
               </>
+            ) : form.aiService === "cloudflare" ? (
+              <label className="form-field form-field--long form-field--span">
+                Cloudflare Account ID
+                <input aria-label="Cloudflare Account ID" value={cloudflareAiAccountId(form.aiBaseUrl)} onChange={event => update("aiBaseUrl", cloudflareAiBaseUrl(event.target.value))} disabled={!form.aiEnabled} autoComplete="off" spellCheck={false} />
+                <small>32 karakterli hesap kimliğinden resmi API adresi oluşturulur. API Token için Workers AI erişim yetkisi gerekir.</small>
+                <small>Modeller belgeye dayalı adaylardır; hesap erişimi ve ücretsiz kota gerçek isteklerle doğrulanır. Bağlantı testi seçili metin/görsel modellerine istek gönderir ve kota kullanır. STT ayrı denenir.</small>
+              </label>
             ) : (
               <label className="form-field form-field--long form-field--span">
                 Bağlantı adresi
@@ -203,7 +210,12 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
             )}
             <label className="form-field form-field--medium">
               Model adı
-              {form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
+              {form.aiService === "cloudflare" ? (
+                <select aria-label="Metin modeli" value={form.aiModel} onChange={event => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
+                  <option value="">Model seçin</option>
+                  {[CLOUDFLARE_AI_MODELS.text, CLOUDFLARE_AI_MODELS.vision].map(model => <option key={model} value={model}>{model} · aday</option>)}
+                </select>
+              ) : form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
                 <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
                   {form.aiModelOptions.filter(model => !supportsImageGenerationModel(form.aiService, model.id)).map((model) => (
                     <option value={model.id} key={model.id}>{model.label}</option>
@@ -220,6 +232,13 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                   : "Bağlantıyı Dene ile görsel destekli, güncel modeller otomatik alınır."}</small>
               )}
             </label>
+            {form.aiService === "cloudflare" && <label className="form-field form-field--medium">
+              Görsel analiz modeli
+              <select aria-label="Görsel analiz modeli" value={form.aiVisionModel} onChange={event => update("aiVisionModel", event.target.value)} disabled={!form.aiEnabled}>
+                <option value="">Kapalı</option>
+                <option value={CLOUDFLARE_AI_MODELS.vision}>{CLOUDFLARE_AI_MODELS.vision} · aday</option>
+              </select>
+            </label>}
             <label className="form-field form-field--medium">
               Görsel üretim modeli
               <select aria-label="Görsel üretim modeli" value={form.aiImageModel} onChange={(event) => update("aiImageModel", event.target.value)}>
@@ -243,10 +262,10 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               <input value={form.aiTimeoutSeconds} onChange={(event) => update("aiTimeoutSeconds", event.target.value)} inputMode="numeric" min="5" max="120" disabled={!form.aiEnabled} />
             </label>
             {form.aiService !== "gemini" && <div className="form-field form-field--long form-field--span">
-              <span>AI güvenlik anahtarı</span>
+              <span>{form.aiService === "cloudflare" ? "Cloudflare API Token" : "AI güvenlik anahtarı"}</span>
               <div className="field-control-group setup-secret-input">
                 <input
-                  aria-label="AI güvenlik anahtarı"
+                  aria-label={form.aiService === "cloudflare" ? "Cloudflare API Token" : "AI güvenlik anahtarı"}
                   value={genericSecretValue}
                   onChange={(event) => replaceGenericSecret(event.target.value)}
                   onFocus={(event) => {

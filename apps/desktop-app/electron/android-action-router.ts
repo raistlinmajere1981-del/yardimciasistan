@@ -54,6 +54,7 @@ import {
   applyStockImageImportInTransaction
 } from "./database/stock-image-store.js";
 import { queueSyncJob } from "./database/sync-runtime-store.js";
+import { applyAndroidKbsAction } from "./android-kbs-actions.js";
 import { getPublishedMenu } from "./database/menu-store.js";
 import { saveMenuProductEntryInTransaction } from "./database/menu-product-entry-store.js";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
@@ -80,6 +81,10 @@ export function routeAndroidActionInTransaction(
   ) => insertAndroidActionEvent(db, sinkAction, type, entityType, entityId, payload, eventNow);
 
   switch (action.action_type) {
+    case "kbs_send_request":
+    case "kbs_retry_prepare":
+    case "kbs_mark_sent_externally":
+      return applyAndroidKbsAction(db, action, now);
     case "commerce_order_confirm":
     case "commerce_order_cancel":
       return applyAndroidCommerceOrderAction(db, action, now);
@@ -159,6 +164,8 @@ export function routeAndroidActionInTransaction(
           insertEvent(action, type, "finance_entry", entityId, payload, now)
       });
     case "room_folio_payment_add":
+    case "room_folio_menu_item_add":
+    case "room_folio_manual_charge_add":
     case "room_folio_checkout":
       return applyAndroidRoomFolioAction({
         db,
@@ -228,6 +235,8 @@ export function routeAndroidActionInTransaction(
     case "market_product_create":
     case "market_cart_draft_create":
     case "market_barcode_scan":
+    case "market_sale_complete":
+    case "customer_credit_payment_add":
       return applyMarketAndroidAction({
         db,
         action,

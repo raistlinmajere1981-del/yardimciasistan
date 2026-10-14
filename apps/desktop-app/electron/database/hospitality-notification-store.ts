@@ -176,6 +176,7 @@ export function markHospitalityNotificationSentExternally(
     SET status = 'sent',
         provider = ?,
         provider_reference = 'external',
+        confirmed_rejection = 0,
         sent_at = ?
     WHERE id = ? AND status != 'sent'
   `).run(provider, now, notificationId);
@@ -189,18 +190,25 @@ export function retryHospitalityNotification(
   const notificationId = notificationIdInput.trim();
   if (!notificationId) return { ok: false, message: "Kimlik bildirimi seçilmedi." };
 
-  const row = db.prepare("SELECT status FROM hospitality_notifications WHERE id = ? LIMIT 1").get(notificationId) as { status?: string } | undefined;
+  const row = db.prepare("SELECT status, confirmed_rejection FROM hospitality_notifications WHERE id = ? LIMIT 1").get(notificationId) as { status?: string; confirmed_rejection?: number } | undefined;
   if (!row) return { ok: false, message: "Kimlik bildirimi kaydı bulunamadı." };
   if (row.status === "sent") return { ok: false, message: "Gönderilmiş bildirim tekrar kuyruğa alınamaz." };
   if (row.status === "submission_unknown") return { ok: false, message: "Gönderim sonucu belirsiz; resmi KBS kaydı kontrol edilmeden yeniden gönderilemez." };
+  if (row.status !== "failed" || row.confirmed_rejection !== 1) {
+    return { ok: false, message: "Yalnız sağlayıcının kesin olarak reddettiği başarısız bildirim yeniden denemeye hazırlanabilir." };
+  }
+  if (db.prepare("SELECT 1 FROM kbs_delivery_requests WHERE notification_id=? AND completed_at=''").get(notificationId)) {
+    return { ok: false, message: "Önceki gönderim isteğinin yerel tamamlanma kaydı bekleniyor. Durumu yenileyip tekrar deneyin." };
+  }
 
   const changed = db.prepare(`
     UPDATE hospitality_notifications
     SET status = 'pending',
         provider = '',
         provider_reference = '',
+        confirmed_rejection = 0,
         sent_at = ''
-    WHERE id = ? AND status IN ('pending', 'failed')
+    WHERE id = ? AND status = 'failed' AND confirmed_rejection = 1
   `).run(notificationId).changes;
   if (!changed) return { ok: false, message: "Gönderim durumu değişti; bildirim yeniden kuyruğa alınamadı." };
   return { ok: true, message: "Kimlik bildirimi yeniden gönderim kuyruğuna alındı." };

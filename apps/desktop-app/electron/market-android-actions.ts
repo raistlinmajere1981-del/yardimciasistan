@@ -1,6 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { CommerceUnit } from "@yardimci-asistan/shared";
+import { createHash } from "node:crypto";
+import type { CommerceUnit, CustomerCreditPaymentMethod } from "@yardimci-asistan/shared";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
+import { completeMarketSaleInTransaction } from "./market-sale-operation.js";
+import { recordCustomerCreditPaymentInTransaction } from "./customer-credit-runtime.js";
+import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
 import { receiveCommercePurchaseInTransaction } from "./commerce-purchase-store.js";
 import { saveCatalogProductInTransaction, setInventoryCountInTransaction } from "./commerce-store.js";
 import {
@@ -44,6 +48,10 @@ export function applyMarketAndroidAction(
         return applyCartDraftCreate(context);
       case "market_barcode_scan":
         return applyBarcodeScan(context);
+      case "market_sale_complete":
+        return applySaleComplete(context);
+      case "customer_credit_payment_add":
+        return applyCreditPayment(context);
       default:
         return { ok: false, message: "Market telefon işlem türü desteklenmiyor." };
     }
@@ -54,6 +62,83 @@ export function applyMarketAndroidAction(
       message: message || "Market telefon işlemi yerel kayıtlara uygulanamadı."
     };
   }
+}
+
+/** Bind the immutable financial intent to its action receipt, including device identity. */
+export function marketAndroidActionIntentHash(action: AndroidSyncAction): string {
+  const ordered = (value: unknown): unknown => Array.isArray(value) ? value.map(ordered)
+    : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+      .map(([key, child]) => [key, ordered(child)])) : value;
+  return createHash("sha256").update(JSON.stringify(ordered({ actionType: action.action_type,
+    deviceId: action.device_id, payload: action.payload }))).digest("hex");
+}
+
+function requireFields(payload: Record<string, unknown>, fields: string[]) {
+  if (Object.keys(payload).some(key => !fields.includes(key))) throw new Error("Mobil işlem desteklenmeyen alan içeriyor.");
+}
+
+function paymentMethod(payload: Record<string, unknown>): CustomerCreditPaymentMethod {
+  const method = text(payload.payment_method);
+  if (!["cash", "card", "bank", "other"].includes(method)) throw new Error("Ödeme yöntemi geçersiz.");
+  if (method === "card" && payload.external_payment_confirmed !== true) {
+    throw new Error("Kart ödemesinin harici POS'ta gerçekleştiğini açıkça onaylayın.");
+  }
+  return method as CustomerCreditPaymentMethod;
+}
+
+function applySaleComplete(context: MarketAndroidActionContext): MarketAndroidActionResult {
+  const payload = context.action.payload;
+  requireFields(payload, ["lines", "location_id", "settlement", "customer_id", "payment_method", "external_payment_confirmed"]);
+  if (payload.settlement !== "paid" && payload.settlement !== "credit") throw new Error("Satış ödeme seçimi geçersiz.");
+  if (!Array.isArray(payload.lines) || !payload.lines.length || payload.lines.length > 200) throw new Error("Satış için 1–200 ürün satırı gerekli.");
+  const seen = new Set<string>();
+  const items = payload.lines.map(raw => {
+    const line = record(raw);
+    requireFields(line, ["product_id", "quantity", "expected_unit_price", "expected_currency", "expected_updated_at"]);
+    const productId = text(line.product_id);
+    if (!productId || seen.has(productId)) throw new Error("Satış ürünleri geçersiz veya yineleniyor.");
+    seen.add(productId);
+    if (typeof line.quantity !== "number" || !Number.isFinite(line.quantity) || line.quantity <= 0 || line.quantity > 1_000_000
+        || Math.abs(line.quantity * 10000 - Math.round(line.quantity * 10000)) > 0.00001) throw new Error("Satış miktarı geçersiz.");
+    if (typeof line.expected_unit_price !== "number" || !Number.isFinite(line.expected_unit_price) || line.expected_unit_price < 0
+        || !/^[A-Z]{3}$/.test(text(line.expected_currency)) || !text(line.expected_updated_at)) throw new Error("Güncel ürün fiyatı ve sürümü gerekli.");
+    return { productId, quantity: line.quantity, expectedUnitPrice: line.expected_unit_price,
+      expectedCurrency: text(line.expected_currency), expectedUpdatedAt: text(line.expected_updated_at) };
+  });
+  const credit = payload.settlement === "credit";
+  if (readEnabledBusinessCapabilities(context.db).includes("commerce.inventory") && !text(payload.location_id)) throw new Error("Güncel stok konumu gerekli.");
+  if (credit && (!text(payload.customer_id) || text(payload.payment_method))) throw new Error("Veresiye için müşteri seçin; ödeme yöntemi boş olmalı.");
+  if (!credit && text(payload.customer_id)) throw new Error("Mobil müşteri seçimi yalnız veresiye satışta kullanılabilir.");
+  const result = completeMarketSaleInTransaction(context.db, {
+    items, settlement: payload.settlement, customerId: credit ? text(payload.customer_id) : "",
+    locationId: text(payload.location_id), paymentMethod: credit ? "" : paymentMethod(payload),
+    source: "android-market-sale", operationId: context.action.id
+  }, context.now);
+  context.insertEvent("market.sale_completed", "commerce_sale", result.sale.id, {
+    source: "android", device_id: context.action.device_id, settlement: result.sale.status,
+    total: result.sale.total, currency: result.sale.currency
+  });
+  context.queueSnapshot();
+  return { ok: true, message: credit ? "Veresiye satış kaydedildi; müşteri hesabına borç işlendi."
+    : "Satış ve alınmış ödeme kaydı masaüstünde tamamlandı." };
+}
+
+function applyCreditPayment(context: MarketAndroidActionContext): MarketAndroidActionResult {
+  const payload = context.action.payload;
+  requireFields(payload, ["customer_id", "amount_minor", "currency", "expected_balance_minor", "payment_method", "external_payment_confirmed"]);
+  if (!Number.isSafeInteger(payload.amount_minor) || Number(payload.amount_minor) <= 0
+      || !Number.isSafeInteger(payload.expected_balance_minor) || Number(payload.expected_balance_minor) <= 0) {
+    throw new Error("Pozitif tahsilat tutarı ve güncel bakiye gerekli.");
+  }
+  const entry = recordCustomerCreditPaymentInTransaction(context.db, {
+    customerId: text(payload.customer_id), amountMinor: Number(payload.amount_minor), currency: text(payload.currency),
+    paymentMethod: paymentMethod(payload), expectedBalanceMinor: Number(payload.expected_balance_minor), source: "android"
+  }, context.now);
+  context.insertEvent("customer_credit.payment_recorded", "customer_credit_entry", entry.id, {
+    source: "android", device_id: context.action.device_id, amount_minor: entry.amountMinor, currency: entry.currency
+  });
+  context.queueSnapshot();
+  return { ok: true, message: "Müşteri borcu tahsilatı masaüstünde kaydedildi." };
 }
 
 function applyStockCount(context: MarketAndroidActionContext): MarketAndroidActionResult {

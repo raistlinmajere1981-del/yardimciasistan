@@ -849,10 +849,14 @@ final class AndroidOperationCards {
     top.addView(label);
     top.addView(UiKit.badge(
         activity,
-        formatActionStatus(action.status),
+        KbsUiRules.isAction(action.type) ? ("applied".equals(action.status) ? "Masaüstüne ulaştı" : "failed".equals(action.status) ? "Reddedildi" : "Kuyruğa alındı") : formatActionStatus(action.status),
         actionTone(action.status)
     ));
     card.addView(top);
+    if (KbsUiRules.isAction(action.type)) card.addView(UiKit.text(activity, KbsUiRules.actionFeedback(action.type, action.status), 16, UiKit.SECONDARY, Typeface.NORMAL));
+    if (MarketUiRules.ACTION_SALE.equals(action.type) || MarketUiRules.ACTION_CREDIT_PAYMENT.equals(action.type)) {
+      card.addView(UiKit.text(activity, MarketUiRules.financialFeedback(action.type, action.status), 16, UiKit.SECONDARY, Typeface.NORMAL));
+    }
     card.addView(UiKit.text(
         activity,
         shortTimestamp(action.createdAt),

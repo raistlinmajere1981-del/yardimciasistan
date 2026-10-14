@@ -34,7 +34,7 @@ export function createAiProfileApiKeyUpdates(input: SaveInitialSetupInput):
     }
   | { ok: false; message: string } {
   const profiles = Array.isArray(input.aiProfiles) ? input.aiProfiles : [];
-  const supportedServices = new Set<DesktopAiService>(["openai", "openrouter", "groq", "gemini", "custom"]);
+  const supportedServices = new Set<DesktopAiService>(["openai", "openrouter", "groq", "gemini", "cloudflare", "custom"]);
   const updates: Partial<Record<DesktopAiService, AiApiKeyUpdate>> = {};
   const sanitizedProfiles: SaveAiServiceProfileInput[] = [];
 
@@ -82,7 +82,7 @@ export function getEffectiveAiApiKey(database: DesktopDatabase, service?: string
 
 export function revealStoredAiApiKey(database: DesktopDatabase, serviceValue: unknown): AiApiKeyRevealResult {
   const service = String(serviceValue ?? "").trim().toLowerCase() as DesktopAiService;
-  if (!["openai", "openrouter", "groq", "gemini", "custom"].includes(service)) {
+  if (!["openai", "openrouter", "groq", "gemini", "cloudflare", "custom"].includes(service)) {
     return { ok: false, message: "API anahtarı için geçerli bir servis sağlayıcı seçin." };
   }
 

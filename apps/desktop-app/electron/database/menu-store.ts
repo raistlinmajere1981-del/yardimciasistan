@@ -46,6 +46,7 @@ export function getPublishedMenu(db: DatabaseSync, includeInactiveProducts = fal
         LEFT JOIN inventory_locations l ON l.business_id = p.business_id AND l.is_primary = 1 AND l.deleted_at = ''
         LEFT JOIN inventory_balances b ON b.product_id = p.id AND b.location_id = l.id
         WHERE e.deleted_at = '' AND (? = 1 OR p.is_active = 1)
+          AND p.business_id = (SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1)
         ORDER BY e.sort_order ASC, p.name ASC
       `)
     .all(includeInactiveProducts ? 1 : 0) as Array<Record<string, unknown>>;

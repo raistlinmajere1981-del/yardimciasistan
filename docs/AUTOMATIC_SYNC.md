@@ -44,6 +44,17 @@ aynı işlemin iki kez uygulanmasını engeller:
   gelen eski revision `409` ile reddedilir.
 - Android action kimliği telefonda ağ çağrısından önce üretilir. Telefon outbox'ı,
   hosting kuyruğu ve masaüstü action receipt kaydı bu kimliği korur.
+- Android oda hesabına menü ürünü (`room_folio_menu_item_add`) ve manuel ek ücret
+  (`room_folio_manual_charge_add`) ekleme, açık hesap ve giriş yapılmış geçerli
+  konaklama gerektirir. `rooms_tasks` grubunun ayrı `room_folio.add_menu_item` ve
+  `room_folio.add_manual_charge` izinleri, `room_folio.view` ile birlikte kontrol
+  edilir; menü kalemi ayrıca `menu.view` gerektirir. Kalem ekleme tahsilat değildir.
+  Menü/stok özeti cihazın okuma izinleri ve işletmenin etkin capability'leriyle süzülür.
+- Yeni oda hesabı kalemleri `expected_folio_version` taşır; sürüm hesap, kalem,
+  ödeme ve konaklama durumundan üretilir. Menü kalemi ayrıca menü güncelleme zamanı,
+  minor-unit fiyat ve para birimi beklentisi taşır. Eski veri sessizce yeniden
+  fiyatlandırılmaz. Kanonik kalem, stok tüketimi, snapshot outbox işi ve action receipt
+  aynı transaction'da commit edilir; tekrar teslim ikinci kalem veya stok düşümü üretmez.
 - Android özet isteği ve action gönderimi kalıcı cihaz kimliğiyle birlikte cihaz adı ve
   uygulama sürümünü bildirir. Hostingdeki görülme kayıtları masaüstüne taşınır; rol,
   aktiflik ve action yetkisi yalnız masaüstü SQLite'tan belirlenir.
@@ -94,6 +105,74 @@ Masaüstü Android modülü açıkken bu capability'ler eksikse senkronu başar�
 hostingde HTTPS kullanın; sync anahtarını URL query parametresine veya loglara yazmayın.
 
 ## Taşıma Katmanı
+
+### Mobil KBS bildirim yönetimi
+
+Bugün kartı ve Pansiyon → KBS, yalnız aktif yönetici cihazında `kbs.view`,
+`service.android`, `accommodation.rooms`, `accommodation.stays` ve etkin KBS
+kesişiminde görünür. Personel grupları KBS izni vermez. Hosting kişisel cihaz
+anahtarı ister; ortak sync anahtarıyla KBS özeti veya işlem açılamaz. KBS ayarı,
+kurum şifresi, tesis/kullanıcı bilgisi, kimlik/belge numarası ve ham sağlayıcı
+yanıtı taşınmaz. İzinli snapshot; enabled/configured/provider, durum/kimlik
+hazırlığı sayıları ve en fazla 500 minimal bildirim kaydını taşır. Sayılar tüm
+kayıtlara aittir; LOCAL, HOSTING ve Android parse/disk cache ayrı allowlist uygular.
+Müşteri snapshot'ındaki kimlik/belge numaraları da boş döner; mobil düzenlemede
+boş/eksik değerler masaüstündeki mevcut numaraları silmez.
+
+`kbs_send_request` yalnız bildirim kimliği, beklenen durum ve sağlayıcı taşır.
+KBS'nin `kbs_delivery_requests` kaydı, immutable intent hash ve Android receipt
+aynı transaction'da commit olur. Yerel işleyici başlangıçta, commit sonrasında
+ve periyodik taramada çalışır; Hosting bağlantısına veya otomatik yayın ayarına
+bağımlı değildir. Provider I/O açık Android/SQLite transaction'ında çalışmaz.
+Güncel yetki, capability, KBS ayarı, sağlayıcı, durum ve kimlik yeniden kontrol
+edildikten sonra mevcut `KbsDeliveryService.deliver` kullanılır. I/O öncesindeki
+kalıcı `submission_unknown` fence hiçbir restart veya iş tamamlama hatasında
+silinmez; belirsiz sonuç yeniden POST edilmez. Kesin ret sonrasındaki iş tamamlama
+hatası da otomatik tekrar gönderim üretmez.
+
+`kbs_retry_prepare` için `kbs.retry`, failed durum ve kalıcı kesin ret kanıtı
+gerekir; sent/submission_unknown veya kanıtsız eski failed kayıtları reddedilir.
+Bu eylem gönderim yapmaz. `kbs_mark_sent_externally`, `kbs.reconcile_external`
+ve resmi portalda bu kaydın bulunduğunu belirten iki açık kullanıcı onayı ister;
+mevcut harici gönderim operasyonunu kullanır. Portal kontrolü veya sent geçişi
+otomatik yapılmaz.
+
+Android “Kuyruğa alındı”, “Masaüstüne ulaştı”, “Resmi olarak gönderildi” ve
+“Sonuç belirsiz” durumlarını ayırır. Yerel işlemenin gönderim koşulları/yetki
+nedeniyle durması da minimal request state ile görünür; action applied resmi
+gönderim onayı değildir. Bildirim değişiklikleri, KBS ayarı ve istek sonuçları
+mevcut android_snapshot outbox'ını transaction içinde invalid eder; aynı kalıcı
+yayın, revision ve exact acknowledgement hattı kullanılır.
+
+`android-kbs` ve `android-kbs-hosting` registry kontrolleri geçici SQLite/PHP
+fixture'ları ve mock provider kullanır. Gerçek EGM/Jandarma giriş, WSDL, gönderim,
+bağlantı veya kurum kayıt doğrulaması bu kontrollerin parçası değildir.
+
+### Mobil Market satış ve cari işlemleri
+
+`market_sale_complete`, mevcut sepetin ürün kimlikleri, miktarları, stok konumu,
+`paid|credit` settlement ve ödeme türünü taşır. Her satırın `expected_unit_price`,
+`expected_currency` ve `expected_updated_at` alanları yalnız beklentidir.
+Masaüstü `completeMarketSaleInTransaction` üzerinden güncel müşteri/katalog fiyatını
+ve stoğu doğrular; farklı fiyat/sürümde yeni onay ister. Satış, stok ve varsa cari
+debit ile source action ID makbuzu tek SQLite transaction'ında kaydedilir.
+Mevcut `market_cart_draft_create` ayrı taslak akışı olarak kalır.
+
+`customer_credit_payment_add`, pozitif integer `amount_minor`, currency ve
+`expected_balance_minor` ister. Cari owner'ın transaction içi ödeme operasyonu
+güncel borcu doğrular; ledger credit, finance income ve Android makbuzu birlikte
+commit olur. Aynı action ID retry yeni hareket üretmez; cihaz/tür/içerik değişimi
+reddedilir. `cash|card|bank|other` alınmış ödemenin kaydıdır; kart için
+`external_payment_confirmed=true` zorunludur. Telefon harici POS'a tahsilat göndermez.
+
+Personelin `market_sales`, `customer_credit_view`, `customer_credit_payment`
+grupları ayrı ve varsayılan kapalıdır. Cari erişim Market çalışma alanı ile
+`commerce.customer_credit`, Customers, Sales/Catalog ve Finance kesişimindedir.
+Hosting kişisel cihaz token'ı gerektirir; Hosting ve LAN izin/capability redaksiyonu
+cari müşteri adı, ayrı döviz bakiyeleri ve son 10 hareketle sınırlıdır. Telefon/kimlik,
+not ve satış detayları bu projection'a girmez. Sonuçlar mevcut cache/outbox içinde
+saklanır; offline veya Hosting'e kabul edilmiş `pending` işlemler **Masaüstünde onay
+bekliyor** olarak görünür. Tamamlanma yalnız `applied` sonucu geldikten sonra gösterilir.
 
 `packages/sync-core` içindeki `SyncTransport` iş akışını hosting sağlayıcısından ayırır.
 Bugünkü adaptör `PhpHostingSyncTransport` sınıfıdır ve aynı arayüz üzerinden şunları yapar:

@@ -11,6 +11,13 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.os.Build;
+import android.os.Bundle;
+import android.view.WindowInsets;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
+import androidx.core.content.ContextCompat;
+import java.util.List;
 
 import androidx.activity.ComponentActivity;
 
@@ -22,18 +29,19 @@ final class AndroidShellController {
     void onRefresh();
     void onThemeToggle();
     void onSettingsToggle();
-    void onTabSelected(String tab);
-    boolean canOpenTab(String tab);
+    void onNavigate(String route);
+    boolean canSwipeRoot();
+    void onRootSwipe(int direction);
     AppTheme.Mode themeMode();
   }
 
-  private static final int BOTTOM_NAV_HEIGHT_DP = 70;
+  private static final int BOTTOM_NAV_HEIGHT_DP = 76;
   private static final int MAIN_CONTENT_BOTTOM_PADDING_DP = BOTTOM_NAV_HEIGHT_DP + 24;
   private static final int LANDSCAPE_CONTENT_BOTTOM_PADDING_DP = 18;
   private static final int LANDSCAPE_SIDE_NAV_WIDTH_DP = 112;
   private static final int PORTRAIT_HEADER_HEIGHT_DP = 72;
   private static final int LANDSCAPE_HEADER_HEIGHT_DP = 60;
-  private static final int HEADER_ACTION_SIZE_DP = 44;
+  private static final int HEADER_ACTION_SIZE_DP = 48;
 
   private final ComponentActivity activity;
   private final Listener listener;
@@ -56,14 +64,25 @@ final class AndroidShellController {
   }
 
   void build() {
-    landscapeLayout = activity.getResources().getConfiguration().orientation
-        == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+    int width = activity.getResources().getConfiguration().screenWidthDp;
+    int height = activity.getResources().getConfiguration().screenHeightDp;
+    if (Build.VERSION.SDK_INT >= 30) {
+      android.view.WindowMetrics metrics = activity.getWindowManager().getCurrentWindowMetrics();
+      Rect bounds = metrics.getBounds();
+      android.graphics.Insets insets = metrics.getWindowInsets().getInsetsIgnoringVisibility(
+          WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+      float density = activity.getResources().getDisplayMetrics().density;
+      width = Math.round((bounds.width() - insets.left - insets.right) / density);
+      height = Math.round((bounds.height() - insets.top - insets.bottom) / density);
+    }
+    landscapeLayout = AndroidRootSwipeRules.usesRail(width, height);
+    boolean compactHeader = height < 480;
 
     LinearLayout root = UiKit.column(activity);
     root.setBackgroundColor(UiKit.BG);
 
     LinearLayout header = UiKit.row(activity);
-    int headerVerticalPadding = landscapeLayout ? 4 : 8;
+    int headerVerticalPadding = compactHeader ? 4 : 8;
     header.setPadding(
         UiKit.dp(activity, 14),
         UiKit.dp(activity, headerVerticalPadding),
@@ -73,7 +92,7 @@ final class AndroidShellController {
     header.setBackgroundColor(UiKit.BG);
     header.setLayoutParams(new LinearLayout.LayoutParams(
         -1,
-        UiKit.dp(activity, landscapeLayout ? LANDSCAPE_HEADER_HEIGHT_DP : PORTRAIT_HEADER_HEIGHT_DP)
+        UiKit.dp(activity, compactHeader ? LANDSCAPE_HEADER_HEIGHT_DP : PORTRAIT_HEADER_HEIGHT_DP)
     ));
 
     LinearLayout titleGroup = UiKit.column(activity);
@@ -105,7 +124,10 @@ final class AndroidShellController {
     errorBanner.setLayoutParams(bannerParams);
     root.addView(errorBanner);
 
-    content = new FrameLayout(activity);
+    content = new AndroidRootSwipeLayout(activity, new AndroidRootSwipeLayout.Listener() {
+      @Override public boolean canSwipeRoot() { return listener.canSwipeRoot(); }
+      @Override public void onRootSwipe(int direction) { listener.onRootSwipe(direction); }
+    });
     bottomNavigation = landscapeLayout ? UiKit.column(activity) : UiKit.row(activity);
     bottomNavigation.setBackground(UiKit.rounded(activity, UiKit.BOTTOM_NAV_BACKGROUND, UiKit.BORDER, 0));
 
@@ -153,7 +175,8 @@ final class AndroidShellController {
   }
 
   void updateChrome(
-      String activeTab,
+      List<AndroidUiRules.NavigationItem> roots,
+      String selectedRoot,
       boolean settingsOpen,
       boolean inactiveDevice,
       boolean canOpenSettings,
@@ -167,14 +190,11 @@ final class AndroidShellController {
     settingsButton.setVisibility(canOpenSettings ? View.VISIBLE : View.GONE);
     styleHeaderAction(settingsButton, settingsOpen);
     bottomNavigation.setVisibility(
-        settingsOpen
-            || inactiveDevice
-            || AndroidUiRules.TAB_REPORTS.equals(activeTab)
-            || AndroidUiRules.TAB_CASH.equals(activeTab)
+        settingsOpen || inactiveDevice
         ? View.GONE
         : View.VISIBLE
     );
-    renderBottomNavigation(activeTab, settingsOpen);
+    renderBottomNavigation(roots, selectedRoot);
   }
 
   void showScreen(String title, String meta, View screen, String screenKey) {
@@ -218,7 +238,7 @@ final class AndroidShellController {
     });
     header.addView(quickTheme, headerActionParams(true));
     Button close = UiKit.outlineButton(activity, "Kapat", view -> dialog.dismiss());
-    LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, UiKit.dp(activity, 44));
+    LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, UiKit.dp(activity, 48));
     closeParams.setMargins(UiKit.dp(activity, 6), 0, 0, 0);
     close.setLayoutParams(closeParams);
     header.addView(close);
@@ -272,55 +292,61 @@ final class AndroidShellController {
     });
   }
 
-  private void renderBottomNavigation(String activeTab, boolean settingsOpen) {
+  void saveScrollState(Bundle state) {
+    rememberCurrentScrollPosition();
+    Bundle positions = new Bundle();
+    for (Map.Entry<String, Integer> item : screenScrollPositions.entrySet()) positions.putInt(item.getKey(), item.getValue());
+    state.putBundle("navigation_scroll", positions);
+  }
+
+  void restoreScrollState(Bundle state) {
+    Bundle positions = state == null ? null : state.getBundle("navigation_scroll");
+    if (positions != null) for (String key : positions.keySet()) screenScrollPositions.put(key, positions.getInt(key));
+  }
+
+  private void renderBottomNavigation(List<AndroidUiRules.NavigationItem> roots, String selectedRoot) {
     bottomNavigation.removeAllViews();
-    addNavButton("Bugün", AndroidUiRules.TAB_TODAY, activeTab, settingsOpen);
-    if (listener.canOpenTab(AndroidUiRules.TAB_CUSTOMERS)) {
-      addNavButton("Müşteri", AndroidUiRules.TAB_CUSTOMERS, activeTab, settingsOpen);
-    }
-    if (listener.canOpenTab(AndroidUiRules.TAB_PENSION)) {
-      addNavButton("Pansiyon", AndroidUiRules.TAB_PENSION, activeTab, settingsOpen);
-    }
-    if (listener.canOpenTab(AndroidUiRules.TAB_RESTAURANT)) {
-      addNavButton("Restoran", AndroidUiRules.TAB_RESTAURANT, activeTab, settingsOpen);
-    }
-    if (listener.canOpenTab(AndroidUiRules.TAB_MARKET)) {
-      addNavButton("Market", AndroidUiRules.TAB_MARKET, activeTab, settingsOpen);
-    }
-    if (listener.canOpenTab(AndroidUiRules.TAB_MESSAGES)) {
-      addNavButton("Mesajlar", AndroidUiRules.TAB_MESSAGES, activeTab, settingsOpen);
-    }
+    bottomNavigation.setContentDescription("Ana gezinme");
+    for (AndroidUiRules.NavigationItem item : roots) addNavButton(item, selectedRoot);
   }
 
   private void addNavButton(
-      String label,
-      String tab,
-      String activeTab,
-      boolean settingsOpen
+      AndroidUiRules.NavigationItem item,
+      String selectedRoot
   ) {
-    boolean selected = tab.equals(activeTab) && !settingsOpen;
+    boolean selected = item.route.equals(selectedRoot);
     Button button = new Button(activity);
-    button.setText(label);
-    button.setTextSize(11);
+    button.setText(item.label);
+    button.setTextSize(13);
     button.setTextColor(selected ? UiKit.BOTTOM_NAV_ACTIVE : UiKit.BOTTOM_NAV_INACTIVE);
     button.setTypeface(Typeface.create("sans", selected ? Typeface.BOLD : Typeface.NORMAL));
     button.setAllCaps(false);
     button.setGravity(Gravity.CENTER);
-    button.setPadding(1, 0, 1, 0);
+    button.setPadding(UiKit.dp(activity, 2), UiKit.dp(activity, 4), UiKit.dp(activity, 2), UiKit.dp(activity, 4));
     button.setMinWidth(0);
     button.setMinimumWidth(0);
-    button.setMinHeight(0);
-    button.setMinimumHeight(0);
-    button.setBackground(UiKit.rounded(
+    button.setMinHeight(UiKit.dp(activity, 48));
+    button.setMinimumHeight(UiKit.dp(activity, 48));
+    button.setSelected(selected);
+    button.setContentDescription(item.label + ", ana bölüm");
+    int iconId = AndroidUiRules.TAB_TODAY.equals(item.route) ? R.drawable.ic_nav_today
+        : AndroidUiRules.TAB_CUSTOMERS.equals(item.route) ? R.drawable.ic_nav_customers
+        : AndroidUiRules.TAB_MORE.equals(item.route) ? R.drawable.ic_nav_more : R.drawable.ic_nav_business;
+    Drawable icon = ContextCompat.getDrawable(activity, iconId);
+    if (icon != null) { icon = icon.mutate(); icon.setTint(selected ? UiKit.BOTTOM_NAV_ACTIVE : UiKit.BOTTOM_NAV_INACTIVE); }
+    button.setCompoundDrawablesWithIntrinsicBounds(null, icon, null, null);
+    button.setCompoundDrawablePadding(UiKit.dp(activity, 3));
+    button.setBackground(new android.graphics.drawable.RippleDrawable(
+        android.content.res.ColorStateList.valueOf(UiKit.withAlpha(UiKit.PRIMARY, 40)), UiKit.rounded(
         activity,
         selected ? UiKit.SURFACE_ALT : Color.TRANSPARENT,
-        Color.TRANSPARENT,
+        selected ? UiKit.PRIMARY : Color.TRANSPARENT,
         11
-    ));
-    button.setOnClickListener(view -> listener.onTabSelected(tab));
+    ), null));
+    button.setOnClickListener(view -> listener.onNavigate(item.route));
     button.setLayoutParams(
         landscapeLayout
-            ? new LinearLayout.LayoutParams(-1, 0, 1f)
+            ? new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 80))
             : new LinearLayout.LayoutParams(0, -1, 1f)
     );
     bottomNavigation.addView(button);

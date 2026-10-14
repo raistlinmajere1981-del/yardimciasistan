@@ -63,6 +63,7 @@ final class PensionWorkspace {
     if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_TASKS)) {
       options.add(new String[] {AndroidUiRules.PENSION_TASKS, "İşler"});
     }
+    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_KBS)) options.add(new String[] {AndroidUiRules.PENSION_KBS, "KBS"});
 
     if (options.isEmpty()) {
       page.addView(emptyCard(
@@ -88,6 +89,8 @@ final class PensionWorkspace {
           (actionType, actionPayload, successMessage) ->
               listener.onFolioAction(actionType, actionPayload, successMessage)
       );
+    } else if (AndroidUiRules.PENSION_KBS.equals(mode)) {
+      KbsWorkspace.append(activity, page, data, (type, payload, message) -> listener.onFolioAction(type, payload, message));
     } else {
       renderTasks(page);
     }

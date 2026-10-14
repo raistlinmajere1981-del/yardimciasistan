@@ -8,7 +8,7 @@ import { decryptMessagingSecret } from "./business-messaging/secret-service";
 import { setInstagramOAuthEnabled } from "./marketing/instagram-oauth-store";
 import { normalizeProfileTransitionInput } from "./profile-service-activation";
 import type { DatabaseSync } from "node:sqlite";
-import { isSupportedSttBaseUrl, supportsImageGenerationModel, supportsSttModel } from "@yardimci-asistan/shared";
+import { isCloudflareAiBaseUrl, supportsVisionModel, isSupportedSttBaseUrl, supportsImageGenerationModel, supportsSttModel } from "@yardimci-asistan/shared";
 import {
   BUSINESS_CAPABILITIES,
   createId,
@@ -111,6 +111,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiService,
     aiProjectName: activeAiProfile?.projectName ?? "",
     aiModel: activeAiProfile?.model ?? "",
+    aiVisionModel: activeAiProfile?.visionModel ?? "",
     aiImageModel: activeAiProfile?.imageModel ?? "",
     aiSttModel: activeAiProfile?.sttModel ?? "",
     aiBaseUrl: activeAiProfile?.baseUrl ?? "",
@@ -241,6 +242,14 @@ export function saveSetupData(
   const existingAiProfile = db
     .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
     .get(profileService) as Record<string, unknown> | undefined;
+  const aiVisionModel = input.aiVisionModel === undefined ? String(existingAiProfile?.vision_model ?? "") : input.aiVisionModel;
+  if (typeof aiVisionModel !== "string" || (aiVisionModel !== "" && !supportsVisionModel(profileService, aiVisionModel))) {
+    return { ok: false, message: "Seçilen görsel analiz modeli bu sağlayıcıda desteklenmiyor." };
+  }
+  if (profileService === "cloudflare" && (input.aiBaseUrl || input.aiEnabled)
+      && !isCloudflareAiBaseUrl(input.aiBaseUrl)) {
+    return { ok: false, message: "Cloudflare için geçerli Account ID ile oluşturulan resmi API adresi gerekli." };
+  }
   const existingEncryptedAiApiKey = String(existingAiProfile?.api_key_encrypted ?? "").trim();
   const aiSttModel = input.aiSttModel === undefined ? String(existingAiProfile?.stt_model ?? "") : input.aiSttModel;
   if (typeof aiSttModel !== "string" || (aiSttModel !== "" && !supportsSttModel(profileService, aiSttModel))) {
@@ -303,6 +312,7 @@ export function saveSetupData(
     projectName: string;
     baseUrl: string;
     model: string;
+    visionModel: string;
     imageModel: string;
     sttModel: string;
     modelOptions: DesktopAiModelOption[];
@@ -322,6 +332,10 @@ export function saveSetupData(
         || (profileInput.sttModel !== "" && !supportsSttModel(service, profileInput.sttModel)))) {
       return { ok: false, message: "Seçilen konuşma tanıma modeli bu sağlayıcıda desteklenmiyor." };
     }
+    if (profileInput.visionModel !== undefined && (typeof profileInput.visionModel !== "string"
+      || (profileInput.visionModel !== "" && !supportsVisionModel(service, profileInput.visionModel)))) {
+      return { ok: false, message: "Seçilen görsel analiz modeli bu sağlayıcıda desteklenmiyor." };
+    }
     if (service === profileService) continue;
 
     const existingProfile = db
@@ -329,6 +343,7 @@ export function saveSetupData(
       .get(service) as Record<string, unknown> | undefined;
     const projectName = String(profileInput.projectName ?? "").trim();
     const model = String(profileInput.model ?? "").trim();
+    const visionModel = profileInput.visionModel ?? String(existingProfile?.vision_model ?? "");
     const imageModel = String(profileInput.imageModel ?? "").trim();
     if (imageModel && !supportsImageGenerationModel(service, imageModel)) return { ok: false, message: "Seçilen görsel üretim modeli bu sağlayıcıda desteklenmiyor." };
     const normalizedBaseUrl = normalizeAiBaseUrl(profileInput.baseUrl);
@@ -336,6 +351,10 @@ export function saveSetupData(
     const sttModel = profileInput.sttModel ?? String(existingProfile?.stt_model ?? "");
     if (sttModel && (!supportsSttModel(service, sttModel) || !isSupportedSttBaseUrl(service, profileInput.baseUrl))) {
       return { ok: false, message: "Konuşma tanıma modeli veya resmi HTTPS bağlantı adresi desteklenmiyor." };
+    }
+    if (service === "cloudflare" && (profileInput.baseUrl || model || imageModel || visionModel)
+        && !isCloudflareAiBaseUrl(profileInput.baseUrl)) {
+      return { ok: false, message: "Cloudflare profili için geçerli Account ID ve resmi API adresi gerekli." };
     }
     const timeoutSeconds = normalizeAiTimeout(profileInput.timeoutSeconds);
     const rawKeyProvided = Boolean(String(profileInput.apiKey ?? "").trim());
@@ -365,6 +384,7 @@ export function saveSetupData(
       projectName,
       baseUrl,
       model,
+      visionModel,
       imageModel,
       sttModel,
       modelOptions: normalizeAiModelOptions(
@@ -385,7 +405,7 @@ export function saveSetupData(
   const settingsCreatedAt = String(existingSettings?.created_at ?? "") || now;
   const storedAiProvider = aiProvider === "openai_compatible" ? aiProvider : "openai_compatible";
   const storedAiService = aiService ?? "openai";
-  const storedAiBaseUrl = aiBaseUrl || DEFAULT_AI_BASE_URL;
+  const storedAiBaseUrl = aiBaseUrl || (storedAiService === "cloudflare" ? "" : DEFAULT_AI_BASE_URL);
   const storedAiTimeoutSeconds = aiTimeoutSeconds ?? DEFAULT_AI_TIMEOUT_SECONDS;
   const storedEncryptedAiApiKey = aiApiKeyResolution.encryptedValue;
   const storedAiModelOptions = normalizeAiModelOptions(
@@ -403,6 +423,7 @@ export function saveSetupData(
     String(existingAiProfile.project_name ?? "").trim() !== aiProjectName ||
     String(existingAiProfile.model ?? "").trim() !== aiModel ||
     String(existingAiProfile.stt_model ?? "") !== aiSttModel ||
+    String(existingAiProfile.vision_model ?? "") !== aiVisionModel ||
     (normalizeAiBaseUrl(existingAiProfile.base_url) || AI_SERVICE_DEFAULT_BASE_URLS[storedAiService]) !== storedAiBaseUrl ||
     normalizeStoredAiTimeout(existingAiProfile.timeout_seconds) !== storedAiTimeoutSeconds ||
     existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
@@ -520,6 +541,7 @@ export function saveSetupData(
       projectName: aiProjectName,
       baseUrl: storedAiBaseUrl,
       model: aiModel,
+      visionModel: aiVisionModel,
       imageModel: aiImageModel,
       sttModel: aiSttModel,
       modelOptionsJson: JSON.stringify(storedAiModelOptions),
@@ -535,6 +557,7 @@ export function saveSetupData(
         projectName: profile.projectName,
         baseUrl: profile.baseUrl,
         model: profile.model,
+        visionModel: profile.visionModel,
         imageModel: profile.imageModel,
         sttModel: profile.sttModel,
         modelOptionsJson: JSON.stringify(profile.modelOptions),

@@ -52,6 +52,7 @@ export function createAndroidOperationsSnapshot(
   }));
 
   const source: AndroidOperationsSnapshot = {
+    kbs: database.getAndroidKbsSnapshot(),
     ...createAndroidCompanionSnapshot(database.databasePath, database.getEnabledBusinessCapabilities()),
     business_capabilities: [],
     voice: { stt_available: setup.aiEnabled && setup.aiApiKeyConfigured
@@ -131,11 +132,11 @@ export function createAndroidOperationsSnapshot(
       notes: customer.notes,
       tags: customer.tags,
       identity_type: customer.identityType,
-      identity_number: customer.identityNumber,
+      identity_number: "",
       nationality: customer.nationality,
       birth_date: customer.birthDate,
       gender: customer.gender,
-      document_serial_number: customer.documentSerialNumber,
+      document_serial_number: "",
       document_expiry_date: customer.documentExpiryDate,
       birth_place: customer.birthPlace,
       mother_name: customer.motherName,
@@ -177,6 +178,8 @@ export function createAndroidOperationsSnapshot(
       .slice(0, 100)
       .map((folio) => ({
         id: folio.id,
+        version: folio.version,
+        can_add_items: folio.canAddItems,
         stay_id: folio.stayId,
         room_id: folio.roomId,
         room_name: folio.roomName,

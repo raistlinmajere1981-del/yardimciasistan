@@ -398,6 +398,7 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
       base_url: options.aiSettings.baseUrl,
       model: options.aiSettings.model,
       stt_model: options.aiSettings.sttModel ?? "",
+      ...(options.aiSettings.service === "cloudflare" ? { vision_model: options.aiSettings.visionModel ?? "" } : {}),
       api_key: options.aiSettings.apiKey,
       timeout_seconds: options.aiSettings.timeoutSeconds
     }
@@ -440,6 +441,7 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
     base_url: options.aiSettings.baseUrl.replace(/\/+$/, ""),
     model: options.aiSettings.model,
     stt_model: options.aiSettings.sttModel ?? "",
+    ...(options.aiSettings.service === "cloudflare" ? { vision_model: options.aiSettings.visionModel ?? "" } : {}),
     timeout_seconds: options.aiSettings.timeoutSeconds,
     has_api_key: options.aiSettings.apiKey.trim() !== ""
   };

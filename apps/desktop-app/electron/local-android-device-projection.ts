@@ -3,15 +3,25 @@ import { projectAndroidCompanion, androidCompanionCounters, androidEffectivePerm
 import type {
   AndroidFinanceSnapshot,
   AndroidOperationsSnapshot,
-  AndroidSnapshotPermissionProfile
+  AndroidSnapshotPermissionProfile,
+  PublishedQrMenu
 } from "@yardimci-asistan/sync-core";
 import { emptyAndroidMarketSnapshot } from "./market-android-snapshot.js";
+import { projectAndroidKbsForDevice } from "./android-kbs-projection.js";
 
 const EMPTY_PROFILE: AndroidSnapshotPermissionProfile = {
   role: "staff",
   is_active: false,
   permissions: []
 };
+
+function menuForPermissions(menu: PublishedQrMenu, allowed: boolean, stockAllowed: boolean): PublishedQrMenu {
+  if (!allowed) return { categories: [], items: [], updated_at: menu.updated_at };
+  if (stockAllowed) return menu;
+  return { ...menu, items: menu.items.map(item => ({ ...item, stock_quantity: null,
+    stock_min_quantity: null, stock_note: null, stock_unit: "piece", stock_consumption_quantity: 1,
+    hide_when_out_of_stock: false })) };
+}
 
 function emptyFinance(source: AndroidFinanceSnapshot): AndroidFinanceSnapshot {
   return {
@@ -55,6 +65,7 @@ function inactiveSnapshot(
   return {
     ...source,
     ...companion,
+    kbs: null,
     voice: { stt_available: false },
     summary: { ...emptySummary(), ...androidCompanionCounters(companion.commerce, companion.marketing) },
     daily_tasks: [],
@@ -109,6 +120,8 @@ export function projectLocalAndroidSnapshotForDevice(
   const customerManagementAllowed = profile.role === "admin" && permissions.has("customer.manage");
   const roomFolioAllowed = permissions.has("room_folio.view");
   const financeAllowed = permissions.has("finance.view");
+  const menuAllowed = permissions.has("menu.view");
+  const stockAllowed = permissions.has("menu.stock_view");
   const reportsAllowed = profile.role === "admin" && source.business_capabilities.includes(BUSINESS_CAPABILITIES.REPORTS);
 
   const market = emptyAndroidMarketSnapshot();
@@ -117,6 +130,7 @@ export function projectLocalAndroidSnapshotForDevice(
   }
   if (permissions.has("market.product.view")) {
     market.products = source.market.products;
+    market.primary_location_id = source.market.primary_location_id ?? "";
   }
   if (permissions.has("market.product_create")) {
     market.product_data = source.market.product_data;
@@ -128,21 +142,36 @@ export function projectLocalAndroidSnapshotForDevice(
   if (permissions.has("market.cart_draft")) {
     market.cart_drafts = source.market.cart_drafts;
   }
+  if (permissions.has("customer_credit.view")) {
+    market.customer_credit_accounts = (source.market.customer_credit_accounts ?? []).slice(0, 300).map(account => ({
+      customer_id: account.customer_id, full_name: account.full_name,
+      balances: account.balances.slice(0, 10).map(balance => ({ currency: balance.currency, amount_minor: balance.amount_minor })),
+      entries: account.entries.slice(0, 10).map(entry => ({ direction: entry.direction, entry_type: entry.entry_type,
+        amount_minor: entry.amount_minor, currency: entry.currency, payment_method: entry.payment_method, occurred_at: entry.occurred_at }))
+    }));
+  }
 
   return {
     ...source,
     ...companion,
     voice: { stt_available: permissions.has("voice.dictation") && source.voice?.stt_available === true },
-    summary: { ...source.summary, ...androidCompanionCounters(companion.commerce, companion.marketing) },
-    customers: customerManagementAllowed ? source.customers : [],
+    summary: { ...source.summary, ...androidCompanionCounters(companion.commerce, companion.marketing),
+      active_menu_categories: menuAllowed ? source.summary.active_menu_categories : 0,
+      available_menu_items: menuAllowed ? source.summary.available_menu_items : 0 },
+    customers: customerManagementAllowed ? source.customers.map(customer => ({ ...customer, identity_number: "", document_serial_number: "" })) : [],
     menu_product_candidates: permissions.has("menu.edit") ? source.menu_product_candidates ?? [] : [],
     customer_room_stays: customerManagementAllowed ? source.customer_room_stays : [],
     room_folios: roomFolioAllowed ? source.room_folios : [],
+    menu: menuForPermissions(source.menu, menuAllowed, stockAllowed),
+    admin_menu: menuForPermissions(source.admin_menu, permissions.has("menu.edit") || permissions.has("menu.delete"), stockAllowed),
+    trackedStockItems: stockAllowed ? source.trackedStockItems : [],
+    appliedStockImageHashes: permissions.has("menu.stock_update") ? source.appliedStockImageHashes : [],
     androidPermissions: {
       [deviceId]: profile
     },
     finance: financeAllowed ? source.finance : emptyFinance(source.finance),
     reports: reportsAllowed ? source.reports : {} as AndroidOperationsSnapshot["reports"],
-    market
+    market,
+    kbs: projectAndroidKbsForDevice(source.kbs, source.business_capabilities, profile)
   };
 }

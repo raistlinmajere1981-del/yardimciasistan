@@ -6,6 +6,11 @@ import {
 import type { KbsProvider } from "./kbs-settings.js";
 import { getKbsOverview } from "./database/hospitality-notification-store.js";
 import { desktopLog } from "./desktop-logger.js";
+import { authorizeAndroidAction } from "./android-action-service.js";
+import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
+import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
+import { queueSyncJob } from "./database/sync-runtime-store.js";
+import { androidKbsActionIntentHash } from "./android-kbs-actions.js";
 
 export type KbsDeliveryAttemptResult = KbsDeliveryResult | {
   ok: true; state: "already_sent"; message: string; provider: KbsProvider; providerReference: string;
@@ -20,7 +25,45 @@ export class KbsDeliveryService {
     for (const adapter of adapters) this.adapters.set(adapter.provider, adapter);
   }
 
-  async deliver(notificationIdInput: string, provider: KbsProvider): Promise<KbsDeliveryAttemptResult> {
+  /** Called after receipt commit and again on restart. No running lease can reopen a fence. */
+  async processRequests(available: () => boolean): Promise<number> {
+    if (this.db.isTransaction || !available()) return 0;
+    const requests = this.db.prepare(`SELECT q.*,r.intent_hash AS receipt_hash FROM kbs_delivery_requests q
+      JOIN android_action_receipts r ON r.id=q.action_id AND r.device_id=q.device_id AND r.action_type='kbs_send_request'
+      WHERE q.completed_at='' ORDER BY q.requested_at,q.action_id LIMIT 50`).all();
+    let completed = 0;
+    for (const request of requests) {
+      if (!available()) break;
+      const action: AndroidSyncAction = { id: String(request.action_id), action_type: "kbs_send_request",
+        device_id: String(request.device_id), device_name: "", app_version: "", created_at: String(request.requested_at),
+        payload: { notification_id: String(request.notification_id), provider: request.provider, expected_status: "pending" },
+        status: "pending", error_message: "", processed_at: "", last_seen_at: "" };
+      const authorized = () => available() && Boolean(this.db.prepare("SELECT 1 FROM kbs_delivery_requests WHERE action_id=? AND completed_at=''").get(action.id))
+        && request.receipt_hash === androidKbsActionIntentHash(action)
+        && authorizeAndroidAction(this.db, action, readEnabledBusinessCapabilities(this.db)).ok;
+      const result = await this.deliver(String(request.notification_id), request.provider === "jandarma" ? "jandarma" : "egm", authorized, true);
+      // Local preparation failures have not called the adapter and must remain durable work.
+      if (!result.ok && ["local_preparation_failed", "local_transaction_active"].includes(result.code ?? "")) continue;
+      const state = result.ok ? "sent" : result.code === "request_unauthorized" ? "denied"
+        : result.state === "submission_unknown" ? "submission_unknown" : result.state === "failed" ? "failed" : "waiting";
+      try {
+        this.db.exec("BEGIN IMMEDIATE");
+        const now = new Date().toISOString();
+        const changed = this.db.prepare("UPDATE kbs_delivery_requests SET completed_at=?,result_state=? WHERE action_id=? AND completed_at=''")
+          .run(now, state, String(request.action_id)).changes;
+        if (changed) queueSyncJob(this.db, "android_snapshot", now);
+        this.db.exec("COMMIT");
+        completed += Number(changed);
+      } catch {
+        if (this.db.isTransaction) this.db.exec("ROLLBACK");
+        // Restart revisits the request. The canonical notification still fences any POST.
+        desktopLog.warn({ scope: "kbs", event: "kbs.request.completion.failed", message: "KBS isteği tamamlanma kaydı bekliyor; kalıcı gönderim sınırı korunuyor." });
+      }
+    }
+    return completed;
+  }
+
+  async deliver(notificationIdInput: string, provider: KbsProvider, authorize?: () => boolean, pendingOnly = false): Promise<KbsDeliveryAttemptResult> {
     const notificationId = notificationIdInput.trim();
     if (!notificationId) return waiting(provider, "Kimlik bildirimi seçilmedi.", "notification_required");
     // A caller-owned transaction must not carry a not-yet-durable fence across network I/O.
@@ -28,7 +71,9 @@ export class KbsDeliveryService {
     let prepared: KbsDeliveryInput | KbsDeliveryAttemptResult;
     try {
       this.db.exec("BEGIN IMMEDIATE");
-      prepared = this.prepareSubmission(notificationId, provider);
+      prepared = authorize && !authorize()
+        ? waiting(provider, "KBS gönderim isteğinin cihaz yetkisi artık geçerli değil.", "request_unauthorized")
+        : this.prepareSubmission(notificationId, provider, pendingOnly);
       this.db.exec("COMMIT");
     } catch (error) {
       if (this.db.isTransaction) this.db.exec("ROLLBACK");
@@ -63,7 +108,11 @@ export class KbsDeliveryService {
     }
   }
 
-  private prepareSubmission(notificationId: string, provider: KbsProvider): KbsDeliveryInput | KbsDeliveryAttemptResult {
+  private prepareSubmission(notificationId: string, provider: KbsProvider, pendingOnly: boolean): KbsDeliveryInput | KbsDeliveryAttemptResult {
+    const enabled = new Set(readEnabledBusinessCapabilities(this.db));
+    if (!enabled.has("accommodation.rooms") || !enabled.has("accommodation.stays")) {
+      return waiting(provider, "Konaklama yönetimi bu işletmede etkin değil.", "accommodation_disabled");
+    }
     const overview = getKbsOverview(this.db);
     if (!overview.enabled) return waiting(provider, "Kimlik Bildirim Sistemi etkin değil.", "kbs_disabled");
     if (!overview.configured) return waiting(provider, "KBS bağlantı ayarları tamamlanmadan bildirim gönderilemez.", "kbs_not_configured");
@@ -73,6 +122,13 @@ export class KbsDeliveryService {
     if (!row) return waiting(provider, "Kimlik bildirimi kaydı bulunamadı.", "notification_not_found");
     if (row.status === "sent") return alreadySent(row);
     if (row.status === "submission_unknown") return unknown(row.provider === "jandarma" ? "jandarma" : "egm", "submission_unknown");
+    // A request completion crash after rejection must not automatically submit it again.
+    if (pendingOnly && row.status === "failed") return { ok: false, state: "failed", provider,
+      retryable: Number(row.confirmed_rejection) === 1, code: "request_already_attempted",
+      message: "Gönderim isteği işlendi; yeniden deneme ayrı onay gerektirir." };
+    if (row.status !== "pending" && !(row.status === "failed" && Number(row.confirmed_rejection) === 1)) {
+      return waiting(provider, "Sağlayıcının kesin ret kanıtı olmadan başarısız bildirim yeniden gönderilemez.", "rejection_unverified");
+    }
     const identity = parseKbsIdentitySnapshot(String(row.identity_snapshot ?? ""));
     if (!identity) return waiting(provider, "Kimlik bildirimi için kayıt anlık görüntüsü okunamadı.", "identity_snapshot_invalid");
     if (!hasKbsIdentityMinimum(identity)) return waiting(provider, "Kimlik bilgileri eksik. Müşteri kartını tamamladıktan sonra bildirimi yeniden deneyin.", "identity_incomplete");
@@ -81,8 +137,8 @@ export class KbsDeliveryService {
     const occurredAt = String(row.occurred_at ?? "").trim();
     if (!occurredAt || !Number.isFinite(Date.parse(occurredAt))) return waiting(provider, "Kimlik bildirimi işlem zamanı geçersiz.", "occurred_at_invalid");
     if (!this.adapters.has(provider)) return waiting(provider, "Seçili KBS sağlayıcısı için gönderim adapterı hazır değil.", "adapter_unavailable");
-    const changed = this.db.prepare(`UPDATE hospitality_notifications SET status='submission_unknown',provider=?,provider_reference='',sent_at=''
-      WHERE id=? AND status IN ('pending','failed')`).run(provider, notificationId).changes;
+    const changed = this.db.prepare(`UPDATE hospitality_notifications SET status='submission_unknown',provider=?,provider_reference='',sent_at='',confirmed_rejection=0
+      WHERE id=? AND (status='pending' OR (status='failed' AND confirmed_rejection=1))`).run(provider, notificationId).changes;
     if (!changed) return unknown(provider, "submission_unknown");
     return { notificationId, kind, occurredAt, roomNumber: String(row.room_number ?? identity.roomNumber).trim(), identity };
   }
@@ -94,10 +150,10 @@ export class KbsDeliveryService {
     if (row?.status !== "submission_unknown") throw new Error("kbs_result_fence_conflict");
     if (!result.ok && result.state === "submission_unknown") return result;
     const status = result.ok ? "sent" : result.state === "failed" ? "failed" : "pending";
-    const changed = this.db.prepare(`UPDATE hospitality_notifications SET status=?,provider=?,provider_reference=?,sent_at=?
+    const changed = this.db.prepare(`UPDATE hospitality_notifications SET status=?,provider=?,provider_reference=?,sent_at=?,confirmed_rejection=?
       WHERE id=? AND status='submission_unknown'`).run(status, result.provider,
       result.ok ? result.providerReference.trim() : result.state === "failed" ? result.code?.trim() || "failed" : "",
-      result.ok ? new Date().toISOString() : "", notificationId).changes;
+      result.ok ? new Date().toISOString() : "", !result.ok && result.state === "failed" && result.submission === "rejected" ? 1 : 0, notificationId).changes;
     if (!changed) throw new Error("kbs_result_fence_conflict");
     return result;
   }

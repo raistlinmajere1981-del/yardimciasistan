@@ -1,14 +1,16 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/cloudflare-ai.php';
 
 const YA_STT_MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 const YA_STT_MAX_RESPONSE_BYTES = 128 * 1024;
 const YA_STT_MAX_TEXT_CHARS = 16000;
 
-/** Kept in parity with shared ai-model-capabilities; verified models only. */
+/** Documented adapter contracts in parity with shared metadata; access needs a real audio test. */
 function ya_stt_models(string $service): array
 {
     return match ($service) {
+        'cloudflare' => ['@cf/openai/whisper-large-v3-turbo'],
         'openai' => ['gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'whisper-1'],
         'gemini' => ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-2.5-flash'],
         default => []
@@ -17,6 +19,7 @@ function ya_stt_models(string $service): array
 
 function ya_stt_base_url_supported(string $service, string $baseUrl): bool
 {
+    if ($service === 'cloudflare') return ya_cloudflare_base_url_supported($baseUrl);
     $expected = match ($service) {
         'openai' => 'https://api.openai.com/v1',
         'gemini' => 'https://generativelanguage.googleapis.com/v1beta',
@@ -30,6 +33,9 @@ function ya_stt_base_url_supported(string $service, string $baseUrl): bool
 function ya_stt_failure(int $status, string $code): array
 {
     $message = match ($code) {
+        'provider_authentication_failed', 'provider_permission_denied', 'provider_quota_exhausted',
+        'provider_rate_limited', 'provider_busy', 'provider_network', 'provider_model_unavailable',
+        'provider_invalid_response' => ya_cloudflare_failure_message($code),
         'method_not_allowed' => 'Konuşma tanıma için POST isteği gerekli.',
         'unauthorized' => 'Konuşma tanıma bağlantısı doğrulanamadı.',
         'android_stt_scope_denied' => 'Android ses girişi için kişisel cihaz bağlantısı gerekli.',
@@ -145,6 +151,14 @@ function ya_stt_transcribe(array $config, string $path, ?callable $transport = n
             $headers[] = 'Authorization: Bearer ' . $key;
             $body = ['model' => $model, 'response_format' => 'json',
                 'file' => new CURLFile($path, $format[0], 'audio.' . $format[1])];
+        } elseif ($service === 'cloudflare') {
+            $url .= '/run/' . $model;
+            $headers[] = 'Authorization: Bearer ' . $key;
+            $headers[] = 'Content-Type: application/json';
+            $audio = file_get_contents($path, false, null, 0, YA_STT_MAX_AUDIO_BYTES + 1);
+            if ($audio === false || strlen($audio) !== $size) return ya_stt_failure(422, 'invalid_audio');
+            $body = json_encode(['audio' => base64_encode($audio), 'task' => 'transcribe', 'language' => 'tr'], JSON_THROW_ON_ERROR);
+            unset($audio);
         } else {
             $url .= '/models/' . $model . ':generateContent';
             $headers[] = 'x-goog-api-key: ' . $key;
@@ -171,16 +185,29 @@ function ya_stt_transcribe(array $config, string $path, ?callable $transport = n
         // reaches the official JSON API. Keep OpenAI on its default network path.
         if ($service === 'gemini') $options[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
         $response = ($transport ?? 'ya_stt_curl')($url, $options);
+        if ($service === 'cloudflare' && ($response['limit_exceeded'] ?? false) === true) return ya_stt_failure(502, 'provider_invalid_response');
         if (!is_array($response) || ($response['error'] ?? 0) !== 0) {
             return ya_stt_failure(($response['error'] ?? 0) === CURLE_OPERATION_TIMEDOUT ? 504 : 502,
-                ($response['error'] ?? 0) === CURLE_OPERATION_TIMEDOUT ? 'provider_timeout' : 'provider_failed');
+                ($response['error'] ?? 0) === CURLE_OPERATION_TIMEDOUT ? 'provider_timeout' : ($service === 'cloudflare' ? 'provider_network' : 'provider_failed'));
+        }
+        if ($service === 'cloudflare') {
+            if (!is_string($response['body'] ?? null) || strlen($response['body']) > YA_STT_MAX_RESPONSE_BYTES) return ya_stt_failure(502, 'provider_invalid_response');
+            $cloudflarePayload = json_decode($response['body'], true);
+            if (($response['status'] ?? 0) !== 200 || (is_array($cloudflarePayload) && ($cloudflarePayload['success'] ?? null) === false)) {
+                $code = ya_cloudflare_failure_code((int) ($response['status'] ?? 0), is_array($cloudflarePayload) ? $cloudflarePayload : null);
+                return ya_stt_failure($code === 'provider_timeout' ? 504 : 502, $code);
+            }
+            if (!is_array($cloudflarePayload) || ($cloudflarePayload['success'] ?? null) !== true
+                || !is_array($cloudflarePayload['result'] ?? null)) return ya_stt_failure(502, 'provider_invalid_response');
         }
         if (($response['status'] ?? 0) !== 200 || !is_string($response['body'] ?? null)
             || strlen($response['body']) > YA_STT_MAX_RESPONSE_BYTES) return ya_stt_failure(502, 'provider_failed');
         $decoded = json_decode($response['body'], true, 32, JSON_THROW_ON_ERROR);
         if (!is_array($decoded)) return ya_stt_failure(502, 'provider_failed');
         $text = '';
-        if ($service === 'openai') {
+        if ($service === 'cloudflare') {
+            $text = $decoded['result']['text'] ?? null;
+        } elseif ($service === 'openai') {
             $text = $decoded['text'] ?? null;
         } else {
             $candidate = $decoded['candidates'][0] ?? null;
@@ -194,14 +221,14 @@ function ya_stt_transcribe(array $config, string $path, ?callable $transport = n
             }
         }
         if (!is_string($text) || !mb_check_encoding($text, 'UTF-8') || mb_strlen($text, 'UTF-8') > YA_STT_MAX_TEXT_CHARS) {
-            return ya_stt_failure(502, 'provider_failed');
+            return ya_stt_failure(502, $service === 'cloudflare' ? 'provider_invalid_response' : 'provider_failed');
         }
         $text = trim((string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', strip_tags($text)));
         $text = str_replace($key, '[gizlendi]', $text);
         return ['status' => 200, 'payload' => ['ok' => true, 'text' => $text]
             + ($expectedConfiguration !== null ? ['stt_configuration' => $binding] : [])];
     } catch (Throwable) {
-        return ya_stt_failure(502, 'provider_failed');
+        return ya_stt_failure(502, $service === 'cloudflare' ? 'provider_invalid_response' : 'provider_failed');
     }
 }
 
@@ -210,15 +237,16 @@ function ya_stt_curl(string $url, array $options): array
     $handle = curl_init($url);
     if ($handle === false) return ['status' => 0, 'error' => CURLE_FAILED_INIT, 'body' => ''];
     $body = '';
-    $options[CURLOPT_WRITEFUNCTION] = static function ($curl, string $chunk) use (&$body): int {
-        if (strlen($body) + strlen($chunk) > YA_STT_MAX_RESPONSE_BYTES) return 0;
+    $limitExceeded = false;
+    $options[CURLOPT_WRITEFUNCTION] = static function ($curl, string $chunk) use (&$body, &$limitExceeded): int {
+        if (strlen($body) + strlen($chunk) > YA_STT_MAX_RESPONSE_BYTES) { $limitExceeded = true; return 0; }
         $body .= $chunk;
         return strlen($chunk);
     };
     try {
         curl_setopt_array($handle, $options);
         curl_exec($handle);
-        return ['status' => (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE), 'error' => curl_errno($handle), 'body' => $body];
+        return ['status' => (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE), 'error' => curl_errno($handle), 'body' => $body, 'limit_exceeded' => $limitExceeded];
     } finally {
         curl_close($handle);
     }

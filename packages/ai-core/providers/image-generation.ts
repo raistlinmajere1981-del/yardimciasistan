@@ -1,15 +1,24 @@
 import type { AIProviderConfig } from "../types";
 import { supportsImageGenerationModel } from "@yardimci-asistan/shared";
+import { CloudflareAiError, generateCloudflareImage } from "./cloudflare";
 export interface GeneratedImage { bytes: Uint8Array; mimeType: "image/png"; providerId: string; modelId: string }
 export function imageModelForProfile(service: string, models: readonly string[]): string | undefined {
   const configured = models.find(model => supportsImageGenerationModel(service, model));
-  if (configured && ["openai", "custom", "gemini"].includes(service)) return configured;
+  if (configured && ["openai", "custom", "gemini", "cloudflare"].includes(service)) return configured;
   // An existing configured OpenAI account can use its image endpoint independently of its chat model.
   if (service === "openai") return "gpt-image-1";
   return undefined;
 }
-export async function generateConfiguredImage(config: AIProviderConfig, prompt: string, aspect: "square" | "landscape" | "portrait", fetchImpl: typeof fetch = globalThis.fetch): Promise<GeneratedImage> {
+export async function generateConfiguredImage(config: AIProviderConfig, prompt: string, aspect: "square" | "landscape" | "portrait", fetchImpl: typeof fetch = globalThis.fetch,
+  normalizePng?: (bytes: Uint8Array, aspect: "square" | "landscape" | "portrait") => Uint8Array): Promise<GeneratedImage> {
   if (!config.enabled || !config.apiKey || !config.model || !imageModelForProfile(config.service ?? "",[config.model])) throw new Error("image_capability_unavailable");
+  if (config.service === "cloudflare") {
+    const image = await generateCloudflareImage(config, prompt, fetchImpl);
+    // FLUX has no documented aspect parameter. Desktop decodes/crops locally and returns real PNG.
+    const bytes = normalizePng ? normalizePng(image.bytes, aspect) : image.mimeType === "image/png" && aspect === "square" ? image.bytes : undefined;
+    if (!bytes || bytes.length > 30 * 1024 * 1024 || ![137,80,78,71,13,10,26,10].every((byte,i) => bytes[i] === byte)) throw new CloudflareAiError("invalid_response");
+    return { bytes, mimeType: "image/png", providerId: "cloudflare", modelId: config.model };
+  }
   const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 120000);
   try {
     const gemini = config.service === "gemini";

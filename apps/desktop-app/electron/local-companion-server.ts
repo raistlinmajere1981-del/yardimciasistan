@@ -9,6 +9,7 @@ import {
   type AndroidSyncAction
 } from "@yardimci-asistan/sync-core";
 import { desktopLog } from "./desktop-logger";
+import { projectAndroidKbsForDevice } from "./android-kbs-projection.js";
 
 const DEFAULT_LOCAL_COMPANION_PORT = 47_831;
 const MAX_JSON_BODY_BYTES = 128 * 1024;
@@ -155,7 +156,8 @@ function latestRequestTimestamp(snapshot: AndroidOperationsSnapshot): string {
     request.created_at && request.created_at > latest ? request.created_at : latest, "");
 }
 
-function summaryResponse(
+/** @compiledSmoke Final LAN projection can be tested without opening a socket. */
+export function createLocalAndroidSummaryResponse(
   snapshot: AndroidOperationsSnapshot,
   business: LocalCompanionBusinessInfo,
   deviceId: string,
@@ -208,6 +210,7 @@ function summaryResponse(
     finance: snapshot.finance,
     reports: snapshot.reports,
     market: snapshot.market,
+    kbs: profile ? projectAndroidKbsForDevice(snapshot.kbs, snapshot.business_capabilities, profile) : null,
     commerce: snapshot.commerce,
     marketing: snapshot.marketing,
     actions: [],
@@ -468,7 +471,7 @@ export class LocalCompanionServer {
         writeJson(response, 200, {
           protocol_version: LOCAL_COMPANION_PROTOCOL_VERSION,
           desktop_id: this.options.desktopId(),
-          ...summaryResponse(
+          ...createLocalAndroidSummaryResponse(
             snapshot,
             this.options.businessInfo(),
             deviceId,

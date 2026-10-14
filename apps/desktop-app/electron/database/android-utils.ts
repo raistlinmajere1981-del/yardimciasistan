@@ -22,6 +22,9 @@ export type AndroidActionMutationResult =
 const ANDROID_PERMISSION_SET = new Set<string>(ANDROID_PERMISSIONS);
 
 const ANDROID_ADMIN_ONLY_ACTIONS = new Set<string>([
+  "kbs_send_request",
+  "kbs_retry_prepare",
+  "kbs_mark_sent_externally",
   "customer_request_delete",
   "customer_create",
   "customer_update",
@@ -69,7 +72,10 @@ function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
     shipment_view: false,
     online_sales_view: false,
     marketing_status_view: false,
-    market_operations: false
+    market_operations: false,
+    market_sales: false,
+    customer_credit_view: false,
+    customer_credit_payment: false
   };
 }
 
@@ -98,7 +104,8 @@ export function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPe
   const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
   for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
     if (!(groupId in record)) {
-      if (["voice_dictation", "commerce_orders_view", "commerce_orders_manage", "dealer_view", "shipment_view", "online_sales_view", "marketing_status_view"].includes(groupId)) continue;
+      if (["voice_dictation", "commerce_orders_view", "commerce_orders_manage", "dealer_view", "shipment_view", "online_sales_view", "marketing_status_view",
+        "market_sales", "customer_credit_view", "customer_credit_payment"].includes(groupId)) continue;
       return null;
     }
     if (typeof record[groupId] !== "boolean") return null;
@@ -190,7 +197,7 @@ export function androidActionRelatedId(action: AndroidSyncAction): string {
   const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
     ? action.payload
     : {};
-  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "customer_id", "folio_id", "room_id", "task_id", "item_id", "product_id", "menu_entry_id", "category_id", "message_id"]) {
+  for (const key of ["notification_id", "order_id", "table_id", "reservation_id", "request_id", "customer_id", "folio_id", "room_id", "task_id", "item_id", "product_id", "menu_entry_id", "category_id", "message_id"]) {
     const value = String(payload[key] ?? "").trim();
     if (value) {
       return value;
@@ -220,7 +227,7 @@ export function androidActionTargetPage(
   if (actionType.startsWith("daily_task_") && String(payload.task_type ?? "").trim() === "manual_restaurant") {
     return "restaurant";
   }
-  if (actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {
+  if (actionType.startsWith("kbs_") || actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {
     return "pension";
   }
   if (actionType.startsWith("table_") || actionType.startsWith("menu_")) {

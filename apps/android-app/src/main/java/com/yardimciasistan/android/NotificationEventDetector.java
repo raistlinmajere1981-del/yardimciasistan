@@ -124,6 +124,7 @@ final class NotificationEventDetector {
     }
 
     for (OperationData.ActionRecord action : data.actions) {
+      if (KbsUiRules.isAction(action.type) && !KbsUiRules.canView(data)) continue;
       if (action.id.isEmpty() || !"failed".equals(action.status)) {
         continue;
       }
@@ -150,6 +151,7 @@ final class NotificationEventDetector {
       return false;
     }
     if (NotificationEvent.CATEGORY_ACTION.equals(event.category)) {
+      if ("pension:kbs".equals(event.route)) return KbsUiRules.canView(data);
       return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID);
     }
     if (!data.deviceActive) {
@@ -220,6 +222,7 @@ final class NotificationEventDetector {
 
   static String routeForAction(String actionType) {
     String type = actionType == null ? "" : actionType;
+    if (KbsUiRules.isAction(type)) return "pension:kbs";
     if (type.startsWith("customer_")) {
       return "customers:new";
     }

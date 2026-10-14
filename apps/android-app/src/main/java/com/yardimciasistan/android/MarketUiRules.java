@@ -36,6 +36,11 @@ final class MarketUiRules {
   static final String ACTION_PRODUCT_CREATE = "market_product_create";
   static final String ACTION_CART_DRAFT_CREATE = "market_cart_draft_create";
   static final String ACTION_BARCODE_SCAN = "market_barcode_scan";
+  static final String PERMISSION_SALE = "market.sale.complete";
+  static final String PERMISSION_CREDIT_VIEW = "customer_credit.view";
+  static final String PERMISSION_CREDIT_PAYMENT = "customer_credit.payment";
+  static final String ACTION_SALE = "market_sale_complete";
+  static final String ACTION_CREDIT_PAYMENT = "customer_credit_payment_add";
   static final long BARCODE_DEBOUNCE_MS = 1_000L;
 
   private static final String[] MARKET_PERMISSIONS = {
@@ -45,7 +50,7 @@ final class MarketUiRules {
       PERMISSION_RECEIVING,
       PERMISSION_PRODUCT_CREATE,
       PERMISSION_CART_DRAFT,
-      PERMISSION_SCAN_TO_DESKTOP
+      PERMISSION_SCAN_TO_DESKTOP, PERMISSION_SALE, PERMISSION_CREDIT_VIEW, PERMISSION_CREDIT_PAYMENT
   };
 
   private MarketUiRules() {}
@@ -108,6 +113,55 @@ final class MarketUiRules {
     return canViewProducts(data) && data.hasPermission(PERMISSION_CART_DRAFT);
   }
 
+  static boolean canCompleteSale(OperationData data) {
+    return canViewProducts(data) && data.hasPermission(PERMISSION_SALE);
+  }
+
+  static boolean canViewCredit(OperationData data) {
+    return canOpenMarket(data) && data.hasPermission(PERMISSION_CREDIT_VIEW);
+  }
+
+  static boolean canPayCredit(OperationData data) {
+    return canViewCredit(data) && data.hasPermission(PERMISSION_CREDIT_PAYMENT);
+  }
+
+  static OperationData.CustomerCreditAccount creditAccount(OperationData data, String customerId) {
+    if (!canViewCredit(data)) return null;
+    for (OperationData.CustomerCreditAccount account : data.market.customerCreditAccounts) {
+      if (account.customerId.equals(customerId)) return account;
+    }
+    return null;
+  }
+
+  static String financialFeedback(String type, String status) {
+    if ("applied".equals(status)) return ACTION_CREDIT_PAYMENT.equals(type)
+        ? "Tahsilat masaüstünde kaydedildi." : "Satış masaüstünde kaydedildi.";
+    if ("failed".equals(status)) return "Masaüstü işlemi reddetti; hata bilgisini kontrol edin.";
+    return "Masaüstünde onay bekliyor";
+  }
+
+  static JSONObject creditPaymentPayload(OperationData data, String customerId, String currency,
+      String amountText, String method, boolean externalConfirmed) throws ValidationException {
+    if (!canPayCredit(data)) throw new ValidationException("Cari tahsilat yetkiniz yok.");
+    OperationData.CustomerCreditAccount account = creditAccount(data, customerId);
+    if (account == null) throw new ValidationException("Güncel müşteri hesabını seçin.");
+    long debt = -1;
+    for (OperationData.CreditBalance balance : account.balances) if (balance.currency.equals(currency)) debt = balance.amountMinor;
+    long amount;
+    try { amount = new java.math.BigDecimal(text(amountText).replace(',', '.')).movePointRight(2).longValueExact(); }
+    catch (Exception error) { throw new ValidationException("Tahsilat tutarını en fazla iki ondalıkla girin."); }
+    if (amount <= 0 || amount > debt || amount > 999999999999L) throw new ValidationException("Tutar pozitif olmalı ve mevcut borcu aşmamalı.");
+    validatePayment(method, externalConfirmed);
+    try { return new JSONObject().put("customer_id", customerId).put("currency", currency).put("amount_minor", amount)
+        .put("expected_balance_minor", debt).put("payment_method", method).put("external_payment_confirmed", externalConfirmed); }
+    catch (Exception error) { throw new ValidationException("Tahsilat hazırlanamadı."); }
+  }
+
+  private static void validatePayment(String method, boolean externalConfirmed) throws ValidationException {
+    if (!java.util.Arrays.asList("cash", "card", "bank", "other").contains(method)) throw new ValidationException("Ödeme yöntemi seçin.");
+    if ("card".equals(method) && !externalConfirmed) throw new ValidationException("Kart ödemesinin harici POS'ta gerçekleştiğini onaylayın.");
+  }
+
   static boolean canScanToDesktop(OperationData data) {
     return canOpenMarket(data)
         && data.hasPermission(PERMISSION_SCAN_TO_DESKTOP)
@@ -122,6 +176,8 @@ final class MarketUiRules {
     if (ACTION_PRODUCT_CREATE.equals(actionType)) return PERMISSION_PRODUCT_CREATE;
     if (ACTION_CART_DRAFT_CREATE.equals(actionType)) return PERMISSION_CART_DRAFT;
     if (ACTION_BARCODE_SCAN.equals(actionType)) return PERMISSION_SCAN_TO_DESKTOP;
+    if (ACTION_SALE.equals(actionType)) return PERMISSION_SALE;
+    if (ACTION_CREDIT_PAYMENT.equals(actionType)) return PERMISSION_CREDIT_PAYMENT;
     return null;
   }
 
@@ -418,14 +474,16 @@ final class MarketUiRules {
       }
       CartLine existing = lines.get(product.id);
       if (existing == null) {
-        lines.put(product.id, new CartLine(
+        CartLine line = new CartLine(
             product.id,
             product.name,
             product.salePrice,
             product.currency,
             product.unit,
             1
-        ));
+        );
+        line.updatedAt = product.updatedAt;
+        lines.put(product.id, line);
       } else {
         existing.quantity = round(existing.quantity + 1, 4);
       }
@@ -487,6 +545,33 @@ final class MarketUiRules {
       }
     }
 
+    JSONObject toSalePayload(OperationData data, String settlement, String customerId, String method,
+        boolean externalConfirmed) throws ValidationException {
+      if (!canCompleteSale(data)) throw new ValidationException("Mobil satış yetkiniz yok.");
+      if (!"paid".equals(settlement) && !"credit".equals(settlement)) throw new ValidationException("Ödeme seçimi geçersiz.");
+      if ("credit".equals(settlement)) {
+        if (creditAccount(data, customerId) == null) throw new ValidationException("Veresiye için kayıtlı müşteri seçin.");
+      } else { validatePayment(method, externalConfirmed); }
+      if (data.hasBusinessCapability(CAPABILITY_INVENTORY) && data.market.primaryLocationId.isEmpty()) throw new ValidationException("Stok konumunu yenileyin.");
+      JSONObject payload = toPayload();
+      payload.remove("note");
+      JSONArray serialized = payload.optJSONArray("lines");
+      String currency = "";
+      int index = 0;
+      try {
+        for (CartLine line : lines.values()) {
+          if (!currency.isEmpty() && !currency.equals(line.currency)) throw new ValidationException("Tek satışta birden fazla para birimi kullanılamaz.");
+          currency = line.currency;
+          if (line.updatedAt.isEmpty() || !Double.isFinite(line.unitPrice) || productById(data, line.productId) == null) throw new ValidationException("Güncel ürün bilgilerini yenileyin.");
+          serialized.getJSONObject(index++).put("expected_unit_price", line.unitPrice).put("expected_currency", line.currency).put("expected_updated_at", line.updatedAt);
+        }
+        return payload.put("location_id", data.market.primaryLocationId).put("settlement", settlement)
+            .put("customer_id", "credit".equals(settlement) ? customerId : "")
+            .put("payment_method", "credit".equals(settlement) ? "" : method).put("external_payment_confirmed", externalConfirmed);
+      } catch (ValidationException error) { throw error; }
+      catch (Exception error) { throw new ValidationException("Satış hazırlanamadı."); }
+    }
+
     void clear() {
       lines.clear();
       note = "";
@@ -499,6 +584,7 @@ final class MarketUiRules {
     final double unitPrice;
     final String currency;
     final String unit;
+    String updatedAt = "";
     double quantity;
 
     CartLine(

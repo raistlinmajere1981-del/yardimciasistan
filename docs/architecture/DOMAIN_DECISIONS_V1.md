@@ -435,11 +435,14 @@ A stable operation key makes retries idempotent. Reusing the same key with diffe
 settlement/location/order input is rejected. A separate commerce_order_fulfillments link
 table is used instead of embedding sale_id into commerce_orders.
 
-Fulfillment deliberately does not add a new finance entry for paid Commerce Sales because
-the existing Market Quick Sale path does not currently project paid commerce_sales into
-finance_entries. Customer-credit finance income remains tied to later actual collection.
-Finance standardization, if desired, is a separate domain decision and must apply to both
-sales paths consistently.
+Positive paid Commerce Sales project income through the canonical Finance owner inside
+the same transaction, after sale items and stock writes. Both Market checkout (Desktop
+and Android) and Order snapshot fulfillment use `commerce_sale + sale id`, the protected
+`market` income category and the same source uniqueness contract. Zero-total/no_payment
+and credit Sales create no income; customer-credit finance income remains tied to later
+actual collection. Existing missing source links can be repaired only through the explicit,
+transactional Finance reconciliation helper; no startup backfill or second ledger exists.
+See [Finance model](../FINANCE_MODEL.md) for the repair command and manual-income limitation.
 
 
 ## D-026 — Online Sales ingress imports an inbox into canonical Commerce Orders
@@ -1329,6 +1332,41 @@ future verified negative-reconciliation/resubmit operation remain explicit limit
 Configuration, notification creation, provider automation and other hospitality operations
 are unchanged. Current schema only; no migration or backward compatibility is introduced.
 
+Android KBS management extends this owner with durable `kbs_delivery_requests`. An
+authenticated `kbs_send_request` and its immutable intent hash/Android receipt commit
+together; the local KBS worker calls `deliver` after commit, independently of Hosting
+availability and automatic publication settings. Startup and a periodic local scan recover
+accepted requests. A missing completion after success/uncertainty cannot reopen the fence;
+a missing completion after explicit rejection completes the request without another POST.
+Pending requests never expire or become a second notification identity. Retry preparation
+waits for the prior request's durable completion and requires `failed` plus persisted
+`confirmed_rejection` evidence written only by an explicit adapter rejection. Legacy failed
+status/provider codes alone do not authorize retry or direct delivery.
+
+Only active admin devices receive the independent `kbs.view`, `kbs.send`, `kbs.retry` and
+`kbs.reconcile_external` permissions; no staff/rooms/tasks group inherits them. Android,
+Rooms, Stays and enabled KBS are checked at projection and mutation boundaries. Hosted
+responses and all three typed actions require personal-device authentication. The worker
+rechecks the receipt-bound request, persisted role/capabilities, provider, configuration,
+notification state and identity before the durable pre-I/O fence. A disabled/locked
+installation retains accepted work; revoked authorization terminates it without submission.
+
+Only provider/enabled/configured flags, status/readiness counts and bounded notification
+name/room/date/kind/status/readiness plus safe request/retry state are projected. KBS
+credentials, facility/user configuration, identity numbers/documents, raw provider messages
+and references are excluded by Desktop, LAN, Hosting and Android parse/cache allowlists.
+Existing customer document numbers are also redacted in Android snapshots; blank/omitted
+mobile update fields preserve their canonical Desktop values. Clearing those existing
+numbers requires the Desktop customer editor.
+
+`kbs_retry_prepare` only prepares a confirmed rejection; it performs no submission.
+`kbs_mark_sent_externally` delegates to the existing notification owner after two explicit
+confirmations that the operator verified this record in the official portal. It does not
+verify that portal automatically. Transport queued/applied receipts mean queued/reached
+Desktop; only the canonical notification's sent status means officially sent. Unknown
+result stays distinct. Live EGM/Jandarma binding and field verification remain unverified;
+the automated contract tests use fake adapters and temporary databases exclusively.
+
 ## D-043 — Explicit local backup restore reconciles ownership, not remote history
 
 **Status:** ACCEPTED (2026-10-06), implementing the requested restore correctness contract.
@@ -1437,6 +1475,10 @@ runtime validation and its existing backend/bridge contract intact.
 AI profiles independently own assistant model and optional image-generation model. Empty
 image choice preserves automatic capable-profile selection; an override uses the existing
 provider/model capability metadata. No renderer AI provider execution is introduced.
+Cloudflare additionally owns an optional independent `vision_model` for existing
+Hosting image analysis; Account ID is carried by its official profile API root.
+Documented candidate metadata never proves account/free-plan access. See
+[AI provider profiles](ai-providers.md) for transport, verification and PNG contracts.
 Web map publication contains only the selected Google embed or manual coordinates;
 canonical location and the inactive saved map configuration remain intact.
 

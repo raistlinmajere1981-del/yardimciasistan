@@ -28,6 +28,7 @@ Repository-wide agent kuralları için kökteki `AGENTS.md` otoritatiftir.
 - `architecture/hospitality-domain.md` — pansiyon domain sınırları.
 - `architecture/sector-feature-contribution-model.md` — capability tabanlı feature katkıları.
 - `architecture/voice-input.md` — S2A STT ayarları/hosting servisi ve S2B doğrudan ses girişi sınırı.
+- `architecture/ai-providers.md` — AI profilleri, Cloudflare erişim/yetenek ayrımı ve sağlayıcı sözleşmeleri.
 
 ## Workspace / platform
 

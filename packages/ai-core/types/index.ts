@@ -52,6 +52,7 @@ export type AICompletionFailureReason =
   | "network"
   | "model_unavailable"
   | "invalid_request"
+  | "invalid_response"
   | "provider_error";
 
 export interface AICompletionFailure {

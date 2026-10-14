@@ -35,6 +35,7 @@ import {
 } from "./database/hospitality-notification-store.js";
 import { assignHospitalityStay, enterReservedHospitalityStay, checkInHospitalityStay } from "./hospitality-entry-service.js";
 import { KbsDeliveryService } from "./kbs-delivery-service.js";
+import { readAndroidKbsSnapshot } from "./android-kbs-projection.js";
 import { updateRoomStatusWithStayGuard } from "./room-status-service.js";
 import { createDesktopDashboardData } from "./desktop-dashboard-service.js";
 import { reportReservationCapabilitySqlClause, reportTaskCapabilitySqlClause } from "./database/report-utils.js";
@@ -544,6 +545,19 @@ export class DesktopDatabase {
     const service = new KbsDeliveryService(this.db, [adapter]);
     const result = await service.deliver(notificationId, overview.provider);
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  processKbsDeliveryRequests(adapters: readonly KbsProviderAdapter[], available: () => boolean): Promise<number> {
+    return new KbsDeliveryService(this.db, adapters).processRequests(available);
+  }
+
+  canProcessKbsDeliveryRequests(): boolean {
+    const enabled = new Set(this.getEnabledBusinessCapabilities());
+    return enabled.has("service.android") && enabled.has("accommodation.rooms") && enabled.has("accommodation.stays") && getKbsOverview(this.db).enabled;
+  }
+
+  getAndroidKbsSnapshot() {
+    return readAndroidKbsSnapshot(this.db, this.getEnabledBusinessCapabilities());
   }
 
   deleteCustomer(customerIdInput: string): DesktopStatusUpdateResult {

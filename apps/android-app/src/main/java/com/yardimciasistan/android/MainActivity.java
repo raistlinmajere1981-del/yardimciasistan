@@ -52,8 +52,7 @@ public final class MainActivity extends ComponentActivity {
   private MarketWorkspace marketWorkspace;
   private OperationData data = new OperationData();
   private DeviceIdentity identity;
-  private String activeTab = TAB_TODAY;
-  private boolean settingsOpen;
+  private final AndroidNavigationState navigation = new AndroidNavigationState();
   private boolean loading;
   private boolean operationsSyncFailed;
   private String connectionState = "Henüz bağlanmadı";
@@ -126,21 +125,17 @@ public final class MainActivity extends ComponentActivity {
     getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
       @Override
       public void handleOnBackPressed() {
-        if (settingsOpen) {
-          settingsOpen = false;
+        if (navigation.settingsOpen()) {
+          navigation.back(data);
           render();
           return;
         }
-        if (TAB_MARKET.equals(activeTab) && marketWorkspace != null && marketWorkspace.handleBack()) {
-          return;
-        }
-        if (TAB_TODAY.equals(activeTab) && todayCoordinator != null && todayCoordinator.handleBack()) {
-          render();
-          return;
-        }
-        if (TAB_REPORTS.equals(activeTab) || TAB_CASH.equals(activeTab)) {
-          activeTab = TAB_TODAY;
-          settingsOpen = true;
+        if (TAB_MARKET.equals(navigation.tab()) && marketWorkspace != null && marketWorkspace.handleBack()) return;
+        if (TAB_TODAY.equals(navigation.tab()) && todayCoordinator != null && todayCoordinator.isOrderDetailOpen()
+            && todayCoordinator.handleBack()) { render(); return; }
+        String previous = navigation.route();
+        if (navigation.back(data)) {
+          applyNavigationRoute(previous);
           render();
           return;
         }
@@ -176,16 +171,15 @@ public final class MainActivity extends ComponentActivity {
           @Override public void onRefresh() { syncOperations(false); }
           @Override public void onThemeToggle() { switchTheme(); }
           @Override public void onSettingsToggle() {
-            settingsOpen = !settingsOpen;
+            navigation.toggleSettings(data);
             render();
           }
-          @Override public void onTabSelected(String tab) {
-            activeTab = tab;
-            settingsOpen = false;
-            if (TAB_TODAY.equals(tab) && todayCoordinator != null) todayCoordinator.applyDestination(data, AndroidUiRules.resolveDestination("today"));
-            render();
+          @Override public void onNavigate(String route) { openRoute(route); render(); }
+          @Override public boolean canSwipeRoot() { return MainActivity.this.canSwipeRoot(); }
+          @Override public void onRootSwipe(int direction) {
+            String previous = navigation.route();
+            if (navigation.swipe(data, direction)) { applyNavigationRoute(previous); render(); }
           }
-          @Override public boolean canOpenTab(String tab) { return MainActivity.this.canOpenTab(tab); }
           @Override public AppTheme.Mode themeMode() { return themeMode; }
         }
     );
@@ -225,7 +219,7 @@ public final class MainActivity extends ComponentActivity {
     );
     identity = DeviceIdentity.loadOrCreate(this, preferences);
     voiceController = new AndroidVoiceController(this, preferences, identity, syncClient, () -> data,
-        () -> { if (settingsOpen && shell != null) render(); });
+        () -> { if (navigation.settingsOpen() && shell != null) render(); });
     identityImageWorkflow = new IdentityImageWorkflow(
         this,
         preferences,
@@ -494,8 +488,10 @@ public final class MainActivity extends ComponentActivity {
             clearError();
             if (CompanionUiRules.isDecision(feedbackActionType)) {
               Toast.makeText(MainActivity.this, successMessage, Toast.LENGTH_SHORT).show();
+            } else if (KbsUiRules.isAction(feedbackActionType)) {
+              Toast.makeText(MainActivity.this, successMessage, Toast.LENGTH_SHORT).show();
             } else if (marketFeedback && marketWorkspace != null) {
-              marketWorkspace.onSubmissionAccepted(feedbackActionType, successMessage);
+              marketWorkspace.onSubmissionAccepted(feedbackActionType, successMessage, accepted.isEmpty() ? "" : accepted.get(0).id);
               Toast.makeText(MainActivity.this, successMessage, Toast.LENGTH_SHORT).show();
             }
             render();
@@ -517,7 +513,11 @@ public final class MainActivity extends ComponentActivity {
               data.pendingActions += pendingActionCount(accepted);
             }
             mergeCompanionActionResults();
-            if (CompanionUiRules.isDecision(feedbackActionType) && actionRemainsQueued) {
+            if (KbsUiRules.isAction(feedbackActionType) && actionRemainsQueued) {
+              connectionState = errorMessage;
+              clearError();
+              Toast.makeText(MainActivity.this, marketQueuedMessage, Toast.LENGTH_LONG).show();
+            } else if (CompanionUiRules.isDecision(feedbackActionType) && actionRemainsQueued) {
               connectionState = errorMessage;
               clearError();
               Toast.makeText(MainActivity.this, marketQueuedMessage, Toast.LENGTH_SHORT).show();
@@ -577,22 +577,6 @@ public final class MainActivity extends ComponentActivity {
         identity,
         voiceController,
         new AndroidSettingsWorkspace.Listener() {
-          @Override
-          public void openCash() {
-            settingsOpen = false;
-            activeTab = TAB_CASH;
-            clearError();
-            render();
-          }
-
-          @Override
-          public void openReports() {
-            settingsOpen = false;
-            activeTab = TAB_REPORTS;
-            clearError();
-            render();
-          }
-
           @Override
           public void onSyncRequested() {
             syncOperations(true);
@@ -692,7 +676,11 @@ public final class MainActivity extends ComponentActivity {
     }
     applyConnectionExtras();
     SyncJobService.schedule(this);
-    applyNotificationIntent(getIntent());
+    if (savedInstanceState != null) {
+      navigation.open(data, savedInstanceState.getString("navigation_return", TAB_TODAY));
+      openRoute(savedInstanceState.getString("navigation_route", TAB_TODAY));
+    } else applyNotificationIntent(getIntent());
+    shell.restoreScrollState(savedInstanceState);
     shell.build();
     render();
     requestNotificationPermissionIfNeeded();
@@ -723,6 +711,14 @@ public final class MainActivity extends ComponentActivity {
   protected void onStop() {
     if (voiceController != null) voiceController.background();
     super.onStop();
+  }
+
+  @Override
+  protected void onSaveInstanceState(Bundle state) {
+    state.putString("navigation_route", navigation.route());
+    state.putString("navigation_return", navigation.settingsReturnRoute());
+    shell.saveScrollState(state);
+    super.onSaveInstanceState(state);
   }
 
   @Override
@@ -838,27 +834,31 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
     String normalized = route.trim();
-    settingsOpen = "settings".equals(normalized)
-        && (!data.permissionsResolved || data.hasPermission("settings.view"));
-    if (settingsOpen) {
-      return;
-    }
+    if ("settings".equals(normalized) && data.permissionsResolved && !data.hasPermission("settings.view")) return;
     openRoute(normalized);
   }
 
   private void openRoute(String route) {
-    AndroidUiRules.Destination destination = AndroidUiRules.resolveDestination(route);
-    settingsOpen = false;
-    if (TAB_REPORTS.equals(destination.tab) && !canOpenTab(TAB_REPORTS)) {
-      activeTab = TAB_TODAY;
-      showError("Bu cihazın raporlara erişim yetkisi yok.");
-      return;
-    }
-    if (workspaceCoordinator != null) {
-      workspaceCoordinator.applyDestination(data, destination);
-    }
-    if (todayCoordinator != null) todayCoordinator.applyDestination(data, destination);
-    activeTab = canOpenTab(destination.tab) ? destination.tab : TAB_TODAY;
+    String previous = navigation.route();
+    boolean allowed = navigation.open(data, route);
+    applyNavigationRoute(previous);
+    if (!allowed) showError("Bu cihazın bu bölüme erişim yetkisi yok.");
+  }
+
+  private void applyNavigationRoute(String previous) {
+    if (navigation.settingsOpen()) return;
+    AndroidUiRules.Destination destination = AndroidUiRules.resolveDestination(navigation.route());
+    if (!"settings".equals(previous) && navigation.route().contains(":") && workspaceCoordinator != null) workspaceCoordinator.applyDestination(data, destination);
+    if (TAB_TODAY.equals(destination.tab) && todayCoordinator != null
+        && !todayCoordinator.mode().equals(destination.mode)) todayCoordinator.applyDestination(data, destination);
+  }
+
+  private boolean canSwipeRoot() {
+    if (navigation.settingsOpen() || data.permissionsResolved && !data.deviceActive) return false;
+    String tab = navigation.tab();
+    if (TAB_CASH.equals(tab) || TAB_REPORTS.equals(tab)) return false;
+    if (TAB_MARKET.equals(tab)) return marketWorkspace != null && "home".equals(marketWorkspace.screenKey());
+    return !TAB_TODAY.equals(tab) || todayCoordinator == null || !todayCoordinator.isOrderDetailOpen();
   }
 
   private void requestNotificationPermissionIfNeeded() {
@@ -906,25 +906,20 @@ public final class MainActivity extends ComponentActivity {
       operationCards.setData(data);
     }
     boolean canOpenSettings = !data.permissionsResolved || data.deviceActive;
-    if (settingsOpen && !canOpenSettings) {
-      settingsOpen = false;
-    }
-    if (!canOpenTab(activeTab)) {
-      activeTab = TAB_TODAY;
-    }
     if (workspaceCoordinator != null) {
       workspaceCoordinator.normalize(data);
     }
     if (todayCoordinator != null) todayCoordinator.normalize(data);
+    String previousRoute = navigation.route();
+    if (navigation.normalize(data)) applyNavigationRoute(previousRoute);
     boolean inactiveDevice = data.permissionsResolved && !data.deviceActive;
-    if (inactiveDevice) {
-      settingsOpen = false;
-    }
+    if (inactiveDevice) navigation.open(data, TAB_TODAY);
 
     String screenKey = currentScreenKey(inactiveDevice);
     shell.updateChrome(
-        activeTab,
-        settingsOpen,
+        AndroidUiRules.rootNavigation(data),
+        navigation.selectedRoot(data),
+        navigation.settingsOpen(),
         inactiveDevice,
         canOpenSettings,
         loading,
@@ -936,29 +931,32 @@ public final class MainActivity extends ComponentActivity {
     if (inactiveDevice) {
       title = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID) ? "Cihaz Pasif" : "Android Kapalı";
       screen = inactiveDeviceScreen();
-    } else if (settingsOpen) {
+    } else if (navigation.settingsOpen()) {
       title = "Ayarlar";
       screen = settingsScreen();
-    } else if (TAB_CUSTOMERS.equals(activeTab)) {
+    } else if (AndroidUiRules.TAB_MORE.equals(navigation.tab())) {
+      title = "Diğer";
+      screen = AndroidMoreWorkspace.create(this, data, route -> { openRoute(route); render(); }, shell.contentBottomPaddingDp());
+    } else if (TAB_CUSTOMERS.equals(navigation.tab())) {
       title = "Müşteri";
       screen = customerScreen();
-    } else if (TAB_PENSION.equals(activeTab)) {
+    } else if (TAB_PENSION.equals(navigation.tab())) {
       title = "Pansiyon";
       screen = pensionScreen();
-    } else if (TAB_RESTAURANT.equals(activeTab)) {
+    } else if (TAB_RESTAURANT.equals(navigation.tab())) {
       title = "Restoran";
       screen = restaurantScreen();
-    } else if (TAB_MARKET.equals(activeTab)) {
+    } else if (TAB_MARKET.equals(navigation.tab())) {
       title = "Market";
       screen = marketWorkspace.create(data, localPendingActionCount(), loading);
-    } else if (TAB_MESSAGES.equals(activeTab)) {
+    } else if (TAB_MESSAGES.equals(navigation.tab())) {
       title = "Mesajlar";
       screen = messagesScreen();
-    } else if (TAB_CASH.equals(activeTab)) {
+    } else if (TAB_CASH.equals(navigation.tab())) {
       title = "Kasa";
       screen = FinanceWorkspace.create(this, data, actionPayload ->
           sendAction("finance_manual_create", actionPayload, "Kasa hareketi gönderildi."));
-    } else if (TAB_REPORTS.equals(activeTab)) {
+    } else if (TAB_REPORTS.equals(navigation.tab())) {
       title = "Raporlar";
       screen = reportsScreen();
     } else {
@@ -973,35 +971,31 @@ public final class MainActivity extends ComponentActivity {
     if (inactiveDevice) {
       return "inactive";
     }
-    if (settingsOpen) {
+    if (navigation.settingsOpen()) {
       return "settings";
     }
-    if (TAB_CUSTOMERS.equals(activeTab)
-        || TAB_PENSION.equals(activeTab)
-        || TAB_RESTAURANT.equals(activeTab)) {
+    if (TAB_CUSTOMERS.equals(navigation.tab())
+        || TAB_PENSION.equals(navigation.tab())
+        || TAB_RESTAURANT.equals(navigation.tab())) {
       return workspaceCoordinator == null
-          ? activeTab
-          : workspaceCoordinator.screenKey(activeTab);
+          ? navigation.tab()
+          : workspaceCoordinator.screenKey(navigation.tab());
     }
-    if (TAB_MARKET.equals(activeTab)) {
+    if (TAB_MARKET.equals(navigation.tab())) {
       return TAB_MARKET + ":" + (marketWorkspace == null ? "home" : marketWorkspace.screenKey());
     }
-    if (TAB_MESSAGES.equals(activeTab)) {
+    if (TAB_MESSAGES.equals(navigation.tab())) {
       return workspaceCoordinator == null
           ? TAB_MESSAGES
           : workspaceCoordinator.screenKey(TAB_MESSAGES);
     }
-    if (TAB_CASH.equals(activeTab)) {
+    if (TAB_CASH.equals(navigation.tab())) {
       return TAB_CASH;
     }
-    if (TAB_REPORTS.equals(activeTab)) {
+    if (TAB_REPORTS.equals(navigation.tab())) {
       return TAB_REPORTS + ":" + (reportsWorkspace == null ? AndroidUiRules.REPORT_LAST_7 : reportsWorkspace.screenKey());
     }
-    return TAB_TODAY.equals(activeTab) && todayCoordinator != null ? todayCoordinator.screenKey() : activeTab;
-  }
-
-  private boolean canOpenTab(String tab) {
-    return AndroidUiRules.canOpenTab(data, tab);
+    return TAB_TODAY.equals(navigation.tab()) && todayCoordinator != null ? todayCoordinator.screenKey() : navigation.tab();
   }
 
   private View inactiveDeviceScreen() {
@@ -1278,7 +1272,8 @@ public final class MainActivity extends ComponentActivity {
           if (result.retryingOnlyMarketActions && marketWorkspace != null) {
             marketWorkspace.onSubmissionAccepted(
                 result.retriedMarketActionType,
-                "Bekleyen Market işlemi masaüstüne gönderildi."
+                "Bekleyen Market işlemi masaüstüne gönderildi.",
+                result.retriedMarketActionId
             );
           }
         }
@@ -1324,7 +1319,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private boolean companionViewVisible() {
-    return TAB_TODAY.equals(activeTab) && !settingsOpen
+    return TAB_TODAY.equals(navigation.tab()) && !navigation.settingsOpen()
         && todayCoordinator != null && todayCoordinator.isCompanionViewOpen();
   }
 

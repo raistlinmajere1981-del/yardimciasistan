@@ -68,7 +68,7 @@ const marketCapabilities = getBusinessProfile("market").defaultCapabilities;
 // ANDROID is opt-in since the sector feature selection simplification:
 // the operator enables it on top of the market defaults.
 const marketCapabilitiesWithAndroid = [...marketCapabilities, C.ANDROID];
-assert.deepEqual(androidAvailablePermissionGroupIds(marketCapabilitiesWithAndroid), ["market_operations"]);
+assert.deepEqual(androidAvailablePermissionGroupIds(marketCapabilitiesWithAndroid), ["market_operations", "market_sales"]);
 assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_operations, MARKET_PERMISSIONS);
 assert.deepEqual(
   androidEffectivePermissionsForGroups(MARKET_GROUPS, marketCapabilitiesWithAndroid),
@@ -437,7 +437,8 @@ try {
       "sale_price",
       "sku",
       "track_inventory",
-      "unit"
+      "unit",
+      "updated_at"
     ]);
     assert.equal("purchase_price" in projectedProduct, false);
     assert.equal("description" in projectedProduct, false);

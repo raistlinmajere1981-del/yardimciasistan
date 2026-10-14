@@ -156,10 +156,11 @@ function readEntries(db: DatabaseSync, businessId: string, customerId: string, o
     ? { ...entry, saleDetail: details.get(entry.saleId) ?? null } : entry);
 }
 
-export function getCustomerCreditAccount(databasePath: string, customerId: string): CustomerCreditAccountDetail {
+export function getCustomerCreditAccount(databasePath: string, customerId: string, options: { entryLimit?: number } = {}): CustomerCreditAccountDetail {
   return withCreditDatabase(databasePath, false, (db, businessId) => {
     const customer = requireCustomer(db, businessId, customerId, false);
-    return { customer, balances: balances(db, businessId, customer.id), entries: readEntries(db, businessId, customer.id, {}) };
+    return { customer, balances: balances(db, businessId, customer.id), entries: readEntries(db, businessId, customer.id,
+      options.entryLimit === undefined ? {} : { limit: options.entryLimit }) };
   });
 }
 
@@ -271,27 +272,34 @@ export function createCustomerCreditSaleInTransaction(db: DatabaseSync, input: C
   return sale;
 }
 
-function requireAvailableDebt(db: DatabaseSync, businessId: string, customerId: string, currency: string, amount: number) {
+function requireAvailableDebt(db: DatabaseSync, businessId: string, customerId: string, currency: string, amount: number, expectedBalanceMinor?: number) {
   const debt = balances(db, businessId, customerId).find((balance) => balance.currency === currency)?.amountMinor ?? 0;
+  if (expectedBalanceMinor !== undefined && (!Number.isSafeInteger(expectedBalanceMinor) || expectedBalanceMinor !== debt)) {
+    throw new Error("Müşteri bakiyesi değişti. Hesabı yenileyip tahsilatı tekrar onaylayın.");
+  }
   if (debt <= 0 || amount > debt) throw new Error("Tutar mevcut veresiye borcunu aşamaz.");
 }
 
 export function recordCustomerCreditPayment(databasePath: string, input: RecordCustomerCreditPaymentInput): CustomerCreditEntry {
-  return withCreditDatabase(databasePath, true, (db, businessId) => {
-    const customer = requireCustomer(db, businessId, input.customerId);
-    const amountMinor = positiveAmount(input.amountMinor);
-    const currency = currencyCode(input.currency);
-    if (!["cash", "card", "bank", "other"].includes(input.paymentMethod)) throw new Error("Tahsilat ödeme yöntemi geçersiz.");
-    requireAvailableDebt(db, businessId, customer.id, currency, amountMinor);
-    const now = new Date().toISOString();
-    const paidAt = input.paidAt === undefined ? new Date(now) : new Date(input.paidAt);
-    if (!Number.isFinite(paidAt.getTime())) throw new Error("Tahsilat tarihi geçersiz.");
-    // The finance owner writes the collection on this exact transaction.
-    return insertEntry(db, {
-      ...entryBase(businessId, customer.id, now, input.note, input.source),
-      direction: "credit", entryType: "payment", amountMinor, currency,
-      paymentMethod: input.paymentMethod, occurredAt: paidAt.toISOString()
-    });
+  return withCreditDatabase(databasePath, true, db => recordCustomerCreditPaymentInTransaction(db, input, new Date().toISOString()));
+}
+
+/** Caller owns the receipt and transaction; ledger and finance stay with this owner. */
+export function recordCustomerCreditPaymentInTransaction(db: DatabaseSync,
+  input: RecordCustomerCreditPaymentInput & { expectedBalanceMinor?: number }, now: string): CustomerCreditEntry {
+  const businessId = assertCustomerCreditBusinessInTransaction(db);
+  const customer = requireCustomer(db, businessId, input.customerId);
+  const amountMinor = positiveAmount(input.amountMinor);
+  const currency = currencyCode(input.currency);
+  if (!["cash", "card", "bank", "other"].includes(input.paymentMethod)) throw new Error("Tahsilat ödeme yöntemi geçersiz.");
+  requireAvailableDebt(db, businessId, customer.id, currency, amountMinor, input.expectedBalanceMinor);
+  const paidAt = input.paidAt === undefined ? new Date(now) : new Date(input.paidAt);
+  if (!Number.isFinite(paidAt.getTime())) throw new Error("Tahsilat tarihi geçersiz.");
+  // The finance owner writes the collection on this exact transaction.
+  return insertEntry(db, {
+    ...entryBase(businessId, customer.id, now, input.note, input.source),
+    direction: "credit", entryType: "payment", amountMinor, currency,
+    paymentMethod: input.paymentMethod, occurredAt: paidAt.toISOString()
   });
 }
 

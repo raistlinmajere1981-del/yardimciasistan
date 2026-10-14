@@ -473,7 +473,7 @@ export type GenerateDesktopReportAiResult =
   | { ok: true; content: string }
   | { ok: false; message: string };
 
-export type DesktopAiService = "openai" | "openrouter" | "groq" | "gemini" | "custom";
+export type DesktopAiService = "openai" | "openrouter" | "groq" | "gemini" | "cloudflare" | "custom";
 
 export interface DesktopAiModelOption {
   id: string;
@@ -485,6 +485,7 @@ export interface DesktopAiServiceProfile {
   projectName: string;
   baseUrl: string;
   model: string;
+  visionModel?: string;
   imageModel?: string;
   sttModel?: string;
   modelOptions: DesktopAiModelOption[];
@@ -498,6 +499,7 @@ export interface SaveAiServiceProfileInput {
   projectName: string;
   baseUrl: string;
   model: string;
+  visionModel?: string;
   imageModel?: string;
   sttModel?: string;
   modelOptions?: DesktopAiModelOption[];
@@ -537,6 +539,7 @@ export interface DesktopSetupData {
   aiService: DesktopAiService;
   aiProjectName: string;
   aiModel: string;
+  aiVisionModel?: string;
   aiImageModel?: string;
   aiSttModel?: string;
   aiBaseUrl: string;
@@ -576,6 +579,7 @@ export interface SaveInitialSetupInput {
   aiService: string;
   aiProjectName: string;
   aiModel: string;
+  aiVisionModel?: string;
   aiImageModel?: string;
   aiSttModel?: string;
   aiModelOptions?: DesktopAiModelOption[];

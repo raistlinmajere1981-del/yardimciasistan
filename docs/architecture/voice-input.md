@@ -23,6 +23,7 @@ no silent reset, data deletion or auto-migration is performed.
 | --- | --- | --- |
 | OpenAI | `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1` | Multipart `POST /v1/audio/transcriptions`, `CURLFile`, JSON response |
 | Google AI Studio | `gemini-2.5-flash` | REST `POST /v1beta/models/{model}:generateContent`, base64 `inline_data`, text output |
+| Cloudflare Workers AI | Candidate `@cf/openai/whisper-large-v3-turbo`; account/Turkish quality require live verification | REST `POST /client/v4/accounts/{account}/ai/run/{model}`, base64 `audio`, `task=transcribe`, `language=tr` |
 | Groq / OpenRouter / custom | Disabled in S2A | No verified adapter/model contract installed |
 
 Gemini is an audio-capable multimodal model, not a dedicated transcription model.
@@ -78,6 +79,9 @@ files and excessive actual size are rejected. Host limits must allow
 STT accepts a configured base URL only at the exact official API root
 `https://api.openai.com/v1` or
 `https://generativelanguage.googleapis.com/v1beta` (optional trailing slash).
+Cloudflare additionally accepts its exact official account AI root with a 32-hex
+Account ID; see [AI provider profiles](ai-providers.md). Model access is verified
+only by the separate actual audio request, never text/image discovery.
 Other hosts/proxies, HTTP, userinfo, ports, path overrides, queries and fragments
 are rejected. cURL verifies TLS, permits HTTPS only, follows no redirects, does
 not inherit a proxy and keeps keys in auth headers. Total timeout is capped at

@@ -1,4 +1,5 @@
-import { generateConfiguredChat, generateConfiguredImage, imageModelForProfile, type AIProviderConfig } from "@yardimci-asistan/ai-core";
+import { CloudflareAiError, generateConfiguredChat, generateConfiguredImage, imageModelForProfile, type AIProviderConfig } from "@yardimci-asistan/ai-core";
+import { normalizeGeneratedImagePng } from "../generated-image-normalization";
 import { BUSINESS_CAPABILITIES as C, hasBusinessCapability, evaluateBusinessAiInput, businessAiBoundaryReply, buildBusinessAiAuthorityPrompt, type MarketingAiCapability, type MarketingAiInput } from "@yardimci-asistan/shared";
 import type { DesktopDatabase } from "../database";
 import { getEffectiveAiApiKey } from "../ai-secret-service";
@@ -12,7 +13,7 @@ export function resolveMarketingAi(db: DesktopDatabase, capability: MarketingAiC
   const profiles=[...setup.aiProfiles].sort((a,b)=>Number(b.service===setup.aiService)-Number(a.service===setup.aiService));
   for (const profile of profiles) {
     if (!profile.apiKeyConfigured || !profile.baseUrl) continue;
-    const model=capability==="image_generation"?(profile.imageModel || imageModelForProfile(profile.service,[profile.model,...profile.modelOptions.map(m=>m.id)])):profile.model;
+    const model=capability==="image_generation"?(profile.imageModel || (profile.service === "cloudflare" ? undefined : imageModelForProfile(profile.service,[profile.model,...profile.modelOptions.map(m=>m.id)]))):profile.model;
     if (!model) continue;
     const key=getEffectiveAiApiKey(db,profile.service); if (!key) continue;
     return {enabled:true,provider:"openai_compatible",service:profile.service,baseUrl:profile.baseUrl,model,apiKey:key,timeoutMs:profile.timeoutSeconds*1000};
@@ -46,8 +47,8 @@ export class MarketingAiService {
     const authority=buildBusinessAiAuthorityPrompt(capabilities);
     if (input.capability==="image_generation") {
       if (input.aspect && !["square","landscape","portrait"].includes(input.aspect)) throw new MarketingError("invalid_input","Görsel oranı geçersiz.");
-      try { return {image:await generateConfiguredImage(config,`${authority}\nPazarlama görseli. ${text}\n${instructions}\nStil: ${style}`,input.aspect??"square")}; }
-      catch { throw new MarketingError("ai_failed","AI görseli oluşturulamadı. Servis ve model erişimini kontrol edin."); }
+      try { return {image:await generateConfiguredImage(config,`${authority}\nPazarlama görseli. ${text}\n${instructions}\nStil: ${style}`,input.aspect??"square", globalThis.fetch, normalizeGeneratedImagePng)}; }
+      catch (error) { throw new MarketingError("ai_failed",error instanceof CloudflareAiError ? error.message : "AI görseli oluşturulamadı. Servis ve model erişimini kontrol edin."); }
     }
     const channel=input.capability==="channel_adaptation"?marketingChannel(input.channel):undefined;
     const channelRules={website:"Açık duyuru metni, başlık metinden ayrı.",whatsapp:"Kısa, sıcak WhatsApp taslağı.",sms:"En fazla 160 karakter; link ve telefon ekleme.",instagram:"Instagram caption, kısa açıklama ve ilgili az sayıda hashtag."};
@@ -55,7 +56,7 @@ export class MarketingAiService {
       {role:"system",content:`${authority}\nTürkçe pazarlama taslağı üret. İşlem: ${input.capability}. Olmayan fiyat/hizmet üretme. Kişi, telefon, kimlik veya anahtar bilgisi ekleme. Sadece taslak metnini döndür. ${channel?channelRules[channel]:""}`},
       {role:"user",content:JSON.stringify({text,instructions})}
     ]});
-    if (!completion.ok) throw new MarketingError("ai_failed","AI metni oluşturulamadı. Servis ve model erişimini kontrol edin.");
+    if (!completion.ok) throw new MarketingError("ai_failed", config.service === "cloudflare" ? completion.message : "AI metni oluşturulamadı. Servis ve model erişimini kontrol edin.");
     const answer=sanitizeMarketingAiText(completion.answer,names).trim();
     if (!answer || answer.length>12000 || (channel==="sms" && answer.length>160)) throw new MarketingError("invalid_ai_output","AI sonucu kanal sınırlarını aşıyor. Yeniden deneyin.");
     return {text:answer};

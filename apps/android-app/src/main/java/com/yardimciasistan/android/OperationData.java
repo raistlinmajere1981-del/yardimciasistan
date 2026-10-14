@@ -13,6 +13,7 @@ import java.util.Set;
 
 final class OperationData {
   private static final String[] ALL_PERMISSIONS = {
+      "kbs.view", "kbs.send", "kbs.retry", "kbs.reconcile_external",
       "voice.dictation",
       "customer.view",
       "customer.manage",
@@ -32,6 +33,8 @@ final class OperationData {
       "room.update_status",
       "room.assign_customer",
       "room_folio.view",
+      "room_folio.add_menu_item",
+      "room_folio.add_manual_charge",
       "room_folio.payment",
       "room_folio.checkout",
       "daily_task.view",
@@ -77,7 +80,8 @@ final class OperationData {
       "shipment.view",
       "online_sales.view",
       "marketing.status.view",
-      "market.scan_to_desktop"
+      "market.scan_to_desktop",
+      "market.sale.complete", "customer_credit.view", "customer_credit.payment"
   };
   private static final String[] KNOWN_BUSINESS_CAPABILITIES = {
       "core.customers",
@@ -106,6 +110,7 @@ final class OperationData {
       "commerce.catalog",
       "commerce.inventory",
       "commerce.sales",
+      "commerce.customer_credit",
       "commerce.orders",
       "commerce.wholesale",
       "channel.online_sales",
@@ -169,6 +174,7 @@ final class OperationData {
   final Map<String, ReportSnapshot> reports = new HashMap<>();
   MarketSnapshot market = new MarketSnapshot();
   CompanionData companion = new CompanionData();
+  KbsSnapshot kbs = new KbsSnapshot();
 
   static OperationData fromJson(JSONObject root) {
     return fromJson(root, "");
@@ -288,6 +294,15 @@ final class OperationData {
     }
 
     data.applyPermissionProfile(root.optJSONObject("androidPermissions"), deviceId);
+    if (KbsUiRules.canReadProjection(data)) data.kbs = KbsSnapshot.fromJson(root.optJSONObject("kbs"));
+    if (!KbsUiRules.canView(data)) data.actions.removeIf(action -> KbsUiRules.isAction(action.type));
+    if (data.hasPermission("customer_credit.view")) {
+      JSONArray accounts = array(object(root, "market"), "customer_credit_accounts");
+      for (int index = 0; index < Math.min(300, accounts.length()); index++) {
+        JSONObject account = accounts.optJSONObject(index);
+        if (account != null && !account.optString("customer_id").isEmpty()) data.market.customerCreditAccounts.add(CustomerCreditAccount.fromJson(account));
+      }
+    }
     data.companion = CompanionData.fromJson(root, data);
 
     if (!messagesIncluded) {
@@ -329,11 +344,19 @@ final class OperationData {
     if (permission == null || permission.isEmpty()) {
       return false;
     }
+    if (permission.startsWith("kbs.")) return isAdmin() && hasBusinessCapability("accommodation.rooms") && hasBusinessCapability("accommodation.stays");
     if ("voice.dictation".equals(permission)) return hasBusinessCapability("service.ai");
     if (permission.startsWith("commerce_order.") || "shipment.view".equals(permission)) return hasBusinessCapability("commerce.orders");
     if ("dealer.view".equals(permission)) return hasBusinessCapability("core.customers") && hasBusinessCapability("commerce.orders") && hasBusinessCapability("commerce.wholesale");
     if ("online_sales.view".equals(permission)) return hasBusinessCapability("commerce.orders") && hasBusinessCapability("channel.online_sales");
     if ("marketing.status.view".equals(permission)) return hasBusinessCapability("marketing.studio");
+    if ("room_folio.add_menu_item".equals(permission)) {
+      return hasBusinessCapability("accommodation.folio") && hasBusinessCapability("accommodation.stays")
+          && hasBusinessCapability("food_service.menu");
+    }
+    if ("room_folio.add_manual_charge".equals(permission)) {
+      return hasBusinessCapability("accommodation.folio") && hasBusinessCapability("accommodation.stays");
+    }
     if (permission.startsWith("room_folio.")) {
       return hasBusinessCapability("accommodation.folio");
     }
@@ -413,6 +436,14 @@ final class OperationData {
           && hasBusinessCapability("commerce.sales")
           && hasBusinessCapability("retail.barcode");
     }
+    if ("market.sale.complete".equals(permission)) {
+      return MarketUiRules.hasRetailWorkspaceCapability(this) && hasBusinessCapability("commerce.catalog") && hasBusinessCapability("commerce.sales");
+    }
+    if ("customer_credit.view".equals(permission) || "customer_credit.payment".equals(permission)) {
+      return MarketUiRules.hasRetailWorkspaceCapability(this) && hasBusinessCapability("commerce.customer_credit")
+          && hasBusinessCapability("commerce.catalog") && hasBusinessCapability("commerce.sales")
+          && hasBusinessCapability("core.customers") && hasBusinessCapability("core.finance");
+    }
     return false;
   }
 
@@ -473,11 +504,15 @@ final class OperationData {
     Set<String> allowed = new HashSet<>(Arrays.asList(ALL_PERMISSIONS));
     for (int index = 0; index < profilePermissions.length(); index += 1) {
       String permission = profilePermissions.optString(index, "").trim();
-      if (allowed.contains(permission)) {
+      if (allowed.contains(permission) && (!permission.startsWith("kbs.") || "admin".equals(deviceRole))) {
         permissions.add(permission);
       }
     }
     companion.redact(this);
+    if (!KbsUiRules.canReadProjection(this)) {
+      kbs = new KbsSnapshot();
+      actions.removeIf(action -> KbsUiRules.isAction(action.type));
+    }
   }
 
   TableOrder activeOrderForTable(String tableId) {
@@ -649,6 +684,8 @@ final class OperationData {
   }
 
   static final class MarketSnapshot {
+    String primaryLocationId = "";
+    final List<CustomerCreditAccount> customerCreditAccounts = new ArrayList<>();
     MarketProductDataSettings productData = new MarketProductDataSettings();
     MarketSummary summary = new MarketSummary();
     final List<MarketProduct> products = new ArrayList<>();
@@ -658,6 +695,7 @@ final class OperationData {
 
     static MarketSnapshot fromJson(JSONObject source) {
       MarketSnapshot market = new MarketSnapshot();
+      market.primaryLocationId = value(source, "primary_location_id", "");
       market.productData = MarketProductDataSettings.fromJson(object(source, "product_data"));
       market.summary = MarketSummary.fromJson(object(source, "summary"));
       addRecords(array(source, "products"), market.products, MarketProduct::fromJson);
@@ -741,6 +779,7 @@ final class OperationData {
     double currentQuantity;
     double minimumQuantity;
     String inventoryUpdatedAt = "";
+    String updatedAt = "";
     String imageSourceUrl = "";
     String dataSource = "";
 
@@ -758,10 +797,50 @@ final class OperationData {
       product.currentQuantity = decimal(source, "current_quantity");
       product.minimumQuantity = decimal(source, "minimum_quantity");
       product.inventoryUpdatedAt = value(source, "inventory_updated_at", "");
+      product.updatedAt = value(source, "updated_at", "");
       product.imageSourceUrl = value(source, "image_source_url", "");
       product.dataSource = value(source, "data_source", "");
       return product;
     }
+  }
+
+  static final class CustomerCreditAccount {
+    String customerId = "";
+    String fullName = "Müşteri";
+    final List<CreditBalance> balances = new ArrayList<>();
+    final List<CreditMovement> entries = new ArrayList<>();
+    static CustomerCreditAccount fromJson(JSONObject source) {
+      CustomerCreditAccount account = new CustomerCreditAccount();
+      account.customerId = value(source, "customer_id", "");
+      account.fullName = value(source, "full_name", "Müşteri");
+      JSONArray balances = array(source, "balances");
+      for (int i = 0; i < Math.min(10, balances.length()); i++) {
+        JSONObject raw = balances.optJSONObject(i);
+        if (raw == null || !raw.optString("currency").matches("[A-Z]{3}")) continue;
+        long amount = raw.optLong("amount_minor", -1);
+        if (amount < 0 || amount > 999999999999L) continue;
+        CreditBalance balance = new CreditBalance();
+        balance.currency = raw.optString("currency"); balance.amountMinor = amount;
+        account.balances.add(balance);
+      }
+      JSONArray entries = array(source, "entries");
+      for (int i = 0; i < Math.min(10, entries.length()); i++) {
+        JSONObject raw = entries.optJSONObject(i);
+        if (raw == null) continue;
+        CreditMovement entry = new CreditMovement();
+        entry.direction = value(raw, "direction", ""); entry.entryType = value(raw, "entry_type", "");
+        entry.amountMinor = raw.optLong("amount_minor", 0); entry.currency = value(raw, "currency", "");
+        entry.paymentMethod = value(raw, "payment_method", ""); entry.occurredAt = value(raw, "occurred_at", "");
+        if (entry.amountMinor > 0 && entry.amountMinor <= 999999999999L && entry.currency.matches("[A-Z]{3}")) account.entries.add(entry);
+      }
+      return account;
+    }
+  }
+
+  static final class CreditBalance { String currency = ""; long amountMinor; }
+  static final class CreditMovement {
+    String direction = "", entryType = "", currency = "", paymentMethod = "", occurredAt = "";
+    long amountMinor;
   }
 
   static final class MarketSupplier {
@@ -927,11 +1006,11 @@ final class OperationData {
       record.notes = value(source, "notes", "");
       record.tags = strings(source, "tags");
       record.identityType = value(source, "identity_type", "");
-      record.identityNumber = value(source, "identity_number", "");
+      record.identityNumber = "";
       record.nationality = value(source, "nationality", "");
       record.birthDate = value(source, "birth_date", "");
       record.gender = value(source, "gender", "");
-      record.documentSerialNumber = value(source, "document_serial_number", "");
+      record.documentSerialNumber = "";
       record.documentExpiryDate = value(source, "document_expiry_date", "");
       record.birthPlace = value(source, "birth_place", "");
       record.motherName = value(source, "mother_name", "");
@@ -1306,6 +1385,7 @@ final class OperationData {
   }
 
   static final class ActionRecord {
+    String notificationId = "";
     String id = "";
     String type = "";
     String status = "pending";
@@ -1324,6 +1404,7 @@ final class OperationData {
       record.status = value(source, "status", "pending");
       record.errorMessage = value(source, "error_message", "");
       JSONObject payload = source.optJSONObject("payload");
+      record.notificationId = payload == null ? "" : value(payload, "notification_id", "");
       record.taskType = payload == null ? "" : value(payload, "task_type", "");
       record.orderId = payload == null ? "" : value(payload, "order_id", "");
       record.expectedUpdatedAt = payload == null ? "" : value(payload, "expected_updated_at", "");
@@ -1334,8 +1415,59 @@ final class OperationData {
     }
   }
 
+  static final class KbsSnapshot {
+    boolean enabled;
+    boolean configured;
+    String provider = "";
+    int pendingCount, failedCount, unknownCount, sentCount, identityReadyCount, identityMissingCount;
+    final List<KbsNotification> notifications = new ArrayList<>();
+    static KbsSnapshot fromJson(JSONObject source) {
+      KbsSnapshot result = new KbsSnapshot();
+      if (source == null || !Boolean.TRUE.equals(source.opt("enabled"))
+          || !Arrays.asList("egm", "jandarma").contains(source.optString("provider"))) return result;
+      result.enabled = true;
+      result.configured = Boolean.TRUE.equals(source.opt("configured"));
+      result.provider = source.optString("provider");
+      result.pendingCount = Math.max(0, source.optInt("pending_count"));
+      result.failedCount = Math.max(0, source.optInt("failed_count"));
+      result.unknownCount = Math.max(0, source.optInt("submission_unknown_count"));
+      result.sentCount = Math.max(0, source.optInt("sent_count"));
+      result.identityReadyCount = Math.max(0, source.optInt("identity_ready_count"));
+      result.identityMissingCount = Math.max(0, source.optInt("identity_missing_count"));
+      JSONArray rows = source.optJSONArray("notifications");
+      if (rows != null) for (int i = 0; i < Math.min(500, rows.length()); i++) {
+        JSONObject row = rows.optJSONObject(i);
+        if (row == null || !(row.opt("id") instanceof String) || row.optString("id").trim().isEmpty()
+            || !Arrays.asList("arrival", "departure", "room_change").contains(row.optString("kind"))
+            || !Arrays.asList("pending", "failed", "submission_unknown", "sent").contains(row.optString("status"))) continue;
+        KbsNotification record = new KbsNotification();
+        record.id = bounded(row, "id", 180); record.customerName = bounded(row, "customer_name", 160);
+        record.roomName = bounded(row, "room_name", 120); record.roomNumber = bounded(row, "room_number", 40);
+        record.occurredAt = bounded(row, "occurred_at", 80); record.kind = row.optString("kind"); record.status = row.optString("status");
+        record.identityReady = Boolean.TRUE.equals(row.opt("identity_ready"));
+        record.retryReady = "failed".equals(record.status) && Boolean.TRUE.equals(row.opt("retry_ready"));
+        record.deliveryRequested = "pending".equals(record.status) && Boolean.TRUE.equals(row.opt("delivery_requested"));
+        record.requestState = Arrays.asList("queued","sent","failed","waiting","submission_unknown","denied").contains(row.optString("request_state")) ? row.optString("request_state") : "";
+        result.notifications.add(record);
+      }
+      return result;
+    }
+    private static String bounded(JSONObject source, String key, int max) {
+      Object raw = source.opt(key);
+      if (!(raw instanceof String)) return "";
+      String text = ((String) raw).trim(); return text.substring(0, Math.min(max, text.length()));
+    }
+  }
+  static final class KbsNotification {
+    String requestState = "";
+    String id = "", customerName = "", roomName = "", roomNumber = "", occurredAt = "", kind = "", status = "";
+    boolean identityReady, retryReady, deliveryRequested;
+  }
+
   static final class RoomFolioRecord {
     String id = "";
+    String version = "";
+    boolean canAddItems;
     String stayId = "";
     String roomId = "";
     String roomName = "Oda";
@@ -1359,6 +1491,8 @@ final class OperationData {
     static RoomFolioRecord fromJson(JSONObject source) {
       RoomFolioRecord folio = new RoomFolioRecord();
       folio.id = value(source, "id", "");
+      folio.version = value(source, "version", "");
+      folio.canAddItems = source.optBoolean("can_add_items", false);
       folio.stayId = value(source, "stay_id", "");
       folio.roomId = value(source, "room_id", "");
       folio.roomName = value(source, "room_name", "Oda");

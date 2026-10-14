@@ -73,7 +73,7 @@ final class OperationCache {
       revisions.put(normalizedSourceKey, Math.max(0L, sourceRevision));
 
       SharedPreferences.Editor editor = preferences.edit()
-          .putString(KEY_CACHE, payload.toString())
+          .putString(KEY_CACHE, KbsUiRules.redactSnapshotForCache(payload, deviceId).toString())
           .putString(KEY_REVISIONS, revisions.toString());
 
       JSONObject profiles = payload.optJSONObject("androidPermissions");
@@ -105,8 +105,10 @@ final class OperationCache {
 
   /** Bounded transport receipts in the existing cache; no order/customer payload is copied. */
   synchronized void recordActionResult(OperationData.ActionRecord action, String targetKey) throws CacheException {
-    if (!CompanionUiRules.isDecision(action.type) || !action.id.matches("[A-Za-z0-9._:-]{1,120}")
-        || !action.orderId.matches("[A-Za-z0-9._:-]{1,120}") || targetKey.isEmpty()) return;
+    boolean financial = MarketUiRules.ACTION_SALE.equals(action.type) || MarketUiRules.ACTION_CREDIT_PAYMENT.equals(action.type);
+    boolean kbsAction = KbsUiRules.isAction(action.type);
+    if ((!CompanionUiRules.isDecision(action.type) && !financial && !kbsAction) || !action.id.matches("[A-Za-z0-9._:-]{1,120}")
+        || (!financial && !kbsAction && !action.orderId.matches("[A-Za-z0-9._:-]{1,120}")) || targetKey.isEmpty()) return;
     try {
       org.json.JSONArray source = new org.json.JSONArray(preferences.getString(KEY_ACTION_RESULTS, "[]"));
       java.util.List<JSONObject> rows = new java.util.ArrayList<>();
@@ -139,9 +141,15 @@ final class OperationCache {
     try {
       org.json.JSONArray results = new org.json.JSONArray(preferences.getString(KEY_ACTION_RESULTS, "[]"));
       java.util.List<OperationData.ActionRecord> merged = new java.util.ArrayList<>();
-      if (data.hasPermission("commerce_order.view")) for (int i = 0; i < results.length(); i++) {
+      for (int i = 0; i < results.length(); i++) {
         JSONObject row = results.optJSONObject(i);
-        if (row != null && target.equals(row.optString("target_key"))) merged.add(OperationData.ActionRecord.fromJson(row));
+        if (row != null && target.equals(row.optString("target_key"))) {
+          OperationData.ActionRecord saved = OperationData.ActionRecord.fromJson(row);
+          boolean allowed = CompanionUiRules.isDecision(saved.type) ? data.hasPermission("commerce_order.view")
+              : KbsUiRules.isAction(saved.type) ? KbsUiRules.canView(data) && data.hasPermission(KbsUiRules.permission(saved.type))
+              : MarketUiRules.ACTION_SALE.equals(saved.type) ? MarketUiRules.canCompleteSale(data) : MarketUiRules.canViewCredit(data);
+          if (allowed) merged.add(saved);
+        }
       }
       for (OperationData.ActionRecord action : data.actions) {
         boolean found = false;
@@ -191,8 +199,9 @@ final class OperationCache {
     row.put("id", action.id); row.put("action_type", action.type); row.put("status", action.status);
     row.put("error_message", action.errorMessage.length() > 500 ? action.errorMessage.substring(0, 500) : action.errorMessage);
     row.put("created_at", action.createdAt); row.put("processed_at", action.processedAt);
-    row.put("payload", new JSONObject().put("order_id", action.orderId)
-        .put("expected_updated_at", action.expectedUpdatedAt).put("expected_status", action.expectedStatus));
+    row.put("payload", CompanionUiRules.isDecision(action.type) ? new JSONObject().put("order_id", action.orderId)
+        .put("expected_updated_at", action.expectedUpdatedAt).put("expected_status", action.expectedStatus)
+        : KbsUiRules.isAction(action.type) ? new JSONObject().put("notification_id", action.notificationId).put("expected_status", action.expectedStatus) : new JSONObject());
     row.put("target_key", targetKey);
     return row;
   }

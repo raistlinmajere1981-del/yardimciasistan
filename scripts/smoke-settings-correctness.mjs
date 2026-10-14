@@ -112,6 +112,24 @@ try {
   assert.equal(validate(ai), null, "runtime AI failure does not revoke valid activation evidence");
   for (const patch of [{ aiModel: "gpt-4.2" }, { aiBaseUrl: "https://other.test/v1" }, { aiApiKey: "other" }, { aiImageModel: "gpt-image-1" }, { aiService: "custom" }]) assert.match(validate({ ...ai, ...patch }), /test edin/);
 
+  // Cloudflare connection proof includes the selected vision model.
+  // Save policy must compare exactly the same fingerprint as the successful test.
+  const cloudflare = {
+    ...ai, aiService: "cloudflare", aiProjectName: "", aiBaseUrl: "https://api.cloudflare.com/client/v4/accounts/" + "a".repeat(32) + "/ai",
+    aiModel: "@cf/zai-org/glm-4.7-flash", aiVisionModel: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    aiImageModel: "@cf/black-forest-labs/flux-1-schnell"
+  };
+  const verifiedCloudflare = {
+    provider: cloudflare.aiProvider, service: cloudflare.aiService, projectName: cloudflare.aiProjectName,
+    baseUrl: cloudflare.aiBaseUrl, model: cloudflare.aiModel, visionModel: cloudflare.aiVisionModel,
+    imageModel: cloudflare.aiImageModel, apiKey: cloudflare.aiApiKey, timeoutSeconds: cloudflare.aiTimeoutSeconds
+  };
+  assert.match(validate(cloudflare), /test edin/, "Cloudflare requires a real saved test proof");
+  db.recordServiceSettingsVerification("ai", verifiedCloudflare);
+  assert.equal(validate(cloudflare), null, "Cloudflare text + vision + image test authorizes the exact same Save draft");
+  assert.match(validate({ ...cloudflare, aiVisionModel: "" }), /test edin/, "changing vision invalidates Cloudflare proof");
+  assert.match(validate({ ...cloudflare, aiImageModel: "" }), /test edin/, "changing generated-image model invalidates proof");
+
   for (const [field, serviceId, configuration, credentials, change] of [
     ["sms", "sms", { enabled: true, senderId: "FIXTURE", iysList: "BIREYSEL", apiKey: "fixture-key", apiHash: "fixture-hash" }, { senderId: "FIXTURE", iysList: "BIREYSEL", apiKey: "fixture-key", apiHash: "fixture-hash" }, { senderId: "OTHER" }],
     ["whatsappCloud", "whatsapp_cloud", { enabled: true, wabaId: "123", phoneNumberId: "456", accessToken: "fixture-token" }, { wabaId: "123", phoneNumberId: "456", accessToken: "fixture-token" }, { phoneNumberId: "789" }]

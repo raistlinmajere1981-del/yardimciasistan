@@ -1,5 +1,5 @@
 import { synchronizeFinanceSourceInTransaction } from "./finance";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
 import { getPublishedMenu } from "./database/menu-store.js";
@@ -7,6 +7,7 @@ import { snapshotProductConsumption, applyProductConsumptionInTransaction } from
 import { updateStayDatesInTransaction } from "./stay-reservation-service.js";
 import type { CommerceUnit } from "@yardimci-asistan/shared";
 import { normalizeMenuStockUnit } from "./database/stock-utils.js";
+import { queueSyncJob } from "./database/sync-runtime-store.js";
 
 export type RoomFolioPaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
 type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
@@ -67,6 +68,8 @@ interface DesktopRoomFolioPayment {
 
 export interface DesktopRoomFolio {
   id: string;
+  version: string;
+  canAddItems: boolean;
   stayId: string;
   roomId: string;
   roomName: string;
@@ -172,6 +175,105 @@ export type DesktopRoomFolioMutationResult =
   | { ok: false; message: string };
 
 const PAYMENT_METHODS = new Set<RoomFolioPaymentMethod>(["cash", "card", "bank", "other", "unspecified"]);
+
+/** Account version includes child mutations, even when the parent timestamp is unchanged. */
+export function getRoomFolioChargeState(db: DatabaseSync, folioId: string) {
+  const folio = db.prepare(`SELECT f.id, f.status, f.stay_id, f.room_id, f.customer_id, f.currency,
+    f.guest_count, f.check_in_date, f.planned_check_out_date, f.nightly_price_minor,
+    f.lodging_total_minor, f.lodging_manual_override, f.note, f.updated_at, f.deleted_at,
+    s.status AS stay_status, s.room_id AS stay_room_id, s.customer_id AS stay_customer_id,
+    s.updated_at AS stay_updated_at, s.deleted_at AS stay_deleted_at,
+    r.is_active AS room_active, r.deleted_at AS room_deleted_at, c.deleted_at AS customer_deleted_at
+    FROM room_folios f LEFT JOIN customer_room_stays s ON s.id = f.stay_id
+    LEFT JOIN rooms r ON r.id = f.room_id LEFT JOIN customers c ON c.id = f.customer_id
+    WHERE f.id = ?`).get(folioId);
+  if (!folio) return null;
+  const items = db.prepare(`SELECT id, kind, product_id, menu_entry_id, label, unit_price_minor,
+    quantity, line_total_minor, note, updated_at, deleted_at FROM room_folio_items
+    WHERE folio_id = ? ORDER BY id`).all(folioId);
+  const payments = db.prepare(`SELECT id, amount_minor, currency, payment_method, paid_at,
+    note, origin, reference_id, updated_at, deleted_at FROM room_folio_payments
+    WHERE folio_id = ? ORDER BY id`).all(folioId);
+  return {
+    version: createHash("sha256").update(JSON.stringify({ folio, items, payments })).digest("hex"),
+    canAddItems: folio.status === "open" && folio.deleted_at === "" && folio.stay_status === "checked_in"
+      && folio.stay_deleted_at === "" && folio.stay_room_id === folio.room_id
+      && folio.stay_customer_id === folio.customer_id && Number(folio.room_active) === 1
+      && folio.room_deleted_at === "" && folio.customer_deleted_at === "",
+    currency: text(folio.currency).trim().toUpperCase()
+  };
+}
+
+/** The caller owns rollback and commits the line, stock movement and receipt together. */
+export function addRoomFolioMenuItemInTransaction(db: DatabaseSync, input: AddRoomFolioMenuItemInput,
+  metadata: { itemId?: string; now?: string; actorSource?: string } = {}): { ok: boolean; message: string } {
+  if (!db.isTransaction) throw new Error("Room folio menu item requires a transaction.");
+  const folioId = cleanText(input?.folioId, 180);
+  const menuItemId = cleanText(input?.menuEntryId, 180);
+  const quantity = positiveInteger(input?.quantity, 1000);
+  if (!folioId || !menuItemId || quantity === null) return { ok: false, message: "Menü ürünü eklenemedi." };
+  const folio = db.prepare("SELECT currency FROM room_folios WHERE id = ? AND status = 'open' AND deleted_at = ''").get(folioId);
+  if (!folio) return { ok: false, message: "Oda adisyonu kapalı." };
+  const menuProjection = getPublishedMenu(db);
+  const menu = menuProjection.items.find(item => item.id === menuItemId && item.is_available
+    && item.product_is_active !== false
+    && menuProjection.categories.some(category => category.id === item.category_id && category.is_active));
+  if (!menu) return { ok: false, message: "Menü ürünü bulunamadı veya satışa kapalı." };
+  if (text(menu.currency).trim().toUpperCase() !== text(folio.currency).trim().toUpperCase()) {
+    return { ok: false, message: "Menü ürününün para birimi oda hesabıyla aynı olmalı." };
+  }
+  const unitPriceMinor = Math.round(Number(menu.price) * 100);
+  const lineTotalMinor = unitPriceMinor * quantity;
+  const totals = db.prepare("SELECT charge_total_minor FROM room_folio_totals WHERE folio_id = ?").get(folioId);
+  if (!Number.isSafeInteger(unitPriceMinor) || unitPriceMinor < 0 || !Number.isSafeInteger(lineTotalMinor)
+      || !Number.isSafeInteger(Number(totals?.charge_total_minor) + lineTotalMinor)) {
+    return { ok: false, message: "Menü fiyatı veya kalem tutarı geçersiz." };
+  }
+  const itemId = metadata.itemId ?? `room_folio_item_${randomUUID()}`;
+  const now = metadata.now ?? new Date().toISOString();
+  const consumption = snapshotProductConsumption(db, menu.product_id!, menu.stock_consumption_quantity, now);
+  const stock = applyProductConsumptionInTransaction(db, consumption, -quantity, {
+    referenceType: "room_folio", referenceId: itemId, actorSource: metadata.actorSource ?? "desktop", note: "Oda adisyonu", now
+  });
+  if (!stock.ok) return stock;
+  db.prepare(`INSERT INTO room_folio_items (
+    id, folio_id, kind, product_id, menu_entry_id, inventory_quantity_per_item, inventory_location_id,
+    label, unit_price_minor, quantity, line_total_minor, note, created_at, updated_at, deleted_at, sync_status
+  ) VALUES (?, ?, 'menu', ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, '', 'local_only')`)
+    .run(itemId, folioId, consumption.product_id, menuItemId, consumption.inventory_quantity_per_item,
+      consumption.inventory_location_id, text(menu.name), unitPriceMinor, quantity, lineTotalMinor, now, now);
+  queueSyncJob(db, "android_snapshot", now);
+  return { ok: true, message: "Menü ürünü oda hesabına eklendi." };
+}
+
+export function addRoomFolioManualItemInTransaction(db: DatabaseSync, input: AddRoomFolioManualItemInput,
+  metadata: { itemId?: string; now?: string } = {}): { ok: boolean; message: string } {
+  if (!db.isTransaction) throw new Error("Room folio manual item requires a transaction.");
+  const folioId = cleanText(input?.folioId, 180);
+  const kind = input?.kind === "discount" ? "discount" : input?.kind === "manual_charge" ? "manual_charge" : null;
+  const label = cleanText(input?.label, 120);
+  const amountMinor = positiveAmount(input?.amountMinor);
+  if (!folioId || !kind || !label || amountMinor === null) return { ok: false, message: "Ek ücret veya indirim bilgisi geçersiz." };
+  const totals = db.prepare(`SELECT t.charge_total_minor, t.paid_total_minor FROM room_folio_totals t
+    JOIN room_folios f ON f.id = t.folio_id WHERE f.id = ? AND f.status = 'open' AND f.deleted_at = ''`).get(folioId);
+  if (!totals) return { ok: false, message: "Oda adisyonu kapalı." };
+  const signedTotal = kind === "discount" ? -amountMinor : amountMinor;
+  if (!Number.isSafeInteger(Number(totals.charge_total_minor) + signedTotal)) {
+    return { ok: false, message: "Hesap toplamı çok büyük." };
+  }
+  if (safeMinor(totals.charge_total_minor) + signedTotal < safeMinor(totals.paid_total_minor)) {
+    return { ok: false, message: "İndirim toplamı alınan ödemenin altına düşüremez." };
+  }
+  const now = metadata.now ?? new Date().toISOString();
+  db.prepare(`INSERT INTO room_folio_items (
+    id, folio_id, kind, product_id, label, unit_price_minor, quantity,
+    line_total_minor, note, created_at, updated_at, deleted_at, sync_status
+  ) VALUES (?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?, '', 'local_only')`)
+    .run(metadata.itemId ?? `room_folio_item_${randomUUID()}`, folioId, kind, label, amountMinor,
+      signedTotal, cleanText(input?.note, 500), now, now);
+  queueSyncJob(db, "android_snapshot", now);
+  return { ok: true, message: kind === "discount" ? "İndirim eklendi." : "Ek ücret eklendi." };
+}
 
 export function addRoomFolioPaymentInTransaction(db: DatabaseSync, input: AddRoomFolioPaymentInput,
   metadata: { paymentId?: string; referenceId?: string; now?: string } = {}): { ok: true; message: string } | { ok: false; message: string } {
@@ -490,51 +592,19 @@ export class DesktopRoomFolioService {
   }
 
   addMenuItem(input: AddRoomFolioMenuItemInput): DesktopRoomFolioMutationResult {
-    const folioId = cleanText(input?.folioId, 180);
-    const menuItemId = cleanText(input?.menuEntryId, 180);
-    const quantity = positiveInteger(input?.quantity, 1000);
-    if (!folioId || !menuItemId || quantity === null) {
-      return { ok: false, message: "Menü ürünü eklenemedi." };
-    }
-
     const db = this.openDatabase();
     try {
       db.exec("BEGIN IMMEDIATE");
-      if (!this.requireOpenFolio(db, folioId)) return { ok: false, message: "Oda adisyonu kapalı." };
-      const menuProjection = getPublishedMenu(db);
-      const menu = menuProjection.items.find(item => item.id === menuItemId && item.is_available
-        && menuProjection.categories.some(category => category.id === item.category_id && category.is_active));
-      if (!menu) return { ok: false, message: "Menü ürünü bulunamadı veya satışa kapalı." };
-      const itemId = `room_folio_item_${randomUUID()}`;
-      const unitPriceMinor = Math.max(0, Math.round(Number(menu.price ?? 0) * 100));
-      const lineTotalMinor = unitPriceMinor * quantity;
-      const now = new Date().toISOString();
-
-      try {
-        const consumption = snapshotProductConsumption(db, menu.product_id!, menu.stock_consumption_quantity, now);
-        const stock = applyProductConsumptionInTransaction(db, consumption, -quantity, {
-          referenceType: "room_folio", referenceId: itemId, actorSource: "desktop", note: "Oda adisyonu", now
-        });
-        if (!stock.ok) throw new Error(stock.message);
-        db.prepare(`
-          INSERT INTO room_folio_items (
-            id, folio_id, kind, product_id, menu_entry_id, inventory_quantity_per_item, inventory_location_id, label, unit_price_minor, quantity,
-            line_total_minor, note, created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, 'menu', ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, '', 'local_only')
-        `).run(itemId, folioId, consumption.product_id, menuItemId, consumption.inventory_quantity_per_item,
-          consumption.inventory_location_id, text(menu.name), unitPriceMinor, quantity, lineTotalMinor, now, now);
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
-      }
+      const result = addRoomFolioMenuItemInTransaction(db, input);
+      if (!result.ok) return { ok: false, message: result.message };
+      db.exec("COMMIT");
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Menü ürünü oda hesabına eklenemedi.") };
     } finally {
       if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
-    return { ok: true, message: "Menü ürünü oda hesabına eklendi.", data: this.getData(), folioId };
+    return { ok: true, message: "Menü ürünü oda hesabına eklendi.", data: this.getData(), folioId: cleanText(input.folioId, 180) };
   }
 
   updateItemQuantity(input: UpdateRoomFolioItemQuantityInput): DesktopRoomFolioMutationResult {
@@ -590,45 +660,20 @@ export class DesktopRoomFolioService {
   }
 
   addManualItem(input: AddRoomFolioManualItemInput): DesktopRoomFolioMutationResult {
-    const folioId = cleanText(input?.folioId, 180);
-    const kind = input?.kind === "discount" ? "discount" : input?.kind === "manual_charge" ? "manual_charge" : null;
-    const label = cleanText(input?.label, 120);
-    const amountMinor = positiveAmount(input?.amountMinor);
-    if (!folioId || !kind || !label || amountMinor === null) {
-      return { ok: false, message: "Ek ücret veya indirim bilgisi geçersiz." };
-    }
-
     const db = this.openDatabase();
     try {
-      if (!this.requireOpenFolio(db, folioId)) return { ok: false, message: "Oda adisyonu kapalı." };
-      const totals = this.getTotals(db, folioId);
-      const signedTotal = kind === "discount" ? -amountMinor : amountMinor;
-      if (totals.chargeTotalMinor + signedTotal < totals.paidTotalMinor) {
-        return { ok: false, message: "İndirim toplamı alınan ödemenin altına düşüremez." };
-      }
-      const now = new Date().toISOString();
-      db.prepare(`
-        INSERT INTO room_folio_items (
-          id, folio_id, kind, product_id, label, unit_price_minor, quantity,
-          line_total_minor, note, created_at, updated_at, deleted_at, sync_status
-        ) VALUES (?, ?, ?, NULL, ?, ?, 1, ?, ?, ?, ?, '', 'local_only')
-      `).run(
-        `room_folio_item_${randomUUID()}`,
-        folioId,
-        kind,
-        label,
-        amountMinor,
-        signedTotal,
-        cleanText(input?.note, 500),
-        now,
-        now
-      );
+      db.exec("BEGIN IMMEDIATE");
+      const result = addRoomFolioManualItemInTransaction(db, input);
+      if (!result.ok) return { ok: false, message: result.message };
+      db.exec("COMMIT");
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Hesap kalemi eklenemedi.") };
     } finally {
+      if (db.isTransaction) db.exec("ROLLBACK");
       db.close();
     }
-    return { ok: true, message: kind === "discount" ? "İndirim eklendi." : "Ek ücret eklendi.", data: this.getData(), folioId };
+    return { ok: true, message: input.kind === "discount" ? "İndirim eklendi." : "Ek ücret eklendi.",
+      data: this.getData(), folioId: cleanText(input.folioId, 180) };
   }
 
   setDiscount(input: SetRoomFolioDiscountInput): DesktopRoomFolioMutationResult {
@@ -819,10 +864,13 @@ export class DesktopRoomFolioService {
       WHERE folio_id = ? AND deleted_at = ''
       ORDER BY paid_at, created_at
     `).all(folioId) as Array<Record<string, unknown>>;
+    const chargeState = getRoomFolioChargeState(db, folioId);
     const checkInDate = normalizeDate(row.check_in_date) || "";
     const checkOutDate = normalizeDate(row.planned_check_out_date, true);
     return {
       id: folioId,
+      version: chargeState?.version ?? "",
+      canAddItems: chargeState?.canAddItems === true,
       stayId: text(row.stay_id),
       roomId: text(row.room_id),
       roomName: text(row.room_name),

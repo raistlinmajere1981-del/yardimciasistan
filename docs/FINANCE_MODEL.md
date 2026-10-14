@@ -85,6 +85,7 @@ unspecified  -> Belirtilmedi
 ```text
 restaurant
 pension
+market
 other_income
 ```
 
@@ -111,6 +112,7 @@ Otomatik oluşturulan kasa hareketleri `source_type + source_id` ile kaynak kayd
 ```text
 restaurant_order + order_001
 pension_payment + payment_001
+commerce_sale + sale_001
 ```
 
 Bu ikili benzersizdir. Böylece senkron tekrarlarında veya aynı işlemin ikinci kez çağrılması durumunda gelir iki kere yazılmaz.
@@ -131,9 +133,59 @@ amount         adisyon toplamı
 
 Kullanıcı aynı tutarı ayrıca `Gelir Ekle` ekranından girmek zorunda değildir.
 
-Current finans şeması, ödenmiş ve tutarı sıfırdan büyük adisyonlar için otomatik kasa kaydını trigger sözleşmesiyle üretir.
+`finance.ts` içindeki `synchronizeFinanceSourceInTransaction`, ödenmiş ve tutarı sıfırdan büyük adisyonlar için otomatik kasa kaydını kaynak işlemin transaction'ında üretir.
 
 Ödenmiş bir adisyon yeniden açılır veya iptal durumuna alınırsa bağlı otomatik kasa hareketi görünür toplamdan çıkarılır. Adisyon tekrar ödenirse aynı kaynak kaydı yeniden etkinleştirilir; ikinci gelir oluşturulmaz.
+
+## Market geliri ve eksik kaynak bağlantılarının uzlaştırılması
+
+`commerce_sales` satışın operasyon kaynağıdır. Masaüstü Hızlı Satış, Android satış
+tamamlama ve siparişten satış oluşturma yolları, satış satırları ve stok yazıldıktan
+sonra aynı transaction içinde finans sahibini çağırır. Yalnız silinmemiş, `paid`
+durumundaki pozitif satışlar `income / market` üretir; açıklama `Market satışı`,
+kategori etiketi korunan sistem türü `Market` olur.
+
+Kaynak `commerce_sale`, kaynak kimliği satış id'sidir. Tutar kanonik `moneyToMinor`
+ile güvenli integer kuruşa çevrilir; sıfır veya kuruşa yuvarlandığında sıfır kalan
+tutar gelir üretmez. Güvenli integer sınırını aşan tutar transaction'ı başarısız
+kılar. Para birimi satıştan, işlem zamanı `closed_at` doluysa oradan, aksi halde
+`created_at` alanından alınır. Ödeme yöntemleri `cash/card/bank/other` olur;
+eski, tanınmayan yöntemler finans projection'ında `other` olarak gösterilir.
+
+Kaynak güncellenirken finans sahibi tekrar çağrılırsa aynı kayıt güncellenir.
+Satış `paid` durumundan çıkarsa, silinirse veya tutarı sıfırlanırsa bağlı hareket
+görünür toplamdan çıkarılır; tekrar ödenirse aynı finans kimliği etkinleşir.
+Bu sözleşme yeni bir iptal/iade işlemi eklemez. Veresiye satış gelir değildir:
+gelir ancak `customer_credit_payment` kaynaklı gerçek tahsilatta oluşur.
+Satış receipt'iyle tekrar deneme mevcut satışı döndürür; stok veya finansı tekrar yazmaz.
+
+Güncel şemada `finance_entries.source_type` serbest `TEXT` alanıdır;
+`(source_type, source_id)` için `source_id != ''` koşullu benzersiz indeks vardır.
+`commerce_sale` için şema değişikliği veya migration gerekmez. `Kasa` günlük TRY
+toplamı bu kaydı mevcut `finance_entries` sorgusuyla toplar; diğer para birimleri
+ayrı para birimiyle hareket listesinde kalır.
+
+Önceden oluşmuş eksik kayıtlar otomatik başlangıç backfill'iyle tamamlanmaz.
+Tek seferlik komut, yalnız mevcut dosyanın açıkça verilen mutlak yolunu kabul eder
+ve `--apply` olmadan çalışmaz. Yerel derlenmiş finans sahibini kullanmak için depo
+kökünden, kurulu bağımlılıklar ve derlenmiş shared paketiyle:
+
+```sh
+./node_modules/.bin/tsc -p apps/desktop-app/tsconfig.electron.json
+node scripts/reconcile-commerce-sale-finance.mjs '/mutlak/yol/desktop.sqlite' --apply
+```
+
+Uygulamayı kapatıp yedeğini aldığınız dosyanın yolunu açıkça verin. Komut kanonik
+`reconcileMissingCommerceSaleFinanceInTransaction` yardımcısını tek `BEGIN IMMEDIATE`
+transaction'ında çağırır; herhangi bir hata tüm eklemeleri geri alır. Yalnız
+silinmemiş, pozitif, `paid` satışlardan hiçbir `commerce_sale` kaynak bağlantısı
+olmayanları tamamlar. Mevcut bağlantıları (soft-delete edilmiş olanlar dahil),
+veresiye borçlarını, stokları ve receipt'leri değiştirmez. Tekrar çalıştırılması
+aynı satış için ek gelir oluşturmaz; yalnız tamamlanan bağlantı sayısını yazdırır.
+
+Kaynak bağlantısı olmayan manuel gelirlerin aynı satışa ait olduğu çıkarılamaz.
+Komut manuel geliri silmez, eşleştirmez veya bunun varlığı nedeniyle otomatik geliri
+atlamaz; olası dışarıdan girilmiş manuel mükerrerlik kullanıcı tarafından değerlendirilir.
 
 ## Pansiyon fiyat modeli
 
@@ -302,6 +354,7 @@ Finans akışı iki seviyede korunur:
 
 - `smoke-finance-db.mjs`: current schema, trigger, restoran otomatik geliri ve pansiyon ödeme tablosunu doğrular.
 - `smoke-finance-service.mjs`: masaüstü Kasa servisinin manuel gelir/gider, tutar belirleme, kısmi/tam ödeme ve fazla ödeme engeli davranışını doğrular.
+- `smoke-market-sale-finance.mjs`: geçici veritabanında ücretli satışların kanonik finans bağlantısını, veresiye ayrımını, transaction rollback'ini, receipt tekrarlarını, uzlaştırmayı ve günlük toplamları doğrular.
 
 ## Sonraki geliştirme adımları
 

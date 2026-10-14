@@ -13,6 +13,26 @@ const FAILED = "Ses metne çevrilemedi. Bağlantıyı ve kayıtlı konuşma mode
 const RESPONSE_LIMIT = 128 * 1024;
 const TIMEOUT_MS = 70000;
 
+/** Accept only fixed Hosting codes; never display provider bodies or untrusted messages. */
+function hostedSttFailure(body: string, fallback: string): string {
+  const messages: Record<string, string> = {
+    provider_authentication_failed: "Cloudflare API Token veya hesap bilgisi kabul edilmedi.",
+    provider_permission_denied: "Cloudflare hesabının bu STT modeline erişim izni yok.",
+    provider_quota_exhausted: "Cloudflare günlük ücretsiz AI kotası doldu.",
+    provider_rate_limited: "Cloudflare istek sınırına ulaşıldı. Kısa süre sonra tekrar deneyin.",
+    provider_busy: "Cloudflare şu anda yoğun veya geçici olarak kullanılamıyor.",
+    provider_network: "Cloudflare bağlantısı kurulamadı.",
+    provider_model_unavailable: "Cloudflare STT modeli bulunamadı veya kullanılamıyor.",
+    provider_invalid_response: "Cloudflare STT yanıtı uygulamanın beklediği biçimde değil.",
+    provider_timeout: "Konuşma tanıma yanıtı zamanında alınamadı."
+  };
+  try {
+    if (Buffer.byteLength(body) > RESPONSE_LIMIT) return fallback;
+    const value = JSON.parse(body) as Record<string, unknown>;
+    return value?.ok === false && typeof value.code === "string" && Object.hasOwn(messages, value.code) ? messages[value.code]! : fallback;
+  } catch { return fallback; }
+}
+
 /** HTTPS only, no redirects/retries/proxy, bounded streaming response; no audio file or logging. */
 export function uploadDesktopDictation(url: URL, secret: string, mime: string, audio: Buffer, signal: AbortSignal, configuration?: string): Promise<{ status: number; body: string }> {
   const boundary = `ya-${randomBytes(16).toString("hex")}`;
@@ -159,7 +179,7 @@ export function createDesktopDictationService(options: {
       try {
         const response = await (options.upload ?? uploadDesktopDictation)(hostingEndpoint(web.baseUrl)!, web.syncSecret, "audio/wav", sample, controller.signal, binding);
         if (controller.signal.aborted || !current().canTest || revision !== expectedRevision) return { ok: false, message: CHANGED };
-        if (response.status !== 200 || Buffer.byteLength(response.body) > RESPONSE_LIMIT) return { ok: false, message: "STT bağlantısı doğrulanamadı" };
+        if (response.status !== 200 || Buffer.byteLength(response.body) > RESPONSE_LIMIT) return { ok: false, message: hostedSttFailure(response.body, "STT bağlantısı doğrulanamadı") };
         const result = JSON.parse(response.body) as Record<string, unknown>;
         if (result?.ok !== true || typeof result.text !== "string" || result.stt_configuration !== binding) {
           return { ok: false, message: "STT modeli doğrulanamadı; web hizmetini kontrol edin" };
@@ -217,7 +237,7 @@ export function createDesktopDictationService(options: {
         const response = await (options.upload ?? uploadDesktopDictation)(hostingEndpoint(config.baseUrl)!, config.syncSecret, mime, audio, controller.signal);
         const latest = current();
         if (controller.signal.aborted || !latest.available || latest.revision !== expectedRevision) return { ok: false, message: CHANGED };
-        if (response.status !== 200 || Buffer.byteLength(response.body) > RESPONSE_LIMIT) return { ok: false, message: FAILED };
+        if (response.status !== 200 || Buffer.byteLength(response.body) > RESPONSE_LIMIT) return { ok: false, message: hostedSttFailure(response.body, FAILED) };
         const body: unknown = JSON.parse(response.body);
         if (!body || typeof body !== "object") return { ok: false, message: FAILED };
         const record = body as Record<string, unknown>;

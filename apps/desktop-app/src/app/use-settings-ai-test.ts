@@ -75,6 +75,7 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
       baseUrl,
       model,
       imageModel: setupForm.aiImageModel,
+      visionModel: setupForm.aiVisionModel,
       apiKey,
       useStoredApiKey: !setupForm.clearAiApiKey && setupForm.aiStoredApiKeyConfigured && apiKey.trim() === "",
       timeoutSeconds: Number(setupForm.aiTimeoutSeconds)
@@ -111,5 +112,5 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
 
 function aiTestSignature(form: SetupFormState) {
   return JSON.stringify([form.aiService, form.aiProvider, form.aiProjectName, form.aiBaseUrl, form.aiModel,
-    form.aiImageModel, form.aiApiKey, form.clearAiApiKey, form.aiStoredApiKeyConfigured, form.aiTimeoutSeconds, form.aiGoogleCurl]);
+    form.aiImageModel, form.aiVisionModel, form.aiApiKey, form.clearAiApiKey, form.aiStoredApiKeyConfigured, form.aiTimeoutSeconds, form.aiGoogleCurl]);
 }

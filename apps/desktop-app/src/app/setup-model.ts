@@ -20,6 +20,7 @@ export interface AiServiceFormDraft {
   googleCurl: string;
   baseUrl: string;
   model: string;
+  visionModel: string;
   imageModel: string;
   sttModel: string;
   modelOptions: DesktopAiModelOption[];
@@ -48,6 +49,7 @@ export interface SetupFormState {
   aiGoogleCurl: string;
   aiBaseUrl: string;
   aiModel: string;
+  aiVisionModel: string;
   aiImageModel: string;
   aiSttModel: string;
   aiModelOptions: DesktopAiModelOption[];
@@ -76,6 +78,7 @@ export const aiServicePresets = [
   { id: "openrouter", label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
   { id: "groq", label: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
   { id: "gemini", label: "Google AI Studio (Gemini)", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
+  { id: "cloudflare", label: "Cloudflare Workers AI", baseUrl: "" },
   { id: "custom", label: "Özel OpenAI uyumlu servis", baseUrl: "" }
 ] as const satisfies ReadonlyArray<{
   id: DesktopAiService;
@@ -114,6 +117,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiGoogleCurl: activeAiDraft.googleCurl,
     aiBaseUrl: activeAiDraft.baseUrl,
     aiModel: activeAiDraft.model,
+    aiVisionModel: activeAiDraft.visionModel,
     aiImageModel: activeAiDraft.imageModel,
     aiSttModel: activeAiDraft.sttModel,
     aiModelOptions: activeAiDraft.modelOptions,
@@ -153,6 +157,7 @@ function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<
       projectName: profile?.projectName ?? (isActiveService ? setupData.aiProjectName : ""),
       baseUrl: profile?.baseUrl || (isActiveService ? setupData.aiBaseUrl : preset.baseUrl) || "",
       model: profile?.model ?? (isActiveService ? setupData.aiModel : ""),
+      visionModel: profile?.visionModel ?? (isActiveService ? setupData.aiVisionModel ?? "" : ""),
       imageModel: profile?.imageModel ?? (isActiveService ? setupData.aiImageModel ?? "" : ""),
       sttModel: profile?.sttModel ?? (isActiveService ? setupData.aiSttModel ?? "" : ""),
       modelOptions: profile?.modelOptions ?? (
@@ -173,6 +178,7 @@ export function createDefaultAiServiceDraft(service: DesktopAiService): AiServic
     googleCurl: "",
     baseUrl: preset?.baseUrl ?? "",
     model: "",
+    visionModel: "",
     imageModel: "",
     sttModel: "",
     modelOptions: [],
@@ -189,6 +195,7 @@ export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
     googleCurl: form.aiGoogleCurl,
     baseUrl: form.aiBaseUrl,
     model: form.aiModel,
+    visionModel: form.aiVisionModel,
     imageModel: form.aiImageModel,
     sttModel: form.aiSttModel,
     modelOptions: form.aiModelOptions,
@@ -204,7 +211,7 @@ export function selectAiService(form: SetupFormState, service: string): SetupFor
   const target = form.aiServiceDrafts[selected] ?? createDefaultAiServiceDraft(selected);
   return {
     ...form, aiService: selected, aiProjectName: target.projectName, aiGoogleCurl: target.googleCurl,
-    aiBaseUrl: target.baseUrl, aiModel: target.model, aiImageModel: target.imageModel, aiSttModel: target.sttModel,
+    aiBaseUrl: target.baseUrl, aiModel: target.model, aiVisionModel: target.visionModel, aiImageModel: target.imageModel, aiSttModel: target.sttModel,
     aiModelOptions: target.modelOptions, aiApiKey: target.apiKey, aiStoredApiKeyConfigured: target.storedApiKeyConfigured,
     clearAiApiKey: target.clearApiKey, aiTimeoutSeconds: target.timeoutSeconds,
     aiServiceDrafts: { ...form.aiServiceDrafts, [form.aiService]: toAiServiceFormDraft(form) }
@@ -227,6 +234,7 @@ function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInit
       projectName: draft.projectName,
       baseUrl: draft.baseUrl,
       model: draft.model,
+      visionModel: draft.visionModel,
       imageModel: draft.imageModel,
       sttModel: draft.sttModel,
       modelOptions: draft.modelOptions,
@@ -269,6 +277,7 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
       aiProjectName: setupForm.aiProjectName,
       aiBaseUrl: setupForm.aiBaseUrl,
       aiModel: setupForm.aiModel,
+      aiVisionModel: setupForm.aiVisionModel,
       aiImageModel: setupForm.aiImageModel,
       aiSttModel: setupForm.aiSttModel,
       aiModelOptions: setupForm.aiModelOptions,

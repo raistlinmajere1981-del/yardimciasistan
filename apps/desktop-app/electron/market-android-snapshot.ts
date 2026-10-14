@@ -4,6 +4,9 @@ import type {
   AndroidMarketSnapshot
 } from "@yardimci-asistan/sync-core";
 import { listMarketCartDraftRecords } from "./market-companion-store.js";
+import { assertCustomerCreditBusinessInTransaction, listCustomerCreditAccounts, getCustomerCreditAccount } from "./customer-credit-runtime.js";
+import { readEnabledBusinessCapabilities } from "./business-capability-store.js";
+import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 
 export function emptyAndroidMarketSnapshot(currency = "TRY"): AndroidMarketSnapshot {
   return {
@@ -24,7 +27,9 @@ export function emptyAndroidMarketSnapshot(currency = "TRY"): AndroidMarketSnaps
     products: [],
     suppliers: [],
     recent_purchases: [],
-    cart_drafts: []
+    cart_drafts: [],
+    primary_location_id: "",
+    customer_credit_accounts: []
   };
 }
 
@@ -57,6 +62,7 @@ export function createAndroidMarketSnapshotSource(
     const products = (database.prepare(`
       SELECT
         products.id,
+        products.updated_at,
         products.name,
         products.sku,
         products.barcode,
@@ -96,7 +102,8 @@ export function createAndroidMarketSnapshotSource(
       data_source: text(row.data_source),
       current_quantity: nonNegativeNumber(row.current_quantity),
       minimum_quantity: nonNegativeNumber(row.minimum_quantity),
-      inventory_updated_at: text(row.inventory_updated_at)
+      inventory_updated_at: text(row.inventory_updated_at),
+      updated_at: text(row.updated_at)
     }));
 
     const salesRow = database.prepare(`
@@ -219,11 +226,27 @@ export function createAndroidMarketSnapshotSource(
       products,
       suppliers,
       recent_purchases: recentPurchases,
-      cart_drafts: cartDrafts(databasePath)
+      cart_drafts: cartDrafts(databasePath),
+      primary_location_id: text((database.prepare("SELECT id FROM inventory_locations WHERE business_id = ? AND is_primary = 1 AND is_active = 1 AND deleted_at = '' LIMIT 1")
+        .get(businessId) as { id?: string } | undefined)?.id),
+      customer_credit_accounts: customerCreditAccounts(database, databasePath)
     };
   } finally {
     database.close();
   }
+}
+
+function customerCreditAccounts(database: DatabaseSync, databasePath: string) {
+  if (!readEnabledBusinessCapabilities(database).includes(C.CUSTOMER_CREDIT)) return [];
+  // Profile/dependency ownership remains in the credit runtime, even for private reads.
+  try { assertCustomerCreditBusinessInTransaction(database); } catch { return []; }
+  return listCustomerCreditAccounts(databasePath, { limit: 300 }).map(({ customer }) => {
+    const account = getCustomerCreditAccount(databasePath, customer.id, { entryLimit: 10 });
+    return { customer_id: customer.id, full_name: customer.fullName,
+      balances: account.balances.map(balance => ({ currency: balance.currency, amount_minor: balance.amountMinor })),
+      entries: account.entries.slice(0, 10).map(entry => ({ direction: entry.direction, entry_type: entry.entryType,
+        amount_minor: entry.amountMinor, currency: entry.currency, payment_method: entry.paymentMethod, occurred_at: entry.occurredAt })) };
+  });
 }
 
 function cartDrafts(databasePath: string): AndroidMarketCartDraft[] {

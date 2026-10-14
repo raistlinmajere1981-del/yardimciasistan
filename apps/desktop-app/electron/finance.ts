@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { moneyToMinor } from "@yardimci-asistan/shared";
 
 export type FinanceDirection = "income" | "expense";
 export type FinancePaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
@@ -99,7 +100,7 @@ export type DesktopFinanceMutationResult =
 
 const PAYMENT_METHODS = new Set<FinancePaymentMethod>(["cash", "card", "bank", "other", "unspecified"]);
 
-export type FinanceSource = "restaurant_order" | "pension_payment" | "room_folio_payment" | "customer_credit_payment";
+export type FinanceSource = "restaurant_order" | "pension_payment" | "room_folio_payment" | "customer_credit_payment" | "commerce_sale";
 
 /** Canonical automatic ledger writer. The source owner must write on this transaction first.
  * System collections have fixed categories, independent of manual category availability.
@@ -121,6 +122,23 @@ export function synchronizeFinanceSourceInTransaction(db: DatabaseSync, source: 
       return;
     }
     prefix = "finance_restaurant_"; category = "restaurant"; description = "Restoran adisyonu";
+  } else if (source === "commerce_sale") {
+    row = db.prepare(`SELECT *, COALESCE(NULLIF(closed_at, ''), created_at) AS occurred_at,
+      '' AS note FROM commerce_sales WHERE id = ?`).get(sourceId);
+    if (!row) throw new Error("Finance source not found.");
+    if (row.status === "paid" && !row.deleted_at && Number(row.total) > 0) {
+      row.amount_minor = moneyToMinor(Number(row.total));
+    }
+    if (!row.amount_minor) {
+      const removedAt = String(row.deleted_at || row.updated_at);
+      db.prepare("UPDATE finance_entries SET deleted_at = ?, updated_at = ? WHERE source_type = ? AND source_id = ?")
+        .run(removedAt, String(row.updated_at), source, sourceId);
+      return;
+    }
+    const method = String(row.payment_method ?? "").trim();
+    row.payment_method = ["cash", "card", "bank"].includes(method) ? method : "other";
+    ensureFinanceCategories(db);
+    prefix = "finance_commerce_sale_"; category = "market"; description = "Market satışı";
   } else if (source === "pension_payment") {
     row = db.prepare("SELECT *, paid_at AS occurred_at FROM pension_payments WHERE id = ?").get(sourceId);
     prefix = "finance_pension_"; category = "pension"; description = "Pansiyon ödemesi";
@@ -145,6 +163,24 @@ export function synchronizeFinanceSourceInTransaction(db: DatabaseSync, source: 
       String(row.occurred_at), source, sourceId, String(row.note), String(row.created_at), String(row.updated_at), String(row.deleted_at ?? ""));
 }
 
+/** Explicit repair only: existing source links (including deleted entries) are left untouched.
+ * Manual income cannot be matched to a sale safely and is never changed here. */
+export function reconcileMissingCommerceSaleFinanceInTransaction(db: DatabaseSync): { reconciledCount: number } {
+  if (!db.isTransaction) throw new Error("Finance reconciliation requires a transaction.");
+  const sales = db.prepare(`SELECT s.id FROM commerce_sales s
+    WHERE s.status = 'paid' AND s.total > 0 AND s.deleted_at = ''
+      AND NOT EXISTS (SELECT 1 FROM finance_entries f
+        WHERE f.source_type = 'commerce_sale' AND f.source_id = s.id)
+    ORDER BY s.created_at, s.id`).all() as Array<{ id: string }>;
+  const activeEntry = db.prepare("SELECT id FROM finance_entries WHERE source_type = 'commerce_sale' AND source_id = ? AND deleted_at = ''");
+  let reconciledCount = 0;
+  for (const sale of sales) {
+    synchronizeFinanceSourceInTransaction(db, "commerce_sale", sale.id);
+    if (activeEntry.get(sale.id)) reconciledCount += 1;
+  }
+  return { reconciledCount };
+}
+
 const DEFAULT_FINANCE_CATEGORIES: ReadonlyArray<{
   id: string;
   direction: FinanceDirection;
@@ -155,6 +191,7 @@ const DEFAULT_FINANCE_CATEGORIES: ReadonlyArray<{
   { id: "other_income", direction: "income", name: "Diğer gelir", isSystem: false, sortOrder: 10 },
   { id: "pension", direction: "income", name: "Pansiyon", isSystem: true, sortOrder: 90 },
   { id: "restaurant", direction: "income", name: "Restoran", isSystem: true, sortOrder: 100 },
+  { id: "market", direction: "income", name: "Market", isSystem: true, sortOrder: 110 },
   { id: "stock", direction: "expense", name: "Market / Stok", isSystem: false, sortOrder: 10 },
   { id: "utilities", direction: "expense", name: "Elektrik - Su", isSystem: false, sortOrder: 20 },
   { id: "rent", direction: "expense", name: "Kira", isSystem: false, sortOrder: 30 },

@@ -1,4 +1,6 @@
 import { getCommerceOrderOperationState } from "./commerce-order-store";
+import { isAndroidKbsAction } from "./android-kbs-actions.js";
+import { getKbsOverview } from "./database/hospitality-notification-store.js";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import { androidActionAllowedByCapabilities, resolveAndroidActionPermission, type AndroidSyncAction } from "@yardimci-asistan/sync-core";
@@ -38,6 +40,9 @@ export function authorizeAndroidAction(db: DatabaseSync, action: AndroidSyncActi
   const requiredPermission = resolveAndroidActionPermission(action.action_type, action.payload);
   if (!requiredPermission) return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
   const role = normalizeAndroidDeviceRole(device.role);
+  if (isAndroidKbsAction(action.action_type) && (role !== "admin" || !getKbsOverview(db).enabled)) {
+    return { ok: false, message: "KBS yalnız etkin ve yetkili yönetici cihazlarında kullanılabilir." };
+  }
   if (isAndroidAdminOnlyAction(action.action_type) && role !== "admin") {
     return { ok: false, message: "Müşteri yönetimi ve kayıt silme işlemleri yalnız yönetici cihazlarda kullanılabilir." };
   }
@@ -46,9 +51,27 @@ export function authorizeAndroidAction(db: DatabaseSync, action: AndroidSyncActi
     return { ok: false, message: "Bu işlem işletmenin etkin yeteneklerinde kullanılamıyor." };
   }
   const permissions = effectiveAndroidPermissions(role, device.permissions_json, enabledCapabilities);
+  if (isAndroidKbsAction(action.action_type) && !permissions.includes("kbs.view")) {
+    return { ok: false, message: "Bu cihazın KBS görüntüleme yetkisi yok." };
+  }
   if (!permissions.includes(requiredPermission)) {
     return { ok: false, message: requiredPermission === "table_order.close_paid"
       ? "Bu cihazın hesap kapatma yetkisi yok." : "Bu cihazın bu işlem için yetkisi yok." };
+  }
+  if (action.action_type === "market_sale_complete" && (!permissions.includes("market.product.view")
+      || (action.payload.settlement === "credit" && !permissions.includes("customer_credit.view")))) {
+    return { ok: false, message: "Bu cihazın ürün veya cari görüntüleme yetkisi yok." };
+  }
+  if (action.action_type === "customer_credit_payment_add" && !permissions.includes("customer_credit.view")) {
+    return { ok: false, message: "Bu cihazın cari görüntüleme yetkisi yok." };
+  }
+  if (["room_folio_menu_item_add", "room_folio_manual_charge_add"].includes(action.action_type)) {
+    if (!permissions.includes("room_folio.view")) {
+      return { ok: false, message: "Bu cihazın oda hesabını görüntüleme yetkisi yok." };
+    }
+    if (action.action_type === "room_folio_menu_item_add" && !permissions.includes("menu.view")) {
+      return { ok: false, message: "Bu cihazın menüyü görüntüleme yetkisi yok." };
+    }
   }
   if (action.action_type.startsWith("commerce_order_")) {
     if (!permissions.includes("commerce_order.view")
@@ -149,16 +172,16 @@ export function applyAndroidRequestStatus(db: DatabaseSync, action: AndroidSyncA
 
 export function applyAndroidCustomerSave(db: DatabaseSync, action: AndroidSyncAction, now: string, updating: boolean): AndroidActionMutationResult {
   const customerId = updating ? androidPayloadString(action.payload, "customer_id") : createAndroidEntityId("customer_", action.id);
-  const existing = updating ? db.prepare("SELECT updated_at FROM customers WHERE id = ? AND deleted_at = ''").get(customerId) as { updated_at: string } | undefined : undefined;
+  const existing = updating ? db.prepare("SELECT updated_at,identity_number,document_serial_number FROM customers WHERE id = ? AND deleted_at = ''").get(customerId) as { updated_at: string; identity_number: string; document_serial_number: string } | undefined : undefined;
   if (updating && !existing) return { ok: false, message: "Güncellenecek müşteri masaüstü kayıtlarında bulunamadı." };
   const conflict = updating ? getAndroidVersionConflict(action.payload, "expected_updated_at", existing?.updated_at, "Müşteri") : null;
   if (conflict) return conflict;
   const result = saveCustomer(db, {
     ...(updating ? { id: customerId } : {}), fullName: androidPayloadString(action.payload, "full_name"), phone: androidPayloadString(action.payload, "phone"),
     email: androidPayloadString(action.payload, "email"), notes: androidPayloadString(action.payload, "notes"), tags: androidPayloadStringArray(action.payload, "tags"),
-    identityType: androidPayloadString(action.payload, "identity_type"), identityNumber: androidPayloadString(action.payload, "identity_number"),
+    identityType: androidPayloadString(action.payload, "identity_type"), identityNumber: androidPayloadString(action.payload, "identity_number") || existing?.identity_number || "",
     nationality: androidPayloadString(action.payload, "nationality"), birthDate: androidPayloadString(action.payload, "birth_date"), gender: androidPayloadString(action.payload, "gender"),
-    documentSerialNumber: androidPayloadString(action.payload, "document_serial_number"), documentExpiryDate: androidPayloadString(action.payload, "document_expiry_date"),
+    documentSerialNumber: androidPayloadString(action.payload, "document_serial_number") || existing?.document_serial_number || "", documentExpiryDate: androidPayloadString(action.payload, "document_expiry_date"),
     birthPlace: androidPayloadString(action.payload, "birth_place"), motherName: androidPayloadString(action.payload, "mother_name"), fatherName: androidPayloadString(action.payload, "father_name"),
     issuingAuthority: androidPayloadString(action.payload, "issuing_authority"), address: androidPayloadString(action.payload, "address")
   }, { now: nextMutationTimestamp(existing?.updated_at, now), androidAction: action, newCustomerId: customerId });

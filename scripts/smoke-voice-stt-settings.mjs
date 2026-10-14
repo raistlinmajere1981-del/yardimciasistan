@@ -30,6 +30,7 @@ const safeStorage = {
 const originalLoad = Module._load;
 Module._load = function (id, ...args) { return id === "electron" ? { safeStorage } : originalLoad.call(this, id, ...args); };
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const { testAiConnection } = require("../apps/desktop-app/dist-electron/ai-connection-service.js");
 const { publishSavedAiSettings } = require("../apps/desktop-app/dist-electron/ai-settings-publish-service.js");
 const { createAiApiKeyUpdate, createAiProfileApiKeyUpdates } = require("../apps/desktop-app/dist-electron/ai-secret-service.js");
 Module._load = originalLoad;
@@ -88,7 +89,7 @@ try {
   for (const aiBaseUrl of ["http://api.openai.com/v1", "https://127.0.0.1/v1", "https://api.openai.com/v1?evil", "file:///secret"]) {
     assert.equal(save({ aiBaseUrl }).ok, false, "authority rejects unsafe STT origin");
   }
-  for (const service of ["openai", "gemini", "custom", "groq", "openrouter"]) {
+  for (const service of ["openai", "gemini", "cloudflare", "custom", "groq", "openrouter"]) {
     assert.equal(save({ aiProfiles: [{ service, projectName: "", baseUrl: "https://api.openai.com/v1", model: "", sttModel: "gpt-4o", timeoutSeconds: 30, apiKey: "", clearApiKey: false }] }).ok, false,
       "active and inactive profile input is validated");
     const php = spawnSync("php", ["-r", 'require $argv[1]; echo json_encode(ya_stt_models($argv[2]));', resolve("firm-template/web-module/lib/audio-transcription.php"), service], { encoding: "utf8" });
@@ -174,6 +175,66 @@ try {
   assert.equal(db.getSetupData().aiModel, "gpt-4.1");
   assert.equal(db.getSetupData().aiImageModel, "gpt-image-1");
   assert.deepEqual([db.getEncryptedAiApiKey("openai"), db.getEncryptedAiApiKey("gemini")], storedKeys, "STT changes preserve all provider ciphertext");
+  const cfModels = shared.CLOUDFLARE_AI_MODELS;
+  const beforeCloudflare = model.toSetupForm(db.getSetupData());
+  let cfForm = model.selectAiService(beforeCloudflare, "cloudflare");
+  cfForm = { ...cfForm, aiBaseUrl: shared.cloudflareAiBaseUrl("a".repeat(32)), aiModel: cfModels.text,
+    aiVisionModel: cfModels.vision, aiImageModel: cfModels.image, aiSttModel: cfModels.stt, aiApiKey: "voice-cloudflare-fixture-key" };
+  assert.equal(drafts.isCategoryDirty(cfForm, model.selectAiService(beforeCloudflare, "cloudflare"), "services"), true);
+  const switched = model.selectAiService(model.selectAiService(cfForm, "gemini"), "cloudflare");
+  assert.equal(switched.aiVisionModel, cfModels.vision); assert.equal(switched.aiSttModel, cfModels.stt);
+  assert.equal(switched.aiApiKey, "voice-cloudflare-fixture-key"); assert.equal(switched.aiBaseUrl, cfForm.aiBaseUrl);
+  const publicationFetch = globalThis.fetch;
+  const cfRequests = [];
+  const cfConnection = { provider: "openai_compatible", service: "cloudflare", projectName: "", baseUrl: cfForm.aiBaseUrl,
+    model: cfModels.text, visionModel: cfModels.vision, imageModel: "", apiKey: cfForm.aiApiKey, useStoredApiKey: false, timeoutSeconds: 30 };
+  globalThis.fetch = async (url, init) => {
+    cfRequests.push({ url, body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ success: true, result: { response: "Cloudflare bağlantısı hazır." } }));
+  };
+  const cfConnectionResult = await testAiConnection(db, cfConnection);
+  assert.equal(cfConnectionResult.ok, true);
+  assert.equal(cfConnectionResult.models.some(model => model.id === cfModels.image), false, "untested image candidate is not presented as verified");
+  assert.equal(cfRequests.length, 2, "text and selected vision are actual separate requests");
+  assert.equal(db.getServiceSettingsVerification("desktop_stt"), "", "text/vision never grants audio evidence");
+  assert.ok(cfRequests[1].url.endsWith(`/run/${cfModels.vision}`));
+  const unsafeConnection = await testAiConnection(db, { ...cfConnection, baseUrl: `${cfForm.aiBaseUrl}?evil` });
+  assert.equal(unsafeConnection.ok, false); assert.equal(cfRequests.length, 2, "invalid account root never sends token");
+  globalThis.fetch = async () => new Response(JSON.stringify({ success: false, errors: [{ code: 5018, message: cfForm.aiApiKey }] }), { status: 403 });
+  const deniedConnection = await testAiConnection(db, cfConnection);
+  assert.equal(deniedConnection.ok, false); assert.match(deniedConnection.message, /erişim izni/);
+  assert.equal(deniedConnection.message.includes(cfForm.aiApiKey), false);
+  globalThis.fetch = publicationFetch;
+  const cfInput = model.createSetupInput(cfForm), cfSecret = createAiApiKeyUpdate(cfInput);
+  assert.equal(cfSecret.ok, true);
+  assert.equal(db.saveInitialSetup(cfInput, cfSecret.update).ok, true);
+  assert.equal(db.getSetupData().aiVisionModel, cfModels.vision);
+  assert.equal(JSON.stringify(db.getSetupData()).includes(cfForm.aiApiKey), false, "Cloudflare projection has no token");
+  assert.ok(!db.getEncryptedAiApiKey("cloudflare").includes(cfForm.aiApiKey), "Cloudflare uses OS encryption");
+  const savedCfForm = model.toSetupForm(db.getSetupData());
+  assert.equal(savedCfForm.aiVisionModel, cfModels.vision);
+  assert.equal(savedCfForm.aiApiKey, "");
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
+  assert.equal(sent.at(-1).ai_settings.service, "cloudflare"); assert.equal(sent.at(-1).ai_settings.stt_model, cfModels.stt);
+  assert.equal(sent.at(-1).ai_settings.base_url, cfForm.aiBaseUrl);
+  assert.equal(sent.at(-1).ai_settings.vision_model, cfModels.vision);
+  assert.equal(save({ aiVisionModel: "" }).ok, true);
+  assert.equal(db.getSetupData().aiLastPublishedAt, "", "vision edits invalidate publication");
+  onSend = () => { assert.equal(save({ aiVisionModel: cfModels.vision }).ok, true); };
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
+  assert.equal(db.getSetupData().aiLastPublishedAt, "", "older vision receipt cannot mark newer selection published");
+  assert.ok(db.getPendingSyncJobs("9999").some(job => job.jobKey === "ai_settings"));
+  onSend = null;
+  assert.equal((await publishSavedAiSettings(db, config, true)).ok, true);
+  assert.equal(sent.at(-1).ai_settings.vision_model, cfModels.vision);
+  for (const patch of [{ aiBaseUrl: `${cfForm.aiBaseUrl}?evil` }, { aiVisionModel: cfModels.text }, { aiSttModel: "whisper-1" }]) assert.equal(save(patch).ok, false);
+  assert.equal(save({ aiVisionModel: undefined, aiProfiles: undefined }).ok, true, "vision omission preserves choice");
+  assert.equal(db.getSetupData().aiVisionModel, cfModels.vision);
+  const backToOpenai = model.selectAiService(model.toSetupForm(db.getSetupData()), "openai");
+  assert.equal(db.saveInitialSetup(model.createSetupInput(backToOpenai)).ok, true);
+  assert.deepEqual([db.getEncryptedAiApiKey("openai"), db.getEncryptedAiApiKey("gemini")], storedKeys, "Cloudflare never overwrites other keys");
+  const cfProfile = db.getSetupData().aiProfiles.find(profile => profile.service === "cloudflare");
+  assert.equal(cfProfile.visionModel, cfModels.vision); assert.equal(cfProfile.sttModel, cfModels.stt);
   console.log("voice-stt-settings-smoke-ok: drafts, persistence, provider policy, durable exact ack/retry, OFF and secret privacy");
 } finally {
   Module._load = originalLoad; globalThis.fetch = nativeFetch; raw?.close(); db.close();

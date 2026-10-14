@@ -328,7 +328,7 @@ Tek `BEGIN IMMEDIATE` transaction içinde:
 
 1. idempotency / mevcut fulfillment kontrolü,
 2. order snapshot'tan `commerce_sales + commerce_sale_items`,
-3. etkinse aynı sale üzerinden stok hareketleri,
+3. etkinse aynı sale üzerinden stok hareketleri ve pozitif paid sale için kanonik finance projection,
 4. settlement `credit` ise aynı transaction'da customer-credit debit entry,
 5. `commerce_order_fulfillments` bağlantı kaydı,
 6. order `fulfilled` geçişi
@@ -352,11 +352,13 @@ ledger/link kaydıdır. Bugün bir order yalnız bir kez full-fulfill edilir; ba
 tabloda olması ileride partial fulfillment ihtiyacında `commerce_orders` şemasına sale
 alanları gömmememizi sağlar.
 
-Mevcut Market/Hızlı Satış `paid` commerce sale oluştururken ayrıca `finance_entries`
-üretmediği için fulfillment da paid sale için yeni bir finance projection üretmez. Credit
-sale borcu customer-credit ledger'a gider; finance income ancak mevcut sistemde olduğu gibi
-gerçek tahsilat kaydı girildiğinde oluşur. Bu davranış ayrı bir finance standardizasyon
-işinden önce wholesale'a özel olarak değiştirilmemelidir.
+Market/Hızlı Satış, Android ve fulfillment pozitif `paid` commerce sale için aynı
+`finance.ts` sahibine delege eder: `commerce_sale + sale id`, `income / market`.
+Satış, stok ve gelir aynı transaction'dadır; receipt tekrarları yeni hareket üretmez.
+Sıfır tutarlı/no_payment satış gelir üretmez. Credit sale borcu customer-credit ledger'a
+gider; finance income yalnız gerçek tahsilat kaydı girildiğinde oluşur. Eksik eski
+kaynak bağlantıları için otomatik backfill yerine [finans modelindeki](FINANCE_MODEL.md)
+açık, tekrar çalıştırılabilir uzlaştırma komutu kullanılır.
 
 **C2b UI:** Onaylanmış sipariş detayında renderer yalnız settlement tercihini toplar.
 Pozitif toplamda Nakit/Kart/Banka/Diğer ve capability açıksa Veresiye sunulur; sıfır
@@ -736,7 +738,7 @@ Veresiye satış: aktif kayıtlı müşteri doğrulaması, güncel katalog fiyat
 satış, ürün snapshot'ları, stok düşümü ve tek ledger debit aynı `BEGIN IMMEDIATE`
 transaction'ındadır. Paid ve credit satışlar aynı transaction-aware primitive'i
 kullanır. `credit_sale != cash income`: veresiye satışında kasa geliri oluşmaz.
-Mevcut paid commerce sale'in kasa projection davranışı değiştirilmez.
+Pozitif paid commerce sale aynı primitive içinde kanonik `commerce_sale` kasa projection'ını üretir.
 
 Tahsilat: mevcut currency borcu doğrulanır; ledger credit ve `finance_entries`
 income aynı transaction'da oluşur. `source_type=customer_credit_payment`,

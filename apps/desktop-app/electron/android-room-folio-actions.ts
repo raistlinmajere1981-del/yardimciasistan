@@ -1,7 +1,12 @@
 import { checkoutHospitalityStay } from "./hospitality-checkout.js";
 import type { DatabaseSync } from "node:sqlite";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
-import { addRoomFolioPaymentInTransaction, type RoomFolioPaymentMethod } from "./room-folio.js";
+import { createHash } from "node:crypto";
+import {
+  addRoomFolioPaymentInTransaction, addRoomFolioMenuItemInTransaction,
+  addRoomFolioManualItemInTransaction, getRoomFolioChargeState, type RoomFolioPaymentMethod
+} from "./room-folio.js";
+import { getPublishedMenu } from "./database/menu-store.js";
 
 export interface AndroidRoomFolioMutationResult {
   ok: boolean;
@@ -26,7 +31,66 @@ export function applyAndroidRoomFolioAction(
   if (options.action.action_type === "room_folio_checkout") {
     return checkout(options);
   }
+  if (["room_folio_menu_item_add", "room_folio_manual_charge_add"].includes(options.action.action_type)) {
+    return addCharge(options);
+  }
   return { ok: false, message: "Telefon oda hesabı işlem türü desteklenmiyor." };
+}
+
+function addCharge({ db, action, now, insertEvent }: ApplyAndroidRoomFolioActionOptions): AndroidRoomFolioMutationResult {
+  const payload = actionPayload(action);
+  const folioId = text(payload.folio_id);
+  const expectedVersion = text(payload.expected_folio_version);
+  if (!folioId || !/^[a-f0-9]{64}$/.test(expectedVersion)) {
+    return { ok: false, message: "Güncel oda hesabı sürümü gerekli. Veriyi yenileyip tekrar deneyin." };
+  }
+  const state = getRoomFolioChargeState(db, folioId);
+  if (!state?.canAddItems) {
+    return { ok: false, message: "Kalem eklemek için açık oda hesabı ve giriş yapılmış geçerli konaklama gerekli." };
+  }
+  if (state.version !== expectedVersion) {
+    return { ok: false, message: "Oda hesabı siz açtıktan sonra değişmiş. Güncel veriyi çekip tekrar deneyin." };
+  }
+  const itemId = `room_folio_item_android_${createHash("sha256").update(action.id).digest("hex")}`;
+  const menuCharge = action.action_type === "room_folio_menu_item_add";
+  let result: AndroidRoomFolioMutationResult;
+  try {
+    if (menuCharge) {
+      const entryId = text(payload.menu_entry_id);
+      const quantity = positiveInteger(payload.quantity);
+      const expectedMenuUpdatedAt = text(payload.expected_menu_updated_at);
+      const expectedUnitPriceMinor = nonNegativeInteger(payload.expected_unit_price_minor);
+      const expectedCurrency = text(payload.expected_currency).toUpperCase();
+      if (!entryId || typeof payload.quantity !== "number" || quantity === null || quantity > 1000 || !expectedMenuUpdatedAt
+          || typeof payload.expected_unit_price_minor !== "number" || expectedUnitPriceMinor === null || !/^[A-Z]{3}$/.test(expectedCurrency)) {
+        return { ok: false, message: "Menü ürünü, adet ve güncel fiyat bilgileri gerekli." };
+      }
+      const menu = getPublishedMenu(db);
+      const entry = menu.items.find(item => item.id === entryId && item.is_available
+        && item.product_is_active !== false && menu.categories.some(category => category.id === item.category_id && category.is_active));
+      if (!entry) return { ok: false, message: "Menü ürünü bulunamadı veya satışa kapalı." };
+      if (entry.updated_at !== expectedMenuUpdatedAt || Math.round(entry.price * 100) !== expectedUnitPriceMinor
+          || text(entry.currency).toUpperCase() !== expectedCurrency) {
+        return { ok: false, message: "Menü fiyatı veya stok bilgisi değişmiş. Güncel veriyi çekip tekrar deneyin." };
+      }
+      result = addRoomFolioMenuItemInTransaction(db, { folioId, menuEntryId: entryId, quantity }, { itemId, now, actorSource: "android" });
+    } else {
+      const label = cleanText(payload.label, 121);
+      const note = text(payload.note);
+      const amountMinor = positiveInteger(payload.amount_minor);
+      if (typeof payload.label !== "string" || !label || label.length > 120
+          || (payload.note !== undefined && typeof payload.note !== "string") || note.length > 500
+          || typeof payload.amount_minor !== "number" || amountMinor === null || amountMinor > 999_999_999_999) {
+        return { ok: false, message: "Ek ücret adı (en fazla 120 karakter), pozitif tutar ve not (en fazla 500 karakter) gerekli." };
+      }
+      result = addRoomFolioManualItemInTransaction(db, { folioId, kind: "manual_charge", label, amountMinor, note }, { itemId, now });
+    }
+  } catch {
+    return { ok: false, message: menuCharge ? "Menü ürünü oda hesabına eklenemedi." : "Ek ücret oda hesabına eklenemedi." };
+  }
+  if (!result.ok) return result;
+  insertEvent("room_folio.item_added", folioId, { item_id: itemId, kind: menuCharge ? "menu" : "manual_charge", source: "android" });
+  return result;
 }
 
 function addPayment(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFolioMutationResult {

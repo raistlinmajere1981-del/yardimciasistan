@@ -68,7 +68,7 @@ test("admin remains bounded by active business capabilities", () => {
   assert.equal(androidActionAllowedByCapabilities("reservation_room_create", core), false);
 });
 
-test("pure Market exposes one handheld group and capability-bounded permissions", () => {
+test("pure Market exposes handheld and separate sales groups with capability-bounded permissions", () => {
   const market = [
     C.ANDROID,
     C.CATALOG,
@@ -78,7 +78,7 @@ test("pure Market exposes one handheld group and capability-bounded permissions"
     C.RETAIL_SUPPLIERS,
     C.RETAIL_PURCHASING
   ];
-  assert.deepEqual(androidAvailablePermissionGroupIds(market), ["market_operations"]);
+  assert.deepEqual(androidAvailablePermissionGroupIds(market), ["market_operations", "market_sales"]);
   const effective = androidEffectivePermissionsForGroups({
     service_orders: false,
     cashier: false,

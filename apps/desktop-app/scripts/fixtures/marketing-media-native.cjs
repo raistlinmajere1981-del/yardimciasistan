@@ -4,6 +4,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { app, nativeImage } = require('electron');
 const { DesktopDatabase } = require('../../dist-electron/database.js');
+const { normalizeGeneratedImagePng } = require('../../dist-electron/generated-image-normalization.js');
 const { MarketingMediaService } = require('../../dist-electron/marketing/media-service.js');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'marketing-native-'));
 fs.mkdirSync(path.join(root,'electron'));app.setPath('userData',path.join(root,'electron'));
@@ -20,6 +21,17 @@ app.whenReady().then(() => {
       const canonical=db.getMediaAsset(asset.id),file=service.absolutePath(canonical);assert.ok(fs.existsSync(file));assert.ok(asset.previewUrl.startsWith('data:image/png'));
       assert.equal(nativeImage.createFromPath(file).getSize().width,2);service.manage(asset.id,'delete');assert.equal(fs.existsSync(file),false);
     }
+    const cfImage = nativeImage.createFromBitmap(Buffer.alloc(12*8*4,255),{width:12,height:8});
+    for (const [aspect,width,height] of [['landscape',12,8],['portrait',5,8],['square',8,8]]) {
+      const converted = normalizeGeneratedImagePng(cfImage.toJPEG(90), aspect);
+      assert.deepEqual([...converted.subarray(0,8)],[137,80,78,71,13,10,26,10], 'JPEG becomes actual PNG');
+      const decoded = nativeImage.createFromBuffer(Buffer.from(converted));
+      assert.deepEqual(decoded.getSize(),{width,height}, 'FLUX aspect cropped locally');
+      const imported = service.generated({bytes:converted,mimeType:'image/png',providerId:'cloudflare',modelId:'@cf/black-forest-labs/flux-1-schnell'});
+      assert.equal(imported.mimeType,'image/png');
+      assert.equal(imported.width,width);assert.equal(imported.height,height);
+    }
+    assert.throws(()=>normalizeGeneratedImagePng(Buffer.from('invalid JPEG'),'square'),error=>error.reason==='invalid_response');
     const square=service.importBytes(nativeImage.createFromBitmap(Buffer.alloc(4*4*4,255),{width:4,height:4}).toPNG(),'upload');
     const staged=nativeImage.createFromBuffer(service.instagramJpeg(square.id));assert.equal(staged.getSize().width,320);assert.equal(staged.getSize().height,320);assert.equal(db.getMediaAsset(square.id).mimeType,'image/png');
     const wide=service.importBytes(image.toPNG(),'upload');assert.throws(()=>service.instagramJpeg(wide.id),e=>e.code==='instagram_image_ratio');

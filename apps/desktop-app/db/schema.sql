@@ -13,6 +13,7 @@ CREATE TABLE ai_service_profiles (
   project_name TEXT NOT NULL DEFAULT '',
   base_url TEXT NOT NULL DEFAULT '',
   model TEXT NOT NULL DEFAULT '',
+  vision_model TEXT NOT NULL DEFAULT '',
   image_model TEXT NOT NULL DEFAULT '',
   stt_model TEXT NOT NULL DEFAULT '',
   model_options_json TEXT NOT NULL DEFAULT '[]',
@@ -1877,8 +1878,8 @@ BEGIN
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
 END;
-CREATE TRIGGER trg_sync_ai_profile_update AFTER UPDATE OF base_url, model, stt_model, timeout_seconds, api_key_encrypted ON ai_service_profiles
-WHEN NEW.base_url != OLD.base_url OR NEW.model != OLD.model OR NEW.stt_model != OLD.stt_model OR NEW.timeout_seconds != OLD.timeout_seconds OR NEW.api_key_encrypted != OLD.api_key_encrypted
+CREATE TRIGGER trg_sync_ai_profile_update AFTER UPDATE OF base_url, model, vision_model, stt_model, timeout_seconds, api_key_encrypted ON ai_service_profiles
+WHEN NEW.base_url != OLD.base_url OR NEW.model != OLD.model OR NEW.vision_model != OLD.vision_model OR NEW.stt_model != OLD.stt_model OR NEW.timeout_seconds != OLD.timeout_seconds OR NEW.api_key_encrypted != OLD.api_key_encrypted
 BEGIN
   INSERT INTO sync_outbox(job_key, job_type, created_at, updated_at)
   VALUES ('ai_settings', 'ai_settings_publish', NEW.updated_at, NEW.updated_at)
@@ -2128,10 +2129,25 @@ CREATE TABLE hospitality_notifications (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'submission_unknown')),
   provider TEXT NOT NULL DEFAULT '',
   provider_reference TEXT NOT NULL DEFAULT '',
+  confirmed_rejection INTEGER NOT NULL DEFAULT 0 CHECK (confirmed_rejection IN (0, 1)),
   sent_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
 CREATE INDEX idx_hospitality_notifications_pending ON hospitality_notifications(stay_id, status);
+
+-- Domain delivery intent, separate from publication jobs. Receipt + request commit together.
+-- A crash leaves the request pending; notification submission_unknown is the permanent I/O fence.
+CREATE TABLE kbs_delivery_requests (
+  action_id TEXT PRIMARY KEY,
+  notification_id TEXT NOT NULL REFERENCES hospitality_notifications(id),
+  device_id TEXT NOT NULL REFERENCES android_devices(device_id),
+  provider TEXT NOT NULL CHECK (provider IN ('egm', 'jandarma')),
+  requested_at TEXT NOT NULL,
+  completed_at TEXT NOT NULL DEFAULT '',
+  result_state TEXT NOT NULL DEFAULT '' CHECK (result_state IN ('', 'sent', 'failed', 'waiting', 'submission_unknown', 'denied'))
+);
+CREATE UNIQUE INDEX idx_kbs_delivery_requests_pending
+  ON kbs_delivery_requests(notification_id) WHERE completed_at = '';
 
 CREATE TABLE stay_room_history (
   id TEXT PRIMARY KEY,
@@ -2982,4 +2998,67 @@ WHEN EXISTS (SELECT 1 FROM commerce_product_publications WHERE product_id=OLD.id
   VALUES ('android_snapshot', 'android_snapshot', 1, OLD.updated_at, OLD.updated_at)
   ON CONFLICT(job_key) DO UPDATE SET source_revision = sync_outbox.source_revision + 1,
     attempt_count = 0, next_attempt_at = '', last_error = '', updated_at = excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_notifications_android_snapshot_insert AFTER INSERT ON hospitality_notifications BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_notifications_android_snapshot_update AFTER UPDATE ON hospitality_notifications BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_notifications_android_snapshot_delete AFTER DELETE ON hospitality_notifications BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_settings_android_snapshot_insert AFTER INSERT ON kbs_service_settings BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_settings_android_snapshot_update AFTER UPDATE ON kbs_service_settings BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_settings_android_snapshot_delete AFTER DELETE ON kbs_service_settings BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_requests_android_snapshot_insert AFTER INSERT ON kbs_delivery_requests BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_requests_android_snapshot_update AFTER UPDATE ON kbs_delivery_requests BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
+END;
+
+CREATE TRIGGER trg_kbs_requests_android_snapshot_delete AFTER DELETE ON kbs_delivery_requests BEGIN
+  INSERT INTO sync_outbox (job_key,job_type,source_revision,created_at,updated_at)
+  VALUES ('android_snapshot','android_snapshot',1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  ON CONFLICT(job_key) DO UPDATE SET source_revision=sync_outbox.source_revision+1,
+    attempt_count=0,next_attempt_at='',last_error='',updated_at=excluded.updated_at;
 END;

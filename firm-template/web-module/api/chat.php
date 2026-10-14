@@ -10,6 +10,7 @@ const YA_AI_CONVERSATIONS_FILE = YA_BASE_DIR . '/data/ai-conversations.json';
 require_once YA_BASE_DIR . '/lib/storage.php';
 require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_BASE_DIR . '/lib/business-ai-policy.php';
+require_once YA_BASE_DIR . '/lib/cloudflare-ai.php';
 
 $businessConfig = ya_chat_load_json(YA_CONFIG_FILE, []);
 $aiConfig = is_file(YA_AI_CONFIG_FILE) ? require YA_AI_CONFIG_FILE : [];
@@ -248,7 +249,7 @@ function ya_chat_generate_android_report(array $businessConfig, array $aiConfig,
     ];
     $result = $service === 'gemini'
         ? ya_chat_call_google_ai_studio($chatOptions)
-        : ya_chat_call_openai_compatible($chatOptions);
+        : ($service === 'cloudflare' ? ya_cloudflare_chat($chatOptions) : ya_chat_call_openai_compatible($chatOptions));
     if (!($result['ok'] ?? false)) {
         ya_chat_response(503, [
             'ok' => false,
@@ -471,7 +472,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
     ];
     $chatResult = $service === 'gemini'
         ? ya_chat_call_google_ai_studio($chatOptions)
-        : ya_chat_call_openai_compatible($chatOptions);
+        : ($service === 'cloudflare' ? ya_cloudflare_chat($chatOptions) : ya_chat_call_openai_compatible($chatOptions));
 
     if (!$chatResult['ok']) {
         return ya_chat_fallback_result('openai_compatible', $model, $chatResult['error'], $businessConfig, $businessContext, $catalogContext, $message);

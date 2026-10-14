@@ -140,6 +140,79 @@ try {
         $response['body'] = json_encode(['candidates' => [array_replace($candidate, $patch)]]);
         code_is(ya_stt_transcribe($gemini, $wav, $transport), 502, 'provider_failed');
     }
+    $cloudflare = [...$config, 'service' => 'cloudflare',
+        'base_url' => 'https://api.cloudflare.com/client/v4/accounts/' . str_repeat('a', 32) . '/ai',
+        'stt_model' => '@cf/openai/whisper-large-v3-turbo'];
+    $cloudflareResponse = ['status' => 200, 'error' => 0, 'body' => json_encode(['success' => true, 'result' => ['text' => 'Türkçe konuşma.']])];
+    $cloudflareCalls = 0;
+    $cloudflareTransport = static function (string $url, array $options) use (&$cloudflareCalls, &$cloudflareResponse, $cloudflare, $waveBytes): array {
+        $cloudflareCalls++;
+        check($url === $cloudflare['base_url'] . '/run/@cf/openai/whisper-large-v3-turbo', 'Cloudflare native STT path');
+        check($options[CURLOPT_FOLLOWLOCATION] === false && $options[CURLOPT_SSL_VERIFYPEER] === true, 'Cloudflare TLS/no redirects');
+        check($options[CURLOPT_TIMEOUT] <= 60 && $options[CURLOPT_PROXY] === '', 'Cloudflare bounded/no proxy');
+        check(in_array('Authorization: Bearer fixture-provider-key', $options[CURLOPT_HTTPHEADER], true), 'Cloudflare header token');
+        $body = json_decode($options[CURLOPT_POSTFIELDS], true, 32, JSON_THROW_ON_ERROR);
+        check(base64_decode($body['audio'], true) === $waveBytes, 'Cloudflare audio bytes intact');
+        check($body['task'] === 'transcribe' && $body['language'] === 'tr', 'Turkish transcription, no translation');
+        return $cloudflareResponse;
+    };
+    foreach ([$cloudflare['base_url'] . '?x=1', str_replace('https:', 'http:', $cloudflare['base_url']),
+        str_replace('.com/', '.com:443/', $cloudflare['base_url']), str_replace('/ai', '/ai/../ai', $cloudflare['base_url'])] as $unsafe) {
+        code_is(ya_stt_transcribe([...$cloudflare, 'base_url' => $unsafe], $wav, $cloudflareTransport), 422, 'stt_configuration_invalid');
+    }
+    check($cloudflareCalls === 0, 'unsafe Cloudflare roots fail before transport');
+    $cfBinding = hash('sha256', json_encode([$cloudflare['provider'], $cloudflare['service'], $cloudflare['base_url'],
+        $cloudflare['stt_model'], $cloudflare['api_key'], $cloudflare['timeout_seconds']], JSON_UNESCAPED_SLASHES));
+    $cfResult = ya_stt_transcribe($cloudflare, $wav, $cloudflareTransport, $cfBinding);
+    check($cfResult['payload']['text'] === 'Türkçe konuşma.' && $cfResult['payload']['stt_configuration'] === $cfBinding, 'Cloudflare actual audio evidence');
+    foreach ([[401, 10000, 'provider_authentication_failed'], [403, 5018, 'provider_permission_denied'],
+        [403, 5035, 'provider_permission_denied'], [429, 3036, 'provider_quota_exhausted'],
+        [429, 3040, 'provider_busy'], [429, 0, 'provider_rate_limited'], [400, 5007, 'provider_model_unavailable']] as [$status, $code, $expected]) {
+        $cloudflareResponse = ['status' => $status, 'error' => 0, 'body' => json_encode(['success' => false,
+            'errors' => [['code' => $code, 'message' => 'fixture-provider-key private transcript']]])];
+        code_is(ya_stt_transcribe($cloudflare, $wav, $cloudflareTransport), 502, $expected);
+        $chat = ya_cloudflare_chat(['base_url' => $cloudflare['base_url'], 'model' => '@cf/zai-org/glm-4.7-flash',
+            'api_key' => $cloudflare['api_key'], 'messages' => [['role' => 'user', 'content' => 'Merhaba']]],
+            static fn(): array => $cloudflareResponse);
+        check($chat['error']['code'] === $expected && !str_contains(json_encode($chat), 'fixture-provider-key'), 'Cloudflare chat/STT diagnostics parity');
+    }
+    foreach (['bad JSON', '{}', '{"success":true,"result":{}}', '{"success":false}', str_repeat('x', YA_STT_MAX_RESPONSE_BYTES + 1)] as $bad) {
+        $cloudflareResponse = ['status' => 200, 'error' => 0, 'body' => $bad];
+        code_is(ya_stt_transcribe($cloudflare, $wav, $cloudflareTransport), 502, 'provider_invalid_response');
+    }
+    $cloudflareResponse = ['status' => 200, 'error' => CURLE_WRITE_ERROR, 'body' => '', 'limit_exceeded' => true];
+    code_is(ya_stt_transcribe($cloudflare, $wav, $cloudflareTransport), 502, 'provider_invalid_response');
+    foreach ([CURLE_COULDNT_CONNECT => 'provider_network', CURLE_OPERATION_TIMEDOUT => 'provider_timeout'] as $curlError => $expected) {
+        $cloudflareResponse = ['status' => 0, 'error' => $curlError, 'body' => 'fixture-provider-key'];
+        code_is(ya_stt_transcribe($cloudflare, $wav, $cloudflareTransport), $curlError === CURLE_OPERATION_TIMEDOUT ? 504 : 502, $expected);
+    }
+    foreach ([['response' => 'Merhaba'], ['choices' => [['message' => ['content' => 'Merhaba'], 'finish_reason' => 'stop']]]] as $result) {
+        $chat = ya_cloudflare_chat(['base_url' => $cloudflare['base_url'], 'model' => '@cf/zai-org/glm-4.7-flash',
+            'api_key' => $cloudflare['api_key'], 'messages' => [['role' => 'user', 'content' => 'Merhaba']]],
+            static function (string $url, array $options) use ($result): array {
+                check(str_ends_with($url, '/run/@cf/zai-org/glm-4.7-flash'), 'Hosting native text endpoint');
+                check(json_decode($options[CURLOPT_POSTFIELDS], true)['stream'] === false, 'bounded non-stream text');
+                return ['status' => 200, 'error' => 0, 'body' => json_encode(['success' => true, 'result' => $result])];
+            });
+        check($chat['ok'] === true && $chat['answer'] === 'Merhaba', 'Hosting GLM/Scout text envelope');
+    }
+    require_once __DIR__ . '/../firm-template/web-module/lib/stock-image-analysis.php';
+    $visionConfig = [...$cloudflare, 'model' => '@cf/zai-org/glm-4.7-flash', 'vision_model' => '@cf/meta/llama-4-scout-17b-16e-instruct'];
+    $image = $root . '/vision.png';
+    $imageBytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+    file_put_contents($image, $imageBytes);
+    $stockAnalyzer = ya_stock_image_create_analyzer($visionConfig);
+    check($stockAnalyzer instanceof YaCloudflareVisionStockAnalyzer && $stockAnalyzer->supports($visionConfig), 'Cloudflare separate vision analyzer');
+    check(!$stockAnalyzer->supports([...$visionConfig, 'vision_model' => '']), 'text does not imply vision');
+    $vision = ya_cloudflare_analyze_image($visionConfig, $image, 'image/png', 'Oku', 'JSON döndür.',
+        static function (string $url, array $options) use ($imageBytes): array {
+            check(str_ends_with($url, '/run/@cf/meta/llama-4-scout-17b-16e-instruct'), 'vision never uses GLM text model');
+            $body = json_decode($options[CURLOPT_POSTFIELDS], true);
+            check(base64_decode(explode(',', $body['messages'][1]['content'][1]['image_url']['url'], 2)[1], true) === $imageBytes, 'vision inline bytes intact');
+            return ['status' => 200, 'error' => 0, 'body' => json_encode(['success' => true, 'result' => ['response' => '{"lines":[]}']])];
+        });
+    check($vision['ok'] === true && json_decode($vision['answer'], true) === ['lines' => []], 'vision output goes to existing analysis decoder');
+    check(ya_cloudflare_analyze_image([...$visionConfig, 'vision_model' => ''], $image, 'image/png', 'Oku', 'JSON')['code'] === 'vision_not_supported', 'vision explicit OFF');
     echo "voice-stt-provider-smoke-ok: provider formats, gates, size, MIME, HTTPS, bounded errors and credential privacy\n";
 } finally {
     foreach (glob($root . '/*') ?: [] as $file) unlink($file);

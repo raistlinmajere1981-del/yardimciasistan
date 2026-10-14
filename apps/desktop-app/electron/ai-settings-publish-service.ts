@@ -24,6 +24,7 @@ export async function publishSavedAiSettings(
       baseUrl: setup.aiBaseUrl,
       model: setup.aiModel,
       sttModel: setup.aiSttModel ?? "",
+      ...(setup.aiService === "cloudflare" ? { visionModel: setup.aiVisionModel ?? "" } : {}),
       apiKey: aiCapabilityEnabled ? getEffectiveAiApiKey(database, setup.aiService) : "",
       timeoutSeconds: normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds)
     };
@@ -51,6 +52,7 @@ export async function publishSavedAiSettings(
       if (current.aiProvider === sent.provider && current.aiService === sent.service && current.aiBaseUrl === sent.baseUrl
           && current.aiModel === sent.model && normalizeAiTimeoutSeconds(current.aiTimeoutSeconds) === sent.timeoutSeconds
           && (current.aiSttModel ?? "") === sent.sttModel
+          && (current.aiService !== "cloudflare" || (current.aiVisionModel ?? "") === (sent.visionModel ?? ""))
           && effectiveEnabled === sent.enabled
           && (!sent.enabled || getEffectiveAiApiKey(database, current.aiService) === sent.apiKey)) database.markAiSettingsPublished(receipt.published_at);
     } });

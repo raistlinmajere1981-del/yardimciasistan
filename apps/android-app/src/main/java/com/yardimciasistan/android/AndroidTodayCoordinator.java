@@ -70,6 +70,8 @@ final class AndroidTodayCoordinator {
 
   String title() { return orderId.isEmpty() ? CompanionUiRules.title(mode) : "Sipariş ayrıntısı"; }
   boolean isCompanionViewOpen() { return !mode.isEmpty(); }
+  boolean isOrderDetailOpen() { return !orderId.isEmpty(); }
+  String mode() { return mode; }
   String screenKey() { return "today:" + mode + ":" + source + ":" + orderId + (notice.isEmpty() ? "" : ":denied"); }
 
   void openOrder(OperationData data, String id) {

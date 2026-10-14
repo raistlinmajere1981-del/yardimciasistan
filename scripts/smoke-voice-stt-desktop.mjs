@@ -96,6 +96,7 @@ const service = createService({
       if (behavior === "wrong-binding") return { status: 200, body: JSON.stringify({ ok: true, text: "", stt_configuration: "a".repeat(64) }) };
       if (behavior === "legacy") return { status: 200, body: '{"ok":true,"text":""}' };
     }
+    if (behavior.startsWith("cf:")) return { status: 502, body: JSON.stringify({ ok: false, code: behavior.slice(3), message: "raw-provider-token-secret" }) };
     if (behavior === "throw") throw new Error("raw-provider-auth-secret");
     if (behavior === "wait") return new Promise(resolve => { pending = { resolve, signal }; });
     if (behavior === "oversize") return { status: 200, body: "x".repeat(128 * 1024 + 1) };
@@ -224,6 +225,30 @@ waiting = invoke("dictation:transcribe", input());
 sender.emit("destroyed"); assert.equal(pending.signal.aborted, true);
 pending.resolve({ status: 200, body: '{"ok":true,"text":"late"}' });
 assert.equal((await waiting).ok, false);
+
+// Cloudflare uses the same saved gates and separate real audio evidence; fixed diagnostics only.
+const previousProvider = { ...setup };
+setup = { ...setup, aiService: "cloudflare", aiBaseUrl: `https://api.cloudflare.com/client/v4/accounts/${"a".repeat(32)}/ai`,
+  aiModel: "@cf/zai-org/glm-4.7-flash", aiSttModel: "@cf/openai/whisper-large-v3-turbo" };
+behavior = "success";
+assert.equal(getStatus().canTest, true); assert.equal(getStatus().ready, false);
+assert.equal((await invoke("dictation:testConnection")).ok, true);
+assert.equal(invoke("dictation:saveEnabled", true).ok, true);
+assert.equal((await invoke("dictation:transcribe", input())).ok, true);
+for (const [code, text] of [["provider_authentication_failed", /Token/], ["provider_permission_denied", /erişim izni/],
+  ["provider_quota_exhausted", /kota/], ["provider_busy", /yoğun/], ["provider_network", /bağlantısı/],
+  ["provider_invalid_response", /beklediği biçimde/], ["__proto__", /Ses metne çevrilemedi/]]) {
+  behavior = `cf:${code}`;
+  const failed = await invoke("dictation:transcribe", input());
+  assert.equal(failed.ok, false); assert.match(failed.message, text);
+  assert.equal(JSON.stringify(failed).includes("raw-provider"), false);
+  assert.equal(getStatus().enabled, true, "runtime failures preserve saved activation");
+}
+behavior = "cf:provider_quota_exhausted";
+const failedAudioTest = await invoke("dictation:testConnection");
+assert.equal(failedAudioTest.ok, false); assert.match(failedAudioTest.message, /kota/);
+assert.equal(getStatus().ready, false, "failed Cloudflare audio test withdraws evidence");
+setup = previousProvider; behavior = "success";
 
 // Real Node transport implementation, fake HTTPS stream: multipart identity/size/path, response cap.
 const signal = new AbortController().signal;
