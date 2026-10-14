@@ -265,13 +265,21 @@ try {
   assert.equal(salesBefore.today_sale_count, 1);
   assert.equal(salesBefore.today_sales_total, 50);
   const financeBeforePaidSales = counts().finance_entries;
+  const paidSales = [];
   for (const paymentMethod of ["cash", "card"]) {
     const sale = runtime.createRuntimePaidSale(databasePath, { items: [{ productId: product.id, quantity: 1 }], paymentMethod });
     assert.equal(sale.status, "paid");
     assert.equal(sale.paymentMethod, paymentMethod);
     assert.equal(sale.total, 25.15);
+    paidSales.push(sale);
   }
-  assert.equal(counts().finance_entries, financeBeforePaidSales, "Preserve existing paid commerce finance behavior.");
+  assert.equal(counts().finance_entries, financeBeforePaidSales + 2, "Paid commerce sales project canonical market income (commerce_sale, FINANCE_MODEL/D-025).");
+  for (const sale of paidSales) {
+    const row = raw.prepare("SELECT * FROM finance_entries WHERE source_type = 'commerce_sale' AND source_id = ?").get(sale.id);
+    assert.ok(row, `Missing canonical finance entry for ${sale.id}`);
+    assert.equal(row.direction, "income");
+    assert.equal(row.category, "market");
+  }
   const salesAfter = createAndroidMarketSnapshotSource(databasePath, today).summary;
   assert.equal(salesAfter.today_sale_count, 3);
   assert.equal(moneyToMinor(salesAfter.today_sales_total), 10030);

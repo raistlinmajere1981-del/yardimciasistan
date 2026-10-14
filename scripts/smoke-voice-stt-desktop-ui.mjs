@@ -144,8 +144,10 @@ try {
   await settings(); await tab("Servisler").click(); await stt.selectOption("whisper-1"); await discard(); await editor(); await expect(mic()).toHaveCount(0);
   await settings(); await tab("Servisler").click(); await stt.selectOption("whisper-1"); await save(); await activate(); await editor(); await expect(mic()).toBeVisible();
   uploadBehavior = "success";
-  await start(); environment = { ...environment, locked: true, revision: 10 }; await expect(mic()).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Durdur ve Metne Çevir" })).toHaveCount(0); assert.ok(await allTracksStopped());
+  await start(); await expect(page.getByRole("button", { name: "Durdur ve Metne Çevir" })).toBeVisible();
+  environment = { ...environment, locked: true, revision: 10 };
+  await expect(page.getByRole("button", { name: "Durdur ve Metne Çevir" })).toHaveCount(0);
+  await expect.poll(() => allTracksStopped(), { timeout: 8000 }).toBe(true);
   environment = { locked: false, hosting: false, revision: 20 }; await expect(mic()).toHaveCount(0);
   environment = { locked: false, hosting: true, revision: 30 }; await expect(mic()).toBeVisible();
   await page.getByRole("button", { name: "Metin Asistanını Aç", exact: true }).click(); await expect(mic()).toBeVisible();

@@ -409,7 +409,10 @@ try {
     false,
     "A hosting web request deleted on desktop must not reappear in Android summary."
   );
-  assert.equal(summaryAfterDeletion.admin_menu.categories.length, database.getDashboardData().menu.categories.length);
+  // Staff without menu.edit/delete receives a permission-gated empty admin_menu
+  // (sync.php ya_sync_android_menu_for_permissions). Full menu remains in desktop and admin snapshots.
+  assert.equal(summaryAfterDeletion.admin_menu.categories.length, 0);
+  assert.deepEqual(summaryAfterDeletion.admin_menu.items, []);
 
   const duplicateAction = await syncApi({
     action: "enqueue_android_action",
@@ -643,8 +646,11 @@ try {
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("message.delete"), true);
   const managedCustomerSnapshot = adminSummary.customers.find((customer) => customer.id === managedCustomerResult.savedId);
   assert.ok(managedCustomerSnapshot);
-  assert.equal(managedCustomerSnapshot.identity_number, "PAUTO12345");
-  assert.equal(managedCustomerSnapshot.document_serial_number, "AUTO12345");
+  // Hosted Android snapshots redact identity/document numbers for all roles
+  // (sync.php ya_sync_sanitize_android_customers, D-042 privacy). Canonical desktop retains them.
+  assert.equal(managedCustomerSnapshot.identity_number, "");
+  assert.equal(managedCustomerSnapshot.document_serial_number, "");
+  assert.equal(database.getDashboardData().customers.find((customer) => customer.id === managedCustomerResult.savedId)?.identityNumber, "PAUTO12345");
   const managedStaySnapshot = adminSummary.customer_room_stays.find((stay) => stay.id === managedStayResult.savedId);
   assert.ok(managedStaySnapshot);
   assert.equal(managedStaySnapshot.customer_id, managedCustomerResult.savedId);

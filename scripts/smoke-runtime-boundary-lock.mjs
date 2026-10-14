@@ -135,7 +135,7 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 262, "all production invoke registrations must execute");
+assert.equal(handlers.size, 264, "all production invoke registrations must execute");
 assert.equal(coordinatorOptions.androidActions, androidIngress, "main composes the same ingress owner for automatic and manual sync");
 assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
 const renderer = Object.assign(new EventEmitter(), { id: 42, getURL: () => "fixture" });
@@ -156,7 +156,7 @@ assert.equal(calls.length, beforeDictation, "Locked dictation must not read conf
 for (const channel of handlers.keys()) {
   if (lockFree.has(channel)) continue;
   const before = calls.length;
-  if (channel === "dictation:transcribe") assert.equal((await invoke(channel, {})).ok, false);
+  if (channel.startsWith("dictation:")) assert.equal((await invoke(channel, {})).ok, false, `${channel}: locked dictation returns sanitized failure`);
   else await assert.rejects(invoke(channel, {}), /Uygulama kilitli/, channel);
   assert.equal(calls.length, before, `${channel}: no operation/read/network dependency before session gate`);
 }

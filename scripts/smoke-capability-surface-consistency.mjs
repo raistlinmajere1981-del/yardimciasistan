@@ -218,7 +218,10 @@ assert.match(
   androidUiRulesSource,
   /CAPABILITY_ACCOMMODATION_RESERVATIONS\)[\s\S]{0,120}hasPermission\("reservation\.view"\)/
 );
-assert.match(androidMainSource, /canOpenTab\(destination\.tab\)/);
+assert.match(androidMainSource, /navigation\.open\(data,/);
+assert.match(androidMainSource, /AndroidUiRules\.resolveDestination\(navigation\.route\(\)\)/);
+assert.match(androidUiRulesSource, /canOpenTab\(data,\s*target\.tab\)/);
+assert.match(androidUiRulesSource, /static boolean canOpenRoute\(OperationData data, String route\)/);
 assert.match(androidSyncClientSource, /android_capability_disabled[\s\S]{0,300}invalidatesPendingAction/);
 assert.match(androidSyncControllerSource, /operationCache\.clear\(\)[\s\S]{0,120}actionOutbox\.clear\(\)/);
 assert.match(androidActivitySource, /provisioningController\.bootstrap\(identity\)/);
@@ -351,7 +354,7 @@ assert.equal(marketCapabilities.includes(C.ACCOMMODATION_ROOMS), false);
 assert.equal(marketCapabilities.includes(C.FOOD_TABLES), false);
 assert.deepEqual(
   androidAvailablePermissionGroupIds(marketCapabilities),
-  ["market_operations"]
+  ["market_operations", "market_sales"]
 );
 const marketPermissions = androidEffectivePermissionsForGroups({
   service_orders: false,
