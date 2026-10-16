@@ -98,3 +98,15 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Prototype components: compact-notifications.css, notification-center.js, build-compact.py. V4 pages and index.html in .superdesign/android-companion/redesign-pixco-stitch-v1/.
 - Browser test test-compact.cjs: 36/36 PASS including 360/393/840, dark and 150% text, role restrictions, central operation feedback and notification filtering. All 4 Superdesign drafts updated in place and downloaded HTML verified identical.
 - Native Java code, pilot DB, hosting and published APK not changed. New notification design must later subscribe to typed existing domain/sync/outbox events and preserve permission authority.
+
+
+## 16 Ekim 2026 — V5: işlem-yetki ve gönderim durumu eşleştirmesi
+
+- Görünüm yetkisiyle işlem yetkisi ayrıldı. Android kaynakları: AndroidUiRules.java, AndroidActionPolicy.java, PensionRoomCard.java, TableOrderDialog.java, RoomFolioWorkspace.java, MarketUiRules.java.
+- Restoranda yalnız table_order.view hakkı olan kişi adisyonu görebilir, ancak table_order.open / table_order.add_item / table_order.close_paid eylemlerine erişemez. Örnek sipariş personeli ile ödeme kapatabilen karma yönetici ayrı senaryolardır.
+- Market'te market.product.view, market.sale.complete, market.stock_count, customer_credit.view ve customer_credit.payment ayrı kontroller olarak tasarıma yansıtıldı. Satış var/cari yok personeline borç bilgisi gösterilmez.
+- Pansiyonda müşteri-oda ataması isAdmin + customer.manage + room.assign_customer gerektirir; oda görüntüleme tek başına check-in yetkisi vermez.
+- Gönderim bekliyor (telefonda) ile masaüstü işlem sonucu bekleniyor iki ayrı durum/bildirimdir. Her ikisi de işlem tamamlandı olarak sunulmaz.
+- V5 dört taslağın aynı Superdesign kimliğinde güncellendiği sürümdür. .superdesign/android-companion/redesign-pixco-stitch-v1/index.html yeni toplu karşılaştırma panosudur.
+- test-actions.cjs ile 32 temel akış/rol/durum/ekran genişliği senaryosu PASS; Superdesign'a V5 içeriği aktarılıp geri alınarak 4/4 dosya birebir kontrol edildi.
+- Kaynak sözleşme: .superdesign/android-companion/redesign-pixco-stitch-v1/ACTION_AUTHORITY_V5_NOTES.md. Tüm profil/rol kombinasyonlarının tam matrisi, gerçek cihaz ve gerçek offline/outbox testleri sonraki native entegrasyon doğrulamasıdır. Android Java, saha APK 2.0.8, pilot DB ve hosting değişmedi.
