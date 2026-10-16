@@ -110,3 +110,13 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - V5 dört taslağın aynı Superdesign kimliğinde güncellendiği sürümdür. .superdesign/android-companion/redesign-pixco-stitch-v1/index.html yeni toplu karşılaştırma panosudur.
 - test-actions.cjs ile 32 temel akış/rol/durum/ekran genişliği senaryosu PASS; Superdesign'a V5 içeriği aktarılıp geri alınarak 4/4 dosya birebir kontrol edildi.
 - Kaynak sözleşme: .superdesign/android-companion/redesign-pixco-stitch-v1/ACTION_AUTHORITY_V5_NOTES.md. Tüm profil/rol kombinasyonlarının tam matrisi, gerçek cihaz ve gerçek offline/outbox testleri sonraki native entegrasyon doğrulamasıdır. Android Java, saha APK 2.0.8, pilot DB ve hosting değişmedi.
+
+
+## 16 Ekim 2026 — V6: Müşteriler / Talepler ve Oda Hesapları
+
+- İki yeni native Android görsel konsepti üretildi. Mevcut dört ekranla beraber tasarım panosu 6 ekran içeriyor: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html.
+- Müşteriler/Talepler: Yeni Talepler, Müşteriler, Cevap Bekleyenler sekmeleri ve ayrıntıları; görüntüleme ile müşteri yönetimi / yanıt / rezervasyona çevirme yetkileri ayrıdır. Kaynak: AndroidUiRules, CustomerWorkspace, CustomerRequestDetailDialog.
+- Oda Hesapları: açık/ödenmiş bakiye, yetkili ödeme, ek ücret ve menü ürünü, kalan borç 0 olduğunda çıkış. Kaynak: RoomFolioWorkspace ve AndroidActionPolicy. Basit bir adisyon görüntüleme hakki finansal işlem hakkı vermez.
+- Çevrimdışı ve pending/queued durumlarda salt-okunur müşteri/talep/folio ayrıntısı açılabilir; mutasyon eylemleri yeni kayıt göndermeye uygun değilse sunulmaz. Merkezi bildirim UX'i korunur.
+- test-customer-folio.cjs: 51/51 tarayıcı senaryosu PASS (360/393/840, tema/font/rol/durum, ayrıntı, filtre ve navigasyon). Superdesign 6/6 tasarım aktarımı ve kaynaktan geri okuma byte-identical doğrulandı.
+- Bu sayfaların fixture verileri sentetiktir. Android Java, gerçek DB, yayındaki pilot 2.0.8 veya hosting değiştirilmedi. Fiziksel Android tablet, TalkBack, tam rol matrixi ve kalan iş akışları ayrı doğrulama gerektirir.
