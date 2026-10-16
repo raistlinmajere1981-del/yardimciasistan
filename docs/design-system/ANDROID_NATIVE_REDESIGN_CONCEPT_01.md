@@ -120,3 +120,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Çevrimdışı ve pending/queued durumlarda salt-okunur müşteri/talep/folio ayrıntısı açılabilir; mutasyon eylemleri yeni kayıt göndermeye uygun değilse sunulmaz. Merkezi bildirim UX'i korunur.
 - test-customer-folio.cjs: 51/51 tarayıcı senaryosu PASS (360/393/840, tema/font/rol/durum, ayrıntı, filtre ve navigasyon). Superdesign 6/6 tasarım aktarımı ve kaynaktan geri okuma byte-identical doğrulandı.
 - Bu sayfaların fixture verileri sentetiktir. Android Java, gerçek DB, yayındaki pilot 2.0.8 veya hosting değiştirilmedi. Fiziksel Android tablet, TalkBack, tam rol matrixi ve kalan iş akışları ayrı doğrulama gerektirir.
+
+
+## 16 Ekim 2026 — V7: Fotoğraf alanlı menü ve kalabalık katalog tasarımı
+
+- Yeni orders-v7.html restoran adisyon tasarımı: görsel alanlı ürün satırı, fotoğrafsız placeholder, Türkçe ürün adı/kodu arama, kategori kısayolları ve tüm kategoriler seçicisi, 24'er ürün sayfalama, adisyon ayrı sekme, yetkili adet ve servis işlemleri.
+- Fotoğraf kaynağı için mevcut masaüstü menu.items[].image_url kullanılacak. Android OperationData.MenuItem modeline bu alan henüz aktarılmıyor; native aşamada güvenli görsel referansı ve çevrimdışı disk önbelleği gerekecek. Bu turdaki görseller gerçek fotoğraf değil, tamamen yerel SVG çizim örnekleridir.
+- Test: 1.200 ürün, 3 rol, 360/393/840 görünüm; 14 senaryo PASS. 10.000 ürünlü arama PASS (tek ölçüm ~121ms). Yedi ekranlık karşılaştırma panosu PASS; Superdesign 7/7 dosya eşleşmesi.
+- Kaynak ve kalan işler: .superdesign/android-companion/redesign-pixco-stitch-v1/RESTAURANT_CATALOG_V7_NOTES.md. Yerel pano aynı dizindeki index.html.
+- Android Java, pilot DB, hosting, yayımlanmış APK değişmedi. Fiziksel Android/TalkBack ve gerçek fotoğraf dağıtımı native entegrasyonda test edilecek.
