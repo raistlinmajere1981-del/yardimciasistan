@@ -41,3 +41,7 @@
 - İki sütunlu, tüm seçenekleri görünür seçim alanları; 150% için büyüyen üst başlık ve alt gezinme.
 - Görseller: .superdesign/android-companion/workbench/accessibility-v4-2026-10-16/
 - Fiziksel tablet henüz bağlanmadı. Aşama 2 için sıradaki işler: 840dp navigasyon rayı, 393dp portre, kart yoğunluğu ve büyük font satır taşmaları.
+
+## 16 Ekim yeni konsept yönü
+
+Pixco Sketch + Stitch davranış referanslarından, mevcut 2.0.8 görünümünü kopyalamayan **Bugün / Şimdi** yeni Superdesign konsepti hazır. Ayrıntı: `docs/design-system/ANDROID_NATIVE_REDESIGN_CONCEPT_01.md`. Java native UI değiştirilmeden önce bu tasarım yönü görsel olarak değerlendirilecek.
