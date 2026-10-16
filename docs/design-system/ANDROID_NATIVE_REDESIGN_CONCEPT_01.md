@@ -78,3 +78,13 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Playwright 40/40 görünüm/etkileşim PASS. Ölçülen örnek metinler için kontrast 4.5:1 altında 0; bütün WCAG uygunluğu iddia edilmez. Karşılaştırma panosu seçimleri de PASS.
 - Bu aşamada Android Java, saha sürümü 2.0.8, canlı hosting, pilot veri veya işletme durumları değiştirilmedi. Fiziksel tablette gerçek doğrulama yapılmadı.
 - Sonraki tur: gerçeğe bağlı capability+permission navigasyon, boş/yükleniyor/çevrimdışı/yetkisiz/bekleyen durumlar, TalkBack ve genişletilmiş tablet kullanımı; sonra toplu görsel değerlendirme.
+
+
+## 16 Ekim 2026 — V3: Role/capability and state designs
+
+- Six representative access fixtures now cover mixed admin, Pension staff, Restaurant staff, full Market staff, product-view-only Market staff, and no business access. Native permission rules remain the authority.
+- Navigation follows AndroidUiRules root ordering: Today, Customer when permitted, first permitted business, More when additional allowed workspaces exist. No fixed cross-sector bottom navigation or automatically granted retail privileges.
+- Empty, loading, offline with stale snapshot, waiting for desktop result, and denied screens are documented. Market product viewing does not automatically reveal sale, count or credit.
+- Playwright 67 role/state cases PASS; 4 Superdesign drafts re-imported into their existing identifiers and verified byte-identical. Cross-screen preview settings remain available in the gallery: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html.
+- Source details and limits: .superdesign/android-companion/redesign-pixco-stitch-v1/ROLE_STATE_V3_NOTES.md.
+- Remaining: exact native action/permission mapping, real offline/outbox and stale projection behavior, Android TalkBack/IME, physical tablet and UI design review. Java app, release 2.0.8, hosting and pilot data unchanged.
