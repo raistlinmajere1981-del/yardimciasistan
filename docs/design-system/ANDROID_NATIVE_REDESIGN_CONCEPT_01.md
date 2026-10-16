@@ -174,3 +174,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Gönderiler ve Pazarlama salt-okunur. Kargo takip bağlantısı ancak mevcutsa; pazarlama yayın/plan kayıtları mevcut marketing.status.view iznine göre, kampanya kayıtları ayrıca messaging.campaigns + core.customers koşuluyla gösterilir.
 - 15 ekranlık yerel toplu pano .superdesign/android-companion/redesign-pixco-stitch-v1/index.html. V12 test-workflows-v12.cjs 54/54 PASS (360/393/840, rol, offline/queued/pending, eksik sipariş ürünleri, bekleyen eylem, stale ve unknown sonuç).
 - Android native kodu, pilot verisi, APK ve hosting değişmedi. Superdesign V12 bulut doğrulaması yalnız geri indirilen eşleşen taslakları kapsar; rapor WORKFLOWS_V12_NOTES.md ile superdesign-project.json içindedir.
+
+
+## 17 Ekim 2026 — V13: Finans ve yerel Görünüm tercihleri
+
+- Kasa ve Raporlar iki ayrı büyük sayfa yerine **Finans** içinde yalnız yetkili bölümleri gösteriyor. Kasa görüntüleme finance.view, hareket oluşturma finance.create; Raporlar admin + core.reports. Rapor dönemleri today/yesterday/last7/last30 ve metrikler ilgili capability kaynaklarına göre koşullu. AI yalnız hazır rapor özetini yetkili servisle yorumlayabilir.
+- Kişisel Görünüm altyapısı Android Java'da **zaten mevcut**: AppearancePreferences (font 90/100/115/130/150, yeşil/mavi/sıcak/mor renk, yüksek kontrast) + AppTheme DAY/NIGHT ve AndroidSettingsWorkspace. V13 bunu yeniden yazmaz, yalnız native tasarım sözleşmesi ve tüm ekran önizleme kontrolü sağlar. Tercihler per-device; browser taslağı URL üzerinden değişir, kaydetmez.
+- Ortak bildirim peek şeridinin üst sekmeleri örtebilmesi çevrimdışı testte tespit edilerek V13 bütün HTML önizlemelerinde alt kontrollere taşındı. Fiziksel Android davranışı ayrıca doğrulanacak.
+- Yerelde 17 ekran, test-finance-settings-v13.cjs ile 53/53 PASS (360/393/840, roller, finans formu ve izinleri, dönem raporu, AI görünürlüğü, renk/font/kontrast/tema, gezinme). Yeni Finans/Görünüm Superdesign taslakları sunucudan geri alınıp birebir doğrulandı; diğer 15 V13 tasarım yerelde güncel.
+- Toplu pano .superdesign/android-companion/redesign-pixco-stitch-v1/index.html, kaynak notları FINANCE_APPEARANCE_V13_NOTES.md. Native Android, pilot DB, APK ve hosting değişmedi.
