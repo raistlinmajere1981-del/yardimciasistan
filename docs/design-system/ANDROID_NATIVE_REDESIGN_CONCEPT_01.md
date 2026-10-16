@@ -165,3 +165,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Yerel panoda 14 ekran: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html. test-shared-v11.cjs ile 49/49 browser testi PASS; 360/393/840, rol, sektör, offline, bekleyen, yetkisiz, gezinme.
 - Superdesign'da V11 Günlük İşler ve yeni Mesajlar taslağı byte-identical doğrulandı; diğer 12 V11 taslak için sync tamamlandı denmiyor. superdesign-project.json -> cloud_v11_verification.
 - Native Android kodu, pilot DB, APK ve hosting değişmedi; arayüz/işlem sözleşmesi SHARED_OPERATIONS_V11_NOTES.md içinde.
+
+
+## 17 Ekim 2026 — V12: İş Takibi / Siparişler, Gönderiler, Pazarlama
+
+- Üç bağımsız büyük ekran yerine tek "İş Takibi" tasarımı: Siparişler / Gönderiler / Pazarlama sekmeleri yalnız yetkili kullanıcıya görünür. Sipariş Online/Bayi/Masaüstü kaynaklarına göre filtrelenir; online_sales.view ve commerce.wholesale ayrı koşuldur.
+- Sipariş ayrıntısının tam olması, expected_status/expected_updated_at sürüm doğrulaması, availableActions, bağımsız commerce_order.confirm/cancel izni ve pending/unknown/applied-awaiting-projection engelleri native uygulamaya taşınmalıdır. Taslakta sipariş onayı ne gerçek işlem gönderir ne de siparişi hemen onaylı gösterir.
+- Gönderiler ve Pazarlama salt-okunur. Kargo takip bağlantısı ancak mevcutsa; pazarlama yayın/plan kayıtları mevcut marketing.status.view iznine göre, kampanya kayıtları ayrıca messaging.campaigns + core.customers koşuluyla gösterilir.
+- 15 ekranlık yerel toplu pano .superdesign/android-companion/redesign-pixco-stitch-v1/index.html. V12 test-workflows-v12.cjs 54/54 PASS (360/393/840, rol, offline/queued/pending, eksik sipariş ürünleri, bekleyen eylem, stale ve unknown sonuç).
+- Android native kodu, pilot verisi, APK ve hosting değişmedi. Superdesign V12 bulut doğrulaması yalnız geri indirilen eşleşen taslakları kapsar; rapor WORKFLOWS_V12_NOTES.md ile superdesign-project.json içindedir.
