@@ -129,3 +129,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Test: 1.200 ürün, 3 rol, 360/393/840 görünüm; 14 senaryo PASS. 10.000 ürünlü arama PASS (tek ölçüm ~121ms). Yedi ekranlık karşılaştırma panosu PASS; Superdesign 7/7 dosya eşleşmesi.
 - Kaynak ve kalan işler: .superdesign/android-companion/redesign-pixco-stitch-v1/RESTAURANT_CATALOG_V7_NOTES.md. Yerel pano aynı dizindeki index.html.
 - Android Java, pilot DB, hosting, yayımlanmış APK değişmedi. Fiziksel Android/TalkBack ve gerçek fotoğraf dağıtımı native entegrasyonda test edilecek.
+
+
+## 17 Ekim 2026 — V8: Restoran Rezervasyonları / Günlük İşler / KBS
+
+- Koleksiyon 10 tasarım ekranına yükseltildi: yeni Restoran Rezervasyonları, Günlük İşler ve KBS. Tek karşılaştırma panosu .superdesign/android-companion/redesign-pixco-stitch-v1/index.html.
+- Restoran rezervasyonunda bekleyen/onaylı, yetkili onay/iptal ve yeni kayıt; günlük işte bekleyen/tamamlanan, yetkili düzenleme/tamamlama. Ortak sade kartlar ve tek bildirim merkezi.
+- KBS yalnız admin + accommodation.rooms/stays + kbs.view + etkin durumda. Gönderim talebi resmi gönderim değildir; belirsiz sonuç tekrar gönderilmez; başarısız ve retryReady kaydı için yeniden deneme hazırlanabilir. Harici gönderimde portal doğrulaması ve ikinci açık onay şart. Yerel prototip resmi gönderim yapmaz.
+- test-operations-v8.cjs: 59/59 PASS; 360/393 telefon, 840 tablet tarayıcı simülasyonu; yetki/veri gizleme, offline, KBS 2 aşamalı onay ve gezinme. 10/10 Superdesign dosyası yerelle birebir doğrulandı.
+- Sözleşme: .superdesign/android-companion/redesign-pixco-stitch-v1/OPERATIONS_V8_NOTES.md. Android Java, pilot DB, Android 2.0.8 APK ve hosting değişmedi. Gerçek cihaz / KBS testleri ayrı bekliyor.
