@@ -147,3 +147,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Tasarımdaki görseller gerçek menü fotoğrafı değil, çevrimdışı örnek SVG'lerdir. Native Android MenuItem image_url/veri kaynağı + küçük fotoğraf önbelleği daha sonra yapılacaktır. AI stok girişi yalnız izinli servis kombinasyonunda olmalıdır.
 - 39/39 Playwright testi PASS; 360/393/840, 1.200 ürün, büyük yazı, arama/kategori, rol/izin, çevrimdışı salt-okunur ve menü kaldırma onayı. 12/12 Superdesign HTML dosyası yerel ile birebir doğrulandı.
 - Kaynak sözleşme .superdesign/android-companion/redesign-pixco-stitch-v1/STOCK_MENU_V9_NOTES.md. Gerçek Android Java, 2.0.8 APK, pilot DB ve hosting değiştirilmedi.
+
+
+## 17 Ekim 2026 — V10: Konaklama / Rezervasyonlar
+
+- İki yeni sayfa yerine tek Konaklama yüzeyi: Rezervasyonlar / Konaklamalar sekmeleri. Pansiyon rezervasyonunda görüntüleme ile oluşturma/güncelleme/onay/ret/iptal ayrı izinler; konaklama görüntüleme kaynak AndroidUiRules'a göre admin + customer.manage + room.assign_customer + accommodation.stays gerektirir.
+- Açık bakiyeli misafir için ayrı çıkış kısayolu yok; mevcut Oda Hesapları ekranına geçiş var. İşlemler masaüstü sonucu gelmeden gerçekleşmiş kabul edilmiyor. Sade metinler, tek bildirim merkezi, çevrimdışı salt-okunur ayrıntılar korunuyor.
+- 27/27 hedefli tarayıcı testi PASS; 360/393 telefon ve 840 tablet emülasyonu, yetki/rol, offline/queued/pending/denied/empty/loading, ayrıntı ve folio geçişleri.
+- Yerel tasarım seti 13 ekrana genişledi: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html.
+- Yeni Konaklama Superdesign draft'ı oluşturuldu ve içerik birebir doğrulandı. Eski draftların V10 güncellemesinde Superdesign API sunucu hataları görüldü; tam cloud sync yapılmış sayılmıyor. Tam liste superdesign-project.json -> cloud_v10_verification. Android Java, pilot DB, release APK ve hosting değiştirilmedi.
