@@ -68,3 +68,13 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - **Kod sınırı:** `apps/android-app` native Java, senkronizasyon, SQLite, hosting, 2.0.8 pilot sürüm bu dört ekranın tasarımı sırasında değiştirilmedi. Kullanıcı tasarımı değerlendirmeden native UI refactor yapılmayacak.
 
 **Tasarım sonrası sıra:** İlk dört ekranın görsel değerlendirmesi ve erişilebilirlik varyantları → gerçek yetki/gezinme haritası → ekranların mevcut native operasyon sahiplerine parça parça entegrasyonu → hedefli Android device smoke → release öncesi kapsamlı doğrulama.
+
+
+## 16 Ekim 2026 — İkinci tur adaptif Android UI tamamlandı
+
+- Dört Superdesign taslağı mevcut draft kimlikleriyle adaptif v2 sürümüne güncellendi, sunucudan alınan HTML dosyaları yerel kaynakla byte-byte eşleşti.
+- Ortak karşılaştırma panosu .superdesign/android-companion/redesign-pixco-stitch-v1/index.html: 360/393 telefon, 840/1024 tablet, %90–%150 font, açık/koyu ve normal/yüksek kontrast.
+- adaptive.css ve build-adaptive.py dört -v2.html üretir; v1 kaynakları korunur. 840+ genişlikte 94px sol ray, oda/masa iki sütun.
+- Playwright 40/40 görünüm/etkileşim PASS. Ölçülen örnek metinler için kontrast 4.5:1 altında 0; bütün WCAG uygunluğu iddia edilmez. Karşılaştırma panosu seçimleri de PASS.
+- Bu aşamada Android Java, saha sürümü 2.0.8, canlı hosting, pilot veri veya işletme durumları değiştirilmedi. Fiziksel tablette gerçek doğrulama yapılmadı.
+- Sonraki tur: gerçeğe bağlı capability+permission navigasyon, boş/yükleniyor/çevrimdışı/yetkisiz/bekleyen durumlar, TalkBack ve genişletilmiş tablet kullanımı; sonra toplu görsel değerlendirme.
