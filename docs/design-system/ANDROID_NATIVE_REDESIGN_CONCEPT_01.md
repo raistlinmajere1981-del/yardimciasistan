@@ -46,3 +46,25 @@ Kaydetme yöntemi: `@superdesign/cli import-design-draft` (AI üretim kredisi ha
 5. Taslaklar yeterli bulunduğunda ilgili Android Java bileşenlerine **küçük parçalarda** taşı. Veritabanı/sync sözleşmesi ve saha release'i ancak ayrı doğrulamayla.
 
 **Not:** Superdesign bulut taslağı, sahada çalışan Android 2.0.8 uygulamasının yeni sürümü değildir.
+
+## Konsept 01 — 4 ekranlık ilk set tamamlandı (16 Ekim 2026)
+
+Superdesign proje: https://superdesign.dev/teams/d43e8b12-551a-4b15-a10c-e48c388c4fc6/projects/c3b4e035-cfa9-45e8-a310-c2281f6edbec
+
+- **01 Bugün / Şimdi:** `today.html`; taslak `cf82d223-36f3-4382-979d-bf19357d7383`.
+- **02 Odalar / Misafir Girişi:** `rooms.html`; taslak `35214f27-4679-47ae-9ac2-36b55463b0af`. Oda durumu ile rezervasyon/giriş olayı ayrı gösterilir. Giriş üç aşamalı önizleme; eylem sunucuya gönderilmez.
+- **03 Masalar / Servis:** `tables.html`; taslak `f47f8a49-226e-431a-883a-b9bfcf31418b`. Masa durumu ile açık adisyon/hesap bekleme durumu ayrı. Alan seçimi, masa filtresi ve ödeme önizlemesi mevcut.
+- **04 Market / Satış & Stok:** `market.html`; taslak `1df945a8-1b54-403e-8a0e-a62350ff5e9e`. Barkod/ürün arama, sepet/ödeme onayı, sayım ve cari işlemler birbirinden ayrılır. POS terminali gibi bir ana ekran tasarlanmamıştır.
+
+Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v1/index.html`. Her dört HTML de aynı klasörde ve birlikte görülebilir. Ekranlar arası footer butonları gerçek uygulama navigasyonu değildir; bazıları yalnız örnek bilgilendirme yüzeyi açar.
+
+### Doğrulama ve sonraki kapılar
+
+- **PASS:** Her dört ekran için Playwright/Brave 360×740, 393×852, 440×915: toplam 12 viewport denemesi; yatay taşma ve JS hatası yok. Bottom sheet, oda/masa filtreleri, müşteri giriş adımları, satış-sepet-ödeme stok/cari örnekleri kontrol edildi.
+- **PASS:** Üç yeni Superdesign draft import'u ve geri okunan HTML'nin yerel kaynakla byte-byte eşleşmesi. İlk Bugün draft'ı önceki turda da doğrulanmıştı. AI jenerasyon kredisi kullanılmadı.
+- **Yetki farkı:** Karşılaştırma amacıyla karma Pansiyon/Restoran alt gezinmesinde Bugün/Odalar/Masalar/Diğer, Market örneğinde Bugün/Satış/Ürünler/Diğer önerildi. Mevcut Android rootNavigation bununla birebir aynı değildir. Native aktarma aşamasında rol/capability/permission matrisi korunarak gezinme kararı yeniden uygulanmalıdır. Yetkisiz ekranlar varsayılan olarak gösterilmemelidir.
+- **Ek doğrulama:** gerçek cihaz üzerinde SP font %150 ve yüksek kontrast/koyu tema, 393dp/840dp tablet, ekran döndürme, TalkBack/IME, offline/pending/denied/error ve gerçek veri yoğunluğu ayrı turlardır; bu ilk prototip bunları geçtiğini iddia etmez.
+- **Tüm sayılar sentetik:** Market stok sayım ilerlemesi, sepet toplamı, cari bakiye, konaklama ve masa durumu yalnız görsel fixture'dır. Gerçek kayda bağlanmadan gösterilmemeli. Cari hesap için geçerli kişisel Android cihaz kimliği ve yetki zorunluluğu korunur; satış/ödeme eylemleri masaüstü onayı bekler.
+- **Kod sınırı:** `apps/android-app` native Java, senkronizasyon, SQLite, hosting, 2.0.8 pilot sürüm bu dört ekranın tasarımı sırasında değiştirilmedi. Kullanıcı tasarımı değerlendirmeden native UI refactor yapılmayacak.
+
+**Tasarım sonrası sıra:** İlk dört ekranın görsel değerlendirmesi ve erişilebilirlik varyantları → gerçek yetki/gezinme haritası → ekranların mevcut native operasyon sahiplerine parça parça entegrasyonu → hedefli Android device smoke → release öncesi kapsamlı doğrulama.
