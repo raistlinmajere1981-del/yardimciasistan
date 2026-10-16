@@ -156,3 +156,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - 27/27 hedefli tarayıcı testi PASS; 360/393 telefon ve 840 tablet emülasyonu, yetki/rol, offline/queued/pending/denied/empty/loading, ayrıntı ve folio geçişleri.
 - Yerel tasarım seti 13 ekrana genişledi: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html.
 - Yeni Konaklama Superdesign draft'ı oluşturuldu ve içerik birebir doğrulandı. Eski draftların V10 güncellemesinde Superdesign API sunucu hataları görüldü; tam cloud sync yapılmış sayılmıyor. Tam liste superdesign-project.json -> cloud_v10_verification. Android Java, pilot DB, release APK ve hosting değiştirilmedi.
+
+
+## 17 Ekim 2026 — V11: Ortak Günlük İşler ve Mesajlar
+
+- Pansiyon ile Restoran günlük işleri tek tasarım çalışma alanında birleşti; karma işletmede sektör sekmesi, tek sektör personelinde yalnız yetkili görevler. Günlük iş izleme, oluşturma, güncelleme ve tamamlama izinleri ayrıldı. Native kapsamda mixed-domain görevler gerçek kaynaktan sınıflandırılacak.
+- Mesajlar: Hazır Mesajlar ve customer.requests yetkisiyle Cevap Bekleyenler. service.whatsapp ve customer.view görüntüleme için, customer.respond WhatsApp içerik/yanıt, customer.mark_answered Cevaplandı, message.delete yönetici silme için ayrı izinler. WhatsApp'ı açmak gönderilmiş veya cevaplanmış kabul edilmez.
+- Yerel panoda 14 ekran: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html. test-shared-v11.cjs ile 49/49 browser testi PASS; 360/393/840, rol, sektör, offline, bekleyen, yetkisiz, gezinme.
+- Superdesign'da V11 Günlük İşler ve yeni Mesajlar taslağı byte-identical doğrulandı; diğer 12 V11 taslak için sync tamamlandı denmiyor. superdesign-project.json -> cloud_v11_verification.
+- Native Android kodu, pilot DB, APK ve hosting değişmedi; arayüz/işlem sözleşmesi SHARED_OPERATIONS_V11_NOTES.md içinde.
