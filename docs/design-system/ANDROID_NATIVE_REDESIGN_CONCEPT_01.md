@@ -183,3 +183,13 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Ortak bildirim peek şeridinin üst sekmeleri örtebilmesi çevrimdışı testte tespit edilerek V13 bütün HTML önizlemelerinde alt kontrollere taşındı. Fiziksel Android davranışı ayrıca doğrulanacak.
 - Yerelde 17 ekran, test-finance-settings-v13.cjs ile 53/53 PASS (360/393/840, roller, finans formu ve izinleri, dönem raporu, AI görünürlüğü, renk/font/kontrast/tema, gezinme). Yeni Finans/Görünüm Superdesign taslakları sunucudan geri alınıp birebir doğrulandı; diğer 15 V13 tasarım yerelde güncel.
 - Toplu pano .superdesign/android-companion/redesign-pixco-stitch-v1/index.html, kaynak notları FINANCE_APPEARANCE_V13_NOTES.md. Native Android, pilot DB, APK ve hosting değişmedi.
+
+
+## 17 Ekim 2026 — V14: Ayarlar bölümleri, bağlantı ve işlem geçmişi
+
+- Yeni tam ekran yok: Mevcut Ayarlar alanında Görünüm, Ses, Bildirimler, Bağlantı ve Telefon İşlemleri bölümleri. Kişisel tercihler kısıtlı hesapta ve boş/yükleniyor/denied durumda da erişilebilir.
+- core.notifications açıkken müşteri/rezervasyon, restoran/sipariş, oda/günlük iş, işlem hataları; settings.view izniyle ayrıca sync_connection bildirimleri gösterilir.
+- Teknik bağlantı görüntüleme settings.view, düzenleme settings.edit ile ayrıldı. Embedded APK bağlantı kilidi varsa düzenleme alanları yoktur. Gerçek URL/güvenlik anahtarı tasarıma taşınmadı; .invalid adres ve boş parola alanı kullanıldı.
+- Telefon işlemleri pending/applied/failed/unknown durumlarında salt okunur; unknown için kör tekrar gönderim yok. Ses bölümü AndroidVoiceController yerine çalışan sahte motor üretmiyor.
+- 17 ekranın yerel V14 kopyası güncel. test-settings-v14.cjs 32/32, test-v14-collection-smoke.cjs 34/34 PASS. Ayarlar Superdesign V14 geri indirilip birebir doğrulandı, diğer 16 V14 taslak yerel-only.
+- Kaynak sözleşme .superdesign/android-companion/redesign-pixco-stitch-v1/SETTINGS_V14_NOTES.md. Android Java/APK, pilot DB, hosting ve gerçek bağlantılar değişmedi.
