@@ -6,6 +6,7 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Intent;
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -78,6 +79,16 @@ public final class MainActivity extends ComponentActivity {
   private StockImageAnalysisController stockImageAnalysisController;
   private StockImageWorkflow stockImageWorkflow;
   private AndroidVoiceController voiceController;
+  @Override
+  protected void attachBaseContext(Context base) {
+    SharedPreferences local = base.getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
+    AppearancePreferences selected = AppearancePreferences.load(local);
+    Configuration scaled = new Configuration(base.getResources().getConfiguration());
+    scaled.fontScale = AppearancePreferences.combinedFontScale(
+        scaled.fontScale, selected.fontPercent);
+    super.attachBaseContext(base.createConfigurationContext(scaled));
+  }
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
@@ -163,7 +174,7 @@ public final class MainActivity extends ComponentActivity {
     });
     IdentityImageAnalysisController identityImageAnalysisController = new IdentityImageAnalysisController(this, executor, syncClient);
     stockImageAnalysisController = new StockImageAnalysisController(this, executor, syncClient);
-    UiKit.applyTheme(AppTheme.tokens(themeMode));
+    UiKit.applyTheme(AppTheme.tokens(themeMode, AppearancePreferences.load(preferences)));
     applyWindowTheme();
     shell = new AndroidShellController(
         this,
@@ -581,6 +592,27 @@ public final class MainActivity extends ComponentActivity {
           public void onSyncRequested() {
             syncOperations(true);
           }
+          @Override
+          public void onAppearanceChanged(AppearancePreferences next) {
+            AppearancePreferences previous = AppearancePreferences.load(preferences);
+            if (!next.save(preferences)) {
+              Toast.makeText(MainActivity.this, "Görünüm ayarı kaydedilemedi.", Toast.LENGTH_SHORT).show();
+              return;
+            }
+            if (previous.fontPercent != next.fontPercent) {
+              // recreate() restores Settings/route/scroll through onSaveInstanceState.
+              // A debug reset-extra must never re-run just because font size changed.
+              getIntent().removeExtra("ya_reset_debug_app_state");
+              recreate();
+              return;
+            }
+            shell.rememberCurrentScrollPosition();
+            UiKit.applyTheme(AppTheme.tokens(themeMode, next));
+            applyWindowTheme();
+            shell.build();
+            render();
+          }
+
 
           @Override
           public void refreshNotifications(OperationData snapshot) {
@@ -877,7 +909,7 @@ public final class MainActivity extends ComponentActivity {
     boolean persisted = AppTheme.save(preferences, nextMode);
     themeMode = nextMode;
     setTheme(themeStyleResource(themeMode));
-    UiKit.applyTheme(AppTheme.tokens(themeMode));
+    UiKit.applyTheme(AppTheme.tokens(themeMode, AppearancePreferences.load(preferences)));
     applyWindowTheme();
     shell.build();
     render();

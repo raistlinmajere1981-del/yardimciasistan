@@ -3,6 +3,7 @@ package com.yardimciasistan.android;
 import android.app.Dialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -57,6 +58,7 @@ final class AndroidShellController {
   private boolean landscapeLayout;
   private String renderedScreenKey = "";
   private String currentError = "";
+  private int currentBottomNavHeightDp = BOTTOM_NAV_HEIGHT_DP;
 
   AndroidShellController(ComponentActivity activity, Listener listener) {
     this.activity = activity;
@@ -77,6 +79,8 @@ final class AndroidShellController {
     }
     landscapeLayout = AndroidRootSwipeRules.usesRail(width, height);
     boolean compactHeader = height < 480;
+    boolean largeText = activity.getResources().getConfiguration().fontScale >= 1.28f;
+    currentBottomNavHeightDp = largeText ? 94 : BOTTOM_NAV_HEIGHT_DP;
 
     LinearLayout root = UiKit.column(activity);
     root.setBackgroundColor(UiKit.BG);
@@ -92,14 +96,20 @@ final class AndroidShellController {
     header.setBackgroundColor(UiKit.BG);
     header.setLayoutParams(new LinearLayout.LayoutParams(
         -1,
-        UiKit.dp(activity, compactHeader ? LANDSCAPE_HEADER_HEIGHT_DP : PORTRAIT_HEADER_HEIGHT_DP)
+        UiKit.dp(activity, compactHeader
+            ? (largeText ? 82 : LANDSCAPE_HEADER_HEIGHT_DP)
+            : (largeText ? 98 : PORTRAIT_HEADER_HEIGHT_DP))
     ));
 
     LinearLayout titleGroup = UiKit.column(activity);
     titleGroup.setGravity(Gravity.CENTER_VERTICAL);
     headerTitle = UiKit.text(activity, "Bugün", 20, UiKit.TEXT, Typeface.BOLD);
+    headerTitle.setSingleLine(true);
+    headerTitle.setEllipsize(TextUtils.TruncateAt.END);
     titleGroup.addView(headerTitle);
     headerMeta = UiKit.text(activity, "Personel · Henüz sync yok", 11, UiKit.MUTED, Typeface.NORMAL);
+    headerMeta.setSingleLine(true);
+    headerMeta.setEllipsize(TextUtils.TruncateAt.END);
     titleGroup.addView(headerMeta);
     titleGroup.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
     header.addView(titleGroup);
@@ -141,7 +151,7 @@ final class AndroidShellController {
           UiKit.dp(activity, 5)
       );
       bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(
-          UiKit.dp(activity, LANDSCAPE_SIDE_NAV_WIDTH_DP),
+          UiKit.dp(activity, largeText ? 144 : LANDSCAPE_SIDE_NAV_WIDTH_DP),
           -1
       ));
       content.setLayoutParams(new LinearLayout.LayoutParams(0, -1, 1f));
@@ -159,7 +169,7 @@ final class AndroidShellController {
       );
       bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(
           -1,
-          UiKit.dp(activity, BOTTOM_NAV_HEIGHT_DP)
+          UiKit.dp(activity, currentBottomNavHeightDp)
       ));
       root.addView(bottomNavigation);
     }
@@ -171,7 +181,7 @@ final class AndroidShellController {
   int contentBottomPaddingDp() {
     return landscapeLayout
         ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP
-        : MAIN_CONTENT_BOTTOM_PADDING_DP;
+        : currentBottomNavHeightDp + 24;
   }
 
   void updateChrome(

@@ -6,6 +6,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -14,6 +15,7 @@ import androidx.activity.ComponentActivity;
 final class AndroidSettingsWorkspace {
   interface Listener {
     void onSyncRequested();
+    void onAppearanceChanged(AppearancePreferences next);
     void refreshNotifications(OperationData data);
     int localPendingActionCount();
     View actionCard(OperationData.ActionRecord action);
@@ -53,6 +55,7 @@ final class AndroidSettingsWorkspace {
     page.addView(sectionLabel("Görünüm"));
     LinearLayout appearance = UiKit.card(activity);
     appearance.addView(settingLine("Tema", themeLabel, UiKit.PRIMARY));
+    appendAppearanceControls(appearance);
     page.addView(appearance);
     page.addView(sectionLabel("Ses"));
     page.addView(voice.settingsView());
@@ -90,6 +93,84 @@ final class AndroidSettingsWorkspace {
     }
 
     return UiKit.scroll(activity, page);
+  }
+
+  private void appendAppearanceControls(LinearLayout card) {
+    AppearancePreferences selected = AppearancePreferences.load(preferences);
+
+    card.addView(UiKit.divider(activity));
+    card.addView(UiKit.text(activity, "Yazı boyutu", 15, UiKit.TEXT, Typeface.BOLD));
+    card.addView(UiKit.text(activity,
+        "Sistem yazı boyutuna eklenir; bütün ekranlar için geçerlidir.",
+        12, UiKit.SECONDARY, Typeface.NORMAL));
+    LinearLayout sizeChoices = UiKit.column(activity);
+    int[] sizesPercent = AppearancePreferences.FONT_OPTIONS;
+    LinearLayout sizeRow = null;
+    for (int index = 0; index < sizesPercent.length; index++) {
+      if (index % 2 == 0) {
+        sizeRow = UiKit.row(activity);
+        sizeChoices.addView(sizeRow);
+      }
+      int size = sizesPercent[index];
+      String label = size == 100 ? "Normal %100" : "%" + size;
+      Button button = UiKit.chip(activity, label, selected.fontPercent == size,
+          view -> listener.onAppearanceChanged(selected.withFontPercent(size)));
+      button.setContentDescription("Yazı boyutu " + size + " yüzde");
+      button.setLayoutParams(appearanceChoiceParams());
+      sizeRow.addView(button);
+    }
+    card.addView(sizeChoices);
+
+    card.addView(UiKit.text(activity, "Renk tonu", 15, UiKit.TEXT, Typeface.BOLD));
+    LinearLayout colorChoices = UiKit.column(activity);
+    LinearLayout colorRow = null;
+    AppearancePreferences.Accent[] accents = AppearancePreferences.Accent.values();
+    for (int index=0; index<accents.length; index++) {
+      if (index % 2 == 0) {
+        colorRow = UiKit.row(activity);
+        colorChoices.addView(colorRow);
+      }
+      AppearancePreferences.Accent accent = accents[index];
+      Button button = UiKit.chip(activity, accent.label, selected.accent == accent,
+          view -> listener.onAppearanceChanged(selected.withAccent(accent)));
+      button.setContentDescription("Renk tonu " + accent.label);
+      button.setLayoutParams(appearanceChoiceParams());
+      colorRow.addView(button);
+    }
+    card.addView(colorChoices);
+
+    card.addView(UiKit.text(activity, "Kontrast", 15, UiKit.TEXT, Typeface.BOLD));
+    LinearLayout contrast = UiKit.row(activity);
+    for (boolean high : new boolean[] {false, true}) {
+      Button button = UiKit.chip(activity, high ? "Yüksek" : "Normal",
+          selected.highContrast == high,
+          view -> listener.onAppearanceChanged(selected.withHighContrast(high)));
+      button.setContentDescription("Kontrast " + (high ? "yüksek" : "normal"));
+      button.setLayoutParams(appearanceChoiceParams());
+      contrast.addView(button);
+    }
+    card.addView(contrast);
+
+    card.addView(UiKit.divider(activity));
+    card.addView(UiKit.text(activity, "Önizleme · Başlık ve açıklama", 17, UiKit.TEXT, Typeface.BOLD));
+    card.addView(UiKit.text(activity,
+        "Rezervasyon hazır. Oda, masa ve ödeme bilgilerini rahatça okuyabilmelisiniz.",
+        14, UiKit.SECONDARY, Typeface.NORMAL));
+    card.addView(UiKit.badge(activity, "Hazır · Örnek durum", UiKit.SUCCESS));
+    Button defaults = UiKit.outlineButton(activity, "Görünümü varsayılana döndür",
+        view -> listener.onAppearanceChanged(AppearancePreferences.defaults()));
+    defaults.setMinimumHeight(UiKit.dp(activity, 48));
+    card.addView(defaults);
+    card.addView(UiKit.text(activity,
+        "Bu tercihler yalnızca bu cihazda saklanır; işletme yetkilerini ve masaüstü ayarlarını değiştirmez.",
+        11, UiKit.MUTED, Typeface.NORMAL));
+  }
+
+  private LinearLayout.LayoutParams appearanceChoiceParams() {
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+        0, UiKit.dp(activity, 52), 1f);
+    params.setMargins(0, UiKit.dp(activity, 4), UiKit.dp(activity, 7), UiKit.dp(activity, 8));
+    return params;
   }
 
   String webModuleValue() {

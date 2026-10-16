@@ -46,6 +46,10 @@ final class AppTheme {
   static ThemeTokens tokens(Mode mode) {
     return mode == Mode.DAY ? ThemeTokens.day() : ThemeTokens.night();
   }
+  static ThemeTokens tokens(Mode mode, AppearancePreferences appearance) {
+    return ThemeTokens.withAppearance(tokens(mode), mode, appearance);
+  }
+
 }
 
 final class ThemeTokens {
@@ -142,6 +146,69 @@ final class ThemeTokens {
     this.secondaryAccentText = secondaryAccentText;
     this.dangerBackground = dangerBackground;
     this.dangerText = dangerText;
+  }
+
+  static ThemeTokens withAppearance(
+      ThemeTokens base, AppTheme.Mode mode, AppearancePreferences appearance) {
+    if (appearance == null) return base;
+    boolean night = mode == AppTheme.Mode.NIGHT;
+    boolean high = appearance.highContrast;
+    int accent = base.accent;
+    int pressed = base.accentPressed;
+    int onAccent = base.accentText;
+
+    switch (appearance.accent) {
+      case BLUE:
+        accent = night ? 0xFF93C5FD : 0xFF1D4ED8;
+        pressed = night ? 0xFF60A5FA : 0xFF1E40AF;
+        onAccent = night ? 0xFF08192B : 0xFFFFFFFF;
+        break;
+      case WARM:
+        accent = night ? 0xFFFDE047 : 0xFF9A3412;
+        pressed = night ? 0xFFFACC15 : 0xFF7C2D12;
+        onAccent = night ? 0xFF302000 : 0xFFFFFFFF;
+        break;
+      case VIOLET:
+        accent = night ? 0xFFDDD6FE : 0xFF6D28D9;
+        pressed = night ? 0xFFC4B5FD : 0xFF5B21B6;
+        onAccent = night ? 0xFF21113B : 0xFFFFFFFF;
+        break;
+      case GREEN:
+        if (high) {
+          accent = night ? 0xFF5EEAD4 : 0xFF0B766A;
+          pressed = night ? 0xFF2DD4BF : 0xFF075E54;
+          onAccent = night ? 0xFF062E2A : 0xFFFFFFFF;
+        }
+        break;
+    }
+    if (!high && appearance.accent == AppearancePreferences.Accent.GREEN) return base;
+    return new ThemeTokens(
+        high ? (night ? 0xFF000000 : 0xFFFFFFFF) : base.appBackground,
+        high ? (night ? 0xFF080808 : 0xFFFFFFFF) : base.surface,
+        high ? (night ? 0xFF101010 : 0xFFFFFFFF) : base.cardBackground,
+        high ? (night ? 0xFF161616 : 0xFFFFFFFF) : base.elevatedCard,
+        high ? (night ? 0xFF94A3B8 : 0xFF334155) : base.border,
+        high ? (night ? 0xFFFFFFFF : 0xFF0B1220) : base.textPrimary,
+        high ? (night ? 0xFFF1F5F9 : 0xFF1E293B) : base.textSecondary,
+        high ? (night ? 0xFFCBD5E1 : 0xFF334155) : base.textMuted,
+        accent,
+        pressed,
+        onAccent,
+        base.success, base.warning, base.danger, base.info,
+        high ? (night ? 0xFF1F2937 : 0xFFE2E8F0) : base.disabledBackground,
+        high ? (night ? 0xFFCBD5E1 : 0xFF475569) : base.disabledText,
+        high ? (night ? 0xFF080808 : 0xFFFFFFFF) : base.bottomNavBackground,
+        accent,
+        high ? (night ? 0xFFCBD5E1 : 0xFF334155) : base.bottomNavInactive,
+        high ? (night ? 0xFF101010 : 0xFFFFFFFF) : base.iconButtonBackground,
+        high ? (night ? 0xFFFFFFFF : 0xFF0B1220) : base.iconButtonForeground,
+        high ? (night ? 0xFF161616 : 0xFFFFFFFF) : base.chipBackground,
+        accent,
+        high ? (night ? 0xFFFFFFFF : 0xFF0B1220) : base.chipText,
+        onAccent,
+        base.secondaryAccent, base.secondaryAccentText,
+        base.dangerBackground, base.dangerText
+    );
   }
 
   static ThemeTokens night() {
