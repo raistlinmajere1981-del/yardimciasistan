@@ -88,3 +88,13 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Playwright 67 role/state cases PASS; 4 Superdesign drafts re-imported into their existing identifiers and verified byte-identical. Cross-screen preview settings remain available in the gallery: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html.
 - Source details and limits: .superdesign/android-companion/redesign-pixco-stitch-v1/ROLE_STATE_V3_NOTES.md.
 - Remaining: exact native action/permission mapping, real offline/outbox and stale projection behavior, Android TalkBack/IME, physical tablet and UI design review. Java app, release 2.0.8, hosting and pilot data unchanged.
+
+
+## 16 Ekim 2026 — V4: compact workspaces and unified notification design
+
+- Karar: workspaces show only actionable information. Greeting/coaching paragraphs such as “Günaydın, Ayşe” and “Önce önemli işleri halledelim” are removed; unnecessary helper paragraphs also trimmed from rooms, restaurant and market.
+- One global top notification center for all logical warning/error/connection/pending/operation result notices: dynamic bell badge, short priority peek and one overlay drawer. Old bottom toast and per-screen warning strips are retired in the browser concepts.
+- Domain work cards (incoming guest, table service, stock count) remain in the task flow rather than being incorrectly treated as system alerts.
+- Prototype components: compact-notifications.css, notification-center.js, build-compact.py. V4 pages and index.html in .superdesign/android-companion/redesign-pixco-stitch-v1/.
+- Browser test test-compact.cjs: 36/36 PASS including 360/393/840, dark and 150% text, role restrictions, central operation feedback and notification filtering. All 4 Superdesign drafts updated in place and downloaded HTML verified identical.
+- Native Java code, pilot DB, hosting and published APK not changed. New notification design must later subscribe to typed existing domain/sync/outbox events and preserve permission authority.
