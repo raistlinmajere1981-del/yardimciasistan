@@ -138,3 +138,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - KBS yalnız admin + accommodation.rooms/stays + kbs.view + etkin durumda. Gönderim talebi resmi gönderim değildir; belirsiz sonuç tekrar gönderilmez; başarısız ve retryReady kaydı için yeniden deneme hazırlanabilir. Harici gönderimde portal doğrulaması ve ikinci açık onay şart. Yerel prototip resmi gönderim yapmaz.
 - test-operations-v8.cjs: 59/59 PASS; 360/393 telefon, 840 tablet tarayıcı simülasyonu; yetki/veri gizleme, offline, KBS 2 aşamalı onay ve gezinme. 10/10 Superdesign dosyası yerelle birebir doğrulandı.
 - Sözleşme: .superdesign/android-companion/redesign-pixco-stitch-v1/OPERATIONS_V8_NOTES.md. Android Java, pilot DB, Android 2.0.8 APK ve hosting değişmedi. Gerçek cihaz / KBS testleri ayrı bekliyor.
+
+
+## 17 Ekim 2026 — V9: Restoran Stok ve Menü Yönetimi
+
+- Yeni konseptler stock-v9.html ve menuadmin-v9.html: fotoğraflı ürün alanı ve fallback, Türkçe ürün/kategori araması, durum ve kategori filtreleri, 24'er listeleme, yetkili işlem ayrımı. Toplu pano 12 ekrana ulaştı: .superdesign/android-companion/redesign-pixco-stitch-v1/index.html.
+- AndroidUiRules.RESTAURANT_STOCK: food_service.menu + food_service.inventory + menu.stock_view. Stok güncelleme ayrıca menu.stock_update gerektirir. AndroidUiRules.RESTAURANT_MENU: food_service.menu + admin + menu.delete; menü ürün sunumu düzenleme ayrıca menu.edit. Ortak ürünü silmeden menüden kaldırma öncesi onay.
+- Tasarımdaki görseller gerçek menü fotoğrafı değil, çevrimdışı örnek SVG'lerdir. Native Android MenuItem image_url/veri kaynağı + küçük fotoğraf önbelleği daha sonra yapılacaktır. AI stok girişi yalnız izinli servis kombinasyonunda olmalıdır.
+- 39/39 Playwright testi PASS; 360/393/840, 1.200 ürün, büyük yazı, arama/kategori, rol/izin, çevrimdışı salt-okunur ve menü kaldırma onayı. 12/12 Superdesign HTML dosyası yerel ile birebir doğrulandı.
+- Kaynak sözleşme .superdesign/android-companion/redesign-pixco-stitch-v1/STOCK_MENU_V9_NOTES.md. Gerçek Android Java, 2.0.8 APK, pilot DB ve hosting değiştirilmedi.
