@@ -136,6 +136,7 @@ let snapshotRevision = 100;
 let uiTestBaseUrl = "";
 let deviceIdBeforeUiReset = "";
 let originalDeviceOrientation = null;
+let designTabletSizeOverridden = false;
 
 const options = parseArgs(process.argv.slice(2));
 let phoneTest = null;
@@ -159,8 +160,8 @@ async function main() {
   ensureArtifactDir();
   ensureAdbDevice();
   lockDevicePortrait();
-  if (options.companionOnly || options.commerceOnly) backupCompanionPreferences();
-  else prepareStockGalleryFixture();
+  if (options.companionOnly || options.commerceOnly || options.stockImageOnly || options.stockCameraOnly || (options.designCaptureOnly || options.designOperationsOnly || options.designTabletOnly || options.designPhone393Only || options.designMarketFinanceOnly || options.designAuthorityOnly || options.appearanceOnly)) backupCompanionPreferences();
+  if (!options.companionOnly && !options.commerceOnly && !options.stockCameraOnly && !options.designCaptureOnly && !options.designOperationsOnly && !options.designTabletOnly && !options.designPhone393Only && !options.designMarketFinanceOnly && !options.designAuthorityOnly && !options.appearanceOnly) prepareStockGalleryFixture();
 
   phoneTest = startPhoneTest();
   await waitForReady(phoneTest, options.readyTimeoutMs);
@@ -195,10 +196,43 @@ async function main() {
     await waitForPhoneTestExit();
     return;
   }
-  if (options.stockImageOnly) {
+  if (options.appearanceOnly) {
+    await runAppearanceOnly(baseUrl);
+    console.log("android-appearance-capture-ok");
+    return;
+  }
+  if (options.designAuthorityOnly) {
+    await runDesignAuthorityOnly(baseUrl);
+    console.log("android-design-authority-capture-ok");
+    return;
+  }
+  if (options.designMarketFinanceOnly) {
+    await runDesignMarketFinanceOnly(baseUrl);
+    console.log("android-design-market-finance-capture-ok");
+    return;
+  }
+  if (options.designTabletOnly || options.designPhone393Only) {
+    await runDesignTabletOnly(baseUrl);
+    console.log("android-design-tablet-capture-ok");
+    return;
+  }
+  if (options.designOperationsOnly) {
+    await runDesignOperationsOnly(baseUrl);
+    console.log("android-design-operations-capture-ok");
+    return;
+  }
+  if (options.designCaptureOnly) {
+    await runDesignCaptureOnly(baseUrl);
+    await restoreEmbeddedConnectionAfterTest();
+    console.log("android-design-capture-device-ui-ok");
+    cleanup();
+    await waitForPhoneTestExit();
+    return;
+  }
+  if (options.stockImageOnly || options.stockCameraOnly) {
     await runStockImageOnly(baseUrl);
     await restoreEmbeddedConnectionAfterTest();
-    console.log("android-stock-image-device-ui-smoke-ok");
+    console.log(options.stockCameraOnly ? "android-stock-camera-device-ui-smoke-ok" : "android-stock-image-device-ui-smoke-ok");
     cleanup();
     await waitForPhoneTestExit();
     return;
@@ -877,6 +911,14 @@ function parseArgs(args) {
     settleMs: 1800,
     noBuild: false,
     stockImageOnly: false,
+    stockCameraOnly: false,
+    designCaptureOnly: false,
+    designOperationsOnly: false,
+    designTabletOnly: false,
+    designPhone393Only: false,
+    designMarketFinanceOnly: false,
+    designAuthorityOnly: false,
+    appearanceOnly: false,
     reportsOnly: false,
     companionOnly: false,
     commerceOnly: false,
@@ -889,6 +931,22 @@ function parseArgs(args) {
       parsed.noBuild = true;
     } else if (arg === "--stock-image-only") {
       parsed.stockImageOnly = true;
+    } else if (arg === "--stock-camera-only") {
+      parsed.stockCameraOnly = true;
+    } else if (arg === "--design-capture-only") {
+      parsed.designCaptureOnly = true;
+    } else if (arg === "--design-operations-only") {
+      parsed.designOperationsOnly = true;
+    } else if (arg === "--design-tablet-only") {
+      parsed.designTabletOnly = true;
+    } else if (arg === "--design-phone393-only") {
+      parsed.designPhone393Only = true;
+    } else if (arg === "--design-market-finance-only") {
+      parsed.designMarketFinanceOnly = true;
+    } else if (arg === "--design-authority-only") {
+      parsed.designAuthorityOnly = true;
+    } else if (arg === "--appearance-only") {
+      parsed.appearanceOnly = true;
     } else if (arg === "--reports-only") {
       parsed.reportsOnly = true;
     } else if (arg === "--market-only") {
@@ -925,7 +983,7 @@ function parseArgs(args) {
   if (parsed.holdMs < 8000) {
     throw new Error("--hold-ms Android UI smoke için en az 8000 olmalı.");
   }
-  if ([parsed.stockImageOnly, parsed.reportsOnly, parsed.marketOnly, parsed.companionOnly, parsed.commerceOnly].filter(Boolean).length > 1) {
+  if ([parsed.stockImageOnly, parsed.stockCameraOnly, parsed.designCaptureOnly, parsed.designOperationsOnly, parsed.designTabletOnly, parsed.designPhone393Only, parsed.designMarketFinanceOnly, parsed.designAuthorityOnly, parsed.appearanceOnly, parsed.reportsOnly, parsed.marketOnly, parsed.companionOnly].filter(Boolean).length > 1) {
     throw new Error("Tek bir --*-only Android UI smoke seçeneği kullanılmalı.");
   }
 
@@ -1146,11 +1204,14 @@ async function runCommerceOnly(baseUrl) {
     return snapshot;
   }
   async function click(text) {
-    const page = await waitForUiCondition(xml => {
-      try { findClickableBoundsByText(xml, text); return true; } catch { return false; }
-    }, 10000, "Tıklanabilir sipariş alanı bulunamadı: " + text);
+    const target = xml => {
+      try { return findClickableBoundsByText(xml, text); }
+      catch { return findBoundsByContentDescriptionPrefix(xml, text); }
+    };
+    const page = await waitForUiCondition(xml => Boolean(target(xml)),
+      10000, "Tıklanabilir sipariş alanı bulunamadı: " + text);
     writeFileSync(join(artifactDir, "commerce-before-click.xml"), page);
-    tap(centerOf(findClickableBoundsByText(page, text))); await delay(400);
+    tap(centerOf(target(page))); await delay(400);
   }
   async function findOnPage(text) {
     for (let i = 0; i < 14; i++) {
@@ -1172,6 +1233,7 @@ async function runCommerceOnly(baseUrl) {
   }
   async function openOrder(order, filter) {
     await click("Bugün"); await waitForUiText("Öncelikli işler", 12000);
+    await click("Diğer"); await waitForUiText("Çalışma alanları", 12000);
     scrollToTop();
     await findOnPage("Ticari siparişler"); await click("Ticari siparişler");
     scrollToTop();
@@ -1749,41 +1811,382 @@ async function runReportsOnly(baseUrl) {
   );
 }
 
+async function runAppearanceOnly(baseUrl) {
+  await publishDeviceRole(baseUrl, readDeviceId(), "admin");
+  relaunchApp();
+  const today = await waitForUiCondition(xml => xml.includes("Yönetici")
+    && xml.includes('content-desc="Ayarlar"'), 16000,
+    "Görünüm testi ana ekranı açılamadı");
+  tap(centerOf(findClickableBoundsByDescription(today, "Ayarlar")));
+  await waitForUiCondition(xml => xml.includes("Yazı boyutu")
+    && xml.includes("Renk tonu") && xml.includes("Kontrast"), 11000,
+    "Kişisel görünüm kontrolleri açılmadı");
+  captureScreenshot("appearance-default-settings.png");
+
+  async function choice(text) {
+    let xml = "";
+    for (let attempt=0;attempt<7;attempt++) {
+      xml = dumpUi("appearance-choice-" + attempt + ".xml");
+      if (xml.includes('text="' + text + '"')) break;
+      swipe(355, 1060, 355, 340, 360);
+      await delay(320);
+    }
+    if (!xml.includes('text="' + text + '"'))
+      throw new Error("Görünüm kontrolü bulunamadı: " + text);
+    tap(centerOf(findBoundsByText(xml, text)));
+    await delay(700);
+  }
+
+  await choice("%150");
+  await waitForUiCondition(xml => xml.includes("Yazı boyutu")
+    && xml.includes("Renk tonu"), 12000,
+    "Büyük yazı seçiminden sonra Ayarlar korunmadı");
+  const fontPrefs = adb(["shell", "run-as", packageName, "cat",
+    "shared_prefs/yardimci_asistan_android.xml"], {capture:true}).stdout;
+  assert.match(fontPrefs, /name="appearance_font_percent_v1" value="150"/);
+  captureScreenshot("appearance-large-font-settings.png");
+
+  await choice("Mavi");
+  const colorPrefs = adb(["shell", "run-as", packageName, "cat",
+    "shared_prefs/yardimci_asistan_android.xml"], {capture:true}).stdout;
+  assert.match(colorPrefs, /<string name="appearance_accent_v1">blue<\/string>/);
+  await choice("Yüksek");
+  const contrastPrefs = adb(["shell", "run-as", packageName, "cat",
+    "shared_prefs/yardimci_asistan_android.xml"], {capture:true}).stdout;
+  assert.match(contrastPrefs, /name="appearance_high_contrast_v1" value="true"/);
+  captureScreenshot("appearance-blue-high-contrast-150.png");
+  const settingsPage = await waitForUiCondition(xml => xml.includes('content-desc="Ayarlar"')
+    && xml.includes("Önizleme"), 7000, "Görünüm ayarı ekranı kayboldu");
+  tap(centerOf(findClickableBoundsByDescription(settingsPage, "Ayarlar")));
+  await waitForUiCondition(xml => xml.includes('text="Bugün"')
+    && xml.includes("Yönetici"), 9500,
+    "Büyük yazıda ana gezintiye dönülemedi");
+  captureScreenshot("appearance-today-blue-high-contrast-150.png");
+  console.log("appearance-preferences-verified");
+}
+
+async function runDesignAuthorityOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  await publishDeviceRole(baseUrl, deviceId, "staff", {permissions: ["customer.view"]});
+  relaunchApp();
+  await waitForUiCondition(xml => xml.includes("Personel") && xml.includes('text="Bugün"'),
+    12000, "Yetkileri kısıtlı personel ekranı görünmedi");
+  captureScreenshot("design-authority-staff-today.png");
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", "reports"]);
+  await waitForUiCondition(xml => xml.includes("Bu cihazın bu bölüme erişim yetkisi yok."),
+    9000, "Yetkisiz rapor rotası engellenmedi");
+  captureScreenshot("design-authority-staff-reports-denied.png");
+  await publishDeviceRole(baseUrl, deviceId, "admin");
+  relaunchApp();
+  await waitForUiCondition(xml => xml.includes("Yönetici") && xml.includes('text="Bugün"'),
+    12000, "Yönetici ekranı görünmedi");
+  captureScreenshot("design-authority-admin-today.png");
+  console.log("design-authority-captured: staff+denied+admin");
+}
+
+async function runDesignMarketFinanceOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  const snapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
+  snapshot.business_capabilities = ["service.android", "core.customers", "core.finance",
+    "commerce.catalog", "commerce.inventory", "commerce.sales", "commerce.customer_credit",
+    "retail.barcode", "retail.purchasing", "retail.suppliers"];
+  snapshot.androidPermissions = {
+    [deviceId]: {role: "staff", is_active: true,
+      permissions: [...marketPermissions, "market.sale.complete", "customer_credit.view", "customer_credit.payment"]}
+  };
+  snapshot.market = {
+    summary: {today_sale_count: 2, today_sales_total: 45, currency: "TRY",
+      critical_stock_count: 0, recent_stock_adjustments: [], recent_receiving_count: 0},
+    products: [{id: "product_design_001", name: "Test Kola 330 ml",
+      sku: "DEMO-KOLA", barcode: "8690000000001", unit: "piece",
+      sale_price: 35, currency: "TRY", is_active: true, track_inventory: true,
+      current_quantity: 7, minimum_quantity: 1, inventory_updated_at: new Date().toISOString()}],
+    suppliers: [], recent_purchases: [], product_drafts: [], cart_drafts: [],
+    customer_credit_accounts: [{
+      customer_id: "customer_android_demo_001", full_name: "Demo Cari",
+      balances: [{currency: "TRY", amount_minor: 14000}],
+      entries: [{direction: "debit", entry_type: "credit_sale",
+        amount_minor: 14000, currency: "TRY", payment_method: "credit",
+        occurred_at: "2026-10-16T09:00:00+03:00"}]
+    }]
+  };
+  await publishSnapshot(baseUrl, snapshot, "tasarım-market-satis-cari");
+  // Financial projections require a validated per-device token; never weaken
+  // the PHP gate or restart this capture with the shared bootstrap secret.
+  assert.match(readPreferenceValueIfPresent("sync_secret"),
+    /^device:yat_[a-f0-9]{64}$/, "Sentetik telefon kişisel cihaz anahtarına geçemedi");
+  relaunchApp(true);
+  await waitForUiCondition(xml => xml.includes('text="Market"')
+    && xml.includes("Personel") && !xml.includes('text="Pansiyon"'), 16000,
+    "Sentetik market yetkileri telefona uygulanmadı");
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", "market"]);
+  await waitForUiText("Saha işlemleri", 13000);
+  await enterMarketBarcode("8690000000001");
+  const product = await waitForUiCondition(xml => xml.includes("Test Kola 330 ml")
+    && xml.includes("Sepete Ekle"), 9000, "Sentetik ürün barkodu bulunmadı");
+  tap(centerOf(findClickableBoundsByText(product, "Sepete Ekle")));
+  await waitForUiText("Sepet satırları", 9000);
+  captureScreenshot("design-market-cart-filled.png");
+  scrollToBottom();
+  const cart = await waitForUiCondition(xml => xml.includes("Satışı Tamamla"), 10000,
+    "Dolu sepette satış butonu görünmedi");
+  captureScreenshot("design-market-cart-action.png");
+  tap(centerOf(findClickableBoundsByText(cart, "Satışı Tamamla")));
+  await waitForUiText("Satışı Onayla ve Gönder", 9000);
+  captureScreenshot("design-market-sale-confirm.png");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  // Scroll state persists on return from Sale; "Sepet satırları" may be offscreen.
+  await waitForUiCondition(xml => xml.includes("Satışı Tamamla")
+    && xml.includes("Tahmini toplam"), 9000,
+    "Satıştan dolu sepete geri dönülemedi");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiCondition(xml => xml.includes("Saha işlemleri"), 9000,
+    "Sepetten market ana ekranına geri dönülemedi");
+  let main = dumpUi("design-market-credit-home.xml");
+  for (let i = 0; i < 5 && !main.includes("Veresiye / Cari"); i += 1) {
+    swipe(360, 960, 360, 460, 360);
+    main = dumpUi("design-market-credit-home.xml");
+  }
+  assert.ok(main.includes("Veresiye / Cari"), "Market veresiye kartı bulunamadı");
+  tap(centerOf(findBoundsByText(main, "Veresiye / Cari")));
+  const creditList = await waitForUiCondition(xml => xml.includes("Demo Cari")
+    && xml.includes("Müşteri ara"), 12000, "Sentetik cari müşterisi listelenmedi");
+  captureScreenshot("design-market-credit-list.png");
+  tap(centerOf(findClickableBoundsByText(creditList, "Demo Cari")));
+  await waitForUiText("Borç:", 12000);
+  captureScreenshot("design-market-credit-ledger.png");
+  scrollToBottom();
+  await waitForUiText("Tahsilatı Kaydet", 10000);
+  captureScreenshot("design-market-credit-payment-form.png");
+  console.log("market-design-sale-credit-forms-captured");
+}
+
+async function runDesignTabletOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  await publishDeviceRole(baseUrl, deviceId, "admin");
+  const initialSize = adb(["shell", "wm", "size"], { capture: true }).stdout;
+  assert.ok(initialSize.includes("Physical size: 720x1280") && !initialSize.includes("Override size:"));
+  adb(["shell", "wm", "size", options.designPhone393Only ? "786x1398" : "1680x900"]);
+  designTabletSizeOverridden = true;
+  relaunchApp();
+  await waitForUiCondition(xml => xml.includes("Yönetici"), 16000,
+    "840dp simülasyonunda yönetici ekranı yüklenmedi.");
+  const targets = [
+    ["today", "Bugün"],
+    ["more", "Diğer"],
+    ["pension:rooms", "Pansiyon"],
+    ["restaurant:tables", "Restoran"]
+  ];
+  for (const [route, marker] of targets) {
+    adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+      "--es", "ya_notification_route", route]);
+    await waitForUiCondition(xml => xml.includes(marker), 15000,
+      "840dp görünüm hazırlanmadı: " + route);
+    captureScreenshot(options.designPhone393Only
+      ? "design-phone-" + route.replace(":", "-") + "-393dp.png"
+      : "design-tablet-" + route.replace(":", "-") + "-840dp.png");
+    console.log("design-tablet-captured:", route);
+  }
+  const marketSnapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
+  marketSnapshot.business_capabilities = [
+    "service.android", "commerce.catalog", "commerce.inventory",
+    "commerce.sales", "retail.barcode", "retail.purchasing", "retail.suppliers"
+  ];
+  marketSnapshot.androidPermissions = {
+    [deviceId]: {role: "staff", is_active: true, permissions: marketPermissions}
+  };
+  marketSnapshot.market = {
+    summary: { today_sale_count: 2, today_sales_total: 45, currency: "TRY",
+      critical_stock_count: 0, recent_stock_adjustments: [], recent_receiving_count: 0 },
+    products: [], suppliers: [], recent_purchases: [], product_drafts: [], cart_drafts: []
+  };
+  await publishSnapshot(baseUrl, marketSnapshot, "tasarım-market-840dp");
+  relaunchApp();
+  await waitForUiCondition(xml => xml.includes('text="Market"')
+    && xml.includes("Personel") && !xml.includes('text="Pansiyon"'),
+    16000, "Sentetik Market profili cihazda henüz görünmedi");
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", "market"]);
+  await waitForUiCondition(xml => xml.includes("Saha işlemleri"), 16000,
+    "840dp Market çalışma alanı görünmedi");
+  captureScreenshot(options.designPhone393Only
+    ? "design-phone-market-393dp.png"
+    : "design-tablet-market-840dp.png");
+  console.log("design-tablet-captured: market");
+  console.log("design-tablet-ready");
+}
+
+async function runDesignOperationsOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  const snapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
+  snapshot.androidPermissions = {
+    [deviceId]: {
+      role: "admin",
+      is_active: true,
+      permissions: [...new Set([...adminPermissions, "room_folio.add_manual_charge", "room_folio.add_menu_item"])]
+    }
+  };
+  snapshot.room_folios = [{
+    id: "folio_synthetic_design_001",
+    version: "a".repeat(64),
+    can_add_items: true,
+    stay_id: "stay_synthetic_design_001",
+    room_id: "room_101",
+    room_name: "Balkonlu Oda",
+    room_number: "101",
+    customer_id: "customer_android_demo_001",
+    customer_name: "Demo Aile",
+    status: "open",
+    guest_count: 2,
+    check_in_date: "2026-10-16",
+    planned_check_out_date: "2026-10-18",
+    nights: 2,
+    nightly_price_minor: 150000,
+    currency: "TRY",
+    lodging_total_minor: 300000,
+    extras_total_minor: 20000,
+    charge_total_minor: 320000,
+    paid_total_minor: 70000,
+    remaining_minor: 250000,
+    opened_at: "2026-10-16T12:00:00+03:00"
+  }];
+  await publishSnapshot(baseUrl, snapshot, "tasarım-oda-hesapları");
+  relaunchApp();
+  await waitForUiCondition(xml => xml.includes("Yönetici") && xml.includes('text="Bugün"'),
+    14000, "Sentetik oda hesabı yayınından sonra yönetici ekranı açılmadı.");
+  console.log("design-operations-fixture-ready");
+  await captureDesignOperationRoute("pension:rooms", "Pansiyon", "Durumu Değiştir",
+    "design-extra-pension-room-status", "Oda durumunu değiştir");
+  await captureDesignOperationRoute("restaurant:tables", "Restoran", "Masa Durumu",
+    "design-extra-restaurant-table-status", "Masa durumunu değiştir");
+  await captureDesignFolioForms();
+}
+
+async function captureDesignOperationRoute(route, title, button, prefix, expectedDialog) {
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", route]);
+  const ui = await waitForUiCondition(xml => xml.includes(`text="${title}"`) && xml.includes(button),
+    12000, "İşlem ekranı görünmedi: " + route);
+  captureScreenshot(prefix + "-list.png");
+  tap(centerOf(findBoundsByText(ui, button)));
+  await waitForUiCondition(xml => xml.includes(expectedDialog), 10000,
+    "İşlem durum penceresi açılmadı: " + route);
+  captureScreenshot(prefix + "-dialog.png");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  console.log("design-operation-captured:", route);
+}
+
+async function captureDesignFolioForms() {
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", "pension:folios"]);
+  const page = await waitForUiCondition(
+    xml => xml.includes('text="Pansiyon"') && xml.includes("Ek Ücret Ekle")
+      && xml.includes("Ödeme Al"),
+    14000, "Sentetik açık oda hesabı veya işlem izinleri görünmedi");
+  captureScreenshot("design-extra-pension-open-folio.png");
+  tap(centerOf(findBoundsByText(page, "Ek Ücret Ekle")));
+  await waitForUiCondition(xml => xml.includes("Ek ücret ekle"), 9000,
+    "Ek ücret formu görünmedi");
+  captureScreenshot("design-extra-pension-manual-charge-form.png");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  const again = await waitForUiCondition(xml => xml.includes("Ödeme Al"), 9000,
+    "Ek ücret formundan geri dönülemedi");
+  tap(centerOf(findBoundsByText(again, "Ödeme Al")));
+  await waitForUiCondition(xml => xml.includes("Oda tahsilatı"), 9000,
+    "Oda tahsilat formu görünmedi");
+  captureScreenshot("design-extra-pension-payment-form.png");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  console.log("design-folio-forms-captured");
+}
+
+async function runDesignCaptureOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  await publishDeviceRole(baseUrl, deviceId, "admin");
+  relaunchApp();
+  await waitForUiCondition(xml => xml.includes("Yönetici") && xml.includes('text="Bugün"'),
+    12000, "Yönetici ekranı hazırlanmadı.");
+  const screens = [
+    ["restaurant:reservations", "Restoran", "+ Yeni Rezervasyon", "restaurant-reservations"],
+    ["restaurant:tasks", "Restoran", "+ Yeni İş", "restaurant-tasks"],
+    ["restaurant:menu", "Restoran", "Menü sunumu yönetimi", "restaurant-menu"],
+    ["pension:reservations", "Pansiyon", "+ Yeni Rezervasyon", "pension-reservations"],
+    ["pension:stays", "Pansiyon", "+ Müşteriyi Odaya Ata", "pension-stays"],
+    ["pension:tasks", "Pansiyon", "+ Yeni İş", "pension-tasks"]
+  ];
+  for (const spec of screens) {
+    await captureDesignRoute(spec);
+  }
+  console.log("design-fixture-ready");
+}
+
+async function captureDesignRoute([route, title, marker, name]) {
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", route]);
+  const ui = await waitForUiCondition(
+    xml => xml.includes(`text="${title}"`) && xml.includes(marker),
+    15000, "Tasarım rotası görünmedi: " + route);
+  captureScreenshot("design-" + name + ".png");
+  console.log("design-captured:", route);
+  if (name === "restaurant-menu") return;
+  const dialogTitle = name === "pension-stays" ? "Konaklama oluştur"
+    : name.endsWith("reservations") ? "Yeni rezervasyon" : "Yeni günlük iş";
+  tap(centerOf(findBoundsByText(ui, marker)));
+  await waitForUiCondition(xml => xml.includes(dialogTitle),
+    8500, "Tasarım formu açılamadı: " + route);
+  captureScreenshot("design-" + name + "-form.png");
+  console.log("design-form-captured:", route);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiCondition(xml => xml.includes(`text="${title}"`) && xml.includes(marker),
+    8000, "Form kapandıktan sonra ana ekran görünmedi: " + route);
+}
+
 async function runStockImageOnly(baseUrl) {
   const deviceId = readDeviceId();
   await publishDeviceRole(baseUrl, deviceId, "admin");
   relaunchApp();
-  const topXml = await waitForUiCondition(
-    (xml) => xml.includes("Yönetici") && xml.includes('text="Restoran"'),
+  await waitForUiCondition(
+    (xml) => xml.includes("Yönetici") && xml.includes('text="Bugün"'),
     12000,
     "Odaklı stok görseli testi için yönetici profili uygulanmadı."
   );
-  tap(centerOf(findClickableBoundsByText(topXml, "Restoran")));
-  await waitForUiCondition(
-    (xml) => xml.includes("Masalar") && xml.includes("Açık Adisyon"),
-    8000,
-    "Odaklı stok görseli testi restoran ekranını açamadı."
-  );
-  await delay(300);
-  let restaurantModesXml = dumpUi("stock-only-restaurant.xml");
-  for (let index = 0; index < 4 && !restaurantModesXml.includes('text="Stok"'); index += 1) {
-    swipe(650, 245, 180, 245, 320);
-    await delay(300);
-    restaurantModesXml = dumpUi("stock-only-restaurant-modes.xml");
-  }
-  const restaurantXml = await waitForUiCondition(
-    (xml) => xml.includes('text="Stok"'),
-    8000,
-    "Odaklı stok görseli testi restoran ekranını açamadı."
-  );
-  tap(centerOf(findClickableBoundsByText(restaurantXml, "Stok")));
+  // Native V4 can place Restoran under Diğer instead of the primary root bar.
+  // Open the canonical mode route rather than assuming its tab position.
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", "restaurant:stock"]);
+  await delay(450);
   const stockXml = await waitForUiCondition(
     (xml) => xml.includes("AI DESTEKLİ STOK GİRİŞİ") && xml.includes("Kamera ile çek") && xml.includes("Galeriden seç"),
     8000,
     "Odaklı stok görseli kartı açılmadı."
   );
   captureScreenshot("admin-stock-image-import.png");
-  await exerciseStockImageSources(stockXml);
+  if (options.stockCameraOnly) await exerciseStockCameraOnly(stockXml);
+  else await exerciseStockImageSources(stockXml);
+}
+
+async function exerciseStockCameraOnly(stockXml) {
+  tap(centerOf(findBoundsByText(stockXml, "Kamera ile çek")));
+  await waitForFocusedPackage("net.sourceforge.opencamera", 12000, "Sistem kamera uygulaması açılamadı.");
+  await delay(1000);
+  const cameraXml = dumpUi("stock-camera-only-system-camera.xml");
+  assertContains(cameraXml, ["net.sourceforge.opencamera:id/take_photo", 'content-desc="Take Photo"']);
+  tap(centerOf(findBoundsByResourceId(cameraXml, "net.sourceforge.opencamera:id/take_photo")));
+  const preview = await waitForUiCondition(
+    xml => xml.includes("Görseli kontrol et") && xml.includes("Görsel hazır") && xml.includes("Analiz Et"),
+    20000, "Kamera fotoğrafından stok görseli önizlemesine dönülemedi."
+  );
+  assertContains(preview, ["Yeniden çek", "Başka görsel seç", "90° döndür", "kalıcı saklanmaz"]);
+  console.log("stock-camera-preview-verified");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiCondition(
+    xml => xml.includes("AI DESTEKLİ STOK GİRİŞİ") && xml.includes("Galeriden seç"),
+    10000, "Kamera önizlemesinden stok ekranına dönülemedi."
+  );
+  const remaining = adb(["shell", "run-as", packageName, "find", "cache/stock-images", "-type", "f"],
+    { capture: true, allowFailure: true });
+  assert.equal(remaining.stdout.trim(), "", "İptal edilen kamera görselinin geçici dosyası temizlenmedi.");
 }
 
 function startPhoneTest() {
@@ -1935,7 +2338,7 @@ function prepareAppForUi(baseUrl) {
   adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"], { allowFailure: true });
   adb(["shell", "wm", "dismiss-keyguard"], { allowFailure: true });
   adb(["shell", "am", "force-stop", "com.android.documentsui"], { allowFailure: true });
-  if (!options.companionOnly && !options.commerceOnly) prepareSystemCameraForUiTest();
+  if (!options.companionOnly && !options.commerceOnly && !options.appearanceOnly) prepareSystemCameraForUiTest();
   adb(["shell", "cmd", "statusbar", "collapse"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
@@ -1986,7 +2389,14 @@ function prepareStockGalleryFixture() {
 async function exerciseStockImageSources(stockXml) {
   tap(centerOf(findBoundsByText(stockXml, "Galeriden seç")));
   await waitForFocusedPackage("com.android.documentsui", 8000, "Sistem görsel seçicisi açılmadı.");
-  let pickerXml = dumpUi("stock-image-gallery-recent.xml");
+  // Focus may move to DocumentsUI before its navigation controls are laid out.
+  // Wait for its actual accessibility tree instead of assuming it is ready.
+  let pickerXml = await waitForUiCondition(
+    (xml) => xml.includes('package="com.android.documentsui"')
+      && (xml.includes('content-desc="Show roots"') || xml.includes("yardimci-stock-image-smoke")),
+    12000,
+    "Sistem galeri seçicisi gezinmeye hazır olmadı."
+  );
   if (!pickerXml.includes("yardimci-stock-image-smoke")) {
     tap(centerOf(findClickableBoundsByDescription(pickerXml, "Show roots")));
     const rootsXml = await waitForUiCondition(
@@ -2582,6 +2992,10 @@ function formatOutput(result) {
 }
 
 function cleanup() {
+  if (designTabletSizeOverridden) {
+    adb(["shell", "wm", "size", "reset"], { allowFailure: true });
+    designTabletSizeOverridden = false;
+  }
   adb(["shell", "rm", "-f", stockGalleryDeviceFile], { allowFailure: true });
   adb(["shell", "am", "force-stop", "com.android.documentsui"], { allowFailure: true });
   if (focusedPackage() === "net.sourceforge.opencamera") {

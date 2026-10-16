@@ -6,7 +6,7 @@
 - Ayrı tablet uygulaması, yeni sektör, yeni capability, veri migration'u ya da sahadaki pilot DB'yi temizleme yok.
 - Navigasyon ve eylem sahipliği mevcut Native UI v4 kurallarında kalır. Boş/kapalı alanlar görünürlük ve yetkiyle belirlenir.
 
-## Aşama 1 — Erişilebilir görünüm (koda alındı, cihaz smoke bekler)
+## Aşama 1 — Erişilebilir görünüm (kodlandı, 360dp cihaz smoke PASS)
 - Ayarlar → Görünüm: font boyu %90/%100/%115/%130/%150; Yeşil/Mavi/Sıcak/Mor vurgu; Normal/Yüksek kontrast.
 - Tek yerel preference grubu, yalnız cihazda saklanır; masaüstü/hosting eşitlemesi yok.
 - Font: Android sistem fontScale × uygulama font yüzdesi, sistem 0.5–3.0 sınırı. Tüm TextView ve dialog SP ölçeklerine yansır.
