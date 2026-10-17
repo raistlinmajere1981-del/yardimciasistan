@@ -193,3 +193,12 @@ Yerel çalışma panosu: `.superdesign/android-companion/redesign-pixco-stitch-v
 - Telefon işlemleri pending/applied/failed/unknown durumlarında salt okunur; unknown için kör tekrar gönderim yok. Ses bölümü AndroidVoiceController yerine çalışan sahte motor üretmiyor.
 - 17 ekranın yerel V14 kopyası güncel. test-settings-v14.cjs 32/32, test-v14-collection-smoke.cjs 34/34 PASS. Ayarlar Superdesign V14 geri indirilip birebir doğrulandı, diğer 16 V14 taslak yerel-only.
 - Kaynak sözleşme .superdesign/android-companion/redesign-pixco-stitch-v1/SETTINGS_V14_NOTES.md. Android Java/APK, pilot DB, hosting ve gerçek bağlantılar değişmedi.
+
+
+## 17 Ekim 2026 — V15: Ortak Türkçe tarih-saat seçici ve Ayarlar temizliği
+
+- Android native tasarım hedefi: tek yeniden kullanılabilir tarih-saat bileşeni. Türkçe Pazartesi başlangıçlı takvim, Bugün/Yarın, konaklama çıkışında girişe göre +1/+2/+7/+10 gün, 24 saatlik iki kolon saat seçimi ve Şimdi/+30 dk/+1 saat kısayolları; tek mevcut işlem paneli içinde.
+- Pansiyon rezervasyonu/oda atama, Restoran rezervasyonu ve Günlük İşler prototiplerinde uygulandı. Tarih YYYY-MM-DD, saat HH:mm formatı korunuyor; geçersiz eski çıkış tarihi temizlenir.
+- 150% font taşmasını önlemek için V15 önizlemelerinde viewport yüksekliği ve işlem paneli iç scroll düzenlendi. Ayarlar/Görünüm'deki Rezervasyon · Oda 104 önizlemesi ile per-device açıklaması kaldırıldı.
+- Yerel koleksiyon 17 ekran; test-picker-v15.cjs 30/30 PASS, ekran görüntüleri ve kurallar DATE_TIME_PICKER_V15_NOTES.md'de. V15 Superdesign aktarımı sunucu hatası nedeniyle doğrulanamadı, bu yüzden yalnız yerel V15 güncel kabul edilir.
+- Yalnız tarayıcı prototipi; Java DatePickerDialog/TimePickerDialog henüz değiştirilmedi, Android uygulaması/APK, pilot verileri ve hosting etkilenmedi.
