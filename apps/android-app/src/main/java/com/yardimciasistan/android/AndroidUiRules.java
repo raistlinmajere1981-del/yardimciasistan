@@ -135,7 +135,7 @@ final class AndroidUiRules {
   private static NavigationItem tabNavigationItem(String tab) {
     if (TAB_PENSION.equals(tab)) return new NavigationItem(tab, "Pansiyon", "Odalar ve konaklama işlemleri");
     if (TAB_RESTAURANT.equals(tab)) return new NavigationItem(tab, "Restoran", "Masalar ve adisyonlar");
-    if (TAB_MARKET.equals(tab)) return new NavigationItem(tab, "Market", "Satış, stok ve cari işlemler");
+    if (TAB_MARKET.equals(tab)) return new NavigationItem(tab, "Satış", "Satış, stok ve cari işlemler");
     if (TAB_MESSAGES.equals(tab)) return new NavigationItem(tab, "Mesajlar", "Hazır mesajlar ve yanıtlar");
     if (TAB_CASH.equals(tab)) return new NavigationItem(tab, "Kasa", "Gelir, gider ve kasa hareketleri");
     return new NavigationItem(tab, "Raporlar", "İşletme raporları");

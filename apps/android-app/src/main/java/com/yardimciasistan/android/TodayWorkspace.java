@@ -43,14 +43,14 @@ final class TodayWorkspace {
 
   View build() {
     LinearLayout page = UiKit.column(activity);
-    LinearLayout heading = UiKit.column(activity);
-    heading.addView(UiKit.title(activity, "Bugün / Şimdi"));
-    heading.addView(UiKit.text(activity,
+    // The application header already names this screen "Bugün".
+    // Keep only the context line to avoid a duplicate oversized title.
+    TextView description = UiKit.text(activity,
         "Öncelikli işler, talepler ve yakın eylemler",
-        13, UiKit.MUTED, Typeface.NORMAL));
-    LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
-    headingParams.setMargins(0, UiKit.dp(activity, 2), 0, UiKit.dp(activity, 18));
-    page.addView(heading, headingParams);
+        13, UiKit.MUTED, Typeface.NORMAL);
+    LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
+    descriptionParams.setMargins(0, UiKit.dp(activity, 2), 0, UiKit.dp(activity, 14));
+    page.addView(description, descriptionParams);
     if (!companionNotice.isEmpty()) {
       page.addView(emptyCard("Görünüm kapatıldı", companionNotice));
     }

@@ -323,13 +323,8 @@ final class MarketWorkspace {
 
   private LinearLayout homeScreen() {
     LinearLayout page = UiKit.column(context);
-    page.addView(UiKit.eyebrow(context, "SATIŞ"));
-    TextView title = UiKit.title(context, "Satış");
-    LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-    titleParams.setMargins(0, dp(3), 0, dp(12));
-    title.setLayoutParams(titleParams);
-    page.addView(title);
-
+    // The application shell already shows the "Satış" title.
+    // Avoid repeating the same label in the content area.
     addPendingState(page);
 
     if (MarketUiRules.canScanToDesktop(data)) {

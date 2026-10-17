@@ -979,7 +979,7 @@ public final class MainActivity extends ComponentActivity {
       title = "Restoran";
       screen = restaurantScreen();
     } else if (TAB_MARKET.equals(navigation.tab())) {
-      title = "Market";
+      title = "Satış";
       screen = marketWorkspace.create(data, localPendingActionCount(), loading);
     } else if (TAB_MESSAGES.equals(navigation.tab())) {
       title = "Mesajlar";

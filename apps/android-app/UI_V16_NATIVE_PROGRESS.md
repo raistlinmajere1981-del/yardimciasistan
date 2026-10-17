@@ -56,16 +56,23 @@ Bu dizin, kaynak Java ile gerçek Android APK'ye entegre edilen parçaları izle
 - `DailyTaskEditorDialog.java`: V16 alan ve etiketleri; dikte ve tarih/saat bağlantıları korunur. “Sil” işlemi iç içe ikinci modal yerine aynı formda iki aşamalı **Silmeyi Onayla** kontrolü kullanır; yalnız silme yetkisi mevcutsa görünür.
 - Bu turda bağlantı anahtarları, cihaz yetkisi, outbox ve senkronizasyon yazma yolu değiştirilmedi. Tasarım incelemesinde gerçek cihaz ve erişilebilirlik denemesi gereklidir.
 
-## Henüz tamamlanmayan görsel aktarım
+## Kapanış doğrulaması — 17 Ekim 2026
 
-İlk altı native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e bire bir geçirildiği anlamına gelmez. Temel liste/kartlar, Ayarlar, Bağlantı, Cihaz ve önemli kayıt formlarına tasarım uyarlaması yapıldı; gerçek Android cihazında ekranların tam eşitliği henüz doğrulanmadı.
-Sıradaki aşama, telefon/tablet üzerinde V16'nın 19 ekran ve alt formlarının görsel/fonksiyonel karşılaştırılması, bulunan taşma ve etkileşim farklılıklarının giderilmesidir. Mesaj, kimlik tarama, kamera ve KBS detay panelleri özellikle fiziksel cihazda gözden geçirilmelidir.
-Kullanıcı yetkisi, sektör, outbox ve senkronizasyon davranışları backend kaynaklarında kalır; HTML prototip iş mantığı native koda taşınmaz.
-Gerçek cihazda 360/393, Android 8.1, tablet, TalkBack, klavye, tarih popup yüksekliği, çevrimdışı ve senkronizasyon ayrıca kontrol edilmelidir.
-Prototipteki 'Analiz hatasını dene' kullanıcıya görünen native butona eklenmemelidir.
+**Android V16 ana UI aktarımı ve geliştirme turu kapatıldı.** Bu ifade, 19 HTML prototip ekranının native Android'e piksel piksel kopyalandığını veya tüm sektör işlemlerinin fiziksel cihazda kanıtlandığını iddia etmez. Kaynak envanteri ve tarayıcı karşılaştırması yerel `.superdesign/android-companion/redesign-pixco-stitch-v1/ANDROID_UI_PARITY_V16.md` içindedir.
 
-## Derleme ve test
+- Son küçük düzeltmeler: `TodayWorkspace` içindeki yinelenen `Bugün / Şimdi` başlığı kaldırıldı; market çalışma alanının kullanıcıya görünen menü/üst başlığı **Satış** oldu, aynı sayfanın tekrar eden iç başlığı kaldırıldı. Teknik route `market` değişmedi.
+- **137 Android JVM testi, 0 başarısız**; `testDebugUnitTest assembleDebug` başarılı.
+- **V16 HTML/prototip: 71/71 tarayıcı testi, 0 sayfa hatası, 0 beklenmeyen ağ isteği**.
+- Android izin matrisi smoke: `pending → approved staff → admin → revoked` geçti.
+- Fiziksel SM-J700F / **LineageOS Android 13** üzerinde uygulama ve yönetici senkronu doğrulandı. Bugün, Müşteri, Satış (eski Market), Diğer, Kasa açıldı; tıklanabilir öğeler ekran sınırının dışına taşmadı. Yeni Müşteri, Ürün Ara ve Kasa Hareketi panelleri gerçek kayıt göndermeden açılarak kontrol edildi. Son düzeltmeli debug APK **`adb install -r`** ile yüklendi ve bağlantı anahtarı korundu. Bugün başlığının tekilleştirilmesi ve **Satış** etiketi cihaz XML'inde teyit edildi.
+- Minimum SDK **26** (Android 8.0), dolayısıyla Android 8.1 (SDK 27) yapılandırmada destekleniyor; ancak fiziksel 8.1 cihaz üzerinde bu turda çalıştırılmış test yok.
+- Gerçek kamera/kimlik OCR, TalkBack, tablet/yatay ekran, çevrimdışı yeniden denemeler, tam stok-satış-tahsilat akışları, canlı KBS gönderimi ve diğer sektörlerin gerçek yetki profilleri üzerinde uçtan uca cihaz testi **bu kapanışın kapsamında değil**. Bu konular yeni bir pilot/özellik doğrulama turunda incelenmeli.
+- Kullanıcı yetkisi, sektör, outbox ve senkronizasyon backend sahipliği korunmuştur; HTML prototip mantığı native koda taşınmamıştır. Prototipteki `Analiz hatasını dene` kullanıcı butonu native ekrana eklenmemiştir.
 
-`node scripts/run-android-gradle.mjs testDebugUnitTest assembleDebug --offline`
+## Tekrar doğrulama komutları
 
-Native APK kurulumunu/kullanıcı verisini değiştirmeden derleme yapıldı; fiziksel cihaza yükleme ve V16 canlı UI gözden geçirme sonraki aşamada.
+- `node scripts/run-android-gradle.mjs testDebugUnitTest assembleDebug --offline`
+- `npm run verify:check -- android-ui-parity-v16`
+- `node scripts/smoke-android-permission-matrix.mjs`
+
+Bu tamamlanan V16 UI çalışmasının sonraki adımı bir UI tasarım turu değil; işletme işlemleri ve fiziksel donanımlar için ayrı saha/pilot doğrulamasıdır.
