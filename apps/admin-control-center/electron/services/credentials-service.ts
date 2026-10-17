@@ -1,8 +1,10 @@
-import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { readInstallationSecret, type InstallationTarget, type SecretReadResult } from "./installation-secret-sync";
 import { join } from "node:path";
 import { CREDENTIAL_FIELDS, type CredentialField, type InstallationCredentialRecord } from "../../shared/contracts";
 
-type Registry = { installations?: Record<string, { credentialRef?: string }> };
+type Registry = { installations?: Record<string, InstallationTarget & { credentialRef?: string }> };
 type CredentialsFile = { schemaVersion?: number; credentials?: Record<string, Record<string, unknown>> };
 
 function getCredentialRef(repoRoot: string, installationId: string) {
@@ -64,4 +66,69 @@ export function getCredentialForClipboard(repoRoot: string, installationId: stri
   const file = readCredentials(join(repoRoot, "config", "credentials.local.json"));
   const value = file.credentials?.[ref]?.[field];
   return typeof value === "string" && value ? value : null;
+}
+
+export type CredentialSyncResult = { ok: boolean; changed: boolean; verifiedLive: boolean; message: string };
+
+function storeSecret(repoRoot: string, ref: string, value: string) {
+  const path = join(repoRoot, "config", "credentials.local.json");
+  const file = readCredentials(path);
+  const current = file.credentials?.[ref] ?? {};
+  if (current.syncSecret === value) return false;
+
+  file.schemaVersion = 1;
+  file.credentials ??= {};
+  file.credentials[ref] = { ...current, syncSecret: value };
+  const temp = `${path}.${randomBytes(8).toString("hex")}.tmp`;
+  try {
+    writeFileSync(temp, `${JSON.stringify(file, null, 2)}\n`, { mode: 0o600 });
+    chmodSync(temp, 0o600);
+    renameSync(temp, path);
+  } finally {
+    if (existsSync(temp)) unlinkSync(temp);
+  }
+  return true;
+}
+
+export async function syncInstallationCredential(
+  repoRoot: string,
+  installationId: string,
+  reader: (root: string, installation: InstallationTarget) => Promise<SecretReadResult> = readInstallationSecret
+): Promise<CredentialSyncResult> {
+  const registry = JSON.parse(readFileSync(join(repoRoot, "config", "installations.json"), "utf8")) as Registry;
+  const record = registry.installations?.[installationId];
+  const ref = record?.credentialRef?.trim();
+  if (!record || !ref || !record.webModuleUrl) {
+    return { ok: false, changed: false, verifiedLive: false, message: "Web bağlantısı veya kurulum kaydı bulunamadı." };
+  }
+
+  try {
+    const result = await reader(repoRoot, { ...record, id: installationId });
+    const value = result.value.trim();
+    if (value.length < 16 || value.length > 512 || /\s/.test(value)) {
+      throw new Error("Alınan web bağlantı anahtarı geçersiz.");
+    }
+    const fields = getInstallationCredentials(repoRoot, installationId).fields;
+    const saved = "syncSecret" in fields ? fields.syncSecret : undefined;
+    if (!result.verifiedLive && saved && saved !== value) {
+      return {
+        ok: false, changed: false, verifiedLive: false,
+        message: "BlackSea yerel kurulum kaydı farklı. Canlı doğrulama olmadan mevcut anahtar değiştirilmedi."
+      };
+    }
+
+    const changed = storeSecret(repoRoot, ref, value);
+    return {
+      ok: true, changed, verifiedLive: result.verifiedLive,
+      message: result.verifiedLive
+        ? changed ? "Canlı sunucudaki anahtar alındı ve güncellendi." : "Anahtar canlı sunucuyla eşleşiyor."
+        : changed ? "Anahtar yerel BlackSea kurulum kaydından alındı; canlı doğrulanmadı."
+          : "BlackSea yerel kurulum kaydı eşleşiyor; canlı doğrulanmadı."
+    };
+  } catch (error) {
+    return {
+      ok: false, changed: false, verifiedLive: false,
+      message: `${error instanceof Error ? error.message : "Anahtar okunamadı."} Kayıt korunuyor; canlı güncellik bilinmiyor.`
+    };
+  }
 }

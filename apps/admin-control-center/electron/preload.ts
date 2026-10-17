@@ -4,6 +4,7 @@ import type { AdminBridge } from "../shared/contracts";
 const bridge: AdminBridge = {
   getOverview: () => ipcRenderer.invoke("admin:get-overview"),
   getInstallationCredentials: (installationId) => ipcRenderer.invoke("admin:get-installation-credentials", installationId),
+  syncInstallationCredential: (installationId) => ipcRenderer.invoke("admin:sync-installation-credential", installationId),
   saveInstallationCredential: (installationId, field, value) =>
     ipcRenderer.invoke("admin:save-installation-credential", installationId, field, value),
   copyInstallationCredential: (installationId, field) =>

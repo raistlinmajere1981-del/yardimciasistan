@@ -4,6 +4,7 @@ import { checkDependencyUpdates } from "./services/dependency-update-service";
 import {
   getCredentialForClipboard,
   getInstallationCredentials,
+  syncInstallationCredential,
   saveInstallationCredential
 } from "./services/credentials-service";
 import { DeploymentRunner, getDeploymentTargets } from "./services/deployment-runner";
@@ -87,6 +88,9 @@ function createWindow() {
 ipcMain.handle("admin:get-overview", () => getOverviewSnapshot(REPO_ROOT));
 ipcMain.handle("admin:get-installation-credentials", (_event, installationId: string) =>
   getInstallationCredentials(REPO_ROOT, installationId)
+);
+ipcMain.handle("admin:sync-installation-credential", (_event, installationId: string) =>
+  syncInstallationCredential(REPO_ROOT, installationId)
 );
 ipcMain.handle("admin:save-installation-credential", (_event, installationId: string, field: string, value: string) =>
   saveInstallationCredential(REPO_ROOT, installationId, field, value)

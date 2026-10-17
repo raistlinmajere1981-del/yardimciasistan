@@ -3158,3 +3158,6 @@ body {
 @media (max-width: 1050px) {
   .verification-row--action { grid-template-columns: 26px minmax(0,1fr) 88px 82px auto; }
 }
+
+.credential-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 1050px) { .credential-header-actions { justify-content: flex-start; } }

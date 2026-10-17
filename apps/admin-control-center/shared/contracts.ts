@@ -30,7 +30,7 @@ export type CredentialField =
 export type InstallationCredentialRecord = Partial<Record<CredentialField, string>>;
 export type CredentialFieldDefinition = { id: CredentialField; label: string; secret: boolean };
 export const CREDENTIAL_FIELDS: CredentialFieldDefinition[] = [
-  { id: "syncSecret", label: "Sync secret", secret: true },
+  { id: "syncSecret", label: "Web güvenlik anahtarı", secret: true },
   { id: "ftpProtocol", label: "FTP protokolü", secret: false },
   { id: "ftpHost", label: "FTP sunucusu", secret: false },
   { id: "ftpPort", label: "FTP portu", secret: false },
@@ -318,6 +318,7 @@ export type OverviewSnapshot = {
 export type AdminBridge = {
   getOverview(): Promise<OverviewSnapshot>;
   getInstallationCredentials(installationId: string): Promise<{ ref: string | null; fields: InstallationCredentialRecord }>;
+  syncInstallationCredential(installationId: string): Promise<{ ok: boolean; changed: boolean; verifiedLive: boolean; message: string }>;
   saveInstallationCredential(installationId: string, field: CredentialField, value: string): Promise<{ ok: boolean; message: string }>;
   copyInstallationCredential(installationId: string, field: CredentialField): Promise<boolean>;
   checkDependencyUpdates(): Promise<DependencyUpdateReport>;

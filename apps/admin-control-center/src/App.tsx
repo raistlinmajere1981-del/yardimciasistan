@@ -411,66 +411,120 @@ function LiveConsole({
   );
 }
 
-function InstallationCredentials({ installation }: { installation: InstallationSnapshot }) {
+function InstallationCredentials({ installation, onRefresh }: { installation: InstallationSnapshot; onRefresh: () => void }) {
   const [fields, setFields] = useState<Partial<Record<CredentialField, string>>>({});
   const [drafts, setDrafts] = useState<Partial<Record<CredentialField, string>>>({});
   const [visible, setVisible] = useState<Partial<Record<CredentialField, boolean>>>({});
   const [busyField, setBusyField] = useState<CredentialField | null>(null);
+  const [checking, setChecking] = useState(false);
   const [notice, setNotice] = useState("");
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
+    setFields({});
+    setDrafts({});
+    setVisible({});
     setLoaded(false);
+    setChecking(false);
     setNotice("");
+
     if (!installation.credentialRef) {
-      setFields({});
-      setDrafts({});
       setLoaded(true);
       return () => { active = false; };
     }
-    void window.adminControlCenter.getInstallationCredentials(installation.id).then((result) => {
-      if (!active) return;
-      setFields(result.fields);
-      setDrafts(result.fields);
-      setLoaded(true);
-    }).catch(() => {
-      if (!active) return;
-      setNotice("Yerel erişim bilgileri okunamadı.");
-      setLoaded(true);
-    });
+    void (async () => {
+      try {
+        const local = await window.adminControlCenter.getInstallationCredentials(installation.id);
+        if (!active) return;
+        setFields(local.fields);
+        setDrafts(local.fields);
+        setLoaded(true);
+        if (!installation.webModuleUrl) return;
+
+        setChecking(true);
+        const result = await window.adminControlCenter.syncInstallationCredential(installation.id);
+        if (!active) return;
+        setNotice(result.message);
+        if (result.ok) {
+          const refreshed = await window.adminControlCenter.getInstallationCredentials(installation.id);
+          if (!active) return;
+          setFields(refreshed.fields);
+          setDrafts(refreshed.fields);
+          if (result.changed) onRefresh();
+        }
+      } catch {
+        if (active) setNotice("Anahtar bilgileri okunamadı; yerel kayıt korunuyor.");
+      } finally {
+        if (active) { setChecking(false); setLoaded(true); }
+      }
+    })();
     return () => { active = false; };
-  }, [installation.id, installation.credentialRef]);
+  }, [installation.id, installation.credentialRef, installation.webModuleUrl]);
+
+  async function refreshSecret() {
+    setChecking(true);
+    setNotice("");
+    try {
+      const result = await window.adminControlCenter.syncInstallationCredential(installation.id);
+      setNotice(result.message);
+      if (result.ok) {
+        const refreshed = await window.adminControlCenter.getInstallationCredentials(installation.id);
+        setFields(refreshed.fields);
+        setDrafts(refreshed.fields);
+        setVisible({});
+        if (result.changed) onRefresh();
+      }
+    } catch {
+      setNotice("Eşitleme yapılamadı; yerel anahtar korunuyor.");
+    } finally {
+      setChecking(false);
+    }
+  }
 
   async function save(field: CredentialField) {
     setBusyField(field);
-    const result = await window.adminControlCenter.saveInstallationCredential(installation.id, field, drafts[field] ?? "");
-    setNotice(result.message);
-    if (result.ok) {
-      const refreshed = await window.adminControlCenter.getInstallationCredentials(installation.id);
-      setFields(refreshed.fields);
-      setDrafts(refreshed.fields);
+    try {
+      const result = await window.adminControlCenter.saveInstallationCredential(installation.id, field, drafts[field] ?? "");
+      setNotice(result.message);
+      if (result.ok) {
+        const refreshed = await window.adminControlCenter.getInstallationCredentials(installation.id);
+        setFields(refreshed.fields);
+        setDrafts(refreshed.fields);
+      }
+    } catch {
+      setNotice("Yerel kayıt değiştirilemedi.");
+    } finally {
+      setBusyField(null);
     }
-    setBusyField(null);
   }
+
+  const displayedFields = CREDENTIAL_FIELDS.filter((field) => installation.id === "blacksea"
+    ? field.id !== "sshIdentityFile"
+    : field.id === "syncSecret" || field.id === "sshIdentityFile")
+    .filter((field) => (field.id === "syncSecret" && Boolean(installation.webModuleUrl))
+      || Boolean(fields[field.id]));
 
   return (
     <section className="panel credential-panel">
       <div className="panel-header">
         <div>
-          <p className="panel-kicker">YEREL DOSYA · config/credentials.local.json</p>
-          <h2>Erişim Bilgileri</h2>
+          <p className="panel-kicker">YEREL KAYIT · CANLI KONTROL</p>
+          <h2>Web bağlantı anahtarı</h2>
         </div>
-        <span className="quiet">{installation.credentialRef ?? "Credential referansı yok"}</span>
+        <div className="credential-header-actions">
+          <span className="quiet">{installation.credentialRef ?? "Credential referansı yok"}</span>
+          {installation.webModuleUrl ? (
+            <button className="button button--secondary button--compact" disabled={checking || !loaded} onClick={() => void refreshSecret()}>
+              <RefreshCw size={15} />{checking ? "Kontrol ediliyor" : "Sunucudan yenile"}
+            </button>
+          ) : null}
+        </div>
       </div>
-      {!installation.credentialRef ? <p className="credential-note">Bu kurulum için credentialRef tanımlanmamış.</p> : null}
+      {!installation.credentialRef ? <p className="credential-note">Bu kurulum için anahtar kaydı tanımlanmamış.</p> : null}
       {installation.credentialRef && !loaded ? <p className="credential-note">Yerel kayıt okunuyor…</p> : null}
       {installation.credentialRef && loaded ? <div className="credential-list">
-        {CREDENTIAL_FIELDS.filter((field) => installation.id === "blacksea"
-          ? field.id !== "sshIdentityFile"
-          : field.id === "syncSecret" || field.id === "sshIdentityFile")
-          .filter((field) => (installation.id === "blacksea" && field.id === "syncSecret") || Boolean(fields[field.id]))
-          .map((field) => {
+        {displayedFields.map((field) => {
           const saved = fields[field.id] ?? "";
           const manual = installation.id === "blacksea" && field.id === "syncSecret";
           const draft = manual ? drafts[field.id] ?? "" : saved;
@@ -482,22 +536,25 @@ function InstallationCredentials({ installation }: { installation: InstallationS
               autoComplete="off"
               value={draft}
               readOnly={!manual}
-              placeholder={manual ? "BlackSea web modül secret’ını girin" : "SSH sistem ayarlarından kullanılıyor"}
+              placeholder={checking ? "Sunucudan okunuyor…" : manual ? "BlackSea anahtarını girin" : "Henüz anahtar okunamadı"}
               onChange={manual ? (event) => setDrafts((current) => ({ ...current, [field.id]: event.target.value })) : undefined}
             />
-            {saved ? <button className="button button--secondary button--compact" title={visible[field.id] ? "Gizle" : "Göster"} aria-label={visible[field.id] ? "Gizle" : "Göster"} onClick={() => setVisible((current) => ({ ...current, [field.id]: !current[field.id] }))}>
+            {saved ? <button className="button button--secondary button--compact" title={visible[field.id] ? "Gizle" : "Göster"} onClick={() => setVisible((current) => ({ ...current, [field.id]: !current[field.id] }))}>
               {visible[field.id] ? <EyeOff size={15} /> : <Eye size={15} />}{visible[field.id] ? "Gizle" : "Göster"}
             </button> : <span />}
-            {saved ? <button className="button button--secondary button--compact" title="Kopyala" onClick={() => void window.adminControlCenter.copyInstallationCredential(installation.id, field.id)}><Copy size={15} />Kopyala</button> : null}
-            {manual ? <button className="button button--secondary button--compact" disabled={!draft.trim() || draft === saved || busyField === field.id} onClick={() => void save(field.id)}>
+            {saved ? <button className="button button--secondary button--compact" title="Kopyala" onClick={() => void window.adminControlCenter.copyInstallationCredential(installation.id, field.id).then((ok) => setNotice(ok ? "Panoya kopyalandı." : "Kopyalanamadı."))}>
+              <Copy size={15} />Kopyala
+            </button> : <span />}
+            {manual ? <button className="button button--secondary button--compact" disabled={!draft.trim() || draft === saved || busyField === field.id || checking} onClick={() => void save(field.id)}>
               <Save size={15} />{busyField === field.id ? "Kaydediliyor" : saved ? "Değiştir" : "Kaydet"}
             </button> : <span />}
           </div>;
         })}
-        {installation.id !== "blacksea" && !fields.syncSecret && !fields.sshIdentityFile ? (
-          <p className="credential-note">Bu deploy SSH config/agent üzerinden çalışıyor; ayrıca parola girilmesi gerekmiyor.</p>
+        {!installation.webModuleUrl && !displayedFields.length ? (
+          <p className="credential-note">Bu kurulumun web bağlantı anahtarı yok; SSH erişimi işletim sistemi tarafından yönetiliyor.</p>
         ) : null}
       </div> : null}
+      {checking ? <p className="credential-note" role="status">Sunucudaki anahtar kontrol ediliyor; kayıtlı değer bu sırada değişmez.</p> : null}
       {notice ? <p className="credential-note" role="status">{notice}</p> : null}
     </section>
   );
@@ -633,7 +690,7 @@ function Installations({
               </div>
             </section>
 
-            <InstallationCredentials installation={selected} />
+            <InstallationCredentials installation={selected} onRefresh={onRefresh} />
 
             <section className="panel installation-metadata">
               <div className="panel-header">
