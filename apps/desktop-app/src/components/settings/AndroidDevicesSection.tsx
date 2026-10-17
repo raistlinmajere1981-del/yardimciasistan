@@ -1,4 +1,5 @@
 import { useConfirmDialog } from "../ui/useConfirmDialog";
+import { useEffect, useRef } from "react";
 import { RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import {
   androidAvailablePermissionGroupIds,
@@ -98,6 +99,25 @@ export function AndroidDevicesSection({
     if (registeredDevice) matchedDeviceIds.add(registeredDevice.deviceId);
     return { usbDevice, registeredDevice };
   });
+  const autoRepairAttempted = useRef(new Set<string>());
+  // Only exact registered identities can silently restore a missing debug
+  // credential. No model-name guesses, no rekey of connected healthy phones.
+  useEffect(() => {
+    if (!onProvisionApp || installBusy || busy) return;
+    for (const { usbDevice, registeredDevice } of usbRows) {
+      const exact = Boolean(usbDevice.deviceId && usbDevice.deviceId === registeredDevice?.deviceId);
+      if (!exact || !registeredDevice?.isActive || usbDevice.state !== "device"
+          || !usbDevice.appInstalled) continue;
+      if (usbDevice.credentialState === "present") {
+        autoRepairAttempted.current.delete(usbDevice.serial);
+      } else if (usbDevice.credentialState === "missing"
+          && !autoRepairAttempted.current.has(usbDevice.serial)) {
+        autoRepairAttempted.current.add(usbDevice.serial);
+        onProvisionApp(usbDevice.serial);
+        break;
+      }
+    }
+  }, [installBusy, busy, onProvisionApp, usbRows]);
   const offlineRegisteredDevices = availableDevices.filter((device) => !matchedDeviceIds.has(device.deviceId));
 
   const restoreDevice = async (device: DesktopAndroidDevice) => {
@@ -246,6 +266,11 @@ export function AndroidDevicesSection({
             const canCompleteSetup = usbDevice.appInstalled
               && usbDevice.state === "device"
               && !registeredDevice;
+            const sameRegisteredPhone = Boolean(registeredDevice
+              && usbDevice.deviceId && usbDevice.deviceId === registeredDevice.deviceId);
+            const canRepair = sameRegisteredPhone && registeredDevice?.isActive
+              && usbDevice.appInstalled && usbDevice.state === "device"
+              && usbDevice.credentialState !== "pending";
             const primaryLabel = installAction && !installSnapshot?.apkAvailable
               ? "APK Hazır Değil"
               : usbDevice.action === "install"
@@ -302,9 +327,13 @@ export function AndroidDevicesSection({
                   </div>
                   <div>
                     <dt>Bağlantı</dt>
-                    <dd>{registeredDevice
-                      ? registeredDevice.lastSeenAt ? formatDateTime(registeredDevice.lastSeenAt) : "Hazır"
-                      : usbDevice.appInstalled ? "Kurulum tamamlanmadı" : "Uygulama bekleniyor"}</dd>
+                    <dd>{usbDevice.credentialState === "missing" && sameRegisteredPhone
+                      ? "Yeniden eşleştirme gerekli"
+                      : usbDevice.credentialState === "pending"
+                        ? "Eşleştiriliyor"
+                        : registeredDevice
+                          ? registeredDevice.lastSeenAt ? formatDateTime(registeredDevice.lastSeenAt) : "Hazır"
+                          : usbDevice.appInstalled ? "Kurulum tamamlanmadı" : "Uygulama bekleniyor"}</dd>
                   </div>
                   <div>
                     <dt>Durum</dt>
@@ -333,6 +362,15 @@ export function AndroidDevicesSection({
                   </div>
                 )}
 
+                {canRepair && (
+                  <div className="android-device-actions">
+                    <ActionButton variant="secondary" size="sm" type="button"
+                      onClick={() => onProvisionApp?.(usbDevice.serial)}
+                      disabled={installBusy || !onProvisionApp}>
+                      Yeniden Eşleştir
+                    </ActionButton>
+                  </div>
+                )}
                 {registeredDevice && renderManagement(registeredDevice)}
               </article>
             );

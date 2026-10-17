@@ -23,6 +23,8 @@ export interface DesktopAndroidInstallDevice {
   model: string;
   deviceId: string;
   appInstalled: boolean;
+  // Readable only with authorized USB+debug run-as; never expose the token itself.
+  credentialState: "present" | "missing" | "pending" | "unknown";
   installedVersionName: string;
   installedVersionCode: number;
   bundledVersionName: string;
@@ -288,6 +290,7 @@ export class AndroidInstallationService {
         ...device,
         deviceId: "",
         appInstalled: false,
+        credentialState: "unknown",
         installedVersionName: "",
         installedVersionCode: 0,
         bundledVersionName,
@@ -301,6 +304,7 @@ export class AndroidInstallationService {
         ...device,
         deviceId: "",
         appInstalled: false,
+        credentialState: "unknown",
         installedVersionName: "",
         installedVersionCode: 0,
         bundledVersionName,
@@ -316,6 +320,7 @@ export class AndroidInstallationService {
         ...device,
         deviceId: "",
         appInstalled: false,
+        credentialState: "unknown",
         installedVersionName: "",
         installedVersionCode: 0,
         bundledVersionName,
@@ -325,7 +330,8 @@ export class AndroidInstallationService {
       };
     }
 
-    const deviceId = this.resolveInstalledDeviceId(adb, device.serial);
+    const inspected = this.inspectInstalledIdentity(adb, device.serial);
+    const deviceId = inspected.deviceId;
     let action: DesktopAndroidInstallAction = "current";
     let message = `Yardımcı Asistan ${installed.versionName || "sürümü bilinmiyor"} kurulu.`;
     if (bundledVersionCode > 0 && installed.versionCode > 0) {
@@ -344,6 +350,7 @@ export class AndroidInstallationService {
       ...device,
       deviceId,
       appInstalled: true,
+      credentialState: inspected.credentialState,
       installedVersionName: installed.versionName,
       installedVersionCode: installed.versionCode,
       bundledVersionName,
@@ -372,17 +379,34 @@ export class AndroidInstallationService {
     };
   }
 
-  private resolveInstalledDeviceId(adb: string, serial: string): string {
+  private inspectInstalledIdentity(adb: string, serial: string): {
+    deviceId: string;
+    credentialState: DesktopAndroidInstallDevice["credentialState"];
+  } {
+    // The debug application is readable by Android's run-as on an authorized USB
+    // connection. A production (non-debuggable) build returns "unknown", never
+    // "missing": it must not be automatically rekeyed based on a guess.
     const prefs = this.runAdb(
       adb,
       ["-s", serial, "shell", "run-as", PACKAGE_NAME, "cat", "shared_prefs/yardimci_asistan_android.xml"],
       true
     );
-    const stored = prefs.status === 0
-      ? prefs.stdout.match(/<string name="device_id">([^<]+)<\/string>/)?.[1]?.trim() ?? ""
-      : "";
+    const xml = prefs.status === 0 ? prefs.stdout : "";
+    // Do not persist, log or return the actual credential.
+    const credential = xml.match(/<string name="sync_secret">([^<]*)<\/string>/)?.[1]?.trim() ?? "";
+    const bootstrap = xml.match(/<string name="bootstrap_ticket_v1">([^<]*)<\/string>/)?.[1]?.trim() ?? "";
+    let credentialState: DesktopAndroidInstallDevice["credentialState"] = "unknown";
+    if (prefs.status === 0) {
+      credentialState = /^device:yat_[a-f0-9]{64}$/.test(credential)
+        ? "present" : /^yab1\.[A-Za-z0-9_-]+\.[a-f0-9]{64}$/.test(bootstrap)
+          ? "pending" : "missing";
+    } else {
+      const readable = this.runAdb(adb, ["-s", serial, "shell", "run-as", PACKAGE_NAME, "id"], true);
+      if (readable.status === 0) credentialState = "missing";
+    }
+    const stored = xml.match(/<string name="device_id">([^<]+)<\/string>/)?.[1]?.trim() ?? "";
     if (/^[A-Za-z0-9._:-]{6,120}$/.test(stored)) {
-      return stored;
+      return { deviceId: stored, credentialState };
     }
 
     const androidIdResult = this.runAdb(
@@ -394,12 +418,12 @@ export class AndroidInstallationService {
       ? androidIdResult.stdout.trim().toLowerCase()
       : "";
     if (!/^[a-f0-9]{8,64}$/.test(androidId) || androidId === "9774d56d682e549c") {
-      return "";
+      return { deviceId: "", credentialState };
     }
     const digest = createHash("sha256")
       .update(`yardimci-asistan/android-device/v1\n${PACKAGE_NAME}\n${androidId}`, "utf8")
       .digest("hex");
-    return `android-device-${digest.slice(0, 32)}`;
+    return { deviceId: `android-device-${digest.slice(0, 32)}`, credentialState };
   }
 
   private isPackageInstalled(adb: string, serial: string) {
