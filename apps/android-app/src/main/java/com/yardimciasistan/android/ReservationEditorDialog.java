@@ -43,11 +43,12 @@ final class ReservationEditorDialog {
     boolean detailsEditable = !editing
         || reservation.requestId.startsWith("manual:")
         || reservation.requestId.startsWith("android:");
-    LinearLayout form = new LinearLayout(context);
-    form.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout form = UiKit.column(context);
     int padding = dp(context, 16);
     form.setPadding(padding, padding, padding, padding);
 
+    form.addView(UiKit.eyebrow(context,
+        kind == Kind.ROOM ? "PANSİYON · REZERVASYON" : "RESTORAN · REZERVASYON"));
     Spinner customerSpinner = null;
     TextView customerText = null;
     if (editing) {
@@ -138,8 +139,7 @@ final class ReservationEditorDialog {
         "Örn. Telefonla alındı, geç giriş yapacak."
     );
 
-    TextView status = new TextView(context);
-    status.setTextSize(12);
+    TextView status = UiKit.text(context, "", 12, UiKit.DANGER, android.graphics.Typeface.BOLD);
     status.setPadding(0, dp(context, 8), 0, 0);
     if (editing && !detailsEditable) {
       status.setText("Web talebinden oluşan rezervasyonda tarih, saat ve kişi bilgisi korunur; oda/masa ve not değiştirilebilir.");
@@ -173,6 +173,7 @@ final class ReservationEditorDialog {
 
       String validation = validate(kind, customerId, start, end, clock, guests);
       if (!validation.isEmpty()) {
+        status.setTextColor(UiKit.DANGER);
         status.setText(validation);
         return;
       }
@@ -231,6 +232,8 @@ final class ReservationEditorDialog {
     ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, values);
     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     spinner.setAdapter(adapter);
+    spinner.setBackground(UiKit.rounded(context, UiKit.SURFACE, UiKit.BORDER, 12));
+    spinner.setPadding(dp(context, 10), 0, dp(context, 10), 0);
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(context, 48));
     params.setMargins(0, 0, 0, dp(context, 10));
     spinner.setLayoutParams(params);
@@ -240,10 +243,9 @@ final class ReservationEditorDialog {
 
   private static EditText dateField(Context context, LinearLayout form, String label, String initial) {
     addLabel(context, form, label);
-    EditText field = new EditText(context);
+    EditText field = UiKit.input(context, "YYYY-AA-GG");
     field.setSingleLine(true);
     field.setText(initial == null ? "" : initial);
-    field.setHint("YYYY-AA-GG");
     field.setFocusable(false);
     field.setClickable(true);
     field.setOnClickListener(view -> NativeDateTimePicker.showDate(context, field, null, false));
@@ -253,10 +255,9 @@ final class ReservationEditorDialog {
 
   private static EditText timeField(Context context, LinearLayout form, String label, String initial) {
     addLabel(context, form, label);
-    EditText field = new EditText(context);
+    EditText field = UiKit.input(context, "SS:DD");
     field.setSingleLine(true);
     field.setText(initial == null ? "" : initial);
-    field.setHint("SS:DD");
     field.setFocusable(false);
     field.setClickable(true);
     field.setOnClickListener(view -> NativeDateTimePicker.showTime(context, field));
@@ -266,7 +267,7 @@ final class ReservationEditorDialog {
 
   private static EditText numberField(Context context, LinearLayout form, String label, String initial) {
     addLabel(context, form, label);
-    EditText field = new EditText(context);
+    EditText field = UiKit.input(context, "1");
     field.setSingleLine(true);
     field.setInputType(InputType.TYPE_CLASS_NUMBER);
     field.setText(initial);
@@ -297,10 +298,9 @@ final class ReservationEditorDialog {
   }
 
   private static void addLabel(Context context, LinearLayout form, String value) {
-    TextView label = new TextView(context);
-    label.setText(value);
-    label.setTextSize(12);
-    label.setPadding(0, dp(context, 4), 0, dp(context, 2));
+    TextView label = UiKit.text(context, value, 12,
+        UiKit.SECONDARY, android.graphics.Typeface.BOLD);
+    label.setPadding(0, dp(context, 7), 0, dp(context, 4));
     form.addView(label);
   }
 

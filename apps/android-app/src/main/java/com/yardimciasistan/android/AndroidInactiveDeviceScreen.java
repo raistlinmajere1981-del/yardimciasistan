@@ -65,6 +65,7 @@ final class AndroidInactiveDeviceScreen {
       page.addView(localCard);
     }
 
+    page.addView(UiKit.sectionTitle(activity, "Cihaz"));
     LinearLayout card = UiKit.card(activity);
     card.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
     card.addView(UiKit.divider(activity));
@@ -82,7 +83,7 @@ final class AndroidInactiveDeviceScreen {
     intro.setPadding(0, UiKit.dp(activity, 4), 0, UiKit.dp(activity, 8));
     intro.addView(UiKit.eyebrow(activity, eyebrow));
     LinearLayout titleRow = UiKit.row(activity);
-    TextView titleView = UiKit.text(activity, title, 18, UiKit.TEXT, Typeface.BOLD);
+    TextView titleView = UiKit.title(activity, title);
     titleView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
     titleRow.addView(titleView);
     intro.addView(titleRow);

@@ -48,10 +48,18 @@ Bu dizin, kaynak Java ile gerçek Android APK'ye entegre edilen parçaları izle
 - `AndroidSettingsWorkspace.java`: Ayarlar başlığı; V14/V15 kararı gereği görünüm örnek önizlemesi ve gereksiz cihaz-tercihi açıklaması kaldırıldı. Temalar, font, kontrast, ses ve bildirim kontrol bağlantıları aynı.
 - `AndroidMoreWorkspace.java`: Diğer menü başlığı ve satır tasarımı sadeleştirildi; rota ve yetki kontrolleri aynı.
 
+## Altıncı tur — Bağlantı / Cihaz / Rezervasyon ve İş Formları
+
+- `AndroidConnectionSettingsPanel.java`: Web bağlantısı, otomatik yerel ağ ve senkron durumu **Bağlantı** altında; telefon kimliği, adı ve yetki profili ayrı **Cihaz** bölümünde. Mevcut senkron isteği, read-only/eşleştirme kuralları, görünür bekleyen işlem sayısı ve ayar taslakları korunur.
+- `AndroidInactiveDeviceScreen.java`: Pasifleştirilmiş cihaz görünümü V16 başlıkları ve Cihaz bölümüyle eşlendi. Pasifleştirilen cihaz için iş alanlarına erişim yine açılmaz.
+- `ReservationEditorDialog.java`: Pansiyon/restoran formunda bağlam etiketi, ortak V16 giriş alanları, seçici sınırları ve hata etiketi. Müşteri, oda/masa, tarih/saat, yetkili düzenleme ve eski action payload sözleşmesi değişmez.
+- `DailyTaskEditorDialog.java`: V16 alan ve etiketleri; dikte ve tarih/saat bağlantıları korunur. “Sil” işlemi iç içe ikinci modal yerine aynı formda iki aşamalı **Silmeyi Onayla** kontrolü kullanır; yalnız silme yetkisi mevcutsa görünür.
+- Bu turda bağlantı anahtarları, cihaz yetkisi, outbox ve senkronizasyon yazma yolu değiştirilmedi. Tasarım incelemesinde gerçek cihaz ve erişilebilirlik denemesi gereklidir.
+
 ## Henüz tamamlanmayan görsel aktarım
 
-İlk beş native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e geçirildiği anlamına gelmez. İşletme ana listeleri, KBS, Mesajlar, Günlük İşler, Kasa ve Ayarlar'ın temel görünümü yenilendi; gerçek Android cihazında birebir tasarım ve işlem doğrulaması henüz yapılmadı.
-Sıradaki turda Rezervasyon ve Günlük İş düzenleme formlarının kalan yerleşimleri, Bağlantı/Cihazlar ekranları ve detay panelleri ele alınmalı. Sonrasında telefon/tablet üstünde V16 bütün ekranları karşılaştırılıp kalan görsel uyumsuzluklar tamamlanmalı.
+İlk altı native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e bire bir geçirildiği anlamına gelmez. Temel liste/kartlar, Ayarlar, Bağlantı, Cihaz ve önemli kayıt formlarına tasarım uyarlaması yapıldı; gerçek Android cihazında ekranların tam eşitliği henüz doğrulanmadı.
+Sıradaki aşama, telefon/tablet üzerinde V16'nın 19 ekran ve alt formlarının görsel/fonksiyonel karşılaştırılması, bulunan taşma ve etkileşim farklılıklarının giderilmesidir. Mesaj, kimlik tarama, kamera ve KBS detay panelleri özellikle fiziksel cihazda gözden geçirilmelidir.
 Kullanıcı yetkisi, sektör, outbox ve senkronizasyon davranışları backend kaynaklarında kalır; HTML prototip iş mantığı native koda taşınmaz.
 Gerçek cihazda 360/393, Android 8.1, tablet, TalkBack, klavye, tarih popup yüksekliği, çevrimdışı ve senkronizasyon ayrıca kontrol edilmelidir.
 Prototipteki 'Analiz hatasını dene' kullanıcıya görünen native butona eklenmemelidir.

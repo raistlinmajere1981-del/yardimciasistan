@@ -52,6 +52,7 @@ final class AndroidConnectionSettingsPanel {
     webModuleInput = null;
     syncSecretInput = null;
 
+    page.addView(UiKit.sectionTitle(activity, "Bağlantı"));
     boolean embeddedConnectionLocked = ConnectionSettings.isEmbeddedConnectionLocked();
     boolean canEditSettings = !embeddedConnectionLocked
         && (!data.permissionsResolved || data.hasPermission("settings.edit"));
@@ -163,7 +164,7 @@ final class AndroidConnectionSettingsPanel {
     ));
     page.addView(localConnectionCard);
 
-    page.addView(UiKit.sectionTitle(activity, "Bağlantı özeti"));
+    page.addView(UiKit.sectionTitle(activity, "Bağlantı durumu"));
     LinearLayout state = UiKit.card(activity);
     state.addView(settingLine(
         "Bağlantı durumu",
@@ -207,17 +208,17 @@ final class AndroidConnectionSettingsPanel {
         String.valueOf(visiblePendingActions),
         visiblePendingActions > 0 ? UiKit.WARNING : UiKit.SUCCESS
     ));
-    state.addView(UiKit.divider(activity));
-    state.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
-    state.addView(UiKit.divider(activity));
-    state.addView(settingLine("Cihaz adı", identity.deviceName, UiKit.MUTED));
-    state.addView(UiKit.divider(activity));
-    state.addView(settingLine(
-        "Yetki profili",
-        data.deviceRoleLabel(),
-        data.deviceActive ? UiKit.SUCCESS : UiKit.DANGER
-    ));
     page.addView(state);
+
+    page.addView(UiKit.sectionTitle(activity, "Cihaz"));
+    LinearLayout device = UiKit.card(activity);
+    device.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
+    device.addView(UiKit.divider(activity));
+    device.addView(settingLine("Cihaz adı", identity.deviceName, UiKit.MUTED));
+    device.addView(UiKit.divider(activity));
+    device.addView(settingLine("Yetki profili", data.deviceRoleLabel(),
+        data.deviceActive ? UiKit.SUCCESS : UiKit.DANGER));
+    page.addView(device);
   }
 
   String webModuleValue() {

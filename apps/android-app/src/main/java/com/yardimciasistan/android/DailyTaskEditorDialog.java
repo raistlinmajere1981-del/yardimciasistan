@@ -37,14 +37,12 @@ final class DailyTaskEditorDialog {
       Listener listener
   ) {
     boolean editing = existing != null;
-    LinearLayout form = new LinearLayout(context);
-    form.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout form = UiKit.column(context);
     int padding = dp(context, 16);
     form.setPadding(padding, padding, padding, padding);
 
-    TextView area = new TextView(context);
-    area.setText(kind == Kind.PENSION ? "Pansiyon işi" : "Restoran işi");
-    area.setTextSize(13);
+    TextView area = UiKit.eyebrow(context,
+        kind == Kind.PENSION ? "PANSİYON · GÜNLÜK İŞ" : "RESTORAN · GÜNLÜK İŞ");
     area.setPadding(0, 0, 0, dp(context, 10));
     form.addView(area);
 
@@ -92,8 +90,7 @@ final class DailyTaskEditorDialog {
     useTime.setOnCheckedChangeListener((button, checked) -> dueTime.setEnabled(checked));
     dueTime.setOnClickListener(view -> NativeDateTimePicker.showTime(context, dueTime));
 
-    TextView status = new TextView(context);
-    status.setTextSize(12);
+    TextView status = UiKit.text(context, "", 12, UiKit.DANGER, android.graphics.Typeface.BOLD);
     status.setPadding(0, dp(context, 8), 0, 0);
     form.addView(status);
 
@@ -143,17 +140,18 @@ final class DailyTaskEditorDialog {
         listener.onSave(payload);
       });
       if (editing && canDelete) {
-        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view ->
-            new AlertDialog.Builder(context)
-                .setTitle("Günlük işi sil")
-                .setMessage(existing.title + " silinsin mi? Bu işlem otomatik görevlerde kullanılamaz.")
-                .setNegativeButton("Vazgeç", null)
-                .setPositiveButton("Sil", (confirmDialog, which) -> {
-                  dialog.dismiss();
-                  listener.onDelete();
-                })
-                .show()
-        );
+        // Two-step confirmation in the same surface; no nested Android dialog.
+        final boolean[] deleteArmed = {false};
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> {
+          if (!deleteArmed[0]) {
+            deleteArmed[0] = true;
+            status.setText("Bu günlük işi silmek için 'Silmeyi Onayla' seçin.");
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setText("Silmeyi Onayla");
+            return;
+          }
+          dialog.dismiss();
+          listener.onDelete();
+        });
       }
     });
     dialog.show();
@@ -188,7 +186,7 @@ final class DailyTaskEditorDialog {
 
   private static EditText input(Context context, LinearLayout form, String label, String initial) {
     addLabel(context, form, label);
-    EditText field = new EditText(context);
+    EditText field = UiKit.input(context, label);
     field.setSingleLine(true);
     field.setText(initial == null ? "" : initial);
     addField(context, form, field, 48);
@@ -212,7 +210,7 @@ final class DailyTaskEditorDialog {
 
   private static EditText pickerField(Context context, LinearLayout form, String label, String initial) {
     addLabel(context, form, label);
-    EditText field = new EditText(context);
+    EditText field = UiKit.input(context, label);
     field.setSingleLine(true);
     field.setFocusable(false);
     field.setClickable(true);
@@ -229,10 +227,9 @@ final class DailyTaskEditorDialog {
   }
 
   private static void addLabel(Context context, LinearLayout form, String value) {
-    TextView label = new TextView(context);
-    label.setText(value);
-    label.setTextSize(12);
-    label.setPadding(0, dp(context, 4), 0, dp(context, 2));
+    TextView label = UiKit.text(context, value, 12,
+        UiKit.SECONDARY, android.graphics.Typeface.BOLD);
+    label.setPadding(0, dp(context, 7), 0, dp(context, 4));
     form.addView(label);
   }
 
