@@ -160,6 +160,18 @@ final class UiKit {
     return card;
   }
 
+  /** Shared V16 empty state card; callers provide only authorized list data. */
+  static View emptyCard(Context context, String title, String detail) {
+    return emptyCard(context, title, detail, SECONDARY);
+  }
+
+  static View emptyCard(Context context, String title, String detail, int detailTone) {
+    LinearLayout card = card(context);
+    card.addView(text(context, title, 14, TEXT, Typeface.BOLD));
+    card.addView(text(context, detail, 12, detailTone, Typeface.NORMAL));
+    return card;
+  }
+
   static View divider(Context context) {
     View divider = new View(context);
     divider.setBackgroundColor(BORDER);
@@ -318,34 +330,6 @@ final class UiKit {
       grid.addView(row, rowParams);
     }
     return grid;
-  }
-
-  static Button counterChip(Context context, String label, long value, int tone, View.OnClickListener listener) {
-    Button button = new Button(context);
-    button.setText(label + " " + value);
-    button.setTextSize(12);
-    button.setTextColor(tone);
-    button.setTypeface(Typeface.create("sans", Typeface.BOLD));
-    button.setAllCaps(false);
-    button.setSingleLine(true);
-    button.setMinWidth(0);
-    button.setMinimumWidth(0);
-    button.setGravity(Gravity.CENTER);
-    button.setMinHeight(dp(context, 34));
-    button.setMinimumHeight(dp(context, 34));
-    button.setPadding(dp(context, 10), 0, dp(context, 10), 0);
-    button.setBackground(statefulRounded(
-        context,
-        withAlpha(tone, 24),
-        withAlpha(tone, 84),
-        withAlpha(tone, 42),
-        17
-    ));
-    button.setOnClickListener(listener);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(context, 36));
-    params.setMargins(0, 0, dp(context, 7), 0);
-    button.setLayoutParams(params);
-    return button;
   }
 
   static TextView badge(Context context, String label, int tone) {

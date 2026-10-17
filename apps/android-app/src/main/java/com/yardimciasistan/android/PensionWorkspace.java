@@ -67,7 +67,7 @@ final class PensionWorkspace {
     if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_KBS)) options.add(new String[] {AndroidUiRules.PENSION_KBS, "KBS"});
 
     if (options.isEmpty()) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Bu cihazın bu alan için yetkisi yok",
           "Yetkiler masaüstü yöneticisi tarafından belirlenir."
       ));
@@ -123,7 +123,7 @@ final class PensionWorkspace {
     }
     if (search != null) finishSearch(page, search, "Aramayla eşleşen rezervasyon yok.");
     if (shown == 0) {
-      page.addView(emptyCard("Konaklama rezervasyonu yok", "Yeni rezervasyonlar burada listelenir."));
+      page.addView(UiKit.emptyCard(activity, "Konaklama rezervasyonu yok", "Yeni rezervasyonlar burada listelenir."));
     }
   }
 
@@ -137,7 +137,7 @@ final class PensionWorkspace {
     }));
 
     if (data.rooms.isEmpty()) {
-      page.addView(emptyCard("Oda verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
+      page.addView(UiKit.emptyCard(activity, "Oda verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
     }
     if (!data.rooms.isEmpty()) {
       NativeSearchList search = new NativeSearchList(activity, "Oda ara");
@@ -166,7 +166,7 @@ final class PensionWorkspace {
     }));
 
     if (data.customerRoomStays.isEmpty()) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Konaklama arşivi boş",
           "Müşteri-oda atamaları oluşturulduğunda burada saklanır."
       ));
@@ -204,7 +204,7 @@ final class PensionWorkspace {
     }
     if (search != null) finishSearch(page, search, "Aramayla eşleşen iş yok.");
     if (shown == 0) {
-      page.addView(emptyCard("Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
+      page.addView(UiKit.emptyCard(activity, "Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
     }
   }
 
@@ -278,13 +278,6 @@ final class PensionWorkspace {
       tiles.add(UiKit.metricCard(activity, counter.label, counter.value, counter.tone, null));
     }
     return UiKit.metricGrid(activity, tiles);
-  }
-
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(activity);
-    card.addView(UiKit.text(activity, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(activity, detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    return card;
   }
 
   private int countPensionReservations(String status) {

@@ -84,7 +84,7 @@ final class AndroidSettingsWorkspace {
 
     page.addView(UiKit.sectionTitle(activity, "Son telefon işlemleri"));
     if (data.actions.isEmpty()) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Gönderilmiş işlem yok",
           "Telefondan yaptığınız değişiklikler burada bekliyor, uygulandı veya hata durumuyla görünür."
       ));
@@ -360,10 +360,4 @@ final class AndroidSettingsWorkspace {
     return row;
   }
 
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(activity);
-    card.addView(UiKit.text(activity, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(activity, detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    return card;
-  }
 }

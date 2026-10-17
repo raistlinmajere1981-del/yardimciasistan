@@ -33,12 +33,6 @@ final class RoomFolioWorkspace {
 
   private RoomFolioWorkspace() {}
 
-  static ScrollView create(Context context, OperationData data, Listener listener) {
-    LinearLayout page = UiKit.column(context);
-    append(context, page, data, listener);
-    return UiKit.scroll(context, page);
-  }
-
   static void append(Context context, LinearLayout page, OperationData data, Listener listener) {
     int openCount = 0;
     Map<String, Long> remainingByCurrency = new LinkedHashMap<>();
@@ -464,12 +458,6 @@ final class RoomFolioWorkspace {
           listener.onAction("room_folio_checkout", payload, "Çıkış işlemi gönderildi.");
         })
         .show();
-  }
-
-  private static TextView line(Context context, String label, String value, int tone) {
-    TextView text = UiKit.text(context, label + ": " + value, 13, tone, Typeface.BOLD);
-    text.setPadding(0, dp(context, 7), 0, 0);
-    return text;
   }
 
   private static void addField(Context context, LinearLayout form, String label, View field) {

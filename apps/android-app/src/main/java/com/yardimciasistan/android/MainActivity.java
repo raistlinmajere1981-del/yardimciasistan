@@ -1221,12 +1221,6 @@ public final class MainActivity extends ComponentActivity {
     sendAction("table_status_update", payload("table_id", table.id, "status", status, "expected_updated_at", table.updatedAt), table.name + " durumu güncellenmek üzere gönderildi.");
   }
 
-  private ReservationEditorDialog.Kind reservationEditorKind(
-      OperationData.ReservationRecord reservation
-  ) {
-    return ReservationDetailDialog.editorKind(reservation);
-  }
-
   private void showReservationEditor(
       ReservationEditorDialog.Kind kind,
       OperationData.ReservationRecord reservation

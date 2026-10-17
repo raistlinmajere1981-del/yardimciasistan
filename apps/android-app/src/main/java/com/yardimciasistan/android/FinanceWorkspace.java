@@ -118,12 +118,6 @@ final class FinanceWorkspace {
     return card;
   }
 
-  private static TextView line(Context context, String label, String value, int tone) {
-    TextView text = UiKit.text(context, label + ": " + value, 13, tone, Typeface.BOLD);
-    text.setPadding(0, dp(context, 7), 0, 0);
-    return text;
-  }
-
   private static void showCreateDialog(Context context, OperationData data, Listener listener) {
     LinearLayout form = new LinearLayout(context);
     form.setOrientation(LinearLayout.VERTICAL);

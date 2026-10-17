@@ -696,7 +696,7 @@ final class MarketWorkspace {
 
     OperationData.MarketProduct product = MarketUiRules.productById(data, stockProductId);
     if (product == null || !product.trackInventory) {
-      page.addView(emptyCard("Ürün seçilmedi", "Barkod okutun veya stok takibine açık bir ürün seçin."));
+      page.addView(UiKit.emptyCard(context, "Ürün seçilmedi", "Barkod okutun veya stok takibine açık bir ürün seçin.", UiKit.MUTED));
       return page;
     }
 
@@ -765,7 +765,7 @@ final class MarketWorkspace {
 
     page.addView(UiKit.sectionTitle(context, "Ürün satırları"));
     if (receiving.size() == 0) {
-      page.addView(emptyCard("Henüz ürün yok", "Barkod okutun veya listeden ürün ekleyin."));
+      page.addView(UiKit.emptyCard(context, "Henüz ürün yok", "Barkod okutun veya listeden ürün ekleyin.", UiKit.MUTED));
     } else {
       for (MarketUiRules.ReceivingLine line : receiving.lines()) {
         page.addView(receivingLineCard(line));
@@ -919,7 +919,7 @@ final class MarketWorkspace {
 
     page.addView(UiKit.sectionTitle(context, "Sepet satırları"));
     if (cart.size() == 0) {
-      page.addView(emptyCard("Sepet boş", "Barkod okutun veya ürün seçin. Her okutma miktarı 1 artırır."));
+      page.addView(UiKit.emptyCard(context, "Sepet boş", "Barkod okutun veya ürün seçin. Her okutma miktarı 1 artırır.", UiKit.MUTED));
     } else {
       for (MarketUiRules.CartLine line : cart.lines()) {
         page.addView(cartLineCard(line));
@@ -1107,7 +1107,7 @@ final class MarketWorkspace {
           });
           open.setLayoutParams(fullButtonParams(54, 0, 8)); rows.addView(open);
         }
-        if (rows.getChildCount() == 0) rows.addView(emptyCard("Müşteri bulunamadı", "Yetkili müşteri listesini yenileyin."));
+        if (rows.getChildCount() == 0) rows.addView(UiKit.emptyCard(context, "Müşteri bulunamadı", "Yetkili müşteri listesini yenileyin.", UiKit.MUTED));
       };
       search.addTextChangedListener(new TextWatcher() {
         @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -1655,12 +1655,6 @@ final class MarketWorkspace {
     return card;
   }
 
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(context);
-    card.addView(UiKit.text(context, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(context, detail, 12, UiKit.MUTED, Typeface.NORMAL));
-    return card;
-  }
 
   private void addFormError(LinearLayout page) {
     if (!formError.isEmpty()) {

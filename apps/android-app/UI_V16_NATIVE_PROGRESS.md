@@ -76,3 +76,15 @@ Bu dizin, kaynak Java ile gerçek Android APK'ye entegre edilen parçaları izle
 - `node scripts/smoke-android-permission-matrix.mjs`
 
 Bu tamamlanan V16 UI çalışmasının sonraki adımı bir UI tasarım turu değil; işletme işlemleri ve fiziksel donanımlar için ayrı saha/pilot doğrulamasıdır.
+
+## Temiz kod milestone'u — 17 Ekim 2026
+
+**Etiket:** `android-v16-native-clean-2026-10-17` (yerel Git milestone)
+
+V16 aktarıldıktan sonra hem statik çağrı/referans taraması hem de salt-okunur Codex incelemesi yapıldı. **Ayrı, kullanılmayan bir eski Android ekran takımı tespit edilmedi.** Aktif `CompanionWorkspace`, `AndroidNavigationState`, `AndroidRootSwipeLayout`, Pansiyon/Restoran özet kartları, yetki, KBS, outbox ve senkronizasyon akışları silinmedi.
+
+- Altı çağrılmayan metot/sarmalayıcı kaldırıldı: `UiKit.counterChip`, `FinanceWorkspace.line`, `RoomFolioWorkspace.line`, `RoomFolioWorkspace.create`, `MainActivity.reservationEditorKind`, `AndroidPresentation.parseCustomerTags`.
+- Pansiyon, Restoran, Ayarlar ve Satış çalışma alanlarındaki dört aynı boş-durum kartı üreticisi `UiKit.emptyCard` altında toplandı. Market/Satış'ın sessiz metin tonu (`MUTED`) ile diğer ekranların tonu (`SECONDARY`) ve metinler korundu.
+- Değişiklik yalnız Android UI kaynakları ve bu ilerleme kaydı ile sınırlı. Veri şeması, ağ protokolü, masaüstü, web, yetki/payload iş akışları ve kullanıcının başka çalışma dosyaları değiştirilmedi.
+- Doğrulama kapısı: `testDebugUnitTest assembleDebug --offline` **137/137 PASS**, `smoke-android-permission-matrix` **PASS**, V16 tarayıcı eşitlik testi **71/71 PASS**.
+- Bu adım telefonda yeniden kurulum gerektirmeyen kaynak temizliğidir; APK derlendi. Fiziksel Android 8.1, kamera/OCR, işletme işlemleri ve tablet senaryoları saha testi kapsamındadır.

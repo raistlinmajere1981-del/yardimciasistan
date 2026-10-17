@@ -1,7 +1,5 @@
 package com.yardimciasistan.android;
 
-import org.json.JSONArray;
-
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -97,18 +95,6 @@ final class AndroidPresentation {
         customer.identityNumber,
         customer.documentSerialNumber
     );
-  }
-
-  static JSONArray parseCustomerTags(String source) {
-    JSONArray result = new JSONArray();
-    if (source == null || source.trim().isEmpty()) return result;
-    java.util.HashSet<String> seen = new java.util.HashSet<>();
-    for (String raw : source.split("[,;\\n]")) {
-      String tag = raw.trim();
-      String key = tag.toLowerCase(new Locale("tr", "TR"));
-      if (!tag.isEmpty() && tag.length() <= 40 && seen.add(key) && result.length() < 20) result.put(tag);
-    }
-    return result;
   }
 
   static boolean isIsoDate(String value) {

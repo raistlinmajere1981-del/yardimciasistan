@@ -69,7 +69,7 @@ final class RestaurantWorkspace {
       options.add(new String[] {AndroidUiRules.RESTAURANT_MENU, "Menü"});
     }
     if (options.isEmpty()) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Bu cihazın bu alan için yetkisi yok",
           "Yetkiler masaüstü yöneticisi tarafından belirlenir."
       ));
@@ -106,7 +106,7 @@ final class RestaurantWorkspace {
     page.addView(statusStrip(counters.toArray(new CounterValue[0])));
 
     if (data.tables.isEmpty()) {
-      page.addView(emptyCard("Masa verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
+      page.addView(UiKit.emptyCard(activity, "Masa verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
     }
     if (!data.tables.isEmpty()) {
       NativeSearchList search = addSearch(page, "Masa ara");
@@ -142,7 +142,7 @@ final class RestaurantWorkspace {
     }
     if (search != null) finishSearch(page, search, "Aramayla eşleşen rezervasyon yok.");
     if (shown == 0) {
-      page.addView(emptyCard(
+      page.addView(UiKit.emptyCard(activity,
           "Restoran rezervasyonu yok",
           "Masa ve kahvaltı rezervasyonları geldiğinde burada görünür."
       ));
@@ -158,7 +158,7 @@ final class RestaurantWorkspace {
         new CounterValue("Hesap", countOrdersByStatus("payment"), UiKit.WARNING, "")
     }));
     if (activeOrders == 0) {
-      page.addView(emptyCard("Aktif adisyon yok", "Sipariş açılan masalar burada ayrıca görünür."));
+      page.addView(UiKit.emptyCard(activity, "Aktif adisyon yok", "Sipariş açılan masalar burada ayrıca görünür."));
     } else {
       NativeSearchList search = addSearch(page, "Adisyon veya masa ara");
       for (OperationData.TableOrder order : data.tableOrders) {
@@ -193,7 +193,7 @@ final class RestaurantWorkspace {
     }
     if (search != null) finishSearch(page, search, "Aramayla eşleşen iş yok.");
     if (shown == 0) {
-      page.addView(emptyCard("Restoran işi yok", "Günlük restoran işleri sakin görünüyor."));
+      page.addView(UiKit.emptyCard(activity, "Restoran işi yok", "Günlük restoran işleri sakin görünüyor."));
     }
   }
 
@@ -216,7 +216,7 @@ final class RestaurantWorkspace {
       }
     }
     if (outOfStock == 0) {
-      page.addView(emptyCard("Stokta olmayan ürün yok", "Takip edilen ürünlerde tükenen stok bulunmuyor."));
+      page.addView(UiKit.emptyCard(activity, "Stokta olmayan ürün yok", "Takip edilen ürünlerde tükenen stok bulunmuyor."));
     }
 
     page.addView(sectionLabel("Az stok"));
@@ -228,12 +228,12 @@ final class RestaurantWorkspace {
       }
     }
     if (lowStock == 0) {
-      page.addView(emptyCard("Azalan stok yok", "Minimum stok seviyesine yaklaşan ürün bulunmuyor."));
+      page.addView(UiKit.emptyCard(activity, "Azalan stok yok", "Minimum stok seviyesine yaklaşan ürün bulunmuyor."));
     }
 
     page.addView(sectionLabel("Tüm takip edilen ürünler"));
     if (data.trackedStockItems.isEmpty()) {
-      page.addView(emptyCard("Stok takibi yapılmıyor", "Masaüstünde stok adedi girilen ürünler burada görünür."));
+      page.addView(UiKit.emptyCard(activity, "Stok takibi yapılmıyor", "Masaüstünde stok adedi girilen ürünler burada görünür."));
     } else {
       NativeSearchList search = addSearch(page, "Stok ürünü ara");
       for (OperationData.TrackedStockItem item : data.trackedStockItems) {
@@ -250,7 +250,7 @@ final class RestaurantWorkspace {
         new CounterValue("Kategori", data.adminCategories.size(), UiKit.INFO, ""),
         new CounterValue("Ürün", data.adminMenuItems.size(), UiKit.ACCENT, "")
     }));
-    page.addView(emptyCard(
+    page.addView(UiKit.emptyCard(activity,
         "Menü sunumu yönetimi",
         "Kategori kaldırmak yalnız menü ilişkilerini kaldırır. Ortak ürünler, stok ve diğer satış kanalları korunur. Her kaldırma işlemi ayrıca onay ister."
     ));
@@ -258,7 +258,7 @@ final class RestaurantWorkspace {
     page.addView(sectionLabel("Kategoriler"));
     if (data.hasPermission("menu.edit")) page.addView(listener.createMenuProductCreateCard());
     if (data.adminCategories.isEmpty()) {
-      page.addView(emptyCard("Kategori yok", "Silinebilecek menü kategorisi bulunmuyor."));
+      page.addView(UiKit.emptyCard(activity, "Kategori yok", "Silinebilecek menü kategorisi bulunmuyor."));
     }
     for (OperationData.MenuCategory category : data.adminCategories) {
       page.addView(listener.createAdminCategoryCard(category));
@@ -266,7 +266,7 @@ final class RestaurantWorkspace {
 
     page.addView(sectionLabel("Ürünler"));
     if (data.adminMenuItems.isEmpty()) {
-      page.addView(emptyCard("Ürün yok", "Silinebilecek menü ürünü bulunmuyor."));
+      page.addView(UiKit.emptyCard(activity, "Ürün yok", "Silinebilecek menü ürünü bulunmuyor."));
     }
     for (OperationData.MenuItem item : data.adminMenuItems) {
       page.addView(listener.createAdminMenuItemCard(item));
@@ -349,13 +349,6 @@ final class RestaurantWorkspace {
     params.setMargins(0, UiKit.dp(activity, 7), 0, UiKit.dp(activity, 7));
     label.setLayoutParams(params);
     return label;
-  }
-
-  private View emptyCard(String title, String detail) {
-    LinearLayout card = UiKit.card(activity);
-    card.addView(UiKit.text(activity, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(activity, detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
-    return card;
   }
 
   private int countTablesByStatus(String status) {
