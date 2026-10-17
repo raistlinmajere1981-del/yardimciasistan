@@ -76,6 +76,7 @@ final class RestaurantWorkspace {
       return UiKit.scroll(activity, page, bottomPaddingDp);
     }
 
+    page.addView(titleBar(mode));
     page.addView(filterBar(options.toArray(new String[0][]), mode));
 
     if (AndroidUiRules.RESTAURANT_TABLES.equals(mode)) {
@@ -107,26 +108,18 @@ final class RestaurantWorkspace {
     if (data.tables.isEmpty()) {
       page.addView(emptyCard("Masa verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
     }
-    for (OperationData.TableRecord table : data.tables) {
-      page.addView(listener.createTableCard(table));
+    if (!data.tables.isEmpty()) {
+      NativeSearchList search = addSearch(page, "Masa ara");
+      for (OperationData.TableRecord table : data.tables) {
+        View row = listener.createTableCard(table);
+        page.addView(row);
+        search.add(row, table.name + " " + table.area + " " + table.status + " " + table.activeReservation);
+      }
+      finishSearch(page, search, "Aramayla eşleşen masa yok.");
     }
   }
 
   private void renderReservations(LinearLayout page) {
-    if (AndroidUiRules.canCreateTableReservation(data)) {
-      Button create = UiKit.button(
-          activity,
-          "+ Yeni Rezervasyon",
-          UiKit.PRIMARY,
-          view -> listener.onCreateTableReservation()
-      );
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-      params.setMargins(0, 0, 0, UiKit.dp(activity, 10));
-      create.setLayoutParams(params);
-      create.setEnabled(!data.customers.isEmpty());
-      page.addView(create);
-    }
-
     page.addView(statusStrip(new CounterValue[] {
         new CounterValue("Bekleyen", countRestaurantReservations("pending"), UiKit.WARNING, ""),
         new CounterValue("Onaylı", countRestaurantReservations("approved"), UiKit.SUCCESS, ""),
@@ -134,14 +127,20 @@ final class RestaurantWorkspace {
     }));
 
     int shown = 0;
+    NativeSearchList search = null;
     for (OperationData.ReservationRecord reservation : data.reservations) {
       if (!AndroidUiRules.isRestaurantReservation(data, reservation)
           || !AndroidUiRules.reservationAllowed(data, reservation)) {
         continue;
       }
-      page.addView(listener.createReservationCard(reservation));
+      if (search == null) search = addSearch(page, "Rezervasyon ara");
+      View row = listener.createReservationCard(reservation);
+      page.addView(row);
+      search.add(row, reservation.customerName + " " + reservation.startDate + " "
+          + reservation.time + " " + reservation.status);
       shown += 1;
     }
+    if (search != null) finishSearch(page, search, "Aramayla eşleşen rezervasyon yok.");
     if (shown == 0) {
       page.addView(emptyCard(
           "Restoran rezervasyonu yok",
@@ -160,24 +159,20 @@ final class RestaurantWorkspace {
     }));
     if (activeOrders == 0) {
       page.addView(emptyCard("Aktif adisyon yok", "Sipariş açılan masalar burada ayrıca görünür."));
-    }
-    for (OperationData.TableOrder order : data.tableOrders) {
-      if (order.isActive()) {
-        page.addView(listener.createOrderCard(order));
+    } else {
+      NativeSearchList search = addSearch(page, "Adisyon veya masa ara");
+      for (OperationData.TableOrder order : data.tableOrders) {
+        if (order.isActive()) {
+          View row = listener.createOrderCard(order);
+          page.addView(row);
+          search.add(row, order.tableName + " " + order.status + " " + order.id);
+        }
       }
+      finishSearch(page, search, "Aramayla eşleşen adisyon yok.");
     }
   }
 
   private void renderTasks(LinearLayout page) {
-    if (data.hasPermission("daily_task.create")
-        && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)) {
-      Button create = UiKit.button(activity, "+ Yeni İş", UiKit.PRIMARY, view -> listener.onCreateTask());
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-      params.setMargins(0, 0, 0, UiKit.dp(activity, 10));
-      create.setLayoutParams(params);
-      page.addView(create);
-    }
-
     page.addView(statusStrip(new CounterValue[] {
         new CounterValue("Bekleyen", countRestaurantTasks(false), UiKit.WARNING, ""),
         new CounterValue("Tamam", countRestaurantTasks(true), UiKit.SUCCESS, "")
@@ -233,9 +228,14 @@ final class RestaurantWorkspace {
     page.addView(sectionLabel("Tüm takip edilen ürünler"));
     if (data.trackedStockItems.isEmpty()) {
       page.addView(emptyCard("Stok takibi yapılmıyor", "Masaüstünde stok adedi girilen ürünler burada görünür."));
-    }
-    for (OperationData.TrackedStockItem item : data.trackedStockItems) {
-      page.addView(listener.createStockCard(item));
+    } else {
+      NativeSearchList search = addSearch(page, "Stok ürünü ara");
+      for (OperationData.TrackedStockItem item : data.trackedStockItems) {
+        View row = listener.createStockCard(item);
+        page.addView(row);
+        search.add(row, item.name + " " + item.stockStatus);
+      }
+      finishSearch(page, search, "Aramayla eşleşen stok ürünü yok.");
     }
   }
 
@@ -267,6 +267,49 @@ final class RestaurantWorkspace {
     }
   }
 
+  private View titleBar(String mode) {
+    String title = AndroidUiRules.RESTAURANT_TABLES.equals(mode) ? "Masalar"
+        : AndroidUiRules.RESTAURANT_RESERVATIONS.equals(mode) ? "Rezervasyonlar"
+        : AndroidUiRules.RESTAURANT_ORDERS.equals(mode) ? "Açık Adisyon"
+        : AndroidUiRules.RESTAURANT_TASKS.equals(mode) ? "Günlük İşler"
+        : AndroidUiRules.RESTAURANT_STOCK.equals(mode) ? "Stok" : "Menü Yönetimi";
+    LinearLayout row = UiKit.row(activity);
+    TextView heading = UiKit.title(activity, title);
+    row.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
+    Button create = null;
+    if (AndroidUiRules.RESTAURANT_RESERVATIONS.equals(mode)
+        && AndroidUiRules.canCreateTableReservation(data)) {
+      create = UiKit.iconButton(activity, "+", "Yeni rezervasyon", false,
+          view -> listener.onCreateTableReservation());
+      create.setEnabled(!data.customers.isEmpty());
+    } else if (AndroidUiRules.RESTAURANT_TASKS.equals(mode)
+        && data.hasPermission("daily_task.create")
+        && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)) {
+      create = UiKit.iconButton(activity, "+", "Yeni iş", false,
+          view -> listener.onCreateTask());
+    }
+    if (create != null) row.addView(create,
+        new LinearLayout.LayoutParams(UiKit.dp(activity, 48), UiKit.dp(activity, 48)));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, 0, 0, UiKit.dp(activity, 12));
+    row.setLayoutParams(params);
+    return row;
+  }
+
+  private NativeSearchList addSearch(LinearLayout page, String hint) {
+    NativeSearchList search = new NativeSearchList(activity, hint);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, UiKit.dp(activity, 5), 0, UiKit.dp(activity, 12));
+    page.addView(search.input(), params);
+    return search;
+  }
+
+  private void finishSearch(LinearLayout page, NativeSearchList search, String emptyText) {
+    TextView noMatches = UiKit.text(activity, emptyText, 13, UiKit.MUTED, Typeface.NORMAL);
+    page.addView(noMatches);
+    search.setNoMatchesNotice(noMatches);
+  }
+
   private View filterBar(String[][] options, String selected) {
     HorizontalScrollView scroll = new HorizontalScrollView(activity);
     scroll.setHorizontalScrollBarEnabled(false);
@@ -285,19 +328,13 @@ final class RestaurantWorkspace {
   }
 
   private View statusStrip(CounterValue[] counters) {
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    scroll.setContentDescription("Sayaçlar");
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 2), UiKit.dp(activity, 4), UiKit.dp(activity, 7));
+    ArrayList<View> tiles = new ArrayList<>();
     for (CounterValue counter : counters) {
       View.OnClickListener click = counter.route.isEmpty()
-          ? null
-          : view -> listener.onRoute(counter.route);
-      row.addView(UiKit.counterChip(activity, counter.label, counter.value, counter.tone, click));
+          ? null : view -> listener.onRoute(counter.route);
+      tiles.add(UiKit.metricCard(activity, counter.label, counter.value, counter.tone, click));
     }
-    scroll.addView(row);
-    return scroll;
+    return UiKit.metricGrid(activity, tiles);
   }
 
   private View sectionLabel(String value) {

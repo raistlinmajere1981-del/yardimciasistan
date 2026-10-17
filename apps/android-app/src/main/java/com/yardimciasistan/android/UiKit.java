@@ -267,11 +267,16 @@ final class UiKit {
 
   /** V16 summary tile; only cards backed by an authorized route are clickable. */
   static View metricCard(Context context, String label, long value, int tone, View.OnClickListener click) {
+    return metricCard(context, label, String.valueOf(value), tone, click);
+  }
+
+  static View metricCard(Context context, String label, String value, int tone, View.OnClickListener click) {
     LinearLayout card = column(context);
     card.setPadding(dp(context, 14), dp(context, 12), dp(context, 12), dp(context, 12));
     card.setMinimumHeight(dp(context, 92));
     card.setBackground(rounded(context, CARD, BORDER, 14));
-    TextView count = text(context, String.valueOf(value), 22, TEXT, Typeface.BOLD);
+    TextView count = text(context, value, 20, TEXT, Typeface.BOLD);
+    count.setMaxLines(2);
     count.setIncludeFontPadding(false);
     TextView caption = text(context, label, 12, SECONDARY, Typeface.NORMAL);
     caption.setMaxLines(3);

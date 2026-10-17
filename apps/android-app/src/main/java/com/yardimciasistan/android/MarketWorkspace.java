@@ -323,8 +323,8 @@ final class MarketWorkspace {
 
   private LinearLayout homeScreen() {
     LinearLayout page = UiKit.column(context);
-    page.addView(UiKit.eyebrow(context, "MARKET"));
-    TextView title = UiKit.title(context, "Saha işlemleri");
+    page.addView(UiKit.eyebrow(context, "SATIŞ"));
+    TextView title = UiKit.title(context, "Satış");
     LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
     titleParams.setMargins(0, dp(3), 0, dp(12));
     title.setLayoutParams(titleParams);
@@ -429,19 +429,21 @@ final class MarketWorkspace {
   private void addMarketSummary(LinearLayout page) {
     page.addView(UiKit.sectionTitle(context, "Bugün"));
     OperationData.MarketSummary summary = data.market.summary;
-    LinearLayout metrics = UiKit.card(context);
-    int metricsShown = 0;
+    ArrayList<View> metrics = new ArrayList<>();
     if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_SALES)) {
-      addMetric(metrics, metricsShown++, "Satış", summary.todaySaleCount + " · " + money(summary.todaySalesTotal, summary.currency), UiKit.SUCCESS);
+      metrics.add(UiKit.metricCard(context, "Bugünkü satış",
+          summary.todaySaleCount + " · " + money(summary.todaySalesTotal, summary.currency),
+          UiKit.SUCCESS, null));
     }
     if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)) {
-      addMetric(metrics, metricsShown++, "Kritik stok", String.valueOf(summary.criticalStockCount),
-          summary.criticalStockCount > 0 ? UiKit.WARNING : UiKit.SUCCESS);
+      metrics.add(UiKit.metricCard(context, "Kritik stok", summary.criticalStockCount,
+          summary.criticalStockCount > 0 ? UiKit.WARNING : UiKit.SUCCESS, null));
     }
     if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_PURCHASING)) {
-      addMetric(metrics, metricsShown++, "Mal kabul", String.valueOf(summary.recentReceivingCount), UiKit.INFO);
+      metrics.add(UiKit.metricCard(context, "Mal kabul", summary.recentReceivingCount,
+          UiKit.INFO, null));
     }
-    if (metricsShown > 0) page.addView(metrics);
+    if (!metrics.isEmpty()) page.addView(UiKit.metricGrid(context, metrics));
 
     if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)
         && !summary.recentStockAdjustments.isEmpty()) {
@@ -494,12 +496,12 @@ final class MarketWorkspace {
     }
   }
 
+  // Line totals remain compact inside stock receiving and cart forms.
   private void addMetric(LinearLayout card, int index, String label, String value, int tone) {
     if (index > 0) card.addView(UiKit.divider(context));
     LinearLayout row = UiKit.row(context);
-    TextView labelView = UiKit.text(context, label, 13, UiKit.SECONDARY, Typeface.NORMAL);
-    labelView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-    row.addView(labelView);
+    TextView caption = UiKit.text(context, label, 13, UiKit.SECONDARY, Typeface.NORMAL);
+    row.addView(caption, new LinearLayout.LayoutParams(0, -2, 1f));
     row.addView(UiKit.text(context, value, 14, tone, Typeface.BOLD));
     card.addView(row);
   }
@@ -1523,8 +1525,25 @@ final class MarketWorkspace {
             }
         );
         choice.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        choice.setLayoutParams(fullButtonParams(52, 0, 7));
-        results.addView(choice);
+        LinearLayout resultRow = UiKit.row(context);
+        Bitmap cached = productImagePreviews.get(productImageKey(product.id, product.imageSourceUrl));
+        if (cached != null) {
+          ImageView preview = productImageView(cached, 58);
+          LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+          imageParams.setMargins(0, 0, dp(8), 0);
+          resultRow.addView(preview, imageParams);
+        } else {
+          TextView placeholder = UiKit.text(context, "Görsel\nyok", 10, UiKit.MUTED, Typeface.NORMAL);
+          placeholder.setGravity(Gravity.CENTER);
+          placeholder.setBackground(UiKit.rounded(context, UiKit.SURFACE_ALT, UiKit.BORDER, 10));
+          LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+          imageParams.setMargins(0, 0, dp(8), 0);
+          resultRow.addView(placeholder, imageParams);
+        }
+        resultRow.addView(choice, new LinearLayout.LayoutParams(0, dp(62), 1f));
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+        rowParams.setMargins(0, 0, 0, dp(7));
+        results.addView(resultRow, rowParams);
         shown += 1;
         if (shown >= 40) break;
       }
@@ -1584,7 +1603,7 @@ final class MarketWorkspace {
   }
 
   private void addBackHeader(LinearLayout page, String title, String subtitle) {
-    Button back = UiKit.outlineButton(context, "← Market", view -> handleBack());
+    Button back = UiKit.outlineButton(context, "← Satış", view -> handleBack());
     back.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
     LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(-1, dp(44));
     backParams.setMargins(0, 0, 0, dp(10));
