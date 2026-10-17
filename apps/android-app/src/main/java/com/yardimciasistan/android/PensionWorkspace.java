@@ -5,6 +5,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
@@ -73,6 +74,7 @@ final class PensionWorkspace {
       return UiKit.scroll(activity, page, bottomPaddingDp);
     }
 
+    page.addView(titleBar(mode));
     page.addView(filterBar(options.toArray(new String[0][]), mode));
 
     if (AndroidUiRules.PENSION_RESERVATIONS.equals(mode)) {
@@ -99,20 +101,6 @@ final class PensionWorkspace {
   }
 
   private void renderReservations(LinearLayout page) {
-    if (AndroidUiRules.canCreateRoomReservation(data)) {
-      Button create = UiKit.button(
-          activity,
-          "+ Yeni Rezervasyon",
-          UiKit.PRIMARY,
-          view -> listener.onCreateRoomReservation()
-      );
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-      params.setMargins(0, 0, 0, UiKit.dp(activity, 10));
-      create.setLayoutParams(params);
-      create.setEnabled(!data.customers.isEmpty());
-      page.addView(create);
-    }
-
     page.addView(statusStrip(new CounterValue[] {
         new CounterValue("Bekleyen", countPensionReservations("pending"), UiKit.WARNING),
         new CounterValue("Giriş", countPensionDate(true), UiKit.INFO),
@@ -145,24 +133,25 @@ final class PensionWorkspace {
     if (data.rooms.isEmpty()) {
       page.addView(emptyCard("Oda verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
     }
-    for (OperationData.RoomRecord room : data.rooms) {
-      page.addView(listener.createRoomCard(room));
+    if (!data.rooms.isEmpty()) {
+      NativeSearchList search = new NativeSearchList(activity, "Oda ara");
+      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
+      searchParams.setMargins(0, UiKit.dp(activity, 5), 0, UiKit.dp(activity, 12));
+      page.addView(search.input(), searchParams);
+      for (OperationData.RoomRecord room : data.rooms) {
+        View roomCard = listener.createRoomCard(room);
+        page.addView(roomCard);
+        search.add(roomCard,
+            room.name + " " + room.number + " " + room.status + " " + room.activeReservation);
+      }
+      TextView none = UiKit.text(activity, "Aramayla eşleşen oda yok.", 13,
+          UiKit.MUTED, Typeface.NORMAL);
+      page.addView(none);
+      search.setNoMatchesNotice(none);
     }
   }
 
   private void renderStays(LinearLayout page) {
-    Button assign = UiKit.button(
-        activity,
-        "+ Müşteriyi Odaya Ata",
-        UiKit.PRIMARY,
-        view -> listener.onAssignCustomerToRoom()
-    );
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-    params.setMargins(0, 0, 0, UiKit.dp(activity, 10));
-    assign.setLayoutParams(params);
-    assign.setEnabled(!data.customers.isEmpty() && !data.rooms.isEmpty());
-    page.addView(assign);
-
     page.addView(statusStrip(new CounterValue[] {
         new CounterValue("Planlı", countCustomerRoomStays("planned"), UiKit.WARNING),
         new CounterValue("Konaklıyor", countCustomerRoomStays("checked_in"), UiKit.INFO),
@@ -182,20 +171,6 @@ final class PensionWorkspace {
   }
 
   private void renderTasks(LinearLayout page) {
-    if (data.hasPermission("daily_task.create")
-        && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)) {
-      Button create = UiKit.button(
-          activity,
-          "+ Yeni İş",
-          UiKit.PRIMARY,
-          view -> listener.onCreateTask()
-      );
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-      params.setMargins(0, 0, 0, UiKit.dp(activity, 10));
-      create.setLayoutParams(params);
-      page.addView(create);
-    }
-
     page.addView(statusStrip(new CounterValue[] {
         new CounterValue("Bekleyen", countPensionTasks(false), UiKit.WARNING),
         new CounterValue("Tamam", countPensionTasks(true), UiKit.SUCCESS)
@@ -212,6 +187,39 @@ final class PensionWorkspace {
     if (shown == 0) {
       page.addView(emptyCard("Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
     }
+  }
+
+  private View titleBar(String mode) {
+    String title = AndroidUiRules.PENSION_ROOMS.equals(mode) ? "Odalar"
+        : AndroidUiRules.PENSION_RESERVATIONS.equals(mode) ? "Rezervasyonlar"
+        : AndroidUiRules.PENSION_STAYS.equals(mode) ? "Konaklamalar"
+        : AndroidUiRules.PENSION_FOLIOS.equals(mode) ? "Oda Hesapları"
+        : AndroidUiRules.PENSION_TASKS.equals(mode) ? "Günlük İşler" : "KBS";
+    LinearLayout toolbar = UiKit.row(activity);
+    TextView heading = UiKit.title(activity, title);
+    toolbar.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
+    Button create = null;
+    if (AndroidUiRules.PENSION_RESERVATIONS.equals(mode)
+        && AndroidUiRules.canCreateRoomReservation(data)) {
+      create = UiKit.iconButton(activity, "+", "Yeni rezervasyon", false,
+          v -> listener.onCreateRoomReservation());
+      create.setEnabled(!data.customers.isEmpty());
+    } else if (AndroidUiRules.PENSION_STAYS.equals(mode)) {
+      create = UiKit.iconButton(activity, "+", "Müşteriyi odaya ata", false,
+          v -> listener.onAssignCustomerToRoom());
+      create.setEnabled(!data.customers.isEmpty() && !data.rooms.isEmpty());
+    } else if (AndroidUiRules.PENSION_TASKS.equals(mode)
+        && data.hasPermission("daily_task.create")
+        && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)) {
+      create = UiKit.iconButton(activity, "+", "Yeni iş", false,
+          v -> listener.onCreateTask());
+    }
+    if (create != null) toolbar.addView(create,
+        new LinearLayout.LayoutParams(UiKit.dp(activity, 48), UiKit.dp(activity, 48)));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, 0, 0, UiKit.dp(activity, 12));
+    toolbar.setLayoutParams(params);
+    return toolbar;
   }
 
   private View filterBar(String[][] options, String selected) {
@@ -232,16 +240,11 @@ final class PensionWorkspace {
   }
 
   private View statusStrip(CounterValue[] counters) {
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    scroll.setContentDescription("Sayaçlar");
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 2), UiKit.dp(activity, 4), UiKit.dp(activity, 7));
+    ArrayList<View> tiles = new ArrayList<>();
     for (CounterValue counter : counters) {
-      row.addView(UiKit.counterChip(activity, counter.label, counter.value, counter.tone, null));
+      tiles.add(UiKit.metricCard(activity, counter.label, counter.value, counter.tone, null));
     }
-    scroll.addView(row);
-    return scroll;
+    return UiKit.metricGrid(activity, tiles);
   }
 
   private View emptyCard(String title, String detail) {

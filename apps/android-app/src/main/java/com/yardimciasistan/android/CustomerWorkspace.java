@@ -86,7 +86,17 @@ final class CustomerWorkspace {
     }
     page.addView(filterBar(options.toArray(new String[0][]), visibleFilter));
 
-    if (AndroidUiRules.CUSTOMER_LIST.equals(visibleFilter)) {
+    boolean customerList = AndroidUiRules.CUSTOMER_LIST.equals(visibleFilter);
+    boolean hasSearchableRows = customerList ? !data.customers.isEmpty() : !data.requests.isEmpty();
+    NativeSearchList search = hasSearchableRows
+        ? new NativeSearchList(activity, customerList ? "Müşteri ara" : "Talep ara") : null;
+    if (search != null) {
+      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
+      searchParams.setMargins(0, 0, 0, UiKit.dp(activity, 12));
+      page.addView(search.input(), searchParams);
+    }
+
+    if (customerList) {
       if (data.customers.isEmpty()) {
         page.addView(emptyCard(
             "Müşteri listesi boş",
@@ -94,7 +104,11 @@ final class CustomerWorkspace {
         ));
       }
       for (OperationData.CustomerRecord customer : data.customers) {
-        page.addView(customerCard(customer));
+        View item = customerCard(customer);
+        page.addView(item);
+        if (search != null) search.add(item,
+            customer.fullName + " " + customer.phone + " " + customer.email + " "
+                + customer.notes + " " + String.join(" ", customer.tags));
       }
     } else {
       boolean waitingOnly = AndroidUiRules.CUSTOMER_WAITING.equals(visibleFilter);
@@ -102,7 +116,11 @@ final class CustomerWorkspace {
       for (OperationData.RequestRecord request : data.requests) {
         boolean visible = waitingOnly ? request.waitingForResponse() : "new".equals(request.status);
         if (!visible) continue;
-        page.addView(listener.createRequestCard(request));
+        View item = listener.createRequestCard(request);
+        page.addView(item);
+        if (search != null) search.add(item,
+            request.customerName + " " + request.customerPhone + " " + request.message
+                + " " + request.dateText);
         shown += 1;
       }
       if (shown == 0) {
@@ -113,6 +131,12 @@ final class CustomerWorkspace {
       }
     }
 
+    if (search != null) {
+      TextView noMatches = UiKit.text(activity, "Aramayla eşleşen kayıt yok.",
+          13, UiKit.MUTED, Typeface.NORMAL);
+      page.addView(noMatches);
+      search.setNoMatchesNotice(noMatches);
+    }
     return UiKit.scroll(activity, page, bottomPaddingDp);
   }
 

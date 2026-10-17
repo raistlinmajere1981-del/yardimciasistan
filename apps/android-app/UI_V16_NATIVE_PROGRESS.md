@@ -14,11 +14,19 @@ Bu dizin, kaynak Java ile gerçek Android APK'ye entegre edilen parçaları izle
 - `CustomerWorkspace.java`: yeni müşteri oluşturma aynı yetki kontrolüyle V16 başlık satırına taşındı.
 - `AppThemeSmoke.java` ve `NativeDateTimePickerTest.java`: yeni renkler ve ISO tarih kuralı testleri.
 
+## İkinci tur — Bugün, Müşteriler, Odalar
+
+- `TodayWorkspace.java`: Bugün / Şimdi başlığı ve açıklaması eklendi; izinli sayaçlar yatay kayan chip yerine basılabilir/izinli **iki sütunlu (tablet üç) özet kartları** olarak sunuluyor. Sayaç rotaları ve öncelikli işlem kartları değişmedi.
+- `UiKit.java`: herkesin kullandığı sayaç kartı ve cihaz genişliğine göre yerleşen özet ızgarası eklendi; servislerden hiçbir şey çağırmaz.
+- `PensionWorkspace.java`: Odalar, Rezervasyonlar, Konaklamalar, Hesaplar, İşler, KBS alanlarında V16 sayfa başlıkları; yeni kayıt eylemleri büyük tekrarlı butondan üstteki + kontrolüne taşındı. İzin/etkinlik koşulları aynen korundu. Oda durum sayaçları özet ızgarasına dönüştü ve Odalar'a anlık liste araması eklendi.
+- `CustomerWorkspace.java`: müşteri/gelen talep listelerine Türkçe arama eklendi; yalnız mevcut yetkili, görüntülenen kayıtlar içinde yerel filtreleme yapar. Sonuç bulunamadı metni var; backend sorgusu yok.
+- `NativeSearchList.java` ve `NativeSearchListTest.java`: tekrar kullanılabilir yerel liste filtreleme ve Türkçe büyük/küçük harf testleri.
+
 ## Henüz tamamlanmayan görsel aktarım
 
-Bu **ilk ortak bileşen turudur**, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e geçirilmiş olduğu anlamına gelmez.
-Sıradaki turda gerçek Android kaynak workspaceleri üzerinden V16 ekran bileşenleri karşılaştırılarak uygulanmalı:
-Bugün/Şimdi, Odalar/Konaklama, Müşteriler/Talepler, Masalar/Restoran, Market/Stok, Oda hesapları, Rezervasyonlar, Günlük işler, KBS, Mesajlar, İş Takibi, Finans, Ayarlar/Bağlantı/Cihazlar.
+İlk iki native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e geçirilmiş olduğu anlamına gelmez. Bugün, Müşteriler ve Odalar'ın ortak yerleşimi güncellendi; bunların detay kartları ve formları için görsel karşılaştırma sürüyor.
+Sıradaki turda gerçek Android workspaceleri üzerinden V16 bileşenleri karşılaştırılarak uygulanmalı:
+Masalar/Restoran, Market/Stok, Konaklama ve Oda Hesapları detayları, Rezervasyon ve Günlük İş formları, KBS, Mesajlar, İş Takibi, Finans, Ayarlar/Bağlantı/Cihazlar.
 Kullanıcı yetkisi, sektör, outbox ve senkronizasyon davranışları backend kaynaklarında kalır; HTML prototip iş mantığı native koda taşınmaz.
 Gerçek cihazda 360/393, Android 8.1, tablet, TalkBack, klavye, tarih popup yüksekliği, çevrimdışı ve senkronizasyon ayrıca kontrol edilmelidir.
 Prototipteki 'Analiz hatasını dene' kullanıcıya görünen native butona eklenmemelidir.

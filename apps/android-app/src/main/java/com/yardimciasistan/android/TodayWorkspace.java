@@ -2,7 +2,6 @@ package com.yardimciasistan.android;
 
 import android.graphics.Typeface;
 import android.view.View;
-import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -44,6 +43,14 @@ final class TodayWorkspace {
 
   View build() {
     LinearLayout page = UiKit.column(activity);
+    LinearLayout heading = UiKit.column(activity);
+    heading.addView(UiKit.title(activity, "Bugün / Şimdi"));
+    heading.addView(UiKit.text(activity,
+        "Öncelikli işler, talepler ve yakın eylemler",
+        13, UiKit.MUTED, Typeface.NORMAL));
+    LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
+    headingParams.setMargins(0, UiKit.dp(activity, 2), 0, UiKit.dp(activity, 18));
+    page.addView(heading, headingParams);
     if (!companionNotice.isEmpty()) {
       page.addView(emptyCard("Görünüm kapatıldı", companionNotice));
     }
@@ -325,27 +332,13 @@ final class TodayWorkspace {
 
 
   private View statusStrip(ArrayList<Counter> counters) {
-    HorizontalScrollView scroll = new HorizontalScrollView(activity);
-    scroll.setHorizontalScrollBarEnabled(false);
-    scroll.setClipToPadding(false);
-    scroll.setContentDescription("Sayaçlar");
-
-    LinearLayout row = UiKit.row(activity);
-    row.setPadding(0, UiKit.dp(activity, 2), UiKit.dp(activity, 4), UiKit.dp(activity, 7));
+    ArrayList<View> tiles = new ArrayList<>();
     for (Counter counter : counters) {
       View.OnClickListener click = counter.route.isEmpty()
-          ? null
-          : view -> listener.openRoute(counter.route);
-      row.addView(UiKit.counterChip(
-          activity,
-          counter.label,
-          counter.value,
-          counter.tone,
-          click
-      ));
+          ? null : view -> listener.openRoute(counter.route);
+      tiles.add(UiKit.metricCard(activity, counter.label, counter.value, counter.tone, click));
     }
-    scroll.addView(row);
-    return scroll;
+    return UiKit.metricGrid(activity, tiles);
   }
 
   private View sectionLabel(String value) {

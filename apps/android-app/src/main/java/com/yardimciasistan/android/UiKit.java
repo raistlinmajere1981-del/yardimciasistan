@@ -15,6 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
+import java.util.List;
 
 final class UiKit {
   private static ThemeTokens tokens = ThemeTokens.night();
@@ -117,7 +118,7 @@ final class UiKit {
   }
 
   static TextView title(Context context, String value) {
-    TextView text = text(context, value, 22, TEXT, Typeface.BOLD);
+    TextView text = text(context, value, 24, TEXT, Typeface.BOLD);
     text.setPadding(0, 0, 0, dp(context, 3));
     return text;
   }
@@ -264,6 +265,56 @@ final class UiKit {
     return button;
   }
 
+  /** V16 summary tile; only cards backed by an authorized route are clickable. */
+  static View metricCard(Context context, String label, long value, int tone, View.OnClickListener click) {
+    LinearLayout card = column(context);
+    card.setPadding(dp(context, 14), dp(context, 12), dp(context, 12), dp(context, 12));
+    card.setMinimumHeight(dp(context, 92));
+    card.setBackground(rounded(context, CARD, BORDER, 14));
+    TextView count = text(context, String.valueOf(value), 22, TEXT, Typeface.BOLD);
+    count.setIncludeFontPadding(false);
+    TextView caption = text(context, label, 12, SECONDARY, Typeface.NORMAL);
+    caption.setMaxLines(3);
+    card.addView(count);
+    LinearLayout.LayoutParams captionParams = new LinearLayout.LayoutParams(-1, -2);
+    captionParams.setMargins(0, dp(context, 5), 0, 0);
+    caption.setLayoutParams(captionParams);
+    card.addView(caption);
+    View line = new View(context);
+    line.setBackgroundColor(tone);
+    LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(dp(context, 30), dp(context, 3));
+    lineParams.setMargins(0, dp(context, 8), 0, 0);
+    line.setLayoutParams(lineParams);
+    card.addView(line);
+    card.setContentDescription(label + ": " + value);
+    if (click != null) {
+      card.setClickable(true);
+      card.setFocusable(true);
+      card.setOnClickListener(click);
+    }
+    return card;
+  }
+
+  /** Balanced two-column phone / three-column wide-screen tiles; no horizontal scrolling. */
+  static View metricGrid(Context context, List<View> tiles) {
+    LinearLayout grid = column(context);
+    int columns = context.getResources().getConfiguration().screenWidthDp >= 600 ? 3 : 2;
+    for (int offset = 0; offset < tiles.size(); offset += columns) {
+      LinearLayout row = row(context);
+      for (int i = 0; i < columns; i++) {
+        View tile = offset + i < tiles.size() ? tiles.get(offset + i) : new View(context);
+        LinearLayout.LayoutParams cell = new LinearLayout.LayoutParams(0, -2, 1f);
+        if (i > 0) cell.setMargins(dp(context, 4), 0, 0, 0);
+        if (i < columns - 1) cell.setMarginEnd(dp(context, 4));
+        row.addView(tile, cell);
+      }
+      LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+      rowParams.setMargins(0, 0, 0, dp(context, 8));
+      grid.addView(row, rowParams);
+    }
+    return grid;
+  }
+
   static Button counterChip(Context context, String label, long value, int tone, View.OnClickListener listener) {
     Button button = new Button(context);
     button.setText(label + " " + value);
@@ -308,7 +359,8 @@ final class UiKit {
     ScrollView scroll = new ScrollView(context);
     scroll.setFillViewport(true);
     scroll.setClipToPadding(false);
-    scroll.setPadding(dp(context, 14), 0, dp(context, 14), dp(context, bottomPaddingDp));
+    int inset = context.getResources().getConfiguration().screenWidthDp >= 600 ? 24 : 18;
+    scroll.setPadding(dp(context, inset), dp(context, 16), dp(context, inset), dp(context, bottomPaddingDp));
     scroll.addView(content);
     return scroll;
   }
