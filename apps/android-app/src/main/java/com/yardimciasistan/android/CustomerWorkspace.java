@@ -54,18 +54,20 @@ final class CustomerWorkspace {
       return UiKit.scroll(activity, page, bottomPaddingDp);
     }
 
+    // V16: section title and the create action share one compact toolbar.
+    LinearLayout toolbar = UiKit.row(activity);
+    TextView heading = UiKit.title(activity, "Müşteriler");
+    toolbar.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
     if (canManageCustomers) {
-      View createCustomer = UiKit.button(
-          activity,
-          "+ Yeni Müşteri",
-          UiKit.PRIMARY,
-          view -> listener.onCreateCustomer()
-      );
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(activity, 46));
-      params.setMargins(0, 0, 0, UiKit.dp(activity, 10));
-      createCustomer.setLayoutParams(params);
-      page.addView(createCustomer);
+      View createCustomer = UiKit.iconButton(
+          activity, "+", "Yeni müşteri", false, view -> listener.onCreateCustomer());
+      toolbar.addView(createCustomer,
+          new LinearLayout.LayoutParams(UiKit.dp(activity, 48), UiKit.dp(activity, 48)));
     }
+    LinearLayout.LayoutParams toolbarParams = new LinearLayout.LayoutParams(-1, -2);
+    toolbarParams.setMargins(0, 0, 0, UiKit.dp(activity, 12));
+    toolbar.setLayoutParams(toolbarParams);
+    page.addView(toolbar);
 
     ArrayList<String[]> options = new ArrayList<>();
     if (canViewRequests) {

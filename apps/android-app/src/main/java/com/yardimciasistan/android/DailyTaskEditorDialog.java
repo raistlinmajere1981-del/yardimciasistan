@@ -1,8 +1,6 @@
 package com.yardimciasistan.android;
 
 import android.app.AlertDialog;
-import android.app.DatePickerDialog;
-import android.app.TimePickerDialog;
 import android.content.Context;
 import android.text.InputType;
 import android.widget.CheckBox;
@@ -14,7 +12,6 @@ import android.widget.TextView;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -79,7 +76,7 @@ final class DailyTaskEditorDialog {
     );
     dueDate.setEnabled(useDate.isChecked());
     useDate.setOnCheckedChangeListener((button, checked) -> dueDate.setEnabled(checked));
-    dueDate.setOnClickListener(view -> showDatePicker(context, dueDate));
+    dueDate.setOnClickListener(view -> NativeDateTimePicker.showDate(context, dueDate, null, false));
 
     CheckBox useTime = new CheckBox(context);
     useTime.setText("Saat ekle");
@@ -93,7 +90,7 @@ final class DailyTaskEditorDialog {
     );
     dueTime.setEnabled(useTime.isChecked());
     useTime.setOnCheckedChangeListener((button, checked) -> dueTime.setEnabled(checked));
-    dueTime.setOnClickListener(view -> showTimePicker(context, dueTime));
+    dueTime.setOnClickListener(view -> NativeDateTimePicker.showTime(context, dueTime));
 
     TextView status = new TextView(context);
     status.setTextSize(12);
@@ -237,55 +234,6 @@ final class DailyTaskEditorDialog {
     label.setTextSize(12);
     label.setPadding(0, dp(context, 4), 0, dp(context, 2));
     form.addView(label);
-  }
-
-  private static void showDatePicker(Context context, EditText target) {
-    Calendar calendar = parseDate(target.getText().toString());
-    new DatePickerDialog(
-        context,
-        (view, year, month, day) -> target.setText(String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day)),
-        calendar.get(Calendar.YEAR),
-        calendar.get(Calendar.MONTH),
-        calendar.get(Calendar.DAY_OF_MONTH)
-    ).show();
-  }
-
-  private static void showTimePicker(Context context, EditText target) {
-    int[] parts = parseTime(target.getText().toString());
-    new TimePickerDialog(
-        context,
-        (view, hour, minute) -> target.setText(String.format(Locale.US, "%02d:%02d", hour, minute)),
-        parts[0],
-        parts[1],
-        true
-    ).show();
-  }
-
-  private static Calendar parseDate(String raw) {
-    Calendar calendar = Calendar.getInstance();
-    try {
-      Date parsed = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(raw == null ? "" : raw.trim());
-      if (parsed != null) calendar.setTime(parsed);
-    } catch (Exception ignored) {
-      // Bugünün tarihiyle aç.
-    }
-    return calendar;
-  }
-
-  private static int[] parseTime(String raw) {
-    String[] parts = raw == null ? new String[0] : raw.trim().split(":", 2);
-    if (parts.length == 2) {
-      try {
-        int hour = Integer.parseInt(parts[0]);
-        int minute = Integer.parseInt(parts[1]);
-        if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
-          return new int[] {hour, minute};
-        }
-      } catch (NumberFormatException ignored) {
-        // Varsayılan saate düş.
-      }
-    }
-    return new int[] {9, 0};
   }
 
   private static boolean validDate(String value) {

@@ -1,8 +1,6 @@
 package com.yardimciasistan.android;
 
 import android.app.AlertDialog;
-import android.app.DatePickerDialog;
-import android.app.TimePickerDialog;
 import android.content.Context;
 import android.text.InputType;
 import android.view.View;
@@ -71,6 +69,22 @@ final class ReservationEditorDialog {
     if (kind == Kind.ROOM) {
       String defaultEnd = editing ? reservation.endDate : tomorrowKey();
       endDate = dateField(context, form, "Çıkış tarihi", defaultEnd);
+      final EditText checkoutDate = endDate;
+      checkoutDate.setOnClickListener(view ->
+          NativeDateTimePicker.showDate(context, checkoutDate, startDate, false));
+      startDate.addTextChangedListener(new android.text.TextWatcher() {
+        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+          String entry = s.toString();
+          String checkout = checkoutDate.getText().toString();
+          if (entry.matches("\\d{4}-\\d{2}-\\d{2}") && !checkout.isEmpty()
+              && NativeDateTimePicker.parseDate(checkout).getTimeInMillis()
+                  <= NativeDateTimePicker.parseDate(entry).getTimeInMillis()) {
+            checkoutDate.setText("");
+          }
+        }
+        @Override public void afterTextChanged(android.text.Editable s) {}
+      });
     } else {
       time = timeField(context, form, "Saat", editing ? reservation.time : "19:00");
     }
@@ -232,7 +246,7 @@ final class ReservationEditorDialog {
     field.setHint("YYYY-AA-GG");
     field.setFocusable(false);
     field.setClickable(true);
-    field.setOnClickListener(view -> showDatePicker(context, field));
+    field.setOnClickListener(view -> NativeDateTimePicker.showDate(context, field, null, false));
     addInput(context, form, field);
     return field;
   }
@@ -245,7 +259,7 @@ final class ReservationEditorDialog {
     field.setHint("SS:DD");
     field.setFocusable(false);
     field.setClickable(true);
-    field.setOnClickListener(view -> showTimePicker(context, field));
+    field.setOnClickListener(view -> NativeDateTimePicker.showTime(context, field));
     addInput(context, form, field);
     return field;
   }
@@ -296,57 +310,6 @@ final class ReservationEditorDialog {
     text.setTextSize(14);
     text.setPadding(0, dp(context, 4), 0, dp(context, 12));
     return text;
-  }
-
-  private static void showDatePicker(Context context, EditText target) {
-    Calendar calendar = parseDate(target.getText().toString());
-    new DatePickerDialog(
-        context,
-        (view, year, month, day) -> target.setText(String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day)),
-        calendar.get(Calendar.YEAR),
-        calendar.get(Calendar.MONTH),
-        calendar.get(Calendar.DAY_OF_MONTH)
-    ).show();
-  }
-
-  private static void showTimePicker(Context context, EditText target) {
-    int[] parts = parseTime(target.getText().toString());
-    new TimePickerDialog(
-        context,
-        (view, hour, minute) -> target.setText(String.format(Locale.US, "%02d:%02d", hour, minute)),
-        parts[0],
-        parts[1],
-        true
-    ).show();
-  }
-
-  private static Calendar parseDate(String raw) {
-    Calendar calendar = Calendar.getInstance();
-    try {
-      Date parsed = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(raw == null ? "" : raw.trim());
-      if (parsed != null) {
-        calendar.setTime(parsed);
-      }
-    } catch (Exception ignored) {
-      // Bugünün tarihiyle aç.
-    }
-    return calendar;
-  }
-
-  private static int[] parseTime(String raw) {
-    String[] parts = raw == null ? new String[0] : raw.trim().split(":", 2);
-    if (parts.length == 2) {
-      try {
-        int hour = Integer.parseInt(parts[0]);
-        int minute = Integer.parseInt(parts[1]);
-        if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
-          return new int[] {hour, minute};
-        }
-      } catch (NumberFormatException ignored) {
-        // Varsayılan saate düş.
-      }
-    }
-    return new int[] {19, 0};
   }
 
   private static String tomorrowKey() {

@@ -168,6 +168,9 @@ final class CustomerFormDialog {
     identityNumber = addInput(form, "Kimlik / pasaport no", "Belge numarası", value("identityNumber"), false);
     nationality = addInput(form, "Uyruk", "Örn. T.C.", value("nationality"), false);
     birthDate = addInput(form, "Doğum tarihi", "YYYY-AA-GG", value("birthDate"), false);
+    birthDate.setFocusable(false);
+    birthDate.setClickable(true);
+    birthDate.setOnClickListener(view -> NativeDateTimePicker.showDate(activity, birthDate, null, true));
     gender = addChoiceSpinner(
         form,
         "Cinsiyet",
@@ -181,6 +184,9 @@ final class CustomerFormDialog {
     );
     documentSerialNumber = addInput(form, "Belge seri no", "Seri numarası", value("documentSerialNumber"), false);
     documentExpiryDate = addInput(form, "Son geçerlilik tarihi", "YYYY-AA-GG", value("documentExpiryDate"), false);
+    documentExpiryDate.setFocusable(false);
+    documentExpiryDate.setClickable(true);
+    documentExpiryDate.setOnClickListener(view -> NativeDateTimePicker.showDate(activity, documentExpiryDate, null, true));
     birthPlace = addInput(form, "Doğum yeri", "Şehir / ülke", value("birthPlace"), false);
     motherName = addInput(form, "Anne adı", "Kimlikte yer alıyorsa", value("motherName"), false);
     fatherName = addInput(form, "Baba adı", "Kimlikte yer alıyorsa", value("fatherName"), false);

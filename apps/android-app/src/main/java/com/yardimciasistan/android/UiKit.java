@@ -151,8 +151,8 @@ final class UiKit {
 
   static LinearLayout card(Context context) {
     LinearLayout card = column(context);
-    card.setPadding(dp(context, 14), dp(context, 13), dp(context, 14), dp(context, 13));
-    card.setBackground(rounded(context, CARD, BORDER, 14));
+    card.setPadding(dp(context, 16), dp(context, 16), dp(context, 16), dp(context, 16));
+    card.setBackground(rounded(context, CARD, BORDER, 18));
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
     params.setMargins(0, 0, 0, dp(context, 9));
     card.setLayoutParams(params);
@@ -175,16 +175,16 @@ final class UiKit {
     int enabledText = primary ? ACCENT_TEXT : (secondaryAccent ? ACCENT_TEXT_SECONDARY : readableTextColor(tone));
     int pressedFill = primary ? ACCENT_PRESSED : darken(tone, 0.82f);
     button.setText(label);
-    button.setTextSize(13);
+    button.setTextSize(14);
     button.setTextColor(statefulText(enabledText));
     button.setTypeface(Typeface.create("sans", Typeface.BOLD));
     button.setAllCaps(false);
     button.setGravity(Gravity.CENTER);
-    button.setMinHeight(dp(context, 44));
-    button.setMinimumHeight(dp(context, 44));
-    button.setPadding(dp(context, 12), 0, dp(context, 12), 0);
+    button.setMinHeight(dp(context, 48));
+    button.setMinimumHeight(dp(context, 48));
+    button.setPadding(dp(context, 14), 0, dp(context, 14), 0);
     int fill = tone == PRIMARY ? PRIMARY : tone;
-    button.setBackground(statefulRounded(context, fill, Color.TRANSPARENT, pressedFill, 11));
+    button.setBackground(statefulRounded(context, fill, Color.TRANSPARENT, pressedFill, 12));
     button.setOnClickListener(listener);
     return button;
   }
@@ -192,7 +192,7 @@ final class UiKit {
   static Button outlineButton(Context context, String label, View.OnClickListener listener) {
     Button button = button(context, label, ICON_BUTTON_BACKGROUND, listener);
     button.setTextColor(statefulText(ICON_BUTTON_FOREGROUND));
-    button.setBackground(statefulRounded(context, ICON_BUTTON_BACKGROUND, BORDER, SURFACE, 11));
+    button.setBackground(statefulRounded(context, ICON_BUTTON_BACKGROUND, BORDER, SURFACE, 12));
     return button;
   }
 
@@ -259,7 +259,7 @@ final class UiKit {
     button.setMinimumWidth(dp(context, 44));
     button.setMinimumHeight(dp(context, 44));
     button.setPadding(dp(context, 10), dp(context, 10), dp(context, 10), dp(context, 10));
-    button.setBackground(statefulRounded(context, ICON_BUTTON_BACKGROUND, BORDER, SURFACE, 11));
+    button.setBackground(statefulRounded(context, ICON_BUTTON_BACKGROUND, BORDER, SURFACE, 12));
     button.setOnClickListener(listener);
     return button;
   }
