@@ -108,14 +108,20 @@ final class PensionWorkspace {
     }));
 
     int shown = 0;
+    NativeSearchList search = null;
     for (OperationData.ReservationRecord reservation : data.reservations) {
       if (!AndroidUiRules.isPensionReservation(data, reservation)
           || !AndroidUiRules.reservationAllowed(data, reservation)) {
         continue;
       }
-      page.addView(listener.createReservationCard(reservation));
+      if (search == null) search = addSearch(page, "Rezervasyon ara");
+      View row = listener.createReservationCard(reservation);
+      page.addView(row);
+      search.add(row, reservation.customerName + " " + reservation.title + " "
+          + reservation.startDate + " " + reservation.endDate + " " + reservation.status);
       shown += 1;
     }
+    if (search != null) finishSearch(page, search, "Aramayla eşleşen rezervasyon yok.");
     if (shown == 0) {
       page.addView(emptyCard("Konaklama rezervasyonu yok", "Yeni rezervasyonlar burada listelenir."));
     }
@@ -164,9 +170,16 @@ final class PensionWorkspace {
           "Konaklama arşivi boş",
           "Müşteri-oda atamaları oluşturulduğunda burada saklanır."
       ));
-    }
-    for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
-      page.addView(listener.createStayCard(stay));
+    } else {
+      NativeSearchList search = addSearch(page, "Konuk veya oda ara");
+      for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
+        View row = listener.createStayCard(stay);
+        page.addView(row);
+        search.add(row, stay.customerName + " " + stay.roomName + " "
+            + stay.roomNumber + " " + stay.status + " " + stay.checkInDate
+            + " " + stay.checkOutDate + " " + stay.notes);
+      }
+      finishSearch(page, search, "Aramayla eşleşen konaklama yok.");
     }
   }
 
@@ -187,6 +200,20 @@ final class PensionWorkspace {
     if (shown == 0) {
       page.addView(emptyCard("Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
     }
+  }
+
+  private NativeSearchList addSearch(LinearLayout page, String hint) {
+    NativeSearchList search = new NativeSearchList(activity, hint);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, UiKit.dp(activity, 5), 0, UiKit.dp(activity, 12));
+    page.addView(search.input(), params);
+    return search;
+  }
+
+  private void finishSearch(LinearLayout page, NativeSearchList search, String message) {
+    TextView noMatches = UiKit.text(activity, message, 13, UiKit.MUTED, Typeface.NORMAL);
+    page.addView(noMatches);
+    search.setNoMatchesNotice(noMatches);
   }
 
   private View titleBar(String mode) {

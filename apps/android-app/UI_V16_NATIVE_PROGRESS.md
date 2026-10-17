@@ -30,10 +30,19 @@ Bu dizin, kaynak Java ile gerçek Android APK'ye entegre edilen parçaları izle
 - Ürün kategorisi market snapshot ürün modelinde bulunmuyor: sahte kategori filtresi yapılmadı, veri sözleşmesi ve backend değişmedi.
 - Yukarıdaki değişiklikler yalnız gerçek Android Java görünümüdür; V16 HTML prototipi ve sunucuya dokunulmadı.
 
+## Dördüncü tur — Konaklama / Oda Hesapları
+
+- `RoomFolioWorkspace.java`: açık hesap ve para birimi bazında bekleyen tahsilat V16 özet ızgarası; açık hesaplar müşteri, oda, tarih ve para birimine göre aranabilir. Kart içinde tutarlar etiket/değer satırlarına ayrıldı, ücret ekleme butonları iki sütunda toplandı. Yetkili menü ürünü, ek ücret, ödeme ve çıkış işlemlerinin payload/validation akışı korundu.
+- Menü ürünü ekleme formunda **ürün veya kategori araması** mevcut, yalnız güncel snapshot'taki satışa açık ve uygun para birimindeki ürünleri filtreler. Eşleşen ürün yokken gönderim engellenir.
+- Ödenmiş oda hesabının çıkış düğmesi V16 diline uygun `Çıkış ve Hesabı Kapat` şeklinde adlandırıldı; aynı `room_folio_checkout` işlemi çağrılır.
+- `PensionWorkspace.java`: rezervasyon ve konaklama kartları için Türkçe arama ve boş sonuç durumu eklendi.
+- `RoomAssignmentDialog.java`: konaklama giriş/çıkış tarihleri ortak yerel Türkçe seçiciye taşındı. Çıkış alanı boş bırakılabilir; giriş tarihi değişirse geçersiz çıkış alanı temizlenir.
+- `NativeDateTimePicker.java`: yalnız isteğe bağlı tarih alanlarında `Tarihi temizle` kontrolü sunan overload eklendi; diğer mevcut tarih seçicilerin davranışı değişmedi.
+
 ## Henüz tamamlanmayan görsel aktarım
 
-İlk üç native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e geçirilmiş olduğu anlamına gelmez. Bugün, Müşteriler, Odalar, Masalar, Restoran ve Satış alanlarının temel yerleşimi güncellendi; detay kartları ve formlarda görsel karşılaştırma devam ediyor.
-Sıradaki turda Konaklama ve Oda Hesapları ayrıntıları, Rezervasyon ve Günlük İş formları, KBS, Mesajlar, İş Takibi, Finans, Ayarlar/Bağlantı/Cihazlar ekranları ele alınmalı.
+İlk dört native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e geçirildiği anlamına gelmez. Bugün, Müşteriler, Odalar, Masalar, Restoran, Satış, Konaklama ve Oda Hesapları için temel kart/listeler ve bazı işlemler yenilendi; cihaz üzerinde görsel karşılaştırma henüz yapılmadı.
+Sıradaki turda Rezervasyon ve Günlük İş formlarının kalan düzenleri, KBS, Mesajlar, İş Takibi, Finans, Ayarlar/Bağlantı/Cihazlar ekranları ele alınmalı.
 Kullanıcı yetkisi, sektör, outbox ve senkronizasyon davranışları backend kaynaklarında kalır; HTML prototip iş mantığı native koda taşınmaz.
 Gerçek cihazda 360/393, Android 8.1, tablet, TalkBack, klavye, tarih popup yüksekliği, çevrimdışı ve senkronizasyon ayrıca kontrol edilmelidir.
 Prototipteki 'Analiz hatasını dene' kullanıcıya görünen native butona eklenmemelidir.

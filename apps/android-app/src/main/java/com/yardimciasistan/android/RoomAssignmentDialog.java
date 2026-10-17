@@ -61,6 +61,20 @@ final class RoomAssignmentDialog {
     String today=new SimpleDateFormat("yyyy-MM-dd",Locale.ROOT).format(new Date());
     EditText checkIn=addInput(activity,form,"Giriş tarihi *","YYYY-AA-GG",today,false);
     EditText checkOut=addInput(activity,form,"Çıkış tarihi","YYYY-AA-GG","",false);
+    checkIn.setFocusable(false);
+    checkIn.setClickable(true);
+    checkIn.setOnClickListener(view -> NativeDateTimePicker.showDate(activity, checkIn, null, true));
+    checkOut.setFocusable(false);
+    checkOut.setClickable(true);
+    checkOut.setOnClickListener(view -> NativeDateTimePicker.showDate(activity, checkOut, checkIn, true, true));
+    checkIn.addTextChangedListener(new android.text.TextWatcher() {
+      @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+      @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+        String out = checkOut.getText().toString();
+        if (!out.isEmpty() && out.compareTo(s.toString()) < 0) checkOut.setText("");
+      }
+      @Override public void afterTextChanged(android.text.Editable s) {}
+    });
     EditText guestCount=addInput(activity,form,"Kişi sayısı *","1","1",false);
     guestCount.setInputType(InputType.TYPE_CLASS_NUMBER);
     Spinner status=addChoice(activity,form,"Başlangıç durumu",

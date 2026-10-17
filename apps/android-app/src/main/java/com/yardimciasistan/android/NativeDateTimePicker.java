@@ -30,6 +30,11 @@ final class NativeDateTimePicker {
   private NativeDateTimePicker() {}
 
   static void showDate(Context context, EditText target, EditText checkIn, boolean allowPast) {
+    showDate(context, target, checkIn, allowPast, false);
+  }
+
+  static void showDate(Context context, EditText target, EditText checkIn,
+      boolean allowPast, boolean optional) {
     Calendar current = parseDate(target.getText().toString());
     Calendar minimum = minDate(checkIn, allowPast);
     if (current.before(minimum)) current = (Calendar) minimum.clone();
@@ -51,6 +56,17 @@ final class NativeDateTimePicker {
       quick.addView(item, new LinearLayout.LayoutParams(0, UiKit.dp(context, 46), 1f));
     }
     panel.addView(quick);
+    if (optional) {
+      Button clear = small(context, "Tarihi temizle");
+      clear.setContentDescription("İsteğe bağlı tarihi temizle");
+      clear.setOnClickListener(v -> {
+        target.setText("");
+        pop[0].dismiss();
+      });
+      LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(-1, UiKit.dp(context, 44));
+      clearParams.setMargins(0, UiKit.dp(context, 6), 0, UiKit.dp(context, 5));
+      panel.addView(clear, clearParams);
+    }
 
     LinearLayout nav = UiKit.row(context);
     Button back = small(context, "‹");

@@ -48,14 +48,16 @@ final class RoomFolioWorkspace {
       remainingByCurrency.put(folio.currency, remainingByCurrency.getOrDefault(folio.currency, 0L) + Math.max(0L, folio.remainingMinor));
     }
 
-    LinearLayout summary = UiKit.card(context);
-    summary.addView(UiKit.text(context, "Oda Hesapları", 16, UiKit.TEXT, Typeface.BOLD));
-    summary.addView(line(context, "Açık hesap", String.valueOf(openCount), UiKit.INFO));
+    // V16: each independently denominated balance gets its own tile;
+    // never combine different currencies into one amount.
+    ArrayList<View> summary = new ArrayList<>();
+    summary.add(UiKit.metricCard(context, "Açık hesap", openCount, UiKit.INFO, null));
     for (Map.Entry<String, Long> remaining : remainingByCurrency.entrySet()) {
-      summary.addView(line(context, "Bekleyen tahsilat", money(remaining.getValue(), remaining.getKey()),
-          remaining.getValue() > 0 ? UiKit.WARNING : UiKit.SUCCESS));
+      summary.add(UiKit.metricCard(context, "Bekleyen · " + remaining.getKey(),
+          money(remaining.getValue(), remaining.getKey()),
+          remaining.getValue() > 0 ? UiKit.WARNING : UiKit.SUCCESS, null));
     }
-    page.addView(summary);
+    page.addView(UiKit.metricGrid(context, summary));
 
     if (openCount == 0) {
       LinearLayout empty = UiKit.card(context);
@@ -71,11 +73,22 @@ final class RoomFolioWorkspace {
       return;
     }
 
+    NativeSearchList search = new NativeSearchList(context, "Müşteri veya oda ara");
+    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
+    searchParams.setMargins(0, dp(context, 4), 0, dp(context, 12));
+    page.addView(search.input(), searchParams);
     for (OperationData.RoomFolioRecord folio : data.roomFolios) {
-      if (folio.isOpen()) {
-        page.addView(folioCard(context, data, folio, listener));
-      }
+      if (!folio.isOpen()) continue;
+      View card = folioCard(context, data, folio, listener);
+      page.addView(card);
+      search.add(card, folio.customerName + " " + folio.roomName + " "
+          + folio.roomNumber + " " + folio.currency + " "
+          + folio.checkInDate + " " + folio.plannedCheckOutDate);
     }
+    TextView noMatches = UiKit.text(context, "Aramayla eşleşen açık hesap yok.",
+        13, UiKit.MUTED, Typeface.NORMAL);
+    page.addView(noMatches);
+    search.setNoMatchesNotice(noMatches);
 
     TextView note = UiKit.text(
         context,
@@ -104,17 +117,13 @@ final class RoomFolioWorkspace {
     );
     title.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
     top.addView(title);
-    top.addView(UiKit.text(
-        context,
-        folio.remainingMinor > 0 ? money(folio.remainingMinor, folio.currency) : "Ödendi",
-        13,
-        folio.remainingMinor > 0 ? UiKit.WARNING : UiKit.SUCCESS,
-        Typeface.BOLD
-    ));
+    top.addView(UiKit.badge(context,
+        folio.remainingMinor > 0 ? "Tahsilat bekliyor" : "Ödendi",
+        folio.remainingMinor > 0 ? UiKit.WARNING : UiKit.SUCCESS));
     card.addView(top);
 
     String room = folio.roomNumber.isEmpty() ? folio.roomName : folio.roomName + " · " + folio.roomNumber;
-    card.addView(UiKit.text(context, room, 12, UiKit.MUTED, Typeface.BOLD));
+    card.addView(UiKit.text(context, room, 13, UiKit.SECONDARY, Typeface.BOLD));
     card.addView(UiKit.text(
         context,
         dateRange(folio.checkInDate, folio.plannedCheckOutDate) + " · " + Math.max(1, folio.nights) + " gece",
@@ -124,23 +133,26 @@ final class RoomFolioWorkspace {
     ));
 
     LinearLayout totals = UiKit.column(context);
-    totals.setPadding(0, dp(context, 7), 0, 0);
-    totals.addView(UiKit.text(context, "Toplam: " + money(folio.chargeTotalMinor, folio.currency), 12, UiKit.TEXT, Typeface.NORMAL));
-    totals.addView(UiKit.text(context, "Alınan: " + money(folio.paidTotalMinor, folio.currency), 12, UiKit.SECONDARY, Typeface.NORMAL));
-    totals.addView(UiKit.text(
-        context,
-        "Kalan: " + money(folio.remainingMinor, folio.currency),
-        13,
-        folio.remainingMinor > 0 ? UiKit.WARNING : UiKit.SUCCESS,
-        Typeface.BOLD
-    ));
+    totals.setPadding(0, dp(context, 9), 0, dp(context, 2));
+    totals.addView(amountLine(context, "Toplam", money(folio.chargeTotalMinor, folio.currency), UiKit.TEXT));
+    totals.addView(amountLine(context, "Alınan", money(folio.paidTotalMinor, folio.currency), UiKit.SECONDARY));
+    totals.addView(amountLine(context, "Kalan", money(folio.remainingMinor, folio.currency),
+        folio.remainingMinor > 0 ? UiKit.WARNING : UiKit.SUCCESS));
     card.addView(totals);
 
+    LinearLayout additions = UiKit.row(context);
     if (canAddMenuItems(data, folio)) {
-      card.addView(UiKit.outlineButton(context, "Menü Ürünü Ekle", view -> showMenuItemDialog(context, data, folio, listener)));
+      UiKit.addAction(additions, UiKit.outlineButton(context, "Menü Ekle",
+          view -> showMenuItemDialog(context, data, folio, listener)), context);
     }
     if (canAddManualCharge(data, folio)) {
-      card.addView(UiKit.outlineButton(context, "Ek Ücret Ekle", view -> showManualChargeDialog(context, folio, listener)));
+      UiKit.addAction(additions, UiKit.outlineButton(context, "Ek Ücret",
+          view -> showManualChargeDialog(context, folio, listener)), context);
+    }
+    if (additions.getChildCount() > 0) {
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+      params.setMargins(0, dp(context, 10), 0, 0);
+      card.addView(additions, params);
     }
 
     if (data.hasPermission("room_folio.payment") && folio.remainingMinor > 0) {
@@ -153,7 +165,8 @@ final class RoomFolioWorkspace {
 
     if (data.hasPermission("room_folio.checkout")) {
       if (folio.remainingMinor == 0) {
-        Button checkout = UiKit.outlineButton(context, "Çıkışı Tamamla", view -> confirmCheckout(context, folio, listener));
+        Button checkout = UiKit.outlineButton(context, "Çıkış ve Hesabı Kapat",
+            view -> confirmCheckout(context, folio, listener));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(context, 46));
         params.setMargins(0, dp(context, 8), 0, 0);
         checkout.setLayoutParams(params);
@@ -171,6 +184,17 @@ final class RoomFolioWorkspace {
       }
     }
     return card;
+  }
+
+  private static View amountLine(Context context, String label, String amount, int tone) {
+    LinearLayout row = UiKit.row(context);
+    TextView name = UiKit.text(context, label, 12, UiKit.SECONDARY, Typeface.NORMAL);
+    row.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
+    row.addView(UiKit.text(context, amount, 13, tone, Typeface.BOLD));
+    LinearLayout.LayoutParams spacing = new LinearLayout.LayoutParams(-1, -2);
+    spacing.setMargins(0, dp(context, 3), 0, dp(context, 3));
+    row.setLayoutParams(spacing);
+    return row;
   }
 
   static boolean canAddMenuItems(OperationData data, OperationData.RoomFolioRecord folio) {
@@ -228,11 +252,16 @@ final class RoomFolioWorkspace {
     List<MenuChoice> choices = new ArrayList<>();
     for (OperationData.MenuItem item : data.menuItems) {
       boolean activeCategory = false;
+      String categoryName = "Menü";
       for (OperationData.MenuCategory category : data.categories) {
-        if (category.id.equals(item.categoryId) && category.active) activeCategory = true;
+        if (category.id.equals(item.categoryId) && category.active) {
+          activeCategory = true;
+          if (!category.name.trim().isEmpty()) categoryName = category.name;
+        }
       }
-      if (activeCategory && item.available && item.productActive && folio.currency.equalsIgnoreCase(item.currency) && !item.outOfStock()) {
-        choices.add(new MenuChoice(item));
+      if (activeCategory && item.available && item.productActive
+          && folio.currency.equalsIgnoreCase(item.currency) && !item.outOfStock()) {
+        choices.add(new MenuChoice(item, categoryName));
       }
     }
     if (choices.isEmpty()) {
@@ -243,11 +272,31 @@ final class RoomFolioWorkspace {
     }
     LinearLayout form = UiKit.column(context);
     form.setPadding(dp(context, 16), dp(context, 12), dp(context, 16), dp(context, 12));
+    EditText productSearch = UiKit.input(context, "Ürün veya kategori ara");
+    addField(context, form, "Menüde ara", productSearch);
     Spinner product = new Spinner(context);
-    ArrayAdapter<MenuChoice> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, choices);
+    ArrayAdapter<MenuChoice> adapter = new ArrayAdapter<>(context,
+        android.R.layout.simple_spinner_item, new ArrayList<>(choices));
     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     product.setAdapter(adapter);
     addField(context, form, "Menü ürünü · " + folio.currency, product);
+    TextView found = UiKit.text(context, choices.size() + " uygun ürün", 12,
+        UiKit.MUTED, Typeface.NORMAL);
+    form.addView(found);
+    productSearch.addTextChangedListener(new android.text.TextWatcher() {
+      @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+      @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+        adapter.clear();
+        for (MenuChoice choice : choices) {
+          if (NativeSearchList.matches(s.toString(), choice.searchText()))
+            adapter.add(choice);
+        }
+        adapter.notifyDataSetChanged();
+        found.setText(adapter.getCount() == 0 ? "Eşleşen ürün yok."
+            : adapter.getCount() + " uygun ürün");
+      }
+      @Override public void afterTextChanged(android.text.Editable s) {}
+    });
     EditText quantity = new EditText(context);
     quantity.setSingleLine(true);
     quantity.setInputType(InputType.TYPE_CLASS_NUMBER);
@@ -259,6 +308,10 @@ final class RoomFolioWorkspace {
         .setView(UiKit.scroll(context, form)).setNegativeButton("Vazgeç", null).setPositiveButton("Odaya Ekle", null).create();
     dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
       try {
+        if (!(product.getSelectedItem() instanceof MenuChoice)) {
+          status.setText("Önce uygun bir menü ürünü seçin.");
+          return;
+        }
         int count = Integer.parseInt(quantity.getText().toString().trim());
         JSONObject payload = menuChargePayload(folio, ((MenuChoice) product.getSelectedItem()).item, count);
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
@@ -303,9 +356,15 @@ final class RoomFolioWorkspace {
 
   private static final class MenuChoice {
     final OperationData.MenuItem item;
-    MenuChoice(OperationData.MenuItem item) { this.item = item; }
+    final String category;
+    MenuChoice(OperationData.MenuItem item, String category) {
+      this.item = item;
+      this.category = category;
+    }
+    String searchText() { return category + " " + item.name + " " + item.description; }
     @Override public String toString() {
-      return item.name + " · " + money(Math.round(item.price * 100), item.currency);
+      return category + " · " + item.name + " · "
+          + money(Math.round(item.price * 100), item.currency);
     }
   }
 
@@ -390,7 +449,7 @@ final class RoomFolioWorkspace {
 
   private static void confirmCheckout(Context context, OperationData.RoomFolioRecord folio, Listener listener) {
     new AlertDialog.Builder(context)
-        .setTitle("Çıkışı tamamla")
+        .setTitle("Çıkış ve hesabı kapat")
         .setMessage((folio.customerName.isEmpty() ? "Misafirin" : folio.customerName + " adlı misafirin")
             + " oda hesabı ödenmiş görünüyor. Konaklama kapatılıp oda boş olarak işaretlensin mi?")
         .setNegativeButton("Vazgeç", null)
