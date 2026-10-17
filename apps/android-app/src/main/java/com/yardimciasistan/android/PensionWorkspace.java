@@ -190,13 +190,19 @@ final class PensionWorkspace {
     }));
 
     int shown = 0;
+    NativeSearchList search = null;
     for (OperationData.TaskRecord task : data.tasks) {
       if (!AndroidUiRules.isPensionTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
         continue;
       }
-      page.addView(listener.createTaskCard(task));
+      if (search == null) search = addSearch(page, "İş veya açıklama ara");
+      View row = listener.createTaskCard(task);
+      page.addView(row);
+      search.add(row, task.title + " " + task.description + " " + task.status
+          + " " + task.dueDate + " " + task.dueTime);
       shown += 1;
     }
+    if (search != null) finishSearch(page, search, "Aramayla eşleşen iş yok.");
     if (shown == 0) {
       page.addView(emptyCard("Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
     }

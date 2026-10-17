@@ -52,6 +52,7 @@ final class AndroidSettingsWorkspace {
     boolean canViewTechnicalSettings =
         !data.permissionsResolved || data.hasPermission("settings.view");
 
+    page.addView(UiKit.title(activity, "Ayarlar"));
     page.addView(sectionLabel("Görünüm"));
     LinearLayout appearance = UiKit.card(activity);
     appearance.addView(settingLine("Tema", themeLabel, UiKit.PRIMARY));
@@ -152,18 +153,11 @@ final class AndroidSettingsWorkspace {
     card.addView(contrast);
 
     card.addView(UiKit.divider(activity));
-    card.addView(UiKit.text(activity, "Önizleme · Başlık ve açıklama", 17, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(activity,
-        "Rezervasyon hazır. Oda, masa ve ödeme bilgilerini rahatça okuyabilmelisiniz.",
-        14, UiKit.SECONDARY, Typeface.NORMAL));
-    card.addView(UiKit.badge(activity, "Hazır · Örnek durum", UiKit.SUCCESS));
     Button defaults = UiKit.outlineButton(activity, "Görünümü varsayılana döndür",
         view -> listener.onAppearanceChanged(AppearancePreferences.defaults()));
     defaults.setMinimumHeight(UiKit.dp(activity, 48));
     card.addView(defaults);
-    card.addView(UiKit.text(activity,
-        "Bu tercihler yalnızca bu cihazda saklanır; işletme yetkilerini ve masaüstü ayarlarını değiştirmez.",
-        11, UiKit.MUTED, Typeface.NORMAL));
+
   }
 
   private LinearLayout.LayoutParams appearanceChoiceParams() {

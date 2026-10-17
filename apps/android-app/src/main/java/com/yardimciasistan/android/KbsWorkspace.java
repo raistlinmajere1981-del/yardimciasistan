@@ -3,6 +3,9 @@ package com.yardimciasistan.android;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Typeface;
+import android.view.View;
+import android.widget.TextView;
+import java.util.ArrayList;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
@@ -16,14 +19,25 @@ final class KbsWorkspace {
 
   static void append(Context context, LinearLayout page, OperationData data, Listener listener) {
     if (!KbsUiRules.canView(data)) return;
-    LinearLayout overview = UiKit.card(context);
-    overview.addView(UiKit.text(context, "KBS · " + ("jandarma".equals(data.kbs.provider) ? "Jandarma" : "EGM"), 20, UiKit.TEXT, Typeface.BOLD));
-    overview.addView(UiKit.text(context, "Bekleyen: " + data.kbs.pendingCount + " · Başarısız: " + data.kbs.failedCount
-        + " · Sonuç belirsiz: " + data.kbs.unknownCount + " · Gönderilen: " + data.kbs.sentCount, 16, UiKit.SECONDARY, Typeface.NORMAL));
-    overview.addView(UiKit.text(context, "Kimliği hazır: " + data.kbs.identityReadyCount + " · Eksik: " + data.kbs.identityMissingCount, 16, UiKit.SECONDARY, Typeface.NORMAL));
-    overview.addView(UiKit.text(context, data.kbs.configured ? "Gönderim isteği masaüstünde işlenir. Kuyruğa alınması resmi gönderim değildir."
-        : "KBS bağlantı ayarları masaüstünde tamamlanmalı.", 16, UiKit.WARNING, Typeface.NORMAL));
-    page.addView(overview);
+    TextView provider = UiKit.text(context,
+        "Sağlayıcı: " + ("jandarma".equals(data.kbs.provider) ? "Jandarma" : "EGM"),
+        13, UiKit.MUTED, Typeface.BOLD);
+    page.addView(provider);
+    ArrayList<View> stats = new ArrayList<>();
+    stats.add(UiKit.metricCard(context, "Bekleyen", data.kbs.pendingCount, UiKit.WARNING, null));
+    stats.add(UiKit.metricCard(context, "Başarısız", data.kbs.failedCount, UiKit.DANGER, null));
+    stats.add(UiKit.metricCard(context, "Sonuç belirsiz", data.kbs.unknownCount, UiKit.WARNING, null));
+    stats.add(UiKit.metricCard(context, "Gönderilen", data.kbs.sentCount, UiKit.SUCCESS, null));
+    stats.add(UiKit.metricCard(context, "Kimliği hazır", data.kbs.identityReadyCount, UiKit.SUCCESS, null));
+    stats.add(UiKit.metricCard(context, "Kimliği eksik", data.kbs.identityMissingCount, UiKit.WARNING, null));
+    page.addView(UiKit.metricGrid(context, stats));
+    LinearLayout notice = UiKit.card(context);
+    notice.addView(UiKit.text(context,
+        data.kbs.configured
+            ? "Gönderim isteği masaüstünde işlenir. Kuyruğa alınması resmi gönderim değildir."
+            : "KBS bağlantı ayarları masaüstünde tamamlanmalı.",
+        13, UiKit.WARNING, Typeface.NORMAL));
+    page.addView(notice);
     int history = 0;
     for (OperationData.ActionRecord action : data.actions) {
       if (!KbsUiRules.isAction(action.type) || history++ >= 5) continue;
@@ -32,6 +46,13 @@ final class KbsWorkspace {
       card.addView(UiKit.text(context, KbsUiRules.actionFeedback(action.type, action.status), 16, UiKit.SECONDARY, Typeface.NORMAL));
       if (!action.errorMessage.isEmpty()) card.addView(UiKit.text(context, action.errorMessage, 16, UiKit.DANGER, Typeface.NORMAL));
       page.addView(card);
+    }
+    NativeSearchList search = null;
+    if (!data.kbs.notifications.isEmpty()) {
+      search = new NativeSearchList(context, "Misafir, oda veya durum ara");
+      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
+      searchParams.setMargins(0, UiKit.dp(context, 8), 0, UiKit.dp(context, 12));
+      page.addView(search.input(), searchParams);
     }
     for (OperationData.KbsNotification row : data.kbs.notifications) {
       LinearLayout card = UiKit.card(context);
@@ -54,6 +75,17 @@ final class KbsWorkspace {
       if (KbsUiRules.canReconcile(data, row)) card.addView(UiKit.button(context, "Haricen gönderildi", UiKit.SECONDARY,
           view -> confirmExternal(context, data, row, listener)));
       page.addView(card);
+      if (search != null) {
+        search.add(card, row.customerName + " " + row.roomName + " " + row.roomNumber
+            + " " + row.kind + " " + row.status + " " + row.occurredAt
+            + " " + KbsUiRules.statusLabel(row.status));
+      }
+    }
+    if (search != null) {
+      TextView none = UiKit.text(context, "Aramayla eşleşen KBS bildirimi yok.",
+          13, UiKit.MUTED, Typeface.NORMAL);
+      page.addView(none);
+      search.setNoMatchesNotice(none);
     }
     if (data.kbs.notifications.isEmpty()) page.addView(UiKit.text(context, "KBS bildirim kaydı yok.", 16, UiKit.MUTED, Typeface.NORMAL));
     if (data.kbs.notifications.size() >= 500) page.addView(UiKit.text(context, "En fazla 500 bildirim gösterilir. Tüm durumların sayıları yukarıdadır.", 16, UiKit.MUTED, Typeface.NORMAL));

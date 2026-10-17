@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.text.InputType;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -32,23 +33,28 @@ final class FinanceWorkspace {
         ? new OperationData.FinanceSnapshot()
         : data.finance;
 
-    LinearLayout summary = UiKit.card(context);
-    summary.addView(UiKit.text(context, "Bugünkü Kasa", 16, UiKit.TEXT, Typeface.BOLD));
-    summary.addView(line(context, "Gelir", money(finance.todayIncomeMinor), UiKit.SUCCESS));
-    summary.addView(line(context, "Gider", money(finance.todayExpenseMinor), UiKit.DANGER));
-    summary.addView(line(context, "Net", signedMoney(finance.todayNetMinor), finance.todayNetMinor >= 0 ? UiKit.SUCCESS : UiKit.DANGER));
-    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOLIO)) {
-      summary.addView(line(context, "Bekleyen oda alacağı", money(finance.outstandingPensionMinor), UiKit.WARNING));
-    }
-    page.addView(summary);
-
+    LinearLayout header = UiKit.row(context);
+    TextView title = UiKit.title(context, "Kasa");
+    header.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
     if (data.hasPermission("finance.create")) {
-      Button add = UiKit.button(context, "+ Kasa Hareketi Ekle", UiKit.PRIMARY, view -> showCreateDialog(context, data, listener));
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(context, 48));
-      params.setMargins(0, 0, 0, dp(context, 12));
-      add.setLayoutParams(params);
-      page.addView(add);
+      Button add = UiKit.iconButton(context, "+", "Kasa hareketi ekle", false,
+          view -> showCreateDialog(context, data, listener));
+      header.addView(add, new LinearLayout.LayoutParams(dp(context, 48), dp(context, 48)));
     }
+    LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
+    headingParams.setMargins(0, 0, 0, dp(context, 12));
+    page.addView(header, headingParams);
+
+    ArrayList<View> summary = new ArrayList<>();
+    summary.add(UiKit.metricCard(context, "Gelir", money(finance.todayIncomeMinor), UiKit.SUCCESS, null));
+    summary.add(UiKit.metricCard(context, "Gider", money(finance.todayExpenseMinor), UiKit.DANGER, null));
+    summary.add(UiKit.metricCard(context, "Net", signedMoney(finance.todayNetMinor),
+        finance.todayNetMinor >= 0 ? UiKit.SUCCESS : UiKit.DANGER, null));
+    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOLIO)) {
+      summary.add(UiKit.metricCard(context, "Bekleyen oda alacağı",
+          money(finance.outstandingPensionMinor), UiKit.WARNING, null));
+    }
+    page.addView(UiKit.metricGrid(context, summary));
 
     page.addView(UiKit.sectionTitle(context, "Son hareketler"));
     if (finance.recentEntries.isEmpty()) {
@@ -57,12 +63,23 @@ final class FinanceWorkspace {
       empty.addView(UiKit.text(context, "Gelir ve gider kayıtları burada kısa liste halinde görünür.", 12, UiKit.MUTED, Typeface.NORMAL));
       page.addView(empty);
     } else {
+      NativeSearchList search = new NativeSearchList(context, "Hareket ara");
+      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, -2);
+      searchParams.setMargins(0, 0, 0, dp(context, 10));
+      page.addView(search.input(), searchParams);
       int shown = 0;
       for (OperationData.FinanceEntry entry : finance.recentEntries) {
         if (shown >= 20) break;
-        page.addView(entryCard(context, entry));
+        View row = entryCard(context, entry);
+        page.addView(row);
+        search.add(row, entry.description + " " + entry.category + " " + entry.paymentMethod
+            + " " + entry.occurredAt + " " + (entry.isIncome() ? "Gelir" : "Gider"));
         shown += 1;
       }
+      TextView noMatches = UiKit.text(context, "Aramayla eşleşen kasa hareketi yok.",
+          13, UiKit.MUTED, Typeface.NORMAL);
+      page.addView(noMatches);
+      search.setNoMatchesNotice(noMatches);
     }
 
     TextView note = UiKit.text(

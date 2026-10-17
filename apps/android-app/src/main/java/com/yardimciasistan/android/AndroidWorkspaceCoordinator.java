@@ -4,6 +4,7 @@ import android.graphics.Typeface;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 
@@ -313,9 +314,14 @@ final class AndroidWorkspaceCoordinator {
       messageMode = AndroidUiRules.MESSAGES_PREPARED;
     }
 
+    page.addView(UiKit.title(activity, "Mesajlar"));
     page.addView(filterBar(options.toArray(new String[0][])));
 
     if (AndroidUiRules.MESSAGES_PREPARED.equals(messageMode)) {
+      NativeSearchList search = null;
+      if (!data.messages.isEmpty()) {
+        search = addMessageSearch(page, "Müşteri veya mesaj ara");
+      }
       if (data.messages.isEmpty()) {
         page.addView(emptyCard(
             "Hazır mesaj yok",
@@ -323,13 +329,22 @@ final class AndroidWorkspaceCoordinator {
         ));
       }
       for (OperationData.MessageRecord message : data.messages) {
-        page.addView(cards.messageCard(message));
+        View row = cards.messageCard(message);
+        page.addView(row);
+        if (search != null) search.add(row, message.customerName + " " + message.customerPhone
+            + " " + message.message + " " + message.status);
       }
+      if (search != null) finishMessageSearch(page, search, "Aramayla eşleşen mesaj yok.");
     } else {
       int shown = 0;
+      NativeSearchList search = null;
       for (OperationData.RequestRecord request : data.requests) {
         if (!request.waitingForResponse()) continue;
-        page.addView(cards.waitingMessageCard(request));
+        if (search == null) search = addMessageSearch(page, "Yanıt bekleyen müşteri ara");
+        View row = cards.waitingMessageCard(request);
+        page.addView(row);
+        search.add(row, request.customerName + " " + request.customerPhone + " "
+            + request.message + " " + request.status);
         shown += 1;
       }
       if (shown == 0) {
@@ -337,10 +352,24 @@ final class AndroidWorkspaceCoordinator {
             "Cevap bekleyen müşteri yok",
             "Yanıt gerektiren talepler burada görünür."
         ));
-      }
+      } else finishMessageSearch(page, search, "Aramayla eşleşen talep yok.");
     }
 
     return UiKit.scroll(activity, page, bottomPaddingDp);
+  }
+
+  private NativeSearchList addMessageSearch(LinearLayout page, String hint) {
+    NativeSearchList search = new NativeSearchList(activity, hint);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, UiKit.dp(activity, 4), 0, UiKit.dp(activity, 12));
+    page.addView(search.input(), params);
+    return search;
+  }
+
+  private void finishMessageSearch(LinearLayout page, NativeSearchList search, String emptyText) {
+    TextView text = UiKit.text(activity, emptyText, 13, UiKit.MUTED, Typeface.NORMAL);
+    page.addView(text);
+    search.setNoMatchesNotice(text);
   }
 
   private View filterBar(String[][] options) {

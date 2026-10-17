@@ -39,10 +39,19 @@ Bu dizin, kaynak Java ile gerçek Android APK'ye entegre edilen parçaları izle
 - `RoomAssignmentDialog.java`: konaklama giriş/çıkış tarihleri ortak yerel Türkçe seçiciye taşındı. Çıkış alanı boş bırakılabilir; giriş tarihi değişirse geçersiz çıkış alanı temizlenir.
 - `NativeDateTimePicker.java`: yalnız isteğe bağlı tarih alanlarında `Tarihi temizle` kontrolü sunan overload eklendi; diğer mevcut tarih seçicilerin davranışı değişmedi.
 
+## Beşinci tur — KBS / Mesajlar / Günlük İşler / Finans / Ayarlar
+
+- `KbsWorkspace.java`: EGM/Jandarma sağlayıcısı ve ayrı KBS sayılarını V16 özet ızgarasında gösterir. Misafir/oda/tarih/durum araması yalnız görüntülenebilir bildirimler üzerinde çalışır. “Sonuç belirsiz” statüsü ve yeniden gönderimi engelleyen kurallar değiştirilmedi; kuyruğun resmî gönderim olmadığını açıklayan uyarı kaldı.
+- `AndroidWorkspaceCoordinator.java`: Hazır Mesajlar ve Cevap Bekleyenler için yerel mesaj/müşteri araması; yetki ve talepler capability koşullarına dokunulmadı.
+- `PensionWorkspace.java`, `RestaurantWorkspace.java`: İş Takibi'nin native karşılığı olan iki **Günlük İşler** listesinde görev adı/açıklama/tarih/durum araması. İş oluşturma/sonuçlandırma/düzenleme mevcut action owner'da kalır.
+- `FinanceWorkspace.java`: Kasa başlığı ve yetkili yeni hareket için +; gelir/gider/net, opsiyonel oda alacağı V16 özet kartları. Son 20 işlemin metni/kategorisi/tarihinde yerel arama. Finans payload ve kategorileri değişmedi.
+- `AndroidSettingsWorkspace.java`: Ayarlar başlığı; V14/V15 kararı gereği görünüm örnek önizlemesi ve gereksiz cihaz-tercihi açıklaması kaldırıldı. Temalar, font, kontrast, ses ve bildirim kontrol bağlantıları aynı.
+- `AndroidMoreWorkspace.java`: Diğer menü başlığı ve satır tasarımı sadeleştirildi; rota ve yetki kontrolleri aynı.
+
 ## Henüz tamamlanmayan görsel aktarım
 
-İlk dört native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e geçirildiği anlamına gelmez. Bugün, Müşteriler, Odalar, Masalar, Restoran, Satış, Konaklama ve Oda Hesapları için temel kart/listeler ve bazı işlemler yenilendi; cihaz üzerinde görsel karşılaştırma henüz yapılmadı.
-Sıradaki turda Rezervasyon ve Günlük İş formlarının kalan düzenleri, KBS, Mesajlar, İş Takibi, Finans, Ayarlar/Bağlantı/Cihazlar ekranları ele alınmalı.
+İlk beş native tur, 19 V16 HTML ekranının bütün piksel düzenlerinin Android'e geçirildiği anlamına gelmez. İşletme ana listeleri, KBS, Mesajlar, Günlük İşler, Kasa ve Ayarlar'ın temel görünümü yenilendi; gerçek Android cihazında birebir tasarım ve işlem doğrulaması henüz yapılmadı.
+Sıradaki turda Rezervasyon ve Günlük İş düzenleme formlarının kalan yerleşimleri, Bağlantı/Cihazlar ekranları ve detay panelleri ele alınmalı. Sonrasında telefon/tablet üstünde V16 bütün ekranları karşılaştırılıp kalan görsel uyumsuzluklar tamamlanmalı.
 Kullanıcı yetkisi, sektör, outbox ve senkronizasyon davranışları backend kaynaklarında kalır; HTML prototip iş mantığı native koda taşınmaz.
 Gerçek cihazda 360/393, Android 8.1, tablet, TalkBack, klavye, tarih popup yüksekliği, çevrimdışı ve senkronizasyon ayrıca kontrol edilmelidir.
 Prototipteki 'Analiz hatasını dene' kullanıcıya görünen native butona eklenmemelidir.
