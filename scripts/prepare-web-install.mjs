@@ -7,6 +7,7 @@ import process from "node:process";
 const args = process.argv.slice(2);
 let publicUrl = "";
 let displayName = "";
+let printSecret = true;
 const explicitOrigins = [];
 
 for (let index = 0; index < args.length; index += 1) {
@@ -18,6 +19,8 @@ for (let index = 0; index < args.length; index += 1) {
   } else if (arg === "--origin") {
     const origin = String(args[++index] ?? "").trim();
     if (origin) explicitOrigins.push(origin);
+  } else if (arg === "--no-print-secret") {
+    printSecret = false;
   } else if (arg === "--help" || arg === "-h") {
     printHelp();
     process.exit(0);
@@ -89,7 +92,7 @@ try {
 
 console.log("\nWeb modülü kurulum paketi hazır.");
 console.log(`Web modül adresi: ${publicUrl}`);
-console.log(`Web güvenlik anahtarı: ${syncSecret}`);
+if (printSecret) console.log(`Web güvenlik anahtarı: ${syncSecret}`);
 console.log(`Kurulum bilgisi: ${infoPath}`);
 console.log("Arşiv: artifacts/web-module-deploy/yardimci-asistan.tar.gz");
 console.log("ZIP mevcutsa: artifacts/web-module-deploy/yardimci-asistan.zip");
@@ -111,7 +114,7 @@ function normalizeOrigin(value) {
 
 function printHelp() {
   console.log(`Kullanım:
-  npm run prepare:web-install -- --url <web-modül-adresi> [--name <işletme-adı>] [--origin <site-origin>]
+  npm run prepare:web-install -- --url <web-modül-adresi> [--name <işletme-adı>] [--origin <site-origin>] [--no-print-secret]
 
 Örnek:
   npm run prepare:web-install -- --url https://firma.com/yardimci-asistan --name "Firma Adı"

@@ -67,6 +67,22 @@
       "deploy": {
         "type": "external-repo"
       }
+    },
+    "market-pilot": {
+      "id": "market-pilot",
+      "title": "Tekel Market · Pilot 2",
+      "kind": "web-module",
+      "siteUrl": "https://yardimciasistantest.alwaysdata.net",
+      "webModuleUrl": "https://yardimciasistantest.alwaysdata.net/yardimci-asistan",
+      "versionEndpoint": "https://yardimciasistantest.alwaysdata.net/yardimci-asistan/api/version.php",
+      "credentialRef": "alwaysdata-market-pilot",
+      "deploy": {
+        "type": "ssh-rsync",
+        "host": "yardimciasistantest@ssh-yardimciasistantest.alwaysdata.net",
+        "remoteRoot": "/home/yardimciasistantest/www/yardimci-asistan",
+        "backupDir": "/home/yardimciasistantest/backups",
+        "stageParent": "/home/yardimciasistantest"
+      }
     }
   }
 }

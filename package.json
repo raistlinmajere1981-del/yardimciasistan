@@ -125,7 +125,8 @@
     "installations:show": "node scripts/installation-config.mjs show",
     "installations:check": "node scripts/installation-config.mjs check",
     "version:web:set": "node scripts/product-version.mjs web-set",
-    "version:web:bump": "node scripts/product-version.mjs web-bump"
+    "version:web:bump": "node scripts/product-version.mjs web-bump",
+    "deploy:market-pilot": "bash scripts/deploy-market-pilot.sh"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

@@ -108,6 +108,36 @@ const TARGETS: TargetDefinition[] = [
     })
   },
   {
+    id: "market-pilot",
+    installationId: "market-pilot",
+    title: "Tekel Market · Pilot 2",
+    description: "Ayrı Alwaysdata hesabına market sayfasını ve web modülünü yayınlar.",
+    confirmText: "Yalnız Market Pilot Alwaysdata hesabı güncellenecek. İlk kurulumda yeni anahtar üretilir; sonraki yayınlarda veri korunur.",
+    impact: [
+      "Yardımcı Asistan ana demo ve BlackSea sitesi değişmez.",
+      "Market ana sayfası ve marketin web modülü güncellenir.",
+      "İlk bağlantı anahtarı yalnız yerel artifacts dizininde saklanır."
+    ],
+    preflight: (repoRoot) => [{
+      label: "Market Pilot SSH ve yayın ön kontrolü",
+      command: npmCommand(),
+      args: ["run", "deploy:market-pilot", "--", "--dry-run"],
+      cwd: repoRoot
+    }],
+    deploy: (repoRoot) => [{
+      label: "Market Pilot site ve modül yayını",
+      command: npmCommand(),
+      args: ["run", "deploy:market-pilot", "--", "--yes"],
+      cwd: repoRoot
+    }],
+    availability: (repoRoot) => ({
+      available: rootScriptExists(repoRoot, "scripts/deploy-market-pilot.sh"),
+      note: rootScriptExists(repoRoot, "scripts/deploy-market-pilot.sh")
+        ? "Ayrı tenant deploy scripti hazır. SSH bağlantısı ön kontrolde sınanır."
+        : "scripts/deploy-market-pilot.sh bulunamadı."
+    })
+  },
+  {
     id: "support-endpoint",
     installationId: "support",
     title: "Merkezi Destek endpoint'i",
