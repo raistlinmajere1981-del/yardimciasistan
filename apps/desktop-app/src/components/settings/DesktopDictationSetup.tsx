@@ -20,15 +20,16 @@ export function DesktopDictationSetup({ controller, form, canonical, aiCapabilit
         : ready && controller.enabled !== controller.status?.enabled ? (controller.enabled ? "Etkinleştirilecek · Masaüstü dikte" : "Kapatılacak · Masaüstü dikte")
           : controller.status?.message ?? "Kayıtlı durum kontrol ediliyor…";
   const canTest = aiCapability && !changed && controller.status?.canTest === true;
-  return <ServiceSettingsCard id="settings-dictation" title="Konuşmadan Metne" enabled={ready && controller.enabled}
+  return <ServiceSettingsCard id="settings-dictation" title="Konuşmadan Metne" enabled={controller.enabled}
+    readiness={controller.testing ? "Kontrol ediliyor…" : controller.error ? "Hata" : ready ? "Hazır" : canTest ? "Test edilmedi" : "Test kullanılamıyor"} testMessage={controller.error}
     status={message} disabled={disabled} toggleDisabled={!ready || controller.busy}
     toggleLabel="Masaüstü dikte etkin" onEnabledChange={controller.change}
     headerActions={canTest && <ActionButton variant="secondary" size="sm" disabled={disabled || controller.busy}
       title="Tek kısa deneme sesi gönderir; sağlayıcı ücretlendirebilir." onClick={() => void controller.test()}>
       {controller.testing ? "Deneniyor…" : "STT Bağlantısını Dene"}
     </ActionButton>}
-    feedback={!changed && controller.error ? <p role="alert">{controller.error}</p>
-      : canTest && !ready && <p>Test tek kısa ses gönderir; sağlayıcı ücretlendirebilir.</p>}>
+    >
+    {canTest && <small>Test tek kısa ses gönderir; sağlayıcı ücretlendirebilir.</small>}
     <small>Masaüstündeki mikrofon düğmelerini etkinleştirir.</small>
   </ServiceSettingsCard>;
 }

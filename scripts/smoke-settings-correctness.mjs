@@ -1,3 +1,4 @@
+import ts from "typescript";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -23,7 +24,7 @@ runInNewContext(readFileSync(resolve("apps/desktop-app/dist-electron/setup-servi
     : name === "./ai-secret-service" ? { getEffectiveAiApiKey: () => "" }
     : name === "./business-messaging/secret-service" ? { decryptMessagingSecret: () => "" } : compiledRequire(name)
 });
-const validate = input => activationExports.validateSetupServiceActivation(db, input);
+const validate = (input, database = db) => activationExports.validateSetupServiceActivation(database, input);
 function loadProvider(filename, overrides, globals = {}) {
   const exports = {}, file = resolve(`apps/desktop-app/dist-electron/${filename}.js`);
   const providerRequire = createRequire(file);
@@ -39,6 +40,43 @@ const setup = { businessName: "Settings fixture", profileId: "market", profileOp
 let raw;
 try {
   db.initialize();
+  // Each service merge carries only its fields, preserving every other owner and draft.
+  const fieldCode = ts.transpileModule(readFileSync(resolve("apps/desktop-app/src/app/settings-service-fields.ts"), "utf8"),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const fields = {};
+  runInNewContext(fieldCode, { exports: fields });
+  const canonicalForm = Object.fromEntries(Object.values(fields.serviceSettingsFields).flat().map(key => [key, `saved:${key}`]));
+  canonicalForm.businessName = "Saved business";
+  const dirtyForm = Object.fromEntries(Object.keys(canonicalForm).map(key => [key, `dirty:${key}`]));
+  const owned = new Set();
+  for (const [id, keys] of Object.entries(fields.serviceSettingsFields)) {
+    const merged = fields.copySettingsFields(canonicalForm, dirtyForm, keys);
+    for (const key of Object.keys(canonicalForm)) assert.equal(merged[key], keys.includes(key) ? dirtyForm[key] : canonicalForm[key], `${id}: isolated save ${key}`);
+    const discarded = fields.copySettingsFields(dirtyForm, canonicalForm, keys);
+    for (const key of Object.keys(dirtyForm)) assert.equal(discarded[key], keys.includes(key) ? canonicalForm[key] : dirtyForm[key], `${id}: isolated discard ${key}`);
+    assert.equal(fields.settingsFieldsDirty(dirtyForm, canonicalForm, keys), true);
+    assert.equal(fields.settingsFieldsDirty(discarded, canonicalForm, keys), false);
+    for (const key of keys) { assert.equal(owned.has(key), false, `${key}: only one service writer`); owned.add(key); }
+  }
+
+  for (const online of [false, true]) {
+    const initial = new DesktopDatabase({ appPath: resolve("apps/desktop-app"), userDataPath: join(root, online ? "online-first-run" : "offline-first-run") });
+    try {
+      initial.initialize();
+      const input = { ...setup, businessName: "", autoSyncEnabled: online, syncSecret: online ? setup.syncSecret : "", webModuleUrl: online ? setup.webModuleUrl : "" };
+      assert.equal(initial.getSetupData().setupRequired, true);
+      if (online) {
+        assert.match(validate(input, initial), /test edin/, "initial online setup requires real main-process test evidence");
+        initial.recordServiceSettingsVerification("web", { baseUrl: input.webModuleUrl, syncSecret: input.syncSecret });
+        assert.match(validate({ ...input, syncSecret: "another-tested-secret" }, initial), /test edin/, "proof binds to exact effective transport");
+      }
+      assert.equal(validate(input, initial), null, "offline setup needs no web proof or secret");
+      assert.equal(initial.saveInitialSetup(input).ok, true, "company name and phone are optional without WhatsApp");
+      assert.equal(initial.getSetupData().businessName, "", "persist non-null empty company name");
+      assert.equal(initial.getSetupData().setupRequired, false);
+      assert.match(validate({ ...input, autoSyncEnabled: true, webModuleUrl: setup.webModuleUrl, syncSecret: "new-transport-secret" }, initial), /test edin/, "existing activation checks remain enforced");
+    } finally { initial.close(); }
+  }
   const empty = { enabled: false, environment: "test", customerCode: "", username: "", password: "" };
   const shippingMethods = { pickupEnabled: false, shippingEnabled: true };
   const shippingSetup = { ...setup, onlineSalesDelivery: shippingMethods };
@@ -175,7 +213,15 @@ try {
   assert.equal(save({ autoSyncEnabled: true }).ok, true);
   assert.equal(validate(autoSync), null, "unchanged active transport retains matching evidence");
   db.recordServiceSettingsVerification("web", { baseUrl: "https://other.test", syncSecret: setup.syncSecret });
-  assert.match(validate(autoSync), /test edin/, "unchanged active transport still requires matching evidence");
+  assert.equal(validate({ ...autoSync, address: "Offline local edit" }), null, "unchanged active transport permits unrelated local saves without matching evidence");
+  db.clearServiceSettingsVerification("web");
+  assert.equal(validate({ ...autoSync, businessName: "Local offline name" }), null, "missing proof cannot block unrelated local saves");
+  assert.equal(validate({ ...autoSync, webModuleUrl: setup.webModuleUrl + "/" }), null, "trailing slash is the same effective transport");
+  assert.match(validate({ ...autoSync, syncSecret: "new-untested-secret" }), /test edin/);
+  assert.match(validate({ ...autoSync, webModuleUrl: "https://new.test" }), /test edin/);
+  assert.equal(validate({ ...setup, syncSecret: "new-offline-secret" }), null, "disabled sync needs no live test");
+  assert.equal(db.saveInitialSetup(setup).ok, true);
+  assert.match(validate(autoSync), /test edin/, "reenabling unchanged transport still requires verification");
   assert.match(validate({ ...setup, arasShipping: { ...shipping, username: null } }), /geçersiz/);
 
   assert.equal(db.saveInitialSetup({ ...setup, profileId: "pension" }).ok, true);
@@ -217,7 +263,14 @@ try {
   const embed = "https://www.google.com/maps/embed?pb=!fixture";
   assert.equal(saveBusinessPublicProfile(db.databasePath, { ...getBusinessPublicProfile(db.databasePath), mapDisplayMode: "google_maps_embed", googleMapsEmbedUrl: embed,
     latitude: 39, longitude: 32 }).ok, true);
+  assert.equal(saveBusinessPublicProfile(db.databasePath, {
+    ...getBusinessPublicProfile(db.databasePath),
+    aboutText: "Bizim hikâyemiz.\nİkinci bölüm."
+  }).ok, true);
+  assert.equal(getBusinessPublicProfile(db.databasePath).aboutText, "Bizim hikâyemiz.\nİkinci bölüm.");
   let web = createCurrentBusinessWebContext(db);
+  assert.equal(web.aboutText, "Bizim hikâyemiz.\nİkinci bölüm.");
+  assert.deepEqual(web.gallery, []);
   assert.equal(web.mapDisplayMode, "google_maps_embed");
   assert.equal(web.latitude, null);
   assert.equal(web.googleMapsEmbedUrl, embed);

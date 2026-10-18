@@ -6,7 +6,7 @@ import { reportAppStatus } from "../../app/runtime-state";
 
 type MaintenanceAction = "load" | "backup" | "open-root" | "open-item" | "restore" | "delete" | "reset" | null;
 
-export function DataMaintenanceSettings() {
+export function DataMaintenanceSettings({ initialized = true }: { initialized?: boolean }) {
   const { confirm, confirmDialog } = useConfirmDialog();
   useEffect(() => window.yardimciDesktop?.onDataMaintenanceConfirmation?.(
     (request) => confirm({ ...request, tone: "danger" })
@@ -18,8 +18,9 @@ export function DataMaintenanceSettings() {
   const busy = action !== null;
 
   useEffect(() => {
-    void loadBackups();
-  }, []);
+    if (initialized) void loadBackups();
+    else setAction(null);
+  }, [initialized]);
 
   async function loadBackups() {
     const bridge = window.yardimciDesktop;
@@ -185,11 +186,11 @@ export function DataMaintenanceSettings() {
       </div>
       <div className="settings-panel-body">
       <div className="form-actions backup-manager-toolbar">
-        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void createBackup()} disabled={busy}>
+        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void createBackup()} disabled={busy || !initialized}>
           <Save size={16} aria-hidden="true" />
           {action === "backup" ? "Yedekleniyor" : "Yedek Al"}
         </button>
-        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy}>
+        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy || !initialized}>
           <FolderOpen size={16} aria-hidden="true" />
           {action === "open-root" ? "Açılıyor" : "Yedek Klasörünü Aç"}
         </button>

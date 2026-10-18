@@ -19,7 +19,8 @@ try {
   browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ locale: "tr-TR" });
   const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', error => { errors.push(error.message); console.error(error); });
+  page.on('console', message => { if (message.type() === 'error') console.error(message.text()); });
   // Stable local tiles: the visual test does not depend on OSM/network availability.
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edece6"/><path d="M0 40L256 200M40 0L180 256" stroke="#fff" stroke-width="10"/></svg>' }));
   await page.addInitScript(({ setup, dashboard, report, allCapabilities }) => {
@@ -39,6 +40,8 @@ try {
       getFinanceData: async () => ({ generatedAt: '', currency: 'TRY', todayIncomeMinor: 0, todayExpenseMinor: 0, todayNetMinor: 0, outstandingPensionMinor: 0, recentEntries: [], pensionBalances: [] }),
       openTableOrder: async tableId => ({ ok: true, message: 'Adisyon açıldı.', order: { id: `stage1-${tableId}`, tableId, tableName: dashboard.tables.find(table => table.id === tableId).name, status: 'open', openedAt: '2026-09-14T09:00:00Z', closedAt: '', subtotal: 0, discountTotal: 0, total: 0, note: '', itemCount: 0, items: [], createdAt: '2026-09-14T09:00:00Z', updatedAt: '2026-09-14T09:00:00Z' } }),
       getSetupData: async () => setup,
+      getInstagramConfiguration: async () => ({ providerId: 'instagram_api', enabled: false, accountId: '', username: '',
+        expiresAt: '', apiVersion: 'v25.0', hasSecret: false, configured: false }),
       getDashboardData: async () => dashboard,
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
@@ -224,22 +227,20 @@ try {
   }
   for (const [scheme, density] of [['light','compact'],['dark','compact'],['light','comfortable']]) {
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
-    await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'Uygulama', exact: true }).click();
-    await expect(page.getByRole('tab', { name: 'Uygulama', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await page.getByRole('button', { name: 'Görünüm', exact: true }).click();
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
     if (density === 'comfortable') await page.getByRole('radio', { name: 'Rahat', exact: true }).click();
-    // Appearance is staged: apply through the category save before asserting.
-    await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
+    await page.keyboard.press('Escape');
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', scheme);
     await expect(page.locator('html')).toHaveAttribute('data-density', density);
     expect(await page.locator('html').evaluate(el => getComputedStyle(el).colorScheme)).toBe(scheme);
     await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
     await page.screenshot({ path: `${output}/shell-${scheme}-${density}.png` });
   }
-  // Leaving Settings from the real sidebar must use the same dirty-category guard.
+  // Leaving Settings from the real sidebar must protect the business draft.
   await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
-  await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
+  const persistedBusinessName = await page.getByLabel('Firma adı', { exact: true }).inputValue();
   await page.getByLabel('Firma adı', { exact: true }).fill('Sidebar guard taslağı');
   await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   const leaveDialog = page.getByRole('dialog', { name: /İşletme değişiklikleri bekliyor/ });
@@ -250,7 +251,9 @@ try {
   await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   await leaveDialog.getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Bugün ne var?', level: 1, exact: true })).toBeVisible();
-  await expect(page.locator('.global-message-bar')).toContainText('değişiklikleri geri alındı');
+  await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
+  await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue(persistedBusinessName);
+  await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   // Isolate sync-silent: central success auto-clears, wait for idle before asserting silence.
   await expect(page.locator('.global-message-bar')).toHaveCount(0, { timeout: 10000 });
 

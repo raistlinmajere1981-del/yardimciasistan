@@ -17,8 +17,8 @@ export function WhatsAppBusinessSettingsSection({ draft, busy, onChange }: {
       catch { return { ok: false, providerId: "whatsapp_cloud", message: "Bağlantı testi tamamlanamadı.", testedAt: new Date().toISOString() }; }
     });
   }
-  return <ServiceSettingsCard id="settings-whatsapp-business" title="WhatsApp Business" enabled={draft.enabled}
-    status={!draft.enabled ? "Kapalı" : complete ? "Etkin · Yapılandırılmış" : "Etkin · Yapılandırılmamış"} disabled={busy || testing} onEnabledChange={(enabled) => change({ enabled })}>
+  return <ServiceSettingsCard id="settings-whatsapp-business" title="WhatsApp Business" readiness={testing ? "Kontrol ediliyor…" : connection.result ? connection.result.ok ? "Hazır" : "Hata" : "Test edilmedi"} testMessage={message} enabled={draft.enabled}
+    status={complete ? "Yapılandırılmış" : "Hesap bilgileri eksik"} disabled={busy || testing} onEnabledChange={(enabled) => change({ enabled })}>
     <div className="form-grid">
       <label className="form-field">WABA ID<input aria-label="WABA ID" value={draft.wabaId} maxLength={40} inputMode="numeric" onChange={(event) => change({ wabaId: event.target.value })} /></label>
       <label className="form-field">Phone Number ID<input aria-label="Phone Number ID" value={draft.phoneNumberId} maxLength={40} inputMode="numeric" onChange={(event) => change({ phoneNumberId: event.target.value })} /></label>
@@ -28,6 +28,6 @@ export function WhatsAppBusinessSettingsSection({ draft, busy, onChange }: {
     {draft.hasSecret && <label className="form-check"><input type="checkbox" checked={Boolean(draft.clearAccessToken)} onChange={(event) => change({ clearAccessToken: event.target.checked, accessToken: "" })} />Kayıtlı erişim anahtarını kaldır</label>}
     <small>Bağlantı testi ayarları kaydetmez.</small>
     <ActionButton variant="secondary" size="sm" disabled={busy || testing || !complete} busy={testing} onClick={() => void test()}>Bağlantıyı test et</ActionButton>
-    {message && <p role="status">{message}</p>}
+
   </ServiceSettingsCard>;
 }

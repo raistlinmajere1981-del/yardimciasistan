@@ -5,7 +5,7 @@ import type { SetupFormState } from "../../app/setup-model";
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { ActionButton } from "../ui/ActionButton";
 export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["sms"];busy:boolean;onChange:(draft:SetupFormState["sms"])=>void}) {
-  const connection=useSettingsConnectionTest<MarketingProviderConnectionResult>(draft);
+  const connection=useSettingsConnectionTest<MarketingProviderConnectionResult & { connectionVerified?: boolean }>(draft);
   const {testing,result}=connection;
   const [senders,setSenders]=useState<string[]>([]);
   const change=(patch:Partial<typeof draft>)=>{connection.clear();onChange({...draft,...patch});};
@@ -14,12 +14,12 @@ export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["
     const bridge=window.yardimciDesktop;if(!bridge)return;
     await connection.run(async () => {
       try { if(refresh){const value=await bridge.listSmsSenderIds(draft);if(value.ok)setSenders(value.value);return {ok:value.ok,message:value.ok?"Başlık listesi yenilendi.":value.message,testedAt:new Date().toISOString()};}
-        const value=await bridge.testSmsConnection(draft);if(value.senderIds)setSenders(value.senderIds);return value;
+        const value=await bridge.testSmsConnection(draft);if(value.senderIds)setSenders(value.senderIds);return {...value,connectionVerified:value.ok};
       } catch{return {ok:false,message:"Bağlantı testi tamamlanamadı.",testedAt:new Date().toISOString()};}
     });
   }
-  return <ServiceSettingsCard id="settings-marketing-sms" title="SMS / İleti Merkezi" enabled={draft.enabled} disabled={busy||testing}
-    status={!draft.enabled?"Kapalı":complete?"Etkin · Yapılandırılmış":"Etkin · Yapılandırılmamış"} onEnabledChange={enabled=>change({enabled})}>
+  return <ServiceSettingsCard id="settings-marketing-sms" title="SMS / İleti Merkezi" readiness={testing ? "Kontrol ediliyor…" : result && !result.ok ? "Hata" : result?.connectionVerified ? "Hazır" : "Test edilmedi"} testMessage={result?.message ?? ""} enabled={draft.enabled} disabled={busy||testing}
+    status={complete?"Yapılandırılmış":"Hesap bilgileri eksik"} onEnabledChange={enabled=>change({enabled})}>
     <div className="form-grid">
       <label className="form-field">API Key<input aria-label="SMS API Key" type="password" autoComplete="new-password" maxLength={4096} value={draft.apiKey??""} placeholder={draft.hasApiKey?"Kayıtlı anahtarı değiştirmek için girin":"API Key"} onChange={e=>change({apiKey:e.target.value,clearApiKey:false})}/></label>
       <label className="form-field">API Hash<input aria-label="SMS API Hash" type="password" autoComplete="new-password" maxLength={4096} value={draft.apiHash??""} placeholder={draft.hasApiHash?"Kayıtlı hash'i değiştirmek için girin":"API Hash"} onChange={e=>change({apiHash:e.target.value,clearApiHash:false})}/></label>
@@ -31,7 +31,7 @@ export function SmsSettingsSection({draft,busy,onChange}:{draft:SetupFormState["
     <p>Test bakiye ve onaylı başlığı sorgular. Yerel SMS izni ve sağlayıcı İYS kontrolü gönderimde ayrı ayrı uygulanır.</p>
     <div className="action-row"><ActionButton variant="secondary" disabled={busy||testing||!complete} busy={testing} onClick={()=>void test()}>Bağlantıyı test et</ActionButton>
       <ActionButton variant="secondary" disabled={busy||testing||!complete} onClick={()=>void test(true)}>Başlık listesini yenile</ActionButton></div>
-    {result && <p role="status">{result.ok?"Başarılı":"Başarısız"} · {result.message} · {new Date(result.testedAt).toLocaleString("tr-TR")}</p>}
+
   </ServiceSettingsCard>;
 }
 /** Instagram credentials live in the OAuth owner; activation lives in staged Settings. */
@@ -43,12 +43,13 @@ export function InstagramSettingsSection({draft,busy,onChange}:{
   const [working,setWorking]=useState(false);
   const [confirmDisconnect,setConfirmDisconnect]=useState(false);
   const [message,setMessage]=useState("");
+  const [messageError,setMessageError]=useState(false);
   const [testResult,setTestResult]=useState<MarketingProviderConnectionResult|null>(null);
   const polling=useRef(false);
   useEffect(()=>{
     let active=true;
     void window.yardimciDesktop?.getInstagramConfiguration().then(value=>{if(active)setAccount(value);})
-      .catch(()=>{if(active)setMessage("Instagram bağlantı durumu okunamadı.");});
+      .catch(()=>{if(active){setMessage("Instagram bağlantı durumu okunamadı.");setMessageError(true);}});
     return()=>{active=false;};
   },[]);
   useEffect(()=>{
@@ -65,19 +66,19 @@ export function InstagramSettingsSection({draft,busy,onChange}:{
           setAccount(await window.yardimciDesktop!.getInstagramConfiguration());
           setMessage("");
           setTestResult(null);
-        } else setMessage(result.message);
-      }).catch(()=>{if(!stopped){setWaiting(false);setMessage("Bağlantı kontrolü tamamlanamadı. Yeniden bağlanmayı deneyin.");}})
+        } else {setMessage(result.message);setMessageError(true);}
+      }).catch(()=>{if(!stopped){setWaiting(false);setMessage("Bağlantı kontrolü tamamlanamadı. Yeniden bağlanmayı deneyin.");setMessageError(true);}})
         .finally(()=>{polling.current=false;});
     },2500);
     return()=>{stopped=true;window.clearInterval(timer);};
   },[waiting]);
   async function begin(){
     if(busy||working||waiting)return;
-    setWorking(true);setMessage("");setTestResult(null);setConfirmDisconnect(false);
+    setWorking(true);setMessage("");setMessageError(false);setTestResult(null);setConfirmDisconnect(false);
     try {
       const result=await window.yardimciDesktop!.beginInstagramOAuth();
-      setMessage(result.message);setWaiting(result.ok);
-    } catch {setMessage("Instagram giriş işlemi başlatılamadı.");}
+      setMessage(result.message);setMessageError(!result.ok);setWaiting(result.ok);
+    } catch {setMessage("Instagram giriş işlemi başlatılamadı.");setMessageError(true);}
     finally {setWorking(false);}
   }
   async function disconnect(){
@@ -87,22 +88,24 @@ export function InstagramSettingsSection({draft,busy,onChange}:{
       const next=await window.yardimciDesktop!.disconnectInstagramOAuth();
       setAccount(next);
       onChange({...draft,enabled:false});
-      setMessage("Instagram bağlantısı kesildi.");setTestResult(null);
-    } catch {setMessage("Instagram bağlantısı kesilemedi.");}
+      setMessage("Instagram bağlantısı kesildi.");setMessageError(false);setTestResult(null);
+    } catch {setMessage("Instagram bağlantısı kesilemedi.");setMessageError(true);}
     finally {setWorking(false);setConfirmDisconnect(false);}
   }
   async function test(){
-    setWorking(true);setTestResult(null);
+    setWorking(true);setTestResult(null);setMessage("");setMessageError(false);
     try {setTestResult(await window.yardimciDesktop!.testInstagramConnection());}
-    catch {setMessage("Instagram bağlantısı test edilemedi.");}
+    catch {setMessage("Instagram bağlantısı test edilemedi.");setMessageError(true);}
     finally {setWorking(false);}
   }
   const linked=Boolean(account.hasSecret && account.accountId && account.username);
   const legacy=Boolean(account.hasSecret && account.accountId && !account.username);
   return <ServiceSettingsCard id="settings-marketing-instagram" title="Instagram"
+    readiness={working || waiting ? "Kontrol ediliyor…" : testResult ? testResult.ok ? "Hazır" : "Hata" : "Test edilmedi"} testMessage={testResult?.message ?? message}
+    messageState={testResult ? testResult.ok ? "success" : "error" : messageError ? "error" : waiting ? "loading" : "success"}
     enabled={draft.enabled} disabled={busy||working||waiting}
     onEnabledChange={enabled=>{setMessage("");setTestResult(null);setConfirmDisconnect(false);onChange({...draft,enabled});}}
-    status={!draft.enabled?"Kapalı":linked?`Etkin · @${account.username}`:"Etkin · Bağlantı gerekli"}>
+    status={linked?"":"Hesap bağlantısı gerekli"}>
     {linked && <p role="status"><strong>@{account.username}</strong> · Paylaşım izni etkin
       {account.expiresAt?` · Erişim: ${new Date(account.expiresAt).toLocaleDateString("tr-TR")}`:""}</p>}
     {legacy && <p role="status">Önceki manuel bağlantı bulundu. Instagram ile yeniden bağlayın.</p>}
@@ -121,6 +124,6 @@ export function InstagramSettingsSection({draft,busy,onChange}:{
     </div>
     {confirmDisconnect && <p role="alert">Bağlantıyı keserseniz Instagram'a planlanmış yayınlar yeniden bağlanana kadar gönderilemez.</p>}
     {message && <p role="status">{message}</p>}
-    {testResult && <p role="status">{testResult.ok?"Başarılı":"Başarısız"} · {testResult.message}</p>}
+
   </ServiceSettingsCard>;
 }

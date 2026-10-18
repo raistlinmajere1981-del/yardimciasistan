@@ -58,10 +58,13 @@ export function validateSetupServiceActivation(db: DesktopDatabase, input: SaveI
       Number.isFinite(Date.parse(String(instagramStored?.secret_two_encrypted ?? ""))) &&
       Date.parse(String(instagramStored?.secret_two_encrypted ?? "")) > Date.now()));
   if (error) return error;
-  // Initial setup establishes the required transport, not an optional service activation.
-  // Normal saves of enabled automatic sync require evidence for the effective transport.
-  if (!current.setupRequired && (input.autoSyncEnabled ?? current.autoSyncEnabled)) {
-    const web = { baseUrl: input.webModuleUrl.trim().replace(/\/+$/, ""), syncSecret: input.syncSecret.trim() };
+  // Initial setup and activation require matching main-process test evidence.
+  // Revalidate activation or effective transport changes, never unrelated local edits.
+  const web = { baseUrl: input.webModuleUrl.trim().replace(/\/+$/, ""), syncSecret: input.syncSecret.trim() };
+  const transportChanged = web.baseUrl !== current.webModuleUrl.trim().replace(/\/+$/, "")
+    || web.syncSecret !== current.syncSecret.trim();
+  if ((input.autoSyncEnabled ?? current.autoSyncEnabled)
+    && (current.setupRequired || !current.autoSyncEnabled || transportChanged)) {
     error = check("web", "Web Modülü", true, web, Boolean(web.baseUrl && web.syncSecret.length >= 12));
   }
   return error;

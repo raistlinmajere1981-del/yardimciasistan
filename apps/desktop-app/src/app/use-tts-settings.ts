@@ -3,7 +3,7 @@ import { readTtsPreferences, saveTtsPreferences, TTS_PREFERENCES_CHANGED } from 
 import type { TtsPreferences } from "./tts/tts-adapter";
 import type { SettingsOperationResult } from "./settings-save";
 
-/** Device-local resource draft, committed by the existing Services category footer. */
+/** Device-local draft committed only by the TTS service owner. */
 export function useTtsSettings() {
   const [preferences, setPreferences] = useState(readTtsPreferences);
   const draft = useRef(preferences);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   type KbsConnectionTestResult,
   type KbsProvider,
@@ -8,7 +8,7 @@ import {
 import type { SettingsOperationResult } from "../../app/settings-save";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
-import { ServiceSettingsCard } from "./ServiceSettingsCard";
+import { ServiceSettingsContext, ServiceSettingsCard } from "./ServiceSettingsCard";
 
 const EGM_KBS_PORTAL_URL = "https://kbs.egm.gov.tr";
 
@@ -56,6 +56,7 @@ export function useKbsSettings(enabled: boolean, persistedProfileId = "") {
   const [testing, setTesting] = useState(false);
   const [feedback, setFeedback] = useState<{ error: boolean; message: string }>({ error: false, message: "" });
   const saveInFlight = useRef(false);
+  const [readiness, setReadiness] = useState<"Test edilmedi" | "Kontrol ediliyor…" | "Hazır" | "Hata">("Test edilmedi");
 
   useEffect(() => {
     if (!enabled) {
@@ -88,6 +89,7 @@ export function useKbsSettings(enabled: boolean, persistedProfileId = "") {
     || draft.clearPassword;
 
   const update = <K extends keyof KbsDraft>(key: K, value: KbsDraft[K]) => {
+    setReadiness("Test edilmedi");
     setDraft((current) => ({ ...current, [key]: value }));
     setFeedback({ error: false, message: "" });
   };
@@ -120,7 +122,7 @@ export function useKbsSettings(enabled: boolean, persistedProfileId = "") {
       return { ok: true, changed: true, message: result.message };
     } catch {
       const message = "Kimlik Bildirim Sistemi ayarları kaydedilemedi.";
-      setFeedback({ error: false, message: "" });
+      setFeedback({ error: true, message });
       return { ok: false, message };
     } finally {
       saveInFlight.current = false;
@@ -130,14 +132,17 @@ export function useKbsSettings(enabled: boolean, persistedProfileId = "") {
 
   const testConnection = useCallback(async (): Promise<KbsConnectionTestResult> => {
     setTesting(true);
+    setReadiness("Kontrol ediliyor…");
     setFeedback({ error: false, message: "" });
     try {
       const result = await window.yardimciDesktop!.testKbsConnection(buildInput());
       setFeedback({ error: !result.ok, message: result.message });
+      setReadiness(!result.ok ? "Hata" : (!("credentialsVerified" in result) || !result.credentialsVerified) ? "Test edilmedi" : "Hazır");
       return result;
     } catch {
       const result = { ok: false as const, message: "KBS bağlantısı denenemedi." };
       setFeedback({ error: true, message: result.message });
+      setReadiness(!result.ok ? "Hata" : (!("credentialsVerified" in result) || !result.credentialsVerified) ? "Test edilmedi" : "Hazır");
       return result;
     } finally {
       setTesting(false);
@@ -156,11 +161,13 @@ export function useKbsSettings(enabled: boolean, persistedProfileId = "") {
 
   const discard = () => {
     if (saving) return;
+    setReadiness("Test edilmedi");
     setDraft(toDraft(settings));
     setFeedback({ error: false, message: "" });
   };
 
   return {
+    readiness,
     settings,
     draft,
     loading,
@@ -285,6 +292,9 @@ export function KbsSettingsSection({
     };
   }, [inspectEgmSession, prepareEgmLogin, webLoginOpen, webTestEpoch]);
 
+  const host = useContext(ServiceSettingsContext);
+  useEffect(() => { if (host && host.active !== "settings-kbs") setWebLoginOpen(false); }, [host]);
+
   async function runTest() {
     const result = await testConnection();
     if (result.ok && result.requiresWebLogin) {
@@ -299,9 +309,8 @@ export function KbsSettingsSection({
   return (
     <ServiceSettingsCard id="settings-kbs" title="Kimlik Bildirim Sistemi (KBS)" enabled={draft.enabled}
       disabled={loading || saving || testing || disabled} toggleAriaLabel="Kimlik Bildirim Sistemi servisi"
-      status={loading ? "Yükleniyor…" : draft.enabled ? (draft.provider === "egm" ? "Etkin · Emniyet" : "Etkin · Jandarma") : "Kapalı"}
       onEnabledChange={enabled => { update("enabled", enabled); if (!enabled) setWebLoginOpen(false); }}
-      feedback={feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}>
+      readiness={controller.readiness} testMessage={feedback.message} messageState={feedback.error ? "error" : "success"}>
           <p className="settings-service-empty">
             Konaklayan misafirlerin giriş, çıkış ve oda değişikliği bildirimlerini resmi KBS altyapısına iletmek için kullanılır.
           </p>

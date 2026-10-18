@@ -31,6 +31,7 @@ export interface BusinessAiContext {
   latitude: number | null;
   longitude: number | null;
   description: string;
+  aboutText: string;
   directionsNote: string;
   policyNote: string;
   paymentNote: string;
@@ -83,6 +84,7 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
     latitude: source.publicProfile.latitude,
     longitude: source.publicProfile.longitude,
     description: cleanText(source.publicProfile.description, 1600),
+    aboutText: String(source.publicProfile.aboutText ?? "").trim().slice(0, 8000),
     directionsNote: cleanText(source.publicProfile.directionsNote, 1200),
     policyNote: cleanText(source.publicProfile.policyNote, 1200),
     paymentNote: cleanText(source.publicProfile.paymentNote, 800),

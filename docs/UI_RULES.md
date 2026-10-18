@@ -51,15 +51,36 @@ ikincil, non-canonical bir yüzey gerekirse düşünülebilir.
 
 ## Settings
 
-Ayarlar dört sabit kategori kullanır:
+Ayarlar tek sayfadır; kategori sekmeleri yoktur. İşletme Yapısı ve Özellikler,
+sektör/yetenekler ve genişliğe göre 3–4 kolonlu kompakt servis grid’ini içerir.
+Dar ekranlarda kolon sayısı azalır. Her hücre yalnız ad, açıklamalı renkli etkinlik
+göstergesi ve ayar ikonunu taşır; test durumu yalnız detayda gösterilir. Kurulum gerekliyken
+açıktır; normal her ziyarette kapalı başlar. Kurulum tamamlanınca taslaklar temiz
+olduğunda kapanır. Her servis ortak, klavye erişimli detay penceresinde kendi
+Kaydet/İptal işlemlerini kullanır. Etkinleştirme tercihi ile gerçek test sonucu ayrı
+gösterilir; doğrulanmamış yapılandırma hazır sayılmaz. Desteklenmeyen test açıkça
+belirtilir. Kirli detayda X, Escape ve dış tıklama ortak kaydedilmemiş değişiklik
+kararını mevcut modal sınırı içinde gösterir: Burada kal / Değişiklikleri geri al ve
+kapat / Kaydet ve kapat. Alttaki form inert olur; ikinci native dialog açılmaz.
+Başarısız kayıt taslağı ve servis penceresini açık tutar. İptal yalnız o servisi geri alır.
 
-- İşletme
-- İşletme Düzeni
-- Servisler
-- Uygulama
+Güncellemeler global sidebar altındaki durum göstergesinden açılır; tercihleri kendi
+Kaydet/Geri Al eylemlerini kullanır. Güvenlik ve Veriler, arama satırının sağında
+açılan non-modal, kaydırılabilir işlem yüzeyleridir. Mevcut global onay diyalogları
+işlem sırasında tek modal sınır olarak korunur; gizli yedek yöneticisi mount edilmez.
 
-Yalnız aktif kategori ana gövdede render edilir. Staged draft/save category-scoped'tur.
-Appearance immediate preference'tır. Backup, update, password ve cihaz revoke gibi
+İşletme Bilgileri; iletişim, konum, müşteriye açık özellikler/diller ve sosyal bağlantıları
+aynı dış panelde, mevcut kayıt sahipleriyle sunar. İşletme Yapısı ve Özellikler sektör
+ve staged capability seçimini sahiplenir. Oda/Masa Yönetimi yalnız kalıcı kurulum ve
+runtime capability sonrasında İşletme Bilgileri içindeki düğmelerden açılır; tek modal
+sınırında kendi BusinessLayout Kaydet/Geri Al ve ayrılma korumasını kullanır.
+İlk kurulumda firma adı isteğe bağlıdır. Otomatik eşitleme açıksa aynı web bağlantısı
+ana süreçte test edilmiş olmalıdır; kapalıysa web anahtarı ve testi gerekmez.
+
+Alt Kaydet yalnız işletme/sektör/yetenekler ve public profile içindir; servisleri
+kaydetmez. Servis kaydı yalnız kendi alanlarını güncel kalıcı snapshot'a birleştirir,
+diğer sahiplerin taslaklarını korur. Arama aynı servis detayını açar; kategori
+geçişi yoktur. Appearance immediate preference'tır. Backup, update, password ve cihaz revoke gibi
 işlemler staged field gibi davranmaz; açık action/resource lifecycle'ı kullanır.
 
 Yeni staged Settings katkıları mevcut typed contribution seam'i ve field ownership

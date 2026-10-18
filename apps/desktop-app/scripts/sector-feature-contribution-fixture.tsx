@@ -22,7 +22,7 @@ const fixtureWindow = window as unknown as {
     folioEnabled: boolean;
     menuEnabled: boolean;
   };
-  fixtureWebModuleUrl: () => string;
+  fixtureAiBaseUrl: () => string;
 };
 
 const testNavigationContribution = {
@@ -48,11 +48,11 @@ const testSettingsContribution: SettingsSectionContribution<"services"> = {
   },
   render: ({ draft, onChange }) => (
     <label className="form-field form-field--short">
-      Test web adresi
+      Test AI adresi
       <input
-        aria-label="Test web adresi"
-        value={draft.webModuleUrl}
-        onChange={(event) => onChange({ webModuleUrl: event.target.value })}
+        aria-label="Test AI adresi"
+        value={draft.aiBaseUrl}
+        onChange={(event) => onChange({ aiBaseUrl: event.target.value })}
       />
     </label>
   )
@@ -60,6 +60,8 @@ const testSettingsContribution: SettingsSectionContribution<"services"> = {
 
 // @ts-expect-error Services contributions cannot write Business-owned fields.
 const invalidOperationsPatch: Parameters<Parameters<typeof testSettingsContribution.render>[0]["onChange"]>[0] = { businessName: "cross-category-write" };
+// @ts-expect-error Web transport has an independent persistence owner.
+const invalidWebTransportPatch: Parameters<Parameters<typeof testSettingsContribution.render>[0]["onChange"]>[0] = { webModuleUrl: "https://other.example.test" };
 // @ts-expect-error Capability groups are deliberately non-empty.
 const invalidEmptyCondition: CapabilityCondition = { allOf: [] };
 // @ts-expect-error anyOf only accepts capability leaves or one allOf group.
@@ -73,7 +75,7 @@ export const testFeatureComposition = {
 
 function ContributionFixture() {
   const navigation = useWorkspaceNavigation();
-  const [form, setForm] = useState(() => ({ ...toSetupForm(defaultSetupData), webModuleUrl: "https://fixture.example.test" }));
+  const [form, setForm] = useState(() => ({ ...toSetupForm(defaultSetupData), aiBaseUrl: "https://fixture.example.test" }));
   const [data, setData] = useState(fixtureWindow.fixtureDashboard);
   const runtimeSnapshot: BusinessCapabilitySnapshot = {
     businessId: "stage-9-fixture",
@@ -82,7 +84,7 @@ function ContributionFixture() {
     enabledCapabilities: [C.ACCOMMODATION_ROOMS]
   };
   const items = buildNavigationFromContributions(runtimeSnapshot, [testFeatureComposition.navigation]);
-  fixtureWindow.fixtureWebModuleUrl = () => form.webModuleUrl;
+  fixtureWindow.fixtureAiBaseUrl = () => form.aiBaseUrl;
 
   return <AppShell
     contentScroll="workspace"
@@ -123,7 +125,7 @@ function ContributionFixture() {
       >
         Test oda çalışma alanını aç
       </button>
-      <output aria-label="Test web adresi sonucu">{form.webModuleUrl}</output>
+      <output aria-label="Test AI adresi sonucu">{form.aiBaseUrl}</output>
     </section>
   </AppShell>;
 }
@@ -138,6 +140,7 @@ function Fixture() {
 }
 
 void invalidOperationsPatch;
+void invalidWebTransportPatch;
 void invalidEmptyCondition;
 void invalidRecursiveCondition;
 

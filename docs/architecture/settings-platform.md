@@ -1,167 +1,124 @@
-# Settings Platform v2 — Stage 7
+# Settings Platform v3
 
-Status: implemented; external verification pending. The pre-change audit is archived in Git history and
-records actual source-of-truth, draft, validation, gates, APIs and feedback owners.
-Constitution and D-007/D-013/D-014/D-016 remain authoritative. Stage 6 Page / Entity
-Workspace / Operation contracts and static Room/Table composition are unchanged.
+The application constitution and domain decision register remain authoritative.
+Settings reuses the existing Setup, public-profile, service and BusinessLayout owners.
+There are no category tabs, alternate editors or schema migrations.
 
-## Categories and static definitions
+## Page composition and setup
 
-| Category | Canonical sections | Persistence |
-| --- | --- | --- |
-| İşletme | Identity/contact, sector + optional capabilities; public business profile | Setup staged; separate profile resource |
-| İşletme Düzeni | Room collection/profile/default nightly prices, table categories | Transactional BusinessLayout staged resource |
-| Servisler | WhatsApp/birthdays, Android/local network, product data, web sync, AI profiles | Setup staged; connection/device actions remain commands |
-| Uygulama | Appearance, update preferences, password/security, updates and backups | Staged appearance + update preferences; explicit commands |
+The search and Web Connection bar precede one scrolling Settings page. Business
+Structure and Features contains the sector, capability choices and compact service
+grid cells. It opens during required setup and starts collapsed on each normal visit.
+Successful setup collapses it once drafts are clean. Users can expand it again.
+Business Information remains on the same page, with contact fields, room/table
+management, map, public details, languages and social links. Its outer panel body
+owns the shared padding; subsections do not add another panel inset.
 
-`app/settings-registry.ts` contains static TypeScript category and section definitions:
-id (also the focus target), category, title, keywords, persistence kind and a narrow
-visibility predicate. It contains no form schema or component generator. Search and
-category staged-action availability consume the same metadata. Components retain
-normal typed props and field handlers. A new section contributes metadata plus an
-explicit component in the category composition, not a runtime plugin.
+Company name is optional. Sector selection and the business Save complete setup.
+Automatic sync requires main-process verification of the exact effective web URL
+and secret during setup, activation or transport changes. With sync disabled,
+offline setup requires neither a web test nor a web secret. Ordinary local saves
+retain the existing transport validation policy.
 
-Persistence kinds are `staged`, `action` and `resource`. There is intentionally no
-`immediate` settings persistence kind anymore. Editable values either join their owning
-category draft or an explicit resource draft; commands such as tests, installs, password
-operations and maintenance remain actions. Appearance/update preferences are Application
-resources even though appearance still persists through the existing device-local UI
-preference store.
+Persisted runtime capabilities gate resource reads, service availability and device
+actions. Sector names and unsaved capability selections never authorize operations.
+The existing profile transition transaction preserves configuration/credentials and
+resets feature activation according to the canonical owner policy. A saved sector
+change uses the existing safe restart operation.
 
-## Setup draft ownership and save
+## Draft and save ownership
 
-`useSetupController` holds app canonical DesktopSetupData and the existing
-saveInitialSetup bridge operation. `SettingsWorkspace` owns active category/search and
-`useSettingsDrafts`; no draft or save-status state was added to DesktopAppView.
-The obsolete app-wide header Save/ref/status chain was removed.
+`useSetupController` owns canonical DesktopSetupData and the existing
+`saveInitialSetup` bridge. `useSettingsDrafts` reuses `toSetupForm` and
+`createSetupInput`; it does not introduce a second Setup model or persistence path.
 
-`settings-draft-model.ts` assigns every SetupFormState field to exactly one of the
-three staged categories. This reuses `toSetupForm` and one `createSetupInput` serializer,
-not a second setup model. Table row presentation keys are excluded from dirty equality.
-A persisted zero room count stays zero; the existing two-room suggestion applies only
-to an incomplete first setup. First-run generated sync secret remains stable across
-bootstrap refreshes.
+- The bottom Save/Discard owns identity, contact, sector/capabilities and the separate
+  public-profile resource. It never saves services. During initial setup it also
+  includes the pending web configuration.
+- `settings-service-fields.ts` defines the non-overlapping Setup fields for each
+  service. Each service Save reads the latest persisted Setup, merges only those
+  fields, validates and delegates to the existing bridge. Only that owner's draft
+  and baseline advance. Failed saves retain their pending fields.
+- External snapshots refresh clean owners independently. A dirty service cannot
+  block refresh of another clean service; dirty owners retain their fields until
+  explicit Save or Cancel. Cancel restores only its owner from canonical state.
+- Google Reviews, KBS, TTS, dictation and Android permission groups retain dedicated
+  persistence owners. Android activation and the transactional permission-group
+  batch remain coordinated by the Android service overlay.
+- Web Connection has its own draft, verification and Save after setup. It merges
+  only transport fields and cannot commit pending business or service edits.
+- Appearance applies immediately through the existing device-local preference
+  owner. Sidebar updates retain their own preference Save/Discard and commands.
 
-A Business or Services category save:
+Local persistence can succeed while publication or projection refresh reports a
+warning. Canonical state advances after that local commit; the result must not
+pretend that persistence failed. Setup read/merge remains a full existing bridge
+operation, not a new cross-process atomic patch API.
 
-1. Locks that category's staged controls and Settings transitions.
-2. Reads the latest canonical setup using existing getSetupData.
-3. Merges only the active category's owned fields over that canonical snapshot.
-4. Validates that category; other Setup fields contribute only persisted values.
-5. Calls the existing setup:saveInitial API through the app controller, preserving
-   backend capability/security gates, encrypted keys, normalization and side effects.
-6. On success replaces the Setup draft/baseline with the committed snapshot. Because
-   Settings permits at most one dirty category, no second hidden dirty Setup draft is
-   preserved or rebased. Failure preserves the active draft.
+## Service surfaces and evidence
 
-Operations bypasses setup:saveInitial entirely. getBusinessLayout/saveBusinessLayout
-owns the room collection and table categories and commits both in one database
-transaction.
+Every service uses `ServiceSettingsCard` in a responsive grid with 3–4 columns
+on wide screens and fewer columns as space decreases. Each cell contains only a
+name, an accessible activation indicator and a settings icon. Green means enabled;
+neutral means disabled; actual connection errors may use warning. Configuration
+and test/readiness states appear only in the service detail. One shared FormDialog provides
+internal scrolling, keyboard focus handling and service-specific Save/Cancel.
+Enabling or configuring a service never establishes successful test evidence.
+Only actual provider/adapter checks establish readiness; unsupported tests say so.
+KBS endpoint reachability alone is not authenticated credential verification.
+Save failure is reported separately and does not replace a provider test result.
 
-Birthday validation and table-category validation reuse existing rules. The pure
-browser-safe table-category validator moved to shared; the Electron module re-exports
-it and retains desktop reconciliation. Database-dependent validation (protected tables,
-secret persistence, etc.) remains in the backend. No IPC or schema change.
+Escape, backdrop and close request the shared stay/discard-and-close/save-and-close
+decision when the service is dirty. `ConfirmDialog` uses its existing `withinModal`
+layer inside the same native dialog; the underlying form is inert until the
+decision resolves. Staying restores form focus. Clean services close immediately.
+Explicit Cancel discards only that service; a failed Save dismisses the decision
+and keeps the service overlay and draft, with the error in the top message area.
+An open service or layout overlay blocks page navigation. Pending business changes
+use the shared save/discard/stay leave decision. Provider safety explanations remain
+beside their controls; operation success/error messages use the global top bar.
 
-Clean Setup categories follow canonical refresh. The single active dirty category is
-not overwritten by an external refresh; explicit discard resolves it against the latest
-canonical snapshot. Category/search/page transitions never silently save or discard:
-they open the common save/discard/stay decision. Controls are locked while persistence
-is in flight, so edits made during a save are not retained through a rebase. A backend
-local commit with a web-publication or capability-refresh warning advances canonical
-state and reports that warning without pretending local persistence failed.
+## Resources and commands
 
-Sector selection retains the existing defaultOptional reprojection on an explicit
-sector change. Same-sector refresh never reapplies defaults: Customer Credit and Android
-remain opt-in. Required capabilities have no off switch; only supported optional
-capabilities render in BusinessProfileOptionEditor. Resource/API gates use persisted
-capabilities, so an unsaved sector selection cannot authorize an operation. Unsupported
-room/table/product-data draft fields never enter category payloads. Their pending values
-survive while hidden and reappear if the sector is restored; discard removes them.
-A save reports when unsaved local values remain after excluded fields are preserved.
+Public Profile uses its existing get/save APIs and independent validation. Its
+fields never enter Setup payloads. Room and table management share the transactional
+BusinessLayout collection draft. Details edit that same collection; room/table media
+retains its main-process staging and commit/discard lifecycle. Management and detail
+surfaces share one modal boundary. The folio nightly-price override remains a
+separate financial operation.
 
-First setup uses the same categories: save business identity first, then other category
-drafts. Only the selected category is committed even when completing initial setup.
-There is no save-all shortcut.
+Device install/provision/role/active/revoke, password changes, update checks/install
+and maintenance remain explicit commands. Revoke exits a clean Android overlay
+before opening the global confirmation. Security and Data use non-modal action
+surfaces; hidden backup managers are not mounted.
 
-## Independent resources and actions
+## Search, layout and lifetime
 
-Public Profile, Room Management, Update preferences and Password controllers are domain
-hooks called above the category render boundary. Their forms unmount on category switch;
-their drafts and operation state remain mounted. Resource dirty markers contribute to
-the owning category indicator but never to Setup payload/save validation.
+`settings-registry.ts` owns metadata: IDs, titles, search synonyms, persistence,
+capability predicates and optional canonical service targets. Business/services
+are metadata and field-ownership groups, not routes or tabs. Static typed service
+contributions remain explicit components; there is no runtime plugin or form DSL.
+Search never includes stored customer values or secrets. Matching normalizes
+Turkish casing, including AI/ai. Result titles need not equal search terms.
+AI Test and Phone Setup aliases open the same AI/Android service overlays.
+Phone Setup requires committed Android capability; configuration of an available
+but inactive Android service remains accessible through its Android row.
+Other results focus their same-page target or open the existing room/table or
+security/data surface.
 
-- Public Profile: getBusinessPublicProfile/saveBusinessPublicProfile, own validation,
-  dirty, save/discard, saving lock and local result. No profile fields copied into Setup.
-- Operations layout: getBusinessLayout/saveBusinessLayout owns rooms and table
-  categories as one staged collection. RoomPublicDetailsEditor edits the same local
-  collection draft; it no longer performs a separate database save. Room removal is
-  staged and backend-protected, then archived transactionally on save. Room media uses
-  the same category contract: add/type/delete operations mutate a main-process staging
-  manifest, staged files are isolated from publication, Save commits the manifest and
-  only then schedules web sync, and Discard removes staged files and reloads canonical
-  media. Folio-specific nightly price override remains a separate financial concept.
-- Update URL/auto-check: saveUpdatePreferences remains its backend resource, but its
-  draft participates in the Application category footer. Returning to the persisted
-  value clears dirty state; Varsayılana Dön stages the default instead of persisting
-  immediately.
-- Password change/remove/reset, update check/download/restart/default reset,
-  device role/active/install/revoke and maintenance commands are explicit actions.
-  Android staff permission-group checkboxes are a Services-category draft and are
-  committed together through one transactional batch write. No category Save invokes
-  the explicit device commands. Errors/results belong to their respective sections.
+The page owns vertical scrolling; dialogs own their bodies. Shared layout/spacing
+tokens preserve light/dark and comfortable/compact appearances and avoid horizontal
+overflow at the supported 900px desktop width. Draft lifetime is the mounted Settings
+page. Restart persistence, CRDT/rebase machinery and a second global state library
+are deliberately absent.
 
-Appearance remains persisted and applied by DesktopAppView, but Settings edits a local
-Application-category draft. Scheme (including system), density, scale, accent, font and
-motion do not reach DesktopAppView until the category Save succeeds. Discard restores the
-last committed values. The v2 localStorage contract is unchanged; appearance now contributes
-to the Application dirty marker and leave guard.
+## Verification
 
-## Navigation, search, layout and accessibility
-
-One active role=tabpanel renders. SettingsCategoryTabs is a narrow sibling-tab primitive:
-role=tablist/tab, aria-selected/controls/labelledby, selected tab stop and wrapping
-Left/Right/Home/End activation. It is separate from entity WorkspaceTabs and page view
-selectors. Dirty state is textual, not color-only.
-
-The existing Page Header is followed by a named search field, fixed category navigation,
-fixed category header, one flexible local scroll body and contextual category actions.
-Application uses the same category Save/Discard footer for appearance and update-preference
-drafts; password, update and maintenance commands remain explicit actions. Responsive forms
-use one column at narrow widths;
-category tabs scroll horizontally where necessary. The shell treats Settings as bounded
-workspace content, avoiding document overflow. Legacy anchor primary navigation and its
-CSS were removed; stable IDs remain solely for search/focus.
-
-Search uses Turkish case-normalized metadata matching without dependencies/fuzzy engine
-or customer/secret values. Keyboard-usable result buttons request the same guarded
-category transition as tabs; query/focus state changes only after the transition is
-accepted. App-level page navigation also consults the Settings leave guard before the
-page owner changes. Section errors use role=alert and operation results use role=status.
-Native time fields retain lang=tr-TR. Settings is not a modal; the existing bounded
-room-details dialog and the unsaved-changes decision are each single-layer dialogs.
-
-## Lifetime and deliberate limits
-
-Guarantee: draft lifetime is the mounted Settings page. Room-media staging is also
-process-local; stale staging files from an interrupted process are cleaned before the
-next media session. Category/search switches and
-page navigation cannot destroy a dirty active draft without an explicit save/discard/stay
-decision. Draft persistence across restart, generic rebase/CRDT, a global state library,
-settings DSL/form generator/plugin discovery and backend Setup category-patch/versioning
-APIs remain deliberately absent. A full Setup save read/merge is not a cross-process
-atomic patch; BusinessLayout is separately transactional.
-
-## Verification contract
-
-`npm run smoke:settings-platform` uses installed Vite/Chromium, real Settings components
-and the production setup controller with a deterministic preload fixture. No builds,
-Electron packaging or broad E2E chains. It covers active DOM/ARIA/keyboard, dirty/save/
-discard/failure/double submit, clean/dirty refresh, hidden draft isolation, optional vs
-required capabilities, resource APIs/failure retention, commands, search/focus, appearance
-v2/system behavior, a single room dialog and 1440/1024/900/760/600 scroll geometry.
-
-Existing Settings presentation fixtures were updated to select categories and invoke
-explicit resource/action saves; their business assertions remain. Full renderer/pilot/
-lint/knip/design/architecture/Linux verification is intentionally delegated to the
-separate verification session; see the handoff in the implementation report.
+`scripts/verification-registry.mjs` and `scripts/verify.mjs` remain the verification
+authority. Settings platform/UI smoke uses real React components, the production
+Setup controller and deterministic preload fixtures. Assertions cover independent
+save/cancel, failed-save retention, clean-owner refresh beside dirty owners,
+capability-gated search aliases, real test invocation, setup online/offline policy,
+room/table ownership, keyboard dismissal/focus and responsive panel padding.
+Settings correctness and setup/profile contracts exercise domain persistence and
+verification evidence. TTS/STT and renderer checks cover their existing owners.

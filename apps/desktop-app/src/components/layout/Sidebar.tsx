@@ -1,9 +1,11 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import type { ReactNode } from "react";
 import type { DesktopPage, NavigationItem } from "../../app/navigation";
 import { NexaHabitat } from "./NexaHabitat";
 
 interface SidebarProps {
   items: NavigationItem[];
+  updateSlot?: ReactNode;
   activePage: DesktopPage;
   businessName?: string;
   collapsed?: boolean;
@@ -11,7 +13,7 @@ interface SidebarProps {
   onToggleCollapsed?: () => void;
 }
 
-export function Sidebar({ items, activePage, businessName, collapsed = false, onNavigate, onToggleCollapsed }: SidebarProps) {
+export function Sidebar({ items, activePage, businessName, collapsed = false, onNavigate, onToggleCollapsed, updateSlot }: SidebarProps) {
   const primaryItems = items.filter((item) => item.id !== "settings");
   const settingsItem = items.find((item) => item.id === "settings");
 
@@ -63,6 +65,7 @@ export function Sidebar({ items, activePage, businessName, collapsed = false, on
       <NexaHabitat collapsed={collapsed} />
       {settingsItem && (
         <nav className="sidebar-footer-nav" aria-label="Uygulama ayarları">
+          {updateSlot}
           {renderItem(settingsItem)}
         </nav>
       )}

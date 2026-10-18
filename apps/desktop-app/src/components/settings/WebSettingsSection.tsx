@@ -1,94 +1,120 @@
-import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { useEffect, useState } from "react";
-import { useRequestGeneration } from "../workspace/use-request-generation";
-import { RefreshCw } from "lucide-react";
-import type { SetupFormState } from "../../app/setup-model";
-import type { SetupFieldsProps } from "./setup-fields";
-import type { SyncState } from "../../app/runtime-state";
+import { Eye, EyeOff } from "lucide-react";
+import type { WebConnectionSettings } from "../../app/settings-draft-model";
+import type { SettingsOperationResult } from "../../app/settings-save";
+import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
-export function WebSettingsSection({ form, onFormChange }: SetupFieldsProps) {
-  const beginTest = useRequestGeneration();
-  const [webConnectionTestState, setWebConnectionTestState] = useState<SyncState>("idle");
-  const [webConnectionTestMessage, setWebConnectionTestMessage] = useState("Web bağlantısı henüz denenmedi.");
+
+type TestState = "unchecked" | "testing" | "verified" | "failed";
+
+export function WebSettingsSection({ canonical, onSave, disabled, initialized, onSetupChange }: {
+  canonical: WebConnectionSettings;
+  onSetupChange?: (web: WebConnectionSettings) => void;
+  onSave: (web: WebConnectionSettings) => Promise<SettingsOperationResult>;
+  disabled: boolean;
+  initialized: boolean;
+}) {
+  const [web, setWeb] = useState<WebConnectionSettings>(() => ({
+    webModuleUrl: canonical.webModuleUrl, syncSecret: canonical.syncSecret, autoSyncEnabled: canonical.autoSyncEnabled
+  }));
+  function updateWeb(next: WebConnectionSettings) {
+    setWeb(next);
+    if (!initialized) onSetupChange?.(next);
+  }
+  const [reveal, setReveal] = useState(false);
+  const [state, setState] = useState<TestState>("unchecked");
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
-    beginTest();
-    setWebConnectionTestState("idle");
-    setWebConnectionTestMessage("Web bağlantısı henüz denenmedi.");
-  }, [beginTest, form.webModuleUrl, form.syncSecret]);
+    setWeb({ webModuleUrl: canonical.webModuleUrl, syncSecret: canonical.syncSecret, autoSyncEnabled: canonical.autoSyncEnabled });
+  }, [canonical.webModuleUrl, canonical.syncSecret, canonical.autoSyncEnabled]);
 
-  const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
-    onFormChange({ ...form, [key]: value });
-  };
-
-  const testWebConnection = async () => {
-    const isCurrent = beginTest();
-    const baseUrl = form.webModuleUrl.trim().replace(/\/+$/, "");
-    const syncSecret = form.syncSecret.trim();
-    if (!/^https?:\/\//i.test(baseUrl)) {
-      setWebConnectionTestState("error");
-      setWebConnectionTestMessage("Web eşitleme adresi http:// veya https:// ile başlamalı.");
-      return;
-    }
-    if (syncSecret.length < 12) {
-      setWebConnectionTestState("error");
-      setWebConnectionTestMessage("Web güvenlik anahtarı en az 12 karakter olmalı.");
-      return;
-    }
-
+  async function connect() {
+    const input = {
+      baseUrl: web.webModuleUrl.trim().replace(/\/+$/, ""),
+      syncSecret: web.syncSecret.trim()
+    };
     const bridge = window.yardimciDesktop;
-    if (!bridge?.testWebConnection) {
-      setWebConnectionTestState("error");
-      setWebConnectionTestMessage("Web bağlantı kontrolü hazır değil. Uygulamayı yeniden başlatın.");
+    if (!bridge?.testWebConnection || !bridge?.connectWebPublicationSource) {
+      setState("failed");
+      reportAppStatus("error", "Web bağlantı kontrolü hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
-
-    setWebConnectionTestState("loading");
-    setWebConnectionTestMessage("Web modülüne bağlanılıyor...");
+    setConnecting(true);
+    setState("testing");
+    reportAppStatus("loading", "Web bağlantısı ve yayın kaynağı doğrulanıyor…");
     try {
-      const result = await bridge.testWebConnection({ baseUrl, syncSecret });
-      if (!isCurrent()) return;
-      setWebConnectionTestState(result.ok ? "success" : "error");
-      setWebConnectionTestMessage(result.message);
+      const result = await bridge.testWebConnection(input);
+      if (!result.ok) {
+        setState("failed");
+        reportAppStatus("error", result.message || "Web bağlantısı doğrulanamadı.");
+        return;
+      }
+      const source = await bridge.connectWebPublicationSource(input);
+      if (!source.ok) {
+        setState("failed");
+        reportAppStatus("error", source.message || "Web yayın kaynağı bağlanamadı.");
+        return;
+      }
+      const saved = await onSave(web);
+      if (!saved.ok) {
+        setState("failed");
+        reportAppStatus("error", saved.message || "Web bağlantısı kaydedilemedi.");
+        return;
+      }
+      setState("verified");
+      const warning = saved.message && /başarısız|uygulanamadı|hata|uyarı/i.test(saved.message);
+      reportAppStatus(warning ? "error" : "success", warning ? saved.message! : "Web bağlantısı ve yayın kaynağı hazır.");
     } catch {
-      if (!isCurrent()) return;
-      setWebConnectionTestState("error");
-      setWebConnectionTestMessage("Web bağlantısı kontrol edilemedi. Uygulamayı yeniden başlatıp tekrar deneyin.");
+      setState("failed");
+      reportAppStatus("error", "Web bağlantısı tamamlanamadı. Tekrar deneyin.");
+    } finally {
+      setConnecting(false);
     }
-  };
+  }
+
+  const busy = disabled || connecting;
+  const canConnect = Boolean(web.webModuleUrl.trim() && web.syncSecret.trim());
+  const status = connecting ? "Bağlanıyor" : state === "verified" ? "Bağlantı doğrulandı"
+    : state === "failed" ? "Bağlantı doğrulanamadı" : "Bağlantı henüz kontrol edilmedi";
 
   return (
-        <ServiceSettingsCard id="settings-web" title="Website / Web Modülü" enabled={form.autoSyncEnabled}
-          toggleLabel="Otomatik eşitle" onEnabledChange={enabled => update("autoSyncEnabled", enabled)} showBody
-          status={webConnectionTestState === "success" ? "Bağlantı doğrulandı"
-            : webConnectionTestState === "error" ? "Bağlantı doğrulanmadı"
-              : !form.autoSyncEnabled ? "Otomatik eşitleme kapalı"
-                : form.webModuleUrl.trim() && form.syncSecret.trim().length >= 12 ? "Bağlantı ayarlı" : "Bağlantı ayarları gerekli"}>
-          <div className="form-grid">
-            <label className="form-field form-field--long form-field--span setup-field">
-              Web eşitleme adresi
-              <input value={form.webModuleUrl} onChange={(event) => update("webModuleUrl", event.target.value)} placeholder="https://yardimciasistan.alwaysdata.net/yardimci-asistan" />
-            </label>
-            <label className="form-field form-field--medium">
-              Web güvenlik anahtarı
-              <input
-                value={form.syncSecret}
-                onChange={(event) => update("syncSecret", event.target.value)}
-                placeholder="uzun-gizli-anahtar"
-                type="password"
-                autoComplete="new-password"
-                spellCheck={false}
-              />
-            </label>
-          </div>
-          <div id="settings-web-test" tabIndex={-1} className={`setup-ai-actions is-inline setup-web-actions sync-${webConnectionTestState}`}>
-            <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={() => void testWebConnection()} disabled={webConnectionTestState === "loading"}>
-              <RefreshCw size={16} aria-hidden="true" />
-              {webConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Web Bağlantısını Dene"}
-            </ActionButton>
-            <span className="setup-connection-message" role={webConnectionTestState === "error" ? "alert" : "status"} aria-live="polite">{webConnectionTestMessage}</span>
-          </div>
-        </ServiceSettingsCard>
-
+    <section id="settings-web" tabIndex={-1} className="settings-web-bar" aria-label="Web bağlantısı">
+      <div className="settings-web-heading">
+        <strong>Web bağlantısı</strong>
+        <span className={`settings-web-indicator is-${state}`} role="img" aria-label={status} title={status} />
+        <label className="settings-web-choice">
+          <input type="checkbox" checked={web.autoSyncEnabled}
+            disabled={busy}
+            onChange={event => updateWeb({ ...web, autoSyncEnabled: event.target.checked })} />
+          Otomatik eşitle
+        </label>
+      </div>
+      <div className="settings-web-fields">
+        <label className="form-field settings-web-url">
+          Web eşitleme adresi
+          <input value={web.webModuleUrl} disabled={busy} spellCheck={false}
+            onChange={event => updateWeb({ ...web, webModuleUrl: event.target.value })} />
+        </label>
+        <label className="form-field settings-web-secret">
+          Web güvenlik anahtarı
+          <span className="settings-web-secret-control">
+            <input type={reveal ? "text" : "password"} disabled={busy}
+              autoComplete="new-password" spellCheck={false} value={web.syncSecret}
+              onChange={event => updateWeb({ ...web, syncSecret: event.target.value })} />
+            <button type="button" className="settings-web-secret-toggle"
+              disabled={busy} aria-label={reveal ? "Anahtarı gizle" : "Anahtarı göster"}
+              title={reveal ? "Anahtarı gizle" : "Anahtarı göster"}
+              aria-pressed={reveal} onClick={() => setReveal(value => !value)}>
+              {reveal ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </span>
+        </label>
+        <div className="settings-web-actions">
+          <ActionButton type="button" disabled={busy || !canConnect}
+            onClick={() => void connect()}>{connecting ? "Bağlanıyor…" : "Bağlan"}</ActionButton>
+        </div>
+      </div>
+    </section>
   );
 }

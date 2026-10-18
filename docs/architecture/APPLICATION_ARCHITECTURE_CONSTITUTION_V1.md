@@ -41,7 +41,7 @@ Examples:
 - Pension → Rooms / Reservations / Daily Work
 - Restaurant → Floor / Active Table
 - Market → Sale / Products / Inventory / Purchasing
-- Settings → selected configuration category
+- Settings → business configuration and service overlays
 
 A page must not become the second canonical editor for every entity it displays.
 
@@ -284,7 +284,7 @@ SQLite and existing domain services remain the source of truth. Do not introduce
 
 ### Draft preservation
 
-If a UI mode/tab unmounts, state that users reasonably expect to keep must live above that presentation boundary. This is especially important for Settings category drafts, Market sale cart, TableOrder note edits and entity workspace forms.
+If a UI mode/tab unmounts, state that users reasonably expect to keep must live above that presentation boundary. This is especially important for Settings owner drafts, Market sale cart, TableOrder note edits and entity workspace forms.
 
 ---
 
@@ -340,20 +340,18 @@ The Pension and Restaurant pilots remain the evidence threshold: extract after e
 
 Settings is a platform, not one giant form.
 
-### Stable top-level categories
+### Single page
 
-Prefer a small stable taxonomy. Initial target:
+Settings has no category tabs. İşletme Yapısı ve Özellikler contains sector,
+capabilities and a compact responsive service grid. It is expanded during required setup and
+starts collapsed on each normal visit. Setup completion collapses it once drafts
+are clean. İşletme Bilgileri remains on the same page with contact, social, map
+and room/table management entry points. The page body owns scrolling.
 
-- İşletme
-- İşletme Düzeni
-- Servisler
-- Uygulama
-
-New sectors and integrations should normally contribute sections inside these categories instead of creating a new top-level tab. If a category becomes large, it can have local sub-navigation.
-
-### Only the active category is presented
-
-The active category fills the remaining Settings viewport. Its body owns scrolling. Other categories do not remain in the same document flow.
+Each service grid cell shows only its name, an accessibly labelled activation
+indicator and a settings icon. Test/readiness states belong only in the detail. The shared service form dialog owns internal
+scrolling and its Save/Cancel. Configuration alone is never proof of readiness.
+Only real provider checks establish verified state; unsupported tests say so.
 
 ### Settings registry
 
@@ -378,21 +376,29 @@ Do not pretend backup, update check, device revoke or password reset are ordinar
 
 ### Dirty state
 
-Dirty state is category-scoped and at most one category may remain dirty: the active category. A requested tab/search transition from a dirty category is guarded before focus, query state or the visible category changes. The user chooses to save and continue, discard and continue, or stay. Leaving Settings through application navigation uses the same guard.
-
-A failed save does not complete the transition. While a category save is in flight, that category's staged controls and transition actions are locked. Settings does not preserve a second hidden dirty category or rebase edits made during an in-flight save.
+Business identity/capability/public-profile drafts use the bottom Save/Discard
+and application leave guard. Services have independent draft owners. Close, Escape and backdrop request the shared stay/discard/save decision for dirty
+service edits inside the current modal boundary. The form becomes inert during
+that decision; there is never a second native modal. Explicit Cancel discards that owner.
+A failed save retains its draft. No service is saved by the bottom business Save.
 
 ### Save
 
-Default: save the active category only. A global “save everything” action is not the primary contract.
-
-Business and Services may still merge their owned fields into the latest persisted Setup snapshot before calling the existing full Setup save contract. Operations instead owns the transactional `BusinessLayout` resource for rooms and table categories. Application update preferences use the category footer; Appearance stays immediate and operational commands remain actions.
+Each service merges only its owned fields into the latest persisted Setup snapshot
+through the existing persistence hook/bridge. Committing one owner preserves other
+owners' dirty fields and baselines. Google reviews, KBS, TTS, dictation and Android
+permissions retain their existing dedicated persistence owners. Resource commands
+remain explicit actions; device revoke exits a clean service overlay before its
+global confirmation. Room/table management retains transactional BusinessLayout.
+Update preferences and appearance retain their existing owners. Security and data
+maintenance remain non-modal search-row action surfaces. Results use global
+app status; provider-specific safety explanations remain beside their controls.
 
 ### Search
 
 Settings search is a first-class navigation path. Search metadata contains labels/descriptions/synonyms/capability conditions, never stored secret/customer values.
 
-Selecting a result activates the correct category and focuses/highlights the target setting when possible.
+Selecting a service result opens its common overlay (including legacy AI-test/device aliases); other results focus the same-page target. Search grouping is metadata, never a category route.
 
 ---
 
@@ -677,7 +683,7 @@ Diagnostics must remain shareable without secrets or unnecessary customer PII.
 | Market / Inventory | Inventory Workspace |
 | Market / Purchasing | Supplier / Purchase Workspaces |
 | Finance | Finance Workspace |
-| Settings | Selected Settings Category Workspace |
+| Settings | Unified Settings page with service overlays |
 
 This map can grow, but a new workspace requires a real entity/operational ownership reason.
 

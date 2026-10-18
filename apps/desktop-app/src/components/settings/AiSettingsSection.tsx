@@ -1,18 +1,23 @@
 import { ServiceSettingsCard } from "./ServiceSettingsCard";
 import { CLOUDFLARE_AI_MODELS, cloudflareAiAccountId, cloudflareAiBaseUrl, imageGenerationModelOptions, sttModelOptions, supportsImageGenerationModel } from "@yardimci-asistan/shared";
-import { useConfirmDialog } from "../ui/useConfirmDialog";
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { aiServicePresets, isAiServiceProfileStored, selectAiService, type SetupFormState } from "../../app/setup-model";
-import type { ServicesSettingsProps } from "./ServicesSettingsSection";
+import type { SetupFieldsProps } from "./setup-fields";
+import type { SyncState } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
-export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiConnectionTestState, aiConnectionTestMessage, savedEnabled = form.aiEnabled }: Pick<ServicesSettingsProps, "form" | "onFormChange" | "onTestAiConnection" | "aiConnectionTestState" | "aiConnectionTestMessage"> & { savedEnabled?: boolean }) {
+export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiConnectionTestState, aiConnectionTestMessage, disabled = false }: SetupFieldsProps & {
+  onTestAiConnection: () => void;
+  aiConnectionTestState: SyncState;
+  aiConnectionTestMessage: string;
+  disabled?: boolean;
+}) {
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
   };
 
-  const { confirm, confirmDialog } = useConfirmDialog();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showAiApiKey, setShowAiApiKey] = useState(false);
   const [showGoogleCurl, setShowGoogleCurl] = useState(false);
   const [revealedAiApiKey, setRevealedAiApiKey] = useState("");
@@ -118,16 +123,20 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
         <RefreshCw size={16} aria-hidden="true" />
         {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
       </ActionButton>
-      <span className="setup-connection-message" role={aiConnectionTestState === "error" ? "alert" : "status"} aria-live="polite">{aiConnectionTestMessage}</span>
+
     </div>
   );
 
   return (
-        <>{confirmDialog}<ServiceSettingsCard id="settings-ai" title="AI Yardımcı" className="setup-ai-section" enabled={form.aiEnabled}
-          status={`${form.aiEnabled !== savedEnabled ? (form.aiEnabled ? "Etkinleştirilecek" : "Kapatılacak") : form.aiEnabled ? "Etkin" : "Kapalı"} · ${aiConnectionTestState === "success" ? "Metin/görsel bağlantısı doğrulandı"
-            : aiConnectionTestState === "error" ? "Bağlantı doğrulanmadı"
-              : (form.aiApiKey || form.aiGoogleCurl || (form.aiStoredApiKeyConfigured && !form.clearAiApiKey)) ? "Anahtar mevcut" : "Anahtar gerekli"}`}
+        <><ServiceSettingsCard id="settings-ai" title="AI Yardımcı" className="setup-ai-section" enabled={form.aiEnabled}
+          disabled={disabled} readiness={aiConnectionTestState === "success" ? "Hazır" : aiConnectionTestState === "error" ? "Hata" : aiConnectionTestState === "loading" ? "Kontrol ediliyor…" : "Test edilmedi"}
+          testMessage={aiConnectionTestState === "success" || aiConnectionTestState === "error" ? aiConnectionTestMessage : ""}
           onEnabledChange={enabled => update("aiEnabled", enabled)}>
+          {confirmDelete && <div role="group" aria-label="Anahtar silme onayı">
+            <p>Bu sağlayıcının anahtarı servis kaydedildiğinde silinecek.</p>
+            <ActionButton variant="danger" onClick={() => { onFormChange({ ...form, clearAiApiKey: true, aiEnabled: false }); setConfirmDelete(false); }}>Silmeyi Onayla</ActionButton>
+            <ActionButton variant="secondary" onClick={() => setConfirmDelete(false)}>Vazgeç</ActionButton>
+          </div>}
           <div className="form-grid">
             <div className="setup-ai-provider-row form-field--span">
               <label className="form-field form-field--medium setup-ai-service-field">
@@ -147,13 +156,7 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                   className="setup-ai-delete-key"
                   type="button"
                   disabled={form.clearAiApiKey}
-                  onClick={() => void (async () => {
-                    if (await confirm({ title: "Kayıtlı anahtarı sil", tone: "danger", confirmLabel: "Anahtarı Sil",
-                      description: "Bu sağlayıcının kayıtlı AI anahtarı silinsin mi?",
-                      details: "Anahtar, bu ayar alanı kaydedildiğinde silinecek ve AI Yardımcı kapatılacak." })) {
-                      onFormChange({ ...form, clearAiApiKey: true, aiEnabled: false });
-                    }
-                  })()}
+                  onClick={() => setConfirmDelete(true)}
                 >
                   <Trash2 size={15} aria-hidden="true" />
                   {form.clearAiApiKey ? "Anahtar silinecek" : "Kayıtlı Anahtarı Sil"}

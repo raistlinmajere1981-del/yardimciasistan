@@ -79,6 +79,7 @@ ya_business_response(200, [
         'latitude' => is_numeric($publicContext['latitude'] ?? null) ? (float) $publicContext['latitude'] : null,
         'longitude' => is_numeric($publicContext['longitude'] ?? null) ? (float) $publicContext['longitude'] : null,
         'description' => ya_business_string($publicContext['description'] ?? ''),
+        'about_text' => ya_business_string($publicContext['about_text'] ?? ''),
         'directions_note' => ya_business_string($publicContext['directions_note'] ?? ''),
         'policy_note' => ya_business_string($publicContext['policy_note'] ?? ''),
         'payment_note' => ya_business_string($publicContext['payment_note'] ?? ''),

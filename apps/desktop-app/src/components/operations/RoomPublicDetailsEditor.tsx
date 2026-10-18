@@ -36,6 +36,7 @@ interface RoomPublicDetailsSaveResult {
 }
 
 interface RoomPublicDetailsEditorProps {
+  dialogClassName?: string;
   open: boolean;
   room: RoomPublicDetailsEditorRoom | null;
   onClose: () => void;
@@ -74,7 +75,7 @@ function toggleFeature(features: RoomPublicFeatureId[], featureId: RoomPublicFea
     : [...features, featureId];
 }
 
-export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPublicDetailsEditorProps) {
+export function RoomPublicDetailsEditor({ open, room, onClose, onSave, dialogClassName }: RoomPublicDetailsEditorProps) {
   const [form, setForm] = useState<RoomPublicDetailsFormState>(() => toForm(room));
   const [state, setState] = useState<EditorState>("idle");
   const seededRoomIdRef = useRef("");
@@ -93,6 +94,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
   const capacity = useMemo(() => Number.parseInt(form.capacity, 10), [form.capacity]);
   const validCapacity = Number.isInteger(capacity) && capacity > 0 && capacity <= 100;
   const canSave = Boolean(room && form.name.trim() && validCapacity && state !== "loading");
+  const formDirty = room !== null && JSON.stringify(form) !== JSON.stringify(toForm(room));
 
   if (!open || !room) {
     return null;
@@ -100,11 +102,12 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
 
   return (
     <FormDialog
+      dialogClassName={dialogClassName ?? ""}
       title="Oda bilgilerini düzenle"
       onClose={() => {
         if (state !== "loading") onClose();
       }}
-      closeBlocked={state === "loading"}
+      closeBlocked={state === "loading" || formDirty}
       dismissOnBackdrop
       onSubmit={(event) => void (async () => {
         event.preventDefault();
@@ -152,14 +155,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
     >
       <div className="form-stack customer-create-form room-public-details-form">
         <section className="panel form-stack">
-          <div className="page-toolbar">
-            <div className="page-toolbar__copy">
-              <strong>Temel bilgiler</strong>
-              <small>Oda kimliği, kapasite ve yatak düzeni</small>
-            </div>
-          </div>
-
-          <div className="form-grid">
+          <div className="form-grid room-public-basic-grid">
             <label className="form-field form-field--medium">
               Oda adı
               <input
@@ -220,37 +216,6 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                 placeholder="Örn. 1.250,00"
               />
             </label>
-          </div>
-        </section>
-
-        <section className="panel form-stack">
-          <div className="page-toolbar">
-            <div className="page-toolbar__copy">
-              <strong>Müşteriye açık bilgiler</strong>
-              <small>Oda özellikleri ve açıklamalar</small>
-            </div>
-          </div>
-
-          <fieldset className="room-public-features">
-            <legend>Oda özellikleri</legend>
-            <div className="page-toolbar__start">
-              {ROOM_PUBLIC_FEATURE_CATALOG.map((feature) => (
-                <label className="form-check" key={feature.id}>
-                  <input
-                    type="checkbox"
-                    checked={form.features.includes(feature.id)}
-                    onChange={() => setForm((current) => ({
-                      ...current,
-                      features: toggleFeature(current.features, feature.id)
-                    }))}
-                  />
-                  {feature.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="form-grid">
             <label className="form-field--span form-field form-field--fluid">
               Açıklama
               <textarea
@@ -270,6 +235,27 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
               />
             </label>
           </div>
+        </section>
+
+        <section className="panel form-stack">
+          <fieldset className="room-public-features">
+            <legend>Oda özellikleri</legend>
+            <div className="page-toolbar__start">
+              {ROOM_PUBLIC_FEATURE_CATALOG.map((feature) => (
+                <label className="form-check" key={feature.id}>
+                  <input
+                    type="checkbox"
+                    checked={form.features.includes(feature.id)}
+                    onChange={() => setForm((current) => ({
+                      ...current,
+                      features: toggleFeature(current.features, feature.id)
+                    }))}
+                  />
+                  {feature.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </section>
       </div>
     </FormDialog>

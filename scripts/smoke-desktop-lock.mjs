@@ -215,7 +215,7 @@ try {
   await expect(page.getByRole("heading", { name: "Bugün ne var?" })).toBeVisible();
 
   await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
-  await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
+  await page.getByRole("button", { name: "Güvenlik", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bilgileri Kaydet", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Oda Bilgilerini Kaydet", exact: true })).toHaveCount(0);
@@ -241,7 +241,7 @@ try {
   await lockDialog.getByLabel("Uygulama şifresi").fill("yeni-şifre-42");
   await lockDialog.getByRole("button", { name: "Kilidi Aç" }).click();
   await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
-  await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
+  await page.getByRole("button", { name: "Güvenlik", exact: true }).click();
   await page.getByLabel("Mevcut şifre").fill("yeni-şifre-42");
   await page.getByLabel("Yeni şifre", { exact: true }).fill("değişen-şifre-84");
   await page.getByLabel("Yeni şifre tekrar").fill("değişen-şifre-84");
@@ -256,7 +256,7 @@ try {
   await lockDialog.getByRole("button", { name: "Kilidi Aç" }).click();
   await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
 
-  await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
+  await page.getByRole("button", { name: "Güvenlik", exact: true }).click();
   await page.getByLabel("Mevcut şifre").fill("değişen-şifre-84");
   await page.getByRole("button", { name: "Şifreyi Kaldır" }).click();
   await page.getByRole("dialog", { name: "Uygulama şifresini kaldır" }).getByRole("button", { name: "Şifreyi Kaldır" }).click();

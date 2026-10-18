@@ -79,6 +79,7 @@ CREATE TABLE business_public_profile (
   google_maps_embed_url TEXT NOT NULL DEFAULT '',
   business_id TEXT PRIMARY KEY,
   description TEXT NOT NULL DEFAULT '',
+  about_text TEXT NOT NULL DEFAULT '',
   latitude REAL NULL
     CHECK (latitude IS NULL OR (latitude >= -90 AND latitude <= 90)),
   longitude REAL NULL

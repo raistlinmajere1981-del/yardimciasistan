@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PageViewStateProvider, usePageViewState } from "../../apps/desktop-app/src/app/page-view-state";
+import { PageViewStateProvider } from "../../apps/desktop-app/src/app/page-view-state";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C, getBusinessProfile, getBusinessProfileSelectionCapabilities, supportsSttModel, isSupportedSttBaseUrl } from "@yardimci-asistan/shared";
 import { normalizeProfileTransitionInput } from "../../apps/desktop-app/electron/profile-service-activation";
@@ -7,8 +7,11 @@ import { defaultDashboardData, defaultSetupData } from "../../apps/desktop-app/s
 import { useSetupController } from "../../apps/desktop-app/src/app/use-setup-controller";
 import { createCapabilitySnapshotFixture } from "../test-helpers/business-capability-fixtures.mjs";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
+import { useUpdateSettings } from "../../apps/desktop-app/src/components/settings/UpdateSettings";
+import { SidebarUpdateStatus } from "../../apps/desktop-app/src/components/settings/SidebarUpdateStatus";
 import { SettingsWorkspace } from "../../apps/desktop-app/src/components/settings/SettingsWorkspace";
 import type { PageLeaveGuard } from "../../apps/desktop-app/src/app/page-navigation-guard";
+import { AppearanceSettingsSection } from "../../apps/desktop-app/src/components/settings/AppearanceSettingsSection";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
 import { GlobalMessageBar } from "../../apps/desktop-app/src/components/layout/GlobalMessageBar";
 import { subscribeAppStatus, type AppStatusDetail } from "../../apps/desktop-app/src/app/runtime-state";
@@ -36,7 +39,7 @@ function FixtureStatusHost() {
 let maintenanceConfirmation: ((request: { title: string; description: string; details: string; confirmLabel: string }) => Promise<boolean>) | null = null;
 let canonical = { ...defaultSetupData, profileId: new URLSearchParams(window.location.search).get("profile") ?? defaultSetupData.profileId, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
 const firstRun = new URLSearchParams(window.location.search).get("firstRun") === "on";
-if (firstRun) canonical = { ...canonical, setupRequired: true, businessName: "" };
+if (firstRun) canonical = { ...canonical, setupRequired: true, businessName: "", syncSecret: "" };
 canonical.profileOptions = [...getBusinessProfile(canonical.profileId).defaultOptionalCapabilities];
 if (new URLSearchParams(window.location.search).get("wholesale") === "on") canonical.profileOptions = [C.WHOLESALE];
 let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"], socialLinks: [] };
@@ -67,6 +70,7 @@ let layout = {
   publication: { rooms: true, tables: false }
 };
 if (firstRun) layout = { ...layout, rooms: [], tables: [], tableCategories: [], publication: { rooms: false, tables: false } };
+let updateListener: ((status: typeof updateStatus) => void) | undefined;
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
 let mediaSeq = 0;
 let mediaCanonical: Array<Record<string, unknown>> = [];
@@ -154,12 +158,30 @@ window.yardimciDesktop = {
   transcribeAudio: async input => (await fetch("/fixture-dictation-upload", { method: "POST", body: JSON.stringify(input) })).json(),
   cancelDictation: async id => { if (voiceDesktop) await fetch("/fixture-dictation-cancel", { method: "POST", body: JSON.stringify({ id }) }); return true; },
   getSetupData: async () => structuredClone(canonical),
+  listSmsSenderIds: async () => {
+    window.settingsCalls.push({ kind: "sms-senders" });
+    return { ok: true, value: ["FIXTURE"] };
+  },
+  testSmsConnection: async () => {
+    window.settingsCalls.push({ kind: "sms-test" });
+    return { ok: true, message: "Fixture SMS bağlantısı doğrulandı.", testedAt: new Date().toISOString(), senderIds: ["FIXTURE"] };
+  },
   getInstagramConfiguration: async () => structuredClone(canonical.instagram),
   beginInstagramOAuth: async () => ({ ok: false, message: "OAuth fixture bağlı değil." }),
   pollInstagramOAuth: async () => ({ status: "failed", message: "OAuth fixture bağlı değil." }),
   disconnectInstagramOAuth: async () => structuredClone(canonical.instagram),
   testInstagramConnection: async () => ({ ok: false, message: "OAuth fixture bağlı değil.", testedAt: new Date().toISOString() }),
-  testWebConnection: async input => { window.settingsCalls.push({ kind: "web-test", input }); return { ok: true, message: "Fixture web bağlantısı doğrulandı." }; },
+  testWebConnection: async input => {
+    window.settingsCalls.push({ kind: "web-test", input });
+    const ok = !window.failWebTest;
+    window.webVerification = ok ? JSON.stringify([input.baseUrl, input.syncSecret]) : "";
+    return { ok, message: ok ? "Fixture web bağlantısı doğrulandı." : "Fixture web bağlantısı başarısız." };
+  },
+  connectWebPublicationSource: async input => {
+    window.settingsCalls.push({kind: "web-connect-source", input});
+    return window.failWebSource ? {ok: false, message: "Fixture yayın kaynağı reddedildi."} :
+      {ok: true, message: "Fixture yayın kaynağı etkin."};
+  },
   commerce: {
     getShippingProviderConfiguration: async () => ({ ...canonical.arasShipping,
       verified: Boolean(shippingVerification && shippingVerification === shippingSignature(canonical.arasShipping)) }),
@@ -176,6 +198,10 @@ window.yardimciDesktop = {
     window.settingsCalls.push({ kind: "setup", input });
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
+    const transport = web => JSON.stringify([web.webModuleUrl.trim().replace(/\/+$/, ""), web.syncSecret.trim()]);
+    if (input.autoSyncEnabled
+      && (canonical.setupRequired || !canonical.autoSyncEnabled || transport(input) !== transport(canonical))
+      && window.webVerification !== transport(input)) return { ok: false, message: "Web bağlantısını test edin." };
     input = normalizeProfileTransitionInput(input, canonical);
     const arasShipping = input.arasShipping ? {
       ...canonical.arasShipping, enabled: input.onlineSalesDeliveryEnabled && input.onlineSalesDelivery.shippingEnabled, environment: input.arasShipping.environment,
@@ -188,7 +214,7 @@ window.yardimciDesktop = {
     else if (input.arasShipping?.password) shippingPassword = input.arasShipping.password;
     canonical = { ...canonical, ...input, arasShipping, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured };
     if (dictationSignature() !== previousDictation || input.aiApiKey || input.clearAiApiKey) dictationVerification = "";
-    return { ok: true, message: "Kaydedildi", setupData: structuredClone(canonical), dashboardData: { ...defaultDashboardData, androidDevices: structuredClone(androidDevices) } };
+    return { ok: true, message: window.webSaveWarning ? "Yerel ayarlar kaydedildi; web yayını başarısız." : "Kaydedildi", ...(window.webSaveWarning ? { aiWebSync: { ok: false } } : {}), setupData: structuredClone(canonical), dashboardData: { ...defaultDashboardData, androidDevices: structuredClone(androidDevices) } };
   },
   getBusinessPublicProfile: async () => profile,
   geocodeBusinessAddress: async address => {
@@ -204,6 +230,7 @@ window.yardimciDesktop = {
   getGoogleReviewsSettings: async () => structuredClone(googleReviews),
   saveGoogleReviewsSettings: async input => {
     window.settingsCalls.push({ kind: "google-reviews", input });
+    if (window.failGoogleReviewsSave) return { ok: false, message: "Google yorumları kayıt hatası." };
     googleReviews = {
       enabled: input.enabled,
       placeId: input.placeId,
@@ -400,9 +427,11 @@ window.yardimciDesktop = {
     return { ok: true, message: "Telefon görev alanları kaydedildi.", devices: structuredClone(androidDevices) };
   },
   getUpdateStatus: async () => updateStatus,
-  onUpdateStatusChanged: () => () => {},
+  onUpdateStatusChanged: listener => { updateListener = listener; return () => { updateListener = undefined; }; },
   saveUpdatePreferences: async input => { window.settingsCalls.push({ kind: "update-preferences", input }); if (window.failUpdate) return { ok: false, message: "Güncelleme tercih hatası", status: updateStatus }; updateStatus = { ...updateStatus, ...input }; return { ok: true, message: "Güncelleme tercihleri kaydedildi", status: updateStatus }; },
   checkForUpdates: async () => { window.settingsCalls.push({ kind: "update-check" }); return updateStatus; },
+  downloadUpdate: async () => { window.settingsCalls.push({ kind: "update-download" }); updateStatus = { ...updateStatus, phase: "ready" }; return updateStatus; },
+  restartAndInstallUpdate: async () => { window.settingsCalls.push({ kind: "update-install" }); return { ok: false, status: updateStatus, message: "Fixture installation" }; },
   updateAppPassword: async input => { window.settingsCalls.push({ kind: "password", input }); return { ok: true, message: "Şifre kaydedildi", status: { passwordConfigured: Boolean(input.newPassword) } }; },
   onDataMaintenanceConfirmation: listener => { maintenanceConfirmation = listener; return () => { maintenanceConfirmation = null; }; },
   resetLocalData: async () => {
@@ -417,6 +446,7 @@ function Fixture() {
   const setup = useSetupController();
   const [ready, setReady] = useState(false);
   const [workspaceKey, setWorkspaceKey] = useState(0);
+  const updates = useUpdateSettings(true);
   const [voiceScreen, setVoiceScreen] = useState("settings");
   const [voiceText, setVoiceText] = useState("Mevcut paylaşım metni");
   const [preferences, setPreferences] = useState(readUiPreferences);
@@ -425,6 +455,7 @@ function Fixture() {
   useEffect(() => { applyUiPreferences(preferences); saveUiPreferences(preferences); }, [preferences]);
   window.refreshSettings = patch => { dictationRevision++; canonical = { ...canonical, ...patch }; setup.applyBootstrapSetup(structuredClone(canonical), false); };
   window.persistedSettings = () => canonical;
+  window.emitUpdateStatus = patch => { updateStatus = { ...updateStatus, ...patch }; updateListener?.(updateStatus); };
   window.reopenSettings = () => setWorkspaceKey(key => key + 1);
   const snapshot = new URLSearchParams(window.location.search).has("missingRuntime")
     ? null : createCapabilitySnapshotFixture(setup.setupData);
@@ -433,7 +464,7 @@ function Fixture() {
   window.requiredCapabilities = () => getBusinessProfileSelectionCapabilities(setup.setupData.profileId, []);
   return <BusinessCapabilityRuntimeProvider value={{ snapshot }}>
     {voiceDesktop && <nav aria-label="Ses testi ekranı"><button onClick={() => setVoiceScreen("settings")}>Ayarları Aç</button><button onClick={() => setVoiceScreen("editor")}>Editörü Aç</button><button onClick={() => setVoiceScreen("ai")}>Metin Asistanını Aç</button></nav>}
-    <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions" /></div></header>}>
+    <AppShell contentScroll="workspace" sidebar={<aside className="sidebar"><SidebarUpdateStatus controller={updates} /></aside>} header={<header className="page-header"><div className="page-header__main"><div className="page-header-copy"><h1 className="page-header__title">Ayarlar</h1></div><div className="page-header__notice has-notice"><FixtureStatusHost /></div><div className="page-header__actions"><AppearanceSettingsSection preferences={preferences} onPreferencesChange={setPreferences} /></div></div></header>}>
       {voiceDesktop && voiceScreen === "editor" && <section className="form-stack" aria-label="Paylaşım düzenleyicisi">
         <SpeechTextField label="Paylaşım metni" value={voiceText} maxLength={12000} rows={6} onChange={setVoiceText} />
         <ReadAloudButton text="Görünür yanıt metni" />
@@ -441,8 +472,6 @@ function Fixture() {
       {voiceDesktop && voiceScreen === "ai" && <MarketingTextAssistant text={voiceText} capabilities={["text_generation", "rewrite"]} onApply={setVoiceText} onBusy={() => {}} />}
       {ready && (!voiceDesktop || voiceScreen === "settings") && <SettingsWorkspace key={workspaceKey} setupData={setup.setupData} dashboardData={dashboard}
         onSave={input => setup.saveSetup(input, setDashboard)}
-        uiPreferences={preferences}
-        onUiPreferencesChange={setPreferences}
         onAppPasswordConfiguredChange={setup.setPasswordConfigured}
         onDashboardRefresh={async () => {
           setDashboard((current) => ({ ...current, androidDevices: structuredClone(androidDevices) }));
@@ -457,23 +486,4 @@ function Fixture() {
     </AppShell>
   </BusinessCapabilityRuntimeProvider>;
 }
-function StoredCategory() {
-  const [category] = usePageViewState("settings.category", "business");
-  return <output aria-label="Stored settings category">{category}</output>;
-}
-
-function SeededFixture() {
-  const [, setCategory] = usePageViewState("settings.category", "business");
-  const [ready, setReady] = useState(false);
-  const [reading, setReading] = useState(false);
-  useEffect(() => {
-    const seed = new URLSearchParams(window.location.search).get("category");
-    if (seed) setCategory(seed);
-    setReady(true);
-  }, []);
-  window.readStoredSettingsCategory = () => setReading(true);
-  return ready ? reading ? <StoredCategory /> : <Fixture /> : null;
-}
-createRoot(document.getElementById("root")!).render(<PageViewStateProvider>
-  {new URLSearchParams(window.location.search).has("category") ? <SeededFixture /> : <Fixture />}
-</PageViewStateProvider>);
+createRoot(document.getElementById("root")!).render(<PageViewStateProvider><Fixture /></PageViewStateProvider>);

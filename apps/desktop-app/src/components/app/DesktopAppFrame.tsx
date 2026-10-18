@@ -22,6 +22,10 @@ import type {
   SetupController
 } from "../../app/controller-types";
 import type { DesktopDashboardData } from "../../../electron/database";
+import type { UiPreferences } from "../../ui-preferences";
+import { useUpdateSettings } from "../settings/UpdateSettings";
+import { SidebarUpdateStatus } from "../settings/SidebarUpdateStatus";
+import { AppearanceSettingsSection } from "../settings/AppearanceSettingsSection";
 import { AppShell } from "../layout/AppShell";
 import { PageHeader } from "../layout/PageHeader";
 import { GlobalMessageBar, type GlobalMessageTone } from "../layout/GlobalMessageBar";
@@ -35,6 +39,8 @@ const LocalMenuPreview = lazy(() => import("../menu/MenuPreview").then(module =>
 const DiagnosticsViewer = lazy(() => import("../diagnostics/DiagnosticsViewer").then(module => ({default: module.DiagnosticsViewer})));
 
 interface DesktopAppFrameProps {
+  uiPreferences: UiPreferences;
+  onUiPreferencesChange: (preferences: UiPreferences) => void;
   activePage: DesktopPage;
   pageTransitionPending: boolean;
   requestPageChange: RequestPageChange;
@@ -71,6 +77,8 @@ export function DesktopAppFrame(props: DesktopAppFrameProps) {
 }
 
 function DesktopAppFrameContent({
+  uiPreferences,
+  onUiPreferencesChange,
   activePage,
   pageTransitionPending,
   requestPageChange,
@@ -88,6 +96,7 @@ function DesktopAppFrameContent({
   marketController,
   children
 }: DesktopAppFrameProps) {
+  const updates = useUpdateSettings(true);
   const contentRef = useRef<HTMLElement>(null);
   const { hospitalitySessions } = useWorkspaceNavigation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
@@ -208,6 +217,7 @@ function DesktopAppFrameContent({
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(
         <Sidebar
+          updateSlot={<SidebarUpdateStatus controller={updates} />}
           items={navigationItems}
           activePage={activePage}
           businessName={setupData.businessName}
@@ -233,6 +243,7 @@ function DesktopAppFrameContent({
                   Açılıyor
                 </span>
               )}
+              <AppearanceSettingsSection preferences={uiPreferences} onPreferencesChange={onUiPreferencesChange} />
               <SyncStatusIndicator
                 automaticSyncStatus={automaticSyncStatus}
                 onSync={() => void handlePullRequests()}

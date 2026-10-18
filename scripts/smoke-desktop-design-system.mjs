@@ -1,3 +1,4 @@
+import { expandSettingsStructure, openSettingsService, cancelSettingsService } from "./test-helpers/settings-ui.mjs";
 import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
@@ -257,13 +258,14 @@ try {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Ayarlar', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Giriş saati', exact: true })).toHaveAttribute('data-picker-value', '14:00');
-  await page.getByRole("tab", { name: "Servisler", exact: true }).click();
+  await openSettingsService(page, "settings-whatsapp");
   const birthdaySettings = page.locator('.setup-birthday-settings');
   await expect(birthdaySettings.getByRole('heading', { name: 'Doğum Günü Mesajları', exact: true })).toBeVisible();
   await expect(birthdaySettings.getByLabel('Doğum günü mesajlarını kullan')).toBeChecked();
   await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer tutucuları desteklenir.' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
 
-  await page.getByRole("tab", { name: "İşletme", exact: true }).click();
+  await cancelSettingsService(page);
+  await expandSettingsStructure(page);
   const sectorType = page.getByLabel('Sektör tipi');
   await sectorType.selectOption('market');
   await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
@@ -300,21 +302,23 @@ try {
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[640,800],[600,800]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);
-    for (const name of ['İşletme', 'İşletme Düzeni', 'Servisler', 'Uygulama']) {
-      await page.getByRole('tab', { name, exact: true }).click();
-      await expect(page.getByRole('tabpanel')).toHaveCount(1);
+    for (const name of ['Kapalı', 'Açık']) {
+      const toggle = page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ });
+      if (await toggle.getAttribute('aria-expanded') !== String(name === 'Açık')) await toggle.click();
+      await expect(page.locator('.settings-page-workspace')).toHaveCount(1);
       const metrics = await page.evaluate(() => ({
         documentOverflow: document.documentElement.scrollWidth > innerWidth + 1 || document.documentElement.scrollHeight > innerHeight + 1,
-        overflows: [...document.querySelectorAll('.content, .setup-capabilities, .settings-category-body, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className)
+        overflows: [...document.querySelectorAll('.content, .setup-capabilities, .settings-page-body, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className)
       }));
       observations.push({ width, height, category: name, ...metrics });
       expect(metrics.documentOverflow, `Document overflow at ${width}/${name}`).toBe(false);
       expect(metrics.overflows, `Content overflow at ${width}/${name}`).toEqual([]);
-      await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' })).toBeInViewport();
+      await expect(page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ })).toBeInViewport();
       await page.screenshot({ animations: 'disabled', path: `${output}/settings-${width}-${name}.png` });
     }
   }
-  await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
+  await cancelSettingsService(page);
+  await expandSettingsStructure(page);
   await page.locator('.business-location-map-viewport').scrollIntoViewIfNeeded();
   await page.screenshot({ animations: "disabled", path: `${output}/settings-map.png` });
   await page.getByLabel('Enlem', { exact: true }).fill('37.06');
@@ -345,33 +349,38 @@ try {
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
   expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
 
-  await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
+  await openSettingsService(page, "settings-whatsapp");
   await birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer tutucuları desteklenir.' }).fill('İyi ki doğdun {ad}! {işletme}');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await page.locator('.settings-service-overlay').getByRole('button', { name: 'Kaydet', exact: true }).click();
   expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'setup').at(-1).input.birthdaySettings)).toEqual({
     enabled: true, mode: 'manual', sendTime: '10:00', messageTemplate: 'İyi ki doğdun {ad}! {işletme}'
   });
 
-  await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
+  await cancelSettingsService(page);
+  await expandSettingsStructure(page);
+  await page.locator('#settings-rooms-button').click();
   const designRoomRows = page.locator('.room-management-row');
   await expect(designRoomRows).toHaveCount(2);
   await designRoomRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
-  const designRoomDialog = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle' });
+  const designRoomDialog = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle', exact: true });
   await expect(designRoomDialog).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(1);
   await designRoomDialog.getByLabel('Oda adı').fill('Güncellenen Oda');
   await designRoomDialog.getByLabel('Gecelik fiyat').fill('2750');
   await designRoomDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect(designRoomDialog).toHaveCount(0);
-  await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await page.locator('.settings-layout-overlay > footer').getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'layout')?.input.rooms?.[0]?.name)).toBe('Güncellenen Oda');
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
 
-  await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
+  await page.locator('#sidebar-updates').click();
+  await page.getByRole('textbox', { name: /Güncelleme sunucusu/ }).fill('https://updates.example.test/custom');
+  await page.getByRole('button', { name: 'Güncelleme Tercihlerini Kaydet', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Güvenlik', exact: true }).click();
   await page.getByLabel('Şifre belirleyin', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('design-test-password');
-  await page.getByRole('textbox', { name: /Güncelleme sunucusu/ }).fill('https://updates.example.test/custom');
-  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await page.getByRole('button', { name: 'Şifreyi Kaydet', exact: true }).click();
   const saveOrder = await page.evaluate(() => window.__designCalls.map(call => call.kind));
   expect(saveOrder.slice(0, 2)).toEqual(['setup', 'public']);
@@ -382,10 +391,11 @@ try {
   await expect(page.getByText('Şifre kaydedildi.', { exact: true })).toBeVisible();
 
   const callCountAfterSave = await page.evaluate(() => window.__designCalls.length);
-  await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
+  await cancelSettingsService(page);
+  await expandSettingsStructure(page);
   await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await page.getByLabel('Enlem', { exact: true }).fill('91');
-  await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
+  await page.getByRole('button', { name: 'Ana Ekran', exact: true }).click();
   const sharedConfirm = page.getByRole('dialog', { name: /değişiklikleri bekliyor/ });
   const previousScheme = await page.evaluate(() => document.documentElement.dataset.colorScheme);
   const previousViewport = page.viewportSize();
@@ -417,7 +427,9 @@ try {
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
   await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
 
-  await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
+  await cancelSettingsService(page);
+  await expandSettingsStructure(page);
+  await page.locator('#settings-rooms-button').click();
   await designRoomRows.first().getByRole('button', { name: 'Detaylar', exact: true }).click();
   await expect(designRoomDialog).toBeVisible();
   const roomPriceInput = designRoomDialog.getByLabel('Gecelik fiyat', { exact: true });
@@ -428,18 +440,20 @@ try {
   await expect(roomPriceInput).toHaveValue(roomPriceBefore);
   await designRoomDialog.getByRole('button', { name: 'Vazgeç', exact: true }).click();
   await expect(designRoomDialog).toHaveCount(0);
-  await expect(page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
-  await expect(page.locator('.settings-category-actions').getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeDisabled();
+  await expect(page.locator('.settings-page-actions').getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
+  await expect(page.locator('.settings-page-actions').getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
+  await page.keyboard.press('Escape');
 
-  await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
+  await page.getByRole('button', { name: 'Güvenlik', exact: true }).click();
   await page.getByLabel('Mevcut şifre', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre', { exact: true }).fill('short');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('short');
   await page.getByRole('button', { name: 'Şifreyi Kaydet', exact: true }).click();
   await expect(page.locator('#settings-password').getByRole('alert')).toBeVisible();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
-  await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
+  await openSettingsService(page, "settings-ai");
+  await page.locator('.settings-service-overlay').getByRole('switch').check();
   await page.getByLabel('Servis sağlayıcı').selectOption('gemini');
   const googleCredential = page.getByLabel('Google AI Studio API anahtarı veya cURL');
   const aiTestCallCountBeforePlaceholder = await page.evaluate(() => window.__designCalls.filter(call => call.kind === 'ai-test').length);
@@ -455,18 +469,17 @@ try {
   expect(aiTestInput.apiKey).toBe('auth-key-smoke-1234567890');
   expect(aiTestInput.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta');
   expect(aiTestInput.model).toBe('');
-  await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
-  await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
+  await cancelSettingsService(page);
   for (const scheme of ['light','dark']) {
+    await page.getByRole('button', { name: 'Görünüm', exact: true }).click();
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
-    // Appearance is staged: apply through the category save so captures show the applied theme.
-    await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
+    await page.keyboard.press('Escape');
     await page.locator('.content').evaluate(el => el.scrollTop = 0);
     await page.screenshot({ animations: "disabled", path: `${output}/settings-compact-${scheme}.png` });
   }
   // Focus ring remains visible with keyboard navigation.
-  await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab').first().focus();
+  await page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ }).focus();
   await page.keyboard.press('Tab');
   expect(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle)).not.toBe('none');
   // Simulate an app-level lock request while the native modal makes shell controls inert.

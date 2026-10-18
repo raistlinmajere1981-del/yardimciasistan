@@ -18,18 +18,13 @@ import {
   layoutSettingsDefinition,
   roomSettingsDefinition,
   searchSettings,
-  settingsCategories,
-  visibleSettingsCategories,
-  settingsSections,
-  type SettingsCategoryId
 } from "../../app/settings-registry";
 import type { SettingsOperationResult, SettingsSetupSaveResult } from "../../app/settings-save";
-import type { UiPreferences } from "../../ui-preferences";
-import { SettingsCategoryTabs } from "./SettingsCategoryTabs";
+import { ServiceSettingsContext, type ServiceSettingsOwner } from "./ServiceSettingsCard";
+import { isSetupServiceId, serviceActivation } from "../../app/settings-service-fields";
 import { SettingsUnsavedChangesDialog } from "./SettingsUnsavedChangesDialog";
-import { BusinessSettingsSection } from "./BusinessSettingsSection";
+import { BusinessContactFields, BusinessSettingsSection } from "./BusinessSettingsSection";
 import { ServicesSettingsSection, type ServicesSettingsProps } from "./ServicesSettingsSection";
-import { AppearanceSettingsSection, useAppearanceSettings } from "./AppearanceSettingsSection";
 import {
   BusinessPublicProfileSection,
   BusinessSocialLinksSection,
@@ -40,10 +35,10 @@ import {
   useGoogleReviewsSettings
 } from "./GoogleReviewsSettingsSection";
 import { KbsSettingsSection, useKbsSettings } from "./KbsSettingsSection";
-import { RoomManagementSection } from "./RoomManagementSection";
-import { LayoutSettingsSection } from "./LayoutSettingsSection";
+import { BusinessLayoutOverlay } from "./BusinessLayoutOverlay";
+import { BusinessGalleryOverlay } from "./BusinessGalleryOverlay";
 import { PasswordSettings, usePasswordSettings } from "../security/PasswordSettings";
-import { UpdateSettings, useUpdateSettings } from "./UpdateSettings";
+import { SettingsActionPopover } from "./SettingsActionPopover";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
 import { ActionButton } from "../ui/ActionButton";
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
@@ -53,35 +48,23 @@ import { AiSettingsSection } from "./AiSettingsSection";
 
 export type SettingsWorkspaceProps = Omit<
   ServicesSettingsProps,
-  "form" | "onFormChange" | "enabledCapabilities" | "onTestAiConnection" | "aiConnectionTestState" | "aiConnectionTestMessage"
+  "form" | "onFormChange" | "enabledCapabilities"
 > & {
   onSave: (input: SaveInitialSetupInput) => Promise<SettingsSetupSaveResult>;
   onDashboardRefresh?: () => Promise<unknown>;
   onAppPasswordConfiguredChange?: (configured: boolean) => void;
-  uiPreferences: UiPreferences;
-  onUiPreferencesChange: (preferences: UiPreferences) => void;
   registerPageLeaveGuard?: RegisterPageLeaveGuard;
 };
 
-interface PendingCategoryTransition {
-  kind: "category";
-  category: SettingsCategoryId;
-  focusTarget: string;
-  clearQuery: boolean;
-  focusTabAfterGuard: boolean;
-}
-
-interface PendingPageTransition {
-  kind: "page";
+interface PendingTransition {
   destination: DesktopPage;
   continueNavigation: () => void;
 }
 
-type PendingTransition = PendingCategoryTransition | PendingPageTransition;
-
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const { registerPageLeaveGuard } = props;
-  const [storedActive, setActive] = usePageViewState<SettingsCategoryId>("settings.category", "business");
+  const [structureExpanded, setStructureExpanded] = useState(props.setupData.setupRequired);
+  const [serviceOpen, setServiceOpen] = useState<string | null>(null);
   const [query, setQuery] = usePageViewState("settings.search", "");
   const [focusTarget, setFocusTarget] = useState("");
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
@@ -95,15 +78,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
   const initialized = !props.setupData.setupRequired;
   const capabilities = runtimeCapabilities?.enabledCapabilities ?? [];
-  const visibleCategories = visibleSettingsCategories(initialized, runtimeCapabilities);
+
   const roomsEnabled = isSettingsSectionVisible(roomSettingsDefinition, capabilities, initialized, runtimeCapabilities);
   const tablesEnabled = isSettingsSectionVisible(layoutSettingsDefinition, capabilities, initialized, runtimeCapabilities);
-  const category = visibleCategories.find((item) => item.id === storedActive)
-    ?? settingsCategories[0] ?? { id: "business" as SettingsCategoryId, title: "İşletme", description: "" };
-  const active = category.id;
-  useEffect(() => {
-    if (storedActive !== active) setActive(active);
-  }, [active, setActive, storedActive]);
   const profile = useBusinessPublicProfileSettings({
     businessAddress: drafts.form.address,
     enabledCapabilities: capabilities,
@@ -119,67 +96,74 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     },
     ...(props.onDashboardRefresh === undefined ? {} : { onDashboardRefresh: props.onDashboardRefresh })
   });
-  const appearance = useAppearanceSettings(props.uiPreferences, props.onUiPreferencesChange);
   const androidPermissions = useAndroidDevicePermissionSettings({
     devices: props.dashboardData?.androidDevices ?? [],
     enabled: initialized && props.setupData.servicePreferences.android && capabilities.includes(C.ANDROID),
     ...(props.onDashboardRefresh === undefined ? {} : { onDashboardRefresh: props.onDashboardRefresh })
   });
-  const updates = useUpdateSettings(initialized);
+  const [layoutOpen, setLayoutOpen] = useState<"rooms" | "tables" | null>(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [utility, setUtility] = useState<"security" | "data" | null>(null);
   const password = usePasswordSettings({
     configured: props.setupData.appPasswordConfigured,
     onConfiguredChange: props.onAppPasswordConfiguredChange ?? (() => undefined)
   });
 
-  const setupCategory = active === "business" || active === "services" ? active : null;
-  const hasSetupSection = setupCategory
-    ? settingsSections.some((section) =>
-        section.category === active
-        && section.persistence === "staged"
-        && isSettingsSectionVisible(section, capabilities, initialized, runtimeCapabilities)
-      )
-    : false;
-  const hasCategorySaveSection = active === "operations"
-    ? layout.draft.capabilities.rooms || layout.draft.capabilities.tables
-    : active === "application"
-      ? initialized
-      : hasSetupSection;
-
-  const dirty: Record<SettingsCategoryId, boolean> = {
-    business: drafts.dirty.business || profile.dirty || googleReviews.dirty,
-    operations: layout.dirty,
-    services: drafts.dirty.services || androidPermissions.dirty || kbs.dirty || tts.dirty || dictation.dirty,
-    application: appearance.dirty || updates.dirty
-  };
-  const categoryDirty = dirty[active];
-
-  const categoryBusy = active === "operations"
-    ? layout.loading || layout.saving
-    : active === "application"
-      ? updates.busy
-      : drafts.busy
-      || (active === "services" && (androidPermissions.busy || kbs.loading || kbs.saving || kbs.testing || dictation.loading || dictation.busy))
-      || (active === "business" && (profile.saving || googleReviews.saving || googleReviews.testing));
-
-  const categorySaving = active === "operations"
-    ? layout.saving
-    : active === "application"
-      ? updates.action === "save"
-      : setupCategory
-        ? drafts.feedback[setupCategory]?.state === "loading"
-          || (active === "services" && (androidPermissions.busy || kbs.saving || dictation.saving))
-          || (active === "business" && (profile.saving || googleReviews.saving))
-        : false;
-
+  const businessDirty = drafts.dirty.business || profile.dirty;
+  const canSaveBusiness = businessDirty || !initialized;
+  const businessBusy = drafts.busy || profile.saving;
+  const allDirty = businessDirty || drafts.dirty.services || googleReviews.dirty || kbs.dirty || tts.dirty || dictation.dirty || androidPermissions.dirty;
+  const wasSetupRequired = useRef(props.setupData.setupRequired);
+  const collapsePending = useRef(false);
+  useEffect(() => {
+    if (wasSetupRequired.current && initialized) collapsePending.current = true;
+    wasSetupRequired.current = !initialized;
+    if (!initialized) setStructureExpanded(true);
+    else if (collapsePending.current && !allDirty && !serviceOpen) {
+      setStructureExpanded(false);
+      collapsePending.current = false;
+    }
+  }, [initialized, allDirty, serviceOpen]);
+  const expanded = !initialized || structureExpanded;
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities)
-    .filter((result) => initialized || result.category === "business");
+    .filter(result => initialized || result.category === "business" || result.id === "settings-web");
 
-  async function saveCategory(categoryId: SettingsCategoryId): Promise<SettingsOperationResult> {
-    if (categoryId === "business") {
+  function serviceOwner(id: string): ServiceSettingsOwner {
+    if (id === "settings-google-reviews") return { dirty: googleReviews.dirty, busy: googleReviews.loading || googleReviews.saving || googleReviews.testing,
+      savedEnabled: googleReviews.settings.enabled, save: googleReviews.save, discard: googleReviews.discard };
+    if (id === "settings-kbs") return { dirty: kbs.dirty, busy: kbs.loading || kbs.saving || kbs.testing,
+      savedEnabled: kbs.settings.enabled, save: async () => {
+        const result = await kbs.save();
+        if (result.ok && result.changed) {
+          try { await props.onDashboardRefresh?.(); }
+          catch { return { ...result, message: "KBS ayarları kaydedildi. Görünümü yenilemek için Ayarları tekrar açın." }; }
+        }
+        return result;
+      }, discard: kbs.discard };
+    if (id === "settings-speech") return { dirty: tts.dirty, savedEnabled: tts.savedPreferences.enabled, save: tts.save, discard: tts.discard };
+    if (id === "settings-dictation") return { dirty: dictation.dirty, busy: dictation.busy || dictation.loading,
+      savedEnabled: dictation.status?.enabled ?? false, save: dictation.save, discard: dictation.discard };
+    if (isSetupServiceId(id)) return {
+      savedEnabled: serviceActivation(drafts.canonical, id),
+      dirty: drafts.serviceDirty(id) || (id === "settings-android" && androidPermissions.dirty),
+      busy: drafts.busy || (id === "settings-android" && androidPermissions.busy) || (id === "settings-ai" && ai.aiConnectionTestState === "loading"),
+      save: async () => {
+        const result = await drafts.saveService(id);
+        if (!result.ok) return result;
+        if (id === "settings-android" && drafts.form.androidEnabled && androidPermissions.dirty) return androidPermissions.save();
+        if (id === "settings-android" && !drafts.form.androidEnabled) androidPermissions.discard();
+        return result;
+      },
+      discard: () => { drafts.discardService(id); if (id === "settings-android") androidPermissions.discard(); if (id === "settings-ai") ai.invalidate(); }
+    };
+    return { dirty: false, save: () => ({ ok: false, message: "Servis kayıt sahibi bulunamadı." }), discard: () => undefined };
+  }
+
+  async function saveBusiness(): Promise<SettingsOperationResult> {
       const profileChanged = initialized && drafts.form.profileId !== drafts.canonical.profileId;
       let changed = false;
-      if (drafts.dirty.business) {
-        const setupResult = await drafts.save("business");
+      if (drafts.dirty.business || !initialized) {
+        const setupResult = await drafts.saveBusiness();
         if (!setupResult.ok) return setupResult;
         changed ||= setupResult.changed;
       }
@@ -187,11 +171,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         const profileResult = await profile.save();
         if (!profileResult.ok) return profileResult;
         changed ||= profileResult.changed;
-      }
-      if (googleReviews.dirty) {
-        const googleReviewsResult = await googleReviews.save();
-        if (!googleReviewsResult.ok) return googleReviewsResult;
-        changed ||= googleReviewsResult.changed;
       }
       if (profileChanged && changed) {
         try {
@@ -206,224 +185,76 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         }
       }
       return { ok: true, changed };
-    }
-
-    if (categoryId === "operations") {
-      return layout.save();
-    }
-
-    if (categoryId === "services") {
-      let changed = false;
-      if (drafts.dirty.services) {
-        const setupResult = await drafts.save("services");
-        if (!setupResult.ok) return setupResult;
-        changed ||= setupResult.changed;
-      }
-      if (!drafts.form.androidEnabled) {
-        androidPermissions.discard();
-      } else if (androidPermissions.dirty) {
-        const permissionResult = await androidPermissions.save();
-        if (!permissionResult.ok) return permissionResult;
-        changed ||= permissionResult.changed;
-      }
-      if (kbs.dirty) {
-        const kbsResult = await kbs.save();
-        if (!kbsResult.ok) return kbsResult;
-        changed ||= kbsResult.changed;
-        if (kbsResult.changed) await props.onDashboardRefresh?.();
-      }
-      const ttsResult = tts.save();
-      if (!ttsResult.ok) return ttsResult;
-      changed ||= ttsResult.changed;
-      const dictationResult = await dictation.save();
-      if (!dictationResult.ok) return dictationResult;
-      changed ||= dictationResult.changed;
-      return { ok: true, changed };
-    }
-
-    let changed = false;
-    if (updates.dirty) {
-      const updateResult = await updates.savePreferences();
-      if (!updateResult.ok) return updateResult;
-      changed ||= updateResult.changed;
-    }
-    if (appearance.dirty) {
-      const appearanceResult = appearance.save();
-      if (!appearanceResult.ok) return appearanceResult;
-      changed ||= appearanceResult.changed;
-    }
-    return { ok: true, changed };
   }
 
-  async function discardCategory(categoryId: SettingsCategoryId): Promise<boolean> {
-    if (categoryId === "business") {
-      drafts.discard("business");
-      profile.discard();
-      googleReviews.discard();
-      return true;
-    }
-    if (categoryId === "operations") {
-      return await layout.discard();
-    }
-    if (categoryId === "services") {
-      drafts.discard("services");
-      androidPermissions.discard();
-      kbs.discard();
-      tts.discard();
-      await dictation.discard();
-      ai.invalidate();
-      return true;
-    }
-    appearance.discard();
-    updates.discard();
-    return true;
+  function discardBusiness() { drafts.discardBusiness(); profile.discard(); }
+  function reportResult(result: SettingsOperationResult) {
+    reportAppStatus(result.ok ? "success" : "error", result.message || (result.ok ? "İşletme ayarları kaydedildi." : "Ayarlar kaydedilemedi."));
   }
-
-  function commitTransition(transition: PendingCategoryTransition, afterGuard = false) {
-    if (active === "services" && transition.category !== "services") {
-      ai.invalidate();
-    }
-    setActive(transition.category);
-    if (transition.clearQuery) setQuery("");
-    if (transition.focusTarget) {
-      setFocusTarget(transition.focusTarget);
-    } else if (afterGuard && transition.focusTabAfterGuard) {
-      setFocusTarget(`settings-tab-${transition.category}`);
-    }
-  }
-
-  function requestCategoryTransition(transition: Omit<PendingCategoryTransition, "kind">): boolean {
-    if (!initialized && transition.category !== "business") return false;
-    const categoryTransition: PendingCategoryTransition = { kind: "category", ...transition };
-    if (transition.category === active) {
-      if (transition.clearQuery) setQuery("");
-      if (transition.focusTarget) setFocusTarget(transition.focusTarget);
-      return true;
-    }
-    if (!dirty[active]) {
-      commitTransition(categoryTransition);
-      return true;
-    }
-    setPendingTransition(categoryTransition);
-    return false;
-  }
-
-  function requestTabChange(categoryId: SettingsCategoryId) {
-    return requestCategoryTransition({
-      category: categoryId,
-      focusTarget: "",
-      clearQuery: false,
-      focusTabAfterGuard: true
-    });
-  }
-
-  function reportSettingsSaveResult(categoryId: SettingsCategoryId, result: SettingsOperationResult) {
-    const title = settingsCategories.find((item) => item.id === categoryId)?.title ?? "Ayarlar";
-    if (!result.ok) {
-      reportAppStatus("error", result.message);
-      return;
-    }
-    if (result.changed) {
-      reportAppStatus("success", result.message || `${title} kaydedildi.`);
-    }
-  }
-
-  async function saveCurrentCategory() {
-    if (!categoryDirty) return;
-    const categoryId = active;
-    const result = await saveCategory(categoryId);
-    reportSettingsSaveResult(categoryId, result);
-  }
-
-  async function discardCurrentCategory() {
-    if (categoryBusy) return;
-    const categoryId = active;
-    const discarded = await discardCategory(categoryId);
-    if (discarded) {
-      const title = settingsCategories.find((item) => item.id === categoryId)?.title ?? "Ayarlar";
-      reportAppStatus("success", `${title} değişiklikleri geri alındı.`);
-    }
-  }
-
+  async function saveBusinessSettings() { if (canSaveBusiness) reportResult(await saveBusiness()); }
+  function discardBusinessSettings() { if (!businessBusy) discardBusiness(); }
   async function saveAndContinue() {
-    if (!pendingTransition || guardBusy || categoryBusy) return;
+    if (!pendingTransition || guardBusy || businessBusy) return;
     setGuardBusy(true);
     try {
-      const categoryId = active;
-      const result = await saveCategory(categoryId);
-      reportSettingsSaveResult(categoryId, result);
-      if (!result.ok) return;
-      const transition = pendingTransition;
-      setPendingTransition(null);
-      if (transition.kind === "category") {
-        commitTransition(transition, true);
-      } else {
-        if (active === "services") ai.invalidate();
-        transition.continueNavigation();
-      }
-    } finally {
-      setGuardBusy(false);
-    }
+      const result = await saveBusiness();
+      reportResult(result);
+      if (result.ok) { const next = pendingTransition; setPendingTransition(null); next.continueNavigation(); }
+    } finally { setGuardBusy(false); }
   }
-
-  async function discardAndContinue() {
-    if (!pendingTransition || guardBusy || categoryBusy) return;
-    setGuardBusy(true);
-    try {
-      const categoryId = active;
-      const discarded = await discardCategory(categoryId);
-      if (!discarded) return;
-      const title = settingsCategories.find((item) => item.id === categoryId)?.title ?? "Ayarlar";
-      reportAppStatus("success", `${title} değişiklikleri geri alındı.`);
-      const transition = pendingTransition;
-      setPendingTransition(null);
-      if (transition.kind === "category") {
-        commitTransition(transition, true);
-      } else {
-        if (active === "services") ai.invalidate();
-        transition.continueNavigation();
-      }
-    } finally {
-      setGuardBusy(false);
-    }
+  function discardAndContinue() {
+    if (!pendingTransition || guardBusy || businessBusy) return;
+    discardBusiness(); const next = pendingTransition; setPendingTransition(null); next.continueNavigation();
   }
 
   useEffect(() => {
     if (!registerPageLeaveGuard) return;
 
     return registerPageLeaveGuard((destination, continueNavigation) => {
-      if (!categoryDirty) return true;
+      if (layoutOpen || layout.dirty || serviceOpen) return false;
+      if (!businessDirty) return true;
       if (pendingTransition || guardBusy) return false;
       setPendingTransition({
-        kind: "page",
         destination,
         continueNavigation
       });
       return false;
     });
-  }, [categoryDirty, guardBusy, pendingTransition, registerPageLeaveGuard]);
+  }, [businessDirty, guardBusy, pendingTransition, registerPageLeaveGuard, layoutOpen, layout.dirty, serviceOpen]);
 
   useEffect(() => {
     if (!focusTarget) return;
+    if (focusTarget === "settings-rooms-button" || focusTarget === "settings-tables-button") {
+      setLayoutOpen(focusTarget === "settings-rooms-button" ? "rooms" : "tables");
+    }
     const target = root.current?.querySelector<HTMLElement>(`#${focusTarget}`);
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ block: "start", behavior: "instant" });
     setFocusTarget("");
-  }, [active, focusTarget]);
+  }, [focusTarget, expanded]);
 
-  const pageScroll = usePageViewScroll(`settings.scroll.${active}`, active);
+  const pageScroll = usePageViewScroll("settings.scroll");
   return (
+    <ServiceSettingsContext.Provider value={{ active: serviceOpen, open: setServiceOpen, owner: serviceOwner }}>
     <div ref={root} className="settings-workspace setup-capabilities">
       <div className="settings-search">
-        <label className="form-field">
-          Ayarlarda ara
+        <div className="form-field">
           <input
+            aria-label="Ayarlarda ara"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Kategori, bölüm veya ayar adı"
+            placeholder="Ayarlarda ara"
           />
-        </label>
+        </div>
+        <div className="settings-utility-actions">
+          <SettingsActionPopover id="settings-security-button" label="Güvenlik" open={utility === "security"} onOpenChange={open => setUtility(open ? "security" : null)}>
+            <PasswordSettings controller={password} />
+          </SettingsActionPopover>
+          <SettingsActionPopover id="settings-data-button" label="Veriler" open={utility === "data"} onOpenChange={open => setUtility(open ? "data" : null)}>
+            <DataMaintenanceSettings initialized={initialized} />
+          </SettingsActionPopover>
+        </div>
         {query.trim() && (
           <div className="settings-search-results" aria-label="Ayar arama sonuçları">
             {results.length ? results.map((result) => (
@@ -432,33 +263,42 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 key={result.id}
                 type="button"
                 onClick={() => {
-                  requestCategoryTransition({
-                    category: result.category,
-                    focusTarget: result.id,
-                    clearQuery: true,
-                    focusTabAfterGuard: false
-                  });
+                  if (result.placement === "global") {
+                    setQuery("");
+                    if (result.id === "settings-security-button") setUtility("security");
+                    if (result.id === "settings-data-button") setUtility("data");
+                    if (result.id === "settings-web") setFocusTarget(result.id);
+                    return;
+                  }
+                  setQuery("");
+                  const id = result.serviceTarget ?? result.id;
+                  if (result.category === "services") {
+                    setStructureExpanded(true); setServiceOpen(id);
+                  } else {
+                    if (id === "settings-business" || id === "settings-options") setStructureExpanded(true);
+                    setFocusTarget(id);
+                  }
                 }}
               >
-                {settingsCategories.find((item) => item.id === result.category)?.title ?? "Ayarlar"} · {result.title}
+                {result.title}
               </button>
             )) : <p role="status">Ayar bulunamadı.</p>}
           </div>
         )}
       </div>
 
-      <SettingsCategoryTabs active={active} dirty={dirty} categories={visibleCategories} onChange={requestTabChange} />
+      <WebSettingsSection canonical={initialized ? drafts.canonical : drafts.form} onSave={drafts.saveWebConnection}
+        disabled={drafts.busy || guardBusy} initialized={initialized}
+        onSetupChange={web => drafts.setDraft(form => ({ ...form, ...web }))} />
 
-      <section
-        className="settings-category-workspace"
-        id={`settings-panel-${active}`}
-        role="tabpanel"
-        aria-labelledby={`settings-tab-${active}`}
-        tabIndex={0}
-      >
-        <div ref={pageScroll} className="settings-category-body" role="region" aria-label={`${category.title} ayar içeriği`}>
-          {active === "business" && (
-            <>
+      <section className="settings-page-workspace" id="settings-panel-business" aria-label="İşletme ayarları">
+        <div ref={pageScroll} className="settings-page-body">
+          <section className="settings-panel settings-structure">
+            <div className="settings-panel-header"><ActionButton variant="ghost" aria-expanded={expanded} aria-controls="settings-structure-content"
+              onClick={() => { if (initialized && !(expanded && allDirty)) setStructureExpanded(!expanded); }}>
+              İşletme Yapısı ve Özellikler {expanded ? '▴' : '▾'}
+            </ActionButton></div>
+            <div id="settings-structure-content" hidden={!expanded}>
               <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
                 <BusinessSettingsSection form={drafts.form} onFormChange={drafts.setDraft} persistedProfileId={drafts.canonical.profileId} />
               </fieldset>
@@ -471,8 +311,64 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 initialized={initialized}
                 runtimeSnapshot={runtimeCapabilities}
               />
-              {initialized && (
-                <>
+              {initialized && <section className="settings-services-list" aria-label="Servisler"><h3>Servisler</h3>
+              <div className="settings-services-grid">
+              {isBusinessServiceAvailable("googleReviews", capabilities) && (
+                    <GoogleReviewsSettingsSection
+                      controller={googleReviews}
+                      disabled={drafts.busy || guardBusy}
+                    />
+                  )}
+              {isBusinessServiceAvailable("ai", capabilities) &&
+                <AiSettingsSection form={drafts.form} onFormChange={drafts.setDraft} {...ai}
+                  disabled={businessBusy || guardBusy} onTestAiConnection={() => void ai.testAiConnection()} />}
+              <SpeechSettingsSection controller={tts} disabled={businessBusy || guardBusy} />
+              <DesktopDictationSetup controller={dictation} form={drafts.form} canonical={drafts.canonical}
+                aiCapability={capabilities.includes(C.AI)} disabled={businessBusy || guardBusy} />
+                <ServicesSettingsSection
+                  {...props}
+                  disabled={businessBusy || guardBusy}
+                  onRevokeAndroidDevice={device => {
+                    if (serviceOwner("settings-android").dirty) { reportAppStatus("error", "Önce Android değişikliklerini kaydedin veya İptal seçin."); return; }
+                    setServiceOpen(null);
+                    setTimeout(() => props.onRevokeAndroidDevice?.(device), 0);
+                  }}
+                  form={drafts.form}
+                  onFormChange={drafts.setDraft}
+                  enabledCapabilities={capabilities}
+                  androidPermissionGroups={androidPermissions.draft}
+                  onAndroidPermissionGroupsChange={androidPermissions.update}
+                />
+              {isBusinessServiceAvailable("kbs", capabilities) && (
+                <KbsSettingsSection controller={kbs} disabled={businessBusy || guardBusy} />
+              )}
+              <StagedSettingsContributionSlot
+                category="services"
+                form={drafts.form}
+                onFormChange={drafts.setDraft}
+                busy={businessBusy || guardBusy}
+                configurationCapabilities={capabilities}
+                initialized={initialized}
+                runtimeSnapshot={runtimeCapabilities}
+              />
+              </div>
+              </section>}
+            </div>
+          </section>
+              <section id="settings-public-profile" tabIndex={-1} className="settings-panel">
+                <div className="settings-panel-header"><h2>İşletme Bilgileri</h2></div>
+                <div className="settings-panel-body">
+                  <div className="settings-company-toolbar">
+                    <fieldset className="settings-resource-fields" disabled={drafts.busy || guardBusy}>
+                      <BusinessContactFields form={drafts.form} onFormChange={drafts.setDraft} />
+                    </fieldset>
+                    <div className="settings-company-management-actions">
+                      {roomsEnabled && <ActionButton id="settings-rooms-button" variant="secondary" onClick={() => setLayoutOpen("rooms")}>Oda Yönetimi</ActionButton>}
+                      {tablesEnabled && <ActionButton id="settings-tables-button" variant="secondary" onClick={() => setLayoutOpen("tables")}>Masa Yönetimi</ActionButton>}
+                      {initialized && <ActionButton id="settings-gallery-button" variant="secondary" onClick={() => setGalleryOpen(true)}>Galeri Yönetimi</ActionButton>}
+                    </div>
+                  </div>
+                  {initialized && <>
                   <BusinessPublicProfileSection
                     controller={profile}
                     disabled={drafts.busy || guardBusy}
@@ -481,94 +377,31 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                     controller={profile}
                     disabled={drafts.busy || guardBusy}
                   />
-                  {isBusinessServiceAvailable("googleReviews", capabilities) && (
-                    <GoogleReviewsSettingsSection
-                      controller={googleReviews}
-                      disabled={drafts.busy || guardBusy}
-                    />
-                  )}
-                </>
-              )}
-            </>
-          )}
-
-          {active === "operations" && (
-            <>
-              {tablesEnabled && <LayoutSettingsSection controller={layout} />}
-              {roomsEnabled && <RoomManagementSection controller={layout} />}
-            </>
-          )}
-
-          {active === "services" && (
-            <>
-              <fieldset className="settings-resource-fields" disabled={categoryBusy || guardBusy}>
-                <WebSettingsSection form={drafts.form} onFormChange={drafts.setDraft} />
-              </fieldset>
-              {isBusinessServiceAvailable("ai", capabilities) && <fieldset className="settings-resource-fields" disabled={categoryBusy || guardBusy}>
-                <AiSettingsSection form={drafts.form} onFormChange={drafts.setDraft} {...ai}
-                  onTestAiConnection={() => void ai.testAiConnection()} savedEnabled={props.setupData.aiEnabled} />
-              </fieldset>}
-              <SpeechSettingsSection controller={tts} disabled={categoryBusy || guardBusy} />
-              <DesktopDictationSetup controller={dictation} form={drafts.form} canonical={drafts.canonical}
-                aiCapability={capabilities.includes(C.AI)} disabled={categoryBusy || guardBusy} />
-              <fieldset className="settings-resource-fields" disabled={categoryBusy || guardBusy}>
-                <ServicesSettingsSection
-                  {...props}
-                  {...ai}
-                  onTestAiConnection={() => void ai.testAiConnection()}
-                  form={drafts.form}
-                  onFormChange={drafts.setDraft}
-                  enabledCapabilities={capabilities}
-                  androidPermissionGroups={androidPermissions.draft}
-                  onAndroidPermissionGroupsChange={androidPermissions.update}
-                />
-              </fieldset>
-              {isBusinessServiceAvailable("kbs", capabilities) && (
-                <KbsSettingsSection controller={kbs} disabled={categoryBusy || guardBusy} />
-              )}
-              <StagedSettingsContributionSlot
-                category="services"
-                form={drafts.form}
-                onFormChange={drafts.setDraft}
-                busy={categoryBusy || guardBusy}
-                configurationCapabilities={capabilities}
-                initialized={initialized}
-                runtimeSnapshot={runtimeCapabilities}
-              />
-            </>
-          )}
-
-          {active === "application" && (
-            <div id="settings-application" className="settings-application-workspace">
-              <AppearanceSettingsSection controller={appearance} />
-              {initialized && <UpdateSettings controller={updates} />}
-              <PasswordSettings controller={password} />
-              {initialized && (
-                <div id="settings-maintenance" tabIndex={-1}>
-                  <DataMaintenanceSettings />
+                  </>}
                 </div>
-              )}
-            </div>
-          )}
+              </section>
+
+
+
         </div>
 
-        {hasCategorySaveSection && (
-          <footer className="settings-category-actions">
+        {(
+          <footer className="settings-page-actions">
             <div>
-              {categoryDirty && <span>Kaydedilmemiş kategori değişiklikleri</span>}
+              {businessDirty && <span>Kaydedilmemiş işletme değişiklikleri</span>}
             </div>
             <ActionButton
               type="button"
-              disabled={categoryBusy || guardBusy || !categoryDirty}
-              onClick={() => { void saveCurrentCategory(); }}
+              disabled={businessBusy || guardBusy || !canSaveBusiness}
+              onClick={() => { void saveBusinessSettings(); }}
             >
-              {categorySaving ? "Kaydediliyor…" : "Kaydet"}
+              {businessBusy ? "Kaydediliyor…" : "Kaydet"}
             </ActionButton>
             <ActionButton
               variant="secondary"
               type="button"
-              disabled={categoryBusy || guardBusy || !categoryDirty}
-              onClick={() => { void discardCurrentCategory(); }}
+              disabled={businessBusy || guardBusy || !businessDirty}
+              onClick={() => { void discardBusinessSettings(); }}
             >
               Değişiklikleri Geri Al
             </ActionButton>
@@ -576,10 +409,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         )}
       </section>
 
+      {layoutOpen && <BusinessLayoutOverlay kind={layoutOpen} controller={layout} onClose={() => setLayoutOpen(null)} />}
+      {galleryOpen && <BusinessGalleryOverlay onClose={() => setGalleryOpen(false)} />}
       <SettingsUnsavedChangesDialog
         open={Boolean(pendingTransition)}
-        busy={guardBusy || categoryBusy}
-        categoryTitle={category.title}
+        busy={guardBusy || businessBusy}
+        categoryTitle="İşletme"
         onSaveAndContinue={() => { void saveAndContinue(); }}
         onDiscardAndContinue={() => { void discardAndContinue(); }}
         onStay={() => {
@@ -587,5 +422,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         }}
       />
     </div>
+    </ServiceSettingsContext.Provider>
   );
 }

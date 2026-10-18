@@ -1,3 +1,4 @@
+import { ServiceSettingsCard } from './ServiceSettingsCard';
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   GoogleReviewsConnectionTestResult,
@@ -43,6 +44,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
     message: ""
   });
   const saveInFlight = useRef(false);
+  const [readiness, setReadiness] = useState<"Test edilmedi" | "Kontrol ediliyor…" | "Hazır" | "Hata">("Test edilmedi");
 
   useEffect(() => {
     if (!enabled) {
@@ -72,6 +74,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
     || draft.clearApiKey;
 
   const update = <K extends keyof GoogleReviewsDraft>(key: K, value: GoogleReviewsDraft[K]) => {
+    setReadiness("Test edilmedi");
     setDraft((current) => ({ ...current, [key]: value }));
     setFeedback({ error: false, warning: false, message: "" });
   };
@@ -111,6 +114,7 @@ export function useGoogleReviewsSettings(enabled: boolean) {
 
   const testConnection = useCallback(async (): Promise<GoogleReviewsConnectionTestResult> => {
     setTesting(true);
+    setReadiness("Kontrol ediliyor…");
     setFeedback({ error: false, warning: false, message: "" });
     try {
       const result = await window.yardimciDesktop!.testGoogleReviewsConnection({
@@ -125,10 +129,12 @@ export function useGoogleReviewsSettings(enabled: boolean) {
           ? `${result.message} ${result.name}${result.rating !== null ? ` · ${result.rating.toFixed(1)} ★` : ""} · ${result.userRatingCount} değerlendirme`
           : result.message
       });
+      setReadiness(result.ok ? "Hazır" : "Hata");
       return result;
     } catch {
       const result = { ok: false as const, message: "Google Places bağlantısı denenemedi." };
       setFeedback({ error: true, warning: false, message: result.message });
+      setReadiness(result.ok ? "Hazır" : "Hata");
       return result;
     } finally {
       setTesting(false);
@@ -137,11 +143,13 @@ export function useGoogleReviewsSettings(enabled: boolean) {
 
   const discard = () => {
     if (saving) return;
+    setReadiness("Test edilmedi");
     setDraft(toDraft(settings));
     setFeedback({ error: false, warning: false, message: "" });
   };
 
   return {
+    readiness,
     draft,
     settings,
     loading,
@@ -163,35 +171,13 @@ export function GoogleReviewsSettingsSection({
   controller: ReturnType<typeof useGoogleReviewsSettings>;
   disabled?: boolean;
 }) {
-  const { draft, settings, loading, saving, testing, feedback, update, save, testConnection } = controller;
+  const { draft, settings, loading, saving, testing, feedback, update, testConnection } = controller;
   const apiKeyConfigured = settings.apiKeyConfigured && !draft.clearApiKey;
 
   return (
-    <section id="settings-google-reviews" tabIndex={-1} className="settings-panel" aria-busy={loading || saving || testing}>
-      <div className="settings-panel-header">
-        <div>
-          <h2>Google Yorumları</h2>
-        </div>
-      </div>
-
-      <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving || testing || disabled}>
-        {feedback.message && (
-          <p role={feedback.error ? "alert" : "status"}>
-            {feedback.warning ? "Uyarı: " : ""}{feedback.message}
-          </p>
-        )}
-
-        <label className="setting-switch-row">
-          <span>
-            <strong>Google yorumlarını web sitesinde göster</strong>
-          </span>
-          <input
-            type="checkbox"
-            checked={draft.enabled}
-            onChange={(event) => update("enabled", event.target.checked)}
-          />
-        </label>
-
+    <ServiceSettingsCard id="settings-google-reviews" title="Google Yorumları" enabled={draft.enabled}
+      disabled={loading || saving || testing || disabled} onEnabledChange={value => update("enabled", value)}
+      readiness={controller.readiness} testMessage={feedback.message} messageState={feedback.error ? "error" : "success"}>
         <div className="form-grid">
           <label className="form-field form-field--span">
             Google Place ID
@@ -248,22 +234,9 @@ export function GoogleReviewsSettingsSection({
           >
             {testing ? "Bağlantı deneniyor…" : "Google Bağlantısını Dene"}
           </ActionButton>
-          {settings.publicationPending ? (
-            <>
-              <small>Web yayını bekliyor. Yerel ayar kaydedildi; web modülüne yeniden gönderebilirsiniz.</small>
-              <ActionButton
-                variant="secondary"
-                type="button"
-                onClick={() => { void save(); }}
-              >
-                {saving ? "Web'e gönderiliyor…" : "Web Yayınını Yeniden Dene"}
-              </ActionButton>
-            </>
-          ) : settings.lastPublishedAt ? (
-            <small>Son web yayını: {new Date(settings.lastPublishedAt).toLocaleString("tr-TR")}</small>
-          ) : null}
+          {settings.publicationPending && <small>Web yayını bekliyor. Kaydet ile yeniden deneyin.</small>}
+
         </div>
-      </fieldset>
-    </section>
+    </ServiceSettingsCard>
   );
 }

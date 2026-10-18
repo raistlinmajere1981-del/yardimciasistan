@@ -76,7 +76,7 @@ export const UI_FONT_OPTIONS: UiFont[] = ["plex", "system"];
 export const UI_MOTION_OPTIONS: UiMotion[] = ["system", "full", "reduced"];
 
 const UI_PREFERENCES_STORAGE_KEY = "yardimci-asistan.ui-preferences";
-const DEFAULT_UI_PREFERENCES: UiPreferences = {
+export const DEFAULT_UI_PREFERENCES: Readonly<UiPreferences> = {
   version: 2,
   scheme: "system",
   density: "comfortable",

@@ -137,7 +137,10 @@
     root.replaceChildren();
     const features = Array.isArray(table.features) ? table.features : [];
     const known = features.filter((feature) => featureCatalog[feature]);
-    if (!known.length) {
+    const smokingPolicy = String(table.smoking_policy || "unspecified");
+    const smokingLabel = smokingPolicy === "smoking_allowed" || smokingPolicy === "outdoor_only"
+      ? smokingLabels[smokingPolicy] : "";
+    if (!known.length && !smokingLabel) {
       const empty = document.createElement("div");
       empty.className = "room-catalog-empty";
       empty.textContent = "Masa özellikleri henüz yayınlanmadı.";
@@ -149,6 +152,18 @@
       item.className = "amenity-item";
       item.innerHTML = '<span class="amenity-icon" aria-hidden="true">◇</span><span></span>';
       item.lastElementChild.textContent = featureCatalog[feature];
+      root.append(item);
+    }
+    if (smokingLabel) {
+      const item = document.createElement("div");
+      item.className = "amenity-item";
+      const icon = document.createElement("span");
+      icon.className = "amenity-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "🚬";
+      const label = document.createElement("span");
+      label.textContent = smokingLabel;
+      item.append(icon, label);
       root.append(item);
     }
   };
@@ -284,7 +299,13 @@
     setText("[data-table-name]", table.name || "Masa");
     setText("[data-table-area]", table.area || "Bölüm belirtilmedi");
     setText("[data-table-capacity]", Number(table.capacity) > 0 ? `${Math.trunc(Number(table.capacity))} kişi` : "");
-    setText("[data-table-smoking]", smokingLabels[String(table.smoking_policy || "unspecified")] || "Sigara politikası belirtilmedi");
+    const smokingNotice = document.querySelector("[data-table-smoking]");
+    if (smokingNotice instanceof HTMLElement) {
+      const policy = String(table.smoking_policy || "unspecified");
+      // Allowed policies are rendered with an icon in the feature grid; no duplicate note.
+      smokingNotice.textContent = policy === "non_smoking" ? smokingLabels.non_smoking : "";
+      smokingNotice.hidden = policy !== "non_smoking";
+    }
 
     const description = document.querySelector("[data-table-description]");
     if (description instanceof HTMLElement) {

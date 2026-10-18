@@ -1,3 +1,4 @@
+import { reportAppStatus } from "../../app/runtime-state";
 import { useEffect, useState } from "react";
 import { ARAS_SHIPPING_PROVIDER, isArasShippingConfigurationReady, type ArasShippingConfiguration, type ShippingConnectionTestResult } from "@yardimci-asistan/shared";
 import { useSettingsConnectionTest } from "../../app/use-settings-connection-test";
@@ -10,6 +11,7 @@ export function ArasShippingSettingsSection({ draft, busy, onChange }: {
   const connection = useSettingsConnectionTest<ShippingConnectionTestResult>(draft);
   const { testing } = connection;
   const message = connection.result?.message ?? "";
+  useEffect(() => { if (message) reportAppStatus(connection.result?.ok ? "success" : "error", message); }, [message, connection.result]);
   const canTest = isArasShippingConfigurationReady(draft);
   const [stored, setStored] = useState<ArasShippingConfiguration | null>(null);
   useEffect(() => {
@@ -24,7 +26,7 @@ export function ArasShippingSettingsSection({ draft, busy, onChange }: {
   const matchesStored = !draft.password && !draft.clearPassword && draft.hasSecret && stored?.verified
     && stored.environment === draft.environment && stored.customerCode === draft.customerCode && stored.username === draft.username;
   const ready = connection.result ? connection.result.ok : matchesStored;
-  const status = !canTest ? "Yapılandırılmadı" : ready ? "Hazır" : "Test edilmedi";
+  const status = testing ? "Kontrol ediliyor…" : connection.result?.ok === false ? "Hata" : !canTest ? "Yapılandırılmadı" : ready ? "Hazır" : "Test edilmedi";
   function change(patch: Partial<typeof draft>) { connection.clear(); onChange({ ...draft, ...patch }); }
   async function testConnection() {
     const bridge = window.yardimciDesktop?.commerce;
@@ -51,7 +53,7 @@ export function ArasShippingSettingsSection({ draft, busy, onChange }: {
     {draft.hasSecret && <label className="form-check setup-checkline"><input type="checkbox" checked={Boolean(draft.clearPassword)} onChange={(event) => change({ clearPassword: event.target.checked, password: "" })} /><span>Kayıtlı şifreyi kaldır</span></label>}
     <small>Bağlantı testi ayarları kaydetmez.</small>
     <div className="settings-inline-actions"><ActionButton variant="secondary" size="sm" disabled={busy || testing || !canTest} busy={testing} onClick={() => void testConnection()}>Bağlantıyı test et</ActionButton></div>
-    {message && <p role="status">{message}</p>}
+
     </fieldset>
   </section>;
 }

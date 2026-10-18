@@ -1,22 +1,22 @@
+import { copySettingsFields, serviceSettingsFields, settingsFieldsDirty, type SetupServiceId } from './settings-service-fields';
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { getBusinessProfile, normalizeBusinessProfileOptions } from "@yardimci-asistan/shared";
 import type { DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
 import { createSetupInput, toSetupForm, type SetupFormState } from "./setup-model";
 import {
+  settingsFieldOwners,
   copyCategory,
+  copyWebConnection,
+  type WebConnectionSettings,
   isCategoryDirty,
-  mergeSettingsCategory,
   stagedSettingsCategories,
   validateSettingsCategory
 } from "./settings-draft-model";
-import { settingsCategories, type StagedSettingsCategoryId } from "./settings-registry";
+import type { StagedSettingsCategoryId } from "./settings-registry";
 import type {
   SettingsOperationResult,
-  SettingsSaveState,
   SettingsSetupSaveResult
 } from "./settings-save";
-
-type CategoryFeedback = { state: SettingsSaveState; message: string };
 
 export function useSettingsDrafts(
   setupData: DesktopSetupData,
@@ -29,7 +29,6 @@ export function useSettingsDrafts(
   const baselineRef = useRef(initial);
   const sourceRef = useRef(setupData);
   const savingRef = useRef(false);
-  const [feedback, setFeedback] = useState<Partial<Record<StagedSettingsCategoryId, CategoryFeedback>>>({});
   const [busy, setBusy] = useState(false);
 
   const setDraft = useCallback((next: SetStateAction<SetupFormState>) => {
@@ -43,35 +42,29 @@ export function useSettingsDrafts(
     value = { ...value, profileOptions: normalizeBusinessProfileOptions(value.profileId, value.profileOptions) };
     draftRef.current = value;
     setForm(value);
-
-    setFeedback((current) => {
-      let changed = false;
-      const nextFeedback = { ...current };
-      for (const category of stagedSettingsCategories) {
-        if (isCategoryDirty(value, previous, category) && nextFeedback[category]) {
-          delete nextFeedback[category];
-          changed = true;
-        }
-      }
-      return changed ? nextFeedback : current;
-    });
   }, []);
 
-  const applyExternalSnapshot = useCallback((next: DesktopSetupData) => {
+  const applyExternalSnapshot = useCallback((next: DesktopSetupData, resetDraft = false) => {
     const fresh = toSetupForm(next);
-
-    // First-run generated sync secret is initialization state, not a new draft on each bootstrap.
-    if (next.setupRequired && (!next.syncSecret || next.syncSecret === "change-this-secret")) {
-      fresh.syncSecret = canonicalRef.current.syncSecret;
+    if (resetDraft) {
+      // Clean start owns a new form; never resurrect a secret or pending fields.
+      canonicalRef.current = fresh;
+      baselineRef.current = fresh;
+      draftRef.current = fresh;
+      setForm(fresh);
+      return;
     }
 
-    let nextDraft = draftRef.current;
-    let nextBaseline = baselineRef.current;
+    const webDirty = JSON.stringify([draftRef.current.webModuleUrl, draftRef.current.syncSecret, draftRef.current.autoSyncEnabled])
+      !== JSON.stringify([baselineRef.current.webModuleUrl, baselineRef.current.syncSecret, baselineRef.current.autoSyncEnabled]);
+    let nextDraft = next.setupRequired && webDirty ? draftRef.current : copyWebConnection(draftRef.current, fresh);
+    let nextBaseline = copyWebConnection(baselineRef.current, fresh);
 
-    for (const category of stagedSettingsCategories) {
-      if (!isCategoryDirty(nextDraft, nextBaseline, category)) {
-        nextDraft = copyCategory(nextDraft, fresh, category);
-        nextBaseline = copyCategory(nextBaseline, fresh, category);
+    // Each service is an independent owner even while another service is dirty.
+    for (const fields of [settingsFieldOwners.business, ...Object.values(serviceSettingsFields)]) {
+      if (!settingsFieldsDirty(nextDraft, nextBaseline, fields)) {
+        nextDraft = copySettingsFields(nextDraft, fresh, fields);
+        nextBaseline = copySettingsFields(nextBaseline, fresh, fields);
       }
     }
 
@@ -81,80 +74,72 @@ export function useSettingsDrafts(
     setForm(nextDraft);
   }, []);
 
-  const replaceWithCommittedSnapshot = useCallback((next: DesktopSetupData) => {
+  function acceptCommitted(next: DesktopSetupData, fields: readonly (keyof SetupFormState)[]) {
     const fresh = toSetupForm(next);
-    canonicalRef.current = fresh;
-    baselineRef.current = fresh;
-    draftRef.current = fresh;
-    setForm(fresh);
-  }, []);
+    applyExternalSnapshot(next);
+    baselineRef.current = copySettingsFields(baselineRef.current, fresh, fields);
+    draftRef.current = copySettingsFields(draftRef.current, fresh, fields);
+    setForm(draftRef.current);
+  }
 
   useEffect(() => {
     if (sourceRef.current === setupData) return;
+    const resetDraft = !sourceRef.current.setupRequired && setupData.setupRequired;
     sourceRef.current = setupData;
-    applyExternalSnapshot(setupData);
+    applyExternalSnapshot(setupData, resetDraft);
   }, [applyExternalSnapshot, setupData]);
 
   const dirty = Object.fromEntries(
     stagedSettingsCategories.map((category) => [
       category,
       isCategoryDirty(form, baselineRef.current, category)
+        || (category === "business" && setupData.setupRequired &&
+          JSON.stringify([form.webModuleUrl, form.syncSecret, form.autoSyncEnabled]) !==
+          JSON.stringify([baselineRef.current.webModuleUrl, baselineRef.current.syncSecret, baselineRef.current.autoSyncEnabled]))
     ])
   ) as Record<StagedSettingsCategoryId, boolean>;
 
-  function discard(category: StagedSettingsCategoryId) {
+  function discardBusiness() {
     if (savingRef.current) return;
 
-    const next = copyCategory(draftRef.current, canonicalRef.current, category);
-    baselineRef.current = copyCategory(baselineRef.current, canonicalRef.current, category);
+    const categoryDraft = copyCategory(draftRef.current, canonicalRef.current, "business");
+    const next = setupData.setupRequired ? copyWebConnection(categoryDraft, canonicalRef.current) : categoryDraft;
+    baselineRef.current = copyCategory(baselineRef.current, canonicalRef.current, "business");
+    if (setupData.setupRequired) baselineRef.current = copyWebConnection(baselineRef.current, canonicalRef.current);
     draftRef.current = next;
     setForm(next);
-    setFeedback((current) => ({
-      ...current,
-      [category]: { state: "idle", message: "" }
-    }));
   }
 
-  async function save(category: StagedSettingsCategoryId): Promise<SettingsOperationResult> {
+  async function saveBusiness(): Promise<SettingsOperationResult> {
     if (savingRef.current) return { ok: false, message: "Ayarlar kaydediliyor." };
-    if (!dirty[category]) return { ok: true, changed: false };
+    if (!dirty.business && !setupData.setupRequired) return { ok: true, changed: false };
 
     savingRef.current = true;
     setBusy(true);
 
-    const title = settingsCategories.find((item) => item.id === category)!.title;
-    const report = (state: SettingsSaveState, message: string) => {
-      setFeedback((current) => ({
-        ...current,
-        [category]: { state, message }
-      }));
-    };
-
-    report("loading", `${title} kaydediliyor…`);
+    const title = "İşletme";
 
     try {
       const latest = await window.yardimciDesktop?.getSetupData?.();
       const latestCanonical = latest ? toSetupForm(latest) : canonicalRef.current;
       canonicalRef.current = latestCanonical;
 
-      const merged = mergeSettingsCategory(latestCanonical, draftRef.current, category);
-      const error = category !== "business" && !merged.businessName.trim()
-        ? "Önce İşletme kategorisindeki firma adını kaydedin."
-        : validateSettingsCategory(merged, category);
+      const categoryDraft = copyCategory(latestCanonical, draftRef.current, "business");
+      const merged = setupData.setupRequired
+        ? copyWebConnection(categoryDraft, draftRef.current) : categoryDraft;
+      const error = validateSettingsCategory(merged, "business");
 
       if (error) {
-        report("error", error);
         return { ok: false, message: error };
       }
 
       const result = await persist(createSetupInput(merged));
       if (!result.ok) {
-        report("error", result.message);
         return { ok: false, message: result.message };
       }
 
       sourceRef.current = result.setupData;
-      replaceWithCommittedSnapshot(result.setupData);
+      acceptCommitted(result.setupData, [...settingsFieldOwners.business, ...(setupData.setupRequired ? ["webModuleUrl", "syncSecret", "autoSyncEnabled"] as const : [])]);
 
       const warning = result.refreshWarning
         || (merged.aiEnabled && (result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false)
@@ -165,12 +150,76 @@ export function useSettingsDrafts(
         ? `${title}: ${warning}`
         : `${title} kaydedildi.`;
 
-      report(warning ? "error" : "success", message);
       return { ok: true, changed: true, message };
     } catch (error) {
       const message = error instanceof Error ? error.message : `${title} kaydedilemedi.`;
-      report("error", message);
       return { ok: false, message };
+    } finally {
+      savingRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  function serviceDirty(id: SetupServiceId) {
+    return settingsFieldsDirty(form, baselineRef.current, serviceSettingsFields[id]);
+  }
+
+  function discardService(id: SetupServiceId) {
+    if (savingRef.current) return;
+    const fields = serviceSettingsFields[id];
+    baselineRef.current = copySettingsFields(baselineRef.current, canonicalRef.current, fields);
+    draftRef.current = copySettingsFields(draftRef.current, canonicalRef.current, fields);
+    setForm(draftRef.current);
+  }
+
+  async function saveService(id: SetupServiceId): Promise<SettingsOperationResult> {
+    if (savingRef.current) return { ok: false, message: "Ayarlar kaydediliyor." };
+    if (!serviceDirty(id)) return { ok: true, changed: false };
+    savingRef.current = true;
+    setBusy(true);
+    try {
+      const latest = await window.yardimciDesktop?.getSetupData?.();
+      if (!latest || latest.setupRequired) return { ok: false, message: "Önce işletme kurulumunu tamamlayın." };
+      const fields = serviceSettingsFields[id];
+      const merged = copySettingsFields(toSetupForm(latest), draftRef.current, fields);
+      const error = validateSettingsCategory(merged, "services");
+      if (error) return { ok: false, message: error };
+      const result = await persist(createSetupInput(merged));
+      if (!result.ok) return result;
+      sourceRef.current = result.setupData;
+      acceptCommitted(result.setupData, fields);
+      return { ok: true, changed: true, message: result.refreshWarning || result.message || "Servis ayarları kaydedildi." };
+    } catch {
+      return { ok: false, message: "Servis ayarları kaydedilemedi. Tekrar deneyin." };
+    } finally {
+      savingRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function saveWebConnection(web: WebConnectionSettings): Promise<SettingsOperationResult> {
+    if (savingRef.current) return { ok: false, message: "Ayarlar kaydediliyor." };
+    savingRef.current = true;
+    setBusy(true);
+    try {
+      const latest = await window.yardimciDesktop?.getSetupData?.();
+      if (!latest) return { ok: false, message: "Kayıtlı ayarlar okunamadı. Tekrar deneyin." };
+      const startingSetup = latest.setupRequired;
+      const base = startingSetup
+        ? copyCategory(toSetupForm(latest), draftRef.current, "business")
+        : toSetupForm(latest);
+      const result = await persist(createSetupInput(copyWebConnection(base, web)));
+      if (!result.ok) return { ok: false, message: result.message };
+      sourceRef.current = result.setupData;
+      acceptCommitted(result.setupData, [
+        "webModuleUrl", "syncSecret", "autoSyncEnabled",
+        ...(startingSetup ? settingsFieldOwners.business : [])
+      ]);
+      const warning = result.refreshWarning
+        || (result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false ? result.message : "");
+      return { ok: true, changed: true, message: warning || "Web bağlantı ayarları kaydedildi." };
+    } catch {
+      return { ok: false, message: "Web bağlantı ayarları kaydedilemedi. Tekrar deneyin." };
     } finally {
       savingRef.current = false;
       setBusy(false);
@@ -181,10 +230,13 @@ export function useSettingsDrafts(
     form,
     setDraft,
     dirty,
-    feedback,
     busy,
-    save,
-    discard,
+    saveBusiness,
+    saveWebConnection,
+    saveService,
+    discardService,
+    serviceDirty,
+    discardBusiness,
     canonical: canonicalRef.current
   };
 }

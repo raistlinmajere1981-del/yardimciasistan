@@ -1,3 +1,4 @@
+import { openSettingsService, cancelSettingsService, saveSettingsService } from "./test-helpers/settings-ui.mjs";
 import assert from "node:assert/strict";
 import { installSpeechMock, localTtsVoice as local } from "./test-helpers/tts-fixtures.mjs";
 import { resolve } from "node:path";
@@ -6,7 +7,7 @@ import { createServer } from "vite";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 
 // Only Web Speech and the sound device are mocked. Preferences, adapter, camera
-// feedback and Settings category guards execute their real renderer code.
+// feedback and service close guards execute their real renderer code.
 
 const voices = [local("tr-one", "Türkçe Bir", "tr-TR"), local("en-one", "English One", "en-US", true), local("tr-two", "Türkçe İki", "tr-TR")];
 const server = await createServer({
@@ -30,14 +31,13 @@ try {
   const ui = await context.newPage();
   ui.setDefaultTimeout(8000);
   await ui.goto(`${server.resolvedUrls.local[0]}tts-settings-test?profile=market`);
-  const tab = name => ui.getByRole("tab", { name: new RegExp(`^${name}( ·|$)`) });
-  const panel = ui.locator("#settings-speech");
-  const save = () => ui.locator(".settings-category-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
-  const guard = () => ui.getByRole("dialog", { name: /değişiklikleri bekliyor/i });
-  await tab("Servisler").click();
+  const openSpeech = () => openSettingsService(ui, "settings-speech");
+  const panel = ui.locator(".settings-service-overlay");
+  const save = () => saveSettingsService(ui);
+  await openSpeech();
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText("Yerel sesler aranıyor");
   await expect(panel).toContainText("Yerel ses yok");
+  await expect(panel.getByLabel("Canlı kontrol durumu")).toHaveText("Kullanılamıyor");
   await expect(panel.getByRole("button", { name: "Sesi Dene", exact: true })).toBeDisabled();
   await ui.evaluate(voices => window.__ttsVoices(voices), voices);
   await expect(panel).toContainText("3 yerel ses");
@@ -53,20 +53,20 @@ try {
   }, value);
   await slider("Konuşma hızı", 1.3);
   await slider("Ses düzeyi", 37);
-  await expect(tab("Servisler")).toContainText("Değişiklik var");
+  await expect(ui.locator("#settings-speech").getByRole("img")).toHaveAttribute("aria-label", /Bekliyor/);
   assert.equal(await ui.evaluate(() => localStorage.getItem("yardimci-asistan.desktop-tts")), null);
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
-  await expect(panel).toContainText("Ses denemesi tamamlandı");
+  await expect(ui.getByText("Ses denemesi tamamlandı.", { exact: true })).toBeVisible();
+  await expect(panel.getByLabel("Canlı kontrol durumu")).toHaveText("Hazır");
   assert.deepEqual(await ui.evaluate(() => {
     const spoken = window.__ttsMock.spoken.at(-1);
     return { text: spoken.text, voice: spoken.voice.name, rate: spoken.rate, volume: spoken.volume };
   }), { text: "Yardımcı Asistan. Ses denemesi.", voice: "Türkçe İki", rate: 1.3, volume: 0.37 });
   assert.equal(await ui.evaluate(() => localStorage.getItem("yardimci-asistan.desktop-tts")), null);
-  await tab("Uygulama").click();
-  await expect(guard()).toBeVisible();
-  await guard().getByRole("button", { name: "Burada kal", exact: true }).click();
+  await ui.keyboard.press("Escape");
+  await expect(panel).toBeVisible();
   await save();
-  await expect(tab("Servisler")).not.toContainText("Değişiklik var");
+  await expect(ui.locator("#settings-speech").getByRole("img")).not.toHaveAttribute("aria-label", /Bekliyor/);
   assert.equal(await ui.evaluate(() => window.settingsCalls.filter(call => call.kind === "setup").length), 0, "Device TTS save must not rewrite business Setup");
   const saved = await ui.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.desktop-tts")));
   assert.equal(saved.voiceId, secondVoice);
@@ -75,28 +75,29 @@ try {
 
   await ui.reload();
   await ui.evaluate(voices => window.__ttsVoices(voices), voices);
-  await tab("Servisler").click();
+  await openSpeech();
   await expect(panel.getByRole("combobox", { name: "Konuşma sesi" })).toHaveValue(secondVoice);
   await expect(panel.getByRole("slider", { name: /Konuşma hızı/ })).toHaveValue("1.3");
   await expect(panel.getByRole("slider", { name: /Ses düzeyi/ })).toHaveValue("37");
   await slider("Ses düzeyi", 55);
-  await tab("Uygulama").click();
-  await guard().getByRole("button", { name: "Değişiklikleri geri al ve geç", exact: true }).click();
-  await tab("Servisler").click();
+  await ui.keyboard.press("Escape");
+  await expect(panel).toBeVisible();
+  await cancelSettingsService(ui);
+  await openSpeech();
   await expect(panel.getByRole("slider", { name: /Ses düzeyi/ })).toHaveValue("37");
   await ui.evaluate(voices => window.__ttsVoices(voices.slice(0, 2)), voices);
   await expect(panel).toContainText("Kayıtlı ses bulunamadı");
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
-  await expect(panel).toContainText("Ses denemesi tamamlandı");
+  await expect(ui.getByText("Ses denemesi tamamlandı.", { exact: true })).toBeVisible();
   assert.equal(await ui.evaluate(() => window.__ttsMock.spoken.at(-1).voice.name), "Türkçe Bir");
   assert.equal(await ui.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.desktop-tts")).voiceId), secondVoice);
 
   await ui.evaluate(() => { window.__ttsMock.mode = "never-start"; });
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
-  await expect(panel).toContainText("Konuşma başlatılamadı");
+  await expect(ui.getByText(/Konuşma başlatılamadı/)).toBeVisible();
   await panel.getByRole("button", { name: "Sesi Dene", exact: true }).click();
   await panel.getByRole("button", { name: "Sesi Durdur", exact: true }).click();
-  await expect(panel).toContainText("Ses denemesi durduruldu");
+  await expect(ui.getByText("Ses denemesi durduruldu.", { exact: true })).toBeVisible();
 
   // Storage failure keeps the dirty category and blocks Save-and-continue.
   await slider("Ses düzeyi", 60);
@@ -107,14 +108,15 @@ try {
       return window.__setItem.call(this, key, value);
     };
   });
-  await tab("Uygulama").click();
-  await guard().getByRole("button", { name: "Kaydet ve geç", exact: true }).click();
-  await expect(guard()).toBeVisible();
-  await expect(panel).toContainText("saklanamadı");
+  await ui.keyboard.press("Escape");
+  await expect(panel).toBeVisible();
+  await save();
+  await expect(panel).toBeVisible();
+  await expect(ui.getByText(/saklanamadı/)).toBeVisible();
   await ui.evaluate(() => { Storage.prototype.setItem = window.__setItem; });
-  await guard().getByRole("button", { name: "Kaydet ve geç", exact: true }).click();
-  await expect(tab("Uygulama")).toHaveAttribute("aria-selected", "true");
-  await tab("Servisler").click();
+  await save();
+  await expect(panel).toHaveCount(0);
+  await openSpeech();
   await expect(panel.getByRole("slider", { name: /Ses düzeyi/ })).toHaveValue("60");
 
   // Existing camera prompts use committed settings and preserve signal patterns.
@@ -160,8 +162,8 @@ try {
   assert.deepEqual(camera.synthesisErrorBeep, [300, 220]);
   assert.deepEqual(camera.cancelledBeep, []);
   assert.ok(camera.gains.includes(0.14) && camera.gains.includes(0.22));
-  await panel.getByRole("checkbox", { name: "Seslendirme etkin", exact: true }).uncheck();
-  await expect(panel.locator(".settings-service-card-body")).toHaveCount(0);
+  await panel.getByRole("switch", { name: "Seslendirme etkin", exact: true }).uncheck();
+  await expect(panel.getByRole("combobox", { name: "Konuşma sesi" })).toBeVisible();
   await save();
   const disabledCamera = await ui.evaluate(async () => {
     const { announceIdentityCamera } = await import("/src/app/identity-camera-feedback.ts");

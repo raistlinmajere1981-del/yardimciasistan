@@ -36,3 +36,29 @@ export async function ensurePublicationSource(database: DesktopDatabase, config:
 export function publicationIdempotencyKey(clientId: string, epoch: number, jobKey: string, revision: number) {
   return `${clientId}:${epoch}:${jobKey}:${revision}`;
 }
+
+
+/** An explicit Connect action claims this publication target after authenticated
+ * validation. Background retries never take over an existing publication source. */
+export async function connectPublicationSource(database: DesktopDatabase, config: SyncCoreConfig) {
+  const target = config.baseUrl.trim().replace(/\/+$/, "");
+  const clientId = database.getSyncRuntimeStatus().clientId;
+  if (!clientId) return { ok: false as const, message: "Masaüstü yayın kimliği bulunamadı." };
+  const remote = await readRestoreSyncState(config);
+  if (!remote.ok) return remote;
+  const epoch = remote.source_epoch;
+  if (epoch > 0 && remote.source_client_id === clientId) {
+    database.replacePublicationSourceEpoch(target, epoch);
+    database.ensurePublicationTarget(target);
+    return { ok: true as const, message: "Bu masaüstü yayın kaynağı zaten etkin.", sourceEpoch: epoch };
+  }
+  // The user explicitly requested connection. CAS preserves remote ordering;
+  // unauthenticated tests and passive synchronization never transfer ownership.
+  const result = await activatePublicationSource({
+    ...config, clientId, expectedEpoch: epoch, activationKey: `${clientId}:connect:${epoch}`
+  });
+  if (!result.ok) return result;
+  database.replacePublicationSourceEpoch(target, result.source_epoch);
+  database.ensurePublicationTarget(target);
+  return { ok: true as const, message: "Web yayın kaynağı bağlandı.", sourceEpoch: result.source_epoch };
+}

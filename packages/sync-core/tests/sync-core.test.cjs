@@ -1026,6 +1026,8 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
       latitude: 41.1,
       longitude: 33.2,
       description: "Mahalle marketi.",
+      aboutText: "Hikâyemiz\nİkinci satır",
+      gallery: [{id:"gallery_1",kind:"photo",url:"/yardimci-asistan/media/gallery/gallery/gallery_1.jpg",mimeType:"image/jpeg",title:"İşletmemiz",sortOrder:1}],
       directionsNote: "Ana caddeden ikinci sokak.",
       policyNote: "İade koşulları fiş üzerinde belirtilir.",
       paymentNote: "Nakit ve kart kabul edilir.",
@@ -1047,6 +1049,11 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
   assert.equal(calls[0].body.client_id, "desktop-1");
   assert.equal(calls[0].body.business_context.profile_id, "market");
   assert.equal(calls[0].body.business_context.directions_note, "Ana caddeden ikinci sokak.");
+  assert.equal(calls[0].body.business_context.aboutText, "Hikâyemiz\nİkinci satır");
+  assert.deepEqual(calls[0].body.business_context.gallery, [{
+    id:"gallery_1",kind:"photo",url:"/yardimci-asistan/media/gallery/gallery/gallery_1.jpg",
+    mime_type:"image/jpeg",title:"İşletmemiz",sort_order:1
+  }]);
   assert.deepEqual(calls[0].body.business_context.features, []);
   assert.deepEqual(calls[0].body.business_context.feature_ids, []);
   assert.deepEqual(calls[0].body.business_context.social_links, []);

@@ -49,7 +49,9 @@ try {
     if ($action === 'restore_sync_state') {
         $db = ya_storage_open();
         $db->beginTransaction();
-        $state = ['source_epoch' => (int)$db->query('SELECT COALESCE(MAX(epoch), 0) FROM publication_sources')->fetchColumn(),
+        $activeSource = $db->query('SELECT epoch, client_id FROM publication_sources ORDER BY epoch DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+        $state = ['source_epoch' => (int)($activeSource['epoch'] ?? 0),
+            'source_client_id' => (string)($activeSource['client_id'] ?? ''),
             'requests_through' => (int)$db->query('SELECT COALESCE(MAX(seq), 0) FROM web_requests')->fetchColumn(),
             'orders_through' => (int)$db->query('SELECT COALESCE(MAX(seq), 0) FROM web_orders')->fetchColumn()];
         $db->commit();
@@ -1566,6 +1568,22 @@ function ya_sync_publish_business_context(array $payload): void
         $longitude = null;
     }
 
+    $gallery = [];
+    foreach (($candidate['gallery'] ?? []) as $image) {
+        if (!is_array($image) || count($gallery) >= 80) continue;
+        $url = trim((string) ($image['url'] ?? ''));
+        // Only our public gallery-media endpoint can be referenced.
+        if (!preg_match('#^/yardimci-asistan/media/gallery/gallery/[A-Za-z0-9._%-]+$#', $url)) continue;
+        $gallery[] = [
+            'id' => mb_substr(ya_sync_string($image['id'] ?? ''), 0, 180),
+            'url' => $url,
+            'title' => mb_substr(ya_sync_string($image['title'] ?? ''), 0, 240),
+            'kind' => ($image['kind'] ?? '') === 'cover' ? 'cover' : 'photo',
+            'sort_order' => (int) ($image['sort_order'] ?? 0)
+        ];
+    }
+    usort($gallery, static fn(array $a, array $b): int => $a['sort_order'] <=> $b['sort_order']);
+
     $publishedContext = [
         'version' => 1,
         'business_name' => mb_substr(ya_sync_string($candidate['business_name'] ?? ''), 0, 160),
@@ -1581,6 +1599,8 @@ function ya_sync_publish_business_context(array $payload): void
         'latitude' => $latitude,
         'longitude' => $longitude,
         'description' => mb_substr(ya_sync_string($candidate['description'] ?? ''), 0, 1600),
+        'about_text' => mb_substr(ya_sync_string($candidate['aboutText'] ?? ''), 0, 8000),
+        'gallery' => $gallery,
         'directions_note' => mb_substr(ya_sync_string($candidate['directions_note'] ?? ''), 0, 1200),
         'policy_note' => mb_substr(ya_sync_string($candidate['policy_note'] ?? ''), 0, 1200),
         'payment_note' => mb_substr(ya_sync_string($candidate['payment_note'] ?? ''), 0, 800),

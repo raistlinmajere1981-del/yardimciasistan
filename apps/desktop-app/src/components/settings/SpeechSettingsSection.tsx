@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { getDesktopTts } from "../../app/tts/desktop-tts";
 import { readTtsPreferences } from "../../tts-preferences";
 import type { useTtsSettings } from "../../app/use-tts-settings";
 import { ActionButton } from "../ui/ActionButton";
-import { ServiceSettingsCard } from "./ServiceSettingsCard";
+import { ServiceSettingsContext, ServiceSettingsCard } from "./ServiceSettingsCard";
 
 export function SpeechSettingsSection({ controller, disabled = false }: {
   controller: ReturnType<typeof useTtsSettings>;
   disabled?: boolean;
 }) {
+  const host = useContext(ServiceSettingsContext);
   const [adapter] = useState(getDesktopTts);
   const [snapshot, setSnapshot] = useState(() => adapter.getSnapshot());
   const [testing, setTesting] = useState(false);
+  const [readiness, setReadiness] = useState<"Test edilmedi" | "Hazır" | "Hata">("Test edilmedi");
   const [message, setMessage] = useState("");
   const mounted = useRef(false);
   const previewActive = useRef(false);
@@ -29,6 +31,11 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
     };
   }, [adapter]);
 
+  useEffect(() => { setReadiness("Test edilmedi"); setMessage(""); }, [preferences]);
+
+  useEffect(() => {
+    if (host && host.active !== "settings-speech" && previewActive.current) adapter.cancel();
+  }, [host, adapter]);
   const selection = adapter.resolveVoice(preferences);
   const languages = [...new Set(snapshot.voices.map(voice => voice.language))].sort();
   const visibleVoices = snapshot.voices.filter(voice => !preferences.language || voice.language === preferences.language);
@@ -47,15 +54,17 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
     previewActive.current = false;
     if (!mounted.current) return;
     setTesting(false);
+    setReadiness(result.status === "failed" ? "Hata" : result.status === "cancelled" ? "Test edilmedi" : "Hazır");
     setMessage(result.status === "failed" ? result.error.message
       : result.status === "cancelled" ? "Ses denemesi durduruldu."
         : preferences.volume === 0 ? "Ses düzeyi 0: sessiz deneme tamamlandı." : "Ses denemesi tamamlandı.");
   }
 
   return <ServiceSettingsCard id="settings-speech" title="Metin Seslendirme" enabled={preferences.enabled}
-    status={preferences.enabled ? status : "Kapalı"} disabled={disabled} toggleLabel="Seslendirme etkin"
+    readiness={snapshot.state === "unavailable" || snapshot.state === "error" ? "Kullanılamıyor" : testing ? "Kontrol ediliyor…" : readiness} testMessage={message}
+    status={status} disabled={disabled} toggleLabel="Seslendirme etkin"
     onEnabledChange={enabled => { if (!enabled && previewActive.current) adapter.cancel(); change({ ...preferences, enabled }); }}
-    feedback={controller.error && <p role="alert">{controller.error}</p>}>
+    >
     {preferences.enabled && !committedEnabled && <small>Etkinleştirmek için Kaydet seçin.</small>}
     <fieldset className="settings-resource-fields" disabled={disabled || testing}>
       <div className="form-grid">
@@ -97,6 +106,6 @@ export function SpeechSettingsSection({ controller, disabled = false }: {
       <ActionButton type="button" variant="secondary" disabled={disabled || testing || !preferences.enabled || !committedEnabled || !selection.voice} onClick={() => { void testVoice(); }}>Sesi Dene</ActionButton>
       {testing && <ActionButton type="button" variant="secondary" onClick={() => adapter.cancel()}>Sesi Durdur</ActionButton>}
     </div>
-    {message && <p role="status">{message}</p>}
+
   </ServiceSettingsCard>;
 }

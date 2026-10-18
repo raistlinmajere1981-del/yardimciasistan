@@ -1,4 +1,6 @@
 const SMOKE_FILES = [
+  "scripts/smoke-android-auto-repair.mjs",
+  "scripts/smoke-web-table-smoking-icons.mjs",
   "scripts/smoke-android-companion-v3.mjs",
   "scripts/smoke-record-picker-ui.mjs",
   "scripts/smoke-feature-dependencies.mjs",
@@ -80,6 +82,9 @@ const SMOKE_FILES = [
   "scripts/smoke-business-layout.mjs",
   "scripts/smoke-business-location-geocode.mjs",
   "scripts/smoke-business-public-profile.mjs",
+  "scripts/smoke-business-gallery-ui.mjs",
+  "scripts/smoke-business-gallery-storage.mjs",
+  "scripts/smoke-business-site-pages.mjs",
   "scripts/smoke-calendar-workspace.mjs",
   "scripts/smoke-capability-runtime.mjs",
   "scripts/smoke-capability-settings-source.mjs",
@@ -189,6 +194,7 @@ const SMOKE_FILES = [
   "scripts/smoke-table-categories-db.mjs",
   "scripts/smoke-table-customer.mjs",
   "scripts/smoke-web-connection-test.mjs",
+  "scripts/smoke-web-explicit-source.mjs",
   "scripts/smoke-web-form-api.mjs",
   "scripts/smoke-web-module-menu.mjs",
   "scripts/smoke-web-version.mjs",
@@ -237,6 +243,9 @@ const LINUX_ONLY_SMOKE_FILES = new Set([
 ]);
 
 const BASE_CHECKS = [
+  check("android-ui-parity-v16", "Yerel Android V16 tasarım eşitliği tarayıcı kontrolü", "node", [".superdesign/android-companion/redesign-pixco-stitch-v1/test-parity-v16.cjs"], {
+    phase: 50, domains: ["android", "design"]
+  }),
   check("business-ai-boundary", "AI business domain authority contract", "node", ["scripts/smoke-business-ai-boundary.mjs"], {
     phase: 50, presets: ["full"], domains: ["platform", "web", "marketing"], requires: ["build-desktop", "php-lint"]
   }),
@@ -561,6 +570,8 @@ function smokeLabel(file) {
 }
 
 function smokeRequires(file) {
+  if (file === "scripts/smoke-android-auto-repair.mjs") return ["build-packages"];
+  if (file === "scripts/smoke-web-table-smoking-icons.mjs") return [];
   if (file === "scripts/smoke-android-kbs-hosting.mjs") return ["php-lint"];
   if (file === "scripts/smoke-voice-stt-android.mjs") return ["build-desktop", "php-lint"];
   if (file === "scripts/smoke-voice-stt-desktop.mjs") return [];
@@ -588,6 +599,7 @@ function smokeRequires(file) {
 }
 
 function smokeDomains(file) {
+  if (file === "scripts/smoke-android-auto-repair.mjs") return ["android", "desktop", "settings"];
   if (file === "scripts/smoke-android-kbs.mjs") return ["android", "hospitality", "desktop"];
   if (file === "scripts/smoke-android-kbs-hosting.mjs") return ["android", "hospitality", "web"];
   if (file === "scripts/smoke-voice-stt-android.mjs") return ["voice", "android", "settings", "web"];

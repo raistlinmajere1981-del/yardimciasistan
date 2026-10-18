@@ -5,7 +5,8 @@ import { build } from 'vite';
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium } from '@playwright/test';
+import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 
@@ -38,7 +39,7 @@ await build({
   build:{outDir:temporary,emptyOutDir:false,minify:false,
     lib:{entry,formats:['iife'],name:'AndroidRepairSmoke',fileName:'bundle.js'}}
 });
-const browser=await chromium.launch({executablePath:'/usr/bin/brave',headless:true,args:['--no-sandbox']});
+const browser=await launchChromiumForSmoke(chromium);
 try {
   const page=await browser.newPage();
   page.on('pageerror',error=>console.log('BROWSER_ERROR',String(error).slice(0,400)));

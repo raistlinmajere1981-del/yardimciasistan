@@ -31,6 +31,7 @@
 @import "./components/header.css" layer(components.primitives);
 @import "./components/page-transition.css" layer(components.primitives);
 @import "./components/notifications.css" layer(components.primitives);
+@import "./components/appearance.css" layer(components.primitives);
 @import "./components/toolbars.css" layer(components.primitives);
 @import "./components/status.css" layer(components.primitives);
 @import "./components/feedback.css" layer(components.support);

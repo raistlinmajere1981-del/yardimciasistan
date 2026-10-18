@@ -40,6 +40,7 @@ const ACCOMMODATION_ONLY_PUBLIC_FEATURE_IDS = new Set<BusinessPublicFeatureId>([
 
 export const BUSINESS_PUBLIC_PROFILE_LIMITS = {
   description: 1600,
+  aboutText: 8000,
   directionsNote: 1200,
   policyNote: 1200,
   paymentNote: 800,
@@ -78,6 +79,7 @@ export interface BusinessPublicProfile {
   mapDisplayMode: BusinessMapDisplayMode;
   googleMapsEmbedUrl: string;
   description: string;
+  aboutText: string;
   latitude: number | null;
   longitude: number | null;
   directionsNote: string;

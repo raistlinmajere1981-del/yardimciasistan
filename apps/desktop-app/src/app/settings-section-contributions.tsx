@@ -62,7 +62,7 @@ const stagedSettingsContributions = {
   }, {
     definition: dealerPortalDefinition,
     render: ({ draft, onChange, busy }) => (
-      <ServiceSettingsCard id="settings-dealer-portal" title="Bayi Web Erişimi" enabled={draft.dealerPortalEnabled}
+      <ServiceSettingsCard id="settings-dealer-portal" readiness="Test kullanılamıyor" title="Bayi Web Erişimi" enabled={draft.dealerPortalEnabled}
         disabled={busy} onEnabledChange={dealerPortalEnabled => onChange({ dealerPortalEnabled })}>
         <p>Aktif bayilere Müşteri kartından tek kullanımlık davet ile web erişimi verin.</p>
       </ServiceSettingsCard>
@@ -72,7 +72,7 @@ const stagedSettingsContributions = {
     render: (props) => {
       const { draft, onChange, busy } = props;
       return (
-      <ServiceSettingsCard id="settings-online-delivery" title="Teslimat ve Gönderim"
+      <ServiceSettingsCard id="settings-online-delivery" readiness="Test kullanılamıyor" title="Teslimat ve Gönderim"
         enabled={draft.onlineSalesDeliveryEnabled} disabled={busy} onEnabledChange={onlineSalesDeliveryEnabled => onChange({ onlineSalesDeliveryEnabled })}>
         <small>En az bir teslimat yöntemi açık olmalı. Kapalıyken web siparişi alınmaz.</small>
         <label className="settings-service-toggle"><input type="checkbox" disabled={busy} checked={draft.onlineSalesDelivery.pickupEnabled}

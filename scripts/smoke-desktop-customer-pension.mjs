@@ -75,6 +75,7 @@ try {
     const record = (kind, input) => { window.__designCalls.push({ kind, input }); return { ok: true, message: 'Kaydedildi.', dashboardData: dashboard, savedId: input.id || 'stage2-customer' }; };
     window.yardimciDesktop = {
       getBusinessMessagingConfiguration: async () => ({ providerId: 'whatsapp_cloud', enabled: false, wabaId: '', phoneNumberId: '', hasSecret: false, configured: false }),
+      getInstagramConfiguration: async () => ({ providerId: 'instagram_api', enabled: false, accountId: '', username: '', expiresAt: '', apiVersion: 'v25.0', hasSecret: false, configured: false }),
       onBusinessMessagingChanged: () => () => {},
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
       commerce: { listProducts: async () => [], listCategories: async () => [], getCustomerCreditAccount: async id => ({ customer: { ...dashboard.customers.find(customer => customer.id === id), businessId: 'fixture', deletedAt: '' }, balances: [{ currency: 'TRY', amountMinor: 45000 }], entries: [] }) },
@@ -343,11 +344,14 @@ try {
     await expect(checkoutConfirmation).toHaveCount(0);
     await closeHospitalityWorkspace();
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
-    await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
-    await expect(page.getByRole('tab', { name: 'İşletme Düzeni', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await page.locator('#settings-rooms-button').click();
+    await expect(page.locator('.settings-layout-overlay')).toBeVisible();
     await page.getByLabel('Oda özetleri').getByRole('button', { name: 'Detaylar', exact: true }).first().click();
     await capture('room-editor');
-    await closeDialog();
+    const roomDetails = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle', exact: true });
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await roomDetails.getByRole('button', { name: 'Vazgeç', exact: true }).click();
+    await page.keyboard.press('Escape');
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
@@ -386,13 +390,11 @@ try {
   for (const [scheme, density] of [['light','compact'],['dark','compact'],['light','comfortable']]) {
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
-    await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'Uygulama', exact: true }).click();
-    await expect(page.getByRole('tab', { name: 'Uygulama', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await page.getByRole('button', { name: 'Görünüm', exact: true }).click();
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
     if (density === 'comfortable') await page.getByRole('radio', { name: 'Rahat', exact: true }).click();
-    // Appearance is staged: apply through the category save before asserting.
-    await page.locator('.settings-category-actions').getByRole('button', { name: 'Kaydet', exact: true }).click();
+    await page.keyboard.press('Escape');
     for (const name of ['Müşteri İşleri', 'Pansiyon']) {
       await page.locator('.sidebar').getByRole('button', { name, exact: true }).click();
       await capture(`${name}-${scheme}-${density}`);

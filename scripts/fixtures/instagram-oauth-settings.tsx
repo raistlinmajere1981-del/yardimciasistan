@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { InstagramSettingsSection } from "../../apps/desktop-app/src/components/settings/MarketingChannelsSettingsSection";
 import type { InstagramConfiguration } from "@yardimci-asistan/shared";
+import { ServiceSettingsContext } from "../../apps/desktop-app/src/components/settings/ServiceSettingsCard";
+import { GlobalMessageBar } from "../../apps/desktop-app/src/components/layout/GlobalMessageBar";
+import { subscribeAppStatus, type AppStatusDetail } from "../../apps/desktop-app/src/app/runtime-state";
+import type { SettingsOperationResult } from "../../apps/desktop-app/src/app/settings-save";
 import "../../apps/desktop-app/src/styles/index.css";
 
 const empty: InstagramConfiguration = {
@@ -50,31 +54,32 @@ Object.defineProperty(window, "yardimciDesktop", {
 function Fixture(){
   const [draft,setDraft]=useState<InstagramConfiguration>({...empty});
   const [persisted,setPersisted]=useState<InstagramConfiguration>({...empty});
-  const [message,setMessage]=useState("");
-  const change=(next:InstagramConfiguration)=>{state.draftEnabled=next.enabled;setDraft(next);setMessage("");};
-  const save=()=>{
+  const [active,setActive]=useState<string|null>(null);
+  const [status,setStatus]=useState<AppStatusDetail|null>(null);
+  useEffect(()=>subscribeAppStatus(setStatus),[]);
+  const change=(next:InstagramConfiguration)=>{state.draftEnabled=next.enabled;setDraft(next);};
+  const save=():SettingsOperationResult=>{
     state.saveCount++;
     if(draft.enabled && !(state.configuration.hasSecret && state.hasPassedTest)){
       state.error="Instagram ayarlarını kaydetmeden önce bağlantıyı başarıyla test edin.";
-      setMessage(state.error);
-      return;
+      return {ok:false,message:state.error};
     }
     state.savedEnabled=draft.enabled;
     state.configuration={...state.configuration,enabled:draft.enabled,configured:draft.enabled && state.configuration.hasSecret};
     const next={...draft,enabled:draft.enabled};
     setPersisted(next);setDraft(next);state.error="";
-    setMessage("Servisler kaydedildi.");
+    return {ok:true,changed:true,message:"Instagram kaydedildi."};
   };
   const revert=()=>{
-    state.draftEnabled=persisted.enabled;setDraft({...persisted});setMessage("");
+    state.draftEnabled=persisted.enabled;setDraft({...persisted});
   };
   return <main style={{padding:30,maxWidth:760}}>
+    {status && <GlobalMessageBar tone={status.state} message={status.message}/>}
+    <ServiceSettingsContext.Provider value={{active,open:setActive,owner:()=>({
+      dirty:draft.enabled!==persisted.enabled,savedEnabled:persisted.enabled,save,discard:revert
+    })}}>
     <InstagramSettingsSection draft={draft} busy={false} onChange={change}/>
-    <div className="action-row">
-      <button onClick={save} disabled={draft.enabled===persisted.enabled}>Kaydet</button>
-      <button onClick={revert} disabled={draft.enabled===persisted.enabled}>Değişiklikleri Geri Al</button>
-    </div>
-    {message && <p role="status">{message}</p>}
+    </ServiceSettingsContext.Provider>
   </main>;
 }
 createRoot(document.getElementById("root")!).render(<Fixture/>);

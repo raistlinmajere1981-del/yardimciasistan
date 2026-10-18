@@ -10,14 +10,12 @@ export interface ServicesSettingsProps {
   form: SetupFormState;
   enabledCapabilities: BusinessCapability[];
   setupData: DesktopSetupData;
+  disabled?: boolean;
   dashboardData?: DesktopDashboardData;
   androidDeviceState?: SyncState;
   androidInstallState?: SyncState;
   androidInstallSnapshot?: DesktopAndroidInstallationSnapshot | null;
-  aiConnectionTestState: SyncState;
-  aiConnectionTestMessage: string;
   onFormChange: (form: SetupFormState) => void;
-  onTestAiConnection: () => void;
   onRefreshAndroidInstallDevices?: () => void;
   onInstallAndroidApp?: (serial: string) => void;
   onProvisionAndroidApp?: (serial: string) => void;
@@ -33,6 +31,7 @@ export function ServicesSettingsSection({
   form,
   enabledCapabilities,
   setupData,
+  disabled = false,
   dashboardData,
   androidDeviceState = "idle",
   androidInstallState = "idle",
@@ -60,10 +59,10 @@ export function ServicesSettingsSection({
   };
 
   return (
-        <div id="settings-connections" className="settings-services-workspace">
+        <>
 
           {isBusinessServiceAvailable("whatsapp", enabledCapabilities) && (
-          <ServiceSettingsCard id="settings-whatsapp" title="WhatsApp" enabled={form.whatsappEnabled} onEnabledChange={enabled => update("whatsappEnabled", enabled)}>
+          <ServiceSettingsCard disabled={disabled} readiness="Test kullanılamıyor" id="settings-whatsapp" title="WhatsApp" enabled={form.whatsappEnabled} onEnabledChange={enabled => update("whatsappEnabled", enabled)}>
             <div className="setup-birthday-settings form-stack">
               <div className="setup-section-title setup-section-title--subsection">
                 <h3>Doğum Günü Mesajları</h3>
@@ -93,8 +92,8 @@ export function ServicesSettingsSection({
           )}
 
           {isBusinessServiceAvailable("android", enabledCapabilities) && (
-          <ServiceSettingsCard id="settings-android" title="Android" enabled={form.androidEnabled}
-            status={`${form.androidEnabled !== setupData.servicePreferences.android ? (form.androidEnabled ? "Etkinleştirilecek" : "Kapatılacak") : form.androidEnabled ? "Etkin" : "Kapalı"} · ${(dashboardData?.androidDevices ?? []).filter(device => device.isActive && !device.revokedAt).length} etkin cihaz`}
+          <ServiceSettingsCard disabled={disabled} readiness="Test kullanılamıyor" id="settings-android" title="Android" enabled={form.androidEnabled}
+            status={`${(dashboardData?.androidDevices ?? []).filter(device => device.isActive && !device.revokedAt).length} etkin cihaz`}
             onEnabledChange={enabled => update("androidEnabled", enabled)}>
               <div className="form-stack">
                 <div className="form-stack">
@@ -134,7 +133,7 @@ export function ServicesSettingsSection({
           )}
 
           {isBusinessServiceAvailable("productData", enabledCapabilities) && (
-          <ServiceSettingsCard id="settings-product-data" title="Ürün Verisi"
+          <ServiceSettingsCard disabled={disabled} readiness="Test kullanılamıyor" id="settings-product-data" title="Ürün Verisi"
             enabled={form.productDataEnabled} onEnabledChange={(enabled) => update("productDataEnabled", enabled)}>
               <div className="settings-service-empty">
                 Veri kaynağı: Open Food Facts · Veri lisansı: ODbL · Görseller: CC BY-SA
@@ -161,6 +160,6 @@ export function ServicesSettingsSection({
           </ServiceSettingsCard>
           )}
 
-        </div>
+        </>
   );
 }

@@ -1,4 +1,5 @@
 import { ipcMain } from "electron";
+import { connectPublicationSource } from "./publication-source-service";
 import type { DesktopDatabase } from "./database";
 import {
   testWebConnection,
@@ -18,4 +19,13 @@ export function registerWebConnectionIpcHandlers(options: { assertUnlocked: () =
       return result;
     }
   );
+  ipcMain.handle("sync:connectSource", async (_event, input: WebConnectionTestInput) => {
+    options.assertUnlocked();
+    const result = await connectPublicationSource(options.getDatabase(), {
+      baseUrl: input.baseUrl.trim().replace(/\/+$/, ""),
+      syncSecret: input.syncSecret.trim()
+    });
+    options.assertUnlocked();
+    return result;
+  });
 }

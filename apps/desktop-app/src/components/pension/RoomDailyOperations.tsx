@@ -113,7 +113,7 @@ export function RoomDailyOperations({ model, operations, disabled, data }: {
     </section>)}
     {isOutOfService && <section className="operation-section form-stack">
       <h4>Oda hazırlığı</h4>
-      <p>Oda hizmet dışı. Ayarlar &gt; İşletme Düzeni &gt; Oda Yönetimi&apos;nden yeniden kullanıma alınabilir.</p>
+      <p>Oda hizmet dışı. Ayarlar &gt; İşletme &gt; Oda Yönetimi&apos;nden yeniden kullanıma alınabilir.</p>
     </section>}
     {confirmDialog}
   </>;

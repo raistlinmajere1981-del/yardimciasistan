@@ -35,6 +35,7 @@ import { registerRequestIpcHandlers } from "./ipc/request-ipc";
 import { registerWhatsAppIpcHandlers } from "./ipc/whatsapp-ipc";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
 import { registerRoomMediaIpcHandlers } from "./room-media-ipc";
+import { registerBusinessGalleryIpcHandlers } from "./business-gallery-ipc";
 import { registerTableMediaIpcHandlers } from "./table-media-ipc";
 import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
 import { registerReservationIpcHandlers } from "./ipc/reservation-ipc";
@@ -329,6 +330,15 @@ export function registerDesktopIpcHandlers(
     getDatabase,
     assertUnlocked,
     assertCapability
+  });
+
+  registerBusinessGalleryIpcHandlers({
+    userDataPath: () => getDatabase().userDataPath,
+    assertUnlocked,
+    onCommit: () => {
+      publishBusinessAiContext();
+      getSyncCoordinator().scheduleSoon();
+    }
   });
 
   registerRoomMediaIpcHandlers({

@@ -135,7 +135,8 @@ load(resolve(root, "main-entry"));
 // Drain real Promise-based startup, then the root's deferred registrations.
 await new Promise(setImmediate);
 for (const action of immediate) action();
-assert.equal(handlers.size, 264, "all production invoke registrations must execute");
+assert.equal(handlers.size, 265, "all production invoke registrations must execute");
+assert.ok(handlers.has("sync:connectSource"), "explicit web publication ownership transfer must retain the production session lock gate");
 assert.equal(coordinatorOptions.androidActions, androidIngress, "main composes the same ingress owner for automatic and manual sync");
 assert.ok(handlers.has("app:restartAfterProfileChange"), "sector restart must remain an unlock-gated IPC operation");
 const renderer = Object.assign(new EventEmitter(), { id: 42, getURL: () => "fixture" });

@@ -45,6 +45,7 @@ export interface ResourceMediaServiceConfig {
   pickerTitle: string;
   singularLabel: string;
   pluralLabel: string;
+  imageOnly?: boolean;
 }
 
 export interface ResourceMediaUpdateInput {
@@ -81,8 +82,8 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
       title: config.pickerTitle,
       properties: ["openFile", "multiSelections"],
       filters: [{
-        name: "Görsel ve video",
-        extensions: ["jpg", "jpeg", "png", "webp", "mp4", "webm"]
+        name: config.imageOnly ? "Fotoğraf" : "Görsel ve video",
+        extensions: config.imageOnly ? ["jpg", "jpeg", "png", "webp"] : ["jpg", "jpeg", "png", "webp", "mp4", "webm"]
       }]
     };
     const result = owner
@@ -108,8 +109,8 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
     try {
       for (const sourcePath of result.filePaths) {
         const detectedKind = defaultKindForPath(sourcePath, preferredKind);
-        if (!detectedKind) {
-          throw new Error("Yalnız JPG, PNG, WebP, MP4 veya WebM dosyaları eklenebilir.");
+        if (!detectedKind || (config.imageOnly && detectedKind === "video")) {
+          throw new Error(config.imageOnly ? "Yalnız JPG, PNG ve WebP fotoğrafları eklenebilir." : "Yalnız JPG, PNG, WebP, MP4 veya WebM dosyaları eklenebilir.");
         }
 
         if (SINGLETON_KINDS.has(detectedKind)) {
@@ -224,6 +225,28 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
       media: list(userDataPath, resourceId),
       dirty: getDraftState(userDataPath).dirty
     };
+  }
+
+  function move(userDataPath: string, resourceIdValue: string, mediaIdValue: string, direction: "up" | "down"):
+    PublicResourceMediaMutationResult<ResourceMediaAsset> {
+    const resourceId = normalizeId(resourceIdValue);
+    const mediaId = normalizeId(mediaIdValue);
+    const draft = getDraftManifest(userDataPath);
+    const items = draft.media.filter(item => item.resourceId === resourceId)
+      .sort((a,b) => a.sortOrder - b.sortOrder);
+    const at = items.findIndex(item => item.id === mediaId);
+    const adjacent = direction === "up" ? at - 1 : at + 1;
+    if (at < 0 || adjacent < 0 || adjacent >= items.length) {
+      return failure("Fotoğrafın sırası değiştirilemedi.", list(userDataPath, resourceId), getDraftState(userDataPath).dirty);
+    }
+    const a = items[at]!, b = items[adjacent]!;
+    const order = a.sortOrder;
+    a.sortOrder = b.sortOrder;
+    b.sortOrder = order;
+    const now = new Date().toISOString();
+    a.updatedAt = now;
+    b.updatedAt = now;
+    return { ok: true, message: "Galeri sırası güncellendi.", media: list(userDataPath, resourceId), dirty: getDraftState(userDataPath).dirty };
   }
 
   function list(userDataPath: string, resourceIdValue: string): ResourceMediaAsset[] {
@@ -660,6 +683,7 @@ export function createPublicResourceMediaService(config: ResourceMediaServiceCon
   return {
     addFromDialog,
     update,
+    move,
     remove,
     list,
     listCoverPreviews,

@@ -1,3 +1,4 @@
+import { expandSettingsStructure } from "./test-helpers/settings-ui.mjs";
 import { chromium, expect } from "@playwright/test";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
@@ -67,8 +68,8 @@ async function verifyFirstSetupCategoryGate(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBeNull();
-    await expect(page.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab")).toHaveCount(1);
-    await expect(page.getByRole("tab", { name: "İşletme", exact: true })).toBeVisible();
+    await expect(page.getByRole("tablist", { name: "Ayar kategorileri" })).toHaveCount(0);
+    await expect(page.getByLabel("Sektör tipi")).toBeVisible();
     await expect(page.getByRole("tab", { name: "Uygulama", exact: true })).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
@@ -85,166 +86,122 @@ async function verifyFreshPreferences(activeBrowser, rendererUrl) {
   const context = await createIsolatedContext(activeBrowser, undefined, false);
   const page = await context.newPage();
   const pageErrors = trackPageErrors(page);
-
+  const defaults = { version: 2, scheme: "system", density: "comfortable", scale: 1, accent: "coral", font: "plex", motion: "system" };
+  const trigger = page.getByRole("button", { name: "Görünüm", exact: true });
+  const panel = page.getByRole("dialog", { name: "Görünüm", exact: true });
   try {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
-
     expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBeNull();
     await waitForBootstrap(page);
-    await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
-    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("group", { name: "Renk düzeni" }).getByRole("radio", { name: "Sistem", exact: true })).toBeFocused();
+    await expect(panel.getByRole("button", { name: "Kaydet", exact: true })).toHaveCount(0);
+    // Text labels and blank panel areas are inside the popover, not outside clicks.
+    await panel.getByText("Açık", { exact: true }).click();
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("radio", { name: "Açık", exact: true })).toBeChecked();
+    await panel.locator(".appearance-popover-header h2").click();
+    await expect(panel).toBeVisible();
+    const controls = panel.locator(".appearance-controls");
+    const controlsBox = await controls.boundingBox();
+    expect(controlsBox).not.toBeNull();
+    await controls.click({ position: { x: Math.floor(controlsBox.width - 4), y: 4 } });
+    await expect(panel).toBeVisible();
+    await panel.getByRole("group", { name: "Renk düzeni" }).getByRole("radio", { name: "Sistem", exact: true }).check();
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
-    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
-    await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
-    await expect(page.locator("html")).toHaveAttribute("data-font", "plex");
-    await expect(page.locator("html")).toHaveAttribute("data-motion", "system");
-    expect(await page.evaluate(() => ({
-      inline: document.documentElement.style.colorScheme,
-      computed: getComputedStyle(document.documentElement).colorScheme
-    }))).toEqual({ inline: "light dark", computed: "light dark" });
-
-    await expect(page.getByText("Büyük ve Sade Görünüm", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Kompakt ve Gelişmiş Görünüm", { exact: true })).toHaveCount(0);
-    await expect(page.getByLabel("Karanlık tema")).toHaveCount(0);
-    await expect(page.getByRole("radio", { name: "Sistem", exact: true }).first()).toBeChecked();
-    await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
-    await expect(page.getByRole("radio", { name: "Mercan", exact: true })).toBeChecked();
-    await expect(page.getByRole("radio", { name: "IBM Plex Sans", exact: true })).toBeChecked();
-    await expect(page.getByLabel("Arayüz ölçeği")).toBeVisible();
-
-    const actualTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
-    expect(Object.values(actualTokens).every((value) => value.trim().length > 0)).toBe(true);
-
-    const lightSystemTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
-    const saveAppearance = () => page.locator(".settings-category-actions").getByRole("button", { name: "Kaydet", exact: true }).click();
-    const applicationTab = () => page.getByRole("tab", { name: /^Uygulama/ });
-
-    // Staged appearance: selecting a value dirties the category, but neither
-    // the document nor localStorage changes until the category is saved.
-    await page.getByRole("radio", { name: "Koyu", exact: true }).check();
-    await expect(applicationTab()).toContainText("Değişiklik var");
+    await expect.poll(() => readStoredPreferences(page)).toEqual(defaults);
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
+    await expect.poll(() => readStoredPreferences(page)).toEqual({ ...defaults, scheme: "light" });
+    await page.keyboard.press("ArrowLeft");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
-    expect(await readStoredPreferences(page)).toEqual({
-      version: 2,
-      scheme: "system",
-      density: "comfortable",
-      scale: 1,
-      accent: "coral",
-      font: "plex",
-      motion: "system"
-    });
-    await saveAppearance();
-    await expect(applicationTab()).not.toContainText("Değişiklik var");
-    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
-    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
-    expect(await page.evaluate(() => ({
-      inline: document.documentElement.style.colorScheme,
-      computed: getComputedStyle(document.documentElement).colorScheme
-    }))).toEqual({ inline: "dark", computed: "dark" });
-    const darkThemeTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
-    expect(normalizeTokenMap(darkThemeTokens)).not.toEqual(normalizeTokenMap(lightSystemTokens));
-    expect(darkThemeTokens["--color-bg-surface"]).not.toBe(lightSystemTokens["--color-bg-surface"]);
-    expect(darkThemeTokens["--color-text"]).not.toBe(lightSystemTokens["--color-text"]);
-    await expect.poll(() => readStoredPreferences(page)).toEqual({
-      version: 2,
-      scheme: "dark",
-      density: "comfortable",
-      scale: 1,
-      accent: "coral",
-      font: "plex",
-      motion: "system"
-    });
+    const lightTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
+    expect(Object.values(lightTokens).every(value => value.trim().length > 0)).toBe(true);
 
-    await page.getByRole("radio", { name: "Açık", exact: true }).check();
-    await expect(applicationTab()).toContainText("Değişiklik var");
-    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
-    await saveAppearance();
-    await expect(applicationTab()).not.toContainText("Değişiklik var");
-    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
-    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
-
-    await page.getByRole("tab", { name: "İşletme", exact: true }).click();
-    await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
-    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
-    await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
-    expect(await page.locator(".settings-category-body").evaluate((surface) => surface.scrollWidth <= surface.clientWidth + 1)).toBe(true);
-
-    await expect.poll(() => readStoredPreferences(page)).toEqual({
-      version: 2,
-      scheme: "light",
-      density: "comfortable",
-      scale: 1,
-      accent: "coral",
-      font: "plex",
-      motion: "system"
+    // No web secret, setup save or network is available: preferences still persist.
+    await page.evaluate(() => {
+      window.yardimciDesktop.saveInitialSetup = () => { throw new Error("Appearance must not save setup"); };
+      window.yardimciDesktop.publishSnapshot = () => { throw new Error("Appearance must not publish"); };
     });
-    mkdirSync(screenshotDirectory, { recursive: true });
-    await page.screenshot({
-      path: join(screenshotDirectory, "desktop-appearance-fresh-preferences.png"),
-      fullPage: true
-    });
-
-    await page.getByRole("radio", { name: "Kompakt", exact: true }).check();
-    await expect(applicationTab()).toContainText("Değişiklik var");
-    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
-    await saveAppearance();
-    await expect(applicationTab()).not.toContainText("Değişiklik var");
-    await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
-    await expect(page.getByRole("radio", { name: "Kompakt", exact: true })).toBeChecked();
-    await expect(page.getByLabel("Arayüz ölçeği")).toBeVisible();
-    await expect(page.getByRole("radio", { name: "Koyu", exact: true })).not.toBeChecked();
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
-    await expect.poll(() => readStoredPreferences(page)).toEqual({
-      version: 2,
-      scheme: "light",
-      density: "compact",
-      scale: 1,
-      accent: "coral",
-      font: "plex",
-      motion: "system"
-    });
-
-    await page.getByRole("radio", { name: "Koyu", exact: true }).check();
-    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
-    await saveAppearance();
-    await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
-    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+    await context.setOffline(true);
+    const next = { ...defaults };
+    for (const [field, label, value] of [
+      ["scheme", "Koyu", "dark"], ["density", "Kompakt", "compact"],
+      ["accent", "Mavi", "blue"], ["font", "Sistem", "system"],
+      ["motion", "Azaltılmış", "reduced"]
+    ]) {
+      const group = field === "font" ? panel.getByRole("group", { name: "Yazı tipi" }) : panel;
+      await group.getByRole("radio", { name: label, exact: true }).check();
+      next[field] = value;
+      await expect(page.locator("html")).toHaveAttribute(`data-${field === "scheme" ? "color-scheme" : field}`, value);
+      await expect.poll(() => readStoredPreferences(page)).toEqual(next);
+    }
+    await panel.getByLabel("Arayüz ölçeği").selectOption("1.2");
+    next.scale = 1.2;
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1.2");
+    await expect.poll(() => readStoredPreferences(page)).toEqual(next);
+    const darkTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
+    expect(normalizeTokenMap(darkTokens)).not.toEqual(normalizeTokenMap(lightTokens));
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
-    await expect.poll(() => readStoredPreferences(page)).toEqual({
-      version: 2,
-      scheme: "dark",
-      density: "compact",
-      scale: 1,
-      accent: "coral",
-      font: "plex",
-      motion: "system"
-    });
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await context.setOffline(false);
 
-    await page.getByRole("radio", { name: "Mavi", exact: true }).check();
-    await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
-    await saveAppearance();
-    await expect(page.locator("html")).toHaveAttribute("data-accent", "blue");
-    const blueAccentTokens = await readRootTokens(page, ["--color-accent", "--color-focus"]);
-    expect(blueAccentTokens["--color-accent"]).not.toBe(darkThemeTokens["--color-accent"]);
-    await page.getByRole("radio", { name: "Mercan", exact: true }).check();
-    await saveAppearance();
-    await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
+    await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "Uygulama", exact: true })).toHaveCount(0);
+    await expect(page.locator("#settings-appearance")).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: /^Uygulama/ })).toHaveCount(0);
+    await trigger.click();
+    await panel.getByRole("radio", { name: "Yeşil", exact: true }).check();
+    next.accent = "green";
+    await expect.poll(() => readStoredPreferences(page)).toEqual(next);
+    await expect(page.getByRole("tab", { name: /^Uygulama/ })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expandSettingsStructure(page);
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitForBootstrap(page);
-    await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
-    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
-    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+    await trigger.click();
+    await expect(panel.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
+    await expect(panel.getByRole("radio", { name: "Kompakt", exact: true })).toBeChecked();
+    await expect(panel.getByLabel("Arayüz ölçeği")).toHaveValue("1.2");
+    await expect.poll(() => readStoredPreferences(page)).toEqual(next);
+    await page.setViewportSize({ width: 1366, height: 768 });
+    // Resizing while CSS zoom is active can require a layout frame before bounds settle.
+    await expect.poll(() => panel.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return box.left >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1;
+    })).toBe(true);
+    await panel.getByRole("button", { name: "Varsayılanlara dön", exact: true }).click();
+    await expect.poll(() => readStoredPreferences(page)).toEqual(defaults);
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
+    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+    await expect(page.locator("html")).toHaveAttribute("data-font", "plex");
+    await expect(page.locator("html")).toHaveAttribute("data-motion", "system");
     await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
-    await expect(page.getByRole("radio", { name: "Kompakt", exact: true })).toBeChecked();
-    await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1");
-    await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
-    expect(await readStoredPreferences(page)).toEqual({ version: 2, scheme: "dark", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" });
+    await expect(panel.getByLabel("Arayüz ölçeği")).toHaveValue("1");
+    await page.setViewportSize({ width: 1366, height: 768 });
+    expect(await panel.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return box.left >= 0 && box.right <= innerWidth && box.bottom <= innerHeight && el.scrollWidth <= el.clientWidth + 1;
+    })).toBe(true);
+    expect(await panel.locator(".appearance-option").evaluateAll(options => options.every(el => el.getBoundingClientRect().height >= 44))).toBe(true);
+    mkdirSync(screenshotDirectory, { recursive: true });
+    await page.screenshot({ path: join(screenshotDirectory, "desktop-appearance-fresh-preferences.png"), fullPage: true });
+    await panel.getByRole("button", { name: "Görünümü kapat" }).click();
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await page.locator(".page-header__title").click();
+    await expect(panel).toHaveCount(0);
+    await trigger.click();
+    await page.getByRole("button", { name: "Uygulama loglarını aç" }).focus();
+    await expect(panel).toHaveCount(0);
     expect(pageErrors).toEqual([]);
   } catch (error) {
     await reportScenarioFailure("fresh preferences", page, pageErrors);
@@ -278,14 +235,16 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();
     await expect(page.locator(".settings-workspace")).toBeVisible();
-    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Uygulama", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Görünüm", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
     await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
     await expect(page.getByLabel("Arayüz ölçeği")).toBeVisible();
 
-    await expect(page.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab")).toHaveCount(4);
-    await page.getByRole("tab", { name: "İşletme", exact: true }).click();
+    await expect(page.getByRole("tablist", { name: "Ayar kategorileri" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expandSettingsStructure(page);
     await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
     expect(await page.locator(".setup-capabilities").evaluate((surface) => surface.scrollWidth <= surface.clientWidth + 1)).toBe(true);
     expect(pageErrors).toEqual([]);
@@ -309,8 +268,9 @@ async function verifyLegacyPreferenceRecordIsDiscarded(activeBrowser, rendererUr
     expect(JSON.parse(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord))).toEqual(legacyPreferences);
     await waitForBootstrap(page);
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
-    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Uygulama", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Görünüm", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
     await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
@@ -346,8 +306,9 @@ async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
     expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBe(malformedPreferences);
     await waitForBootstrap(page);
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
-    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Uygulama", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Görünüm", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
     await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
@@ -396,7 +357,7 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
         appName: "Yardımcı Asistan",
         version: "appearance-smoke",
         platform: "linux",
-        syncSettings: { webModuleUrl: setupData.webModuleUrl, hasSyncSecret: true },
+        syncSettings: { webModuleUrl: setupData.webModuleUrl, hasSyncSecret: false },
         databasePath: dashboardData.databasePath,
         userDataPath: "/tmp/yardimci-asistan-appearance-smoke",
         backupPath: dashboardData.backupPath,
@@ -462,7 +423,7 @@ function createSetupFixture(setupRequired = true) {
     email: "smoke@example.test",
     address: "Smoke adresi",
     webModuleUrl: "https://example.test/yardimci-asistan",
-    syncSecret: "appearance-smoke-secret",
+    syncSecret: "",
     autoSyncEnabled: true,
     localNetworkEnabled: true,
     aiEnabled: false,

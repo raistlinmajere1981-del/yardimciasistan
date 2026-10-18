@@ -17,6 +17,7 @@ const expectedEmptyProfile = {
   mapDisplayMode: "manual",
   googleMapsEmbedUrl: "",
   description: "",
+  aboutText: "",
   latitude: null,
   longitude: null,
   directionsNote: "",
@@ -80,6 +81,7 @@ try {
 
   const saved = saveBusinessPublicProfile(database.databasePath, {
     description: "  Sahile yakın, sakin aile işletmesi.  ",
+    aboutText: "  1984 yılından beri sahildeyiz.  ",
     latitude: 36.8123,
     longitude: 28.6321,
     directionsNote: "  Merkezden sahil yolunu takip edin.  ",
@@ -100,6 +102,7 @@ try {
   assert.deepEqual(saved.profile.features, ["wifi", "parking"]);
   assert.deepEqual(saved.profile.languages, ["Türkçe", "English", "Deutsch"]);
   assert.equal(saved.profile.description, "Sahile yakın, sakin aile işletmesi.");
+  assert.equal(saved.profile.aboutText, "1984 yılından beri sahildeyiz.");
   assert.deepEqual(saved.profile.socialLinks, [
     { platform: "facebook", url: "https://facebook.com/profiltest" },
     { platform: "instagram", url: "https://instagram.com/profiltest" }
@@ -126,10 +129,11 @@ try {
   const raw = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
     const row = raw.prepare(`
-      SELECT business_id, features_json, languages_json, sync_status
+      SELECT business_id, about_text, features_json, languages_json, sync_status
       FROM business_public_profile
     `).get();
     assert.ok(row?.business_id);
+    assert.equal(row.about_text, "1984 yılından beri sahildeyiz.");
     assert.deepEqual(JSON.parse(String(row.features_json)), ["wifi", "parking"]);
     assert.deepEqual(JSON.parse(String(row.languages_json)), ["Türkçe", "English", "Deutsch"]);
     assert.equal(row.sync_status, "local_only");
@@ -176,6 +180,7 @@ try {
     for (const mode of ["manual", "google_maps_embed"]) {
       assert.equal(saveBusinessPublicProfile(database.databasePath, { ...beforeMapSwitch, mapDisplayMode: mode, googleMapsEmbedUrl: embedUrl }).ok, true);
       assert.equal((await publishBusinessAiContext(database, { baseUrl: "https://example.test/yardimci-asistan", syncSecret: "test" })).ok, true);
+      assert.equal(published.at(-1).aboutText, "1984 yılından beri sahildeyiz.");
       assert.equal(published.at(-1).mapDisplayMode, mode);
       assert.equal(published.at(-1).googleMapsEmbedUrl, mode === "google_maps_embed" ? embedUrl : "");
       assert.equal(published.at(-1).latitude, mode === "manual" ? beforeMapSwitch.latitude : null);

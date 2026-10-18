@@ -2,24 +2,20 @@ import { useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   getTableSmokingPolicyLabel,
-  type SaveTablePublicDetailsInput
 } from "@yardimci-asistan/shared";
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
-import { TablePublicDetailsEditor } from "../operations/TablePublicDetailsEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { ResourceManagementWorkspace } from "./ResourceManagementWorkspace";
 import { TableMediaPanel } from "./TableMediaPanel";
 
 type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
 
-export function LayoutSettingsSection({ controller }: { controller: BusinessLayoutController }) {
-  const [editingTableId, setEditingTableId] = useState("");
+export function LayoutSettingsSection({ controller, onEditTable }: { controller: BusinessLayoutController; onEditTable: (id: string) => void }) {
   const [mediaTableKey, setMediaTableKey] = useState("");
   const {
     draft,
     loading,
     saving,
-    updateTable,
     updatePublication,
     updateTableCategory,
     addTableCategory,
@@ -43,11 +39,9 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     const count = Number(category.tableCount);
     return total + (Number.isFinite(count) && count > 0 ? count : 0);
   }, 0);
-  const editingTable = draft.tables.find((table) => table.id === editingTableId) ?? null;
   const mediaTable = draft.tables.find((table) => table.key === mediaTableKey) ?? draft.tables[0] ?? null;
 
   return (
-    <>
       <ResourceManagementWorkspace
         id="settings-operations"
         className="table-resource-workspace"
@@ -162,7 +156,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
                         onClick={(event) => {
                           event.stopPropagation();
                           setMediaTableKey(table.key);
-                          setEditingTableId(table.id);
+                          onEditTable(table.key);
                         }}
                       >
                         <Pencil size={14} aria-hidden="true" />
@@ -176,23 +170,5 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
           </section>
         </fieldset>
       </ResourceManagementWorkspace>
-
-      <TablePublicDetailsEditor
-        open={Boolean(editingTable)}
-        table={editingTable}
-        onClose={() => setEditingTableId("")}
-        onSave={async (input: SaveTablePublicDetailsInput) => {
-          const table = draft.tables.find((candidate) => candidate.id === input.tableId);
-          if (!table) return { ok: false, message: "Masa bulunamadı." };
-          updateTable(table.key, {
-            capacity: input.capacity,
-            description: input.description,
-            features: input.features,
-            smokingPolicy: input.smokingPolicy
-          });
-          return { ok: true, message: "Masa detayları taslağa uygulandı." };
-        }}
-      />
-    </>
   );
 }

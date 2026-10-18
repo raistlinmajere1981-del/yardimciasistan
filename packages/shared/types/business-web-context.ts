@@ -1,3 +1,4 @@
+import type { PublicResourceMedia } from "./public-resource-media";
 import type { BusinessAiContext } from "./business-ai-context";
 import type { BusinessMapDisplayMode } from "./business-public-profile";
 
@@ -5,4 +6,5 @@ import type { BusinessMapDisplayMode } from "./business-public-profile";
 export interface BusinessWebContext extends BusinessAiContext {
   mapDisplayMode: BusinessMapDisplayMode;
   googleMapsEmbedUrl: string;
+  gallery: PublicResourceMedia[];
 }

@@ -1,3 +1,4 @@
+import { expandSettingsStructure, openSettingsService, cancelSettingsService } from "./test-helpers/settings-ui.mjs";
 import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 import { resolve } from "node:path";
@@ -19,7 +20,7 @@ try {
       `<html><body><div id="root"></div><script type="module" src="/@fs/${resolve(`scripts/fixtures/${fixture}.tsx`)}"></script></body></html>`) });
   });
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.abort());
-  const visit = query => page.goto(`${server.resolvedUrls.local[0]}profile-transition-test${query}`);
+  const visit = async query => { await page.goto(`${server.resolvedUrls.local[0]}profile-transition-test${query}`); if (!query.includes("runtime")) await expandSettingsStructure(page); };
   await visit("?profile=pension");
   const select = page.getByRole("combobox", { name: /Sektör tipi/ });
   const options = page.locator("#settings-options");
@@ -149,6 +150,7 @@ try {
   await save.click();
   expect(await page.evaluate(() => window.persistedSettings().profileOptions)).toEqual(["retail.suppliers"]);
   await page.evaluate(() => window.reopenSettings());
+  await expandSettingsStructure(page);
   await expect(purchasing).toBeChecked();
   await expect(purchasing).toBeDisabled();
   await suppliers.uncheck();
@@ -171,22 +173,25 @@ try {
   await expect(options.locator('input[value="marketing.studio"]')).toBeDisabled();
   await save.click();
   await page.evaluate(() => window.reopenSettings());
+  await expandSettingsStructure(page);
   await options.locator('input[value="messaging.campaigns"]').uncheck();
   await expect(options.locator('input[value="marketing.studio"]')).toBeChecked();
   await revert.click();
   await page.evaluate(() => window.refreshSettings({ profileOptions: [] }));
-  await page.getByRole("tab", { name: "Servisler", exact: true }).click();
+  await expandSettingsStructure(page);
   await expect(page.locator("#settings-marketing-sms")).toHaveCount(0);
   await expect(page.locator("#settings-marketing-instagram")).toHaveCount(0);
   await expect(page.locator("#settings-online-delivery")).toHaveCount(0);
-  await page.getByRole("tab", { name: "İşletme", exact: true }).click();
+  await expandSettingsStructure(page);
   await options.locator('input[value="messaging.campaigns"]').check();
   await options.locator('input[value="channel.online_sales"]').check();
   await save.click();
-  await page.getByRole("tab", { name: "Servisler", exact: true }).click();
+  await expandSettingsStructure(page);
   await expect(page.locator("#settings-marketing-sms")).toBeVisible();
   await expect(page.locator("#settings-marketing-instagram")).toBeVisible();
-  await expect(page.locator("#settings-online-delivery").getByRole("checkbox", { name: "Teslimat ve Gönderim servisi", exact: true })).not.toBeChecked();
+  await openSettingsService(page, "settings-online-delivery");
+  await expect(page.locator(".settings-service-overlay").getByRole("switch")).not.toBeChecked();
+  await cancelSettingsService(page);
   expect(await page.evaluate(() => window.persistedSettings().sms.enabled)).toBe(false);
   expect(await page.evaluate(() => window.persistedSettings().instagram.enabled)).toBe(false);
 

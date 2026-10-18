@@ -63,6 +63,27 @@ function site_qr_menu_available(): bool
     return ($menu['enabled'] ?? false) === true;
 }
 
+/** Only the published, sanitized business context controls these optional pages. */
+function site_published_business_content(): array {
+    $content = site_publication('business_context');
+    return is_array($content) && !empty($content['_publication']) ? $content : [];
+}
+function site_about_text(): string {
+    return trim((string) (site_published_business_content()['about_text'] ?? ''));
+}
+function site_gallery_images(): array {
+    $content = site_published_business_content();
+    $images = is_array($content['gallery'] ?? null) ? $content['gallery'] : [];
+    $valid = [];
+    foreach ($images as $image) {
+        if (!is_array($image)) continue;
+        $url = trim((string) ($image['url'] ?? ''));
+        if (!str_starts_with($url, '/yardimci-asistan/media/') && !preg_match('#^https://[^/]+/yardimci-asistan/media/#', $url)) continue;
+        $valid[] = ['url' => $url, 'title' => mb_substr(trim((string) ($image['title'] ?? '')), 0, 240), 'kind' => ($image['kind'] ?? '') === 'cover' ? 'cover' : 'photo'];
+    }
+    return array_slice($valid, 0, 80);
+}
+
 function render_site_hero(string $eyebrow, string $title, string $description = ''): void
 {
     ?>
@@ -84,6 +105,8 @@ function site_navigation(): array
         ['id'=>'store','label'=>'Mağaza','path'=>'/magaza/','availability'=>'store'],
         ['id'=>'announcements','label'=>'Kampanyalar','path'=>'/duyurular/','availability'=>'announcements'],
         ['id'=>'reviews','label'=>'Yorumlar','path'=>'/yorumlar/','availability'=>'reviews'],
+        ['id'=>'about','label'=>'Hakkımızda','path'=>'/hakkimizda/','availability'=>'about'],
+        ['id'=>'gallery','label'=>'Galeri','path'=>'/galeri/','availability'=>'gallery'],
         ['id'=>'contact','label'=>'İletişim','path'=>'/iletisim/','availability'=>'always'],
         ['id'=>'installation','label'=>'Kurulum','path'=>'/kurulum/','availability'=>'always'],
         ['id'=>'guide','label'=>'Kullanım Kılavuzu','path'=>'/kullanim-kilavuzu/','availability'=>'always'],
@@ -104,7 +127,7 @@ function site_availability(): array
     if (is_file($path)) {
         try { $settings = require $path; $reviews = ($settings['enabled'] ?? false) === true && !empty($settings['place_id']) && !empty($settings['api_key']); } catch (Throwable) {}
     }
-    return ['always'=>true, 'rooms'=>$has('room_catalog'),
+    return ['always'=>true, 'about'=>site_about_text() !== '', 'gallery'=>site_gallery_images() !== [], 'rooms'=>$has('room_catalog'),
         'restaurant'=>$has('table_catalog'), 'qr_menu'=>site_qr_menu_available(),
         'store'=>$has('online_catalog'), 'announcements'=>$announcements, 'reviews'=>$reviews];
 }

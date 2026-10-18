@@ -36,6 +36,10 @@ import type {
   AddTableMediaInput,
   DeleteRoomMediaInput,
   PublicResourceCoverPreview,
+  PublicResourceMediaAssetFields,
+  PublicResourceMediaMutationResult,
+  PublicResourceMediaDraftResult,
+  PublicResourceMediaDraftState,
   DeleteTableMediaInput,
   RoomMediaAsset,
   RoomMediaDraftResult,
@@ -246,6 +250,7 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
   getSyncStatus: () => Promise<AutomaticSyncStatus>;
   testWebConnection: (input: WebConnectionTestInput) => Promise<WebConnectionTestResult>;
+  connectWebPublicationSource: (input: WebConnectionTestInput) => Promise<{ok: boolean; message: string}>;
   runSyncNow: () => Promise<AutomaticSyncCycleResult>;
   setAutoSyncEnabled: (enabled: boolean) => Promise<AutomaticSyncStatus>;
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
@@ -259,6 +264,14 @@ export interface DesktopBridge extends MarketingShareBridge, MarketingAnalyticsB
   restartAfterProfileChange: () => Promise<boolean>;
   getBusinessLayout: () => Promise<BusinessLayoutSnapshot>;
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => Promise<BusinessLayoutSaveResult>;
+  listBusinessGallery: () => Promise<PublicResourceMediaAssetFields[]>;
+  getBusinessGalleryDraftState: () => Promise<PublicResourceMediaDraftState>;
+  commitBusinessGallery: () => Promise<PublicResourceMediaDraftResult>;
+  discardBusinessGallery: () => Promise<PublicResourceMediaDraftResult>;
+  addBusinessGalleryPhoto: () => Promise<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>;
+  updateBusinessGalleryPhoto: (input: { id: string; kind: "cover" | "photo"; title: string }) => Promise<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>;
+  deleteBusinessGalleryPhoto: (id: string) => Promise<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>;
+  moveBusinessGalleryPhoto: (input: { id: string; direction: "up" | "down" }) => Promise<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>;
   listRoomMedia: (roomId: string) => Promise<RoomMediaAsset[]>;
   listRoomMediaCoverPreviews: () => Promise<PublicResourceCoverPreview[]>;
   getRoomMediaDraftState: () => Promise<RoomMediaDraftState>;
@@ -508,6 +521,7 @@ const bridge: DesktopBridge = {
   },
   getSyncStatus: () => ipcRenderer.invoke("sync:getStatus"),
   testWebConnection: (input: WebConnectionTestInput) => ipcRenderer.invoke("sync:testConnection", input),
+  connectWebPublicationSource: (input: WebConnectionTestInput) => invokeWhenUnlocked<{ok: boolean; message: string}>("sync:connectSource", input),
   runSyncNow: () => ipcRenderer.invoke("sync:runNow"),
   setAutoSyncEnabled: (enabled: boolean) => ipcRenderer.invoke("sync:setAutoEnabled", enabled),
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => {
@@ -525,6 +539,14 @@ const bridge: DesktopBridge = {
   restartAfterProfileChange: () => invokeWhenUnlocked<boolean>("app:restartAfterProfileChange"),
   getBusinessLayout: () => invokeWhenUnlocked<BusinessLayoutSnapshot>("businessLayout:get"),
   saveBusinessLayout: (input: SaveBusinessLayoutInput) => invokeWhenUnlocked<BusinessLayoutSaveResult>("businessLayout:save", input),
+  listBusinessGallery: () => invokeWhenUnlocked<PublicResourceMediaAssetFields[]>("businessGallery:list"),
+  getBusinessGalleryDraftState: () => invokeWhenUnlocked<PublicResourceMediaDraftState>("businessGallery:draftState"),
+  commitBusinessGallery: () => invokeWhenUnlocked<PublicResourceMediaDraftResult>("businessGallery:commit"),
+  discardBusinessGallery: () => invokeWhenUnlocked<PublicResourceMediaDraftResult>("businessGallery:discard"),
+  addBusinessGalleryPhoto: () => invokeWhenUnlocked<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>("businessGallery:add"),
+  updateBusinessGalleryPhoto: input => invokeWhenUnlocked<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>("businessGallery:update", input),
+  deleteBusinessGalleryPhoto: id => invokeWhenUnlocked<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>("businessGallery:delete", id),
+  moveBusinessGalleryPhoto: input => invokeWhenUnlocked<PublicResourceMediaMutationResult<PublicResourceMediaAssetFields>>("businessGallery:move", input),
   listRoomMedia: (roomId: string) => invokeWhenUnlocked<RoomMediaAsset[]>("roomMedia:list", roomId),
   listRoomMediaCoverPreviews: () => invokeWhenUnlocked<PublicResourceCoverPreview[]>("roomMedia:coverPreviews"),
   getRoomMediaDraftState: () => invokeWhenUnlocked<RoomMediaDraftState>("roomMedia:draftState"),

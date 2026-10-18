@@ -3,7 +3,9 @@ import { compareVersions } from "@yardimci-asistan/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopUpdateStatus } from "../../../electron/desktop-update-service";
 import type { SettingsOperationResult } from "../../app/settings-save";
+import { IconButton } from "../ui/IconButton";
 import { ActionButton } from "../ui/ActionButton";
+import { reportAppStatus } from "../../app/runtime-state";
 
 type UpdateAction = "load" | "save" | "check" | "download" | "restart" | "reset" | null;
 
@@ -48,8 +50,8 @@ export function useUpdateSettings(enabled: boolean) {
         setLocalMessage("");
       })
       .catch(() => {
-        setError(true);
         if (!active) return;
+        setError(true);
         setLocalMessage("Güncelleme durumu okunamadı.");
       })
       .finally(() => {
@@ -235,139 +237,111 @@ export function useUpdateSettings(enabled: boolean) {
 }
 
 export function UpdateSettings({ controller }: { controller: ReturnType<typeof useUpdateSettings> }) {
-  const { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, resetToDefault, checkNow, downloadNow, restartAndInstall } = controller;
+  const {
+    status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error,
+    sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, resetToDefault,
+    checkNow, downloadNow, restartAndInstall, savePreferences, dirty
+  } = controller;
+
+  async function save() {
+    const result = await savePreferences();
+    reportAppStatus(
+      result.ok ? "success" : "error",
+      result.message || (result.ok ? "Güncelleme tercihleri kaydedildi." : "Güncelleme tercihleri kaydedilemedi.")
+    );
+  }
+
+  const summary = status?.phase === "up-to-date" && !status.lastCheckedAt
+    ? "Henüz kontrol edilmedi."
+    : status?.message || "Güncelleme durumu okunuyor...";
+  const newerVersion = Boolean(status?.latestVersion
+    && compareVersions(status.latestVersion, status.currentVersion) > 0);
+
   return (
-    <section ref={sectionRef} id="settings-updates" tabIndex={-1} className="settings-application-subsection settings-update-section settings-panel">
-      <div className="settings-panel-header">
-        <div>
-          <h3>Güncellemeler</h3>
-          <p>Güncelleme kaynağı ve otomatik kontrol tercihleri.</p>
-        </div>
-        {status && (
-          <span>
-            {status.currentVersion}
-             {status.latestVersion && compareVersions(status.latestVersion, status.currentVersion) > 0
-              ? ` → ${status.latestVersion}`
-              : ""}
-          </span>
+    <section ref={sectionRef} id="settings-updates" tabIndex={-1} className="settings-update-section">
+      <div className="settings-update-summary" role="status" aria-live="polite">
+        <span>{summary}</span>
+        {newerVersion && <strong>{status?.currentVersion} → {status?.latestVersion}</strong>}
+        {status?.lastCheckedAt && <small>Son kontrol: {formatDateTime(status.lastCheckedAt)}</small>}
+        {status?.lastResult && (
+          <small>Son kurulum: {status.lastResult.kind === "success" ? "başarılı" : "başarısız"} · {status.lastResult.version}</small>
         )}
       </div>
 
-      <div className="settings-panel-body">
-      <div className="form-grid">
-        <label className="form-field form-field--long">
+      <div className="settings-update-address-row">
+        <label className="form-field settings-update-url">
           Güncelleme sunucusu
           <input
             disabled={busy}
             ref={baseUrlInputRef}
             value={baseUrl}
-            onChange={(event) => {
-              setBaseUrl(event.target.value);
-            }}
+            onChange={event => setBaseUrl(event.target.value)}
             placeholder={status?.defaultBaseUrl || "https://.../updates/stable"}
             spellCheck={false}
             autoCapitalize="none"
             autoCorrect="off"
           />
         </label>
-
-        <div className="setup-field">
-          <span>Otomatik kontrol</span>
-          <label className="form-check setup-checkline">
-            <input
-              disabled={busy}
-              checked={autoCheckEnabled}
-              onChange={(event) => {
-                setAutoCheckEnabled(event.target.checked);
-              }}
-              type="checkbox"
-            />
-            Günde en fazla bir kez güncelleme kontrol et
-          </label>
-        </div>
+        <IconButton className="settings-update-url-reset" aria-label="Güncelleme adresini varsayılana döndür"
+          title="Güncelleme adresini varsayılana döndür"
+          onClick={resetToDefault} disabled={busy || !status || baseUrl === status.defaultBaseUrl}>
+          <RotateCcw size={18} aria-hidden="true" />
+        </IconButton>
       </div>
 
-      <div id="settings-update-actions" tabIndex={-1} className="form-actions">
-        <ActionButton
-          variant="ghost"
-          type="button"
-          onClick={resetToDefault}
-          disabled={busy || !status}
-        >
-          <RotateCcw size={16} aria-hidden="true" />
-          Varsayılana Dön
-        </ActionButton>
-        <ActionButton
-          variant="secondary"
-          type="button"
-          onClick={() => void checkNow()}
+      <label className="form-check setup-checkline settings-update-checkbox">
+        <input
           disabled={busy}
-        >
-          <RefreshCw size={16} aria-hidden="true" />
-          {status?.phase === "checking" || action === "check" ? "Kontrol Ediliyor" : "Güncellemeleri Kontrol Et"}
+          checked={autoCheckEnabled}
+          onChange={event => setAutoCheckEnabled(event.target.checked)}
+          type="checkbox"
+        />
+        Otomatik güncellemeleri kontrol et
+      </label>
+
+      <div id="settings-update-actions" tabIndex={-1} className="settings-update-actions" aria-label="Güncelleme işlemleri">
+        <ActionButton variant="secondary" aria-label="Güncellemeleri Kontrol Et"
+          onClick={() => void checkNow()} disabled={busy} busy={action === "check"}
+          busyLabel="Kontrol ediliyor…">
+          Güncellemeleri Kontrol Et
         </ActionButton>
         {updateAvailable && (
-          <ActionButton
-            variant="secondary"
-            type="button"
-            onClick={() => void downloadNow()}
-            disabled={busy || !status?.installSupported}
-          >
-            <Download size={16} aria-hidden="true" />
-            Güncellemeyi İndir
-          </ActionButton>
+          <IconButton aria-label="Güncellemeyi İndir" title="Güncellemeyi İndir"
+            onClick={() => void downloadNow()} disabled={busy || !status?.installSupported}>
+            <Download size={18} aria-hidden="true" />
+          </IconButton>
         )}
         {updateReady && (
-          <ActionButton
-            variant="primary"
-            type="button"
-            onClick={() => void restartAndInstall()}
-            disabled={busy}
-          >
-            <RefreshCw size={16} aria-hidden="true" />
-            Yeniden Başlat ve Güncelle
-          </ActionButton>
+          <IconButton variant="selected" aria-label="Yeniden Başlat ve Güncelle" title="Yeniden Başlat ve Güncelle"
+            onClick={() => void restartAndInstall()} disabled={busy}>
+            <RefreshCw size={18} aria-hidden="true" />
+          </IconButton>
         )}
+        <ActionButton className="settings-update-save" aria-label="Güncelleme Tercihlerini Kaydet"
+          onClick={() => void save()} disabled={busy || !dirty}
+          busy={action === "save"} busyLabel="Kaydediliyor…">
+          Kaydet
+        </ActionButton>
       </div>
 
       {status?.phase === "downloading" && status.totalBytes > 0 && (
-        <div className="setup-field">
-          <span>İndirme</span>
-          <progress max={100} value={status.progressPercent} />
-          <small>
-            %{status.progressPercent} · {formatBytes(status.downloadedBytes)} / {formatBytes(status.totalBytes)}
-          </small>
+        <div className="settings-update-progress">
+          <progress max={100} value={status.progressPercent} aria-label="Güncelleme indirme ilerlemesi" />
+          <small>%{status.progressPercent} · {formatBytes(status.downloadedBytes)} / {formatBytes(status.totalBytes)}</small>
         </div>
       )}
-
       {status?.notes?.length ? (
-        <div className="setup-field">
-          <span>Bu sürüm</span>
-          <ul>
-            {status.notes.map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}
-          </ul>
+        <div className="settings-update-notes">
+          <strong>Bu sürüm</strong>
+          <ul>{status.notes.map((note, index) => <li key={index + "-" + note}>{note}</li>)}</ul>
         </div>
       ) : null}
-
-      <div className="setup-field">
-        <span>Durum</span>
-        <small>
-          {status?.message || "Güncelleme durumu okunuyor..."}
-          {status?.lastCheckedAt ? ` · Son kontrol: ${formatDateTime(status.lastCheckedAt)}` : ""}
-        </small>
-        {status?.lastResult && (
-          <small>
-            Son kurulum: {status.lastResult.kind === "success" ? "başarılı" : "başarısız"} · {status.lastResult.version}
-          </small>
-        )}
-      </div>
-
-      {localMessage && (
-        <p className={`menu-status sync-${status?.phase === "error" ? "error" : "idle"}`} role={error || status?.phase === "error" ? "alert" : "status"} aria-live="polite">
+      {localMessage && localMessage !== status?.message && (
+        <p className={"menu-status sync-" + (error || status?.phase === "error" ? "error" : "idle")}
+          role={error || status?.phase === "error" ? "alert" : "status"} aria-live="polite">
           {localMessage}
         </p>
       )}
-      </div>
     </section>
   );
 }

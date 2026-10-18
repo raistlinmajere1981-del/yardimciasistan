@@ -1,11 +1,12 @@
 import { isArasShippingConfigurationReady, normalizeOnlineSalesDeliverySettings, validateBirthdaySettings } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "./setup-model";
 import type { StagedSettingsCategoryId } from "./settings-registry";
+import { serviceSettingsFields } from "./settings-service-fields";
 
-// Setup persistence now owns only Business and Services. Operations has its own BusinessLayout draft.
+// Setup persistence owns Business and Services. Resource overlays have their own BusinessLayout draft.
 export const settingsFieldOwners = {
   business: ["businessName", "profileId", "profileOptions", "phone", "whatsapp", "email", "address"],
-  services: ["sms", "instagram", "whatsappCloud", "dealerPortalEnabled", "arasShipping", "onlineSalesDelivery", "onlineSalesDeliveryEnabled", "webModuleUrl", "syncSecret", "autoSyncEnabled", "localNetworkEnabled", "aiEnabled", "aiProvider", "aiService", "aiProjectName", "aiGoogleCurl", "aiBaseUrl", "aiModel", "aiVisionModel", "aiImageModel", "aiSttModel", "aiModelOptions", "aiApiKey", "aiStoredApiKeyConfigured", "clearAiApiKey", "aiTimeoutSeconds", "aiServiceDrafts", "whatsappEnabled", "androidEnabled", "productDataEnabled", "productDataAutoSearch", "productDataIncludeImages", "birthdaySettings"]
+  services: Object.values(serviceSettingsFields).flat()
 } as const satisfies Record<StagedSettingsCategoryId, readonly (keyof SetupFormState)[]>;
 
 export const stagedSettingsCategories = ["business", "services"] as const;
@@ -35,21 +36,10 @@ export function copyCategory(
   };
 }
 
-export function mergeSettingsCategory(
-  canonical: SetupFormState,
-  draft: SetupFormState,
-  category: StagedSettingsCategoryId
-): SetupFormState {
-  return copyCategory(canonical, draft, category);
-}
-
 export function validateSettingsCategory(
   form: SetupFormState,
   category: StagedSettingsCategoryId
 ): string | null {
-  if (category === "business" && !form.businessName.trim()) {
-    return "Firma adı gerekli.";
-  }
   if (form.whatsappEnabled && !form.whatsapp.trim()) {
     return "WhatsApp servisi açıkken WhatsApp numarası gerekli.";
   }
@@ -59,12 +49,6 @@ export function validateSettingsCategory(
     catch (error) { return error instanceof Error ? error.message : "Online satış teslimat ayarları geçersiz."; }
     if (form.onlineSalesDeliveryEnabled && form.onlineSalesDelivery.shippingEnabled && !isArasShippingConfigurationReady(form.arasShipping)) {
       return "Kargo ile gönderim için bir kargo sağlayıcısının hesap ayarlarını tamamlayın ve bağlantıyı test edin.";
-    }
-    if (!/^https?:\/\//i.test(form.webModuleUrl.trim())) {
-      return "Web modül adresi http veya https ile başlamalı.";
-    }
-    if (form.syncSecret.trim().length < 12 || form.syncSecret.trim() === "change-this-secret") {
-      return "Web güvenlik anahtarı en az 12 karakter olmalı ve varsayılan değer olmamalı.";
     }
     const birthdayError = validateBirthdaySettings(form.birthdaySettings);
     if (birthdayError) return birthdayError;
@@ -101,4 +85,10 @@ export function validateSettingsCategory(
   }
 
   return null;
+}
+
+export type WebConnectionSettings = Pick<SetupFormState, "webModuleUrl" | "syncSecret" | "autoSyncEnabled">;
+
+export function copyWebConnection(target: SetupFormState, web: WebConnectionSettings): SetupFormState {
+  return { ...target, webModuleUrl: web.webModuleUrl, syncSecret: web.syncSecret, autoSyncEnabled: web.autoSyncEnabled };
 }

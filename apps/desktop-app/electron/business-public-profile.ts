@@ -15,6 +15,7 @@ const EMPTY_BUSINESS_PUBLIC_PROFILE: BusinessPublicProfile = {
   mapDisplayMode: "manual",
   googleMapsEmbedUrl: "",
   description: "",
+  aboutText: "",
   latitude: null,
   longitude: null,
   directionsNote: "",
@@ -37,6 +38,7 @@ interface BusinessPublicProfileRow {
   map_display_mode?: unknown;
   google_maps_embed_url?: unknown;
   description?: unknown;
+  about_text?: unknown;
   latitude?: unknown;
   longitude?: unknown;
   directions_note?: unknown;
@@ -57,7 +59,7 @@ export function getBusinessPublicProfile(databasePath: string): BusinessPublicPr
     if (!businessId) return { ...EMPTY_BUSINESS_PUBLIC_PROFILE };
 
     const row = db.prepare(`
-      SELECT map_display_mode, google_maps_embed_url, description, latitude, longitude, directions_note,
+      SELECT map_display_mode, google_maps_embed_url, description, about_text, latitude, longitude, directions_note,
              check_in_time, check_out_time, breakfast_start_time, breakfast_end_time,
              features_json, policy_note, payment_note, languages_json
       FROM business_public_profile
@@ -101,15 +103,16 @@ export function saveBusinessPublicProfile(
     try {
       db.prepare(`
         INSERT INTO business_public_profile (
-          business_id, map_display_mode, google_maps_embed_url, description, latitude, longitude, directions_note,
+          business_id, map_display_mode, google_maps_embed_url, description, about_text, latitude, longitude, directions_note,
           check_in_time, check_out_time, breakfast_start_time, breakfast_end_time,
           features_json, policy_note, payment_note, languages_json,
           created_at, updated_at, sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
         ON CONFLICT(business_id) DO UPDATE SET
           map_display_mode = excluded.map_display_mode,
           google_maps_embed_url = excluded.google_maps_embed_url,
           description = excluded.description,
+          about_text = excluded.about_text,
           latitude = excluded.latitude,
           longitude = excluded.longitude,
           directions_note = excluded.directions_note,
@@ -128,6 +131,7 @@ export function saveBusinessPublicProfile(
         profile.mapDisplayMode,
         profile.googleMapsEmbedUrl,
         profile.description,
+        profile.aboutText,
         profile.latitude,
         profile.longitude,
         profile.directionsNote,
@@ -208,6 +212,7 @@ function normalizeProfileInput(
       mapDisplayMode,
       googleMapsEmbedUrl,
       description: cleanText(input?.description, BUSINESS_PUBLIC_PROFILE_LIMITS.description),
+      aboutText: String(input?.aboutText ?? "").trim().slice(0, BUSINESS_PUBLIC_PROFILE_LIMITS.aboutText),
       latitude,
       longitude,
       directionsNote: cleanText(input?.directionsNote, BUSINESS_PUBLIC_PROFILE_LIMITS.directionsNote),
@@ -232,6 +237,7 @@ function mapProfileRow(row: BusinessPublicProfileRow): BusinessPublicProfile {
     mapDisplayMode: row.map_display_mode === "google_maps_embed" ? "google_maps_embed" : "manual",
     googleMapsEmbedUrl: normalizeGoogleMapsEmbedUrl(row.google_maps_embed_url),
     description: String(row.description ?? ""),
+    aboutText: String(row.about_text ?? ""),
     latitude: mapPoint ? latitude : null,
     longitude: mapPoint ? longitude : null,
     directionsNote: String(row.directions_note ?? ""),

@@ -32,7 +32,6 @@ import type {
   OperationController,
   SetupController
 } from "../../app/controller-types";
-import type { UiPreferences } from "../../ui-preferences";
 import { getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
 import { formatTaskDue } from "../operations/task-due-format";
 import { useCalendarPageController } from "../calendar/calendar-page-state";
@@ -78,8 +77,6 @@ interface DesktopWorkspaceRouterProps {
   financeController: FinanceController;
   operationController: OperationController;
   deviceController: DeviceController;
-  uiPreferences: UiPreferences;
-  setUiPreferences: Dispatch<SetStateAction<UiPreferences>>;
   surfaceData: DesktopDashboardData;
   onDashboardRefresh: () => Promise<unknown>;
 }
@@ -102,8 +99,6 @@ export function DesktopWorkspaceRouter({
   financeController,
   operationController,
   deviceController,
-  uiPreferences,
-  setUiPreferences,
   surfaceData,
   onDashboardRefresh
 }: DesktopWorkspaceRouterProps) {
@@ -539,8 +534,6 @@ export function DesktopWorkspaceRouter({
           onRevokeAndroidDevice={(device) => void handleRevokeAndroidDevice(device)}
           onSave={handleSaveSetup}
           onAppPasswordConfiguredChange={handleAppPasswordConfiguredChange}
-          uiPreferences={uiPreferences}
-          onUiPreferencesChange={setUiPreferences}
           onDashboardRefresh={onDashboardRefresh}
           registerPageLeaveGuard={registerPageLeaveGuard}
         />

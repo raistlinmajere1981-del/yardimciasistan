@@ -267,7 +267,7 @@ try {
   await expect(outOfServiceCard.locator('.resource-card__out-of-service')).toContainText('Hizmet dışı');
   await button('Pilot 102 odasını aç').click();
   const outOperations = workspace.locator('#room-operations');
-  await expect(outOperations).toContainText('Oda hizmet dışı. Ayarlar > İşletme Düzeni > Oda Yönetimi');
+  await expect(outOperations).toContainText('Oda hizmet dışı. Ayarlar > İşletme > Oda Yönetimi');
   await expect(workspace.getByLabel('Fiziksel oda durumu')).toHaveCount(0);
   await expect(outOperations.getByRole('button', { name: 'Hizmet dışı', exact: true })).toHaveCount(0);
   await button('Çalışma alanını kapat').click();

@@ -1,0 +1,116 @@
+.appearance-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.appearance-trigger,
+.appearance-close,
+.appearance-reset {
+  min-width: var(--control-height-lg);
+  min-height: var(--control-height-lg);
+}
+
+.appearance-trigger[aria-expanded="true"] {
+  color: var(--color-accent);
+  background: var(--color-selected-soft);
+}
+
+.appearance-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-dropdown);
+  width: min(360px, calc(100vw / var(--ui-scale) - var(--space-6)));
+  max-height: calc(100dvh / var(--ui-scale) - var(--header-height) - var(--space-8));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+  color: var(--color-text);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.appearance-popover-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.appearance-popover-header h2 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.appearance-popover-header p {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.appearance-reset {
+  margin-top: var(--space-3);
+}
+
+.appearance-popover select {
+  min-height: var(--control-height-lg);
+  width: 100%;
+}
+
+.appearance-option:hover {
+  background: var(--color-interactive-hover);
+}
+
+.appearance-option:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.appearance-field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.appearance-field legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.appearance-segment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.appearance-option {
+  display: inline-flex;
+  min-height: var(--control-height-lg);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-bg-panel);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.appearance-option.is-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.appearance-popover .appearance-controls {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr);
+  max-width: none;
+}

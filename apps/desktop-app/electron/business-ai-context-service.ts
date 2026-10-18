@@ -9,6 +9,9 @@ import {
   type PushBusinessContextResult
 } from "@yardimci-asistan/sync-core";
 import type { DesktopDatabase } from "./database";
+import { publishedGallery, pendingGallery } from "./business-gallery-service";
+import { publishPendingBusinessGallery } from "./business-gallery-publication";
+import { ensurePublicationSource } from "./publication-source-service";
 import { getBusinessPublicProfile } from "./business-public-profile";
 import type { AiSettingsSyncConfig } from "./ai-settings-publish-service";
 import { publishDesktopProjection } from "./desktop-publication-service";
@@ -32,6 +35,12 @@ export async function publishBusinessAiContext(
   syncConfig: AiSettingsSyncConfig,
   refresh = true
 ): Promise<PushBusinessContextResult | null> {
+  if (pendingGallery(database.userDataPath).length) {
+    const source = await ensurePublicationSource(database, syncConfig);
+    if (!source.ok) return { ok: false, message: source.message, error: "gallery_publication_source" };
+    const uploaded = await publishPendingBusinessGallery(database.userDataPath, syncConfig, source.clientId);
+    if (!uploaded.ok) return { ok: false, message: uploaded.message, error: "gallery_upload_failed" };
+  }
   const context = createCurrentBusinessWebContext(database);
   const result = await publishDesktopProjection(database, syncConfig, "business_context_publish", context,
     (identity, frozen) => pushBusinessContext({ ...syncConfig, ...identity, context: frozen }), { refresh });
@@ -59,6 +68,7 @@ export function createCurrentBusinessWebContext(database: DesktopDatabase): Busi
     latitude: profile.mapDisplayMode === "manual" ? context.latitude : null,
     longitude: profile.mapDisplayMode === "manual" ? context.longitude : null,
     mapDisplayMode: profile.mapDisplayMode,
+    gallery: publishedGallery(database.userDataPath),
     googleMapsEmbedUrl: profile.mapDisplayMode === "google_maps_embed" ? normalizeGoogleMapsEmbedUrl(profile.googleMapsEmbedUrl) : ""
   };
 }

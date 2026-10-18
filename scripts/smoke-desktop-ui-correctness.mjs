@@ -5,6 +5,7 @@ import { chromium, expect } from '@playwright/test';
 import { createServer } from 'vite';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { chooseSearchSelect } from './test-helpers/search-select.mjs';
+import { openSettingsService } from './test-helpers/settings-ui.mjs';
 
 // Vite treats port 0 as its default port; reserve a real ephemeral port for this fixture.
 const port = await new Promise((resolvePort, reject) => {
@@ -101,22 +102,19 @@ try {
     assert.deepEqual(await page.evaluate(() => window.uiFixture.calls), ['inspect'], 'existing event-driven session orchestration unchanged');
   });
 
-  await scenario('Settings stale category normalizes stored state', 'settings-platform', 'category=removed-category', async page => {
-    await expect(page.getByRole('tab', { name: /^İşletme( ·|$)/ })).toHaveAttribute('aria-selected', 'true');
+  await scenario('Settings ignores obsolete category state', 'settings-platform', 'category=removed-category', async page => {
+    await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' })).toHaveCount(0);
     await expect(page.getByLabel('Firma adı', { exact: true })).toBeVisible();
-    await page.evaluate(() => window.readStoredSettingsCategory());
-    await expect(page.getByLabel('Stored settings category')).toHaveText('business');
+    await expect(page.getByRole('button', { name: /^İşletme Yapısı ve Özellikler/ })).toHaveAttribute('aria-expanded', 'false');
   });
-  await scenario('Settings hidden category falls back on setup reset', 'settings-platform', 'category=application', async page => {
-    await expect(page.getByRole('tab', { name: /^Uygulama( ·|$)/ })).toHaveAttribute('aria-selected', 'true');
+  await scenario('Settings setup reset exposes sector', 'settings-platform', 'category=services', async page => {
     await page.evaluate(() => window.refreshSettings({ setupRequired: true }));
-    await expect(page.getByRole('tab', { name: /^İşletme( ·|$)/ })).toHaveAttribute('aria-selected', 'true');
-    await page.evaluate(() => window.readStoredSettingsCategory());
-    await expect(page.getByLabel('Stored settings category')).toHaveText('business');
+    await expect(page.getByRole('tablist', { name: 'Ayar kategorileri' })).toHaveCount(0);
+    await expect(page.getByLabel('Sektör tipi')).toBeVisible();
   });
 
   await scenario('Room keyboard selection excludes nested actions', 'settings-platform', '', async page => {
-    await page.getByRole('tab', { name: /^İşletme Düzeni( ·|$)/ }).click();
+    await page.locator('#settings-rooms-button').click();
     await page.getByRole('button', { name: 'Oda Ekle', exact: true }).click();
     const rows = page.locator('.room-management-row');
     await expect(rows).toHaveCount(2);
@@ -134,19 +132,23 @@ try {
       window.roomDetailsClicks = 0;
       window.roomNestedKeyPrevented = null;
       const row = document.querySelectorAll('.room-management-row')[1];
-      row.addEventListener('click', event => { if (event.target.closest('button')?.textContent.includes('Detaylar')) window.roomDetailsClicks++; });
+      row.querySelector('.room-management-details-button').addEventListener('click', () => { window.roomDetailsClicks++; });
       document.addEventListener('keydown', event => { if (event.key === 'Enter') window.roomNestedKeyPrevented = event.defaultPrevented; });
     });
     await rows.nth(1).getByRole('button', { name: 'Detaylar', exact: true }).focus(); await page.keyboard.press('Enter');
     await expect(page.getByRole('dialog')).toHaveCount(1);
-    await expect(rows.nth(1)).toHaveClass(/is-media-selected/);
+    const details = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle', exact: true });
+    await expect(details).toBeVisible();
+    await expect(rows).toHaveCount(0);
     assert.deepEqual(await page.evaluate(() => ({ clicks: window.roomDetailsClicks, prevented: window.roomNestedKeyPrevented })), { clicks: 1, prevented: false }, 'nested control has one native click and no parent key handling');
-    await page.getByRole('dialog').getByRole('button', { name: /kapat/i }).click();
+    await details.getByRole('button', { name: 'Vazgeç', exact: true }).click();
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(1).getByRole('checkbox')).toBeChecked();
     assert.equal(await page.evaluate(() => window.settingsCalls.filter(c => c.kind === 'layout').length), 0, 'keyboard selection never saves domain state');
   });
 
-  await scenario('Google Reviews reject inline + global feedback', 'settings-platform', '', async page => {
-    const card = page.locator('#settings-google-reviews');
+  await scenario('Google Reviews rejection retains draft and reports global feedback', 'settings-platform', '', async page => {
+    const card = await openSettingsService(page, 'settings-google-reviews');
     await card.getByLabel('Google Place ID').fill('fixture-place');
     await card.getByLabel('Places API anahtarı').fill('fixture-key');
     await page.evaluate(() => {
@@ -154,12 +156,16 @@ try {
       window.yardimciDesktop.testGoogleReviewsConnection = async () => { throw new Error('Fixture test rejection'); };
     });
     await card.getByRole('button', { name: 'Google Bağlantısını Dene' }).click();
-    await expect(card.getByRole('alert')).toBeVisible();
-    await expect(card).toHaveAttribute('aria-busy', 'false');
-    await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
-    await expect(card.getByRole('alert')).toContainText('kaydedilemedi');
+    await expect(card.getByLabel('Canlı kontrol durumu')).toHaveText('Hata');
+    await expect(page.locator('.global-message-bar')).toContainText('bağlantısı denenemedi');
+    await expect(card.getByRole('button', { name: 'Google Bağlantısını Dene' })).toBeEnabled();
+    await card.getByRole('button', { name: 'Kaydet', exact: true }).click();
     await expect(page.locator('.global-message-bar')).toContainText('kaydedilemedi');
-    await expect(card).toHaveAttribute('aria-busy', 'false');
+    await expect(card).toBeVisible();
+    await expect(card.getByLabel('Google Place ID')).toHaveValue('fixture-place');
+    await expect(card.getByLabel('Places API anahtarı')).toHaveValue('fixture-key');
+    await expect(card.getByLabel('Canlı kontrol durumu')).toHaveText('Hata');
+    await expect(card.getByRole('button', { name: 'Kaydet', exact: true })).toBeEnabled();
   });
 
   await scenario('Marketing disabled page contract', 'desktop-ui-correctness', 'mode=marketing', async page => {
@@ -233,7 +239,7 @@ try {
   });
 
   await scenario('Password submit busy and recovery semantics', 'settings-platform', '', async page => {
-    await page.getByRole('tab', { name: /^Uygulama( ·|$)/ }).click();
+    await page.getByRole('button', { name: 'Güvenlik', exact: true }).click();
     const card = page.locator('#settings-password');
     await card.getByLabel('Şifre belirleyin', { exact: true }).fill('fixture-password');
     await card.getByLabel('Yeni şifre tekrar', { exact: true }).fill('fixture-password');
@@ -253,7 +259,7 @@ try {
     await card.getByRole('button', { name: 'Şifremi Unuttum' }).click();
     await card.getByLabel('Mevcut şifre', { exact: true }).fill('fixture-password');
     await card.getByRole('button', { name: 'Şifreyi Kaldır', exact: true }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Şifreyi Kaldır', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Uygulama şifresini kaldır', exact: true }).getByRole('button', { name: 'Şifreyi Kaldır', exact: true }).click();
     await expect(card.getByRole('button', { name: 'Kaldırılıyor', exact: true })).toHaveAttribute('aria-busy', 'true');
     await page.evaluate(() => window.finishPassword());
     await expect(card).toContainText('İsteğe bağlı');

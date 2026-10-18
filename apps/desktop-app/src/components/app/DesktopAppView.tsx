@@ -107,6 +107,8 @@ export function DesktopAppView({
 
   return (
     <PageViewStateProvider key={`${desktopSyncController.businessCapabilities?.businessId ?? ""}:${surfaceData.databasePath}`}><DesktopAppFrame
+      uiPreferences={uiPreferences}
+      onUiPreferencesChange={setUiPreferences}
       activePage={activePage}
       pageTransitionPending={pageTransitionPending}
       requestPageChange={requestPageChange}
@@ -143,8 +145,6 @@ export function DesktopAppView({
         financeController={financeController}
         operationController={operationController}
         deviceController={deviceController}
-        uiPreferences={uiPreferences}
-        setUiPreferences={setUiPreferences}
         onDashboardRefresh={desktopSyncController.loadDashboardData}
       />
     </DesktopAppFrame></PageViewStateProvider>

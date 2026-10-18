@@ -86,9 +86,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
   const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
   const setupRequired =
     !setupCompleted ||
-    !businessName.trim() ||
-    syncSecret.length < 12 ||
-    syncSecret === "change-this-secret";
+    (Number(settings?.auto_sync_enabled ?? 1) === 1 && (syncSecret.length < 12 || syncSecret === "change-this-secret"));
 
   return {
     setupRequired,
@@ -265,8 +263,6 @@ export function saveSetupData(
     existingEncryptedValue: existingEncryptedAiApiKey
   });
 
-  if (!businessName) return { ok: false, message: "Firma adı gerekli." };
-
   if (input.birthdaySettings) {
     const birthdaySettingsError = validateBirthdaySettings(input.birthdaySettings);
     if (birthdaySettingsError) return { ok: false, message: birthdaySettingsError };
@@ -275,10 +271,10 @@ export function saveSetupData(
   if (input.servicePreferences.whatsapp && !input.whatsapp.trim()) {
     return { ok: false, message: "WhatsApp servisi açıkken WhatsApp numarası gerekli." };
   }
-  if (!webModuleUrl) {
+  if (input.autoSyncEnabled !== false && !webModuleUrl) {
     return { ok: false, message: "Web modül adresi http veya https ile başlamalı." };
   }
-  if (syncSecret.length < 12 || syncSecret === "change-this-secret") {
+  if (input.autoSyncEnabled !== false && (syncSecret.length < 12 || syncSecret === "change-this-secret")) {
     return { ok: false, message: "Web güvenlik anahtarı en az 12 karakter olmalı ve varsayılan değer olmamalı." };
   }
   if (!aiApiKeyResolution.ok) return aiApiKeyResolution;

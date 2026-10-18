@@ -173,7 +173,7 @@ export async function activatePublicationSource(options: SyncCoreConfig & { clie
  * activate a source or reset Web-owned history/acknowledgements.
  */
 export async function readRestoreSyncState(options: SyncCoreConfig) {
-  const result = await syncRequest<{ ok: true; message: string; source_epoch: number; requests_through: number; orders_through: number }>(options, { action: "restore_sync_state" });
+  const result = await syncRequest<{ ok: true; message: string; source_epoch: number; source_client_id?: string; requests_through: number; orders_through: number }>(options, { action: "restore_sync_state" });
   if (result.ok && ![result.source_epoch, result.requests_through, result.orders_through].every(value => Number.isSafeInteger(value) && value >= 0)) {
     return { ok: false as const, message: "Restore senkron sınırları doğrulanamadı.", error: "restore_state_invalid" };
   }
@@ -363,6 +363,11 @@ export async function pushBusinessContext(options: PushBusinessContextOptions): 
       latitude: options.context.latitude,
       longitude: options.context.longitude,
       description: options.context.description,
+      aboutText: options.context.aboutText ?? "",
+      gallery: (options.context.gallery ?? []).map(media => ({
+        id: media.id, kind: media.kind, url: media.url,
+        mime_type: media.mimeType, title: media.title, sort_order: media.sortOrder
+      })),
       directions_note: options.context.directionsNote,
       policy_note: options.context.policyNote,
       payment_note: options.context.paymentNote,

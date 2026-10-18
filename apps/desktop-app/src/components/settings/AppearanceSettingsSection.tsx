@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { SettingsOperationResult } from "../../app/settings-save";
+import { useEffect, useRef, useState } from "react";
+import { Palette, X } from "lucide-react";
+import { IconButton } from "../ui/IconButton";
+import { ActionButton } from "../ui/ActionButton";
 import {
+  DEFAULT_UI_PREFERENCES,
   UI_ACCENT_OPTIONS,
   UI_DENSITY_OPTIONS,
   UI_FONT_OPTIONS,
@@ -38,84 +41,82 @@ const APPEARANCE_MOTION_LABELS = {
   reduced: "Azaltılmış"
 } as const;
 
-export function useAppearanceSettings(
-  canonicalPreferences: UiPreferences,
-  onCommit: (preferences: UiPreferences) => void
-) {
-  const [preferences, setPreferencesState] = useState<UiPreferences>(
-    () => cloneUiPreferences(canonicalPreferences)
-  );
-  const draftRef = useRef(preferences);
-  const baselineRef = useRef(cloneUiPreferences(canonicalPreferences));
-  const canonicalRef = useRef(canonicalPreferences);
+export function AppearanceSettingsSection({ preferences: uiPreferences, onPreferencesChange }: {
+  preferences: UiPreferences;
+  onPreferencesChange: (preferences: UiPreferences) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (canonicalRef.current === canonicalPreferences) return;
-    canonicalRef.current = canonicalPreferences;
-    // Adopt the new commit point as baseline, but never overwrite an active
-    // dirty draft with an external refresh. Discard restores these values.
-    const next = cloneUiPreferences(canonicalPreferences);
-    const wasDirty = !sameUiPreferences(draftRef.current, baselineRef.current);
-    baselineRef.current = next;
-    if (!wasDirty) {
-      draftRef.current = cloneUiPreferences(next);
-      setPreferencesState(cloneUiPreferences(next));
+    if (!open) return;
+    panelRef.current?.querySelector<HTMLInputElement>('input:checked')?.focus();
+
+    // Clicking a label or a non-focusable area can briefly move focus outside
+    // the popover. That focus transition must not dismiss an inside click.
+    let internalPointerFocus = false;
+    let pointerFocusReset: number | undefined;
+    function handlePointerDown(event: PointerEvent) {
+      const inside = event.target instanceof Node && rootRef.current?.contains(event.target);
+      if (!inside) {
+        setOpen(false);
+        return;
+      }
+      internalPointerFocus = true;
+      window.clearTimeout(pointerFocusReset);
+      pointerFocusReset = window.setTimeout(() => { internalPointerFocus = false; }, 0);
     }
-  }, [canonicalPreferences]);
-
-  const onPreferencesChange = useCallback((next: UiPreferences) => {
-    const draft = cloneUiPreferences(next);
-    draftRef.current = draft;
-    setPreferencesState(draft);
-  }, []);
-
-  const dirty = !sameUiPreferences(preferences, baselineRef.current);
-
-  const save = useCallback((): SettingsOperationResult => {
-    if (sameUiPreferences(draftRef.current, baselineRef.current)) {
-      return { ok: true, changed: false };
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
     }
-
-    const next = cloneUiPreferences(draftRef.current);
-    onCommit(next);
-    canonicalRef.current = next;
-    baselineRef.current = next;
-    draftRef.current = next;
-    setPreferencesState(next);
-    return { ok: true, changed: true, message: "Görünüm tercihleri kaydedildi." };
-  }, [onCommit]);
-
-  const discard = useCallback(() => {
-    const next = cloneUiPreferences(baselineRef.current);
-    draftRef.current = next;
-    setPreferencesState(next);
-  }, []);
-
-  return {
-    preferences,
-    onPreferencesChange,
-    dirty,
-    save,
-    discard
-  };
-}
-
-type AppearanceSettingsController = ReturnType<typeof useAppearanceSettings>;
-
-export function AppearanceSettingsSection({ controller }: {
-  controller: AppearanceSettingsController;
-}) {
-  const { preferences: uiPreferences, onPreferencesChange } = controller;
+    function handleFocusIn(event: FocusEvent) {
+      if (internalPointerFocus) return;
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("focusin", handleFocusIn);
+    return () => {
+      window.clearTimeout(pointerFocusReset);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("focusin", handleFocusIn);
+    };
+  }, [open]);
 
   return (
-          <section id="settings-appearance" tabIndex={-1} className="settings-application-subsection settings-panel appearance-settings">
-            <div className="settings-panel-header">
-              <div>
-                <h3>Görünüm</h3>
-                <p>Seçimler Kaydet ile uygulanır ve bu cihazda saklanır.</p>
-              </div>
+    <div className="appearance-menu" ref={rootRef}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="icon-button icon-button--normal icon-button--md appearance-trigger"
+        aria-label="Görünüm"
+        title="Görünüm"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? "desktop-appearance" : undefined}
+        onClick={() => setOpen(current => !current)}
+      >
+        <Palette size={18} aria-hidden="true" />
+      </button>
+      {open && (
+        <section id="desktop-appearance" ref={panelRef} className="appearance-popover" role="dialog" aria-labelledby="desktop-appearance-title" aria-describedby="desktop-appearance-description">
+          <header className="appearance-popover-header">
+            <div>
+              <h2 id="desktop-appearance-title">Görünüm</h2>
+              <p id="desktop-appearance-description">Seçimler hemen uygulanır ve bu cihazda saklanır.</p>
             </div>
-          <div className="settings-panel-body">
+            <IconButton className="appearance-close" aria-label="Görünümü kapat" onClick={() => {
+              setOpen(false);
+              triggerRef.current?.focus();
+            }}><X size={18} aria-hidden="true" /></IconButton>
+          </header>
           <div className="form-grid appearance-controls">
             <fieldset className="appearance-field">
               <legend>Renk düzeni</legend>
@@ -214,22 +215,11 @@ export function AppearanceSettingsSection({ controller }: {
               </div>
             </fieldset>
           </div>
-          </div>
-          </section>
-
+          <ActionButton variant="ghost" className="appearance-reset" onClick={() => onPreferencesChange({ ...DEFAULT_UI_PREFERENCES })}>
+            Varsayılanlara dön
+          </ActionButton>
+        </section>
+      )}
+    </div>
   );
-}
-
-function cloneUiPreferences(preferences: UiPreferences): UiPreferences {
-  return { ...preferences };
-}
-
-function sameUiPreferences(left: UiPreferences, right: UiPreferences) {
-  return left.version === right.version
-    && left.scheme === right.scheme
-    && left.density === right.density
-    && left.scale === right.scale
-    && left.accent === right.accent
-    && left.font === right.font
-    && left.motion === right.motion;
 }

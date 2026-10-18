@@ -27,6 +27,7 @@ interface BusinessPublicProfileDraft {
   mapDisplayMode: BusinessMapDisplayMode;
   googleMapsEmbedUrl: string;
   description: string;
+  aboutText: string;
   latitude: string;
   longitude: string;
   directionsNote: string;
@@ -53,6 +54,7 @@ const EMPTY_DRAFT: BusinessPublicProfileDraft = {
   mapDisplayMode: "manual",
   googleMapsEmbedUrl: "",
   description: "",
+  aboutText: "",
   latitude: "",
   longitude: "",
   directionsNote: "",
@@ -274,6 +276,7 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
         mapDisplayMode: draft.mapDisplayMode,
         googleMapsEmbedUrl,
         description: draft.description,
+        aboutText: draft.aboutText,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
         directionsNote: draft.directionsNote,
@@ -368,20 +371,14 @@ export function BusinessPublicProfileSection({
   const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, feedback } = controller;
 
   return (
-    <section ref={sectionRef} id="settings-public-profile" tabIndex={-1} className="business-public-profile-section settings-business-subsection settings-panel" aria-busy={loading || saving}>
-      <div className="settings-panel-header">
-        <div>
-          <h2>Müşteriye Açık Bilgiler</h2>
-        </div>
-      </div>
-      <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving || disabled}>
+    <section ref={sectionRef} id="settings-public-details" tabIndex={-1} className="business-public-profile-section" aria-busy={loading || saving}>
+      <fieldset className="settings-resource-fields" disabled={loading || saving || disabled}>
       {feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}
       {loading ? (
         <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
       ) : (
         <div className="business-public-profile-body">
           <div className="business-public-profile-map-point">
-            <h3>Konum</h3>
             <SegmentedControl<BusinessMapDisplayMode> ariaLabel="Harita yöntemi" value={draft.mapDisplayMode}
               options={[{ id: "google_maps_embed", label: "Google Maps" }, { id: "manual", label: "Manuel harita" }]}
               onChange={(value) => update("mapDisplayMode", value)} />
@@ -469,6 +466,17 @@ export function BusinessPublicProfileSection({
               onChange={(event) => update("description", event.target.value)}
               placeholder="İşletmenizi müşteriye kısa ve net biçimde anlatın."
               rows={4}
+            />
+          </label>
+
+          <label className="form-field form-field--fluid form-field--span">
+            Hakkımızda
+            <textarea
+              value={draft.aboutText}
+              maxLength={BUSINESS_PUBLIC_PROFILE_LIMITS.aboutText}
+              onChange={(event) => update("aboutText", event.target.value)}
+              placeholder="İşletmenizin hikâyesini ve yaklaşımını anlatın."
+              rows={6}
             />
           </label>
 
@@ -589,10 +597,10 @@ export function BusinessSocialLinksSection({
   const canAdd = draft.socialLinks.length < BUSINESS_PUBLIC_PROFILE_LIMITS.socialLinks;
 
   return (
-    <section id="settings-social-links" tabIndex={-1} className="settings-panel business-social-links-section" aria-busy={loading || saving}>
-      <div className="settings-panel-header">
+    <section id="settings-social-links" tabIndex={-1} className="business-social-links-section form-stack" aria-busy={loading || saving}>
+      <div className="setup-section-title setup-section-title--subsection">
         <div>
-          <h2>Sosyal Medya</h2>
+          <h3>Sosyal Medya</h3>
           <p>Web sitesinin üst ve alt alanında gösterilecek profil bağlantıları.</p>
         </div>
         <ActionButton
@@ -607,7 +615,7 @@ export function BusinessSocialLinksSection({
         </ActionButton>
       </div>
 
-      <fieldset className="settings-resource-fields settings-panel-body" disabled={loading || saving || disabled}>
+      <fieldset className="settings-resource-fields" disabled={loading || saving || disabled}>
         {draft.socialLinks.length === 0 ? (
           <div className="business-social-links-empty">
             Henüz sosyal medya bağlantısı eklenmedi.
@@ -682,6 +690,7 @@ function toDraft(profile: BusinessPublicProfile): BusinessPublicProfileDraft {
     mapDisplayMode: profile.mapDisplayMode ?? "manual",
     googleMapsEmbedUrl: profile.googleMapsEmbedUrl ?? "",
     description: profile.description,
+    aboutText: profile.aboutText ?? "",
     latitude: profile.latitude === null ? "" : String(profile.latitude),
     longitude: profile.longitude === null ? "" : String(profile.longitude),
     directionsNote: profile.directionsNote,

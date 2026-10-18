@@ -94,6 +94,11 @@ export function savePublicationSourceEpoch(db: DatabaseSync, target: string, epo
   db.prepare('INSERT INTO sync_publication_sources(target, source_epoch) VALUES (?, ?) ON CONFLICT(target) DO UPDATE SET source_epoch = MAX(source_epoch, excluded.source_epoch)').run(target, epoch);
 }
 
+/** Explicit user connection can rebind after a clean hosting reset (epoch may decrease). */
+export function replacePublicationSourceEpoch(db: DatabaseSync, target: string, epoch: number) {
+  db.prepare('INSERT INTO sync_publication_sources(target, source_epoch) VALUES (?, ?) ON CONFLICT(target) DO UPDATE SET source_epoch = excluded.source_epoch').run(target, epoch);
+}
+
 export function ensurePublicationTarget(db: DatabaseSync, target: string) {
   db.exec('BEGIN IMMEDIATE');
   try {

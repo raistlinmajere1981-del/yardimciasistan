@@ -912,6 +912,7 @@ export class DesktopDatabase {
 
   getPublicationSourceEpoch(target: string) { return getStoredPublicationSourceEpoch(this.db, target); }
   savePublicationSourceEpoch(target: string, epoch: number) { saveStoredPublicationSourceEpoch(this.db, target, epoch); }
+  replacePublicationSourceEpoch(target: string, epoch: number) { replaceStoredPublicationSourceEpoch(this.db, target, epoch); }
   prepareSyncPublication<T>(jobType: DesktopSyncJobType, value: T, refresh = false, expectedRevision?: number) {
     return prepareStoredSyncPublication(this.db, jobType, value, refresh, expectedRevision);
   }
@@ -1376,6 +1377,7 @@ import {
   queueSyncJob as queueStoredSyncJob,
   getPublicationSourceEpoch as getStoredPublicationSourceEpoch,
   savePublicationSourceEpoch as saveStoredPublicationSourceEpoch,
+  replacePublicationSourceEpoch as replaceStoredPublicationSourceEpoch,
   prepareSyncPublication as prepareStoredSyncPublication,
   ensurePublicationTarget as ensureStoredPublicationTarget,
   completeSyncJob as completeStoredSyncJob,

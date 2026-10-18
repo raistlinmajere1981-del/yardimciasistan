@@ -83,10 +83,10 @@ try {
 
   await expect(page.getByRole("navigation", { name: "Test feature navigation" }).getByRole("button", { name: "Test Konaklama" })).toBeVisible();
 
-  await expect(page.getByLabel("Test web adresi", { exact: true })).toHaveValue("https://fixture.example.test");
-  await page.getByLabel("Test web adresi", { exact: true }).fill("https://changed.example.test");
-  await expect(page.getByLabel("Test web adresi sonucu")).toHaveText("https://changed.example.test");
-  expect(await page.evaluate(() => window.fixtureWebModuleUrl())).toBe("https://changed.example.test");
+  await expect(page.getByLabel("Test AI adresi", { exact: true })).toHaveValue("https://fixture.example.test");
+  await page.getByLabel("Test AI adresi", { exact: true }).fill("https://changed.example.test");
+  await expect(page.getByLabel("Test AI adresi sonucu")).toHaveText("https://changed.example.test");
+  expect(await page.evaluate(() => window.fixtureAiBaseUrl())).toBe("https://changed.example.test");
 
   const launcher = page.getByRole("button", { name: "Test oda çalışma alanını aç" });
   await launcher.click();

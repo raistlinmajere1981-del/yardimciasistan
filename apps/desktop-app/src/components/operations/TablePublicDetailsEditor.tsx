@@ -3,8 +3,6 @@ import { Save } from "lucide-react";
 import {
   TABLE_PUBLIC_DETAIL_LIMITS,
   TABLE_PUBLIC_FEATURE_CATALOG,
-  TABLE_SMOKING_POLICIES,
-  getTableSmokingPolicyLabel,
   normalizeTablePublicFeatures,
   normalizeTableSmokingPolicy,
   type SaveTablePublicDetailsInput,
@@ -30,6 +28,7 @@ interface TablePublicDetailsSaveResult {
 }
 
 interface TablePublicDetailsEditorProps {
+  dialogClassName?: string;
   open: boolean;
   table: TablePublicDetailsEditorTable | null;
   onClose: () => void;
@@ -58,7 +57,7 @@ function toggleFeature(features: TablePublicFeatureId[], featureId: TablePublicF
     : [...features, featureId];
 }
 
-export function TablePublicDetailsEditor({ open, table, onClose, onSave }: TablePublicDetailsEditorProps) {
+export function TablePublicDetailsEditor({ open, table, onClose, onSave, dialogClassName }: TablePublicDetailsEditorProps) {
   const [form, setForm] = useState<TablePublicDetailsFormState>(() => toForm(table));
   const [saving, setSaving] = useState(false);
   const seededTableIdRef = useRef("");
@@ -80,11 +79,12 @@ export function TablePublicDetailsEditor({ open, table, onClose, onSave }: Table
 
   return (
     <FormDialog
+      dialogClassName={dialogClassName ?? ""}
       title="Masa bilgilerini düzenle"
       onClose={() => {
         if (!saving) onClose();
       }}
-      closeBlocked={saving}
+      closeBlocked={saving || JSON.stringify(form) !== JSON.stringify(toForm(table))}
       dismissOnBackdrop
       onSubmit={(event) => void (async () => {
         event.preventDefault();
@@ -123,14 +123,8 @@ export function TablePublicDetailsEditor({ open, table, onClose, onSave }: Table
     >
       <div className="form-stack customer-create-form room-public-details-form">
         <section className="panel form-stack">
-          <div className="page-toolbar">
-            <div className="page-toolbar__copy">
-              <strong>{table.name}</strong>
-              <small>{table.area || "Bölüm belirtilmemiş"} · Ad ve bölüm masa kategorilerinden yönetilir.</small>
-            </div>
-          </div>
-
-          <div className="form-grid">
+          <p className="settings-table-detail-context">{table.name}{table.area ? " · " + table.area : ""}</p>
+          <div className="form-grid table-public-basic-grid">
             <label className="form-field form-field--xs">
               Kapasite
               <input
@@ -145,33 +139,19 @@ export function TablePublicDetailsEditor({ open, table, onClose, onSave }: Table
                 onChange={(event) => setForm((current) => ({ ...current, capacity: event.target.value }))}
               />
             </label>
-            <label className="form-field form-field--medium">
-              Sigara kullanımı
-              <select
-                value={form.smokingPolicy}
-                onChange={(event) => setForm((current) => ({
-                  ...current,
-                  smokingPolicy: normalizeTableSmokingPolicy(event.target.value)
-                }))}
-              >
-                {TABLE_SMOKING_POLICIES.map((policy) => (
-                  <option value={policy} key={policy}>
-                    {policy === "unspecified" ? "Belirtilmedi" : getTableSmokingPolicyLabel(policy)}
-                  </option>
-                ))}
-              </select>
+            <label className="form-field form-field--fluid table-public-description">
+              Açıklama
+              <textarea
+                maxLength={TABLE_PUBLIC_DETAIL_LIMITS.description}
+                value={form.description}
+                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                placeholder="Müşteriye gösterilebilecek kısa masa açıklaması."
+              />
             </label>
           </div>
         </section>
 
         <section className="panel form-stack">
-          <div className="page-toolbar">
-            <div className="page-toolbar__copy">
-              <strong>Müşteriye açık bilgiler</strong>
-              <small>Konum, manzara, erişilebilirlik ve kısa açıklama</small>
-            </div>
-          </div>
-
           <fieldset className="room-public-features">
             <legend>Masa özellikleri</legend>
             <div className="page-toolbar__start">
@@ -188,18 +168,19 @@ export function TablePublicDetailsEditor({ open, table, onClose, onSave }: Table
                   {feature.label}
                 </label>
               ))}
+              <label className="form-check">
+                <input
+                  type="checkbox"
+                  checked={form.smokingPolicy === "smoking_allowed" || form.smokingPolicy === "outdoor_only"}
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    smokingPolicy: event.target.checked ? "smoking_allowed" : "unspecified"
+                  }))}
+                />
+                Sigara içiliyor
+              </label>
             </div>
           </fieldset>
-
-          <label className="form-field form-field--fluid">
-            Açıklama
-            <textarea
-              maxLength={TABLE_PUBLIC_DETAIL_LIMITS.description}
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Müşteriye gösterilebilecek kısa masa açıklaması."
-            />
-          </label>
         </section>
       </div>
     </FormDialog>

@@ -107,7 +107,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     email: setupData.email || "",
     address: setupData.address || "",
     webModuleUrl: setupData.webModuleUrl || defaultSetupData.webModuleUrl,
-    syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : generateSyncSecret(),
+    syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : "",
     autoSyncEnabled: setupData.autoSyncEnabled,
     localNetworkEnabled: setupData.localNetworkEnabled !== false,
     aiEnabled: setupData.aiEnabled,
@@ -245,18 +245,7 @@ function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInit
   });
 }
 
-function generateSyncSecret() {
-  const bytes = new Uint8Array(12);
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let index = 0; index < bytes.length; index += 1) {
-      bytes[index] = Math.floor(Math.random() * 256);
-    }
-  }
 
-  return `ya-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-}
 
 export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInput {
   return {

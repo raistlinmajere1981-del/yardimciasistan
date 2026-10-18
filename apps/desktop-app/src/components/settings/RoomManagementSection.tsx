@@ -5,7 +5,6 @@ import {
   parseMoneyToMinor
 } from "@yardimci-asistan/shared";
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
-import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { RoomMediaPanel } from "./RoomMediaPanel";
 import { ResourceManagementWorkspace } from "./ResourceManagementWorkspace";
@@ -31,16 +30,11 @@ function roomPriceSummary(price: string, currency: string) {
   return minor === null ? "—" : formatMinorCurrency(minor, currency || "TRY");
 }
 
-export function RoomManagementSection({ controller }: { controller: BusinessLayoutController }) {
-  const [editingKey, setEditingKey] = useState("");
+export function RoomManagementSection({ controller, onEditRoom }: { controller: BusinessLayoutController; onEditRoom: (key: string) => void }) {
   const [mediaRoomKey, setMediaRoomKey] = useState("");
   const { draft, loading, saving, mediaRevision, updateRoom, addRoom, removeRoom, updatePublication, reportMediaDirty } = controller;
   const rooms = draft.rooms;
 
-  const editingRoom = useMemo(
-    () => rooms.find((room) => room.key === editingKey) ?? null,
-    [editingKey, rooms]
-  );
   const mediaRoom = useMemo(
     () => rooms.find((room) => room.key === mediaRoomKey) ?? rooms[0] ?? null,
     [mediaRoomKey, rooms]
@@ -58,7 +52,6 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
   }, [mediaRoomKey, rooms]);
 
   return (
-    <>
       <ResourceManagementWorkspace
         id="settings-rooms"
         className="room-resource-workspace"
@@ -147,7 +140,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
                           className="room-management-details-button"
                           onClick={() => {
                             setMediaRoomKey(room.key);
-                            setEditingKey(room.key);
+                            onEditRoom(room.key);
                           }}
                         >
                           <Pencil size={14} aria-hidden="true" />
@@ -174,39 +167,5 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
           </div>
         </fieldset>
       </ResourceManagementWorkspace>
-
-      <RoomPublicDetailsEditor
-        open={Boolean(editingRoom)}
-        room={editingRoom ? {
-          id: editingRoom.key,
-          name: editingRoom.name,
-          number: editingRoom.number,
-          capacity: editingRoom.capacity,
-          bedInfo: editingRoom.bedInfo,
-          floor: editingRoom.floor,
-          features: editingRoom.features,
-          description: editingRoom.description,
-          priceNote: editingRoom.priceNote,
-          price: editingRoom.price
-        } : null}
-        onClose={() => setEditingKey("")}
-        onSave={async (input) => {
-          const room = rooms.find((candidate) => candidate.key === input.roomId);
-          if (!room) return { ok: false, message: "Oda bulunamadı." };
-          updateRoom(room.key, {
-            name: input.name,
-            number: input.number,
-            capacity: input.capacity,
-            bedInfo: input.bedInfo,
-            floor: input.floor,
-            features: input.features,
-            description: input.description,
-            priceNote: input.priceNote,
-            price: input.price
-          });
-          return { ok: true, message: "Oda detayları taslağa uygulandı." };
-        }}
-      />
-    </>
   );
 }
